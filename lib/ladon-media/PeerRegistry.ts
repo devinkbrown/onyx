@@ -1,0 +1,282 @@
+'use client';
+
+import {
+  OpvoxDecoder, OpvisDecoder,
+  OpcodecWasm,
+  yuv420ToRgba,
+  OPVOX_FRAME_48K,
+  type OpvoxQuality,
+} from './OpcodecWasm';
+import type { LadonPeerState, MediaKind } from './types';
+
+// -------------------------------------------------------------------
+// Per-peer decoder state
+// -------------------------------------------------------------------
+
+export interface PeerMedia {
+  state:          LadonPeerState;
+  audDec:         OpvoxDecoder | null;
+  vidDec:         OpvisDecoder | null;
+  screenVidDec:   OpvisDecoder | null;
+  audCtx:         AudioContext | null;
+  vidCanvas:      HTMLCanvasElement | null;
+  screenCanvas:   HTMLCanvasElement | null;
+  screenStream:   MediaStream | null;
+  panner:         StereoPannerNode | null;
+  lastKeyW:       number;
+  lastKeyH:       number;
+  lastScreenKeyW: number;
+  lastScreenKeyH: number;
+}
+
+// -------------------------------------------------------------------
+// Registry — creates, tracks, and tears down per-peer state
+// -------------------------------------------------------------------
+
+export class PeerRegistry {
+  private peers = new Map<string, PeerMedia>();
+
+  /** Accumulated inter-arrival jitter (EMA) */
+  lastJitterMs = 0;
+  private lastDecodeAt = 0;
+
+  private wasm: OpcodecWasm | null = null;
+  private readonly sampleRate: number;
+  private readonly audioQuality: () => OpvoxQuality;
+  private readonly videoW: number;
+  private readonly videoH: number;
+  private readonly speakingRms: number;
+
+  readonly peerLevels    = new Map<string, number>();
+  readonly decodeErrors  = new Map<string, number>();
+
+  onPeerStateChanged?: (state: LadonPeerState) => void;
+  onPeerLeft?:         (nick: string) => void;
+  onPeerSpeaking?:     (nick: string, speaking: boolean) => void;
+
+  constructor(opts: {
+    sampleRate:   number;
+    audioQuality: () => OpvoxQuality;
+    videoW:       number;
+    videoH:       number;
+    speakingRms:  number;
+  }) {
+    this.sampleRate   = opts.sampleRate;
+    this.audioQuality = opts.audioQuality;
+    this.videoW       = opts.videoW;
+    this.videoH       = opts.videoH;
+    this.speakingRms  = opts.speakingRms;
+  }
+
+  setWasm(wasm: OpcodecWasm) { this.wasm = wasm; }
+
+  get(nick: string): PeerMedia | undefined {
+    return this.peers.get(nick.toLowerCase());
+  }
+
+  getOrCreate(nick: string, channel: string | null, kind: MediaKind): PeerMedia {
+    const key = nick.toLowerCase();
+    let pm = this.peers.get(key);
+    if (pm) return pm;
+    pm = {
+      state: { nick, channel, kind, speaking: false, muted: false, hasVideo: false, canvas: null },
+      audDec: null, vidDec: null, audCtx: null,
+      screenVidDec: null, vidCanvas: null, screenCanvas: null, screenStream: null,
+      panner: null, lastKeyW: 0, lastKeyH: 0, lastScreenKeyW: 0, lastScreenKeyH: 0,
+    };
+    this.peers.set(key, pm);
+    this.updateSpatialAudio();
+    this.onPeerStateChanged?.(pm.state);
+    return pm;
+  }
+
+  remove(nick: string) {
+    const key = nick.toLowerCase();
+    const pm  = this.peers.get(key);
+    if (!pm) return;
+    pm.audDec?.destroy();
+    pm.vidDec?.destroy();
+    pm.screenVidDec?.destroy();
+    pm.audCtx?.close().catch(() => {});
+    pm.panner?.disconnect();
+    pm.screenStream?.getTracks().forEach(t => t.stop());
+    this.peers.delete(key);
+    this.peerLevels.delete(key);
+    this.decodeErrors.delete(key);
+    this.updateSpatialAudio();
+    this.onPeerLeft?.(nick);
+  }
+
+  reset(nick: string) {
+    const pm = this.peers.get(nick.toLowerCase());
+    if (!pm) return;
+    pm.audDec?.destroy();       pm.audDec       = null;
+    pm.vidDec?.destroy();       pm.vidDec       = null;
+    pm.screenVidDec?.destroy(); pm.screenVidDec = null;
+    pm.audCtx?.close().catch(() => {}); pm.audCtx  = null;
+    pm.panner?.disconnect();    pm.panner       = null;
+    pm.screenStream?.getTracks().forEach(t => t.stop());
+    pm.screenStream = null;
+    pm.screenCanvas = null;
+    this.decodeErrors.set(nick.toLowerCase(), 0);
+  }
+
+  all(): IterableIterator<PeerMedia> {
+    return this.peers.values();
+  }
+
+  allNicks(): IterableIterator<string> {
+    return this.peers.keys();
+  }
+
+  clear() {
+    for (const nick of Array.from(this.peers.keys())) this.remove(nick);
+  }
+
+  getScreenStream(nick: string): MediaStream | null {
+    return this.peers.get(nick.toLowerCase())?.screenStream ?? null;
+  }
+
+  totalFramesDecoded(): number {
+    let n = 0;
+    for (const pm of this.peers.values()) n += pm.audDec?.framesDecoded ?? 0;
+    return n;
+  }
+
+  // ----------------------------------------------------------------
+  // Decode helpers
+  // ----------------------------------------------------------------
+
+  async decodeAudio(pm: PeerMedia, frame: Uint8Array): Promise<void> {
+    if (!this.wasm) return;
+    if (!pm.audDec) pm.audDec = this.wasm.audioDecoder(this.sampleRate, this.audioQuality());
+    if (!pm.audCtx) pm.audCtx = new AudioContext({ sampleRate: this.sampleRate });
+
+    const pcm = pm.audDec.decode(frame);
+    const ctx  = pm.audCtx;
+    const buf  = ctx.createBuffer(2, OPVOX_FRAME_48K, this.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const out = buf.getChannelData(ch);
+      for (let i = 0; i < OPVOX_FRAME_48K; i++) {
+        out[i] = pcm[i * 2 + ch] / 32768;
+      }
+    }
+
+    /* RMS energy for VAD level metering */
+    let sumSq = 0;
+    for (let i = 0; i < pcm.length; i++) { const s = pcm[i] / 32768; sumSq += s * s; }
+    const rms = Math.sqrt(sumSq / pcm.length);
+    this.peerLevels.set(pm.state.nick.toLowerCase(), Math.min(1, rms / 0.1));
+
+    /* Inter-arrival jitter (EMA) */
+    const now = Date.now();
+    if (this.lastDecodeAt > 0) {
+      const iat      = now - this.lastDecodeAt;
+      const expected = (OPVOX_FRAME_48K / this.sampleRate) * 1000;
+      const diff     = Math.abs(iat - expected);
+      this.lastJitterMs = this.lastJitterMs * 0.9 + diff * 0.1;
+    }
+    this.lastDecodeAt = now;
+
+    const prevSpeaking = pm.state.speaking;
+    pm.state.speaking  = rms > this.speakingRms;
+    if (pm.state.speaking !== prevSpeaking) {
+      this.onPeerSpeaking?.(pm.state.nick, pm.state.speaking);
+      this.onPeerStateChanged?.(pm.state);
+    }
+
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    if (!pm.panner) pm.panner = ctx.createStereoPanner();
+    src.connect(pm.panner);
+    pm.panner.connect(ctx.destination);
+    src.start(ctx.currentTime);
+  }
+
+  async decodeVideo(pm: PeerMedia, frame: Uint8Array, ftype: string): Promise<void> {
+    if (!this.wasm) return;
+    const isKey = ftype === 'KEYFRAME';
+    const W = this.videoW, H = this.videoH;
+    if (!pm.vidDec || (isKey && (pm.lastKeyW !== W || pm.lastKeyH !== H))) {
+      pm.vidDec?.destroy();
+      pm.vidDec = this.wasm.videoDecoder(W, H);
+      pm.lastKeyW = W; pm.lastKeyH = H;
+    }
+    const planes = pm.vidDec.decode(frame);
+    if (!planes) return;
+
+    if (!pm.vidCanvas) {
+      const c = document.createElement('canvas');
+      c.width = W; c.height = H;
+      pm.vidCanvas = c;
+      pm.state.canvas   = c;
+      pm.state.hasVideo = true;
+      this.onPeerStateChanged?.(pm.state);
+    }
+    const ctx2 = pm.vidCanvas.getContext('2d');
+    if (!ctx2) return;
+    const imageData = ctx2.createImageData(W, H);
+    yuv420ToRgba(planes.y, planes.u, planes.v, W, H, imageData.data);
+    ctx2.putImageData(imageData, 0, 0);
+  }
+
+  async decodeScreenVideo(pm: PeerMedia, frame: Uint8Array, ftype: string): Promise<void> {
+    if (!this.wasm) return;
+    const isKey = ftype === 'KEYFRAME';
+    const W = this.videoW, H = this.videoH;
+    if (!pm.screenVidDec || (isKey && (pm.lastScreenKeyW !== W || pm.lastScreenKeyH !== H))) {
+      pm.screenVidDec?.destroy();
+      pm.screenVidDec = this.wasm.videoDecoder(W, H);
+      pm.lastScreenKeyW = W; pm.lastScreenKeyH = H;
+    }
+    const planes = pm.screenVidDec.decode(frame);
+    if (!planes) return;
+
+    if (!pm.screenCanvas) {
+      const c = document.createElement('canvas');
+      c.width = W; c.height = H;
+      pm.screenCanvas = c;
+      pm.screenStream = (c as HTMLCanvasElement & { captureStream(fps?: number): MediaStream })
+        .captureStream(10);
+      pm.state.hasVideo = true;
+      this.onPeerStateChanged?.(pm.state);
+    }
+    const ctx2 = pm.screenCanvas.getContext('2d');
+    if (!ctx2) return;
+    const imageData = ctx2.createImageData(W, H);
+    yuv420ToRgba(planes.y, planes.u, planes.v, W, H, imageData.data);
+    ctx2.putImageData(imageData, 0, 0);
+  }
+
+  // ----------------------------------------------------------------
+  // Spatial audio (stereo panning spread across peers)
+  // ----------------------------------------------------------------
+
+  /**
+   * Apply a manual stereo pan (-1..+1) for a specific nick.
+   * Used by the SpatialPad UI for listener-centric panning.
+   * Falls back silently if no AudioContext exists yet for the peer.
+   */
+  setPanForNick(nick: string, pan: number): void {
+    const key = nick.toLowerCase();
+    for (const pm of this.peers.values()) {
+      if (pm.state.nick.toLowerCase() !== key) continue;
+      if (!pm.audCtx) return;
+      if (!pm.panner) pm.panner = pm.audCtx.createStereoPanner();
+      pm.panner.pan.value = Math.max(-1, Math.min(1, pan));
+      return;
+    }
+  }
+
+  private updateSpatialAudio() {
+    const list = Array.from(this.peers.values());
+    list.forEach((pm, idx) => {
+      if (!pm.audCtx) return;
+      const panValue = list.length <= 1
+        ? 0
+        : ((idx / Math.max(1, list.length - 1)) * 2 - 1) * 0.6;
+      if (!pm.panner) pm.panner = pm.audCtx.createStereoPanner();
+      pm.panner.pan.value = panValue;
+    });
+  }
+}
