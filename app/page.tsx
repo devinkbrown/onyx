@@ -621,7 +621,7 @@ export default function LandingPage() {
         .land-card:hover .land-card-glow { opacity: 1; }
         .land-card-glow-voice  { background: radial-gradient(circle at 25% 50%, var(--accent-subtle) 0%, transparent 65%); }
         .land-card-glow-session { background: radial-gradient(circle at 80% 20%, var(--gold-subtle) 0%, transparent 60%); }
-        .land-card-glow-veil   { background: radial-gradient(circle at 50% 100%, rgba(167,139,250,0.08) 0%, transparent 60%); }
+        .land-card-glow-veil   { background: radial-gradient(circle at 50% 100%, rgba(14,165,233,0.08) 0%, transparent 60%); }
         .land-card-glow-irc    { background: radial-gradient(circle at 30% 30%, var(--accent-subtle) 0%, transparent 70%); }
         .land-card-glow-wb     { background: radial-gradient(circle at 70% 70%, var(--gold-subtle) 0%, transparent 70%); }
         .land-card-glow-msg    { background: radial-gradient(circle at 50% 20%, var(--accent-subtle) 0%, transparent 70%); }
@@ -670,9 +670,9 @@ export default function LandingPage() {
           border: 1px solid rgba(103,232,249,0.25);
         }
         .land-eyebrow-veil {
-          color: #a78bfa;
-          background: rgba(167,139,250,0.1);
-          border: 1px solid rgba(167,139,250,0.25);
+          color: #0ea5e9;
+          background: rgba(14,165,233,0.1);
+          border: 1px solid rgba(14,165,233,0.25);
         }
         .land-eyebrow-dim {
           color: var(--text-muted);
@@ -688,7 +688,7 @@ export default function LandingPage() {
           background: currentColor; opacity: 0.8;
         }
         .land-eyebrow-pip-gold { background: var(--gold); }
-        .land-eyebrow-pip-veil { background: #a78bfa; }
+        .land-eyebrow-pip-veil { background: #0ea5e9; }
         .land-eyebrow-pip-dim  { background: var(--text-muted); }
 
         .land-card-h3 {
@@ -737,8 +737,8 @@ export default function LandingPage() {
           font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
           text-transform: uppercase;
           padding: 3px 8px; border-radius: 4px;
-          color: #a78bfa; background: rgba(167,139,250,0.1);
-          border: 1px solid rgba(167,139,250,0.25);
+          color: #0ea5e9; background: rgba(14,165,233,0.1);
+          border: 1px solid rgba(14,165,233,0.25);
         }
 
         /* VEIL diagram area */
@@ -1283,8 +1283,8 @@ function VeilKeyVis() {
     <svg width="220" height="170" viewBox="0 0 220 170" fill="none" role="img" aria-label="VEIL key exchange diagram">
       <defs>
         <radialGradient id="veil-glow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="#a78bfa" stopOpacity="0" />
+          <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.35" />
+          <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0" />
         </radialGradient>
         <radialGradient id="shared-glow" cx="50%" cy="50%" r="50%">
           <stop offset="0%" stopColor="#67e8f9" stopOpacity="0.4" />
@@ -1297,15 +1297,15 @@ function VeilKeyVis() {
       </defs>
 
       {/* Left node — client A */}
-      <circle cx="42" cy="85" r="30" fill="rgba(124,90,245,0.12)" stroke="rgba(124,90,245,0.45)" strokeWidth="1.5" />
+      <circle cx="42" cy="85" r="30" fill="rgba(14,165,233,0.12)" stroke="rgba(14,165,233,0.45)" strokeWidth="1.5" />
       <circle cx="42" cy="85" r="30" fill="url(#veil-glow)" filter="url(#veil-blur)" opacity="0.5" />
       {/* Key icon */}
       <g transform="translate(28, 71)">
-        <circle cx="9" cy="9" r="7" stroke="rgba(167,139,250,0.9)" strokeWidth="1.4" fill="none" />
-        <rect x="14" y="7" width="10" height="4" rx="1" stroke="rgba(167,139,250,0.9)" strokeWidth="1.2" fill="none" />
-        <rect x="21" y="11" width="3" height="3" rx="0.5" fill="rgba(167,139,250,0.9)" />
+        <circle cx="9" cy="9" r="7" stroke="rgba(14,165,233,0.9)" strokeWidth="1.4" fill="none" />
+        <rect x="14" y="7" width="10" height="4" rx="1" stroke="rgba(14,165,233,0.9)" strokeWidth="1.2" fill="none" />
+        <rect x="21" y="11" width="3" height="3" rx="0.5" fill="rgba(14,165,233,0.9)" />
       </g>
-      <text x="42" y="126" textAnchor="middle" fill="rgba(167,139,250,0.7)" fontSize="8.5" fontFamily="monospace" fontWeight="600">P-256</text>
+      <text x="42" y="126" textAnchor="middle" fill="rgba(14,165,233,0.7)" fontSize="8.5" fontFamily="monospace" fontWeight="600">P-256</text>
 
       {/* Right node — client B */}
       <circle cx="178" cy="85" r="30" fill="rgba(14,165,233,0.12)" stroke="rgba(14,165,233,0.45)" strokeWidth="1.5" />
@@ -1328,11 +1328,11 @@ function VeilKeyVis() {
       <text x="110" y="118" textAnchor="middle" fill="rgba(103,232,249,0.75)" fontSize="8.5" fontFamily="monospace" fontWeight="600">AES-GCM</text>
 
       {/* Exchange arc — top (A→B) */}
-      <path d="M70 72 Q110 42 150 72" stroke="rgba(167,139,250,0.5)" strokeWidth="1.5" fill="none" strokeDasharray="5 4">
+      <path d="M70 72 Q110 42 150 72" stroke="rgba(14,165,233,0.5)" strokeWidth="1.5" fill="none" strokeDasharray="5 4">
         <animate attributeName="stroke-dashoffset" values="0;-18" dur="1.5s" repeatCount="indefinite" />
       </path>
       {/* Arrow tip */}
-      <polygon points="148,70 155,73 147,76" fill="rgba(167,139,250,0.6)" />
+      <polygon points="148,70 155,73 147,76" fill="rgba(14,165,233,0.6)" />
 
       {/* Exchange arc — bottom (B→A) */}
       <path d="M150 98 Q110 128 70 98" stroke="rgba(14,165,233,0.5)" strokeWidth="1.5" fill="none" strokeDasharray="5 4">
