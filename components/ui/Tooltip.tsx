@@ -47,9 +47,7 @@ export default function Tooltip({ text, side = 'right', delay = 120, children }:
           font-weight: 500;
           padding: 5px 10px;
           border-radius: 6px;
-          max-width: 200px;
-          white-space: normal;
-          word-break: break-word;
+          white-space: nowrap;
           pointer-events: none;
           box-shadow: 0 4px 16px rgba(0,0,0,0.6);
           border: 1px solid var(--border-subtle);

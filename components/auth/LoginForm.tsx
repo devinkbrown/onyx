@@ -144,7 +144,6 @@ export default function LoginForm({ onSwitch }: Props) {
     setAutoMode(false);
     setNick('');
     setPassword('');
-    setServer(DEFAULT_SERVER);
     setRememberMe(false);
   };
 
@@ -611,119 +610,6 @@ export default function LoginForm({ onSwitch }: Props) {
           font-size: 13px;
           color: var(--text-secondary);
         }
-
-        /* ── Recent servers ── */
-        .recent-servers {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-        .recent-label {
-          font-size: 11px;
-          font-weight: 600;
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-          color: var(--text-muted);
-        }
-        .recent-list {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-        .recent-chip {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 8px 12px;
-          background: var(--bg-elevated);
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-md);
-          cursor: pointer;
-          transition: border-color var(--t-fast), background var(--t-fast);
-          text-align: left;
-          font-family: inherit;
-        }
-        .recent-chip:hover {
-          border-color: var(--border-normal);
-          background: rgba(14,165,233,0.06);
-        }
-        .recent-chip:disabled { opacity: 0.4; cursor: not-allowed; }
-        .recent-nick {
-          font-size: 14px;
-          font-weight: 500;
-          color: var(--text-primary);
-        }
-        .recent-url {
-          font-size: 12px;
-          color: var(--text-muted);
-        }
-
-        /* ── Server presets ── */
-        .preset-row {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-        .preset-label {
-          font-size: 13px;
-          color: var(--text-secondary);
-          white-space: nowrap;
-          flex-shrink: 0;
-          display: flex;
-          align-items: center;
-          gap: 5px;
-        }
-        .preset-chips {
-          display: flex;
-          gap: 6px;
-          flex-wrap: wrap;
-        }
-        .preset-chip {
-          padding: 5px 12px;
-          border-radius: 20px;
-          font-size: 13px;
-          font-weight: 500;
-          font-family: inherit;
-          cursor: pointer;
-          border: 1px solid var(--border-normal);
-          background: var(--bg-elevated);
-          color: var(--text-secondary);
-          transition: all var(--t-fast);
-        }
-        .preset-chip:hover {
-          border-color: var(--border-normal);
-          color: var(--text-primary);
-          background: rgba(14,165,233,0.06);
-        }
-        .preset-chip--active {
-          border-color: var(--accent);
-          background: rgba(14,165,233,0.1);
-          color: var(--accent);
-        }
-        .preset-chip:disabled { opacity: 0.4; cursor: not-allowed; }
-
-        /* ── Advanced toggle ── */
-        .advanced-toggle {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 13px;
-          color: var(--text-secondary);
-          background: none;
-          border: none;
-          cursor: pointer;
-          padding: 0;
-          transition: color var(--t-fast);
-          align-self: flex-start;
-          font-family: inherit;
-        }
-        .advanced-toggle:hover { color: var(--text-primary); }
-        .advanced-arrow {
-          display: inline-block;
-          transition: transform var(--t-fast);
-          font-size: 11px;
-        }
-        .advanced-arrow.open { transform: rotate(90deg); }
 
         /* ── Error banner ── */
         .auth-error {
