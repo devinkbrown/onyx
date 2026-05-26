@@ -149,14 +149,15 @@ export default function IgnoreListModal() {
         }
 
         .ign-modal {
-          width: 380px; max-width: 100%;
+          width: 400px; max-width: 100%;
           background: var(--bg-deep);
           border: 1px solid var(--border-normal);
           border-radius: var(--r-lg, 12px);
-          box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+          box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--border-subtle);
           display: flex; flex-direction: column;
           overflow: hidden;
           animation: ign-appear 150ms var(--ease-out) both;
+          max-height: 80vh;
         }
 
         @keyframes ign-appear {
@@ -245,36 +246,46 @@ export default function IgnoreListModal() {
 
         .ign-row {
           display: flex; align-items: center; justify-content: space-between;
-          padding: 8px 10px;
+          padding: 7px 10px;
           border-radius: var(--r-sm);
-          transition: background var(--t-fast);
+          border: 1px solid transparent;
+          transition: background var(--t-fast), border-color var(--t-fast);
         }
-        .ign-row:hover { background: var(--ch-hover-bg); }
+        .ign-row:hover {
+          background: var(--accent-subtle, rgba(14,165,233,0.05));
+          border-color: var(--border-subtle);
+        }
 
         .ign-nick {
-          font-size: 14px; color: var(--text-primary);
-          font-weight: 500;
+          font-size: 13.5px; color: var(--text-primary);
+          font-weight: 600;
+          font-family: var(--font-mono, monospace);
           overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
 
         .ign-remove-btn {
           flex-shrink: 0;
-          font-size: 12px; font-weight: 600;
-          padding: 4px 10px; border-radius: var(--r-xs);
-          border: 1px solid var(--border-normal);
-          background: none; color: var(--text-muted);
+          font-size: 11.5px; font-weight: 600;
+          padding: 3px 9px; border-radius: var(--r-xs);
+          border: 1px solid rgba(248,113,113,0.25);
+          background: rgba(248,113,113,0.08);
+          color: var(--danger, #f87171);
           cursor: pointer;
-          transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+          transition: background var(--t-fast), border-color var(--t-fast);
         }
         .ign-remove-btn:hover {
-          background: rgba(239,68,68,0.12);
-          border-color: rgba(239,68,68,0.4);
-          color: #ef4444;
+          background: rgba(248,113,113,0.18);
+          border-color: rgba(248,113,113,0.5);
         }
 
+        .ign-remove-btn--show {
+          border-color: var(--border-normal);
+          background: none;
+          color: var(--text-muted);
+        }
         .ign-remove-btn--show:hover {
-          background: rgba(124,90,245,0.12);
-          border-color: rgba(124,90,245,0.4);
+          background: var(--accent-subtle, rgba(14,165,233,0.1));
+          border-color: var(--accent-border, rgba(14,165,233,0.3));
           color: var(--accent);
         }
 
@@ -283,14 +294,14 @@ export default function IgnoreListModal() {
           font-weight: 700;
           color: var(--text-muted);
           text-transform: uppercase;
-          letter-spacing: 0.06em;
-          padding: 8px 16px 2px;
+          letter-spacing: 0.08em;
+          padding: 10px 16px 4px;
         }
 
         .ign-section-sep {
           height: 1px;
           background: var(--border-subtle);
-          margin: 8px 12px 4px;
+          margin: 6px 12px 2px;
         }
       `}</style>
     </div>

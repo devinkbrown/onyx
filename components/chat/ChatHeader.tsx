@@ -583,6 +583,24 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
 
         {isChannel && (
           <>
+            {/* ── Member count chip — click to open member list ─────────── */}
+            <Tooltip text={showMemberList ? 'Close member list' : 'Open member list'} side="bottom">
+              <button
+                className={`ch-head-member-chip${showMemberList ? ' ch-head-member-chip--active' : ''}`}
+                aria-label={`${memberCount} members — click to ${showMemberList ? 'close' : 'open'} member list`}
+                aria-pressed={showMemberList}
+                onClick={toggleMemberList}
+              >
+                <MembersIcon />
+                <span>{memberCount}</span>
+              </button>
+            </Tooltip>
+
+            {/* ── Notification level bell ───────────────────────────────── */}
+            {activeView.kind === 'channel' && (
+              <NotifyLevelButton channel={activeView.channel} />
+            )}
+
             <Tooltip text="Load History" side="bottom">
               <button className="ch-head-btn" onClick={loadHistory} aria-label="Load history">
                 <HistoryIcon />
@@ -964,10 +982,11 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           align-items: center;
           justify-content: space-between;
           padding: 0 16px;
-          border-bottom: 1px solid var(--border-subtle);
+          border-bottom: 1px solid var(--border-normal);
           background: var(--bg-base);
           flex-shrink: 0;
           gap: 12px;
+          box-shadow: 0 1px 0 rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.18);
         }
 
         .ch-head-left {
@@ -980,29 +999,34 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
         }
 
         .ch-head-sigil {
-          font-size: 19px;
-          font-weight: 600;
+          font-size: 18px;
+          font-weight: 700;
           color: var(--text-muted);
           flex-shrink: 0;
           line-height: 1;
+          opacity: 0.65;
+          letter-spacing: -0.01em;
         }
 
         .ch-head-title {
-          font-size: 16px;
-          font-weight: 700;
+          font-size: 15px;
+          font-weight: 600;
           color: var(--text-primary);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
           flex-shrink: 0;
           max-width: 200px;
+          letter-spacing: -0.01em;
         }
 
         .ch-head-divider {
           width: 1px;
-          height: 20px;
+          height: 16px;
           background: var(--border-normal);
           flex-shrink: 0;
+          opacity: 0.7;
+          margin: 0 2px;
         }
 
         /* ── DM identity block ── */
@@ -1059,22 +1083,25 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
 
         .ch-head-topic {
           font-size: 13px;
-          color: var(--text-secondary);
+          color: var(--text-muted);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
           min-width: 0;
-          padding: 2px 4px;
+          padding: 1px 4px;
           border-radius: var(--r-xs);
-          transition: background var(--t-fast);
+          transition: background var(--t-fast), color var(--t-fast);
           margin: 0;
+          line-height: 1.4;
         }
         .ch-head-topic-area--editable:hover .ch-head-topic {
           background: var(--ch-hover-bg);
+          color: var(--text-secondary);
         }
         .ch-head-topic--empty {
           color: var(--text-muted);
           font-style: italic;
+          opacity: 0.6;
         }
         .ch-head-topic-ellipsis {
           margin-left: 1px;
@@ -1243,17 +1270,69 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
         }
 
         .ch-head-btn {
-          width: 32px; height: 32px;
+          width: 28px; height: 28px;
           border-radius: var(--r-sm);
           background: none; border: none; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
-          color: var(--text-secondary);
-          transition: background var(--t-fast), color var(--t-fast);
+          color: var(--text-muted);
+          transition: background var(--t-fast), color var(--t-fast), transform 120ms cubic-bezier(0.34,1.56,0.64,1);
+          flex-shrink: 0;
+          position: relative;
         }
-        .ch-head-btn:hover { background: var(--ch-hover-bg); color: var(--text-primary); }
+        .ch-head-btn:hover {
+          background: var(--bg-float);
+          color: var(--text-primary);
+          transform: scale(1.08);
+        }
+        .ch-head-btn:active { transform: scale(0.92); }
         .ch-head-btn--active { color: var(--accent); }
-        .ch-head-btn--active:hover { color: var(--accent); }
+        .ch-head-btn--active:hover { color: var(--accent); background: var(--accent-subtle); }
         .ch-head-btn--danger:hover { background: var(--danger-subtle); color: var(--danger); }
+
+        @media (prefers-reduced-motion: reduce) {
+          .ch-head-btn { transition: background var(--t-fast), color var(--t-fast); }
+          .ch-head-btn:hover, .ch-head-btn:active { transform: none; }
+        }
+
+        @media (max-width: 768px) {
+          .ch-head-btn { width: 32px; height: 32px; }
+          .ch-head { padding: 0 10px; gap: 8px; }
+          .ch-head-title { font-size: 14px; max-width: 140px; }
+          .ch-mode-badges { display: none; }
+          .ch-head-heatmap { display: none; }
+          .ch-head-members-count { display: none; }
+          .ch-head-sep { display: none; }
+        }
+
+        /* Member count chip */
+        .ch-head-member-chip {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          padding: 3px 9px 3px 7px;
+          height: 28px;
+          border-radius: var(--r-sm);
+          background: none;
+          border: none;
+          cursor: pointer;
+          color: var(--text-muted);
+          font-size: 12px;
+          font-weight: 600;
+          font-family: inherit;
+          transition: background var(--t-fast), color var(--t-fast);
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+        .ch-head-member-chip:hover { background: var(--bg-float); color: var(--text-primary); }
+        .ch-head-member-chip--active { color: var(--accent); }
+        .ch-head-member-chip--active:hover { background: var(--accent-subtle); color: var(--accent); }
+        .ch-head-member-chip svg { flex-shrink: 0; }
+
+        /* Notification level bell */
+        .ch-head-btn--notify-all     { color: var(--text-muted); }
+        .ch-head-btn--notify-mentions { color: var(--gold, #e8b84b); }
+        .ch-head-btn--notify-none    { color: var(--text-muted); opacity: 0.5; }
+        .ch-head-btn--notify-none:hover { opacity: 1; }
 
         .ch-head-sep {
           width: 1px; height: 20px;
@@ -1273,8 +1352,14 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
 
         .ch-head-members-count {
           display: flex; align-items: center; gap: 4px;
-          font-size: 13px; color: var(--text-secondary);
-          padding: 0 4px;
+          font-size: 11px; font-weight: 600;
+          color: var(--text-muted);
+          padding: 2px 8px;
+          background: var(--bg-elevated);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-full);
+          letter-spacing: 0.02em;
+          flex-shrink: 0;
         }
 
         .ch-head-btn--pin {
@@ -1287,15 +1372,16 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           color: var(--gold);
         }
         .ch-head-pin-badge {
-          position: absolute; top: 2px; right: 2px;
-          font-size: 9px; font-weight: 700;
-          min-width: 14px; height: 14px;
+          position: absolute; top: 1px; right: 1px;
+          font-size: 8px; font-weight: 800;
+          min-width: 13px; height: 13px;
           background: var(--gold);
           color: #000;
           border-radius: var(--r-full);
           display: flex; align-items: center; justify-content: center;
           line-height: 1;
           pointer-events: none;
+          letter-spacing: 0;
         }
 
         .ch-head-btn--bookmark { position: relative; }
@@ -1339,7 +1425,7 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
         }
         .ch-mode-badge--ladon {
           color: var(--accent);
-          border-color: var(--accent-border, rgba(124,90,245,0.3));
+          border-color: var(--accent-border, rgba(14,165,233,0.3));
           background: rgba(124,90,245,0.08);
         }
 
@@ -1630,3 +1716,79 @@ const StopStreamIcon = () => (
     <rect x="4" y="4" width="16" height="16" rx="2"/>
   </svg>
 );
+
+const MembersIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+    <circle cx="9" cy="7" r="4"/>
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+  </svg>
+);
+
+// ── NotifyLevelButton ──────────────────────────────────────────────────────────
+
+function NotifyLevelButton({ channel }: { channel: string }) {
+  const channelNotify    = useOnyxStore(s => s.channelNotify);
+  const setChannelNotify = useOnyxStore(s => s.setChannelNotify);
+
+  const level = channelNotify.get(channel.toLowerCase()) ?? 'all';
+
+  const LEVELS: Array<'all' | 'mentions' | 'none'> = ['all', 'mentions', 'none'];
+  const LEVEL_META: Record<'all' | 'mentions' | 'none', { label: string; tooltip: string; icon: React.ReactNode }> = {
+    all:      { label: 'All Messages',  tooltip: 'Notify: All messages',   icon: <BellAllIcon /> },
+    mentions: { label: 'Mentions Only', tooltip: 'Notify: Mentions only',  icon: <BellMentionIcon /> },
+    none:     { label: 'Muted',         tooltip: 'Notify: Muted',          icon: <BellMuteIcon /> },
+  };
+
+  const handleCycle = () => {
+    const idx = LEVELS.indexOf(level);
+    const next = LEVELS[(idx + 1) % LEVELS.length];
+    setChannelNotify(channel, next);
+  };
+
+  const meta = LEVEL_META[level];
+
+  return (
+    <Tooltip text={meta.tooltip} side="bottom">
+      <button
+        className={`ch-head-btn ch-head-btn--notify ch-head-btn--notify-${level}`}
+        aria-label={`Notification level: ${meta.label} — click to change`}
+        onClick={handleCycle}
+        type="button"
+      >
+        {meta.icon}
+      </button>
+    </Tooltip>
+  );
+}
+
+function BellAllIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+      <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+    </svg>
+  );
+}
+
+function BellMentionIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+      <path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" d="M13.73 21a2 2 0 0 1-3.46 0"/>
+    </svg>
+  );
+}
+
+function BellMuteIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+      <path d="M18.63 13A17.888 17.888 0 0 1 18 8"/>
+      <path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"/>
+      <path d="M18 8a6 6 0 0 0-9.33-5"/>
+      <line x1="1" y1="1" x2="23" y2="23"/>
+    </svg>
+  );
+}

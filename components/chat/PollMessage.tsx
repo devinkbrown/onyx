@@ -143,10 +143,11 @@ const pollStyles = `
     gap: 10px;
     background: var(--bg-elevated);
     border: 1px solid var(--border-normal);
-    border-radius: var(--r-lg, 10px);
-    padding: 14px 16px 12px;
-    max-width: 400px;
+    border-radius: var(--r-md);
+    padding: 16px 16px 12px;
+    max-width: 420px;
     margin-top: 4px;
+    box-shadow: var(--shadow-sm);
   }
 
   /* Header */
@@ -203,7 +204,7 @@ const pollStyles = `
   }
   .poll-option--voted {
     border-color: var(--accent-border);
-    background: rgba(14,165,233,0.07);
+    background: var(--accent-subtle);
     color: var(--text-primary);
   }
 
@@ -233,9 +234,9 @@ const pollStyles = `
 
   /* Progress bar */
   .poll-bar-track {
-    height: 6px;
-    background: var(--border-subtle);
-    border-radius: 3px;
+    height: 5px;
+    background: var(--bg-float);
+    border-radius: 99px;
     overflow: hidden;
     display: block;
   }
@@ -243,12 +244,13 @@ const pollStyles = `
     display: block;
     height: 100%;
     background: var(--accent);
-    border-radius: 3px;
-    transition: width 0.35s ease;
+    border-radius: 99px;
+    transition: width 0.4s var(--ease-out, ease);
     min-width: 0;
   }
   .poll-option--voted .poll-bar-fill {
-    background: var(--accent-hover);
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent-glow);
   }
 
   /* Vote stats */

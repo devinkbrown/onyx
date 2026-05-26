@@ -309,10 +309,10 @@ export default function ForumCreateModal() {
         }
 
         .fcm-panel {
-          background: var(--bg-surface);
+          background: var(--bg-elevated);
           border: 1px solid var(--border-normal);
           border-radius: var(--r-lg, 12px);
-          box-shadow: 0 24px 64px rgba(0,0,0,0.55);
+          box-shadow: var(--shadow-xl, 0 24px 64px rgba(0,0,0,0.65)), 0 0 0 1px var(--border-subtle);
           width: 100%;
           max-width: 560px;
           max-height: calc(100vh - 40px);
@@ -423,13 +423,13 @@ export default function ForumCreateModal() {
 
         .fcm-input {
           width: 100%;
-          padding: 9px 12px;
-          padding-right: 52px;
+          padding: 10px 52px 10px 12px;
           background: var(--bg-deep);
-          border: 1px solid var(--border-subtle);
+          border: 1px solid var(--border-normal);
           border-radius: var(--r-sm);
-          font-size: 14px;
-          font-weight: 500;
+          /* Larger, more prominent title input */
+          font-size: 15px;
+          font-weight: 600;
           color: var(--text-primary);
           font-family: inherit;
           transition: border-color var(--t-fast), box-shadow var(--t-fast);
@@ -437,14 +437,14 @@ export default function ForumCreateModal() {
         }
         .fcm-input:focus {
           outline: none;
-          border-color: var(--accent-border, rgba(124,90,245,0.5));
-          box-shadow: 0 0 0 3px rgba(124,90,245,0.12);
+          border-color: var(--accent);
+          box-shadow: 0 0 0 3px var(--accent-subtle);
         }
         .fcm-input--error {
-          border-color: var(--danger, #f04747);
-          box-shadow: 0 0 0 3px rgba(240,71,71,0.12);
+          border-color: var(--danger);
+          box-shadow: 0 0 0 3px var(--danger-subtle);
         }
-        .fcm-input::placeholder { color: var(--text-muted); }
+        .fcm-input::placeholder { color: var(--text-muted); font-weight: 400; }
 
         .fcm-char-counter {
           position: absolute;
@@ -478,7 +478,7 @@ export default function ForumCreateModal() {
           transition: border-color var(--t-fast), box-shadow var(--t-fast);
         }
         .fcm-tag-box:focus-within {
-          border-color: var(--accent-border, rgba(124,90,245,0.5));
+          border-color: var(--accent-border, rgba(14,165,233,0.5));
           box-shadow: 0 0 0 3px rgba(124,90,245,0.12);
         }
         .fcm-tag-box--full { opacity: 0.75; }
@@ -561,22 +561,23 @@ export default function ForumCreateModal() {
         .fcm-textarea {
           width: 100%;
           background: var(--bg-deep);
-          border: 1px solid var(--border-subtle);
+          border: 1px solid var(--border-normal);
           border-radius: var(--r-sm);
-          padding: 10px 12px;
-          font-size: 13px;
+          padding: 12px 14px;
+          font-size: 14px;
           font-family: inherit;
           color: var(--text-primary);
           resize: vertical;
-          min-height: 120px;
-          line-height: 1.6;
+          /* Good default height */
+          min-height: 160px;
+          line-height: 1.65;
           transition: border-color var(--t-fast), box-shadow var(--t-fast);
           box-sizing: border-box;
         }
         .fcm-textarea:focus {
           outline: none;
-          border-color: var(--accent-border, rgba(124,90,245,0.5));
-          box-shadow: 0 0 0 3px rgba(124,90,245,0.12);
+          border-color: var(--accent);
+          box-shadow: 0 0 0 3px var(--accent-subtle);
         }
         .fcm-textarea::placeholder { color: var(--text-muted); }
 
@@ -610,7 +611,7 @@ export default function ForumCreateModal() {
         }
 
         .fcm-btn-post {
-          padding: 7px 20px;
+          padding: 8px 22px;
           background: var(--accent);
           border: none;
           border-radius: var(--r-sm);
@@ -619,14 +620,18 @@ export default function ForumCreateModal() {
           font-family: inherit;
           color: #fff;
           cursor: pointer;
-          transition: opacity var(--t-fast), box-shadow var(--t-fast);
+          transition: opacity var(--t-fast), box-shadow var(--t-fast), transform var(--t-fast);
         }
         .fcm-btn-post:hover:not([disabled]) {
-          opacity: 0.88;
-          box-shadow: 0 0 0 3px rgba(124,90,245,0.3);
+          opacity: 0.90;
+          box-shadow: 0 0 0 3px var(--accent-subtle), var(--glow, 0 0 16px var(--accent-glow));
+          transform: translateY(-1px);
+        }
+        .fcm-btn-post:active:not([disabled]) {
+          transform: translateY(0);
         }
         .fcm-btn-post[disabled] {
-          opacity: 0.4;
+          opacity: 0.38;
           cursor: not-allowed;
         }
       `}</style>

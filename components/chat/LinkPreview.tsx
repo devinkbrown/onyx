@@ -38,6 +38,9 @@ const KNOWN_SITES: Record<string, { name: string; color: string; icon: string }>
   'npmjs.com':          { name: 'npm',             color: '#cb0000', icon: '📦' },
   'youtube.com':        { name: 'YouTube',         color: '#ff0000', icon: '▶' },
   'youtu.be':           { name: 'YouTube',         color: '#ff0000', icon: '▶' },
+  'twitch.tv':          { name: 'Twitch',          color: '#9146ff', icon: '🎮' },
+  'crates.io':          { name: 'crates.io',       color: '#f74c00', icon: '📦' },
+  'pypi.org':           { name: 'PyPI',            color: '#0073b7', icon: '🐍' },
 };
 
 // ── Module-level cache (persists across renders for the session) ───────────────
@@ -160,40 +163,222 @@ function getMeta(doc: Document, property: string): string | undefined {
   );
 }
 
-async function fetchOG(url: string): Promise<OGData | null> {
-  try {
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(6000) });
-    if (!res.ok) return null;
-
-    const json = await res.json() as { contents?: string };
-    const html = json.contents;
-    if (!html) return null;
-
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-
-    let image = getMeta(doc, 'og:image');
-    if (image && !image.startsWith('http')) {
-      try {
-        const origin = new URL(url).origin;
-        image = image.startsWith('/') ? origin + image : `${origin}/${image}`;
-      } catch {
-        image = undefined;
+// CORS proxies tried in order; each gets 5 s before we move to the next.
+const CORS_PROXIES: Array<(u: string) => { proxyUrl: string; parseJson: (j: unknown) => string | null }> = [
+  (u) => ({
+    proxyUrl: `https://corsproxy.io/?${encodeURIComponent(u)}`,
+    // corsproxy.io returns the raw HTML body directly
+    parseJson: (j: unknown) => (typeof j === 'string' ? j : null),
+  }),
+  (u) => ({
+    proxyUrl: `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
+    // allorigins wraps HTML in { contents }
+    parseJson: (j: unknown) => {
+      if (j && typeof j === 'object' && 'contents' in j) {
+        const c = (j as { contents?: unknown }).contents;
+        return typeof c === 'string' ? c : null;
       }
-    }
+      return null;
+    },
+  }),
+  (u) => ({
+    proxyUrl: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+    // codetabs returns raw HTML
+    parseJson: (j: unknown) => (typeof j === 'string' ? j : null),
+  }),
+];
 
-    return {
-      title:       getMeta(doc, 'og:title')      || doc.title        || undefined,
-      description: getMeta(doc, 'og:description')|| getMeta(doc, 'description') || undefined,
-      image,
-      siteName:    getMeta(doc, 'og:site_name')  || undefined,
-      themeColor:  getMeta(doc, 'theme-color')   || undefined,
-      favicon:     getFaviconUrl(url),
-    };
-  } catch {
-    return null;
+async function fetchOG(url: string): Promise<OGData | null> {
+  for (const proxyFactory of CORS_PROXIES) {
+    const { proxyUrl, parseJson } = proxyFactory(url);
+    try {
+      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) continue;
+
+      // corsproxy.io and codetabs return text/html; allorigins returns JSON
+      const contentType = res.headers.get('content-type') ?? '';
+      let html: string | null = null;
+
+      if (contentType.includes('application/json')) {
+        const json: unknown = await res.json();
+        html = parseJson(json);
+      } else {
+        const text = await res.text();
+        // Try parseJson in case the proxy smuggled HTML as a text body
+        html = parseJson(text) ?? text;
+      }
+
+      if (!html) continue;
+
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+
+      let image = getMeta(doc, 'og:image');
+      if (image && !image.startsWith('http')) {
+        try {
+          const origin = new URL(url).origin;
+          image = image.startsWith('/') ? origin + image : `${origin}/${image}`;
+        } catch {
+          image = undefined;
+        }
+      }
+
+      return {
+        title:       getMeta(doc, 'og:title')       || doc.title || undefined,
+        description: getMeta(doc, 'og:description') || getMeta(doc, 'description') || undefined,
+        image,
+        siteName:    getMeta(doc, 'og:site_name')   || undefined,
+        themeColor:  getMeta(doc, 'theme-color')    || undefined,
+        favicon:     getFaviconUrl(url),
+      };
+    } catch {
+      // timeout or network error — try next proxy
+    }
   }
+  return null;
+}
+
+// ── Per-platform heuristic metadata (no fetch required) ───────────────────────
+
+function heuristicData(url: string, platform: Platform): UnfurlData | null {
+  const host = getHostname(url);
+
+  // GitHub: parse owner/repo/path from URL
+  if (platform === 'github' || host === 'github.com') {
+    const parts = (() => {
+      try { return new URL(url).pathname.split('/').filter(Boolean); } catch { return [] as string[]; }
+    })();
+    if (parts.length >= 2) {
+      const owner = parts[0];
+      const repo  = parts[1];
+      const subPath = parts.slice(2).join('/');
+      const title = subPath ? `${owner}/${repo} — ${subPath}` : `${owner}/${repo}`;
+      return {
+        url,
+        title,
+        siteName: 'GitHub',
+        favicon: `https://www.google.com/s2/favicons?domain=github.com&sz=32`,
+      };
+    }
+  }
+
+  // YouTube: derive thumbnail from video ID; title from searchParams
+  if (platform === 'youtube') {
+    const id = extractYouTubeId(url);
+    if (id) {
+      let title: string | undefined;
+      try {
+        const sp = new URL(url).searchParams;
+        // v param doesn't give us a title, but let's include the ID as a hint
+        title = `YouTube · ${id}`;
+      } catch {
+        title = 'YouTube';
+      }
+      return {
+        url,
+        title,
+        siteName: 'YouTube',
+        image: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+        favicon: `https://www.google.com/s2/favicons?domain=youtube.com&sz=32`,
+      };
+    }
+  }
+
+  // Twitter/X: placeholder card without fetch
+  if (platform === 'twitter') {
+    let username = '';
+    try {
+      const parts = new URL(url).pathname.split('/').filter(Boolean);
+      if (parts.length > 0) username = `@${parts[0]}`;
+    } catch { /* empty */ }
+    return {
+      url,
+      title: username ? `Post by ${username}` : 'Post on X (Twitter)',
+      siteName: 'X (Twitter)',
+      favicon: `https://www.google.com/s2/favicons?domain=x.com&sz=32`,
+    };
+  }
+
+  // Reddit: parse subreddit/post from URL
+  if (host === 'reddit.com' || host === 'old.reddit.com' || host === 'www.reddit.com') {
+    try {
+      const parts = new URL(url).pathname.split('/').filter(Boolean);
+      // /r/subreddit/comments/id/slug
+      const sub  = parts[0] === 'r' ? parts[1] : undefined;
+      const slug = parts[4] ? parts[4].replace(/_/g, ' ') : undefined;
+      const title = slug ? slug : sub ? `r/${sub}` : 'Reddit';
+      return {
+        url,
+        title,
+        siteName: sub ? `r/${sub} · Reddit` : 'Reddit',
+        favicon: `https://www.google.com/s2/favicons?domain=reddit.com&sz=32`,
+      };
+    } catch { /* empty */ }
+  }
+
+  // Twitch: channel or clip
+  if (platform === 'twitch' || host === 'twitch.tv') {
+    const channel = extractTwitchChannel(url);
+    return {
+      url,
+      title: channel ? `${channel} on Twitch` : 'Twitch',
+      siteName: 'Twitch',
+      favicon: `https://www.google.com/s2/favicons?domain=twitch.tv&sz=32`,
+    };
+  }
+
+  // npm: parse package name from URL
+  if (host === 'npmjs.com' || host === 'www.npmjs.com') {
+    try {
+      const parts = new URL(url).pathname.split('/').filter(Boolean);
+      // /package/name  or  /package/@scope/name
+      const pkgIdx = parts.indexOf('package');
+      if (pkgIdx !== -1) {
+        const pkgName = parts[pkgIdx + 1] === '@'
+          ? `@${parts[pkgIdx + 1]}/${parts[pkgIdx + 2]}`
+          : parts[pkgIdx + 1];
+        if (pkgName) {
+          return { url, title: pkgName, siteName: 'npm', favicon: `https://www.google.com/s2/favicons?domain=npmjs.com&sz=32` };
+        }
+      }
+    } catch { /* empty */ }
+  }
+
+  // crates.io: parse crate name
+  if (host === 'crates.io') {
+    try {
+      const parts = new URL(url).pathname.split('/').filter(Boolean);
+      // /crates/name
+      if (parts[0] === 'crates' && parts[1]) {
+        return { url, title: parts[1], siteName: 'crates.io', favicon: `https://www.google.com/s2/favicons?domain=crates.io&sz=32` };
+      }
+    } catch { /* empty */ }
+  }
+
+  // PyPI: parse package name
+  if (host === 'pypi.org') {
+    try {
+      const parts = new URL(url).pathname.split('/').filter(Boolean);
+      // /project/name
+      if (parts[0] === 'project' && parts[1]) {
+        return { url, title: parts[1], siteName: 'PyPI', favicon: `https://www.google.com/s2/favicons?domain=pypi.org&sz=32` };
+      }
+    } catch { /* empty */ }
+  }
+
+  return null;
+}
+
+// ── Minimal domain fallback card (shown when all fetches fail) ─────────────────
+
+function minimalFallback(url: string): UnfurlData {
+  const domain = getHostname(url);
+  const known = KNOWN_SITES[domain];
+  return {
+    url,
+    siteName: known?.name ?? domain,
+    favicon:  `https://www.google.com/s2/favicons?domain=${domain}&sz=32`,
+  };
 }
 
 async function unfurlUrl(url: string): Promise<UnfurlData | null> {
@@ -206,24 +391,6 @@ async function unfurlUrl(url: string): Promise<UnfurlData | null> {
     const data: UnfurlData = { url, title: getVideoFilename(url) };
     unfurlCache.set(url, data);
     return data;
-  }
-
-  // YouTube: derive thumbnail from ID, fetch OG for title
-  if (platform === 'youtube') {
-    const youtubeId = extractYouTubeId(url);
-    if (youtubeId) {
-      const og = await fetchOG(url);
-      const data: UnfurlData = {
-        url,
-        title:       og?.title,
-        description: og?.description,
-        siteName:    'YouTube',
-        image:       `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`,
-        favicon:     'https://www.google.com/s2/favicons?domain=youtube.com&sz=16',
-      };
-      unfurlCache.set(url, data);
-      return data;
-    }
   }
 
   // Vimeo: branded card, no OEmbed (static export constraint)
@@ -239,25 +406,47 @@ async function unfurlUrl(url: string): Promise<UnfurlData | null> {
     return data;
   }
 
-  const og = await fetchOG(url);
-  if (!og) {
-    // For known sites, return a minimal branded entry even without OG
-    const host = getHostname(url);
-    const known = KNOWN_SITES[host];
-    if (known) {
-      const data: UnfurlData = {
-        url,
-        siteName: known.name,
-        favicon: getFaviconUrl(url),
-      };
-      unfurlCache.set(url, data);
-      return data;
-    }
-    unfurlCache.set(url, null);
-    return null;
+  // Derive heuristic data immediately (no network required).
+  // For YouTube we always have a thumbnail from heuristics; we still attempt OG
+  // fetch to get the real title and replace the placeholder.
+  const heuristic = heuristicData(url, platform);
+
+  // YouTube: use heuristic thumbnail + try to upgrade title via OG fetch
+  if (platform === 'youtube') {
+    const base = heuristic ?? { url, siteName: 'YouTube', favicon: getFaviconUrl(url) };
+    const og = await fetchOG(url);
+    const data: UnfurlData = {
+      ...base,
+      title:       og?.title       ?? base.title,
+      description: og?.description ?? base.description,
+      // Keep heuristic thumbnail (reliable) unless OG provides one
+      image:       base.image      ?? og?.image,
+    };
+    unfurlCache.set(url, data);
+    return data;
   }
 
-  const data: UnfurlData = { url, ...og };
+  // For Twitter/X, Reddit, Twitch, GitHub, npm, crates.io, PyPI:
+  // Show heuristic card immediately, then try to enrich via OG fetch.
+  if (heuristic) {
+    const og = await fetchOG(url);
+    const data: UnfurlData = og
+      ? { ...heuristic, ...og, url, favicon: heuristic.favicon ?? og.favicon }
+      : heuristic;
+    unfurlCache.set(url, data);
+    return data;
+  }
+
+  // Generic: try OG fetch; if all proxies fail, show minimal domain card.
+  const og = await fetchOG(url);
+  if (og) {
+    const data: UnfurlData = { url, ...og };
+    unfurlCache.set(url, data);
+    return data;
+  }
+
+  // All proxies failed — never show nothing. Return minimal domain card.
+  const data = minimalFallback(url);
   unfurlCache.set(url, data);
   return data;
 }
@@ -652,17 +841,28 @@ export default function LinkPreview({ url }: Props) {
       return;
     }
 
-    // Known sites: show a branded skeleton immediately while fetching OG
-    const host = getHostname(url);
-    const known = KNOWN_SITES[host];
-    if (known && !unfurlCache.has(url)) {
-      setData({ url, siteName: known.name, favicon: getFaviconUrl(url) });
-      setLoadState('ready');
+    // Show optimistic heuristic data immediately while the OG fetch runs.
+    // heuristicData() is synchronous and covers GitHub, YouTube, Twitter,
+    // Reddit, Twitch, npm, crates.io, PyPI plus KNOWN_SITES fallback.
+    if (!unfurlCache.has(url)) {
+      const optimistic = heuristicData(url, platform) ?? (() => {
+        const host = getHostname(url);
+        const known = KNOWN_SITES[host];
+        return known
+          ? { url, siteName: known.name, favicon: getFaviconUrl(url) }
+          : null;
+      })();
+      if (optimistic) {
+        setData(optimistic);
+        setLoadState('ready');
+      }
     }
 
     unfurlUrl(url).then(result => {
       if (cancelled) return;
       setData(result);
+      // unfurlUrl always returns at least a minimal domain card (never null for
+      // non-video URLs), so 'empty' only fires if result itself is falsy.
       setLoadState(result && (result.title || result.description || result.image || result.siteName) ? 'ready' : 'empty');
     });
 

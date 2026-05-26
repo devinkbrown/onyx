@@ -520,7 +520,7 @@ export default function FriendsPanel() {
         .fp-tab:hover { color: var(--text-secondary); }
         .fp-tab--active {
           color: var(--text-normal, var(--text-primary));
-          border-bottom-color: var(--accent, #7c5af5);
+          border-bottom-color: var(--accent, #0ea5e9);
         }
 
         /* ── Body ── */
@@ -541,17 +541,28 @@ export default function FriendsPanel() {
           padding: 8px 0;
         }
 
+        /* ── Section label ── */
+        .fp-section-label {
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.07em;
+          text-transform: uppercase;
+          color: var(--text-muted);
+          padding: 12px 16px 4px;
+        }
+
         /* ── Friend row ── */
         .fp-row {
           display: flex;
           align-items: center;
           gap: 10px;
-          padding: 8px 16px;
+          padding: 7px 16px;
           cursor: pointer;
           transition: background var(--t-fast, 150ms);
+          border-radius: 0;
         }
-        .fp-row:hover { background: var(--bg-overlay); }
-        .fp-row--offline { opacity: 0.7; }
+        .fp-row:hover { background: var(--ch-hover-bg, rgba(14,165,233,0.07)); }
+        .fp-row--offline { opacity: 0.6; }
 
         .fp-row-avatar-wrap {
           position: relative;
@@ -635,8 +646,8 @@ export default function FriendsPanel() {
           transition: background var(--t-fast, 150ms), color var(--t-fast, 150ms);
         }
         .fp-action-btn--dm:hover {
-          background: color-mix(in oklch, var(--accent, #7c5af5) 18%, transparent);
-          color: var(--accent, #7c5af5);
+          background: color-mix(in oklch, var(--accent, #0ea5e9) 18%, transparent);
+          color: var(--accent, #0ea5e9);
         }
         .fp-action-btn--remove:hover {
           background: color-mix(in oklch, var(--danger, #ed4245) 14%, transparent);
@@ -675,42 +686,43 @@ export default function FriendsPanel() {
           justify-content: center;
           padding: 48px 24px;
           gap: 10px;
-          min-height: 300px;
+          min-height: 260px;
         }
         .fp-empty-icon {
           display: flex;
           align-items: center;
           justify-content: center;
-          width: 64px;
-          height: 64px;
+          width: 60px;
+          height: 60px;
           border-radius: 50%;
-          background: var(--bg-overlay);
+          background: var(--bg-elevated);
+          border: 1px solid var(--border-subtle);
           color: var(--text-muted);
           margin-bottom: 4px;
         }
         .fp-empty-title {
-          font-size: 15px;
+          font-size: 14px;
           font-weight: 700;
-          color: var(--text-primary);
+          color: var(--text-secondary);
         }
         .fp-empty-sub {
-          font-size: 13px;
+          font-size: 12px;
           color: var(--text-muted);
           text-align: center;
-          max-width: 260px;
-          line-height: 1.5;
+          max-width: 240px;
+          line-height: 1.55;
         }
 
         /* ── Add Friend tab ── */
         .fp-add-section {
-          padding: 24px;
+          padding: 24px 20px;
           max-width: 460px;
           display: flex;
           flex-direction: column;
-          gap: 12px;
+          gap: 14px;
         }
         .fp-add-heading {
-          font-size: 16px;
+          font-size: 15px;
           font-weight: 700;
           color: var(--text-primary);
           margin: 0;
@@ -718,55 +730,55 @@ export default function FriendsPanel() {
         .fp-add-desc {
           font-size: 13px;
           color: var(--text-muted);
-          margin: 0;
-          line-height: 1.5;
+          margin: -4px 0 0;
+          line-height: 1.55;
         }
         .fp-add-row {
           display: flex;
           gap: 0;
-          margin-top: 4px;
         }
         .fp-add-input {
           flex: 1;
-          padding: 10px 12px;
-          background: var(--bg-deep);
-          border: 1px solid var(--border-subtle);
+          padding: 10px 14px;
+          background: var(--bg-elevated);
+          border: 1px solid var(--border-normal);
           border-right: none;
-          border-radius: 6px 0 0 6px;
-          color: var(--text-normal, var(--text-primary));
+          border-radius: var(--r-md) 0 0 var(--r-md);
+          color: var(--text-primary);
           font-size: 14px;
           font-family: inherit;
           outline: none;
-          transition: border-color var(--t-fast, 150ms);
+          transition: border-color var(--t-fast, 150ms), box-shadow var(--t-fast, 150ms);
         }
         .fp-add-input:focus {
-          border-color: var(--accent, #7c5af5);
+          border-color: var(--accent-border);
+          box-shadow: 0 0 0 2px var(--accent-glow);
         }
         .fp-add-input::placeholder {
           color: var(--text-muted);
         }
         .fp-add-btn {
-          padding: 0 16px;
-          background: var(--accent, #7c5af5);
+          padding: 0 18px;
+          background: var(--accent, #0ea5e9);
           color: #fff;
           border: none;
-          border-radius: 0 6px 6px 0;
+          border-radius: 0 var(--r-md) var(--r-md) 0;
           font-size: 13px;
           font-weight: 700;
           font-family: inherit;
           cursor: pointer;
-          transition: opacity var(--t-fast, 150ms);
+          transition: background var(--t-fast, 150ms);
           white-space: nowrap;
         }
-        .fp-add-btn:hover:not(:disabled) { opacity: 0.88; }
-        .fp-add-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .fp-add-btn:hover:not(:disabled) { background: var(--accent-hover, #38bdf8); }
+        .fp-add-btn:disabled { opacity: 0.35; cursor: not-allowed; }
         .fp-add-hint {
           display: flex;
           align-items: flex-start;
           gap: 8px;
           padding: 10px 12px;
-          background: color-mix(in oklch, var(--accent, #7c5af5) 8%, transparent);
-          border: 1px solid color-mix(in oklch, var(--accent, #7c5af5) 20%, transparent);
+          background: var(--accent-subtle);
+          border: 1px solid var(--accent-border);
           border-radius: var(--r-sm, 4px);
           color: var(--text-muted);
           font-size: 12px;
@@ -775,7 +787,7 @@ export default function FriendsPanel() {
         .fp-add-hint svg {
           flex-shrink: 0;
           margin-top: 1px;
-          color: var(--accent, #7c5af5);
+          color: var(--accent, #0ea5e9);
         }
 
         @media (max-width: 480px) {

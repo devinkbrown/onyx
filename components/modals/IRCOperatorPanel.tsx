@@ -562,7 +562,7 @@ export default function IRCOperatorPanel() {
           max-height: min(88vh, 720px);
           display: flex;
           flex-direction: column;
-          background: #06101d;
+          background: var(--bg-deep, #06101d);
           border: 1px solid rgba(248, 185, 56, 0.22);
           border-radius: 12px;
           box-shadow:
@@ -819,14 +819,20 @@ export default function IRCOperatorPanel() {
           display: flex;
           flex-direction: column;
           gap: 6px;
+          padding: 10px 12px;
+          background: rgba(255,255,255,0.025);
+          border: 1px solid var(--border-subtle, rgba(14,165,233,0.08));
+          border-radius: 8px;
         }
         .op-action-group-title {
-          font-size: 10.5px;
+          font-size: 10px;
           font-weight: 700;
-          letter-spacing: 0.07em;
+          letter-spacing: 0.08em;
           text-transform: uppercase;
-          color: #3d6480;
+          color: var(--text-muted, #3d6480);
           margin: 0;
+          padding-bottom: 6px;
+          border-bottom: 1px solid var(--border-subtle, rgba(14,165,233,0.08));
         }
 
         .op-btn-row {

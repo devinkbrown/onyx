@@ -32,12 +32,15 @@ export default function ServerStatsWidget() {
           display: flex;
           flex-direction: column;
           gap: 10px;
+          padding-top: 4px;
+          border-top: 1px solid var(--border-subtle);
+          margin-top: 4px;
         }
 
         .ssw-title {
-          font-size: 11px;
+          font-size: 10px;
           font-weight: 700;
-          letter-spacing: 0.07em;
+          letter-spacing: 0.09em;
           text-transform: uppercase;
           color: var(--text-muted);
           margin: 0;
@@ -46,41 +49,67 @@ export default function ServerStatsWidget() {
         .ssw-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 8px;
+          gap: 6px;
         }
 
         .ssw-card {
-          background: var(--bg-deep, #06101d);
-          border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+          background: var(--bg-void);
+          border: 1px solid var(--border-subtle);
           border-radius: var(--r-md, 8px);
-          padding: 10px 12px;
+          padding: 10px 10px 8px;
           display: flex;
           flex-direction: column;
-          gap: 2px;
+          gap: 1px;
           min-width: 0;
+          position: relative;
+          overflow: hidden;
+          transition: border-color var(--t-fast);
+        }
+
+        .ssw-card::after {
+          content: '';
+          position: absolute;
+          top: 0; left: 0; right: 0;
+          height: 1px;
+          background: linear-gradient(90deg, transparent, var(--accent-border), transparent);
+          opacity: 0;
+          transition: opacity var(--t-fast);
+        }
+
+        .ssw-card:hover {
+          border-color: var(--accent-border);
+        }
+
+        .ssw-card:hover::after {
+          opacity: 1;
         }
 
         .ssw-icon {
-          font-size: 16px;
+          font-size: 14px;
           line-height: 1;
-          margin-bottom: 2px;
+          margin-bottom: 4px;
+          opacity: 0.75;
         }
 
         .ssw-value {
-          font-size: 18px;
-          font-weight: 700;
-          color: var(--text-primary, #e8eaf0);
+          font-size: 20px;
+          font-weight: 800;
+          color: var(--accent);
           line-height: 1.1;
           font-variant-numeric: tabular-nums;
+          letter-spacing: -0.03em;
         }
 
         .ssw-label {
-          font-size: 11px;
-          color: var(--text-muted, rgba(255,255,255,0.4));
-          font-weight: 500;
+          font-size: 10px;
+          color: var(--text-muted);
+          font-weight: 600;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
+          margin-top: 1px;
         }
       `}</style>
     </div>

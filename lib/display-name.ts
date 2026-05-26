@@ -18,8 +18,3 @@ export function getSelfDisplayName(): string {
   return selfDisplayName || ourNick || '';
 }
 
-/**
- * TODO: MessageItem.tsx should also use getDisplayName(msg.from) for the
- * sender nick displayed in each message header — update it in a follow-up
- * pass once concurrent agent changes to that file are merged.
- */

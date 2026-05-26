@@ -871,35 +871,41 @@ const styles = `
 
   .ci-panel {
     width: 420px; max-width: 95vw;
+    height: 100%;
     background: var(--bg-deep);
     border-left: 1px solid var(--border-normal);
     display: flex; flex-direction: column;
     overflow: hidden;
-    box-shadow: -8px 0 40px rgba(0, 0, 0, 0.5);
+    box-shadow: -12px 0 48px rgba(0, 0, 0, 0.55), -1px 0 0 var(--border-subtle);
   }
 
   /* Banner */
   .ci-banner {
     position: relative;
     height: 160px;
-    background: linear-gradient(135deg, #0a1628 0%, #0c2442 50%, #0ea5e920 100%);
+    background: linear-gradient(135deg,
+      var(--bg-void) 0%,
+      color-mix(in srgb, var(--accent) 8%, var(--bg-deep)) 50%,
+      color-mix(in srgb, var(--gold) 5%, var(--bg-deep)) 100%
+    );
     flex-shrink: 0;
   }
   .ci-banner-overlay {
     position: absolute; inset: 0;
-    background: linear-gradient(to top, var(--bg-deep) 0%, transparent 60%);
+    background: linear-gradient(to top, var(--bg-deep) 0%, rgba(0,0,0,0.1) 100%);
   }
   .ci-close {
     position: absolute; top: 12px; right: 12px;
     width: 30px; height: 30px;
-    background: rgba(0,0,0,0.4); border: none;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.08);
     border-radius: var(--r-full); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     color: var(--text-secondary);
     transition: background var(--t-fast), color var(--t-fast);
     z-index: 2;
   }
-  .ci-close:hover { background: rgba(0,0,0,0.7); color: var(--text-primary); }
+  .ci-close:hover { background: rgba(0,0,0,0.8); color: var(--text-primary); }
 
   .ci-banner-content {
     position: absolute; bottom: 16px; left: 20px; right: 20px;
@@ -930,11 +936,12 @@ const styles = `
     font-size: 11px; color: var(--text-muted);
   }
 
-  /* Stats */
+  /* Stats row */
   .ci-stats {
     display: flex; gap: 0;
     border-bottom: 1px solid var(--border-subtle);
     flex-shrink: 0;
+    background: var(--bg-elevated);
   }
   .ci-stat {
     flex: 1; display: flex; flex-direction: column; align-items: center;
@@ -943,12 +950,13 @@ const styles = `
   }
   .ci-stat:last-child { border-right: none; }
   .ci-stat-value {
-    font-size: 18px; font-weight: 700; color: var(--text-primary);
-    line-height: 1.2;
+    font-size: 18px; font-weight: 800; color: var(--text-primary);
+    line-height: 1.2; letter-spacing: -0.02em;
   }
   .ci-stat-label {
     font-size: 10px; color: var(--text-muted);
-    text-transform: uppercase; letter-spacing: 0.07em; margin-top: 2px;
+    text-transform: uppercase; letter-spacing: 0.07em; margin-top: 3px;
+    font-weight: 600;
   }
 
   /* Tabs */
@@ -1082,10 +1090,17 @@ const styles = `
   /* Mode badges */
   .ci-modes { display: flex; flex-wrap: wrap; gap: 6px; }
   .ci-mode-badge {
-    padding: 4px 10px; border-radius: var(--r-full);
+    padding: 3px 10px; border-radius: var(--r-full);
     background: var(--bg-overlay); border: 1px solid var(--border-normal);
-    color: var(--text-secondary); font-size: 12px; font-weight: 500;
-    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-secondary); font-size: 11px; font-weight: 600;
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    letter-spacing: 0.01em;
+    transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+  }
+  .ci-mode-badge:hover {
+    background: var(--accent-subtle);
+    border-color: var(--accent-border);
+    color: var(--accent);
   }
 
   /* Search */

@@ -507,11 +507,15 @@ export class IRCClient {
 
   private _wantedCaps(caps: string[]) {
     return [...new Set(caps)].filter(cap => {
-      // "tls" is the IRC STARTTLS upgrade cap. Nexus already uses WSS, so
+      // "tls" is the IRC STARTTLS upgrade cap. Ocean already uses WSS, so
       // requesting it after the WebSocket TLS handshake is incorrect.
       if (cap === 'tls') return false;
       // Only request SASL when we can actually complete authentication.
       if (cap === 'sasl') return Boolean(this.opts.password);
+      // "no-implicit-names" suppresses the automatic 353 NAMREPLY on JOIN.
+      // Ocean relies on the implicit 353 to populate the member list; we do
+      // not implement the explicit NAMES-on-join flow, so opt out of this cap.
+      if (cap === 'no-implicit-names') return false;
       return true;
     });
   }

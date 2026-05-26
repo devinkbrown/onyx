@@ -207,7 +207,9 @@ export default function MemberList() {
   return (
     <div className="ml-root">
       <div className="ml-header">
-        <span className="ml-title">Members</span>
+        <span className="ml-title">
+          Members<span className="ml-title-count"> — {total}</span>
+        </span>
         <div className="ml-header-actions">
           <button
             className="ml-sort-btn"
@@ -218,7 +220,6 @@ export default function MemberList() {
             <SortIcon />
             <span className="ml-sort-label">{SORT_LABELS[memberListSort]}</span>
           </button>
-          <span className="ml-count">{total}</span>
         </div>
       </div>
 
@@ -335,11 +336,20 @@ export default function MemberList() {
         }
 
         .ml-title {
-          font-size: 13px;
+          font-size: 12px;
           font-weight: 700;
-          letter-spacing: 0.05em;
+          letter-spacing: 0.06em;
           text-transform: uppercase;
           color: var(--text-secondary);
+        }
+
+        .ml-title-count {
+          font-size: 11px;
+          font-weight: 600;
+          color: var(--text-muted);
+          font-variant-numeric: tabular-nums;
+          letter-spacing: 0.02em;
+          text-transform: none;
         }
 
         .ml-header-actions {
@@ -351,121 +361,137 @@ export default function MemberList() {
         .ml-sort-btn {
           display: flex;
           align-items: center;
-          gap: 4px;
+          gap: 3px;
           background: none;
           border: none;
           cursor: pointer;
           color: var(--text-muted);
-          font-size: 11px;
+          font-size: 10px;
           font-family: inherit;
-          padding: 3px 5px;
+          padding: 3px 6px;
           border-radius: var(--r-sm, 4px);
           transition: color var(--t-fast), background var(--t-fast);
           white-space: nowrap;
         }
         .ml-sort-btn:hover {
           color: var(--text-secondary);
-          background: var(--bg-elevated);
+          background: var(--bg-float);
+        }
+        .ml-sort-btn:active {
+          background: var(--accent-subtle);
+          color: var(--accent);
         }
 
         .ml-sort-label {
           font-weight: 600;
-          letter-spacing: 0.03em;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
         }
 
-        .ml-count {
-          font-size: 12px;
-          color: var(--text-muted);
-          background: var(--bg-elevated);
-          padding: 2px 7px;
-          border-radius: var(--r-full);
-        }
+        /* Member count is now inline in the title — .ml-count removed */
 
         .member-search-wrap {
           padding: 8px 10px;
           border-bottom: 1px solid var(--border-subtle);
           flex-shrink: 0;
           position: relative;
+          display: flex;
+          align-items: center;
+          gap: 4px;
         }
 
         .member-search-input {
-          width: 100%;
-          background: var(--bg-elevated);
+          flex: 1;
+          background: var(--bg-deep);
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-md, 6px);
-          padding: 5px 36px 5px 10px;
+          padding: 5px 28px 5px 10px;
           font-size: 12px;
           color: var(--text-primary);
           outline: none;
           font-family: inherit;
-          transition: border-color 0.15s;
+          transition: border-color var(--t-fast), box-shadow var(--t-fast);
           box-sizing: border-box;
         }
         .member-search-input::placeholder { color: var(--text-muted); }
-        .member-search-input:focus { border-color: var(--accent-border); }
+        .member-search-input:focus {
+          border-color: var(--accent-border);
+          box-shadow: 0 0 0 2px var(--accent-subtle);
+        }
 
         .member-search-clear {
           position: absolute;
-          right: 36px;
+          right: 44px;
           top: 50%;
           transform: translateY(-50%);
           background: none;
           border: none;
           cursor: pointer;
           color: var(--text-muted);
-          font-size: 16px;
+          font-size: 15px;
           line-height: 1;
-          padding: 0 2px;
+          padding: 2px 3px;
+          border-radius: var(--r-xs);
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: color var(--t-fast);
+          transition: color var(--t-fast), background var(--t-fast);
         }
-        .member-search-clear:hover { color: var(--text-primary); }
+        .member-search-clear:hover { color: var(--text-primary); background: var(--bg-float); }
 
         .member-refresh-btn {
-          position: absolute;
-          right: 14px;
-          top: 50%;
-          transform: translateY(-50%);
-          width: 24px;
-          height: 24px;
-          border-radius: 4px;
-          border: none;
+          flex-shrink: 0;
+          width: 26px;
+          height: 26px;
+          border-radius: var(--r-sm);
+          border: 1px solid transparent;
           background: none;
           color: var(--text-muted);
           cursor: pointer;
-          font-size: 14px;
+          font-size: 15px;
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: color 0.15s, transform 0.3s;
+          transition: color var(--t-fast), background var(--t-fast), border-color var(--t-fast), transform 0.35s;
           padding: 0;
         }
-        .member-refresh-btn:hover { color: var(--text-primary); }
-        .member-refresh-btn:active { transform: translateY(-50%) rotate(180deg); }
+        .member-refresh-btn:hover {
+          color: var(--text-secondary);
+          background: var(--bg-float);
+          border-color: var(--border-normal);
+        }
+        .member-refresh-btn:active { transform: rotate(180deg); }
 
         .member-count {
           font-size: 10px;
           color: var(--text-muted);
-          padding: 4px 10px 2px;
+          padding: 4px 12px 2px;
           font-variant-numeric: tabular-nums;
           flex-shrink: 0;
+          letter-spacing: 0.02em;
         }
 
         .ml-scroll {
           flex: 1;
           overflow-y: auto;
-          padding: 8px 8px;
+          padding: 6px 6px 12px;
         }
 
-        .ml-group { margin-bottom: 16px; }
+        /* Group: add subtle top separator for visual rhythm */
+        .ml-group {
+          margin-bottom: 8px;
+        }
+        .ml-group + .ml-group {
+          border-top: 1px solid var(--border-subtle);
+          padding-top: 6px;
+          margin-top: 2px;
+        }
 
         .ml-group-label {
-          padding: 16px 8px 4px;
-          font-size: 11px;
+          padding: 8px 8px 4px;
+          font-size: 10px;
           font-weight: 700;
-          letter-spacing: 0.06em;
+          letter-spacing: 0.08em;
           text-transform: uppercase;
           color: var(--text-muted);
         }
@@ -482,15 +508,18 @@ export default function MemberList() {
           text-align: left;
           user-select: none;
           border-radius: var(--r-sm, 4px);
-          transition: color var(--t-fast);
+          transition: color var(--t-fast), background var(--t-fast);
         }
-        .ml-group-label--btn:hover { color: var(--text-secondary); }
+        .ml-group-label--btn:hover {
+          color: var(--text-secondary);
+          background: var(--ch-hover-bg);
+        }
 
         .ml-group-arrow {
-          font-size: 9px;
+          font-size: 8px;
           display: inline-block;
-          transition: transform 0.15s;
-          opacity: 0.7;
+          transition: transform 0.2s var(--ease-out, cubic-bezier(0.16,1,0.3,1));
+          opacity: 0.55;
           flex-shrink: 0;
         }
         .ml-group-arrow--collapsed { transform: rotate(-90deg); }
@@ -499,14 +528,15 @@ export default function MemberList() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 6px;
-          padding: 32px 16px;
+          gap: 8px;
+          padding: 40px 16px;
           color: var(--text-muted);
         }
 
         .ml-no-results-title {
           font-size: 13px;
-          color: var(--text-muted);
+          color: var(--text-secondary);
+          font-weight: 500;
         }
 
         .ml-no-results-query {
@@ -515,6 +545,7 @@ export default function MemberList() {
           font-style: italic;
           word-break: break-all;
           text-align: center;
+          opacity: 0.8;
         }
       `}</style>
     </div>
@@ -674,13 +705,20 @@ function MemberRow({
             position: relative;
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 4px 8px;
+            gap: 9px;
+            padding: 5px 8px;
             border-radius: var(--r-sm);
             cursor: pointer;
-            transition: background var(--t-fast);
+            transition: background var(--t-fast), opacity var(--t-fast);
           }
           .mr-row:hover { background: var(--ch-hover-bg); }
+          .mr-row:focus-visible {
+            outline: 2px solid var(--accent-border);
+            outline-offset: -1px;
+          }
+          /* Offline/away de-emphasis */
+          .mr-row--away { opacity: 0.55; }
+          .mr-row--away:hover { opacity: 0.85; }
 
           .mr-avatar-wrap {
             position: relative;

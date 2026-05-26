@@ -325,9 +325,15 @@ export default function SearchOverlay() {
           position: fixed;
           inset: 0;
           z-index: 900;
-          background: rgba(3, 8, 16, 0.85);
-          backdrop-filter: blur(8px);
-          -webkit-backdrop-filter: blur(8px);
+          background: rgba(3, 8, 16, 0.88);
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+          animation: so-backdrop-in 160ms ease both;
+        }
+
+        @keyframes so-backdrop-in {
+          from { opacity: 0; }
+          to   { opacity: 1; }
         }
 
         .so-panel {
@@ -340,8 +346,8 @@ export default function SearchOverlay() {
           max-height: 70vh;
           background: var(--bg-elevated);
           border: 1px solid var(--border-normal);
-          border-radius: 12px;
-          box-shadow: var(--shadow-xl);
+          border-radius: var(--r-lg);
+          box-shadow: var(--shadow-xl), 0 0 0 1px var(--accent-border);
           z-index: 901;
           display: flex;
           flex-direction: column;
@@ -349,17 +355,18 @@ export default function SearchOverlay() {
         }
 
         @keyframes fade-scale {
-          from { opacity: 0; transform: translateX(-50%) scale(0.97); }
-          to   { opacity: 1; transform: translateX(-50%) scale(1); }
+          from { opacity: 0; transform: translateX(-50%) scale(0.96) translateY(-6px); }
+          to   { opacity: 1; transform: translateX(-50%) scale(1) translateY(0); }
         }
-        .animate-fade-scale { animation: fade-scale 180ms var(--ease-out) both; }
+        .animate-fade-scale { animation: fade-scale 200ms var(--ease-out) both; }
 
         .so-header {
           display: flex;
           align-items: center;
           gap: 10px;
-          padding: 14px 16px;
+          padding: 14px 18px;
           border-bottom: 1px solid var(--border-subtle);
+          background: var(--bg-float);
           flex-shrink: 0;
         }
 
@@ -368,12 +375,13 @@ export default function SearchOverlay() {
           background: none;
           border: none;
           outline: none;
-          font-size: 15px;
+          font-size: 18px;
           color: var(--text-primary);
           font-family: inherit;
           min-width: 0;
+          caret-color: var(--accent);
         }
-        .so-input::placeholder { color: var(--text-muted); }
+        .so-input::placeholder { color: var(--text-muted); font-size: 15px; }
 
         .so-clear {
           width: 24px; height: 24px;
@@ -390,17 +398,20 @@ export default function SearchOverlay() {
           font-size: 11px;
           font-family: var(--font-mono);
           color: var(--text-muted);
-          background: var(--bg-float);
-          border: 1px solid var(--border-normal);
+          background: var(--bg-overlay);
+          border: 1px solid var(--border-subtle);
           border-radius: var(--r-xs);
-          padding: 2px 5px;
+          padding: 2px 6px;
           flex-shrink: 0;
+          letter-spacing: 0.02em;
         }
 
         .so-body {
           overflow-y: auto;
           flex: 1;
           min-height: 0;
+          scrollbar-width: thin;
+          scrollbar-color: var(--accent-border) transparent;
         }
 
         .so-section {
@@ -410,7 +421,7 @@ export default function SearchOverlay() {
         .so-section-label {
           font-size: 11px;
           font-weight: 700;
-          letter-spacing: 0.06em;
+          letter-spacing: 0.08em;
           text-transform: uppercase;
           color: var(--text-muted);
           padding: 6px 16px 4px;
@@ -428,7 +439,8 @@ export default function SearchOverlay() {
           align-items: center;
           gap: 8px;
           width: 100%;
-          padding: 8px 16px;
+          height: 48px;
+          padding: 0 16px;
           background: none;
           border: none;
           cursor: pointer;
@@ -436,17 +448,24 @@ export default function SearchOverlay() {
           transition: background var(--t-fast);
           border-radius: 0;
         }
-        .so-recent-item:hover { background: var(--bg-float); }
-        .so-recent-item--active { color: var(--accent); }
+        .so-recent-item:hover { background: var(--accent-subtle); }
+        .so-recent-item--active { background: var(--accent-subtle); }
 
         .so-recent-sigil {
           font-size: 13px;
           color: var(--text-muted);
           flex-shrink: 0;
-          width: 16px;
-          text-align: center;
+          width: 20px;
+          height: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: var(--bg-float);
+          border-radius: var(--r-xs);
+          font-weight: 700;
         }
-        .so-recent-item--active .so-recent-sigil { color: var(--accent); }
+        .so-recent-item--active .so-recent-sigil,
+        .so-recent-item:hover .so-recent-sigil { color: var(--accent); }
 
         .so-recent-name {
           font-size: 14px;
@@ -485,7 +504,7 @@ export default function SearchOverlay() {
         .so-result {
           display: block;
           width: 100%;
-          padding: 8px 16px;
+          padding: 10px 16px;
           background: none;
           border: none;
           cursor: pointer;
@@ -493,9 +512,9 @@ export default function SearchOverlay() {
           transition: background var(--t-fast);
           border-left: 2px solid transparent;
         }
-        .so-result:hover { background: var(--bg-float); }
+        .so-result:hover { background: var(--accent-subtle); }
         .so-result--selected {
-          background: rgba(14, 165, 233, 0.08);
+          background: var(--accent-subtle);
           border-left: 2px solid var(--accent);
         }
 
@@ -508,7 +527,7 @@ export default function SearchOverlay() {
 
         .so-result-from {
           font-size: 12px;
-          font-weight: 600;
+          font-weight: 700;
           color: var(--accent);
         }
 
@@ -530,10 +549,11 @@ export default function SearchOverlay() {
         }
 
         .so-mark {
-          background: rgba(14, 165, 233, 0.22);
+          background: var(--accent-subtle);
           color: var(--accent);
           border-radius: 2px;
-          padding: 0 1px;
+          padding: 0 2px;
+          font-weight: 600;
         }
 
         .so-footer {
@@ -545,15 +565,16 @@ export default function SearchOverlay() {
           flex-shrink: 0;
           font-size: 11px;
           color: var(--text-muted);
+          background: var(--bg-deep);
         }
 
         .so-footer kbd {
           font-family: var(--font-mono);
           background: var(--bg-float);
-          border: 1px solid var(--border-normal);
+          border: 1px solid var(--border-subtle);
           border-radius: var(--r-xs);
-          padding: 1px 4px;
-          margin-right: 2px;
+          padding: 1px 5px;
+          margin-right: 3px;
           font-size: 10px;
         }
 
@@ -562,7 +583,7 @@ export default function SearchOverlay() {
           animation: jump-pulse 2s ease-out forwards;
         }
         @keyframes jump-pulse {
-          0%   { background: rgba(14,165,233,0.18); }
+          0%   { background: var(--accent-subtle); }
           100% { background: transparent; }
         }
       `}</style>

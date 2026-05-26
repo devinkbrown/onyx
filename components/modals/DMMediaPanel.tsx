@@ -458,7 +458,7 @@ const css = `
 
   .dm-media-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
     gap: 3px;
     padding: 0 4px;
   }
@@ -468,7 +468,7 @@ const css = `
 
   .dm-media-cell {
     aspect-ratio: 1;
-    border-radius: 3px;
+    border-radius: var(--r-sm);
     overflow: hidden;
     background: var(--bg-elevated);
     cursor: pointer;
@@ -483,9 +483,9 @@ const css = `
     width: 100%; height: 100%;
     object-fit: cover;
     display: block;
-    transition: transform 200ms;
+    transition: transform 220ms var(--ease-out, ease);
   }
-  .dm-media-cell:hover img { transform: scale(1.04); }
+  .dm-media-cell:hover img { transform: scale(1.06); }
 
   .dm-media-video-thumb {
     width: 100%; height: 100%;
@@ -511,14 +511,28 @@ const css = `
   .dm-media-overlay {
     position: absolute;
     inset: 0;
-    background: rgba(0,0,0,0.4);
+    background: linear-gradient(to bottom, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.52) 100%);
     opacity: 0;
-    transition: opacity 0.15s;
+    transition: opacity 180ms var(--ease-out, ease);
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
-    padding: 3px;
+    padding: 4px;
   }
+  /* expand icon */
+  .dm-media-cell::after {
+    content: '⤢';
+    position: absolute;
+    top: 6px;
+    right: 7px;
+    font-size: 14px;
+    color: rgba(255,255,255,0.85);
+    text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+    opacity: 0;
+    transition: opacity 180ms ease;
+    pointer-events: none;
+  }
+  .dm-media-cell:hover::after { opacity: 1; }
   .dm-media-cell:hover .dm-media-overlay { opacity: 1; }
 
   .dm-media-overlay-nick {
@@ -547,12 +561,15 @@ const css = `
   .dm-media-jump-btn:hover { background: rgba(0,0,0,0.75); }
 
   .dm-media-skeleton {
-    background: var(--bg-overlay);
-    animation: dm-media-shimmer 1.4s ease-in-out infinite;
+    background: linear-gradient(90deg,
+      var(--bg-elevated) 0%,
+      var(--bg-float)    45%,
+      var(--bg-elevated) 100%);
+    background-size: 200% 100%;
+    animation: dm-media-shimmer 1.5s ease infinite;
   }
   @keyframes dm-media-shimmer {
-    0%   { opacity: 1; }
-    50%  { opacity: 0.4; }
-    100% { opacity: 1; }
+    from { background-position: -200% 0; }
+    to   { background-position:  200% 0; }
   }
 `;

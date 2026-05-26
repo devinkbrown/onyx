@@ -35,6 +35,8 @@ export function useKeyboardShortcuts() {
   const openSearchOverlay     = useOnyxStore(s => s.openSearchOverlay);
   const openKeyboardShortcuts = useOnyxStore(s => s.openKeyboardShortcuts);
   const toggleFocusMode       = useOnyxStore(s => s.toggleFocusMode);
+  const markRead              = useOnyxStore(s => s.markRead);
+  const markChannelRead       = useOnyxStore(s => s.markChannelRead);
 
   // Navigation history stack for Alt+←/→
   const historyStack  = useRef<ActiveView[]>([]);
@@ -163,11 +165,18 @@ export function useKeyboardShortcuts() {
         return;
       }
 
-      // ── Ctrl/Cmd + Shift + M → Toggle mute ───────────────────────────
+      // ── Ctrl/Cmd + Shift + M → Mark all channels and DMs as read ─────
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'M') {
         e.preventDefault();
-        const { muted } = useOnyxStore.getState().voice;
-        setVoiceCallState({ muted: !muted });
+        // Mark all channels read
+        const state = useOnyxStore.getState();
+        for (const ch of state.channels.values()) {
+          markRead(ch.name);
+          markChannelRead(ch.name);
+        }
+        for (const dm of state.dms.values()) {
+          markRead(dm.nick);
+        }
         return;
       }
 
@@ -295,5 +304,5 @@ export function useKeyboardShortcuts() {
       document.removeEventListener('keydown', handleDown);
       document.removeEventListener('keyup',   handleUp);
     };
-  }, [status, openSettings, openSearchOverlay, openKeyboardShortcuts, toggleMemberList, navigate, activeView, channels, dms, setVoiceCallState, toggleFocusMode]);
+  }, [status, openSettings, openSearchOverlay, openKeyboardShortcuts, toggleMemberList, navigate, activeView, channels, dms, setVoiceCallState, toggleFocusMode, markRead, markChannelRead]);
 }

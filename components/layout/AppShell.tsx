@@ -203,6 +203,35 @@ export default function AppShell({ children }: Props) {
   const dragStartXRef = useRef(0);
   const dragStartWidthRef = useRef(0);
 
+  // ── Swipe-right-to-open-sidebar (mobile) ──────────────────────────────────
+  const swipeTouchStartX = useRef(0);
+  const swipeTouchStartY = useRef(0);
+  const swipeIsTracking = useRef(false);
+
+  const onSwipeTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    swipeTouchStartX.current = touch.clientX;
+    swipeTouchStartY.current = touch.clientY;
+    // Only initiate swipe tracking if the touch starts within 30px of the left edge
+    swipeIsTracking.current = touch.clientX <= 30;
+  }, []);
+
+  const onSwipeTouchMove = useCallback((_e: React.TouchEvent) => {
+    // tracking state only — no action mid-move needed
+  }, []);
+
+  const onSwipeTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!swipeIsTracking.current) return;
+    const touch = e.changedTouches[0];
+    const deltaX = touch.clientX - swipeTouchStartX.current;
+    const deltaY = Math.abs(touch.clientY - swipeTouchStartY.current);
+    swipeIsTracking.current = false;
+    // Must be predominantly horizontal and at least 50px rightward
+    if (deltaX >= 50 && deltaY < 80) {
+      openMobileSidebar();
+    }
+  }, [openMobileSidebar]);
+
   const onResizeMouseDown = useCallback((e: React.MouseEvent) => {
     isDraggingRef.current = true;
     dragStartXRef.current = e.clientX;
@@ -362,7 +391,14 @@ export default function AppShell({ children }: Props) {
       </div>
 
       {/* Main content area */}
-      <div className="app-main" id="main-content" ref={mainRef}>
+      <div
+        className="app-main"
+        id="main-content"
+        ref={mainRef}
+        onTouchStart={onSwipeTouchStart}
+        onTouchMove={onSwipeTouchMove}
+        onTouchEnd={onSwipeTouchEnd}
+      >
         {/* Mobile top bar */}
         <div className="mobile-topbar">
           <button
@@ -645,10 +681,10 @@ export default function AppShell({ children }: Props) {
           gap: 6px;
           margin: 4px 8px;
           padding: 6px 10px;
-          background: var(--accent-subtle, rgba(124,90,245,0.12));
-          border: 1px solid var(--accent-border, rgba(124,90,245,0.3));
+          background: var(--accent-subtle, rgba(14,165,233,0.12));
+          border: 1px solid var(--accent-border, rgba(14,165,233,0.3));
           border-radius: 6px;
-          color: var(--accent, #7c5af5);
+          color: var(--accent, #0ea5e9);
           font-size: 12px;
           font-weight: 500;
           cursor: pointer;
@@ -657,7 +693,7 @@ export default function AppShell({ children }: Props) {
         }
         .pwa-install-btn:hover {
           background: var(--accent-subtle-hover, rgba(124,90,245,0.2));
-          border-color: var(--accent, #7c5af5);
+          border-color: var(--accent, #0ea5e9);
         }
         .pwa-install-icon {
           font-size: 14px;
@@ -697,6 +733,8 @@ export default function AppShell({ children }: Props) {
           background: var(--bg-deep);
           border-left: 1px solid var(--border-subtle);
           overflow-y: auto;
+          position: relative;
+          z-index: 1;
         }
 
         /* ── Spatial pad floating host ── */
@@ -749,8 +787,9 @@ export default function AppShell({ children }: Props) {
         .mobile-overlay {
           display: none;
           position: fixed; inset: 0; z-index: 100;
-          background: rgba(0,0,0,0.6);
-          backdrop-filter: blur(2px);
+          background: rgba(0,0,0,0.65);
+          backdrop-filter: blur(6px) saturate(0.7);
+          -webkit-backdrop-filter: blur(6px) saturate(0.7);
         }
 
         /* ── Mobile breakpoint ── */
@@ -758,15 +797,30 @@ export default function AppShell({ children }: Props) {
           .mobile-topbar { display: flex; }
           .mobile-overlay { display: block; }
 
+          /* Main shell bottom pad accounts for bottom nav + safe area */
+          .app-shell {
+            padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+          }
+
+          /* Mobile topbar gets larger menu button touch target */
+          .mobile-menu-btn {
+            width: 44px;
+            height: 44px;
+          }
+
           .app-sidebar {
             position: fixed;
             left: 0; top: 0; bottom: 0;
             z-index: 200;
             transform: translateX(calc(-100% - var(--server-bar-w)));
             width: var(--sidebar-w);
+            /* Smooth spring slide */
+            transition: transform 300ms cubic-bezier(0.16,1,0.3,1),
+                        box-shadow 300ms cubic-bezier(0.16,1,0.3,1);
           }
           .app-sidebar--open {
             transform: translateX(0);
+            box-shadow: 4px 0 32px rgba(0,0,0,0.6);
           }
 
           .app-member-list { display: none; }
@@ -774,7 +828,8 @@ export default function AppShell({ children }: Props) {
             display: flex;
             flex-direction: column;
             position: fixed;
-            right: 0; top: 0; bottom: 56px;
+            right: 0; top: 0;
+            bottom: calc(56px + env(safe-area-inset-bottom, 0px));
             z-index: 150;
             width: min(280px, 80vw);
             background: var(--bg-deep);

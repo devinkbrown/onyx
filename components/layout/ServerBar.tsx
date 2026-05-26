@@ -225,91 +225,117 @@ export default function ServerBar() {
           flex-direction: column;
           align-items: center;
           padding: 12px 0;
-          gap: 8px;
+          gap: 4px;
           overflow-y: auto;
           overflow-x: hidden;
           border-right: 1px solid var(--border-subtle);
         }
         .server-bar::-webkit-scrollbar { display: none; }
 
+        /* ── Server icon button ── */
         .server-btn {
-          width: 48px;
-          height: 48px;
-          border-radius: var(--r-xl);
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
           border: none;
           cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: border-radius var(--t-normal), background var(--t-fast);
+          transition:
+            border-radius 200ms var(--ease-out),
+            background 150ms var(--ease-out),
+            transform 200ms var(--ease-out),
+            opacity 150ms var(--ease-out);
           position: relative;
           flex-shrink: 0;
+          transform: scale(1);
         }
-        .server-btn:hover { border-radius: var(--r-md); }
-        .server-btn--active { border-radius: var(--r-md) !important; }
+        .server-btn:hover {
+          border-radius: 12px;
+          transform: scale(1.136); /* 44→50px equivalent */
+        }
+        .server-btn--active {
+          border-radius: 12px !important;
+          transform: scale(1.136) !important;
+          box-shadow: 0 0 0 0 transparent;
+        }
+        /* Server icon glow on active */
+        .server-btn:not(.server-btn--home):not(.server-btn--add).server-btn--active {
+          box-shadow: 0 4px 20px rgba(14, 165, 233, 0.35), 0 0 0 1px rgba(14, 165, 233, 0.18);
+        }
 
         /* Active indicator bar on the left */
         .server-btn::before {
           content: '';
           position: absolute;
           left: -12px;
-          width: 4px;
-          background: var(--text-primary);
+          width: 3px;
+          background: var(--accent);
           border-radius: 0 var(--r-xs) var(--r-xs) 0;
-          transition: height var(--t-normal), opacity var(--t-fast);
+          transition: height 200ms var(--ease-out), opacity 150ms var(--ease-out);
           opacity: 0;
           height: 0;
         }
-        .server-btn:hover::before { height: 20px; opacity: 1; }
-        .server-btn--active::before { height: 40px; opacity: 1; }
+        .server-btn:hover::before { height: 20px; opacity: 0.7; }
+        .server-btn--active::before { height: 40px; opacity: 1; background: var(--accent); }
 
         .server-btn--home {
           background: var(--bg-deep);
           color: var(--text-primary);
         }
-        .server-btn--home:hover { background: var(--accent); }
+        .server-btn--home:hover { background: var(--accent); color: #fff; }
         .server-btn--home.server-btn--active { background: var(--accent); color: #fff; }
 
+        /* Add server button */
         .server-btn--add {
           background: var(--bg-deep);
           color: var(--success);
+          border: 1.5px dashed rgba(52, 211, 153, 0.35);
         }
-        .server-btn--add:hover { background: var(--success); color: #fff; border-radius: var(--r-md); }
+        .server-btn--add:hover {
+          background: var(--success);
+          color: #fff;
+          border: 1.5px solid var(--success);
+          transform: scale(1.05);
+          border-radius: 12px;
+        }
 
         .server-btn--bell {
           background: var(--bg-deep);
           color: var(--text-secondary);
         }
-        .server-btn--bell:hover { background: var(--bg-overlay); color: var(--text-primary); border-radius: var(--r-md); }
+        .server-btn--bell:hover { background: var(--bg-overlay); color: var(--text-primary); }
         .server-btn--bell.server-btn--active { background: var(--accent); color: #fff; }
 
         .server-btn--theme {
           background: var(--bg-deep);
           color: var(--text-secondary);
         }
-        .server-btn--theme:hover { background: var(--bg-overlay); color: var(--text-primary); border-radius: var(--r-md); }
+        .server-btn--theme:hover { background: var(--bg-overlay); color: var(--text-primary); }
         .server-btn--theme.server-btn--active { background: var(--accent); color: #fff; }
 
         .server-btn--connprofile {
           background: var(--bg-deep);
           color: var(--text-secondary);
         }
-        .server-btn--connprofile:hover { background: var(--bg-overlay); color: var(--text-primary); border-radius: var(--r-md); }
+        .server-btn--connprofile:hover { background: var(--bg-overlay); color: var(--text-primary); }
         .server-btn--connprofile.server-btn--active { background: var(--accent); color: #fff; }
 
         .server-btn--help {
           background: var(--bg-deep);
           color: var(--text-muted);
         }
-        .server-btn--help:hover { background: var(--bg-overlay); color: var(--text-secondary); border-radius: var(--r-md); }
+        .server-btn--help:hover { background: var(--bg-overlay); color: var(--text-secondary); }
 
         .server-btn--friends {
           background: var(--bg-deep);
           color: var(--text-secondary);
         }
-        .server-btn--friends:hover { background: var(--bg-overlay); color: var(--text-primary); border-radius: var(--r-md); }
+        .server-btn--friends:hover { background: var(--bg-overlay); color: var(--text-primary); }
         .server-btn--friends.server-btn--active { background: var(--accent); color: #fff; }
 
+        /* ── Badges ── */
         .server-badge--online {
           background: var(--success, #3ba55d);
           color: #fff;
@@ -327,9 +353,7 @@ export default function ServerBar() {
           pointer-events: none;
         }
 
-        .server-spacer {
-          flex: 1;
-        }
+        .server-spacer { flex: 1; }
 
         .server-btn-initial {
           font-size: 14px;
@@ -344,7 +368,8 @@ export default function ServerBar() {
           background: var(--border-normal);
           border-radius: var(--r-full);
           flex-shrink: 0;
-          margin: 2px 0;
+          margin: 4px 0;
+          opacity: 0.6;
         }
 
         /* Wrapper for badge positioning */
@@ -353,7 +378,7 @@ export default function ServerBar() {
           flex-shrink: 0;
         }
 
-        /* Mention count badge */
+        /* Unread / mention badge */
         .server-badge {
           position: absolute;
           bottom: -2px;
@@ -376,8 +401,9 @@ export default function ServerBar() {
           width: 10px;
           height: 10px;
           border-radius: 50%;
-          background: var(--text-primary);
+          background: var(--accent);
           border: 2px solid var(--bg-void);
+          opacity: 0.8;
         }
         .server-badge--gold {
           background: var(--gold, #e8b84b);
@@ -396,14 +422,14 @@ export default function ServerBar() {
           background: var(--bg-deep);
           color: var(--text-secondary);
         }
-        .server-btn--bookmark:hover { background: var(--bg-overlay); color: var(--text-primary); border-radius: var(--r-md); }
+        .server-btn--bookmark:hover { background: var(--bg-overlay); color: var(--gold, #e8b84b); }
         .server-btn--bookmark.server-btn--active { background: var(--gold, #e8b84b); color: #000; }
 
         .server-btn--announce {
           background: var(--bg-deep);
           color: var(--text-secondary);
         }
-        .server-btn--announce:hover { background: var(--bg-overlay); color: #e8b84b; border-radius: var(--r-md); }
+        .server-btn--announce:hover { background: var(--bg-overlay); color: #e8b84b; }
         .server-btn--announce.server-btn--active { background: #e8b84b; color: #000; }
 
         .server-badge--announce-pulse {
@@ -448,6 +474,15 @@ export default function ServerBar() {
         @keyframes conn-dot-pulse {
           0%, 100% { opacity: 1; }
           50%       { opacity: 0.4; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .server-btn {
+            transition-duration: 0.001ms !important;
+          }
+          .server-btn::before {
+            transition-duration: 0.001ms !important;
+          }
         }
       `}</style>
     </div>

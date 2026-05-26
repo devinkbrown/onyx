@@ -7,7 +7,7 @@ import { _applyAccentColor } from '@/lib/store';
 // Reads from / writes to the Zustand store so it works anywhere in the tree
 // without requiring a provider wrapper.
 
-export type ThemeOption = 'onyx' | 'ash' | 'amoled' | 'light' | 'system';
+export type ThemeOption = 'midnight' | 'onyx' | 'ash' | 'amoled' | 'light' | 'system';
 
 export interface ThemeContextValue {
   theme: ThemeOption;
@@ -51,7 +51,7 @@ export default function ThemeProvider() {
   const [resolvedTheme, setResolvedTheme] = useState<string>(() => {
     if (storeTheme === 'system') {
       if (typeof window !== 'undefined') {
-        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'onyx' : 'light';
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'midnight' : 'light';
       }
       return 'onyx';
     }
@@ -85,10 +85,10 @@ export default function ThemeProvider() {
   useEffect(() => {
     const html = document.documentElement;
     // Only override data-theme with the legacy system if the new theme is still
-    // at the default ('onyx'), so new-system themes take priority.
-    if (storeTheme === 'onyx') {
-      if (activeTheme === 'ocean') {
-        // Legacy default maps to onyx — leave the new system in control
+    // at the default ('midnight'), so new-system themes take priority.
+    if (storeTheme === 'midnight') {
+      if (activeTheme === 'ocean' || activeTheme === 'midnight') {
+        // Legacy defaults map to midnight — leave the new system in control
       } else {
         html.setAttribute('data-theme', activeTheme);
       }

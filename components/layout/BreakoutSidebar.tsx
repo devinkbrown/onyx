@@ -361,9 +361,10 @@ export function BreakoutSidebar({ channel, onClose }: BreakoutSidebarProps) {
           width: 280px;
           height: 100%;
           background: var(--bg-deep);
-          border-left: 1px solid var(--border-subtle);
+          border-left: 1px solid var(--border-normal);
           overflow: hidden;
           flex-shrink: 0;
+          box-shadow: -4px 0 20px rgba(0,0,0,0.35);
         }
 
         /* Mobile: full-screen panel */
@@ -382,24 +383,25 @@ export function BreakoutSidebar({ channel, onClose }: BreakoutSidebarProps) {
           align-items: center;
           justify-content: space-between;
           gap: 8px;
-          padding: 12px 14px;
+          padding: 13px 14px 12px;
           border-bottom: 1px solid var(--border-subtle);
           flex-shrink: 0;
+          background: var(--bg-elevated);
         }
         .bk-sidebar-title {
           display: flex;
           align-items: center;
-          gap: 6px;
-          font-size: 12px;
+          gap: 7px;
+          font-size: 11px;
           font-weight: 700;
-          letter-spacing: 0.06em;
+          letter-spacing: 0.07em;
           text-transform: uppercase;
           color: var(--text-secondary);
         }
         .bk-badge {
           min-width: 18px;
           height: 18px;
-          padding: 0 4px;
+          padding: 0 5px;
           background: var(--accent-subtle);
           color: var(--accent);
           border-radius: var(--r-full);
@@ -453,12 +455,16 @@ export function BreakoutSidebar({ channel, onClose }: BreakoutSidebarProps) {
           border-radius: var(--r-md);
           border: 1px solid var(--border-subtle);
           background: var(--bg-elevated);
-          transition: border-color var(--t-fast), background var(--t-fast);
+          transition: border-color var(--t-fast), background var(--t-fast), box-shadow var(--t-fast);
+        }
+        .bk-card:hover {
+          border-color: var(--border-normal);
+          background: var(--bg-float);
         }
         .bk-card--active {
           border-color: var(--accent-border);
           background: var(--bg-float);
-          box-shadow: inset 0 0 0 1px var(--accent-border);
+          box-shadow: inset 0 0 0 1px var(--accent-border), 0 0 0 1px var(--accent-glow);
         }
 
         .bk-card-name-row {

@@ -251,8 +251,9 @@ export default function OnboardingModal() {
           position: fixed;
           inset: 0;
           z-index: 900;
-          background: rgba(0, 0, 0, 0.72);
-          backdrop-filter: blur(6px);
+          background: rgba(0, 0, 0, 0.75);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -262,17 +263,17 @@ export default function OnboardingModal() {
 
         .onb-modal {
           width: 100%;
-          max-width: 500px;
-          background: var(--bg-float);
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-xl, 16px);
-          box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255,255,255,0.04) inset;
+          max-width: 480px;
+          background: var(--bg-2, var(--bg-elevated));
+          border: 1px solid var(--border-subtle);
+          border-radius: 12px;
+          box-shadow: 0 24px 64px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(14,165,233,0.06) inset;
           padding: 36px 32px 32px;
           display: flex;
           flex-direction: column;
           align-items: center;
           gap: 0;
-          animation: onb-fade-in 220ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+          animation: onb-fade-in 180ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
         }
 
         /* ── Progress dots ── */
@@ -280,20 +281,23 @@ export default function OnboardingModal() {
           display: flex;
           gap: 8px;
           margin-bottom: 28px;
+          align-items: center;
         }
         .onb-dot {
-          width: 8px;
-          height: 8px;
+          width: 7px;
+          height: 7px;
           border-radius: 9999px;
-          background: var(--bg-overlay, #3a3a4a);
-          transition: background 220ms ease, transform 220ms ease;
+          background: var(--bg-overlay);
+          transition: background 220ms ease, width 220ms ease, transform 220ms ease;
         }
         .onb-dot--active {
           background: var(--accent);
-          transform: scale(1.25);
+          width: 22px;
+          transform: none;
+          box-shadow: 0 0 8px rgba(14,165,233,0.4);
         }
         .onb-dot--done {
-          background: color-mix(in srgb, var(--accent) 50%, transparent);
+          background: color-mix(in srgb, var(--accent) 45%, transparent);
         }
 
         /* ── Step container ── */
@@ -367,14 +371,14 @@ export default function OnboardingModal() {
         .onb-label {
           font-size: 11px;
           font-weight: 700;
-          letter-spacing: 0.07em;
+          letter-spacing: 0.1em;
           text-transform: uppercase;
           color: var(--text-muted);
         }
         .onb-textarea {
           width: 100%;
           box-sizing: border-box;
-          background: var(--bg-input, var(--bg-deep));
+          background: var(--bg-deep);
           border: 1px solid var(--border-normal);
           border-radius: var(--r-md, 8px);
           color: var(--text-primary);
@@ -383,12 +387,12 @@ export default function OnboardingModal() {
           padding: 10px 12px;
           resize: none;
           line-height: 1.5;
-          transition: border-color 150ms ease;
+          transition: border-color 150ms ease, box-shadow 150ms ease;
           outline: none;
         }
         .onb-textarea:focus {
-          border-color: var(--accent-border, var(--accent));
-          box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
+          border-color: var(--accent-border);
+          box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
         }
         .onb-textarea::placeholder {
           color: var(--text-muted);
@@ -407,7 +411,7 @@ export default function OnboardingModal() {
           padding: 10px 12px;
           border-radius: var(--r-md, 8px);
           background: var(--bg-deep);
-          border: 1px solid var(--border-subtle);
+          border: 1px solid var(--border-normal);
           color: var(--text-secondary);
           font-size: 13px;
           font-weight: 500;
@@ -418,11 +422,12 @@ export default function OnboardingModal() {
         }
         .onb-status-option:hover {
           background: var(--ch-hover-bg);
+          border-color: var(--accent-border);
           color: var(--text-primary);
         }
         .onb-status-option--active {
-          background: var(--accent-subtle, color-mix(in srgb, var(--accent) 15%, transparent));
-          border-color: var(--accent-border, color-mix(in srgb, var(--accent) 40%, transparent));
+          background: var(--accent-subtle);
+          border-color: var(--accent-border);
           color: var(--text-primary);
         }
         .onb-status-dot {
@@ -446,13 +451,13 @@ export default function OnboardingModal() {
           padding: 10px 14px;
           border-radius: var(--r-md, 8px);
           background: var(--bg-deep);
-          border: 1px solid var(--border-subtle);
+          border: 1px solid var(--border-normal);
           cursor: pointer;
           transition: background 150ms ease, border-color 150ms ease;
         }
         .onb-channel-item:has(.onb-checkbox:checked) {
-          background: var(--accent-subtle, color-mix(in srgb, var(--accent) 15%, transparent));
-          border-color: var(--accent-border, color-mix(in srgb, var(--accent) 40%, transparent));
+          background: var(--accent-subtle);
+          border-color: var(--accent-border);
         }
         .onb-channel-item:hover {
           background: var(--ch-hover-bg);
@@ -504,7 +509,7 @@ export default function OnboardingModal() {
           font-size: 13px;
           color: var(--text-muted);
           background: var(--bg-deep);
-          border: 1px solid var(--border-subtle);
+          border: 1px solid var(--border-normal);
           border-radius: var(--r-md, 8px);
           padding: 10px 14px;
           display: flex;
@@ -535,7 +540,7 @@ export default function OnboardingModal() {
         /* ── Primary button ── */
         .onb-btn-primary {
           width: 100%;
-          height: 42px;
+          height: 40px;
           background: var(--accent);
           color: #fff;
           border: none;
@@ -545,8 +550,9 @@ export default function OnboardingModal() {
           font-family: inherit;
           cursor: pointer;
           margin-top: 8px;
-          transition: opacity 150ms ease, transform 100ms ease;
-          letter-spacing: 0.01em;
+          transition: opacity 150ms ease, transform 100ms ease, box-shadow 150ms ease;
+          letter-spacing: 0.02em;
+          box-shadow: 0 2px 12px rgba(14,165,233,0.3);
         }
         .onb-btn-primary:hover:not(:disabled) {
           opacity: 0.9;

@@ -154,19 +154,21 @@ export default function MotdModal() {
         }
 
         .motd-header {
-          padding: 20px 24px 12px;
+          padding: 20px 24px 14px;
           flex-shrink: 0;
           display: flex;
           align-items: center;
           gap: 12px;
+          border-bottom: 1px solid var(--border-subtle);
         }
 
         .motd-title {
-          font-size: 18px;
+          font-size: 17px;
           font-weight: 700;
           color: var(--text-primary);
           margin: 0;
           flex: 1;
+          letter-spacing: -0.01em;
         }
 
         .motd-copy-btn {
@@ -188,7 +190,7 @@ export default function MotdModal() {
         }
 
         .motd-search-wrap {
-          padding: 0 24px 10px;
+          padding: 10px 24px 8px;
           flex-shrink: 0;
           display: flex;
           align-items: center;
@@ -224,36 +226,40 @@ export default function MotdModal() {
         }
 
         .motd-lines {
-          font-size: 12px;
-          line-height: 1.6;
+          font-size: 13px;
+          line-height: 1.65;
           background: var(--bg-elevated);
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-md);
-          padding: 12px 14px;
+          padding: 14px 16px;
           max-height: 420px;
           overflow-y: auto;
           scrollbar-width: thin;
-          scrollbar-color: var(--border-normal) transparent;
+          scrollbar-color: var(--accent-border, rgba(14,165,233,0.28)) transparent;
         }
-        .motd-lines::-webkit-scrollbar { width: 6px; }
+        .motd-lines::-webkit-scrollbar { width: 4px; }
         .motd-lines::-webkit-scrollbar-track { background: transparent; }
         .motd-lines::-webkit-scrollbar-thumb {
-          background: var(--border-normal);
-          border-radius: 3px;
+          background: var(--accent-border, rgba(14,165,233,0.28));
+          border-radius: 2px;
+        }
+        .motd-lines::-webkit-scrollbar-thumb:hover {
+          background: var(--accent, #0ea5e9);
         }
 
         .motd-line {
           color: var(--text-secondary);
           white-space: pre-wrap;
           word-break: break-word;
-          min-height: 1.6em;
+          min-height: 1.65em;
         }
 
         .motd-line--art {
-          font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
-          font-size: 11px;
+          font-family: var(--font-mono, 'JetBrains Mono', 'Fira Code', monospace);
+          font-size: 11.5px;
           line-height: 1.4;
           white-space: pre;
+          color: var(--text-primary);
         }
 
         .motd-footer {

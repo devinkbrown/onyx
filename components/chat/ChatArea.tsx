@@ -305,7 +305,7 @@ export default function ChatArea() {
       {isChannel && activeChannelKey && streams.get(activeChannelKey)?.live && (
         <StreamLayout channel={activeView.kind === 'channel' ? activeView.channel : ''} />
       )}
-      <div className="chat-msg-wrap">
+      <div className="chat-body-wrap">
         <MessageList
           messages={messages}
           ourNick={''}
@@ -362,7 +362,7 @@ export default function ChatArea() {
           position: relative;
         }
 
-        .chat-msg-wrap {
+        .chat-body-wrap {
           position: relative;
           flex: 1;
           overflow: hidden;

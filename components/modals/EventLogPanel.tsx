@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, type CSSProperties } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import type { ChannelEventType } from '@/lib/store';
 
@@ -75,7 +75,7 @@ export default function EventLogPanel() {
             <button
               key={type}
               className={`elp-filter-btn${active ? ' elp-filter-btn--active' : ''}`}
-              style={active ? { '--filter-color': activeColor } as React.CSSProperties : undefined}
+              style={active ? { '--filter-color': activeColor } as unknown as CSSProperties : undefined}
               onClick={() => toggleEventFilter(type)}
               aria-pressed={active}
               title={`Toggle ${label} events`}
@@ -224,9 +224,17 @@ export default function EventLogPanel() {
           overflow-y: auto;
           padding: 6px 0;
           scrollbar-width: thin;
+          scrollbar-color: var(--accent-border, rgba(14,165,233,0.28)) transparent;
         }
-        .elp-list::-webkit-scrollbar { width: 4px; }
-        .elp-list::-webkit-scrollbar-thumb { background: var(--border-normal); border-radius: 2px; }
+        .elp-list::-webkit-scrollbar { width: 3px; }
+        .elp-list::-webkit-scrollbar-track { background: transparent; }
+        .elp-list::-webkit-scrollbar-thumb {
+          background: var(--accent-border, rgba(14,165,233,0.28));
+          border-radius: 2px;
+        }
+        .elp-list::-webkit-scrollbar-thumb:hover {
+          background: var(--accent, #0ea5e9);
+        }
 
         .elp-empty {
           display: flex;
@@ -247,10 +255,11 @@ export default function EventLogPanel() {
           display: flex;
           align-items: flex-start;
           gap: 6px;
-          padding: 4px 12px;
+          padding: 3px 12px;
           transition: background 100ms;
         }
-        .elp-row:hover { background: var(--ch-hover-bg); }
+        .elp-row:nth-child(even) { background: rgba(255,255,255,0.018); }
+        .elp-row:hover { background: var(--accent-subtle, rgba(14,165,233,0.06)) !important; }
 
         .elp-row-icon {
           font-size: 11px;
@@ -265,13 +274,16 @@ export default function EventLogPanel() {
           color: var(--text-muted);
           flex-shrink: 0;
           line-height: 18px;
+          font-family: var(--font-mono, monospace);
           font-variant-numeric: tabular-nums;
           letter-spacing: -0.01em;
           white-space: nowrap;
+          opacity: 0.7;
         }
 
         .elp-row-text {
           font-size: 12px;
+          font-family: var(--font-mono, monospace);
           color: var(--text-secondary);
           line-height: 18px;
           min-width: 0;

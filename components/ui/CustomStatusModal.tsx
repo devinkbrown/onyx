@@ -250,7 +250,7 @@ export default function CustomStatusModal() {
           background: var(--bg-elevated);
           border: 1px solid var(--border-normal);
           border-radius: var(--r-lg);
-          box-shadow: var(--shadow-xl, 0 16px 48px rgba(0,0,0,0.55));
+          box-shadow: var(--shadow-xl, 0 16px 48px rgba(0,0,0,0.55)), 0 0 0 1px var(--border-subtle);
           padding: 16px;
           display: flex;
           flex-direction: column;
@@ -301,10 +301,11 @@ export default function CustomStatusModal() {
           border: 1px solid var(--border-normal);
           border-radius: var(--r-md);
           padding: 6px 10px;
-          transition: border-color 150ms ease;
+          transition: border-color var(--t-fast, 150ms) ease, box-shadow var(--t-fast, 150ms) ease;
         }
         .csm-input-row:focus-within {
-          border-color: var(--accent-border, var(--accent));
+          border-color: var(--accent);
+          box-shadow: 0 0 0 3px var(--accent-subtle);
         }
 
         .csm-emoji-btn {
@@ -366,11 +367,12 @@ export default function CustomStatusModal() {
 
         /* ── Section label ── */
         .csm-presets-label {
-          font-size: 10px;
+          font-size: 11px;
           font-weight: 700;
-          letter-spacing: 0.07em;
+          letter-spacing: 0.09em;
           text-transform: uppercase;
           color: var(--text-muted);
+          margin-bottom: -4px;
         }
 
         /* ── Activity presets ── */
@@ -474,9 +476,16 @@ export default function CustomStatusModal() {
           font-family: inherit;
           border-radius: var(--r-md);
           cursor: pointer;
-          transition: opacity 120ms ease;
+          transition: opacity 120ms ease, box-shadow 120ms ease, transform 120ms ease;
         }
-        .csm-save-btn:hover { opacity: 0.88; }
+        .csm-save-btn:hover {
+          opacity: 0.90;
+          box-shadow: 0 0 0 3px var(--accent-subtle);
+          transform: translateY(-1px);
+        }
+        .csm-save-btn:active {
+          transform: translateY(0);
+        }
       `}</style>
     </div>
   );

@@ -168,7 +168,7 @@ export default function MemberContextMenu({
           </button>
         )}
 
-        {/* Mode section — only if we have op/halfop */}
+        {/* Mode section — only if we have op */}
         {canMode && (
           <>
             <div className="member-ctx-sep" role="separator" />

@@ -28,18 +28,19 @@ export default function ConnectionBanner() {
       {connectionStatus === 'connecting' && (
         <>
           <Spinner />
-          <span>Connecting to server...</span>
+          <span className="conn-text">Connecting to server…</span>
         </>
       )}
 
       {connectionStatus === 'reconnecting' && (
         <>
           <Spinner />
-          <span>
-            Connection lost. Reconnecting in {reconnectIn}s&hellip;
+          <span className="conn-text">
+            Connection lost. Reconnecting
+            {reconnectIn > 0 ? ` in ${reconnectIn}s` : '…'}
           </span>
           <button className="conn-btn" onClick={reconnectNow}>
-            Reconnect now
+            Now
           </button>
         </>
       )}
@@ -47,10 +48,10 @@ export default function ConnectionBanner() {
       {connectionStatus === 'disconnected' && (
         <>
           <DisconnectedIcon />
-          <span>You are disconnected.</span>
+          <span className="conn-text">You are disconnected.</span>
           {server && (
             <button className="conn-btn" onClick={handleConnect}>
-              Connect
+              Reconnect
             </button>
           )}
         </>
@@ -62,54 +63,87 @@ export default function ConnectionBanner() {
           align-items: center;
           justify-content: center;
           gap: 10px;
-          padding: 0 16px;
-          height: 40px;
+          padding: 0 20px;
+          height: 38px;
           font-size: 13px;
           font-weight: 500;
           flex-shrink: 0;
           position: sticky;
           top: 0;
           z-index: 200;
+          letter-spacing: 0.01em;
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
         }
-        .conn-banner--connecting {
-          background: rgba(251, 191, 36, 0.12);
-          border-bottom: 1px solid rgba(251, 191, 36, 0.3);
-          color: #fbbf24;
-        }
+
+        /* Status variant colors */
+        .conn-banner--connecting,
         .conn-banner--reconnecting {
-          background: rgba(251, 191, 36, 0.12);
-          border-bottom: 1px solid rgba(251, 191, 36, 0.3);
-          color: #fbbf24;
+          background: rgba(251,191,36, 0.08);
+          border-bottom: 1px solid rgba(251,191,36,0.2);
+          color: var(--warning, #fbbf24);
         }
         .conn-banner--disconnected {
-          background: rgba(248, 113, 113, 0.12);
-          border-bottom: 1px solid rgba(248, 113, 113, 0.3);
-          color: var(--danger);
+          background: rgba(248,113,113, 0.08);
+          border-bottom: 1px solid rgba(248,113,113,0.2);
+          color: var(--danger, #f87171);
         }
-        .conn-btn {
+
+        /* Pulsing status dot — only on disconnected (no spinner) */
+        .conn-banner--disconnected::before {
+          content: '';
+          display: inline-block;
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
           background: currentColor;
-          color: var(--bg-base);
-          border: none;
-          border-radius: var(--r-sm);
-          padding: 4px 12px;
+          flex-shrink: 0;
+          box-shadow: 0 0 6px currentColor;
+        }
+
+        .conn-text {
+          flex: 0 1 auto;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .conn-btn {
+          padding: 4px 14px;
+          border: 1px solid currentColor;
+          border-radius: var(--r-sm, 6px);
+          background: rgba(255,255,255,0.06);
+          color: currentColor;
           font-size: 12px;
           font-weight: 700;
+          font-family: inherit;
           cursor: pointer;
-          transition: opacity 120ms;
+          transition: background 120ms ease, transform 120ms ease;
           flex-shrink: 0;
+          letter-spacing: 0.02em;
+          white-space: nowrap;
         }
-        .conn-btn:hover { opacity: 0.85; }
-        .conn-btn:active { opacity: 0.7; }
+        .conn-btn:hover {
+          background: rgba(255,255,255,0.12);
+        }
+        .conn-btn:active {
+          transform: scale(0.96);
+          background: rgba(255,255,255,0.08);
+        }
+        .conn-btn:focus-visible {
+          outline: 2px solid currentColor;
+          outline-offset: 2px;
+        }
 
         /* Spinner */
         @keyframes conn-spin {
           to { transform: rotate(360deg); }
         }
         .conn-spinner {
-          width: 14px;
-          height: 14px;
-          border: 2px solid currentColor;
-          border-top-color: transparent;
+          width: 13px;
+          height: 13px;
+          border: 1.5px solid color-mix(in srgb, currentColor 30%, transparent);
+          border-top-color: currentColor;
           border-radius: 50%;
           animation: conn-spin 700ms linear infinite;
           flex-shrink: 0;

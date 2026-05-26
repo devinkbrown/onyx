@@ -125,7 +125,7 @@ function FolderContextMenu({
           font-family: inherit;
           transition: background 80ms;
         }
-        .fcm-item:hover { background: var(--accent-subtle, rgba(124,90,245,0.12)); }
+        .fcm-item:hover { background: var(--accent-subtle, rgba(14,165,233,0.12)); }
         .fcm-item--danger { color: var(--danger, #f04747); }
         .fcm-item--danger:hover { background: rgba(240,71,71,0.1); }
         .fcm-icon { font-size: 13px; flex-shrink: 0; line-height: 1; }
@@ -230,7 +230,7 @@ function MoveToFolderMenu({
           font-family: inherit;
           transition: background 80ms;
         }
-        .mfm-item:hover { background: var(--accent-subtle, rgba(124,90,245,0.12)); }
+        .mfm-item:hover { background: var(--accent-subtle, rgba(14,165,233,0.12)); }
         .mfm-item--new { color: var(--accent); }
         .mfm-icon { font-size: 13px; flex-shrink: 0; line-height: 1; }
         .mfm-check { margin-left: auto; color: var(--accent); font-weight: 700; font-size: 13px; }
@@ -527,8 +527,8 @@ function FolderSection({
         }
         .cfp-folder-header:hover { background: var(--ch-hover-bg, rgba(255,255,255,0.04)); }
         .cfp-folder-header--drag-over {
-          background: var(--accent-subtle, rgba(124,90,245,0.12));
-          outline: 1px dashed var(--accent, #7c5af5);
+          background: var(--accent-subtle, rgba(14,165,233,0.12));
+          outline: 1px dashed var(--accent, #0ea5e9);
           outline-offset: -1px;
         }
 
@@ -554,9 +554,20 @@ function FolderSection({
         .cfp-folder-header:hover .cfp-folder-name { color: var(--text-primary); }
 
         .cfp-folder-count {
-          font-size: 11px;
+          font-size: 10px;
+          font-weight: 700;
           color: var(--text-muted);
           flex-shrink: 0;
+          background: var(--accent-subtle);
+          border: 1px solid var(--accent-border);
+          border-radius: var(--r-full);
+          padding: 0 5px;
+          min-width: 16px;
+          height: 16px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          line-height: 1;
         }
 
         .cfp-folder-body {
@@ -575,8 +586,8 @@ function FolderSection({
           transition: background 80ms;
         }
         .cfp-empty--drag-over {
-          background: var(--accent-subtle, rgba(124,90,245,0.12));
-          color: var(--accent, #7c5af5);
+          background: var(--accent-subtle, rgba(14,165,233,0.12));
+          color: var(--accent, #0ea5e9);
           font-style: normal;
         }
 
@@ -592,8 +603,8 @@ function FolderSection({
         .cfp-row:hover { background: var(--ch-hover-bg, rgba(255,255,255,0.04)); }
         .cfp-row--active { background: var(--ch-active-bg, rgba(124,90,245,0.2)) !important; }
         .cfp-row--drag-over {
-          background: var(--accent-subtle, rgba(124,90,245,0.12));
-          outline: 1px dashed var(--accent, #7c5af5);
+          background: var(--accent-subtle, rgba(14,165,233,0.12));
+          outline: 1px dashed var(--accent, #0ea5e9);
           outline-offset: -1px;
         }
 
@@ -728,10 +739,12 @@ export default function ChannelFoldersPanel({
 
         .cfp-add-folder {
           display: flex; align-items: center;
-          gap: 4px;
-          padding: 3px 10px;
-          margin: 2px 6px;
-          background: none; border: none;
+          justify-content: center;
+          gap: 5px;
+          padding: 5px 10px;
+          margin: 4px 6px 2px;
+          background: none;
+          border: 1px dashed var(--border-normal);
           cursor: pointer;
           font-size: 11px;
           font-weight: 600;
@@ -740,12 +753,13 @@ export default function ChannelFoldersPanel({
           color: var(--text-muted);
           border-radius: var(--r-sm, 4px);
           font-family: inherit;
-          transition: background 80ms, color 80ms;
-          text-align: left;
+          transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+          text-align: center;
         }
         .cfp-add-folder:hover {
-          background: var(--ch-hover-bg, rgba(255,255,255,0.04));
-          color: var(--text-secondary);
+          background: var(--accent-subtle);
+          border-color: var(--accent-border);
+          color: var(--accent);
         }
       `}</style>
     </div>

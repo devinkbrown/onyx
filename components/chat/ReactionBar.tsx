@@ -160,22 +160,22 @@ const styles = `
     flex-wrap: wrap;
     align-items: center;
     gap: 4px;
-    margin-top: 4px;
+    margin-top: 5px;
   }
 
   .rb-pill {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    height: 24px;
-    padding: 0 8px;
-    border-radius: 12px;
-    border: 1px solid var(--border-normal);
+    gap: 5px;
+    height: 26px;
+    padding: 0 9px;
+    border-radius: 6px;
+    border: 1px solid var(--border-subtle);
     background: var(--bg-elevated);
     cursor: pointer;
     font-size: 13px;
     color: var(--text-secondary);
-    transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
+    transition: background 150ms ease, border-color 150ms ease, transform 150ms var(--ease-spring, cubic-bezier(0.175,0.885,0.32,1.275)), box-shadow 150ms ease;
     line-height: 1;
     white-space: nowrap;
     user-select: none;
@@ -183,31 +183,41 @@ const styles = `
   .rb-pill:hover {
     border-color: var(--accent-border);
     background: var(--accent-subtle);
-    transform: scale(1.05);
+    transform: scale(1.08);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
   }
   .rb-pill--mine {
     border-color: var(--accent-border);
     background: var(--accent-subtle);
     color: var(--accent);
+    box-shadow: 0 0 0 0.5px var(--accent-border) inset;
   }
   .rb-pill--mine:hover {
-    background: rgba(14, 165, 233, 0.18);
+    background: rgba(var(--accent-rgb, 14,165,233), 0.16);
+    transform: scale(1.08);
   }
 
   @keyframes reaction-pop {
     0%   { transform: scale(1); }
-    40%  { transform: scale(1.4) rotate(-8deg); }
-    70%  { transform: scale(0.9) rotate(4deg); }
+    35%  { transform: scale(1.45) rotate(-10deg); }
+    65%  { transform: scale(0.88) rotate(5deg); }
     100% { transform: scale(1) rotate(0deg); }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .rb-emoji--pop { animation: none !important; }
+    .rb-pill:hover { transform: none; }
   }
 
   .rb-emoji { font-size: 14px; line-height: 1; display: inline-block; }
-  .rb-emoji--pop { animation: reaction-pop 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
-  .rb-count { font-size: 12px; font-weight: 600; }
+  .rb-emoji--pop { animation: reaction-pop 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+  .rb-count {
+    font-size: 11.5px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-secondary);
+  }
+  .rb-pill--mine .rb-count { color: var(--accent); }
 
   .rb-picker-anchor { position: relative; }
 
@@ -215,19 +225,20 @@ const styles = `
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 12px;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
     border: 1px dashed var(--border-normal);
     background: none;
     cursor: pointer;
     color: var(--text-muted);
-    transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+    transition: background 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease;
   }
   .rb-add-btn:hover {
     border-color: var(--accent-border);
     background: var(--accent-subtle);
     color: var(--accent);
+    transform: scale(1.08);
   }
 `;
 

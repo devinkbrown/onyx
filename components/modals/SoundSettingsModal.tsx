@@ -184,10 +184,10 @@ export default function SoundSettingsModal() {
 
         .ssm-panel {
           background: var(--bg-deep, #06101d);
-          border: 1px solid rgba(14,165,233,0.18);
+          border: 1px solid var(--border-normal, rgba(124,90,245,0.18));
           border-radius: 14px;
           width: min(440px, 94vw);
-          box-shadow: 0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(14,165,233,0.06);
+          box-shadow: 0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px var(--border-subtle, rgba(124,90,245,0.07));
           overflow: hidden;
         }
 
@@ -195,42 +195,51 @@ export default function SoundSettingsModal() {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 20px 24px 16px;
-          border-bottom: 1px solid rgba(255,255,255,0.06);
+          padding: 18px 24px 16px;
+          border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
         }
 
         .ssm-title {
           font-size: 16px;
           font-weight: 700;
-          color: #e2eaf4;
+          color: var(--text-primary, #e2eaf4);
           margin: 0;
+          letter-spacing: -0.01em;
         }
 
         .ssm-close {
           background: none;
           border: none;
-          color: rgba(226,234,244,0.4);
+          color: var(--text-muted, rgba(226,234,244,0.4));
           font-size: 16px;
           cursor: pointer;
           padding: 4px 8px;
           border-radius: 6px;
           line-height: 1;
           transition: color 150ms, background 150ms;
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
-        .ssm-close:hover { color: #e2eaf4; background: rgba(255,255,255,0.07); }
+        .ssm-close:hover {
+          color: var(--text-primary, #e2eaf4);
+          background: rgba(255,255,255,0.07);
+        }
 
         .ssm-section {
           padding: 16px 24px;
-          border-bottom: 1px solid rgba(255,255,255,0.05);
+          border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.05));
         }
         .ssm-section:last-child { border-bottom: none; }
 
         .ssm-section-title {
-          font-size: 11px;
+          font-size: 10px;
           font-weight: 700;
-          letter-spacing: 0.08em;
+          letter-spacing: 0.1em;
           text-transform: uppercase;
-          color: rgba(226,234,244,0.4);
+          color: var(--text-muted, rgba(226,234,244,0.4));
           margin: 0 0 12px;
         }
 
@@ -248,8 +257,9 @@ export default function SoundSettingsModal() {
         .ssm-row + .ssm-row { margin-top: 4px; }
 
         .ssm-label {
-          font-size: 14px;
-          color: rgba(226,234,244,0.85);
+          font-size: 13.5px;
+          color: var(--text-primary, rgba(226,234,244,0.85));
+          font-weight: 500;
         }
 
         /* Toggle switch */
@@ -258,7 +268,7 @@ export default function SoundSettingsModal() {
           width: 44px;
           height: 24px;
           border-radius: 12px;
-          background: rgba(255,255,255,0.12);
+          background: var(--border-normal, rgba(255,255,255,0.12));
           border: none;
           cursor: pointer;
           transition: background 200ms;
@@ -274,6 +284,7 @@ export default function SoundSettingsModal() {
           height: 18px;
           border-radius: 50%;
           background: #fff;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.4);
           transition: transform 200ms cubic-bezier(0.16,1,0.3,1);
         }
         .ssm-toggle--on .ssm-toggle-knob { transform: translateX(20px); }
@@ -282,8 +293,9 @@ export default function SoundSettingsModal() {
         .ssm-slider {
           width: 100%;
           accent-color: var(--accent, #0ea5e9);
-          margin-top: 6px;
+          margin-top: 8px;
           cursor: pointer;
+          height: 4px;
         }
         .ssm-slider:disabled { opacity: 0.35; cursor: not-allowed; }
 
@@ -303,10 +315,10 @@ export default function SoundSettingsModal() {
         .ssm-select {
           width: 100%;
           appearance: none;
-          background: rgba(255,255,255,0.06);
-          border: 1px solid rgba(255,255,255,0.12);
+          background: var(--bg-elevated, rgba(255,255,255,0.06));
+          border: 1px solid var(--border-normal, rgba(255,255,255,0.12));
           border-radius: 7px;
-          color: rgba(226,234,244,0.9);
+          color: var(--text-primary, rgba(226,234,244,0.9));
           font-size: 13px;
           padding: 7px 30px 7px 10px;
           cursor: pointer;
@@ -315,34 +327,43 @@ export default function SoundSettingsModal() {
           background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='rgba(226,234,244,0.45)' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
           background-repeat: no-repeat;
           background-position: right 10px center;
+          font-family: inherit;
         }
-        .ssm-select:focus { border-color: rgba(14,165,233,0.5); background-color: rgba(255,255,255,0.09); }
+        .ssm-select:focus {
+          border-color: var(--accent-border, rgba(14,165,233,0.4));
+          box-shadow: 0 0 0 2px var(--accent-subtle, rgba(14,165,233,0.1));
+        }
         .ssm-select:disabled { opacity: 0.35; cursor: not-allowed; }
-        .ssm-select option { background: #0d1b2a; color: #e2eaf4; }
+        .ssm-select option { background: var(--bg-deep, #0d1b2a); color: var(--text-primary, #e2eaf4); }
 
         .ssm-preview-desc {
           margin: 8px 0 0;
           font-size: 11px;
-          color: rgba(226,234,244,0.4);
+          color: var(--text-muted, rgba(226,234,244,0.4));
           font-style: italic;
           line-height: 1.4;
         }
 
         /* Test button */
         .ssm-test-btn {
-          background: rgba(14,165,233,0.14);
-          border: 1px solid rgba(14,165,233,0.25);
+          background: var(--accent-subtle, rgba(14,165,233,0.1));
+          border: 1px solid var(--accent-border, rgba(14,165,233,0.28));
           color: var(--accent, #0ea5e9);
-          font-size: 12px;
-          font-weight: 600;
+          font-size: 12.5px;
+          font-weight: 700;
           padding: 7px 14px;
           border-radius: 7px;
           cursor: pointer;
-          transition: background 150ms, border-color 150ms;
+          transition: background 150ms, border-color 150ms, box-shadow 150ms;
           white-space: nowrap;
           flex-shrink: 0;
+          letter-spacing: 0.01em;
         }
-        .ssm-test-btn:hover:not(:disabled) { background: rgba(14,165,233,0.24); border-color: rgba(14,165,233,0.4); }
+        .ssm-test-btn:hover:not(:disabled) {
+          background: var(--accent-glow, rgba(14,165,233,0.18));
+          border-color: var(--accent, #0ea5e9);
+          box-shadow: 0 0 12px var(--accent-glow, rgba(14,165,233,0.2));
+        }
         .ssm-test-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
         /* Checkboxes */
@@ -352,9 +373,15 @@ export default function SoundSettingsModal() {
           gap: 10px;
           min-height: 32px;
           cursor: pointer;
+          padding: 2px 4px;
+          border-radius: var(--r-xs, 3px);
+          transition: background 80ms;
+        }
+        .ssm-check-row:not(.ssm-check-row--disabled):hover {
+          background: rgba(255,255,255,0.03);
         }
         .ssm-check-row--disabled { cursor: default; }
-        .ssm-check-row + .ssm-check-row { margin-top: 2px; }
+        .ssm-check-row + .ssm-check-row { margin-top: 1px; }
 
         .ssm-checkbox {
           width: 16px;
@@ -367,9 +394,9 @@ export default function SoundSettingsModal() {
 
         .ssm-check-label {
           font-size: 13px;
-          color: rgba(226,234,244,0.8);
+          color: var(--text-secondary, rgba(226,234,244,0.8));
         }
-        .ssm-muted { color: rgba(226,234,244,0.35); font-style: italic; }
+        .ssm-muted { color: var(--text-muted, rgba(226,234,244,0.35)); font-style: italic; }
 
         /* Label group (label + subtitle stacked) */
         .ssm-label-group {

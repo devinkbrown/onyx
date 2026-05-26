@@ -150,7 +150,7 @@ export default function MessageSelectionToolbar() {
           gap: 12px;
           padding: 10px 16px;
           background: var(--bg-deep, #0d1117);
-          border-top: 1px solid var(--accent, #7c5af5);
+          border-top: 1px solid var(--accent, #0ea5e9);
           box-shadow: 0 -4px 20px rgba(124, 90, 245, 0.12);
           animation: sel-toolbar-rise 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
           z-index: 10;
@@ -165,7 +165,7 @@ export default function MessageSelectionToolbar() {
         .msg-sel-count {
           font-size: 13px;
           font-weight: 600;
-          color: var(--accent, #7c5af5);
+          color: var(--accent, #0ea5e9);
           white-space: nowrap;
           flex-shrink: 0;
         }

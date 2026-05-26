@@ -19,11 +19,10 @@ function initials(nick: string): string {
   return clean.slice(0, 2).toUpperCase();
 }
 
-/** Returns true for users who are considered speakers: voice (+v), halfop (+h), op (+o), admin (+a), owner (+q) */
+/** Returns true for users who are considered speakers: voice (+v), op (+o), admin (+a), owner (+q) */
 function isSpeaker(user: ChannelUser): boolean {
   return (
     user.modes.has('v') ||
-    user.modes.has('h') ||
     user.modes.has('o') ||
     user.modes.has('a') ||
     user.modes.has('q')
@@ -635,7 +634,7 @@ export default function StageView() {
           font-size: 10px;
           padding: 1px 5px;
           border-radius: 4px;
-          background: var(--accent, #7c5af5);
+          background: var(--accent, #0ea5e9);
           color: white;
           font-weight: 600;
           margin-left: 4px;
@@ -821,8 +820,8 @@ export default function StageView() {
         }
         .stage-hand-btn {
           background: rgba(124, 90, 245, 0.15);
-          border: 1px solid var(--accent, #7c5af5);
-          color: var(--accent, #7c5af5);
+          border: 1px solid var(--accent, #0ea5e9);
+          color: var(--accent, #0ea5e9);
           border-radius: 20px;
           padding: 8px 16px;
           cursor: pointer;
@@ -889,8 +888,8 @@ export default function StageView() {
 
         .sv-invite-btn--accept {
           background: rgba(124, 90, 245, 0.25);
-          border: 1px solid var(--accent, #7c5af5);
-          color: var(--accent, #7c5af5);
+          border: 1px solid var(--accent, #0ea5e9);
+          color: var(--accent, #0ea5e9);
         }
 
         .sv-invite-btn--decline {

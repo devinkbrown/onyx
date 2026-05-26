@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useOnyxStore } from '@/lib/store';
+
+let _warnedAboutMediaUrl = false;
 
 export interface UploadResult {
   file: File;
@@ -60,6 +63,7 @@ export function useFileUpload(): {
 } {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<UploadProgress[]>([]);
+  const addNotification = useOnyxStore(s => s.addNotification);
 
   const upload = useCallback(async (files: File[]): Promise<UploadResult[]> => {
     if (files.length === 0) return [];
@@ -68,6 +72,13 @@ export function useFileUpload(): {
 
     // If no media server configured, fall back to blob URLs immediately
     if (!mediaUrl) {
+      if (!_warnedAboutMediaUrl) {
+        _warnedAboutMediaUrl = true;
+        addNotification({
+          type: 'system',
+          text: 'File sharing is local only — set NEXT_PUBLIC_MEDIA_URL for cross-user sharing',
+        });
+      }
       return files.map(file => {
         const localUrl = URL.createObjectURL(file);
         const isMedia = file.type.startsWith('image/') || file.type.startsWith('video/');
@@ -119,7 +130,7 @@ export function useFileUpload(): {
 
     setUploading(false);
     return results;
-  }, []);
+  }, [addNotification]);
 
   return { upload, uploading, progress };
 }

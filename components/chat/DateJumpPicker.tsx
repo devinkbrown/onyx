@@ -117,32 +117,37 @@ export default function DateJumpPicker({ onJump }: DateJumpPickerProps) {
 
         .djp-popover {
           position: absolute;
-          top: calc(100% + 6px);
+          top: calc(100% + 8px);
           right: 0;
-          width: 210px;
-          background: var(--bg-float, #1e1e2e);
-          border: 1px solid var(--border-normal, rgba(255,255,255,0.1));
-          border-radius: var(--r-md, 8px);
-          box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-          padding: 12px;
+          width: 224px;
+          background: var(--bg-float);
+          border: 1px solid var(--border-normal);
+          border-radius: var(--r-lg);
+          box-shadow: var(--shadow-lg, 0 8px 32px rgba(0,0,0,0.65)), 0 0 0 1px var(--border-subtle);
+          padding: 14px;
           z-index: 200;
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 10px;
+          animation: djp-in 140ms var(--ease-out, ease) both;
+        }
+        @keyframes djp-in {
+          from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+          to   { opacity: 1; transform: translateY(0)   scale(1);     }
         }
 
         .djp-label {
           font-size: 11px;
           font-weight: 700;
-          letter-spacing: 0.06em;
+          letter-spacing: 0.08em;
           text-transform: uppercase;
-          color: var(--text-muted, #4b4f6a);
+          color: var(--text-muted);
           margin: 0;
         }
 
         .djp-row {
           display: flex;
-          gap: 6px;
+          gap: 7px;
           align-items: stretch;
         }
 
@@ -150,34 +155,39 @@ export default function DateJumpPicker({ onJump }: DateJumpPickerProps) {
           flex: 1;
           min-width: 0;
           font-size: 13px;
-          padding: 5px 8px;
-          background: var(--bg-base, #13131f);
-          color: var(--text-primary, #e4e4ef);
-          border: 1px solid var(--border-normal, rgba(255,255,255,0.1));
-          border-radius: var(--r-sm, 4px);
+          height: 34px;
+          padding: 0 10px;
+          background: var(--bg-deep);
+          color: var(--text-primary);
+          border: 1px solid var(--border-normal);
+          border-radius: var(--r-sm);
           outline: none;
-          transition: border-color 150ms;
+          transition: border-color var(--t-fast, 150ms) ease, box-shadow var(--t-fast, 150ms) ease;
           color-scheme: dark;
+          font-family: inherit;
         }
         .djp-input:focus {
-          border-color: var(--accent, #7c5af5);
-          box-shadow: 0 0 0 1px var(--accent-border, rgba(124,90,245,0.3));
+          border-color: var(--accent);
+          box-shadow: 0 0 0 3px var(--accent-subtle);
         }
 
         .djp-go {
           flex-shrink: 0;
           font-size: 13px;
           font-weight: 600;
-          padding: 5px 12px;
-          background: var(--accent, #7c5af5);
+          padding: 0 14px;
+          height: 34px;
+          background: var(--accent);
           color: #fff;
           border: none;
-          border-radius: var(--r-sm, 4px);
+          border-radius: var(--r-sm);
           cursor: pointer;
-          transition: opacity 150ms;
+          font-family: inherit;
+          transition: opacity var(--t-fast, 150ms) ease, box-shadow var(--t-fast, 150ms) ease;
         }
         .djp-go:hover:not(:disabled) {
-          opacity: 0.85;
+          opacity: 0.88;
+          box-shadow: 0 0 0 3px var(--accent-subtle);
         }
         .djp-go:disabled {
           opacity: 0.35;

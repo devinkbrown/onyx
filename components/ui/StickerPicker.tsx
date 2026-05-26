@@ -117,12 +117,12 @@ export default function StickerPicker({ onPick, onClose }: Props) {
           max-height: 380px;
           display: flex;
           flex-direction: column;
-          background: rgba(6, 16, 29, 0.92);
+          background: var(--bg-float, #1a2c40);
           backdrop-filter: blur(20px);
           -webkit-backdrop-filter: blur(20px);
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 16px;
-          box-shadow: 0 8px 48px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4);
+          border: 1px solid var(--border-subtle, rgba(124,90,245,0.08));
+          border-radius: 12px;
+          box-shadow: 0 12px 48px rgba(0,0,0,0.65), 0 2px 8px rgba(0,0,0,0.4);
           z-index: 200;
           overflow: hidden;
           animation: sp-enter 180ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
@@ -137,12 +137,11 @@ export default function StickerPicker({ onPick, onClose }: Props) {
         .sp-tabs {
           display: flex;
           gap: 0;
-          padding: 8px 10px 0;
+          padding: 0 8px;
           flex-shrink: 0;
           overflow-x: auto;
           scrollbar-width: none;
-          border-bottom: 1px solid rgba(255,255,255,0.06);
-          padding-bottom: 0;
+          border-bottom: 1px solid var(--border-subtle, rgba(124,90,245,0.08));
         }
 
         .sp-tabs::-webkit-scrollbar { display: none; }
@@ -151,25 +150,27 @@ export default function StickerPicker({ onPick, onClose }: Props) {
           background: none;
           border: none;
           border-bottom: 2px solid transparent;
-          padding: 7px 12px 8px;
+          padding: 9px 10px;
           font-size: 12px;
-          font-weight: 500;
+          font-weight: 600;
           font-family: inherit;
-          color: var(--text-muted);
+          color: var(--text-muted, #505880);
           cursor: pointer;
           white-space: nowrap;
           flex-shrink: 0;
           transition: color 150ms ease, border-color 150ms ease;
-          letter-spacing: 0.2px;
+          letter-spacing: 0.01em;
+          position: relative;
+          top: 1px;
         }
 
         .sp-tab:hover {
-          color: var(--text-secondary);
+          color: var(--text-secondary, #a0a8c8);
         }
 
         .sp-tab--active {
-          color: var(--accent);
-          border-bottom-color: var(--accent);
+          color: var(--text-primary, #f0f4ff);
+          border-bottom-color: var(--accent, #0ea5e9);
         }
 
         /* ── Grid ── */
@@ -177,55 +178,58 @@ export default function StickerPicker({ onPick, onClose }: Props) {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
           gap: 6px;
-          padding: 10px;
+          padding: 8px;
           overflow-y: auto;
           scrollbar-width: thin;
-          scrollbar-color: rgba(14,165,233,0.15) transparent;
+          scrollbar-color: var(--border-normal, rgba(124,90,245,0.12)) transparent;
         }
 
         .sp-grid::-webkit-scrollbar { width: 4px; }
         .sp-grid::-webkit-scrollbar-thumb {
-          background: rgba(14,165,233,0.15);
+          background: var(--border-normal, rgba(124,90,245,0.12));
           border-radius: 2px;
         }
         .sp-grid::-webkit-scrollbar-thumb:hover {
-          background: rgba(14,165,233,0.3);
+          background: var(--border-subtle, rgba(124,90,245,0.2));
         }
 
-        /* ── Sticker tile ── */
+        /* ── Sticker tile — 64px cells ── */
         .sp-sticker {
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
           gap: 4px;
-          background: rgba(255,255,255,0.03);
-          border: 1px solid rgba(255,255,255,0.06);
-          border-radius: 10px;
+          background: rgba(255,255,255,0.025);
+          border: 1px solid var(--border-subtle, rgba(124,90,245,0.06));
+          border-radius: 8px;
           padding: 8px 4px 6px;
           cursor: pointer;
           transition:
             background 150ms ease,
             border-color 150ms ease,
-            transform 120ms cubic-bezier(0.34, 1.56, 0.64, 1),
-            box-shadow 120ms ease;
+            transform 250ms cubic-bezier(0.34, 1.56, 0.64, 1),
+            box-shadow 250ms ease;
           font-family: inherit;
-          min-height: 68px;
+          min-height: 64px;
         }
 
         .sp-sticker:hover {
-          background: rgba(255,255,255,0.07);
-          border-color: rgba(14,165,233,0.25);
-          transform: scale(1.06);
-          box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+          background: rgba(255,255,255,0.06);
+          border-color: var(--accent-border, rgba(14,165,233,0.25));
+          transform: scale(1.15);
+          box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+          z-index: 1;
+          position: relative;
         }
 
         .sp-sticker:active {
           transform: scale(0.96);
+          transition-duration: 100ms;
         }
 
         .sp-sticker-preview {
-          font-size: 20px;
+          font-size: 22px;
           line-height: 1.2;
           display: block;
           text-align: center;
@@ -237,7 +241,7 @@ export default function StickerPicker({ onPick, onClose }: Props) {
 
         .sp-sticker-label {
           font-size: 10px;
-          color: var(--text-muted);
+          color: var(--text-muted, #505880);
           text-align: center;
           max-width: 100%;
           overflow: hidden;

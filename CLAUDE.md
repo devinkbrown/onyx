@@ -53,8 +53,9 @@ Configure `NEXT_PUBLIC_IRC_WS` in `.env.local` to point to your Ophion wsockd en
 ## Design system
 All design tokens live in `app/globals.css` under `:root`.
 - Surfaces: `--bg-void` through `--bg-overlay` (6 levels)
-- Accent: `--accent` (violet #7c5af5)
-- Gold: `--gold` (#e8b84b, luxury accent)
+- Default theme: `midnight` — sky blue `--accent` (#0ea5e9), bioluminescent cyan `--gold` (#67e8f9)
+- Accent: `--accent` (sky blue #0ea5e9 in default/midnight theme)
+- Gold: `--gold` (#67e8f9, bioluminescent cyan)
 - Component styles are co-located as `<style>` tags inside components
 
 ## Auth features integrated

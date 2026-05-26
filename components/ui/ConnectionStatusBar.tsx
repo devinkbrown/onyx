@@ -157,46 +157,59 @@ export default function ConnectionStatusBar() {
   );
 
   if (isHigh) {
+    // High latency — show as a compact floating pill (not an intrusive full-width banner)
     return (
-      <div className="csb-banner csb-banner--high" role="alert" aria-live="assertive">
-        <span className="csb-banner-icon" aria-hidden>⚠</span>
-        <span className="csb-banner-text">High latency: {latencyMs}ms</span>
+      <div className="csb-pill csb-pill--high" role="status" aria-live="polite" title={`High latency: ${latencyMs}ms`}>
+        <span className="csb-pill-icon" aria-hidden>⚠</span>
+        <span>{latencyMs}ms</span>
         {latencyHistory.length >= 2 && (
           <div className="csb-sparkline-wrap" title="Ping history">
             <LatencySparkline history={latencyHistory} />
           </div>
         )}
-        {connectedAt && (
-          <span className="csb-uptime" title="Connected for">⏱ {uptime}</span>
-        )}
         {server && (
-          <button className="csb-banner-btn" onClick={handleReconnect}>
-            Reconnect
+          <button className="csb-reconnect-btn" onClick={handleReconnect} title="Reconnect">
+            ↺
           </button>
         )}
-        {InfoButton}
         <style>{`
-          .csb-banner {
+          .csb-pill {
+            position: fixed;
+            bottom: 16px;
+            right: 16px;
+            z-index: 150;
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 10px;
-            padding: 0 16px;
-            height: 36px;
+            gap: 5px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            user-select: none;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            pointer-events: auto;
+          }
+          .csb-pill--high {
+            background: rgba(248, 113, 113, 0.1);
+            border: 1px solid rgba(248, 113, 113, 0.3);
+            color: #f87171;
+          }
+          .csb-pill-icon { font-size: 10px; line-height: 1; opacity: 0.8; }
+          .csb-reconnect-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: currentColor;
             font-size: 13px;
-            font-weight: 500;
-            flex-shrink: 0;
-            position: sticky;
-            top: 0;
-            z-index: 200;
+            line-height: 1;
+            padding: 0 2px;
+            opacity: 0.7;
+            transition: opacity 120ms;
           }
-          .csb-banner--high {
-            background: rgba(249, 115, 22, 0.12);
-            border-bottom: 1px solid rgba(249, 115, 22, 0.3);
-            color: #f97316;
-          }
-          .csb-banner-icon { font-size: 14px; line-height: 1; }
-          .csb-banner-text { flex: 1; text-align: center; }
+          .csb-reconnect-btn:hover { opacity: 1; }
           .csb-sparkline-wrap { display: flex; align-items: center; }
           .csb-sparkline-group { position: relative; }
           .csb-sparkline-stats {
@@ -212,50 +225,17 @@ export default function ConnectionStatusBar() {
           }
           .csb-sparkline-tooltip {
             position: absolute;
-            background: var(--bg-float, #1e1e2e);
-            border: 1px solid var(--border-subtle, rgba(255,255,255,0.12));
+            background: var(--bg-float, #1a2c40);
+            border: 1px solid var(--border-subtle, rgba(14,165,233,0.12));
             border-radius: 4px;
             padding: 2px 6px;
             font-size: 10px;
             font-weight: 700;
-            color: var(--text-primary, #fff);
+            color: var(--text-primary, #dff0ff);
             white-space: nowrap;
             pointer-events: none;
             z-index: 100;
           }
-          .csb-uptime {
-            font-size: 11px;
-            opacity: 0.7;
-            white-space: nowrap;
-          }
-          .csb-banner-btn {
-            background: currentColor;
-            color: var(--bg-base);
-            border: none;
-            border-radius: var(--r-sm);
-            padding: 4px 12px;
-            font-size: 12px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: opacity 120ms;
-            flex-shrink: 0;
-          }
-          .csb-banner-btn:hover { opacity: 0.85; }
-          .csb-banner-btn:active { opacity: 0.7; }
-          .csb-info-btn {
-            background: none;
-            border: none;
-            cursor: pointer;
-            color: currentColor;
-            font-size: 14px;
-            line-height: 1;
-            padding: 2px 4px;
-            opacity: 0.6;
-            border-radius: var(--r-sm);
-            transition: opacity 120ms;
-            flex-shrink: 0;
-          }
-          .csb-info-btn:hover { opacity: 1; }
         `}</style>
       </div>
     );
@@ -283,19 +263,21 @@ export default function ConnectionStatusBar() {
             z-index: 150;
             display: flex;
             align-items: center;
-            gap: 4px;
-            padding: 3px 9px;
-            background: rgba(251, 191, 36, 0.12);
-            border: 1px solid rgba(251, 191, 36, 0.3);
+            gap: 5px;
+            padding: 4px 10px;
+            background: rgba(251, 191, 36, 0.08);
+            border: 1px solid rgba(251, 191, 36, 0.25);
             border-radius: 999px;
             color: #fbbf24;
             font-size: 11px;
             font-weight: 600;
-            letter-spacing: 0.01em;
+            letter-spacing: 0.02em;
             user-select: none;
-            backdrop-filter: blur(8px);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
           }
-          .csb-pill-icon { font-size: 10px; line-height: 1; }
+          .csb-pill-icon { font-size: 10px; line-height: 1; opacity: 0.8; }
           .csb-sparkline-wrap { display: flex; align-items: center; }
           .csb-sparkline-group { position: relative; }
           .csb-sparkline-stats {
@@ -368,17 +350,30 @@ export default function ConnectionStatusBar() {
             display: flex;
             align-items: center;
             gap: 5px;
-            padding: 3px 8px;
-            background: rgba(var(--bg-elevated-rgb, 40,40,60), 0.6);
+            padding: 3px 10px 3px 8px;
+            background: var(--bg-elevated);
             border: 1px solid var(--border-subtle);
             border-radius: 999px;
             color: var(--text-muted);
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 500;
             user-select: none;
             pointer-events: auto;
+            box-shadow: var(--shadow-sm);
+            letter-spacing: 0.01em;
           }
-          .csb-quiet-ms { opacity: 0.8; }
+          /* Green connected dot */
+          .csb-quiet::before {
+            content: '';
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--status-online);
+            box-shadow: 0 0 5px rgba(52,211,153,0.5);
+            flex-shrink: 0;
+          }
+          .csb-quiet-ms { opacity: 0.8; font-variant-numeric: tabular-nums; }
           .csb-sparkline-wrap { display: flex; align-items: center; }
           .csb-sparkline-group { position: relative; }
           .csb-sparkline-stats {

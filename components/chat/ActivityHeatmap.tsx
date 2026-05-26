@@ -78,7 +78,7 @@ export default function ActivityHeatmap({ messages }: Props) {
                   width={CELL_W}
                   height={CELL_H}
                   rx={0.5}
-                  fill={opacity === 0 ? 'var(--border-subtle, rgba(255,255,255,0.06))' : 'var(--accent, #7c5af5)'}
+                  fill={opacity === 0 ? 'var(--border-subtle, rgba(255,255,255,0.06))' : 'var(--accent, #0ea5e9)'}
                   fillOpacity={opacity === 0 ? 1 : opacity}
                   style={{ cursor: count > 0 ? 'pointer' : 'default' }}
                   onMouseEnter={(e) => {

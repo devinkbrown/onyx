@@ -18,7 +18,7 @@ const ACCESS_LEVELS: AccessLevel[] = ['OWNER', 'ADMIN', 'OP', 'HOST', 'VOICE', '
 const LEVEL_COLORS: Record<AccessLevel, string> = {
   OWNER: '#67e8f9',
   ADMIN: '#a78bfa',
-  OP:    '#7c5af5',
+  OP:    '#0ea5e9',
   HOST:  '#38bdf8',
   VOICE: '#4ade80',
   DENY:  '#ef4444',
@@ -279,12 +279,12 @@ export default function AccessListModal() {
         }
 
         .acl-panel {
-          width: 420px; max-width: 96vw;
+          width: 440px; max-width: 96vw;
           background: var(--bg-deep);
           border-left: 1px solid var(--border-normal);
           display: flex; flex-direction: column;
           overflow: hidden;
-          box-shadow: -8px 0 48px rgba(0, 0, 0, 0.55);
+          box-shadow: -8px 0 48px rgba(0, 0, 0, 0.6), -1px 0 0 var(--accent-glow);
         }
 
         /* ── Header ── */

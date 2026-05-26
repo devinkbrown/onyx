@@ -1,10 +1,11 @@
 'use client';
 
 import { useOnyxStore } from '@/lib/store';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react';
 import Tooltip from '@/components/ui/Tooltip';
 import SpeakingBars from './SpeakingBars';
 import VoiceParticipantCard from './VoiceParticipantCard';
+import { OpcodecWasm } from '@/lib/ladon-media/OpcodecWasm';
 
 // ── Video participant tile ─────────────────────────────────────────────────────
 interface VoiceVideoTileProps {
@@ -127,6 +128,18 @@ function useLocalMicLevel(isInCall: boolean, localStream: MediaStream | null): n
   return level;
 }
 
+// ── WASM load-failure detector ───────────────────────────────────────────────
+function useWasmLoadFailed(): boolean {
+  const [failed, setFailed] = useState(() => OpcodecWasm.loadFailed);
+  useEffect(() => {
+    if (OpcodecWasm.loadFailed) return; // already failed before mount
+    const handler = () => setFailed(true);
+    window.addEventListener('wasmLoadFailed', handler);
+    return () => window.removeEventListener('wasmLoadFailed', handler);
+  }, []);
+  return failed;
+}
+
 // ── Participant tile ──────────────────────────────────────────────────────────
 interface ParticipantTileProps {
   nick: string;
@@ -221,6 +234,7 @@ export default function VoiceBar() {
   const duration  = useCallDuration(isInCall);
   const micLevel  = useLocalMicLevel(isInCall, localStream);
   const ourSpeaking = micLevel > 0.12 && !muted;
+  const codecUnavailable = useWasmLoadFailed();
 
   // ── Sync peer speaking state to speakingNicks store ───────────────────────
   useEffect(() => {
@@ -328,9 +342,21 @@ export default function VoiceBar() {
 
       {/* ── Channel header ── */}
       <div className="vb-header">
-        <span className="vb-connected-dot" aria-hidden="true" />
+        <span className="vb-waveform" aria-hidden="true">
+          <span className="vb-waveform-bar" />
+          <span className="vb-waveform-bar" />
+          <span className="vb-waveform-bar" />
+          <span className="vb-waveform-bar" />
+        </span>
         <span className="vb-channel-name">{channelLabel}</span>
         <span className="vb-duration">{duration}</span>
+        {codecUnavailable && (
+          <Tooltip text="Voice codec unavailable (opcodec_wasm.js not found) — audio disabled" side="top">
+            <span className="vb-codec-warn" aria-label="Voice codec unavailable" role="img">
+              <CodecWarnIcon />
+            </span>
+          </Tooltip>
+        )}
       </div>
 
       {/* ── Participant grid ── */}
@@ -396,7 +422,7 @@ export default function VoiceBar() {
       <div className="vb-gate-wrap" title={muted ? 'Microphone muted' : 'Microphone level'}>
         <div
           className={`vb-gate-bar ${muted ? 'vb-gate-bar--muted' : 'vb-gate-bar--active'}`}
-          style={{ '--gate-level': muted ? 0 : micLevel } as React.CSSProperties}
+          style={{ '--gate-level': muted ? 0 : micLevel } as unknown as CSSProperties}
         />
       </div>
 
@@ -418,7 +444,7 @@ export default function VoiceBar() {
 
         <Tooltip text={deafened ? 'Undeafen' : 'Deafen'} side="top">
           <button
-            className={`vb-btn ${deafened ? 'vb-btn--active-danger' : ''}`}
+            className={`vb-btn ${deafened ? 'vb-btn--active-deaf' : ''}`}
             onClick={toggleDeafen}
             aria-label={deafened ? 'Undeafen' : 'Deafen'}
             aria-pressed={deafened}
@@ -451,9 +477,10 @@ export default function VoiceBar() {
           </button>
         </Tooltip>
 
-        <Tooltip text="Leave Voice" side="top">
+        <Tooltip text="Leave voice channel" side="top">
           <button className="vb-btn vb-btn--leave" onClick={hangUp} aria-label="Leave voice channel">
             <PhoneOffIcon />
+            <span aria-hidden="true">Leave</span>
           </button>
         </Tooltip>
       </div>
@@ -477,19 +504,26 @@ export default function VoiceBar() {
         @keyframes speaking-pulse {
           0%, 100% {
             box-shadow:
-              0 0 0 2px var(--vb-speaking, #22c55e),
-              0 0 0 4px rgba(34, 197, 94, 0.3);
+              0 0 0 0   rgba(52, 211, 153, 0),
+              0 0 0 2.5px var(--status-online, #34d399),
+              0 0 8px  rgba(52, 211, 153, 0.5);
           }
           50% {
             box-shadow:
-              0 0 0 3px var(--vb-speaking, #22c55e),
-              0 0 0 8px rgba(34, 197, 94, 0.0);
+              0 0 0 5px  rgba(52, 211, 153, 0),
+              0 0 0 2.5px var(--status-online, #34d399),
+              0 0 18px rgba(52, 211, 153, 0.35);
           }
         }
 
         @keyframes vb-fadein {
-          from { opacity: 0; transform: translateY(4px); }
+          from { opacity: 0; transform: translateY(6px); }
           to   { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes vb-dot-wave {
+          0%, 60%, 100% { transform: scaleY(0.4); opacity: 0.5; }
+          30%            { transform: scaleY(1);   opacity: 1; }
         }
 
         /* ── Container ── */
@@ -497,75 +531,108 @@ export default function VoiceBar() {
           display: flex;
           flex-direction: column;
           gap: 0;
-          background: rgba(34, 197, 94, 0.06);
-          border-top: 1px solid rgba(34, 197, 94, 0.18);
+          background: linear-gradient(180deg,
+            rgba(52, 211, 153, 0.07) 0%,
+            rgba(52, 211, 153, 0.03) 100%);
+          border-top: 1px solid rgba(52, 211, 153, 0.25);
           flex-shrink: 0;
-          animation: vb-fadein 200ms ease-out;
+          animation: vb-fadein 220ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
         }
 
         /* ── Header ── */
         .vb-header {
           display: flex;
           align-items: center;
-          gap: 6px;
-          padding: 8px 12px 4px;
+          gap: 7px;
+          padding: 9px 14px 5px;
         }
-        .vb-connected-dot {
-          width: 8px; height: 8px;
-          border-radius: 50%;
-          background: var(--status-online, #22c55e);
-          box-shadow: 0 0 6px rgba(34, 197, 94, 0.7);
+
+        /* Animated waveform dots — shown when not speaking; pulses when connected */
+        .vb-waveform {
+          display: flex;
+          align-items: center;
+          gap: 2px;
+          height: 14px;
           flex-shrink: 0;
         }
+        .vb-waveform-bar {
+          width: 3px;
+          border-radius: 2px;
+          background: var(--status-online, #34d399);
+          transform-origin: center bottom;
+          animation: vb-dot-wave 1.2s ease-in-out infinite;
+        }
+        .vb-waveform-bar:nth-child(1) { height: 8px; animation-delay: 0s; }
+        .vb-waveform-bar:nth-child(2) { height: 12px; animation-delay: 0.15s; }
+        .vb-waveform-bar:nth-child(3) { height: 6px; animation-delay: 0.3s; }
+        .vb-waveform-bar:nth-child(4) { height: 10px; animation-delay: 0.15s; }
+
         .vb-channel-name {
-          font-size: 12px;
+          font-size: 11.5px;
           font-weight: 700;
-          color: var(--status-online, #22c55e);
+          color: var(--status-online, #34d399);
           flex: 1;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-          letter-spacing: 0.01em;
+          letter-spacing: 0.03em;
+          text-transform: uppercase;
         }
         .vb-duration {
           font-size: 11px;
-          color: var(--text-muted);
+          color: var(--status-online, #34d399);
           font-variant-numeric: tabular-nums;
           flex-shrink: 0;
+          background: rgba(52, 211, 153, 0.1);
+          padding: 2px 7px;
+          border-radius: var(--r-full, 9999px);
+          border: 1px solid rgba(52, 211, 153, 0.2);
+          font-weight: 600;
+          letter-spacing: 0.02em;
         }
+        .vb-codec-warn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--warning, #fbbf24);
+          opacity: 0.85;
+          flex-shrink: 0;
+          cursor: default;
+          padding: 2px;
+        }
+        .vb-codec-warn:hover { opacity: 1; }
 
         /* ── Participant grid ── */
         .vb-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 6px;
-          padding: 6px 12px;
+          gap: 8px;
+          padding: 6px 14px 4px;
         }
 
         .vb-tile {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 3px;
+          gap: 4px;
           min-width: 0;
         }
 
         .vb-tile-avatar {
           position: relative;
-          width: 48px; height: 48px;
+          width: 46px; height: 46px;
           border-radius: 50%;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 15px;
+          font-size: 14px;
           font-weight: 700;
-          color: rgba(255,255,255,0.9);
+          color: rgba(255,255,255,0.92);
           letter-spacing: 0.02em;
           user-select: none;
-          transition: box-shadow 150ms ease;
+          transition: box-shadow 200ms ease, opacity 200ms;
           flex-shrink: 0;
-          /* default ring */
-          box-shadow: 0 0 0 2px transparent;
+          box-shadow: 0 0 0 2px transparent, 0 2px 8px rgba(0,0,0,0.4);
         }
 
         .vb-tile-avatar--speaking {
@@ -573,33 +640,52 @@ export default function VoiceBar() {
         }
 
         .vb-tile-avatar--muted {
-          box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.5);
-          opacity: 0.8;
+          box-shadow: 0 0 0 2.5px rgba(248, 113, 113, 0.6), 0 2px 8px rgba(0,0,0,0.4);
+          opacity: 0.72;
+        }
+
+        /* Muted icon overlay badge */
+        .vb-tile-avatar--muted::after {
+          content: '';
+          position: absolute;
+          bottom: -1px;
+          right: -1px;
+          width: 14px;
+          height: 14px;
+          background: var(--danger, #f87171);
+          border-radius: 50%;
+          border: 2px solid var(--bg-deep, #06101d);
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' fill='none' stroke='white' stroke-width='1.5' stroke-linecap='round'%3E%3Cpath d='M2 2l6 6'/%3E%3C/svg%3E");
+          background-size: 70%;
+          background-position: center;
+          background-repeat: no-repeat;
         }
 
         .vb-tile-avatar--deafened {
-          box-shadow: 0 0 0 2px rgba(156, 163, 175, 0.4);
-          opacity: 0.6;
+          box-shadow: 0 0 0 2px rgba(100,120,140,0.35), 0 2px 8px rgba(0,0,0,0.4);
+          opacity: 0.45;
+          filter: grayscale(0.5);
         }
 
         .vb-tile-you-badge {
           position: absolute;
-          bottom: -2px; right: -4px;
-          background: var(--accent, #7c5af5);
-          color: white;
-          font-size: 8px;
-          font-weight: 700;
+          bottom: -3px; right: -5px;
+          background: var(--accent, #0ea5e9);
+          color: #fff;
+          font-size: 7.5px;
+          font-weight: 800;
           padding: 1px 4px;
-          border-radius: 6px;
-          letter-spacing: 0.04em;
-          line-height: 1.4;
+          border-radius: 5px;
+          letter-spacing: 0.05em;
+          line-height: 1.5;
           white-space: nowrap;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.4);
         }
 
         .vb-tile-name {
           font-size: 10px;
           color: var(--text-secondary);
-          max-width: 52px;
+          max-width: 54px;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
@@ -612,17 +698,17 @@ export default function VoiceBar() {
           align-items: center;
           justify-content: center;
           gap: 3px;
-          max-width: 52px;
+          max-width: 54px;
         }
 
         .vb-tile-status {
-          font-size: 10px;
+          font-size: 11px;
           line-height: 1;
-          min-height: 12px;
+          min-height: 13px;
         }
 
         .vb-tile-status--speaking {
-          filter: drop-shadow(0 0 3px rgba(34,197,94,0.7));
+          filter: drop-shadow(0 0 4px rgba(52,211,153,0.8));
         }
 
         .vb-tile-hover-card {
@@ -635,39 +721,42 @@ export default function VoiceBar() {
           display: flex;
           align-items: center;
           justify-content: center;
-          width: 48px; height: 48px;
+          width: 46px; height: 46px;
           border-radius: 50%;
-          background: rgba(255,255,255,0.08);
-          border: 1px dashed rgba(255,255,255,0.2);
+          background: var(--bg-elevated, rgba(19,33,49,0.9));
+          border: 1px dashed var(--border-normal);
           font-size: 12px;
-          font-weight: 600;
+          font-weight: 700;
           color: var(--text-muted);
           cursor: default;
           user-select: none;
+          letter-spacing: 0.02em;
         }
 
         /* ── Mic gate bar ── */
         .vb-gate-wrap {
-          padding: 0 12px 2px;
+          padding: 2px 14px 3px;
           display: flex;
           align-items: center;
-          height: 12px;
+          height: 14px;
         }
         .vb-gate-bar {
           width: 100%;
           height: 3px;
           border-radius: 2px;
-          transition: transform 60ms linear, background 200ms;
+          transition: transform 55ms linear, background 220ms;
           transform-origin: left;
           transform: scaleX(var(--gate-level, 0));
         }
         .vb-gate-bar--active {
-          background: var(--status-online, #22c55e);
-          box-shadow: 0 0 4px rgba(34, 197, 94, 0.5);
+          background: linear-gradient(90deg,
+            var(--status-online, #34d399) 0%,
+            rgba(52, 211, 153, 0.6) 100%);
+          box-shadow: 0 0 6px rgba(52, 211, 153, 0.45);
         }
         .vb-gate-bar--muted {
           background: var(--text-muted);
-          opacity: 0.3;
+          opacity: 0.22;
           transform: scaleX(1);
           height: 2px;
         }
@@ -675,8 +764,8 @@ export default function VoiceBar() {
         /* ── Divider ── */
         .vb-divider {
           height: 1px;
-          background: rgba(255,255,255,0.06);
-          margin: 0 12px;
+          background: var(--border-subtle);
+          margin: 0 14px;
         }
 
         /* ── Controls ── */
@@ -684,67 +773,102 @@ export default function VoiceBar() {
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 6px;
-          padding: 8px 12px 10px;
+          gap: 8px;
+          padding: 9px 14px 11px;
         }
 
         .vb-btn {
-          width: 40px; height: 40px;
+          width: 38px; height: 38px;
           border-radius: 50%;
-          border: none;
-          background: rgba(255,255,255,0.07);
+          border: 1px solid transparent;
+          background: var(--bg-elevated, rgba(19,33,49,0.8));
           cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
           color: var(--text-secondary);
-          transition: background 150ms, color 150ms, transform 80ms;
+          transition: background 150ms, color 150ms, transform 80ms, border-color 150ms, box-shadow 150ms;
           flex-shrink: 0;
         }
         .vb-btn:hover {
-          background: rgba(255,255,255,0.13);
+          background: var(--bg-float, rgba(26,44,64,0.9));
           color: var(--text-primary);
+          border-color: var(--border-normal);
+          box-shadow: var(--shadow-sm);
         }
         .vb-btn:active {
-          transform: scale(0.93);
+          transform: scale(0.91);
         }
 
+        /* Muted = red mic — prominent danger state */
         .vb-btn--active-danger {
-          background: rgba(239, 68, 68, 0.18);
-          color: #f87171;
-          border: 1px solid rgba(239, 68, 68, 0.3);
+          background: rgba(248, 113, 113, 0.18);
+          color: var(--danger, #f87171);
+          border-color: rgba(248, 113, 113, 0.45);
+          box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.1) inset,
+                      0 0 8px rgba(248, 113, 113, 0.12);
         }
         .vb-btn--active-danger:hover {
-          background: rgba(239, 68, 68, 0.28);
+          background: rgba(248, 113, 113, 0.28);
+          border-color: rgba(248, 113, 113, 0.6);
+          box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.15) inset,
+                      0 0 12px rgba(248, 113, 113, 0.2);
+        }
+
+        /* Deafened uses separate grey state */
+        .vb-btn--active-deaf {
+          background: rgba(100, 120, 140, 0.18);
+          color: var(--text-muted);
+          border-color: rgba(100, 120, 140, 0.3);
+          opacity: 0.8;
+        }
+        .vb-btn--active-deaf:hover {
+          background: rgba(100, 120, 140, 0.28);
+          border-color: rgba(100, 120, 140, 0.45);
+          opacity: 1;
         }
 
         .vb-btn--active-blue {
-          background: rgba(59, 130, 246, 0.18);
-          color: #60a5fa;
-          border: 1px solid rgba(59, 130, 246, 0.3);
+          background: rgba(14, 165, 233, 0.14);
+          color: var(--accent, #0ea5e9);
+          border-color: rgba(14, 165, 233, 0.32);
         }
         .vb-btn--active-blue:hover {
-          background: rgba(59, 130, 246, 0.28);
+          background: rgba(14, 165, 233, 0.24);
+          border-color: rgba(14, 165, 233, 0.5);
         }
 
+        /* Leave: red, prominent pill — stands out clearly */
         .vb-btn--leave {
-          background: #dc2626;
-          color: white;
+          background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+          color: #fff;
+          border-color: rgba(220, 38, 38, 0.5);
+          box-shadow: 0 2px 10px rgba(220, 38, 38, 0.4),
+                      0 1px 0 rgba(255,255,255,0.08) inset;
+          border-radius: var(--r-full, 9999px);
+          padding: 0 14px;
+          width: auto;
+          gap: 5px;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.03em;
         }
         .vb-btn--leave:hover {
-          background: #b91c1c;
+          background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+          box-shadow: 0 3px 14px rgba(220, 38, 38, 0.55),
+                      0 1px 0 rgba(255,255,255,0.12) inset;
         }
 
         /* ── Self-preview pip ── */
         .vb-self-preview {
           position: fixed;
-          bottom: 72px;
+          bottom: 76px;
           right: 16px;
-          width: 80px; height: 60px;
-          border-radius: 6px;
+          width: 84px; height: 63px;
+          border-radius: var(--r-md, 8px);
           overflow: hidden;
-          border: 1px solid rgba(124, 90, 245, 0.5);
-          box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+          border: 1.5px solid rgba(124, 90, 245, 0.55);
+          box-shadow: 0 4px 20px rgba(0,0,0,0.6), 0 0 0 1px rgba(124,90,245,0.2);
           z-index: 200;
           background: #000;
         }
@@ -756,17 +880,18 @@ export default function VoiceBar() {
 
         /* ── Video grid ── */
         @keyframes vb-speaking-glow {
-          0%, 100% { box-shadow: 0 0 0 2px #22c55e, 0 0 10px rgba(34,197,94,0.35); }
-          50%       { box-shadow: 0 0 0 3px #22c55e, 0 0 18px rgba(34,197,94,0.15); }
+          0%, 100% { box-shadow: 0 0 0 2px var(--status-online, #34d399), 0 0 12px rgba(52,211,153,0.3); }
+          50%       { box-shadow: 0 0 0 2.5px var(--status-online, #34d399), 0 0 20px rgba(52,211,153,0.12); }
         }
 
         .voice-video-grid {
           display: grid;
-          gap: 4px;
-          padding: 4px;
+          gap: 5px;
+          padding: 5px;
           background: #000;
-          border-radius: 8px;
+          border-radius: var(--r-md, 8px);
           margin: 8px;
+          border: 1px solid var(--border-subtle);
         }
 
         /* Single tile — centered, max 2/3 width */
@@ -777,7 +902,7 @@ export default function VoiceBar() {
 
         .voice-video-tile {
           position: relative;
-          border-radius: 6px;
+          border-radius: var(--r-sm, 6px);
           overflow: hidden;
           background: var(--bg-void);
           aspect-ratio: 16/9;
@@ -797,18 +922,19 @@ export default function VoiceBar() {
           transform: scaleX(-1);
         }
         .voice-video-tile--self {
-          border-color: rgba(124,90,245,0.55);
+          border-color: rgba(124,90,245,0.6);
+          box-shadow: 0 0 0 1px rgba(124,90,245,0.2) inset;
         }
 
         /* Speaking: green glow border */
         .voice-video-tile--speaking {
-          animation: vb-speaking-glow 900ms ease-in-out infinite;
-          border-color: #22c55e;
+          animation: vb-speaking-glow 950ms ease-in-out infinite;
+          border-color: var(--status-online, #34d399);
         }
 
         /* Screenshare: accent border */
         .voice-video-tile--screenshare {
-          border-color: rgba(124,90,245,0.5);
+          border-color: rgba(124,90,245,0.55);
         }
 
         /* Bottom label row */
@@ -820,40 +946,40 @@ export default function VoiceBar() {
           display: flex;
           align-items: center;
           gap: 5px;
-          padding: 18px 8px 6px;
-          background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%);
+          padding: 20px 8px 7px;
+          background: linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0) 100%);
           pointer-events: none;
         }
 
         .voice-video-screen-icon {
           display: flex;
           align-items: center;
-          color: var(--accent, #7c5af5);
+          color: var(--accent, #0ea5e9);
           flex-shrink: 0;
           opacity: 0.9;
         }
 
         .voice-video-label {
           font-size: 12px;
-          color: rgba(255,255,255,0.92);
+          color: rgba(255,255,255,0.95);
           font-weight: 600;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+          text-shadow: 0 1px 4px rgba(0,0,0,0.95);
           display: flex;
           align-items: center;
           gap: 5px;
         }
 
         .voice-video-you-tag {
-          font-size: 10px;
-          font-weight: 700;
-          background: var(--accent, #7c5af5);
-          color: white;
+          font-size: 9.5px;
+          font-weight: 800;
+          background: var(--accent, #0ea5e9);
+          color: #fff;
           padding: 1px 5px;
           border-radius: 4px;
-          letter-spacing: 0.03em;
+          letter-spacing: 0.04em;
           flex-shrink: 0;
         }
       `}</style>
@@ -913,5 +1039,13 @@ const PhoneOffIcon = () => (
   <svg width="16" height="16" viewBox="0 0 15 15" fill="currentColor">
     <path d="M1.5 4.5a1 1 0 0 1 1-1h2.5l1 3-1.5 1a8 8 0 0 0 3 3l1-1.5 3 1v2.5a1 1 0 0 1-1 1A11 11 0 0 1 1.5 4.5z" />
     <path d="M2 2l11 11" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+  </svg>
+);
+
+const CodecWarnIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M7.5 1L1 13h13L7.5 1z" />
+    <path d="M7.5 6v3.5" />
+    <circle cx="7.5" cy="11" r="0.5" fill="currentColor" stroke="none" />
   </svg>
 );

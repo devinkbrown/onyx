@@ -151,14 +151,15 @@ export default function AwayModal() {
         .away-panel {
           width: 400px;
           max-width: calc(100vw - 32px);
-          background: var(--bg-deep, #06101d);
-          border: 1px solid var(--border-normal, rgba(255,255,255,0.1));
-          border-radius: var(--r-xl, 16px);
+          background: var(--bg-deep);
+          border: 1px solid var(--border-normal);
+          border-radius: var(--r-xl);
           padding: 20px;
           display: flex;
           flex-direction: column;
           gap: 16px;
-          box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+          box-shadow: var(--shadow-xl);
+          animation: scaleIn 180ms var(--ease-out) both;
         }
 
         .away-header {
@@ -203,18 +204,18 @@ export default function AwayModal() {
           align-items: center;
           gap: 5px;
           padding: 6px 12px;
-          background: var(--bg-base, #0c1828);
-          border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
-          border-radius: var(--r-full, 9999px);
+          background: var(--bg-elevated);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-full);
           cursor: pointer;
-          font-size: 13px;
+          font-size: 12px;
           font-family: inherit;
           color: var(--text-secondary);
           transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
         }
         .away-preset:hover {
-          background: var(--bg-overlay, rgba(255,255,255,0.08));
-          border-color: var(--border-normal, rgba(255,255,255,0.1));
+          background: var(--accent-subtle);
+          border-color: var(--accent-border);
           color: var(--text-primary);
         }
 
@@ -254,19 +255,19 @@ export default function AwayModal() {
         }
 
         .away-btn-set {
-          padding: 9px 18px;
-          background: var(--accent, #0ea5e9);
+          padding: 9px 20px;
+          background: var(--accent);
           color: #fff;
           border: none;
-          border-radius: var(--r-md, 8px);
+          border-radius: var(--r-md);
           font-size: 14px;
           font-weight: 600;
           font-family: inherit;
           cursor: pointer;
-          transition: opacity var(--t-fast), filter var(--t-fast);
+          transition: background var(--t-fast), opacity var(--t-fast);
           align-self: flex-end;
         }
-        .away-btn-set:hover:not(:disabled) { filter: brightness(1.1); }
+        .away-btn-set:hover:not(:disabled) { background: var(--accent-hover); }
         .away-btn-set:disabled {
           opacity: 0.4;
           cursor: not-allowed;

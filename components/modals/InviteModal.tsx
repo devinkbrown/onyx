@@ -281,8 +281,8 @@ const styles = `
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.55);
-    backdrop-filter: blur(3px);
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(6px);
     animation: inv-fade-in 150ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
   }
 
@@ -297,13 +297,13 @@ const styles = `
     background: var(--bg-deep);
     border: 1px solid var(--border-normal);
     border-radius: var(--r-xl, 16px);
-    box-shadow: var(--shadow-xl, 0 24px 64px rgba(0,0,0,0.5));
+    box-shadow: var(--shadow-xl, 0 24px 64px rgba(0,0,0,0.5)), 0 0 0 1px var(--accent-border);
     overflow: hidden;
-    animation: inv-scale-in 160ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
+    animation: inv-scale-in 180ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
   }
 
   @keyframes inv-scale-in {
-    from { opacity: 0; transform: scale(0.95) translateY(4px); }
+    from { opacity: 0; transform: scale(0.95) translateY(6px); }
     to   { opacity: 1; transform: scale(1)    translateY(0);   }
   }
 
@@ -311,8 +311,9 @@ const styles = `
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 20px 14px;
+    padding: 16px 20px;
     border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-elevated);
   }
 
   .inv-title-row {
@@ -331,9 +332,9 @@ const styles = `
   }
 
   .inv-close {
-    width: 28px;
-    height: 28px;
-    border-radius: var(--r-sm, 6px);
+    width: 30px;
+    height: 30px;
+    border-radius: var(--r-md, 8px);
     background: none;
     border: none;
     cursor: pointer;
@@ -350,65 +351,71 @@ const styles = `
   }
 
   .inv-body {
-    padding: 18px 20px 20px;
+    padding: 20px;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 18px;
   }
 
+  /* ── Section dividers ── */
   .inv-field {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 7px;
   }
 
   .inv-field-label {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.08em;
     color: var(--text-muted);
   }
 
   .inv-copy-row {
     display: flex;
-    align-items: flex-start;
-    gap: 8px;
+    align-items: stretch;
     background: var(--bg-void, #0d0f14);
     border: 1px solid var(--border-normal);
     border-radius: var(--r-md, 8px);
     overflow: hidden;
+    transition: border-color var(--t-fast);
+  }
+  .inv-copy-row:hover {
+    border-color: var(--accent-border);
   }
 
   .inv-pre {
     flex: 1;
     margin: 0;
-    padding: 10px 12px;
-    font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
-    font-size: 12.5px;
-    line-height: 1.6;
+    padding: 10px 13px;
+    font-family: var(--font-mono, 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace);
+    font-size: 12px;
+    line-height: 1.65;
     color: var(--text-secondary);
     white-space: pre-wrap;
     word-break: break-all;
     background: transparent;
     overflow: hidden;
+    letter-spacing: 0.01em;
   }
 
   .inv-copy-btn {
     flex-shrink: 0;
     align-self: stretch;
-    padding: 0 14px;
+    padding: 0 16px;
     border: none;
     border-left: 1px solid var(--border-subtle);
     background: var(--bg-elevated, rgba(255,255,255,0.04));
     color: var(--text-muted);
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
     transition: background var(--t-fast, 150ms), color var(--t-fast, 150ms);
     font-family: inherit;
-    min-width: 80px;
+    min-width: 82px;
     text-align: center;
+    letter-spacing: 0.02em;
   }
   .inv-copy-btn:hover {
     background: var(--bg-float, rgba(255,255,255,0.08));
@@ -416,11 +423,11 @@ const styles = `
   }
   .inv-copy-btn--copied {
     color: var(--status-online, #3dd68c);
-    background: rgba(61, 214, 140, 0.08);
+    background: rgba(52, 211, 153, 0.08);
   }
   .inv-copy-btn--copied:hover {
     color: var(--status-online, #3dd68c);
-    background: rgba(61, 214, 140, 0.12);
+    background: rgba(52, 211, 153, 0.13);
   }
 
   .inv-key-warning {
@@ -428,8 +435,8 @@ const styles = `
     align-items: flex-start;
     gap: 10px;
     padding: 12px 14px;
-    background: rgba(232, 184, 75, 0.08);
-    border: 1px solid rgba(232, 184, 75, 0.25);
+    background: var(--gold-subtle);
+    border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent);
     border-radius: var(--r-md, 8px);
     color: var(--gold, #e8b84b);
   }
@@ -457,10 +464,10 @@ const styles = `
   }
 
   .inv-key-value code {
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-family: var(--font-mono, 'JetBrains Mono', 'Fira Code', monospace);
     background: var(--bg-elevated, rgba(255,255,255,0.06));
-    padding: 1px 5px;
-    border-radius: 4px;
+    padding: 1px 6px;
+    border-radius: var(--r-xs);
     border: 1px solid var(--border-subtle);
     font-size: 12px;
     color: var(--text-primary);
@@ -470,21 +477,21 @@ const styles = `
   .inv-link-box {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 7px;
   }
 
   .inv-expiry-row {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 5px 8px;
-    background: rgba(124,90,245,0.07);
-    border-radius: 6px;
-    border: 1px solid var(--accent-border, rgba(124,90,245,0.3));
+    padding: 6px 10px;
+    background: var(--accent-subtle);
+    border-radius: var(--r-sm);
+    border: 1px solid var(--accent-border);
   }
   .inv-expiry-row--expired {
-    background: rgba(240,71,71,0.07);
-    border-color: rgba(240,71,71,0.3);
+    background: var(--danger-subtle);
+    border-color: rgba(248,113,113,0.25);
   }
   .inv-expiry-label {
     font-size: 11.5px;
@@ -495,64 +502,65 @@ const styles = `
     font-size: 12px;
     font-weight: 700;
     color: var(--accent);
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-family: var(--font-mono, 'JetBrains Mono', 'Fira Code', monospace);
     margin-left: auto;
+    letter-spacing: 0.03em;
   }
   .inv-regen-btn {
     margin-left: auto;
     padding: 2px 8px;
-    border-radius: 4px;
+    border-radius: var(--r-xs);
     border: 1px solid var(--border-normal);
     background: var(--bg-elevated);
     color: var(--text-secondary);
     font-size: 11.5px;
     cursor: pointer;
     font-family: inherit;
-    transition: background 150ms, color 150ms;
+    transition: background var(--t-fast), color var(--t-fast);
   }
   .inv-regen-btn:hover { background: var(--bg-float); color: var(--text-primary); }
 
   .inv-gen-row {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
   }
   .inv-expiry-select {
     display: flex;
-    gap: 5px;
+    gap: 6px;
   }
   .inv-expiry-btn {
     flex: 1;
     padding: 5px 8px;
-    border-radius: 20px;
+    border-radius: var(--r-full);
     border: 1px solid var(--border-normal);
     background: var(--bg-elevated);
     color: var(--text-muted);
     font-size: 12px;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
     font-family: inherit;
-    transition: background 150ms, border-color 150ms, color 150ms;
+    transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
   }
-  .inv-expiry-btn:hover { border-color: var(--accent-border); color: var(--text-secondary); }
+  .inv-expiry-btn:hover { border-color: var(--accent-border); color: var(--text-secondary); background: var(--bg-float); }
   .inv-expiry-btn--active {
     border-color: var(--accent);
     background: var(--accent-subtle);
     color: var(--accent);
-    font-weight: 600;
   }
   .inv-gen-btn {
     align-self: flex-start;
-    padding: 7px 14px;
-    border-radius: 8px;
+    padding: 8px 18px;
+    border-radius: var(--r-md);
     border: none;
     background: var(--accent);
     color: #fff;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
     font-family: inherit;
-    transition: opacity 150ms;
+    transition: background var(--t-fast);
+    letter-spacing: 0.01em;
   }
-  .inv-gen-btn:hover { opacity: 0.85; }
+  .inv-gen-btn:hover { background: var(--accent-hover); }
 `;

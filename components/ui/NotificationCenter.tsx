@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useCallback, useState, useRef } from 'react';
+import { useEffect, useCallback, useState, useRef, type CSSProperties } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import type { Notification } from '@/lib/store';
 import { getNickColor } from '@/lib/nick-color';
@@ -132,7 +132,7 @@ function NotificationCard({ note, isRead, onActivate, onDismiss }: CardProps) {
         className="nc-card"
         onClick={() => onActivate(note)}
         aria-label={`${note.type} notification${note.from ? ` from ${note.from}` : ''}: ${note.text}`}
-        style={{ '--nc-type-color': borderColor } as React.CSSProperties}
+        style={{ '--nc-type-color': borderColor } as unknown as CSSProperties}
       >
         {/* Colored left border */}
         <span className="nc-card-border" aria-hidden />
@@ -264,10 +264,19 @@ function GroupHeader({ label }: { label: string }) {
 
 function EmptyState() {
   return (
-    <div className="nc-empty">
-      <div className="nc-empty-icon">🔔</div>
-      <div className="nc-empty-title">You&rsquo;re all caught up!</div>
-      <div className="nc-empty-desc">New mentions and DMs will appear here</div>
+    <div className="nc-empty" role="status" aria-label="No notifications">
+      {/* Depth rings */}
+      <div className="nc-empty-rings" aria-hidden>
+        <div className="nc-empty-ring nc-empty-ring--1" />
+        <div className="nc-empty-ring nc-empty-ring--2" />
+        <div className="nc-empty-ring nc-empty-ring--3" />
+      </div>
+      <div className="nc-empty-icon-wrap" aria-hidden>
+        <div className="nc-empty-icon-glow" />
+        <div className="nc-empty-icon">🔔</div>
+      </div>
+      <div className="nc-empty-title">All clear</div>
+      <div className="nc-empty-desc">No new mentions or DMs. You&apos;re up to date.</div>
     </div>
   );
 }
@@ -526,7 +535,14 @@ export default function NotificationCenter({ onClose }: Props) {
           position: fixed;
           inset: 0;
           z-index: 619;
-          background: transparent;
+          background: rgba(0,0,0,0.35);
+          backdrop-filter: blur(2px);
+          -webkit-backdrop-filter: blur(2px);
+          animation: nc-backdrop-in 200ms ease both;
+        }
+        @keyframes nc-backdrop-in {
+          from { opacity: 0; }
+          to   { opacity: 1; }
         }
 
         /* ── Panel ── */
@@ -535,18 +551,19 @@ export default function NotificationCenter({ onClose }: Props) {
           right: 0;
           top: 0;
           bottom: 0;
-          width: 360px;
+          width: 340px;
+          max-height: 100vh;
           z-index: 620;
-          background: var(--bg-deep);
+          background: var(--bg-float, #1a2c40);
           border-left: 1px solid var(--border-normal);
           display: flex;
           flex-direction: column;
-          box-shadow: -8px 0 40px rgba(0,0,0,0.55), -1px 0 0 rgba(255,255,255,0.04);
+          box-shadow: -12px 0 48px rgba(0,0,0,0.65), -4px 0 16px rgba(0,0,0,0.35);
           overflow: hidden;
         }
 
         @keyframes nc-slide-in {
-          from { transform: translateX(100%); opacity: 0; }
+          from { transform: translateX(110%); opacity: 0; }
           to   { transform: translateX(0);    opacity: 1; }
         }
         .animate-nc-in {
@@ -558,7 +575,7 @@ export default function NotificationCenter({ onClose }: Props) {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 0 14px;
+          padding: 0 12px;
           height: 52px;
           border-bottom: 1px solid var(--border-subtle);
           flex-shrink: 0;
@@ -575,10 +592,9 @@ export default function NotificationCenter({ onClose }: Props) {
         }
         .nc-header-title {
           font-size: 13px;
-          font-weight: 800;
-          letter-spacing: 0.06em;
+          font-weight: 700;
+          letter-spacing: 0.03em;
           color: var(--text-primary);
-          text-transform: uppercase;
         }
         .nc-header-badge {
           background: var(--gold, #e8b84b);
@@ -594,36 +610,45 @@ export default function NotificationCenter({ onClose }: Props) {
         }
         .nc-mark-all {
           font-size: 11px;
-          font-weight: 600;
-          color: var(--accent, #7c5af5);
-          background: none;
-          border: none;
+          font-weight: 700;
+          color: var(--accent, #0ea5e9);
+          background: color-mix(in srgb, var(--accent, #0ea5e9) 10%, transparent);
+          border: 1px solid color-mix(in srgb, var(--accent, #0ea5e9) 25%, transparent);
           cursor: pointer;
-          padding: 4px 8px;
+          padding: 4px 10px;
           border-radius: var(--r-sm, 4px);
           font-family: inherit;
-          transition: background var(--t-fast, 150ms), color var(--t-fast, 150ms);
+          transition: background var(--t-fast, 150ms), border-color var(--t-fast, 150ms);
           white-space: nowrap;
+          letter-spacing: 0.01em;
         }
         .nc-mark-all:hover {
-          background: color-mix(in oklch, var(--accent, #7c5af5) 14%, transparent);
+          background: color-mix(in srgb, var(--accent, #0ea5e9) 18%, transparent);
+          border-color: color-mix(in srgb, var(--accent, #0ea5e9) 40%, transparent);
+        }
+        .nc-mark-all:focus-visible {
+          outline: 2px solid var(--accent, #0ea5e9);
+          outline-offset: 2px;
         }
         .nc-clear-all {
-          font-size: 11px;
+          font-size: 12px;
           font-weight: 500;
           color: var(--text-muted);
           background: none;
           border: none;
           cursor: pointer;
-          padding: 4px 8px;
+          padding: 4px 6px;
           border-radius: var(--r-sm, 4px);
           font-family: inherit;
-          transition: background var(--t-fast, 150ms), color var(--t-fast, 150ms);
+          transition: color var(--t-fast, 150ms);
           white-space: nowrap;
+          text-decoration: underline;
+          text-underline-offset: 2px;
+          text-decoration-color: transparent;
         }
         .nc-clear-all:hover {
-          color: var(--danger, #ed4245);
-          background: color-mix(in oklch, var(--danger, #ed4245) 10%, transparent);
+          color: var(--danger, #f04747);
+          text-decoration-color: currentColor;
         }
         .nc-close {
           width: 28px;
@@ -767,8 +792,9 @@ export default function NotificationCenter({ onClose }: Props) {
           align-items: flex-start;
           gap: 10px;
           width: 100%;
-          padding: 11px 12px 11px 16px;
-          background: var(--bg-surface, var(--bg-deep));
+          min-height: 44px;
+          padding: 10px 12px 10px 16px;
+          background: transparent;
           border: none;
           border-bottom: 1px solid var(--border-subtle);
           cursor: pointer;
@@ -778,23 +804,26 @@ export default function NotificationCenter({ onClose }: Props) {
           z-index: 1;
         }
         .nc-card:hover {
-          background: color-mix(in oklch, var(--bg-overlay) 80%, transparent);
+          background: var(--bg-elevated);
         }
         .nc-card:hover .nc-card-arrow { opacity: 1; }
 
         .nc-card--unread .nc-card {
-          background: color-mix(in oklch, var(--bg-surface, var(--bg-deep)) 100%, transparent);
+          background: var(--accent-subtle);
         }
 
-        /* Left type border */
+        /* Left type border — 2px for unread accent */
         .nc-card-border {
           position: absolute;
           left: 0;
           top: 6px;
           bottom: 6px;
-          width: 4px;
+          width: 2px;
           background: var(--nc-type-color, var(--accent));
-          border-radius: 0 3px 3px 0;
+          border-radius: 0 2px 2px 0;
+        }
+        .nc-card--read .nc-card-border {
+          opacity: 0.3;
         }
 
         /* Unread dot */
@@ -805,8 +834,8 @@ export default function NotificationCenter({ onClose }: Props) {
           width: 7px;
           height: 7px;
           border-radius: 50%;
-          background: var(--accent, #7c5af5);
-          box-shadow: 0 0 6px color-mix(in oklch, var(--accent, #7c5af5) 60%, transparent);
+          background: var(--accent, #0ea5e9);
+          box-shadow: 0 0 6px color-mix(in oklch, var(--accent, #0ea5e9) 60%, transparent);
         }
 
         /* Avatar */
@@ -821,7 +850,7 @@ export default function NotificationCenter({ onClose }: Props) {
           font-size: 13px;
           font-weight: 700;
           color: rgba(255,255,255,0.92);
-          margin-top: 1px;
+          margin-top: 2px;
         }
 
         /* Body */
@@ -830,7 +859,7 @@ export default function NotificationCenter({ onClose }: Props) {
           min-width: 0;
           display: flex;
           flex-direction: column;
-          gap: 3px;
+          gap: 2px;
         }
         .nc-card-meta {
           display: flex;
@@ -856,9 +885,9 @@ export default function NotificationCenter({ onClose }: Props) {
           max-width: 90px;
         }
         .nc-card-preview {
-          font-size: 12px;
+          font-size: 13px;
           color: var(--text-secondary);
-          line-height: 1.5;
+          line-height: 1.45;
           word-break: break-word;
           display: -webkit-box;
           -webkit-line-clamp: 2;
@@ -888,7 +917,7 @@ export default function NotificationCenter({ onClose }: Props) {
           margin-left: 4px;
         }
         .nc-card-time {
-          font-size: 10px;
+          font-size: 11px;
           color: var(--text-muted);
           white-space: nowrap;
         }
@@ -948,7 +977,7 @@ export default function NotificationCenter({ onClose }: Props) {
           gap: 6px;
         }
         .nc-group-more-badge {
-          background: var(--accent, #7c5af5);
+          background: var(--accent, #0ea5e9);
           color: #fff;
           font-size: 9px;
           font-weight: 700;
@@ -1002,33 +1031,76 @@ export default function NotificationCenter({ onClose }: Props) {
 
         /* ── Empty state ── */
         .nc-empty {
+          position: relative;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          padding: 60px 24px 40px;
+          padding: 60px 24px 48px;
           gap: 8px;
           height: 100%;
           min-height: 280px;
+          overflow: hidden;
+        }
+
+        /* Depth rings */
+        .nc-empty-rings {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          pointer-events: none;
+        }
+        .nc-empty-ring {
+          position: absolute;
+          border-radius: 50%;
+          border: 1px solid var(--accent, #0ea5e9);
+        }
+        .nc-empty-ring--1 { width: 80px;  height: 80px;  opacity: 0.07; }
+        .nc-empty-ring--2 { width: 140px; height: 140px; opacity: 0.04; }
+        .nc-empty-ring--3 { width: 200px; height: 200px; opacity: 0.02; }
+
+        /* Icon glow */
+        .nc-empty-icon-wrap {
+          position: relative;
+          width: 60px;
+          height: 60px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 4px;
+          z-index: 1;
+        }
+        .nc-empty-icon-glow {
+          position: absolute;
+          inset: -10px;
+          border-radius: 50%;
+          background: radial-gradient(circle, var(--accent-glow, rgba(14,165,233,0.15)) 0%, transparent 70%);
+          filter: blur(4px);
         }
         .nc-empty-icon {
-          font-size: 40px;
+          position: relative;
+          z-index: 1;
+          font-size: 36px;
           line-height: 1;
-          margin-bottom: 8px;
-          filter: grayscale(0.4);
         }
         .nc-empty-title {
+          position: relative;
+          z-index: 1;
           font-size: 15px;
           font-weight: 700;
           color: var(--text-primary);
           letter-spacing: 0.01em;
         }
         .nc-empty-desc {
+          position: relative;
+          z-index: 1;
           font-size: 13px;
           color: var(--text-muted);
           text-align: center;
-          max-width: 220px;
-          line-height: 1.5;
+          max-width: 200px;
+          line-height: 1.55;
         }
 
         /* ── Footer ── */

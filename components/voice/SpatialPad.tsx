@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useSpatial, type SpatialPeer } from '@/hooks/useSpatial';
 
 interface SpatialPadProps {
@@ -106,7 +106,7 @@ export function SpatialPad({ channel, size = 360, onClose }: SpatialPadProps) {
   ];
 
   return (
-    <div className="sp-root" style={{ '--sp-size': `${size}px` } as React.CSSProperties}>
+    <div className="sp-root" style={{ '--sp-size': `${size}px` } as unknown as CSSProperties}>
       {/* Header */}
       <div className="sp-header">
         <span className="sp-header-title">
@@ -197,7 +197,7 @@ export function SpatialPad({ channel, size = 360, onClose }: SpatialPadProps) {
                 <div className="sp-peer-label">{p.nick}</div>
                 {/* Audio waveform bars when speaking */}
                 {p.speaking && (
-                  <div className="sp-audio-bars" aria-hidden style={{ '--peer-color': color } as React.CSSProperties}>
+                  <div className="sp-audio-bars" aria-hidden style={{ '--peer-color': color } as unknown as CSSProperties}>
                     {[0, 1, 2].map(i => (
                       <div key={i} className="sp-audio-bar" style={{ animationDelay: `${i * 0.15}s` }} />
                     ))}

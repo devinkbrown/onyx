@@ -53,29 +53,30 @@ export default function FloodWarningBar({ visible, cooldownMs }: Props) {
           position: relative;
           flex-shrink: 0;
           overflow: hidden;
-          animation: fwb-in 150ms ease-out;
+          animation: fwb-in 180ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
         }
         @keyframes fwb-in {
-          from { opacity: 0; transform: translateY(4px); }
+          from { opacity: 0; transform: translateY(-6px); }
           to   { opacity: 1; transform: translateY(0); }
         }
         .fwb-body {
           display: flex;
           align-items: center;
-          gap: 8px;
-          padding: 6px 16px 8px;
-          background: rgba(239, 68, 68, 0.12);
-          border-top: 1px solid rgba(239, 68, 68, 0.25);
+          gap: 9px;
+          padding: 7px 16px 9px;
+          background: rgba(251, 191, 36, 0.10);
+          border-bottom: 1px solid rgba(251, 191, 36, 0.22);
         }
         .fwb-icon {
           font-size: 14px;
           line-height: 1;
           flex-shrink: 0;
-          color: #ef4444;
+          color: var(--warning, #fbbf24);
+          filter: drop-shadow(0 0 4px rgba(251,191,36,0.5));
         }
         .fwb-text {
           font-size: 12px;
-          color: #ef4444;
+          color: var(--warning, #fbbf24);
           font-weight: 500;
           letter-spacing: 0.01em;
           line-height: 1.4;
@@ -89,11 +90,12 @@ export default function FloodWarningBar({ visible, cooldownMs }: Props) {
           left: 0;
           right: 0;
           height: 2px;
-          background: rgba(239, 68, 68, 0.15);
+          background: rgba(251, 191, 36, 0.12);
         }
         .fwb-progress-fill {
           height: 100%;
-          background: #ef4444;
+          background: var(--warning, #fbbf24);
+          opacity: 0.7;
           transition: width 50ms linear;
         }
       `}</style>

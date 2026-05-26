@@ -222,12 +222,12 @@ export default function DNDModal() {
         }
 
         .dnd-modal {
-          width: 400px;
+          width: 420px;
           max-width: calc(100vw - 32px);
-          background: var(--bg-float, var(--bg-overlay));
+          background: var(--bg-deep);
           border: 1px solid var(--border-normal);
-          border-radius: var(--r-lg, 12px);
-          box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+          border-radius: var(--r-xl);
+          box-shadow: var(--shadow-xl);
           overflow: hidden;
           animation: dnd-slide-up 160ms var(--ease-out, ease) both;
         }
@@ -277,12 +277,12 @@ export default function DNDModal() {
         .dnd-active-badge {
           margin: 12px 20px 0;
           padding: 8px 12px;
-          background: rgba(245, 168, 18, 0.12);
-          border: 1px solid rgba(245, 168, 18, 0.3);
-          border-radius: var(--r-sm, 6px);
+          background: rgba(248,113,113,0.10);
+          border: 1px solid rgba(248,113,113,0.28);
+          border-radius: var(--r-sm);
           font-size: 12px;
           font-weight: 600;
-          color: #f5a812;
+          color: var(--status-dnd);
           display: flex;
           align-items: center;
           gap: 6px;
@@ -327,7 +327,7 @@ export default function DNDModal() {
           flex-shrink: 0;
           padding: 0;
         }
-        .dnd-toggle--on { background: var(--accent, #7c5af5); }
+        .dnd-toggle--on { background: var(--accent, #0ea5e9); }
         .dnd-toggle-thumb {
           position: absolute;
           top: 3px;
@@ -388,7 +388,7 @@ export default function DNDModal() {
           transition: border-color var(--t-fast, 80ms);
         }
         .dnd-select:focus {
-          outline: 2px solid var(--accent-border, rgba(124,90,245,0.5));
+          outline: 2px solid var(--accent-border, rgba(14,165,233,0.5));
           outline-offset: 1px;
         }
         .dnd-hours-to {
@@ -424,14 +424,14 @@ export default function DNDModal() {
           transition: background var(--t-fast, 80ms), border-color var(--t-fast, 80ms), color var(--t-fast, 80ms);
         }
         .dnd-preset-btn:hover {
-          background: var(--accent-subtle, rgba(124,90,245,0.1));
-          border-color: var(--accent-border, rgba(124,90,245,0.4));
+          background: var(--accent-subtle, rgba(14,165,233,0.1));
+          border-color: var(--accent-border, rgba(14,165,233,0.4));
           color: var(--text-primary);
         }
         .dnd-preset-btn--active {
-          background: var(--accent-subtle, rgba(124,90,245,0.15));
-          border-color: var(--accent, #7c5af5);
-          color: var(--accent, #7c5af5);
+          background: var(--accent-subtle, rgba(14,165,233,0.15));
+          border-color: var(--accent, #0ea5e9);
+          color: var(--accent, #0ea5e9);
           font-weight: 600;
         }
         .dnd-preset-btn--clear {
@@ -462,7 +462,7 @@ export default function DNDModal() {
           transition: background var(--t-fast, 80ms), opacity var(--t-fast, 80ms);
         }
         .dnd-btn--primary {
-          background: var(--accent, #7c5af5);
+          background: var(--accent, #0ea5e9);
           color: #fff;
         }
         .dnd-btn--primary:hover { opacity: 0.88; }

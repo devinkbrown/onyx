@@ -287,17 +287,26 @@ const styles = `
 
   .pcm-input {
     padding: 9px 12px;
-    background: var(--bg-void, #0d0f14);
+    background: var(--bg-elevated);
     border: 1px solid var(--border-normal);
-    border-radius: 8px;
+    border-radius: var(--r-sm);
     color: var(--text-primary);
     font-size: 14px;
     font-family: inherit;
     outline: none;
-    transition: border-color 150ms;
+    transition: border-color 150ms, background 150ms, box-shadow 150ms;
   }
-  .pcm-input:focus { border-color: var(--accent); }
-  .pcm-input--option { flex: 1; }
+  .pcm-input:focus { border-color: var(--accent); background: var(--bg-float); box-shadow: 0 0 0 2px var(--accent-glow); }
+  .pcm-input--option { flex: 1; font-size: 13px; }
+
+  /* Question input: larger and more prominent */
+  #pcm-question.pcm-input {
+    font-size: 16px;
+    font-weight: 500;
+    padding: 11px 14px;
+    border-color: var(--border-normal);
+  }
+  #pcm-question.pcm-input:focus { border-color: var(--accent); }
 
   .pcm-options-list { display: flex; flex-direction: column; gap: 7px; }
 
@@ -307,12 +316,20 @@ const styles = `
     gap: 8px;
   }
   .pcm-option-num {
-    width: 20px;
+    width: 22px;
+    height: 22px;
     text-align: center;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
-    color: var(--text-muted);
+    color: var(--accent);
     flex-shrink: 0;
+    background: var(--accent-subtle);
+    border: 1px solid var(--accent-border);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
   }
   .pcm-remove-btn {
     width: 24px; height: 24px;
@@ -361,7 +378,7 @@ const styles = `
   .pcm-duration-btn:hover { border-color: var(--accent-border); color: var(--text-secondary); }
   .pcm-duration-btn--active {
     border-color: var(--accent);
-    background: var(--accent-subtle, rgba(124,90,245,0.15));
+    background: var(--accent-subtle, rgba(14,165,233,0.15));
     color: var(--accent);
     font-weight: 600;
   }

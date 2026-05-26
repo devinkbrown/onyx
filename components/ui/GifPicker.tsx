@@ -28,7 +28,7 @@ interface TenorResponse {
   results: TenorGif[];
 }
 
-const TENOR_KEY = process.env.NEXT_PUBLIC_TENOR_KEY ?? '';
+const TENOR_KEY = process.env.NEXT_PUBLIC_TENOR_KEY ?? 'LIVDSRZULELA04';
 const TENOR_BASE = 'https://tenor.googleapis.com/v2';
 
 const CATEGORIES = [
@@ -128,27 +128,6 @@ export default function GifPicker({ onPick, onClose }: Props) {
 
   const showEmpty = !loading && !error && gifs.length === 0;
   const showGrid = !loading && gifs.length > 0;
-
-  if (!TENOR_KEY) {
-    return (
-      <div className="gp-root" role="dialog" aria-label="GIF picker">
-        <div className="gp-content" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, height: '100%', padding: '24px', textAlign: 'center' }}>
-          <span style={{ fontSize: 28 }}>🔑</span>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: 0 }}>GIF search requires a Tenor API key.</p>
-          <p style={{ color: 'var(--text-muted)', fontSize: 12, margin: 0 }}>Set <code style={{ background: 'var(--bg-elevated)', padding: '1px 5px', borderRadius: 4 }}>NEXT_PUBLIC_TENOR_KEY</code> in <code style={{ background: 'var(--bg-elevated)', padding: '1px 5px', borderRadius: 4 }}>.env.local</code>.</p>
-        </div>
-        <style>{`
-          .gp-root {
-            position: absolute; bottom: calc(100% + 8px); right: 0;
-            width: 360px; height: 200px; display: flex; flex-direction: column;
-            background: rgba(6, 16, 29, 0.92); backdrop-filter: blur(20px);
-            border: 1px solid rgba(255,255,255,0.08); border-radius: 16px;
-            box-shadow: 0 8px 48px rgba(0,0,0,0.6); z-index: 200; overflow: hidden;
-          }
-        `}</style>
-      </div>
-    );
-  }
 
   return (
     <div className="gp-root" role="dialog" aria-label="GIF picker">
@@ -311,8 +290,8 @@ export default function GifPicker({ onPick, onClose }: Props) {
         }
 
         .gp-search:focus {
-          border-color: rgba(14, 165, 233, 0.4);
-          box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
+          border-color: var(--accent-border);
+          box-shadow: 0 0 0 2.5px var(--accent-glow);
         }
 
         .gp-search::placeholder {
@@ -369,8 +348,8 @@ export default function GifPicker({ onPick, onClose }: Props) {
         }
 
         .gp-cat-chip--active {
-          background: rgba(14, 165, 233, 0.14);
-          border-color: rgba(14, 165, 233, 0.4);
+          background: var(--accent-subtle);
+          border-color: var(--accent-border);
           color: var(--accent);
         }
 
@@ -380,17 +359,17 @@ export default function GifPicker({ onPick, onClose }: Props) {
           overflow-y: auto;
           padding: 8px;
           scrollbar-width: thin;
-          scrollbar-color: rgba(14,165,233,0.15) transparent;
+          scrollbar-color: var(--border-normal) transparent;
           margin-top: 6px;
         }
 
         .gp-content::-webkit-scrollbar { width: 4px; }
         .gp-content::-webkit-scrollbar-thumb {
-          background: rgba(14,165,233,0.15);
+          background: var(--border-normal);
           border-radius: 2px;
         }
         .gp-content::-webkit-scrollbar-thumb:hover {
-          background: rgba(14,165,233,0.3);
+          background: var(--accent-border);
         }
 
         /* ── Masonry grid ── */
@@ -415,13 +394,27 @@ export default function GifPicker({ onPick, onClose }: Props) {
 
         .gp-skeleton-item {
           border-radius: 10px;
-          background: rgba(255,255,255,0.04);
-          animation: gp-shimmer 1.6s ease-in-out infinite;
+          background: linear-gradient(90deg,
+            var(--bg-elevated) 0%,
+            var(--bg-float)    45%,
+            var(--bg-elevated) 100%);
+          background-size: 200% 100%;
+          animation: gp-shimmer 1.6s var(--ease-out, ease) infinite;
         }
 
         @keyframes gp-shimmer {
-          0%, 100% { opacity: 0.35; }
-          50% { opacity: 0.65; }
+          from { background-position: -200% 0; }
+          to   { background-position:  200% 0; }
+        }
+
+        /* ── Trending label ── */
+        .gp-trending-label {
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: var(--text-muted);
+          padding: 0 2px 4px;
         }
 
         /* ── States ── */
@@ -535,7 +528,7 @@ function GifTile({ gif, onPick, onClose }: GifTileProps) {
 
         .gp-gif-tile:hover {
           transform: scale(1.03);
-          box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 0 1px rgba(14,165,233,0.2);
+          box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 0 1px var(--accent-border);
           z-index: 1;
         }
 
@@ -554,14 +547,38 @@ function GifTile({ gif, onPick, onClose }: GifTileProps) {
         .gp-gif-placeholder {
           position: absolute;
           inset: 0;
-          background: rgba(255,255,255,0.04);
-          animation: gp-tile-shimmer 1.6s ease-in-out infinite;
+          background: linear-gradient(90deg,
+            var(--bg-elevated) 0%,
+            var(--bg-float)    45%,
+            var(--bg-elevated) 100%);
+          background-size: 200% 100%;
+          animation: gp-tile-shimmer 1.6s ease infinite;
           border-radius: 10px;
         }
 
         @keyframes gp-tile-shimmer {
-          0%, 100% { opacity: 0.4; }
-          50% { opacity: 0.75; }
+          from { background-position: -200% 0; }
+          to   { background-position:  200% 0; }
+        }
+
+        /* ── Play / hover overlay ── */
+        .gp-gif-tile::after {
+          content: '▶';
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 22px;
+          color: rgba(255,255,255,0.9);
+          text-shadow: 0 2px 8px rgba(0,0,0,0.7);
+          background: rgba(0,0,0,0.28);
+          opacity: 0;
+          transition: opacity 150ms ease;
+          border-radius: 10px;
+        }
+        .gp-gif-tile:hover::after {
+          opacity: 1;
         }
       `}</style>
     </button>

@@ -299,31 +299,33 @@ export default function ThreadPanel() {
         }
 
         .thread-panel {
-          width: 400px; max-width: 95vw;
+          width: 360px; max-width: 95vw;
+          height: 100%;
           background: var(--bg-deep);
           border-left: 1px solid var(--border-normal);
           display: flex; flex-direction: column;
           overflow: hidden;
-          box-shadow: -8px 0 40px rgba(0, 0, 0, 0.45);
+          box-shadow: -12px 0 48px rgba(0, 0, 0, 0.55), -1px 0 0 var(--border-subtle);
         }
 
         .thread-header {
           display: flex; align-items: center; justify-content: space-between;
           padding: 0 16px;
-          height: var(--header-h);
+          height: var(--header-h, 48px);
           border-bottom: 1px solid var(--border-subtle);
           flex-shrink: 0;
+          background: var(--bg-elevated);
         }
         .thread-header-left {
           display: flex; align-items: center; gap: 8px;
         }
         .thread-title {
-          font-size: 15px; font-weight: 700; color: var(--text-primary);
-          letter-spacing: -0.2px;
+          font-size: 14px; font-weight: 700; color: var(--text-primary);
+          letter-spacing: -0.1px;
         }
         .thread-count {
           font-size: 11px; font-weight: 700;
-          padding: 1px 6px; border-radius: var(--r-full);
+          padding: 1px 7px; border-radius: var(--r-full);
           background: var(--accent-subtle); border: 1px solid var(--accent-border);
           color: var(--accent);
         }
@@ -331,7 +333,7 @@ export default function ThreadPanel() {
           width: 28px; height: 28px;
           background: none; border: none; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
-          color: var(--text-muted); border-radius: var(--r-xs);
+          color: var(--text-muted); border-radius: var(--r-sm);
           transition: background var(--t-fast), color var(--t-fast);
         }
         .thread-close:hover { background: var(--ch-hover-bg); color: var(--text-primary); }
@@ -347,20 +349,26 @@ export default function ThreadPanel() {
         .thread-jump-to-parent {
           display: inline-flex; align-items: center; gap: 5px;
           background: none; border: none; cursor: pointer;
-          font-size: 11px; font-weight: 600; color: var(--text-muted);
-          padding: 4px 6px; border-radius: var(--r-xs);
-          margin-bottom: 6px; transition: color var(--t-fast), background var(--t-fast);
+          font-size: 11px; font-weight: 700; color: var(--text-muted);
+          padding: 4px 8px; border-radius: var(--r-sm);
+          margin-bottom: 8px;
+          transition: color var(--t-fast), background var(--t-fast);
           font-family: inherit;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
         }
         .thread-jump-to-parent:hover {
           color: var(--accent); background: var(--accent-subtle);
         }
 
-        /* Parent message card */
+        /* Parent message card — quoted bg */
         .thread-parent-msg {
-          border-bottom: 1px solid var(--border-subtle);
-          padding-bottom: 12px;
-          margin-bottom: 4px;
+          background: var(--bg-elevated);
+          border: 1px solid var(--border-subtle);
+          border-left: 3px solid var(--accent);
+          border-radius: var(--r-md);
+          padding: 10px 12px;
+          margin-bottom: 8px;
         }
 
         /* Divider */
@@ -372,8 +380,9 @@ export default function ThreadPanel() {
           flex: 1; height: 1px; background: var(--border-subtle);
         }
         .thread-divider-label {
-          font-size: 11px; color: var(--text-muted);
-          font-weight: 600; letter-spacing: 0.03em;
+          font-size: 10px; color: var(--text-muted);
+          font-weight: 700; letter-spacing: 0.07em;
+          text-transform: uppercase;
           white-space: nowrap;
         }
 
@@ -383,19 +392,22 @@ export default function ThreadPanel() {
           font-style: italic;
         }
 
-        /* Message card */
+        /* Reply message cards */
         .thread-msg-card {
           display: flex; gap: 10px;
-          padding: 6px 0;
+          padding: 6px 4px;
           border-radius: var(--r-sm);
           transition: background var(--t-fast);
         }
-        .thread-msg-card:hover { background: rgba(14,165,233,0.03); }
-        .thread-msg-card--parent { padding: 8px 0; }
+        .thread-msg-card:hover { background: var(--accent-subtle); }
+        .thread-msg-card--parent {
+          padding: 0;
+          background: none !important;
+        }
 
         .thread-msg-body { flex: 1; min-width: 0; }
         .thread-msg-meta {
-          display: flex; align-items: baseline; gap: 6px;
+          display: flex; align-items: baseline; gap: 7px;
           margin-bottom: 2px;
         }
         .thread-msg-nick {
@@ -406,19 +418,21 @@ export default function ThreadPanel() {
           font-variant-numeric: tabular-nums;
         }
         .thread-msg-text {
-          font-size: 14px; line-height: 1.5; color: var(--text-primary);
+          font-size: 14px; line-height: 1.55; color: var(--text-secondary);
           word-break: break-word; white-space: pre-wrap;
         }
+        .thread-msg-card--parent .thread-msg-nick { color: var(--accent); }
+        .thread-msg-card--parent .thread-msg-text { color: var(--text-primary); }
         .thread-msg-deleted {
           font-size: 13px; color: var(--text-muted); font-style: italic;
         }
 
         /* Reply input */
         .thread-input-wrap {
-          padding: 10px 12px;
+          padding: 10px 12px 12px;
           border-top: 1px solid var(--border-subtle);
           flex-shrink: 0;
-          background: var(--bg-deep);
+          background: var(--bg-elevated);
         }
         .thread-input-row {
           display: flex; align-items: flex-end; gap: 8px;
@@ -428,13 +442,13 @@ export default function ThreadPanel() {
         }
         .thread-textarea {
           width: 100%;
-          background: var(--bg-elevated);
+          background: var(--bg-void);
           border: 1px solid var(--border-normal);
-          border-radius: var(--r-sm);
+          border-radius: var(--r-md);
           color: var(--text-primary);
           font-size: 14px;
           line-height: 1.5;
-          padding: 7px 10px;
+          padding: 8px 12px;
           resize: none;
           outline: none;
           font-family: inherit;
@@ -446,22 +460,26 @@ export default function ThreadPanel() {
         }
         .thread-textarea:focus {
           border-color: var(--accent);
-          box-shadow: 0 0 0 2px rgba(14,165,233,0.15);
+          box-shadow: 0 0 0 2px var(--accent-glow);
         }
         .thread-textarea::placeholder { color: var(--text-muted); }
 
         .thread-send-btn {
-          width: 32px; height: 32px; flex-shrink: 0;
-          border: none; border-radius: var(--r-sm);
-          background: var(--bg-elevated);
+          width: 34px; height: 34px; flex-shrink: 0;
+          border: none; border-radius: var(--r-md);
+          background: var(--bg-float);
+          border: 1px solid var(--border-subtle);
           color: var(--text-muted); cursor: pointer;
           display: flex; align-items: center; justify-content: center;
-          transition: background var(--t-fast), color var(--t-fast);
+          transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
         }
         .thread-send-btn--active {
-          background: var(--accent); color: #fff;
+          background: var(--accent);
+          border-color: var(--accent);
+          color: #fff;
+          box-shadow: 0 2px 8px var(--accent-glow);
         }
-        .thread-send-btn:disabled { opacity: 0.5; cursor: default; }
+        .thread-send-btn:disabled { opacity: 0.45; cursor: default; }
 
         @keyframes slide-right {
           from { opacity: 0; transform: translateX(8px); }
@@ -476,11 +494,11 @@ export default function ThreadPanel() {
 
         /* ── Archived chip in header ── */
         .thread-archived-chip {
-          font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
-          padding: 2px 6px; border-radius: var(--r-full);
-          background: rgba(239,68,68,0.12);
-          border: 1px solid rgba(239,68,68,0.3);
-          color: #ef4444;
+          font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
+          padding: 2px 7px; border-radius: var(--r-full);
+          background: var(--danger-subtle);
+          border: 1px solid rgba(248,113,113,0.25);
+          color: var(--danger);
           text-transform: uppercase;
         }
 
@@ -490,7 +508,7 @@ export default function ThreadPanel() {
           width: 28px; height: 28px;
           background: none; border: none; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
-          color: var(--text-muted); border-radius: var(--r-xs);
+          color: var(--text-muted); border-radius: var(--r-sm);
           transition: background var(--t-fast), color var(--t-fast);
         }
         .thread-settings-btn:hover,
@@ -505,10 +523,10 @@ export default function ThreadPanel() {
           background: var(--bg-float);
           border: 1px solid var(--border-normal);
           border-radius: var(--r-md);
-          box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-          min-width: 160px;
+          box-shadow: var(--shadow-md);
+          min-width: 168px;
           padding: 4px 0;
-          animation: settings-pop 120ms ease-out both;
+          animation: settings-pop 120ms var(--ease-out) both;
         }
         @keyframes settings-pop {
           from { opacity: 0; transform: translateY(-4px); }
@@ -516,13 +534,13 @@ export default function ThreadPanel() {
         }
         .thread-settings-header {
           font-size: 10px; font-weight: 700;
-          letter-spacing: 0.06em; text-transform: uppercase;
+          letter-spacing: 0.07em; text-transform: uppercase;
           color: var(--text-muted);
-          padding: 6px 12px 4px;
+          padding: 7px 12px 4px;
         }
         .thread-settings-item {
           display: flex; align-items: center; justify-content: space-between;
-          width: 100%; padding: 6px 12px;
+          width: 100%; padding: 7px 12px;
           background: none; border: none; cursor: pointer;
           font-size: 13px; font-family: inherit;
           color: var(--text-secondary);
@@ -531,24 +549,22 @@ export default function ThreadPanel() {
         .thread-settings-item:hover {
           background: var(--ch-hover-bg); color: var(--text-primary);
         }
-        .thread-settings-item--active {
-          color: var(--accent);
-        }
+        .thread-settings-item--active { color: var(--accent); }
 
         /* ── Archived banner ── */
         .thread-archived-banner {
           display: flex; align-items: center; gap: 8px;
-          padding: 8px 12px; margin: 8px 0;
-          background: color-mix(in srgb, var(--bg-overlay, var(--bg-elevated)) 80%, transparent);
+          padding: 8px 12px; margin: 6px 0;
+          background: var(--bg-elevated);
           border: 1px solid var(--border-normal);
-          border-radius: 6px;
+          border-radius: var(--r-md);
           font-size: 13px; color: var(--text-muted);
           flex-shrink: 0;
         }
 
         /* ── Archived textarea variant ── */
         .thread-textarea--archived {
-          opacity: 0.6;
+          opacity: 0.55;
           cursor: text;
         }
       `}</style>

@@ -98,7 +98,6 @@ interface ModeBadgeProps {
 function ModeBadge({ modes }: ModeBadgeProps) {
   if (modes.has('q')) return <span className="upm-mode-badge upm-mode-owner">Owner</span>;
   if (modes.has('o')) return <span className="upm-mode-badge upm-mode-op">Op</span>;
-  if (modes.has('h')) return <span className="upm-mode-badge upm-mode-halfop">Halfop</span>;
   if (modes.has('v')) return <span className="upm-mode-badge upm-mode-voice">Voice</span>;
   return null;
 }
@@ -808,9 +807,9 @@ export default function UserProfileModal() {
           display: flex;
           align-items: center;
           justify-content: center;
-          background: rgba(0, 0, 0, 0.65);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
+          background: rgba(0, 0, 0, 0.75);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
           padding: 16px;
         }
 
@@ -819,17 +818,17 @@ export default function UserProfileModal() {
           position: relative;
           width: 100%;
           max-width: 720px;
-          background: var(--bg-float);
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-xl);
+          background: var(--bg-2, var(--bg-elevated));
+          border: 1px solid var(--border-subtle);
+          border-radius: 12px;
           overflow: hidden;
-          box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6), 0 4px 16px rgba(0, 0, 0, 0.4);
+          box-shadow: 0 24px 64px rgba(0, 0, 0, 0.65), 0 4px 16px rgba(0, 0, 0, 0.4);
           max-height: 90dvh;
         }
 
         @keyframes scale-in {
-          from { opacity: 0; transform: scale(0.94) translateY(8px); }
-          to   { opacity: 1; transform: scale(1) translateY(0); }
+          from { opacity: 0; transform: scale(0.96); }
+          to   { opacity: 1; transform: scale(1); }
         }
         .animate-scale-in { animation: scale-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both; }
 
@@ -839,19 +838,23 @@ export default function UserProfileModal() {
           top: 12px;
           right: 12px;
           z-index: 10;
-          width: 32px;
-          height: 32px;
+          width: 28px;
+          height: 28px;
           border-radius: var(--r-full);
-          border: none;
-          background: rgba(0, 0, 0, 0.45);
-          color: rgba(255, 255, 255, 0.8);
+          border: 1px solid rgba(255,255,255,0.12);
+          background: rgba(0, 0, 0, 0.5);
+          color: rgba(255, 255, 255, 0.75);
           display: flex;
           align-items: center;
           justify-content: center;
           cursor: pointer;
-          transition: background 150ms ease, color 150ms ease;
+          transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
         }
-        .upm-close:hover { background: rgba(0, 0, 0, 0.65); color: #fff; }
+        .upm-close:hover {
+          background: rgba(0, 0, 0, 0.75);
+          color: #fff;
+          border-color: rgba(255,255,255,0.25);
+        }
 
         /* ── Two-column layout ── */
         .upm-layout {
@@ -870,7 +873,7 @@ export default function UserProfileModal() {
         }
 
         .upm-banner {
-          height: 80px;
+          height: 120px;
           position: relative;
           flex-shrink: 0;
         }
@@ -902,14 +905,15 @@ export default function UserProfileModal() {
         .upm-avatar-wrap {
           position: relative;
           padding: 0 16px;
-          margin-top: -28px;
+          margin-top: -36px;
           flex-shrink: 0;
         }
 
         .upm-avatar-border {
           display: inline-flex;
           border-radius: var(--r-full);
-          border: 4px solid var(--bg-float);
+          border: 4px solid var(--accent);
+          box-shadow: 0 0 0 3px var(--bg-2, var(--bg-elevated));
           line-height: 0;
         }
 
@@ -984,18 +988,18 @@ export default function UserProfileModal() {
 
         /* ── Mode badges ── */
         .upm-mode-badge {
-          font-size: 11px;
+          font-size: 10px;
           font-weight: 700;
           padding: 3px 9px;
           border-radius: var(--r-full);
-          letter-spacing: 0.03em;
+          letter-spacing: 0.05em;
+          text-transform: uppercase;
         }
-        .upm-mode-owner { background: rgba(232, 184, 75, 0.18); color: var(--gold); }
-        .upm-mode-op    { background: rgba(124, 90, 245, 0.18); color: var(--accent); }
-        .upm-mode-halfop { background: rgba(100, 160, 200, 0.18); color: #7ab8d4; }
-        .upm-mode-voice { background: rgba(67, 181, 129, 0.18); color: var(--status-online); }
-        .upm-mode-oper  { background: rgba(250, 200, 50, 0.15); color: #f0c040; }
-        .upm-mode-self  { background: var(--bg-elevated); color: var(--text-muted); }
+        .upm-mode-owner { background: rgba(232, 184, 75, 0.15); color: var(--gold); border: 1px solid rgba(232,184,75,0.25); }
+        .upm-mode-op    { background: rgba(14, 165, 233, 0.15); color: var(--accent); border: 1px solid rgba(14,165,233,0.25); }
+        .upm-mode-voice { background: rgba(52, 211, 153, 0.15); color: var(--status-online); border: 1px solid rgba(52,211,153,0.25); }
+        .upm-mode-oper  { background: rgba(250, 200, 50, 0.15); color: #f0c040; border: 1px solid rgba(250,200,50,0.25); }
+        .upm-mode-self  { background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border-subtle); }
 
         .upm-custom-status {
           font-size: 13px;
@@ -1112,9 +1116,13 @@ export default function UserProfileModal() {
           font-size: 11px;
           font-weight: 700;
           text-transform: uppercase;
-          letter-spacing: 0.05em;
+          letter-spacing: 0.1em;
           color: var(--text-muted);
           margin: 0 0 6px;
+          display: flex; align-items: center; gap: 8px;
+        }
+        .upm-section-label::after {
+          content: ''; flex: 1; height: 1px; background: var(--border-subtle);
         }
 
         /* ── About Me ── */
@@ -1323,18 +1331,22 @@ export default function UserProfileModal() {
 
         .upm-edit-input {
           width: 100%;
-          padding: 8px 12px;
+          height: 36px;
+          padding: 0 12px;
           border: 1px solid var(--border-normal);
           border-radius: var(--r-md);
-          background: var(--bg-elevated);
+          background: var(--bg-deep);
           color: var(--text-primary);
           font-size: 14px;
           font-family: inherit;
           outline: none;
           box-sizing: border-box;
-          transition: border-color 150ms ease;
+          transition: border-color 150ms ease, box-shadow 150ms ease;
         }
-        .upm-edit-input:focus { border-color: var(--accent); }
+        .upm-edit-input:focus {
+          border-color: var(--accent-border);
+          box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+        }
         .upm-edit-input::placeholder { color: var(--text-muted); }
 
         .upm-edit-textarea {
@@ -1342,7 +1354,7 @@ export default function UserProfileModal() {
           padding: 8px 12px;
           border: 1px solid var(--border-normal);
           border-radius: var(--r-md);
-          background: var(--bg-elevated);
+          background: var(--bg-deep);
           color: var(--text-primary);
           font-size: 14px;
           font-family: inherit;
@@ -1351,9 +1363,12 @@ export default function UserProfileModal() {
           outline: none;
           box-sizing: border-box;
           min-height: 80px;
-          transition: border-color 150ms ease;
+          transition: border-color 150ms ease, box-shadow 150ms ease;
         }
-        .upm-edit-textarea:focus { border-color: var(--accent); }
+        .upm-edit-textarea:focus {
+          border-color: var(--accent-border);
+          box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+        }
         .upm-edit-textarea::placeholder { color: var(--text-muted); }
 
         /* ── Invisible mode toggle ── */
@@ -1376,38 +1391,36 @@ export default function UserProfileModal() {
 
         .upm-toggle {
           position: relative;
-          width: 40px;
-          height: 22px;
+          width: 44px;
+          height: 24px;
           border-radius: var(--r-full);
           border: none;
-          background: var(--bg-elevated);
-          border: 1px solid var(--border-normal);
+          background: var(--bg-overlay);
           cursor: pointer;
           flex-shrink: 0;
-          transition: background 200ms ease, border-color 200ms ease;
+          transition: background 200ms ease;
           padding: 0;
         }
 
         .upm-toggle-on {
           background: var(--accent);
-          border-color: var(--accent);
         }
 
         .upm-toggle-thumb {
           position: absolute;
-          top: 2px;
-          left: 2px;
-          width: 16px;
-          height: 16px;
+          top: 3px;
+          left: 3px;
+          width: 18px;
+          height: 18px;
           border-radius: var(--r-full);
-          background: var(--text-muted);
-          transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1), background 200ms ease;
+          background: #fff;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+          transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
           pointer-events: none;
         }
 
         .upm-toggle-on .upm-toggle-thumb {
-          transform: translateX(18px);
-          background: #fff;
+          transform: translateX(20px);
         }
 
         /* ── Responsive: stack columns on narrow screens ── */

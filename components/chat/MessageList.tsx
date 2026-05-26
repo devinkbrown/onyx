@@ -400,7 +400,7 @@ export default function MessageList({ messages, target, searchActive, searchMatc
         .msg-list {
           flex: 1;
           overflow-y: auto;
-          padding: 16px 0 8px;
+          padding: 16px 0 80px;
           display: flex;
           flex-direction: column;
           position: relative;
@@ -565,18 +565,20 @@ export default function MessageList({ messages, target, searchActive, searchMatc
         .ml-hist-loading {
           display: flex;
           justify-content: center;
-          gap: 6px;
-          padding: 12px;
+          align-items: center;
+          gap: 5px;
+          padding: 14px;
         }
         .ml-hist-dot {
-          width: 8px;
-          height: 8px;
+          width: 6px;
+          height: 6px;
           border-radius: 50%;
-          background: var(--text-muted);
-          animation: pulse 1.2s ease infinite;
+          background: var(--accent);
+          opacity: 0.5;
+          animation: pulse 1.3s ease-in-out infinite;
         }
-        .ml-hist-dot:nth-child(2) { animation-delay: 0.2s; }
-        .ml-hist-dot:nth-child(3) { animation-delay: 0.4s; }
+        .ml-hist-dot:nth-child(2) { animation-delay: 0.22s; }
+        .ml-hist-dot:nth-child(3) { animation-delay: 0.44s; }
 
         @keyframes pulse {
           0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
@@ -604,56 +606,73 @@ export default function MessageList({ messages, target, searchActive, searchMatc
           gap: 8px;
           padding: 4px 16px;
           margin: 8px 0;
+          animation: ml-unread-sep-in 300ms var(--ease-out) both;
+        }
+        @keyframes ml-unread-sep-in {
+          from { opacity: 0; transform: scaleX(0.96); }
+          to   { opacity: 1; transform: scaleX(1); }
         }
         .ml-unread-sep__line {
           flex: 1;
           height: 1px;
-          background: var(--danger);
-          opacity: 0.5;
+          background: var(--accent);
+          opacity: 0.4;
         }
         .ml-unread-sep__label {
           font-size: 11px;
           font-weight: 700;
-          letter-spacing: 0.06em;
-          color: var(--danger);
+          letter-spacing: 0.07em;
+          text-transform: uppercase;
+          color: var(--accent);
           white-space: nowrap;
-          padding: 0 4px;
-          opacity: 0.8;
+          padding: 2px 8px;
+          background: var(--accent-subtle);
+          border: 1px solid var(--accent-border);
+          border-radius: var(--r-full);
+          opacity: 0.9;
         }
 
         /* ── Jump to Present button ─────────────────────────────────── */
         .ml-jump-btn {
           position: sticky;
-          bottom: 16px;
+          bottom: 20px;
           left: 50%;
           transform: translateX(-50%);
           background: var(--accent);
           color: #fff;
           border: none;
           border-radius: var(--r-full);
-          padding: 6px 14px;
-          font-size: 13px;
-          font-weight: 600;
+          padding: 7px 18px;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: 0.03em;
           cursor: pointer;
-          box-shadow: var(--shadow-md);
-          transition: background var(--t-fast);
+          box-shadow: 0 4px 20px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.08);
+          transition: background var(--t-fast), box-shadow var(--t-fast), transform var(--t-fast);
           white-space: nowrap;
           z-index: 10;
+          display: flex;
+          align-items: center;
+          gap: 6px;
         }
-        .ml-jump-btn:hover { background: var(--accent-hover); }
+        .ml-jump-btn:hover {
+          background: var(--accent-hover);
+          box-shadow: 0 6px 24px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.12);
+          transform: translateX(-50%) translateY(-1px);
+        }
 
         @keyframes ml-fadein {
-          from { opacity: 0; transform: translateX(-50%) translateY(6px); }
+          from { opacity: 0; transform: translateX(-50%) translateY(10px); }
           to   { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
-        .animate-ml-fadein { animation: ml-fadein 150ms ease both; }
+        .animate-ml-fadein { animation: ml-fadein 180ms var(--ease-out) both; }
 
         /* ── Date separator ─────────────────────────────────────── */
         .date-separator {
           display: flex;
           align-items: center;
           gap: 10px;
-          margin: 16px 0 8px;
+          margin: 20px 0 10px;
           padding: 0 16px;
         }
         .date-separator-line {
@@ -667,7 +686,11 @@ export default function MessageList({ messages, target, searchActive, searchMatc
           color: var(--text-muted, #4a6b8a);
           white-space: nowrap;
           text-transform: uppercase;
-          letter-spacing: 0.06em;
+          letter-spacing: 0.08em;
+          padding: 2px 10px;
+          background: var(--bg-elevated);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-full);
         }
 
         /* ── Jump-to-message highlight ── */

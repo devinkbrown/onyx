@@ -238,8 +238,8 @@ export default function MessageSearchModal() {
           border-left: 1px solid var(--border-subtle);
           display: flex;
           flex-direction: column;
-          box-shadow: -8px 0 32px rgba(0,0,0,0.45);
-          animation: msm-slide-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+          box-shadow: -12px 0 40px rgba(0,0,0,0.5);
+          animation: msm-slide-in 220ms var(--ease-out) both;
         }
 
         @keyframes msm-slide-in {
@@ -254,6 +254,7 @@ export default function MessageSearchModal() {
           padding: 16px 16px 12px;
           border-bottom: 1px solid var(--border-subtle);
           flex-shrink: 0;
+          background: var(--bg-elevated);
         }
 
         .msm-header-title-row {
@@ -288,7 +289,7 @@ export default function MessageSearchModal() {
           flex-shrink: 0;
         }
         .msm-close:hover {
-          background: var(--ch-hover-bg);
+          background: var(--accent-subtle);
           color: var(--text-primary);
         }
 
@@ -296,6 +297,8 @@ export default function MessageSearchModal() {
           position: relative;
           padding: 12px 12px 8px;
           flex-shrink: 0;
+          background: var(--bg-elevated);
+          border-bottom: 1px solid var(--border-subtle);
         }
 
         .msm-input-icon {
@@ -312,8 +315,8 @@ export default function MessageSearchModal() {
         .msm-input {
           width: 100%;
           box-sizing: border-box;
-          background: var(--bg-base);
-          border: 1px solid var(--border-normal);
+          background: var(--bg-deep);
+          border: 1px solid var(--border-subtle);
           border-radius: var(--r-md);
           padding: 8px 32px 8px 36px;
           font-size: 13px;
@@ -325,8 +328,8 @@ export default function MessageSearchModal() {
           color: var(--text-muted);
         }
         .msm-input:focus {
-          border-color: var(--accent);
-          box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
+          border-color: var(--accent-border);
+          box-shadow: 0 0 0 2px var(--accent-glow);
         }
 
         .msm-clear {
@@ -354,7 +357,9 @@ export default function MessageSearchModal() {
         .msm-results {
           flex: 1;
           overflow-y: auto;
-          padding: 4px 0 8px;
+          padding: 8px 0;
+          scrollbar-width: thin;
+          scrollbar-color: var(--accent-border) transparent;
         }
 
         .msm-hint,
@@ -368,14 +373,16 @@ export default function MessageSearchModal() {
         }
 
         .msm-result-row {
-          padding: 10px 16px;
+          padding: 12px 16px;
           cursor: pointer;
           transition: background var(--t-fast);
           border-radius: var(--r-sm);
-          margin: 0 4px;
+          margin: 2px 8px;
+          border: 1px solid var(--border-subtle);
         }
         .msm-result-row:hover {
-          background: var(--bg-base);
+          background: var(--accent-subtle);
+          border-color: var(--accent-border);
         }
 
         .msm-result-top {
@@ -383,7 +390,7 @@ export default function MessageSearchModal() {
           align-items: baseline;
           justify-content: space-between;
           gap: 8px;
-          margin-bottom: 2px;
+          margin-bottom: 4px;
         }
 
         .msm-result-nick {
@@ -407,7 +414,7 @@ export default function MessageSearchModal() {
           color: var(--text-secondary);
           margin: 0;
           word-break: break-word;
-          line-height: 1.45;
+          line-height: 1.5;
           overflow: hidden;
           display: -webkit-box;
           -webkit-line-clamp: 3;
@@ -415,16 +422,20 @@ export default function MessageSearchModal() {
         }
 
         .msm-mark {
-          background: color-mix(in srgb, var(--accent) 28%, transparent);
+          background: var(--accent-subtle);
           color: var(--accent);
           border-radius: 2px;
-          padding: 0 1px;
+          padding: 0 2px;
           font-style: normal;
+          font-weight: 600;
         }
 
         /* ── Skeleton ── */
         .msm-skeleton-row {
-          padding: 10px 16px;
+          padding: 12px 16px;
+          margin: 2px 8px;
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-sm);
           display: flex;
           flex-direction: column;
           gap: 6px;
@@ -434,14 +445,14 @@ export default function MessageSearchModal() {
           height: 12px;
           width: 80px;
           border-radius: var(--r-sm);
-          background: var(--bg-base);
+          background: var(--bg-elevated);
         }
 
         .msm-skeleton-text {
           height: 12px;
           width: 90%;
           border-radius: var(--r-sm);
-          background: var(--bg-base);
+          background: var(--bg-elevated);
         }
 
         .msm-pulse {

@@ -81,17 +81,18 @@ export default function ServerSettingsModal() {
       <style>{`
         .ss-overlay {
           position: fixed; inset: 0;
-          background: rgba(0,0,0,0.7);
+          background: rgba(0,0,0,0.75);
           z-index: 500;
           display: flex; align-items: center; justify-content: center;
           padding: 24px;
-          backdrop-filter: blur(4px);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
         }
 
         .ss-modal {
-          background: var(--bg-deep);
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-xl);
+          background: var(--bg-2, var(--bg-elevated));
+          border: 1px solid var(--border-subtle);
+          border-radius: 12px;
           width: 100%; max-width: 860px;
           height: 85dvh; max-height: 680px;
           display: flex;
@@ -100,31 +101,38 @@ export default function ServerSettingsModal() {
         }
 
         .ss-nav {
-          width: 220px; flex-shrink: 0;
+          width: 200px; flex-shrink: 0;
           background: var(--bg-void);
-          padding: 24px 12px;
+          padding: 24px 10px;
           display: flex; flex-direction: column; gap: 2px;
           border-right: 1px solid var(--border-subtle);
         }
 
         .ss-nav-title {
           font-size: 11px; font-weight: 700;
-          letter-spacing: 0.08em; text-transform: uppercase;
+          letter-spacing: 0.1em; text-transform: uppercase;
           color: var(--text-muted); padding: 0 8px;
           margin-bottom: 8px;
         }
 
         .settings-tab {
           display: flex; align-items: center; gap: 10px;
-          padding: 8px 12px; border-radius: var(--r-sm);
-          background: none; border: none; cursor: pointer;
-          text-align: left; font-size: 14px; font-weight: 500;
+          padding: 0 10px; height: 30px;
+          border-radius: var(--r-sm);
+          background: none; border: none;
+          border-left: 2px solid transparent;
+          cursor: pointer;
+          text-align: left; font-size: 13.5px; font-weight: 500;
           color: var(--text-secondary);
-          transition: background var(--t-fast), color var(--t-fast);
+          transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
           width: 100%;
         }
         .settings-tab:hover { background: var(--ch-hover-bg); color: var(--text-primary); }
-        .settings-tab--active { background: var(--accent-subtle); color: var(--accent); }
+        .settings-tab--active {
+          background: var(--accent-subtle);
+          color: var(--accent);
+          border-left-color: var(--accent);
+        }
         .settings-tab-icon { width: 18px; display: flex; align-items: center; flex-shrink: 0; }
 
         .ss-content {
@@ -133,21 +141,26 @@ export default function ServerSettingsModal() {
         }
 
         .ss-close {
-          position: absolute; top: 20px; right: 20px;
-          width: 32px; height: 32px;
-          border-radius: 50%; border: none; background: var(--bg-elevated);
-          color: var(--text-secondary); cursor: pointer;
+          position: absolute; top: 16px; right: 16px;
+          width: 28px; height: 28px;
+          border-radius: 50%; border: 1px solid var(--border-subtle);
+          background: var(--bg-elevated);
+          color: var(--text-muted); cursor: pointer;
           display: flex; align-items: center; justify-content: center;
-          font-size: 12px;
-          transition: background var(--t-fast), color var(--t-fast);
+          font-size: 13px; font-weight: 600; line-height: 1;
+          transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
         }
-        .ss-close:hover { background: var(--bg-overlay); color: var(--text-primary); }
+        .ss-close:hover {
+          background: var(--bg-overlay);
+          color: var(--text-primary);
+          border-color: var(--border-normal);
+        }
 
         @keyframes scale-in {
           from { opacity: 0; transform: scale(0.96); }
           to   { opacity: 1; transform: scale(1); }
         }
-        .animate-scale-in { animation: scale-in 160ms var(--ease-out) both; }
+        .animate-scale-in { animation: scale-in 180ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both; }
       `}</style>
     </div>
   );
@@ -502,13 +515,7 @@ function MembersTab() {
         .ss-members-count {
           font-size: 13px; color: var(--text-muted); font-weight: 500; flex-shrink: 0;
         }
-        .ss-search {
-          flex: 1; max-width: 280px;
-          padding: 8px 12px; border-radius: var(--r-md);
-          background: var(--bg-elevated); border: 1px solid var(--border-normal);
-          color: var(--text-primary); font-size: 13px; font-family: inherit;
-        }
-        .ss-search:focus { outline: none; border-color: var(--accent-border); }
+        .ss-search { flex: 1; max-width: 280px; }
 
         .ss-members-table {
           border: 1px solid var(--border-normal);
@@ -960,12 +967,19 @@ function InvitesTab() {
           letter-spacing: 0.06em; color: var(--text-muted);
         }
         .ss-select {
-          padding: 8px 12px; border-radius: var(--r-md);
-          background: var(--bg-elevated); border: 1px solid var(--border-normal);
+          height: 36px;
+          padding: 0 12px; border-radius: var(--r-md);
+          background: var(--bg-deep); border: 1px solid var(--border-normal);
           color: var(--text-primary); font-size: 13px; font-family: inherit;
           cursor: pointer; min-width: 120px;
+          box-sizing: border-box;
+          transition: border-color 150ms ease, box-shadow 150ms ease;
         }
-        .ss-select:focus { outline: none; border-color: var(--accent-border); }
+        .ss-select:focus {
+          outline: none;
+          border-color: var(--accent-border);
+          box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+        }
 
         .ss-invite-empty {
           padding: 24px; text-align: center;
@@ -1396,8 +1410,26 @@ const ssSharedStyles = `
 
   .ss-section { display: flex; flex-direction: column; gap: 10px; }
   .ss-section-title {
-    font-size: 11px; font-weight: 700; letter-spacing: 0.07em;
-    text-transform: uppercase; color: var(--text-secondary);
+    font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--text-muted);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .ss-section-title::after {
+    content: ''; flex: 1; height: 1px; background: var(--border-subtle);
+  }
+
+  .ss-search {
+    height: 36px;
+    padding: 0 12px; border-radius: var(--r-md);
+    background: var(--bg-deep); border: 1px solid var(--border-normal);
+    color: var(--text-primary); font-size: 13px; font-family: inherit;
+    box-sizing: border-box;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+  .ss-search:focus {
+    outline: none;
+    border-color: var(--accent-border);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
   }
 
   .ss-channel-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
@@ -1433,7 +1465,7 @@ const ssSharedStyles = `
     border-radius: var(--r-lg);
     overflow: hidden;
   }
-  .ss-table-row--alt { background: rgba(255,255,255,0.02); }
+  .ss-table-row--alt { background: rgba(14, 165, 233, 0.025); }
 `;
 
 // ── RolesTab ───────────────────────────────────────────────────────────────────
@@ -1441,8 +1473,7 @@ const ssSharedStyles = `
 const IRC_ROLES = [
   { mode: 'q', symbol: '~', label: 'Owner',    color: '#e8b84b', description: 'Channel founders and owners — full control' },
   { mode: 'a', symbol: '&', label: 'Admin',    color: '#f87171', description: 'Channel administrators — almost full control' },
-  { mode: 'o', symbol: '@', label: 'Operator', color: '#7c5af5', description: 'Channel operators — manage messages, kick, ban' },
-  { mode: 'h', symbol: '%', label: 'Half-Op',  color: '#60a5fa', description: 'Half-operators — limited moderation' },
+  { mode: 'o', symbol: '@', label: 'Operator', color: '#0ea5e9', description: 'Channel operators — manage messages, kick, ban' },
   { mode: 'v', symbol: '+', label: 'Voice',    color: '#23a55a', description: 'Voiced users — can speak in moderated channels' },
   { mode:  '', symbol: '',  label: 'Member',   color: '#9ca3af', description: 'Regular channel members' },
 ] as const;
@@ -1478,7 +1509,7 @@ function RolesTab() {
       )}
       <div className="roles-list">
         {IRC_ROLES.map(role => (
-          <div key={role.mode || 'member'} className="role-card">
+          <div key={role.mode || 'member'} className="role-card" style={{ borderLeftColor: role.color }}>
             <div className="role-color-dot" style={{ background: role.color }}>
               {role.symbol && <span className="role-symbol">{role.symbol}</span>}
             </div>
@@ -1499,29 +1530,38 @@ function RolesTab() {
       </div>
       <style>{`
         .roles-tab { padding: 24px; }
-        .roles-heading { font-size: 18px; font-weight: 700; margin: 0 0 8px; color: var(--text-primary); }
+        .roles-heading {
+          font-size: 11px; font-weight: 700; text-transform: uppercase;
+          letter-spacing: 0.1em; color: var(--text-muted);
+          display: flex; align-items: center; gap: 10px;
+          margin: 0 0 8px;
+        }
+        .roles-heading::after { content: ''; flex: 1; height: 1px; background: var(--border-subtle); }
         .roles-description { color: var(--text-muted); font-size: 13px; margin: 0 0 20px; line-height: 1.5; }
         .roles-no-channel { color: var(--text-muted); font-style: italic; margin-bottom: 16px; }
-        .roles-list { display: flex; flex-direction: column; gap: 8px; }
+        .roles-list { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border-subtle); border-radius: var(--r-lg); overflow: hidden; }
         .role-card {
           display: flex; align-items: center; gap: 14px;
-          padding: 12px 16px; border-radius: 8px;
-          background: var(--bg-elevated); border: 1px solid var(--border);
-          transition: border-color 0.15s;
+          padding: 12px 16px;
+          background: var(--bg-elevated);
+          border-bottom: 1px solid var(--border-subtle);
+          border-left: 3px solid transparent;
+          transition: background 150ms ease, border-left-color 150ms ease;
         }
-        .role-card:hover { border-color: var(--accent); }
+        .role-card:last-child { border-bottom: none; }
+        .role-card:hover { background: var(--ch-hover-bg); }
         .role-color-dot {
-          width: 36px; height: 36px; border-radius: 50%;
-          display: flex; align-items: center; justify-content: center;
+          width: 10px; height: 10px; border-radius: 50%;
           flex-shrink: 0;
         }
-        .role-symbol { font-weight: 700; font-size: 16px; color: white; }
+        .role-symbol { display: none; }
         .role-info { flex: 1; min-width: 0; }
         .role-name-row { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
         .role-name { font-weight: 600; font-size: 14px; color: var(--text-primary); }
         .role-mode-badge {
-          font-size: 11px; padding: 1px 5px; border-radius: 4px;
-          background: var(--bg-surface); color: var(--text-muted);
+          font-size: 11px; padding: 1px 6px; border-radius: 4px;
+          background: var(--bg-deep); color: var(--text-muted);
+          border: 1px solid var(--border-subtle);
           font-family: monospace;
         }
         .role-desc { font-size: 12px; color: var(--text-muted); }

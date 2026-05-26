@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import SkeletonChannel from '@/components/chat/SkeletonChannel';
 import type { Channel } from '@/lib/irc/types';
@@ -163,6 +163,40 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
     voiceChannels.includes(c.name.toLowerCase())
   );
 
+  // ── Keyboard navigation: Up/Down navigate channels when sidebar has focus ─────
+  const navRef = useRef<HTMLElement>(null);
+  const navItems = useMemo((): Array<{ kind: 'channel'; channel: string } | { kind: 'dm'; nick: string }> => {
+    const chans = [...channels.values()]
+      .filter(c => !c.modes.includes('V') && !c.name.startsWith('+') && !voiceChannels.includes(c.name.toLowerCase()))
+      .map(c => ({ kind: 'channel' as const, channel: c.name }));
+    const dmsArr = [...dms.values()].map(d => ({ kind: 'dm' as const, nick: d.nick }));
+    return [...chans, ...dmsArr];
+  }, [channels, dms, voiceChannels]);
+
+  const handleSidebarKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown' && e.key !== 'Enter') return;
+    if ((e.target as HTMLElement).tagName === 'INPUT') return;
+    e.preventDefault();
+
+    const currentIdx = navItems.findIndex(item =>
+      item.kind === 'channel'
+        ? activeView.kind === 'channel' && item.channel.toLowerCase() === activeView.channel.toLowerCase()
+        : activeView.kind === 'dm' && item.nick.toLowerCase() === activeView.nick.toLowerCase()
+    );
+
+    if (e.key === 'Enter' && currentIdx >= 0) {
+      // Already navigated — do nothing (already selected)
+      return;
+    }
+
+    const dir = e.key === 'ArrowDown' ? 1 : -1;
+    const next = navItems[(currentIdx + dir + navItems.length) % navItems.length];
+    if (next) {
+      navigate(next);
+      onNavigate?.();
+    }
+  }, [navItems, activeView, navigate, onNavigate]);
+
   // Drag-and-drop state
   const dragChannelRef = useRef<string | null>(null);
 
@@ -218,9 +252,9 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channels, channelSortOrder, channelLastActivity, voiceChannels, channelOrder]);
-  const dmList = [...dms.values()].sort(
-    (a, b) => b.highlights - a.highlights || b.unread - a.unread || a.nick.localeCompare(b.nick)
-  );
+  const dmList = [...dms.values()]
+    .filter(dm => dm.nick) // defensive: skip ghost entries with blank nick
+    .sort((a, b) => b.highlights - a.highlights || b.unread - a.unread || a.nick.localeCompare(b.nick));
 
   const isActiveChannel = (name: string) =>
     activeView.kind === 'channel' && activeView.channel.toLowerCase() === name.toLowerCase();
@@ -278,7 +312,7 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
         )}
       </div>
 
-      <nav className="ch-scroll" aria-label="Channel navigation">
+      <nav className="ch-scroll" aria-label="Channel navigation" ref={navRef} onKeyDown={handleSidebarKeyDown} tabIndex={-1}>
 
         {/* ── Skeleton during initial connection ───────────────────────── */}
         {connectionStatus === 'connecting' && (
@@ -307,12 +341,14 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
         {starredChannels.size > 0 && (() => {
           const starredList = channelList.filter(c => starredChannels.has(c.name.toLowerCase()));
           if (starredList.length === 0) return null;
+          const starredUnread = starredList.reduce((sum, c) => sum + (channelUnread[c.name.toLowerCase()] ?? 0), 0);
           return (
             <Section
               label="Starred"
               expanded={!collapsed.has('__starred__')}
               onToggle={() => toggleCategory('__starred__')}
               compact={compactSidebar}
+              unreadBadge={starredUnread}
             >
               {starredList.map(ch => (
                 <ChannelRow
@@ -420,6 +456,7 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
           expanded={dmExpanded}
           onToggle={() => setDmExpanded(e => !e)}
           compact={compactSidebar}
+          unreadBadge={dmList.reduce((sum, dm) => sum + (dm.unread ?? 0), 0)}
         >
           {dmList.map(dm => (
             <DMRow
@@ -704,22 +741,33 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
         }
 
         .ch-join {
-          padding: 4px 8px 4px;
+          padding: 4px 8px 6px;
           flex-shrink: 0;
+        }
+        @media (max-width: 768px) {
+          .ch-join { display: none; }
         }
 
         .ch-join-input {
           width: 100%;
-          padding: 7px 10px;
-          background: var(--bg-void);
-          border: 1px solid var(--border-subtle);
+          padding: 6px 10px;
+          background: transparent;
+          border: 1px dashed var(--border-subtle);
           border-radius: var(--r-sm);
-          font-size: 13px;
-          color: var(--text-primary);
+          font-size: 12px;
+          color: var(--text-muted);
           font-family: inherit;
+          box-sizing: border-box;
+          transition: border-color var(--t-fast), color var(--t-fast), background var(--t-fast);
         }
-        .ch-join-input:focus { outline: none; border-color: var(--accent-border); }
-        .ch-join-input::placeholder { color: var(--text-muted); }
+        .ch-join-input:focus {
+          outline: none;
+          border-color: var(--accent-border);
+          border-style: solid;
+          color: var(--text-secondary);
+          background: var(--bg-deep);
+        }
+        .ch-join-input::placeholder { color: var(--text-muted); opacity: 0.65; }
 
         .ch-spotlight-btn {
           display: flex;
@@ -771,8 +819,8 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
           display: flex;
           align-items: center;
           justify-content: center;
-          width: 28px;
-          height: 28px;
+          width: 36px;
+          height: 36px;
           background: none;
           border: none;
           cursor: pointer;
@@ -781,10 +829,17 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
           transition: background var(--t-fast), color var(--t-fast);
           flex-shrink: 0;
           margin-left: 4px;
+          -webkit-tap-highlight-color: transparent;
         }
         .ch-mobile-close:hover {
           background: var(--ch-hover-bg);
           color: var(--text-primary);
+        }
+        @media (max-width: 768px) {
+          .ch-mobile-close {
+            width: 44px;
+            height: 44px;
+          }
         }
 
         @media (min-width: 769px) {
@@ -871,15 +926,34 @@ interface SectionProps {
   onAdd?: () => void;
   children: React.ReactNode;
   compact?: boolean;
+  /** Total unread count — shown as a badge on the header when collapsed */
+  unreadBadge?: number;
 }
 
-function Section({ label, expanded, onToggle, onAdd, children, compact }: SectionProps) {
+function Section({ label, expanded, onToggle, onAdd, children, compact, unreadBadge }: SectionProps) {
+  const showBadge = !expanded && (unreadBadge ?? 0) > 0;
   return (
     <div className="ch-section">
       {!compact && (
-        <div className="ch-section-header" onClick={onToggle}>
+        <div
+          className="ch-section-header"
+          onClick={onToggle}
+          role="button"
+          tabIndex={0}
+          aria-expanded={expanded}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
+        >
           <ChevronIcon open={expanded} />
           <span className="ch-section-label">{label}</span>
+          {showBadge && (
+            <span
+              className="ch-section-unread-badge"
+              aria-label={`${unreadBadge} unread`}
+              title={`${unreadBadge} unread message${(unreadBadge ?? 0) === 1 ? '' : 's'}`}
+            >
+              {(unreadBadge ?? 0) > 99 ? '99+' : unreadBadge}
+            </span>
+          )}
           {onAdd && (
             <button
               className="ch-section-add"
@@ -894,38 +968,74 @@ function Section({ label, expanded, onToggle, onAdd, children, compact }: Sectio
       {(expanded || compact) && <div className="ch-section-items" role="list">{children}</div>}
 
       <style>{`
-        .ch-section { margin-bottom: 8px; }
+        .ch-section { margin-bottom: 6px; }
+        .ch-section + .ch-section {
+          border-top: 1px solid var(--border-subtle);
+          margin-top: 2px;
+          padding-top: 4px;
+        }
 
         .ch-section-header {
           display: flex;
           align-items: center;
           gap: 4px;
-          padding: 6px 6px 4px 6px;
+          padding: 5px 6px 3px 6px;
           cursor: pointer;
           user-select: none;
+          border-radius: var(--r-sm);
+          margin: 0 4px;
+          transition: background 100ms ease;
         }
-        .ch-section-header:hover .ch-section-label { color: var(--text-primary); }
+        .ch-section-header:hover { background: var(--ch-hover-bg); }
+        .ch-section-header:hover .ch-section-label { color: var(--text-secondary); }
         .ch-section-header:hover .ch-section-add { opacity: 1; }
+
+        /* Chevron rotates 200ms on collapse/expand — already handled by ChevronIcon inline style */
 
         .ch-section-label {
           flex: 1;
-          font-size: 11px;
+          font-size: 10px;
           font-weight: 700;
-          letter-spacing: 0.07em;
+          letter-spacing: 0.09em;
           text-transform: uppercase;
-          color: var(--text-secondary);
-          transition: color var(--t-fast);
+          color: var(--text-muted);
+          transition: color 100ms var(--ease-out);
         }
+        .ch-section-header:hover .ch-section-label { color: var(--text-secondary); }
 
         .ch-section-add {
           width: 16px; height: 16px;
           display: flex; align-items: center; justify-content: center;
           background: none; border: none; cursor: pointer;
-          color: var(--text-secondary); font-size: 16px; line-height: 1;
-          border-radius: 2px; opacity: 0; transition: opacity var(--t-fast);
+          color: var(--text-muted); font-size: 16px; line-height: 1;
+          border-radius: 2px; opacity: 0;
+          transition: opacity 100ms var(--ease-out), color 100ms;
           padding: 0;
         }
         .ch-section-add:hover { color: var(--text-primary); }
+
+        /* Unread badge on collapsed section header */
+        .ch-section-unread-badge {
+          min-width: 18px;
+          height: 16px;
+          padding: 0 5px;
+          background: var(--accent, #0ea5e9);
+          color: #fff;
+          font-size: 10px;
+          font-weight: 700;
+          border-radius: 9999px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          line-height: 1;
+          letter-spacing: 0.01em;
+          animation: ch-badge-pop 200ms var(--ease-spring, cubic-bezier(0.175,0.885,0.32,1.275)) both;
+        }
+        @keyframes ch-badge-pop {
+          from { transform: scale(0.6); opacity: 0; }
+          to   { transform: scale(1);   opacity: 1; }
+        }
 
         .ch-section-items { display: flex; flex-direction: column; gap: 1px; }
       `}</style>
@@ -1109,15 +1219,31 @@ function ChannelRow({ channel, active, onClick, onContextMenu, starred, autoJoin
       <style>{`
         .ch-row {
           display: flex; align-items: center; gap: 6px;
-          padding: 5px 8px 5px 4px;
-          border-radius: var(--r-sm);
+          padding: 0 8px 0 4px;
+          height: 28px;
+          border-radius: 5px;
           margin: 0 6px;
           background: none; border: none; cursor: pointer;
           text-align: left; width: calc(100% - 12px);
-          transition: background 150ms ease, border-color 150ms ease;
+          transition: background 100ms ease;
+          -webkit-tap-highlight-color: transparent;
+          position: relative;
+          /* Left border placeholder — takes up 3px, invisible by default */
+          border-left: 3px solid transparent;
         }
-        .ch-row:hover { background: var(--ch-hover-bg); }
-        .ch-row--active { background: var(--ch-active-bg) !important; }
+        @media (max-width: 768px) {
+          .ch-row { height: 40px; }
+          .dm-row { height: 40px; }
+          .vch-row { min-height: 40px; }
+        }
+        .ch-row:hover {
+          background: var(--ch-hover-bg);
+          border-left-color: var(--border-normal);
+        }
+        .ch-row--active {
+          background: var(--ch-active-bg) !important;
+          border-left-color: var(--accent) !important;
+        }
 
         .ch-drag-handle {
           font-size: 11px;
@@ -1157,11 +1283,12 @@ function ChannelRow({ channel, active, onClick, onContextMenu, starred, autoJoin
         .ch-row-name {
           overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
           font-size: 14px; font-weight: 500;
-          color: var(--ch-read); transition: color var(--t-fast);
+          color: var(--ch-read); transition: color 100ms var(--ease-out);
         }
-        .ch-row--unread .ch-row-name, .ch-row:hover .ch-row-name,
+        .ch-row--unread .ch-row-name { color: var(--text-primary); font-weight: 600; }
+        .ch-row:hover .ch-row-name,
         .ch-row--active .ch-row-name { color: var(--ch-unread); }
-        .ch-row-name--unread { font-weight: 600; color: var(--text-primary) !important; }
+        .ch-row-name--unread { font-weight: 700; color: var(--text-primary) !important; }
 
         .ch-last-preview {
           font-size: 11px;
@@ -1190,7 +1317,9 @@ function ChannelRow({ channel, active, onClick, onContextMenu, starred, autoJoin
 
         .ch-row-dot {
           width: 8px; height: 8px; border-radius: 50%;
-          background: var(--text-primary); flex-shrink: 0;
+          background: var(--accent);
+          flex-shrink: 0;
+          opacity: 0.75;
         }
         .ch-row-count {
           font-size: 11px; color: var(--text-muted);
@@ -1403,12 +1532,13 @@ function VoiceChannelRow({ channel, active, onClick, speakingNicks, participants
         }
 
         .vch-name {
-          flex: 1; font-size: 14px; font-weight: 500; color: var(--ch-read);
+          flex: 1; font-size: 14px; font-weight: 500; color: var(--status-online, #23a55a);
           overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
           transition: color var(--t-fast);
+          opacity: 0.85;
         }
-        .vch-wrap:hover .vch-name,
-        .vch-wrap--active .vch-name { color: var(--ch-unread); }
+        .vch-wrap:hover .vch-name { opacity: 1; }
+        .vch-wrap--active .vch-name { color: var(--status-online, #23a55a); opacity: 1; }
 
         .vch-count {
           font-size: 11px; color: var(--text-muted); flex-shrink: 0;
@@ -1565,26 +1695,33 @@ function DMRow({ dm, active, muted, onClick, onContextMenu }: {
       <style>{`
         .dm-row {
           display: flex; align-items: center; gap: 8px;
-          padding: 4px 8px 4px 12px;
-          border-radius: var(--r-sm); margin: 0 6px;
+          padding: 0 8px 0 7px;
+          height: 28px;
+          border-radius: 5px; margin: 0 6px;
           background: none; border: none; cursor: pointer;
           text-align: left; width: calc(100% - 12px);
-          transition: background var(--t-fast);
+          transition: background 100ms ease;
         }
-        .dm-row:hover { background: var(--ch-hover-bg); }
+        .dm-row:hover { background: var(--bg-3, var(--bg-elevated)); }
         .dm-row--active { background: var(--ch-active-bg); }
-        .dm-nick { flex: 1; font-size: 14px; font-weight: 500; color: var(--ch-read); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .dm-nick--unread, .dm-row:hover .dm-nick, .dm-row--active .dm-nick { color: var(--ch-unread); }
+        .dm-nick {
+          flex: 1; font-size: 14px; font-weight: 500;
+          color: var(--ch-read);
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+          transition: color 100ms var(--ease-out);
+        }
+        .dm-nick--unread { color: var(--text-primary); font-weight: 600; }
+        .dm-row:hover .dm-nick, .dm-row--active .dm-nick { color: var(--ch-unread); }
 
         .dm-avatar-wrap {
           position: relative;
-          width: 28px; height: 28px;
+          width: 24px; height: 24px;
           flex-shrink: 0;
         }
         .dm-status-dot {
           position: absolute;
           bottom: -1px; right: -1px;
-          width: 9px; height: 9px;
+          width: 8px; height: 8px;
           border-radius: 50%;
           border: 2px solid var(--bg-deep);
         }
@@ -1662,7 +1799,7 @@ function DMContextMenu({ nick, x, y, muted, onMute, onUnmute, onClose }: {
 function ChevronIcon({ open }: { open: boolean }) {
   return (
     <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"
-      style={{ transform: open ? 'rotate(90deg)' : 'rotate(0)', transition: 'transform 150ms', color: 'var(--text-muted)' }}>
+      style={{ transform: open ? 'rotate(90deg)' : 'rotate(0)', transition: 'transform 200ms cubic-bezier(0.16,1,0.3,1)', color: 'var(--text-muted)' }}>
       <path d="M3 2l4 3-4 3V2z" />
     </svg>
   );
@@ -1670,7 +1807,7 @@ function ChevronIcon({ open }: { open: boolean }) {
 
 function VoiceIcon() {
   return (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style={{ color: 'var(--text-muted)', flexShrink: 0 }}>
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style={{ color: 'var(--status-online, #23a55a)', flexShrink: 0, opacity: 0.85 }}>
       <path d="M7.5 1a2 2 0 0 0-2 2v4.5a2 2 0 0 0 4 0V3a2 2 0 0 0-2-2z" stroke="currentColor" strokeWidth="1.5" />
       <path d="M3 6.5a4.5 4.5 0 0 0 9 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
       <path d="M7.5 11v2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />

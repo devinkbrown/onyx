@@ -233,9 +233,10 @@ export default function ForwardMessageModal() {
         /* Preview */
         .fwd-preview {
           margin: 10px 12px;
-          padding: 10px 12px;
+          padding: 10px 12px 10px 10px;
           background: var(--bg-elevated);
           border: 1px solid var(--border-subtle);
+          border-left: 3px solid var(--accent-border);
           border-radius: var(--r-md);
           display: flex; flex-direction: column; gap: 6px;
         }

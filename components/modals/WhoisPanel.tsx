@@ -276,7 +276,7 @@ export default function WhoisPanel() {
           border-left: 1px solid var(--border-normal);
           display: flex;
           flex-direction: column;
-          box-shadow: -4px 0 24px rgba(0,0,0,0.35);
+          box-shadow: -12px 0 48px rgba(0,0,0,0.55), -1px 0 0 var(--border-subtle);
           overflow: hidden;
         }
 
@@ -297,12 +297,13 @@ export default function WhoisPanel() {
           height: var(--header-h, 48px);
           border-bottom: 1px solid var(--border-subtle);
           flex-shrink: 0;
+          background: var(--bg-elevated);
         }
         .whois-header-title {
-          font-size: 14px;
-          font-weight: 700;
-          letter-spacing: 0.02em;
-          color: var(--text-primary);
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          color: var(--text-muted);
           text-transform: uppercase;
         }
         .whois-close {
@@ -314,17 +315,19 @@ export default function WhoisPanel() {
           background: none;
           border: none;
           cursor: pointer;
-          color: var(--text-secondary);
-          border-radius: var(--r-sm, 4px);
+          color: var(--text-muted);
+          border-radius: var(--r-sm);
           transition: background var(--t-fast, 150ms), color var(--t-fast, 150ms);
         }
-        .whois-close:hover { background: var(--bg-overlay); color: var(--text-primary); }
+        .whois-close:hover { background: var(--ch-hover-bg); color: var(--text-primary); }
 
         /* Body */
         .whois-body {
           flex: 1;
           overflow-y: auto;
           padding-bottom: 16px;
+          scrollbar-width: thin;
+          scrollbar-color: var(--border-normal) transparent;
         }
 
         /* Identity */
@@ -338,6 +341,7 @@ export default function WhoisPanel() {
         }
         .whois-avatar-wrap {
           margin-bottom: 8px;
+          position: relative;
         }
         .whois-nick {
           font-size: 20px;
@@ -350,7 +354,10 @@ export default function WhoisPanel() {
           font-family: var(--font-mono, monospace);
           color: var(--text-muted);
           word-break: break-all;
+          cursor: text;
+          user-select: all;
         }
+        .whois-userhost:hover { color: var(--text-secondary); }
         .whois-realname {
           font-size: 13px;
           color: var(--text-secondary);
@@ -360,16 +367,17 @@ export default function WhoisPanel() {
           align-items: center;
           gap: 5px;
           font-size: 12px;
-          color: var(--accent, #7c5af5);
-          background: color-mix(in oklch, var(--accent, #7c5af5) 15%, transparent);
-          padding: 3px 8px;
-          border-radius: 20px;
-          font-weight: 600;
+          color: var(--accent);
+          background: var(--accent-subtle);
+          border: 1px solid var(--accent-border);
+          padding: 3px 10px;
+          border-radius: var(--r-full);
+          font-weight: 700;
         }
         .whois-account-icon {
           display: flex;
           align-items: center;
-          color: var(--accent, #7c5af5);
+          color: var(--accent);
         }
 
         /* Divider */
@@ -386,37 +394,49 @@ export default function WhoisPanel() {
         .whois-section-label {
           font-size: 10px;
           font-weight: 800;
-          letter-spacing: 0.08em;
+          letter-spacing: 0.09em;
           text-transform: uppercase;
           color: var(--text-muted);
-          margin-bottom: 8px;
+          margin-bottom: 10px;
         }
 
-        /* Rows */
+        /* Rows — label + copyable value */
         .whois-row {
           display: flex;
-          flex-direction: column;
-          gap: 1px;
-          margin-bottom: 8px;
+          align-items: flex-start;
+          gap: 12px;
+          padding: 5px 0;
+          border-bottom: 1px solid var(--border-subtle);
         }
-        .whois-row:last-child { margin-bottom: 0; }
+        .whois-row:last-child { border-bottom: none; }
         .whois-row-label {
           font-size: 11px;
           font-weight: 600;
           color: var(--text-muted);
           text-transform: uppercase;
           letter-spacing: 0.05em;
+          flex-shrink: 0;
+          width: 72px;
+          padding-top: 1px;
         }
         .whois-row-value {
           font-size: 13px;
           color: var(--text-secondary);
           word-break: break-word;
+          flex: 1;
+          cursor: text;
+          user-select: all;
+          transition: color var(--t-fast);
         }
+        .whois-row-value:hover { color: var(--text-primary); }
         .whois-row-code {
           font-size: 12px;
           font-family: var(--font-mono, monospace);
           color: var(--text-secondary);
           word-break: break-all;
+          flex: 1;
+          cursor: text;
+          user-select: all;
         }
 
         /* Channel pills */
@@ -432,24 +452,24 @@ export default function WhoisPanel() {
         .whois-pill {
           display: inline-flex;
           align-items: center;
-          padding: 3px 8px;
+          padding: 3px 9px;
           font-size: 12px;
           font-weight: 600;
-          background: var(--bg-overlay);
+          background: var(--bg-elevated);
           border: 1px solid var(--border-subtle);
-          border-radius: var(--r-sm, 4px);
+          border-radius: var(--r-sm);
           color: var(--text-secondary);
           cursor: pointer;
-          transition: background var(--t-fast, 150ms), color var(--t-fast, 150ms), border-color var(--t-fast, 150ms);
+          transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
           font-family: inherit;
         }
         .whois-pill:hover {
-          background: var(--accent-muted, color-mix(in oklch, var(--accent, #7c5af5) 15%, transparent));
-          color: var(--accent, #7c5af5);
-          border-color: var(--accent, #7c5af5);
+          background: var(--accent-subtle);
+          color: var(--accent);
+          border-color: var(--accent-border);
         }
         .whois-pill-prefix {
-          color: var(--gold, #e8b84b);
+          color: var(--gold);
           font-weight: 700;
           margin-right: 1px;
         }
@@ -465,13 +485,13 @@ export default function WhoisPanel() {
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          padding: 4px 10px;
-          background: color-mix(in oklch, var(--gold, #e8b84b) 15%, transparent);
-          border: 1px solid color-mix(in oklch, var(--gold, #e8b84b) 35%, transparent);
-          border-radius: 20px;
+          padding: 4px 12px;
+          background: var(--gold-subtle);
+          border: 1px solid color-mix(in srgb, var(--gold) 35%, transparent);
+          border-radius: var(--r-full);
           font-size: 12px;
           font-weight: 700;
-          color: var(--gold, #e8b84b);
+          color: var(--gold);
         }
         .whois-special {
           font-size: 13px;
@@ -487,8 +507,8 @@ export default function WhoisPanel() {
         }
         .whois-btn {
           width: 100%;
-          padding: 9px 16px;
-          border-radius: var(--r-sm, 4px);
+          padding: 10px 16px;
+          border-radius: var(--r-md);
           font-size: 14px;
           font-weight: 600;
           cursor: pointer;
@@ -497,26 +517,26 @@ export default function WhoisPanel() {
           transition: background var(--t-fast, 150ms), opacity var(--t-fast, 150ms);
         }
         .whois-btn--primary {
-          background: var(--accent, #7c5af5);
+          background: var(--accent);
           color: #fff;
         }
-        .whois-btn--primary:hover { opacity: 0.88; }
+        .whois-btn--primary:hover { background: var(--accent-hover); }
         .whois-btn--secondary {
-          background: var(--bg-overlay);
+          background: var(--bg-elevated);
           color: var(--text-secondary);
           border: 1px solid var(--border-normal);
         }
-        .whois-btn--secondary:hover { background: var(--bg-float, var(--bg-overlay)); color: var(--text-primary); }
+        .whois-btn--secondary:hover { background: var(--bg-float); color: var(--text-primary); }
 
         /* Skeleton */
         .whois-skeleton {
           height: 12px;
-          border-radius: 6px;
+          border-radius: var(--r-sm);
           background: linear-gradient(
             90deg,
-            var(--bg-overlay) 25%,
-            var(--bg-float, var(--border-subtle)) 50%,
-            var(--bg-overlay) 75%
+            var(--bg-elevated) 25%,
+            var(--bg-float) 50%,
+            var(--bg-elevated) 75%
           );
           background-size: 200% 100%;
           animation: whois-shimmer 1.4s ease-in-out infinite;

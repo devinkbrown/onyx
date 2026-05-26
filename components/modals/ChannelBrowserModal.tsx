@@ -158,8 +158,10 @@ export default function ChannelBrowserModal() {
                   <span className="cbrowser-pill">{ch.name}</span>
                 </span>
                 <span className="cbrowser-col-count">
-                  <span className="cbrowser-member-icon">👥</span>
-                  {ch.count.toLocaleString()}
+                  <span className="cbrowser-member-pill">
+                    <span className="cbrowser-member-icon">👥</span>
+                    {ch.count.toLocaleString()}
+                  </span>
                 </span>
                 <span className="cbrowser-col-topic" title={ch.topic}>
                   {ch.topic.length > 400
@@ -200,27 +202,33 @@ export default function ChannelBrowserModal() {
           position: fixed;
           inset: 0;
           z-index: 800;
-          background: rgba(0, 0, 0, 0.72);
-          backdrop-filter: blur(6px);
+          background: rgba(0, 0, 0, 0.75);
+          backdrop-filter: blur(8px);
           display: flex;
-          align-items: flex-start;
+          align-items: center;
           justify-content: center;
           padding: 40px 16px;
           overflow-y: auto;
         }
 
         .cbrowser-modal {
-          width: 100%;
-          max-width: 900px;
+          width: 640px;
+          max-width: calc(100vw - 32px);
+          height: 500px;
+          max-height: calc(100vh - 80px);
           background: var(--bg-deep);
-          border-radius: 12px;
-          border: 1px solid var(--border-subtle);
-          box-shadow: 0 32px 80px rgba(0, 0, 0, 0.6);
+          border-radius: var(--r-xl);
+          border: 1px solid var(--border-normal);
+          box-shadow: var(--shadow-xl), 0 0 0 1px var(--accent-border);
           display: flex;
           flex-direction: column;
           overflow: hidden;
-          min-height: 0;
-          max-height: calc(100vh - 80px);
+          animation: cbrowser-in 180ms var(--ease-out) both;
+        }
+
+        @keyframes cbrowser-in {
+          from { opacity: 0; transform: scale(0.97) translateY(6px); }
+          to   { opacity: 1; transform: scale(1)    translateY(0); }
         }
 
         /* ── Header ── */
@@ -229,7 +237,7 @@ export default function ChannelBrowserModal() {
           align-items: center;
           justify-content: space-between;
           gap: 12px;
-          padding: 16px 20px;
+          padding: 14px 18px;
           border-bottom: 1px solid var(--border-subtle);
           flex-shrink: 0;
           background: var(--bg-elevated);
@@ -243,7 +251,7 @@ export default function ChannelBrowserModal() {
         }
 
         .cbrowser-title {
-          font-size: 16px;
+          font-size: 15px;
           font-weight: 700;
           color: var(--text-primary);
           letter-spacing: -0.2px;
@@ -252,11 +260,12 @@ export default function ChannelBrowserModal() {
         }
 
         .cbrowser-count {
-          font-size: 12px;
-          font-weight: 600;
-          color: var(--text-muted);
-          background: var(--bg-float);
-          border-radius: 999px;
+          font-size: 11px;
+          font-weight: 700;
+          color: var(--accent);
+          background: var(--accent-subtle);
+          border: 1px solid var(--accent-border);
+          border-radius: var(--r-full);
           padding: 1px 8px;
           flex-shrink: 0;
         }
@@ -283,19 +292,21 @@ export default function ChannelBrowserModal() {
         }
 
         .cbrowser-search {
-          width: 220px;
-          padding: 7px 12px 7px 34px;
+          width: 224px;
+          height: 36px;
+          padding: 0 12px 0 34px;
           background: var(--bg-void);
-          border: 1px solid var(--border-subtle);
-          border-radius: var(--r-sm);
+          border: 1px solid var(--border-normal);
+          border-radius: var(--r-md);
           font-size: 13px;
           color: var(--text-primary);
           font-family: inherit;
-          transition: border-color var(--t-fast);
+          transition: border-color var(--t-fast), box-shadow var(--t-fast);
         }
         .cbrowser-search:focus {
           outline: none;
-          border-color: var(--accent-border);
+          border-color: var(--accent);
+          box-shadow: 0 0 0 2px var(--accent-glow);
         }
         .cbrowser-search::placeholder {
           color: var(--text-muted);
@@ -331,28 +342,29 @@ export default function ChannelBrowserModal() {
           display: flex;
           align-items: center;
           gap: 6px;
-          padding: 10px 20px;
+          padding: 8px 18px;
           border-bottom: 1px solid var(--border-subtle);
           flex-shrink: 0;
+          background: var(--bg-deep);
         }
 
         .cbrowser-sort-label {
-          font-size: 12px;
-          font-weight: 600;
+          font-size: 11px;
+          font-weight: 700;
           color: var(--text-muted);
           text-transform: uppercase;
-          letter-spacing: 0.06em;
+          letter-spacing: 0.07em;
           margin-right: 4px;
         }
 
         .cbrowser-sort-btn {
-          padding: 4px 12px;
+          padding: 3px 11px;
           border-radius: var(--r-full);
           border: 1px solid var(--border-subtle);
           background: none;
           cursor: pointer;
-          font-size: 13px;
-          font-weight: 500;
+          font-size: 12px;
+          font-weight: 600;
           color: var(--text-secondary);
           transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
           font-family: inherit;
@@ -360,6 +372,7 @@ export default function ChannelBrowserModal() {
         .cbrowser-sort-btn:hover {
           background: var(--ch-hover-bg);
           color: var(--text-primary);
+          border-color: var(--border-normal);
         }
         .cbrowser-sort-btn--active {
           background: var(--accent);
@@ -371,51 +384,66 @@ export default function ChannelBrowserModal() {
         .cbrowser-body {
           flex: 1;
           overflow-y: auto;
-          padding: 8px 0 16px;
+          padding: 6px 0 12px;
+          scrollbar-width: thin;
+          scrollbar-color: var(--border-normal) transparent;
         }
 
         /* Grid: name | count | topic | action */
         .cbrowser-row {
           display: grid;
-          grid-template-columns: 200px 100px 1fr 100px;
+          grid-template-columns: 190px 90px 1fr 90px;
           align-items: center;
-          gap: 12px;
-          padding: 8px 20px;
+          gap: 10px;
+          padding: 0 12px;
+          height: 44px;
         }
 
         .cbrowser-row--header {
-          padding-top: 6px;
-          padding-bottom: 6px;
+          height: 32px;
         }
 
         .cbrowser-row--header span {
-          font-size: 11px;
+          font-size: 10px;
           font-weight: 700;
           text-transform: uppercase;
-          letter-spacing: 0.07em;
+          letter-spacing: 0.08em;
           color: var(--text-muted);
         }
 
         .cbrowser-row--data {
-          border-radius: 6px;
-          margin: 0 8px;
+          border-radius: var(--r-sm);
+          margin: 0 6px;
           transition: background var(--t-fast);
+          position: relative;
         }
         .cbrowser-row--data:hover {
-          background: var(--bg-elevated);
+          background: var(--accent-subtle);
+        }
+        /* Show join button only on hover */
+        .cbrowser-row--data .cbrowser-join-btn:not(.cbrowser-join-btn--joined) {
+          opacity: 0;
+          transition: opacity var(--t-fast), background var(--t-fast);
+        }
+        .cbrowser-row--data:hover .cbrowser-join-btn:not(.cbrowser-join-btn--joined) {
+          opacity: 1;
         }
 
         /* Columns */
         .cbrowser-col-name {
           min-width: 0;
           overflow: hidden;
+          display: flex;
+          align-items: center;
+          gap: 8px;
         }
 
         .cbrowser-pill {
           display: inline-block;
-          background: var(--bg-float);
-          border-radius: var(--r-sm);
-          padding: 3px 8px;
+          background: var(--bg-elevated);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-xs);
+          padding: 2px 7px;
           font-family: var(--font-mono, monospace);
           font-size: 13px;
           font-weight: 600;
@@ -423,26 +451,38 @@ export default function ChannelBrowserModal() {
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          max-width: 190px;
+          max-width: 170px;
         }
 
         .cbrowser-col-count {
-          font-size: 13px;
-          font-weight: 600;
-          color: var(--text-secondary);
           display: flex;
           align-items: center;
           gap: 5px;
           white-space: nowrap;
         }
 
+        /* Member count pill */
+        .cbrowser-member-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          background: var(--bg-float);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-full);
+          padding: 2px 8px;
+          font-size: 11px;
+          font-weight: 600;
+          color: var(--text-muted);
+        }
+
         .cbrowser-member-icon {
-          font-size: 13px;
+          font-size: 11px;
+          line-height: 1;
         }
 
         .cbrowser-col-topic {
           font-size: 13px;
-          color: var(--text-secondary);
+          color: var(--text-muted);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -451,6 +491,7 @@ export default function ChannelBrowserModal() {
         .cbrowser-no-topic {
           color: var(--text-muted);
           font-style: italic;
+          opacity: 0.6;
         }
 
         .cbrowser-col-action {
@@ -460,32 +501,34 @@ export default function ChannelBrowserModal() {
 
         /* Join button */
         .cbrowser-join-btn {
-          padding: 5px 16px;
+          padding: 4px 14px;
           border-radius: var(--r-full);
           border: none;
           background: var(--accent);
           color: #fff;
-          font-size: 13px;
-          font-weight: 600;
+          font-size: 12px;
+          font-weight: 700;
           cursor: pointer;
           transition: opacity var(--t-fast), background var(--t-fast);
           white-space: nowrap;
           font-family: inherit;
+          letter-spacing: 0.02em;
         }
         .cbrowser-join-btn:hover:not(:disabled) {
-          opacity: 0.88;
+          background: var(--accent-hover);
         }
         .cbrowser-join-btn--joined {
           background: transparent;
           color: var(--accent);
           border: 1px solid var(--accent-border);
           cursor: default;
+          opacity: 1 !important;
         }
 
         /* Shimmer skeleton */
         .cbrowser-row--shimmer {
-          border-radius: 6px;
-          margin: 0 8px;
+          border-radius: var(--r-sm);
+          margin: 0 6px;
         }
 
         .shimmer {
@@ -506,32 +549,33 @@ export default function ChannelBrowserModal() {
           100% { background-position: -200% 0; }
         }
 
-        .shimmer-name  { width: 140px; height: 28px; }
-        .shimmer-count { width: 60px;  height: 20px; }
-        .shimmer-topic { width: 100%;  height: 16px; }
-        .shimmer-btn   { width: 56px;  height: 28px; border-radius: 999px; }
+        .shimmer-name  { width: 140px; height: 24px; border-radius: var(--r-xs); }
+        .shimmer-count { width: 60px;  height: 20px; border-radius: var(--r-full); }
+        .shimmer-topic { width: 100%;  height: 14px; }
+        .shimmer-btn   { width: 56px;  height: 24px; border-radius: var(--r-full); }
 
         /* Load more */
         .cbrowser-load-more {
-          padding: 16px 20px;
+          padding: 12px 18px;
           text-align: center;
         }
 
         .cbrowser-load-btn {
-          padding: 8px 24px;
+          padding: 7px 20px;
           border-radius: var(--r-full);
-          border: 1px solid var(--border-subtle);
+          border: 1px solid var(--border-normal);
           background: none;
           color: var(--text-secondary);
           font-size: 13px;
           font-weight: 500;
           cursor: pointer;
-          transition: background var(--t-fast), color var(--t-fast);
+          transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
           font-family: inherit;
         }
         .cbrowser-load-btn:hover {
           background: var(--ch-hover-bg);
           color: var(--text-primary);
+          border-color: var(--accent-border);
         }
 
         /* Empty state */
@@ -540,6 +584,7 @@ export default function ChannelBrowserModal() {
           text-align: center;
           color: var(--text-muted);
           font-size: 14px;
+          line-height: 1.6;
         }
 
         /* Responsive */
@@ -549,12 +594,13 @@ export default function ChannelBrowserModal() {
             align-items: flex-end;
           }
           .cbrowser-modal {
-            max-width: 100%;
-            border-radius: 12px 12px 0 0;
+            width: 100%;
+            height: auto;
+            border-radius: var(--r-xl) var(--r-xl) 0 0;
             max-height: 85dvh;
           }
           .cbrowser-row {
-            grid-template-columns: 1fr 80px 90px;
+            grid-template-columns: 1fr 70px 80px;
           }
           .cbrowser-col-topic { display: none; }
           .cbrowser-search { width: 150px; }

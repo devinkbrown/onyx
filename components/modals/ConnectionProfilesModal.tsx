@@ -364,31 +364,34 @@ export default function ConnectionProfilesModal() {
       </div>
 
       <style>{`
-        .conn-modal { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
-        .conn-card { background: var(--bg-deep); border: 1px solid var(--border-normal); border-radius: var(--r-xl, 16px); width: 520px; max-width: calc(100vw - 32px); max-height: 80vh; box-shadow: var(--shadow-xl); display: flex; flex-direction: column; }
-        .conn-header { padding: 20px 24px 16px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; }
+        .conn-modal { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.65); backdrop-filter: blur(4px); animation: scaleIn 180ms var(--ease-out) both; }
+        .conn-card { background: var(--bg-deep); border: 1px solid var(--border-normal); border-radius: var(--r-xl, 16px); width: 540px; max-width: calc(100vw - 32px); max-height: 82vh; box-shadow: var(--shadow-xl); display: flex; flex-direction: column; overflow: hidden; }
+        .conn-header { padding: 18px 24px 15px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; background: var(--bg-elevated); flex-shrink: 0; }
         .conn-title { font-size: 16px; font-weight: 700; color: var(--text-primary); flex: 1; }
         .conn-body { display: flex; flex: 1; overflow: hidden; }
-        .conn-sidebar { width: 180px; border-right: 1px solid var(--border-subtle); padding: 12px 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
-        .conn-profile-item { padding: 8px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 13px; }
+        .conn-sidebar { width: 188px; border-right: 1px solid var(--border-subtle); padding: 10px 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; flex-shrink: 0; background: var(--bg-deep); }
+        .conn-profile-item { padding: 9px 10px; border-radius: var(--r-sm); cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 13px; font-weight: 500; border: 1px solid transparent; transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast); }
         .conn-profile-item:hover { background: var(--bg-elevated); color: var(--text-primary); }
-        .conn-profile-item.active { background: rgba(124,90,245,0.1); color: var(--accent); border: 1px solid rgba(124,90,245,0.2); }
-        .conn-profile-del { margin-left: auto; width: 18px; height: 18px; border-radius: 50%; border: none; background: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 12px; }
-        .conn-profile-del:hover { background: rgba(239,68,68,0.1); color: #ef4444; }
-        .conn-editor { flex: 1; padding: 16px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+        .conn-profile-item.active { background: var(--accent-subtle); color: var(--accent); border-color: var(--accent-border); font-weight: 600; }
+        .conn-profile-del { margin-left: auto; width: 20px; height: 20px; border-radius: 50%; border: none; background: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; transition: background var(--t-fast), color var(--t-fast); flex-shrink: 0; }
+        .conn-profile-del:hover { background: var(--danger-subtle); color: var(--danger); }
+        .conn-editor { flex: 1; padding: 16px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
         .conn-field { display: flex; flex-direction: column; gap: 5px; }
-        .conn-label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
-        .conn-input { background: var(--bg-elevated); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 8px 12px; color: var(--text-primary); font-size: 13px; font-family: inherit; outline: none; transition: border-color 0.15s; }
-        .conn-input:focus { border-color: var(--accent-border, rgba(124,90,245,0.4)); }
+        .conn-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+        .conn-input { background: var(--bg-elevated); border: 1px solid var(--border-normal); border-radius: var(--r-sm); padding: 8px 12px; color: var(--text-primary); font-size: 13px; font-family: inherit; outline: none; transition: border-color var(--t-fast), background var(--t-fast); }
+        .conn-input:focus { border-color: var(--accent-border); background: var(--bg-float); }
         .conn-input::placeholder { color: var(--text-muted); }
-        .conn-footer { padding: 14px 20px; border-top: 1px solid var(--border-subtle); display: flex; gap: 8px; justify-content: flex-end; flex-shrink: 0; }
-        .conn-btn-primary { padding: 8px 20px; border-radius: 8px; border: none; background: var(--accent, #7c5af5); color: white; cursor: pointer; font-size: 13px; font-weight: 600; font-family: inherit; }
-        .conn-btn-secondary { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border-normal); background: none; color: var(--text-secondary); cursor: pointer; font-size: 13px; font-family: inherit; }
-        .conn-new-btn { padding: 8px 10px; border-radius: 6px; border: 1px dashed var(--border-normal); background: none; color: var(--text-muted); cursor: pointer; font-size: 12px; font-family: inherit; display: flex; align-items: center; gap: 6px; margin-top: auto; }
-        .conn-new-btn:hover { border-color: var(--accent-border); color: var(--accent); }
-        .conn-toggle { position: relative; width: 36px; height: 20px; border-radius: 10px; border: none; background: var(--border-normal); cursor: pointer; transition: background 0.15s; padding: 0; flex-shrink: 0; }
-        .conn-toggle--on { background: var(--accent, #7c5af5); }
-        .conn-toggle-thumb { position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: white; transition: transform 0.15s; display: block; }
+        .conn-footer { padding: 14px 20px; border-top: 1px solid var(--border-subtle); display: flex; gap: 8px; justify-content: flex-end; flex-shrink: 0; background: var(--bg-elevated); }
+        .conn-btn-primary { padding: 8px 20px; border-radius: var(--r-sm); border: none; background: var(--accent); color: white; cursor: pointer; font-size: 13px; font-weight: 600; font-family: inherit; transition: background var(--t-fast), opacity var(--t-fast); }
+        .conn-btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+        .conn-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+        .conn-btn-secondary { padding: 8px 16px; border-radius: var(--r-sm); border: 1px solid var(--border-normal); background: none; color: var(--text-secondary); cursor: pointer; font-size: 13px; font-family: inherit; transition: background var(--t-fast), color var(--t-fast); }
+        .conn-btn-secondary:hover { background: var(--bg-overlay); color: var(--text-primary); }
+        .conn-new-btn { padding: 8px 10px; border-radius: var(--r-sm); border: 1px dashed var(--border-normal); background: none; color: var(--text-muted); cursor: pointer; font-size: 12px; font-family: inherit; display: flex; align-items: center; gap: 6px; margin-top: auto; transition: border-color var(--t-fast), color var(--t-fast), background var(--t-fast); }
+        .conn-new-btn:hover { border-color: var(--accent-border); color: var(--accent); background: var(--accent-subtle); }
+        .conn-toggle { position: relative; width: 36px; height: 20px; border-radius: 10px; border: none; background: var(--border-normal); cursor: pointer; transition: background var(--t-fast); padding: 0; flex-shrink: 0; }
+        .conn-toggle--on { background: var(--accent); }
+        .conn-toggle-thumb { position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: white; transition: transform var(--t-fast); display: block; }
         .conn-toggle--on .conn-toggle-thumb { transform: translateX(16px); }
       `}</style>
     </div>

@@ -220,25 +220,23 @@ export default function SlashCommandMenu({
           position: absolute;
           bottom: calc(100% + 6px);
           left: 0;
-          right: 0;
+          width: 320px;
           display: flex;
           flex-direction: column;
-          max-height: 320px;
-          background: rgba(6, 16, 29, 0.92);
+          max-height: 240px;
+          background: var(--bg-deep);
           backdrop-filter: blur(16px) saturate(1.4);
           -webkit-backdrop-filter: blur(16px) saturate(1.4);
-          border: 1px solid rgba(14, 165, 233, 0.2);
+          border: 1px solid var(--border-subtle);
           border-radius: var(--r-lg);
-          box-shadow: 0 -2px 0 rgba(14, 165, 233, 0.12) inset,
-                      0 8px 32px rgba(0, 0, 0, 0.72),
-                      0 0 0 1px rgba(14, 165, 233, 0.08);
+          box-shadow: var(--shadow-xl), 0 0 0 1px var(--accent-border);
           overflow: hidden;
           z-index: 60;
-          animation: scm-rise 140ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
+          animation: scm-rise 150ms var(--ease-out) both;
         }
 
         @keyframes scm-rise {
-          from { opacity: 0; transform: translateY(6px) scale(0.98); }
+          from { opacity: 0; transform: translateY(8px) scale(0.97); }
           to   { opacity: 1; transform: translateY(0)   scale(1);    }
         }
 
@@ -248,21 +246,21 @@ export default function SlashCommandMenu({
           min-height: 0;
           overscroll-behavior: contain;
           scrollbar-width: thin;
-          scrollbar-color: rgba(14, 165, 233, 0.18) transparent;
+          scrollbar-color: var(--accent-border) transparent;
         }
-        .scm-list::-webkit-scrollbar { width: 4px; }
+        .scm-list::-webkit-scrollbar { width: 3px; }
         .scm-list::-webkit-scrollbar-thumb {
-          background: rgba(14, 165, 233, 0.18);
+          background: var(--accent-border);
           border-radius: 2px;
         }
 
         .scm-category-label {
-          padding: 8px 14px 4px;
-          font-size: 10px;
+          padding: 8px 12px 3px;
+          font-size: 11px;
           font-weight: 700;
           letter-spacing: 0.08em;
           text-transform: uppercase;
-          color: var(--text-muted, #3d6480);
+          color: var(--text-muted);
           pointer-events: none;
           user-select: none;
         }
@@ -272,79 +270,72 @@ export default function SlashCommandMenu({
 
         .scm-item {
           display: flex;
-          align-items: baseline;
-          gap: 10px;
+          align-items: center;
+          gap: 8px;
           width: 100%;
-          padding: 7px 14px;
+          height: 36px;
+          padding: 0 12px;
           background: none;
           border: none;
           cursor: pointer;
           text-align: left;
-          transition: background var(--t-fast, 150ms);
-          border-radius: 0;
+          transition: background var(--t-fast);
         }
         .scm-item:hover {
-          background: rgba(14, 165, 233, 0.07);
+          background: var(--accent-subtle);
         }
         .scm-item--selected {
-          background: rgba(14, 165, 233, 0.13);
+          background: var(--accent-subtle);
         }
         .scm-item--selected:hover {
-          background: rgba(14, 165, 233, 0.16);
+          background: rgba(124, 90, 245, 0.14);
         }
 
         .scm-cmd-name {
           font-size: 13px;
-          font-weight: 700;
-          color: var(--accent, #0ea5e9);
-          font-family: var(--font-mono, monospace);
+          font-weight: 600;
+          color: var(--accent);
+          font-family: var(--font-mono);
           flex-shrink: 0;
-          min-width: 100px;
+          min-width: 90px;
           white-space: nowrap;
         }
         .scm-item--selected .scm-cmd-name {
-          color: var(--accent-hover, #38bdf8);
+          color: var(--accent-hover);
         }
 
         .scm-match {
-          background: rgba(14, 165, 233, 0.22);
+          background: var(--accent-subtle);
           color: inherit;
           border-radius: 2px;
-          padding: 0 1px;
+          padding: 0 2px;
         }
 
         .scm-usage {
-          font-size: 11px;
-          color: var(--text-muted, #3d6480);
-          font-family: var(--font-mono, monospace);
-          flex-shrink: 0;
-          white-space: nowrap;
-          max-width: 180px;
-          overflow: hidden;
-          text-overflow: ellipsis;
+          display: none;
         }
 
         .scm-description {
           font-size: 12px;
-          color: var(--text-secondary, #7aa8c4);
+          color: var(--text-muted);
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
           flex: 1;
         }
         .scm-item--selected .scm-description {
-          color: var(--text-primary, #dff0ff);
+          color: var(--text-secondary);
         }
 
         .scm-footer {
           flex-shrink: 0;
-          padding: 6px 14px;
+          padding: 5px 12px;
           font-size: 10px;
-          color: var(--text-muted, #3d6480);
-          border-top: 1px solid rgba(14, 165, 233, 0.08);
+          color: var(--text-muted);
+          border-top: 1px solid var(--border-subtle);
           letter-spacing: 0.04em;
           text-align: center;
-          background: rgba(3, 8, 16, 0.4);
+          background: var(--bg-void);
           user-select: none;
         }
       `}</style>

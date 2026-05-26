@@ -83,10 +83,9 @@ export default function AnnouncementsPanel() {
           flex-direction: column;
           background: var(--bg-deep);
           border: 1px solid var(--border-normal);
-          border-top: none;
+          border-top: 3px solid var(--gold);
           border-radius: 0 0 var(--r-xl, 16px) var(--r-xl, 16px);
-          box-shadow: var(--shadow-xl);
-          border-top: 2px solid #e8b84b;
+          box-shadow: var(--shadow-xl), 0 0 0 1px var(--gold-subtle) inset;
           animation: ann-slide-down 0.25s ease;
         }
         @keyframes ann-slide-down {
@@ -108,7 +107,7 @@ export default function AnnouncementsPanel() {
           flex: 1;
         }
         .ann-badge {
-          background: #e8b84b;
+          background: var(--gold);
           color: #000;
           font-size: 10px;
           font-weight: 700;
@@ -116,6 +115,7 @@ export default function AnnouncementsPanel() {
           border-radius: 10px;
           min-width: 18px;
           text-align: center;
+          box-shadow: 0 0 8px rgba(103,232,249,0.3);
         }
         .ann-close {
           width: 26px;
@@ -154,11 +154,18 @@ export default function AnnouncementsPanel() {
         .ann-item {
           background: var(--bg-elevated);
           border: 1px solid var(--border-subtle);
+          border-left: 3px solid var(--gold);
           border-radius: 8px;
-          padding: 10px 14px;
+          padding: 10px 14px 10px 12px;
           display: flex;
           flex-direction: column;
-          gap: 4px;
+          gap: 5px;
+          transition: border-color var(--t-fast), background var(--t-fast);
+        }
+        .ann-item:hover {
+          background: var(--bg-float);
+          border-color: var(--border-normal);
+          border-left-color: var(--gold);
         }
         .ann-item-header {
           display: flex;
@@ -180,25 +187,26 @@ export default function AnnouncementsPanel() {
           letter-spacing: 0.08em;
           padding: 2px 6px;
           border-radius: 4px;
-          background: rgba(232,184,75,0.15);
-          color: #e8b84b;
-          border: 1px solid rgba(232,184,75,0.3);
+          background: var(--gold-subtle);
+          color: var(--gold);
+          border: 1px solid rgba(103,232,249,0.25);
         }
         .ann-type-badge.notice {
-          background: rgba(56,189,248,0.12);
-          color: #38bdf8;
-          border-color: rgba(56,189,248,0.25);
+          background: var(--accent-subtle);
+          color: var(--accent);
+          border-color: var(--accent-border);
         }
         .ann-time {
           font-size: 11px;
           color: var(--text-muted);
           margin-left: auto;
           flex-shrink: 0;
+          font-variant-numeric: tabular-nums;
         }
         .ann-text {
           font-size: 13px;
           color: var(--text-secondary);
-          line-height: 1.5;
+          line-height: 1.55;
           margin: 0;
           word-break: break-word;
         }

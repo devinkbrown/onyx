@@ -171,16 +171,17 @@ export default function CTCPSettingsSection() {
           gap: 8px;
           font-size: 11px;
           font-weight: 700;
-          letter-spacing: 0.07em;
+          letter-spacing: 0.09em;
           text-transform: uppercase;
-          color: var(--text-secondary);
+          color: var(--text-muted);
         }
         .ctcp-header-icon {
-          font-size: 13px;
+          font-size: 12px;
+          opacity: 0.8;
         }
         .ctcp-header-sub {
-          font-size: 13px;
-          color: var(--text-secondary);
+          font-size: 12px;
+          color: var(--text-muted);
           line-height: 1.5;
         }
 

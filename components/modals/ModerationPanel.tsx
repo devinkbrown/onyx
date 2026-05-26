@@ -615,24 +615,30 @@ export default function ModerationPanel() {
           align-items: center;
           justify-content: space-between;
           gap: 8px;
-          padding: 10px 12px;
+          padding: 9px 12px;
           background: var(--bg-base);
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-sm);
+          transition: border-color var(--t-fast), background var(--t-fast);
+        }
+        .modpanel-ban-entry:hover {
+          background: var(--bg-elevated);
+          border-color: var(--border-normal);
         }
 
         .modpanel-ban-main {
           min-width: 0;
           display: flex;
           flex-direction: column;
-          gap: 2px;
+          gap: 3px;
         }
 
         .modpanel-ban-mask {
-          font-size: 13px;
-          font-family: monospace;
-          color: var(--text-primary);
+          font-size: 12.5px;
+          font-family: var(--font-mono, monospace);
+          color: var(--danger, #f87171);
           word-break: break-all;
+          font-weight: 500;
         }
 
         .modpanel-ban-meta {
@@ -640,23 +646,25 @@ export default function ModerationPanel() {
           gap: 8px;
           font-size: 11px;
           color: var(--text-muted);
+          font-family: var(--font-mono, monospace);
         }
 
         .modpanel-unban-btn {
           flex-shrink: 0;
           padding: 4px 10px;
-          background: rgba(52, 211, 153, 0.12);
-          border: 1px solid rgba(52, 211, 153, 0.28);
+          background: rgba(248, 113, 113, 0.1);
+          border: 1px solid rgba(248, 113, 113, 0.25);
           border-radius: var(--r-sm);
-          color: #34d399;
-          font-size: 12px;
+          color: var(--danger, #f87171);
+          font-size: 11.5px;
           font-weight: 600;
           cursor: pointer;
-          transition: background var(--t-fast);
+          transition: background var(--t-fast), border-color var(--t-fast);
           white-space: nowrap;
         }
         .modpanel-unban-btn:hover {
-          background: rgba(52, 211, 153, 0.22);
+          background: rgba(248, 113, 113, 0.2);
+          border-color: rgba(248, 113, 113, 0.45);
         }
 
         .modpanel-refresh-btn {

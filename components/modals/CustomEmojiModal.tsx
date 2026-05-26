@@ -230,15 +230,22 @@ export default function CustomEmojiModal() {
           padding: 12px 0;
         }
         .cem-grid {
-          display: flex; flex-wrap: wrap; gap: 10px;
+          display: flex; flex-wrap: wrap; gap: 8px;
         }
         .cem-item {
-          display: flex; flex-direction: column; align-items: center; gap: 4px;
+          display: flex; flex-direction: column; align-items: center; gap: 0;
           background: var(--bg-elevated);
+          border: 1px solid var(--border-subtle);
           border-radius: var(--r-md);
           padding: 8px 6px 6px;
-          width: 64px;
+          width: 68px;
           position: relative;
+          transition: border-color var(--t-fast), background var(--t-fast);
+          cursor: default;
+        }
+        .cem-item:hover {
+          border-color: var(--accent-border);
+          background: var(--bg-float);
         }
         .cem-thumb {
           width: 48px; height: 48px;
@@ -247,21 +254,25 @@ export default function CustomEmojiModal() {
         .cem-name {
           font-size: 10px; color: var(--text-muted);
           text-overflow: ellipsis; overflow: hidden;
-          white-space: nowrap; max-width: 58px;
+          white-space: nowrap; max-width: 60px;
           text-align: center;
+          margin-top: 5px;
+          opacity: 0;
+          transition: opacity var(--t-fast);
         }
+        .cem-item:hover .cem-name { opacity: 1; }
         .cem-remove {
-          position: absolute; top: 2px; right: 2px;
+          position: absolute; top: 3px; right: 3px;
           background: var(--bg-overlay); border: none;
-          color: var(--text-muted); font-size: 14px; line-height: 1;
+          color: var(--text-muted); font-size: 13px; line-height: 1;
           cursor: pointer; border-radius: 50%;
           width: 18px; height: 18px;
           display: flex; align-items: center; justify-content: center;
           opacity: 0;
-          transition: opacity var(--t-fast), color var(--t-fast);
+          transition: opacity var(--t-fast), color var(--t-fast), background var(--t-fast);
         }
         .cem-item:hover .cem-remove { opacity: 1; }
-        .cem-remove:hover { color: var(--danger, #e04646); }
+        .cem-remove:hover { color: var(--danger, #e04646); background: var(--danger-subtle); }
 
         .cem-divider {
           height: 1px; background: var(--border-subtle); flex-shrink: 0;
@@ -334,12 +345,45 @@ export default function CustomEmojiModal() {
           border-radius: var(--r-md);
           color: #fff;
           font-size: 13px;
-          font-weight: 600;
-          padding: 8px 20px;
+          font-weight: 700;
+          padding: 9px 22px;
           cursor: pointer;
-          transition: opacity var(--t-fast);
+          letter-spacing: 0.01em;
+          transition: background var(--t-fast), transform var(--t-fast);
+          font-family: inherit;
         }
-        .cem-add-btn:hover { opacity: 0.88; }
+        .cem-add-btn:hover { background: var(--accent-hover, color-mix(in srgb, var(--accent) 85%, #fff)); }
+        .cem-add-btn:active { transform: scale(0.97); }
+
+        /* Category tabs row for CEM */
+        .cem-tab-row {
+          display: flex;
+          gap: 4px;
+          padding: 0 0 8px;
+          overflow-x: auto;
+          scrollbar-width: none;
+          flex-shrink: 0;
+        }
+        .cem-tab-row::-webkit-scrollbar { display: none; }
+        .cem-tab {
+          padding: 3px 12px;
+          border-radius: var(--r-full);
+          font-size: 12px;
+          font-weight: 600;
+          border: 1px solid var(--border-subtle);
+          background: none;
+          color: var(--text-muted);
+          cursor: pointer;
+          white-space: nowrap;
+          transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+          font-family: inherit;
+        }
+        .cem-tab:hover { color: var(--text-secondary); }
+        .cem-tab.active {
+          background: var(--accent-subtle);
+          border-color: var(--accent-border);
+          color: var(--accent);
+        }
       `}</style>
     </div>
   );

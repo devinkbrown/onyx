@@ -63,7 +63,7 @@ export default function MiniUserCard({ nick, anchorEl, onClose, onOpenProfile }:
   const vw     = typeof window !== 'undefined' ? window.innerWidth  : 1200;
   const vh     = typeof window !== 'undefined' ? window.innerHeight : 800;
 
-  const cardW  = 280;
+  const cardW  = 240;
   const gap    = 8;
 
   // Default: right of anchor; fall back to left when near right edge
@@ -278,7 +278,7 @@ export default function MiniUserCard({ nick, anchorEl, onClose, onOpenProfile }:
 const styles = `
   .mini-card {
     position: fixed;
-    width: 280px;
+    width: 240px;
     background: var(--bg-deep);
     border: 1px solid var(--border-normal);
     border-radius: var(--r-xl);
@@ -384,10 +384,18 @@ const styles = `
 
   .mini-card-actions {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     padding-top: 10px;
     border-top: 1px solid var(--border-subtle);
     margin-top: 8px;
+    /* Hidden by default, revealed on hover */
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity var(--t-fast), transform var(--t-fast);
+  }
+  .mini-card:hover .mini-card-actions {
+    opacity: 1;
+    transform: translateY(0);
   }
 
   .mini-card-btn {
@@ -395,9 +403,9 @@ const styles = `
     background: var(--bg-float);
     border: 1px solid var(--border-normal);
     border-radius: var(--r-sm);
-    padding: 7px;
-    font-size: 13px;
-    font-weight: 500;
+    padding: 6px;
+    font-size: 12px;
+    font-weight: 600;
     color: var(--text-secondary);
     cursor: pointer;
     transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);

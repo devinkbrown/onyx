@@ -214,39 +214,44 @@ export default function EmojiAutocomplete({ query, onSelect, onClose, anchorRef 
       <style>{`
         .emoji-ac-popup {
           position: fixed;
-          background: var(--bg-float);
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-md);
-          box-shadow: var(--shadow-md);
+          background: var(--bg-deep);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-lg);
+          box-shadow: var(--shadow-xl), 0 0 0 1px var(--accent-border);
           display: flex;
           flex-direction: column;
           overflow: hidden;
           z-index: 8000;
-          min-width: 180px;
-          max-width: 280px;
+          min-width: 200px;
+          max-width: 320px;
+          animation: emoji-ac-rise 140ms var(--ease-out) both;
+        }
+        @keyframes emoji-ac-rise {
+          from { opacity: 0; transform: translateY(6px) scale(0.97); }
+          to   { opacity: 1; transform: translateY(0)   scale(1);    }
         }
         .emoji-ac-item {
           display: flex;
           align-items: center;
-          gap: 8px;
-          height: 34px;
-          padding: 0 10px;
+          gap: 10px;
+          height: 36px;
+          padding: 0 12px;
           background: none;
           border: none;
           cursor: pointer;
           text-align: left;
-          transition: background var(--t-fast, 100ms);
+          transition: background var(--t-fast);
           flex-shrink: 0;
           width: 100%;
         }
         .emoji-ac-item:hover {
-          background: var(--ch-hover-bg, rgba(255,255,255,0.05));
+          background: var(--accent-subtle);
         }
         .emoji-ac-item--selected {
-          background: var(--accent-subtle, rgba(124,90,245,0.15));
+          background: var(--accent-subtle);
         }
         .emoji-ac-char {
-          font-size: 18px;
+          font-size: 20px;
           line-height: 1;
           flex-shrink: 0;
           width: 24px;
@@ -254,13 +259,14 @@ export default function EmojiAutocomplete({ query, onSelect, onClose, anchorRef 
         }
         .emoji-ac-name {
           font-size: 13px;
-          color: var(--text-secondary, #aaa);
+          color: var(--text-secondary);
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+          font-family: var(--font-mono);
         }
         .emoji-ac-item--selected .emoji-ac-name {
-          color: var(--accent, #7c5af5);
+          color: var(--accent);
         }
       `}</style>
     </div>

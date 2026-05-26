@@ -671,8 +671,8 @@ export interface OnyxState {
   closeThemeModal(): void;
 
   // ── Theme & display (ocean-theme / ocean-font-size) ───────────────────
-  /** New theme system: 'onyx' | 'ash' | 'amoled' | 'light' | 'system' */
-  theme: 'onyx' | 'ash' | 'amoled' | 'light' | 'system';
+  /** New theme system: 'midnight' | 'onyx' | 'ash' | 'amoled' | 'light' | 'system' */
+  theme: 'midnight' | 'onyx' | 'ash' | 'amoled' | 'light' | 'system';
   /** UI base font size in px (12 | 14 | 16 | 18 | 20) */
   fontSize: number;
   /** Set UI theme and persist to localStorage 'ocean-theme' */
@@ -2944,10 +2944,15 @@ export const useOnyxStore = create<OnyxState>()(
 
         // ── Names list ────────────────────────────────────────────────────
         case '353': { // RPL_NAMREPLY
-          const ch = params[2];
+          // RFC 2812: 353 nick = #channel :names  (params[1] = visibility char)
+          // RFC 1459: 353 nick #channel :names     (no visibility char)
+          const VISIBILITY = new Set(['=', '*', '@']);
+          const ch = VISIBILITY.has(params[1]) ? params[2] : params[1];
+          const namesStr = VISIBILITY.has(params[1]) ? params[3] : params[2];
+          if (!ch) break;
           const key = ch.toLowerCase();
           const { client } = get();
-          const names = (params[3] ?? '').split(' ').filter(Boolean);
+          const names = (namesStr ?? '').split(' ').filter(Boolean);
           set(s => {
             const channels = new Map(s.channels);
             const c = channels.get(key) ?? emptyChannel(ch);
@@ -3448,11 +3453,22 @@ export const useOnyxStore = create<OnyxState>()(
                 get().incrementUnread(msgTarget, isMention);
               }
             }
-          } else {
+          } else if (sender) {
+            // Guard: sender must be non-empty. A server-sourced NOTICE/PRIVMSG
+            // (prefix ":irc.server.com NOTICE nick :...") parses to nick=null
+            // → sender='', which would create a blank-nick DM entry in the
+            // sidebar. Route those to announcements instead.
             set(s => _addDMMessage(s, sender, msg));
             if (highlight && !get().isDMMuted(sender)) {
               get().addNotification({ type: 'dm', text: displayText, from: sender });
             }
+          } else {
+            // Server-sourced message with no nick — show as announcement
+            get().addAnnouncement({
+              from: msg.target || 'Server',
+              text: displayText,
+              type: 'global-notice',
+            });
           }
           break;
         }
@@ -4073,14 +4089,33 @@ export const useOnyxStore = create<OnyxState>()(
         // ── 352 RPL_WHOREPLY ──────────────────────────────────────────────
         case '352': {
           // :server 352 yournick #channel username host server nick H/G :hopcount realname
+          const ch352 = params[1];
           const nick352 = params[5] ?? '';
           const flags352 = params[6] ?? '';
           const isAway352 = flags352.startsWith('G');
           if (nick352) {
-            const awayNicks = new Set(get().awayNicks);
-            if (isAway352) awayNicks.add(nick352.toLowerCase());
-            else awayNicks.delete(nick352.toLowerCase());
-            set({ awayNicks });
+            set(s => {
+              const awayNicks = new Set(s.awayNicks);
+              if (isAway352) awayNicks.add(nick352.toLowerCase());
+              else awayNicks.delete(nick352.toLowerCase());
+
+              // Also update channel.users[nick].away for sort accuracy
+              const nk = nick352.toLowerCase();
+              const channels = new Map(s.channels);
+              if (ch352) {
+                const ck = ch352.toLowerCase();
+                const c = channels.get(ck);
+                if (c) {
+                  const u = c.users.get(nk);
+                  if (u) {
+                    const users = new Map(c.users);
+                    users.set(nk, { ...u, away: isAway352 });
+                    channels.set(ck, { ...c, users });
+                  }
+                }
+              }
+              return { awayNicks, channels };
+            });
           }
           break;
         }
@@ -5847,7 +5882,9 @@ function parseNamePrefix(
     modes.push(prefixToMode[name[i]]);
     i++;
   }
-  return { nick: name.slice(i), modes };
+  // userhost-in-names sends nick!user@host — extract just the nick
+  const nick = name.slice(i).split('!')[0];
+  return { nick, modes };
 }
 
 function _addMessage(state: OnyxState, target: string, msg: ChatMessage): Partial<OnyxState> {
@@ -6344,10 +6381,10 @@ function _loadBoolPref(key: string): boolean {
 function _loadDisplayTheme(): OnyxState['theme'] {
   if (typeof window === 'undefined') return 'onyx';
   const stored = localStorage.getItem('ocean-theme');
-  if (stored === 'onyx' || stored === 'ash' || stored === 'amoled' || stored === 'light' || stored === 'system') {
+  if (stored === 'midnight' || stored === 'onyx' || stored === 'ash' || stored === 'amoled' || stored === 'light' || stored === 'system') {
     return stored;
   }
-  return 'onyx';
+  return 'midnight';
 }
 
 // ── Display font size persistence ─────────────────────────────────────────────

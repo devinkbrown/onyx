@@ -8,9 +8,9 @@ type StatusDotSize = 'sm' | 'md' | 'lg';
 type StatusValue   = 'online' | 'idle' | 'dnd' | 'offline';
 
 const DOT_PX: Record<StatusDotSize, number> = {
-  sm: 10,
-  md: 12,
-  lg: 14,
+  sm: 8,
+  md: 10,
+  lg: 12,
 };
 
 /* ── StatusDot — pure presentational ───────────────────────────── */
@@ -41,7 +41,7 @@ export function StatusDot({
           justify-content: center;
           border-radius: 50%;
           flex-shrink: 0;
-          border: 2px solid var(--bg-deep, #0d0d12);
+          border: 2px solid var(--bg-void, #030810);
           position: absolute;
           bottom: -1px;
           right: -1px;
@@ -49,23 +49,26 @@ export function StatusDot({
 
         /* online — solid green + subtle pulse glow */
         .sdot--online {
-          background: #22c55e;
+          background: #23a55a;
           animation: sdot-online-glow 2.5s ease-in-out infinite;
+          transition: background 300ms ease;
         }
 
         @keyframes sdot-online-glow {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
-          50%       { box-shadow: 0 0 0 4px rgba(34, 197, 94, 0); }
+          0%, 100% { box-shadow: 0 0 0 0 rgba(35, 165, 90, 0.4); }
+          50%       { box-shadow: 0 0 0 4px rgba(35, 165, 90, 0); }
         }
 
         /* idle — solid amber, no animation */
         .sdot--idle {
-          background: #f59e0b;
+          background: #f0b232;
+          transition: background 300ms ease;
         }
 
         /* dnd — red with horizontal bar */
         .sdot--dnd {
-          background: #ef4444;
+          background: #f04747;
+          transition: background 300ms ease;
         }
 
         .sdot-dnd-bar {
@@ -78,8 +81,8 @@ export function StatusDot({
 
         /* offline — gray, muted */
         .sdot--offline {
-          background: #4b5563;
-          opacity: 0.6;
+          background: rgba(128,128,128,0.5);
+          transition: background 300ms ease;
         }
       `}</style>
     </span>
@@ -130,8 +133,8 @@ export default function UserStatusBadge() {
 
         .usb-dot-wrap {
           position: relative;
-          width: 12px;
-          height: 12px;
+          width: 8px;
+          height: 8px;
           flex-shrink: 0;
         }
 
@@ -143,18 +146,32 @@ export default function UserStatusBadge() {
 
         /* online */
         .usb-dot--online {
-          background: #22c55e;
+          background: #23a55a;
           animation: usb-online-glow 2.5s ease-in-out infinite;
+          transition: background 300ms ease;
         }
 
         @keyframes usb-online-glow {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
-          50%       { box-shadow: 0 0 0 4px rgba(34, 197, 94, 0); }
+          0%, 100% { box-shadow: 0 0 0 0 rgba(35, 165, 90, 0.4); }
+          50%       { box-shadow: 0 0 0 4px rgba(35, 165, 90, 0); }
         }
 
         /* idle/away */
         .usb-dot--idle {
-          background: #f59e0b;
+          background: #f0b232;
+          transition: background 300ms ease;
+        }
+
+        /* dnd */
+        .usb-dot--dnd {
+          background: #f04747;
+          transition: background 300ms ease;
+        }
+
+        /* offline */
+        .usb-dot--offline {
+          background: rgba(128,128,128,0.5);
+          transition: background 300ms ease;
         }
 
         .usb-text {

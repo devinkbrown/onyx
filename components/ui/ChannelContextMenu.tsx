@@ -27,7 +27,7 @@ export default function ChannelContextMenu({ channel, x, y, onClose }: Props) {
   const unmarkChannelNsfw = useOnyxStore(s => s.unmarkChannelNsfw);
 
   const current: NotifyLevel = channelNotify.get(channel.toLowerCase()) ?? 'all';
-  const currentColor = channelColors.get(channel.toLowerCase()) ?? '#7c5af5';
+  const currentColor = channelColors.get(channel.toLowerCase()) ?? '#0ea5e9';
   const [notifyOpen, setNotifyOpen] = useState(false);
   const colorInputRef = useRef<HTMLInputElement>(null);
 
@@ -249,7 +249,7 @@ export default function ChannelContextMenu({ channel, x, y, onClose }: Props) {
           font-family: inherit;
         }
         .ctx-item:hover {
-          background: var(--accent-subtle, rgba(124,90,245,0.12));
+          background: var(--accent-subtle, rgba(14,165,233,0.12));
           color: var(--text-primary);
         }
         .ctx-item--submenu { justify-content: flex-start; }

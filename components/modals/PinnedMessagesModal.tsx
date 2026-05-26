@@ -112,27 +112,28 @@ export default function PinnedMessagesModal() {
           border-left: 1px solid var(--border-normal);
           display: flex; flex-direction: column;
           overflow: hidden;
-          box-shadow: -8px 0 40px rgba(0, 0, 0, 0.45);
+          box-shadow: -12px 0 48px rgba(0, 0, 0, 0.55), -1px 0 0 var(--border-subtle);
         }
 
         /* Header */
         .pin-header {
           display: flex; align-items: center; justify-content: space-between;
           padding: 0 16px;
-          height: var(--header-h);
+          height: var(--header-h, 48px);
           border-bottom: 1px solid var(--border-subtle);
           flex-shrink: 0;
+          background: var(--bg-elevated);
         }
         .pin-header-left {
           display: flex; align-items: center; gap: 8px;
         }
         .pin-title {
-          font-size: 15px; font-weight: 700; color: var(--text-primary);
-          letter-spacing: -0.2px;
+          font-size: 14px; font-weight: 700; color: var(--text-primary);
+          letter-spacing: -0.1px;
         }
         .pin-count {
           font-size: 11px; font-weight: 700;
-          padding: 1px 6px; border-radius: var(--r-full);
+          padding: 1px 7px; border-radius: var(--r-full);
           background: var(--accent-subtle); border: 1px solid var(--accent-border);
           color: var(--accent);
         }
@@ -140,7 +141,7 @@ export default function PinnedMessagesModal() {
           width: 28px; height: 28px;
           background: none; border: none; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
-          color: var(--text-muted); border-radius: var(--r-xs);
+          color: var(--text-muted); border-radius: var(--r-sm);
           transition: background var(--t-fast), color var(--t-fast);
         }
         .pin-close:hover { background: var(--ch-hover-bg); color: var(--text-primary); }
@@ -149,27 +150,34 @@ export default function PinnedMessagesModal() {
         .pin-body {
           flex: 1; overflow-y: auto; padding: 12px;
           display: flex; flex-direction: column; gap: 8px;
+          scrollbar-width: thin;
+          scrollbar-color: var(--border-normal) transparent;
         }
 
         /* Empty state */
         .pin-empty {
           display: flex; flex-direction: column; align-items: center;
-          gap: 10px; padding: 40px 24px; text-align: center;
+          gap: 12px; padding: 56px 24px; text-align: center;
+          flex: 1; justify-content: center;
         }
-        .pin-empty-icon { font-size: 40px; }
+        .pin-empty-icon {
+          font-size: 36px;
+          opacity: 0.5;
+          filter: grayscale(0.3);
+        }
         .pin-empty-title {
-          font-size: 16px; font-weight: 700; color: var(--text-primary);
+          font-size: 15px; font-weight: 700; color: var(--text-secondary);
           margin: 0;
         }
         .pin-empty-hint {
           font-size: 13px; color: var(--text-muted);
-          line-height: 1.6; margin: 0;
+          line-height: 1.65; margin: 0; max-width: 260px;
         }
 
         /* Pinned message list */
         .pin-list {
           list-style: none; padding: 0; margin: 0;
-          display: flex; flex-direction: column; gap: 8px;
+          display: flex; flex-direction: column; gap: 7px;
         }
 
         /* Card */
@@ -177,17 +185,32 @@ export default function PinnedMessagesModal() {
           background: var(--bg-elevated);
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-md);
-          padding: 10px 12px;
+          padding: 11px 12px;
           display: flex; flex-direction: column; gap: 7px;
-          transition: border-color var(--t-fast);
+          transition: border-color var(--t-fast), background var(--t-fast);
+          position: relative;
         }
-        .pin-card:hover { border-color: var(--border-normal); }
+        .pin-card::before {
+          content: '';
+          position: absolute;
+          left: 0; top: 0; bottom: 0;
+          width: 2px;
+          background: var(--accent);
+          border-radius: var(--r-xs) 0 0 var(--r-xs);
+          opacity: 0;
+          transition: opacity var(--t-fast);
+        }
+        .pin-card:hover {
+          border-color: var(--border-normal);
+          background: var(--bg-float);
+        }
+        .pin-card:hover::before { opacity: 1; }
 
         .pin-card-header {
-          display: flex; align-items: center; gap: 6px;
+          display: flex; align-items: center; gap: 7px;
         }
         .pin-card-nick {
-          font-size: 13px; font-weight: 600; color: var(--text-primary);
+          font-size: 13px; font-weight: 700; color: var(--text-primary);
           flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         .pin-card-time {
@@ -195,12 +218,14 @@ export default function PinnedMessagesModal() {
           font-variant-numeric: tabular-nums;
         }
 
+        /* Unpin — red X on hover */
         .pin-unpin-btn {
-          width: 24px; height: 24px;
+          width: 22px; height: 22px;
           background: none; border: none; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
           color: var(--text-muted); border-radius: var(--r-xs);
-          opacity: 0; transition: opacity var(--t-fast), background var(--t-fast), color var(--t-fast);
+          opacity: 0;
+          transition: opacity var(--t-fast), background var(--t-fast), color var(--t-fast);
           flex-shrink: 0;
         }
         .pin-card:hover .pin-unpin-btn { opacity: 1; }

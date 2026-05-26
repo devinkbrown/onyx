@@ -14,12 +14,11 @@ export interface MentionDropdownProps {
 }
 
 // Derive the highest-priority IRC prefix character from a modes Set.
-// Priority: q (owner ~) > a (admin &) > o (op @) > h (halfop %) > v (voice +)
+// Priority: q (owner ~) > a (admin &) > o (op @) > v (voice +)
 function modesPrefix(modes: Set<string>): string {
   if (modes.has('q')) return '~';
   if (modes.has('a')) return '&';
   if (modes.has('o')) return '@';
-  if (modes.has('h')) return '%';
   if (modes.has('v')) return '+';
   return '';
 }
@@ -28,7 +27,6 @@ const PREFIX_COLOR: Record<string, string> = {
   '~': '#f59e0b',
   '&': '#ef4444',
   '@': '#f97316',
-  '%': '#22c55e',
   '+': '#0ea5e9',
 };
 
@@ -121,6 +119,9 @@ export default function MentionDropdown({
                 onSelect(m.nick);
               }}
             >
+              <span className="mention-avatar" aria-hidden="true">
+                {m.nick.slice(0, 1)}
+              </span>
               {m.prefix ? (
                 <span
                   className="mention-prefix"
@@ -140,22 +141,30 @@ export default function MentionDropdown({
 
       <style>{`
         .mention-dropdown {
-          max-height: 240px;
+          max-height: 216px;
           overflow-y: auto;
-          background: var(--bg-float, #101827);
-          border: 1px solid var(--border-normal, rgba(255,255,255,.1));
-          border-radius: var(--r-md, 8px);
-          box-shadow: var(--shadow-md, 0 8px 24px rgba(0,0,0,.5));
+          background: var(--bg-deep);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-lg);
+          box-shadow: var(--shadow-xl), 0 0 0 1px var(--accent-border);
           display: flex;
           flex-direction: column;
           z-index: 200;
-          min-width: 280px;
+          min-width: 320px;
+          width: 320px;
+          scrollbar-width: thin;
+          scrollbar-color: var(--accent-border) transparent;
+          animation: mention-rise 140ms var(--ease-out) both;
+        }
+        @keyframes mention-rise {
+          from { opacity: 0; transform: translateY(6px) scale(0.97); }
+          to   { opacity: 1; transform: translateY(0)   scale(1);    }
         }
 
         .mention-row {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 10px;
           height: 36px;
           padding: 0 12px;
           background: none;
@@ -164,23 +173,39 @@ export default function MentionDropdown({
           text-align: left;
           width: 100%;
           flex-shrink: 0;
-          transition: background 80ms ease;
+          transition: background var(--t-fast);
         }
         .mention-row:hover {
-          background: var(--ch-hover-bg, rgba(255,255,255,.05));
+          background: var(--accent-subtle);
         }
         .mention-row--selected {
-          background: var(--accent-subtle, rgba(14,165,233,.12));
+          background: var(--accent-subtle);
         }
         .mention-row--selected:hover {
-          background: var(--accent-subtle, rgba(14,165,233,.12));
+          background: var(--accent-subtle);
+        }
+
+        .mention-avatar {
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          background: var(--accent);
+          opacity: 0.8;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 11px;
+          font-weight: 700;
+          color: #fff;
+          flex-shrink: 0;
+          text-transform: uppercase;
         }
 
         .mention-prefix {
           width: 14px;
           font-size: 13px;
           font-weight: 700;
-          font-family: var(--font-mono, monospace);
+          font-family: var(--font-mono);
           text-align: center;
           flex-shrink: 0;
           line-height: 1;
@@ -192,14 +217,15 @@ export default function MentionDropdown({
 
         .mention-nick {
           font-size: 13px;
-          color: var(--text-primary, #e2e8f0);
+          font-weight: 600;
+          color: var(--text-primary);
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
           flex: 1;
         }
         .mention-row--selected .mention-nick {
-          color: var(--accent, #0ea5e9);
+          color: var(--accent);
         }
       `}</style>
     </>

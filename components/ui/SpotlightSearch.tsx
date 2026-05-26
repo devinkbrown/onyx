@@ -512,15 +512,15 @@ export default function SpotlightSearch() {
         .sl-backdrop {
           position: fixed;
           inset: 0;
-          background: rgba(0, 0, 0, 0.72);
-          backdrop-filter: blur(6px);
-          -webkit-backdrop-filter: blur(6px);
+          background: rgba(3, 8, 16, 0.72);
+          backdrop-filter: blur(12px) saturate(0.8);
+          -webkit-backdrop-filter: blur(12px) saturate(0.8);
           z-index: 10000;
           display: flex;
           justify-content: center;
           align-items: flex-start;
-          padding-top: 15vh;
-          animation: sl-fade-in 150ms ease both;
+          padding-top: 12vh;
+          animation: sl-fade-in 140ms ease both;
         }
 
         @keyframes sl-fade-in {
@@ -530,19 +530,25 @@ export default function SpotlightSearch() {
 
         .sl-modal {
           width: 580px;
-          max-width: 95vw;
-          background: var(--bg-elevated);
+          max-width: calc(100vw - 32px);
+          background: color-mix(in oklch, var(--bg-elevated) 90%, transparent);
+          backdrop-filter: blur(24px) saturate(1.4);
+          -webkit-backdrop-filter: blur(24px) saturate(1.4);
           border: 1px solid var(--border-normal);
           border-radius: 14px;
-          box-shadow: 0 24px 72px rgba(0, 0, 0, 0.7), 0 0 0 1px var(--accent-border);
+          box-shadow:
+            0 0 0 1px var(--accent-border),
+            0 32px 80px rgba(0, 0, 0, 0.8),
+            0 8px 32px rgba(14, 165, 233, 0.06),
+            inset 0 1px 0 rgba(255, 255, 255, 0.04);
           overflow: hidden;
           display: flex;
           flex-direction: column;
-          animation: sl-slide-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+          animation: sl-slide-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
         }
 
         @keyframes sl-slide-in {
-          from { opacity: 0; transform: scale(0.96) translateY(-8px); }
+          from { opacity: 0; transform: scale(0.94) translateY(-14px); }
           to   { opacity: 1; transform: scale(1) translateY(0); }
         }
 
@@ -550,11 +556,11 @@ export default function SpotlightSearch() {
         .sl-input-row {
           display: flex;
           align-items: center;
-          padding: 14px 16px;
-          border-bottom: 1px solid var(--border-normal);
-          gap: 10px;
+          padding: 15px 18px;
+          border-bottom: 1px solid var(--border-subtle);
+          gap: 11px;
           flex-shrink: 0;
-          background: var(--bg-float);
+          background: rgba(26, 44, 64, 0.6);
         }
 
         .sl-search-icon {
@@ -567,35 +573,40 @@ export default function SpotlightSearch() {
           flex: 1;
           background: none;
           border: none;
-          font-size: 18px;
-          color: var(--text-normal, var(--text-primary));
+          font-size: 17px;
+          color: var(--text-primary);
           outline: none;
           font-family: inherit;
           caret-color: var(--accent);
           min-width: 0;
+          letter-spacing: -0.01em;
         }
 
         .sl-input::placeholder {
           color: var(--text-muted);
-          font-size: 15px;
+          font-size: 14px;
+          font-weight: 400;
         }
 
         .sl-esc-hint {
           font-size: 11px;
-          font-family: inherit;
+          font-family: var(--font-mono);
           color: var(--text-muted);
-          background: var(--bg-overlay, var(--bg-base));
+          background: var(--bg-overlay);
           border: 1px solid var(--border-subtle);
-          border-radius: 3px;
-          padding: 1px 6px;
+          border-radius: var(--r-xs);
+          padding: 2px 6px;
           flex-shrink: 0;
+          letter-spacing: 0.02em;
         }
 
         /* Results scroll area */
         .sl-results {
-          max-height: 400px;
+          max-height: 420px;
           overflow-y: auto;
-          padding: 8px 0;
+          padding: 6px 0;
+          scrollbar-width: thin;
+          scrollbar-color: var(--accent-border) transparent;
         }
 
         /* Empty state */
@@ -624,7 +635,7 @@ export default function SpotlightSearch() {
         .sl-group-label {
           font-size: 11px;
           font-weight: 700;
-          letter-spacing: 0.05em;
+          letter-spacing: 0.08em;
           color: var(--text-muted);
           text-transform: uppercase;
           padding: 8px 16px 4px;
@@ -635,20 +646,31 @@ export default function SpotlightSearch() {
           display: flex;
           align-items: center;
           gap: 10px;
-          padding: 8px 16px;
+          padding: 0 16px;
           cursor: pointer;
-          transition: background 0.1s;
+          transition: background 100ms ease;
           font-size: 14px;
-          min-height: 40px;
+          min-height: 46px;
+          border-left: 2px solid transparent;
+          position: relative;
         }
 
-        .sl-result-row:hover,
-        .sl-result-row.sl-selected {
-          background: var(--ch-hover-bg, rgba(255, 255, 255, 0.06));
+        .sl-result-row:hover {
+          background: rgba(14, 165, 233, 0.06);
         }
 
         .sl-result-row.sl-selected {
-          background: var(--accent-subtle);
+          background: rgba(14, 165, 233, 0.08);
+          border-left-color: var(--accent);
+        }
+
+        .sl-result-row.sl-selected::before {
+          content: '';
+          position: absolute;
+          inset: 1px;
+          border-radius: 6px;
+          background: rgba(14, 165, 233, 0.04);
+          pointer-events: none;
         }
 
         .sl-result-icon {
@@ -657,15 +679,15 @@ export default function SpotlightSearch() {
           display: flex;
           align-items: center;
           justify-content: center;
-          border-radius: 6px;
+          border-radius: var(--r-sm);
           flex-shrink: 0;
           font-weight: 700;
           font-size: 14px;
         }
 
         .sl-icon-channel {
-          background: rgba(14, 165, 233, 0.12);
-          color: var(--accent, #7c5af5);
+          background: var(--accent-subtle);
+          color: var(--accent);
         }
 
         .sl-icon-command {
@@ -694,11 +716,12 @@ export default function SpotlightSearch() {
 
         .sl-result-action {
           font-size: 11px;
-          color: var(--text-muted);
+          color: var(--accent);
           opacity: 0;
           white-space: nowrap;
           flex-shrink: 0;
-          transition: opacity 0.1s;
+          transition: opacity var(--t-fast);
+          font-weight: 500;
         }
 
         .sl-result-row:hover .sl-result-action,
@@ -711,8 +734,8 @@ export default function SpotlightSearch() {
           width: 26px;
           height: 26px;
           border-radius: 50%;
-          background: var(--accent, #7c5af5);
-          opacity: 0.8;
+          background: var(--accent);
+          opacity: 0.85;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -729,8 +752,8 @@ export default function SpotlightSearch() {
           flex-shrink: 0;
         }
 
-        .sl-status-dot[data-status="online"]  { background: #22c55e; }
-        .sl-status-dot[data-status="away"]    { background: #f59e0b; }
+        .sl-status-dot[data-status="online"]  { background: var(--status-online); }
+        .sl-status-dot[data-status="away"]    { background: var(--status-idle); }
         .sl-status-dot[data-status="offline"] { background: var(--text-muted); }
 
         /* Message rows */
@@ -743,13 +766,13 @@ export default function SpotlightSearch() {
         .sl-msg-channel {
           font-size: 11px;
           font-weight: 700;
-          color: var(--accent, #7c5af5);
+          color: var(--accent);
           white-space: nowrap;
           flex-shrink: 0;
         }
 
         .sl-msg-dm {
-          color: #a855f7;
+          color: var(--gold);
         }
 
         .sl-msg-nick {
@@ -780,23 +803,25 @@ export default function SpotlightSearch() {
         /* Footer */
         .sl-footer {
           display: flex;
-          gap: 16px;
-          padding: 8px 16px;
+          gap: 14px;
+          padding: 9px 16px;
           border-top: 1px solid var(--border-subtle);
           font-size: 11px;
           color: var(--text-muted);
           flex-shrink: 0;
           flex-wrap: wrap;
+          background: rgba(6, 16, 29, 0.7);
         }
 
         .sl-footer kbd {
-          background: var(--bg-overlay, var(--bg-base));
-          border: 1px solid var(--border-subtle);
-          border-radius: 3px;
-          padding: 1px 4px;
-          font-family: monospace;
+          background: var(--bg-overlay);
+          border: 1px solid var(--border-normal);
+          border-radius: 4px;
+          padding: 1px 5px;
+          font-family: var(--font-mono, monospace);
           font-size: 10px;
           margin-right: 2px;
+          color: var(--text-secondary);
         }
 
         /* Highlight matches — uses accent token so themes apply */
@@ -810,7 +835,7 @@ export default function SpotlightSearch() {
 
         @media (max-width: 640px) {
           .sl-footer { display: none; }
-          .sl-modal { border-radius: 12px 12px 0 0; }
+          .sl-modal { border-radius: var(--r-lg) var(--r-lg) 0 0; }
           .sl-backdrop { align-items: flex-end; padding-top: 0; }
         }
       `}</style>

@@ -198,26 +198,26 @@ export default function QuickReactBar({ onReact, onReply, onMore }: QuickReactBa
 const quickReactStyles = `
   .quick-react-bar {
     position: absolute;
-    top: -16px;
+    top: -18px;
     right: 8px;
     z-index: 20;
     display: flex;
     align-items: center;
     gap: 1px;
-    background: var(--bg-overlay, #1a2b3d);
+    background: var(--bg-float, #1a2c40);
     border: 1px solid var(--border-normal);
-    border-radius: 20px;
-    padding: 3px 6px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.4);
-    animation: qrb-in 0.12s ease;
+    border-radius: var(--r-full, 9999px);
+    padding: 3px 7px;
+    box-shadow: var(--shadow-md, 0 4px 16px rgba(0,0,0,0.5));
+    animation: qrb-in 130ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
   }
   @keyframes qrb-in {
-    from { opacity: 0; transform: translateY(3px); }
-    to   { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateY(4px) scale(0.95); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
   }
   .qrb-btn {
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     border: none;
     background: none;
@@ -226,13 +226,14 @@ const quickReactStyles = `
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 13px;
-    transition: background 0.12s, color 0.12s;
+    font-size: 14px;
+    transition: background 120ms, color 120ms, transform 120ms var(--ease-spring, cubic-bezier(0.175,0.885,0.32,1.275));
     font-family: inherit;
   }
   .qrb-btn:hover {
     background: var(--bg-elevated);
     color: var(--text-primary);
+    transform: scale(1.12);
   }
   .qrb-btn--active {
     background: var(--accent-subtle);
@@ -243,47 +244,49 @@ const quickReactStyles = `
     height: 14px;
     background: var(--border-subtle);
     margin: 0 2px;
+    flex-shrink: 0;
   }
   .quick-emoji-popup {
     position: absolute;
-    bottom: calc(100% + 6px);
+    bottom: calc(100% + 8px);
     right: 0;
-    background: var(--bg-overlay);
+    background: var(--bg-float, #1a2c40);
     border: 1px solid var(--border-normal);
-    border-radius: 12px;
-    padding: 5px 8px;
+    border-radius: var(--r-lg, 12px);
+    padding: 6px 9px;
     display: flex;
-    gap: 3px;
+    gap: 2px;
     align-items: center;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
-    animation: qrb-in 0.1s ease;
+    box-shadow: var(--shadow-lg, 0 8px 32px rgba(0,0,0,0.65));
+    animation: qrb-in 110ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
     z-index: 30;
   }
   .quick-emoji-btn {
-    width: 30px;
-    height: 30px;
-    border-radius: 6px;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--r-sm, 6px);
     border: none;
     background: none;
-    font-size: 17px;
+    font-size: 18px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.1s, transform 0.1s;
+    transition: background 100ms, transform 150ms var(--ease-spring, cubic-bezier(0.175,0.885,0.32,1.275));
   }
   .quick-emoji-btn:hover {
     background: var(--bg-elevated);
     transform: scale(1.2);
   }
   .quick-emoji-btn--more {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 700;
     color: var(--text-muted);
     border-left: 1px solid var(--border-subtle);
-    border-radius: 0 6px 6px 0;
-    margin-left: 2px;
-    padding-left: 2px;
+    border-radius: 0 var(--r-sm, 6px) var(--r-sm, 6px) 0;
+    margin-left: 3px;
+    padding-left: 3px;
+    width: 32px;
   }
   .quick-emoji-btn--more:hover {
     color: var(--text-primary);
@@ -291,7 +294,7 @@ const quickReactStyles = `
   }
   .quick-react-full-picker {
     position: absolute;
-    bottom: calc(100% + 6px);
+    bottom: calc(100% + 8px);
     right: 0;
     z-index: 30;
   }
@@ -299,24 +302,24 @@ const quickReactStyles = `
   /* Configure favorites popup */
   .qrb-configure-popup {
     position: absolute;
-    bottom: calc(100% + 6px);
+    bottom: calc(100% + 8px);
     right: 0;
-    background: var(--bg-overlay);
+    background: var(--bg-float, #1a2c40);
     border: 1px solid var(--border-normal);
-    border-radius: 12px;
-    padding: 10px 10px 8px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-    animation: qrb-in 0.1s ease;
+    border-radius: var(--r-lg, 12px);
+    padding: 11px 11px 9px;
+    box-shadow: var(--shadow-lg, 0 8px 32px rgba(0,0,0,0.65));
+    animation: qrb-in 110ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
     z-index: 30;
-    width: 220px;
+    width: 224px;
   }
   .qrb-configure-title {
-    font-size: 10.5px;
+    font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.07em;
     color: var(--text-muted);
-    margin-bottom: 8px;
+    margin-bottom: 9px;
     padding: 0 2px;
   }
   .qrb-configure-grid {
@@ -325,24 +328,26 @@ const quickReactStyles = `
     gap: 4px;
   }
   .qrb-configure-btn {
-    width: 34px; height: 34px;
-    border-radius: 8px;
+    width: 36px; height: 36px;
+    border-radius: var(--r-sm, 6px);
     border: 1px solid transparent;
     background: none;
-    font-size: 18px;
+    font-size: 19px;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    transition: background 0.1s, border-color 0.1s, transform 0.1s;
+    transition: background 100ms, border-color 100ms, transform 150ms var(--ease-spring, cubic-bezier(0.175,0.885,0.32,1.275));
   }
   .qrb-configure-btn:hover {
     background: var(--bg-elevated);
-    transform: scale(1.15);
+    transform: scale(1.18);
   }
   .qrb-configure-btn--active {
     background: var(--accent-subtle);
     border-color: var(--accent-border);
   }
   .qrb-configure-btn--active:hover {
-    background: rgba(124,90,245,0.2);
+    background: var(--accent-subtle);
+    border-color: var(--accent);
+    transform: scale(1.12);
   }
 `;

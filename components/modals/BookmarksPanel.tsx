@@ -145,36 +145,37 @@ export default function BookmarksPanel() {
           border-left: 1px solid var(--border-normal);
           display: flex; flex-direction: column;
           overflow: hidden;
-          box-shadow: -8px 0 40px rgba(0, 0, 0, 0.45);
+          box-shadow: -12px 0 48px rgba(0, 0, 0, 0.55), -1px 0 0 var(--border-subtle);
         }
 
         /* Header */
         .bm-header {
           display: flex; align-items: center; justify-content: space-between;
           padding: 0 16px;
-          height: var(--header-h);
+          height: var(--header-h, 48px);
           border-bottom: 1px solid var(--border-subtle);
           flex-shrink: 0;
+          background: var(--bg-elevated);
         }
         .bm-header-left {
           display: flex; align-items: center; gap: 8px;
         }
         .bm-title {
-          font-size: 15px; font-weight: 700; color: var(--text-primary);
-          letter-spacing: -0.2px;
+          font-size: 14px; font-weight: 700; color: var(--text-primary);
+          letter-spacing: -0.1px;
         }
         .bm-count {
           font-size: 11px; font-weight: 700;
-          padding: 1px 6px; border-radius: var(--r-full);
-          background: var(--gold-subtle, rgba(232,184,75,0.12));
-          border: 1px solid rgba(232,184,75,0.3);
+          padding: 1px 7px; border-radius: var(--r-full);
+          background: var(--gold-subtle);
+          border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent);
           color: var(--gold);
         }
         .bm-close {
           width: 28px; height: 28px;
           background: none; border: none; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
-          color: var(--text-muted); border-radius: var(--r-xs);
+          color: var(--text-muted); border-radius: var(--r-sm);
           transition: background var(--t-fast), color var(--t-fast);
         }
         .bm-close:hover { background: var(--ch-hover-bg); color: var(--text-primary); }
@@ -190,7 +191,7 @@ export default function BookmarksPanel() {
         /* List */
         .bm-list {
           list-style: none; padding: 0; margin: 0;
-          display: flex; flex-direction: column; gap: 8px;
+          display: flex; flex-direction: column; gap: 7px;
         }
 
         /* Card */
@@ -198,33 +199,39 @@ export default function BookmarksPanel() {
           background: var(--bg-elevated);
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-md);
-          padding: 10px 12px;
+          padding: 11px 12px;
           display: flex; flex-direction: column; gap: 7px;
           cursor: pointer;
-          transition: border-color var(--t-fast), background var(--t-fast);
+          transition: border-color var(--t-fast), background var(--t-fast), box-shadow var(--t-fast);
           outline: none;
+          position: relative;
         }
-        .bm-card:hover { border-color: var(--border-normal); background: var(--bg-float); }
+        .bm-card:hover {
+          border-color: var(--gold-subtle);
+          background: var(--bg-float);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
         .bm-card:focus-visible {
           outline: 2px solid var(--accent);
           outline-offset: 2px;
         }
 
         .bm-card-header {
-          display: flex; align-items: center; gap: 6px;
+          display: flex; align-items: center; gap: 7px;
         }
         .bm-card-nick {
           font-size: 13px; font-weight: 700; color: var(--text-primary);
           overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
+        /* Channel badge */
         .bm-card-target {
-          font-size: 11px; color: var(--text-muted);
-          background: var(--bg-void);
-          border: 1px solid var(--border-subtle);
+          font-size: 11px; font-weight: 600; color: var(--accent);
+          background: var(--accent-subtle);
+          border: 1px solid var(--accent-border);
           border-radius: var(--r-xs);
-          padding: 0 4px;
+          padding: 1px 6px;
           flex-shrink: 0;
-          max-width: 80px;
+          max-width: 100px;
           overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         .bm-card-time {
@@ -234,12 +241,14 @@ export default function BookmarksPanel() {
           flex-shrink: 0;
         }
 
+        /* Remove button — appears on hover */
         .bm-remove-btn {
           width: 22px; height: 22px;
           background: none; border: none; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
           color: var(--text-muted); border-radius: var(--r-xs);
-          opacity: 0; transition: opacity var(--t-fast), background var(--t-fast), color var(--t-fast);
+          opacity: 0;
+          transition: opacity var(--t-fast), background var(--t-fast), color var(--t-fast);
           flex-shrink: 0;
         }
         .bm-card:hover .bm-remove-btn { opacity: 1; }

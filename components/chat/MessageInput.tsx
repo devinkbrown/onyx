@@ -93,8 +93,14 @@ const EMOJI_SHORTCUTS: Record<string, string> = {
 };
 
 // ── Character counter constants ───────────────────────────────────────────────
-const CHAR_WARNING_AT = 300;
-const CHAR_LIMIT = 450;
+// IRC 512-byte limit. Subtract typical overhead: ":nick!user@host PRIVMSG #channel :\r\n"
+// Conservative overhead of ~60 bytes leaves ~452 usable. We show a counter
+// when within 200 chars of the limit, counting down remaining chars.
+const IRC_LIMIT = 512;
+const IRC_OVERHEAD = 60; // conservative: nick!user@host + command + target + separators
+const CHAR_LIMIT_IRC = IRC_LIMIT - IRC_OVERHEAD; // ~452 usable bytes
+const CHAR_WARNING_AT = CHAR_LIMIT_IRC - 200;    // show counter when < 200 remaining
+const CHAR_LIMIT = CHAR_LIMIT_IRC;
 
 // ── Preview renderer (same transforms as renderText in MessageItem) ───────────
 function previewHtml(text: string): string {
@@ -1518,7 +1524,12 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         <textarea
           ref={textareaRef}
           className="msg-textarea"
-          placeholder={placeholder ?? `Message ${target}`}
+          placeholder={
+            placeholder ??
+            (target.startsWith('#') || target.startsWith('&')
+              ? `Message ${target}`
+              : `Message @${target}`)
+          }
           value={text}
           onChange={e => {
             const prev = text;
@@ -1674,17 +1685,17 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           <EyeIcon />
         </button>
 
-        {/* Character counter */}
+        {/* Character counter — shows remaining chars when within 200 of IRC limit */}
         {text.length >= CHAR_WARNING_AT && (
           <span
             className={`msg-char-counter${
-              text.length >= 430 ? ' danger' :
-              text.length >= 380 ? ' warn' : ''
+              CHAR_LIMIT - text.length < 50 ? ' danger' :
+              CHAR_LIMIT - text.length < 100 ? ' warn' : ''
             }`}
             aria-live="polite"
-            aria-label={`${text.length} of ${CHAR_LIMIT} characters`}
+            aria-label={`${CHAR_LIMIT - text.length} characters remaining`}
           >
-            {text.length} / {CHAR_LIMIT}
+            {CHAR_LIMIT - text.length}
           </span>
         )}
 
@@ -1711,6 +1722,12 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           padding: 0 16px 16px;
           flex-shrink: 0;
           position: relative;
+        }
+        @media (max-width: 768px) {
+          .msg-input-wrap {
+            padding: 0 8px;
+            padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
+          }
         }
 
         /* ── Drop overlay ── */
@@ -1815,11 +1832,11 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         .reply-preview__cancel:hover { color: var(--text-primary); background: var(--bg-float); }
 
         .msg-input-bar {
-          display: flex; align-items: flex-end; gap: 4px;
+          display: flex; align-items: flex-end; gap: 2px;
           background: var(--bg-elevated);
           border: 1px solid var(--border-normal);
           border-radius: var(--r-lg);
-          padding: 6px 8px;
+          padding: 5px 8px 5px 6px;
           position: relative;
           transition: border-color var(--t-fast), box-shadow var(--t-fast);
         }
@@ -1828,29 +1845,67 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         }
         .msg-input-bar:focus-within {
           border-color: var(--accent-border);
-          box-shadow: 0 0 0 3px var(--accent-subtle);
+          box-shadow: 0 0 0 3px var(--accent-subtle), 0 0 12px rgba(14,165,233,0.1) inset;
+        }
+
+        /* ── Toolbar group separators ── */
+        /* [attach] | [formatting] */
+        .msg-input-bar > .fmt-bar {
+          margin-left: 3px;
+        }
+        /* [pickers: gif / sticker / emoji] — subtle left gap */
+        .msg-input-bar > .gif-button-container {
+          margin-left: 6px;
+          position: relative;
+        }
+        .msg-input-bar > .gif-button-container::before {
+          content: '';
+          position: absolute;
+          left: -5px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 1px;
+          height: 16px;
+          background: var(--border-normal);
+          pointer-events: none;
+        }
+        /* [preview / send] — separate from pickers */
+        .msg-input-bar > .preview-toggle {
+          margin-left: 6px;
+          position: relative;
+        }
+        .msg-input-bar > .preview-toggle::before {
+          content: '';
+          position: absolute;
+          left: -5px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 1px;
+          height: 16px;
+          background: var(--border-normal);
+          pointer-events: none;
         }
 
         /* ── Formatting bar ── */
         .fmt-bar {
           display: flex;
           align-items: center;
-          gap: 1px;
+          gap: 2px;
           flex-shrink: 0;
           align-self: flex-end;
-          padding-bottom: 3px;
+          padding-bottom: 1px;
         }
         .fmt-btn {
-          width: 26px; height: 26px; border-radius: var(--r-xs);
+          width: 28px; height: 28px; border-radius: var(--r-xs);
           border: none; background: none; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
-          color: var(--text-muted); flex-shrink: 0;
+          color: var(--text-muted); flex-shrink: 0; padding: 6px;
           transition: color var(--t-fast), background var(--t-fast);
         }
-        .fmt-btn:hover { color: var(--accent); background: var(--accent-subtle); }
+        .fmt-btn:hover { color: var(--text-secondary); background: var(--bg-float); }
         .fmt-divider {
-          width: 1px; height: 16px; background: var(--border-subtle);
-          margin: 0 3px; flex-shrink: 0;
+          width: 1px; height: 14px; background: var(--border-normal);
+          margin: 0 4px; flex-shrink: 0; opacity: 0.7;
         }
         /* Hide on narrow screens */
         @media (max-width: 480px) {
@@ -1880,18 +1935,23 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         }
 
         .input-action {
-          width: 32px; height: 32px; border-radius: var(--r-sm);
+          width: 28px; height: 28px; border-radius: var(--r-xs);
           border: none; background: none; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
-          color: var(--text-muted); flex-shrink: 0;
-          transition: color var(--t-fast), background var(--t-fast);
+          color: var(--text-muted); flex-shrink: 0; padding: 6px;
+          transition: color var(--t-fast), background var(--t-fast), transform 120ms cubic-bezier(0.34,1.56,0.64,1);
         }
-        .input-action:hover { color: var(--accent); background: var(--accent-subtle); }
+        .input-action:hover {
+          color: var(--text-secondary);
+          background: var(--bg-float);
+          transform: scale(1.1);
+        }
+        .input-action:active { transform: scale(0.92); }
 
         /* GIF text button variant */
         .gif-btn {
-          font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
-          width: auto; padding: 0 6px;
+          font-size: 10px; font-weight: 700; letter-spacing: 0.6px;
+          width: auto; padding: 0 7px; height: 28px;
         }
 
         .emoji-button-container   { position: relative; }
@@ -1916,7 +1976,19 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         }
 
         @media (max-width: 768px) {
-          .mobile-expand-btn { display: flex; }
+          .mobile-expand-btn {
+            display: flex;
+            width: 36px;
+            height: 36px;
+            min-height: unset;
+            min-width: unset;
+          }
+          .input-action {
+            width: 36px;
+            height: 36px;
+            min-height: unset;
+            min-width: unset;
+          }
           .fmt-bar { display: none; }
 
           .mobile-tool-sheet {
@@ -1973,19 +2045,36 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         }
 
         .send-btn {
-          width: 32px; height: 32px; border-radius: var(--r-sm);
+          width: 28px; height: 28px; border-radius: var(--r-xs);
           border: none; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
-          flex-shrink: 0; background: none; color: var(--text-muted);
+          flex-shrink: 0; background: none; color: var(--text-muted); padding: 6px;
           transition: transform 120ms cubic-bezier(0.34, 1.56, 0.64, 1), background var(--t-fast), color var(--t-fast);
+          /* Override global mobile min-height — the input bar has enough visual size */
+          min-height: unset; min-width: unset;
         }
         .send-btn:active {
           transform: scale(0.88);
           transition: transform 80ms ease;
         }
-        .send-btn--active { background: var(--accent); color: #fff; }
-        .send-btn--active:hover { background: var(--accent-hover); }
-        .send-btn:disabled:not(.send-btn--active) { cursor: not-allowed; }
+        .send-btn--active {
+          background: var(--accent); color: #fff;
+          box-shadow: 0 2px 8px var(--accent-glow);
+        }
+        .send-btn--active:hover { background: var(--accent-hover); box-shadow: 0 2px 12px var(--accent-glow); }
+        .send-btn:disabled:not(.send-btn--active) { cursor: not-allowed; opacity: 0.4; }
+
+        @media (max-width: 768px) {
+          .send-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: var(--r-sm);
+            padding: 10px;
+          }
+          .send-btn--active {
+            border-radius: var(--r-md);
+          }
+        }
 
         @media (prefers-reduced-motion: reduce) {
           .send-btn { transition: background var(--t-fast), color var(--t-fast); }

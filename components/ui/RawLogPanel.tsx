@@ -184,13 +184,15 @@ export default function RawLogPanel() {
           position: fixed;
           bottom: 0; left: 0; right: 0;
           height: 240px;
-          background: var(--bg-void);
-          border-top: 1px solid var(--border-normal);
+          background: var(--bg-deep);
+          border-top: 2px solid var(--accent-border);
           display: flex;
           flex-direction: column;
           z-index: 400;
           font-family: var(--font-mono, 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace);
-          font-size: 12px;
+          font-size: 11px;
+          box-shadow: 0 -4px 24px rgba(0,0,0,0.5);
+          transition: height var(--t-normal) var(--ease-out);
         }
         .rawlog-panel--minimized {
           height: auto;
@@ -222,7 +224,7 @@ export default function RawLogPanel() {
           margin-left: auto;
         }
         .rawlog-filter {
-          height: 22px;
+          height: 28px;
           padding: 0 8px;
           border-radius: var(--r-sm);
           border: 1px solid var(--border-subtle);
@@ -230,15 +232,16 @@ export default function RawLogPanel() {
           color: var(--text-primary);
           font-size: 11px;
           font-family: inherit;
-          width: 140px;
+          width: 160px;
+          transition: border-color var(--t-fast), background var(--t-fast);
         }
-        .rawlog-filter:focus { outline: none; border-color: var(--accent-border); }
+        .rawlog-filter:focus { outline: none; border-color: var(--accent-border); background: var(--bg-float); }
         .rawlog-filter::placeholder { color: var(--text-muted); }
 
         /* Buttons */
         .rawlog-btn {
-          height: 22px;
-          padding: 0 6px;
+          height: 28px;
+          padding: 0 7px;
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-sm);
           background: var(--bg-elevated);
@@ -247,13 +250,16 @@ export default function RawLogPanel() {
           font-size: 11px;
           font-family: inherit;
           white-space: nowrap;
-          transition: background 100ms, color 100ms;
+          transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+          display: inline-flex;
+          align-items: center;
         }
-        .rawlog-btn:hover { background: var(--bg-overlay); color: var(--text-primary); }
-        .rawlog-btn--active { background: var(--accent-subtle); color: var(--accent); border-color: var(--accent-border); }
-        .rawlog-btn--close { color: var(--text-muted); font-size: 14px; line-height: 1; }
-        .rawlog-btn--close:hover { color: var(--danger); }
+        .rawlog-btn:hover { background: var(--bg-overlay); color: var(--text-primary); border-color: var(--border-normal); }
+        .rawlog-btn--active { background: var(--accent-subtle); color: var(--accent); border-color: var(--accent-border); box-shadow: 0 0 0 1px var(--accent-border) inset; }
+        .rawlog-btn--close { color: var(--text-muted); font-size: 15px; line-height: 1; padding: 0 6px; }
+        .rawlog-btn--close:hover { color: var(--danger); background: var(--danger-subtle); border-color: transparent; }
         .rawlog-btn--send { background: var(--accent-subtle); color: var(--accent); border-color: var(--accent-border); }
+        .rawlog-btn--send:hover:not(:disabled) { background: var(--accent); color: #fff; }
         .rawlog-btn--send:disabled { opacity: 0.4; cursor: default; }
 
         /* Body */
@@ -282,34 +288,36 @@ export default function RawLogPanel() {
 
         /* Direction-based color coding */
         .rawlog-entry--sent .rawlog-line {
-          color: #5db87a;
+          color: var(--accent);
         }
         .rawlog-entry--recv .rawlog-line {
-          color: #5b9bd5;
+          color: var(--text-muted);
         }
 
         /* Classification overrides (higher specificity) */
-        .rawlog-entry--ping { opacity: 0.4; }
+        .rawlog-entry--ping { opacity: 0.35; }
         .rawlog-entry--error .rawlog-line { color: var(--danger) !important; }
         .rawlog-entry--mode .rawlog-line { color: var(--warning) !important; }
-        .rawlog-entry--privmsg.rawlog-entry--recv .rawlog-line { color: #7bb8f0; font-weight: 500; }
-        .rawlog-entry--privmsg.rawlog-entry--sent .rawlog-line { color: #72d48e; font-weight: 500; }
+        .rawlog-entry--privmsg.rawlog-entry--recv .rawlog-line { color: var(--text-secondary); font-weight: 500; }
+        .rawlog-entry--privmsg.rawlog-entry--sent .rawlog-line { color: var(--accent-hover); font-weight: 500; }
 
         .rawlog-ts {
           color: var(--text-muted);
           flex-shrink: 0;
           user-select: none;
-          font-size: 11px;
+          font-size: 10px;
+          opacity: 0.65;
         }
         .rawlog-dir {
           flex-shrink: 0;
           font-weight: 700;
           user-select: none;
-          width: 12px;
+          width: 13px;
           text-align: center;
+          font-size: 10px;
         }
-        .rawlog-dir--in  { color: #5b9bd5; }
-        .rawlog-dir--out { color: #5db87a; }
+        .rawlog-dir--in  { color: var(--text-muted); }
+        .rawlog-dir--out { color: var(--accent); }
         .rawlog-line {
           overflow: hidden;
           text-overflow: ellipsis;

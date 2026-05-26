@@ -8,6 +8,15 @@ import ServerStatsWidget from '@/components/ui/ServerStatsWidget';
 import { stripIrcFormatting } from '@/lib/ircColors';
 import type { ChatMessage } from '@/lib/irc/types';
 
+function SearchHintIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ color: 'var(--text-muted)', flexShrink: 0 }}>
+      <circle cx="7" cy="7" r="4.5" />
+      <path d="M13 13l-2.5-2.5" />
+    </svg>
+  );
+}
+
 export default function HomeView() {
   const ourNick            = useOnyxStore(s => s.ourNick);
   const server             = useOnyxStore(s => s.server);
@@ -21,6 +30,7 @@ export default function HomeView() {
   const openSearchOverlay  = useOnyxStore(s => s.openSearchOverlay);
   const openPinnedMessages = useOnyxStore(s => s.openPinnedMessages);
   const joinHistory        = useOnyxStore(s => s.joinHistory);
+  const toggleSpotlight    = useOnyxStore(s => s.toggleSpotlight);
 
   const [showGroupDM,    setShowGroupDM]    = useState(false);
   const [showInviteTip,  setShowInviteTip]  = useState(false);
@@ -95,7 +105,18 @@ export default function HomeView() {
         <h1 className="hv-hero-title">
           <span className="hv-hero-gradient">Welcome to Ocean</span>
         </h1>
-        <p className="hv-hero-subtitle">Select a channel to start chatting</p>
+        <p className="hv-hero-subtitle">
+          {ourNick ? `Connected as ${ourNick}` : 'Select a channel to start chatting'}
+        </p>
+
+        {/* Spotlight shortcut hint */}
+        <button className="hv-spotlight-hint" onClick={toggleSpotlight} aria-label="Open spotlight search">
+          <SearchHintIcon />
+          <span className="hv-spotlight-hint-text">Search channels, people, messages…</span>
+          <kbd className="hv-kbd">Ctrl</kbd>
+          <span className="hv-kbd-sep">+</span>
+          <kbd className="hv-kbd">K</kbd>
+        </button>
 
         {/* Stats row */}
         <div className="hv-stats-row">
@@ -118,22 +139,22 @@ export default function HomeView() {
         {/* Quick action cards */}
         <div className="hv-quick-cards">
           <button className="hv-quick-card hv-quick-card--0" onClick={openChannelBrowser}>
-            <span className="hv-quick-card-icon">📋</span>
+            <span className="hv-quick-card-icon"><IconChannels /></span>
             <span className="hv-quick-card-title">Browse Channels</span>
             <span className="hv-quick-card-desc">Explore all available channels</span>
           </button>
           <button className="hv-quick-card hv-quick-card--1" onClick={() => setShowNewDM(v => !v)}>
-            <span className="hv-quick-card-icon">💬</span>
+            <span className="hv-quick-card-icon"><IconDM /></span>
             <span className="hv-quick-card-title">Start a DM</span>
             <span className="hv-quick-card-desc">Message someone directly</span>
           </button>
           <button className="hv-quick-card hv-quick-card--2" onClick={openSearchOverlay}>
-            <span className="hv-quick-card-icon">🔍</span>
+            <span className="hv-quick-card-icon"><IconSearch /></span>
             <span className="hv-quick-card-title">Search Messages</span>
             <span className="hv-quick-card-desc">Find messages across channels</span>
           </button>
           <button className="hv-quick-card hv-quick-card--3" onClick={() => setShowGroupDM(true)}>
-            <span className="hv-quick-card-icon">👥</span>
+            <span className="hv-quick-card-icon"><IconGroup /></span>
             <span className="hv-quick-card-title">Group DM</span>
             <span className="hv-quick-card-desc">Chat with multiple people</span>
           </button>
@@ -319,21 +340,21 @@ export default function HomeView() {
             <h2 className="hv-panel-title hv-panel-title--sm">Quick Actions</h2>
             <div className="hv-actions">
               <button className="hv-action-row" onClick={openChannelBrowser}>
-                <span className="hv-action-icon">📋</span>
+                <span className="hv-action-icon"><IconChannels /></span>
                 <span>Browse channels</span>
               </button>
               <button className="hv-action-row" onClick={openSearchOverlay}>
-                <span className="hv-action-icon">🔍</span>
+                <span className="hv-action-icon"><IconSearch /></span>
                 <span>Search messages</span>
               </button>
               {openPinnedMessages && (
                 <button className="hv-action-row" onClick={openPinnedMessages}>
-                  <span className="hv-action-icon">📌</span>
+                  <span className="hv-action-icon"><IconPin /></span>
                   <span>Pinned messages</span>
                 </button>
               )}
               <button className="hv-action-row" onClick={() => setShowGroupDM(true)}>
-                <span className="hv-action-icon">👥</span>
+                <span className="hv-action-icon"><IconGroup /></span>
                 <span>New group DM</span>
               </button>
               <button
@@ -341,7 +362,7 @@ export default function HomeView() {
                 onClick={() => setShowInviteTip(v => !v)}
                 aria-expanded={showInviteTip}
               >
-                <span className="hv-action-icon">🎁</span>
+                <span className="hv-action-icon"><IconInvite /></span>
                 <span>Invite a friend</span>
               </button>
             </div>
@@ -436,9 +457,57 @@ export default function HomeView() {
           display: flex;
           flex-direction: column;
           overflow-y: auto;
-          padding: 0 24px 32px;
+          padding: 0 24px 40px;
           align-items: center;
           justify-content: flex-start;
+          background:
+            radial-gradient(ellipse 80% 35% at 50% 0%, rgba(14,165,233,0.06) 0%, transparent 70%),
+            radial-gradient(ellipse 40% 20% at 20% 100%, rgba(103,232,249,0.03) 0%, transparent 70%);
+        }
+
+        /* ── Spotlight hint ─────────────────────────────────────────── */
+        .hv-spotlight-hint {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 14px;
+          background: var(--bg-elevated);
+          border: 1px solid var(--border-normal);
+          border-radius: var(--r-full);
+          cursor: pointer;
+          font-family: inherit;
+          margin-bottom: 28px;
+          position: relative;
+          z-index: 1;
+          transition: background var(--t-fast), border-color var(--t-fast), box-shadow var(--t-fast);
+        }
+        .hv-spotlight-hint:hover {
+          background: var(--bg-float);
+          border-color: var(--accent-border);
+          box-shadow: 0 4px 16px rgba(14,165,233,0.1);
+        }
+        .hv-spotlight-hint-text {
+          font-size: 13px;
+          color: var(--text-muted);
+          white-space: nowrap;
+        }
+        .hv-kbd {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-family: var(--font-mono, monospace);
+          font-size: 11px;
+          font-weight: 600;
+          color: var(--text-secondary);
+          background: var(--bg-overlay);
+          border: 1px solid var(--border-normal);
+          border-radius: 4px;
+          padding: 2px 6px;
+          line-height: 1.4;
+        }
+        .hv-kbd-sep {
+          font-size: 11px;
+          color: var(--text-muted);
         }
 
         /* ── Hero ───────────────────────────────────────────────────── */
@@ -449,18 +518,18 @@ export default function HomeView() {
           flex-direction: column;
           align-items: center;
           text-align: center;
-          padding: 40px 24px 32px;
+          padding: 48px 24px 36px;
           position: relative;
-          margin-bottom: 4px;
+          margin-bottom: 8px;
         }
 
         .hv-hero-glow {
           position: absolute;
           top: 0; left: 50%;
           transform: translateX(-50%);
-          width: 600px;
-          height: 300px;
-          background: radial-gradient(ellipse at 50% 30%, rgba(124,90,245,0.10) 0%, transparent 70%);
+          width: 700px;
+          height: 340px;
+          background: radial-gradient(ellipse at 50% 20%, rgba(14,165,233,0.09) 0%, rgba(103,232,249,0.04) 40%, transparent 70%);
           pointer-events: none;
           z-index: 0;
         }
@@ -468,21 +537,21 @@ export default function HomeView() {
         .hv-hero-wave {
           position: relative;
           z-index: 1;
-          margin-bottom: 20px;
+          margin-bottom: 22px;
         }
 
         .hv-hero-title {
           position: relative;
           z-index: 1;
-          font-size: clamp(26px, 4vw, 38px);
+          font-size: clamp(28px, 4.5vw, 42px);
           font-weight: 800;
-          letter-spacing: -0.5px;
-          line-height: 1.15;
+          letter-spacing: -0.8px;
+          line-height: 1.1;
           margin: 0 0 10px;
         }
 
         .hv-hero-gradient {
-          background: linear-gradient(135deg, var(--accent) 0%, var(--gold) 100%);
+          background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent) 60%, var(--gold) 100%);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
@@ -491,10 +560,11 @@ export default function HomeView() {
         .hv-hero-subtitle {
           position: relative;
           z-index: 1;
-          font-size: 15px;
+          font-size: 14px;
           color: var(--text-muted);
-          margin: 0 0 28px;
+          margin: 0 0 16px;
           font-weight: 400;
+          letter-spacing: 0.01em;
         }
 
         /* Stats row */
@@ -507,16 +577,17 @@ export default function HomeView() {
           background: var(--bg-elevated);
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-full);
-          padding: 8px 24px;
+          padding: 8px 20px;
           margin-bottom: 28px;
+          box-shadow: var(--shadow-sm);
         }
 
         .hv-stat {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 1px;
-          padding: 0 16px;
+          gap: 2px;
+          padding: 0 18px;
         }
 
         .hv-stat-value {
@@ -524,22 +595,23 @@ export default function HomeView() {
           font-weight: 700;
           color: var(--text-primary);
           white-space: nowrap;
-          max-width: 100px;
+          max-width: 110px;
           overflow: hidden;
           text-overflow: ellipsis;
+          letter-spacing: -0.02em;
         }
 
         .hv-stat-label {
-          font-size: 10px;
-          font-weight: 600;
-          letter-spacing: 0.06em;
+          font-size: 9px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
           text-transform: uppercase;
           color: var(--text-muted);
         }
 
         .hv-stat-divider {
           width: 1px;
-          height: 28px;
+          height: 24px;
           background: var(--border-subtle);
           flex-shrink: 0;
         }
@@ -549,17 +621,17 @@ export default function HomeView() {
           position: relative;
           z-index: 1;
           display: flex;
-          gap: 12px;
+          gap: 10px;
           flex-wrap: wrap;
           justify-content: center;
         }
 
         .hv-quick-card {
-          width: 160px;
+          width: 152px;
           background: var(--bg-elevated);
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-lg);
-          padding: 16px 14px;
+          padding: 16px 14px 14px;
           display: flex;
           flex-direction: column;
           align-items: flex-start;
@@ -567,6 +639,8 @@ export default function HomeView() {
           cursor: pointer;
           font-family: inherit;
           text-align: left;
+          position: relative;
+          overflow: hidden;
           transition: transform 200ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)),
                       box-shadow 200ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)),
                       border-color 200ms;
@@ -574,11 +648,23 @@ export default function HomeView() {
           animation: hv-card-in 350ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
         }
 
+        .hv-quick-card::before {
+          content: '';
+          position: absolute;
+          top: 0; left: 0; right: 0;
+          height: 2px;
+          background: linear-gradient(90deg, transparent, var(--accent-border), transparent);
+          opacity: 0;
+          transition: opacity var(--t-fast);
+        }
+
         .hv-quick-card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 24px rgba(124,90,245,0.15);
+          transform: translateY(-3px);
+          box-shadow: 0 10px 28px rgba(14,165,233,0.12), 0 0 0 1px var(--accent-border);
           border-color: var(--accent-border);
         }
+
+        .hv-quick-card:hover::before { opacity: 1; }
 
         .hv-quick-card--0 { animation-delay: 0ms; }
         .hv-quick-card--1 { animation-delay: 80ms; }
@@ -586,15 +672,14 @@ export default function HomeView() {
         .hv-quick-card--3 { animation-delay: 240ms; }
 
         @keyframes hv-card-in {
-          from { opacity: 0; transform: translateY(8px); }
+          from { opacity: 0; transform: translateY(10px); }
           to   { opacity: 1; transform: translateY(0); }
         }
 
         .hv-quick-card-icon {
-          font-size: 22px;
+          font-size: 20px;
           line-height: 1;
-          margin-bottom: 2px;
-          filter: drop-shadow(0 1px 4px rgba(124,90,245,0.2));
+          margin-bottom: 4px;
         }
 
         .hv-quick-card-title {
@@ -602,12 +687,13 @@ export default function HomeView() {
           font-weight: 700;
           color: var(--text-primary);
           line-height: 1.3;
+          letter-spacing: -0.01em;
         }
 
         .hv-quick-card-desc {
           font-size: 11px;
           color: var(--text-muted);
-          line-height: 1.4;
+          line-height: 1.45;
         }
 
         .hv-layout {
@@ -638,6 +724,15 @@ export default function HomeView() {
           display: flex;
           flex-direction: column;
           gap: 14px;
+          position: relative;
+          overflow: hidden;
+        }
+        .hv-panel::before {
+          content: '';
+          position: absolute;
+          top: 0; left: 0; right: 0;
+          height: 1px;
+          background: linear-gradient(90deg, transparent, var(--border-normal), transparent);
         }
         .hv-panel--sm { padding: 16px; gap: 12px; }
 
@@ -649,15 +744,15 @@ export default function HomeView() {
         }
 
         .hv-panel-title {
-          font-size: 13px;
+          font-size: 11px;
           font-weight: 700;
-          letter-spacing: 0.07em;
+          letter-spacing: 0.09em;
           text-transform: uppercase;
-          color: var(--text-secondary);
+          color: var(--text-muted);
           margin: 0;
         }
         .hv-panel-title--sm {
-          font-size: 11px;
+          font-size: 10px;
           margin-bottom: 2px;
         }
 
@@ -798,38 +893,55 @@ export default function HomeView() {
         .hv-channel-grid {
           display: grid;
           grid-template-columns: repeat(2, 1fr);
-          gap: 8px;
+          gap: 7px;
         }
 
         .hv-ch-card {
           background: var(--bg-deep);
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-md);
-          padding: 12px 14px;
+          padding: 11px 13px;
           text-align: left;
           cursor: pointer;
-          transition: background var(--t-fast), border-color var(--t-fast);
+          transition: background var(--t-fast), border-color var(--t-fast), box-shadow var(--t-fast);
           display: flex;
           flex-direction: column;
-          gap: 5px;
+          gap: 4px;
+          position: relative;
+          overflow: hidden;
         }
         .hv-ch-card:hover {
           background: var(--bg-float);
           border-color: var(--accent-border);
+          box-shadow: 0 4px 12px rgba(14,165,233,0.08);
         }
+
+        /* accent left-edge on hover */
+        .hv-ch-card::before {
+          content: '';
+          position: absolute;
+          top: 0; left: 0;
+          width: 2px; bottom: 0;
+          background: var(--accent);
+          opacity: 0;
+          transition: opacity var(--t-fast);
+          border-radius: var(--r-xs) 0 0 var(--r-xs);
+        }
+        .hv-ch-card:hover::before { opacity: 1; }
 
         .hv-ch-card-header {
           display: flex;
           align-items: center;
-          gap: 4px;
+          gap: 5px;
         }
 
         .hv-ch-hash {
-          font-size: 16px;
-          font-weight: 600;
-          color: var(--text-muted);
+          font-size: 14px;
+          font-weight: 700;
+          color: var(--accent);
           line-height: 1;
           flex-shrink: 0;
+          opacity: 0.7;
         }
 
         .hv-ch-name {
@@ -840,6 +952,7 @@ export default function HomeView() {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+          letter-spacing: -0.01em;
         }
 
         .hv-ch-topic {
@@ -853,21 +966,24 @@ export default function HomeView() {
         }
 
         .hv-ch-count {
-          font-size: 11px;
+          font-size: 10px;
           color: var(--text-muted);
+          font-weight: 500;
+          letter-spacing: 0.02em;
         }
 
         .hv-browse-link {
           background: none;
           border: none;
           cursor: pointer;
-          font-size: 13px;
+          font-size: 12px;
           font-weight: 600;
           color: var(--accent);
           font-family: inherit;
           padding: 4px 0 0;
           text-align: left;
           transition: color var(--t-fast);
+          letter-spacing: 0.01em;
         }
         .hv-browse-link:hover { color: var(--accent-hover); }
 
@@ -1118,27 +1234,24 @@ export default function HomeView() {
         .activity-item {
           background: var(--bg-deep);
           border: 1px solid var(--border-subtle);
-          border-radius: 6px;
+          border-radius: var(--r-md);
           overflow: hidden;
+          transition: border-color var(--t-fast), background var(--t-fast);
         }
 
         .activity-item-btn {
           display: block;
           width: 100%;
-          padding: 8px 12px;
+          padding: 9px 13px;
           background: transparent;
           border: none;
           cursor: pointer;
           text-align: left;
           font-family: inherit;
-          transition: background 0.15s, border-color 0.15s;
         }
         .activity-item:hover {
-          border-color: var(--border-normal);
+          border-color: var(--accent-border);
           background: var(--bg-float);
-        }
-        .activity-item:hover .activity-item-btn {
-          background: transparent;
         }
 
         .activity-item-header {
@@ -1149,13 +1262,15 @@ export default function HomeView() {
         }
 
         .activity-channel-badge {
-          font-size: 11px;
-          font-weight: 600;
+          font-size: 10px;
+          font-weight: 700;
           color: var(--accent);
-          background: rgba(124,90,245,0.1);
-          padding: 2px 6px;
-          border-radius: 4px;
+          background: var(--accent-subtle);
+          border: 1px solid var(--accent-border);
+          padding: 1px 6px;
+          border-radius: var(--r-sm);
           flex-shrink: 0;
+          letter-spacing: 0.02em;
         }
 
         .activity-time {
@@ -1280,6 +1395,65 @@ function CheckIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M3 8l4 4 6-6" />
+    </svg>
+  );
+}
+
+function IconChannels() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="2" y="3" width="6" height="6" rx="1.5" />
+      <rect x="12" y="3" width="6" height="6" rx="1.5" />
+      <rect x="2" y="11" width="6" height="6" rx="1.5" />
+      <rect x="12" y="11" width="6" height="6" rx="1.5" />
+    </svg>
+  );
+}
+
+function IconDM() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 4.5h14a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H5.5L2 17v-1.5V5.5a1 1 0 0 1 1-1Z" />
+    </svg>
+  );
+}
+
+function IconSearch() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="9" cy="9" r="5.5" />
+      <path d="M17 17l-3.5-3.5" />
+    </svg>
+  );
+}
+
+function IconGroup() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="7.5" cy="7" r="3" />
+      <circle cx="13.5" cy="7" r="3" />
+      <path d="M1 17c0-3 2.9-5 6.5-5" />
+      <path d="M19 17c0-3-2.9-5-6.5-5" />
+      <path d="M7.5 12c0-2.5 2.7-4 6-4" strokeOpacity="0" />
+      <path d="M10.5 12c1.7 0 3.2.5 4.3 1.3" />
+    </svg>
+  );
+}
+
+function IconPin() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12.5 2.5L17.5 7.5L13 12L11 18L8 12L2 9L8 7L12.5 2.5Z" />
+    </svg>
+  );
+}
+
+function IconInvite() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="10" cy="8" r="3.5" />
+      <path d="M3 17c0-3.3 3.1-6 7-6" />
+      <path d="M15 13v5M17.5 15.5h-5" />
     </svg>
   );
 }

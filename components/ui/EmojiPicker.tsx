@@ -536,19 +536,22 @@ export default function EmojiPicker({ onPick, onClose }: EmojiPickerProps) {
           height: 440px;
           display: flex;
           flex-direction: column;
-          background: rgba(6, 16, 29, 0.92);
+          background: var(--bg-deep, #06101d);
           backdrop-filter: blur(20px);
           -webkit-backdrop-filter: blur(20px);
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 16px;
-          box-shadow: 0 8px 48px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4);
+          border: 1px solid var(--border-normal, rgba(14,165,233,0.15));
+          border-radius: var(--r-xl, 14px);
+          box-shadow:
+            0 24px 60px rgba(0,0,0,0.7),
+            0 4px 16px rgba(0,0,0,0.4),
+            0 0 0 1px rgba(14,165,233,0.05) inset;
           z-index: 200;
-          overflow: visible;
-          animation: ep-enter 180ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+          overflow: hidden;
+          animation: ep-enter 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
         }
 
         @keyframes ep-enter {
-          from { opacity: 0; transform: scale(0.92) translateY(8px); }
+          from { opacity: 0; transform: scale(0.92) translateY(12px); }
           to   { opacity: 1; transform: scale(1) translateY(0); }
         }
 
@@ -556,10 +559,10 @@ export default function EmojiPicker({ onPick, onClose }: EmojiPickerProps) {
         .ep-tooltip {
           position: absolute;
           transform: translate(-50%, -100%);
-          background: rgba(3, 8, 16, 0.95);
-          border: 1px solid rgba(14, 165, 233, 0.2);
-          border-radius: 8px;
-          padding: 5px 9px;
+          background: var(--bg-void, #030810);
+          border: 1px solid var(--border-normal, rgba(14,165,233,0.15));
+          border-radius: var(--r-md, 8px);
+          padding: 5px 10px;
           pointer-events: none;
           z-index: 300;
           white-space: nowrap;
@@ -567,20 +570,21 @@ export default function EmojiPicker({ onPick, onClose }: EmojiPickerProps) {
           flex-direction: column;
           align-items: center;
           gap: 1px;
-          box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+          box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+          margin-top: -6px;
         }
 
         .ep-tooltip-name {
           font-size: 11px;
-          color: var(--text-primary);
-          font-weight: 500;
+          color: var(--text-primary, #dff0ff);
+          font-weight: 600;
           text-transform: capitalize;
         }
 
         .ep-tooltip-code {
           font-size: 10px;
-          color: var(--text-muted);
-          font-family: var(--font-mono);
+          color: var(--text-muted, #3d6480);
+          font-family: var(--font-mono, ui-monospace, monospace);
           letter-spacing: 0.3px;
         }
 
@@ -588,29 +592,29 @@ export default function EmojiPicker({ onPick, onClose }: EmojiPickerProps) {
         .ep-skin-variants {
           display: flex;
           gap: 2px;
-          padding: 4px 10px 0;
+          padding: 5px 10px;
           flex-shrink: 0;
-          background: rgba(14, 165, 233, 0.04);
-          border-bottom: 1px solid rgba(14, 165, 233, 0.08);
+          background: rgba(14,165,233,0.05);
+          border-bottom: 1px solid var(--border-subtle, rgba(14,165,233,0.08));
         }
 
         .ep-skin-variant-btn {
-          width: 32px;
-          height: 32px;
+          width: 34px;
+          height: 34px;
           border: none;
           background: none;
           cursor: pointer;
-          border-radius: 8px;
-          font-size: 19px;
+          border-radius: var(--r-md, 8px);
+          font-size: 20px;
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: background 100ms ease, transform 100ms cubic-bezier(0.34, 1.56, 0.64, 1);
+          transition: background 120ms ease, transform 120ms cubic-bezier(0.16,1,0.3,1);
         }
 
         .ep-skin-variant-btn:hover {
-          background: rgba(255,255,255,0.08);
-          transform: scale(1.25);
+          background: rgba(14,165,233,0.1);
+          transform: scale(1.28);
         }
 
         /* ── Header ── */
@@ -618,10 +622,9 @@ export default function EmojiPicker({ onPick, onClose }: EmojiPickerProps) {
           display: flex;
           align-items: center;
           gap: 8px;
-          padding: 10px 12px 0;
+          padding: 10px 12px 8px;
           flex-shrink: 0;
-          border-radius: 16px 16px 0 0;
-          overflow: hidden;
+          border-bottom: 1px solid var(--border-subtle, rgba(14,165,233,0.08));
         }
 
         .ep-search-wrap {
@@ -637,32 +640,32 @@ export default function EmojiPicker({ onPick, onClose }: EmojiPickerProps) {
           transform: translateY(-50%);
           width: 13px;
           height: 13px;
-          color: var(--text-muted);
+          color: var(--text-muted, #3d6480);
           pointer-events: none;
           flex-shrink: 0;
         }
 
         .ep-search {
           width: 100%;
-          background: var(--bg-elevated);
-          border: 1px solid rgba(255,255,255,0.06);
+          height: 32px;
+          background: var(--bg-base, #0c1828);
+          border: 1px solid var(--border-subtle, rgba(14,165,233,0.08));
           border-radius: 999px;
-          padding: 7px 30px 7px 32px;
+          padding: 0 30px 0 32px;
           font-size: 13px;
-          color: var(--text-primary);
+          color: var(--text-primary, #dff0ff);
           outline: none;
-          transition: border-color 150ms ease, box-shadow 150ms ease;
+          transition: border-color 140ms ease, box-shadow 140ms ease;
           box-sizing: border-box;
-          height: 36px;
         }
 
         .ep-search:focus {
-          border-color: rgba(14, 165, 233, 0.4);
-          box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
+          border-color: var(--accent, #0ea5e9);
+          box-shadow: 0 0 0 2px rgba(14,165,233,0.15);
         }
 
         .ep-search::placeholder {
-          color: var(--text-muted);
+          color: var(--text-muted, #3d6480);
         }
 
         .ep-search-clear {
@@ -672,16 +675,18 @@ export default function EmojiPicker({ onPick, onClose }: EmojiPickerProps) {
           transform: translateY(-50%);
           background: none;
           border: none;
-          color: var(--text-muted);
+          color: var(--text-muted, #3d6480);
           cursor: pointer;
-          font-size: 13px;
+          font-size: 12px;
           line-height: 1;
-          padding: 0 2px;
-          transition: color 150ms ease;
+          padding: 2px 4px;
+          border-radius: 4px;
+          transition: color 120ms ease, background 120ms ease;
         }
 
         .ep-search-clear:hover {
-          color: var(--text-primary);
+          color: var(--text-primary, #dff0ff);
+          background: rgba(255,255,255,0.06);
         }
 
         /* ── Skin tones ── */
@@ -692,94 +697,97 @@ export default function EmojiPicker({ onPick, onClose }: EmojiPickerProps) {
         }
 
         .ep-tone {
-          width: 17px;
-          height: 17px;
+          width: 16px;
+          height: 16px;
           border-radius: 50%;
           border: 2px solid transparent;
           cursor: pointer;
-          transition: transform 150ms ease, border-color 150ms ease;
+          transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
           flex-shrink: 0;
         }
 
         .ep-tone:hover {
-          transform: scale(1.2);
+          transform: scale(1.25);
         }
 
         .ep-tone--active {
-          border-color: var(--accent);
-          box-shadow: 0 0 0 1px var(--accent);
-          transform: scale(1.15);
+          border-color: var(--accent, #0ea5e9);
+          box-shadow: 0 0 0 1px var(--accent, #0ea5e9);
+          transform: scale(1.18);
         }
 
-        /* ── Category tabs ── */
+        /* ── Category tabs — clean, icon-based, indicator underline ── */
         .ep-cats {
           display: flex;
-          padding: 8px 10px 0;
+          padding: 4px 8px 0;
           gap: 1px;
           flex-shrink: 0;
           overflow-x: auto;
           scrollbar-width: none;
-          height: 40px;
+          height: 38px;
           align-items: center;
+          border-bottom: 1px solid var(--border-subtle, rgba(14,165,233,0.08));
+          background: rgba(14,165,233,0.02);
         }
 
-        .ep-cats::-webkit-scrollbar {
-          display: none;
-        }
+        .ep-cats::-webkit-scrollbar { display: none; }
 
         .ep-cat {
           flex-shrink: 0;
-          width: 28px;
-          height: 28px;
+          width: 30px;
+          height: 30px;
           border: none;
           background: none;
           cursor: pointer;
-          border-radius: 6px;
-          font-size: 15px;
+          border-radius: var(--r-sm, 6px);
+          font-size: 16px;
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: background 150ms ease, transform 150ms ease, filter 150ms ease;
+          transition: background 120ms ease, transform 120ms cubic-bezier(0.16,1,0.3,1), filter 120ms ease;
           position: relative;
-          filter: grayscale(0.3) opacity(0.65);
+          filter: grayscale(0.4) opacity(0.55);
         }
 
         .ep-cat:hover {
-          background: rgba(255,255,255,0.06);
-          transform: scale(1.12);
-          filter: grayscale(0) opacity(1);
+          background: rgba(14,165,233,0.1);
+          transform: scale(1.15);
+          filter: grayscale(0) opacity(0.9);
         }
 
         .ep-cat--active {
-          background: rgba(14, 165, 233, 0.1);
+          background: rgba(14,165,233,0.1);
           filter: grayscale(0) opacity(1);
+          transform: scale(1.05);
         }
 
+        /* Accent underline indicator */
         .ep-cat--active::after {
           content: '';
           position: absolute;
-          bottom: -1px;
+          bottom: -4px;
           left: 50%;
           transform: translateX(-50%);
           width: 18px;
           height: 2px;
-          background: var(--accent);
+          background: var(--accent, #0ea5e9);
           border-radius: 1px;
+          box-shadow: 0 0 6px rgba(14,165,233,0.5);
         }
 
         /* ── Most used strip ── */
         .ep-most-used {
           flex-shrink: 0;
           padding: 5px 10px 0;
-          border-bottom: 1px solid rgba(14, 165, 233, 0.08);
+          border-bottom: 1px solid var(--border-subtle, rgba(14,165,233,0.08));
         }
 
         .ep-most-used-label {
-          font-size: 9px;
+          font-size: 10px;
           font-weight: 700;
-          color: var(--text-muted);
+          color: var(--text-muted, #3d6480);
           text-transform: uppercase;
-          letter-spacing: 0.9px;
+          letter-spacing: 0.1em;
           margin-bottom: 2px;
         }
 
@@ -792,16 +800,16 @@ export default function EmojiPicker({ onPick, onClose }: EmojiPickerProps) {
 
         /* ── Section label ── */
         .ep-section-label {
-          padding: 5px 12px 3px;
-          font-size: 9px;
+          padding: 6px 12px 2px;
+          font-size: 10px;
           font-weight: 700;
-          color: var(--text-muted);
+          color: var(--text-muted, #3d6480);
           text-transform: uppercase;
-          letter-spacing: 0.9px;
+          letter-spacing: 0.1em;
           flex-shrink: 0;
         }
 
-        /* ── Emoji grid ── */
+        /* ── Emoji grid — consistent cell sizing, hover highlight ── */
         .ep-grid {
           flex: 1;
           display: grid;
@@ -810,25 +818,18 @@ export default function EmojiPicker({ onPick, onClose }: EmojiPickerProps) {
           padding: 2px 8px 8px;
           overflow-y: auto;
           scrollbar-width: thin;
-          scrollbar-color: rgba(14,165,233,0.15) transparent;
+          scrollbar-color: rgba(14,165,233,0.2) transparent;
           align-content: start;
         }
 
-        .ep-grid::-webkit-scrollbar {
-          width: 4px;
-        }
-
-        .ep-grid::-webkit-scrollbar-track {
-          background: transparent;
-        }
-
+        .ep-grid::-webkit-scrollbar { width: 3px; }
+        .ep-grid::-webkit-scrollbar-track { background: transparent; }
         .ep-grid::-webkit-scrollbar-thumb {
-          background: rgba(14,165,233,0.15);
+          background: rgba(14,165,233,0.2);
           border-radius: 2px;
         }
-
         .ep-grid::-webkit-scrollbar-thumb:hover {
-          background: rgba(14,165,233,0.3);
+          background: rgba(14,165,233,0.4);
         }
 
         .ep-emoji {
@@ -837,12 +838,12 @@ export default function EmojiPicker({ onPick, onClose }: EmojiPickerProps) {
           border: none;
           background: none;
           cursor: pointer;
-          border-radius: 8px;
+          border-radius: var(--r-md, 8px);
           font-size: 20px;
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: background 100ms ease, transform 100ms cubic-bezier(0.34, 1.56, 0.64, 1);
+          transition: background 100ms ease, transform 120ms cubic-bezier(0.16,1,0.3,1), box-shadow 120ms ease;
           line-height: 1;
           padding: 0;
           position: relative;
@@ -856,14 +857,15 @@ export default function EmojiPicker({ onPick, onClose }: EmojiPickerProps) {
         }
 
         .ep-emoji:hover {
-          background: rgba(255,255,255,0.08);
-          transform: scale(1.25);
+          background: rgba(14,165,233,0.12);
+          transform: scale(1.22);
+          box-shadow: 0 2px 10px rgba(0,0,0,0.45);
           z-index: 1;
         }
 
         .ep-emoji:active {
-          transform: scale(0.92);
-          background: rgba(14, 165, 233, 0.12);
+          transform: scale(0.9);
+          background: rgba(14,165,233,0.08);
         }
 
         /* ── Empty state ── */
@@ -871,7 +873,7 @@ export default function EmojiPicker({ onPick, onClose }: EmojiPickerProps) {
           grid-column: 1 / -1;
           padding: 32px 12px;
           text-align: center;
-          color: var(--text-muted);
+          color: var(--text-muted, #3d6480);
           font-size: 13px;
           line-height: 1.5;
         }
@@ -892,26 +894,27 @@ export default function EmojiPicker({ onPick, onClose }: EmojiPickerProps) {
           padding: 8px;
           overflow-y: auto;
           scrollbar-width: thin;
-          scrollbar-color: rgba(14,165,233,0.15) transparent;
+          scrollbar-color: rgba(14,165,233,0.2) transparent;
           align-content: start;
         }
 
         .ep-custom-item {
           width: 64px;
           height: 64px;
-          border: none;
-          background: var(--bg-elevated);
+          border: 1px solid var(--border-subtle, rgba(14,165,233,0.08));
+          background: var(--bg-elevated, #132131);
           cursor: pointer;
-          border-radius: 8px;
+          border-radius: var(--r-md, 8px);
           display: flex;
           align-items: center;
           justify-content: center;
           padding: 4px;
-          transition: background 150ms ease, transform 150ms ease;
+          transition: background 120ms ease, transform 120ms ease, border-color 120ms ease;
         }
 
         .ep-custom-item:hover {
-          background: rgba(255,255,255,0.07);
+          background: rgba(14,165,233,0.1);
+          border-color: rgba(14,165,233,0.25);
           transform: scale(1.08);
         }
 
@@ -929,20 +932,20 @@ export default function EmojiPicker({ onPick, onClose }: EmojiPickerProps) {
         .ep-custom-add-btn {
           flex-shrink: 0;
           margin: 6px 8px 8px;
-          background: rgba(14, 165, 233, 0.08);
-          border: 1px solid rgba(14, 165, 233, 0.25);
-          border-radius: 8px;
-          color: var(--accent);
+          background: rgba(14,165,233,0.08);
+          border: 1px solid rgba(14,165,233,0.2);
+          border-radius: var(--r-md, 8px);
+          color: var(--accent, #0ea5e9);
           font-size: 12px;
           font-weight: 600;
           padding: 8px 12px;
           cursor: pointer;
-          transition: background 150ms ease, border-color 150ms ease;
+          transition: background 120ms ease, border-color 120ms ease;
         }
 
         .ep-custom-add-btn:hover {
-          background: rgba(14, 165, 233, 0.16);
-          border-color: var(--accent);
+          background: rgba(14,165,233,0.16);
+          border-color: rgba(14,165,233,0.4);
         }
       `}</style>
     </div>

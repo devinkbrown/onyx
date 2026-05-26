@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, FormEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, FormEvent } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import FormField from '@/components/ui/FormField';
 import Button from '@/components/ui/Button';
@@ -65,7 +65,70 @@ function loadSavedNick(): string {
   }
 }
 
+// Suppress TS unused warning — exported for potential external use
+void loadSavedNick;
+
 const CONNECTION_STEPS = ['Connecting…', 'Authenticating…', 'Loading channels…'];
+
+// ── SVG Icons ────────────────────────────────────────────────────────────────
+
+function IconServer() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <rect x="1" y="2" width="14" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.3" fill="none" />
+      <rect x="1" y="9" width="14" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.3" fill="none" />
+      <circle cx="12.5" cy="4.5" r="1" fill="currentColor" />
+      <circle cx="12.5" cy="11.5" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function IconUser() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <circle cx="8" cy="5.5" r="2.5" stroke="currentColor" strokeWidth="1.3" fill="none" />
+      <path d="M2.5 13.5C2.5 11.015 5.015 9 8 9s5.5 2.015 5.5 4.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none" />
+    </svg>
+  );
+}
+
+function IconLock() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <rect x="3" y="7" width="10" height="7.5" rx="1.5" stroke="currentColor" strokeWidth="1.3" fill="none" />
+      <path d="M5 7V5a3 3 0 016 0v2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none" />
+      <circle cx="8" cy="10.5" r="1.2" fill="currentColor" />
+    </svg>
+  );
+}
+
+function IconEye({ off }: { off?: boolean }) {
+  if (off) {
+    return (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M2 2l12 12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        <path d="M6.5 4.2C7 4.07 7.5 4 8 4c3.5 0 6 4 6 4s-.65 1.1-1.8 2.1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none" />
+        <path d="M4.2 5.7C2.9 6.8 2 8 2 8s2.5 4 6 4c.9 0 1.75-.24 2.5-.64" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none" />
+        <path d="M6.5 9.4A2 2 0 009.4 6.6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M2 8s2.5-4 6-4 6 4 6 4-2.5 4-6 4-6-4-6-4z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none" />
+      <circle cx="8" cy="8" r="1.8" stroke="currentColor" strokeWidth="1.3" fill="none" />
+    </svg>
+  );
+}
+
+function IconSpinner() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className="spin-icon">
+      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeOpacity="0.2" />
+      <path d="M8 2a6 6 0 016 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 export default function LoginForm({ onSwitch }: Props) {
   const connect       = useOnyxStore(s => s.connect);
@@ -74,35 +137,39 @@ export default function LoginForm({ onSwitch }: Props) {
 
   const [nick,          setNick]          = useState('');
   const [password,      setPassword]      = useState('');
+  const [showPassword,  setShowPassword]  = useState(false);
   const [server,        setServer]        = useState(DEFAULT_SERVER);
   const [advanced,      setAdvanced]      = useState(false);
   const [error,         setError]         = useState('');
+  const [shake,         setShake]         = useState(false);
   const [rememberMe,    setRememberMe]    = useState(false);
   const [recentServers, setRecentServers] = useState<RecentServer[]>([]);
   const [connStep,      setConnStep]      = useState(0);
   const [activePreset,  setActivePreset]  = useState<string>('eshmaki.me');
 
-  // Saved credentials — null means none stored
+  const nickRef = useRef<HTMLInputElement>(null);
+
   const [savedCreds,    setSavedCreds]    = useState<SavedCredentials | null>(null);
-  // true = the "Continue as…" card is shown, false = full form
   const [autoMode,      setAutoMode]      = useState(false);
 
-  // ── Load saved credentials and recent servers on mount ──────────────────────
+  // Auto-focus nick field on mount
+  useEffect(() => {
+    nickRef.current?.focus();
+  }, []);
+
+  // Load saved credentials and recent servers on mount
   useEffect(() => {
     const creds = loadCredentials();
     if (creds) {
       setSavedCreds(creds);
       setAutoMode(true);
-      // Pre-fill form fields in case user dismisses the card
       setNick(creds.nick);
       setServer(creds.server);
       setRememberMe(true);
-      // Don't pre-fill password — it would appear in the visible input
     }
     setRecentServers(loadRecentServers());
   }, []);
 
-  // ── Auto-connect handler ────────────────────────────────────────────────────
   const handleAutoConnect = useCallback(() => {
     if (!savedCreds) return;
     setError('');
@@ -113,7 +180,6 @@ export default function LoginForm({ onSwitch }: Props) {
     });
   }, [savedCreds, connect]);
 
-  // ── Forget saved credentials ────────────────────────────────────────────────
   const handleForget = () => {
     clearCredentials();
     setSavedCreds(null);
@@ -176,11 +242,16 @@ export default function LoginForm({ onSwitch }: Props) {
     if (!match) setAdvanced(true);
   };
 
+  const triggerShake = () => {
+    setShake(true);
+    setTimeout(() => setShake(false), 600);
+  };
+
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (!nick.trim())   { setError('Nickname is required'); return; }
-    if (nickError)      { setError(nickError); return; }
-    if (!server.trim()) { setError('Server URL is required'); return; }
+    if (!nick.trim())   { setError('Nickname is required'); triggerShake(); return; }
+    if (nickError)      { setError(nickError); triggerShake(); return; }
+    if (!server.trim()) { setError('Server URL is required'); triggerShake(); return; }
     setError('');
 
     if (rememberMe) {
@@ -197,6 +268,7 @@ export default function LoginForm({ onSwitch }: Props) {
   };
 
   const loading = status === 'connecting';
+  const hasError = Boolean(error || lastError);
 
   // ── Auto-reconnect card ─────────────────────────────────────────────────────
   if (autoMode && savedCreds && !loading) {
@@ -246,14 +318,14 @@ export default function LoginForm({ onSwitch }: Props) {
             width: 64px;
             height: 64px;
             border-radius: 50%;
-            background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+            background: linear-gradient(135deg, var(--accent), #0369a1);
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 22px;
             font-weight: 700;
             color: var(--bg-void);
-            box-shadow: 0 0 0 3px var(--bg-elevated), 0 0 0 5px var(--accent-border);
+            box-shadow: 0 0 0 3px var(--bg-elevated), 0 0 0 5px var(--border-normal);
             letter-spacing: -0.02em;
           }
           .arc-info {
@@ -320,7 +392,7 @@ export default function LoginForm({ onSwitch }: Props) {
   }
 
   return (
-    <form onSubmit={submit} className="auth-form-fields">
+    <form onSubmit={submit} className={`auth-form-fields${shake ? ' form-shake' : ''}`} noValidate>
 
       {/* Recent servers */}
       {recentServers.length > 0 && (
@@ -345,19 +417,22 @@ export default function LoginForm({ onSwitch }: Props) {
 
       {/* Nick field */}
       <FormField label="Username" required>
-        <div className="nick-wrap">
+        <div className="input-wrap">
+          <span className="input-icon input-icon--left" aria-hidden="true">
+            <IconUser />
+          </span>
           <input
+            ref={nickRef}
             type="text"
             placeholder="your_nick"
             value={nick}
             onChange={e => setNick(e.target.value)}
             autoComplete="username"
-            autoFocus
             maxLength={32}
-            className={`onyx-input${nickError ? ' onyx-input--error' : ''}`}
+            className={`onyx-input onyx-input--has-icon${nickError || (hasError && !nick.trim()) ? ' onyx-input--error' : ''}`}
             disabled={loading}
           />
-          <span className={`nick-count ${nick.length > 25 ? 'nick-count--warn' : ''} ${nick.length > 30 ? 'nick-count--error' : ''}`}>
+          <span className={`nick-count${nick.length > 25 ? ' nick-count--warn' : ''}${nick.length > 30 ? ' nick-count--error' : ''}`}>
             {nick.length}/30
           </span>
         </div>
@@ -366,19 +441,31 @@ export default function LoginForm({ onSwitch }: Props) {
 
       {/* Password field */}
       <FormField label="Password" hint="Leave blank to join as a guest">
-        <div className="password-wrap">
+        <div className="input-wrap">
+          <span className="input-icon input-icon--left" aria-hidden="true">
+            <IconLock />
+          </span>
           <input
-            type="password"
+            type={showPassword ? 'text' : 'password'}
             placeholder="••••••••"
             value={password}
             onChange={e => setPassword(e.target.value)}
             autoComplete="current-password"
-            className="onyx-input"
+            className="onyx-input onyx-input--has-icon onyx-input--has-icon-right"
             disabled={loading}
           />
-          {password.length > 0 && (
-            <span className="sasl-badge">SASL PLAIN</span>
+          {password.length > 0 && !showPassword && (
+            <span className="sasl-badge">SASL</span>
           )}
+          <button
+            type="button"
+            className="eye-toggle"
+            onClick={() => setShowPassword(v => !v)}
+            aria-label={showPassword ? 'Hide password' : 'Show password'}
+            tabIndex={-1}
+          >
+            <IconEye off={showPassword} />
+          </button>
         </div>
       </FormField>
 
@@ -396,13 +483,16 @@ export default function LoginForm({ onSwitch }: Props) {
 
       {/* Server presets */}
       <div className="preset-row">
-        <span className="preset-label">Server</span>
+        <span className="preset-label">
+          <IconServer />
+          Server
+        </span>
         <div className="preset-chips">
           {SERVER_PRESETS.map(p => (
             <button
               key={p.label}
               type="button"
-              className={`preset-chip ${activePreset === p.label ? 'preset-chip--active' : ''}`}
+              className={`preset-chip${activePreset === p.label ? ' preset-chip--active' : ''}`}
               onClick={() => handlePreset(p)}
               disabled={loading}
             >
@@ -418,25 +508,37 @@ export default function LoginForm({ onSwitch }: Props) {
         className="advanced-toggle"
         onClick={() => setAdvanced(a => !a)}
       >
-        <span className={`advanced-arrow ${advanced ? 'open' : ''}`}>▸</span>
+        <span className={`advanced-arrow${advanced ? ' open' : ''}`}>▸</span>
         Custom server URL
       </button>
 
       {advanced && (
         <FormField label="Server URL">
-          <input
-            type="text"
-            placeholder="wss://server/gateway"
-            value={server}
-            onChange={e => { setServer(e.target.value); setActivePreset('Custom'); }}
-            className="onyx-input"
-            disabled={loading}
-          />
+          <div className="input-wrap">
+            <span className="input-icon input-icon--left" aria-hidden="true">
+              <IconServer />
+            </span>
+            <input
+              type="text"
+              placeholder="wss://server/gateway"
+              value={server}
+              onChange={e => { setServer(e.target.value); setActivePreset('Custom'); }}
+              className="onyx-input onyx-input--has-icon onyx-input--mono"
+              disabled={loading}
+            />
+          </div>
         </FormField>
       )}
 
       {(error || lastError) && (
-        <div className="auth-error">
+        <div className="auth-error" role="alert">
+          <span className="auth-error-icon" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.3" fill="none" />
+              <path d="M7 4v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+              <circle cx="7" cy="10" r="0.8" fill="currentColor" />
+            </svg>
+          </span>
           {error || lastError?.text}
         </div>
       )}
@@ -448,14 +550,19 @@ export default function LoginForm({ onSwitch }: Props) {
           <span className="conn-step">{CONNECTION_STEPS[connStep]}</span>
           <div className="conn-dots">
             {CONNECTION_STEPS.map((_, i) => (
-              <span key={i} className={`conn-dot ${i <= connStep ? 'conn-dot--active' : ''}`} />
+              <span key={i} className={`conn-dot${i <= connStep ? ' conn-dot--active' : ''}`} />
             ))}
           </div>
         </div>
       )}
 
       <Button type="submit" variant="primary" fullWidth loading={loading}>
-        {loading ? CONNECTION_STEPS[connStep] : 'Sign In'}
+        {loading ? (
+          <span className="btn-loading-inner">
+            <IconSpinner />
+            {CONNECTION_STEPS[connStep]}
+          </span>
+        ) : 'Sign In'}
       </Button>
 
       <p className="switch-link">
@@ -466,40 +573,104 @@ export default function LoginForm({ onSwitch }: Props) {
       </p>
 
       <style>{`
-        .auth-form-fields { display: flex; flex-direction: column; gap: 16px; }
+        .auth-form-fields {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
 
-        /* ── Inputs ── */
+        /* ── Shake animation on submit failure ── */
+        @keyframes form-shake {
+          0%, 100% { transform: translateX(0); }
+          15%       { transform: translateX(-5px); }
+          30%       { transform: translateX(5px); }
+          45%       { transform: translateX(-4px); }
+          60%       { transform: translateX(4px); }
+          75%       { transform: translateX(-2px); }
+          90%       { transform: translateX(2px); }
+        }
+        .form-shake { animation: form-shake 0.55s cubic-bezier(0.36,0.07,0.19,0.97) both; }
+
+        /* ── Input wrapper ── */
+        .input-wrap {
+          position: relative;
+          display: flex;
+          align-items: center;
+        }
+
+        /* ── Input icon ── */
+        .input-icon {
+          position: absolute;
+          top: 50%;
+          transform: translateY(-50%);
+          display: flex;
+          align-items: center;
+          pointer-events: none;
+          color: var(--text-muted);
+          transition: color var(--t-fast);
+          z-index: 1;
+        }
+        .input-icon--left { left: 13px; }
+
+        /* ── Base input ── */
         .onyx-input {
           width: 100%;
-          padding: 10px 14px;
-          background: var(--bg-elevated);
+          height: 44px;
+          padding: 0 14px;
+          background: var(--bg-base);
           border: 1px solid var(--border-normal);
           border-radius: var(--r-md);
           color: var(--text-primary);
-          font-size: 15px;
+          font-size: 14px;
           font-family: inherit;
-          transition: border-color var(--t-fast), box-shadow var(--t-fast);
+          transition: border-color var(--t-fast), box-shadow var(--t-fast), background var(--t-fast);
           box-sizing: border-box;
         }
+        .onyx-input::placeholder {
+          color: var(--text-muted);
+          opacity: 0.7;
+        }
+        .onyx-input--has-icon { padding-left: 40px; }
+        .onyx-input--has-icon-right { padding-right: 80px; }
+        .onyx-input--mono {
+          font-family: var(--font-mono, 'ui-monospace', monospace);
+          font-size: 13px;
+          letter-spacing: -0.01em;
+        }
+
+        /* Focus — accent glow ring */
         .onyx-input:focus {
           outline: none;
-          border-color: var(--accent-border);
-          box-shadow: 0 0 0 3px var(--accent-subtle);
+          background: var(--bg-elevated);
+          border-color: var(--accent);
+          box-shadow:
+            0 0 0 3px rgba(14,165,233,0.18),
+            0 0 12px rgba(14,165,233,0.08);
         }
-        .onyx-input:disabled { opacity: 0.5; cursor: not-allowed; }
+        .onyx-input:focus + .input-icon--left,
+        .input-wrap:focus-within .input-icon--left {
+          color: var(--accent);
+        }
+        .onyx-input:hover:not(:focus):not(:disabled) {
+          border-color: var(--border-normal);
+          background: var(--bg-elevated);
+        }
+        .onyx-input:disabled { opacity: 0.45; cursor: not-allowed; }
+
+        /* Error state */
         .onyx-input--error {
-          border-color: rgba(248,113,113,0.5);
+          border-color: rgba(248,113,113,0.6);
+          background: rgba(248,113,113,0.03);
         }
         .onyx-input--error:focus {
+          border-color: var(--danger);
           box-shadow: 0 0 0 3px rgba(248,113,113,0.15);
         }
 
         .field-hint { display: block; font-size: 12px; margin-top: 4px; }
         .field-hint--error { color: var(--danger); }
 
-        /* ── Nick wrap ── */
-        .nick-wrap { position: relative; }
-        .nick-wrap .onyx-input { padding-right: 52px; }
+        /* ── Nick character counter ── */
         .nick-count {
           position: absolute;
           right: 12px;
@@ -509,28 +680,58 @@ export default function LoginForm({ onSwitch }: Props) {
           color: var(--text-muted);
           pointer-events: none;
           font-variant-numeric: tabular-nums;
+          opacity: 0.7;
         }
-        .nick-count--warn { color: var(--gold); }
-        .nick-count--error { color: var(--danger); }
+        .nick-count--warn { color: var(--gold); opacity: 1; }
+        .nick-count--error { color: var(--danger); opacity: 1; }
+        .input-wrap .onyx-input:not(.onyx-input--has-icon-right) { padding-right: 52px; }
 
-        /* ── Password wrap + SASL badge ── */
-        .password-wrap { position: relative; }
-        .sasl-badge {
+        /* ── Password visibility toggle ── */
+        .eye-toggle {
           position: absolute;
           right: 10px;
           top: 50%;
           transform: translateY(-50%);
-          font-size: 10px;
-          font-weight: 600;
-          letter-spacing: 0.04em;
-          color: var(--gold);
-          background: var(--gold-subtle);
-          border: 1px solid rgba(103,232,249,0.25);
-          border-radius: 4px;
-          padding: 2px 6px;
-          pointer-events: none;
+          width: 30px;
+          height: 30px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: none;
+          border: none;
+          cursor: pointer;
+          color: var(--text-muted);
+          border-radius: var(--r-sm);
+          transition: color var(--t-fast), background var(--t-fast);
+          z-index: 2;
+          padding: 0;
         }
-        .password-wrap .onyx-input { padding-right: 96px; }
+        .eye-toggle:hover {
+          color: var(--text-secondary);
+          background: rgba(14,165,233,0.08);
+        }
+        .eye-toggle:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 1px;
+        }
+
+        /* SASL badge — shown when password has content and eye is hidden */
+        .sasl-badge {
+          position: absolute;
+          right: 44px;
+          top: 50%;
+          transform: translateY(-50%);
+          font-size: 9px;
+          font-weight: 700;
+          letter-spacing: 0.06em;
+          color: var(--gold);
+          background: rgba(103,232,249,0.08);
+          border: 1px solid rgba(103,232,249,0.2);
+          border-radius: 3px;
+          padding: 2px 5px;
+          pointer-events: none;
+          white-space: nowrap;
+        }
 
         /* ── Remember me ── */
         .remember-row {
@@ -583,8 +784,8 @@ export default function LoginForm({ onSwitch }: Props) {
           font-family: inherit;
         }
         .recent-chip:hover {
-          border-color: var(--accent-border);
-          background: var(--accent-subtle);
+          border-color: var(--border-normal);
+          background: rgba(14,165,233,0.06);
         }
         .recent-chip:disabled { opacity: 0.4; cursor: not-allowed; }
         .recent-nick {
@@ -608,6 +809,9 @@ export default function LoginForm({ onSwitch }: Props) {
           color: var(--text-secondary);
           white-space: nowrap;
           flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          gap: 5px;
         }
         .preset-chips {
           display: flex;
@@ -627,12 +831,13 @@ export default function LoginForm({ onSwitch }: Props) {
           transition: all var(--t-fast);
         }
         .preset-chip:hover {
-          border-color: var(--accent-border);
+          border-color: var(--border-normal);
           color: var(--text-primary);
+          background: rgba(14,165,233,0.06);
         }
         .preset-chip--active {
           border-color: var(--accent);
-          background: var(--accent-subtle);
+          background: rgba(14,165,233,0.1);
           color: var(--accent);
         }
         .preset-chip:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -660,14 +865,23 @@ export default function LoginForm({ onSwitch }: Props) {
         }
         .advanced-arrow.open { transform: rotate(90deg); }
 
-        /* ── Error ── */
+        /* ── Error banner ── */
         .auth-error {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
           padding: 10px 14px;
-          background: var(--danger-subtle);
-          border: 1px solid rgba(239,68,68,0.3);
+          background: rgba(248,113,113,0.07);
+          border: 1px solid rgba(248,113,113,0.3);
           border-radius: var(--r-md);
           color: var(--danger);
           font-size: 13px;
+          line-height: 1.5;
+        }
+        .auth-error-icon {
+          flex-shrink: 0;
+          margin-top: 1px;
+          display: flex;
         }
 
         /* ── Connection animation ── */
@@ -676,8 +890,8 @@ export default function LoginForm({ onSwitch }: Props) {
           align-items: center;
           gap: 10px;
           padding: 10px 14px;
-          background: var(--accent-subtle);
-          border: 1px solid var(--accent-border);
+          background: rgba(14,165,233,0.06);
+          border: 1px solid var(--border-normal);
           border-radius: var(--r-md);
         }
         .conn-pulse {
@@ -689,7 +903,7 @@ export default function LoginForm({ onSwitch }: Props) {
           animation: conn-pulse-anim 1.2s ease-in-out infinite;
         }
         @keyframes conn-pulse-anim {
-          0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 var(--accent-glow); }
+          0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(14,165,233,0.4); }
           50% { opacity: 0.6; transform: scale(0.85); box-shadow: 0 0 0 5px transparent; }
         }
         .conn-step {
@@ -711,6 +925,21 @@ export default function LoginForm({ onSwitch }: Props) {
           transition: background var(--t-fast);
         }
         .conn-dot--active { background: var(--accent); }
+
+        /* ── Spinner in button ── */
+        .btn-loading-inner {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+        }
+        .spin-icon {
+          animation: spin-anim 0.8s linear infinite;
+        }
+        @keyframes spin-anim {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
 
         /* ── Footer links ── */
         .switch-link {

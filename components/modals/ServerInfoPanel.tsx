@@ -118,25 +118,33 @@ export default function ServerInfoPanel() {
 
               {/* ── Stats ── */}
               <section className="sip-section">
-                <h3 className="sip-section-title">Stats</h3>
-                <dl className="sip-dl">
-                  <div className="sip-row">
-                    <dt>Users online</dt>
-                    <dd>{serverStats?.users ?? '—'}</dd>
+                <h3 className="sip-section-title">Network Stats</h3>
+                <div className="sip-stat-grid">
+                  <div className="sip-stat-card">
+                    <span className="sip-stat-value sip-stat-value--accent">
+                      {serverStats?.users ?? '—'}
+                    </span>
+                    <span className="sip-stat-label">Users</span>
                   </div>
-                  <div className="sip-row">
-                    <dt>Channels</dt>
-                    <dd>{serverStats?.channels ?? '—'}</dd>
+                  <div className="sip-stat-card">
+                    <span className="sip-stat-value">
+                      {serverStats?.channels ?? '—'}
+                    </span>
+                    <span className="sip-stat-label">Channels</span>
                   </div>
-                  <div className="sip-row">
-                    <dt>Servers</dt>
-                    <dd>{serverStats?.servers ?? '—'}</dd>
+                  <div className="sip-stat-card">
+                    <span className="sip-stat-value">
+                      {serverStats?.servers ?? '—'}
+                    </span>
+                    <span className="sip-stat-label">Servers</span>
                   </div>
-                  <div className="sip-row">
-                    <dt>Opers</dt>
-                    <dd>{serverStats?.opers ?? '—'}</dd>
+                  <div className="sip-stat-card">
+                    <span className="sip-stat-value">
+                      {serverStats?.opers ?? '—'}
+                    </span>
+                    <span className="sip-stat-label">Opers</span>
                   </div>
-                </dl>
+                </div>
               </section>
 
               {/* ── Capabilities ── */}
@@ -216,10 +224,10 @@ export default function ServerInfoPanel() {
           z-index: 50;
           display: flex;
           flex-direction: column;
-          background: var(--bg-elevated, #1e1e2e);
-          border-left: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
-          box-shadow: -8px 0 32px rgba(0,0,0,0.4);
-          animation: sip-slide-in 200ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
+          background: var(--bg-elevated, #132131);
+          border-left: 1px solid var(--border-normal, rgba(14,165,233,0.15));
+          box-shadow: -12px 0 48px rgba(0,0,0,0.55), -1px 0 0 rgba(14,165,233,0.06);
+          animation: sip-slide-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
         }
 
         @keyframes sip-slide-in {
@@ -232,39 +240,45 @@ export default function ServerInfoPanel() {
           align-items: center;
           justify-content: space-between;
           padding: 16px 16px 12px;
-          border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+          border-bottom: 1px solid var(--border-subtle, rgba(14,165,233,0.08));
           flex-shrink: 0;
+          background: linear-gradient(180deg, rgba(14,165,233,0.04) 0%, transparent 100%);
         }
 
         .sip-title {
-          font-size: 14px;
+          font-size: 13px;
           font-weight: 700;
-          color: var(--text-primary, #fff);
-          letter-spacing: 0.01em;
+          color: var(--text-primary, #dff0ff);
+          letter-spacing: 0.06em;
           text-transform: uppercase;
         }
 
         .sip-close {
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           background: none;
-          border: none;
+          border: 1px solid transparent;
           cursor: pointer;
-          color: var(--text-muted, rgba(255,255,255,0.4));
-          font-size: 14px;
+          color: var(--text-muted, #3d6480);
+          font-size: 13px;
           line-height: 1;
-          padding: 4px;
-          border-radius: var(--r-sm, 4px);
-          transition: color 120ms, background 120ms;
+          border-radius: var(--r-sm, 6px);
+          transition: color 120ms, background 120ms, border-color 120ms;
         }
         .sip-close:hover {
-          color: var(--text-primary, #fff);
-          background: var(--bg-hover, rgba(255,255,255,0.06));
+          color: var(--text-primary, #dff0ff);
+          background: var(--bg-float, rgba(26,44,64,0.9));
+          border-color: var(--border-subtle, rgba(14,165,233,0.08));
         }
 
         /* Tabs */
         .sip-tabs {
           display: flex;
-          padding: 0 8px;
-          border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+          padding: 0 10px;
+          border-bottom: 1px solid var(--border-subtle, rgba(14,165,233,0.08));
           flex-shrink: 0;
         }
         .sip-tab {
@@ -272,19 +286,20 @@ export default function ServerInfoPanel() {
           display: flex;
           align-items: center;
           gap: 5px;
-          padding: 8px 10px;
+          padding: 9px 10px;
           background: none;
           border: none;
           cursor: pointer;
           font-family: inherit;
           font-size: 12px;
           font-weight: 600;
-          color: var(--text-muted, rgba(255,255,255,0.4));
-          transition: color 120ms;
+          color: var(--text-muted, #3d6480);
+          transition: color 140ms;
           white-space: nowrap;
+          letter-spacing: 0.01em;
         }
-        .sip-tab:hover { color: var(--text-secondary, rgba(255,255,255,0.6)); }
-        .sip-tab--active { color: var(--text-primary, #fff); }
+        .sip-tab:hover { color: var(--text-secondary, #7aa8c4); }
+        .sip-tab--active { color: var(--text-primary, #dff0ff); }
         .sip-tab--active::after {
           content: '';
           position: absolute;
@@ -292,85 +307,146 @@ export default function ServerInfoPanel() {
           left: 0;
           right: 0;
           height: 2px;
-          background: var(--accent, #7c5af5);
+          background: var(--accent, #0ea5e9);
           border-radius: 2px 2px 0 0;
+          box-shadow: 0 -1px 6px rgba(14,165,233,0.4);
         }
         .sip-tab-badge {
-          font-size: 10px;
+          font-size: 9.5px;
           font-weight: 700;
-          background: var(--bg-overlay, rgba(255,255,255,0.08));
-          color: var(--text-secondary);
+          background: rgba(14,165,233,0.12);
+          color: var(--accent, #0ea5e9);
+          border: 1px solid rgba(14,165,233,0.2);
           padding: 1px 5px;
-          border-radius: 10px;
+          border-radius: 999px;
         }
 
         .sip-body {
           flex: 1;
           overflow-y: auto;
-          padding: 8px 0 24px;
+          padding: 6px 0 24px;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(14,165,233,0.15) transparent;
+        }
+        .sip-body::-webkit-scrollbar { width: 3px; }
+        .sip-body::-webkit-scrollbar-thumb {
+          background: rgba(14,165,233,0.15);
+          border-radius: 2px;
         }
 
         .sip-section {
-          padding: 12px 16px 8px;
-          border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+          padding: 12px 16px 10px;
+          border-bottom: 1px solid var(--border-subtle, rgba(14,165,233,0.06));
         }
-        .sip-section:last-child {
-          border-bottom: none;
-        }
-        .sip-section--isupport {
-          padding-bottom: 24px;
-        }
+        .sip-section:last-child { border-bottom: none; }
+        .sip-section--isupport { padding-bottom: 24px; }
 
         .sip-section-title {
-          font-size: 11px;
+          font-size: 10px;
           font-weight: 700;
           text-transform: uppercase;
-          letter-spacing: 0.06em;
-          color: var(--text-muted, rgba(255,255,255,0.4));
+          letter-spacing: 0.1em;
+          color: var(--accent, #0ea5e9);
+          opacity: 0.6;
           margin: 0 0 8px;
+          padding-bottom: 6px;
+          border-bottom: 1px solid var(--border-subtle, rgba(14,165,233,0.08));
+        }
+
+        /* Stat grid for key numbers */
+        .sip-stat-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 6px;
+          margin: 0;
+        }
+
+        .sip-stat-card {
+          background: var(--bg-base, #0c1828);
+          border: 1px solid var(--border-subtle, rgba(14,165,233,0.08));
+          border-radius: var(--r-md, 8px);
+          padding: 10px 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          transition: border-color 120ms, background 120ms;
+        }
+        .sip-stat-card:hover {
+          border-color: rgba(14,165,233,0.2);
+          background: rgba(14,165,233,0.03);
+        }
+
+        .sip-stat-value {
+          font-size: 22px;
+          font-weight: 700;
+          color: var(--text-primary, #dff0ff);
+          line-height: 1;
+          font-variant-numeric: tabular-nums;
+          letter-spacing: -0.02em;
+        }
+        .sip-stat-value--accent { color: var(--accent, #0ea5e9); }
+
+        .sip-stat-label {
+          font-size: 10px;
+          font-weight: 600;
+          color: var(--text-muted, #3d6480);
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
         }
 
         .sip-dl {
           display: flex;
           flex-direction: column;
-          gap: 5px;
+          gap: 2px;
           margin: 0;
         }
 
         .sip-row {
           display: flex;
-          justify-content: space-between;
           align-items: baseline;
           gap: 8px;
+          border-radius: var(--r-sm, 6px);
+          padding: 4px 6px;
+          margin: 0 -6px;
+          transition: background 80ms;
+        }
+        .sip-row:hover {
+          background: rgba(14,165,233,0.04);
         }
 
         .sip-row dt {
-          font-size: 13px;
-          color: var(--text-secondary, rgba(255,255,255,0.6));
+          font-size: 12px;
+          color: var(--text-muted, #3d6480);
           flex-shrink: 0;
+          width: 112px;
+          min-width: 112px;
         }
 
         .sip-row dd {
-          font-size: 13px;
-          color: var(--text-primary, #fff);
+          font-size: 12.5px;
+          color: var(--text-primary, #dff0ff);
           margin: 0;
-          text-align: right;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+          flex: 1;
+          min-width: 0;
         }
 
         .sip-mono {
           font-family: var(--font-mono, 'JetBrains Mono', monospace);
-          font-size: 12px !important;
+          font-size: 11.5px !important;
+          color: var(--gold, #67e8f9) !important;
         }
 
         .sip-empty {
           font-size: 12px;
-          color: var(--text-muted, rgba(255,255,255,0.35));
+          color: var(--text-muted, #3d6480);
           margin: 0;
+          font-style: italic;
         }
 
+        /* Capability tags — ocean sky-blue pill chips */
         .sip-caps {
           display: flex;
           flex-wrap: wrap;
@@ -382,56 +458,60 @@ export default function ServerInfoPanel() {
 
         .sip-cap-tag {
           font-family: var(--font-mono, 'JetBrains Mono', monospace);
-          font-size: 11px;
-          padding: 2px 7px;
-          background: rgba(124, 90, 245, 0.12);
-          border: 1px solid rgba(124, 90, 245, 0.25);
+          font-size: 10.5px;
+          padding: 2px 8px;
+          background: rgba(14,165,233,0.08);
+          border: 1px solid rgba(14,165,233,0.2);
           border-radius: 999px;
-          color: var(--accent, #7c5af5);
+          color: var(--accent, #0ea5e9);
           white-space: nowrap;
+          transition: background 100ms, border-color 100ms;
+        }
+        .sip-cap-tag:hover {
+          background: rgba(14,165,233,0.14);
+          border-color: rgba(14,165,233,0.35);
         }
 
         /* ISUPPORT grid */
         .sip-isupport-grid {
           display: flex;
           flex-direction: column;
-          gap: 2px;
+          gap: 1px;
         }
         .sip-isupport-row {
           display: grid;
-          grid-template-columns: minmax(80px, 40%) 1fr;
+          grid-template-columns: minmax(80px, 42%) 1fr;
           gap: 8px;
           align-items: start;
           padding: 4px 6px;
-          border-radius: var(--r-sm, 4px);
+          border-radius: var(--r-sm, 6px);
           transition: background 100ms;
+          margin: 0 -6px;
         }
         .sip-isupport-row:hover {
-          background: rgba(255,255,255,0.04);
+          background: rgba(14,165,233,0.04);
         }
         .sip-isupport-key {
           font-family: var(--font-mono, 'JetBrains Mono', monospace);
           font-size: 11px;
           font-weight: 700;
-          color: var(--accent, #7c5af5);
+          color: var(--accent, #0ea5e9);
           letter-spacing: 0.03em;
           word-break: break-all;
         }
         .sip-isupport-val {
           font-family: var(--font-mono, 'JetBrains Mono', monospace);
           font-size: 11px;
-          color: var(--text-primary, #fff);
+          color: var(--text-primary, #dff0ff);
           word-break: break-all;
           text-align: right;
         }
         .sip-isupport-empty {
-          color: var(--text-muted, rgba(255,255,255,0.4));
+          color: var(--text-muted, #3d6480);
         }
 
         @media (max-width: 768px) {
-          .sip {
-            width: 100%;
-          }
+          .sip { width: 100%; }
         }
       `}</style>
     </>

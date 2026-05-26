@@ -383,19 +383,22 @@ export default function ChatExportModal() {
           display: flex;
           align-items: center;
           gap: 10px;
-          padding: 10px 12px;
-          border-radius: 8px;
+          padding: 10px 14px;
+          border-radius: var(--r-md, 8px);
           border: 1px solid var(--border-subtle);
+          background: var(--bg-elevated);
           cursor: pointer;
-          transition: border-color 0.15s, background 0.15s;
+          transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
           user-select: none;
         }
         .export-format-option:hover {
           border-color: var(--border-normal);
+          background: var(--bg-float);
         }
         .export-format-option.selected {
-          border-color: var(--accent-border, rgba(124,90,245,0.4));
-          background: rgba(124,90,245,0.06);
+          border-color: var(--accent-border, rgba(14,165,233,0.4));
+          background: var(--accent-subtle, rgba(14,165,233,0.07));
+          box-shadow: 0 0 0 1px var(--accent-border, rgba(14,165,233,0.2)) inset;
         }
         .export-format-option input[type="radio"] {
           display: none;
@@ -418,6 +421,10 @@ export default function ChatExportModal() {
           font-size: 11px;
           color: var(--text-muted);
           font-family: var(--font-mono, monospace);
+          background: var(--bg-base);
+          padding: 1px 5px;
+          border-radius: var(--r-xs, 3px);
+          border: 1px solid var(--border-subtle);
         }
 
         .export-toggle-row {
@@ -483,7 +490,7 @@ export default function ChatExportModal() {
         }
         .export-date-input:focus {
           border-color: var(--accent);
-          box-shadow: 0 0 0 1px var(--accent-border, rgba(124,90,245,0.3));
+          box-shadow: 0 0 0 1px var(--accent-border, rgba(14,165,233,0.3));
         }
 
         .export-btn {
@@ -492,25 +499,31 @@ export default function ChatExportModal() {
           justify-content: center;
           gap: 8px;
           width: 100%;
-          padding: 11px 16px;
-          background: var(--accent, #7c5af5);
+          padding: 12px 16px;
+          background: var(--accent, #0ea5e9);
           color: #fff;
           font-size: 14px;
           font-weight: 700;
           border: none;
           border-radius: var(--r-md, 8px);
           cursor: pointer;
-          transition: opacity 0.15s, transform 0.1s;
+          transition: opacity 0.15s, transform 0.1s, box-shadow 0.15s;
+          box-shadow: 0 4px 16px var(--accent-glow, rgba(14,165,233,0.35));
+          font-family: inherit;
+          letter-spacing: 0.01em;
         }
         .export-btn:hover:not(:disabled) {
-          opacity: 0.9;
+          opacity: 0.92;
+          box-shadow: 0 6px 24px var(--accent-glow, rgba(14,165,233,0.45));
         }
         .export-btn:active:not(:disabled) {
           transform: scale(0.98);
+          box-shadow: 0 2px 8px var(--accent-glow, rgba(14,165,233,0.25));
         }
         .export-btn:disabled {
-          opacity: 0.45;
+          opacity: 0.4;
           cursor: not-allowed;
+          box-shadow: none;
         }
       `}</style>
     </div>

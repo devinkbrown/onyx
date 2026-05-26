@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, type CSSProperties } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import type { Toast as ToastType, ToastVariant } from '@/lib/store';
 
@@ -20,13 +20,13 @@ const DEFAULT_DURATION: Record<ToastVariant, number> = {
 // ── Accent colors ─────────────────────────────────────────────────────────────
 
 const ACCENT: Record<ToastVariant, string> = {
-  success: '#22c55e',
-  error:   '#ef4444',
-  warning: '#f59e0b',
-  info:    '#7c5af5',
+  success: '#23a55a',
+  error:   '#f04747',
+  warning: '#f0b232',
+  info:    'var(--accent)',
   mention: '#e8b84b',
-  dm:      '#7c5af5',
-  join:    '#22c55e',
+  dm:      'var(--accent)',
+  join:    '#23a55a',
   undo:    '#94a3b8',
 };
 
@@ -172,7 +172,7 @@ function ToastCard({
         '--toast-accent': accent,
         transform: isSecondFromTop ? 'scale(0.97)' : undefined,
         opacity: isBack && !isSecondFromTop ? 0.7 : undefined,
-      } as React.CSSProperties}
+      } as unknown as CSSProperties}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -228,20 +228,27 @@ function ToastCard({
           position: relative;
           display: flex;
           flex-direction: column;
-          min-width: 300px;
-          max-width: 400px;
-          background: var(--bg-surface, #1a1a2e);
+          width: 300px;
+          background: var(--bg-float);
+          border: 1px solid var(--border-subtle);
           border-radius: 8px;
-          box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+          box-shadow: var(--shadow-lg);
           overflow: hidden;
           pointer-events: all;
-          animation: toast-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
-          transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
-                      opacity 0.2s ease;
+          animation: toast-in 250ms cubic-bezier(0.16, 1, 0.3, 1) both;
+          transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+                      opacity 200ms ease,
+                      box-shadow 200ms ease;
+        }
+        .toast-card:hover {
+          box-shadow:
+            0 12px 40px rgba(0,0,0,0.7),
+            0 0 0 1px var(--border-normal),
+            0 1px 0 rgba(255,255,255,0.05) inset;
         }
 
         .toast-card--out {
-          animation: toast-out 0.25s cubic-bezier(0.4, 0, 1, 1) both;
+          animation: toast-out 200ms cubic-bezier(0.7, 0, 0.84, 0) both;
         }
 
         .toast-left-border {
@@ -255,7 +262,7 @@ function ToastCard({
         }
 
         .toast-content {
-          padding: 12px 14px 12px 17px;
+          padding: 11px 12px 9px 16px;
           display: flex;
           flex-direction: column;
           gap: 4px;
@@ -272,73 +279,79 @@ function ToastCard({
           display: flex;
           align-items: center;
           flex-shrink: 0;
+          opacity: 0.9;
         }
 
         .toast-title {
           flex: 1;
           font-size: 13px;
           font-weight: 600;
-          color: var(--text-primary, #e8e8f0);
+          color: var(--text-primary);
           line-height: 1.3;
           letter-spacing: 0.01em;
         }
 
         .toast-description {
           font-size: 12px;
-          color: var(--text-muted, #8888aa);
-          line-height: 1.45;
-          margin: 0 0 0 28px;
+          color: var(--text-secondary);
+          line-height: 1.5;
+          margin: 0 0 2px 28px;
           word-break: break-word;
         }
 
         .toast-undo {
-          background: none;
+          background: color-mix(in oklch, currentColor 12%, transparent);
           border: none;
           cursor: pointer;
-          font-size: 12px;
-          font-weight: 600;
-          padding: 2px 4px;
-          border-radius: 3px;
-          letter-spacing: 0.03em;
+          font-size: 11px;
+          font-weight: 700;
+          padding: 2px 6px;
+          border-radius: 4px;
+          letter-spacing: 0.05em;
           text-transform: uppercase;
-          transition: opacity 0.15s, text-decoration 0.15s;
-          text-decoration: none;
+          transition: opacity 0.15s, background 0.15s;
           flex-shrink: 0;
         }
         .toast-undo:hover {
-          text-decoration: underline;
           opacity: 0.85;
+          background: color-mix(in oklch, currentColor 20%, transparent);
         }
 
         .toast-close {
           background: none;
           border: none;
           cursor: pointer;
-          color: var(--text-muted, #8888aa);
-          padding: 3px;
+          color: var(--text-muted);
+          width: 20px;
+          height: 20px;
+          padding: 0;
           border-radius: 4px;
           display: flex;
           align-items: center;
           justify-content: center;
-          opacity: 0;
+          opacity: 0.5;
           transition: opacity 0.15s, color 0.15s, background 0.15s;
           flex-shrink: 0;
+          position: absolute;
+          top: 8px;
+          right: 8px;
         }
         .toast-card:hover .toast-close {
           opacity: 1;
         }
         .toast-close:hover {
-          color: var(--text-primary, #e8e8f0);
-          background: rgba(255,255,255,0.06);
+          opacity: 1;
+          color: var(--text-primary);
+          background: rgba(255,255,255,0.08);
         }
 
         .toast-progress {
-          height: 3px;
+          height: 2px;
           width: 100%;
           animation: toast-progress linear both;
-          border-radius: 0 0 8px 8px;
           flex-shrink: 0;
           transform-origin: left;
+          opacity: 0.75;
         }
 
         @keyframes toast-in {
@@ -346,8 +359,8 @@ function ToastCard({
           to   { transform: translateX(0);    opacity: 1; }
         }
         @keyframes toast-out {
-          from { transform: translateX(0);    opacity: 1; }
-          to   { transform: translateX(110%); opacity: 0; }
+          from { transform: translateX(0);    opacity: 1; max-height: 120px; margin-bottom: 0; }
+          to   { transform: translateX(110%); opacity: 0; max-height: 0;     margin-bottom: -8px; }
         }
         @keyframes toast-progress {
           from { width: 100%; }
@@ -384,7 +397,7 @@ function GroupCard({
   return (
     <div
       className={`toast-group${isDismissing ? ' toast-group--out' : ''}`}
-      style={{ '--toast-accent': accent } as React.CSSProperties}
+      style={{ '--toast-accent': accent } as CSSProperties & Record<string,string>}
     >
       <div className="toast-group-bar" style={{ background: accent }} />
       <div className="toast-group-content">
@@ -441,17 +454,17 @@ function GroupCard({
           position: relative;
           display: flex;
           flex-direction: column;
-          min-width: 300px;
-          max-width: 400px;
-          background: var(--bg-surface, #1a1a2e);
+          width: 300px;
+          background: var(--bg-float);
+          border: 1px solid var(--border-subtle);
           border-radius: 8px;
-          box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+          box-shadow: var(--shadow-lg);
           overflow: hidden;
           pointer-events: all;
-          animation: toast-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+          animation: toast-in 250ms cubic-bezier(0.16, 1, 0.3, 1) both;
         }
         .toast-group--out {
-          animation: toast-out 0.25s cubic-bezier(0.4, 0, 1, 1) both;
+          animation: toast-out 200ms cubic-bezier(0.7, 0, 0.84, 0) both;
         }
         .toast-group-bar {
           position: absolute;
@@ -557,8 +570,8 @@ export default function ToastContainer() {
       <style>{`
         .toast-container {
           position: fixed;
-          bottom: 16px;
-          right: 16px;
+          bottom: 20px;
+          right: 20px;
           z-index: 9999;
           display: flex;
           flex-direction: column;

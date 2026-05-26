@@ -139,11 +139,11 @@ const styles = `
 
   .unm-modal {
     width: 100%;
-    max-width: 380px;
+    max-width: 400px;
     background: var(--bg-deep);
     border: 1px solid var(--border-normal);
     border-radius: var(--r-xl);
-    box-shadow: var(--shadow-xl);
+    box-shadow: var(--shadow-xl), 0 0 0 1px var(--border-subtle);
     display: flex;
     flex-direction: column;
     gap: 0;
@@ -200,25 +200,29 @@ const styles = `
 
   .unm-textarea {
     width: 100%;
-    background: var(--bg-float);
+    background: var(--bg-base);
     border: 1px solid var(--border-normal);
-    border-radius: var(--r-sm);
-    padding: 10px 12px;
+    border-radius: var(--r-md);
+    padding: 12px 14px;
     font-size: 13px;
-    line-height: 1.55;
+    line-height: 1.6;
     color: var(--text-primary);
     resize: vertical;
-    min-height: 110px;
+    min-height: 120px;
     font-family: inherit;
-    transition: border-color var(--t-fast, 120ms);
+    transition: border-color var(--t-fast, 120ms), box-shadow var(--t-fast, 120ms);
     box-sizing: border-box;
+    scrollbar-width: thin;
+    scrollbar-color: var(--accent-border, rgba(14,165,233,0.28)) transparent;
   }
   .unm-textarea::placeholder {
     color: var(--text-muted);
+    font-style: italic;
   }
   .unm-textarea:focus {
     outline: none;
     border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-subtle, rgba(14,165,233,0.12));
   }
 
   .unm-counter {

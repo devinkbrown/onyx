@@ -68,20 +68,28 @@ export default function ReadReceipt({ nick, msgTimestamp }: ReadReceiptProps) {
           display: flex;
           align-items: center;
           justify-content: flex-end;
-          gap: 4px;
-          padding: 2px 16px 6px;
+          gap: 5px;
+          padding: 1px 18px 5px;
           font-size: 11px;
           color: var(--accent);
           user-select: none;
+          opacity: 0;
+          animation: rr-fade-in 200ms var(--ease-out, ease) 120ms both;
+        }
+        @keyframes rr-fade-in {
+          from { opacity: 0; transform: translateY(2px); }
+          to   { opacity: 1; transform: translateY(0); }
         }
         .read-receipt__checks {
-          font-size: 12px;
+          font-size: 13px;
           letter-spacing: -2px;
-          opacity: 0.85;
+          opacity: 0.9;
+          line-height: 1;
         }
         .read-receipt__label {
-          opacity: 0.75;
+          opacity: 0.7;
           font-variant-numeric: tabular-nums;
+          letter-spacing: 0.01em;
         }
       `}</style>
     </div>

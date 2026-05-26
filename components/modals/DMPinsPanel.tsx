@@ -189,12 +189,17 @@ export default function DMPinsPanel() {
         .dmp-card {
           background: var(--bg-elevated);
           border: 1px solid var(--border-subtle);
+          border-left: 3px solid transparent;
           border-radius: var(--r-md);
-          padding: 10px 12px;
+          padding: 10px 12px 10px 10px;
           display: flex; flex-direction: column; gap: 7px;
-          transition: border-color var(--t-fast);
+          transition: border-color var(--t-fast), border-left-color var(--t-fast), background var(--t-fast);
         }
-        .dmp-card:hover { border-color: var(--border-normal); }
+        .dmp-card:hover {
+          border-color: var(--border-normal);
+          border-left-color: var(--accent-border);
+          background: var(--bg-float);
+        }
 
         .dmp-card-header {
           display: flex; align-items: center; gap: 6px;

@@ -44,35 +44,46 @@ export default function UnreadJumpBadge({ count, onClick }: UnreadJumpBadgeProps
       <style>{`
         .ujb-pill {
           position: absolute;
-          bottom: 16px;
+          bottom: 20px;
           left: 50%;
           transform: translateX(-50%);
           z-index: 20;
 
           display: flex;
           align-items: center;
-          gap: 5px;
-          padding: 6px 14px 6px 10px;
+          gap: 6px;
+          padding: 7px 16px 7px 12px;
 
-          background: var(--accent, #0ea5e9);
+          background: var(--accent);
           color: #fff;
           border: none;
           border-radius: 9999px;
           cursor: pointer;
 
-          font-size: 14px;
+          font-size: 13px;
           font-weight: 700;
           line-height: 1;
           white-space: nowrap;
-          box-shadow: 0 4px 16px rgba(14,165,233,0.35), 0 2px 6px rgba(0,0,0,0.3);
+          box-shadow:
+            0 4px 20px rgba(0,0,0,0.4),
+            0 0 0 1px rgba(255,255,255,0.12) inset,
+            0 0 16px var(--accent-glow, rgba(14,165,233,0.35));
 
-          animation: ujb-slide-up 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
-          transition: background 120ms, box-shadow 120ms;
+          animation: ujb-bounce-in 280ms var(--ease-spring, cubic-bezier(0.175,0.885,0.32,1.275)) both;
+          transition: background 120ms, box-shadow 120ms, transform 120ms;
         }
 
         .ujb-pill:hover {
-          background: color-mix(in srgb, var(--accent, #0ea5e9) 85%, #000 15%);
-          box-shadow: 0 6px 20px rgba(14,165,233,0.45), 0 2px 8px rgba(0,0,0,0.35);
+          background: var(--accent-hover, var(--accent));
+          box-shadow:
+            0 6px 24px rgba(0,0,0,0.45),
+            0 0 0 1px rgba(255,255,255,0.14) inset,
+            0 0 22px var(--accent-glow, rgba(14,165,233,0.45));
+          transform: translateX(-50%) translateY(-1px);
+        }
+
+        .ujb-pill:active {
+          transform: translateX(-50%) scale(0.96);
         }
 
         .ujb-pill--exit {
@@ -80,38 +91,39 @@ export default function UnreadJumpBadge({ count, onClick }: UnreadJumpBadgeProps
         }
 
         .ujb-arrow {
-          font-size: 16px;
+          font-size: 15px;
           line-height: 1;
           display: flex;
           align-items: center;
+          opacity: 0.9;
         }
 
         .ujb-label {
-          font-size: 13px;
+          font-size: 12.5px;
           font-weight: 700;
           letter-spacing: 0.01em;
         }
 
-        @keyframes ujb-slide-up {
-          from {
-            opacity: 0;
-            transform: translateX(-50%) translateY(12px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-          }
+        @keyframes ujb-bounce-in {
+          0%   { opacity: 0; transform: translateX(-50%) translateY(14px) scale(0.88); }
+          60%  { opacity: 1; transform: translateX(-50%) translateY(-3px) scale(1.04); }
+          100% { opacity: 1; transform: translateX(-50%) translateY(0)    scale(1); }
         }
 
         @keyframes ujb-slide-down {
           from {
             opacity: 1;
-            transform: translateX(-50%) translateY(0);
+            transform: translateX(-50%) translateY(0) scale(1);
           }
           to {
             opacity: 0;
-            transform: translateX(-50%) translateY(10px);
+            transform: translateX(-50%) translateY(10px) scale(0.93);
           }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .ujb-pill { animation: none; }
+          .ujb-pill--exit { animation: none; opacity: 0; }
         }
       `}</style>
     </button>

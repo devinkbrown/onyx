@@ -1,5 +1,7 @@
 'use client';
 
+import type { CSSProperties } from 'react';
+
 interface SpeakingBarsProps {
   speaking: boolean;
   size?: 'sm' | 'md';
@@ -20,11 +22,11 @@ export default function SpeakingBars({ speaking, size = 'sm' }: SpeakingBarsProp
       className={`sb-wrap${speaking ? ' sb-wrap--speaking' : ''}`}
       aria-label={speaking ? 'Speaking' : 'Silent'}
       aria-hidden="true"
-      style={{ width, height: barH, gap } as React.CSSProperties}
+      style={{ width, height: barH, gap } as unknown as CSSProperties}
     >
-      <span className="sb-bar sb-bar--1" style={{ width: barW, '--bar-max': `${barH}px` } as React.CSSProperties} />
-      <span className="sb-bar sb-bar--2" style={{ width: barW, '--bar-max': `${barH}px` } as React.CSSProperties} />
-      <span className="sb-bar sb-bar--3" style={{ width: barW, '--bar-max': `${barH}px` } as React.CSSProperties} />
+      <span className="sb-bar sb-bar--1" style={{ width: barW, '--bar-max': `${barH}px` } as unknown as CSSProperties} />
+      <span className="sb-bar sb-bar--2" style={{ width: barW, '--bar-max': `${barH}px` } as unknown as CSSProperties} />
+      <span className="sb-bar sb-bar--3" style={{ width: barW, '--bar-max': `${barH}px` } as unknown as CSSProperties} />
       <style>{`
         @keyframes sb-bounce-1 {
           0%, 100% { transform: scaleY(0.2); }
@@ -61,7 +63,8 @@ export default function SpeakingBars({ speaking, size = 'sm' }: SpeakingBarsProp
         }
 
         .sb-wrap--speaking .sb-bar {
-          background: var(--accent, #7c5af5);
+          background: var(--status-online, #34d399);
+          box-shadow: 0 0 4px rgba(52,211,153,0.5);
         }
 
         .sb-wrap--speaking .sb-bar--1 {

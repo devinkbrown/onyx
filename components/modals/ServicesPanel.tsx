@@ -602,6 +602,13 @@ export default function ServicesPanel() {
         .svc-reply-log {
           max-height: 110px; overflow-y: auto;
           display: flex; flex-direction: column; gap: 2px;
+          scrollbar-width: thin;
+          scrollbar-color: var(--accent-border, rgba(14,165,233,0.28)) transparent;
+        }
+        .svc-reply-log::-webkit-scrollbar { width: 3px; }
+        .svc-reply-log::-webkit-scrollbar-thumb {
+          background: var(--accent-border, rgba(14,165,233,0.28));
+          border-radius: 2px;
         }
         .svc-reply-empty {
           font-size: 11px; color: var(--text-muted);
@@ -611,10 +618,17 @@ export default function ServicesPanel() {
           display: flex; gap: 6px; align-items: baseline;
           font-size: 11px;
           line-height: 1.4;
+          padding: 1px 2px;
+          border-radius: 2px;
+          transition: background 80ms;
+        }
+        .svc-reply-line:hover {
+          background: rgba(255,255,255,0.03);
         }
         .svc-reply-time {
           color: var(--text-muted); flex-shrink: 0;
           font-family: var(--font-mono, monospace);
+          opacity: 0.7;
         }
         .svc-reply-source {
           color: var(--gold, #e8b84b); flex-shrink: 0;

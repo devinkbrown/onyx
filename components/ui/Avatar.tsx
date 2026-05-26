@@ -14,9 +14,19 @@ function darkenColor(hex: string, percent: number): string {
 
 /* ── Types ─────────────────────────────────────────────────────── */
 
+// Named size presets: xs=20, sm=24, md=32, lg=40, xl=80
+export type AvatarSizePreset = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+export const AVATAR_SIZE_PX: Record<AvatarSizePreset, number> = {
+  xs: 20,
+  sm: 24,
+  md: 32,
+  lg: 40,
+  xl: 80,
+};
+
 export interface AvatarProps {
   nick: string;
-  size?: 18 | 20 | 24 | 28 | 32 | 36 | 40 | 48 | 52 | 56 | 64 | 72;
+  size?: 18 | 20 | 24 | 28 | 32 | 36 | 40 | 48 | 52 | 56 | 64 | 72 | 80;
   status?: 'online' | 'idle' | 'dnd' | 'offline' | null;
   speaking?: boolean;
   muted?: boolean;
@@ -31,10 +41,10 @@ export interface AvatarProps {
 /* ── Constants ─────────────────────────────────────────────────── */
 
 const STATUS_COLORS: Record<string, string> = {
-  online:  '#22c55e',
-  idle:    '#f59e0b',
-  dnd:     '#ef4444',
-  offline: '#4b5563',
+  online:  '#23a55a',
+  idle:    '#f0b232',
+  dnd:     '#f04747',
+  offline: '#80848e',
 };
 
 /* ── Avatar ────────────────────────────────────────────────────── */
@@ -121,6 +131,19 @@ export default function Avatar({
         </span>
       )}
 
+      {/* Status dot */}
+      {status && STATUS_COLORS[status] && (
+        <span
+          className={`av-status-dot av-status-dot--${status}`}
+          aria-hidden
+          style={{
+            background: STATUS_COLORS[status],
+            width: Math.max(8, Math.round(size * 0.26)),
+            height: Math.max(8, Math.round(size * 0.26)),
+          }}
+        />
+      )}
+
       {/* Hover tooltip */}
       {showTooltip && (
         <span className="av-tooltip" role="tooltip">
@@ -134,6 +157,10 @@ export default function Avatar({
           display: inline-flex;
           flex-shrink: 0;
           border-radius: 50%;
+          transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .av-wrap:hover {
+          transform: scale(1.04);
         }
 
         .av-inner {
@@ -145,7 +172,7 @@ export default function Avatar({
           color: rgba(255, 255, 255, 0.92);
           letter-spacing: 0.02em;
           user-select: none;
-          transition: box-shadow 0.2s ease;
+          transition: box-shadow 0.15s ease;
         }
 
         /* ── Speaking ring ──────────────────────────────────────── */
@@ -156,15 +183,15 @@ export default function Avatar({
         @keyframes av-speaking-pulse {
           0%, 100% {
             box-shadow:
-              0 0 0 2px var(--bg-deep),
-              0 0 0 4px #7c5af5,
-              0 0 0 6px rgba(124, 90, 245, 0.3);
+              0 0 0 2px var(--bg-deep, #06101d),
+              0 0 0 4px var(--accent, #0ea5e9),
+              0 0 0 6px rgba(14, 165, 233, 0.25);
           }
           50% {
             box-shadow:
-              0 0 0 2px var(--bg-deep),
-              0 0 0 5px #7c5af5,
-              0 0 0 10px rgba(124, 90, 245, 0.5);
+              0 0 0 2px var(--bg-deep, #06101d),
+              0 0 0 5px var(--accent, #0ea5e9),
+              0 0 0 10px rgba(14, 165, 233, 0.4);
           }
         }
 
@@ -200,13 +227,34 @@ export default function Avatar({
           filter: none !important;
         }
 
+        /* ── Status indicator dot ─────────────────────────────────── */
+        .av-status-dot {
+          position: absolute;
+          bottom: -1px;
+          right: -1px;
+          border-radius: 50%;
+          border: 2px solid var(--bg-void, #030810);
+          transition: background 300ms ease, box-shadow 300ms ease;
+          pointer-events: none;
+          z-index: 2;
+        }
+        .av-status-dot--online {
+          box-shadow: 0 0 0 0 rgba(35, 165, 90, 0.4);
+          animation: av-online-pulse 2.5s ease-in-out infinite;
+        }
+        @keyframes av-online-pulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(35, 165, 90, 0.4); }
+          50%       { box-shadow: 0 0 0 3px rgba(35, 165, 90, 0); }
+        }
+        .av-status-dot--offline { opacity: 0.5; }
+
         /* ── GIF badge ──────────────────────────────────────────── */
         .av-gif-badge {
           position: absolute;
           top: -2px;
           right: -2px;
           font-size: 8px;
-          background: var(--gold, #e8b84b);
+          background: var(--gold, #67e8f9);
           color: #000;
           border-radius: 3px;
           padding: 1px 3px;
@@ -216,7 +264,7 @@ export default function Avatar({
           z-index: 1;
         }
 
-        /* ── Overlay badge ──────────────────────────────────────── */
+        /* ── Overlay badge (mute/deafen) ────────────────────────── */
         .av-overlay {
           position: absolute;
           bottom: -2px;
@@ -224,8 +272,8 @@ export default function Avatar({
           width: 14px;
           height: 14px;
           border-radius: 50%;
-          background: var(--bg-deep, #0d0d12);
-          border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+          background: var(--bg-deep, #06101d);
+          border: 1.5px solid var(--bg-deep, #06101d);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -236,21 +284,22 @@ export default function Avatar({
         /* ── Tooltip ────────────────────────────────────────────── */
         .av-tooltip {
           position: absolute;
-          bottom: calc(100% + 4px);
+          bottom: calc(100% + 6px);
           left: 50%;
           transform: translateX(-50%);
-          background: var(--bg-overlay, rgba(20, 18, 30, 0.95));
-          padding: 3px 8px;
-          border-radius: 4px;
+          background: var(--bg-elevated, #132131);
+          border: 1px solid var(--border-normal, rgba(14,165,233,0.15));
+          padding: 4px 9px;
+          border-radius: 6px;
           white-space: nowrap;
-          font-size: 12px;
-          font-weight: 500;
-          color: var(--text-primary, #f0eeff);
+          font-size: 11px;
+          font-weight: 600;
+          color: var(--text-primary, #dff0ff);
           pointer-events: none;
           opacity: 0;
-          transition: opacity 0.12s ease;
+          transition: opacity 120ms ease;
           z-index: 50;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
         }
 
         .av-wrap:hover .av-tooltip {

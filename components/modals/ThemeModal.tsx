@@ -39,7 +39,7 @@ interface ThemeDef {
 
 const THEMES: ThemeDef[] = [
   { id: 'ocean',    label: 'Ocean',    bg: '#06101d', sidebar: '#030810', accent: '#0ea5e9' },
-  { id: 'midnight', label: 'Midnight', bg: '#0f0018', sidebar: '#0a0010', accent: '#a855f7' },
+  { id: 'midnight', label: 'Midnight', bg: '#061020', sidebar: '#030810', accent: '#0ea5e9' },
   { id: 'forest',   label: 'Forest',   bg: '#04150a', sidebar: '#010d05', accent: '#22c55e' },
   { id: 'ember',    label: 'Ember',    bg: '#180900', sidebar: '#0d0500', accent: '#f97316' },
   { id: 'arctic',   label: 'Arctic',   bg: '#161b22', sidebar: '#0d1117', accent: '#58a6ff' },
@@ -51,12 +51,12 @@ const THEMES: ThemeDef[] = [
 ];
 
 const ACCENT_PRESETS: Array<{ label: string; color: string }> = [
-  { label: 'Ocean',   color: '#7c5af5' },
   { label: 'Sky',     color: '#0ea5e9' },
+  { label: 'Cyan',    color: '#06b6d4' },
+  { label: 'Violet',  color: '#7c5af5' },
   { label: 'Rose',    color: '#f43f5e' },
   { label: 'Amber',   color: '#f59e0b' },
   { label: 'Emerald', color: '#10b981' },
-  { label: 'Crimson', color: '#dc2626' },
 ];
 
 const BG_PATTERNS: Array<{ id: BgPattern; label: string }> = [
@@ -153,9 +153,9 @@ export default function ThemeModal() {
 
   const handleSetTheme = useCallback((id: string) => {
     setTheme(id);
-    // Also drive the new theme system for onyx/ash/amoled/light/system options
-    if (id === 'onyx' || id === 'ash' || id === 'amoled' || id === 'light' || id === 'system') {
-      setUiTheme(id as 'onyx' | 'ash' | 'amoled' | 'light' | 'system');
+    // Also drive the new theme system for midnight/onyx/ash/amoled/light/system options
+    if (id === 'midnight' || id === 'onyx' || id === 'ash' || id === 'amoled' || id === 'light' || id === 'system') {
+      setUiTheme(id as 'midnight' | 'onyx' | 'ash' | 'amoled' | 'light' | 'system');
     }
     setUseSystemTheme(id === 'system');
     setAppliedFlash(id);
@@ -561,25 +561,40 @@ export default function ThemeModal() {
         .theme-modal-backdrop {
           position: fixed;
           inset: 0;
-          background: rgba(0,0,0,0.7);
+          background: rgba(0,0,0,0.72);
           display: flex;
           align-items: center;
           justify-content: center;
           z-index: 900;
-          animation: fadeIn 150ms var(--ease-out) both;
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+          animation: fadeIn 160ms ease both;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
         }
 
         .theme-modal {
-          background: var(--bg-elevated);
+          background: var(--bg-elevated, #132131);
           border: 1px solid var(--border-normal);
-          border-radius: var(--r-xl);
+          border-radius: var(--r-xl, 16px);
           padding: 28px;
-          width: 420px;
+          width: 440px;
           max-width: calc(100vw - 32px);
           max-height: calc(100dvh - 64px);
           overflow-y: auto;
-          box-shadow: var(--shadow-xl);
-          animation: scaleIn 180ms var(--ease-out) both;
+          box-shadow: var(--shadow-lg, 0 8px 32px rgba(0,0,0,0.65)), 0 0 0 1px rgba(14,165,233,0.06) inset;
+          animation: scaleIn 200ms cubic-bezier(0.16,1,0.3,1) both;
+          scrollbar-width: thin;
+          scrollbar-color: var(--border-normal) transparent;
+        }
+        .theme-modal::-webkit-scrollbar { width: 4px; }
+        .theme-modal::-webkit-scrollbar-track { background: transparent; }
+        .theme-modal::-webkit-scrollbar-thumb { background: var(--border-normal); border-radius: 2px; }
+        @keyframes scaleIn {
+          from { opacity: 0; transform: scale(0.96) translateY(8px); }
+          to   { opacity: 1; transform: scale(1) translateY(0); }
         }
 
         .theme-modal-header {
@@ -599,19 +614,25 @@ export default function ThemeModal() {
         .theme-modal-close {
           width: 28px;
           height: 28px;
-          border-radius: var(--r-sm);
-          border: none;
-          background: transparent;
+          border-radius: 50%;
+          border: 1px solid var(--border-subtle);
+          background: var(--bg-elevated);
           color: var(--text-muted);
           cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: background var(--t-fast), color var(--t-fast);
+          transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+          flex-shrink: 0;
         }
         .theme-modal-close:hover {
           background: var(--bg-overlay);
           color: var(--text-primary);
+          border-color: var(--border-normal);
+        }
+        .theme-modal-close:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
         }
 
         .theme-current-row {
@@ -701,13 +722,15 @@ export default function ThemeModal() {
           position: relative;
           overflow: hidden;
           border: 2px solid transparent;
-          transition: border-color var(--t-fast), transform var(--t-fast);
+          transition: border-color var(--t-fast), transform var(--t-normal) var(--ease-spring), box-shadow var(--t-fast);
         }
         .theme-swatch:hover .theme-swatch-preview {
-          transform: translateY(-2px);
+          transform: translateY(-3px) scale(1.02);
+          box-shadow: var(--shadow-md);
         }
         .theme-swatch--active .theme-swatch-preview {
           border-color: var(--accent);
+          box-shadow: 0 0 0 3px var(--accent-glow);
         }
 
         .theme-swatch-sidebar {
@@ -821,12 +844,21 @@ export default function ThemeModal() {
 
         /* ── Density section ── */
         .density-section-title {
-          font-size: 13px;
-          font-weight: 700;
-          color: var(--text-secondary);
-          letter-spacing: 0.06em;
+          font-size: 10px;
+          font-weight: 800;
+          color: var(--text-muted);
+          letter-spacing: 0.12em;
           text-transform: uppercase;
-          margin: 20px 0 10px;
+          margin: 24px 0 10px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .density-section-title::after {
+          content: '';
+          flex: 1;
+          height: 1px;
+          background: linear-gradient(to right, var(--border-subtle), transparent);
         }
 
         .density-options {

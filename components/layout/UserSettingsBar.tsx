@@ -337,6 +337,7 @@ export default function UserSettingsBar() {
           gap: 2px;
           background: var(--bg-void);
           border-top: 1px solid var(--border-subtle);
+          box-shadow: 0 -1px 0 var(--border-subtle);
           flex-shrink: 0;
           position: relative;
         }
@@ -423,16 +424,19 @@ export default function UserSettingsBar() {
           background: none;
           border: none;
           cursor: pointer;
-          padding: 2px;
+          padding: 1px;
           border-radius: var(--r-full);
-          transition: background var(--t-fast);
+          transition: background 150ms var(--ease-out), box-shadow 150ms var(--ease-out);
           display: flex;
           align-items: center;
         }
-        .user-bar-avatar-btn:hover { background: var(--ch-hover-bg); }
+        .user-bar-avatar-btn:hover {
+          background: var(--ch-hover-bg);
+          box-shadow: 0 0 0 2px var(--accent-border);
+        }
         .user-bar-avatar-btn:focus-visible {
           outline: 2px solid var(--accent-border);
-          outline-offset: 1px;
+          outline-offset: 2px;
         }
 
         /* ── Text group (nick + custom status stacked) ── */
@@ -471,7 +475,7 @@ export default function UserSettingsBar() {
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          line-height: 1.3;
+          line-height: 1.25;
         }
 
         .user-bar-sub {
@@ -480,7 +484,7 @@ export default function UserSettingsBar() {
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          line-height: 1.3;
+          line-height: 1.25;
         }
 
         /* ── Nick row with edit pencil ── */
@@ -619,7 +623,7 @@ export default function UserSettingsBar() {
         .user-bar-actions {
           display: flex;
           align-items: center;
-          gap: 0;
+          gap: 1px;
           flex-shrink: 0;
         }
 
@@ -629,20 +633,31 @@ export default function UserSettingsBar() {
           background: none; border: none; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
           color: var(--text-secondary);
-          transition: background var(--t-fast), color var(--t-fast);
+          opacity: 0.65;
+          transition: background 150ms var(--ease-out), color 150ms var(--ease-out), opacity 150ms var(--ease-out);
           flex-shrink: 0;
         }
+        .user-bar-btn svg { width: 16px; height: 16px; }
         .user-bar-btn:hover {
           background: var(--ch-hover-bg);
           color: var(--text-primary);
+          opacity: 1;
         }
-        .user-bar-btn--active { color: var(--danger); }
-        .user-bar-btn--warn:hover { background: var(--danger-subtle); color: var(--danger); }
-        .user-bar-btn--dnd-active { color: #f5a812; }
-        .user-bar-btn--dnd-active:hover { background: rgba(245,168,18,0.12); color: #f5a812; }
-        .user-bar-btn--focus-active { color: var(--accent); }
-        .user-bar-btn--focus-active:hover { background: var(--accent-subtle); color: var(--accent); }
-        .user-bar-btn--active-soft { background: var(--ch-hover-bg); color: var(--text-primary); }
+        .user-bar-btn--active {
+          color: var(--danger);
+          opacity: 1;
+          background: rgba(237,66,69,0.1);
+        }
+        .user-bar-btn--warn:hover {
+          background: rgba(237,66,69,0.15);
+          color: var(--danger);
+          opacity: 1;
+        }
+        .user-bar-btn--dnd-active { color: #f5a812; opacity: 1; }
+        .user-bar-btn--dnd-active:hover { background: rgba(245,168,18,0.12); color: #f5a812; opacity: 1; }
+        .user-bar-btn--focus-active { color: var(--accent); opacity: 1; }
+        .user-bar-btn--focus-active:hover { background: var(--accent-subtle); color: var(--accent); opacity: 1; }
+        .user-bar-btn--active-soft { background: var(--ch-hover-bg); color: var(--text-primary); opacity: 1; }
       `}</style>
     </div>
   );
@@ -960,7 +975,7 @@ const QuickSettingsPanel = forwardRef<HTMLDivElement, QuickSettingsPanelProps>(
           .qs-theme-dot:hover { transform: scale(1.15); }
           .qs-theme-dot--active { border-color: white; }
           .qs-theme-ocean   { background: #0ea5e9; }
-          .qs-theme-midnight { background: #a855f7; }
+          .qs-theme-midnight { background: #0ea5e9; }
           .qs-theme-forest  { background: #22c55e; }
           .qs-theme-ember   { background: #f97316; }
           .qs-theme-arctic  { background: #58a6ff; }

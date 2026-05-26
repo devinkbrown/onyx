@@ -40,12 +40,13 @@ export default function SlowModeBar({ seconds, lastSentAt, onCountdownEnd }: Slo
     <div className="slowmode-bar" role="status" aria-live="polite">
       <span className="slowmode-icon">⏱</span>
       {inCooldown ? (
-        <span className="slowmode-text">
-          {remaining.toFixed(0) === '0' ? 'Ready' : `${remaining.toFixed(0)}s remaining`}
-        </span>
+        <>
+          <span className="slowmode-text">Slow mode active</span>
+          <span className="slowmode-countdown">{remaining.toFixed(0)}s</span>
+        </>
       ) : (
         <span className="slowmode-text">
-          Slow mode: send a message every {seconds}s
+          Slow mode: send every {seconds}s
         </span>
       )}
 
@@ -64,9 +65,10 @@ export default function SlowModeBar({ seconds, lastSentAt, onCountdownEnd }: Slo
           position: relative;
           display: flex;
           align-items: center;
-          gap: 6px;
-          padding: 5px 16px 7px;
-          background: var(--bg-elevated, #1e1e2e);
+          gap: 8px;
+          padding: 6px 16px 9px;
+          background: rgba(251, 191, 36, 0.06);
+          border-top: 1px solid rgba(251, 191, 36, 0.15);
           flex-shrink: 0;
           overflow: hidden;
         }
@@ -75,15 +77,29 @@ export default function SlowModeBar({ seconds, lastSentAt, onCountdownEnd }: Slo
           font-size: 13px;
           line-height: 1;
           flex-shrink: 0;
+          color: var(--warning, #fbbf24);
         }
 
         .slowmode-text {
           font-size: 12px;
-          color: var(--text-secondary, #8b8fa8);
+          color: rgba(251, 191, 36, 0.85);
           font-weight: 500;
           letter-spacing: 0.01em;
           line-height: 1.4;
           flex: 1;
+        }
+
+        /* Large monospace countdown */
+        .slowmode-countdown {
+          font-family: var(--font-mono, monospace);
+          font-size: 13px;
+          font-weight: 700;
+          color: var(--warning, #fbbf24);
+          letter-spacing: -0.02em;
+          flex-shrink: 0;
+          min-width: 36px;
+          text-align: right;
+          font-variant-numeric: tabular-nums;
         }
 
         .slowmode-progress-track {
@@ -92,13 +108,13 @@ export default function SlowModeBar({ seconds, lastSentAt, onCountdownEnd }: Slo
           left: 0;
           right: 0;
           height: 2px;
-          background: var(--border-subtle, rgba(255,255,255,0.06));
+          background: rgba(251, 191, 36, 0.12);
         }
 
         .slowmode-progress-fill {
           height: 100%;
-          background: var(--accent, #7c5af5);
-          transform-origin: right center;
+          background: linear-gradient(90deg, rgba(251,191,36,0.5), var(--warning, #fbbf24));
+          transform-origin: left center;
           animation: slowmode-drain linear forwards;
         }
 

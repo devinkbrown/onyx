@@ -51,11 +51,11 @@ export default function AttachmentPreview({ attachments, onRemove, uploadProgres
       <style>{`
         .attachment-strip {
           display: flex;
-          gap: 8px;
-          padding: 8px 12px;
+          gap: 10px;
+          padding: 10px 14px;
           flex-wrap: wrap;
-          background: var(--bg-overlay, rgba(12,24,40,0.8));
-          border-radius: 6px 6px 0 0;
+          background: var(--bg-elevated, rgba(19,33,49,0.95));
+          border-radius: var(--r-md, 8px) var(--r-md, 8px) 0 0;
           border: 1px solid var(--border-normal);
           border-bottom: none;
         }
@@ -63,32 +63,43 @@ export default function AttachmentPreview({ attachments, onRemove, uploadProgres
         .attachment-item {
           position: relative;
           flex-shrink: 0;
+          transition: transform 150ms var(--ease-out, cubic-bezier(0.16,1,0.3,1));
+        }
+
+        .attachment-item:hover {
+          transform: translateY(-1px);
         }
 
         .attachment-item:hover .attachment-remove {
           opacity: 1;
+          transform: scale(1);
         }
 
         .attachment-remove {
           position: absolute;
-          top: -6px;
-          right: -6px;
-          width: 18px;
-          height: 18px;
+          top: -7px;
+          right: -7px;
+          width: 20px;
+          height: 20px;
           border-radius: 50%;
-          border: none;
-          background: var(--bg-void, #060e18);
+          border: 1.5px solid var(--bg-base, #0c1828);
+          background: var(--bg-deep, #06101d);
           color: var(--text-muted);
           cursor: pointer;
-          font-size: 13px;
+          font-size: 12px;
           line-height: 1;
           display: flex;
           align-items: center;
           justify-content: center;
           opacity: 0;
-          transition: opacity var(--t-fast, 150ms), color var(--t-fast, 150ms), background var(--t-fast, 150ms);
+          transform: scale(0.8);
+          transition:
+            opacity var(--t-fast, 150ms),
+            color var(--t-fast, 150ms),
+            background var(--t-fast, 150ms),
+            transform 150ms var(--ease-spring, cubic-bezier(0.175,0.885,0.32,1.275));
           z-index: 2;
-          box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+          box-shadow: 0 2px 6px rgba(0,0,0,0.5);
         }
         .attachment-remove:hover {
           color: #fff;
@@ -97,22 +108,24 @@ export default function AttachmentPreview({ attachments, onRemove, uploadProgres
 
         /* ── image / video thumbnails ── */
         .att-thumb {
-          width: 80px;
-          height: 80px;
-          border-radius: 6px;
+          width: 82px;
+          height: 82px;
+          border-radius: var(--r-md, 8px);
           overflow: hidden;
-          background: var(--bg-elevated);
+          background: var(--bg-deep);
           display: flex;
           align-items: center;
           justify-content: center;
           position: relative;
+          border: 1px solid var(--border-subtle);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.35);
         }
 
         .att-thumb-img {
           width: 100%;
           height: 100%;
           object-fit: cover;
-          border-radius: 6px;
+          border-radius: var(--r-md, 8px);
           display: block;
         }
 
@@ -122,22 +135,23 @@ export default function AttachmentPreview({ attachments, onRemove, uploadProgres
           display: flex;
           align-items: center;
           justify-content: center;
-          background: rgba(0,0,0,0.35);
-          border-radius: 6px;
+          background: rgba(0,0,0,0.4);
+          border-radius: var(--r-md, 8px);
         }
 
         .att-play-icon {
-          width: 28px;
-          height: 28px;
+          width: 26px;
+          height: 26px;
           color: #fff;
-          filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6));
+          filter: drop-shadow(0 1px 4px rgba(0,0,0,0.7));
+          opacity: 0.9;
         }
 
         /* ── audio / document ── */
         .att-file {
-          width: 80px;
-          height: 80px;
-          border-radius: 6px;
+          width: 82px;
+          height: 82px;
+          border-radius: var(--r-md, 8px);
           background: var(--bg-elevated);
           border: 1px solid var(--border-subtle);
           display: flex;
@@ -145,11 +159,12 @@ export default function AttachmentPreview({ attachments, onRemove, uploadProgres
           align-items: center;
           justify-content: center;
           gap: 4px;
-          padding: 6px;
+          padding: 8px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.25);
         }
 
         .att-file-icon {
-          font-size: 24px;
+          font-size: 26px;
           line-height: 1;
           flex-shrink: 0;
         }

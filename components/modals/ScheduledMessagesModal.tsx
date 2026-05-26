@@ -187,16 +187,13 @@ export default function ScheduledMessagesModal() {
         .smm-panel {
           width: min(520px, 92vw);
           max-height: 85dvh;
-          background: var(--bg-deep, #06101d);
-          border: 1px solid rgba(14, 165, 233, 0.18);
-          border-radius: 14px;
-          box-shadow:
-            0 0 0 1px rgba(14, 165, 233, 0.06),
-            0 24px 64px rgba(0, 0, 0, 0.72),
-            0 2px 0 rgba(14, 165, 233, 0.1) inset;
+          background: var(--bg-deep);
+          border: 1px solid var(--border-normal);
+          border-radius: var(--r-lg);
+          box-shadow: var(--shadow-xl);
           display: flex; flex-direction: column;
           overflow: hidden;
-          animation: smm-rise 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+          animation: smm-rise 200ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
         }
         @keyframes smm-rise {
           from { opacity: 0; transform: translateY(10px) scale(0.97); }
@@ -206,7 +203,7 @@ export default function ScheduledMessagesModal() {
         .smm-header {
           display: flex; align-items: center; justify-content: space-between;
           padding: 18px 20px 14px;
-          border-bottom: 1px solid rgba(14, 165, 233, 0.08);
+          border-bottom: 1px solid var(--border-subtle);
           flex-shrink: 0;
         }
         .smm-title-row {
@@ -230,8 +227,8 @@ export default function ScheduledMessagesModal() {
           transition: background 140ms, color 140ms;
         }
         .smm-close:hover {
-          background: rgba(14, 165, 233, 0.1);
-          color: var(--text-primary, #dff0ff);
+          background: var(--accent-subtle);
+          color: var(--text-primary);
         }
 
         .smm-form {
@@ -248,12 +245,12 @@ export default function ScheduledMessagesModal() {
         .smm-input,
         .smm-textarea {
           width: 100%; box-sizing: border-box;
-          background: rgba(12, 24, 40, 0.8);
-          border: 1px solid rgba(14, 165, 233, 0.14);
-          border-radius: 8px;
+          background: var(--bg-elevated);
+          border: 1px solid var(--border-normal);
+          border-radius: var(--r-md);
           padding: 9px 12px;
           font-size: 13px;
-          color: var(--text-primary, #dff0ff);
+          color: var(--text-primary);
           outline: none;
           transition: border-color 140ms, box-shadow 140ms;
           font-family: inherit;
@@ -261,12 +258,12 @@ export default function ScheduledMessagesModal() {
         }
         .smm-input:focus,
         .smm-textarea:focus {
-          border-color: rgba(14, 165, 233, 0.45);
-          box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.08);
+          border-color: var(--accent-border);
+          box-shadow: 0 0 0 2.5px var(--accent-glow);
         }
         .smm-input::placeholder,
         .smm-textarea::placeholder {
-          color: var(--text-muted, #3d6480);
+          color: var(--text-muted);
         }
         /* datetime-local icon tinting */
         .smm-input[type="datetime-local"]::-webkit-calendar-picker-indicator {
@@ -301,7 +298,7 @@ export default function ScheduledMessagesModal() {
 
         .smm-divider {
           height: 1px;
-          background: rgba(14, 165, 233, 0.08);
+          background: var(--border-subtle);
           flex-shrink: 0;
         }
 
@@ -317,11 +314,11 @@ export default function ScheduledMessagesModal() {
           flex: 1; overflow-y: auto;
           padding: 0 12px 12px;
           scrollbar-width: thin;
-          scrollbar-color: rgba(14, 165, 233, 0.18) transparent;
+          scrollbar-color: var(--border-normal) transparent;
         }
         .smm-list::-webkit-scrollbar { width: 4px; }
         .smm-list::-webkit-scrollbar-thumb {
-          background: rgba(14, 165, 233, 0.18); border-radius: 2px;
+          background: var(--border-normal); border-radius: 2px;
         }
 
         .smm-empty {
@@ -332,14 +329,17 @@ export default function ScheduledMessagesModal() {
         }
 
         .smm-item {
-          padding: 10px 10px;
-          border-radius: 9px;
-          border: 1px solid rgba(14, 165, 233, 0.08);
-          background: rgba(12, 24, 40, 0.5);
+          padding: 10px 12px;
+          border-radius: var(--r-md);
+          border: 1px solid var(--border-subtle);
+          background: var(--bg-elevated);
           margin-bottom: 6px;
-          transition: border-color 140ms;
+          transition: border-color 140ms, background 140ms;
         }
-        .smm-item:hover { border-color: rgba(14, 165, 233, 0.18); }
+        .smm-item:hover {
+          border-color: var(--border-normal);
+          background: var(--bg-float);
+        }
         .smm-item:last-child { margin-bottom: 0; }
 
         .smm-item-meta {
@@ -348,12 +348,17 @@ export default function ScheduledMessagesModal() {
         }
         .smm-item-channel {
           font-size: 12px; font-weight: 700;
-          color: var(--accent, #0ea5e9);
+          color: var(--accent);
           font-family: var(--font-mono, monospace);
         }
         .smm-item-time {
           font-size: 11px;
-          color: var(--text-muted, #3d6480);
+          font-weight: 600;
+          color: var(--text-muted);
+          background: var(--bg-float);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-full);
+          padding: 1px 7px;
         }
 
         .smm-item-body {

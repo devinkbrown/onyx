@@ -69,18 +69,19 @@ export default function VoiceParticipantCard({
       </div>
       <div className="vpc-body">
         <div className="vpc-nick-row">
-          <span className="vpc-nick">{cleanNick}{isYou && <span className="vpc-you"> (You)</span>}</span>
+          <span className="vpc-nick">{cleanNick}</span>
+          {isYou && <span className="vpc-you">(You)</span>}
           {/* Role badges */}
           {isOwner && <span className="vpc-badge vpc-badge--owner" title="Owner">♛</span>}
           {!isOwner && isOp && <span className="vpc-badge vpc-badge--op" title="Operator">@</span>}
           {!isOwner && !isOp && isVoice && <span className="vpc-badge vpc-badge--voice" title="Voice">+</span>}
         </div>
+        <div className="vpc-divider" />
         <div className="vpc-status-row">
-          <SpeakingBars speaking={speaking} size="sm" />
-          <span className="vpc-status-text">
+          <SpeakingBars speaking={speaking && !muted && !deafened} size="sm" />
+          <span className={`vpc-status-text ${deafened ? 'vpc-status-text--deaf' : muted ? 'vpc-status-text--muted' : speaking ? 'vpc-status-text--speaking' : ''}`}>
             {deafened ? 'Deafened' : muted ? 'Muted' : speaking ? 'Speaking' : 'Listening'}
           </span>
-          {/* Mute icon */}
           {muted && !deafened && (
             <span className="vpc-mute-icon" aria-label="Muted" title="Muted">
               <MuteIcon />
@@ -93,8 +94,8 @@ export default function VoiceParticipantCard({
           )}
         </div>
         <div className="vpc-quality">
-          <span className="vpc-quality-dot" style={{ background: qualityColor }} aria-hidden />
-          <span className="vpc-quality-label">{qualityLabel}</span>
+          <span className="vpc-quality-dot" style={{ background: qualityColor, color: qualityColor }} aria-hidden />
+          <span className="vpc-quality-label">{qualityLabel} connection</span>
         </div>
       </div>
       <style>{`
@@ -102,18 +103,23 @@ export default function VoiceParticipantCard({
           display: flex;
           align-items: flex-start;
           gap: 10px;
-          background: linear-gradient(160deg, var(--bg-elevated) 0%, var(--bg-deep) 100%);
-          border: 1px solid var(--border-normal, rgba(255,255,255,0.1));
-          border-radius: 10px;
-          padding: 10px 12px;
-          box-shadow: 0 8px 24px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.3);
-          min-width: 168px;
-          animation: vpc-pop 120ms cubic-bezier(0.16,1,0.3,1) both;
+          background: linear-gradient(155deg,
+            var(--bg-float, #1a2c40) 0%,
+            var(--bg-deep, #06101d) 100%);
+          border: 1px solid var(--border-normal, rgba(14,165,233,0.15));
+          border-radius: var(--r-lg, 12px);
+          padding: 12px 14px;
+          box-shadow:
+            0 12px 36px rgba(0,0,0,0.55),
+            0 2px 8px rgba(0,0,0,0.35),
+            0 0 0 1px rgba(14,165,233,0.05) inset;
+          min-width: 190px;
+          animation: vpc-pop 140ms cubic-bezier(0.16,1,0.3,1) both;
           pointer-events: none;
         }
 
         @keyframes vpc-pop {
-          from { opacity: 0; transform: scale(0.92) translateY(4px); }
+          from { opacity: 0; transform: scale(0.90) translateY(6px); }
           to   { opacity: 1; transform: scale(1) translateY(0); }
         }
 
@@ -122,32 +128,44 @@ export default function VoiceParticipantCard({
           flex-shrink: 0;
         }
 
+        /* Speaking ring: two-layer glow for premium feel */
         .vpc-speaking-ring {
           position: absolute;
-          inset: -3px;
+          inset: -4px;
           border-radius: 50%;
-          border: 2px solid var(--status-online, #34d399);
+          border: 2.5px solid var(--status-online, #34d399);
           animation: vpc-ring-pulse 900ms ease-in-out infinite;
           pointer-events: none;
         }
+        .vpc-speaking-ring::after {
+          content: '';
+          position: absolute;
+          inset: -4px;
+          border-radius: 50%;
+          border: 1.5px solid rgba(52, 211, 153, 0.25);
+          animation: vpc-ring-pulse 900ms ease-in-out infinite;
+          animation-delay: 150ms;
+        }
 
         @keyframes vpc-ring-pulse {
-          0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(52,211,153,0.4); }
-          50%       { opacity: 0.8; box-shadow: 0 0 0 4px rgba(52,211,153,0); }
+          0%   { opacity: 1;   box-shadow: 0 0 0 0   rgba(52,211,153,0.45); }
+          60%  { opacity: 0.7; box-shadow: 0 0 0 6px rgba(52,211,153,0);    }
+          100% { opacity: 1;   box-shadow: 0 0 0 0   rgba(52,211,153,0.45); }
         }
 
         .vpc-body {
           display: flex;
           flex-direction: column;
-          gap: 4px;
+          gap: 5px;
           min-width: 0;
+          flex: 1;
         }
 
         .vpc-nick-row {
           display: flex;
           align-items: center;
           gap: 5px;
-          flex-wrap: wrap;
+          flex-wrap: nowrap;
         }
 
         .vpc-nick {
@@ -161,10 +179,11 @@ export default function VoiceParticipantCard({
         }
 
         .vpc-you {
-          font-size: 11px;
+          font-size: 10.5px;
           font-weight: 500;
           color: var(--text-muted);
           letter-spacing: 0;
+          flex-shrink: 0;
         }
 
         /* Role badges */
@@ -172,27 +191,34 @@ export default function VoiceParticipantCard({
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          font-size: 10px;
+          font-size: 9.5px;
           font-weight: 800;
           border-radius: 4px;
-          padding: 1px 4px;
+          padding: 1px 5px;
           line-height: 1.3;
           flex-shrink: 0;
         }
         .vpc-badge--owner {
-          background: rgba(232,184,75,0.18);
-          color: var(--gold, #e8b84b);
-          border: 1px solid rgba(232,184,75,0.35);
+          background: rgba(103,232,249,0.12);
+          color: var(--gold, #67e8f9);
+          border: 1px solid rgba(103,232,249,0.3);
         }
         .vpc-badge--op {
-          background: rgba(124,90,245,0.18);
-          color: var(--accent, #7c5af5);
-          border: 1px solid rgba(124,90,245,0.35);
+          background: rgba(14,165,233,0.12);
+          color: var(--accent, #0ea5e9);
+          border: 1px solid rgba(14,165,233,0.28);
         }
         .vpc-badge--voice {
-          background: rgba(34,197,94,0.15);
-          color: #4ade80;
-          border: 1px solid rgba(34,197,94,0.3);
+          background: rgba(52,211,153,0.1);
+          color: var(--status-online, #34d399);
+          border: 1px solid rgba(52,211,153,0.25);
+        }
+
+        /* Divider between nick and status */
+        .vpc-divider {
+          height: 1px;
+          background: var(--border-subtle, rgba(14,165,233,0.08));
+          margin: 0 0 1px;
         }
 
         .vpc-status-row {
@@ -204,13 +230,24 @@ export default function VoiceParticipantCard({
         .vpc-status-text {
           font-size: 11px;
           color: var(--text-secondary);
+          flex: 1;
+        }
+        .vpc-status-text--speaking {
+          color: var(--status-online, #34d399);
+          font-weight: 600;
+        }
+        .vpc-status-text--muted {
+          color: var(--danger, #f87171);
+        }
+        .vpc-status-text--deaf {
+          color: var(--text-muted);
         }
 
         /* Mute / deafen icons */
         .vpc-mute-icon {
           display: inline-flex;
           align-items: center;
-          color: #f87171;
+          color: var(--danger, #f87171);
           flex-shrink: 0;
         }
         .vpc-mute-icon--deafened {
@@ -220,8 +257,7 @@ export default function VoiceParticipantCard({
         .vpc-quality {
           display: flex;
           align-items: center;
-          gap: 4px;
-          margin-top: 1px;
+          gap: 5px;
         }
 
         .vpc-quality-dot {
@@ -229,12 +265,14 @@ export default function VoiceParticipantCard({
           height: 6px;
           border-radius: 50%;
           flex-shrink: 0;
+          box-shadow: 0 0 4px currentColor;
         }
 
         .vpc-quality-label {
           font-size: 10px;
           color: var(--text-muted);
-          letter-spacing: 0.02em;
+          letter-spacing: 0.03em;
+          font-weight: 500;
         }
       `}</style>
     </div>

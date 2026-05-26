@@ -132,74 +132,90 @@ export default function ChannelJoinModal() {
         .cjm-overlay {
           position: fixed;
           inset: 0;
-          background: rgba(3, 8, 16, 0.7);
+          background: rgba(3, 8, 16, 0.75);
           z-index: 1000;
           display: flex;
           align-items: center;
           justify-content: center;
-          backdrop-filter: blur(2px);
+          backdrop-filter: blur(6px);
+          animation: cjmFadeIn 150ms var(--ease-out) both;
+        }
+        @keyframes cjmFadeIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
         }
         .cjm-modal {
           background: var(--bg-elevated);
           border: 1px solid var(--border-normal);
           border-radius: var(--r-xl);
           padding: 24px;
-          width: 360px;
-          box-shadow: var(--shadow-xl);
-          animation: cjmScaleIn 150ms var(--ease-out) both;
+          width: 400px;
+          max-width: calc(100vw - 32px);
+          box-shadow: var(--shadow-xl), 0 0 0 1px var(--accent-border);
+          animation: cjmScaleIn 180ms var(--ease-out) both;
         }
         @keyframes cjmScaleIn {
-          from { opacity: 0; transform: scale(0.94); }
-          to   { opacity: 1; transform: scale(1); }
+          from { opacity: 0; transform: scale(0.95) translateY(4px); }
+          to   { opacity: 1; transform: scale(1)    translateY(0); }
         }
         .cjm-title {
-          font-size: 18px;
+          font-size: 17px;
           font-weight: 700;
           color: var(--text-primary);
-          margin-bottom: 4px;
+          margin-bottom: 16px;
+          letter-spacing: -0.2px;
         }
         .cjm-error {
           font-size: 13px;
           color: var(--danger);
-          margin-bottom: 12px;
-          margin-top: 4px;
+          background: var(--danger-subtle);
+          border: 1px solid rgba(248,113,113,0.2);
+          border-radius: var(--r-sm);
+          padding: 8px 12px;
+          margin-bottom: 14px;
+          margin-top: -4px;
         }
         .cjm-label {
-          font-size: 12px;
-          font-weight: 600;
-          color: var(--text-secondary);
+          font-size: 11px;
+          font-weight: 700;
+          color: var(--text-muted);
           text-transform: uppercase;
-          letter-spacing: 0.06em;
+          letter-spacing: 0.07em;
           margin-bottom: 6px;
         }
         .cjm-input {
           width: 100%;
-          background: var(--bg-deep);
+          height: 38px;
+          background: var(--bg-void);
           border: 1px solid var(--border-normal);
           border-radius: var(--r-md);
-          padding: 8px 12px;
+          padding: 0 12px;
           color: var(--text-primary);
           font-size: 14px;
+          font-family: inherit;
           box-sizing: border-box;
+          transition: border-color var(--t-fast), box-shadow var(--t-fast);
         }
         .cjm-input:focus {
           outline: none;
           border-color: var(--accent);
+          box-shadow: 0 0 0 2px var(--accent-glow);
         }
         .cjm-actions {
           display: flex;
           gap: 8px;
-          margin-top: 16px;
+          margin-top: 20px;
           justify-content: flex-end;
         }
         .cjm-btn {
           border: none;
-          border-radius: var(--r-sm);
-          padding: 8px 16px;
+          border-radius: var(--r-md);
+          padding: 9px 18px;
           font-size: 14px;
           font-weight: 600;
           cursor: pointer;
-          transition: background 120ms ease;
+          font-family: inherit;
+          transition: background var(--t-fast), opacity var(--t-fast);
         }
         .cjm-btn--primary {
           background: var(--accent);
@@ -209,15 +225,17 @@ export default function ChannelJoinModal() {
           background: var(--accent-hover);
         }
         .cjm-btn--primary:disabled {
-          opacity: 0.5;
+          opacity: 0.45;
           cursor: not-allowed;
         }
         .cjm-btn--secondary {
           background: var(--bg-float);
+          border: 1px solid var(--border-normal);
           color: var(--text-secondary);
         }
         .cjm-btn--secondary:hover {
           background: var(--bg-overlay);
+          color: var(--text-primary);
         }
       `}</style>
     </div>

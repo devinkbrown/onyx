@@ -39,6 +39,7 @@ interface EmModule {
 // -------------------------------------------------------------------
 let modulePromise: Promise<EmModule> | null = null;
 let wasmLoadAttempts = 0;
+let _wasmLoadFailed = false;
 
 async function loadModule(url: string): Promise<EmModule> {
   if (typeof window === 'undefined') throw new Error('WASM requires browser environment');
@@ -71,9 +72,10 @@ async function loadModule(url: string): Promise<EmModule> {
     }
   }
   /* All retries exhausted — emit event so UI can show degraded-mode warning */
+  _wasmLoadFailed = true;
   const reason = lastErr instanceof Error ? lastErr.message : String(lastErr);
   window.dispatchEvent(new CustomEvent('wasmLoadFailed', { detail: { reason } }));
-  throw lastErr;
+  throw new Error(`Voice codec unavailable (opcodec_wasm.js not found)`);
 }
 
 // -------------------------------------------------------------------
@@ -373,6 +375,9 @@ export class OpvisDecoder {
 // -------------------------------------------------------------------
 export class OpcodecWasm {
   private constructor(private readonly m: EmModule) {}
+
+  /** True if the WASM codec failed to load after all retries. Voice/video will be unavailable. */
+  static get loadFailed(): boolean { return _wasmLoadFailed; }
 
   static async load(url = '/opcodec_wasm.js'): Promise<OpcodecWasm> {
     if (!modulePromise) modulePromise = loadModule(url);
