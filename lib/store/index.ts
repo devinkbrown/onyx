@@ -6195,18 +6195,38 @@ function _loadFontSize(): number {
 // ── Accent color persistence ───────────────────────────────────────────────────
 
 function _loadAccentColor(): string {
-  if (typeof window === 'undefined') return '#7c5af5';
-  try { return localStorage.getItem('ocean-accent-color') ?? '#7c5af5'; }
-  catch { return '#7c5af5'; }
+  if (typeof window === 'undefined') return '#0ea5e9';
+  try {
+    const stored = localStorage.getItem('ocean-accent-color');
+    // Migrate old violet default → sky blue
+    if (!stored || stored === '#7c5af5') {
+      localStorage.setItem('ocean-accent-color', '#0ea5e9');
+      return '#0ea5e9';
+    }
+    return stored;
+  }
+  catch { return '#0ea5e9'; }
 }
 
 export function _applyAccentColor(hex: string): void {
   if (typeof document === 'undefined') return;
+  // If hex is the default, remove the inline override so the theme CSS takes over
+  if (hex === '#0ea5e9') {
+    const root = document.documentElement;
+    root.style.removeProperty('--accent');
+    root.style.removeProperty('--accent-hover');
+    root.style.removeProperty('--accent-active');
+    root.style.removeProperty('--accent-border');
+    root.style.removeProperty('--accent-subtle');
+    root.style.removeProperty('--accent-glow');
+    return;
+  }
   const root = document.documentElement;
   root.style.setProperty('--accent', hex);
   root.style.setProperty('--accent-hover', hex);
   root.style.setProperty('--accent-border', hex + '66');
   root.style.setProperty('--accent-subtle', hex + '1a');
+  root.style.setProperty('--accent-glow', hex + '2e');
 }
 
 // ── Reduced motion persistence ─────────────────────────────────────────────────
