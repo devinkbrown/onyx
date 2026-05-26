@@ -4,7 +4,6 @@ import { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import type { ChatMessage } from '@/lib/irc/types';
 import { useOnyxStore } from '@/lib/store';
 import { formatMessageTime } from '@/lib/format-time';
-import Avatar from '@/components/ui/Avatar';
 import UserPopover from '@/components/ui/UserPopover';
 import MiniUserCard from '@/components/ui/MiniUserCard';
 import LinkPreview from '@/components/chat/LinkPreview';
@@ -1082,9 +1081,11 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
   if (isAction) {
     return (
       <div className={`msg-item ${grouped ? 'msg-grouped' : ''} ${highlight ? 'msg-item--highlight' : ''}`} style={{ paddingTop: grouped ? 1 : 10 }}>
-        {!grouped && <Avatar nick={from} size={36} />}
+        {!grouped && (
+          <div className="msg-avatar-col" style={{ width: 40, flexShrink: 0 }} />
+        )}
         {grouped && (
-          <div className="msg-avatar-col" style={{ width: 36, flexShrink: 0, position: 'relative' }}>
+          <div className="msg-avatar-col" style={{ width: 40, flexShrink: 0, position: 'relative' }}>
             {timeStr && (
               <time className="msg-grouped-time msg-ts-spacer" aria-hidden>
                 {timeStr}
@@ -1217,19 +1218,10 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
     >
       {/* Avatar column */}
       {!grouped && (
-        <span
-          className="msg-avatar-col"
-          style={{ cursor: 'pointer', flexShrink: 0 }}
-          onClick={e => {
-            e.stopPropagation();
-            setMiniCard({ nick: from, el: e.currentTarget as HTMLElement });
-          }}
-        >
-          <Avatar nick={from} size={36} />
-        </span>
+        <div className="msg-avatar-col" style={{ width: 40, flexShrink: 0 }} />
       )}
       {grouped && (
-        <div className="msg-avatar-col" style={{ width: 36, flexShrink: 0, position: 'relative' }}>
+        <div className="msg-avatar-col" style={{ width: 40, flexShrink: 0, position: 'relative' }}>
           {timeStr && (
             <time className="msg-grouped-time msg-ts-spacer" aria-hidden>
               {timeStr}
@@ -1929,27 +1921,6 @@ const msgStyles = `
     outline: 1px solid rgba(14,165,233,0.35);
     border-radius: 4px;
     transition: background 0.4s ease, outline 0.4s ease;
-  }
-
-  /* Avatar sizing — override Avatar component output size to 40px */
-  .msg-item:not(.msg-grouped) .msg-avatar-col > * {
-    width: 40px !important;
-    height: 40px !important;
-    border-radius: 50% !important;
-    transition: transform 150ms cubic-bezier(0.34,1.56,0.64,1), box-shadow 150ms ease;
-  }
-  .msg-item:not(.msg-grouped) .msg-avatar-col:hover > * {
-    transform: scale(1.08);
-    box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px rgba(14,165,233,0.18);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .msg-item:not(.msg-grouped) .msg-avatar-col > * {
-      transition: none;
-    }
-    .msg-item:not(.msg-grouped) .msg-avatar-col:hover > * {
-      transform: none;
-    }
   }
 
   .msg-text {

@@ -695,14 +695,6 @@ function MemberRow({
           <span className="mr-bot-badge">BOT</span>
         )}
 
-        {roleStyle && (
-          <span
-            className="mr-role-badge"
-            style={{ color: roleStyle.color, background: roleStyle.bg }}
-          >
-            {roleStyle.label}
-          </span>
-        )}
 
         <style>{`
           .mr-row {
@@ -815,20 +807,6 @@ function MemberRow({
             flex-shrink: 0;
           }
 
-          .mr-role-badge {
-            flex-shrink: 0;
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 0.05em;
-            text-transform: uppercase;
-            padding: 2px 6px;
-            border-radius: var(--r-full);
-            opacity: 0;
-            transition: opacity var(--t-fast);
-            pointer-events: none;
-          }
-
-          .mr-row:hover .mr-role-badge { opacity: 1; }
         `}</style>
       </div>
     </UserPopover>
