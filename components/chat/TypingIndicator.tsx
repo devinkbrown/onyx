@@ -95,21 +95,21 @@ export default function TypingIndicator({ channel }: Props) {
         .typing-indicator {
           display: flex;
           align-items: center;
-          gap: 6px;
+          gap: 7px;
           font-size: 13px;
-          color: var(--text-muted, #505880);
+          color: var(--text-secondary, #7aa8c4);
           animation: fadeIn 180ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
         }
 
         .typing-text {
-          font-size: 13px;
-          color: var(--text-muted, #505880);
+          font-size: 12.5px;
+          color: var(--text-secondary, #7aa8c4);
           line-height: 1;
         }
 
         .typing-text strong {
           font-weight: 600;
-          color: var(--text-secondary, #a0a8c8);
+          color: var(--accent, #0ea5e9);
         }
 
         .typing-dots {
@@ -119,12 +119,12 @@ export default function TypingIndicator({ channel }: Props) {
         }
 
         @keyframes typing-bounce {
-          0%, 60%, 100% {
+          0%, 55%, 100% {
             transform: translateY(0);
-            opacity: 0.35;
+            opacity: 0.4;
           }
-          30% {
-            transform: translateY(-3px);
+          27% {
+            transform: translateY(-3.5px);
             opacity: 1;
           }
         }
@@ -138,17 +138,17 @@ export default function TypingIndicator({ channel }: Props) {
           width: 5px;
           height: 5px;
           border-radius: 50%;
-          background: var(--text-muted, #505880);
-          animation: typing-bounce 1.2s ease-in-out infinite;
+          background: var(--accent, #0ea5e9);
+          animation: typing-bounce 1.1s ease-in-out infinite;
           display: inline-block;
-          opacity: 0.35;
+          opacity: 0.4;
         }
         .dot:nth-child(1) { animation-delay: 0ms; }
-        .dot:nth-child(2) { animation-delay: 160ms; }
-        .dot:nth-child(3) { animation-delay: 320ms; }
+        .dot:nth-child(2) { animation-delay: 150ms; }
+        .dot:nth-child(3) { animation-delay: 300ms; }
 
         @media (prefers-reduced-motion: reduce) {
-          .dot { animation: none; opacity: 0.4; }
+          .dot { animation: none; opacity: 0.55; }
           .typing-indicator { animation: none; }
         }
       `}</style>

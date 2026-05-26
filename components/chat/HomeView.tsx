@@ -677,10 +677,28 @@ export default function HomeView() {
         }
 
         .hv-quick-card-icon {
-          font-size: 20px;
-          line-height: 1;
-          margin-bottom: 4px;
+          width: 38px;
+          height: 38px;
+          border-radius: var(--r-md);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 8px;
+          flex-shrink: 0;
+          background: var(--accent-subtle);
+          border: 1px solid var(--accent-border);
+          color: var(--accent);
+          transition: background var(--t-fast), border-color var(--t-fast);
         }
+        .hv-quick-card:hover .hv-quick-card-icon {
+          background: rgba(14,165,233,0.16);
+          border-color: var(--accent);
+        }
+        /* Each card gets a distinct hue */
+        .hv-quick-card--0 .hv-quick-card-icon { background: rgba(14,165,233,0.1); border-color: rgba(14,165,233,0.22); color: #38bdf8; }
+        .hv-quick-card--1 .hv-quick-card-icon { background: rgba(103,232,249,0.08); border-color: rgba(103,232,249,0.2); color: var(--gold); }
+        .hv-quick-card--2 .hv-quick-card-icon { background: rgba(124,90,245,0.1); border-color: rgba(124,90,245,0.22); color: #a78bfa; }
+        .hv-quick-card--3 .hv-quick-card-icon { background: rgba(52,211,153,0.08); border-color: rgba(52,211,153,0.2); color: #34d399; }
 
         .hv-quick-card-title {
           font-size: 13px;

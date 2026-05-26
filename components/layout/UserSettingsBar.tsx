@@ -220,7 +220,9 @@ export default function UserSettingsBar() {
                 aria-label="Edit display name"
                 title="Set your local display name"
               >
-                ✏️
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor" aria-hidden>
+                  <path d="M9.5 1.5l1 1-6.5 6.5-1.5.5.5-1.5 6.5-6.5zm.7-.7a1 1 0 0 1 1.4 1.4L4.5 9.5 2 10l.5-2.5L10.2.8z"/>
+                </svg>
               </button>
             </div>
           )}

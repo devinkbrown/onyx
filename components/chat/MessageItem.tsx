@@ -504,7 +504,13 @@ function CollapsibleMessage({ text, children }: CollapsibleMessageProps) {
         onClick={() => setExpanded(e => !e)}
         aria-expanded={expanded}
       >
-        {expanded ? '▲ Show less' : `▼ Show more (${lineCount} lines)`}
+        <svg className="collapsible-chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          {expanded
+            ? <path d="M2 6.5l3-3 3 3" />
+            : <path d="M2 3.5l3 3 3-3" />
+          }
+        </svg>
+        {expanded ? 'Show less' : `Show more · ${lineCount} lines`}
       </button>
       <style>{collapsibleStyles}</style>
     </div>
@@ -1039,7 +1045,11 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
     const newNick = nickChangeMatch[2];
     return (
       <div className="msg-nick-change" role="status" aria-label={`${oldNick} is now known as ${newNick}`}>
-        <span className="msg-nick-change-icon" aria-hidden>🏷️</span>
+        <span className="msg-nick-change-icon" aria-hidden>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+            <path d="M8.5 2.5l1 1-5.5 5.5-1.5.5.5-1.5 5.5-5.5zm.7-.7a1 1 0 0 1 1.4 1.4l-6 6-2.5.8.8-2.5 6-5.7z"/>
+          </svg>
+        </span>
         <span className="msg-nick-change-old">{oldNick}</span>
         <span className="msg-nick-change-arrow"> → </span>
         <span className="msg-nick-change-new">{newNick}</span>
@@ -1769,7 +1779,7 @@ function parseEventText(text: string, type: string): ParsedEvent {
 
 const msgStyles = `
   @keyframes msg-slide-in {
-    from { opacity: 0; transform: translateY(12px); }
+    from { opacity: 0; transform: translateY(6px); }
     to   { opacity: 1; transform: translateY(0); }
   }
 
@@ -2098,13 +2108,15 @@ const msgStyles = `
   .msg-actions {
     position: absolute; top: -2px; right: 12px;
     display: flex; align-items: center; gap: 1px;
-    background: var(--bg-float);
+    background: color-mix(in srgb, var(--bg-float) 80%, transparent);
     border: 1px solid var(--border-normal);
     border-radius: var(--r-md);
     padding: 2px 4px;
     opacity: 0; transition: opacity var(--t-fast);
     z-index: 20;
     box-shadow: 0 4px 16px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
   .msg-item:hover .msg-actions { opacity: 1; }
 
@@ -2167,7 +2179,7 @@ const msgStyles = `
     position: relative;
     transition: background var(--t-fast);
   }
-  .thread-preview-badge:hover { background: var(--bg-surface, var(--bg-elevated)); }
+  .thread-preview-badge:hover { background: var(--bg-elevated); }
   .thread-unread-dot { color: var(--gold); font-size: 16px; line-height: 1; }
   .thread-arrow { color: var(--text-muted); }
   .thread-badge-archived { font-size: 11px; opacity: 0.7; }
@@ -2367,7 +2379,19 @@ const nickChangeStyles = `
     transition: background var(--t-fast);
   }
   .msg-nick-change:hover { background: rgba(14,165,233,0.025); }
-  .msg-nick-change-icon { font-size: 13px; flex-shrink: 0; }
+  .msg-nick-change-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(103,232,249,0.08);
+    border: 1px solid rgba(103,232,249,0.15);
+    color: var(--gold);
+    opacity: 0.85;
+  }
   .msg-nick-change-old { color: var(--text-secondary); }
   .msg-nick-change-arrow { color: var(--text-muted); }
   .msg-nick-change-new { color: var(--accent); font-weight: 600; }
@@ -2705,15 +2729,25 @@ const collapsibleStyles = `
     align-items: center;
     gap: 5px;
     font-size: 12px;
+    font-weight: 500;
     color: var(--accent, #0ea5e9);
     cursor: pointer;
-    border: none;
-    background: none;
-    padding: 4px 0;
+    border: 1px solid var(--accent-border, rgba(14,165,233,0.28));
+    background: var(--accent-subtle, rgba(14,165,233,0.08));
+    padding: 3px 9px 3px 7px;
+    border-radius: var(--r-full, 9999px);
     font-family: inherit;
-    margin-top: 4px;
+    margin-top: 6px;
+    transition: background var(--t-fast, 150ms), border-color var(--t-fast, 150ms);
   }
-  .collapsible-toggle:hover { text-decoration: underline; }
+  .collapsible-toggle:hover {
+    background: rgba(14,165,233,0.14);
+    border-color: var(--accent, #0ea5e9);
+  }
+  .collapsible-chevron {
+    flex-shrink: 0;
+    opacity: 0.8;
+  }
 `;
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
