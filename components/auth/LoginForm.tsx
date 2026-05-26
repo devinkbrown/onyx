@@ -16,45 +16,9 @@ interface Props {
   onSwitch: () => void;
 }
 
-interface RecentServer {
-  url: string;
-  nick: string;
-  label?: string;
-}
-
 const DEFAULT_SERVER = process.env.NEXT_PUBLIC_IRC_WS ?? 'wss://eshmaki.me:8080';
 
-const SERVER_PRESETS = [
-  { label: 'eshmaki.me', url: process.env.NEXT_PUBLIC_IRC_WS ?? 'wss://eshmaki.me:8080' },
-  { label: 'Custom', url: '' },
-];
-
 const NICK_INVALID_RE = /[^a-zA-Z0-9\-_\[\]{}\\|`^]/;
-
-function loadRecentServers(): RecentServer[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem('ocean-recent-servers');
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return (parsed as RecentServer[]).slice(0, 3);
-  } catch {
-    return [];
-  }
-}
-
-function saveRecentServer(entry: RecentServer) {
-  if (typeof window === 'undefined') return;
-  try {
-    const existing = loadRecentServers();
-    const filtered = existing.filter(s => s.url !== entry.url);
-    const next = [entry, ...filtered].slice(0, 3);
-    localStorage.setItem('ocean-recent-servers', JSON.stringify(next));
-  } catch {
-    // ignore
-  }
-}
 
 function loadSavedNick(): string {
   if (typeof window === 'undefined') return '';
@@ -138,14 +102,10 @@ export default function LoginForm({ onSwitch }: Props) {
   const [nick,          setNick]          = useState('');
   const [password,      setPassword]      = useState('');
   const [showPassword,  setShowPassword]  = useState(false);
-  const [server,        setServer]        = useState(DEFAULT_SERVER);
-  const [advanced,      setAdvanced]      = useState(false);
   const [error,         setError]         = useState('');
   const [shake,         setShake]         = useState(false);
   const [rememberMe,    setRememberMe]    = useState(false);
-  const [recentServers, setRecentServers] = useState<RecentServer[]>([]);
   const [connStep,      setConnStep]      = useState(0);
-  const [activePreset,  setActivePreset]  = useState<string>('eshmaki.me');
 
   const nickRef = useRef<HTMLInputElement>(null);
 
@@ -157,17 +117,15 @@ export default function LoginForm({ onSwitch }: Props) {
     nickRef.current?.focus();
   }, []);
 
-  // Load saved credentials and recent servers on mount
+  // Load saved credentials on mount
   useEffect(() => {
     const creds = loadCredentials();
     if (creds) {
       setSavedCreds(creds);
       setAutoMode(true);
       setNick(creds.nick);
-      setServer(creds.server);
       setRememberMe(true);
     }
-    setRecentServers(loadRecentServers());
   }, []);
 
   const handleAutoConnect = useCallback(() => {
@@ -202,14 +160,6 @@ export default function LoginForm({ onSwitch }: Props) {
     return () => clearInterval(interval);
   }, [status]);
 
-  // Save recent server on successful connection
-  useEffect(() => {
-    if (status === 'connected') {
-      saveRecentServer({ url: server.trim(), nick: nick.trim() });
-      setRecentServers(loadRecentServers());
-    }
-  }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const lastError = notifications.filter(n => n.type === 'error').at(-1);
 
   const nickInvalid  = nick.length > 0 && NICK_INVALID_RE.test(nick);
@@ -223,25 +173,6 @@ export default function LoginForm({ onSwitch }: Props) {
     ? 'Nickname too long (max 30)'
     : '';
 
-  const handlePreset = (preset: typeof SERVER_PRESETS[number]) => {
-    if (preset.url) {
-      setServer(preset.url);
-      setActivePreset(preset.label);
-      setAdvanced(false);
-    } else {
-      setActivePreset('Custom');
-      setAdvanced(true);
-    }
-  };
-
-  const handleRecentClick = (recent: RecentServer) => {
-    setNick(recent.nick);
-    setServer(recent.url);
-    const match = SERVER_PRESETS.find(p => p.url === recent.url);
-    setActivePreset(match ? match.label : 'Custom');
-    if (!match) setAdvanced(true);
-  };
-
   const triggerShake = () => {
     setShake(true);
     setTimeout(() => setShake(false), 600);
@@ -251,20 +182,19 @@ export default function LoginForm({ onSwitch }: Props) {
     e.preventDefault();
     if (!nick.trim())   { setError('Nickname is required'); triggerShake(); return; }
     if (nickError)      { setError(nickError); triggerShake(); return; }
-    if (!server.trim()) { setError('Server URL is required'); triggerShake(); return; }
     setError('');
 
     if (rememberMe) {
       saveCredentials({
         nick:     nick.trim(),
-        server:   server.trim(),
+        server:   DEFAULT_SERVER,
         password: password || undefined,
       });
     } else {
       clearCredentials();
     }
 
-    connect({ url: server.trim(), nick: nick.trim(), password: password || undefined });
+    connect({ url: DEFAULT_SERVER, nick: nick.trim(), password: password || undefined });
   };
 
   const loading = status === 'connecting';
@@ -394,27 +324,6 @@ export default function LoginForm({ onSwitch }: Props) {
   return (
     <form onSubmit={submit} className={`auth-form-fields${shake ? ' form-shake' : ''}`} noValidate>
 
-      {/* Recent servers */}
-      {recentServers.length > 0 && (
-        <div className="recent-servers">
-          <span className="recent-label">Recent</span>
-          <div className="recent-list">
-            {recentServers.map((r, i) => (
-              <button
-                key={i}
-                type="button"
-                className="recent-chip"
-                onClick={() => handleRecentClick(r)}
-                disabled={loading}
-              >
-                <span className="recent-nick">{r.nick}</span>
-                <span className="recent-url">{r.label ?? r.url.replace(/^wss?:\/\//, '').replace(/\/.*$/, '')}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Nick field */}
       <FormField label="Username" required>
         <div className="input-wrap">
@@ -480,55 +389,6 @@ export default function LoginForm({ onSwitch }: Props) {
         />
         <span className="remember-text">Remember me</span>
       </label>
-
-      {/* Server presets */}
-      <div className="preset-row">
-        <span className="preset-label">
-          <IconServer />
-          Server
-        </span>
-        <div className="preset-chips">
-          {SERVER_PRESETS.map(p => (
-            <button
-              key={p.label}
-              type="button"
-              className={`preset-chip${activePreset === p.label ? ' preset-chip--active' : ''}`}
-              onClick={() => handlePreset(p)}
-              disabled={loading}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Advanced / custom server */}
-      <button
-        type="button"
-        className="advanced-toggle"
-        onClick={() => setAdvanced(a => !a)}
-      >
-        <span className={`advanced-arrow${advanced ? ' open' : ''}`}>▸</span>
-        Custom server URL
-      </button>
-
-      {advanced && (
-        <FormField label="Server URL">
-          <div className="input-wrap">
-            <span className="input-icon input-icon--left" aria-hidden="true">
-              <IconServer />
-            </span>
-            <input
-              type="text"
-              placeholder="wss://server/gateway"
-              value={server}
-              onChange={e => { setServer(e.target.value); setActivePreset('Custom'); }}
-              className="onyx-input onyx-input--has-icon onyx-input--mono"
-              disabled={loading}
-            />
-          </div>
-        </FormField>
-      )}
 
       {(error || lastError) && (
         <div className="auth-error" role="alert">
