@@ -364,7 +364,11 @@ export default function RegisterForm({ onSwitch }: Props) {
         className="advanced-toggle"
         onClick={() => setAdvanced(a => !a)}
       >
-        <span className={`advanced-arrow${advanced ? ' open' : ''}`}>▸</span>
+        <span className={`advanced-arrow${advanced ? ' open' : ''}`} aria-hidden="true">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M3 2l4 3-4 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </span>
         Advanced
       </button>
 

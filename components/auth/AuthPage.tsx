@@ -298,10 +298,16 @@ export default function AuthPage() {
         }
 
         .auth-tab--active {
-          background: linear-gradient(135deg, var(--bg-elevated), var(--bg-float));
-          color: var(--text-primary);
+          background: linear-gradient(160deg,
+            color-mix(in srgb, var(--accent) 14%, var(--bg-elevated)),
+            color-mix(in srgb, var(--accent) 6%, var(--bg-float))
+          );
+          color: var(--accent);
           font-weight: 700;
-          box-shadow: 0 1px 6px rgba(0,0,0,0.4), 0 0 0 1px var(--border-normal);
+          box-shadow:
+            0 1px 8px rgba(0,0,0,0.4),
+            0 0 0 1px var(--border-normal),
+            inset 0 -2px 0 0 var(--accent);
         }
 
         .auth-form-area {
@@ -378,15 +384,17 @@ function OceanLogo() {
   return (
     <svg width="44" height="44" viewBox="0 0 44 44" fill="none" aria-hidden="true">
       <rect width="44" height="44" rx="12" fill="url(#logo-grad)" />
-      <path
-        d="M22 9L33 15.5V26.5L22 33L11 26.5V15.5L22 9Z"
-        stroke="white"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-        fill="rgba(255,255,255,0.1)"
-      />
-      <circle cx="22" cy="22" r="5" fill="white" fillOpacity="0.92" />
-      <circle cx="22" cy="22" r="2.5" fill="url(#logo-grad)" fillOpacity="0.8" />
+      {/* Sonar rings — outermost to innermost */}
+      <circle cx="22" cy="22" r="15"  stroke="rgba(255,255,255,0.10)" strokeWidth="1.1" fill="none"/>
+      <circle cx="22" cy="22" r="10"  stroke="rgba(255,255,255,0.20)" strokeWidth="1.1" fill="none"/>
+      <circle cx="22" cy="22" r="5.5" stroke="rgba(255,255,255,0.32)" strokeWidth="1.1" fill="none"/>
+      {/* Sweep arm — pointing to ~1 o'clock */}
+      <line x1="22" y1="22" x2="31.5" y2="11.5"
+        stroke="rgba(255,255,255,0.65)" strokeWidth="1.5" strokeLinecap="round"/>
+      {/* Ping dot at sweep tip */}
+      <circle cx="31.5" cy="11.5" r="1.8" fill="rgba(255,255,255,0.88)"/>
+      {/* Center origin */}
+      <circle cx="22" cy="22" r="2.4" fill="white" fillOpacity="0.95"/>
       <defs>
         <linearGradient id="logo-grad" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stopColor="#0ea5e9" />
