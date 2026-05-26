@@ -2736,7 +2736,28 @@ export const useOnyxStore = create<OnyxState>()(
           {
             const connectedNick = params[0];
             const desiredNick = get().server?.nick ?? connectedNick;
-            set({ currentNickIsAlias: connectedNick.toLowerCase() !== desiredNick.toLowerCase() });
+            const isAlias = connectedNick.toLowerCase() !== desiredNick.toLowerCase();
+            set({ currentNickIsAlias: isAlias });
+
+            // If we landed on an alias AND we authenticated (SASL/password), reclaim the nick:
+            // 1. GHOST the session holding our nick via NickServ
+            // 2. After a short delay, NICK to the desired nick
+            if (isAlias) {
+              const password = get().server?.password;
+              const account  = get().server?.account;
+              const cl       = get().client;
+              if (cl && (password || account)) {
+                // Send GHOST to NickServ to kill the squatting session
+                cl.sendRaw('PRIVMSG', 'NickServ', `GHOST ${desiredNick}`);
+                // Wait 1.5s for NickServ to confirm, then reclaim the nick
+                setTimeout(() => {
+                  const { client: cl2, ourNick: cur } = get();
+                  if (cl2 && cur?.toLowerCase() !== desiredNick.toLowerCase()) {
+                    cl2.sendRaw('NICK', desiredNick);
+                  }
+                }, 1500);
+              }
+            }
           }
           // Send WATCH list to server
           {
@@ -3022,6 +3043,17 @@ export const useOnyxStore = create<OnyxState>()(
             const _svcBots = new Set(['nickserv', 'chanserv', 'hostserv', 'memoserv', 'botserv']);
             if (_svcBots.has(sender.toLowerCase())) {
               get().addServiceNotice(sender, text);
+              // NickServ GHOST success — reclaim nick immediately
+              if (sender.toLowerCase() === 'nickserv') {
+                const ghostOk = /ghost.*killed|has been killed|ghosted|your ghost/i.test(text);
+                if (ghostOk) {
+                  const desiredNick = get().server?.nick;
+                  const { client: ghostCl, ourNick: ghostCur } = get();
+                  if (ghostCl && desiredNick && ghostCur?.toLowerCase() !== desiredNick.toLowerCase()) {
+                    ghostCl.sendRaw('NICK', desiredNick);
+                  }
+                }
+              }
               // fall through so the message also appears in normal DM log
             }
           }
