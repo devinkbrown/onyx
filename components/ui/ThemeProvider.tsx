@@ -53,7 +53,7 @@ export default function ThemeProvider() {
       if (typeof window !== 'undefined') {
         return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'midnight' : 'light';
       }
-      return 'onyx';
+      return 'midnight';
     }
     return storeTheme;
   });
@@ -64,7 +64,7 @@ export default function ThemeProvider() {
       return;
     }
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const apply = (dark: boolean) => setResolvedTheme(dark ? 'onyx' : 'light');
+    const apply = (dark: boolean) => setResolvedTheme(dark ? 'midnight' : 'light');
     apply(mq.matches);
     const handler = (e: MediaQueryListEvent) => apply(e.matches);
     mq.addEventListener('change', handler);

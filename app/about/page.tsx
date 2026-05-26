@@ -109,7 +109,7 @@ export default function AboutPage() {
             <TechCard
               name="VEIL"
               tag="Encryption"
-              accentColor="#a78bfa"
+              accentColor="#0ea5e9"
               desc="P-256 ECDH key exchange with AES-256-GCM encryption for every LADON session. Group session keys derived with forward secrecy — no plaintext voice leaves your device."
               detail="P-256 ECDH · AES-256-GCM"
             />
