@@ -1283,8 +1283,13 @@ const _batchCollectors = new Map<string, { target: string; messages: ChatMessage
 let _motdBuffer = '';
 
 // ── Latency ping tracking (module-level) ─────────────────────────────────────
-/** cookie → timestamp ms when that PING was sent */
+/** cookie → performance.now() timestamp when that PING was sent */
 const _pingTimestamps = new Map<string, number>();
+
+/** High-res timestamp, falls back to Date.now() in non-browser envs */
+function _now(): number {
+  return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
 
 // ── Ban list accumulator (module-level) ───────────────────────────────────────
 /** channel.toLowerCase() → accumulated bans while RPL_BANLIST numerics arrive */
@@ -2704,8 +2709,9 @@ export const useOnyxStore = create<OnyxState>()(
           get().client?.sendRaw('LUSERS');
           // Send initial latency ping
           {
-            const cookie = `lat-${Date.now()}`;
-            _pingTimestamps.set(cookie, Date.now());
+            const t = _now();
+            const cookie = `lat-${t|0}`;
+            _pingTimestamps.set(cookie, t);
             get().client?.sendRaw('PING', cookie);
           }
           // Auto-join configured channels (fall back to #root on eshmaki.me)
@@ -4509,14 +4515,16 @@ export const useOnyxStore = create<OnyxState>()(
             const sentAt = _pingTimestamps.get(cookie);
             if (sentAt !== undefined) {
               _pingTimestamps.delete(cookie);
-              get().setLatency(Date.now() - sentAt);
+              // Round to nearest ms for display; sub-ms RTT is noise
+              get().setLatency(Math.round(_now() - sentAt));
             }
             // Schedule next latency ping in 30s
             setTimeout(() => {
               const { client, connectionStatus } = get();
               if (client && connectionStatus === 'connected') {
-                const nextCookie = `lat-${Date.now()}`;
-                _pingTimestamps.set(nextCookie, Date.now());
+                const t = _now();
+                const nextCookie = `lat-${t|0}`;
+                _pingTimestamps.set(nextCookie, t);
                 client.sendRaw('PING', nextCookie);
               }
             }, 30_000);

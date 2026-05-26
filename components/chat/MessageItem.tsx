@@ -837,7 +837,6 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
   const [editDraft,    setEditDraft]    = useState('');
   const [contextMenu,  setContextMenu]  = useState<{ x: number; y: number } | null>(null);
   const [miniCard,     setMiniCard]     = useState<{ nick: string; el: HTMLElement } | null>(null);
-  const [hovered,      setHovered]      = useState(false);
   const [animNew,      setAnimNew]      = useState(isNew);
   const pickerRef    = useRef<HTMLDivElement>(null);
   const editInputRef = useRef<HTMLTextAreaElement>(null);
@@ -1200,8 +1199,6 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
       className={`msg-item ${grouped ? 'msg-grouped' : ''} ${highlight ? 'msg-item--highlight' : ''} ${isMe ? 'msg-item--self' : ''} ${isSelected ? 'msg-item--selected' : ''} ${animNew ? 'msg-new' : ''}`}
       style={{ paddingTop: grouped ? 2 : 10, paddingBottom: grouped ? 2 : 4 }}
       onClick={handleMsgClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       onContextMenu={e => {
         e.preventDefault();
         setContextMenu({ x: e.clientX, y: e.clientY });
@@ -1362,20 +1359,6 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
 
       {/* Grouped time — rendered inside msg-avatar-col above; this is kept for legacy compact usage */}
       {(compact && !isGrouped) && timeStr && <time className="msg-time-compact" aria-hidden>{timeStr}</time>}
-
-      {/* Quick react bar — compact pill on hover */}
-      {hovered && !isEditing && !deleted && !redacted && (
-        <QuickReactBar
-          msgId={message.id}
-          msgFrom={from}
-          onReact={emoji => addLocalReaction(message.target, message.id, emoji)}
-          onReply={() => setReplyingTo(message)}
-          onMore={e => {
-            e.preventDefault();
-            setContextMenu({ x: e.clientX, y: e.clientY });
-          }}
-        />
-      )}
 
       {/* Hover actions — hidden while editing, deleted or redacted */}
       {!isEditing && !deleted && !redacted && (
