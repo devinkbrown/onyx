@@ -147,11 +147,13 @@ function nickHue(nick: string): number {
 }
 
 export default function MessageInput({ target, placeholder, droppedFile, onDroppedFileConsumed, slowModeActive, onMessageSent, onTypingStart, onTypingStop }: Props) {
-  const sendMessage      = useOnyxStore(s => s.sendMessage);
-  const channels         = useOnyxStore(s => s.channels);
-  const activeView       = useOnyxStore(s => s.activeView);
-  const client           = useOnyxStore(s => s.client);
-  const replyingTo       = useOnyxStore(s => s.replyingTo);
+  const sendMessage        = useOnyxStore(s => s.sendMessage);
+  const channels           = useOnyxStore(s => s.channels);
+  const activeView         = useOnyxStore(s => s.activeView);
+  const client             = useOnyxStore(s => s.client);
+  const sendTypingStart    = useOnyxStore(s => s.sendTypingStart);
+  const sendTypingStop     = useOnyxStore(s => s.sendTypingStop);
+  const replyingTo         = useOnyxStore(s => s.replyingTo);
   const setReplyingTo    = useOnyxStore(s => s.setReplyingTo);
   const joinChannel      = useOnyxStore(s => s.joinChannel);
   const partChannel      = useOnyxStore(s => s.partChannel);
@@ -973,8 +975,8 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
     setSlashMenuOpen(false);
     setSlashQuery('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
-    if (typingTimer.current) clearTimeout(typingTimer.current);
-    client?.sendRaw('TAGMSG', target, '+typing=done');
+    if (typingTimer.current) { clearTimeout(typingTimer.current); typingTimer.current = null; }
+    sendTypingStop(target);
     // Clear CTCP typing stop timer on send
     if (ctcpTypingStopTimer.current) clearTimeout(ctcpTypingStopTimer.current);
     ctcpTypingStopTimer.current = null;
@@ -985,13 +987,13 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
   };
 
   const sendTyping = useCallback(() => {
-    if (!client || !target.startsWith('#')) return;
-    client.sendRaw('TAGMSG', target, '+typing=active');
+    sendTypingStart(target);
+    // If no further input arrives within 5 s, auto-stop (IRCv3 draft/typing)
     if (typingTimer.current) clearTimeout(typingTimer.current);
     typingTimer.current = setTimeout(() => {
-      client.sendRaw('TAGMSG', target, '+typing=done');
+      sendTypingStop(target);
     }, 5000);
-  }, [client, target]);
+  }, [target, sendTypingStart, sendTypingStop]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     const curAc  = acRef.current;

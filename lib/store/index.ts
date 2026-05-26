@@ -392,7 +392,7 @@ export interface OnyxState {
   showServices: boolean;
   servicesTab: 'account' | 'channel' | 'memos' | 'vhost' | 'nickserv' | 'chanserv' | 'hostserv' | 'memoserv';
 
-  // ── Service notices (replies from NickServ / ChanServ / HostServ / MemoServ / BotServ) ──
+  // ── Service notices (replies from Ophion built-in services: Account, Channel, Memo, etc.) ──
   serviceNotices: Array<{ source: string; text: string; time: Date }>;
   addServiceNotice(source: string, text: string): void;
   clearServiceNotices(): void;
@@ -1304,6 +1304,40 @@ let _nickAliasTryIdx = 0;
 let _reconnectCountdownTimer: ReturnType<typeof setInterval> | null = null;
 let _reconnectScheduleTimer: ReturnType<typeof setTimeout> | null = null;
 
+/** Original nick requested in the most recent connect() call.
+ *  Preserved even after the IRC client appends '_' on nick collision. */
+let _connectNick = '';
+/** Account authenticated via SASL (set on 900 RPL_LOGGEDIN, cleared on connect/disconnect). */
+let _saslAccount: string | null = null;
+
+// ── Nick reclaim timer (module-level) ────────────────────────────────────────
+/**
+ * When we land on an alias nick after SESSION-TOKEN auth, this interval
+ * periodically sends NICK <desiredNick> until the zombie dies and the nick
+ * is freed.  Handles ping-timeout zombies that aren't yet marked dead on
+ * the server when we first attempt the reclaim.
+ */
+let _nickReclaimTimer: ReturnType<typeof setInterval> | null = null;
+
+function _stopNickReclaim() {
+  if (_nickReclaimTimer) {
+    clearInterval(_nickReclaimTimer);
+    _nickReclaimTimer = null;
+  }
+}
+
+function _startNickReclaim(desiredNick: string) {
+  _stopNickReclaim();
+  _nickReclaimTimer = setInterval(() => {
+    const s = useOnyxStore.getState();
+    if (!s.currentNickIsAlias || !s.client) {
+      _stopNickReclaim();
+      return;
+    }
+    s.client.sendRaw('NICK', desiredNick);
+  }, 30_000);
+}
+
 function _reconnectDelay(attempt: number): number {
   return Math.min(5 * Math.pow(2, attempt), 60);
 }
@@ -1561,6 +1595,11 @@ export const useOnyxStore = create<OnyxState>()(
       // Clear any in-progress reconnect countdown
       _clearReconnectCountdown();
 
+      // Remember the desired nick before the IRC client may append '_' on collision
+      _stopNickReclaim();
+      _connectNick = nick;
+      _saslAccount = null;
+
       set({ status: 'connecting', connectionStatus: 'connecting', ourNick: nick, autoReconnect: true });
       _nickAliasTryIdx = 0;
 
@@ -1644,7 +1683,10 @@ export const useOnyxStore = create<OnyxState>()(
     // ── disconnect ───────────────────────────────────────────────────────
     disconnect() {
       _clearReconnectCountdown();
+      _stopNickReclaim();
       _reconnectAttempts = 0;
+      _connectNick  = '';
+      _saslAccount  = null;
       get().client?.destroy();
       set({
         client: null,
@@ -1765,6 +1807,12 @@ export const useOnyxStore = create<OnyxState>()(
         if (dm) dms.set(key, { ...dm, unread: 0, highlights: 0 });
         return { channels, dms };
       });
+      // IRCv3 draft/read-marker: sync read position with server so other sessions know
+      const { client } = get();
+      if (client?.negotiatedCaps.has('draft/read-marker')) {
+        const timestamp = new Date().toISOString();
+        client.sendRaw('MARKREAD', target, `timestamp=${timestamp}`);
+      }
     },
 
     // ── clearMessages ─────────────────────────────────────────────────────
@@ -1893,13 +1941,20 @@ export const useOnyxStore = create<OnyxState>()(
     addReaction(target, messageId, emoji) {
       const { client } = get();
       // IRCv3 draft/react via TAGMSG with message tags
-      if (client) {
+      if (client && client.negotiatedCaps.has('draft/react')) {
         client.tagmsg(target, {
           '+draft/react': emoji,
           '+draft/reply': messageId,
         });
+        // With echo-message the server echoes the TAGMSG back and the TAGMSG handler
+        // applies the reaction.  Without it we apply locally as an optimistic update.
+        if (!client.negotiatedCaps.has('echo-message')) {
+          get().addLocalReaction(target, messageId, emoji);
+        }
+      } else {
+        // No draft/react cap — apply locally only (fallback UX)
+        get().addLocalReaction(target, messageId, emoji);
       }
-      get().addLocalReaction(target, messageId, emoji);
     },
 
     removeReaction(target, messageId, emoji, reactionNick) {
@@ -2029,6 +2084,7 @@ export const useOnyxStore = create<OnyxState>()(
     sendTypingStart(target) {
       const { client } = get();
       if (!client) return;
+      if (!client.negotiatedCaps.has('draft/typing')) return;
       const key = target.toLowerCase();
       const now = Date.now();
       const lastSent = _typingLastSent.get(key) ?? 0;
@@ -2040,6 +2096,7 @@ export const useOnyxStore = create<OnyxState>()(
     sendTypingStop(target) {
       const { client } = get();
       if (!client) return;
+      if (!client.negotiatedCaps.has('draft/typing')) return;
       _typingLastSent.delete(target.toLowerCase()); // reset rate limit so next start fires immediately
       client.tagmsg(target, { '+typing': 'done' });
     },
@@ -2732,31 +2789,28 @@ export const useOnyxStore = create<OnyxState>()(
           }
           // Reset nick alias counter — we successfully registered
           _nickAliasTryIdx = 0;
-          // Check if connected nick is an alias (differs from desired nick)
+          // Determine the desired nick:
+          //   1. _saslAccount — canonical account name from 900 RPL_LOGGEDIN
+          //                     (handles saved credentials that stored an alias nick)
+          //   2. _connectNick — what was passed to connect()
+          //   3. connectedNick — final fallback
           {
             const connectedNick = params[0];
-            const desiredNick = get().server?.nick ?? connectedNick;
+            const desiredNick = (_saslAccount && _saslAccount !== '*')
+              ? _saslAccount
+              : (_connectNick || connectedNick);
             const isAlias = connectedNick.toLowerCase() !== desiredNick.toLowerCase();
             set({ currentNickIsAlias: isAlias });
 
-            // If we landed on an alias AND we authenticated (SASL/password), reclaim the nick:
-            // 1. GHOST the session holding our nick via NickServ
-            // 2. After a short delay, NICK to the desired nick
-            if (isAlias) {
-              const password = get().server?.password;
-              const account  = get().server?.account;
-              const cl       = get().client;
-              if (cl && (password || account)) {
-                // Send GHOST to NickServ to kill the squatting session
-                cl.sendRaw('PRIVMSG', 'NickServ', `GHOST ${desiredNick}`);
-                // Wait 1.5s for NickServ to confirm, then reclaim the nick
-                setTimeout(() => {
-                  const { client: cl2, ourNick: cur } = get();
-                  if (cl2 && cur?.toLowerCase() !== desiredNick.toLowerCase()) {
-                    cl2.sendRaw('NICK', desiredNick);
-                  }
-                }, 1500);
-              }
+            // If we landed on an alias after SESSION-TOKEN auth, the server
+            // already evicted the stale session in stoken_step — just reclaim
+            // the nick directly. No GHOST needed.
+            if (isAlias && _saslAccount) {
+              get().client?.sendRaw('NICK', desiredNick);
+              // Also start the periodic retry timer: if the zombie isn't dead
+              // yet (ping-timeout scenario), this retries every 30 s until
+              // the server kills the zombie and frees the nick.
+              _startNickReclaim(desiredNick);
             }
           }
           // Send WATCH list to server
@@ -3038,26 +3092,6 @@ export const useOnyxStore = create<OnyxState>()(
             break;
           }
 
-          // ── Route service bot NOTICEs to serviceNotices store ─────────────
-          if (command === 'NOTICE') {
-            const _svcBots = new Set(['nickserv', 'chanserv', 'hostserv', 'memoserv', 'botserv']);
-            if (_svcBots.has(sender.toLowerCase())) {
-              get().addServiceNotice(sender, text);
-              // NickServ GHOST success — reclaim nick immediately
-              if (sender.toLowerCase() === 'nickserv') {
-                const ghostOk = /ghost.*killed|has been killed|ghosted|your ghost/i.test(text);
-                if (ghostOk) {
-                  const desiredNick = get().server?.nick;
-                  const { client: ghostCl, ourNick: ghostCur } = get();
-                  if (ghostCl && desiredNick && ghostCur?.toLowerCase() !== desiredNick.toLowerCase()) {
-                    ghostCl.sendRaw('NICK', desiredNick);
-                  }
-                }
-              }
-              // fall through so the message also appears in normal DM log
-            }
-          }
-
           // ── Ophion session token (login persistence) ─────────────────────
           // Wire format: NOTICE <nick> :SESSIONTOKEN <token> <unix_expiry>
           // Ophion sends this after successful SASL to avoid storing passwords.
@@ -3066,8 +3100,11 @@ export const useOnyxStore = create<OnyxState>()(
             const token   = parts[1];
             const expiry  = parseInt(parts[2] ?? '0', 10);
             if (token && expiry > 0) {
+              // Pass the canonical account name so saved credentials always
+              // store 'kain' not 'kain_', fixing future auto-connect nicks.
+              const canonicalNick = _saslAccount ?? undefined;
               import('@/lib/credentials').then(({ storeSessionToken }) => {
-                storeSessionToken(token, expiry);
+                storeSessionToken(token, expiry, canonicalNick);
               }).catch(() => { /* ignore */ });
             }
             break; // do not display this as a visible message
@@ -3528,8 +3565,17 @@ export const useOnyxStore = create<OnyxState>()(
           const isSelf = oldNick.toLowerCase() === ourNick.toLowerCase();
 
           if (isSelf) {
-            const desiredNick = get().server?.nick ?? newNick;
-            set({ ourNick: newNick, currentNickIsAlias: newNick.toLowerCase() !== desiredNick.toLowerCase() });
+            // Any successful self-nick-change cancels the reclaim timer:
+            //   • If newNick == desiredNick  → reclaim succeeded, stop ✓
+            //   • If newNick == something else → user moved on, stop ✓
+            // In both cases the alias banner should clear.
+            _stopNickReclaim();
+            set(s => ({
+              ourNick: newNick,
+              currentNickIsAlias: false,
+              // Keep server.nick mirrored so downstream reads see the right value.
+              server: s.server ? { ...s.server, nick: newNick } : null,
+            }));
           }
 
           set(s => {
@@ -3689,7 +3735,14 @@ export const useOnyxStore = create<OnyxState>()(
           // Typing indicator
           const typingVal = msg.tags['+typing'] ?? msg.tags['typing'];
           if (typingVal && nick) {
-            get().setTyping(tagTarget, nick, typingVal === 'active');
+            const { ourNick: myNick } = get();
+            // For DMs the TAGMSG target is our own nick; store under sender's nick
+            // so TypingIndicator(channel=senderNick) can find it.
+            const typingKey = tagTarget.toLowerCase() === myNick.toLowerCase()
+              ? nick
+              : tagTarget;
+            const isActive = typingVal === 'active' || typingVal === 'paused';
+            get().setTyping(typingKey, nick, isActive);
           }
 
           // Reaction via draft/react
@@ -3845,6 +3898,32 @@ export const useOnyxStore = create<OnyxState>()(
         // ── Whiteboard — handled by useWhiteboard() hook via client.extraMessageHandlers ──
         // WHITEBOARD messages are consumed directly in hooks/useWhiteboard.ts
         // using client.extraMessageHandlers; no global store state needed.
+
+        // ── IRCv3 draft/read-marker ───────────────────────────────────────
+        // :server MARKREAD <target> timestamp=<ISO8601>
+        // Received when another session (or echo of our own) marks a target read.
+        case 'MARKREAD': {
+          const mrTarget = params[0];
+          if (!mrTarget) break;
+          // Clear local unread for the target — another session has read it.
+          // Only act if the sender is the server (no nick) or is our own nick;
+          // ignore MARKREAD from other users (shouldn't happen, but guard it).
+          const { ourNick: mrOurNick } = get();
+          const fromSelf = !nick || nick.toLowerCase() === mrOurNick.toLowerCase();
+          if (fromSelf) {
+            const mrKey = mrTarget.toLowerCase();
+            set(s => {
+              const channels = new Map(s.channels);
+              const ch = channels.get(mrKey);
+              if (ch) channels.set(mrKey, { ...ch, unread: 0, highlights: 0 });
+              const dms = new Map(s.dms);
+              const dm = dms.get(mrKey);
+              if (dm) dms.set(mrKey, { ...dm, unread: 0, highlights: 0 });
+              return { channels, dms };
+            });
+          }
+          break;
+        }
 
         // ── IRCv3 draft/message-redaction ─────────────────────────────────
         // :nick!u@h REDACT <target> <msgid> [:<reason>]
@@ -4162,12 +4241,15 @@ export const useOnyxStore = create<OnyxState>()(
         case '900': {
           // :server 900 nick nick!u@h account :You are now logged in as account
           const account900 = params[2] ?? null;
+          // Capture before server object exists (900 arrives during CAP/SASL, before 001)
+          _saslAccount = account900;
           set(s => ({ server: s.server ? { ...s.server, account: account900 } : null }));
           break;
         }
 
         case '901': {
           // :server 901 nick nick!u@h :You are now logged out
+          _saslAccount = null;
           set(s => ({ server: s.server ? { ...s.server, account: null } : null }));
           break;
         }
