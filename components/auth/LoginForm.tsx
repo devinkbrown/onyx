@@ -117,7 +117,7 @@ export default function LoginForm({ onSwitch }: Props) {
     nickRef.current?.focus();
   }, []);
 
-  // Load saved credentials on mount
+  // Load saved credentials on mount — auto-connect immediately if they exist
   useEffect(() => {
     const creds = loadCredentials();
     if (creds) {
@@ -125,7 +125,14 @@ export default function LoginForm({ onSwitch }: Props) {
       setAutoMode(true);
       setNick(creds.nick);
       setRememberMe(true);
+      // Fire connection immediately — no button press needed
+      connect({
+        url:      DEFAULT_SERVER,
+        nick:     creds.nick,
+        password: getAuthSecret(creds),
+      });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleAutoConnect = useCallback(() => {
@@ -200,9 +207,7 @@ export default function LoginForm({ onSwitch }: Props) {
   const hasError = Boolean(error || lastError);
 
   // ── Auto-reconnect card ─────────────────────────────────────────────────────
-  if (autoMode && savedCreds && !loading) {
-    const host = savedCreds.server.replace(/^wss?:\/\//, '').replace(/[/:].*/,'');
-    const hasToken = Boolean(savedCreds.sessionToken);
+  if (autoMode && savedCreds) {
     return (
       <div className="auto-reconnect">
         <div className="arc-avatar" aria-hidden="true">
@@ -210,15 +215,19 @@ export default function LoginForm({ onSwitch }: Props) {
         </div>
         <div className="arc-info">
           <span className="arc-nick">{savedCreds.nick}</span>
-          <span className="arc-server">{host}</span>
-          {hasToken && (
-            <span className="arc-token-badge">Session token active</span>
-          )}
+          <span className="arc-server">eshmaki.me</span>
         </div>
         <div className="arc-actions">
-          <Button variant="primary" fullWidth onClick={handleAutoConnect}>
-            Connect
-          </Button>
+          {loading ? (
+            <div className="arc-connecting">
+              <IconSpinner />
+              <span>{CONNECTION_STEPS[connStep]}</span>
+            </div>
+          ) : (
+            <Button variant="primary" fullWidth onClick={handleAutoConnect}>
+              Connect
+            </Button>
+          )}
           <button
             type="button"
             className="arc-switch"
@@ -290,6 +299,15 @@ export default function LoginForm({ onSwitch }: Props) {
             display: flex;
             flex-direction: column;
             gap: 8px;
+          }
+          .arc-connecting {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 10px;
+            font-size: 14px;
+            color: var(--text-secondary);
           }
           .arc-switch {
             background: none;
