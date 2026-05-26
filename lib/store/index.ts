@@ -2836,6 +2836,8 @@ export const useOnyxStore = create<OnyxState>()(
           const key = ch.toLowerCase();
           const joiner = nick ?? '';
           const isSelf = joiner.toLowerCase() === ourNick.toLowerCase();
+          // extended-join: params[1] = account ('*' = not logged in), params[2] = realname
+          const joinAccount = params[1] && params[1] !== '*' ? params[1] : undefined;
 
           if (isSelf) {
             // We joined — create channel if not exists
@@ -2857,7 +2859,12 @@ export const useOnyxStore = create<OnyxState>()(
               const c = channels.get(key);
               if (c) {
                 const users = new Map(c.users);
-                users.set(joiner.toLowerCase(), { nick: joiner, modes: new Set(), away: false });
+                users.set(joiner.toLowerCase(), {
+                  nick: joiner,
+                  modes: new Set(),
+                  away: false,
+                  ...(joinAccount ? { account: joinAccount } : {}),
+                });
                 const msgs = [...(c.messages ?? []), sysMsg(`${joiner} joined`, ch)];
                 channels.set(key, { ...c, users, messages: msgs } as Channel);
               }
@@ -3605,6 +3612,13 @@ export const useOnyxStore = create<OnyxState>()(
           }
           break;
         }
+
+        // ── CHGHOST (chghost cap) ─────────────────────────────────────────
+        // :nick!user@oldhost CHGHOST newuser newhost
+        // ChannelUser doesn't track host; consume silently to prevent the
+        // message falling through to the default unhandled-command branch.
+        case 'CHGHOST':
+          break;
 
         // ── Mode ──────────────────────────────────────────────────────────
         case 'MODE': {

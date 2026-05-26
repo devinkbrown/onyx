@@ -27,6 +27,12 @@ const RECONNECT_MAX = 60000;
 export class IRCClient {
   private ws: WebSocket | null = null;
   private opts: IRCClientOptions;
+  /**
+   * The nick passed to the constructor — never mutated even when the server
+   * sends 433 and we fall back to kain_.  Used as the SASL authcid so that
+   * SESSION-TOKEN (and PLAIN) always identify against the original nick/account.
+   */
+  private _authNick: string;
   private reconnectDelay = RECONNECT_BASE;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private pingTimer: ReturnType<typeof setTimeout> | null = null;
@@ -94,6 +100,8 @@ export class IRCClient {
 
   constructor(opts: IRCClientOptions) {
     this.opts = opts;
+    // Save before any nick mutations (433 collision appends '_')
+    this._authNick = opts.nick;
   }
 
   connect() {
@@ -372,13 +380,16 @@ export class IRCClient {
         if (this._saslMech === 'SESSION-TOKEN') {
           if (param === '+') {
             // Wire: base64(authcid NUL token)
-            const authcid = this.opts.nick;
+            // Use _authNick (original nick) — opts.nick may have been mutated
+            // to 'kain_' by the 433 handler before AUTHENTICATE fires.
+            const authcid = this._authNick;
             const token   = this.opts.password ?? '';
             this.sendRaw('AUTHENTICATE', btoa(`${authcid}\0${token}`));
           }
         } else if (this._saslMech === 'PLAIN') {
           if (param === '+') {
-            const nick = this.opts.nick;
+            // Use _authNick for the same reason — post-433, opts.nick is the alias.
+            const nick = this._authNick;
             const pass = this.opts.password ?? '';
             const plain = btoa(`\0${nick}\0${pass}`);
             this.sendRaw('AUTHENTICATE', plain);
@@ -507,15 +518,32 @@ export class IRCClient {
 
   private _wantedCaps(caps: string[]) {
     return [...new Set(caps)].filter(cap => {
-      // "tls" is the IRC STARTTLS upgrade cap. Ocean already uses WSS, so
-      // requesting it after the WebSocket TLS handshake is incorrect.
+      // ── Always-off caps ──────────────────────────────────────────────────
+      // STARTTLS upgrade: Ocean already uses WSS; requesting this is wrong.
       if (cap === 'tls') return false;
-      // Only request SASL when we can actually complete authentication.
+      // SASL: only request when we have credentials to send.
       if (cap === 'sasl') return Boolean(this.opts.password);
-      // "no-implicit-names" suppresses the automatic 353 NAMREPLY on JOIN.
-      // Ocean relies on the implicit 353 to populate the member list; we do
-      // not implement the explicit NAMES-on-join flow, so opt out of this cap.
+      // no-implicit-names: Ocean relies on the automatic 353 NAMREPLY on
+      // JOIN to populate the member list; opting in would suppress it.
       if (cap === 'no-implicit-names') return false;
+
+      // ── Unimplemented protocol caps ───────────────────────────────────────
+      // draft/multiline: Ocean splits newlines into separate PRIVMSGs; the
+      // BATCH-based multiline protocol is not implemented.
+      if (cap === 'draft/multiline') return false;
+      // draft/search: searchMessages() filters locally loaded messages;
+      // the server-side SEARCH command is not used.
+      if (cap === 'draft/search') return false;
+      // labeled-response: no @label= request/response correlation in Ocean.
+      if (cap === 'labeled-response') return false;
+      // draft/channel-rename: no RENAME command handler.
+      if (cap === 'draft/channel-rename') return false;
+      // draft/file-upload: Ocean uses HTTP POST to a media server;
+      // the IRC-level file-upload protocol is not implemented.
+      if (cap === 'draft/file-upload') return false;
+      // bot: Ocean is a human client, not a bot.
+      if (cap === 'bot') return false;
+
       return true;
     });
   }
@@ -526,7 +554,7 @@ export class IRCClient {
     const nonce = btoa(String.fromCharCode(...arr)).replace(/[+/=]/g, c =>
       c === '+' ? '-' : c === '/' ? '_' : ''
     );
-    const clientFirstMsgBare = `n=${this.opts.nick},r=${nonce}`;
+    const clientFirstMsgBare = `n=${this._authNick},r=${nonce}`;
     this._scramState = { clientFirstMsgBare, nonce };
     const msg = `n,,${clientFirstMsgBare}`;
     this.sendRaw('AUTHENTICATE', btoa(msg));
