@@ -247,7 +247,11 @@ export default function ModerationPanel() {
                   <span>Grant +o</span>
                 </button>
                 <button className="modpanel-action modpanel-action--deop" onClick={handleTakeO} disabled={!target}>
-                  <span className="modpanel-action-icon">✖</span>
+                  <span className="modpanel-action-icon" aria-hidden>
+                    <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                      <path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/>
+                    </svg>
+                  </span>
                   <span>Take +o</span>
                 </button>
               </div>

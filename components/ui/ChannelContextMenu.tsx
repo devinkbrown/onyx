@@ -191,7 +191,11 @@ export default function ChannelContextMenu({ channel, x, y, onClose }: Props) {
       </button>
       {hasColor && (
         <button className="ctx-item" onClick={handleClearColor} role="menuitem">
-          <span className="ctx-icon">✕</span>
+          <span className="ctx-icon" aria-hidden>
+            <svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+              <path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/>
+            </svg>
+          </span>
           Clear color label
         </button>
       )}
