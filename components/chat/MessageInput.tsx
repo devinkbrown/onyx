@@ -1344,7 +1344,9 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
             onClick={() => setReplyingTo(null)}
             aria-label="Cancel reply"
           >
-            ×
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+              <path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/>
+            </svg>
           </button>
         </div>
       )}
@@ -1824,9 +1826,12 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           border: none;
           color: var(--text-muted);
           cursor: pointer;
-          font-size: 18px;
-          line-height: 1;
-          padding: 0 2px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 22px;
+          height: 22px;
+          padding: 0;
           border-radius: var(--r-xs);
           flex-shrink: 0;
           transition: color var(--t-fast), background var(--t-fast);
@@ -2034,7 +2039,7 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         }
 
         @keyframes input-sent-flash {
-          0%   { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,90,245,0.28); }
+          0%   { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(14,165,233,0.25); }
           100% { border-color: var(--accent-border); box-shadow: 0 0 0 3px var(--accent-subtle); }
         }
 

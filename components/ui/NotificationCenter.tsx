@@ -205,7 +205,11 @@ function ChannelGroup({ channel, notes, readIds, onActivate, onDismiss }: Channe
       <div className="nc-channel-group nc-channel-group--expanded">
         <button className="nc-group-collapse" onClick={() => setExpanded(false)}>
           <span>{channel} · {notes.length} notifications</span>
-          <span className="nc-group-collapse-icon">▲</span>
+          <span className="nc-group-collapse-icon" aria-hidden>
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M1.5 5.5l2.5-3 2.5 3"/>
+            </svg>
+          </span>
         </button>
         {notes.map(note => (
           <NotificationCard
@@ -248,7 +252,11 @@ function ChannelGroup({ channel, notes, readIds, onActivate, onDismiss }: Channe
           {unreadInGroup > 0 && <span className="nc-group-more-badge">{unreadInGroup}</span>}
           +{notes.length - 1} more in {channel}
         </span>
-        <span className="nc-group-expand-icon">▼</span>
+        <span className="nc-group-expand-icon" aria-hidden>
+          <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M1.5 2.5l2.5 3 2.5-3"/>
+          </svg>
+        </span>
       </button>
     </div>
   );
@@ -482,7 +490,10 @@ export default function NotificationCenter({ onClose }: Props) {
                     ))}
                     {olderItems.length > 0 && !olderExpanded && (
                       <button className="nc-older-toggle" onClick={() => setOlderExpanded(true)}>
-                        {olderItems.length} older notification{olderItems.length !== 1 ? 's' : ''} ▼
+                        {olderItems.length} older notification{olderItems.length !== 1 ? 's' : ''}
+                        <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft:4,verticalAlign:'middle',flexShrink:0}} aria-hidden>
+                          <path d="M1.5 2.5l2.5 3 2.5-3"/>
+                        </svg>
                       </button>
                     )}
                     {olderItems.length > 0 && olderExpanded && (
@@ -498,7 +509,10 @@ export default function NotificationCenter({ onClose }: Props) {
                           />
                         ))}
                         <button className="nc-older-toggle" onClick={() => setOlderExpanded(false)}>
-                          Collapse ▲
+                          Collapse
+                          <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{marginLeft:4,verticalAlign:'middle',flexShrink:0}} aria-hidden>
+                            <path d="M1.5 5.5l2.5-3 2.5 3"/>
+                          </svg>
                         </button>
                       </>
                     )}

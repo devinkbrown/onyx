@@ -1441,7 +1441,9 @@ function VoiceChannelRow({ channel, active, onClick, speakingNicks, participants
               aria-label="Leave voice channel"
               title="Leave voice"
             >
-              ✕
+              <svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+                <path d="M1 1l7 7M8 1l-7 7"/>
+              </svg>
             </button>
           )}
           {!hovered && !active && hasUsers && (

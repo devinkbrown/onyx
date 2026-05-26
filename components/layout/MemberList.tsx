@@ -240,7 +240,9 @@ export default function MemberList() {
             onClick={() => { setSearch(''); inputRef.current?.focus(); }}
             aria-label="Clear search"
           >
-            ×
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+              <path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/>
+            </svg>
           </button>
         )}
         <button
@@ -287,8 +289,10 @@ export default function MemberList() {
                   aria-expanded={!isCollapsed}
                   aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${g.label}`}
                 >
-                  <span className={`ml-group-arrow${isCollapsed ? ' ml-group-arrow--collapsed' : ''}`}>
-                    ▼
+                  <span className={`ml-group-arrow${isCollapsed ? ' ml-group-arrow--collapsed' : ''}`} aria-hidden>
+                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1.5 2.5l2.5 3 2.5-3"/>
+                    </svg>
                   </span>
                   {g.label} — {g.members.length}
                 </button>
@@ -516,8 +520,8 @@ export default function MemberList() {
         }
 
         .ml-group-arrow {
-          font-size: 8px;
-          display: inline-block;
+          display: inline-flex;
+          align-items: center;
           transition: transform 0.2s var(--ease-out, cubic-bezier(0.16,1,0.3,1));
           opacity: 0.55;
           flex-shrink: 0;

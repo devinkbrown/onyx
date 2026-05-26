@@ -82,7 +82,9 @@ export default function DMSearchBar({ nick, onClose }: Props) {
               onClick={() => setCursor(c => Math.max(0, c - 1))}
               disabled={cursor === 0}
             >
-              ▲
+              <svg width="9" height="9" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M1.5 5.5l2.5-3 2.5 3"/>
+              </svg>
             </button>
             <button
               className="dmsb-nav-btn"
@@ -90,11 +92,17 @@ export default function DMSearchBar({ nick, onClose }: Props) {
               onClick={() => setCursor(c => Math.min(results.length - 1, c + 1))}
               disabled={cursor >= results.length - 1}
             >
-              ▼
+              <svg width="9" height="9" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M1.5 2.5l2.5 3 2.5-3"/>
+              </svg>
             </button>
           </>
         )}
-        <button className="dmsb-close-btn" onClick={onClose} aria-label="Close search">✕</button>
+        <button className="dmsb-close-btn" onClick={onClose} aria-label="Close search">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+            <path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/>
+          </svg>
+        </button>
       </div>
 
       {query.trim() && results.length > 0 && (

@@ -209,7 +209,11 @@ export function PollCreateModal({ channel, onClose }: PollCreateModalProps) {
       <div className="pcm-modal">
         <div className="pcm-header">
           <h3 id={headingId} className="pcm-title">Create Poll</h3>
-          <button className="pcm-close" onClick={onClose} aria-label="Close">✕</button>
+          <button className="pcm-close" onClick={onClose} aria-label="Close">
+            <svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+              <path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/>
+            </svg>
+          </button>
         </div>
         <div className="pcm-body">
           <label className="pcm-label" htmlFor="pcm-question">Question</label>
@@ -238,7 +242,11 @@ export function PollCreateModal({ channel, onClose }: PollCreateModalProps) {
                   type="button"
                   onClick={() => removeOption(idx)}
                   aria-label={`Remove option ${idx + 1}`}
-                >✕</button>
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+                    <path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/>
+                  </svg>
+                </button>
               )}
             </div>
           ))}
