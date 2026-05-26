@@ -6379,8 +6379,15 @@ function _loadBoolPref(key: string): boolean {
 
 // ── Display theme persistence ─────────────────────────────────────────────────
 function _loadDisplayTheme(): OnyxState['theme'] {
-  if (typeof window === 'undefined') return 'onyx';
+  if (typeof window === 'undefined') return 'midnight';
   const stored = localStorage.getItem('ocean-theme');
+  // v2 migration: 'onyx' was the old default — migrate to 'midnight' unless
+  // the user explicitly re-selected it after the migration flag was written.
+  if (stored === 'onyx' && !localStorage.getItem('ocean-theme-v2')) {
+    localStorage.setItem('ocean-theme', 'midnight');
+    localStorage.setItem('ocean-theme-v2', '1');
+    return 'midnight';
+  }
   if (stored === 'midnight' || stored === 'onyx' || stored === 'ash' || stored === 'amoled' || stored === 'light' || stored === 'system') {
     return stored;
   }
