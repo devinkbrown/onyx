@@ -31,6 +31,23 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={inter.variable}>
       <head>
+        {/* Inline theme script — runs synchronously before CSS paints.
+            Migrates old 'onyx' default → 'midnight' and applies data-theme
+            immediately so there is no flash of wrong theme. */}
+        <script dangerouslySetInnerHTML={{ __html: `(function(){
+  try {
+    var t = localStorage.getItem('ocean-theme');
+    if (t === 'onyx' && !localStorage.getItem('ocean-theme-v2')) {
+      t = 'midnight';
+      localStorage.setItem('ocean-theme', 'midnight');
+      localStorage.setItem('ocean-theme-v2', '1');
+    }
+    var valid = ['midnight','onyx','ash','amoled','light'];
+    document.documentElement.setAttribute('data-theme', valid.indexOf(t) !== -1 ? t : 'midnight');
+  } catch(e) {
+    document.documentElement.setAttribute('data-theme', 'midnight');
+  }
+})();` }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
