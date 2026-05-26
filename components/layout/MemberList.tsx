@@ -8,7 +8,6 @@ import Avatar from '@/components/ui/Avatar';
 import UserPopover from '@/components/ui/UserPopover';
 import MemberContextMenu from '@/components/ui/MemberContextMenu';
 import { getNickColor } from '@/lib/nick-color';
-import { RoleBadge } from '@/components/ui/RoleBadge';
 import EmptyState from '@/components/ui/EmptyState';
 import { parseActivity, activityShort } from '@/lib/activity';
 
@@ -613,7 +612,6 @@ function MemberRow({
   role: string;
   onContextMenu: (e: React.MouseEvent, member: ChannelUser) => void;
 }) {
-  const prefix               = MODE_PREFIX[role] ?? '';
   const roleStyle            = ROLE_STYLES[role] ?? null;
   const userProps            = useOnyxStore(s => s.userProps);
   const userActivities       = useOnyxStore(s => s.userActivities);
@@ -667,7 +665,6 @@ function MemberRow({
 
         <div className="mr-text">
           <span className="mr-nick">
-            {prefix && <RoleBadge prefix={prefix} />}
             <span style={{ color: getNickColor(user.nick) }} className={user.away ? 'mr-nick-away' : ''}>
               {displayName}
             </span>

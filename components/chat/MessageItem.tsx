@@ -14,7 +14,6 @@ import IrcText from '@/components/chat/IrcText';
 import { hasIrcFormatting, stripIrcFormatting } from '@/lib/ircColors';
 import PollMessage, { POLL_PATTERN } from '@/components/chat/PollMessage';
 import { getNickColor } from '@/lib/nick-color';
-import { RoleBadge } from '@/components/ui/RoleBadge';
 import { STICKER_PATTERN, STICKER_PACKS } from '@/lib/stickers';
 import QuickReactBar from '@/components/chat/QuickReactBar';
 import AvatarStack from '@/components/ui/AvatarStack';
@@ -1006,19 +1005,6 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
     return false;
   }, [from, activeView, channels]);
 
-  // Resolve sender's highest IRC mode prefix for the active channel
-  const senderPrefix = useMemo((): string => {
-    if (!from) return '';
-    const target = message.target.toLowerCase();
-    const ch = channels.get(target);
-    if (!ch) return '';
-    const user = ch.users.get(from.toLowerCase());
-    if (!user) return '';
-    for (const [mode, pfx] of Object.entries(MSG_MODE_PREFIX)) {
-      if (user.modes.has(mode)) return pfx;
-    }
-    return '';
-  }, [from, message.target, channels]);
 
   const isSystem  = type === 'system' || type === 'error' || !from;
   const isAction  = type === 'action';
@@ -1242,7 +1228,6 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
                 openUserProfileCard(from, { x: e.clientX, y: e.clientY });
               }}
             >
-              {senderPrefix && <RoleBadge prefix={senderPrefix} />}
               {getDisplayName(from)}
             </span>
             {isBot && <span className="bot-badge">BOT</span>}

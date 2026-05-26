@@ -12,9 +12,10 @@
  *
  * Session tokens are issued by Ophion after successful SASL auth via:
  *   NOTICE <nick> :SESSIONTOKEN <token> <expires_unix>
- * When a valid token is present Ocean sends AUTHENTICATE PLAIN with the
- * token in place of the password; Ophion accepts it as a one-time secret.
- * This way the user's actual password never needs to be persisted.
+ * When a valid token is present Ocean uses AUTHENTICATE SESSION-TOKEN
+ * (the IRC client detects the "sst_" prefix and selects the mechanism
+ * automatically).  This way the user's actual password never needs to be
+ * persisted.
  *
  * When no token is present (first login or expired) the password is used
  * for SASL PLAIN / SCRAM.  The password is stored in plain text — same as
@@ -85,15 +86,24 @@ export function saveCredentials(opts: {
 /**
  * Store a session token received from Ophion.
  * expiresAt is a Unix timestamp (seconds).
+ * canonicalNick — if provided, overwrites the stored nick with the account
+ *   name so future auto-connects use the real nick, not a '_'-suffixed alias.
  */
-export function storeSessionToken(token: string, expiresAt: number): void {
+export function storeSessionToken(token: string, expiresAt: number, canonicalNick?: string): void {
   if (typeof window === 'undefined') return;
   try {
     const existing = loadCredentials();
     if (!existing) return; // Only store tokens when we have base credentials
     const expiry = new Date(expiresAt * 1000).toISOString();
-    const creds: SavedCredentials = { ...existing, sessionToken: token, tokenExpiry: expiry };
+    const creds: SavedCredentials = {
+      ...existing,
+      nick:        canonicalNick ?? existing.nick,
+      sessionToken: token,
+      tokenExpiry:  expiry,
+    };
     localStorage.setItem(KEY, JSON.stringify(creds));
+    // Keep legacy nick key in sync
+    if (canonicalNick) localStorage.setItem('ocean-saved-nick', canonicalNick);
   } catch { /* quota */ }
 }
 

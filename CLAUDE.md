@@ -31,7 +31,7 @@ No STUN/TURN servers needed.
 | +q (owner) | Owner role (gold) |
 | +o (operator) | Op role (violet) |
 | +v (voice) | Voice role (green) |
-| NickServ account | Ocean account |
+| Ophion account (built-in) | Ocean account |
 | CHATHISTORY | Message history |
 | IRCX PROP | Channel/user properties |
 | IRCX ACCESS | Permission overrides |
@@ -60,9 +60,16 @@ All design tokens live in `app/globals.css` under `:root`.
 
 ## Auth features integrated
 - **SASL PLAIN** — direct password login
+- **SASL SESSION-TOKEN** — persistent login via Ophion-issued 30-day tokens (auto-selected when token present)
 - **SCRAM-SHA-256/512** — preferred if server advertises it (auto-selected)
-- **NickServ REGISTER** — in-app registration UI
 - **CERTFP** — future: cert-based auth
 - **IDENTIFY** — automatic on connect when password provided
-- **GHOST** — kill a stale session with same nick
+- **ACCOUNT GHOST** — kill a stale session using Ophion's built-in services (no NickServ)
 - **ACCOUNT** tag — account name auto-populates from server
+
+## Services (Ophion built-in — NO NickServ bot)
+Ophion services are built into the ircd. Commands are sent as `ACCOUNT <subcommand>`, not `PRIVMSG NickServ`.
+Server notices from services arrive as `:<server> NOTICE <nick> :<Service>: <message>`.
+- `ACCOUNT GHOST <nick>` — kill a stale session claiming your nick
+- `ACCOUNT RECOVER <nick> <password>` — reclaim a nick without being identified
+- `ACCOUNT REGISTER <password>` — register an account
