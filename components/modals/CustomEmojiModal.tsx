@@ -82,7 +82,7 @@ export default function CustomEmojiModal() {
       <div className="cem-modal" role="dialog" aria-modal aria-label="Custom Emoji">
         <div className="cem-header">
           <h2 className="cem-title">Custom Emoji</h2>
-          <button className="cem-close" onClick={closeModal} aria-label="Close">×</button>
+          <button className="cem-close" onClick={closeModal} aria-label="Close"><svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></button>
         </div>
 
         {/* Existing emoji grid */}
@@ -100,7 +100,9 @@ export default function CustomEmojiModal() {
                     onClick={() => removeCustomEmoji(ce.name)}
                     aria-label={`Remove :${ce.name}:`}
                   >
-                    ×
+                    <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+                      <path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/>
+                    </svg>
                   </button>
                 </div>
               ))}

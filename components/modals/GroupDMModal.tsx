@@ -59,7 +59,7 @@ export default function GroupDMModal() {
 
         <header className="gdm-header">
           <h2 className="gdm-title">New Group Conversation</h2>
-          <button className="gdm-close" onClick={closeGroupDM} aria-label="Close">✕</button>
+          <button className="gdm-close" onClick={closeGroupDM} aria-label="Close"><svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></button>
         </header>
 
         {/* Selected user chips */}
@@ -73,7 +73,7 @@ export default function GroupDMModal() {
                   className="gdm-chip-remove"
                   onClick={() => removeSelected(nick)}
                   aria-label={`Remove ${nick}`}
-                >✕</button>
+                ><svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></button>
               </span>
             ))}
           </div>

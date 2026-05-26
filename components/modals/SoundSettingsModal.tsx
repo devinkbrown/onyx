@@ -50,7 +50,7 @@ export default function SoundSettingsModal() {
 
         <header className="ssm-header">
           <h2 className="ssm-title">Sound Settings</h2>
-          <button className="ssm-close" onClick={closeSoundSettings} aria-label="Close">✕</button>
+          <button className="ssm-close" onClick={closeSoundSettings} aria-label="Close"><svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></button>
         </header>
 
         {/* ── Master controls ── */}
