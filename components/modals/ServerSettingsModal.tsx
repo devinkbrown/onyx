@@ -1472,7 +1472,6 @@ const ssSharedStyles = `
 
 const IRC_ROLES = [
   { mode: 'q', symbol: '~', label: 'Owner',    color: '#e8b84b', description: 'Channel founders and owners — full control' },
-  { mode: 'a', symbol: '&', label: 'Admin',    color: '#f87171', description: 'Channel administrators — almost full control' },
   { mode: 'o', symbol: '@', label: 'Operator', color: '#0ea5e9', description: 'Channel operators — manage messages, kick, ban' },
   { mode: 'v', symbol: '+', label: 'Voice',    color: '#23a55a', description: 'Voiced users — can speak in moderated channels' },
   { mode:  '', symbol: '',  label: 'Member',   color: '#9ca3af', description: 'Regular channel members' },
@@ -1490,7 +1489,7 @@ function RolesTab() {
     if (!channel) return 0;
     if (!mode) {
       return Array.from(channel.users.values()).filter(u =>
-        !u.modes.has('q') && !u.modes.has('a') && !u.modes.has('o') &&
+        !u.modes.has('q') && !u.modes.has('o') &&
         !u.modes.has('h') && !u.modes.has('v')
       ).length;
     }
