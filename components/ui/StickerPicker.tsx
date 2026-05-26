@@ -120,7 +120,7 @@ export default function StickerPicker({ onPick, onClose }: Props) {
           background: var(--bg-float, #1a2c40);
           backdrop-filter: blur(20px);
           -webkit-backdrop-filter: blur(20px);
-          border: 1px solid var(--border-subtle, rgba(124,90,245,0.08));
+          border: 1px solid var(--border-subtle, rgba(14,165,233,0.08));
           border-radius: 12px;
           box-shadow: 0 12px 48px rgba(0,0,0,0.65), 0 2px 8px rgba(0,0,0,0.4);
           z-index: 200;
@@ -141,7 +141,7 @@ export default function StickerPicker({ onPick, onClose }: Props) {
           flex-shrink: 0;
           overflow-x: auto;
           scrollbar-width: none;
-          border-bottom: 1px solid var(--border-subtle, rgba(124,90,245,0.08));
+          border-bottom: 1px solid var(--border-subtle, rgba(14,165,233,0.08));
         }
 
         .sp-tabs::-webkit-scrollbar { display: none; }
@@ -181,16 +181,16 @@ export default function StickerPicker({ onPick, onClose }: Props) {
           padding: 8px;
           overflow-y: auto;
           scrollbar-width: thin;
-          scrollbar-color: var(--border-normal, rgba(124,90,245,0.12)) transparent;
+          scrollbar-color: var(--border-normal, rgba(14,165,233,0.12)) transparent;
         }
 
         .sp-grid::-webkit-scrollbar { width: 4px; }
         .sp-grid::-webkit-scrollbar-thumb {
-          background: var(--border-normal, rgba(124,90,245,0.12));
+          background: var(--border-normal, rgba(14,165,233,0.12));
           border-radius: 2px;
         }
         .sp-grid::-webkit-scrollbar-thumb:hover {
-          background: var(--border-subtle, rgba(124,90,245,0.2));
+          background: var(--border-subtle, rgba(14,165,233,0.2));
         }
 
         /* ── Sticker tile — 64px cells ── */
@@ -201,7 +201,7 @@ export default function StickerPicker({ onPick, onClose }: Props) {
           justify-content: center;
           gap: 4px;
           background: rgba(255,255,255,0.025);
-          border: 1px solid var(--border-subtle, rgba(124,90,245,0.06));
+          border: 1px solid var(--border-subtle, rgba(14,165,233,0.06));
           border-radius: 8px;
           padding: 8px 4px 6px;
           cursor: pointer;

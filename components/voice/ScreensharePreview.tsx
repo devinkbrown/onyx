@@ -89,17 +89,17 @@ export default function ScreensharePreview() {
             flex-direction: column;
             align-items: center;
             gap: 10px;
-            border: 1px solid rgba(124,90,245,0.3);
+            border: 1px solid rgba(14,165,233,0.3);
             border-radius: 10px;
             background: var(--bg-deep);
             padding: 16px 14px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(124,90,245,0.1);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(14,165,233,0.1);
           }
 
           .screenshare-init-icon {
             font-size: 28px;
             line-height: 1;
-            filter: drop-shadow(0 2px 6px rgba(124,90,245,0.4));
+            filter: drop-shadow(0 2px 6px rgba(14,165,233,0.4));
           }
 
           .screenshare-init-title {

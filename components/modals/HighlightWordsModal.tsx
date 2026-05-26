@@ -255,7 +255,7 @@ const styles = `
   .hlm-input::placeholder { color: var(--text-muted, #3d6480); }
   .hlm-input:focus {
     border-color: var(--accent, #0ea5e9);
-    box-shadow: 0 0 0 2px rgba(124,90,245,0.18);
+    box-shadow: 0 0 0 2px rgba(14,165,233,0.18);
   }
 
   .hlm-add-btn {

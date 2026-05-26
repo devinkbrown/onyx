@@ -198,13 +198,6 @@ export default function ServerBar() {
         </button>
       </Tooltip>
 
-      {/* Add server placeholder */}
-      <Tooltip text="Add a server" side="right">
-        <button className="server-btn server-btn--add" aria-label="Add server">
-          <PlusIcon />
-        </button>
-      </Tooltip>
-
       {/* Keyboard shortcuts hint */}
       <Tooltip text="Keyboard Shortcuts  (?)" side="right">
         <button

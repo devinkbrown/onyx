@@ -11,7 +11,7 @@ const MAX_CONTENT = 4000;
 // ── Deterministic tag color (same palette as ForumView) ───────────────────────
 
 const TAG_PALETTE = [
-  { bg: 'rgba(124,90,245,0.12)', text: '#9d7bf7', border: 'rgba(124,90,245,0.25)' },
+  { bg: 'rgba(14,165,233,0.12)', text: 'var(--accent)', border: 'rgba(14,165,233,0.25)' },
   { bg: 'rgba(14,165,233,0.12)', text: '#38bdf8', border: 'rgba(14,165,233,0.25)' },
   { bg: 'rgba(34,197,94,0.12)',  text: '#4ade80', border: 'rgba(34,197,94,0.25)'  },
   { bg: 'rgba(232,184,75,0.12)', text: '#f0c95c', border: 'rgba(232,184,75,0.25)' },
@@ -479,7 +479,7 @@ export default function ForumCreateModal() {
         }
         .fcm-tag-box:focus-within {
           border-color: var(--accent-border, rgba(14,165,233,0.5));
-          box-shadow: 0 0 0 3px rgba(124,90,245,0.12);
+          box-shadow: 0 0 0 3px rgba(14,165,233,0.12);
         }
         .fcm-tag-box--full { opacity: 0.75; }
 

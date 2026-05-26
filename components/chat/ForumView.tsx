@@ -22,7 +22,7 @@ function buildTopicWithTags(baseTopic: string, tags: string[]): string {
 // ── Deterministic tag color from string ───────────────────────────────────────
 
 const TAG_PALETTE = [
-  { bg: 'rgba(124,90,245,0.12)', text: '#9d7bf7', border: 'rgba(124,90,245,0.25)' },
+  { bg: 'rgba(14,165,233,0.12)', text: 'var(--accent)', border: 'rgba(14,165,233,0.25)' },
   { bg: 'rgba(14,165,233,0.12)', text: '#38bdf8', border: 'rgba(14,165,233,0.25)' },
   { bg: 'rgba(34,197,94,0.12)',  text: '#4ade80', border: 'rgba(34,197,94,0.25)'  },
   { bg: 'rgba(232,184,75,0.12)', text: '#f0c95c', border: 'rgba(232,184,75,0.25)' },

@@ -79,7 +79,7 @@ export default function ChannelWelcomeBanner({ channel, topic, memberCount, onDi
           align-items: flex-start;
           gap: 0;
           background: linear-gradient(135deg,
-            rgba(124,90,245,0.08) 0%,
+            rgba(14,165,233,0.08) 0%,
             var(--bg-elevated, #132131) 60%);
           border-bottom: 1px solid var(--border-subtle);
           padding: 12px 16px 14px;
@@ -93,7 +93,7 @@ export default function ChannelWelcomeBanner({ channel, topic, memberCount, onDi
           width: 3px;
           background: linear-gradient(180deg, var(--accent, #0ea5e9) 0%, var(--gold, #e8b84b) 100%);
           border-radius: 0 2px 2px 0;
-          box-shadow: 0 0 8px rgba(124,90,245,0.35);
+          box-shadow: 0 0 8px rgba(14,165,233,0.35);
         }
         .cwb-content {
           flex: 1;

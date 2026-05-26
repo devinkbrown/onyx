@@ -450,7 +450,7 @@ export default function MessageList({ messages, target, searchActive, searchMatc
         .msg-empty-dots-bg {
           position: absolute;
           inset: 0;
-          background-image: radial-gradient(circle, rgba(124,90,245,0.06) 1px, transparent 1px);
+          background-image: radial-gradient(circle, rgba(14,165,233,0.06) 1px, transparent 1px);
           background-size: 28px 28px;
           pointer-events: none;
         }
@@ -471,7 +471,7 @@ export default function MessageList({ messages, target, searchActive, searchMatc
         .msg-empty-icon {
           font-size: 36px;
           line-height: 1;
-          filter: drop-shadow(0 2px 8px rgba(124,90,245,0.35));
+          filter: drop-shadow(0 2px 8px rgba(14,165,233,0.35));
         }
 
         .msg-empty-channel-title {
@@ -554,7 +554,7 @@ export default function MessageList({ messages, target, searchActive, searchMatc
           font-weight: 600;
           font-family: inherit;
           transition: opacity 150ms, transform 150ms;
-          box-shadow: 0 2px 12px rgba(124,90,245,0.3);
+          box-shadow: 0 2px 12px rgba(14,165,233,0.3);
         }
         .msg-empty-dm-hello:hover {
           opacity: 0.88;

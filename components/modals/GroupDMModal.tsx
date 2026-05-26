@@ -202,7 +202,7 @@ export default function GroupDMModal() {
           border-radius: var(--r-full);
           transition: background var(--t-fast);
         }
-        .gdm-chip:hover { background: rgba(124,90,245,0.18); }
+        .gdm-chip:hover { background: rgba(14,165,233,0.18); }
 
         .gdm-chip-avatar {
           width: 18px;

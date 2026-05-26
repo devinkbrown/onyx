@@ -82,7 +82,7 @@ function NotificationCard({ note, isRead, onActivate, onDismiss }: CardProps) {
 
   const borderColor = {
     mention: 'var(--gold, #e8b84b)',
-    dm:      '#8b5cf6',
+    dm:      'var(--accent)',
     system:  '#3b82f6',
     error:   'var(--danger, #ed4245)',
   }[note.type] ?? 'var(--border-normal)';

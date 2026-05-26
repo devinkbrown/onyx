@@ -184,10 +184,10 @@ export default function SoundSettingsModal() {
 
         .ssm-panel {
           background: var(--bg-deep, #06101d);
-          border: 1px solid var(--border-normal, rgba(124,90,245,0.18));
+          border: 1px solid var(--border-normal, rgba(14,165,233,0.18));
           border-radius: 14px;
           width: min(440px, 94vw);
-          box-shadow: 0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px var(--border-subtle, rgba(124,90,245,0.07));
+          box-shadow: 0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px var(--border-subtle, rgba(14,165,233,0.07));
           overflow: hidden;
         }
 

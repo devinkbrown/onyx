@@ -1426,7 +1426,7 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
         .ch-mode-badge--ladon {
           color: var(--accent);
           border-color: var(--accent-border, rgba(14,165,233,0.3));
-          background: rgba(124,90,245,0.08);
+          background: rgba(14,165,233,0.08);
         }
 
         /* ── Thread list panel ── */

@@ -15,7 +15,7 @@ const PREFIX_CONFIG: Record<string, PrefixConfig> = {
 
 const BORDER_CONFIG: Record<string, string> = {
   '.': 'rgba(232,184,75,0.35)',
-  '@': 'rgba(124,90,245,0.35)',
+  '@': 'rgba(14,165,233,0.35)',
   '+': 'rgba(35,165,90,0.35)',
 };
 

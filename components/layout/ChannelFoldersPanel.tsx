@@ -601,7 +601,7 @@ function FolderSection({
           transition: background 80ms;
         }
         .cfp-row:hover { background: var(--ch-hover-bg, rgba(255,255,255,0.04)); }
-        .cfp-row--active { background: var(--ch-active-bg, rgba(124,90,245,0.2)) !important; }
+        .cfp-row--active { background: var(--ch-active-bg, rgba(14,165,233,0.2)) !important; }
         .cfp-row--drag-over {
           background: var(--accent-subtle, rgba(14,165,233,0.12));
           outline: 1px dashed var(--accent, #0ea5e9);

@@ -1197,7 +1197,7 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
       role="article"
       aria-label={`Message from ${from} at ${timeStr}`}
       aria-selected={isSelectMode ? isSelected : undefined}
-      className={`msg-item ${grouped ? 'msg-grouped' : ''} ${highlight ? 'msg-item--highlight' : ''} ${isMe ? 'msg-item--self' : ''} ${isSelected ? 'msg-item--selected' : ''} ${animNew ? 'msg-new' : ''} chat-msg-wrap`}
+      className={`msg-item ${grouped ? 'msg-grouped' : ''} ${highlight ? 'msg-item--highlight' : ''} ${isMe ? 'msg-item--self' : ''} ${isSelected ? 'msg-item--selected' : ''} ${animNew ? 'msg-new' : ''}`}
       style={{ paddingTop: grouped ? 2 : 10, paddingBottom: grouped ? 2 : 4 }}
       onClick={handleMsgClick}
       onMouseEnter={() => setHovered(true)}
@@ -1796,7 +1796,6 @@ const msgStyles = `
   @media (prefers-reduced-motion: reduce) {
     .msg-slide-in,
     .msg-new,
-    .chat-msg-wrap,
     .msg-reaction-btn,
     .av-pop,
     .msg-inline-edit {
@@ -1932,8 +1931,8 @@ const msgStyles = `
 
   /* Focused highlight (scroll-to-parent) */
   .msg--focused {
-    background: rgba(124,90,245,0.12) !important;
-    outline: 1px solid rgba(124,90,245,0.35);
+    background: rgba(14,165,233,0.12) !important;
+    outline: 1px solid rgba(14,165,233,0.35);
     border-radius: 4px;
     transition: background 0.4s ease, outline 0.4s ease;
   }
@@ -2132,7 +2131,7 @@ const msgStyles = `
     transform-origin: top right;
     transition: opacity 130ms ease, transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1);
   }
-  .chat-msg-wrap:hover .msg-actions-bar {
+  .msg-item:hover .msg-actions-bar {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
@@ -2159,7 +2158,7 @@ const msgStyles = `
   .action-btn--bookmarked { color: var(--gold); }
   .action-btn--bookmarked:hover { color: var(--gold); background: rgba(232,184,75,0.12); }
   .action-btn--suppressed { color: var(--text-muted); opacity: 0.7; }
-  .action-btn--suppressed:hover { color: var(--accent); opacity: 1; background: rgba(124,90,245,0.12); }
+  .action-btn--suppressed:hover { color: var(--accent); opacity: 1; background: rgba(14,165,233,0.12); }
 
   /* Thread reply link */
   .msg-thread-link {
@@ -2702,7 +2701,7 @@ const hiddenMsgStyles = `
     background: none; border: none; cursor: pointer; padding: 2px 6px;
     border-radius: 4px;
   }
-  .msg-hidden-reveal:hover { background: rgba(124,90,245,0.1); }
+  .msg-hidden-reveal:hover { background: rgba(14,165,233,0.1); }
 `;
 
 const collapsibleStyles = `

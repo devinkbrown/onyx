@@ -691,8 +691,8 @@ export default function SpotlightSearch() {
         }
 
         .sl-icon-command {
-          background: rgba(168, 85, 247, 0.12);
-          color: #a855f7;
+          background: var(--accent-subtle);
+          color: var(--accent);
         }
 
         .sl-result-name {

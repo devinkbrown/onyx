@@ -868,7 +868,7 @@ export default function VoiceBar() {
           border-radius: var(--r-md, 8px);
           overflow: hidden;
           border: 1.5px solid rgba(124, 90, 245, 0.55);
-          box-shadow: 0 4px 20px rgba(0,0,0,0.6), 0 0 0 1px rgba(124,90,245,0.2);
+          box-shadow: 0 4px 20px rgba(0,0,0,0.6), 0 0 0 1px rgba(14,165,233,0.2);
           z-index: 200;
           background: #000;
         }
@@ -922,8 +922,8 @@ export default function VoiceBar() {
           transform: scaleX(-1);
         }
         .voice-video-tile--self {
-          border-color: rgba(124,90,245,0.6);
-          box-shadow: 0 0 0 1px rgba(124,90,245,0.2) inset;
+          border-color: rgba(14,165,233,0.6);
+          box-shadow: 0 0 0 1px rgba(14,165,233,0.2) inset;
         }
 
         /* Speaking: green glow border */
@@ -934,7 +934,7 @@ export default function VoiceBar() {
 
         /* Screenshare: accent border */
         .voice-video-tile--screenshare {
-          border-color: rgba(124,90,245,0.55);
+          border-color: rgba(14,165,233,0.55);
         }
 
         /* Bottom label row */

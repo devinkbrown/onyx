@@ -38,8 +38,8 @@ export default function LadonStatusBadge() {
           white-space: nowrap;
         }
         .ladon-badge--e2e {
-          background: rgba(124,90,245,0.15);
-          border-color: rgba(124,90,245,0.35);
+          background: rgba(14,165,233,0.15);
+          border-color: rgba(14,165,233,0.35);
           color: var(--accent);
         }
         .ladon-badge-dot {
