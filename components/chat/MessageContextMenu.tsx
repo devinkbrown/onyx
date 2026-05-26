@@ -137,6 +137,7 @@ export default function MessageContextMenu({
   const [pos, setPos] = useState({ top: y, left: x });
 
   const addLocalReaction    = useOnyxStore(s => s.addLocalReaction);
+  const addReaction         = useOnyxStore(s => s.addReaction);
   const setReplyingTo       = useOnyxStore(s => s.setReplyingTo);
   const setForwardingMessage = useOnyxStore(s => s.setForwardingMessage);
   const pinMessage          = useOnyxStore(s => s.pinMessage);
@@ -250,8 +251,8 @@ export default function MessageContextMenu({
   // ── Action handlers ────────────────────────────────────────────────────────
 
   const handleQuickReact = useCallback((emoji: string) => {
-    run(() => addLocalReaction(message.target, message.id, emoji));
-  }, [run, addLocalReaction, message.target, message.id]);
+    run(() => addReaction(message.target, message.id, emoji));
+  }, [run, addReaction, message.target, message.id]);
 
   const handleReply = () => run(() => setReplyingTo(message));
 

@@ -798,6 +798,7 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
   const ourNick               = useOnyxStore(s => s.ourNick);
   const setReplyingTo         = useOnyxStore(s => s.setReplyingTo);
   const addLocalReaction      = useOnyxStore(s => s.addLocalReaction);
+  const addReaction           = useOnyxStore(s => s.addReaction);
   const editMessage           = useOnyxStore(s => s.editMessage);
   const deleteMessage         = useOnyxStore(s => s.deleteMessage);
   const pinMessage            = useOnyxStore(s => s.pinMessage);
@@ -1321,7 +1322,7 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
             ourNick={ourNick}
             messageId={message.id}
             target={message.target}
-            onToggle={emoji => addLocalReaction(message.target, message.id, emoji)}
+            onToggle={emoji => addReaction(message.target, message.id, emoji)}
           />
         )}
 
@@ -1367,7 +1368,7 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
             {showPicker && (
               <EmojiPicker
                 onPick={(emoji) => {
-                  addLocalReaction(message.target, message.id, emoji);
+                  addReaction(message.target, message.id, emoji);
                   setShowPicker(false);
                 }}
                 onClose={() => setShowPicker(false)}
