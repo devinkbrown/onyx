@@ -33,12 +33,10 @@ export default function Button({
         disabled={disabled || loading}
         {...rest}
       >
-        {loading
-          ? <span className="btn-spinner" aria-hidden />
-          : icon
-            ? <span className="btn-icon">{icon}</span>
-            : null
-        }
+        {/* Only show built-in spinner when loading AND caller didn't provide
+            custom loading content as children (avoids double-spinner). */}
+        {loading && !children ? <span className="btn-spinner" aria-hidden /> : null}
+        {!loading && icon ? <span className="btn-icon">{icon}</span> : null}
         {children && <span>{children}</span>}
       </button>
 

@@ -9,7 +9,7 @@ interface Props {
   onSwitch: () => void;
 }
 
-const DEFAULT_SERVER = process.env.NEXT_PUBLIC_IRC_WS ?? 'wss://eshmaki.me/gateway';
+const DEFAULT_SERVER = process.env.NEXT_PUBLIC_IRC_WS ?? 'wss://eshmaki.me:8080';
 
 type Step = 'fill' | 'verify';
 
@@ -20,15 +20,6 @@ function IconUser() {
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <circle cx="8" cy="5.5" r="2.5" stroke="currentColor" strokeWidth="1.3" fill="none" />
       <path d="M2.5 13.5C2.5 11.015 5.015 9 8 9s5.5 2.015 5.5 4.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none" />
-    </svg>
-  );
-}
-
-function IconEmail() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <rect x="1.5" y="3.5" width="13" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.3" fill="none" />
-      <path d="M1.5 5.5l6.5 4 6.5-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none" />
     </svg>
   );
 }
@@ -124,7 +115,6 @@ export default function RegisterForm({ onSwitch }: Props) {
 
   const [step,          setStep]          = useState<Step>('fill');
   const [nick,          setNick]          = useState('');
-  const [email,         setEmail]         = useState('');
   const [password,      setPassword]      = useState('');
   const [confirm,       setConfirm]       = useState('');
   const [showPassword,  setShowPassword]  = useState(false);
@@ -137,7 +127,6 @@ export default function RegisterForm({ onSwitch }: Props) {
 
   // Inline validation touched state
   const [nickTouched,     setNickTouched]     = useState(false);
-  const [emailTouched,    setEmailTouched]     = useState(false);
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [confirmTouched,  setConfirmTouched]  = useState(false);
 
@@ -154,8 +143,6 @@ export default function RegisterForm({ onSwitch }: Props) {
 
   // Inline validation
   const nickInline    = nickTouched && !nick.trim()    ? 'Nickname required' : '';
-  const emailInline   = emailTouched && !email.trim()  ? 'Email required'
-                      : emailTouched && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? 'Enter a valid email' : '';
   const pwInline      = passwordTouched && !password   ? 'Password required'
                       : passwordTouched && password.length < 6 ? 'Minimum 6 characters' : '';
   const confirmInline = confirmTouched && passwordsMismatch ? 'Passwords do not match' : '';
@@ -168,33 +155,41 @@ export default function RegisterForm({ onSwitch }: Props) {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setNickTouched(true);
-    setEmailTouched(true);
     setPasswordTouched(true);
     setConfirmTouched(true);
 
-    if (!nick.trim())          { setError('Nickname required'); triggerShake(); return; }
-    if (!email.trim())         { setError('Email required'); triggerShake(); return; }
-    if (!password)             { setError('Password required'); triggerShake(); return; }
-    if (password.length < 6)   { setError('Password must be at least 6 characters'); triggerShake(); return; }
-    if (password !== confirm)  { setError('Passwords do not match'); triggerShake(); return; }
+    if (!nick.trim())         { setError('Nickname required'); triggerShake(); return; }
+    if (!password)            { setError('Password required'); triggerShake(); return; }
+    if (password.length < 6)  { setError('Password must be at least 6 characters'); triggerShake(); return; }
+    if (password !== confirm) { setError('Passwords do not match'); triggerShake(); return; }
     setError('');
     setLoading(true);
 
     try {
+      // Connect without a password so we join as the requested nick (unregistered)
       connect({ url: server.trim(), nick: nick.trim(), realname: nick.trim() });
 
+      // Wait for the connection to reach 'connected'. Guard against the race
+      // where status flips before subscribe() is called.
       await new Promise<void>((resolve, reject) => {
+        // Check immediately in case already connected (shouldn't happen on a fresh
+        // connect, but guard it anyway)
+        if (useOnyxStore.getState().status === 'connected') { resolve(); return; }
+
         const unsub = useOnyxStore.subscribe(
           s => s.status,
           s => {
             if (s === 'connected') { unsub(); resolve(); }
-            if (s === 'error') { unsub(); reject(new Error('Connection failed')); }
+            if (s === 'error')     { unsub(); reject(new Error('Connection failed')); }
           },
         );
-        setTimeout(() => { unsub(); reject(new Error('Timeout')); }, 15000);
+        // 15 s hard timeout
+        setTimeout(() => { unsub(); reject(new Error('Connection timed out')); }, 15000);
       });
 
-      sendRaw(`PRIVMSG NickServ :REGISTER ${password} ${email}\r\n`);
+      // Ophion built-in services: ACCOUNT REGISTER <password>
+      // (no NickServ bot, no email parameter)
+      sendRaw(`ACCOUNT REGISTER ${password}`);
       setStep('verify');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
@@ -208,27 +203,30 @@ export default function RegisterForm({ onSwitch }: Props) {
       <div className="verify-step animate-fade-in">
         <div className="verify-icon" aria-hidden="true">
           <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-            <circle cx="24" cy="24" r="22" fill="rgba(14,165,233,0.1)" stroke="var(--accent)" strokeWidth="1.5" />
-            <rect x="10" y="16" width="28" height="18" rx="3" stroke="var(--accent)" strokeWidth="1.4" fill="none" />
-            <path d="M10 20l14 9 14-9" stroke="var(--accent)" strokeWidth="1.4" strokeLinecap="round" fill="none" />
+            <circle cx="24" cy="24" r="22" fill="rgba(52,211,153,0.1)" stroke="var(--success)" strokeWidth="1.5" />
+            <path d="M14 24l7 7 13-14" stroke="var(--success)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
           </svg>
         </div>
-        <h3 className="verify-title">Check your email</h3>
+        <h3 className="verify-title">Account created!</h3>
         <p className="verify-text">
-          A verification code was sent to <strong className="verify-email">{email}</strong>.
-          Follow the instructions to complete registration.
+          <strong className="verify-nick">{nick}</strong> is registered.
+          Sign in with your nickname and password to get started.
         </p>
         <p className="verify-subtext">
-          After verifying, you can sign in with your nickname and password.
+          Your account is active immediately — no verification step needed.
         </p>
-        <button className="link-btn" onClick={onSwitch}>Go to sign in →</button>
+        <button className="link-btn" onClick={onSwitch}>Sign in →</button>
 
         <style>{`
           .verify-step { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 8px 0; text-align: center; }
-          .verify-icon { margin-bottom: 4px; }
+          .verify-icon { margin-bottom: 4px; animation: check-pop 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+          @keyframes check-pop {
+            from { transform: scale(0.5); opacity: 0; }
+            to   { transform: scale(1); opacity: 1; }
+          }
           .verify-title { font-size: 18px; font-weight: 700; color: var(--text-primary); margin: 0; }
           .verify-text { font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin: 0; }
-          .verify-email { color: var(--accent); font-weight: 600; }
+          .verify-nick { color: var(--accent); font-weight: 600; }
           .verify-subtext { font-size: 13px; color: var(--text-muted); margin: 0; }
           .link-btn { color: var(--accent); background: none; border: none; cursor: pointer; font-size: 14px; margin-top: 4px; font-family: inherit; }
           .link-btn:hover { text-decoration: underline; }
@@ -260,26 +258,6 @@ export default function RegisterForm({ onSwitch }: Props) {
           />
         </div>
         {nickInline && <span className="field-hint field-hint--error">{nickInline}</span>}
-      </FormField>
-
-      {/* Email */}
-      <FormField label="Email" required hint="Used for account recovery">
-        <div className="input-wrap">
-          <span className="input-icon input-icon--left" aria-hidden="true">
-            <IconEmail />
-          </span>
-          <input
-            type="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            onBlur={() => setEmailTouched(true)}
-            autoComplete="email"
-            className={`onyx-input onyx-input--has-icon${emailInline ? ' onyx-input--error' : ''}`}
-            disabled={loading}
-          />
-        </div>
-        {emailInline && <span className="field-hint field-hint--error">{emailInline}</span>}
       </FormField>
 
       {/* Password */}

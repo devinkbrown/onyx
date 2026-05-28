@@ -20,18 +20,6 @@ const DEFAULT_SERVER = process.env.NEXT_PUBLIC_IRC_WS ?? 'wss://eshmaki.me:8080'
 
 const NICK_INVALID_RE = /[^a-zA-Z0-9\-_\[\]{}\\|`^]/;
 
-function loadSavedNick(): string {
-  if (typeof window === 'undefined') return '';
-  try {
-    return localStorage.getItem('ocean-saved-nick') ?? '';
-  } catch {
-    return '';
-  }
-}
-
-// Suppress TS unused warning — exported for potential external use
-void loadSavedNick;
-
 const CONNECTION_STEPS = ['Connecting…', 'Authenticating…', 'Loading channels…'];
 
 // ── SVG Icons ────────────────────────────────────────────────────────────────
@@ -138,8 +126,9 @@ export default function LoginForm({ onSwitch }: Props) {
   const handleAutoConnect = useCallback(() => {
     if (!savedCreds) return;
     setError('');
+    // Always use DEFAULT_SERVER so stale saved URLs don't break reconnect
     connect({
-      url:      savedCreds.server,
+      url:      DEFAULT_SERVER,
       nick:     savedCreds.nick,
       password: getAuthSecret(savedCreds),
     });
@@ -217,6 +206,17 @@ export default function LoginForm({ onSwitch }: Props) {
           <span className="arc-nick">{savedCreds.nick}</span>
           <span className="arc-server">eshmaki.me</span>
         </div>
+        {lastError && !loading && (
+          <div className="arc-error" role="alert">
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true" style={{flexShrink:0,marginTop:1}}>
+              <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.3" fill="none" />
+              <path d="M7 4v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+              <circle cx="7" cy="10" r="0.8" fill="currentColor" />
+            </svg>
+            {lastError.text}
+          </div>
+        )}
+
         <div className="arc-actions">
           {loading ? (
             <div className="arc-connecting">
@@ -225,7 +225,7 @@ export default function LoginForm({ onSwitch }: Props) {
             </div>
           ) : (
             <Button variant="primary" fullWidth onClick={handleAutoConnect}>
-              Connect
+              {lastError ? 'Retry' : 'Connect'}
             </Button>
           )}
           <button
@@ -333,6 +333,21 @@ export default function LoginForm({ onSwitch }: Props) {
             transition: color var(--t-fast);
           }
           .arc-forget:hover { color: var(--danger); }
+          .arc-error {
+            display: flex;
+            align-items: flex-start;
+            gap: 7px;
+            width: 100%;
+            padding: 9px 12px;
+            background: rgba(248,113,113,0.07);
+            border: 1px solid rgba(248,113,113,0.28);
+            border-radius: var(--r-md);
+            color: var(--danger);
+            font-size: 12.5px;
+            line-height: 1.45;
+            text-align: left;
+            animation: fadeIn 200ms var(--ease-out);
+          }
         `}</style>
       </div>
     );
@@ -417,19 +432,6 @@ export default function LoginForm({ onSwitch }: Props) {
             </svg>
           </span>
           {error || lastError?.text}
-        </div>
-      )}
-
-      {/* Connection animation */}
-      {loading && (
-        <div className="conn-anim">
-          <div className="conn-pulse" />
-          <span className="conn-step">{CONNECTION_STEPS[connStep]}</span>
-          <div className="conn-dots">
-            {CONNECTION_STEPS.map((_, i) => (
-              <span key={i} className={`conn-dot${i <= connStep ? ' conn-dot--active' : ''}`} />
-            ))}
-          </div>
         </div>
       )}
 
@@ -561,7 +563,8 @@ export default function LoginForm({ onSwitch }: Props) {
         }
         .nick-count--warn { color: var(--gold); opacity: 1; }
         .nick-count--error { color: var(--danger); opacity: 1; }
-        .input-wrap .onyx-input:not(.onyx-input--has-icon-right) { padding-right: 52px; }
+        /* Nick field needs right padding to avoid text running under the counter */
+        .input-wrap .onyx-input:not(.onyx-input--has-icon-right) { padding-right: 48px; }
 
         /* ── Password visibility toggle ── */
         .eye-toggle {
@@ -610,7 +613,7 @@ export default function LoginForm({ onSwitch }: Props) {
           white-space: nowrap;
         }
 
-        /* ── Remember me ── */
+        /* ── Remember me — custom toggle ── */
         .remember-row {
           display: flex;
           align-items: center;
@@ -618,16 +621,45 @@ export default function LoginForm({ onSwitch }: Props) {
           cursor: pointer;
           user-select: none;
         }
+        /* Hide the browser checkbox; we style the label instead */
         .remember-checkbox {
-          width: 15px;
-          height: 15px;
-          accent-color: var(--accent);
+          appearance: none;
+          -webkit-appearance: none;
+          width: 16px;
+          height: 16px;
+          border: 1.5px solid var(--border-normal);
+          border-radius: var(--r-xs);
+          background: var(--bg-base);
           cursor: pointer;
+          flex-shrink: 0;
+          transition: border-color var(--t-fast), background var(--t-fast), box-shadow var(--t-fast);
+          position: relative;
         }
+        .remember-checkbox:hover {
+          border-color: var(--accent);
+        }
+        .remember-checkbox:checked {
+          background: var(--accent);
+          border-color: var(--accent);
+          box-shadow: 0 0 0 2px rgba(14,165,233,0.18);
+        }
+        /* Checkmark via clip-path on ::after */
+        .remember-checkbox:checked::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: url("data:image/svg+xml,%3Csvg viewBox='0 0 10 10' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 5l2.5 2.5L8 3' stroke='white' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 10px no-repeat;
+        }
+        .remember-checkbox:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 1px;
+        }
+        .remember-checkbox:disabled { opacity: 0.4; cursor: not-allowed; }
         .remember-text {
           font-size: 13px;
           color: var(--text-secondary);
         }
+        .remember-row:has(.remember-checkbox:disabled) { opacity: 0.5; cursor: not-allowed; }
 
         /* ── Error banner ── */
         .auth-error {
@@ -647,48 +679,6 @@ export default function LoginForm({ onSwitch }: Props) {
           margin-top: 1px;
           display: flex;
         }
-
-        /* ── Connection animation ── */
-        .conn-anim {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 10px 14px;
-          background: rgba(14,165,233,0.06);
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-md);
-        }
-        .conn-pulse {
-          width: 10px;
-          height: 10px;
-          border-radius: 50%;
-          background: var(--accent);
-          flex-shrink: 0;
-          animation: conn-pulse-anim 1.2s ease-in-out infinite;
-        }
-        @keyframes conn-pulse-anim {
-          0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(14,165,233,0.4); }
-          50% { opacity: 0.6; transform: scale(0.85); box-shadow: 0 0 0 5px transparent; }
-        }
-        .conn-step {
-          font-size: 13px;
-          color: var(--accent);
-          font-weight: 500;
-          flex: 1;
-        }
-        .conn-dots {
-          display: flex;
-          gap: 4px;
-          align-items: center;
-        }
-        .conn-dot {
-          width: 6px;
-          height: 6px;
-          border-radius: 50%;
-          background: var(--border-normal);
-          transition: background var(--t-fast);
-        }
-        .conn-dot--active { background: var(--accent); }
 
         /* ── Spinner in button ── */
         .btn-loading-inner {

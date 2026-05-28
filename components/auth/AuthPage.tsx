@@ -65,9 +65,16 @@ export default function AuthPage() {
         </div>
 
         {/* Footer */}
-        <p className="auth-footer">
-          Powered by <span className="text-accent">Ophion</span>
-        </p>
+        <div className="auth-footer">
+          <span className="auth-footer-status">
+            <span className="auth-footer-dot" aria-hidden="true" />
+            eshmaki.me
+          </span>
+          <span className="auth-footer-sep" aria-hidden="true">·</span>
+          <span className="auth-footer-powered">
+            Powered by <span className="text-accent">Ophion</span>
+          </span>
+        </div>
       </div>
 
       <style>{`
@@ -184,7 +191,7 @@ export default function AuthPage() {
           height: 1px;
           background: linear-gradient(90deg, transparent 0%, var(--accent) 25%, var(--gold) 50%, var(--accent) 75%, transparent 100%);
           background-size: 200% 100%;
-          border-radius: 100%;
+          border-radius: 0 0 99px 99px;
           opacity: 0.6;
           animation: shimmer-slide 4s ease-in-out infinite;
         }
@@ -317,7 +324,10 @@ export default function AuthPage() {
         }
 
         .auth-footer {
-          text-align: center;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
           margin-top: 24px;
           padding-top: 20px;
           border-top: 1px solid var(--border-subtle);
@@ -327,6 +337,27 @@ export default function AuthPage() {
           position: relative;
           z-index: 1;
         }
+        .auth-footer-status {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          color: var(--text-muted);
+        }
+        .auth-footer-dot {
+          display: inline-block;
+          width: 6px; height: 6px;
+          border-radius: 50%;
+          background: var(--success);
+          box-shadow: 0 0 5px var(--success);
+          animation: dot-pulse 2.5s ease-in-out infinite;
+          flex-shrink: 0;
+        }
+        @keyframes dot-pulse {
+          0%, 100% { opacity: 1; }
+          50%       { opacity: 0.45; }
+        }
+        .auth-footer-sep { color: var(--border-normal); }
+        .auth-footer-powered { color: var(--text-muted); }
 
         .text-accent {
           color: var(--accent);
