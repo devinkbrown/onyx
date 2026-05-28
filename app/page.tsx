@@ -48,8 +48,9 @@ export default function LandingPage() {
             </h1>
 
             <p className="land-lead">
-              Open-protocol community chat. Voice without WebRTC. Encryption
-              without compromise. Start in <span className="land-inline-channel">#root</span>.
+              Open-protocol community chat. Native voice and encryption
+              built into the protocol — no relay servers, no third-party
+              infrastructure. Start in <span className="land-inline-channel">#root</span>.
             </p>
 
             <div className="land-hero-actions">
@@ -99,9 +100,10 @@ export default function LandingPage() {
               </div>
               <h3 className="land-card-h3">Voice without borders</h3>
               <p className="land-card-p">
-                Spatial audio and encrypted voice over Ophion IRC. No WebRTC,
-                no STUN/TURN, no relay infrastructure. Your voice travels the
-                same path as your messages.
+                Spatial audio and encrypted voice over Ophion IRC. Native
+                protocol transport — no relay servers, no third-party
+                infrastructure. Your voice travels the same path as your
+                messages.
               </p>
               <div className="land-voice-vis" aria-hidden>
                 <WaveformVis />
@@ -303,11 +305,15 @@ export default function LandingPage() {
            OCEAN LANDING — DEPTH AESTHETIC
            ════════════════════════════════════════════════════════════ */
 
+        /* Override the app shell's global overflow: hidden so this page scrolls */
+        html, body { overflow: auto; overflow-x: hidden; }
+
         .land-root {
           background: var(--bg-void);
           color: var(--text-primary);
           min-height: 100dvh;
-          overflow-x: hidden;
+          /* clip instead of hidden — doesn't create a spurious scroll container */
+          overflow-x: clip;
           font-family: 'Inter', system-ui, sans-serif;
         }
 

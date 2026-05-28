@@ -103,8 +103,8 @@ export default function AboutPage() {
               name="LADON"
               tag="Media Protocol"
               accentColor="#67e8f9"
-              desc="Proprietary voice and video protocol built over IRC messaging. No WebRTC, no STUN/TURN servers — spatial audio and video delivered through the Ophion network."
-              detail="No WebRTC · No relay"
+              desc="Proprietary voice and video protocol built over IRC messaging. Native transport — no relay servers, no third-party infrastructure. Spatial audio and video delivered through the Ophion network."
+              detail="Native transport · No relay"
             />
             <TechCard
               name="VEIL"
@@ -231,11 +231,14 @@ export default function AboutPage() {
            OCEAN ABOUT PAGE
            ════════════════════════════════════════════════════════════ */
 
+        /* Override app shell's global overflow: hidden so this page scrolls */
+        html, body { overflow: auto; overflow-x: hidden; }
+
         .about-root {
           background: var(--bg-void);
           color: var(--text-primary);
           min-height: 100dvh;
-          overflow-x: hidden;
+          overflow-x: clip;
           font-family: 'Inter', system-ui, sans-serif;
         }
 
