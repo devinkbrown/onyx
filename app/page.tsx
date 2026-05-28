@@ -363,8 +363,8 @@ export default function LandingPage() {
         .land-nav {
           position: fixed; top: 0; left: 0; right: 0; z-index: 200;
           display: flex; align-items: center; justify-content: space-between;
-          padding: 0 clamp(20px, 5vw, 80px);
-          height: 60px;
+          padding: env(safe-area-inset-top, 0px) clamp(20px, 5vw, 80px) 0;
+          height: calc(60px + env(safe-area-inset-top, 0px));
           background: color-mix(in srgb, var(--bg-void) 72%, transparent);
           backdrop-filter: blur(24px) saturate(1.5);
           border-bottom: 1px solid var(--border-subtle);
@@ -398,7 +398,7 @@ export default function LandingPage() {
         /* ── Hero ── */
         .land-hero {
           position: relative; z-index: 1;
-          padding: 160px clamp(20px,5vw,80px) 100px;
+          padding: calc(160px + env(safe-area-inset-top, 0px)) clamp(20px,5vw,80px) 100px;
           min-height: 100dvh;
           display: flex; align-items: center;
         }
@@ -633,7 +633,7 @@ export default function LandingPage() {
           top: 0; left: 20px; right: 20px;
           height: 1px;
           background: linear-gradient(90deg, transparent, var(--accent-border), transparent);
-          border-radius: 100%;
+          border-radius: 0 0 99px 99px;
           opacity: 0.6;
           transition: opacity 0.3s;
         }
@@ -742,7 +742,7 @@ export default function LandingPage() {
         }
 
         /* VEIL diagram area */
-        .land-veil-diagram { flex-shrink: 0; }
+        .land-veil-diagram { flex-shrink: 0; align-self: flex-start; }
 
         /* IRC server tag */
         .land-irc-tag {
@@ -893,7 +893,7 @@ export default function LandingPage() {
           grid-template-columns: 1fr auto auto;
           align-items: center;
           gap: 24px 40px;
-          padding: 40px clamp(20px, 5vw, 80px);
+          padding: 40px clamp(20px, 5vw, 80px) max(40px, env(safe-area-inset-bottom, 0px));
           border-top: 1px solid var(--border-subtle);
           margin-top: 20px;
         }
@@ -913,12 +913,15 @@ export default function LandingPage() {
 
         /* ── Mobile — 640px and below ── */
         @media (max-width: 640px) {
-          .land-nav { height: 52px; padding: 0 16px; }
+          .land-nav {
+            height: calc(52px + env(safe-area-inset-top, 0px));
+            padding: env(safe-area-inset-top, 0px) 16px 0;
+          }
           .land-nav-link { display: none; }
           .land-nav-wordmark { font-size: 15px; }
           .land-nav-cta { font-size: 12px; padding: 6px 14px; }
 
-          .land-hero { padding: 80px 16px 64px; min-height: auto; }
+          .land-hero { padding: calc(80px + env(safe-area-inset-top, 0px)) 16px 64px; min-height: auto; }
           .land-hero-body { gap: 32px; }
           .land-hero-copy { gap: 20px; }
           .land-h1 { font-size: clamp(2.6rem, 9vw, 3.4rem); letter-spacing: -0.03em; }
@@ -930,6 +933,7 @@ export default function LandingPage() {
           .land-depth-meter { display: none; }
 
           .land-sonar-line { margin-bottom: 40px; padding: 0 16px; }
+          .land-sonar-text { font-size: 12px; letter-spacing: 0.05em; }
 
           .land-features { padding: 0 12px 64px; }
           .land-bento-row { gap: 10px; }
@@ -937,6 +941,7 @@ export default function LandingPage() {
 
           .land-card-inner { padding: 22px 18px; gap: 10px; }
           .land-card-inner-split { flex-direction: column; gap: 20px; }
+          .land-veil-diagram { align-self: center; }
           .land-card-h3 { font-size: 1.05rem; }
           .land-card-p { font-size: 0.85rem; }
 
@@ -951,7 +956,7 @@ export default function LandingPage() {
           .land-footer {
             grid-template-columns: 1fr;
             text-align: center;
-            padding: 28px 16px;
+            padding: 28px 16px max(28px, env(safe-area-inset-bottom, 0px));
             gap: 16px;
           }
           .land-footer-links { flex-wrap: wrap; justify-content: center; gap: 14px; }
@@ -965,8 +970,8 @@ export default function LandingPage() {
           .land-card-inner { padding: 18px 14px; }
           .land-community { margin: 10px 8px; padding: 36px 16px; }
           .land-features { padding: 0 8px 56px; }
-          .land-hero { padding: 72px 12px 56px; }
-          .land-nav { padding: 0 12px; }
+          .land-hero { padding: calc(72px + env(safe-area-inset-top, 0px)) 12px 56px; }
+          .land-nav { padding: env(safe-area-inset-top, 0px) 12px 0; }
         }
       `}</style>
     </main>
