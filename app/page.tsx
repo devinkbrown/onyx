@@ -184,7 +184,7 @@ export default function LandingPage() {
                 surface.
               </p>
               <div className="land-irc-tag" aria-hidden>
-                <span className="land-irc-tag-text">irc.eshmaki.me:6697</span>
+                <span className="land-irc-tag-text">eshmaki.me:6697</span>
               </div>
             </div>
           </div>

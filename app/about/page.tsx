@@ -97,7 +97,7 @@ export default function AboutPage() {
               accentColor="#0ea5e9"
               desc="A custom IRC server built for performance and modern protocol extensions. Supports IRCv3, IRCX, CHATHISTORY, and full SASL auth including session tokens."
               href="https://github.com/devinkbrown/ophion"
-              detail="irc.eshmaki.me:6697"
+              detail="eshmaki.me:6697"
             />
             <TechCard
               name="LADON"
@@ -188,7 +188,7 @@ export default function AboutPage() {
               </div>
               <div className="about-link-text">
                 <div className="about-link-title">IRC Direct</div>
-                <div className="about-link-sub">irc.eshmaki.me · port 6697 (TLS)</div>
+                <div className="about-link-sub">eshmaki.me · port 6697 (TLS)</div>
               </div>
             </div>
           </div>
