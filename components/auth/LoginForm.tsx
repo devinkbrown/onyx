@@ -199,6 +199,11 @@ export default function LoginForm({ onSwitch }: Props) {
   if (autoMode && savedCreds) {
     return (
       <div className="auto-reconnect">
+        <div className="arc-brand" aria-hidden="true">
+          <span className="arc-brand-line" />
+          <span className="arc-brand-text">Ocean access</span>
+          <span className="arc-brand-line" />
+        </div>
         <div className="arc-avatar" aria-hidden="true">
           {savedCreds.nick.slice(0, 2).toUpperCase()}
         </div>
@@ -224,7 +229,7 @@ export default function LoginForm({ onSwitch }: Props) {
               <span>{CONNECTION_STEPS[connStep]}</span>
             </div>
           ) : (
-            <Button variant="primary" fullWidth onClick={handleAutoConnect}>
+            <Button variant="primary" fullWidth onClick={handleAutoConnect} className="arc-primary">
               {visibleLastError ? 'Retry' : 'Connect'}
             </Button>
           )}
@@ -252,35 +257,70 @@ export default function LoginForm({ onSwitch }: Props) {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 16px;
-            padding: 8px 0;
+            gap: 18px;
+            padding: 4px 0 2px;
+          }
+          .arc-brand {
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-muted);
+            opacity: 0.86;
+          }
+          .arc-brand-line {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border-normal));
+          }
+          .arc-brand-line:last-child {
+            background: linear-gradient(90deg, var(--border-normal), transparent);
+          }
+          .arc-brand-text {
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0;
+            text-transform: uppercase;
+            color: var(--gold);
           }
           .arc-avatar {
-            width: 64px;
-            height: 64px;
+            width: 72px;
+            height: 72px;
             border-radius: 50%;
-            background: linear-gradient(135deg, var(--accent), #0369a1);
+            background:
+              radial-gradient(circle at 34% 24%, rgba(255,255,255,0.32), transparent 24%),
+              linear-gradient(145deg, var(--gold), var(--accent) 54%, var(--bg-overlay));
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 22px;
-            font-weight: 700;
+            font-size: 24px;
+            font-weight: 850;
             color: var(--bg-void);
-            box-shadow: 0 0 0 3px var(--bg-elevated), 0 0 0 5px var(--border-normal);
-            letter-spacing: -0.02em;
+            box-shadow:
+              0 0 0 4px var(--bg-elevated),
+              0 0 0 5px var(--accent-border),
+              0 18px 34px rgba(0,0,0,0.42),
+              0 0 30px var(--accent-glow);
+            letter-spacing: 0;
+            transition: transform var(--t-normal) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
+          }
+          .auto-reconnect:hover .arc-avatar {
+            transform: translateY(-2px) scale(1.02);
+            filter: brightness(1.05);
           }
           .arc-info {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 4px;
+            gap: 2px;
             text-align: center;
           }
           .arc-nick {
-            font-size: 20px;
-            font-weight: 600;
+            font-size: 24px;
+            font-weight: 850;
             color: var(--text-primary);
-            letter-spacing: -0.01em;
+            letter-spacing: 0;
+            line-height: 1.1;
           }
           .arc-server {
             font-size: 13px;
@@ -289,7 +329,7 @@ export default function LoginForm({ onSwitch }: Props) {
           .arc-token-badge {
             font-size: 11px;
             font-weight: 600;
-            letter-spacing: 0.04em;
+            letter-spacing: 0;
             color: var(--success);
             background: rgba(52,211,153,0.1);
             border: 1px solid rgba(52,211,153,0.25);
@@ -301,16 +341,33 @@ export default function LoginForm({ onSwitch }: Props) {
             width: 100%;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 10px;
+            padding-top: 4px;
+          }
+          .auto-reconnect .btn {
+            height: 44px;
+            border-radius: var(--r-lg);
+            transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
+          }
+          .auto-reconnect .btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            filter: brightness(1.04) drop-shadow(0 8px 20px var(--accent-glow));
+          }
+          .auto-reconnect .btn:active:not(:disabled) {
+            transform: translateY(0) scale(0.99);
+            filter: brightness(0.96);
           }
           .arc-connecting {
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 10px;
-            padding: 10px;
+            padding: 12px 10px;
             font-size: 14px;
             color: var(--text-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--r-lg);
+            background: var(--bg-base);
           }
           .arc-switch {
             background: none;
@@ -320,10 +377,11 @@ export default function LoginForm({ onSwitch }: Props) {
             color: var(--text-secondary);
             cursor: pointer;
             text-align: center;
-            padding: 4px;
-            transition: color var(--t-fast);
+            padding: 5px;
+            transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
           }
-          .arc-switch:hover { color: var(--text-primary); }
+          .arc-switch:hover { color: var(--text-primary); transform: translateY(-1px); }
+          .arc-switch:active { transform: translateY(0); opacity: 0.78; }
           .arc-forget {
             background: none;
             border: none;
@@ -332,10 +390,11 @@ export default function LoginForm({ onSwitch }: Props) {
             color: var(--text-muted);
             cursor: pointer;
             text-align: center;
-            padding: 2px;
-            transition: color var(--t-fast);
+            padding: 2px 5px;
+            transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
           }
-          .arc-forget:hover { color: var(--danger); }
+          .arc-forget:hover { color: var(--danger); transform: translateY(-1px); }
+          .arc-forget:active { transform: translateY(0); opacity: 0.76; }
           .arc-error {
             display: flex;
             align-items: flex-start;
@@ -351,6 +410,22 @@ export default function LoginForm({ onSwitch }: Props) {
             text-align: left;
             animation: fadeIn 200ms var(--ease-out);
           }
+          @media (prefers-reduced-motion: reduce) {
+            .arc-avatar,
+            .auto-reconnect .btn,
+            .arc-switch,
+            .arc-forget,
+            .arc-error {
+              animation: none;
+              transition-duration: 0.001ms;
+            }
+            .auto-reconnect:hover .arc-avatar,
+            .auto-reconnect .btn:hover:not(:disabled),
+            .arc-switch:hover,
+            .arc-forget:hover {
+              transform: none;
+            }
+          }
         `}</style>
       </div>
     );
@@ -358,6 +433,16 @@ export default function LoginForm({ onSwitch }: Props) {
 
   return (
     <form onSubmit={submit} className={`auth-form-fields${shake ? ' form-shake' : ''}`} noValidate>
+      <div className="login-brand">
+        <div className="login-brand-mark" aria-hidden="true">
+          <span className="login-brand-core" />
+        </div>
+        <div className="login-brand-copy">
+          <span className="login-kicker">Secure relay</span>
+          <h1 className="login-title">Enter the midnight</h1>
+          <p className="login-subtitle">eshmaki.me IRC access</p>
+        </div>
+      </div>
 
       {/* Nick field */}
       <FormField label="Username" required>
@@ -449,7 +534,7 @@ export default function LoginForm({ onSwitch }: Props) {
         </div>
       )}
 
-      <Button type="submit" variant="primary" fullWidth loading={loading}>
+      <Button type="submit" variant="primary" fullWidth loading={loading} className="login-submit">
         {loading ? (
           <span className="btn-loading-inner">
             <IconSpinner />
@@ -469,7 +554,89 @@ export default function LoginForm({ onSwitch }: Props) {
         .auth-form-fields {
           display: flex;
           flex-direction: column;
-          gap: 16px;
+          gap: 15px;
+        }
+
+        .login-brand {
+          display: grid;
+          grid-template-columns: auto 1fr;
+          align-items: center;
+          gap: 14px;
+          padding: 2px 0 6px;
+        }
+        .login-brand-mark {
+          width: 46px;
+          height: 46px;
+          border-radius: var(--r-lg);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background:
+            linear-gradient(145deg, color-mix(in srgb, var(--accent) 20%, var(--bg-overlay)), var(--bg-base)),
+            var(--bg-base);
+          border: 1px solid var(--accent-border);
+          box-shadow:
+            inset 0 1px 0 rgba(255,255,255,0.08),
+            0 12px 24px rgba(0,0,0,0.28),
+            0 0 26px var(--accent-glow);
+          position: relative;
+          overflow: hidden;
+          transition: transform var(--t-normal) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
+        }
+        .login-brand-mark::before,
+        .login-brand-mark::after {
+          content: '';
+          position: absolute;
+          inset: 8px;
+          border: 1px solid var(--border-normal);
+          border-radius: 50%;
+          opacity: 0.74;
+        }
+        .login-brand-mark::after {
+          inset: 15px;
+          border-color: var(--gold);
+          opacity: 0.5;
+        }
+        .login-brand-core {
+          width: 9px;
+          height: 9px;
+          border-radius: 50%;
+          background: var(--gold);
+          box-shadow:
+            0 0 0 5px var(--gold-subtle),
+            0 0 22px var(--gold);
+          z-index: 1;
+        }
+        .auth-form-fields:hover .login-brand-mark {
+          transform: translateY(-1px) scale(1.02);
+          filter: brightness(1.05);
+        }
+        .login-brand-copy {
+          min-width: 0;
+        }
+        .login-kicker {
+          display: block;
+          margin-bottom: 2px;
+          font-size: 10px;
+          font-weight: 850;
+          letter-spacing: 0;
+          line-height: 1.1;
+          text-transform: uppercase;
+          color: var(--gold);
+        }
+        .login-title {
+          margin: 0;
+          color: var(--text-primary);
+          font-size: 34px;
+          font-weight: 900;
+          line-height: 0.98;
+          letter-spacing: 0;
+        }
+        .login-subtitle {
+          margin: 7px 0 0;
+          color: var(--text-muted);
+          font-size: 13px;
+          font-weight: 550;
         }
 
         /* ── Shake animation on submit failure ── */
@@ -489,6 +656,15 @@ export default function LoginForm({ onSwitch }: Props) {
           position: relative;
           display: flex;
           align-items: center;
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
+        }
+        .input-wrap:hover {
+          transform: translateY(-1px);
+          filter: brightness(1.04);
+        }
+        .input-wrap:focus-within {
+          transform: translateY(-1px);
+          filter: brightness(1.08);
         }
 
         /* ── Input icon ── */
@@ -500,35 +676,45 @@ export default function LoginForm({ onSwitch }: Props) {
           align-items: center;
           pointer-events: none;
           color: var(--text-muted);
-          transition: color var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
           z-index: 1;
         }
         .input-icon--left { left: 13px; }
+        .input-wrap:focus-within .input-icon--left {
+          color: var(--accent);
+          transform: translateY(-50%) scale(1.04);
+          filter: drop-shadow(0 0 8px var(--accent-glow));
+        }
 
         /* ── Base input ── */
         .onyx-input {
           width: 100%;
-          height: 44px;
+          height: 46px;
           padding: 0 14px;
-          background: var(--bg-base);
+          background:
+            linear-gradient(180deg, color-mix(in srgb, var(--bg-elevated) 42%, transparent), transparent),
+            var(--bg-base);
           border: 1px solid var(--border-normal);
-          border-radius: var(--r-md);
+          border-radius: var(--r-lg);
           color: var(--text-primary);
           font-size: 14px;
           font-family: inherit;
-          transition: border-color var(--t-fast), box-shadow var(--t-fast), background var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
           box-sizing: border-box;
+          box-shadow:
+            inset 0 1px 0 rgba(255,255,255,0.035),
+            0 1px 0 rgba(0,0,0,0.22);
         }
         .onyx-input::placeholder {
           color: var(--text-muted);
-          opacity: 0.7;
+          opacity: 0.62;
         }
         .onyx-input--has-icon { padding-left: 40px; }
         .onyx-input--has-icon-right { padding-right: 80px; }
         .onyx-input--mono {
           font-family: var(--font-mono, 'ui-monospace', monospace);
           font-size: 13px;
-          letter-spacing: -0.01em;
+          letter-spacing: 0;
         }
 
         /* Focus — accent glow ring */
@@ -537,16 +723,17 @@ export default function LoginForm({ onSwitch }: Props) {
           background: var(--bg-elevated);
           border-color: var(--accent);
           box-shadow:
-            0 0 0 3px rgba(14,165,233,0.18),
-            0 0 12px rgba(14,165,233,0.08);
-        }
-        .onyx-input:focus + .input-icon--left,
-        .input-wrap:focus-within .input-icon--left {
-          color: var(--accent);
+            inset 0 1px 0 rgba(255,255,255,0.06),
+            0 0 0 1px var(--accent-border),
+            0 0 0 4px var(--accent-subtle),
+            0 12px 28px rgba(0,0,0,0.18);
         }
         .onyx-input:hover:not(:focus):not(:disabled) {
-          border-color: var(--border-normal);
+          border-color: var(--accent-border);
           background: var(--bg-elevated);
+        }
+        .onyx-input:active:not(:disabled) {
+          filter: brightness(0.98);
         }
         .onyx-input:disabled { opacity: 0.45; cursor: not-allowed; }
 
@@ -557,10 +744,10 @@ export default function LoginForm({ onSwitch }: Props) {
         }
         .onyx-input--error:focus {
           border-color: var(--danger);
-          box-shadow: 0 0 0 3px rgba(248,113,113,0.15);
+          box-shadow: 0 0 0 4px rgba(248,113,113,0.15);
         }
 
-        .field-hint { display: block; font-size: 12px; margin-top: 4px; }
+        .field-hint { display: block; font-size: 12px; margin-top: 5px; }
         .field-hint--error { color: var(--danger); }
 
         /* ── Nick character counter ── */
@@ -573,7 +760,7 @@ export default function LoginForm({ onSwitch }: Props) {
           color: var(--text-muted);
           pointer-events: none;
           font-variant-numeric: tabular-nums;
-          opacity: 0.7;
+          opacity: 0.68;
         }
         .nick-count--warn { color: var(--gold); opacity: 1; }
         .nick-count--error { color: var(--danger); opacity: 1; }
@@ -596,13 +783,19 @@ export default function LoginForm({ onSwitch }: Props) {
           cursor: pointer;
           color: var(--text-muted);
           border-radius: var(--r-sm);
-          transition: color var(--t-fast), background var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
           z-index: 2;
           padding: 0;
         }
         .eye-toggle:hover {
           color: var(--text-secondary);
           background: rgba(14,165,233,0.08);
+          transform: translateY(-50%) scale(1.04);
+          filter: brightness(1.08);
+        }
+        .eye-toggle:active {
+          transform: translateY(-50%) scale(0.96);
+          filter: brightness(0.92);
         }
         .eye-toggle:focus-visible {
           outline: 2px solid var(--accent);
@@ -617,7 +810,7 @@ export default function LoginForm({ onSwitch }: Props) {
           transform: translateY(-50%);
           font-size: 9px;
           font-weight: 700;
-          letter-spacing: 0.06em;
+          letter-spacing: 0;
           color: var(--gold);
           background: rgba(103,232,249,0.08);
           border: 1px solid rgba(103,232,249,0.2);
@@ -625,15 +818,23 @@ export default function LoginForm({ onSwitch }: Props) {
           padding: 2px 5px;
           pointer-events: none;
           white-space: nowrap;
+          box-shadow: 0 0 14px rgba(103,232,249,0.08);
         }
 
         /* ── Remember me — custom toggle ── */
         .remember-row {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 9px;
           cursor: pointer;
           user-select: none;
+          width: fit-content;
+          padding: 2px 0 1px;
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
+        }
+        .remember-row:hover {
+          transform: translateY(-1px);
+          filter: brightness(1.05);
         }
         /* Hide the browser checkbox; we style the label instead */
         .remember-checkbox {
@@ -646,11 +847,13 @@ export default function LoginForm({ onSwitch }: Props) {
           background: var(--bg-base);
           cursor: pointer;
           flex-shrink: 0;
-          transition: border-color var(--t-fast), background var(--t-fast), box-shadow var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
           position: relative;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
         }
         .remember-checkbox:hover {
           border-color: var(--accent);
+          filter: brightness(1.12);
         }
         .remember-checkbox:checked {
           background: var(--accent);
@@ -687,6 +890,7 @@ export default function LoginForm({ onSwitch }: Props) {
           color: var(--danger);
           font-size: 13px;
           line-height: 1.5;
+          animation: fadeIn 180ms var(--ease-out);
         }
         .auth-error-icon {
           flex-shrink: 0;
@@ -709,11 +913,36 @@ export default function LoginForm({ onSwitch }: Props) {
           to   { transform: rotate(360deg); }
         }
 
+        .auth-form-fields .btn {
+          height: 46px;
+          border-radius: var(--r-lg);
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
+        }
+        .auth-form-fields .login-submit {
+          margin-top: 2px;
+          letter-spacing: 0;
+          text-transform: uppercase;
+          box-shadow:
+            0 10px 24px rgba(0,0,0,0.34),
+            0 0 0 1px rgba(255,255,255,0.09) inset,
+            0 0 24px var(--accent-glow);
+        }
+        .auth-form-fields .login-submit:hover:not(:disabled) {
+          transform: translateY(-1px);
+          filter: brightness(1.05) drop-shadow(0 8px 20px var(--accent-glow));
+        }
+        .auth-form-fields .login-submit:active:not(:disabled) {
+          transform: translateY(0) scale(0.99);
+          filter: brightness(0.95);
+        }
+
         /* ── Footer links ── */
         .switch-link {
           text-align: center;
           font-size: 13px;
           color: var(--text-secondary);
+          margin: 0;
+          padding-top: 1px;
         }
         .link-btn {
           color: var(--accent);
@@ -722,8 +951,64 @@ export default function LoginForm({ onSwitch }: Props) {
           cursor: pointer;
           font-size: inherit;
           font-family: inherit;
+          padding: 2px 3px;
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
         }
-        .link-btn:hover { text-decoration: underline; }
+        .link-btn:hover {
+          color: var(--text-link-hover);
+          text-decoration: underline;
+          transform: translateY(-1px);
+          filter: brightness(1.06);
+        }
+        .link-btn:active {
+          transform: translateY(0);
+          opacity: 0.76;
+        }
+
+        @media (max-width: 420px) {
+          .login-brand {
+            gap: 12px;
+          }
+          .login-brand-mark {
+            width: 42px;
+            height: 42px;
+          }
+          .login-title {
+            font-size: 27px;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .form-shake,
+          .spin-icon,
+          .auth-error {
+            animation: none;
+          }
+          .login-brand-mark,
+          .input-wrap,
+          .input-icon,
+          .onyx-input,
+          .eye-toggle,
+          .remember-row,
+          .remember-checkbox,
+          .auth-form-fields .btn,
+          .link-btn {
+            transition-duration: 0.001ms;
+          }
+          .auth-form-fields:hover .login-brand-mark,
+          .input-wrap:hover,
+          .input-wrap:focus-within,
+          .input-wrap:focus-within .input-icon--left,
+          .eye-toggle:hover,
+          .eye-toggle:active,
+          .remember-row:hover,
+          .auth-form-fields .login-submit:hover:not(:disabled),
+          .auth-form-fields .login-submit:active:not(:disabled),
+          .link-btn:hover,
+          .link-btn:active {
+            transform: none;
+          }
+        }
       `}</style>
     </form>
   );
