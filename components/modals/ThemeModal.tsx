@@ -571,7 +571,7 @@ export default function ThemeModal() {
           z-index: 900;
           backdrop-filter: blur(10px);
           -webkit-backdrop-filter: blur(10px);
-          animation: fadeIn 160ms ease both;
+          animation: fadeIn var(--t-fast) var(--ease-out) both;
         }
         @keyframes fadeIn {
           from { opacity: 0; }
@@ -582,13 +582,13 @@ export default function ThemeModal() {
           background: var(--bg-elevated, #132131);
           border: 1px solid var(--border-normal);
           border-radius: var(--r-xl, 16px);
-          padding: 28px;
-          width: 440px;
+          padding: 26px;
+          width: 520px;
           max-width: calc(100vw - 32px);
           max-height: calc(100dvh - 64px);
           overflow-y: auto;
-          box-shadow: var(--shadow-lg, 0 8px 32px rgba(0,0,0,0.65)), 0 0 0 1px rgba(14,165,233,0.06) inset;
-          animation: scaleIn 200ms cubic-bezier(0.16,1,0.3,1) both;
+          box-shadow: var(--shadow-xl, 0 24px 64px rgba(0,0,0,0.75)), 0 0 0 1px var(--border-subtle) inset;
+          animation: scaleIn var(--t-normal) var(--ease-out) both;
           scrollbar-width: thin;
           scrollbar-color: var(--border-normal) transparent;
         }
@@ -604,7 +604,7 @@ export default function ThemeModal() {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          margin-bottom: 6px;
+          margin-bottom: 8px;
         }
 
         .theme-modal-title {
@@ -625,13 +625,14 @@ export default function ThemeModal() {
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+          transition: transform var(--t-fast) var(--ease-out);
           flex-shrink: 0;
         }
         .theme-modal-close:hover {
           background: var(--bg-overlay);
           color: var(--text-primary);
           border-color: var(--border-normal);
+          transform: translateY(-1px);
         }
         .theme-modal-close:focus-visible {
           outline: 2px solid var(--accent);
@@ -642,7 +643,7 @@ export default function ThemeModal() {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          margin: 0 0 14px;
+          margin: 0 0 18px;
           min-height: 22px;
         }
 
@@ -703,19 +704,43 @@ export default function ThemeModal() {
 
         .theme-grid {
           display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 10px;
+          grid-template-columns: repeat(auto-fit, minmax(82px, 1fr));
+          gap: 9px;
+          padding: 10px;
+          background: var(--bg-base);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-lg);
+          box-shadow: var(--shadow-sm);
         }
 
         .theme-swatch {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 8px;
-          background: none;
-          border: none;
+          gap: 7px;
+          background: var(--bg-deep);
+          border: 1px solid transparent;
+          border-radius: var(--r-md);
           cursor: pointer;
-          padding: 0;
+          padding: 7px;
+          min-width: 0;
+          position: relative;
+          text-align: center;
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out);
+        }
+        .theme-swatch:hover {
+          background: var(--bg-float);
+          border-color: var(--border-normal);
+          transform: translateY(-2px);
+        }
+        .theme-swatch:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
+        }
+        .theme-swatch--active {
+          background: var(--accent-subtle);
+          border-color: var(--accent-border);
+          box-shadow: 0 0 0 1px var(--accent-glow) inset;
         }
 
         .theme-swatch-preview {
@@ -724,16 +749,38 @@ export default function ThemeModal() {
           border-radius: var(--r-md);
           position: relative;
           overflow: hidden;
-          border: 2px solid transparent;
-          transition: border-color var(--t-fast), transform var(--t-normal) var(--ease-spring), box-shadow var(--t-fast);
+          border: 1px solid var(--border-subtle);
+          box-shadow: var(--shadow-sm);
+          transition: transform var(--t-normal) var(--ease-spring), opacity var(--t-fast) var(--ease-out);
+        }
+        .theme-swatch-preview::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(135deg, rgba(255,255,255,0.10), transparent 42%, rgba(0,0,0,0.20));
+          opacity: 0.75;
+          pointer-events: none;
+        }
+        .theme-swatch-preview::after {
+          content: '';
+          position: absolute;
+          left: calc(28% + 8px);
+          right: 9px;
+          top: 24px;
+          height: 3px;
+          border-radius: var(--r-full);
+          background: var(--text-primary);
+          opacity: 0.28;
+          box-shadow:
+            0 9px 0 var(--text-secondary),
+            18px 18px 0 var(--text-muted);
         }
         .theme-swatch:hover .theme-swatch-preview {
-          transform: translateY(-3px) scale(1.02);
-          box-shadow: var(--shadow-md);
+          transform: translateY(-1px) scale(1.01);
         }
         .theme-swatch--active .theme-swatch-preview {
           border-color: var(--accent);
-          box-shadow: 0 0 0 3px var(--accent-glow);
+          box-shadow: 0 0 0 2px var(--accent-glow), var(--shadow-md);
         }
 
         .theme-swatch-sidebar {
@@ -749,10 +796,11 @@ export default function ThemeModal() {
           position: absolute;
           top: 8px;
           left: calc(28% + 8px);
-          width: 8px;
-          height: 8px;
+          width: 9px;
+          height: 9px;
           border-radius: 50%;
           opacity: 0.9;
+          box-shadow: 0 0 14px currentColor;
         }
 
         .theme-swatch-bar {
@@ -760,31 +808,35 @@ export default function ThemeModal() {
           bottom: 0;
           left: 28%;
           right: 0;
-          height: 20%;
-          opacity: 0.45;
+          height: 18%;
+          opacity: 0.5;
           border-radius: 0 0 4px 0;
         }
 
         .theme-swatch-check {
           position: absolute;
-          top: 6px;
-          right: 6px;
-          width: 18px;
-          height: 18px;
+          top: 5px;
+          right: 5px;
+          width: 20px;
+          height: 20px;
           border-radius: 50%;
           border: 2px solid;
           display: flex;
           align-items: center;
           justify-content: center;
           color: #fff;
+          box-shadow: var(--shadow-sm);
         }
 
         .theme-swatch-label {
-          font-size: 12px;
-          font-weight: 600;
+          font-size: 11px;
+          font-weight: 700;
           color: var(--text-secondary);
-          transition: color var(--t-fast);
-          letter-spacing: 0.2px;
+          line-height: 1.2;
+          max-width: 100%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
         .theme-swatch:hover .theme-swatch-label {
           color: var(--text-primary);
@@ -794,55 +846,74 @@ export default function ThemeModal() {
         .accent-section {
           display: flex;
           flex-direction: column;
-          gap: 10px;
+          gap: 12px;
+          padding: 12px;
+          background: var(--bg-base);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-lg);
+          box-shadow: var(--shadow-sm);
         }
 
         .accent-presets {
           display: flex;
-          gap: 8px;
+          gap: 9px;
           flex-wrap: wrap;
         }
 
         .accent-swatch {
-          width: 32px;
-          height: 32px;
+          width: 34px;
+          height: 34px;
           border-radius: 50%;
-          border: 2px solid transparent;
+          border: 2px solid var(--bg-elevated);
           cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
           color: #fff;
-          transition: transform var(--t-fast), border-color var(--t-fast);
+          box-shadow: 0 0 0 1px var(--border-subtle), var(--shadow-sm);
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out);
         }
         .accent-swatch:hover {
-          transform: scale(1.15);
+          transform: translateY(-2px) scale(1.08);
+        }
+        .accent-swatch:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
         }
         .accent-swatch--active {
-          border-color: #fff;
-          transform: scale(1.1);
+          border-color: var(--text-primary);
+          transform: scale(1.06);
+          box-shadow: 0 0 0 3px var(--accent-glow), var(--shadow-md);
         }
 
         .accent-custom-row {
           display: flex;
           align-items: center;
-          gap: 10px;
+          justify-content: space-between;
+          gap: 12px;
+          padding-top: 10px;
+          border-top: 1px solid var(--border-subtle);
         }
 
         .accent-custom-label {
           font-size: 12px;
-          color: var(--text-muted);
-          font-weight: 500;
+          color: var(--text-secondary);
+          font-weight: 600;
         }
 
         .accent-color-input {
-          width: 36px;
-          height: 28px;
+          width: 46px;
+          height: 32px;
           border-radius: var(--r-sm);
           border: 1px solid var(--border-normal);
           cursor: pointer;
-          background: none;
-          padding: 2px;
+          background: var(--bg-deep);
+          padding: 3px;
+          box-shadow: var(--shadow-sm);
+        }
+        .accent-color-input:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
         }
 
         /* ── Density section ── */
@@ -852,7 +923,7 @@ export default function ThemeModal() {
           color: var(--text-muted);
           letter-spacing: 0.12em;
           text-transform: uppercase;
-          margin: 24px 0 10px;
+          margin: 26px 0 10px;
           display: flex;
           align-items: center;
           gap: 10px;
@@ -867,37 +938,49 @@ export default function ThemeModal() {
         .density-options {
           display: flex;
           flex-direction: column;
-          gap: 6px;
+          gap: 7px;
+          padding: 10px;
+          background: var(--bg-base);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-lg);
+          box-shadow: var(--shadow-sm);
         }
 
         .density-option {
           display: flex;
           align-items: center;
           gap: 12px;
-          background: var(--bg-base);
+          background: var(--bg-deep);
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-md);
           padding: 10px 12px;
           cursor: pointer;
-          transition: border-color var(--t-fast), background var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out);
           text-align: left;
           position: relative;
         }
         .density-option:hover {
           background: var(--bg-float);
           border-color: var(--border-normal);
+          transform: translateY(-1px);
+        }
+        .density-option:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
         }
         .density-option--active {
-          border-color: var(--accent);
+          border-color: var(--accent-border);
           background: var(--accent-subtle);
+          box-shadow: 0 0 0 1px var(--accent-glow) inset;
         }
 
         .density-preview {
           flex-shrink: 0;
           width: 68px;
           height: 42px;
-          background: var(--bg-deep);
+          background: var(--bg-void);
           border-radius: var(--r-sm);
+          border: 1px solid var(--border-subtle);
           overflow: hidden;
           display: flex;
           flex-direction: column;
@@ -980,7 +1063,12 @@ export default function ThemeModal() {
         .font-size-section {
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 10px;
+          padding: 12px;
+          background: var(--bg-base);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-lg);
+          box-shadow: var(--shadow-sm);
         }
 
         .theme-slider-row {
@@ -1006,7 +1094,6 @@ export default function ThemeModal() {
           color: var(--text-secondary);
           line-height: 1.4;
           margin: 0;
-          transition: font-size var(--t-fast);
         }
 
         .zoom-row {
@@ -1033,6 +1120,11 @@ export default function ThemeModal() {
         .tf-options {
           display: flex;
           gap: 8px;
+          padding: 10px;
+          background: var(--bg-base);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-lg);
+          box-shadow: var(--shadow-sm);
         }
 
         .tf-option {
@@ -1042,20 +1134,26 @@ export default function ThemeModal() {
           align-items: center;
           gap: 6px;
           padding: 12px 8px;
-          background: var(--bg-base);
+          background: var(--bg-deep);
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-md);
           cursor: pointer;
-          transition: border-color var(--t-fast), background var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out);
           position: relative;
         }
         .tf-option:hover {
           background: var(--bg-float);
           border-color: var(--border-normal);
+          transform: translateY(-1px);
+        }
+        .tf-option:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
         }
         .tf-option--active {
-          border-color: var(--accent);
+          border-color: var(--accent-border);
           background: var(--accent-subtle);
+          box-shadow: 0 0 0 1px var(--accent-glow) inset;
         }
 
         .tf-preview {
@@ -1091,6 +1189,11 @@ export default function ThemeModal() {
           display: flex;
           gap: 8px;
           flex-wrap: wrap;
+          padding: 10px;
+          background: var(--bg-base);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-lg);
+          box-shadow: var(--shadow-sm);
         }
 
         .bg-pattern-btn {
@@ -1098,12 +1201,12 @@ export default function ThemeModal() {
           flex-direction: column;
           align-items: center;
           gap: 6px;
-          background: var(--bg-base);
+          background: var(--bg-deep);
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-md);
           padding: 8px;
           cursor: pointer;
-          transition: border-color var(--t-fast), background var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out);
           position: relative;
           flex: 1;
           min-width: 56px;
@@ -1111,10 +1214,16 @@ export default function ThemeModal() {
         .bg-pattern-btn:hover {
           background: var(--bg-float);
           border-color: var(--border-normal);
+          transform: translateY(-1px);
+        }
+        .bg-pattern-btn:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
         }
         .bg-pattern-btn--active {
-          border-color: var(--accent);
+          border-color: var(--accent-border);
           background: var(--accent-subtle);
+          box-shadow: 0 0 0 1px var(--accent-glow) inset;
         }
 
         .bg-pattern-preview {
@@ -1122,6 +1231,7 @@ export default function ThemeModal() {
           height: 28px;
           border-radius: var(--r-xs);
           background: var(--bg-deep);
+          border: 1px solid var(--border-subtle);
           flex-shrink: 0;
         }
         .bg-pattern-preview--dots {
@@ -1187,17 +1297,23 @@ export default function ThemeModal() {
           border-radius: var(--r-md);
           padding: 10px 12px;
           cursor: pointer;
-          transition: border-color var(--t-fast), background var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out);
           text-align: left;
           width: 100%;
         }
         .motion-toggle:hover {
           background: var(--bg-float);
           border-color: var(--border-normal);
+          transform: translateY(-1px);
+        }
+        .motion-toggle:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
         }
         .motion-toggle--active {
-          border-color: var(--accent);
+          border-color: var(--accent-border);
           background: var(--accent-subtle);
+          box-shadow: 0 0 0 1px var(--accent-glow) inset;
         }
 
         .motion-toggle-icon {
@@ -1230,7 +1346,6 @@ export default function ThemeModal() {
           border-radius: var(--r-full);
           background: var(--bg-overlay);
           position: relative;
-          transition: background var(--t-fast);
         }
         .toggle-track--on {
           background: var(--accent);
@@ -1255,29 +1370,40 @@ export default function ThemeModal() {
         .font-family-options {
           display: flex;
           flex-direction: column;
-          gap: 6px;
+          gap: 7px;
+          padding: 10px;
+          background: var(--bg-base);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-lg);
+          box-shadow: var(--shadow-sm);
         }
 
         .font-family-option {
           display: flex;
           align-items: center;
           gap: 12px;
-          background: var(--bg-base);
+          background: var(--bg-deep);
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-md);
           padding: 10px 12px;
           cursor: pointer;
-          transition: border-color var(--t-fast), background var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out);
           text-align: left;
           position: relative;
         }
         .font-family-option:hover {
           background: var(--bg-float);
           border-color: var(--border-normal);
+          transform: translateY(-1px);
+        }
+        .font-family-option:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
         }
         .font-family-option--active {
-          border-color: var(--accent);
+          border-color: var(--accent-border);
           background: var(--accent-subtle);
+          box-shadow: 0 0 0 1px var(--accent-glow) inset;
         }
 
         .font-family-preview {
@@ -1300,29 +1426,40 @@ export default function ThemeModal() {
         .msg-width-options {
           display: flex;
           flex-direction: column;
-          gap: 6px;
+          gap: 7px;
+          padding: 10px;
+          background: var(--bg-base);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-lg);
+          box-shadow: var(--shadow-sm);
         }
 
         .msg-width-option {
           display: flex;
           align-items: center;
           gap: 12px;
-          background: var(--bg-base);
+          background: var(--bg-deep);
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-md);
           padding: 10px 12px;
           cursor: pointer;
-          transition: border-color var(--t-fast), background var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out);
           text-align: left;
           position: relative;
         }
         .msg-width-option:hover {
           background: var(--bg-float);
           border-color: var(--border-normal);
+          transform: translateY(-1px);
+        }
+        .msg-width-option:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
         }
         .msg-width-option--active {
-          border-color: var(--accent);
+          border-color: var(--accent-border);
           background: var(--accent-subtle);
+          box-shadow: 0 0 0 1px var(--accent-glow) inset;
         }
 
         .msg-width-info {
@@ -1347,7 +1484,12 @@ export default function ThemeModal() {
         .layout-toggles {
           display: flex;
           flex-direction: column;
-          gap: 6px;
+          gap: 7px;
+          padding: 10px;
+          background: var(--bg-base);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-lg);
+          box-shadow: var(--shadow-sm);
         }
 
         /* ── Custom CSS section ── */
@@ -1355,11 +1497,16 @@ export default function ThemeModal() {
           display: flex;
           flex-direction: column;
           gap: 8px;
+          padding: 12px;
+          background: var(--bg-base);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-lg);
+          box-shadow: var(--shadow-sm);
         }
 
         .custom-css-textarea {
           width: 100%;
-          background: var(--bg-base);
+          background: var(--bg-deep);
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-md);
           padding: 10px 12px;
@@ -1369,7 +1516,6 @@ export default function ThemeModal() {
           line-height: 1.6;
           resize: vertical;
           min-height: 140px;
-          transition: border-color var(--t-fast);
           outline: none;
         }
         .custom-css-textarea:focus {
@@ -1385,6 +1531,42 @@ export default function ThemeModal() {
           color: var(--text-muted);
           margin: 0;
           line-height: 1.5;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .theme-modal-backdrop,
+          .theme-modal,
+          .theme-applied-flash {
+            animation: none;
+          }
+
+          .theme-modal-close,
+          .theme-swatch,
+          .theme-swatch-preview,
+          .accent-swatch,
+          .density-option,
+          .tf-option,
+          .bg-pattern-btn,
+          .motion-toggle,
+          .toggle-thumb,
+          .font-family-option,
+          .msg-width-option {
+            transition: none;
+          }
+
+          .theme-modal-close:hover,
+          .theme-swatch:hover,
+          .theme-swatch:hover .theme-swatch-preview,
+          .accent-swatch:hover,
+          .accent-swatch--active,
+          .density-option:hover,
+          .tf-option:hover,
+          .bg-pattern-btn:hover,
+          .motion-toggle:hover,
+          .font-family-option:hover,
+          .msg-width-option:hover {
+            transform: none;
+          }
         }
       `}</style>
     </div>

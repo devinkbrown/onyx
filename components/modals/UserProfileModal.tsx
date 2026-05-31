@@ -813,10 +813,12 @@ export default function UserProfileModal() {
           display: flex;
           align-items: center;
           justify-content: center;
-          background: rgba(0, 0, 0, 0.75);
-          backdrop-filter: blur(8px);
-          -webkit-backdrop-filter: blur(8px);
-          padding: 16px;
+          background:
+            radial-gradient(circle at 50% 18%, var(--accent-glow), transparent 34%),
+            color-mix(in srgb, var(--bg-void) 86%, transparent);
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+          padding: 20px;
         }
 
         /* ── Card ── */
@@ -824,12 +826,27 @@ export default function UserProfileModal() {
           position: relative;
           width: 100%;
           max-width: 720px;
-          background: var(--bg-2, var(--bg-elevated));
-          border: 1px solid var(--border-subtle);
-          border-radius: 12px;
+          background:
+            linear-gradient(180deg,
+              color-mix(in srgb, var(--bg-float) 22%, var(--bg-elevated)) 0%,
+              var(--bg-elevated) 46%,
+              var(--bg-deep) 100%);
+          border: 1px solid var(--border-normal);
+          border-radius: var(--r-xl);
           overflow: hidden;
-          box-shadow: 0 24px 64px rgba(0, 0, 0, 0.65), 0 4px 16px rgba(0, 0, 0, 0.4);
+          box-shadow: var(--shadow-xl), var(--glow);
           max-height: 90dvh;
+          isolation: isolate;
+        }
+
+        .upm-card::before {
+          content: '';
+          position: absolute;
+          inset: 0 0 auto;
+          height: 1px;
+          background: linear-gradient(90deg, transparent, var(--accent-border), transparent);
+          pointer-events: none;
+          z-index: 1;
         }
 
         @keyframes scale-in {
@@ -841,25 +858,26 @@ export default function UserProfileModal() {
         /* ── Close button ── */
         .upm-close {
           position: absolute;
-          top: 12px;
-          right: 12px;
+          top: 14px;
+          right: 14px;
           z-index: 10;
-          width: 28px;
-          height: 28px;
+          width: 30px;
+          height: 30px;
           border-radius: var(--r-full);
-          border: 1px solid rgba(255,255,255,0.12);
-          background: rgba(0, 0, 0, 0.5);
-          color: rgba(255, 255, 255, 0.75);
+          border: 1px solid var(--border-normal);
+          background: color-mix(in srgb, var(--bg-void) 62%, transparent);
+          color: var(--text-secondary);
           display: flex;
           align-items: center;
           justify-content: center;
           cursor: pointer;
-          transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
         }
         .upm-close:hover {
-          background: rgba(0, 0, 0, 0.75);
-          color: #fff;
-          border-color: rgba(255,255,255,0.25);
+          background: var(--bg-float);
+          color: var(--text-primary);
+          border-color: var(--accent-border);
+          transform: scale(1.04);
         }
 
         /* ── Two-column layout ── */
@@ -876,12 +894,26 @@ export default function UserProfileModal() {
           display: flex;
           flex-direction: column;
           position: relative;
+          background:
+            linear-gradient(180deg,
+              color-mix(in srgb, var(--bg-base) 64%, transparent) 0%,
+              var(--bg-deep) 100%);
         }
 
         .upm-banner {
-          height: 120px;
+          height: 132px;
           position: relative;
           flex-shrink: 0;
+        }
+
+        .upm-banner::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background:
+            linear-gradient(180deg, transparent 40%, color-mix(in srgb, var(--bg-deep) 84%, transparent) 100%),
+            linear-gradient(90deg, color-mix(in srgb, var(--bg-void) 35%, transparent), transparent 46%, color-mix(in srgb, var(--bg-void) 28%, transparent));
+          pointer-events: none;
         }
 
         .upm-banner-edit-btn {
@@ -894,14 +926,19 @@ export default function UserProfileModal() {
           padding: 3px 10px;
           border-radius: var(--r-full);
           border: 1px solid var(--border-normal);
-          background: rgba(0,0,0,0.55);
-          color: rgba(255,255,255,0.85);
+          background: color-mix(in srgb, var(--bg-void) 62%, transparent);
+          color: var(--text-secondary);
           cursor: pointer;
-          transition: background 150ms ease;
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
           z-index: 2;
           white-space: nowrap;
         }
-        .upm-banner-edit-btn:hover { background: rgba(0,0,0,0.75); color: #fff; }
+        .upm-banner-edit-btn:hover {
+          background: var(--bg-float);
+          color: var(--text-primary);
+          border-color: var(--accent-border);
+          transform: translateX(-50%) translateY(-1px);
+        }
 
         .upm-banner-field {
           padding: 0 16px 8px;
@@ -910,31 +947,36 @@ export default function UserProfileModal() {
 
         .upm-avatar-wrap {
           position: relative;
-          padding: 0 16px;
-          margin-top: -36px;
+          padding: 0 20px;
+          margin-top: -40px;
           flex-shrink: 0;
+          z-index: 2;
         }
 
         .upm-avatar-border {
           display: inline-flex;
           border-radius: var(--r-full);
-          border: 4px solid var(--accent);
-          box-shadow: 0 0 0 3px var(--bg-2, var(--bg-elevated));
+          padding: 3px;
+          background: linear-gradient(135deg, var(--accent), var(--gold));
+          border: 1px solid var(--accent-border);
+          box-shadow:
+            0 0 0 5px var(--bg-deep),
+            0 10px 28px color-mix(in srgb, var(--accent) 22%, transparent);
           line-height: 0;
         }
 
         .upm-identity {
-          padding: 8px 16px 16px;
+          padding: 12px 20px 20px;
           flex: 1;
         }
 
         .upm-nick {
-          font-size: 20px;
-          font-weight: 700;
+          font-size: 24px;
+          font-weight: 800;
           color: var(--text-normal, var(--text-primary));
-          margin: 0 0 2px;
-          letter-spacing: -0.01em;
-          line-height: 1.2;
+          margin: 0 0 4px;
+          letter-spacing: 0;
+          line-height: 1.08;
           display: flex;
           align-items: center;
           gap: 8px;
@@ -943,26 +985,35 @@ export default function UserProfileModal() {
 
         .upm-edited-tag {
           font-size: 11px;
-          font-weight: 500;
+          font-weight: 700;
           color: var(--text-muted);
-          background: var(--bg-elevated);
+          background: var(--bg-base);
+          border: 1px solid var(--border-subtle);
           border-radius: var(--r-full);
           padding: 2px 7px;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
         }
 
         .upm-account {
           font-size: 13px;
-          color: var(--text-muted);
-          margin: 0 0 4px;
+          color: var(--text-secondary);
+          margin: 0 0 8px;
           font-weight: 500;
         }
 
         .upm-pronouns {
+          display: inline-flex;
+          align-items: center;
+          width: fit-content;
           font-size: 12px;
-          color: var(--text-muted);
-          margin: 0 0 6px;
-          font-weight: 500;
-          font-style: italic;
+          color: var(--gold);
+          margin: 0 0 8px;
+          font-weight: 700;
+          border: 1px solid var(--accent-border);
+          background: var(--gold-subtle);
+          border-radius: var(--r-full);
+          padding: 3px 8px;
         }
 
         .upm-preview-bio {
@@ -978,8 +1029,8 @@ export default function UserProfileModal() {
 
         .upm-badges {
           display: flex;
-          gap: 6px;
-          margin-top: 8px;
+          gap: 7px;
+          margin-top: 12px;
           align-items: center;
           flex-wrap: wrap;
         }
@@ -990,30 +1041,36 @@ export default function UserProfileModal() {
           border-radius: var(--r-full);
           flex-shrink: 0;
           display: inline-block;
+          box-shadow: 0 0 0 3px var(--accent-subtle), 0 0 18px currentColor;
         }
 
         /* ── Mode badges ── */
         .upm-mode-badge {
           font-size: 10px;
           font-weight: 700;
-          padding: 3px 9px;
+          padding: 4px 9px;
           border-radius: var(--r-full);
           letter-spacing: 0.05em;
           text-transform: uppercase;
+          line-height: 1;
         }
-        .upm-mode-owner { background: rgba(232, 184, 75, 0.15); color: var(--gold); border: 1px solid rgba(232,184,75,0.25); }
-        .upm-mode-op    { background: rgba(14, 165, 233, 0.15); color: var(--accent); border: 1px solid rgba(14,165,233,0.25); }
-        .upm-mode-voice { background: rgba(52, 211, 153, 0.15); color: var(--status-online); border: 1px solid rgba(52,211,153,0.25); }
-        .upm-mode-oper  { background: rgba(250, 200, 50, 0.15); color: #f0c040; border: 1px solid rgba(250,200,50,0.25); }
-        .upm-mode-self  { background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border-subtle); }
+        .upm-mode-owner { background: var(--gold-subtle); color: var(--gold); border: 1px solid color-mix(in srgb, var(--gold) 34%, transparent); }
+        .upm-mode-op    { background: var(--accent-subtle); color: var(--accent-hover); border: 1px solid var(--accent-border); }
+        .upm-mode-voice { background: color-mix(in srgb, var(--success) 14%, transparent); color: var(--success); border: 1px solid color-mix(in srgb, var(--success) 28%, transparent); }
+        .upm-mode-oper  { background: var(--gold-subtle); color: var(--gold); border: 1px solid color-mix(in srgb, var(--gold) 34%, transparent); }
+        .upm-mode-self  { background: var(--bg-base); color: var(--text-secondary); border: 1px solid var(--border-normal); }
 
         .upm-custom-status {
           font-size: 13px;
           color: var(--text-secondary, var(--text-muted));
-          margin: 10px 0 0;
+          margin: 14px 0 0;
           display: flex;
           align-items: center;
           gap: 6px;
+          padding: 8px 10px;
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-md);
+          background: color-mix(in srgb, var(--bg-base) 72%, transparent);
         }
 
         .upm-status-bullet {
@@ -1023,11 +1080,14 @@ export default function UserProfileModal() {
         }
 
         .upm-activity-card {
-          margin-top: 12px;
-          background: var(--bg-elevated);
-          border: 1px solid var(--border-subtle);
+          margin-top: 14px;
+          background:
+            linear-gradient(180deg,
+              color-mix(in srgb, var(--bg-float) 18%, var(--bg-base)) 0%,
+              var(--bg-base) 100%);
+          border: 1px solid var(--border-normal);
           border-radius: var(--r-md);
-          padding: 8px 12px;
+          padding: 10px 12px;
         }
 
         .upm-activity-label {
@@ -1046,11 +1106,11 @@ export default function UserProfileModal() {
         }
 
         .upm-edit-profile-btn {
-          margin-top: 14px;
+          margin-top: 18px;
           width: 100%;
           justify-content: center;
           font-size: 12px;
-          padding: 7px 12px;
+          padding: 9px 12px;
           gap: 5px;
         }
 
@@ -1066,14 +1126,15 @@ export default function UserProfileModal() {
         .upm-tabs {
           display: flex;
           border-bottom: 1px solid var(--border-subtle);
-          padding: 0 16px;
+          padding: 0 18px;
           flex-shrink: 0;
+          background: color-mix(in srgb, var(--bg-deep) 42%, transparent);
         }
 
         .upm-tab {
-          padding: 12px 12px 10px;
+          padding: 14px 12px 12px;
           font-size: 13px;
-          font-weight: 500;
+          font-weight: 700;
           cursor: pointer;
           color: var(--text-muted);
           border: none;
@@ -1083,7 +1144,7 @@ export default function UserProfileModal() {
           display: flex;
           align-items: center;
           gap: 6px;
-          transition: color 150ms ease, border-color 150ms ease;
+          transition: opacity var(--t-fast) var(--ease-out);
         }
 
         .upm-tab.active {
@@ -1098,8 +1159,9 @@ export default function UserProfileModal() {
         .upm-tab-count {
           font-size: 11px;
           font-weight: 700;
-          background: var(--bg-elevated);
-          color: var(--text-muted);
+          background: var(--accent-subtle);
+          color: var(--accent-hover);
+          border: 1px solid var(--accent-border);
           padding: 1px 6px;
           border-radius: var(--r-full);
           min-width: 18px;
@@ -1112,10 +1174,11 @@ export default function UserProfileModal() {
           overflow-y: auto;
           scrollbar-width: thin;
           scrollbar-color: var(--border-subtle) transparent;
+          padding-bottom: 10px;
         }
 
         .upm-section {
-          padding: 16px 16px 0;
+          padding: 18px 18px 0;
         }
 
         .upm-section-label {
@@ -1124,7 +1187,7 @@ export default function UserProfileModal() {
           text-transform: uppercase;
           letter-spacing: 0.1em;
           color: var(--text-muted);
-          margin: 0 0 6px;
+          margin: 0 0 8px;
           display: flex; align-items: center; gap: 8px;
         }
         .upm-section-label::after {
@@ -1134,18 +1197,18 @@ export default function UserProfileModal() {
         /* ── About Me ── */
         .upm-bio-text {
           font-size: 14px;
-          line-height: 1.6;
-          color: var(--text-secondary, var(--text-muted));
+          line-height: 1.68;
+          color: var(--text-secondary, var(--text-primary));
           margin: 0 0 4px;
           white-space: pre-wrap;
           word-break: break-word;
         }
 
         .upm-info-value {
-          font-size: 14px;
-          color: var(--text-secondary, var(--text-primary));
+          font-size: 15px;
+          color: var(--text-primary);
           margin: 0 0 2px;
-          font-weight: 500;
+          font-weight: 700;
         }
 
         .upm-info-sub {
@@ -1157,7 +1220,7 @@ export default function UserProfileModal() {
         .upm-empty-state {
           font-size: 13px;
           color: var(--text-muted);
-          padding: 24px 16px;
+          padding: 30px 18px;
           text-align: center;
           font-style: italic;
         }
@@ -1166,20 +1229,23 @@ export default function UserProfileModal() {
         .upm-mutual-channel {
           display: flex;
           align-items: center;
-          gap: 8px;
-          padding: 8px 16px;
+          gap: 10px;
+          padding: 10px 18px;
           width: 100%;
           background: none;
           border: none;
           cursor: pointer;
           font-family: inherit;
           text-align: left;
-          transition: background 150ms ease;
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out);
         }
-        .upm-mutual-channel:hover { background: var(--bg-overlay, rgba(255,255,255,0.04)); }
+        .upm-mutual-channel:hover {
+          background: var(--bg-base);
+          transform: translateX(2px);
+        }
 
         .upm-mutual-hash {
-          color: var(--text-muted);
+          color: var(--accent-hover);
           flex-shrink: 0;
         }
 
@@ -1206,23 +1272,23 @@ export default function UserProfileModal() {
           min-height: 80px;
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-md);
-          background: var(--bg-elevated);
+          background: var(--bg-deep);
           color: var(--text-secondary, var(--text-primary));
           font-size: 14px;
           font-family: inherit;
           line-height: 1.6;
           resize: vertical;
           outline: none;
-          padding: 8px 12px;
+          padding: 10px 12px;
           box-sizing: border-box;
-          transition: border-color 150ms ease;
+          transition: none;
         }
         .upm-note-textarea::placeholder {
           color: var(--text-muted);
           font-style: italic;
         }
         .upm-note-textarea:focus {
-          border-color: var(--accent);
+          border-color: var(--accent-border);
           color: var(--text-normal, var(--text-primary));
         }
 
@@ -1230,36 +1296,46 @@ export default function UserProfileModal() {
         .upm-actions {
           display: flex;
           gap: 8px;
-          padding: 12px 16px;
+          padding: 14px 18px 16px;
           border-top: 1px solid var(--border-subtle);
           flex-shrink: 0;
           flex-wrap: wrap;
+          background: color-mix(in srgb, var(--bg-deep) 60%, transparent);
         }
 
         .upm-btn {
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          padding: 8px 16px;
+          padding: 9px 16px;
           border-radius: var(--r-md);
           font-size: 13px;
           font-weight: 600;
           font-family: inherit;
           cursor: pointer;
           border: 1px solid transparent;
-          transition: background 150ms ease, color 150ms ease, border-color 150ms ease, opacity 150ms ease;
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
           white-space: nowrap;
         }
 
-        .upm-btn-primary {
-          background: var(--accent);
-          color: #fff;
-          border-color: var(--accent);
+        .upm-btn:hover {
+          transform: translateY(-1px);
         }
-        .upm-btn-primary:hover { opacity: 0.88; }
+
+        .upm-btn:active {
+          transform: translateY(0);
+        }
+
+        .upm-btn-primary {
+          background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+          color: var(--text-primary);
+          border-color: var(--accent-border);
+          box-shadow: 0 8px 22px var(--accent-glow);
+        }
+        .upm-btn-primary:hover { filter: brightness(1.05); }
 
         .upm-btn-secondary {
-          background: var(--bg-elevated);
+          background: var(--bg-base);
           color: var(--text-primary);
           border-color: var(--border-normal);
         }
@@ -1273,11 +1349,11 @@ export default function UserProfileModal() {
         .upm-btn-ghost:hover { color: var(--text-secondary); background: var(--bg-elevated); }
 
         .upm-btn-danger {
-          background: rgba(220, 38, 38, 0.15);
-          color: #ef4444;
-          border-color: rgba(220, 38, 38, 0.35);
+          background: var(--danger-subtle);
+          color: var(--danger);
+          border-color: color-mix(in srgb, var(--danger) 38%, transparent);
         }
-        .upm-btn-danger:hover { background: rgba(220, 38, 38, 0.25); }
+        .upm-btn-danger:hover { background: color-mix(in srgb, var(--danger) 18%, transparent); }
 
         /* ── Link ── */
         .upm-link {
@@ -1288,10 +1364,11 @@ export default function UserProfileModal() {
 
         /* ── Edit mode ── */
         .upm-edit-header {
-          padding: 16px 16px 0;
+          padding: 18px 18px 0;
           border-bottom: 1px solid var(--border-subtle);
-          padding-bottom: 12px;
+          padding-bottom: 14px;
           flex-shrink: 0;
+          background: color-mix(in srgb, var(--bg-deep) 42%, transparent);
         }
 
         .upm-edit-title {
@@ -1306,13 +1383,13 @@ export default function UserProfileModal() {
         .upm-edit-scroll {
           flex: 1;
           overflow-y: auto;
-          padding: 4px 0;
+          padding: 6px 0 10px;
           scrollbar-width: thin;
           scrollbar-color: var(--border-subtle) transparent;
         }
 
         .upm-edit-field {
-          padding: 12px 16px 0;
+          padding: 14px 18px 0;
         }
 
         .upm-edit-label {
@@ -1347,7 +1424,7 @@ export default function UserProfileModal() {
           font-family: inherit;
           outline: none;
           box-sizing: border-box;
-          transition: border-color 150ms ease, box-shadow 150ms ease;
+          transition: none;
         }
         .upm-edit-input:focus {
           border-color: var(--accent-border);
@@ -1369,7 +1446,7 @@ export default function UserProfileModal() {
           outline: none;
           box-sizing: border-box;
           min-height: 80px;
-          transition: border-color 150ms ease, box-shadow 150ms ease;
+          transition: none;
         }
         .upm-edit-textarea:focus {
           border-color: var(--accent-border);
@@ -1404,7 +1481,7 @@ export default function UserProfileModal() {
           background: var(--bg-overlay);
           cursor: pointer;
           flex-shrink: 0;
-          transition: background 200ms ease;
+          transition: opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
           padding: 0;
         }
 
@@ -1421,7 +1498,7 @@ export default function UserProfileModal() {
           border-radius: var(--r-full);
           background: #fff;
           box-shadow: 0 1px 3px rgba(0,0,0,0.35);
-          transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+          transition: transform var(--t-normal) var(--ease-spring);
           pointer-events: none;
         }
 
