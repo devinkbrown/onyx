@@ -1046,14 +1046,15 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 0 14px;
+          padding: 0 12px 0 16px;
           border-bottom: 1px solid var(--border-normal);
           background:
+            linear-gradient(90deg, var(--accent-subtle), transparent 42%),
             linear-gradient(180deg, rgba(255,255,255,0.026), rgba(255,255,255,0)),
             color-mix(in srgb, var(--bg-base) 94%, var(--accent) 6%);
           flex-shrink: 0;
-          gap: 10px;
-          box-shadow: 0 1px 0 rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.18);
+          gap: 12px;
+          box-shadow: var(--shadow-sm);
           min-width: 0;
           box-sizing: border-box;
         }
@@ -1061,42 +1062,42 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
         .ch-head-left {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 9px;
           overflow: hidden;
           flex: 1;
           min-width: 0;
         }
 
         .ch-head-sigil {
-          font-size: 18px;
+          font-size: 19px;
           font-weight: 700;
-          color: var(--text-muted);
+          color: var(--accent);
           flex-shrink: 0;
           line-height: 1;
-          opacity: 0.65;
-          letter-spacing: -0.01em;
+          opacity: 0.82;
+          text-shadow: 0 0 14px var(--accent-glow);
         }
 
         .ch-head-title {
-          font-size: 15px;
-          font-weight: 600;
+          font-size: 16px;
+          font-weight: 750;
           color: var(--text-primary);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
           flex-shrink: 0;
-          max-width: min(240px, 28vw);
-          letter-spacing: -0.01em;
-          line-height: 1.25;
+          max-width: min(260px, 30vw);
+          line-height: 1.15;
+          text-shadow: 0 1px 0 rgba(0,0,0,0.38);
         }
 
         .ch-head-divider {
           width: 1px;
-          height: 16px;
-          background: var(--border-normal);
+          height: 20px;
+          background: linear-gradient(180deg, transparent, var(--border-normal), transparent);
           flex-shrink: 0;
-          opacity: 0.7;
-          margin: 0 2px;
+          opacity: 0.9;
+          margin: 0 1px 0 3px;
         }
 
         /* ── DM identity block ── */
@@ -1138,41 +1139,45 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
         .ch-head-topic-area {
           display: flex;
           align-items: center;
-          gap: 4px;
+          gap: 6px;
           min-width: 0;
           flex: 1;
           overflow: hidden;
           position: relative;
           max-width: 100%;
+          padding: 2px 3px;
+          border-radius: var(--r-sm);
         }
         .ch-head-topic-area--editable {
           cursor: text;
         }
         .ch-head-topic-area--editable:focus {
           outline: none;
+          box-shadow: 0 0 0 1px var(--accent-border);
         }
 
         .ch-head-topic {
-          font-size: 13px;
-          color: var(--text-muted);
+          font-size: 12px;
+          font-weight: 500;
+          color: var(--text-secondary);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
           min-width: 0;
-          padding: 1px 4px;
+          max-width: 100%;
+          padding: 2px 5px;
           border-radius: var(--r-xs);
-          transition: background var(--t-fast), color var(--t-fast);
           margin: 0;
-          line-height: 1.4;
+          line-height: 1.35;
         }
         .ch-head-topic-area--editable:hover .ch-head-topic {
-          background: var(--ch-hover-bg);
+          background: var(--accent-subtle);
           color: var(--text-secondary);
         }
         .ch-head-topic--empty {
           color: var(--text-muted);
           font-style: italic;
-          opacity: 0.6;
+          opacity: 0.72;
         }
         .ch-head-topic-ellipsis {
           margin-left: 1px;
@@ -1181,27 +1186,28 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
         .ch-head-topic-readmore {
           flex-shrink: 0;
           font-size: 11px;
-          color: var(--accent);
-          background: none;
-          border: none;
+          font-weight: 700;
+          color: var(--accent-hover);
+          background: var(--accent-subtle);
+          border: 1px solid var(--accent-border);
+          border-radius: var(--r-full);
           cursor: pointer;
-          padding: 0 4px;
+          padding: 2px 7px;
           white-space: nowrap;
-          opacity: 0.8;
-          transition: opacity var(--t-fast);
+          opacity: 0.86;
         }
         .ch-head-topic-readmore:hover {
           opacity: 1;
-          text-decoration: underline;
+          color: var(--text-primary);
         }
 
         .ch-head-topic-pencil {
           flex-shrink: 0;
-          font-size: 12px;
+          font-size: 11px;
           opacity: 0;
           transition: opacity 150ms;
           pointer-events: none;
-          color: var(--text-muted);
+          color: var(--accent-hover);
           line-height: 1;
         }
         .ch-head-topic-area--editable:hover .ch-head-topic-pencil {
@@ -1212,7 +1218,7 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
         .ch-head-topic-edit-wrap {
           display: flex;
           flex-direction: column;
-          gap: 2px;
+          gap: 3px;
           flex: 1;
           min-width: 0;
         }
@@ -1225,8 +1231,9 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           border-radius: var(--r-sm);
           outline: none;
           width: 100%;
-          padding: 4px 8px;
+          padding: 5px 9px;
           box-sizing: border-box;
+          box-shadow: 0 0 0 1px var(--accent-border), var(--shadow-sm);
         }
         .ch-head-topic-input:focus {
           border-color: var(--accent);
@@ -1248,21 +1255,26 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           flex-shrink: 0;
         }
         .ch-topic-hist-btn {
-          background: none;
-          border: none;
+          width: 28px;
+          height: 28px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: color-mix(in srgb, var(--bg-deep) 72%, transparent);
+          border: 1px solid var(--border-subtle);
           cursor: pointer;
           font-size: 14px;
           line-height: 1;
-          padding: 2px 4px;
-          border-radius: var(--r-xs);
-          opacity: 0.5;
-          transition: opacity var(--t-fast), background var(--t-fast);
+          padding: 0;
+          border-radius: var(--r-sm);
+          opacity: 0.72;
           color: inherit;
         }
         .ch-topic-hist-btn:hover,
         .ch-topic-hist-btn--active {
           opacity: 1;
-          background: var(--ch-hover-bg);
+          background: var(--accent-subtle);
+          border-color: var(--accent-border);
         }
         .ch-topic-hist-dropdown {
           position: absolute;
@@ -1271,11 +1283,11 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           z-index: 200;
           background: var(--bg-float);
           border: 1px solid var(--border-normal);
-          border-radius: var(--r-md);
-          box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-          min-width: 260px;
+          border-radius: var(--r-lg);
+          box-shadow: var(--shadow-lg);
+          min-width: 280px;
           max-width: 380px;
-          padding: 4px 0;
+          padding: 6px;
           animation: ch-hist-pop 120ms ease-out;
         }
         @keyframes ch-hist-pop {
@@ -1288,25 +1300,26 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           letter-spacing: 0.06em;
           text-transform: uppercase;
           color: var(--text-muted);
-          padding: 6px 12px 4px;
+          padding: 7px 8px 6px;
         }
         .ch-topic-hist-item {
           display: block;
           width: 100%;
           text-align: left;
           background: none;
-          border: none;
+          border: 1px solid transparent;
           cursor: pointer;
-          padding: 6px 12px;
+          padding: 7px 8px;
           font-size: 12px;
           color: var(--text-secondary);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          transition: background var(--t-fast), color var(--t-fast);
+          border-radius: var(--r-sm);
         }
         .ch-topic-hist-item:hover {
           background: var(--ch-hover-bg);
+          border-color: var(--border-subtle);
           color: var(--text-primary);
         }
 
@@ -1336,7 +1349,7 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
         .ch-head-actions {
           display: flex;
           align-items: center;
-          gap: 6px;
+          gap: 7px;
           flex-shrink: 0;
           min-width: 0;
           max-width: min(920px, 64vw);
@@ -1347,17 +1360,21 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
         .ch-head-action-group {
           display: inline-flex;
           align-items: center;
-          gap: 2px;
+          gap: 3px;
           height: 34px;
           padding: 2px;
           border: 1px solid var(--border-subtle);
-          border-radius: var(--r-md);
-          background: color-mix(in srgb, var(--bg-deep) 68%, transparent);
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.018);
+          border-radius: var(--r-lg);
+          background:
+            linear-gradient(180deg, rgba(255,255,255,0.025), transparent),
+            color-mix(in srgb, var(--bg-deep) 76%, transparent);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.024), var(--shadow-sm);
           flex: 0 0 auto;
         }
         .ch-head-action-group--status {
-          background: color-mix(in srgb, var(--accent-subtle) 48%, var(--bg-deep));
+          background:
+            linear-gradient(180deg, rgba(255,255,255,0.03), transparent),
+            color-mix(in srgb, var(--accent-subtle) 48%, var(--bg-deep));
           border-color: var(--accent-border);
         }
         .ch-head-action-group--danger {
@@ -1372,11 +1389,11 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
 
         .ch-head-btn {
           width: 30px; height: 30px;
-          border-radius: var(--r-sm);
+          border-radius: var(--r-md);
           background: none; border: none; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
           color: var(--text-muted);
-          transition: background var(--t-fast), color var(--t-fast), box-shadow var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out);
           flex-shrink: 0;
           position: relative;
         }
@@ -1384,15 +1401,27 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           background: var(--bg-float);
           color: var(--text-primary);
           box-shadow: inset 0 0 0 1px var(--border-subtle);
+          transform: translateY(-1px);
         }
-        .ch-head-btn:active { background: var(--accent-subtle); }
+        .ch-head-btn:active { background: var(--accent-subtle); transform: translateY(0); }
+        .ch-head-btn:focus-visible {
+          outline: none;
+          box-shadow: 0 0 0 1px var(--accent-border), 0 0 0 4px var(--accent-subtle);
+        }
         .ch-head-btn--active { color: var(--accent); }
         .ch-head-btn--active:hover { color: var(--accent); background: var(--accent-subtle); }
         .ch-head-btn--danger:hover { background: var(--danger-subtle); color: var(--danger); }
 
         .ch-head-btn--tools {
           border: 1px solid var(--border-subtle);
-          background: color-mix(in srgb, var(--bg-deep) 68%, transparent);
+          background:
+            linear-gradient(180deg, rgba(255,255,255,0.025), transparent),
+            color-mix(in srgb, var(--bg-deep) 72%, transparent);
+        }
+        .ch-head-btn--tools.ch-head-btn--active {
+          border-color: var(--accent-border);
+          background: var(--accent-subtle);
+          box-shadow: 0 0 0 1px var(--accent-border), 0 0 18px var(--accent-glow);
         }
 
         .ch-tools-menu {
@@ -1400,16 +1429,17 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           top: calc(100% + 8px);
           right: 0;
           z-index: 350;
-          width: min(340px, calc(100vw - 20px));
+          width: min(360px, calc(100vw - 20px));
           max-height: min(640px, calc(100vh - 88px));
           overflow-y: auto;
-          padding: 8px;
+          padding: 9px;
           border: 1px solid var(--border-normal);
           border-radius: var(--r-lg);
           background:
+            linear-gradient(135deg, var(--accent-subtle), transparent 42%),
             linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0)),
             var(--bg-float);
-          box-shadow: 0 18px 48px rgba(0,0,0,0.48), 0 0 0 1px rgba(255,255,255,0.025);
+          box-shadow: var(--shadow-xl), 0 0 24px var(--accent-glow);
           scrollbar-width: thin;
           scrollbar-color: var(--border-normal) transparent;
           animation: ch-tools-in 120ms var(--ease-out, ease) both;
@@ -1421,7 +1451,7 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
         }
 
         .ch-tools-section-label {
-          padding: 8px 8px 5px;
+          padding: 10px 9px 6px;
           font-size: 10px;
           line-height: 1;
           font-weight: 800;
@@ -1432,31 +1462,36 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
 
         .ch-tools-item {
           width: 100%;
-          min-height: 44px;
+          min-height: 46px;
           display: grid;
-          grid-template-columns: 28px minmax(0, 1fr);
+          grid-template-columns: 30px minmax(0, 1fr);
           align-items: center;
-          gap: 9px;
-          padding: 7px 8px;
+          gap: 10px;
+          padding: 8px 9px;
           border: 1px solid transparent;
-          border-radius: var(--r-sm);
+          border-radius: var(--r-md);
           background: transparent;
           color: var(--text-secondary);
           cursor: pointer;
           text-align: left;
           font: inherit;
-          transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out);
         }
 
         .ch-tools-item:hover,
         .ch-tools-item--active {
-          background: var(--ch-hover-bg);
-          border-color: var(--border-subtle);
+          background:
+            linear-gradient(90deg, var(--accent-subtle), transparent 88%),
+            color-mix(in srgb, var(--bg-elevated) 70%, transparent);
+          border-color: var(--accent-border);
           color: var(--text-primary);
+        }
+        .ch-tools-item:hover {
+          transform: translateX(2px);
         }
 
         .ch-tools-item--active {
-          box-shadow: inset 3px 0 0 var(--accent);
+          box-shadow: inset 2px 0 0 var(--accent), 0 0 18px var(--accent-glow);
         }
 
         .ch-tools-item--danger {
@@ -1473,17 +1508,24 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           width: 16px;
           height: 16px;
           opacity: 0.78;
+          color: var(--text-muted);
+          filter: drop-shadow(0 0 8px var(--accent-glow));
+        }
+        .ch-tools-item:hover svg,
+        .ch-tools-item--active svg {
+          color: var(--accent-hover);
+          opacity: 1;
         }
 
         .ch-tools-copy {
           display: grid;
-          gap: 2px;
+          gap: 3px;
           min-width: 0;
         }
 
         .ch-tools-title {
           font-size: 13px;
-          font-weight: 650;
+          font-weight: 700;
           color: currentColor;
           white-space: nowrap;
           overflow: hidden;
@@ -1501,13 +1543,13 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
         }
 
         .ch-tools-activity {
-          margin: 6px 4px;
-          padding: 8px;
+          margin: 7px 4px;
+          padding: 9px;
           border: 1px solid var(--border-subtle);
-          border-radius: var(--r-sm);
+          border-radius: var(--r-md);
           background: color-mix(in srgb, var(--bg-deep) 72%, transparent);
           display: grid;
-          gap: 7px;
+          gap: 8px;
         }
 
         .ch-tools-divider {
@@ -1517,12 +1559,25 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .ch-head-btn { transition: background var(--t-fast), color var(--t-fast); }
+          .ch-head-btn,
+          .ch-tools-item {
+            transition: none;
+          }
+          .ch-head-btn:hover,
+          .ch-tools-item:hover {
+            transform: none;
+          }
+          .ch-tools-menu,
+          .ch-topic-hist-dropdown,
+          .ch-thread-list-dropdown,
+          .ch-thread-item-active-dot {
+            animation: none;
+          }
         }
 
         @media (max-width: 768px) {
           .ch-head-btn { width: 32px; height: 32px; }
-          .ch-head { padding: 0 10px; gap: 8px; }
+          .ch-head { padding: 0 10px 0 12px; gap: 8px; }
           .ch-head-title { font-size: 14px; max-width: 140px; }
           .ch-head-actions {
             max-width: 54vw;
@@ -1549,23 +1604,39 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
         .ch-head-member-chip {
           display: flex;
           align-items: center;
-          gap: 5px;
-          padding: 3px 9px 3px 7px;
+          gap: 6px;
+          padding: 3px 10px 3px 8px;
           height: 30px;
-          border-radius: var(--r-sm);
+          border-radius: var(--r-md);
           background: none;
           border: 1px solid transparent;
           cursor: pointer;
-          color: var(--text-muted);
+          color: var(--text-secondary);
           font-size: 12px;
-          font-weight: 600;
+          font-weight: 750;
           font-family: inherit;
-          transition: background var(--t-fast), color var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out);
           white-space: nowrap;
           flex-shrink: 0;
+          font-variant-numeric: tabular-nums;
         }
-        .ch-head-member-chip:hover { background: var(--bg-float); border-color: var(--border-subtle); color: var(--text-primary); }
-        .ch-head-member-chip--active { color: var(--accent); }
+        .ch-head-member-chip:hover {
+          background: var(--bg-float);
+          border-color: var(--accent-border);
+          color: var(--text-primary);
+          transform: translateY(-1px);
+        }
+        .ch-head-member-chip:active { transform: translateY(0); }
+        .ch-head-member-chip:focus-visible {
+          outline: none;
+          box-shadow: 0 0 0 1px var(--accent-border), 0 0 0 4px var(--accent-subtle);
+        }
+        .ch-head-member-chip--active {
+          color: var(--accent);
+          background: var(--accent-subtle);
+          border-color: var(--accent-border);
+          box-shadow: 0 0 18px var(--accent-glow);
+        }
         .ch-head-member-chip--active:hover { background: var(--accent-subtle); color: var(--accent); }
         .ch-head-member-chip svg { flex-shrink: 0; }
 
@@ -1608,12 +1679,15 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
         }
         .ch-head-btn--pin-active {
           color: var(--gold);
+          background: var(--gold-subtle);
+          box-shadow: inset 0 0 0 1px var(--accent-border);
         }
         .ch-head-btn--pin-active:hover {
           color: var(--gold);
+          background: var(--gold-subtle);
         }
         .ch-head-pin-badge {
-          position: absolute; top: 1px; right: 1px;
+          position: absolute; top: 0; right: 0;
           font-size: 8px; font-weight: 800;
           min-width: 13px; height: 13px;
           background: var(--gold);
@@ -1623,6 +1697,7 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           line-height: 1;
           pointer-events: none;
           letter-spacing: 0;
+          box-shadow: 0 0 0 2px var(--bg-deep), 0 0 10px var(--accent-glow);
         }
 
         .ch-head-btn--bookmark { position: relative; }

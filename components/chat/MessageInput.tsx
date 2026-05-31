@@ -1413,7 +1413,7 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
 
       <FloodWarningBar visible={floodWarning} cooldownMs={FLOOD_COOLDOWN_MS} cooldownStart={floodCooldownStart} />
 
-      <div className={`msg-input-bar${sentFlash ? ' msg-input-bar--sent' : ''}${attachments.length > 0 ? ' msg-input-bar--has-attachments' : ''}`}>
+      <div className={`msg-input-bar${sentFlash ? ' msg-input-bar--sent' : ''}${attachments.length > 0 ? ' msg-input-bar--has-attachments' : ''}${text.length > 0 && !showPreview ? ' msg-input-bar--typing' : ''}${slowModeActive ? ' msg-input-bar--slow' : ''}${uploading ? ' msg-input-bar--uploading' : ''}`}>
         {/* ── Mobile bottom sheet (shown when expander is open on mobile) ── */}
         {mobileToolbarOpen && (
           <div className="mobile-tool-sheet" role="toolbar" aria-label="Message tools">
@@ -1654,6 +1654,14 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         />
         )}
 
+        {text.length > 0 && !showPreview && (
+          <span className="msg-typing-dots" aria-hidden="true">
+            <span className="msg-typing-dot" />
+            <span className="msg-typing-dot" />
+            <span className="msg-typing-dot" />
+          </span>
+        )}
+
         {/* GIF picker */}
         <div ref={gifPickerRef} className="gif-button-container">
           {showGifPicker && (
@@ -1772,8 +1780,12 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           </span>
         )}
 
+        {slowModeActive && (
+          <span className="msg-slow-mode" aria-live="polite">Slow mode</span>
+        )}
+
         {uploading && (
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Uploading…</span>
+          <span className="msg-upload-status" aria-live="polite">Uploading…</span>
         )}
 
         <button
@@ -1808,33 +1820,45 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         .drop-overlay {
           position: fixed;
           inset: 0;
-          background: rgba(124, 90, 245, 0.15);
-          border: 2px dashed var(--accent);
-          border-radius: 8px;
+          background:
+            radial-gradient(circle at center, var(--accent-subtle), transparent 48%),
+            linear-gradient(180deg, var(--bg-void), var(--bg-deep));
+          border: 1px solid var(--accent-border);
+          border-radius: var(--r-lg);
           z-index: 9999;
           display: flex;
           align-items: center;
           justify-content: center;
           pointer-events: none;
+          animation: drop-overlay-in var(--t-normal) var(--ease-out) both;
         }
         .drop-overlay__inner {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 12px;
+          gap: 14px;
+          padding: 28px 34px;
+          background: var(--bg-elevated);
+          border: 1px solid var(--accent-border);
+          border-radius: var(--r-xl);
+          box-shadow: var(--shadow-xl), var(--glow);
         }
         .drop-overlay__label {
-          font-size: 24px;
+          font-size: 20px;
           font-weight: 700;
-          letter-spacing: -0.01em;
-          color: var(--accent);
-          text-shadow: 0 2px 12px rgba(0,0,0,0.6);
+          letter-spacing: 0;
+          color: var(--text-primary);
         }
         .drop-overlay__icon {
-          width: 48px;
-          height: 48px;
-          color: var(--accent);
-          opacity: 0.85;
+          width: 50px;
+          height: 50px;
+          color: var(--gold);
+          filter: drop-shadow(0 0 12px var(--accent-glow));
+          opacity: 0.95;
+        }
+        @keyframes drop-overlay-in {
+          from { opacity: 0; transform: scale(0.985); }
+          to   { opacity: 1; transform: scale(1); }
         }
 
         /* Reply preview strip */
@@ -1848,7 +1872,7 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           border-left: 3px solid var(--accent);
           border-radius: var(--r-md) var(--r-md) 0 0;
           min-height: 36px;
-          animation: fadeIn 120ms ease both;
+          animation: fadeIn var(--t-fast) var(--ease-out) both;
         }
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(4px); }
@@ -1885,7 +1909,6 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           cursor: pointer;
           border-radius: var(--r-xs);
           padding: 0 2px;
-          transition: color var(--t-fast), background var(--t-fast);
         }
         .reply-preview__text:hover {
           color: var(--text-primary);
@@ -1904,25 +1927,98 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           padding: 0;
           border-radius: var(--r-xs);
           flex-shrink: 0;
-          transition: color var(--t-fast), background var(--t-fast);
         }
         .reply-preview__cancel:hover { color: var(--text-primary); background: var(--bg-float); }
 
+        .msg-input-wrap .attachment-strip {
+          gap: 12px;
+          padding: 12px 14px 11px;
+          background:
+            linear-gradient(180deg, var(--bg-float), var(--bg-elevated));
+          border-color: var(--border-normal);
+          border-radius: var(--r-lg) var(--r-lg) 0 0;
+          box-shadow: var(--shadow-sm);
+        }
+        .msg-input-wrap .attachment-item {
+          filter: drop-shadow(0 4px 12px var(--bg-void));
+          transition: transform var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
+        }
+        .msg-input-wrap .attachment-item:hover {
+          transform: translateY(-2px);
+          filter: drop-shadow(0 7px 16px var(--bg-void));
+        }
+        .msg-input-wrap .att-thumb,
+        .msg-input-wrap .att-file {
+          background: var(--bg-deep);
+          border: 1px solid var(--accent-border);
+          border-radius: var(--r-lg);
+          box-shadow: inset 0 0 0 1px var(--border-subtle);
+        }
+        .msg-input-wrap .att-thumb-img,
+        .msg-input-wrap .att-play-overlay {
+          border-radius: var(--r-lg);
+        }
+        .msg-input-wrap .att-file-name {
+          color: var(--text-primary);
+        }
+        .msg-input-wrap .att-file-size {
+          color: var(--text-muted);
+        }
+        .msg-input-wrap .attachment-remove {
+          background: var(--bg-overlay);
+          border-color: var(--bg-deep);
+          color: var(--text-secondary);
+          transition: opacity var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-spring), filter var(--t-fast) var(--ease-out);
+        }
+        .msg-input-wrap .attachment-remove:hover {
+          color: var(--text-primary);
+          background: var(--danger);
+          filter: drop-shadow(0 0 8px var(--danger-subtle));
+        }
+
         .msg-input-bar {
-          display: flex; align-items: flex-end; gap: 2px;
-          background: var(--bg-elevated);
+          display: flex; align-items: flex-end; gap: 4px;
+          background:
+            linear-gradient(180deg, var(--bg-float), var(--bg-elevated));
           border: 1px solid var(--border-normal);
           border-radius: var(--r-lg);
-          padding: 5px 8px 5px 6px;
+          padding: 7px 9px 7px 7px;
           position: relative;
-          transition: border-color var(--t-fast), box-shadow var(--t-fast);
+          box-shadow: var(--shadow-sm);
+        }
+        .msg-input-bar::before {
+          content: '';
+          position: absolute;
+          inset: -1px;
+          border-radius: inherit;
+          border: 1px solid var(--accent-border);
+          box-shadow: var(--glow);
+          opacity: 0;
+          pointer-events: none;
+        }
+        .msg-input-bar:hover:not(:focus-within) {
+          border-color: var(--accent-border);
+          box-shadow: var(--shadow-md);
         }
         .msg-input-bar--has-attachments {
           border-radius: 0 0 var(--r-lg) var(--r-lg);
         }
         .msg-input-bar:focus-within {
           border-color: var(--accent-border);
-          box-shadow: 0 0 0 3px var(--accent-subtle), 0 0 12px rgba(14,165,233,0.1) inset;
+          box-shadow: var(--shadow-lg), 0 0 0 3px var(--accent-subtle);
+        }
+        .msg-input-bar:focus-within::before {
+          opacity: 1;
+        }
+        .msg-input-bar--typing {
+          border-color: var(--accent-border);
+        }
+        .msg-input-bar--slow {
+          border-color: var(--border-subtle);
+          filter: saturate(0.86);
+        }
+        .msg-input-bar--uploading {
+          box-shadow: var(--shadow-md), 0 0 0 1px var(--accent-subtle);
         }
 
         .composer-left-tools {
@@ -1951,7 +2047,7 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           background: var(--bg-float);
           box-shadow: var(--shadow-md);
           z-index: 80;
-          animation: format-popover-in 140ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
+          animation: format-popover-in var(--t-fast) var(--ease-out) both;
         }
         @keyframes format-popover-in {
           from { opacity: 0; transform: translateY(6px) scale(0.98); }
@@ -2005,29 +2101,32 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
 
         .fmt-btn {
           width: 28px; height: 28px; border-radius: var(--r-xs);
-          border: none; background: none; cursor: pointer;
+          border: 1px solid transparent; background: none; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
           color: var(--text-muted); flex-shrink: 0; padding: 6px;
-          transition: color var(--t-fast), background var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out);
         }
-        .fmt-btn:hover { color: var(--text-secondary); background: var(--bg-float); }
+        .fmt-btn:hover { color: var(--text-secondary); background: var(--bg-overlay); border-color: var(--border-subtle); transform: translateY(-1px); }
         .msg-textarea {
           flex: 1; background: none; border: none; outline: none; resize: none;
           color: var(--text-primary); font-size: 15px; font-family: inherit;
           line-height: 1.5; min-height: 24px; max-height: 200px;
-          padding: 2px 0; overflow-y: auto;
+          padding: 4px 2px; overflow-y: auto;
+          caret-color: var(--gold);
+          text-shadow: 0 0 14px var(--accent-glow);
         }
-        .msg-textarea::placeholder { color: var(--text-muted); }
+        .msg-textarea::placeholder { color: var(--text-muted); opacity: 0.9; }
+        .msg-textarea:focus::placeholder { color: var(--text-secondary); }
 
         /* Draft indicator badge */
         .msg-draft-badge {
           font-size: 10px;
           font-weight: 600;
-          letter-spacing: 0.04em;
-          color: var(--gold, #e8b84b);
-          opacity: 0.8;
+          letter-spacing: 0;
+          color: var(--gold);
+          opacity: 0.95;
           align-self: flex-end;
-          padding-bottom: 5px;
+          padding: 0 6px 5px;
           flex-shrink: 0;
           pointer-events: none;
           user-select: none;
@@ -2035,24 +2134,28 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
 
         .input-action {
           width: 28px; height: 28px; border-radius: var(--r-xs);
-          border: none; background: none; cursor: pointer;
+          border: 1px solid transparent; background: none; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
           color: var(--text-muted); flex-shrink: 0; padding: 6px;
-          transition: color var(--t-fast), background var(--t-fast), transform 120ms cubic-bezier(0.34,1.56,0.64,1);
+          transition: transform var(--t-fast) var(--ease-spring), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
         }
         .input-action:hover {
-          color: var(--text-secondary);
-          background: var(--bg-float);
-          transform: scale(1.1);
+          color: var(--text-primary);
+          background: var(--bg-overlay);
+          border-color: var(--border-subtle);
+          transform: translateY(-1px);
+          filter: drop-shadow(0 0 7px var(--accent-glow));
         }
         .input-action:active { transform: scale(0.92); }
         .input-action--primary {
           color: var(--accent);
           background: var(--accent-subtle);
+          border-color: var(--accent-border);
         }
         .input-action--active {
           color: var(--accent);
           background: var(--accent-subtle);
+          border-color: var(--accent-border);
         }
 
         /* GIF text button variant */
@@ -2071,7 +2174,7 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           font-size: 20px;
           line-height: 1;
           font-weight: 300;
-          transition: transform 180ms var(--ease-out, cubic-bezier(0.16,1,0.3,1));
+          transition: transform var(--t-fast) var(--ease-out);
         }
         .mobile-expand-btn--open .mobile-expand-icon {
           transform: rotate(45deg);
@@ -2119,13 +2222,13 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
             bottom: calc(100% + 4px);
             left: 0;
             right: 0;
-            background: var(--bg-elevated, #132131);
-            border: 1px solid var(--border-normal, rgba(14,165,233,0.15));
-            border-radius: var(--r-lg, 12px);
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-normal);
+            border-radius: var(--r-lg);
             padding: 10px 12px;
             z-index: 50;
-            box-shadow: 0 -4px 16px rgba(0,0,0,0.4);
-            animation: tool-sheet-in 160ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
+            box-shadow: var(--shadow-lg);
+            animation: tool-sheet-in var(--t-fast) var(--ease-out) both;
           }
           @keyframes tool-sheet-in {
             from { opacity: 0; transform: translateY(8px); }
@@ -2133,16 +2236,16 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           }
           .mobile-tool-btn {
             height: 40px;
-            border: 1px solid var(--border-subtle, rgba(14,165,233,0.08));
-            border-radius: var(--r-md, 8px);
-            background: var(--bg-base, #0c1828);
-            color: var(--text-secondary, #7aa8c4);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--r-md);
+            background: var(--bg-base);
+            color: var(--text-secondary);
             font-size: 15px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: background var(--t-fast, 150ms), color var(--t-fast, 150ms);
+            transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out);
             min-width: 0;
           }
           .mobile-tool-btn svg {
@@ -2150,43 +2253,56 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
             height: 16px;
           }
           .mobile-tool-btn:active {
-            background: var(--accent-subtle, rgba(14,165,233,0.1));
-            color: var(--accent, #0ea5e9);
+            background: var(--accent-subtle);
+            color: var(--accent);
+            transform: scale(0.96);
           }
         }
 
         @keyframes input-sent-flash {
-          0%   { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(14,165,233,0.25); }
-          100% { border-color: var(--accent-border); box-shadow: 0 0 0 3px var(--accent-subtle); }
+          0%   { opacity: 1; transform: scale(1); filter: saturate(1.2); }
+          100% { opacity: 0; transform: scale(1.018); filter: saturate(1); }
         }
 
-        .msg-input-bar--sent {
-          animation: input-sent-flash 450ms ease forwards;
+        .msg-input-bar--sent::before {
+          animation: input-sent-flash var(--t-normal) var(--ease-out) forwards;
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .msg-input-bar--sent { animation: none !important; }
+          .msg-input-bar--sent::before { animation: none !important; }
         }
 
         .send-btn {
-          width: 28px; height: 28px; border-radius: var(--r-xs);
-          border: none; cursor: pointer;
+          width: 30px; height: 30px; border-radius: var(--r-sm);
+          border: 1px solid var(--border-subtle); cursor: pointer;
           display: flex; align-items: center; justify-content: center;
-          flex-shrink: 0; background: none; color: var(--text-muted); padding: 6px;
-          transition: transform 120ms cubic-bezier(0.34, 1.56, 0.64, 1), background var(--t-fast), color var(--t-fast);
+          flex-shrink: 0; background: var(--bg-base); color: var(--text-muted); padding: 6px;
+          transition: transform var(--t-fast) var(--ease-spring), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
           /* Override global mobile min-height — the input bar has enough visual size */
           min-height: unset; min-width: unset;
         }
+        .send-btn:hover:not(:disabled) {
+          transform: translateY(-1px);
+          filter: drop-shadow(0 0 8px var(--accent-glow));
+        }
         .send-btn:active {
           transform: scale(0.88);
-          transition: transform 80ms ease;
         }
         .send-btn--active {
-          background: var(--accent); color: #fff;
-          box-shadow: 0 2px 8px var(--accent-glow);
+          background: var(--accent);
+          color: var(--bg-void);
+          border-color: var(--accent);
+          box-shadow: 0 0 0 1px var(--accent-border), var(--glow);
         }
-        .send-btn--active:hover { background: var(--accent-hover); box-shadow: 0 2px 12px var(--accent-glow); }
-        .send-btn:disabled:not(.send-btn--active) { cursor: not-allowed; opacity: 0.4; }
+        .send-btn--active:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+        .send-btn:disabled {
+          cursor: not-allowed;
+          opacity: 0.5;
+          background: var(--bg-deep);
+          color: var(--text-muted);
+          border-color: var(--border-subtle);
+          filter: saturate(0.75);
+        }
 
         @media (max-width: 768px) {
           .send-btn {
@@ -2201,7 +2317,7 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .send-btn { transition: background var(--t-fast), color var(--t-fast); }
+          .send-btn { transition: opacity var(--t-fast); }
           .send-btn:active { transform: none; }
         }
 
@@ -2216,7 +2332,7 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           display: flex; align-items: baseline; gap: 10px;
           padding: 8px 12px;
           background: none; border: none; cursor: pointer; text-align: left;
-          transition: background var(--t-fast);
+          transition: opacity var(--t-fast) var(--ease-out);
         }
         .cmd-suggest-item:hover { background: var(--ch-hover-bg); }
         .cmd-suggest-name {
@@ -2252,10 +2368,10 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           display: flex; align-items: center; gap: 8px;
           height: 36px; padding: 0 12px;
           background: none; border: none; cursor: pointer; text-align: left;
-          transition: background var(--t-fast);
+          transition: opacity var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-out);
           flex-shrink: 0;
         }
-        .ac-item:hover { background: var(--ch-hover-bg); }
+        .ac-item:hover { background: var(--ch-hover-bg); transform: translateX(2px); }
         .ac-item--selected { background: var(--accent-subtle); }
         .ac-item--selected:hover { background: var(--accent-subtle); }
 
@@ -2263,7 +2379,7 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         .ac-avatar {
           width: 22px; height: 22px; border-radius: 50%;
           display: flex; align-items: center; justify-content: center;
-          font-size: 11px; font-weight: 700; color: #fff;
+          font-size: 11px; font-weight: 700; color: var(--text-primary);
           flex-shrink: 0; letter-spacing: 0;
         }
 
@@ -2295,16 +2411,76 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         /* ── Character counter ── */
         .msg-char-counter {
           font-size: 11px;
+          font-weight: 700;
           font-variant-numeric: tabular-nums;
-          padding: 0 8px;
+          min-width: 34px;
+          padding: 3px 8px;
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-full);
+          background: var(--bg-base);
           align-self: center;
-          transition: color 0.2s;
           color: var(--text-muted);
           flex-shrink: 0;
+          text-align: center;
           white-space: nowrap;
         }
-        .msg-char-counter.warn { color: #fbbf24; }
-        .msg-char-counter.danger { color: #ef4444; }
+        .msg-char-counter.warn {
+          color: var(--warning);
+          border-color: var(--border-normal);
+          background: var(--bg-elevated);
+        }
+        .msg-char-counter.danger {
+          color: var(--danger);
+          border-color: var(--danger-subtle);
+          background: var(--danger-subtle);
+        }
+
+        .msg-slow-mode,
+        .msg-upload-status {
+          align-self: center;
+          flex-shrink: 0;
+          border-radius: var(--r-full);
+          border: 1px solid var(--border-subtle);
+          background: var(--bg-base);
+          color: var(--text-muted);
+          font-size: 11px;
+          font-weight: 700;
+          line-height: 1;
+          padding: 5px 8px;
+          white-space: nowrap;
+        }
+        .msg-slow-mode {
+          color: var(--warning);
+          background: var(--bg-deep);
+        }
+        .msg-upload-status {
+          color: var(--gold);
+          border-color: var(--accent-border);
+          background: var(--accent-subtle);
+        }
+
+        .msg-typing-dots {
+          align-self: center;
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
+          padding: 0 4px;
+          flex-shrink: 0;
+        }
+        .msg-typing-dot {
+          width: 3px;
+          height: 3px;
+          border-radius: var(--r-full);
+          background: var(--gold);
+          opacity: 0.45;
+          animation: typing-dot-pulse calc(var(--t-normal) + var(--t-normal) + var(--t-fast)) var(--ease-out) infinite;
+        }
+        .msg-typing-dot:nth-child(2) { animation-delay: var(--t-fast); }
+        .msg-typing-dot:nth-child(3) { animation-delay: var(--t-normal); }
+        @keyframes typing-dot-pulse {
+          0%, 100% { opacity: 0.35; transform: translateY(0); }
+          45% { opacity: 1; transform: translateY(-2px); }
+        }
 
         /* ── Preview toggle button ── */
         .preview-toggle { opacity: 0.7; }
@@ -2331,6 +2507,37 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         .msg-preview:empty::before {
           content: 'Nothing to preview';
           color: var(--text-muted);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .drop-overlay,
+          .reply-preview,
+          .format-popover,
+          .mobile-tool-sheet,
+          .msg-input-bar--sent::before,
+          .msg-typing-dot {
+            animation: none !important;
+          }
+          .attachment-item,
+          .attachment-remove,
+          .fmt-btn,
+          .input-action,
+          .mobile-expand-icon,
+          .mobile-tool-btn,
+          .send-btn,
+          .cmd-suggest-item,
+          .ac-item {
+            transition: none !important;
+          }
+          .attachment-item:hover,
+          .fmt-btn:hover,
+          .input-action:hover,
+          .mobile-tool-btn:active,
+          .send-btn:hover:not(:disabled),
+          .send-btn:active,
+          .ac-item:hover {
+            transform: none !important;
+          }
         }
       `}</style>
     </div>

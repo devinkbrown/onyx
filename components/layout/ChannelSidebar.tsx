@@ -516,6 +516,9 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
           flex-direction: column;
           overflow: hidden;
           min-height: 0;
+          background:
+            linear-gradient(180deg, color-mix(in srgb, var(--bg-deep) 88%, transparent), transparent 22%),
+            var(--bg-void);
         }
 
         /* ── Compact sidebar mode ── */
@@ -558,8 +561,10 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
           cursor: pointer;
           gap: 8px;
           box-sizing: border-box;
+          background: color-mix(in srgb, var(--bg-deep) 76%, transparent);
+          box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--bg-void) 70%, transparent);
         }
-        .ch-header:hover { background: var(--ch-hover-bg); }
+        .ch-header:hover { background: color-mix(in srgb, var(--bg-base) 78%, var(--ch-hover-bg)); }
 
         .ch-header-info {
           flex: 1;
@@ -577,7 +582,7 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
           font-size: 15px;
           font-weight: 700;
           color: var(--text-primary);
-          letter-spacing: -0.2px;
+          letter-spacing: 0;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -625,9 +630,26 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
         .ch-scroll {
           flex: 1;
           overflow-y: auto;
-          padding: 8px 6px;
+          padding: 10px 6px 14px;
           min-height: 0;
           scrollbar-gutter: stable;
+          background:
+            linear-gradient(180deg, color-mix(in srgb, var(--bg-void) 72%, transparent), transparent 18px) top / 100% 28px no-repeat,
+            linear-gradient(0deg, color-mix(in srgb, var(--bg-void) 78%, transparent), transparent 22px) bottom / 100% 34px no-repeat;
+          scrollbar-color: var(--bg-overlay) transparent;
+          scrollbar-width: thin;
+        }
+        .ch-scroll::-webkit-scrollbar { width: 8px; }
+        .ch-scroll::-webkit-scrollbar-track { background: transparent; }
+        .ch-scroll::-webkit-scrollbar-thumb {
+          background: color-mix(in srgb, var(--bg-overlay) 78%, transparent);
+          border: 2px solid transparent;
+          border-radius: var(--r-full);
+          background-clip: padding-box;
+        }
+        .ch-scroll::-webkit-scrollbar-thumb:hover {
+          background: color-mix(in srgb, var(--accent-border) 52%, var(--bg-overlay));
+          background-clip: padding-box;
         }
 
         .ch-empty {
@@ -642,7 +664,10 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
           display: flex;
           align-items: center;
           gap: 6px;
-          padding: 4px 12px 4px 28px;
+          padding: 7px 12px 8px 28px;
+          margin: 1px 6px 2px;
+          border-radius: var(--r-sm);
+          background: color-mix(in srgb, var(--bg-deep) 58%, transparent);
         }
 
         .ch-dm-empty-text {
@@ -837,8 +862,9 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 2px 4px 4px;
-          margin-bottom: 2px;
+          padding: 4px 6px 6px;
+          margin: 0 2px 7px;
+          border-bottom: 1px solid var(--border-subtle);
         }
         .ch-sort-label {
           font-size: 11px;
@@ -850,22 +876,23 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
         .ch-sort-btn {
           width: 22px;
           height: 22px;
-          border-radius: 4px;
-          border: none;
-          background: none;
+          border-radius: var(--r-sm);
+          border: 1px solid var(--border-subtle);
+          background: color-mix(in srgb, var(--bg-deep) 70%, transparent);
           color: var(--text-muted);
           cursor: pointer;
           font-size: 12px;
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: background var(--t-fast), color var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out);
           flex-shrink: 0;
           padding: 0;
         }
         .ch-sort-btn:hover {
           background: var(--ch-hover-bg);
           color: var(--text-primary);
+          transform: translateY(-1px);
         }
 
         /* Draggable wrapper */
@@ -875,6 +902,221 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
         .ch-draggable-wrap:active {
           cursor: grabbing;
           opacity: 0.75;
+        }
+
+        /* ── Shared channel list polish ─────────────────────────────── */
+        .ch-section {
+          margin: 8px 0 10px;
+        }
+        .ch-section + .ch-section {
+          border-top: 1px solid color-mix(in srgb, var(--border-subtle) 80%, transparent);
+          margin-top: 10px;
+          padding-top: 8px;
+        }
+        .ch-section-header,
+        .cfp-folder-header {
+          min-height: 28px;
+          margin: 0 2px 4px;
+          padding: 6px 7px;
+          border: 1px solid transparent;
+          border-radius: var(--r-md);
+          background: transparent;
+        }
+        .ch-section-header:hover,
+        .cfp-folder-header:hover {
+          background: color-mix(in srgb, var(--bg-elevated) 54%, var(--ch-hover-bg));
+          border-color: var(--border-subtle);
+        }
+        .ch-section-label,
+        .cfp-folder-name {
+          font-size: 10px;
+          letter-spacing: 0.11em;
+          color: var(--text-muted);
+        }
+        .ch-section-header:hover .ch-section-label,
+        .cfp-folder-header:hover .cfp-folder-name {
+          color: var(--text-secondary);
+        }
+        .ch-section-count,
+        .cfp-folder-count {
+          background: color-mix(in srgb, var(--bg-float) 58%, transparent);
+          border: 1px solid var(--border-subtle);
+          color: var(--text-secondary);
+          box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-primary) 5%, transparent);
+        }
+        .ch-section-unread-badge {
+          background: var(--accent);
+          box-shadow: 0 0 0 1px var(--accent-border), 0 0 16px var(--accent-glow);
+        }
+        .ch-section-items,
+        .cfp-folder-body {
+          gap: 2px;
+        }
+
+        .cfp-root {
+          gap: 2px;
+        }
+        .cfp-folder {
+          margin: 0 0 9px;
+        }
+        .cfp-folder-body {
+          padding: 0 0 2px;
+        }
+        .cfp-row,
+        .ch-row,
+        .dm-row,
+        .vch-row {
+          border: 1px solid transparent;
+          box-shadow: none;
+        }
+        .cfp-row {
+          min-height: 31px;
+          padding: 5px 9px 5px 9px;
+          margin: 0 4px;
+          border-left: 3px solid transparent;
+        }
+        .ch-row {
+          border-left: 3px solid transparent;
+        }
+        .ch-row,
+        .dm-row {
+          margin: 0 2px;
+          width: calc(100% - 4px);
+        }
+        .ch-row:hover,
+        .cfp-row:hover,
+        .dm-row:hover,
+        .vch-wrap:hover .vch-row {
+          background: color-mix(in srgb, var(--bg-elevated) 66%, var(--ch-hover-bg));
+          border-color: var(--border-subtle);
+        }
+        .ch-row--active,
+        .cfp-row--active,
+        .dm-row--active,
+        .vch-row--active {
+          background:
+            linear-gradient(90deg, var(--accent-subtle), color-mix(in srgb, var(--bg-elevated) 58%, transparent)) !important;
+          border-color: var(--accent-border) !important;
+          border-left-color: var(--accent) !important;
+          box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-primary) 5%, transparent), 0 0 18px color-mix(in srgb, var(--accent-glow) 62%, transparent);
+        }
+        .ch-row--unread:not(.ch-row--active),
+        .cfp-row--unread:not(.cfp-row--active) {
+          background: color-mix(in srgb, var(--accent-subtle) 52%, transparent);
+          border-left-color: var(--accent-border);
+        }
+        .ch-row--compact {
+          width: calc(100% - 8px);
+          margin: 0 4px;
+        }
+        .ch-row--compact.ch-row--active {
+          border-left-color: transparent !important;
+          box-shadow: 0 0 18px color-mix(in srgb, var(--accent-glow) 70%, transparent);
+        }
+        .ch-row-hash,
+        .cfp-hash {
+          color: color-mix(in srgb, var(--text-muted) 82%, transparent);
+        }
+        .ch-row--unread .ch-row-hash,
+        .cfp-row--unread .cfp-hash,
+        .ch-row--active .ch-row-hash,
+        .cfp-row--active .cfp-hash {
+          color: var(--accent-hover);
+        }
+        .ch-row-name,
+        .cfp-name,
+        .dm-nick {
+          letter-spacing: 0;
+        }
+        .ch-last-preview {
+          color: color-mix(in srgb, var(--text-muted) 82%, transparent);
+        }
+        .ch-last-preview--unread {
+          color: var(--text-secondary);
+        }
+        .ch-row-count {
+          color: var(--text-secondary);
+        }
+        .ch-row-dot {
+          background: var(--accent-hover);
+          box-shadow: 0 0 10px var(--accent-glow);
+        }
+        .ch-row-dot--highlight {
+          background: var(--danger);
+          box-shadow: 0 0 12px var(--danger-subtle);
+        }
+        .ch-row .unread-badge,
+        .cfp-badge,
+        .dm-row .unread-badge {
+          box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-primary) 10%, transparent), 0 0 14px var(--accent-glow);
+        }
+        .ch-row .unread-badge--unread,
+        .cfp-badge--unread {
+          background: var(--accent-active);
+        }
+        .ch-row .unread-badge--mention,
+        .cfp-badge--mention,
+        .dm-row .unread-badge {
+          background: var(--danger);
+          box-shadow: 0 0 0 1px color-mix(in srgb, var(--text-primary) 10%, transparent), 0 0 14px var(--danger-subtle);
+        }
+        .ch-row-actions {
+          background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--bg-elevated) 90%, transparent) 18%);
+          border-radius: var(--r-sm);
+        }
+        .ch-row-action-btn {
+          border-radius: var(--r-xs);
+        }
+        .ch-row-action-btn:hover {
+          background: var(--bg-overlay);
+        }
+
+        .cfp-folder-header--drag-over,
+        .cfp-row--drag-over {
+          background: var(--accent-subtle);
+          outline: 1px dashed var(--accent-border);
+          outline-offset: -2px;
+          box-shadow: inset 0 0 0 1px var(--accent-border);
+        }
+        .cfp-empty {
+          margin: 0 6px 2px;
+          padding: 7px 12px 7px 28px;
+          background: color-mix(in srgb, var(--bg-deep) 58%, transparent);
+          border: 1px dashed var(--border-subtle);
+        }
+        .cfp-add-folder {
+          min-height: 30px;
+          margin: 7px 6px 4px;
+          background: color-mix(in srgb, var(--bg-deep) 48%, transparent);
+          border-color: var(--border-subtle);
+        }
+        .cfp-add-folder:hover {
+          background: var(--accent-subtle);
+          border-color: var(--accent-border);
+        }
+
+        .vch-wrap {
+          margin: 0 4px 2px;
+        }
+        .vch-row {
+          min-height: 32px;
+          border-left: 3px solid transparent;
+        }
+        .vch-wrap--active {
+          background: transparent;
+        }
+        .vch-wrap--active .vch-row {
+          border-left-color: var(--status-online);
+          box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-primary) 5%, transparent);
+        }
+        .vch-avatars {
+          padding-top: 2px;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .ch-sort-btn:hover {
+            transform: none;
+          }
         }
       `}</style>
     </div>
@@ -1242,7 +1484,7 @@ function ChannelRow({ channel, active, onClick, onContextMenu, starred, autoJoin
 
         .ch-drag-handle {
           font-size: 11px;
-          letter-spacing: -1px;
+          letter-spacing: 0;
           color: var(--text-muted);
           flex-shrink: 0;
           opacity: 0;
