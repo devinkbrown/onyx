@@ -77,4 +77,78 @@ describe('parseLadonCap', () => {
     const f = parseLadonCap('v=bad');
     expect(f.version).toBe(0);
   });
+
+  // ── Additional edge cases ───────────────────────────────────────────────────
+
+  it('stores the raw string on the flags object', () => {
+    const raw = 'v=3,codecs=opus';
+    const f = parseLadonCap(raw);
+    expect(f.raw).toBe(raw);
+  });
+
+  it('returns enabled=true for any non-empty string', () => {
+    expect(parseLadonCap('v=1').enabled).toBe(true);
+    expect(parseLadonCap('simulcast').enabled).toBe(true);
+  });
+
+  it('treats max=0 as a valid (zero) value', () => {
+    const f = parseLadonCap('max=0');
+    expect(f.max).toBe(0);
+    expect(f.enabled).toBe(true);
+  });
+
+  it('parses large max value', () => {
+    const f = parseLadonCap('max=1024');
+    expect(f.max).toBe(1024);
+  });
+
+  it('handles non-numeric max gracefully (leaves max at 0)', () => {
+    // parseInt('xyz', 10) => NaN; isFinite(NaN) is false → max stays 0
+    const f = parseLadonCap('max=xyz');
+    expect(f.max).toBe(0);
+  });
+
+  it('parses a single codec without slash delimiter', () => {
+    const f = parseLadonCap('codecs=vp9');
+    expect(f.codecs).toEqual(['vp9']);
+  });
+
+  it('parses three codecs separated by slash', () => {
+    const f = parseLadonCap('codecs=opus/vp8/h264');
+    expect(f.codecs).toEqual(['opus', 'vp8', 'h264']);
+  });
+
+  it('flags default to false when only version is present', () => {
+    const f = parseLadonCap('v=1');
+    expect(f.simulcast).toBe(false);
+    expect(f.e2e).toBe(false);
+    expect(f.spatial).toBe(false);
+    expect(f.mixer).toBe(false);
+  });
+
+  it('handles token that looks like an unknown key=value pair', () => {
+    // 'foo=bar' — unknown key, should not throw and should not affect known flags
+    const f = parseLadonCap('v=2,foo=bar,simulcast');
+    expect(f.version).toBe(2);
+    expect(f.simulcast).toBe(true);
+  });
+
+  it('handles whitespace-only string as disabled', () => {
+    // '   '.trim() => '', filter(Boolean) removes it — enabled is !!raw which
+    // is truthy for whitespace, but all flags remain at defaults
+    const f = parseLadonCap('   ');
+    // !!raw is true for '   ' (non-empty string)
+    expect(f.enabled).toBe(true);
+    // No valid tokens are parsed
+    expect(f.version).toBe(0);
+    expect(f.codecs).toEqual([]);
+    expect(f.simulcast).toBe(false);
+  });
+
+  it('handles repeated comma separators (empty tokens filtered)', () => {
+    // Double comma — filter(Boolean) drops empty strings
+    const f = parseLadonCap('v=1,,simulcast');
+    expect(f.version).toBe(1);
+    expect(f.simulcast).toBe(true);
+  });
 });

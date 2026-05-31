@@ -23,6 +23,16 @@ export interface IRCClientOptions {
 
 const RECONNECT_BASE = 2000;
 
+/** Escape a tag value per IRCv3 spec (inverse of parser's unescapeTagValue). */
+function escapeTagValue(val: string): string {
+  return val
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\:')
+    .replace(/ /g, '\\s')
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n');
+}
+
 export class IRCClient {
   private ws: WebSocket | null = null;
   private opts: IRCClientOptions;
@@ -135,6 +145,9 @@ export class IRCClient {
     this.negotiatedCaps = new Set();
     this.capValues = new Map();
     if (this._saslTimer) { clearTimeout(this._saslTimer); this._saslTimer = null; }
+    // Clear ping timers from any prior connection before opening a new socket.
+    // Without this, a stale pongTimeout fires on the brand-new WebSocket.
+    this._clearPingTimers();
 
     try {
       this.ws = new WebSocket(this.opts.url);
@@ -150,8 +163,14 @@ export class IRCClient {
   destroy() {
     this._destroyed = true;
     this._clearTimers();
-    this.ws?.close();
-    this.ws = null;
+    if (this.ws) {
+      // Null handlers first so _onClose cannot fire onDisconnected after destroy.
+      this.ws.onclose = null;
+      this.ws.onmessage = null;
+      this.ws.onerror = null;
+      this.ws.close();
+      this.ws = null;
+    }
   }
 
   send(line: string) {
@@ -176,7 +195,7 @@ export class IRCClient {
   }
 
   tagmsg(target: string, tags: Record<string, string>) {
-    const tagStr = Object.entries(tags).map(([k, v]) => v ? `${k}=${v}` : k).join(';');
+    const tagStr = Object.entries(tags).map(([k, v]) => v ? `${k}=${escapeTagValue(v)}` : k).join(';');
     this.send(`@${tagStr} TAGMSG ${target}\r\n`);
   }
 
@@ -259,8 +278,13 @@ export class IRCClient {
       const line = rawLine.replace(/\r$/, '');
       if (!line) continue;
       this.opts.onRaw?.(line, 'in');
-      const msg = parseIRCMessage(line);
-      this._handleMessage(msg);
+      try {
+        const msg = parseIRCMessage(line);
+        this._handleMessage(msg);
+      } catch (e) {
+        // A malformed line must not abort processing of the rest of the frame.
+        console.warn('[nexus] failed to handle IRC line:', line, e);
+      }
     }
   }
 
@@ -751,7 +775,7 @@ export class IRCClient {
   }
 
   private _clearPingTimers() {
-    if (this.pingTimer) clearTimeout(this.pingTimer);
+    if (this.pingTimer) { clearTimeout(this.pingTimer); this.pingTimer = null; }
     this._clearPongTimeout();
   }
 
@@ -766,7 +790,7 @@ export class IRCClient {
   // Reconnect scheduling lives in the store (single owner). See _onClose.
 
   private _clearTimers() {
-    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; }
     if (this._saslTimer) { clearTimeout(this._saslTimer); this._saslTimer = null; }
     this._clearPingTimers();
   }

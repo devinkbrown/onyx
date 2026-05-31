@@ -4976,22 +4976,25 @@ export const useOnyxStore = create<OnyxState>()(
     // ── Emoji preferences ─────────────────────────────────────────────────
     recentEmojis: _loadRecentEmojis(),
     addRecentEmoji: (emoji) => {
-      const recent = [emoji, ...get().recentEmojis.filter(e => e !== emoji)].slice(0, 20);
-      if (typeof window !== 'undefined') {
-        try { localStorage.setItem('ocean-recent-emoji', JSON.stringify(recent)); } catch {}
-      }
-      set({ recentEmojis: recent });
+      set(s => {
+        const recent = [emoji, ...s.recentEmojis.filter(e => e !== emoji)].slice(0, 20);
+        if (typeof window !== 'undefined') {
+          try { localStorage.setItem('ocean-recent-emoji', JSON.stringify(recent)); } catch {}
+        }
+        return { recentEmojis: recent };
+      });
     },
     emojiSkinTone: '',
     setEmojiSkinTone: (tone) => set({ emojiSkinTone: tone as '' | '\u{1F3FB}' | '\u{1F3FC}' | '\u{1F3FD}' | '\u{1F3FE}' | '\u{1F3FF}' }),
     emojiUsageCounts: _loadEmojiUsage(),
     incrementEmojiUsage: (emoji) => {
-      const counts = { ...get().emojiUsageCounts };
-      counts[emoji] = (counts[emoji] ?? 0) + 1;
-      if (typeof window !== 'undefined') {
-        try { localStorage.setItem('ocean-emoji-usage', JSON.stringify(counts)); } catch {}
-      }
-      set({ emojiUsageCounts: counts });
+      set(s => {
+        const counts = { ...s.emojiUsageCounts, [emoji]: (s.emojiUsageCounts[emoji] ?? 0) + 1 };
+        if (typeof window !== 'undefined') {
+          try { localStorage.setItem('ocean-emoji-usage', JSON.stringify(counts)); } catch {}
+        }
+        return { emojiUsageCounts: counts };
+      });
     },
 
     // ── Moderation ────────────────────────────────────────────────────────
@@ -5014,14 +5017,18 @@ export const useOnyxStore = create<OnyxState>()(
     highlightWords: _loadHighlightWords(),
     showHighlightModal: false,
     addHighlightWord: (word) => {
-      const words = [...get().highlightWords, word.trim().toLowerCase()].filter(Boolean);
-      _saveHighlightWords(words);
-      set({ highlightWords: words });
+      set(s => {
+        const words = [...s.highlightWords, word.trim().toLowerCase()].filter(Boolean);
+        _saveHighlightWords(words);
+        return { highlightWords: words };
+      });
     },
     removeHighlightWord: (word) => {
-      const words = get().highlightWords.filter(w => w !== word.toLowerCase());
-      _saveHighlightWords(words);
-      set({ highlightWords: words });
+      set(s => {
+        const words = s.highlightWords.filter(w => w !== word.toLowerCase());
+        _saveHighlightWords(words);
+        return { highlightWords: words };
+      });
     },
     openHighlightModal: () => set({ showHighlightModal: true }),
     closeHighlightModal: () => set({ showHighlightModal: false }),
@@ -5029,24 +5036,28 @@ export const useOnyxStore = create<OnyxState>()(
     // ── User notes ────────────────────────────────────────────────────────
     userNotes: _loadUserNotes(),
     setUserNote: (nick, note) => {
-      const notes = new Map(get().userNotes);
-      const key = nick.toLowerCase();
-      if (note.trim()) {
-        notes.set(key, note.trim());
-      } else {
-        notes.delete(key);
-      }
-      _saveUserNotes(notes);
-      set({ userNotes: notes });
+      set(s => {
+        const notes = new Map(s.userNotes);
+        const key = nick.toLowerCase();
+        if (note.trim()) {
+          notes.set(key, note.trim());
+        } else {
+          notes.delete(key);
+        }
+        _saveUserNotes(notes);
+        return { userNotes: notes };
+      });
     },
     getUserNote: (nick) => {
       return get().userNotes.get(nick.toLowerCase()) ?? '';
     },
     deleteUserNote: (nick) => {
-      const notes = new Map(get().userNotes);
-      notes.delete(nick.toLowerCase());
-      _saveUserNotes(notes);
-      set({ userNotes: notes });
+      set(s => {
+        const notes = new Map(s.userNotes);
+        notes.delete(nick.toLowerCase());
+        _saveUserNotes(notes);
+        return { userNotes: notes };
+      });
     },
 
     // ── Invite modal ──────────────────────────────────────────────────────
@@ -5057,16 +5068,20 @@ export const useOnyxStore = create<OnyxState>()(
     // ── Nick color overrides ──────────────────────────────────────────────
     nickColorOverrides: _loadNickColorOverrides(),
     setNickColorOverride: (nick, color) => {
-      const overrides = new Map(get().nickColorOverrides);
-      overrides.set(nick.toLowerCase(), color);
-      _saveNickColorOverrides(overrides);
-      set({ nickColorOverrides: overrides });
+      set(s => {
+        const overrides = new Map(s.nickColorOverrides);
+        overrides.set(nick.toLowerCase(), color);
+        _saveNickColorOverrides(overrides);
+        return { nickColorOverrides: overrides };
+      });
     },
     clearNickColorOverride: (nick) => {
-      const overrides = new Map(get().nickColorOverrides);
-      overrides.delete(nick.toLowerCase());
-      _saveNickColorOverrides(overrides);
-      set({ nickColorOverrides: overrides });
+      set(s => {
+        const overrides = new Map(s.nickColorOverrides);
+        overrides.delete(nick.toLowerCase());
+        _saveNickColorOverrides(overrides);
+        return { nickColorOverrides: overrides };
+      });
     },
 
     // ── CTCP configuration ────────────────────────────────────────────────
@@ -5142,9 +5157,11 @@ export const useOnyxStore = create<OnyxState>()(
     channelLastActivity: new Map(),
     setChannelSortOrder: (order) => set({ channelSortOrder: order }),
     updateChannelActivity: (channel) => {
-      const map = new Map(get().channelLastActivity);
-      map.set(channel.toLowerCase(), Date.now());
-      set({ channelLastActivity: map });
+      set(s => {
+        const map = new Map(s.channelLastActivity);
+        map.set(channel.toLowerCase(), Date.now());
+        return { channelLastActivity: map };
+      });
     },
 
     // ── Chat export modal ─────────────────────────────────────────────────────
@@ -5181,16 +5198,20 @@ export const useOnyxStore = create<OnyxState>()(
     // ── DM mute ───────────────────────────────────────────────────────────────
     mutedDMs: _loadMutedDMs(),
     muteDM: (nick) => {
-      const muted = new Set(get().mutedDMs);
-      muted.add(nick.toLowerCase());
-      _saveMutedDMs(muted);
-      set({ mutedDMs: muted });
+      set(s => {
+        const muted = new Set(s.mutedDMs);
+        muted.add(nick.toLowerCase());
+        _saveMutedDMs(muted);
+        return { mutedDMs: muted };
+      });
     },
     unmuteDM: (nick) => {
-      const muted = new Set(get().mutedDMs);
-      muted.delete(nick.toLowerCase());
-      _saveMutedDMs(muted);
-      set({ mutedDMs: muted });
+      set(s => {
+        const muted = new Set(s.mutedDMs);
+        muted.delete(nick.toLowerCase());
+        _saveMutedDMs(muted);
+        return { mutedDMs: muted };
+      });
     },
     isDMMuted: (nick) => get().mutedDMs.has(nick.toLowerCase()),
 
@@ -5370,10 +5391,12 @@ export const useOnyxStore = create<OnyxState>()(
     // ── WHO / away tracking ───────────────────────────────────────────────────
     awayNicks: new Set(),
     setNickAway: (nick, away) => {
-      const awayNicks = new Set(get().awayNicks);
-      if (away) awayNicks.add(nick.toLowerCase());
-      else awayNicks.delete(nick.toLowerCase());
-      set({ awayNicks });
+      set(s => {
+        const awayNicks = new Set(s.awayNicks);
+        if (away) awayNicks.add(nick.toLowerCase());
+        else awayNicks.delete(nick.toLowerCase());
+        return { awayNicks };
+      });
     },
 
     // ── Focus mode ────────────────────────────────────────────────────────────
@@ -6165,8 +6188,8 @@ function _addDMMessage(
   dms.set(key, {
     ...existing,
     messages: [...existing.messages.slice(-499), effectiveMsg],
-    unread: (isActive || isIgnoredSender || isMuted) ? 0 : existing.unread + 1,
-    highlights: (isActive || isIgnoredSender || isMuted) ? 0 : existing.highlights + 1,
+    unread: isActive ? 0 : (isIgnoredSender || isMuted) ? existing.unread : existing.unread + 1,
+    highlights: isActive ? 0 : (isIgnoredSender || isMuted) ? existing.highlights : existing.highlights + 1,
   });
 
   // Track first unread DM message id (only when not active)
