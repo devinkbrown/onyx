@@ -173,6 +173,10 @@ export class LadonMediaEngine {
   private vidCanvas:    HTMLCanvasElement | null = null;
   private vidCapture:   HTMLVideoElement | null  = null;
 
+  /* Worker-path state (Chromium: MediaStreamTrackProcessor + OffscreenCanvas) */
+  private vidWorker:    Worker | null = null;
+  private workerReady   = false;
+
   private speakingCtx:   AudioContext | null = null;
   private speakingTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -197,8 +201,9 @@ export class LadonMediaEngine {
   private audioLevelTimer: ReturnType<typeof setInterval> | null = null;
   private veilSessions = new Map<string, VeilSession>();
   private veilGroupKey: VeilGroup | null = null;
+  private veilGroupKeyPromise: Promise<VeilGroup> | null = null;
   private veilIdentity: VeilIdentity | null = null;
-  private veilIdentityLoading = false;
+  private veilIdentityPromise: Promise<VeilIdentity> | null = null;
 
   /* PTT */
   private pttMode   = false;
@@ -286,14 +291,17 @@ export class LadonMediaEngine {
     return id.getFingerprint();
   }
 
-  private async ensureVeilIdentity(): Promise<VeilIdentity> {
-    if (this.veilIdentity) return this.veilIdentity;
-    if (!this.veilIdentityLoading) {
-      this.veilIdentityLoading = true;
-      this.veilIdentity = await VeilIdentity.load();
+  private ensureVeilIdentity(): Promise<VeilIdentity> {
+    if (this.veilIdentity) return Promise.resolve(this.veilIdentity);
+    // Memoize the in-flight load so concurrent callers share one identity,
+    // and reset on failure so a later call can retry instead of spinning
+    // forever (VeilIdentity.load() can reject in insecure contexts).
+    if (!this.veilIdentityPromise) {
+      this.veilIdentityPromise = VeilIdentity.load()
+        .then(id => { this.veilIdentity = id; return id; })
+        .catch(err => { this.veilIdentityPromise = null; throw err; });
     }
-    while (!this.veilIdentity) await new Promise(r => setTimeout(r, 20));
-    return this.veilIdentity!;
+    return this.veilIdentityPromise;
   }
 
   getScreenStream(nick: string): MediaStream | null {
@@ -419,26 +427,28 @@ export class LadonMediaEngine {
       this.audioWorklet = node;
     } else {
       const proc = ctx.createScriptProcessor(4096, 1, 1);
-      const buf: Float32Array[] = [];
-      let pending = 0;
+      // Persistent mono accumulator. Each callback delivers up to 4096
+      // samples; we must drain ALL complete 960-sample frames and keep the
+      // remainder, not emit one frame and discard the rest (which dropped
+      // ~76% of audio at a 4096 buffer size).
+      let acc = new Float32Array(0);
       proc.onaudioprocess = (e) => {
         const ch0 = e.inputBuffer.getChannelData(0);
-        buf.push(new Float32Array(ch0));
-        pending += ch0.length;
-        if (pending >= OPVOX_FRAME_48K) {
+        const merged = new Float32Array(acc.length + ch0.length);
+        merged.set(acc, 0); merged.set(ch0, acc.length);
+        acc = merged;
+        let off = 0;
+        while (acc.length - off >= OPVOX_FRAME_48K) {
           const i16 = new Int16Array(FRAME);
-          let written = 0;
-          for (const b of buf) {
-            for (let s = 0; s < b.length && written < OPVOX_FRAME_48K; s++) {
-              const v = Math.max(-1, Math.min(1, b[s]));
-              i16[written * 2]     = v * 32767;
-              i16[written * 2 + 1] = v * 32767;
-              written++;
-            }
+          for (let s = 0; s < OPVOX_FRAME_48K; s++) {
+            const v = Math.max(-1, Math.min(1, acc[off + s]));
+            i16[s * 2]     = v * 32767;
+            i16[s * 2 + 1] = v * 32767;
           }
-          buf.length = 0; pending = 0;
           this.onAudioFrame(i16);
+          off += OPVOX_FRAME_48K;
         }
+        acc = acc.slice(off);
       };
       src.connect(proc); proc.connect(ctx.destination);
       this.audioWorklet = proc;
@@ -453,7 +463,7 @@ export class LadonMediaEngine {
     if (this.veilGroupKey) {
       this.veilGroupKey.encrypt(encoded).then(ct => {
         if (this.activeRoom) this.sendFrame(this.activeRoom, 'VEIL_DATA', ct);
-      }).catch(() => this.sendFrame(this.activeRoom!, 'AUDIO', encoded));
+      }).catch(() => { if (this.activeRoom) this.sendFrame(this.activeRoom, 'AUDIO', encoded); });
       return;
     }
     /* Use per-peer VEIL for 1:1 (no active room participants besides 1 peer) */
@@ -464,7 +474,7 @@ export class LadonMediaEngine {
       singleVs.encrypt(encoded).then(ct => {
         if (this.client && this.callWith)
           this.client.send?.(`MEDIA ${this.callWith} VEIL_DATA :${LadonMediaEngine.toB64(ct)}`);
-      }).catch(() => this.sendFrame(this.activeRoom!, 'AUDIO', encoded));
+      }).catch(() => { if (this.activeRoom) this.sendFrame(this.activeRoom, 'AUDIO', encoded); });
       void singleNick; // suppress unused warning
       return;
     }
@@ -482,11 +492,119 @@ export class LadonMediaEngine {
 
   // ----------------------------------------------------------------
   // Video capture + encode loop
+  //
+  // Two paths:
+  //
+  //  Worker path (Chromium — preferred)
+  //    Requires MediaStreamTrackProcessor + OffscreenCanvas.  The video track
+  //    is handed off to videoEncodeWorker.ts which owns the full
+  //    capture → YUV → WASM-encode pipeline off the main thread.  Encoded
+  //    Uint8Array frames are posted back here and forwarded to sendFrame().
+  //
+  //  Fallback path (Safari / Firefox)
+  //    The original setInterval / drawImage / getImageData / rgbaToYuv420 loop
+  //    runs on the main thread exactly as before, with adaptive downscaling
+  //    added for tiers 1-3.
   // ----------------------------------------------------------------
 
-  private async startVideoCapture(stream: MediaStream, profile: VideoCaptureProfile = CAMERA_PROFILE) {
+  /** True when MediaStreamTrackProcessor and OffscreenCanvas are both available. */
+  private static supportsWorkerCapture(): boolean {
+    return (
+      typeof (globalThis as Record<string, unknown>).MediaStreamTrackProcessor === 'function' &&
+      typeof OffscreenCanvas !== 'undefined'
+    );
+  }
+
+  private async startVideoCapture(
+    stream: MediaStream,
+    profile: VideoCaptureProfile = CAMERA_PROFILE,
+  ) {
     this.stopVideoCapture();
     this.localVideoProfile = profile;
+
+    if (LadonMediaEngine.supportsWorkerCapture()) {
+      await this.startVideoCaptureWorker(stream, profile);
+    } else {
+      await this.startVideoCaptureFallback(stream, profile);
+    }
+  }
+
+  // ── Worker path ──────────────────────────────────────────────────
+
+  private async startVideoCaptureWorker(
+    stream: MediaStream,
+    profile: VideoCaptureProfile,
+  ): Promise<void> {
+    /* Pre-load WASM on the main thread too (for VIDEO_KEYREQ fallback and
+     * any future main-thread codec use). Fire-and-forget. */
+    this.ensureWasm().catch(() => {});
+
+    const videoTrack = stream.getVideoTracks()[0];
+    if (!videoTrack) {
+      /* No video track — fall back silently. */
+      await this.startVideoCaptureFallback(stream, profile);
+      return;
+    }
+
+    /* Spawn the encode worker. Next.js (Webpack/Turbopack) resolves the URL
+     * at bundle time; the worker module is code-split automatically. */
+    const worker = new Worker(new URL('./videoEncodeWorker.ts', import.meta.url));
+    this.vidWorker   = worker;
+    this.workerReady = false;
+
+    /* Handle frames and diagnostics posted back from the worker. */
+    worker.onmessage = (event: MessageEvent) => {
+      const msg = event.data as {
+        type: 'encoded' | 'ready' | 'error';
+        data?: Uint8Array;
+        ftype?: 'KEYFRAME' | 'FRAME';
+        msg?: string;
+      };
+      if (msg.type === 'ready') {
+        this.workerReady = true;
+        return;
+      }
+      if (msg.type === 'error') {
+        console.warn('[ladon/worker]', msg.msg);
+        return;
+      }
+      if (msg.type === 'encoded' && msg.data && msg.ftype && this.activeRoom) {
+        /* Keyframe gate: when tier >= 2 only forward keyframes. */
+        if (this.networkTier >= 2 && msg.ftype !== 'KEYFRAME') return;
+        this.sendFrame(this.activeRoom, msg.ftype, msg.data);
+      }
+    };
+
+    worker.onerror = (ev) => {
+      console.error('[ladon/worker] uncaught:', ev.message);
+    };
+
+    /* Clone the video track so the worker can consume it independently via
+     * MediaStreamTrackProcessor without interfering with the original stream. */
+    const clonedTrack = videoTrack.clone();
+
+    /* Transfer the cloned track to the worker (moves ownership). */
+    worker.postMessage(
+      {
+        type:       'init',
+        wasmUrl:    WASM_URL,
+        encWidth:   profile.width,
+        encHeight:  profile.height,
+        encQuality: profile.quality,
+        encProfile: profile.profile,
+        encFps:     profile.fps,
+        track:      clonedTrack,
+      },
+      [clonedTrack] as unknown as Transferable[],
+    );
+  }
+
+  // ── Fallback path (main thread — Safari / Firefox) ────────────────
+
+  private async startVideoCaptureFallback(
+    stream: MediaStream,
+    profile: VideoCaptureProfile,
+  ): Promise<void> {
     const wasm = await this.ensureWasm();
     this.vidEnc = wasm.videoEncoder(
       profile.width,
@@ -505,19 +623,56 @@ export class LadonMediaEngine {
     this.vidFrameTimer = setInterval(() => this.onVideoTick(), 1000 / profile.fps);
   }
 
+  /**
+   * Main-thread fallback tick: drawImage → getImageData → rgbaToYuv420 → encode.
+   * Only used when MediaStreamTrackProcessor / OffscreenCanvas are unavailable
+   * (Safari, Firefox).
+   *
+   * Adaptive degradation in this path:
+   *   Tier 0 — every frame,  full profile resolution
+   *   Tier 1 — every 2nd frame (frame-skip), downscale canvas to 1080p cap
+   *   Tier 2 — every 4th frame (keyframe-gate), downscale canvas to 720p cap
+   *   Tier 3 — every 4th frame, downscale canvas to 480p cap
+   */
   private onVideoTick() {
     if (!this.vidEnc || !this.vidCapture || !this.vidCanvas || !this.activeRoom) return;
     this.videoSkipCount++;
     const skipMod = this.networkTier === 0 ? 1 : this.networkTier === 1 ? 2 : 4;
     if (this.videoSkipCount % skipMod !== 0) return;
     const keyframeOnly = this.networkTier >= 2;
+
+    /* Adaptive downscale: resize the draw canvas to the tier resolution cap.
+     * This reduces getImageData payload and speeds up rgbaToYuv420 proportionally. */
+    const profile = this.localVideoProfile!;
+    const capW =
+      this.networkTier === 0 ? profile.width
+      : this.networkTier === 1 ? Math.min(profile.width, 1920)
+      : this.networkTier === 2 ? Math.min(profile.width, 1280)
+      : Math.min(profile.width, 854);
+    const aspectRatio = profile.height / profile.width;
+    const rawH = Math.round(capW * aspectRatio);
+    /* Force even dimensions (YUV420 planes require even width/height). */
+    const drawW = capW % 2 === 0 ? capW : capW - 1;
+    const drawH = rawH % 2 === 0 ? rawH : rawH - 1;
+
+    if (this.vidCanvas.width !== drawW || this.vidCanvas.height !== drawH) {
+      /* Dimensions changed — rebuild canvas and encoder at new size. */
+      if (this.wasm) {
+        this.vidEnc.destroy();
+        this.vidEnc = this.wasm.videoEncoder(
+          drawW, drawH, profile.quality, profile.profile, profile.fps,
+        );
+      }
+      this.vidCanvas.width  = drawW;
+      this.vidCanvas.height = drawH;
+    }
+
     const ctx = this.vidCanvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
-    const w = this.vidCanvas.width, h = this.vidCanvas.height;
-    ctx.drawImage(this.vidCapture, 0, 0, w, h);
+    ctx.drawImage(this.vidCapture, 0, 0, drawW, drawH);
     const { y, u, v } = rgbaToYuv420(
-      ctx.getImageData(0, 0, w, h).data,
-      w, h,
+      ctx.getImageData(0, 0, drawW, drawH).data,
+      drawW, drawH,
     );
     const encoded = this.vidEnc.encode(y, u, v, keyframeOnly);
     if (!encoded.length) return;
@@ -527,6 +682,14 @@ export class LadonMediaEngine {
   }
 
   private stopVideoCapture() {
+    /* Worker path teardown. */
+    if (this.vidWorker) {
+      this.vidWorker.postMessage({ type: 'stop' });
+      this.vidWorker.terminate();
+      this.vidWorker   = null;
+      this.workerReady = false;
+    }
+    /* Fallback path teardown. */
     if (this.vidFrameTimer) clearInterval(this.vidFrameTimer);
     this.vidFrameTimer = null;
     this.vidCapture?.pause(); this.vidCapture = null; this.vidCanvas = null;
@@ -869,7 +1032,12 @@ export class LadonMediaEngine {
         break;
       }
       case 'VIDEO_KEYREQ':
-        if (this.vidEnc && this.activeRoom && this.vidCapture && this.vidCanvas) {
+        /* Worker path: forward a keyreq message; the worker will force the
+         * next encode to be a keyframe. */
+        if (this.vidWorker) {
+          this.vidWorker.postMessage({ type: 'keyreq' });
+        } else if (this.vidEnc && this.activeRoom && this.vidCapture && this.vidCanvas) {
+          /* Fallback path: encode a keyframe synchronously on the main thread. */
           const ctx = this.vidCanvas.getContext('2d', { willReadFrequently: true });
           const w = this.vidCanvas.width;
           const h = this.vidCanvas.height;
@@ -974,6 +1142,8 @@ export class LadonMediaEngine {
         const pm = this.registry.get(nick);
         if (pm) {
           pm.screenVidDec?.destroy(); pm.screenVidDec = null;
+          pm.screenStream?.getTracks().forEach(t => t.stop());
+          pm.screenStream = null;
           pm.screenCanvas = null; pm.state.hasVideo = false;
           this.cb.onPeerState?.(pm.state);
         }
@@ -1205,6 +1375,8 @@ export class LadonMediaEngine {
     this.registry.decodeErrors.clear();
     this.veilSessions.clear();
     this.veilGroupKey = null;
+    this.veilGroupKeyPromise = null;
+    if (this.gcTimer) { clearInterval(this.gcTimer); this.gcTimer = null; }
     this.suggestedBps = 0; this.networkTier = 0; this.videoSkipCount = 0;
     this.audioQuality = AUDIO_QUALITY; this.nearCapacityFired = false;
     this.pttMode = false; this.pttActive = false;
@@ -1241,6 +1413,14 @@ export class LadonMediaEngine {
       this.prevNetworkTier = this.networkTier;
       this.networkTier = tier;
       this.cb.onNetworkQuality?.(tier, bps);
+
+      /* Notify the encode worker of the new tier so it can update its draw
+       * canvas resolution.  The fallback path reads this.networkTier directly
+       * inside onVideoTick(). */
+      if (this.vidWorker) {
+        this.vidWorker.postMessage({ type: 'tier', tier });
+      }
+
       if (tier < this.prevNetworkTier && this.activeRoom) {
         for (const pm of this.registry.all()) {
           if (pm.vidDec) this.sendFrame(this.activeRoom, 'VIDEO_KEYREQ', msgpackArray1(pm.state.nick));
@@ -1261,7 +1441,7 @@ export class LadonMediaEngine {
         this.audEnc.destroy();
         this.audEnc = this.wasm.audioEncoder(SAMPLE_RATE, targetQ);
       }
-      if (bps < BW_AUDIO_ONLY && this.vidEnc) this.stopVideoCapture();
+      if (bps < BW_AUDIO_ONLY && (this.vidEnc || this.vidWorker)) this.stopVideoCapture();
     }
   }
 
@@ -1269,11 +1449,22 @@ export class LadonMediaEngine {
     if (!this.activeRoom || !this.client) return;
     const established = [...this.veilSessions.entries()].filter(([, vs]) => vs.established);
     if (established.length === 0) return;
-    /* Create or reuse group key */
-    if (!this.veilGroupKey) this.veilGroupKey = await VeilGroup.create();
+    /* Create or reuse group key. Memoize the in-flight creation so two
+     * concurrent handshakes resolving in the same tick can't each build a
+     * separate group key (the second would clobber the first, making the
+     * first peer's traffic undecryptable). */
+    let group = this.veilGroupKey;
+    if (!group) {
+      if (!this.veilGroupKeyPromise) {
+        this.veilGroupKeyPromise = VeilGroup.create()
+          .then(g => { this.veilGroupKey = g; return g; })
+          .catch(err => { this.veilGroupKeyPromise = null; throw err; });
+      }
+      group = await this.veilGroupKeyPromise;
+    }
     const myNick = (this.client as unknown as { nick?: string })?.nick ?? '';
     for (const [nick, vs] of established) {
-      const wrapped = await this.veilGroupKey.exportKeyFor(vs);
+      const wrapped = await group.exportKeyFor(vs);
       const b64 = LadonMediaEngine.toB64(wrapped);
       /* VEIL_GROUP_KEY payload: the wrapped key; the server relay identifies target by msgpack */
       this.client.send?.(`MEDIA ${this.activeRoom} VEIL_GROUP_KEY :${myNick}:${nick}:${b64}`);
@@ -1300,8 +1491,15 @@ const AUDIO_WORKLET_CODE = `
 class OpvoxCapture extends AudioWorkletProcessor {
   constructor(opts) {
     super();
-    this._frameSize = opts.processorOptions.frameSize || 1920;
-    this._buf = new Float32Array(this._frameSize);
+    // frameSize is the interleaved-stereo sample count the encoder expects
+    // (OPVOX_FRAME_48K * 2). The mic delivers MONO, so accumulate half that
+    // many mono samples per frame, then duplicate each into L and R. The
+    // previous code accumulated the full stereo count of mono samples and
+    // copied 1:1, which the encoder read as alternating L/R — decimating
+    // each channel to 24 kHz with aliasing.
+    const stereoFrame = opts.processorOptions.frameSize || 1920;
+    this._mono = stereoFrame >> 1;
+    this._buf = new Float32Array(this._mono);
     this._pos = 0;
   }
   process(inputs) {
@@ -1309,17 +1507,18 @@ class OpvoxCapture extends AudioWorkletProcessor {
     if (!ch) return true;
     let i = 0;
     while (i < ch.length) {
-      const take = Math.min(ch.length - i, this._frameSize - this._pos);
+      const take = Math.min(ch.length - i, this._mono - this._pos);
       for (let k = 0; k < take; k++) {
         const v = Math.max(-1, Math.min(1, ch[i + k]));
         this._buf[this._pos + k] = v;
       }
       this._pos += take; i += take;
-      if (this._pos === this._frameSize) {
-        const i16 = new Int16Array(this._frameSize);
-        for (let j = 0; j < this._frameSize; j += 2) {
-          i16[j]   = this._buf[j]   * 32767;
-          i16[j+1] = this._buf[j+1] * 32767;
+      if (this._pos === this._mono) {
+        const i16 = new Int16Array(this._mono * 2);
+        for (let j = 0; j < this._mono; j++) {
+          const s = this._buf[j] * 32767;
+          i16[j * 2]     = s;
+          i16[j * 2 + 1] = s;
         }
         this.port.postMessage(i16, [i16.buffer]);
         this._pos = 0;

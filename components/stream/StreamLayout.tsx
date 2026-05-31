@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import type { StreamQuality } from '@/lib/store';
 import { StreamOverlay } from './StreamOverlay';
 import { RaidBanner } from './RaidBanner';
 import { PollWidget } from './PollWidget';
@@ -82,6 +83,9 @@ export function StreamLayout({ channel }: Props) {
           {/* Floating overlays */}
           <StreamOverlay channel={channel} />
           <RaidBanner channel={channel} />
+
+          {/* Quality badge — top right */}
+          <QualityBadge quality={stream.quality} />
 
           {/* Poll widget — bottom left */}
           <div className="sl-poll-host">
@@ -309,8 +313,58 @@ export function StreamLayout({ channel }: Props) {
           cursor: not-allowed;
         }
         .sl-raid-go:not(:disabled):hover { opacity: 0.88; }
+        .sl-quality-badge {
+          position: absolute;
+          top: 10px;
+          right: 12px;
+          z-index: 15;
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          padding: 3px 8px 3px 6px;
+          background: rgba(3, 8, 16, 0.62);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 6px;
+          backdrop-filter: blur(8px);
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          color: rgba(255, 255, 255, 0.65);
+          pointer-events: none;
+          user-select: none;
+        }
+        .sl-quality-badge--4k60 {
+          border-color: rgba(14, 165, 233, 0.28);
+          color: rgba(125, 211, 252, 0.88);
+        }
+        .sl-quality-badge-dot {
+          width: 5px;
+          height: 5px;
+          border-radius: 50%;
+          background: currentColor;
+          opacity: 0.7;
+          flex-shrink: 0;
+        }
       `}</style>
     </>
+  );
+}
+
+const QUALITY_LABEL: Record<StreamQuality, string> = {
+  '4k60': '4K 60',
+  '1080p60': '1080p 60',
+  auto: 'Auto',
+};
+
+function QualityBadge({ quality }: { quality: StreamQuality }) {
+  return (
+    <div
+      className={`sl-quality-badge${quality === '4k60' ? ' sl-quality-badge--4k60' : ''}`}
+      aria-label={`Stream quality: ${QUALITY_LABEL[quality]}`}
+    >
+      <span className="sl-quality-badge-dot" aria-hidden="true" />
+      {QUALITY_LABEL[quality]}
+    </div>
   );
 }
 

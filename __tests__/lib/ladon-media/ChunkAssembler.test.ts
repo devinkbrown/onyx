@@ -101,9 +101,21 @@ describe('ChunkAssembler', () => {
     expect(result).toBeNull();
   });
 
-  it('rejects assembly with total > MAX_CHUNKS (32)', () => {
-    const result = asm.ingest('eve', 'vox', 2, 1, 33, makeChunk(0x00, 10));
+  it('rejects assembly with total > MAX_CHUNKS (65535)', () => {
+    const result = asm.ingest('eve', 'vox', 2, 1, 65536, makeChunk(0x00, 10));
     expect(result).toBeNull();
+  });
+
+  it('accepts a many-chunk frame within the byte cap (real video keyframe)', () => {
+    // 200 chunks × 120 bytes = 24000 bytes — a realistic keyframe size that
+    // the old MAX_CHUNKS=32 cap would have silently dropped.
+    const total = 200;
+    let result: Uint8Array | null = null;
+    for (let n = 1; n <= total; n++) {
+      result = asm.ingest('vic', 'kf', 3, n, total, makeChunk(0x7F, 120));
+    }
+    expect(result).not.toBeNull();
+    expect(result!.length).toBe(total * 120);
   });
 
   it('rejects out-of-range chunk index (n=0)', () => {

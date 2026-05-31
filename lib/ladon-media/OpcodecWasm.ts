@@ -41,6 +41,9 @@ let modulePromise: Promise<EmModule> | null = null;
 let wasmLoadAttempts = 0;
 let _wasmLoadFailed = false;
 
+// Separate singleton for worker context (no shared state with main thread).
+let workerModulePromise: Promise<EmModule> | null = null;
+
 async function loadModule(url: string): Promise<EmModule> {
   if (typeof window === 'undefined') throw new Error('WASM requires browser environment');
 
@@ -76,6 +79,57 @@ async function loadModule(url: string): Promise<EmModule> {
   const reason = lastErr instanceof Error ? lastErr.message : String(lastErr);
   window.dispatchEvent(new CustomEvent('wasmLoadFailed', { detail: { reason } }));
   throw new Error(`Voice codec unavailable (opcodec_wasm.js not found)`);
+}
+
+/**
+ * Worker-safe WASM loader.
+ *
+ * Web Workers have no `document`, so the main-thread script-tag approach
+ * cannot be used.  Instead we use `importScripts` (synchronous) which is
+ * available in dedicated workers, falling back to a dynamic `import()` of the
+ * URL when `importScripts` is absent (e.g. module workers).
+ *
+ * After the script is evaluated, `self.createOpcodec` should be defined by
+ * the Emscripten-generated bundle, mirroring what `window.createOpcodec` is
+ * on the main thread.
+ */
+async function loadModuleInWorker(url: string): Promise<EmModule> {
+  const MAX_ATTEMPTS = 3;
+  const retryDelays  = [500, 1000, 2000];
+  let lastErr: unknown;
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    if (attempt > 0) await new Promise(r => setTimeout(r, retryDelays[attempt - 1]));
+    try {
+      const scriptUrl = url + (attempt > 0 ? `?r=${attempt}` : '');
+      if (typeof (self as any).importScripts === 'function') {
+        (self as any).importScripts(scriptUrl);
+      } else {
+        // Module worker — fetch + eval via dynamic import is not straightforward;
+        // use a Blob-URL shim so the script runs in the worker's scope.
+        const text = await fetch(scriptUrl).then(r => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.text();
+        });
+        const blob = new Blob([text], { type: 'application/javascript' });
+        const blobUrl = URL.createObjectURL(blob);
+        try {
+          await import(/* webpackIgnore: true */ blobUrl);
+        } finally {
+          URL.revokeObjectURL(blobUrl);
+        }
+      }
+      const factory = (self as any).createOpcodec as (() => Promise<EmModule>) | undefined;
+      if (!factory) throw new Error('createOpcodec not defined after worker script load');
+      return factory();
+    } catch (err) {
+      lastErr = err;
+      if (attempt < MAX_ATTEMPTS - 1) {
+        console.warn(`[opcodec worker] load attempt ${attempt + 1}/${MAX_ATTEMPTS} failed, retrying...`);
+      }
+    }
+  }
+  throw new Error(`Voice codec unavailable in worker: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`);
 }
 
 // -------------------------------------------------------------------
@@ -381,6 +435,19 @@ export class OpcodecWasm {
   static async load(url = '/opcodec_wasm.js'): Promise<OpcodecWasm> {
     if (!modulePromise) modulePromise = loadModule(url);
     return new OpcodecWasm(await modulePromise);
+  }
+
+  /**
+   * Worker-safe variant of `load`.  Must be called from inside a Web Worker
+   * (no `document`/`window` available).  Uses `importScripts` or a fetch-based
+   * fallback instead of a `<script>` tag.
+   *
+   * A separate promise singleton is kept so the worker does not share the main
+   * thread's module state (they run in different JS realms).
+   */
+  static async loadInWorker(url = '/opcodec_wasm.js'): Promise<OpcodecWasm> {
+    if (!workerModulePromise) workerModulePromise = loadModuleInWorker(url);
+    return new OpcodecWasm(await workerModulePromise);
   }
 
   audioEncoder(sampleRate: number, quality: OpvoxQuality = 2, enableNs2 = true): OpvoxEncoder {

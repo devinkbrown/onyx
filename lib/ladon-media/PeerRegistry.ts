@@ -33,7 +33,15 @@ export interface PeerMedia {
   screenH:        number;
   videoFps:       number;
   screenFps:      number;
+  /** Cached ImageData for camera video rendering — avoids per-frame allocation. */
+  vidImageData:   ImageData | null;
+  /** Cached ImageData for screen video rendering — avoids per-frame allocation. */
+  screenImageData: ImageData | null;
 }
+
+// Max concurrent peers tracked before we start refusing new entries.
+// Bounds memory growth from a flood of spurious MEDIA commands.
+const MAX_PEERS = 64;
 
 // -------------------------------------------------------------------
 // Registry — creates, tracks, and tears down per-peer state
@@ -84,6 +92,22 @@ export class PeerRegistry {
     const key = nick.toLowerCase();
     let pm = this.peers.get(key);
     if (pm) return pm;
+
+    // Guard against unbounded peer map growth from malformed streams.
+    if (this.peers.size >= MAX_PEERS) {
+      // Return a transient, detached PeerMedia so callers never get null,
+      // but do not register it so it doesn't consume tracked state.
+      return {
+        state: { nick, channel, kind, speaking: false, muted: false, hasVideo: false, canvas: null },
+        audDec: null, vidDec: null, audCtx: null,
+        screenVidDec: null, vidCanvas: null, screenCanvas: null, screenStream: null,
+        panner: null, lastKeyW: 0, lastKeyH: 0, lastScreenKeyW: 0, lastScreenKeyH: 0,
+        videoW: this.videoW, videoH: this.videoH, screenW: this.videoW, screenH: this.videoH,
+        videoFps: 60, screenFps: 60,
+        vidImageData: null, screenImageData: null,
+      };
+    }
+
     pm = {
       state: { nick, channel, kind, speaking: false, muted: false, hasVideo: false, canvas: null },
       audDec: null, vidDec: null, audCtx: null,
@@ -91,6 +115,7 @@ export class PeerRegistry {
       panner: null, lastKeyW: 0, lastKeyH: 0, lastScreenKeyW: 0, lastScreenKeyH: 0,
       videoW: this.videoW, videoH: this.videoH, screenW: this.videoW, screenH: this.videoH,
       videoFps: 60, screenFps: 60,
+      vidImageData: null, screenImageData: null,
     };
     this.peers.set(key, pm);
     this.updateSpatialAudio();
@@ -124,8 +149,12 @@ export class PeerRegistry {
     pm.audCtx?.close().catch(() => {}); pm.audCtx  = null;
     pm.panner?.disconnect();    pm.panner       = null;
     pm.screenStream?.getTracks().forEach(t => t.stop());
-    pm.screenStream = null;
-    pm.screenCanvas = null;
+    pm.screenStream  = null;
+    pm.screenCanvas  = null;
+    pm.vidCanvas     = null;
+    pm.state.canvas  = null;
+    pm.vidImageData   = null;
+    pm.screenImageData = null;
     this.decodeErrors.set(nick.toLowerCase(), 0);
   }
 
@@ -150,26 +179,28 @@ export class PeerRegistry {
     if (kind === 'screen') {
       if (pm.screenW !== width || pm.screenH !== height) {
         pm.screenVidDec?.destroy();
-        pm.screenVidDec = null;
-        pm.screenCanvas = null;
+        pm.screenVidDec  = null;
+        pm.screenCanvas  = null;
+        pm.screenImageData = null;
         pm.screenStream?.getTracks().forEach(t => t.stop());
-        pm.screenStream = null;
+        pm.screenStream  = null;
       }
-      pm.screenW = width;
-      pm.screenH = height;
+      pm.screenW   = width;
+      pm.screenH   = height;
       pm.screenFps = fps;
     } else {
       if (pm.videoW !== width || pm.videoH !== height) {
         pm.vidDec?.destroy();
-        pm.vidDec = null;
-        pm.vidCanvas = null;
+        pm.vidDec       = null;
+        pm.vidCanvas    = null;
+        pm.vidImageData  = null;
         pm.state.canvas = null;
       }
-      pm.videoW = width;
-      pm.videoH = height;
+      pm.videoW   = width;
+      pm.videoH   = height;
       pm.videoFps = fps;
     }
-    pm.state.kind = kind;
+    pm.state.kind     = kind;
     pm.state.hasVideo = true;
     this.onPeerStateChanged?.(pm.state);
   }
@@ -189,20 +220,31 @@ export class PeerRegistry {
     if (!pm.audDec) pm.audDec = this.wasm.audioDecoder(this.sampleRate, this.audioQuality());
     if (!pm.audCtx) pm.audCtx = new AudioContext({ sampleRate: this.sampleRate });
 
-    const pcm = pm.audDec.decode(frame);
-    const ctx  = pm.audCtx;
-    const buf  = ctx.createBuffer(2, OPVOX_FRAME_48K, this.sampleRate);
+    let pcm: Int16Array;
+    try {
+      pcm = pm.audDec.decode(frame);
+    } catch (err) {
+      const key = pm.state.nick.toLowerCase();
+      this.decodeErrors.set(key, (this.decodeErrors.get(key) ?? 0) + 1);
+      return;
+    }
+
+    const ctx = pm.audCtx;
+    // OpvoxDecoder returns OPVOX_FRAME_48K mono Int16 samples.
+    // Create a stereo AudioBuffer and copy the same mono data to both channels.
+    const buf = ctx.createBuffer(2, OPVOX_FRAME_48K, this.sampleRate);
+    const monoSamples = Math.min(pcm.length, OPVOX_FRAME_48K);
     for (let ch = 0; ch < 2; ch++) {
       const out = buf.getChannelData(ch);
-      for (let i = 0; i < OPVOX_FRAME_48K; i++) {
-        out[i] = pcm[i * 2 + ch] / 32768;
+      for (let i = 0; i < monoSamples; i++) {
+        out[i] = pcm[i] / 32768;
       }
     }
 
-    /* RMS energy for VAD level metering */
+    /* RMS energy for VAD level metering (mono signal) */
     let sumSq = 0;
-    for (let i = 0; i < pcm.length; i++) { const s = pcm[i] / 32768; sumSq += s * s; }
-    const rms = Math.sqrt(sumSq / pcm.length);
+    for (let i = 0; i < monoSamples; i++) { const s = pcm[i] / 32768; sumSq += s * s; }
+    const rms = Math.sqrt(sumSq / Math.max(1, monoSamples));
     this.peerLevels.set(pm.state.nick.toLowerCase(), Math.min(1, rms / 0.1));
 
     /* Inter-arrival jitter (EMA) */
@@ -234,39 +276,76 @@ export class PeerRegistry {
     if (!this.wasm) return;
     const isKey = ftype === 'KEYFRAME';
     const W = pm.videoW || this.videoW, H = pm.videoH || this.videoH;
+
+    // Don't feed a delta frame into a non-existent decoder — the codec
+    // needs a keyframe to establish its reference frame.
+    if (!pm.vidDec && !isKey) return;
+
     if (!pm.vidDec || (isKey && (pm.lastKeyW !== W || pm.lastKeyH !== H))) {
       pm.vidDec?.destroy();
-      pm.vidDec = this.wasm.videoDecoder(W, H);
-      pm.lastKeyW = W; pm.lastKeyH = H;
+      pm.vidDec       = this.wasm.videoDecoder(W, H);
+      pm.lastKeyW     = W;
+      pm.lastKeyH     = H;
+      pm.vidImageData  = null;   // dimensions changed; cached ImageData is stale
     }
-    const planes = pm.vidDec.decode(frame);
+
+    let planes: { y: Uint8Array; u: Uint8Array; v: Uint8Array } | null;
+    try {
+      planes = pm.vidDec.decode(frame);
+    } catch (err) {
+      const key = pm.state.nick.toLowerCase();
+      this.decodeErrors.set(key, (this.decodeErrors.get(key) ?? 0) + 1);
+      pm.vidDec.destroy();
+      pm.vidDec = null;   // force re-sync on next keyframe
+      return;
+    }
     if (!planes) return;
 
     if (!pm.vidCanvas) {
       const c = document.createElement('canvas');
       c.width = W; c.height = H;
-      pm.vidCanvas = c;
-      pm.state.canvas   = c;
+      pm.vidCanvas    = c;
+      pm.state.canvas = c;
       pm.state.hasVideo = true;
       this.onPeerStateChanged?.(pm.state);
     }
     const ctx2 = pm.vidCanvas.getContext('2d');
     if (!ctx2) return;
-    const imageData = ctx2.createImageData(W, H);
-    yuv420ToRgba(planes.y, planes.u, planes.v, W, H, imageData.data);
-    ctx2.putImageData(imageData, 0, 0);
+
+    // Reuse the cached ImageData to avoid a large heap allocation every frame.
+    if (!pm.vidImageData || pm.vidImageData.width !== W || pm.vidImageData.height !== H) {
+      pm.vidImageData = ctx2.createImageData(W, H);
+    }
+    yuv420ToRgba(planes.y, planes.u, planes.v, W, H, pm.vidImageData.data);
+    ctx2.putImageData(pm.vidImageData, 0, 0);
   }
 
   async decodeScreenVideo(pm: PeerMedia, frame: Uint8Array, ftype: string): Promise<void> {
     if (!this.wasm) return;
     const isKey = ftype === 'KEYFRAME';
     const W = pm.screenW || this.videoW, H = pm.screenH || this.videoH;
+
+    // Don't feed a delta frame into a non-existent decoder.
+    if (!pm.screenVidDec && !isKey) return;
+
     if (!pm.screenVidDec || (isKey && (pm.lastScreenKeyW !== W || pm.lastScreenKeyH !== H))) {
       pm.screenVidDec?.destroy();
-      pm.screenVidDec = this.wasm.videoDecoder(W, H);
-      pm.lastScreenKeyW = W; pm.lastScreenKeyH = H;
+      pm.screenVidDec   = this.wasm.videoDecoder(W, H);
+      pm.lastScreenKeyW = W;
+      pm.lastScreenKeyH = H;
+      pm.screenImageData = null;  // dimensions changed; cached ImageData is stale
     }
-    const planes = pm.screenVidDec.decode(frame);
+
+    let planes: { y: Uint8Array; u: Uint8Array; v: Uint8Array } | null;
+    try {
+      planes = pm.screenVidDec.decode(frame);
+    } catch (err) {
+      const key = pm.state.nick.toLowerCase();
+      this.decodeErrors.set(key, (this.decodeErrors.get(key) ?? 0) + 1);
+      pm.screenVidDec.destroy();
+      pm.screenVidDec = null;   // force re-sync on next keyframe
+      return;
+    }
     if (!planes) return;
 
     if (!pm.screenCanvas) {
@@ -280,9 +359,13 @@ export class PeerRegistry {
     }
     const ctx2 = pm.screenCanvas.getContext('2d');
     if (!ctx2) return;
-    const imageData = ctx2.createImageData(W, H);
-    yuv420ToRgba(planes.y, planes.u, planes.v, W, H, imageData.data);
-    ctx2.putImageData(imageData, 0, 0);
+
+    // Reuse cached ImageData.
+    if (!pm.screenImageData || pm.screenImageData.width !== W || pm.screenImageData.height !== H) {
+      pm.screenImageData = ctx2.createImageData(W, H);
+    }
+    yuv420ToRgba(planes.y, planes.u, planes.v, W, H, pm.screenImageData.data);
+    ctx2.putImageData(pm.screenImageData, 0, 0);
   }
 
   // ----------------------------------------------------------------

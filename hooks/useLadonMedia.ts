@@ -33,6 +33,10 @@ export function useLadonMedia() {
 
   const engineRef         = useRef<LadonMediaEngine | null>(null);
   const prevShareRef      = useRef<boolean>(false);
+  // Cache canvas-captured streams per nick so onPeerState (which fires on
+  // every speaking/mute change) reuses the existing MediaStream instead of
+  // calling captureStream() each time and leaking a new stream every call.
+  const canvasStreamRef   = useRef<Map<string, { canvas: HTMLCanvasElement; stream: MediaStream }>>(new Map());
 
   const channel = activeView.kind === 'channel' ? activeView.channel : null;
 
@@ -48,14 +52,28 @@ export function useLadonMedia() {
         const videoParticipants = new Map(useOnyxStore.getState().voice.videoParticipants);
         const existingVideo = videoParticipants.get(peer.nick);
         const screenStream = engineRef.current?.getScreenStream(peer.nick) ?? null;
-        const canvasStream = !screenStream && peer.canvas && 'captureStream' in peer.canvas
-          ? (peer.canvas as HTMLCanvasElement & { captureStream(fps?: number): MediaStream }).captureStream(60)
-          : null;
+        const cache = canvasStreamRef.current;
+        let canvasStream: MediaStream | null = null;
+        if (!screenStream && peer.canvas && 'captureStream' in peer.canvas) {
+          const cached = cache.get(peer.nick);
+          if (cached && cached.canvas === peer.canvas) {
+            canvasStream = cached.stream;
+          } else {
+            // Canvas changed (or first sight) — drop the stale stream and
+            // capture once, then reuse on subsequent peer-state updates.
+            cached?.stream.getTracks().forEach(t => t.stop());
+            canvasStream = (peer.canvas as HTMLCanvasElement & { captureStream(fps?: number): MediaStream }).captureStream(60);
+            cache.set(peer.nick, { canvas: peer.canvas as HTMLCanvasElement, stream: canvasStream });
+          }
+        }
         const mediaStream = screenStream ?? canvasStream;
         if (peer.hasVideo && mediaStream && existingVideo !== mediaStream) {
           videoParticipants.set(peer.nick, mediaStream);
         } else if (!peer.hasVideo) {
           videoParticipants.delete(peer.nick);
+          const cached = cache.get(peer.nick);
+          cached?.stream.getTracks().forEach(t => t.stop());
+          cache.delete(peer.nick);
         }
         setVoiceState({ peers, videoParticipants });
       },
@@ -67,6 +85,9 @@ export function useLadonMedia() {
         const videoParticipants = new Map(useOnyxStore.getState().voice.videoParticipants);
         videoParticipants.delete(nick);
         setVoiceState({ videoParticipants });
+        const cached = canvasStreamRef.current.get(nick);
+        cached?.stream.getTracks().forEach(t => t.stop());
+        canvasStreamRef.current.delete(nick);
       },
       onPeerSpeaking(nick, speaking) {
         const peers = new Map(useOnyxStore.getState().voice.peers);
