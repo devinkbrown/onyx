@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import { useDialogFocus } from './useDialogFocus';
 
 type SortKey = 'members' | 'name';
 
@@ -18,6 +19,9 @@ export default function ChannelBrowserModal() {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('members');
   const [page, setPage] = useState(1);
+
+  const modalRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(modalRef);
 
   const joinedKeys = useMemo(() => new Set([...channels.keys()]), [channels]);
 
@@ -50,15 +54,16 @@ export default function ChannelBrowserModal() {
       <div
         className="cbrowser-modal"
         onClick={(e) => e.stopPropagation()}
+        ref={modalRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Browse Channels"
+        aria-labelledby="cbrowser-title"
       >
         {/* Header */}
         <div className="cbrowser-header">
           <div className="cbrowser-header-left">
             <GridIcon />
-            <h2 className="cbrowser-title">Browse Channels</h2>
+            <h2 id="cbrowser-title" className="cbrowser-title">Browse Channels</h2>
             <span className="cbrowser-count">
               {channelListLoading ? '…' : filtered.length}
             </span>

@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
 import Avatar from '@/components/ui/Avatar';
 import EmptyState from '@/components/ui/EmptyState';
+import { useDialogFocus } from './useDialogFocus';
 
 const TIME_FMT = new Intl.DateTimeFormat(undefined, {
   month: 'short',
@@ -18,6 +19,9 @@ export default function BookmarksPanel() {
   const bookmarks       = useOnyxStore(s => s.bookmarks);
   const removeBookmark  = useOnyxStore(s => s.removeBookmark);
   const navigate        = useOnyxStore(s => s.navigate);
+
+  const panelRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(panelRef);
 
   // Escape to close
   useEffect(() => {
@@ -47,17 +51,20 @@ export default function BookmarksPanel() {
     <div
       className="bm-backdrop"
       onClick={e => { if (e.target === e.currentTarget) closeBookmarks(); }}
-      aria-modal="true"
-      role="dialog"
-      aria-label="Bookmarks"
     >
-      <div className="bm-panel animate-slide-right">
+      <div
+        className="bm-panel animate-slide-right"
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="bm-panel-title"
+      >
 
         {/* Header */}
         <div className="bm-header">
           <div className="bm-header-left">
             <BookmarkIcon />
-            <h2 className="bm-title">Bookmarks</h2>
+            <h2 id="bm-panel-title" className="bm-title">Bookmarks</h2>
             {bookmarks.length > 0 && (
               <span className="bm-count">{bookmarks.length}</span>
             )}

@@ -74,8 +74,10 @@ export default function MessageList({ messages, target, searchActive, searchMatc
   useEffect(() => {
     if (scrollToBottomRef) {
       scrollToBottomRef.current = () => scrollToBottom('smooth');
+      return () => { scrollToBottomRef.current = null; };
     }
-  });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scrollToBottomRef]);
 
   // Handle Ctrl+L (ocean:scroll-bottom custom event)
   useEffect(() => {
@@ -106,7 +108,7 @@ export default function MessageList({ messages, target, searchActive, searchMatc
     if (!isSwitching) {
       prevCountRef.current = messages.length;
     }
-  });
+  }, [messages.length, isSwitching]);
 
   // Auto-scroll when new messages arrive — only if already at bottom
   const prevLengthRef = useRef(messages.length);

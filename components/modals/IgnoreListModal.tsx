@@ -2,6 +2,7 @@
 
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import { useDialogFocus } from './useDialogFocus';
 
 export default function IgnoreListModal() {
   const ignoredUsers    = useOnyxStore(s => s.ignoredUsers);
@@ -12,7 +13,9 @@ export default function IgnoreListModal() {
   const toggleSoftIgnore = useOnyxStore(s => s.toggleSoftIgnore);
 
   const [addNick, setAddNick] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef  = useRef<HTMLInputElement>(null);
+  const modalRef  = useRef<HTMLDivElement>(null);
+  useDialogFocus(modalRef);
 
   // Focus input on mount
   useEffect(() => {
@@ -50,15 +53,12 @@ export default function IgnoreListModal() {
     <div
       className="ign-backdrop"
       onClick={e => { if (e.target === e.currentTarget) closeIgnoreList(); }}
-      aria-modal="true"
-      role="dialog"
-      aria-label="Ignored Users"
     >
-      <div className="ign-modal">
+      <div className="ign-modal" ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="ign-modal-title">
 
         {/* Header */}
         <div className="ign-header">
-          <h2 className="ign-title">Ignored Users</h2>
+          <h2 id="ign-modal-title" className="ign-title">Ignored Users</h2>
           <button className="ign-close" onClick={closeIgnoreList} aria-label="Close">
             <CloseIcon />
           </button>

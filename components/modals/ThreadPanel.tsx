@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
+import { useDialogFocus } from './useDialogFocus';
 import Avatar from '@/components/ui/Avatar';
 
 const ARCHIVE_DURATION_OPTIONS: { label: string; minutes: number }[] = [
@@ -45,7 +46,9 @@ export default function ThreadPanel() {
   const [showSettings, setShowSettings] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const bodyRef = useRef<HTMLDivElement>(null);
+  const bodyRef     = useRef<HTMLDivElement>(null);
+  const panelRef    = useRef<HTMLDivElement>(null);
+  useDialogFocus(panelRef);
 
   // Escape to close
   useEffect(() => {
@@ -159,17 +162,20 @@ export default function ThreadPanel() {
     <div
       className="thread-backdrop"
       onClick={e => { if (e.target === e.currentTarget) closeThread(); }}
-      aria-modal="true"
-      role="dialog"
-      aria-label="Thread"
     >
-      <div className="thread-panel animate-slide-right">
+      <div
+        className="thread-panel animate-slide-right"
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="thread-panel-title"
+      >
 
         {/* Header */}
         <div className="thread-header">
           <div className="thread-header-left">
             <ThreadIcon />
-            <h2 className="thread-title">Thread</h2>
+            <h2 id="thread-panel-title" className="thread-title">Thread</h2>
             {replies.length > 0 && (
               <span className="thread-count">{replies.length} {replies.length === 1 ? 'reply' : 'replies'}</span>
             )}

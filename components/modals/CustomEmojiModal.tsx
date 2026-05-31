@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import { useDialogFocus } from './useDialogFocus';
 
 const NAME_RE = /^[a-zA-Z0-9_-]{2,32}$/;
 const MAX_BASE64_LEN = 128 * 1024 * (4 / 3); // ~128KB in base64 chars
@@ -18,7 +19,9 @@ export default function CustomEmojiModal() {
   const [urlErr, setUrlErr]   = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
 
-  const dropRef = useRef<HTMLDivElement>(null);
+  const dropRef   = useRef<HTMLDivElement>(null);
+  const modalRef  = useRef<HTMLDivElement>(null);
+  useDialogFocus(modalRef);
 
   const validateName = (v: string): string => {
     if (!v) return 'Name is required';
@@ -79,9 +82,9 @@ export default function CustomEmojiModal() {
 
   return (
     <div className="cem-backdrop" onClick={e => { if (e.target === e.currentTarget) closeModal(); }}>
-      <div className="cem-modal" role="dialog" aria-modal aria-label="Custom Emoji">
+      <div className="cem-modal" ref={modalRef} role="dialog" aria-modal aria-labelledby="cem-modal-title">
         <div className="cem-header">
-          <h2 className="cem-title">Custom Emoji</h2>
+          <h2 id="cem-modal-title" className="cem-title">Custom Emoji</h2>
           <button className="cem-close" onClick={closeModal} aria-label="Close"><svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></button>
         </div>
 

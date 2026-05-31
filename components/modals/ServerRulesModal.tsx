@@ -1,12 +1,15 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import { useDialogFocus } from './useDialogFocus';
 
 export default function ServerRulesModal() {
   const serverRules        = useOnyxStore(s => s.serverRules);
   const closeServerRulesModal = useOnyxStore(s => s.closeServerRulesModal);
   const client             = useOnyxStore(s => s.client);
+  const cardRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(cardRef);
 
   // Send RULES on mount if no rules loaded yet
   useEffect(() => {
@@ -19,12 +22,9 @@ export default function ServerRulesModal() {
   return (
     <div
       className="rules-modal"
-      role="dialog"
-      aria-modal
-      aria-labelledby="rules-modal-title"
       onClick={e => { if (e.target === e.currentTarget) closeServerRulesModal(); }}
     >
-      <div className="rules-card">
+      <div className="rules-card" ref={cardRef} role="dialog" aria-modal aria-labelledby="rules-modal-title">
         <div className="rules-header">
           <span className="rules-title" id="rules-modal-title">Server Rules</span>
           <button

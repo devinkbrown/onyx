@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import { useDialogFocus } from './useDialogFocus';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -87,6 +88,8 @@ export default function ConnectionProfilesModal() {
     return loaded[0]?.id ?? 'default';
   });
   const [draft, setDraft] = useState<ConnectionProfile | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(cardRef);
 
   // Sync draft whenever active profile changes
   useEffect(() => {
@@ -183,16 +186,13 @@ export default function ConnectionProfilesModal() {
   return (
     <div
       className="conn-modal"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Connection Profiles"
       onClick={e => { if (e.target === e.currentTarget) closeConnectionProfiles(); }}
     >
-      <div className="conn-card">
+      <div className="conn-card" ref={cardRef} role="dialog" aria-modal="true" aria-labelledby="conn-modal-title">
 
         {/* Header */}
         <div className="conn-header">
-          <span className="conn-title">🔌 Connection Profiles</span>
+          <span id="conn-modal-title" className="conn-title">Connection Profiles</span>
           <button
             className="conn-btn-secondary"
             style={{ padding: '4px 10px', fontSize: '12px' }}

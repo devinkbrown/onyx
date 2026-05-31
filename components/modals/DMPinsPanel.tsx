@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import Avatar from '@/components/ui/Avatar';
+import { useDialogFocus } from './useDialogFocus';
 
 const TIME_FMT = new Intl.DateTimeFormat(undefined, {
   month: 'short',
@@ -25,6 +26,9 @@ export default function DMPinsPanel() {
   const nick   = dmPinsNick ?? '';
   const pinned = nick ? (dmPinnedMessages.get(nick.toLowerCase()) ?? []) : [];
 
+  const panelRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(panelRef);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') closeDMPins();
@@ -37,18 +41,21 @@ export default function DMPinsPanel() {
     <div
       className="dmp-backdrop"
       onClick={e => { if (e.target === e.currentTarget) closeDMPins(); }}
-      aria-modal="true"
-      role="dialog"
-      aria-label={`Pinned messages in DM with ${nick}`}
     >
-      <div className="dmp-panel animate-slide-right">
+      <div
+        className="dmp-panel animate-slide-right"
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dmp-panel-title"
+      >
 
         {/* Header */}
         <div className="dmp-header">
           <div className="dmp-header-left">
             <PinIcon />
             <div className="dmp-header-text">
-              <h2 className="dmp-title">Pinned Messages</h2>
+              <h2 id="dmp-panel-title" className="dmp-title">Pinned Messages</h2>
               <p className="dmp-subtitle">DM with {nick}</p>
             </div>
             {pinned.length > 0 && (

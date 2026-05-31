@@ -1,8 +1,9 @@
 'use client';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import { testSound } from '@/hooks/useAudioNotifications';
 import type { SoundId } from '@/lib/sounds';
+import { useDialogFocus } from './useDialogFocus';
 
 // ── Sound catalogue ────────────────────────────────────────────────────────
 
@@ -44,12 +45,15 @@ export default function SoundSettingsModal() {
 
   const selectedEntry = SOUND_CATALOGUE.find(e => e.id === selectedSoundId) ?? SOUND_CATALOGUE[1];
 
+  const panelRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(panelRef);
+
   return (
     <div className="ssm-backdrop" onClick={closeSoundSettings}>
-      <div className="ssm-panel" onClick={e => e.stopPropagation()} role="dialog" aria-modal aria-label="Sound settings">
+      <div className="ssm-panel" ref={panelRef} onClick={e => e.stopPropagation()} role="dialog" aria-modal aria-labelledby="ssm-modal-title">
 
         <header className="ssm-header">
-          <h2 className="ssm-title">Sound Settings</h2>
+          <h2 id="ssm-modal-title" className="ssm-title">Sound Settings</h2>
           <button className="ssm-close" onClick={closeSoundSettings} aria-label="Close"><svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></button>
         </header>
 

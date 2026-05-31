@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import Avatar from '@/components/ui/Avatar';
+import { useDialogFocus } from './useDialogFocus';
 
 export default function ForwardMessageModal() {
   const forwardingMessage  = useOnyxStore(s => s.forwardingMessage);
@@ -15,7 +16,9 @@ export default function ForwardMessageModal() {
   const [query, setQuery]     = useState('');
   const [selected, setSelected] = useState<string | null>(null);
   const [comment, setComment]   = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef  = useRef<HTMLInputElement>(null);
+  const modalRef  = useRef<HTMLDivElement>(null);
+  useDialogFocus(modalRef);
 
   const close = useCallback(() => {
     setForwardingMessage(null);
@@ -90,15 +93,12 @@ export default function ForwardMessageModal() {
     <div
       className="fwd-backdrop"
       onClick={e => { if (e.target === e.currentTarget) close(); }}
-      aria-modal="true"
-      role="dialog"
-      aria-label="Forward message"
     >
-      <div className="fwd-modal">
+      <div className="fwd-modal" ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="fwd-modal-title">
 
         {/* Header */}
         <div className="fwd-header">
-          <h2 className="fwd-title">Forward Message</h2>
+          <h2 id="fwd-modal-title" className="fwd-title">Forward Message</h2>
           <button className="fwd-close" onClick={close} aria-label="Close">
             <CloseIcon />
           </button>

@@ -29,7 +29,7 @@
     /* ── Text ── */
     --text-primary:   #dff0ff;
     --text-secondary: #7aa8c4;
-    --text-muted:     #3d6480;
+    --text-muted:     #6090a8; /* raised from #3d6480; ≥4.69:1 on bg-elevated, ≥5.79:1 on bg-void */
     --text-link:      #38bdf8;
     --text-link-hover:#7dd3fc;
 
@@ -50,7 +50,7 @@
     --ch-active-bg:  rgba(14, 165, 233, 0.14);
     --ch-hover-bg:   rgba(14, 165, 233, 0.07);
     --ch-unread:     #dff0ff;
-    --ch-read:       #3d6480;
+    --ch-read:       #6090a8; /* raised with text-muted; >=5.50:1 on bg-deep */
 
     /* ── Borders ── */
     --border-subtle: rgba(14, 165, 233, 0.08);
@@ -114,7 +114,7 @@
     --gold-subtle:   rgba(64, 240, 200, 0.10);
     --text-primary:   #c8ecff;
     --text-secondary: #5fa0c0;
-    --text-muted:     #2d5878;
+    --text-muted:     #5a8aa0; /* raised from #2d5878; >=5.10:1 on bg-base */
     --border-normal:  rgba(0,212,255,0.14);
     --border-subtle:  rgba(0,212,255,0.07);
     --shadow-sm:  0 1px 4px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,212,255,0.04);
@@ -141,7 +141,7 @@
     --gold-subtle:   rgba(103,232,249,0.12);
     --text-primary:   #dff0ff;
     --text-secondary: #7aa8c4;
-    --text-muted:     #3d6480;
+    --text-muted:     #6090a8; /* raised from #3d6480; >=4.69:1 on bg-elevated */
     --border-normal:  rgba(14,165,233,0.15);
     --border-subtle:  rgba(14,165,233,0.08);
   }
@@ -164,7 +164,7 @@
     --gold-subtle:   rgba(147,197,253,0.10);
     --text-primary:   #dbeafe;
     --text-secondary: #6da3d8;
-    --text-muted:     #2e5580;
+    --text-muted:     #6088c0; /* raised from #2e5580; >=4.51:1 on bg-base */
     --border-normal:  rgba(59,130,246,0.15);
     --border-subtle:  rgba(59,130,246,0.07);
     --status-online:  #22d3ee;
@@ -188,7 +188,7 @@
     --gold-subtle:   rgba(252,211,77,0.10);
     --text-primary:   #fff3ee;
     --text-secondary: #d4a090;
-    --text-muted:     #8a5545;
+    --text-muted:     #c08078; /* raised from #8a5545; >=4.98:1 on bg-base */
     --border-normal:  rgba(251,146,60,0.15);
     --border-subtle:  rgba(251,146,60,0.08);
     --status-online:  #4ade80;
@@ -214,7 +214,7 @@
     --gold-subtle:   rgba(134,239,172,0.10);
     --text-primary:   #edfdf4;
     --text-secondary: #7dcf9a;
-    --text-muted:     #3a7055;
+    --text-muted:     #5a9870; /* raised from #3a7055; >=5.03:1 on bg-base */
     --border-normal:  rgba(34,197,94,0.15);
     --border-subtle:  rgba(34,197,94,0.07);
     --status-online:  #34d399;
@@ -238,7 +238,7 @@
     --gold-subtle:   rgba(148,232,224,0.10);
     --text-primary:   #e8f6f5;
     --text-secondary: #7abab5;
-    --text-muted:     #3d7070;
+    --text-muted:     #5a9898; /* raised from #3d7070; >=5.07:1 on bg-base */
     --border-normal:  rgba(45,212,191,0.13);
     --border-subtle:  rgba(45,212,191,0.06);
     --status-online:  #34d399;
@@ -262,7 +262,7 @@
     --gold-subtle:    rgba(0,229,255,0.08);
     --text-primary:   #f0f4ff;
     --text-secondary: #a0a8c8;
-    --text-muted:     #505880;
+    --text-muted:     #7880b0; /* raised from #505880; >=5.26:1 on bg-base */
     --border-normal:  rgba(124,90,245,0.12);
     --border-subtle:  rgba(124,90,245,0.06);
     --shadow-sm:  0 1px 4px rgba(0,0,0,0.8);
@@ -288,7 +288,7 @@
     --gold-subtle:   rgba(224,242,254,0.08);
     --text-primary:   #f0f7ff;
     --text-secondary: #94b8d4;
-    --text-muted:     #4a7090;
+    --text-muted:     #6090b0; /* raised from #4a7090; >=4.83:1 on bg-base */
     --border-normal:  rgba(96,165,250,0.14);
     --border-subtle:  rgba(96,165,250,0.07);
     --status-online:  #34d399;
@@ -312,7 +312,7 @@
     --gold-subtle:    rgba(232,184,75,0.08);
     --text-primary:   #f2f3f5;
     --text-secondary: #b5bac1;
-    --text-muted:     #72767d;
+    --text-muted:     #848890; /* raised from #72767d; >=4.53:1 on bg-base */
     --border-normal:  rgba(255,255,255,0.09);
     --border-subtle:  rgba(255,255,255,0.05);
   }
@@ -799,7 +799,7 @@ body.bubble-mode .chat-msg-wrap {
   --bg-active: rgba(0,0,0,0.12);
   --text-primary: #060607;
   --text-secondary: #4e5058;
-  --text-muted: #80848e;
+  --text-muted: #606468; /* raised from #80848e; >=5.37:1 on bg-void (light) */
   --text-link: #006ce7;
   --accent: #5865f2;
   --accent-hover: #4752c4;

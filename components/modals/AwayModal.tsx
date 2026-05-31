@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import { useDialogFocus } from './useDialogFocus';
 
 const PRESETS = [
   { emoji: '🍽️', label: 'Lunch',    message: 'Out for lunch' },
@@ -32,8 +33,11 @@ export default function AwayModal() {
 
   const [draft, setDraft] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const panelRef    = useRef<HTMLDivElement>(null);
 
-  // Focus textarea on open
+  // Focus textarea on open + restore focus on close
+  useDialogFocus(panelRef);
+
   useEffect(() => {
     textareaRef.current?.focus();
   }, []);
@@ -57,13 +61,16 @@ export default function AwayModal() {
     <div
       className="away-backdrop"
       onClick={e => { if (e.target === e.currentTarget) closeAwayModal(); }}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Set away status"
     >
-      <div className="away-panel">
+      <div
+        className="away-panel"
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="away-modal-title"
+      >
         <div className="away-header">
-          <h2 className="away-title">Set Away Status</h2>
+          <h2 id="away-modal-title" className="away-title">Set Away Status</h2>
           <button className="away-close" onClick={closeAwayModal} aria-label="Close">
             <CloseIcon />
           </button>

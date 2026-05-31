@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import { useDialogFocus } from './useDialogFocus';
 
 /**
  * ChannelJoinModal — shown when:
@@ -22,6 +23,9 @@ export default function ChannelJoinModal() {
 
   const passwordRef = useRef<HTMLInputElement>(null);
   const channelRef  = useRef<HTMLInputElement>(null);
+  const modalRef    = useRef<HTMLDivElement>(null);
+
+  useDialogFocus(modalRef);
 
   // Reset inputs when the prompt changes
   useEffect(() => {
@@ -75,8 +79,8 @@ export default function ChannelJoinModal() {
   const errorText = prompt.error || '';
 
   return (
-    <div className="cjm-overlay" role="dialog" aria-modal aria-labelledby="cjm-title">
-      <div className="cjm-modal">
+    <div className="cjm-overlay">
+      <div className="cjm-modal" ref={modalRef} role="dialog" aria-modal aria-labelledby="cjm-title">
         <div className="cjm-title" id="cjm-title">
           🔑 {isRetry ? `Join ${prompt.channel}` : 'Join a channel'}
         </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import { useDialogFocus } from './useDialogFocus';
 
 // ── Invite link with expiry ───────────────────────────────────────────────────
 
@@ -153,6 +154,9 @@ export default function InviteModal() {
   const hasKey  = channel?.modes?.includes('k') ?? false;
   const keyValue = props['KEY'] ?? props['key'] ?? null;
 
+  const modalRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(modalRef);
+
   const shareText = [
     `Join me in ${channelName} on Ocean`,
     `Server: ${hostname}`,
@@ -191,13 +195,13 @@ export default function InviteModal() {
   if (!channelName) return null;
 
   return (
-    <div className="inv-overlay" role="dialog" aria-modal aria-label={`Invite to ${channelName}`}>
-      <div className="inv-modal">
+    <div className="inv-overlay">
+      <div className="inv-modal" ref={modalRef} role="dialog" aria-modal aria-labelledby="inv-modal-title">
         {/* Header */}
         <div className="inv-header">
           <div className="inv-title-row">
             <LinkIcon />
-            <h2 className="inv-title">Invite to {channelName}</h2>
+            <h2 id="inv-modal-title" className="inv-title">Invite to {channelName}</h2>
           </div>
           <button
             className="inv-close"

@@ -12,6 +12,7 @@ import {
   applyAppearance,
 } from '@/hooks/useAppearance';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { useDialogFocus } from './useDialogFocus';
 import CTCPSettingsSection from './CTCPSettingsSection';
 
 type Tab = 'account' | 'appearance' | 'voice' | 'notifications' | 'accessibility' | 'developer' | 'streamer' | 'advanced';
@@ -34,6 +35,7 @@ export default function SettingsModal() {
 
   const modalRef = useRef<HTMLDivElement>(null);
   useFocusTrap(modalRef, true);
+  useDialogFocus(modalRef);
 
   // Close on Escape
   useEffect(() => {
@@ -50,26 +52,34 @@ export default function SettingsModal() {
     <div
       className="settings-overlay"
       onClick={closeSettings}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Settings"
     >
-      <div className="settings-modal animate-scale-in" onClick={stopProp} ref={modalRef}>
+      <div
+        className="settings-modal animate-scale-in"
+        onClick={stopProp}
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-modal-title"
+      >
         {/* Sidebar */}
         <nav className="settings-nav" aria-label="Settings navigation">
-          <h2 className="settings-nav-title">Settings</h2>
+          <h2 id="settings-modal-title" className="settings-nav-title">Settings</h2>
+          <div role="tablist" aria-label="Settings sections" aria-orientation="vertical">
           {TABS.map(t => (
             <button
               key={t.id}
+              role="tab"
+              id={`settings-tab-${t.id}`}
+              aria-selected={tab === t.id}
+              aria-controls={`settings-panel-${t.id}`}
               className={`settings-tab ${tab === t.id ? 'settings-tab--active' : ''}`}
               onClick={() => setTab(t.id)}
-              aria-current={tab === t.id ? 'page' : undefined}
-              aria-label={t.label}
             >
-              <span className="settings-tab-icon" aria-hidden>{t.icon}</span>
+              <span className="settings-tab-icon" aria-hidden="true">{t.icon}</span>
               {t.label}
             </button>
           ))}
+          </div>
 
           <div style={{ flex: 1 }} />
 
@@ -84,7 +94,12 @@ export default function SettingsModal() {
         </nav>
 
         {/* Content */}
-        <div className="settings-content">
+        <div
+          role="tabpanel"
+          id={`settings-panel-${tab}`}
+          aria-labelledby={`settings-tab-${tab}`}
+          className="settings-content"
+        >
           <button className="settings-close" onClick={closeSettings} aria-label="Close settings">
             ✕
           </button>

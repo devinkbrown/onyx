@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import { useDialogFocus } from './useDialogFocus';
 
 const DURATION_OPTIONS: Array<{ label: string; seconds: number }> = [
   { label: '1 hour',  seconds: 3600 },
@@ -21,6 +22,8 @@ export default function PollCreateModal() {
   const [durationIdx, setDurationIdx] = useState(1);
 
   const questionRef = useRef<HTMLInputElement>(null);
+  const modalRef    = useRef<HTMLDivElement>(null);
+  useDialogFocus(modalRef);
 
   useEffect(() => {
     questionRef.current?.focus();
@@ -71,13 +74,13 @@ export default function PollCreateModal() {
   }, [canSubmit, activeView, question, options, durationIdx, multiVote, sendMessage, closePollCreate]);
 
   return (
-    <div className="pcm-overlay" role="dialog" aria-modal aria-label="Create poll">
-      <div className="pcm-modal">
+    <div className="pcm-overlay">
+      <div className="pcm-modal" ref={modalRef} role="dialog" aria-modal aria-labelledby="pcm-modal-title">
         {/* Header */}
         <div className="pcm-header">
           <div className="pcm-title-row">
             <PollIcon />
-            <h2 className="pcm-title">Create Poll</h2>
+            <h2 id="pcm-modal-title" className="pcm-title">Create Poll</h2>
           </div>
           <button
             className="pcm-close"

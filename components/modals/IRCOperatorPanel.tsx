@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import { useDialogFocus } from './useDialogFocus';
 
 type OperTab = 'users' | 'server' | 'channels';
 
@@ -14,8 +15,8 @@ interface ConfirmDialogProps {
 
 function ConfirmDialog({ message, onConfirm, onCancel }: ConfirmDialogProps) {
   return (
-    <div className="op-confirm-overlay" role="dialog" aria-modal="true">
-      <div className="op-confirm-box">
+    <div className="op-confirm-overlay">
+      <div className="op-confirm-box" role="dialog" aria-modal="true" aria-label="Confirm action">
         <p className="op-confirm-msg">{message}</p>
         <div className="op-confirm-actions">
           <button className="op-btn op-btn--danger" onClick={onConfirm}>Confirm</button>
@@ -498,6 +499,8 @@ export default function IRCOperatorPanel() {
   const closeOperPanel = useOnyxStore(s => s.closeOperPanel);
 
   const backdropRef = useRef<HTMLDivElement>(null);
+  const panelRef    = useRef<HTMLDivElement>(null);
+  useDialogFocus(panelRef);
 
   // Close on Escape
   useEffect(() => {
@@ -517,14 +520,11 @@ export default function IRCOperatorPanel() {
       className="op-backdrop"
       ref={backdropRef}
       onClick={handleBackdropClick}
-      role="dialog"
-      aria-modal="true"
-      aria-label={isOper ? 'IRC Operator Dashboard' : 'IRC Operator Login'}
     >
-      <div className="op-panel">
+      <div className="op-panel" ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="op-panel-title">
         {/* Title bar */}
         <div className="op-header">
-          <h2 className="op-title">
+          <h2 id="op-panel-title" className="op-title">
             {isOper ? 'IRC Operator Dashboard' : 'IRC Operator Login'}
           </h2>
           <button className="op-close" onClick={closeOperPanel} aria-label="Close"><svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></button>

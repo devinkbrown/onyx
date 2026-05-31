@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import { useDialogFocus } from './useDialogFocus';
 
 type ActionTab = 'actions' | 'banlist' | 'auditlog';
 type AuditFilter = 'all' | 'kick' | 'ban' | 'mode';
@@ -39,6 +40,8 @@ export default function ModerationPanel() {
   const [auditFilter, setAuditFilter] = useState<AuditFilter>('all');
 
   const tempBanTimerRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const panelRef        = useRef<HTMLDivElement>(null);
+  useDialogFocus(panelRef);
 
   // Fetch ban list when switching to that tab
   useEffect(() => {
@@ -152,13 +155,13 @@ export default function ModerationPanel() {
   };
 
   return (
-    <div className="modpanel-overlay" role="dialog" aria-modal="true" aria-label="Channel Moderation">
-      <div className="modpanel">
+    <div className="modpanel-overlay">
+      <div className="modpanel" ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="modpanel-title">
         {/* Header */}
         <div className="modpanel-header">
           <div className="modpanel-header-left">
             <ShieldIcon />
-            <span className="modpanel-title">
+            <span id="modpanel-title" className="modpanel-title">
               Channel Moderation
               {channel && <span className="modpanel-chan"> — {channel}</span>}
             </span>

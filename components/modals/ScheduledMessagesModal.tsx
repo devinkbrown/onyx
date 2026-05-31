@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import { useDialogFocus } from './useDialogFocus';
 
 // ── Relative time helper ───────────────────────────────────────────────────────
 
@@ -44,6 +45,8 @@ export default function ScheduledMessagesModal() {
   const [dateTime, setDateTime] = useState('');
   const [error, setError]       = useState('');
   const channelRef = useRef<HTMLInputElement>(null);
+  const panelRef   = useRef<HTMLDivElement>(null);
+  useDialogFocus(panelRef);
 
   function handleSchedule() {
     setError('');
@@ -66,17 +69,14 @@ export default function ScheduledMessagesModal() {
   return (
     <div
       className="smm-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Scheduled messages"
       onClick={e => { if (e.target === e.currentTarget) closeScheduledMessages(); }}
     >
-      <div className="smm-panel">
+      <div className="smm-panel" ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="smm-modal-title">
         {/* Header */}
         <div className="smm-header">
           <div className="smm-title-row">
             <ClockIcon />
-            <h2 className="smm-title">Schedule a Message</h2>
+            <h2 id="smm-modal-title" className="smm-title">Schedule a Message</h2>
           </div>
           <button
             className="smm-close"

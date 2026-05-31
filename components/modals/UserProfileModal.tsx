@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import Avatar from '@/components/ui/Avatar';
+import { useDialogFocus } from './useDialogFocus';
 
 // ── Nick color helpers ────────────────────────────────────────────────────────
 
@@ -415,7 +416,9 @@ export default function UserProfileModal() {
   const [blocked, setBlocked] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const cardRef    = useRef<HTMLDivElement>(null);
   const { isBlocked, block, unblock } = useBlockedNicks();
+  useDialogFocus(cardRef);
 
   const isSelf = nick.toLowerCase() === ourNick.toLowerCase();
   const isIgnored = ignoredUsers.has(nick.toLowerCase());
@@ -546,11 +549,14 @@ export default function UserProfileModal() {
       className="upm-overlay"
       ref={overlayRef}
       onClick={handleOverlayClick}
-      role="dialog"
-      aria-modal
-      aria-label={`${nick}'s profile`}
     >
-      <div className="upm-card animate-scale-in">
+      <div
+        className="upm-card animate-scale-in"
+        ref={cardRef}
+        role="dialog"
+        aria-modal
+        aria-label={`${nick}'s profile`}
+      >
 
         {/* Close button */}
         <button className="upm-close" onClick={closeUserProfile} aria-label="Close profile">

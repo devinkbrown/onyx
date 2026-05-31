@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import { useDialogFocus } from './useDialogFocus';
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -26,6 +27,8 @@ export default function UserNotesModal({ nick, onClose }: Props) {
   const [saved, setSaved] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const modalRef    = useRef<HTMLDivElement>(null);
+  useDialogFocus(modalRef);
 
   // Focus textarea on mount
   useEffect(() => {
@@ -62,10 +65,10 @@ export default function UserNotesModal({ nick, onClose }: Props) {
   const hasExisting = existingNote.trim().length > 0;
 
   return (
-    <div className="unm-overlay" onClick={handleBackdrop} aria-modal="true" role="dialog" aria-label={`Note about ${nick}`}>
-      <div className="unm-modal">
+    <div className="unm-overlay" onClick={handleBackdrop}>
+      <div className="unm-modal" ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="unm-modal-title">
         <div className="unm-header">
-          <span className="unm-title">📝 Note about <strong>{nick}</strong></span>
+          <span id="unm-modal-title" className="unm-title">Note about <strong>{nick}</strong></span>
           <button className="unm-close" onClick={onClose} aria-label="Close">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
               <path d="M2 2l10 10M12 2L2 12" />

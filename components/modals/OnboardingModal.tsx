@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import Avatar from '@/components/ui/Avatar';
+import { useDialogFocus } from './useDialogFocus';
 
 type UserStatus = 'online' | 'idle' | 'dnd' | 'offline';
 
@@ -33,6 +34,9 @@ export default function OnboardingModal() {
   const setUserStatus     = useOnyxStore(s => s.setUserStatus);
   const joinChannel       = useOnyxStore(s => s.joinChannel);
   const client            = useOnyxStore(s => s.client);
+
+  const modalRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(modalRef);
 
   // Step 1 local state
   const [bio, setBio] = useState('');
@@ -75,8 +79,8 @@ export default function OnboardingModal() {
   }
 
   return (
-    <div className="onb-backdrop" role="dialog" aria-modal="true" aria-label="Welcome to Ocean">
-      <div className="onb-modal">
+    <div className="onb-backdrop">
+      <div className="onb-modal" ref={modalRef} role="dialog" aria-modal="true" aria-label="Welcome to Ocean">
 
         {/* Progress dots */}
         <div className="onb-dots" aria-label={`Step ${onboardingStep + 1} of ${TOTAL_STEPS}`}>

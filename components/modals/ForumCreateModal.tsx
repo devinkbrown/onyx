@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import type { ForumPost } from '@/lib/store';
+import { useDialogFocus } from './useDialogFocus';
 
 const MAX_TITLE   = 100;
 const MAX_TAGS    = 5;
@@ -52,6 +53,8 @@ export default function ForumCreateModal() {
 
   const titleRef   = useRef<HTMLInputElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const panelRef   = useRef<HTMLDivElement>(null);
+  useDialogFocus(panelRef);
 
   const channelName = activeView.kind === 'channel' ? activeView.channel : '';
 
@@ -152,15 +155,12 @@ export default function ForumCreateModal() {
       className="fcm-overlay"
       ref={overlayRef}
       onClick={e => { if (e.target === overlayRef.current) closeForumCreate(); }}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Create new post"
     >
-      <div className="fcm-panel">
+      <div className="fcm-panel" ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="fcm-modal-title">
         {/* Header */}
         <header className="fcm-header">
           <span className="fcm-header-icon" aria-hidden>📋</span>
-          <h2 className="fcm-title">New Post</h2>
+          <h2 id="fcm-modal-title" className="fcm-title">New Post</h2>
           <button className="fcm-close" onClick={closeForumCreate} aria-label="Close">
             <CloseIcon />
           </button>

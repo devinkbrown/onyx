@@ -90,7 +90,7 @@ export default function Avatar({
         className,
       ].filter(Boolean).join(' ')}
       style={{ width: size, height: size }}
-      aria-label={nick}
+      aria-label={status ? `${nick}, ${status}` : nick}
     >
       {/* Core circle */}
       <span
@@ -131,17 +131,20 @@ export default function Avatar({
         </span>
       )}
 
-      {/* Status dot */}
+      {/* Status dot — visual indicator + sr-only text for screen readers */}
       {status && STATUS_COLORS[status] && (
-        <span
-          className={`av-status-dot av-status-dot--${status}`}
-          aria-hidden
-          style={{
-            background: STATUS_COLORS[status],
-            width: Math.max(8, Math.round(size * 0.26)),
-            height: Math.max(8, Math.round(size * 0.26)),
-          }}
-        />
+        <>
+          <span
+            className={`av-status-dot av-status-dot--${status}`}
+            aria-hidden
+            style={{
+              background: STATUS_COLORS[status],
+              width: Math.max(8, Math.round(size * 0.26)),
+              height: Math.max(8, Math.round(size * 0.26)),
+            }}
+          />
+          <span className="sr-only">{status}</span>
+        </>
       )}
 
       {/* Hover tooltip */}

@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import { useDialogFocus } from './useDialogFocus';
 
 // ── Key chip helpers ──────────────────────────────────────────────────────────
 
@@ -70,6 +71,8 @@ function Section({ title, children }: SectionProps) {
 
 export default function KeyboardShortcutsModal() {
   const closeKeyboardShortcuts = useOnyxStore(s => s.closeKeyboardShortcuts);
+  const modalRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(modalRef);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -86,17 +89,18 @@ export default function KeyboardShortcutsModal() {
     <div
       className="ks-backdrop"
       onClick={closeKeyboardShortcuts}
-      role="dialog"
-      aria-modal
-      aria-label="Keyboard shortcuts"
     >
       <div
         className="ks-modal"
+        ref={modalRef}
+        role="dialog"
+        aria-modal
+        aria-labelledby="ks-modal-title"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         <div className="ks-header">
-          <h2 className="ks-title">Keyboard Shortcuts</h2>
+          <h2 id="ks-modal-title" className="ks-title">Keyboard Shortcuts</h2>
           <button
             className="ks-close"
             onClick={closeKeyboardShortcuts}

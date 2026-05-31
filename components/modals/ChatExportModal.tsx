@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
+import { useDialogFocus } from './useDialogFocus';
 
 // ── Pure export functions ──────────────────────────────────────────────────────
 
@@ -78,6 +79,8 @@ const SYSTEM_TYPES = new Set(['join', 'part', 'quit', 'nick', 'mode', 'kick', 't
 
 export default function ChatExportModal() {
   const closeExportModal  = useOnyxStore(s => s.closeExportModal);
+  const cardRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(cardRef);
   const addNotification   = useOnyxStore(s => s.addNotification);
   const activeView        = useOnyxStore(s => s.activeView);
   const channels          = useOnyxStore(s => s.channels);
@@ -152,8 +155,8 @@ export default function ChatExportModal() {
   const filteredCount = buildFilteredMessages().length;
 
   return (
-    <div className="export-modal" role="dialog" aria-modal="true" aria-labelledby="export-modal-title" onClick={e => { if (e.target === e.currentTarget) closeExportModal(); }}>
-      <div className="export-card">
+    <div className="export-modal" onClick={e => { if (e.target === e.currentTarget) closeExportModal(); }}>
+      <div className="export-card" ref={cardRef} role="dialog" aria-modal="true" aria-labelledby="export-modal-title">
 
         {/* Header */}
         <div className="export-header">

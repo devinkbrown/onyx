@@ -367,6 +367,7 @@ export default function LoginForm({ onSwitch }: Props) {
           </span>
           <input
             ref={nickRef}
+            id="login-nick"
             type="text"
             placeholder="your_nick"
             value={nick}
@@ -377,6 +378,8 @@ export default function LoginForm({ onSwitch }: Props) {
             }}
             autoComplete="username"
             maxLength={32}
+            aria-describedby={nickError ? 'login-nick-error' : undefined}
+            aria-invalid={nickError ? true : undefined}
             className={`onyx-input onyx-input--has-icon${nickError || (hasError && !nick.trim()) ? ' onyx-input--error' : ''}`}
             disabled={loading}
           />
@@ -384,7 +387,7 @@ export default function LoginForm({ onSwitch }: Props) {
             {nick.length}/30
           </span>
         </div>
-        {nickError && <span className="field-hint field-hint--error">{nickError}</span>}
+        {nickError && <span id="login-nick-error" className="field-hint field-hint--error" role="alert">{nickError}</span>}
       </FormField>
 
       {/* Password field */}

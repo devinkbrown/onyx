@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import IrcText from '@/components/chat/IrcText';
+import { useDialogFocus } from './useDialogFocus';
 
 // Detect lines that look like ASCII art
 function isArtLine(line: string): boolean {
@@ -28,6 +29,9 @@ export default function MotdModal() {
   const [dontShow, setDontShow] = useState(false);
   const [search,   setSearch]   = useState('');
   const [copied,   setCopied]   = useState(false);
+
+  const panelRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(panelRef);
 
   const lines = useMemo(() => (motd ?? '').split('\n'), [motd]);
 
@@ -61,8 +65,8 @@ export default function MotdModal() {
   if (!motd) return null;
 
   return (
-    <div className="motd-backdrop" role="dialog" aria-modal aria-labelledby="motd-title">
-      <div className="motd-panel">
+    <div className="motd-backdrop">
+      <div className="motd-panel" ref={panelRef} role="dialog" aria-modal aria-labelledby="motd-title">
         <div className="motd-header">
           <h2 className="motd-title" id="motd-title">
             Welcome to {networkName}

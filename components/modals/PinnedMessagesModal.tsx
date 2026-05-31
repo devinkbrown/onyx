@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import Avatar from '@/components/ui/Avatar';
+import { useDialogFocus } from './useDialogFocus';
 
 const TIME_FMT = new Intl.DateTimeFormat(undefined, {
   month: 'short',
@@ -20,6 +21,9 @@ export default function PinnedMessagesModal() {
   const target = activeView.kind === 'channel' ? activeView.channel : '';
   const pinned = target ? (pinnedMessages.get(target.toLowerCase()) ?? []) : [];
 
+  const panelRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(panelRef);
+
   // Escape to close
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -33,17 +37,20 @@ export default function PinnedMessagesModal() {
     <div
       className="pin-backdrop"
       onClick={e => { if (e.target === e.currentTarget) closePinnedMessages(); }}
-      aria-modal="true"
-      role="dialog"
-      aria-label="Pinned Messages"
     >
-      <div className="pin-panel animate-slide-right">
+      <div
+        className="pin-panel animate-slide-right"
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pin-panel-title"
+      >
 
         {/* Header */}
         <div className="pin-header">
           <div className="pin-header-left">
             <PinIcon />
-            <h2 className="pin-title">Pinned Messages</h2>
+            <h2 id="pin-panel-title" className="pin-title">Pinned Messages</h2>
             {pinned.length > 0 && (
               <span className="pin-count">{pinned.length}</span>
             )}

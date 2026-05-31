@@ -240,6 +240,17 @@ export default function AppShell({ children }: Props) {
     document.body.style.userSelect = 'none';
   }, [sidebarWidth]);
 
+  const onResizeKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const STEP = 8;
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      setSidebarWidth(sidebarWidth + STEP);
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      setSidebarWidth(sidebarWidth - STEP);
+    }
+  }, [sidebarWidth, setSidebarWidth]);
+
   useEffect(() => {
     const onMouseMove = (e: MouseEvent) => {
       if (!isDraggingRef.current) return;
@@ -319,19 +330,24 @@ export default function AppShell({ children }: Props) {
     setInstallPrompt(null);
   }, [installPrompt]);
 
-  // Spotlight global keyboard shortcut
+  // Spotlight global keyboard shortcut + mobile sidebar Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
         toggleSpotlight();
-      } else if (e.key === 'Escape' && showSpotlight) {
-        closeSpotlight();
+      } else if (e.key === 'Escape') {
+        if (showSpotlight) {
+          closeSpotlight();
+        } else if (mobileSidebarOpen || mobilePanel === 'channels') {
+          closeMobileSidebar();
+          setMobilePanel('chat');
+        }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [showSpotlight, toggleSpotlight, closeSpotlight]);
+  }, [showSpotlight, toggleSpotlight, closeSpotlight, mobileSidebarOpen, mobilePanel, closeMobileSidebar, setMobilePanel]);
 
   const isInChannel = activeView.kind === 'channel';
   const showRight   = isInChannel && showMemberList && !focusMode;
@@ -386,7 +402,14 @@ export default function AppShell({ children }: Props) {
         <div
           className="sidebar-resize-handle"
           onMouseDown={onResizeMouseDown}
-          aria-hidden
+          onKeyDown={onResizeKeyDown}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize sidebar"
+          aria-valuenow={sidebarWidth}
+          aria-valuemin={180}
+          aria-valuemax={320}
+          tabIndex={0}
         />
       </div>
 

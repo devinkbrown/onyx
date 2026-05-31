@@ -6,6 +6,9 @@ export default function LandingPage() {
   return (
     <main className="land-root">
 
+      {/* ── Skip link ── */}
+      <a href="#land-main" className="land-skip-link">Skip to main content</a>
+
       {/* ── Depth layers ─────────────────────────────────────────────── */}
       <div className="land-depth" aria-hidden>
         <div className="land-depth-ray land-depth-ray-1" />
@@ -33,7 +36,7 @@ export default function LandingPage() {
       </nav>
 
       {/* ── Hero ────────────────────────────────────────────────────── */}
-      <section className="land-hero">
+      <section id="land-main" className="land-hero">
         <div className="land-hero-body">
           <div className="land-hero-copy">
             <div className="land-badge">
@@ -479,6 +482,23 @@ export default function LandingPage() {
 
         /* Override the app shell's global overflow: hidden so this page scrolls */
         html, body { overflow: auto; overflow-x: hidden; }
+
+        /* ── Skip link ── */
+        .land-skip-link {
+          position: absolute;
+          top: -40px;
+          left: 0;
+          background: var(--accent);
+          color: #fff;
+          padding: 8px 16px;
+          text-decoration: none;
+          z-index: 9999;
+          border-radius: 0 0 6px 0;
+          transition: top 150ms;
+          font-size: 14px;
+          font-weight: 600;
+        }
+        .land-skip-link:focus { top: 0; }
 
         .land-root {
           background: var(--bg-void);

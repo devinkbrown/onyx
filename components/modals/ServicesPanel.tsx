@@ -24,6 +24,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import { useDialogFocus } from './useDialogFocus';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -53,6 +54,8 @@ export default function ServicesPanel() {
   const replyBodyRef   = useRef<HTMLDivElement>(null);
   const svcNoticeRef   = useRef<HTMLDivElement>(null);
   const seenIds        = useRef<Set<string>>(new Set());
+  const panelRef       = useRef<HTMLDivElement>(null);
+  useDialogFocus(panelRef);
 
   // Subscribe to ALL dms changes — server replies arrive as NOTICEs
   useEffect(() => {
@@ -147,18 +150,21 @@ export default function ServicesPanel() {
     <div
       className="svc-backdrop"
       onClick={e => { if (e.target === e.currentTarget) closeServices(); }}
-      aria-modal="true"
-      role="dialog"
-      aria-label="Account Services"
     >
-      <div className="svc-panel animate-slide-right">
+      <div
+        className="svc-panel animate-slide-right"
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="svc-panel-title"
+      >
 
         {/* Header */}
         <div className="svc-header">
           <div className="svc-header-left">
             <ShieldIcon />
             <div>
-              <h2 className="svc-title">Account Services</h2>
+              <h2 id="svc-panel-title" className="svc-title">Account Services</h2>
               <p className="svc-subtitle">
                 {isBotTab ? 'Service bot commands via PRIVMSG' : 'Native server commands'}
               </p>

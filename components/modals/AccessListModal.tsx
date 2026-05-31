@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import type { IRCMessage } from '@/lib/irc/types';
+import { useDialogFocus } from './useDialogFocus';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -51,6 +52,8 @@ export default function AccessListModal() {
   const [addError, setAddError] = useState('');
 
   const handlerRef = useRef<((msg: IRCMessage) => void) | null>(null);
+  const panelRef   = useRef<HTMLDivElement>(null);
+  useDialogFocus(panelRef);
 
   // ── Fetch the access list ─────────────────────────────────────────────────
 
@@ -139,14 +142,20 @@ export default function AccessListModal() {
       className="acl-backdrop"
       onClick={e => { if (e.target === e.currentTarget) closeAccessList(); }}
     >
-      <div className="acl-panel animate-slide-right">
+      <div
+        className="acl-panel animate-slide-right"
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="acl-panel-title"
+      >
 
         {/* Header */}
         <div className="acl-header">
           <div className="acl-header-left">
             <ShieldIcon />
             <div>
-              <h2 className="acl-title">Access List</h2>
+              <h2 id="acl-panel-title" className="acl-title">Access List</h2>
               <p className="acl-subtitle">#{displayName}</p>
             </div>
           </div>

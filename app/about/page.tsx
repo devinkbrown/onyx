@@ -4,6 +4,9 @@ import type { CSSProperties } from 'react';
 export default function AboutPage() {
   return (
     <main className="about-root">
+      {/* ── Skip link ── */}
+      <a href="#about-main" className="about-skip-link">Skip to main content</a>
+
       {/* Atmospheric depth background */}
       <div className="about-depth" aria-hidden>
         <div className="about-depth-ray about-depth-ray-1" />
@@ -26,7 +29,7 @@ export default function AboutPage() {
       </nav>
 
       {/* Hero */}
-      <div className="about-hero">
+      <div id="about-main" className="about-hero">
         <div className="about-hero-orb" aria-hidden />
         <div className="about-container">
           <div className="about-badge">
@@ -233,6 +236,23 @@ export default function AboutPage() {
 
         /* Override app shell's global overflow: hidden so this page scrolls */
         html, body { overflow: auto; overflow-x: hidden; }
+
+        /* ── Skip link ── */
+        .about-skip-link {
+          position: absolute;
+          top: -40px;
+          left: 0;
+          background: var(--accent);
+          color: #fff;
+          padding: 8px 16px;
+          text-decoration: none;
+          z-index: 9999;
+          border-radius: 0 0 6px 0;
+          transition: top 150ms;
+          font-size: 14px;
+          font-weight: 600;
+        }
+        .about-skip-link:focus { top: 0; }
 
         .about-root {
           background: var(--bg-void);

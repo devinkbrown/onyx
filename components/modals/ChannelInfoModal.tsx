@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
 import type { IRCClient } from '@/lib/irc/client';
+import { useDialogFocus } from './useDialogFocus';
 
 type Tab = 'overview' | 'members' | 'pins' | 'stats' | 'settings';
 
@@ -106,6 +107,8 @@ export default function ChannelInfoModal() {
   const [editingTopic, setEditingTopic]   = useState(false);
   const [topicDraft, setTopicDraft]       = useState('');
   const topicInputRef                     = useRef<HTMLTextAreaElement>(null);
+  const panelRef                          = useRef<HTMLDivElement>(null);
+  useDialogFocus(panelRef);
 
   // Re-request props each time modal opens
   useEffect(() => {
@@ -211,7 +214,13 @@ export default function ChannelInfoModal() {
 
   return (
     <div className="ci-backdrop" onClick={e => { if (e.target === e.currentTarget) closeChannelInfo(); }}>
-      <div className="ci-panel animate-slide-right">
+      <div
+        className="ci-panel animate-slide-right"
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ci-panel-title"
+      >
 
         {/* ── Banner ────────────────────────────────────────────────── */}
         <div
@@ -224,7 +233,7 @@ export default function ChannelInfoModal() {
           </button>
           <div className="ci-banner-content">
             <div className="ci-sigil">#</div>
-            <h2 className="ci-channel-name">{displayName}</h2>
+            <h2 id="ci-panel-title" className="ci-channel-name">{displayName}</h2>
             <div className="ci-banner-meta">
               {category && <span className="ci-category-badge">{category}</span>}
               {createdAt && (

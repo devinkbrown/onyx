@@ -168,6 +168,7 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
   const [draft,   setDraft]   = useState('');
   const [isDraft, setIsDraft] = useState(false);
   const [sentFlash, setSentFlash] = useState(false);
+  const sentFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showEmojiPicker,   setShowEmojiPicker]   = useState(false);
   const [mobileToolbarOpen, setMobileToolbarOpen] = useState(false);
   const [showGifPicker,     setShowGifPicker]     = useState(false);
@@ -189,6 +190,9 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
   const { upload, uploading, progress: uploadProgress } = useFileUpload();
   const dragCounterRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Keep a live ref to attachments so the unmount cleanup can revoke object URLs
+  // without capturing a stale copy of the array in a closure.
+  const attachmentsRef = useRef<PendingAttachment[]>([]);
 
   const textareaRef          = useRef<HTMLTextAreaElement>(null);
   const typingTimer          = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -277,6 +281,29 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
   const clearAttachments = useCallback((list: PendingAttachment[]) => {
     for (const att of list) URL.revokeObjectURL(att.objectUrl);
     setAttachments([]);
+  }, []);
+
+  // Keep attachmentsRef in sync so the unmount cleanup always has the latest list.
+  useEffect(() => {
+    attachmentsRef.current = attachments;
+  }, [attachments]);
+
+  // ── Cleanup on unmount or target change ──────────────────────────────────────
+  // Clears the flood timer, typing timer, sentFlash timer, stops the typing
+  // indicator for the channel we're leaving, and revokes any pending object URLs.
+  useEffect(() => {
+    const capturedTarget = target;
+    return () => {
+      if (floodTimerRef.current) { clearTimeout(floodTimerRef.current); floodTimerRef.current = null; }
+      if (typingTimer.current)   { clearTimeout(typingTimer.current);   typingTimer.current   = null; }
+      if (sentFlashTimerRef.current) { clearTimeout(sentFlashTimerRef.current); sentFlashTimerRef.current = null; }
+      sendTypingStop(capturedTarget);
+      for (const att of attachmentsRef.current) {
+        URL.revokeObjectURL(att.objectUrl);
+      }
+    };
+  // Run on mount/unmount only. Target changes are handled by the dedicated target-reset effect.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Handle dropped file (legacy prop) ────────────────────────────────────────
@@ -906,10 +933,14 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
       }, FLOOD_COOLDOWN_MS);
     }
 
+    // Snapshot the attachment list BEFORE the async upload so files added
+    // during the await don't get double-revoked or silently dropped.
+    const attachmentSnapshot = attachments.slice();
+
     // Upload attachments if media server configured, else fall back to text annotation
     let attSuffix = '';
-    if (attachments.length > 0) {
-      const results = await upload(attachments.map(a => a.file));
+    if (attachmentSnapshot.length > 0) {
+      const results = await upload(attachmentSnapshot.map(a => a.file));
       attSuffix = results.map(r => {
         const isImage = r.file.type.startsWith('image/');
         const isVideo = r.file.type.startsWith('video/');
@@ -934,12 +965,14 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         onMessageSent?.();
         // Trigger sent flash on the input bar
         setSentFlash(true);
-        setTimeout(() => setSentFlash(false), 500);
+        if (sentFlashTimerRef.current) clearTimeout(sentFlashTimerRef.current);
+        sentFlashTimerRef.current = setTimeout(() => setSentFlash(false), 500);
       }
     }
 
-    // Clear attachments after send
-    clearAttachments(attachments);
+    // Clear attachments after send — revoke based on snapshot to avoid
+    // leaking or dropping any files added during the async upload.
+    clearAttachments(attachmentSnapshot);
 
     const histLine = line || attSuffix.trim();
     if (histLine) setHistory(h => [histLine, ...h.slice(0, 99)]);

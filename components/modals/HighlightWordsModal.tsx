@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import { useDialogFocus } from './useDialogFocus';
 
 export default function HighlightWordsModal() {
   const highlightWords    = useOnyxStore(s => s.highlightWords);
@@ -10,7 +11,10 @@ export default function HighlightWordsModal() {
   const closeHighlightModal = useOnyxStore(s => s.closeHighlightModal);
 
   const [draft, setDraft] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef  = useRef<HTMLInputElement>(null);
+  const modalRef  = useRef<HTMLDivElement>(null);
+
+  useDialogFocus(modalRef);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -48,16 +52,13 @@ export default function HighlightWordsModal() {
     <div
       className="hlm-overlay"
       onClick={e => { if (e.target === e.currentTarget) closeHighlightModal(); }}
-      role="dialog"
-      aria-modal
-      aria-label="Highlight words"
     >
-      <div className="hlm-modal">
+      <div className="hlm-modal" ref={modalRef} role="dialog" aria-modal aria-labelledby="hlm-modal-title">
         {/* Header */}
         <div className="hlm-header">
           <div className="hlm-title-row">
             <span className="hlm-icon" aria-hidden>✦</span>
-            <h2 className="hlm-title">Highlight Words</h2>
+            <h2 id="hlm-modal-title" className="hlm-title">Highlight Words</h2>
           </div>
           <button
             className="hlm-close"

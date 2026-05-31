@@ -1,8 +1,9 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import { useTheme } from '@/components/ui/ThemeProvider';
 import type { TimeFormat } from '@/lib/format-time';
+import { useDialogFocus } from './useDialogFocus';
 
 type Density = 'cozy' | 'compact' | 'spacious';
 type BgPattern = 'solid' | 'dots' | 'grid' | 'noise' | 'diagonal';
@@ -148,6 +149,8 @@ export default function ThemeModal() {
 
   const [appliedFlash, setAppliedFlash] = useState<string | null>(null);
   const [useSystemTheme, setUseSystemTheme] = useState(false);
+  const modalRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(modalRef);
 
   const activeThemeDef = THEMES.find(t => t.id === activeTheme) ?? THEMES[0];
 
@@ -175,11 +178,11 @@ export default function ThemeModal() {
   }, [useSystemTheme, setTheme]);
 
   return (
-    <div className="theme-modal-backdrop" onClick={closeThemeModal} role="dialog" aria-modal aria-label="Appearance settings">
-      <div className="theme-modal" onClick={e => e.stopPropagation()}>
+    <div className="theme-modal-backdrop" onClick={closeThemeModal}>
+      <div className="theme-modal" ref={modalRef} onClick={e => e.stopPropagation()} role="dialog" aria-modal aria-labelledby="theme-modal-title">
 
         <div className="theme-modal-header">
-          <h2 className="theme-modal-title">Appearance</h2>
+          <h2 id="theme-modal-title" className="theme-modal-title">Appearance</h2>
           <button className="theme-modal-close" onClick={closeThemeModal} aria-label="Close">
             <CloseIcon />
           </button>

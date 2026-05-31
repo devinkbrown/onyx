@@ -6,6 +6,7 @@ import type { AuditEntry } from '@/lib/store';
 import Avatar from '@/components/ui/Avatar';
 import Button from '@/components/ui/Button';
 import type { IRCMessage } from '@/lib/irc/types';
+import { useDialogFocus } from './useDialogFocus';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -42,15 +43,24 @@ interface InviteEntry {
 export default function ServerSettingsModal() {
   const closeServerSettings = useOnyxStore(s => s.closeServerSettings);
   const [tab, setTab] = useState<ServerTab>('overview');
+  const modalRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(modalRef);
 
   const stopProp = (e: React.MouseEvent) => e.stopPropagation();
 
   return (
     <div className="ss-overlay" onClick={closeServerSettings}>
-      <div className="ss-modal animate-scale-in" onClick={stopProp}>
+      <div
+        className="ss-modal animate-scale-in"
+        onClick={stopProp}
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ss-modal-title"
+      >
         {/* Sidebar */}
         <nav className="ss-nav">
-          <h2 className="ss-nav-title">Server Settings</h2>
+          <h2 id="ss-modal-title" className="ss-nav-title">Server Settings</h2>
           {TABS.map(t => (
             <button
               key={t.id}

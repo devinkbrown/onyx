@@ -173,6 +173,7 @@ const replyQuoteStyles = `
     transition: background var(--t-fast);
   }
   .rq-wrap:hover { background: rgba(14,165,233,0.04); }
+  .rq-wrap:focus-visible { outline: 2px solid var(--accent, #0ea5e9); outline-offset: 2px; border-radius: var(--r-xs, 4px); }
   .rq-bar {
     width: 3px; flex-shrink: 0; align-self: stretch;
     background: var(--accent); border-radius: 3px;
@@ -383,7 +384,7 @@ function InlineImage({ url, fullWidth = false }: InlineImageProps) {
       className={`msg-img-anchor ${fullWidth ? 'msg-img-anchor--full' : ''}`}
       role="button"
       tabIndex={0}
-      aria-label="View image"
+      aria-label={`View image: ${url.split('/').pop()}`}
       onClick={handleClick}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(); } }}
       style={{ cursor: 'pointer' }}

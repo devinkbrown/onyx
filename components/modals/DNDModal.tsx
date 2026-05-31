@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import { useDialogFocus } from './useDialogFocus';
 
 function formatHour(h: number): string {
   if (h === 0) return '12:00 AM';
@@ -40,6 +41,8 @@ export default function DNDModal() {
   const closeDndModal   = useOnyxStore(s => s.closeDndModal);
 
   const overlayRef = useRef<HTMLDivElement>(null);
+  const modalRef   = useRef<HTMLDivElement>(null);
+  useDialogFocus(modalRef);
 
   // Close on Escape or backdrop click
   useEffect(() => {
@@ -59,11 +62,8 @@ export default function DNDModal() {
       ref={overlayRef}
       className="dnd-overlay"
       onClick={(e) => { if (e.target === overlayRef.current) closeDndModal(); }}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="dnd-title"
     >
-      <div className="dnd-modal">
+      <div className="dnd-modal" ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="dnd-title">
         {/* Header */}
         <div className="dnd-header">
           <span className="dnd-moon" aria-hidden="true">🌙</span>

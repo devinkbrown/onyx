@@ -1,6 +1,7 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import { useDialogFocus } from './useDialogFocus';
 
 export default function GroupDMModal() {
   const closeGroupDM    = useOnyxStore(s => s.closeGroupDM);
@@ -13,6 +14,8 @@ export default function GroupDMModal() {
 
   const [query, setQuery]       = useState('');
   const [selected, setSelected] = useState<string[]>([]);
+  const panelRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(panelRef);
 
   // Collect all known nicks (friends + online channel members) excluding ourselves
   const candidates = useMemo(() => {
@@ -55,10 +58,10 @@ export default function GroupDMModal() {
 
   return (
     <div className="gdm-backdrop" onClick={closeGroupDM}>
-      <div className="gdm-panel" onClick={e => e.stopPropagation()} role="dialog" aria-modal aria-label="New Group Conversation">
+      <div className="gdm-panel" ref={panelRef} onClick={e => e.stopPropagation()} role="dialog" aria-modal aria-labelledby="gdm-modal-title">
 
         <header className="gdm-header">
-          <h2 className="gdm-title">New Group Conversation</h2>
+          <h2 id="gdm-modal-title" className="gdm-title">New Group Conversation</h2>
           <button className="gdm-close" onClick={closeGroupDM} aria-label="Close"><svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></button>
         </header>
 
