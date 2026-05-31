@@ -223,7 +223,7 @@ export class PeerRegistry {
     let pcm: Int16Array;
     try {
       pcm = pm.audDec.decode(frame);
-    } catch (err) {
+    } catch {
       const key = pm.state.nick.toLowerCase();
       this.decodeErrors.set(key, (this.decodeErrors.get(key) ?? 0) + 1);
       return;
@@ -292,7 +292,7 @@ export class PeerRegistry {
     let planes: { y: Uint8Array; u: Uint8Array; v: Uint8Array } | null;
     try {
       planes = pm.vidDec.decode(frame);
-    } catch (err) {
+    } catch {
       const key = pm.state.nick.toLowerCase();
       this.decodeErrors.set(key, (this.decodeErrors.get(key) ?? 0) + 1);
       pm.vidDec.destroy();
@@ -339,7 +339,7 @@ export class PeerRegistry {
     let planes: { y: Uint8Array; u: Uint8Array; v: Uint8Array } | null;
     try {
       planes = pm.screenVidDec.decode(frame);
-    } catch (err) {
+    } catch {
       const key = pm.state.nick.toLowerCase();
       this.decodeErrors.set(key, (this.decodeErrors.get(key) ?? 0) + 1);
       pm.screenVidDec.destroy();

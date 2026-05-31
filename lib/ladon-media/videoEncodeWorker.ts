@@ -132,7 +132,6 @@ async function captureLoop(s: WorkerState): Promise<void> {
   let canvas = new OffscreenCanvas(drawW, drawH);
   let ctx    = canvas.getContext('2d') as OffscreenCanvasRenderingContext2D | null;
 
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     if (s.stopped) break;
 

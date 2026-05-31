@@ -38,7 +38,6 @@ interface EmModule {
 // Singleton loader
 // -------------------------------------------------------------------
 let modulePromise: Promise<EmModule> | null = null;
-let wasmLoadAttempts = 0;
 let _wasmLoadFailed = false;
 
 // Separate singleton for worker context (no shared state with main thread).
@@ -55,7 +54,6 @@ async function loadModule(url: string): Promise<EmModule> {
     if (attempt > 0) {
       await new Promise(r => setTimeout(r, retryDelays[attempt - 1]));
     }
-    wasmLoadAttempts = attempt + 1;
     try {
       const script = document.createElement('script');
       script.src = url + (attempt > 0 ? `?r=${attempt}` : '');
