@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import type { ChatMessage } from '@/lib/irc/types';
 import ChatHeader from './ChatHeader';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
@@ -42,7 +43,6 @@ export default function ChatArea() {
   const activeView          = useOnyxStore(s => s.activeView);
   const channels            = useOnyxStore(s => s.channels);
   const dms                 = useOnyxStore(s => s.dms);
-  const client              = useOnyxStore(s => s.client);
   const channelWelcomeSeen  = useOnyxStore(s => s.channelWelcomeSeen);
   const markWelcomeSeen     = useOnyxStore(s => s.markWelcomeSeen);
   const forumChannels       = useOnyxStore(s => s.forumChannels);
@@ -58,6 +58,7 @@ export default function ChatArea() {
   // Unread jump badge state
   const [unreadCount, setUnreadCount] = useState(0);
   const [isAtBottom, setIsAtBottom] = useState(true);
+  const [now, setNow] = useState(() => Date.now());
   const prevMessagesLengthRef = useRef(0);
   const scrollToBottomRef = useRef<(() => void) | null>(null);
 
@@ -72,10 +73,10 @@ export default function ChatArea() {
   }, []);
 
   // Derive current messages array from store directly so we can safely useEffect before the early return
-  const currentMessages: any[] = (() => {
+  const currentMessages: ChatMessage[] = (() => {
     if (activeView.kind === 'channel') {
       const ch = channels.get(activeView.channel.toLowerCase());
-      return (ch as any)?.messages ?? [];
+      return ch?.messages ?? [];
     } else if (activeView.kind === 'dm') {
       const dm = dms.get(activeView.nick.toLowerCase());
       return dm?.messages ?? [];
@@ -95,6 +96,12 @@ export default function ChatArea() {
   // Slow mode state
   const [lastSentAt, setLastSentAt] = useState<number>(0);
 
+  useEffect(() => {
+    if (!lastSentAt) return;
+    const id = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(id);
+  }, [lastSentAt]);
+
   const handleSearchResults = useCallback((ids: Set<string>, focusedId: string | null) => {
     setSearchMatchIds(ids);
     setSearchFocusedId(focusedId);
@@ -107,26 +114,10 @@ export default function ChatArea() {
   // Callback so MessageInput can receive a dropped file
   const [droppedFile, setDroppedFile] = useState<File | null>(null);
 
-  const handleTypingStart = useCallback(() => {
-    if (!client) return;
-    const view = activeView;
-    const ch = view.kind === 'channel' ? view.channel : view.kind === 'dm' ? view.nick : null;
-    if (!ch) return;
-    client.sendRaw('PRIVMSG', ch, '\x01TYPING 1\x01');
-  }, [client, activeView]);
-
-  const handleTypingStop = useCallback(() => {
-    if (!client) return;
-    const view = activeView;
-    const ch = view.kind === 'channel' ? view.channel : view.kind === 'dm' ? view.nick : null;
-    if (!ch) return;
-    client.sendRaw('PRIVMSG', ch, '\x01TYPING 0\x01');
-  }, [client, activeView]);
-
   let target = '';
   let title  = '';
   let topic  = '';
-  let messages: any[] = [];
+  let messages: ChatMessage[] = [];
   let isChannel = false;
   let slowModeSecs: number | null = null;
   let memberCount = 0;
@@ -136,7 +127,7 @@ export default function ChatArea() {
     target = activeView.channel;
     title  = activeView.channel;
     topic  = ch?.topic ?? '';
-    messages = (ch as any)?.messages ?? [];
+    messages = ch?.messages ?? [];
     isChannel = true;
     slowModeSecs = ch ? parseSlowModeSecs(ch.modes) : null;
     memberCount = ch?.users.size ?? 0;
@@ -147,6 +138,51 @@ export default function ChatArea() {
     messages = dm?.messages ?? [];
     isChannel = false;
   }
+
+  const activeChannelKey = activeView.kind === 'channel' ? activeView.channel.toLowerCase() : '';
+  const showWelcomeBanner = isChannel &&
+    activeChannelKey !== '' &&
+    !channelWelcomeSeen.has(activeChannelKey);
+  const dismissWelcomeBanner = useCallback(() => {
+    if (!activeChannelKey) return;
+    markWelcomeSeen(activeChannelKey);
+  }, [activeChannelKey, markWelcomeSeen]);
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes('Files')) {
+      dragCounter.current += 1;
+      setDragOver(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current -= 1;
+    if (dragCounter.current <= 0) {
+      dragCounter.current = 0;
+      setDragOver(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current = 0;
+    setDragOver(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      setDroppedFile(files[0]);
+    }
+  }, []);
 
   if (!target) return null;
 
@@ -238,47 +274,6 @@ export default function ChatArea() {
     );
   }
 
-  const activeChannelKey = activeView.kind === 'channel' ? activeView.channel.toLowerCase() : '';
-  const showWelcomeBanner = isChannel &&
-    activeChannelKey !== '' &&
-    !channelWelcomeSeen.has(activeChannelKey);
-
-  const handleDragEnter = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.dataTransfer.types.includes('Files')) {
-      dragCounter.current += 1;
-      setDragOver(true);
-    }
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dragCounter.current -= 1;
-    if (dragCounter.current <= 0) {
-      dragCounter.current = 0;
-      setDragOver(false);
-    }
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dragCounter.current = 0;
-    setDragOver(false);
-
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0) {
-      setDroppedFile(files[0]);
-    }
-  }, []);
-
   return (
     <div
       className="chat-area"
@@ -298,7 +293,7 @@ export default function ChatArea() {
           channel={title}
           topic={topic}
           memberCount={memberCount}
-          onDismiss={() => markWelcomeSeen(activeChannelKey)}
+          onDismiss={dismissWelcomeBanner}
         />
       )}
       {/* Stream layout — shown above messages when channel is live */}
@@ -336,11 +331,13 @@ export default function ChatArea() {
           slowModeSecs !== null &&
           slowModeSecs > 0 &&
           lastSentAt > 0 &&
-          Date.now() - lastSentAt < slowModeSecs * 1000
+          now - lastSentAt < slowModeSecs * 1000
         }
-        onMessageSent={() => setLastSentAt(Date.now())}
-        onTypingStart={handleTypingStart}
-        onTypingStop={handleTypingStop}
+        onMessageSent={() => {
+          const sentAt = Date.now();
+          setLastSentAt(sentAt);
+          setNow(sentAt);
+        }}
       />
 
       {/* Drag overlay */}

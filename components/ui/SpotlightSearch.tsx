@@ -86,6 +86,98 @@ function buildCommands(store: ReturnType<typeof useOnyxStore.getState>): Command
       description: 'Open notification center',
       action: () => store.openNotificationCenter(),
     },
+    {
+      group: 'command', id: 'cmd-search', command: '/search',
+      description: 'Search message history',
+      action: () => store.openSearchOverlay(),
+    },
+    {
+      group: 'command', id: 'cmd-sounds', command: '/sounds',
+      description: 'Open sound settings',
+      action: () => store.openSoundSettings(),
+    },
+    {
+      group: 'command', id: 'cmd-highlights', command: '/highlights',
+      description: 'Manage highlight words',
+      action: () => store.openHighlightModal(),
+    },
+    {
+      group: 'command', id: 'cmd-emoji', command: '/emoji',
+      description: 'Manage custom emoji',
+      action: () => store.openCustomEmojiModal(),
+    },
+    {
+      group: 'command', id: 'cmd-scheduled', command: '/scheduled',
+      description: 'Open scheduled messages',
+      action: () => store.openScheduledMessages(),
+    },
+    {
+      group: 'command', id: 'cmd-profiles', command: '/profiles',
+      description: 'Open connection profiles',
+      action: () => store.openConnectionProfiles(),
+    },
+    {
+      group: 'command', id: 'cmd-server', command: '/server',
+      description: 'Open server information',
+      action: () => store.openServerInfo(),
+    },
+    {
+      group: 'command', id: 'cmd-stats', command: '/stats',
+      description: 'Open server statistics',
+      action: () => store.openServerStats(),
+    },
+    {
+      group: 'command', id: 'cmd-announcements', command: '/announcements',
+      description: 'Open announcements',
+      action: () => store.openAnnouncementsPanel(),
+    },
+    {
+      group: 'command', id: 'cmd-rules', command: '/rules',
+      description: 'Open server rules',
+      action: () => store.openServerRulesModal(),
+    },
+    {
+      group: 'command', id: 'cmd-away', command: '/away',
+      description: 'Set away status',
+      action: () => store.openAwayModal(),
+    },
+    {
+      group: 'command', id: 'cmd-dnd', command: '/dnd',
+      description: 'Open do not disturb controls',
+      action: () => store.openDndModal(),
+    },
+    {
+      group: 'command', id: 'cmd-focus', command: '/focus',
+      description: 'Toggle focus mode',
+      action: () => store.toggleFocusMode(),
+    },
+    {
+      group: 'command', id: 'cmd-compact', command: '/compact',
+      description: 'Toggle compact sidebar',
+      action: () => store.setCompactSidebar(!store.compactSidebar),
+    },
+    {
+      group: 'command', id: 'cmd-density', command: '/density',
+      description: 'Cycle message density',
+      action: () => {
+        const next = store.messageDensity === 'cozy'
+          ? 'compact'
+          : store.messageDensity === 'compact'
+          ? 'spacious'
+          : 'cozy';
+        store.setMessageDensity(next);
+      },
+    },
+    {
+      group: 'command', id: 'cmd-rawlog', command: '/rawlog',
+      description: 'Toggle raw IRC log',
+      action: () => store.toggleRawLog(),
+    },
+    {
+      group: 'command', id: 'cmd-poll', command: '/poll',
+      description: 'Create a poll',
+      action: () => store.openPollCreate(),
+    },
   ];
 }
 
@@ -281,7 +373,7 @@ export default function SpotlightSearch() {
 
   // Reset active index when results change
   useEffect(() => {
-    setActiveIdx(0);
+    queueMicrotask(() => setActiveIdx(0));
   }, [results]);
 
   // Scroll active item into view

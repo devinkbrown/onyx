@@ -79,8 +79,6 @@ export default function PollMessage({ msg, onVote }: PollMessageProps) {
     return reaction ? reaction.users.includes(ourNick) : false;
   });
 
-  const isCreator = msg.from === ourNick;
-
   return (
     <div className="poll-card" role="group" aria-label={`Poll: ${question}`}>
       <div className="poll-header">
@@ -122,11 +120,6 @@ export default function PollMessage({ msg, onVote }: PollMessageProps) {
         <span className="poll-total">
           {totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}
         </span>
-        {isCreator && (
-          <button className="poll-close-btn" disabled title="Close poll (coming soon)">
-            Close poll
-          </button>
-        )}
       </div>
 
       <style>{pollStyles}</style>
@@ -285,17 +278,5 @@ const pollStyles = `
     font-size: 11px;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
-  }
-  .poll-close-btn {
-    font-size: 11px;
-    font-weight: 600;
-    padding: 3px 10px;
-    border-radius: var(--r-xs, 4px);
-    border: 1px solid var(--border-normal);
-    background: none;
-    color: var(--text-muted);
-    cursor: not-allowed;
-    opacity: 0.45;
-    font-family: inherit;
   }
 `;

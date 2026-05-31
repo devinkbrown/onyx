@@ -22,7 +22,6 @@ export interface IRCClientOptions {
 }
 
 const RECONNECT_BASE = 2000;
-const RECONNECT_MAX = 60000;
 
 export class IRCClient {
   private ws: WebSocket | null = null;
@@ -106,6 +105,22 @@ export class IRCClient {
 
   connect() {
     if (this._destroyed) return;
+    // Never run two sockets in parallel. Tear down any prior socket first, and
+    // detach its handlers so its close event can't trigger another reconnect.
+    if (this.ws) {
+      try {
+        this.ws.onclose = null;
+        this.ws.onmessage = null;
+        this.ws.onerror = null;
+        this.ws.close();
+      } catch { /* already closing */ }
+      this.ws = null;
+    }
+    // Re-attempt the canonical nick on every fresh connection. A prior 433
+    // fallback mutates opts.nick to an alias (e.g. "kain_"); without this reset
+    // each reconnect would re-register under the alias forever and never
+    // reclaim the real nick.
+    this.opts.nick = this._authNick;
     this._registered = false;
     this._saslPending = false;
     this._capNegotiating = true;
@@ -205,6 +220,15 @@ export class IRCClient {
     this.sendRaw('WHOIS', nick);
   }
 
+  /**
+   * True when the server ACKed `ophion/session-sync`. When active, the server
+   * drives session reclaim (auto JOIN + NAMES/topic + CHATHISTORY replay) on
+   * (re)connect, so the client must suppress its own blind autojoin storm.
+   */
+  get sessionSyncActive(): boolean {
+    return this.negotiatedCaps.has('ophion/session-sync');
+  }
+
   // ── Internals ───────────────────────────────────────────────────────────
 
   private _onOpen() {
@@ -245,9 +269,10 @@ export class IRCClient {
     const reason = ev.reason || `code ${ev.code}`;
     console.error('[nexus] ws closed — code:', ev.code, 'reason:', ev.reason || '(none)', 'wasClean:', ev.wasClean);
     this.opts.onDisconnected?.(reason);
-    if (!this._destroyed) {
-      this._scheduleReconnect();
-    }
+    // Reconnect is owned exclusively by the store (bounded attempts, gated on
+    // autoReconnect, with the UI countdown). The client must NOT also schedule
+    // its own reconnect — doing both spawned duplicate parallel connections,
+    // which is what produced ghost sessions and the "nick_" fallback pile-up.
   }
 
   private _onError(ev: Event) {
@@ -544,6 +569,13 @@ export class IRCClient {
       // bot: Ocean is a human client, not a bot.
       if (cap === 'bot') return false;
 
+      // ophion/session-sync: server-driven session reclaim. When ACKed, the
+      // server auto-pushes JOIN + NAMES/topic + CHATHISTORY replay for every
+      // channel the account's session is live in, so the client must NOT run
+      // its own blind autojoin storm. Always request it when offered; the
+      // store gates autojoin suppression on negotiatedCaps having it.
+      // (Falls through to `return true` — listed here only for documentation.)
+
       return true;
     });
   }
@@ -731,13 +763,7 @@ export class IRCClient {
   }
 
   // ── Reconnect ──────────────────────────────────────────────────────────
-
-  private _scheduleReconnect() {
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectDelay = Math.min(this.reconnectDelay * 2, RECONNECT_MAX);
-      this.connect();
-    }, this.reconnectDelay);
-  }
+  // Reconnect scheduling lives in the store (single owner). See _onClose.
 
   private _clearTimers() {
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);

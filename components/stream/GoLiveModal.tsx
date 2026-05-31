@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import type { StreamQuality } from '@/lib/store';
 
 interface Props {
   channel: string;
@@ -22,6 +23,7 @@ export function GoLiveModal({ channel, onClose }: Props) {
   const [customCategory, setCustomCategory] = useState('');
   const [useCustom, setUseCustom] = useState(false);
   const [mode, setMode] = useState<'camera' | 'screen'>('camera');
+  const [quality, setQuality] = useState<StreamQuality>('4k60');
   const [streamKey, setStreamKey] = useState('');
   const [showKey, setShowKey] = useState(false);
 
@@ -45,7 +47,7 @@ export function GoLiveModal({ channel, onClose }: Props) {
 
   const handleGoLive = () => {
     if (!canGoLive) return;
-    startStream(channel, title.trim(), effectiveCategory.trim(), mode, streamKey || undefined);
+    startStream(channel, title.trim(), effectiveCategory.trim(), mode, streamKey || undefined, quality);
     onClose();
   };
 
@@ -145,6 +147,25 @@ export function GoLiveModal({ channel, onClose }: Props) {
               <ScreenIcon />
               <span>Screen Share</span>
             </button>
+          </div>
+
+          <label className="glm-label">Quality</label>
+          <div className="glm-quality-row" role="group" aria-label="Stream quality">
+            {[
+              ['4k60', '4K 60'] as const,
+              ['1080p60', '1080p 60'] as const,
+              ['auto', 'Auto'] as const,
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                className={`glm-quality-chip${quality === value ? ' glm-quality-chip--active' : ''}`}
+                onClick={() => setQuality(value)}
+                aria-pressed={quality === value}
+              >
+                {label}
+              </button>
+            ))}
           </div>
 
           {/* Optional stream key */}
@@ -387,6 +408,36 @@ export function GoLiveModal({ channel, onClose }: Props) {
           background: var(--accent-subtle);
         }
         .glm-source-card--active {
+          border-color: var(--accent);
+          background: var(--accent-subtle);
+          color: var(--accent);
+          box-shadow: 0 0 0 1px var(--accent-glow);
+        }
+        .glm-quality-row {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 8px;
+          margin-bottom: 16px;
+        }
+        .glm-quality-chip {
+          min-width: 0;
+          height: 38px;
+          border: 1px solid var(--border-normal);
+          border-radius: 8px;
+          background: var(--bg-overlay);
+          color: var(--text-secondary);
+          font: inherit;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: border-color 150ms, background 150ms, color 150ms;
+        }
+        .glm-quality-chip:hover {
+          border-color: var(--accent-border);
+          color: var(--text-primary);
+          background: var(--accent-subtle);
+        }
+        .glm-quality-chip--active {
           border-color: var(--accent);
           background: var(--accent-subtle);
           color: var(--accent);

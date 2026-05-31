@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface Props {
   channel: string;
@@ -14,8 +14,26 @@ const AUTO_DISMISS_MS = 8000;
 export default function ChannelWelcomeBanner({ channel, topic, memberCount, onDismiss }: Props) {
   const [progress, setProgress] = useState(100);
   const [visible, setVisible] = useState(true);
+  const onDismissRef = useRef(onDismiss);
+  const dismissedRef = useRef(false);
+  const channelKey = channel.toLowerCase();
 
   useEffect(() => {
+    onDismissRef.current = onDismiss;
+  }, [onDismiss]);
+
+  const dismiss = useCallback(() => {
+    if (dismissedRef.current) return;
+    dismissedRef.current = true;
+    setVisible(false);
+    onDismissRef.current();
+  }, []);
+
+  useEffect(() => {
+    dismissedRef.current = false;
+    setProgress(100);
+    setVisible(true);
+
     const startTime = Date.now();
     const id = setInterval(() => {
       const elapsed = Date.now() - startTime;
@@ -23,12 +41,11 @@ export default function ChannelWelcomeBanner({ channel, topic, memberCount, onDi
       setProgress(pct);
       if (pct <= 0) {
         clearInterval(id);
-        setVisible(false);
-        onDismiss();
+        dismiss();
       }
     }, 50);
     return () => clearInterval(id);
-  }, [onDismiss]);
+  }, [channelKey, dismiss]);
 
   if (!visible) return null;
 
@@ -52,7 +69,7 @@ export default function ChannelWelcomeBanner({ channel, topic, memberCount, onDi
         </div>
         <button
           className="cwb-dismiss"
-          onClick={() => { setVisible(false); onDismiss(); }}
+          onClick={dismiss}
           aria-label="Dismiss welcome banner"
           type="button"
         >

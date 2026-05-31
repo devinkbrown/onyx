@@ -30,6 +30,11 @@ export default function ImageLightbox({ src, alt = '', onClose, images, currentI
   const activeSrc = imageList[activeIndex] ?? src;
   const hasMultiple = imageList.length > 1;
 
+  const resetTransform = useCallback(() => {
+    setScale(1);
+    setOffset({ x: 0, y: 0 });
+  }, []);
+
   // Entrance animation
   useEffect(() => {
     const raf = requestAnimationFrame(() => setMounted(true));
@@ -51,18 +56,13 @@ export default function ImageLightbox({ src, alt = '', onClose, images, currentI
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, hasMultiple, imageList.length]);
+  }, [onClose, hasMultiple, imageList.length, resetTransform]);
 
   // Prevent body scroll while open
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = prev; };
-  }, []);
-
-  const resetTransform = useCallback(() => {
-    setScale(1);
-    setOffset({ x: 0, y: 0 });
   }, []);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {

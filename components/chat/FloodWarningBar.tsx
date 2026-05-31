@@ -5,9 +5,10 @@ import { useEffect, useState } from 'react';
 interface Props {
   visible: boolean;
   cooldownMs: number;
+  cooldownStart: number;
 }
 
-export default function FloodWarningBar({ visible, cooldownMs }: Props) {
+export default function FloodWarningBar({ visible, cooldownMs, cooldownStart }: Props) {
   const [progress, setProgress] = useState(100);
   const [startTime, setStartTime] = useState<number>(0);
 
@@ -16,9 +17,9 @@ export default function FloodWarningBar({ visible, cooldownMs }: Props) {
       setProgress(100);
       return;
     }
-    setStartTime(Date.now());
+    setStartTime(cooldownStart || Date.now());
     setProgress(100);
-  }, [visible]);
+  }, [visible, cooldownStart]);
 
   useEffect(() => {
     if (!visible || startTime === 0) return;

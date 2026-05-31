@@ -94,6 +94,7 @@ export default function LoginForm({ onSwitch }: Props) {
   const [shake,         setShake]         = useState(false);
   const [rememberMe,    setRememberMe]    = useState(false);
   const [connStep,      setConnStep]      = useState(0);
+  const [connectAttempted, setConnectAttempted] = useState(false);
 
   const nickRef = useRef<HTMLInputElement>(null);
 
@@ -105,7 +106,9 @@ export default function LoginForm({ onSwitch }: Props) {
     nickRef.current?.focus();
   }, []);
 
-  // Load saved credentials on mount — auto-connect immediately if they exist
+  // Load saved credentials on mount. Do not connect until the user clicks
+  // Connect; otherwise a stale URL/token can create a WebSocket error loop
+  // before the user has taken any action.
   useEffect(() => {
     const creds = loadCredentials();
     if (creds) {
@@ -113,19 +116,13 @@ export default function LoginForm({ onSwitch }: Props) {
       setAutoMode(true);
       setNick(creds.nick);
       setRememberMe(true);
-      // Fire connection immediately — no button press needed
-      connect({
-        url:      DEFAULT_SERVER,
-        nick:     creds.nick,
-        password: getAuthSecret(creds),
-      });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleAutoConnect = useCallback(() => {
     if (!savedCreds) return;
     setError('');
+    setConnectAttempted(true);
     // Always use DEFAULT_SERVER so stale saved URLs don't break reconnect
     connect({
       url:      DEFAULT_SERVER,
@@ -141,6 +138,7 @@ export default function LoginForm({ onSwitch }: Props) {
     setNick('');
     setPassword('');
     setRememberMe(false);
+    setConnectAttempted(false);
   };
 
   // Connection step animation
@@ -155,7 +153,9 @@ export default function LoginForm({ onSwitch }: Props) {
     return () => clearInterval(interval);
   }, [status]);
 
+  const loading = status === 'connecting';
   const lastError = notifications.filter(n => n.type === 'error').at(-1);
+  const visibleLastError = connectAttempted && !loading ? lastError : undefined;
 
   const nickInvalid  = nick.length > 0 && NICK_INVALID_RE.test(nick);
   const nickTooLong  = nick.length > 30;
@@ -189,11 +189,11 @@ export default function LoginForm({ onSwitch }: Props) {
       clearCredentials();
     }
 
+    setConnectAttempted(true);
     connect({ url: DEFAULT_SERVER, nick: nick.trim(), password: password || undefined });
   };
 
-  const loading = status === 'connecting';
-  const hasError = Boolean(error || lastError);
+  const hasError = Boolean(error || visibleLastError);
 
   // ── Auto-reconnect card ─────────────────────────────────────────────────────
   if (autoMode && savedCreds) {
@@ -206,14 +206,14 @@ export default function LoginForm({ onSwitch }: Props) {
           <span className="arc-nick">{savedCreds.nick}</span>
           <span className="arc-server">eshmaki.me</span>
         </div>
-        {lastError && !loading && (
+        {visibleLastError && (
           <div className="arc-error" role="alert">
             <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true" style={{flexShrink:0,marginTop:1}}>
               <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.3" fill="none" />
               <path d="M7 4v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
               <circle cx="7" cy="10" r="0.8" fill="currentColor" />
             </svg>
-            {lastError.text}
+            {visibleLastError.text}
           </div>
         )}
 
@@ -225,13 +225,16 @@ export default function LoginForm({ onSwitch }: Props) {
             </div>
           ) : (
             <Button variant="primary" fullWidth onClick={handleAutoConnect}>
-              {lastError ? 'Retry' : 'Connect'}
+              {visibleLastError ? 'Retry' : 'Connect'}
             </Button>
           )}
           <button
             type="button"
             className="arc-switch"
-            onClick={() => setAutoMode(false)}
+            onClick={() => {
+              setAutoMode(false);
+              setConnectAttempted(false);
+            }}
           >
             Use different account
           </button>
@@ -367,7 +370,11 @@ export default function LoginForm({ onSwitch }: Props) {
             type="text"
             placeholder="your_nick"
             value={nick}
-            onChange={e => setNick(e.target.value)}
+            onChange={e => {
+              setNick(e.target.value);
+              setError('');
+              setConnectAttempted(false);
+            }}
             autoComplete="username"
             maxLength={32}
             className={`onyx-input onyx-input--has-icon${nickError || (hasError && !nick.trim()) ? ' onyx-input--error' : ''}`}
@@ -390,7 +397,11 @@ export default function LoginForm({ onSwitch }: Props) {
             type={showPassword ? 'text' : 'password'}
             placeholder="••••••••"
             value={password}
-            onChange={e => setPassword(e.target.value)}
+            onChange={e => {
+              setPassword(e.target.value);
+              setError('');
+              setConnectAttempted(false);
+            }}
             autoComplete="current-password"
             className="onyx-input onyx-input--has-icon onyx-input--has-icon-right"
             disabled={loading}
@@ -422,7 +433,7 @@ export default function LoginForm({ onSwitch }: Props) {
         <span className="remember-text">Remember me</span>
       </label>
 
-      {(error || lastError) && (
+      {(error || visibleLastError) && (
         <div className="auth-error" role="alert">
           <span className="auth-error-icon" aria-hidden="true">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -431,7 +442,7 @@ export default function LoginForm({ onSwitch }: Props) {
               <circle cx="7" cy="10" r="0.8" fill="currentColor" />
             </svg>
           </span>
-          {error || lastError?.text}
+          {error || visibleLastError?.text}
         </div>
       )}
 

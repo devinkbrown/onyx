@@ -13,11 +13,10 @@ function LatencySparkline({ history }: LatencySparklineProps) {
   const [tooltip, setTooltip] = useState<{ x: number; y: number; value: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  if (history.length < 2) return null;
-
-  const min = Math.min(...history);
-  const max = Math.max(...history, 1);
-  const avg = Math.round(history.reduce((a, b) => a + b, 0) / history.length);
+  const hasHistory = history.length >= 2;
+  const min = hasHistory ? Math.min(...history) : 0;
+  const max = hasHistory ? Math.max(...history, 1) : 1;
+  const avg = hasHistory ? Math.round(history.reduce((a, b) => a + b, 0) / history.length) : 0;
   const w = 72;
   const h = 20;
 
@@ -27,7 +26,7 @@ function LatencySparkline({ history }: LatencySparklineProps) {
     return `${x},${y}`;
   }).join(' ');
 
-  const last = history[history.length - 1];
+  const last = history[history.length - 1] ?? 0;
   const color = last < 100 ? '#23a55a' : last < 300 ? '#f0b232' : '#f04747';
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
@@ -44,6 +43,8 @@ function LatencySparkline({ history }: LatencySparklineProps) {
     const y = h - (v / max) * h;
     setTooltip({ x, y, value: v });
   }, [history, max, w, h]);
+
+  if (!hasHistory) return null;
 
   return (
     <div className="csb-sparkline-group" style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 2 }}>

@@ -29,13 +29,6 @@ const GROUP_LABELS: Record<string, string> = {
   '': 'Members',
 };
 
-const MODE_PREFIX: Record<string, string> = {
-  q: '.',
-  o: '@',
-  v: '+',
-  '': '',
-};
-
 type SortMode = 'role' | 'alpha' | 'online-first' | 'recent';
 
 const SORT_LABELS: Record<SortMode, string> = {
@@ -333,9 +326,11 @@ export default function MemberList() {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 0 16px;
+          padding: 0 12px;
           border-bottom: 1px solid var(--border-subtle);
           flex-shrink: 0;
+          box-sizing: border-box;
+          gap: 8px;
         }
 
         .ml-title {
@@ -344,6 +339,10 @@ export default function MemberList() {
           letter-spacing: 0.06em;
           text-transform: uppercase;
           color: var(--text-secondary);
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
         .ml-title-count {
@@ -366,7 +365,7 @@ export default function MemberList() {
           align-items: center;
           gap: 3px;
           background: none;
-          border: none;
+          border: 1px solid transparent;
           cursor: pointer;
           color: var(--text-muted);
           font-size: 10px;
@@ -379,6 +378,7 @@ export default function MemberList() {
         .ml-sort-btn:hover {
           color: var(--text-secondary);
           background: var(--bg-float);
+          border-color: var(--border-subtle);
         }
         .ml-sort-btn:active {
           background: var(--accent-subtle);
@@ -400,7 +400,7 @@ export default function MemberList() {
           position: relative;
           display: flex;
           align-items: center;
-          gap: 4px;
+          gap: 6px;
         }
 
         .member-search-input {
@@ -408,6 +408,8 @@ export default function MemberList() {
           background: var(--bg-deep);
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-md, 6px);
+          min-width: 0;
+          height: 30px;
           padding: 5px 28px 5px 10px;
           font-size: 12px;
           color: var(--text-primary);
@@ -444,8 +446,8 @@ export default function MemberList() {
 
         .member-refresh-btn {
           flex-shrink: 0;
-          width: 26px;
-          height: 26px;
+          width: 30px;
+          height: 30px;
           border-radius: var(--r-sm);
           border: 1px solid transparent;
           background: none;
@@ -477,7 +479,9 @@ export default function MemberList() {
         .ml-scroll {
           flex: 1;
           overflow-y: auto;
-          padding: 6px 6px 12px;
+          padding: 6px 8px 12px;
+          min-height: 0;
+          scrollbar-gutter: stable;
         }
 
         /* Group: add subtle top separator for visual rhythm */
@@ -573,31 +577,6 @@ function SortIcon() {
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden>
       <path d="M2 3h8M3 6h6M4 9h4" />
     </svg>
-  );
-}
-
-/* ── PresenceDot ───────────────────────────────────────────────── */
-
-function PresenceDot({ presence }: { presence: PresenceState }) {
-  return (
-    <span
-      className={`presence-dot presence-${presence}`}
-      aria-hidden
-    >
-      <style>{`
-        .presence-dot {
-          display: inline-block;
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          border: 2px solid var(--bg-deep);
-          flex-shrink: 0;
-        }
-        .presence-online  { background: #23a55a; }
-        .presence-away    { background: #f0b232; }
-        .presence-offline { background: #80848e; }
-      `}</style>
-    </span>
   );
 }
 
@@ -699,6 +678,7 @@ function MemberRow({
             display: flex;
             align-items: center;
             gap: 9px;
+            min-height: 38px;
             padding: 5px 8px;
             border-radius: var(--r-sm);
             cursor: pointer;

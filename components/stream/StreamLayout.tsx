@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import { StreamOverlay } from './StreamOverlay';
 import { RaidBanner } from './RaidBanner';
@@ -17,15 +17,36 @@ export function StreamLayout({ channel }: Props) {
   const client = useOnyxStore(s => s.client);
   const endStream = useOnyxStore(s => s.endStream);
   const raidChannel = useOnyxStore(s => s.raidChannel);
+  const localStream = useOnyxStore(s => s.voice.localStream);
+  const videoParticipants = useOnyxStore(s => s.voice.videoParticipants);
 
   const [showRaidInput, setShowRaidInput] = useState(false);
   const [raidTarget, setRaidTarget] = useState('');
   const [showPollCreate, setShowPollCreate] = useState(false);
 
   const stream = streams.get(channel.toLowerCase());
-  if (!stream?.live) return null;
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  const isStreamer = stream.streamer.toLowerCase() === ourNick.toLowerCase();
+  useEffect(() => {
+    if (!stream?.live || !client) return;
+    const streamRoom = `%%${channel}`;
+    client.sendRaw('JOIN', streamRoom);
+    return () => {
+      client.sendRaw('PART', streamRoom);
+    };
+  }, [stream?.live, client, channel]);
+
+  const isStreamer = stream?.streamer.toLowerCase() === ourNick.toLowerCase();
+  const mediaStream = isStreamer ? localStream : stream ? videoParticipants.get(stream.streamer) ?? null : null;
+
+  useEffect(() => {
+    if (!videoRef.current) return;
+    if (videoRef.current.srcObject !== mediaStream) {
+      videoRef.current.srcObject = mediaStream;
+    }
+  }, [mediaStream]);
+
+  if (!stream?.live) return null;
 
   const handleRaid = () => {
     if (!raidTarget.trim()) return;
@@ -41,12 +62,22 @@ export function StreamLayout({ channel }: Props) {
   return (
     <>
       <div className="sl-root">
-        {/* Black background with LADON media placeholder */}
+        {/* Black background with LADON media */}
         <div className="sl-video-area">
-          <div className="sl-video-placeholder" aria-hidden="true">
-            <VideoPlaceholderIcon />
-            <span>Video stream via LADON</span>
-          </div>
+          {mediaStream ? (
+            <video
+              ref={videoRef}
+              className="sl-video"
+              autoPlay
+              playsInline
+              muted={isStreamer}
+            />
+          ) : (
+            <div className="sl-video-placeholder" aria-hidden="true">
+              <VideoPlaceholderIcon />
+              <span>Video stream via LADON</span>
+            </div>
+          )}
 
           {/* Floating overlays */}
           <StreamOverlay channel={channel} />
@@ -154,6 +185,14 @@ export function StreamLayout({ channel }: Props) {
           max-height: 320px;
           background: #000;
           overflow: hidden;
+        }
+        .sl-video {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+          background: #000;
         }
         .sl-video-placeholder {
           position: absolute;

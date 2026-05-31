@@ -14,9 +14,10 @@ interface InboundChunk {
 
 export class ChunkAssembler {
   private slots = new Map<string, InboundChunk>();
-  private static readonly TIMEOUT_MS = 8000;
-  private static readonly MAX_CHUNKS = 32;
-  private static readonly MAX_CHUNK_BYTES = 65536;
+  private static readonly TIMEOUT_MS = 30000;
+  private static readonly MAX_CHUNKS = 65535;
+  private static readonly MAX_CHUNK_BYTES = 120;
+  private static readonly MAX_FRAME_BYTES = ChunkAssembler.MAX_CHUNKS * ChunkAssembler.MAX_CHUNK_BYTES;
 
   private key(nick: string, fid: number) { return `${nick}:${fid}`; }
 
@@ -25,8 +26,16 @@ export class ChunkAssembler {
     fid: number, n: number, total: number,
     chunk: Uint8Array,
   ): Uint8Array | null {
-    if (total > ChunkAssembler.MAX_CHUNKS || chunk.length > ChunkAssembler.MAX_CHUNK_BYTES)
+    if (
+      total <= 0 ||
+      n <= 0 ||
+      n > total ||
+      total > ChunkAssembler.MAX_CHUNKS ||
+      chunk.length > ChunkAssembler.MAX_CHUNK_BYTES ||
+      total * ChunkAssembler.MAX_CHUNK_BYTES > ChunkAssembler.MAX_FRAME_BYTES
+    ) {
       return null;
+    }
 
     const k = this.key(nick, fid);
     let slot = this.slots.get(k);

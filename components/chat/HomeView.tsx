@@ -31,6 +31,26 @@ export default function HomeView() {
   const openPinnedMessages = useOnyxStore(s => s.openPinnedMessages);
   const joinHistory        = useOnyxStore(s => s.joinHistory);
   const toggleSpotlight    = useOnyxStore(s => s.toggleSpotlight);
+  const openFriendsPanel   = useOnyxStore(s => s.openFriendsPanel);
+  const openServices       = useOnyxStore(s => s.openServices);
+  const openNotificationCenter = useOnyxStore(s => s.openNotificationCenter);
+  const openScheduledMessages  = useOnyxStore(s => s.openScheduledMessages);
+  const openThemeModal     = useOnyxStore(s => s.openThemeModal);
+  const openSoundSettings  = useOnyxStore(s => s.openSoundSettings);
+  const openHighlightModal = useOnyxStore(s => s.openHighlightModal);
+  const openCustomEmojiModal = useOnyxStore(s => s.openCustomEmojiModal);
+  const openConnectionProfiles = useOnyxStore(s => s.openConnectionProfiles);
+  const openServerInfo     = useOnyxStore(s => s.openServerInfo);
+  const openServerStats    = useOnyxStore(s => s.openServerStats);
+  const openKeyboardShortcuts = useOnyxStore(s => s.openKeyboardShortcuts);
+  const openAnnouncementsPanel = useOnyxStore(s => s.openAnnouncementsPanel);
+  const openPollCreate     = useOnyxStore(s => s.openPollCreate);
+  const channelUnread      = useOnyxStore(s => s.channelUnread);
+  const totalUnreadMentions = useOnyxStore(s => s.totalUnreadMentions);
+  const voiceChannels      = useOnyxStore(s => s.voiceChannels);
+  const streams            = useOnyxStore(s => s.streams);
+  const latencyMs          = useOnyxStore(s => s.latencyMs);
+  const connectedAt        = useOnyxStore(s => s.connectedAt);
 
   const [showGroupDM,    setShowGroupDM]    = useState(false);
   const [showInviteTip,  setShowInviteTip]  = useState(false);
@@ -52,6 +72,54 @@ export default function HomeView() {
       return bLast - aLast;
     })
     .slice(0, 8);
+
+  const totalUnread = Object.values(channelUnread).reduce((sum, value) => sum + value, 0) +
+    dmList.reduce((sum, dm) => sum + (dm.unread ?? 0), 0);
+
+  const liveStreams = [...streams.values()].filter(stream => stream.live);
+  const connectedSince = connectedAt
+    ? connectedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : '—';
+  const latencyLabel = latencyMs == null ? '—' : `${latencyMs}ms`;
+
+  const launchGroups = [
+    {
+      label: 'Talk',
+      items: [
+        { title: 'Friends', meta: `${dmList.length} chats`, icon: <IconDM />, action: openFriendsPanel },
+        { title: 'Services', meta: 'NickServ / ChanServ', icon: <IconServices />, action: () => openServices() },
+        { title: 'Notifications', meta: totalUnread ? `${totalUnread} unread` : 'All clear', icon: <IconBell />, action: openNotificationCenter },
+        { title: 'Scheduled', meta: 'Message queue', icon: <IconClock />, action: openScheduledMessages },
+      ],
+    },
+    {
+      label: 'Create',
+      items: [
+        { title: 'Poll', meta: 'Ask the room', icon: <IconPoll />, action: openPollCreate },
+        { title: 'Group DM', meta: 'Private room', icon: <IconGroup />, action: () => setShowGroupDM(true) },
+        { title: 'Emoji', meta: 'Custom set', icon: <IconSparkle />, action: openCustomEmojiModal },
+        { title: 'Highlights', meta: 'Watch words', icon: <IconSearch />, action: openHighlightModal },
+      ],
+    },
+    {
+      label: 'Tune',
+      items: [
+        { title: 'Appearance', meta: 'Theme and layout', icon: <IconPalette />, action: openThemeModal },
+        { title: 'Sound', meta: 'Alerts and volume', icon: <IconSound />, action: openSoundSettings },
+        { title: 'Profiles', meta: 'Saved servers', icon: <IconLink />, action: openConnectionProfiles },
+        { title: 'Shortcuts', meta: 'Keyboard map', icon: <IconKeyboard />, action: openKeyboardShortcuts },
+      ],
+    },
+    {
+      label: 'Server',
+      items: [
+        { title: 'Info', meta: networkName || 'Network', icon: <IconInfo />, action: openServerInfo },
+        { title: 'Stats', meta: latencyLabel, icon: <IconPulse />, action: openServerStats },
+        { title: 'Announcements', meta: 'Network posts', icon: <IconMegaphone />, action: openAnnouncementsPanel },
+        { title: 'Channels', meta: `${channels.size} joined`, icon: <IconChannels />, action: openChannelBrowser },
+      ],
+    },
+  ];
 
   // Recent activity feed across all channels
   const recentActivity = useMemo(() => {
@@ -160,6 +228,51 @@ export default function HomeView() {
           </button>
         </div>
       </div>
+
+      <section className="hv-command-strip animate-fade-in" aria-label="Workspace status" style={{ animationDelay: '70ms' }}>
+        <button className="hv-signal-card" onClick={openNotificationCenter}>
+          <span className="hv-signal-icon hv-signal-icon--mentions"><IconBell /></span>
+          <span className="hv-signal-copy">
+            <span className="hv-signal-value">{totalUnreadMentions}</span>
+            <span className="hv-signal-label">Mentions</span>
+          </span>
+        </button>
+        <button className="hv-signal-card" onClick={openSearchOverlay}>
+          <span className="hv-signal-icon hv-signal-icon--unread"><IconSearch /></span>
+          <span className="hv-signal-copy">
+            <span className="hv-signal-value">{totalUnread}</span>
+            <span className="hv-signal-label">Unread</span>
+          </span>
+        </button>
+        <button className="hv-signal-card" onClick={liveStreams[0] ? () => navigate({ kind: 'channel', channel: liveStreams[0].channel }) : openServerStats}>
+          <span className="hv-signal-icon hv-signal-icon--live"><IconPulse /></span>
+          <span className="hv-signal-copy">
+            <span className="hv-signal-value">{liveStreams.length}</span>
+            <span className="hv-signal-label">Live</span>
+          </span>
+        </button>
+        <button className="hv-signal-card" onClick={openServerInfo}>
+          <span className="hv-signal-icon hv-signal-icon--server"><IconInfo /></span>
+          <span className="hv-signal-copy">
+            <span className="hv-signal-value">{latencyLabel}</span>
+            <span className="hv-signal-label">Latency</span>
+          </span>
+        </button>
+        <button className="hv-signal-card" onClick={openChannelBrowser}>
+          <span className="hv-signal-icon hv-signal-icon--voice"><IconChannels /></span>
+          <span className="hv-signal-copy">
+            <span className="hv-signal-value">{voiceChannels.length}</span>
+            <span className="hv-signal-label">Voice rooms</span>
+          </span>
+        </button>
+        <button className="hv-signal-card" onClick={openServerInfo}>
+          <span className="hv-signal-icon hv-signal-icon--uptime"><IconClock /></span>
+          <span className="hv-signal-copy">
+            <span className="hv-signal-value">{connectedSince}</span>
+            <span className="hv-signal-label">Connected</span>
+          </span>
+        </button>
+      </section>
 
       <div className="hv-layout animate-fade-in" style={{ animationDelay: '100ms' }}>
 
@@ -383,6 +496,35 @@ export default function HomeView() {
                 </div>
               </div>
             )}
+          </section>
+
+          {/* Feature launchpad */}
+          <section className="hv-panel hv-panel--sm">
+            <div className="hv-panel-header">
+              <h2 className="hv-panel-title hv-panel-title--sm">Launchpad</h2>
+              <button className="hv-header-btn hv-header-btn--subtle" onClick={toggleSpotlight}>
+                <SearchHintIcon />
+                Command
+              </button>
+            </div>
+            <div className="hv-launchpad">
+              {launchGroups.map(group => (
+                <div key={group.label} className="hv-launch-group">
+                  <div className="hv-launch-label">{group.label}</div>
+                  <div className="hv-launch-grid">
+                    {group.items.map(item => (
+                      <button key={`${group.label}-${item.title}`} className="hv-launch-tile" onClick={item.action}>
+                        <span className="hv-launch-icon">{item.icon}</span>
+                        <span className="hv-launch-copy">
+                          <span className="hv-launch-title">{item.title}</span>
+                          <span className="hv-launch-meta">{item.meta}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           </section>
 
           {/* Recent Channels */}
@@ -714,6 +856,99 @@ export default function HomeView() {
           line-height: 1.45;
         }
 
+        .hv-command-strip {
+          width: 100%;
+          max-width: 900px;
+          display: grid;
+          grid-template-columns: repeat(6, minmax(0, 1fr));
+          gap: 8px;
+          margin: 0 0 20px;
+        }
+
+        .hv-signal-card {
+          min-width: 0;
+          min-height: 64px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px;
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-lg);
+          background:
+            linear-gradient(180deg, rgba(255,255,255,0.026), rgba(255,255,255,0)),
+            var(--bg-elevated);
+          color: var(--text-secondary);
+          cursor: pointer;
+          text-align: left;
+          font-family: inherit;
+          box-shadow: 0 8px 22px rgba(0,0,0,0.12);
+          transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast), transform var(--t-fast);
+        }
+
+        .hv-signal-card:hover {
+          background: var(--bg-float);
+          border-color: var(--accent-border);
+          color: var(--text-primary);
+          transform: translateY(-1px);
+        }
+
+        .hv-signal-icon {
+          width: 34px;
+          height: 34px;
+          border-radius: var(--r-md);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          background: var(--accent-subtle);
+          border: 1px solid var(--accent-border);
+          color: var(--accent);
+        }
+        .hv-signal-icon svg { width: 17px; height: 17px; }
+        .hv-signal-icon--mentions { color: #f472b6; background: rgba(244,114,182,0.1); border-color: rgba(244,114,182,0.22); }
+        .hv-signal-icon--unread { color: #38bdf8; background: rgba(56,189,248,0.1); border-color: rgba(56,189,248,0.22); }
+        .hv-signal-icon--live { color: #fb7185; background: rgba(251,113,133,0.1); border-color: rgba(251,113,133,0.22); }
+        .hv-signal-icon--server { color: #a78bfa; background: rgba(167,139,250,0.1); border-color: rgba(167,139,250,0.22); }
+        .hv-signal-icon--voice { color: #34d399; background: rgba(52,211,153,0.1); border-color: rgba(52,211,153,0.22); }
+        .hv-signal-icon--uptime { color: var(--gold); background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.22); }
+
+        .hv-signal-copy {
+          min-width: 0;
+          display: grid;
+          gap: 2px;
+        }
+
+        .hv-signal-value {
+          font-size: 15px;
+          font-weight: 800;
+          color: var(--text-primary);
+          line-height: 1.1;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .hv-signal-label {
+          font-size: 10px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          color: var(--text-muted);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        @media (max-width: 900px) {
+          .hv-command-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        }
+
+        @media (max-width: 520px) {
+          .hv-command-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          .hv-signal-card { min-height: 58px; }
+          .hv-signal-icon { width: 30px; height: 30px; }
+        }
+
         .hv-layout {
           width: 100%;
           max-width: 900px;
@@ -789,6 +1024,16 @@ export default function HomeView() {
         .hv-header-btn:hover {
           background: rgba(14,165,233,0.18);
           border-color: var(--accent);
+        }
+        .hv-header-btn--subtle {
+          background: var(--bg-deep);
+          border-color: var(--border-subtle);
+          color: var(--text-secondary);
+        }
+        .hv-header-btn--subtle:hover {
+          background: var(--ch-hover-bg);
+          border-color: var(--accent-border);
+          color: var(--text-primary);
         }
 
         /* ── DM list ────────────────────────────────────────────────── */
@@ -1078,6 +1323,95 @@ export default function HomeView() {
         }
 
         .hv-action-icon { font-size: 16px; line-height: 1; flex-shrink: 0; }
+
+        /* ── Launchpad ──────────────────────────────────────────────── */
+        .hv-launchpad {
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+
+        .hv-launch-group {
+          display: grid;
+          gap: 6px;
+        }
+
+        .hv-launch-label {
+          padding: 0 2px;
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: var(--text-muted);
+        }
+
+        .hv-launch-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 5px;
+        }
+
+        .hv-launch-tile {
+          min-width: 0;
+          min-height: 48px;
+          display: grid;
+          grid-template-columns: 32px minmax(0, 1fr);
+          align-items: center;
+          gap: 10px;
+          padding: 8px;
+          border: 1px solid transparent;
+          border-radius: var(--r-md);
+          background: transparent;
+          color: var(--text-secondary);
+          cursor: pointer;
+          font-family: inherit;
+          text-align: left;
+          transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+        }
+
+        .hv-launch-tile:hover {
+          background: var(--ch-hover-bg);
+          border-color: var(--border-subtle);
+          color: var(--text-primary);
+        }
+
+        .hv-launch-icon {
+          width: 32px;
+          height: 32px;
+          border-radius: var(--r-sm);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: color-mix(in srgb, var(--bg-deep) 72%, transparent);
+          border: 1px solid var(--border-subtle);
+          color: var(--accent);
+        }
+        .hv-launch-icon svg { width: 17px; height: 17px; }
+
+        .hv-launch-copy {
+          min-width: 0;
+          display: grid;
+          gap: 2px;
+        }
+
+        .hv-launch-title {
+          font-size: 13px;
+          font-weight: 700;
+          color: var(--text-primary);
+          line-height: 1.2;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .hv-launch-meta {
+          font-size: 11px;
+          color: var(--text-muted);
+          line-height: 1.25;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
 
         /* ── Invite tip ─────────────────────────────────────────────── */
         .hv-invite-tip {
@@ -1472,6 +1806,116 @@ function IconInvite() {
       <circle cx="10" cy="8" r="3.5" />
       <path d="M3 17c0-3.3 3.1-6 7-6" />
       <path d="M15 13v5M17.5 15.5h-5" />
+    </svg>
+  );
+}
+
+function IconBell() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M10 3a4.5 4.5 0 0 0-4.5 4.5v3.2L4 13h12l-1.5-2.3V7.5A4.5 4.5 0 0 0 10 3Z" />
+      <path d="M8.2 15a2 2 0 0 0 3.6 0" />
+    </svg>
+  );
+}
+
+function IconClock() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="10" cy="10" r="7" />
+      <path d="M10 6v4l2.5 1.5" />
+    </svg>
+  );
+}
+
+function IconServices() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M10 2.5 16 6v8l-6 3.5L4 14V6l6-3.5Z" />
+      <path d="M10 7v6M7 8.5h6" />
+    </svg>
+  );
+}
+
+function IconPoll() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M4 15V9M10 15V5M16 15v-3" />
+      <path d="M3 17h14" />
+    </svg>
+  );
+}
+
+function IconSparkle() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M10 2.5 11.7 8l5.3 2-5.3 2L10 17.5 8.3 12 3 10l5.3-2L10 2.5Z" />
+    </svg>
+  );
+}
+
+function IconPalette() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M10 3a7 7 0 0 0 0 14h1.2a1.8 1.8 0 0 0 1.1-3.2.9.9 0 0 1 .5-1.6H14a3 3 0 0 0 0-6h-.5A7 7 0 0 0 10 3Z" />
+      <circle cx="7" cy="8" r=".7" />
+      <circle cx="10" cy="6.5" r=".7" />
+      <circle cx="13" cy="8.2" r=".7" />
+    </svg>
+  );
+}
+
+function IconSound() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M4 8v4h3l4 3V5L7 8H4Z" />
+      <path d="M14 7.5a4 4 0 0 1 0 5M16 5a7 7 0 0 1 0 10" />
+    </svg>
+  );
+}
+
+function IconLink() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M8.5 6.5 10 5a3.5 3.5 0 0 1 5 5l-1.5 1.5" />
+      <path d="M11.5 13.5 10 15a3.5 3.5 0 0 1-5-5l1.5-1.5" />
+      <path d="M8 12l4-4" />
+    </svg>
+  );
+}
+
+function IconKeyboard() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="3" y="5" width="14" height="10" rx="2" />
+      <path d="M6 8h.01M9 8h.01M12 8h.01M15 8h.01M6 11h.01M9 11h5" />
+    </svg>
+  );
+}
+
+function IconInfo() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="10" cy="10" r="7" />
+      <path d="M10 9v4M10 6.8h.01" />
+    </svg>
+  );
+}
+
+function IconPulse() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 10h3l2-5 4 10 2-5h3" />
+    </svg>
+  );
+}
+
+function IconMegaphone() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M4 11H3a1.5 1.5 0 0 1 0-3h1l9-3v9l-9-3Z" />
+      <path d="M7 12.5 8 16H6l-1-4" />
+      <path d="M16 8.2a3 3 0 0 1 0 2.6" />
     </svg>
   );
 }

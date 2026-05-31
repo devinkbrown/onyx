@@ -85,7 +85,6 @@ export default function MessageList({ messages, target, searchActive, searchMatc
     };
     document.addEventListener('ocean:scroll-bottom', handler);
     return () => document.removeEventListener('ocean:scroll-bottom', handler);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Handle ocean:jump-to-message events dispatched from search results
@@ -225,7 +224,7 @@ export default function MessageList({ messages, target, searchActive, searchMatc
     // Load older messages when within 100px of the top
     if (el.scrollTop < 100 && !isHistLoading && !isHistExhausted) {
       const oldestMsg = messages[0];
-      loadHistory(target, oldestMsg?.id);
+      loadHistory(target, oldestMsg);
     }
   };
 

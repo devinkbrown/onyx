@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import SkeletonChannel from '@/components/chat/SkeletonChannel';
 import type { Channel } from '@/lib/irc/types';
@@ -16,43 +16,6 @@ import SpeakingBars from '@/components/voice/SpeakingBars';
 interface SidebarProps {
   onNavigate?: () => void;
   onMobileClose?: () => void;
-}
-
-// ── Channel categorization ─────────────────────────────────────────────────────
-
-type CategoryType = 'text' | 'voice' | 'announcement' | 'stage';
-
-interface Category {
-  name: string;
-  channels: Channel[];
-  type: CategoryType;
-}
-
-function categorizeChannels(channels: Channel[]): Category[] {
-  const voice: Channel[] = [];
-  const announce: Channel[] = [];
-  const stage: Channel[] = [];
-  const text: Channel[] = [];
-
-  for (const ch of channels) {
-    const lower = ch.name.toLowerCase().replace(/^[#&]/, '');
-    if (/^(voice|vc$|vc-|.*-vc$|.*-voice$)/.test(lower)) {
-      voice.push(ch);
-    } else if (/^(announce|news|update|blog)/.test(lower)) {
-      announce.push(ch);
-    } else if (/^stage/.test(lower)) {
-      stage.push(ch);
-    } else {
-      text.push(ch);
-    }
-  }
-
-  const result: Category[] = [];
-  if (announce.length) result.push({ name: 'Announcements', channels: announce, type: 'announcement' });
-  if (text.length)     result.push({ name: 'Text Channels', channels: text, type: 'text' });
-  if (voice.length)    result.push({ name: 'Voice Channels', channels: voice, type: 'voice' });
-  if (stage.length)    result.push({ name: 'Stage Channels', channels: stage, type: 'stage' });
-  return result;
 }
 
 // ── Collapsed state (localStorage-persisted) ───────────────────────────────────
@@ -150,10 +113,6 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
   const channelOrder         = useOnyxStore(s => s.channelOrder);
   const setChannelOrder      = useOnyxStore(s => s.setChannelOrder);
   const nsfwChannels         = useOnyxStore(s => s.nsfwChannels);
-  const nsfwAcknowledged     = useOnyxStore(s => s.nsfwAcknowledged);
-  const markChannelNsfw      = useOnyxStore(s => s.markChannelNsfw);
-  const unmarkChannelNsfw    = useOnyxStore(s => s.unmarkChannelNsfw);
-  const acknowledgeNsfw      = useOnyxStore(s => s.acknowledgeNsfw);
 
   const channelList   = [...channels.values()];
   // IRC +V mode = LADON voice channel; also channels with '+' prefix (IRCX voice)
@@ -486,29 +445,25 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
         </Section>
       </nav>
 
-      {/* Browse channels link */}
+      {/* Server tools */}
       {!compactSidebar && (
-        <button className="ch-browse-btn" onClick={openChannelBrowser}>
-          <BrowseIcon />
-          Browse channels
-        </button>
-      )}
+        <div className="ch-footer-tools" aria-label="Server tools">
+          <button className="ch-browse-btn" onClick={openChannelBrowser}>
+            <BrowseIcon />
+            Browse channels
+          </button>
 
-      {/* Server stats widget trigger */}
-      {!compactSidebar && (
-        <button className="ch-browse-btn" onClick={openServerStats} aria-label="Show server stats">
-          <StatsIcon />
-          Server stats
-        </button>
-      )}
+          <button className="ch-browse-btn" onClick={openServerStats} aria-label="Show server stats">
+            <StatsIcon />
+            Server stats
+          </button>
 
-      {/* Spotlight search trigger */}
-      {!compactSidebar && (
-        <button className="ch-spotlight-btn" onClick={openSpotlight} aria-label="Open quick navigation (Ctrl+K)">
-          <SearchSmallIcon />
-          <span className="ch-spotlight-label">Quick jump</span>
-          <kbd className="ch-spotlight-kbd">⌘K</kbd>
-        </button>
+          <button className="ch-spotlight-btn" onClick={openSpotlight} aria-label="Open quick navigation (Ctrl+K)">
+            <SearchSmallIcon />
+            <span className="ch-spotlight-label">Quick jump</span>
+            <kbd className="ch-spotlight-kbd">⌘K</kbd>
+          </button>
+        </div>
       )}
 
       {/* User away / status badge */}
@@ -592,16 +547,17 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
         }
 
         .ch-header {
+          height: var(--header-h);
           min-height: var(--header-h);
-          height: auto;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 6px 12px 6px 16px;
+          padding: 0 10px 0 14px;
           border-bottom: 1px solid var(--border-subtle);
           flex-shrink: 0;
           cursor: pointer;
-          gap: 6px;
+          gap: 8px;
+          box-sizing: border-box;
         }
         .ch-header:hover { background: var(--ch-hover-bg); }
 
@@ -669,7 +625,9 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
         .ch-scroll {
           flex: 1;
           overflow-y: auto;
-          padding: 8px 0;
+          padding: 8px 6px;
+          min-height: 0;
+          scrollbar-gutter: stable;
         }
 
         .ch-empty {
@@ -710,11 +668,12 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
           display: flex;
           align-items: center;
           gap: 7px;
-          width: calc(100% - 16px);
-          margin: 2px 8px 0;
+          width: calc(100% - 20px);
+          min-height: 34px;
+          margin: 2px 10px 0;
           padding: 7px 10px;
-          background: none;
-          border: none;
+          background: transparent;
+          border: 1px solid transparent;
           border-radius: var(--r-sm);
           cursor: pointer;
           font-size: 13px;
@@ -727,6 +686,7 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
         }
         .ch-browse-btn:hover {
           background: var(--ch-hover-bg);
+          border-color: var(--border-subtle);
           color: var(--text-primary);
         }
         .ch-browse-btn svg {
@@ -735,13 +695,37 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
         }
         .ch-browse-btn:hover svg { opacity: 1; }
 
+        .ch-footer-tools {
+          display: grid;
+          gap: 4px;
+          margin: 6px 10px 2px;
+          padding: 6px;
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-md);
+          background:
+            linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0)),
+            color-mix(in srgb, var(--bg-void) 60%, transparent);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.018);
+          flex-shrink: 0;
+        }
+        .ch-footer-tools .ch-browse-btn,
+        .ch-footer-tools .ch-spotlight-btn {
+          width: 100%;
+          margin: 0;
+          border-color: transparent;
+        }
+        .ch-footer-tools .ch-spotlight-btn {
+          background: color-mix(in srgb, var(--bg-deep) 72%, transparent);
+          border-color: var(--border-subtle);
+        }
+
         .ch-status-area {
-          padding: 2px 8px 0;
+          padding: 4px 10px 0;
           flex-shrink: 0;
         }
 
         .ch-join {
-          padding: 4px 8px 6px;
+          padding: 6px 10px 8px;
           flex-shrink: 0;
         }
         @media (max-width: 768px) {
@@ -773,11 +757,12 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
           display: flex;
           align-items: center;
           gap: 7px;
-          width: calc(100% - 16px);
-          margin: 0 8px 2px;
+          width: calc(100% - 20px);
+          min-height: 34px;
+          margin: 2px 10px 2px;
           padding: 6px 10px;
-          background: none;
-          border: none;
+          background: color-mix(in srgb, var(--bg-void) 70%, transparent);
+          border: 1px solid var(--border-subtle);
           border-radius: var(--r-sm);
           cursor: pointer;
           font-size: 13px;
@@ -790,6 +775,7 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
         }
         .ch-spotlight-btn:hover {
           background: var(--ch-hover-bg);
+          border-color: var(--border-normal);
           color: var(--text-primary);
         }
         .ch-spotlight-btn svg { flex-shrink: 0; opacity: 0.7; }
@@ -851,7 +837,7 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 2px 10px 0 10px;
+          padding: 2px 4px 4px;
           margin-bottom: 2px;
         }
         .ch-sort-label {
@@ -978,12 +964,13 @@ function Section({ label, expanded, onToggle, onAdd, children, compact, unreadBa
         .ch-section-header {
           display: flex;
           align-items: center;
-          gap: 4px;
-          padding: 5px 6px 3px 6px;
+          gap: 5px;
+          min-height: 26px;
+          padding: 5px 6px;
           cursor: pointer;
           user-select: none;
           border-radius: var(--r-sm);
-          margin: 0 4px;
+          margin: 0;
           transition: background 100ms ease;
         }
         .ch-section-header:hover { background: var(--ch-hover-bg); }
@@ -1000,6 +987,9 @@ function Section({ label, expanded, onToggle, onAdd, children, compact, unreadBa
           text-transform: uppercase;
           color: var(--text-muted);
           transition: color 100ms var(--ease-out);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
         .ch-section-header:hover .ch-section-label { color: var(--text-secondary); }
 
@@ -1037,7 +1027,7 @@ function Section({ label, expanded, onToggle, onAdd, children, compact, unreadBa
           to   { transform: scale(1);   opacity: 1; }
         }
 
-        .ch-section-items { display: flex; flex-direction: column; gap: 1px; }
+        .ch-section-items { display: flex; flex-direction: column; gap: 2px; }
       `}</style>
     </div>
   );
@@ -1155,6 +1145,10 @@ function ChannelRow({ channel, active, onClick, onContextMenu, starred, autoJoin
       className={`ch-row ${active ? 'ch-row--active' : ''} ${hasUnread ? 'ch-row--unread' : ''}`}
       onClick={onClick}
       onContextMenu={onContextMenu}
+      draggable={Boolean(onDragStart)}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
       aria-current={active ? 'page' : undefined}
       aria-label={ariaLabel}
     >
@@ -1220,20 +1214,21 @@ function ChannelRow({ channel, active, onClick, onContextMenu, starred, autoJoin
         .ch-row {
           display: flex; align-items: center; gap: 6px;
           padding: 0 8px 0 4px;
-          height: 28px;
-          border-radius: 5px;
-          margin: 0 6px;
+          min-height: 30px;
+          height: auto;
+          border-radius: var(--r-sm);
+          margin: 0;
           background: none; border: none; cursor: pointer;
-          text-align: left; width: calc(100% - 12px);
-          transition: background 100ms ease;
+          text-align: left; width: 100%;
+          transition: background 100ms ease, border-color 100ms ease;
           -webkit-tap-highlight-color: transparent;
           position: relative;
           /* Left border placeholder — takes up 3px, invisible by default */
           border-left: 3px solid transparent;
         }
         @media (max-width: 768px) {
-          .ch-row { height: 40px; }
-          .dm-row { height: 40px; }
+          .ch-row { min-height: 40px; }
+          .dm-row { min-height: 40px; }
           .vch-row { min-height: 40px; }
         }
         .ch-row:hover {
@@ -1284,6 +1279,7 @@ function ChannelRow({ channel, active, onClick, onContextMenu, starred, autoJoin
           overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
           font-size: 14px; font-weight: 500;
           color: var(--ch-read); transition: color 100ms var(--ease-out);
+          line-height: 1.3;
         }
         .ch-row--unread .ch-row-name { color: var(--text-primary); font-weight: 600; }
         .ch-row:hover .ch-row-name,
@@ -1332,6 +1328,8 @@ function ChannelRow({ channel, active, onClick, onContextMenu, starred, autoJoin
         .ch-row-actions {
           display: flex; align-items: center; gap: 2px;
           flex-shrink: 0;
+          min-width: 42px;
+          justify-content: flex-end;
           opacity: 0; transition: opacity var(--t-fast);
         }
         .ch-row:hover .ch-row-actions,
@@ -1698,10 +1696,11 @@ function DMRow({ dm, active, muted, onClick, onContextMenu }: {
         .dm-row {
           display: flex; align-items: center; gap: 8px;
           padding: 0 8px 0 7px;
-          height: 28px;
-          border-radius: 5px; margin: 0 6px;
+          min-height: 32px;
+          height: auto;
+          border-radius: var(--r-sm); margin: 0;
           background: none; border: none; cursor: pointer;
-          text-align: left; width: calc(100% - 12px);
+          text-align: left; width: 100%;
           transition: background 100ms ease;
         }
         .dm-row:hover { background: var(--bg-3, var(--bg-elevated)); }

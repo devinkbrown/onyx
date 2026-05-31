@@ -7,7 +7,6 @@ import EmojiPicker from '@/components/ui/EmojiPicker';
 import GifPicker from '@/components/ui/GifPicker';
 import StickerPicker from '@/components/chat/StickerPicker';
 import SlashCommandMenu, { filterCommands, type SlashCommand } from '@/components/chat/SlashCommandMenu';
-import FormatToolbar from '@/components/chat/FormatToolbar';
 import MentionDropdown from '@/components/chat/MentionDropdown';
 import EmojiAutocomplete, { searchEmoji } from '@/components/chat/EmojiAutocomplete';
 import { stickerToMessage } from '@/lib/stickers';
@@ -30,10 +29,6 @@ interface Props {
   slowModeActive?: boolean;
   /** Called after a message is sent, so parent can track lastSentAt */
   onMessageSent?: () => void;
-  /** Called when the user starts typing (text transitions from empty to non-empty) */
-  onTypingStart?: () => void;
-  /** Called when the user stops typing (text cleared or 3 s of inactivity) */
-  onTypingStop?: () => void;
 }
 
 // ── Slash command help text ────────────────────────────────────────────────────
@@ -139,14 +134,7 @@ const EMPTY_AC: AutocompleteState = {
   mode: 'none', query: '', triggerStart: 0, items: [], selectedIndex: 0,
 };
 
-// ── Nick → hue for avatar color ──────────────────────────────────────────────
-function nickHue(nick: string): number {
-  let h = 0;
-  for (let i = 0; i < nick.length; i++) h = (h * 31 + nick.charCodeAt(i)) & 0xffff;
-  return h % 360;
-}
-
-export default function MessageInput({ target, placeholder, droppedFile, onDroppedFileConsumed, slowModeActive, onMessageSent, onTypingStart, onTypingStop }: Props) {
+export default function MessageInput({ target, placeholder, droppedFile, onDroppedFileConsumed, slowModeActive, onMessageSent }: Props) {
   const sendMessage        = useOnyxStore(s => s.sendMessage);
   const channels           = useOnyxStore(s => s.channels);
   const activeView         = useOnyxStore(s => s.activeView);
@@ -156,7 +144,6 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
   const replyingTo         = useOnyxStore(s => s.replyingTo);
   const setReplyingTo    = useOnyxStore(s => s.setReplyingTo);
   const joinChannel      = useOnyxStore(s => s.joinChannel);
-  const partChannel      = useOnyxStore(s => s.partChannel);
   const clearMessages    = useOnyxStore(s => s.clearMessages);
   const navigate         = useOnyxStore(s => s.navigate);
   const addNotification      = useOnyxStore(s => s.addNotification);
@@ -185,7 +172,7 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
   const [mobileToolbarOpen, setMobileToolbarOpen] = useState(false);
   const [showGifPicker,     setShowGifPicker]     = useState(false);
   const [showStickerPicker, setShowStickerPicker] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
+  const [showFormatMenu,    setShowFormatMenu]    = useState(false);
   // Feature: draft preview toggle
   const [showPreview, setShowPreview] = useState(false);
   // Feature: emoji autocomplete from EmojiAutocomplete component
@@ -205,11 +192,10 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
 
   const textareaRef          = useRef<HTMLTextAreaElement>(null);
   const typingTimer          = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const ctcpTypingActive     = useRef(false);
-  const ctcpTypingStopTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const emojiPickerRef       = useRef<HTMLDivElement>(null);
   const gifPickerRef         = useRef<HTMLDivElement>(null);
   const stickerPickerRef     = useRef<HTMLDivElement>(null);
+  const formatMenuRef        = useRef<HTMLDivElement>(null);
 
   // (legacy tab-completion state removed — useTabComplete handles cycling now)
 
@@ -378,6 +364,23 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
     return () => document.removeEventListener('mousedown', handler);
   }, [showStickerPicker]);
 
+  // Close formatting popover on outside click
+  useEffect(() => {
+    if (!showFormatMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (formatMenuRef.current && !formatMenuRef.current.contains(e.target as Node)) {
+        setShowFormatMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showFormatMenu]);
+
+  useEffect(() => {
+    setShowFormatMenu(false);
+    setMobileToolbarOpen(false);
+  }, [target]);
+
   // Listen for prefill events from empty state buttons (e.g. "Say hello!")
   useEffect(() => {
     const handler = (e: Event) => {
@@ -420,8 +423,6 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
     };
     window.addEventListener('ocean:insert-mention', handler);
     return () => window.removeEventListener('ocean:insert-mention', handler);
-  // textareaRef is a stable ref; no other deps needed.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Autocomplete detection ────────────────────────────────────────────────
@@ -598,21 +599,6 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
     const close = multiline ? '\n```' : '`';
     wrapSelection(open, close);
   }, [text, wrapSelection]);
-
-  // ── Format handler (used by FormatToolbar) ────────────────────────────────
-  const handleFormat = useCallback((before: string, after: string) => {
-    const el = textareaRef.current;
-    if (!el) return;
-    const start    = el.selectionStart;
-    const end      = el.selectionEnd;
-    const selected = text.slice(start, end);
-    const newText  = text.slice(0, start) + before + selected + after + text.slice(end);
-    setText(newText);
-    requestAnimationFrame(() => {
-      el.setSelectionRange(start + before.length, end + before.length);
-      el.focus();
-    });
-  }, [text]);
 
   // ── Slash command executor ─────────────────────────────────────────────────
   const executeSlashCommand = useCallback((line: string): boolean => {
@@ -892,7 +878,7 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         break;
     }
     return true;
-  }, [addNotification, channels, client, clearMessages, ignoreUser, joinChannel, navigate, openExportModal, openHighlightModal, openIgnoreList, openOperPanel, openPollCreate, openScheduledMessages, openServerRulesModal, openServices, openWhois, partChannel, sendMessage, setChannelJoinPrompt, setRawLogEnabled, target, toggleRawLog, unignoreUser]);
+  }, [addNotification, channels, client, clearMessages, ignoreUser, joinChannel, navigate, openExportModal, openHighlightModal, openIgnoreList, openOperPanel, openPollCreate, openScheduledMessages, openServerRulesModal, openServices, openWhois, sendMessage, setChannelJoinPrompt, setRawLogEnabled, target, toggleRawLog, unignoreUser]);
 
   // ── Computed: can send? ────────────────────────────────────────────────────
   const canSend = (text.trim().length > 0 || attachments.length > 0) && !slowModeActive && text.length <= CHAR_LIMIT && !uploading;
@@ -977,13 +963,6 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
     if (typingTimer.current) { clearTimeout(typingTimer.current); typingTimer.current = null; }
     sendTypingStop(target);
-    // Clear CTCP typing stop timer on send
-    if (ctcpTypingStopTimer.current) clearTimeout(ctcpTypingStopTimer.current);
-    ctcpTypingStopTimer.current = null;
-    if (ctcpTypingActive.current) {
-      ctcpTypingActive.current = false;
-      onTypingStop?.();
-    }
   };
 
   const sendTyping = useCallback(() => {
@@ -1199,7 +1178,6 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
       }
       return next;
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text, detectAutocomplete]);
 
   // ── Render autocomplete popup ─────────────────────────────────────────────
@@ -1400,121 +1378,183 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         />
       )}
 
-      <FormatToolbar
-        textareaRef={textareaRef}
-        onFormat={handleFormat}
-        visible={isFocused}
-      />
-
-      <FloodWarningBar visible={floodWarning} cooldownMs={FLOOD_COOLDOWN_MS} />
+      <FloodWarningBar visible={floodWarning} cooldownMs={FLOOD_COOLDOWN_MS} cooldownStart={floodCooldownStart} />
 
       <div className={`msg-input-bar${sentFlash ? ' msg-input-bar--sent' : ''}${attachments.length > 0 ? ' msg-input-bar--has-attachments' : ''}`}>
-        {/* ── Mobile expander button (shown only on mobile) ── */}
-        <button
-          className={`input-action mobile-expand-btn${mobileToolbarOpen ? ' mobile-expand-btn--open' : ''}`}
-          aria-label={mobileToolbarOpen ? 'Collapse tools' : 'Expand tools'}
-          aria-expanded={mobileToolbarOpen}
-          onClick={() => setMobileToolbarOpen(p => !p)}
-        >
-          <span className="mobile-expand-icon">+</span>
-        </button>
-
         {/* ── Mobile bottom sheet (shown when expander is open on mobile) ── */}
         {mobileToolbarOpen && (
           <div className="mobile-tool-sheet" role="toolbar" aria-label="Message tools">
             <button
               className="mobile-tool-btn"
+              aria-label="Attach file"
+              type="button"
+              onClick={() => { fileInputRef.current?.click(); setMobileToolbarOpen(false); }}
+            ><AttachIcon /></button>
+            <button
+              className="mobile-tool-btn"
               aria-label="Bold"
+              type="button"
               onMouseDown={e => { e.preventDefault(); wrapSelection('**', '**'); setMobileToolbarOpen(false); }}
             >B</button>
             <button
               className="mobile-tool-btn"
               aria-label="Italic"
+              type="button"
               onMouseDown={e => { e.preventDefault(); wrapSelection('*', '*'); setMobileToolbarOpen(false); }}
             ><em>I</em></button>
             <button
               className="mobile-tool-btn"
               aria-label="Code"
+              type="button"
               onMouseDown={e => { e.preventDefault(); wrapCode(); setMobileToolbarOpen(false); }}
             >{'`'}</button>
             <button
               className="mobile-tool-btn"
               aria-label="Emoji"
+              type="button"
               onClick={() => { setShowEmojiPicker(true); setMobileToolbarOpen(false); }}
             >😊</button>
             <button
               className="mobile-tool-btn"
               aria-label="Stickers"
+              type="button"
               onClick={() => { setShowStickerPicker(true); setMobileToolbarOpen(false); }}
             >🗒️</button>
             <button
               className="mobile-tool-btn"
               aria-label="GIF"
+              type="button"
               onClick={() => { setShowGifPicker(true); setMobileToolbarOpen(false); }}
             >GIF</button>
+            <button
+              className="mobile-tool-btn"
+              aria-label="Create poll"
+              type="button"
+              onClick={() => { openPollCreate(); setMobileToolbarOpen(false); }}
+            ><PollIcon /></button>
+            <button
+              className="mobile-tool-btn"
+              aria-label={showPreview ? 'Back to editing' : 'Preview message'}
+              type="button"
+              onClick={() => {
+                setShowPreview(p => !p);
+                setMobileToolbarOpen(false);
+                requestAnimationFrame(() => textareaRef.current?.focus());
+              }}
+            ><EyeIcon /></button>
           </div>
         )}
 
-        {/* Attach — opens file picker */}
-        <button
-          className="input-action"
-          aria-label="Attach file"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <AttachIcon />
-        </button>
+        <div ref={formatMenuRef} className="composer-left-tools" role="toolbar" aria-label="Composer tools">
+          <button
+            className={`input-action mobile-expand-btn${mobileToolbarOpen ? ' mobile-expand-btn--open input-action--active' : ''}`}
+            aria-label={mobileToolbarOpen ? 'Collapse tools' : 'Expand tools'}
+            aria-expanded={mobileToolbarOpen}
+            title={mobileToolbarOpen ? 'Collapse tools' : 'Expand tools'}
+            type="button"
+            onClick={() => {
+              setMobileToolbarOpen(p => !p);
+              setShowFormatMenu(false);
+            }}
+          >
+            <span className="mobile-expand-icon">+</span>
+          </button>
 
-        {/* ── Formatting toolbar (compact inline row) ── */}
-        <div className="fmt-bar" aria-label="Text formatting">
           <button
-            className="fmt-btn"
-            title="Bold (Ctrl+B)"
-            aria-label="Bold"
-            onMouseDown={e => { e.preventDefault(); wrapSelection('**', '**'); }}
+            className="input-action input-action--primary"
+            aria-label="Attach file"
+            title="Attach file"
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
           >
-            <BoldIcon />
+            <AttachIcon />
           </button>
+
           <button
-            className="fmt-btn"
-            title="Italic (Ctrl+I)"
-            aria-label="Italic"
-            onMouseDown={e => { e.preventDefault(); wrapSelection('*', '*'); }}
+            className={`input-action input-format-toggle${showFormatMenu ? ' input-action--active' : ''}`}
+            aria-label={showFormatMenu ? 'Close formatting tools' : 'Open formatting tools'}
+            aria-expanded={showFormatMenu}
+            title="Formatting"
+            type="button"
+            onClick={() => {
+              setShowFormatMenu(p => !p);
+              setMobileToolbarOpen(false);
+              setShowEmojiPicker(false);
+              setShowGifPicker(false);
+              setShowStickerPicker(false);
+            }}
           >
-            <ItalicIcon />
+            <FormatIcon />
           </button>
+
           <button
-            className="fmt-btn"
-            title="Strikethrough"
-            aria-label="Strikethrough"
-            onMouseDown={e => { e.preventDefault(); wrapSelection('~~', '~~'); }}
+            className="input-action input-poll-btn"
+            aria-label="Create poll"
+            title="Create poll"
+            type="button"
+            onClick={openPollCreate}
           >
-            <StrikeIcon />
+            <PollIcon />
           </button>
-          <button
-            className="fmt-btn"
-            title="Code (Ctrl+`)"
-            aria-label="Code"
-            onMouseDown={e => { e.preventDefault(); wrapCode(); }}
-          >
-            <CodeIcon />
-          </button>
-          <button
-            className="fmt-btn"
-            title="Blockquote"
-            aria-label="Blockquote"
-            onMouseDown={e => { e.preventDefault(); wrapBlockquote(); }}
-          >
-            <QuoteIcon />
-          </button>
-          <button
-            className="fmt-btn"
-            title="Spoiler"
-            aria-label="Spoiler"
-            onMouseDown={e => { e.preventDefault(); wrapSelection('||', '||'); }}
-          >
-            <SpoilerIcon />
-          </button>
-          <div className="fmt-divider" />
+
+          {showFormatMenu && (
+            <div className="format-popover" role="toolbar" aria-label="Text formatting">
+              <button
+                className="fmt-btn"
+                title="Bold (Ctrl+B)"
+                aria-label="Bold"
+                type="button"
+                onMouseDown={e => { e.preventDefault(); wrapSelection('**', '**'); }}
+              >
+                <BoldIcon />
+              </button>
+              <button
+                className="fmt-btn"
+                title="Italic (Ctrl+I)"
+                aria-label="Italic"
+                type="button"
+                onMouseDown={e => { e.preventDefault(); wrapSelection('*', '*'); }}
+              >
+                <ItalicIcon />
+              </button>
+              <button
+                className="fmt-btn"
+                title="Strikethrough"
+                aria-label="Strikethrough"
+                type="button"
+                onMouseDown={e => { e.preventDefault(); wrapSelection('~~', '~~'); }}
+              >
+                <StrikeIcon />
+              </button>
+              <button
+                className="fmt-btn"
+                title="Code (Ctrl+`)"
+                aria-label="Code"
+                type="button"
+                onMouseDown={e => { e.preventDefault(); wrapCode(); }}
+              >
+                <CodeIcon />
+              </button>
+              <button
+                className="fmt-btn"
+                title="Blockquote"
+                aria-label="Blockquote"
+                type="button"
+                onMouseDown={e => { e.preventDefault(); wrapBlockquote(); }}
+              >
+                <QuoteIcon />
+              </button>
+              <button
+                className="fmt-btn"
+                title="Spoiler"
+                aria-label="Spoiler"
+                type="button"
+                onMouseDown={e => { e.preventDefault(); wrapSelection('||', '||'); }}
+              >
+                <SpoilerIcon />
+              </button>
+            </div>
+          )}
         </div>
 
         {isDraft && <span className="msg-draft-badge">• draft</span>}
@@ -1541,7 +1581,9 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
             setText(next);
             setIsDraft(false);
             resetCycle();
-            sendTyping();
+            if (next.length > 0) {
+              sendTyping();
+            }
             // Emoji autocomplete detection: `:word` at or before cursor (2+ chars)
             const cursorPos = e.target.selectionStart ?? next.length;
             const beforeCursor = next.slice(0, cursorPos);
@@ -1558,38 +1600,18 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
             } else {
               setEmojiAcQuery(null);
             }
-            // CTCP TYPING callbacks
-            if (next.length > 0 && prev.length === 0) {
-              ctcpTypingActive.current = true;
-              onTypingStart?.();
-            }
-            if (next.length > 0) {
-              if (ctcpTypingStopTimer.current) clearTimeout(ctcpTypingStopTimer.current);
-              ctcpTypingStopTimer.current = setTimeout(() => {
-                if (ctcpTypingActive.current) {
-                  ctcpTypingActive.current = false;
-                  onTypingStop?.();
-                }
-              }, 3000);
-            } else if (prev.length > 0) {
-              if (ctcpTypingStopTimer.current) clearTimeout(ctcpTypingStopTimer.current);
-              ctcpTypingStopTimer.current = null;
-              if (ctcpTypingActive.current) {
-                ctcpTypingActive.current = false;
-                onTypingStop?.();
-              }
+            if (next.length === 0 && prev.length > 0) {
+              sendTypingStop(target);
             }
           }}
           onKeyDown={onKeyDown}
           onInput={onInput}
           onPaste={onPaste}
-          onFocus={() => setIsFocused(true)}
           onBlur={() => {
             // Delay so that mousedown on menu items / toolbar buttons fires before blur closes things
             setTimeout(() => {
               setSlashMenuOpen(false);
               setSlashQuery('');
-              setIsFocused(false);
             }, 150);
           }}
           rows={1}
@@ -1612,12 +1634,16 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
             />
           )}
           <button
-            className="input-action gif-btn"
+            className={`input-action gif-btn${showGifPicker ? ' input-action--active' : ''}`}
             aria-label="GIF picker"
+            aria-expanded={showGifPicker}
+            title="GIF picker"
+            type="button"
             onClick={() => {
               setShowGifPicker(p => !p);
               setShowEmojiPicker(false);
               setShowStickerPicker(false);
+              setShowFormatMenu(false);
             }}
           >
             GIF
@@ -1636,12 +1662,16 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
             />
           )}
           <button
-            className="input-action"
+            className={`input-action${showStickerPicker ? ' input-action--active' : ''}`}
             aria-label="Stickers"
+            aria-expanded={showStickerPicker}
+            title="Stickers"
+            type="button"
             onClick={() => {
               setShowStickerPicker(p => !p);
               setShowEmojiPicker(false);
               setShowGifPicker(false);
+              setShowFormatMenu(false);
             }}
           >
             🗒️
@@ -1660,12 +1690,16 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
             />
           )}
           <button
-            className="input-action"
+            className={`input-action${showEmojiPicker ? ' input-action--active' : ''}`}
             aria-label="Emoji"
+            aria-expanded={showEmojiPicker}
+            title="Emoji"
+            type="button"
             onClick={() => {
               setShowEmojiPicker(p => !p);
               setShowGifPicker(false);
               setShowStickerPicker(false);
+              setShowFormatMenu(false);
             }}
           >
             <EmojiIcon />
@@ -1674,13 +1708,15 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
 
         {/* Draft preview toggle */}
         <button
-          className={`input-action preview-toggle${showPreview ? ' preview-toggle--active' : ''}`}
+          className={`input-action preview-toggle${showPreview ? ' preview-toggle--active input-action--active' : ''}`}
           aria-label={showPreview ? 'Back to editing' : 'Preview message'}
           aria-pressed={showPreview}
           title={showPreview ? 'Back to editing' : 'Preview message'}
+          type="button"
           onMouseDown={e => {
             e.preventDefault();
             setShowPreview(p => !p);
+            setShowFormatMenu(false);
             if (showPreview) {
               requestAnimationFrame(() => textareaRef.current?.focus());
             }
@@ -1711,6 +1747,7 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           className={`send-btn${canSend ? ' send-btn--active' : ''}`}
           onClick={submit}
           disabled={!canSend}
+          type="button"
           aria-label={
             text.length > CHAR_LIMIT ? 'Message too long' :
             slowModeActive ? 'Slow mode active — wait for cooldown' :
@@ -1855,11 +1892,51 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           box-shadow: 0 0 0 3px var(--accent-subtle), 0 0 12px rgba(14,165,233,0.1) inset;
         }
 
-        /* ── Toolbar group separators ── */
-        /* [attach] | [formatting] */
-        .msg-input-bar > .fmt-bar {
-          margin-left: 3px;
+        .composer-left-tools {
+          position: relative;
+          display: flex;
+          align-items: center;
+          align-self: flex-end;
+          gap: 2px;
+          padding: 2px;
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-md);
+          background: var(--bg-base);
+          flex-shrink: 0;
         }
+
+        .format-popover {
+          position: absolute;
+          left: 0;
+          bottom: calc(100% + 10px);
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: 6px;
+          border: 1px solid var(--border-normal);
+          border-radius: var(--r-md);
+          background: var(--bg-float);
+          box-shadow: var(--shadow-md);
+          z-index: 80;
+          animation: format-popover-in 140ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
+        }
+        @keyframes format-popover-in {
+          from { opacity: 0; transform: translateY(6px) scale(0.98); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .format-popover::after {
+          content: '';
+          position: absolute;
+          left: 18px;
+          bottom: -5px;
+          width: 8px;
+          height: 8px;
+          transform: rotate(45deg);
+          background: var(--bg-float);
+          border-right: 1px solid var(--border-normal);
+          border-bottom: 1px solid var(--border-normal);
+        }
+
         /* [pickers: gif / sticker / emoji] — subtle left gap */
         .msg-input-bar > .gif-button-container {
           margin-left: 6px;
@@ -1893,15 +1970,6 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           pointer-events: none;
         }
 
-        /* ── Formatting bar ── */
-        .fmt-bar {
-          display: flex;
-          align-items: center;
-          gap: 2px;
-          flex-shrink: 0;
-          align-self: flex-end;
-          padding-bottom: 1px;
-        }
         .fmt-btn {
           width: 28px; height: 28px; border-radius: var(--r-xs);
           border: none; background: none; cursor: pointer;
@@ -1910,15 +1978,6 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           transition: color var(--t-fast), background var(--t-fast);
         }
         .fmt-btn:hover { color: var(--text-secondary); background: var(--bg-float); }
-        .fmt-divider {
-          width: 1px; height: 14px; background: var(--border-normal);
-          margin: 0 4px; flex-shrink: 0; opacity: 0.7;
-        }
-        /* Hide on narrow screens */
-        @media (max-width: 480px) {
-          .fmt-bar { display: none; }
-        }
-
         .msg-textarea {
           flex: 1; background: none; border: none; outline: none; resize: none;
           color: var(--text-primary); font-size: 15px; font-family: inherit;
@@ -1954,6 +2013,14 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           transform: scale(1.1);
         }
         .input-action:active { transform: scale(0.92); }
+        .input-action--primary {
+          color: var(--accent);
+          background: var(--accent-subtle);
+        }
+        .input-action--active {
+          color: var(--accent);
+          background: var(--accent-subtle);
+        }
 
         /* GIF text button variant */
         .gif-btn {
@@ -1996,10 +2063,24 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
             min-height: unset;
             min-width: unset;
           }
-          .fmt-bar { display: none; }
+          .composer-left-tools {
+            padding: 0;
+            gap: 4px;
+            border: none;
+            background: transparent;
+          }
+          .input-format-toggle,
+          .input-poll-btn,
+          .gif-button-container,
+          .sticker-button-container,
+          .emoji-button-container,
+          .preview-toggle {
+            display: none;
+          }
 
           .mobile-tool-sheet {
-            display: flex;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(42px, 1fr));
             gap: 6px;
             position: absolute;
             bottom: calc(100% + 4px);
@@ -2018,7 +2099,6 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
             to   { opacity: 1; transform: translateY(0); }
           }
           .mobile-tool-btn {
-            flex: 1;
             height: 40px;
             border: 1px solid var(--border-subtle, rgba(14,165,233,0.08));
             border-radius: var(--r-md, 8px);
@@ -2031,6 +2111,10 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
             justify-content: center;
             transition: background var(--t-fast, 150ms), color var(--t-fast, 150ms);
             min-width: 0;
+          }
+          .mobile-tool-btn svg {
+            width: 16px;
+            height: 16px;
           }
           .mobile-tool-btn:active {
             background: var(--accent-subtle, rgba(14,165,233,0.1));
@@ -2222,8 +2306,26 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
 
+const FormatIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M3 12.5 6.3 3.5h1.4l3.3 9"/>
+    <path d="M4.2 9.5h5.6"/>
+    <path d="M11.5 5.5h2"/>
+    <path d="M12.5 4.5v2"/>
+  </svg>
+);
+
+const PollIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M3 13V8"/>
+    <path d="M8 13V3"/>
+    <path d="M13 13V6"/>
+    <path d="M2 13h12"/>
+  </svg>
+);
+
 const AttachIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
     <path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0V3z"/>
   </svg>
 );

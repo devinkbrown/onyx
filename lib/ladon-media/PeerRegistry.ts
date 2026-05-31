@@ -27,6 +27,12 @@ export interface PeerMedia {
   lastKeyH:       number;
   lastScreenKeyW: number;
   lastScreenKeyH: number;
+  videoW:         number;
+  videoH:         number;
+  screenW:        number;
+  screenH:        number;
+  videoFps:       number;
+  screenFps:      number;
 }
 
 // -------------------------------------------------------------------
@@ -83,6 +89,8 @@ export class PeerRegistry {
       audDec: null, vidDec: null, audCtx: null,
       screenVidDec: null, vidCanvas: null, screenCanvas: null, screenStream: null,
       panner: null, lastKeyW: 0, lastKeyH: 0, lastScreenKeyW: 0, lastScreenKeyH: 0,
+      videoW: this.videoW, videoH: this.videoH, screenW: this.videoW, screenH: this.videoH,
+      videoFps: 60, screenFps: 60,
     };
     this.peers.set(key, pm);
     this.updateSpatialAudio();
@@ -135,6 +143,35 @@ export class PeerRegistry {
 
   getScreenStream(nick: string): MediaStream | null {
     return this.peers.get(nick.toLowerCase())?.screenStream ?? null;
+  }
+
+  setVideoParams(nick: string, width: number, height: number, kind: MediaKind, fps = 60): void {
+    const pm = this.getOrCreate(nick, null, kind);
+    if (kind === 'screen') {
+      if (pm.screenW !== width || pm.screenH !== height) {
+        pm.screenVidDec?.destroy();
+        pm.screenVidDec = null;
+        pm.screenCanvas = null;
+        pm.screenStream?.getTracks().forEach(t => t.stop());
+        pm.screenStream = null;
+      }
+      pm.screenW = width;
+      pm.screenH = height;
+      pm.screenFps = fps;
+    } else {
+      if (pm.videoW !== width || pm.videoH !== height) {
+        pm.vidDec?.destroy();
+        pm.vidDec = null;
+        pm.vidCanvas = null;
+        pm.state.canvas = null;
+      }
+      pm.videoW = width;
+      pm.videoH = height;
+      pm.videoFps = fps;
+    }
+    pm.state.kind = kind;
+    pm.state.hasVideo = true;
+    this.onPeerStateChanged?.(pm.state);
   }
 
   totalFramesDecoded(): number {
@@ -196,7 +233,7 @@ export class PeerRegistry {
   async decodeVideo(pm: PeerMedia, frame: Uint8Array, ftype: string): Promise<void> {
     if (!this.wasm) return;
     const isKey = ftype === 'KEYFRAME';
-    const W = this.videoW, H = this.videoH;
+    const W = pm.videoW || this.videoW, H = pm.videoH || this.videoH;
     if (!pm.vidDec || (isKey && (pm.lastKeyW !== W || pm.lastKeyH !== H))) {
       pm.vidDec?.destroy();
       pm.vidDec = this.wasm.videoDecoder(W, H);
@@ -223,7 +260,7 @@ export class PeerRegistry {
   async decodeScreenVideo(pm: PeerMedia, frame: Uint8Array, ftype: string): Promise<void> {
     if (!this.wasm) return;
     const isKey = ftype === 'KEYFRAME';
-    const W = this.videoW, H = this.videoH;
+    const W = pm.screenW || this.videoW, H = pm.screenH || this.videoH;
     if (!pm.screenVidDec || (isKey && (pm.lastScreenKeyW !== W || pm.lastScreenKeyH !== H))) {
       pm.screenVidDec?.destroy();
       pm.screenVidDec = this.wasm.videoDecoder(W, H);
@@ -237,7 +274,7 @@ export class PeerRegistry {
       c.width = W; c.height = H;
       pm.screenCanvas = c;
       pm.screenStream = (c as HTMLCanvasElement & { captureStream(fps?: number): MediaStream })
-        .captureStream(10);
+        .captureStream(pm.screenFps || 60);
       pm.state.hasVideo = true;
       this.onPeerStateChanged?.(pm.state);
     }

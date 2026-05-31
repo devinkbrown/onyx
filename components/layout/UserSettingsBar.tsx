@@ -63,6 +63,9 @@ export default function UserSettingsBar() {
   const toggleFocusMode   = useOnyxStore(s => s.toggleFocusMode);
   const selfDisplayName    = useOnyxStore(s => s.selfDisplayName);
   const setSelfDisplayName = useOnyxStore(s => s.setSelfDisplayName);
+  const connectionStatus   = useOnyxStore(s => s.connectionStatus);
+  const latencyMs          = useOnyxStore(s => s.latencyMs);
+  const connectedAt        = useOnyxStore(s => s.connectedAt);
 
   const [editingSelfName, setEditingSelfName] = useState(false);
   const [selfNameInput, setSelfNameInput]     = useState('');
@@ -134,9 +137,26 @@ export default function UserSettingsBar() {
   const isMuted    = voice.muted;
   const isDeafened = voice.deafened;
 
-  const subLabel = account
-    ? `@${account}`
-    : STATUS_LABELS[userStatus];
+  const subLabel = STATUS_LABELS[userStatus];
+  const accountTitle = account ? `Signed in as ${account}` : subLabel;
+
+  const roundedLatency = typeof latencyMs === 'number' ? Math.round(latencyMs) : null;
+  const latencyLevel =
+    connectionStatus !== 'connected' ? 'offline' :
+    roundedLatency === null ? 'unknown' :
+    roundedLatency >= 500 ? 'bad' :
+    roundedLatency >= 100 ? 'warn' :
+    'good';
+  const latencyLabel =
+    connectionStatus === 'connected'
+      ? roundedLatency !== null ? `${roundedLatency}ms` : 'online'
+      : connectionStatus;
+  const connectionTitle = [
+    latencyLabel,
+    connectedAt
+      ? `connected since ${connectedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+      : null,
+  ].filter(Boolean).join(' - ');
 
   return (
     <div className="user-bar">
@@ -212,7 +232,13 @@ export default function UserSettingsBar() {
                 {hasSelfOverride && (
                   <span className="user-bar-actual-nick">({ourNick})</span>
                 )}
-                <span className="user-bar-sub">{subLabel}</span>
+                <span className="user-bar-sub-row" title={accountTitle}>
+                  <span
+                    className={`user-bar-state-dot user-bar-state-dot--${userStatus}`}
+                    aria-hidden
+                  />
+                  <span className="user-bar-sub">{subLabel}</span>
+                </span>
               </button>
               <button
                 className="user-bar-edit-name-btn"
@@ -242,20 +268,22 @@ export default function UserSettingsBar() {
                 </span>
               )}
             </button>
-          ) : (
-            <button
-              className="user-bar-set-status-btn"
-              onClick={openCustomStatus}
-              aria-label="Set a custom status"
-            >
-              Set status…
-            </button>
-          )}
+          ) : null}
         </div>
       </div>
 
       {/* Action buttons */}
       <div className="user-bar-actions">
+        <Tooltip text={`Connection: ${connectionTitle || latencyLabel}`} side="top">
+          <div
+            className={`user-bar-connection user-bar-connection--${latencyLevel}`}
+            role="status"
+            aria-label={`Connection ${latencyLabel}`}
+          >
+            <ConnectionSignalIcon />
+          </div>
+        </Tooltip>
+
         <Tooltip text={isMuted ? 'Unmute' : 'Mute'} side="top">
           <button
             className={`user-bar-btn ${isMuted ? 'user-bar-btn--active user-bar-btn--warn' : ''}`}
@@ -332,16 +360,19 @@ export default function UserSettingsBar() {
 
       <style>{`
         .user-bar {
-          height: 52px;
+          min-height: 60px;
           display: flex;
           align-items: center;
-          padding: 0 8px;
-          gap: 2px;
-          background: var(--bg-void);
+          padding: 7px 8px;
+          gap: 6px;
+          background:
+            linear-gradient(180deg, rgba(255,255,255,0.018), rgba(255,255,255,0)),
+            var(--bg-void);
           border-top: 1px solid var(--border-subtle);
           box-shadow: 0 -1px 0 var(--border-subtle);
           flex-shrink: 0;
           position: relative;
+          box-sizing: border-box;
         }
 
         /* ── Status picker ── */
@@ -416,21 +447,26 @@ export default function UserSettingsBar() {
           flex: 1;
           display: flex;
           align-items: center;
-          gap: 8px;
-          overflow: hidden;
+          gap: 7px;
+          overflow: visible;
           min-width: 0;
         }
 
         .user-bar-avatar-btn {
-          flex-shrink: 0;
+          flex: 0 0 42px;
+          width: 42px;
+          height: 42px;
           background: none;
           border: none;
           cursor: pointer;
-          padding: 1px;
+          padding: 5px;
           border-radius: var(--r-full);
           transition: background 150ms var(--ease-out), box-shadow 150ms var(--ease-out);
           display: flex;
           align-items: center;
+          justify-content: center;
+          box-sizing: border-box;
+          overflow: visible;
         }
         .user-bar-avatar-btn:hover {
           background: var(--ch-hover-bg);
@@ -438,7 +474,7 @@ export default function UserSettingsBar() {
         }
         .user-bar-avatar-btn:focus-visible {
           outline: 2px solid var(--accent-border);
-          outline-offset: 2px;
+          outline-offset: -1px;
         }
 
         /* ── Text group (nick + custom status stacked) ── */
@@ -448,7 +484,7 @@ export default function UserSettingsBar() {
           flex-direction: column;
           overflow: hidden;
           min-width: 0;
-          gap: 1px;
+          gap: 0;
         }
 
         .user-bar-text-btn {
@@ -456,7 +492,7 @@ export default function UserSettingsBar() {
           flex-direction: column;
           overflow: hidden;
           min-width: 0;
-          padding: 2px 6px;
+          padding: 2px 5px;
           border-radius: var(--r-sm);
           cursor: pointer;
           border: none;
@@ -472,7 +508,7 @@ export default function UserSettingsBar() {
 
         .user-bar-nick {
           font-size: 13px;
-          font-weight: 600;
+          font-weight: 650;
           color: var(--text-primary);
           white-space: nowrap;
           overflow: hidden;
@@ -482,12 +518,58 @@ export default function UserSettingsBar() {
 
         .user-bar-sub {
           font-size: 11px;
-          color: var(--text-muted);
+          color: color-mix(in srgb, var(--text-muted) 92%, var(--text-primary));
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
           line-height: 1.25;
         }
+
+        .user-bar-sub-row {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          min-width: 0;
+          max-width: 100%;
+          line-height: 1.25;
+          color: var(--text-muted);
+        }
+
+        .user-bar-sub-row .user-bar-sub {
+          min-width: 0;
+        }
+
+        .user-bar-state-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          flex: 0 0 auto;
+          background: var(--status-offline);
+          box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 20%, transparent);
+        }
+        .user-bar-state-dot--online { background: var(--status-online); }
+        .user-bar-state-dot--idle { background: var(--status-idle); }
+        .user-bar-state-dot--dnd { background: var(--status-dnd); }
+        .user-bar-state-dot--offline { background: var(--status-offline); opacity: 0.72; }
+
+        .user-bar-connection {
+          flex: 0 0 auto;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 22px;
+          height: 32px;
+          color: var(--text-muted);
+          opacity: 0.72;
+        }
+        .user-bar-connection svg {
+          width: 14px;
+          height: 14px;
+        }
+        .user-bar-connection--good { color: var(--status-online); }
+        .user-bar-connection--warn { color: var(--status-idle); }
+        .user-bar-connection--bad { color: var(--status-dnd); }
+        .user-bar-connection--offline { color: var(--status-offline); }
 
         /* ── Nick row with edit pencil ── */
         .user-bar-nick-row {
@@ -570,7 +652,7 @@ export default function UserSettingsBar() {
           flex-direction: column;
           overflow: hidden;
           min-width: 0;
-          padding: 0 6px;
+          padding: 0 5px;
           border: none;
           background: none;
           cursor: pointer;
@@ -584,7 +666,6 @@ export default function UserSettingsBar() {
 
         .user-bar-status-text {
           font-size: 10px;
-          font-style: italic;
           color: var(--text-muted);
           white-space: nowrap;
           overflow: hidden;
@@ -604,35 +685,24 @@ export default function UserSettingsBar() {
           font-variant-numeric: tabular-nums;
         }
 
-        /* ── Set status button ── */
-        .user-bar-set-status-btn {
-          font-size: 10px;
-          color: var(--text-muted);
-          padding: 0 6px;
-          border: none;
-          background: none;
-          cursor: pointer;
-          text-align: left;
-          font-family: inherit;
-          border-radius: var(--r-sm);
-          transition: color var(--t-fast);
-          white-space: nowrap;
-          line-height: 1.3;
-        }
-        .user-bar-set-status-btn:hover { color: var(--accent); }
-
         /* ── Action buttons ── */
         .user-bar-actions {
           display: flex;
           align-items: center;
-          gap: 1px;
+          gap: 3px;
           flex-shrink: 0;
+          max-width: min(216px, 54%);
+          overflow-x: auto;
+          overflow-y: hidden;
+          scrollbar-width: none;
+          padding: 1px 0;
         }
+        .user-bar-actions::-webkit-scrollbar { display: none; }
 
         .user-bar-btn {
-          width: 30px; height: 30px;
+          width: 32px; height: 32px;
           border-radius: var(--r-sm);
-          background: none; border: none; cursor: pointer;
+          background: none; border: 1px solid transparent; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
           color: var(--text-secondary);
           opacity: 0.65;
@@ -642,6 +712,7 @@ export default function UserSettingsBar() {
         .user-bar-btn svg { width: 16px; height: 16px; }
         .user-bar-btn:hover {
           background: var(--ch-hover-bg);
+          border-color: var(--border-subtle);
           color: var(--text-primary);
           opacity: 1;
         }
@@ -737,6 +808,16 @@ function FocusModeIcon() {
       <rect x="1" y="10" width="5" height="5" rx="1" opacity="0.4" />
       <rect x="10" y="10" width="5" height="5" rx="1" opacity="0.4" />
       <rect x="4.5" y="4.5" width="7" height="7" rx="1.5" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function ConnectionSignalIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+      <rect x="2" y="9" width="2" height="5" rx="1" opacity="0.45" />
+      <rect x="7" y="6" width="2" height="8" rx="1" opacity="0.72" />
+      <rect x="12" y="3" width="2" height="11" rx="1" />
     </svg>
   );
 }

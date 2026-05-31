@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
+import ChanstatsPreview from '@/components/site/ChanstatsPreview';
 
 export default function LandingPage() {
   return (
@@ -20,6 +21,10 @@ export default function LandingPage() {
           <span className="land-nav-wordmark">Ocean</span>
         </div>
         <div className="land-nav-links">
+          <a href="#features" className="land-nav-link">Features</a>
+          <a href="#preview" className="land-nav-link">Preview</a>
+          <a href="#activity" className="land-nav-link">Activity</a>
+          <a href="#connect" className="land-nav-link">Connect</a>
           <Link href="/about" className="land-nav-link">About</Link>
           <Link href="/login" className="land-nav-cta">
             Dive in <ArrowRight size={13} />
@@ -86,7 +91,7 @@ export default function LandingPage() {
       </div>
 
       {/* ── Features bento ──────────────────────────────────────────── */}
-      <section className="land-features">
+      <section id="features" className="land-features">
 
         {/* Row 1 — Voice + Sessions */}
         <div className="land-bento-row land-bento-row-1">
@@ -222,6 +227,173 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── Product preview ────────────────────────────────────────── */}
+      <section id="preview" className="land-preview">
+        <div className="land-section-heading">
+          <span className="land-section-kicker">Ocean app</span>
+          <h2 className="land-section-title">Everything has a predictable place.</h2>
+          <p className="land-section-copy">
+            Ocean keeps the familiar server, channel, chat, and member layout,
+            then layers in IRC-native identity, voice, session handoff, media,
+            and moderation tools where people already expect them.
+          </p>
+        </div>
+
+        <div className="land-app-preview" aria-label="Ocean app interface preview">
+          <div className="land-preview-rail" aria-hidden>
+            <div className="land-preview-orb land-preview-orb-active">O</div>
+            <div className="land-preview-orb">#</div>
+            <div className="land-preview-orb">+</div>
+          </div>
+          <div className="land-preview-sidebar">
+            <div className="land-preview-server">eshmaki.me</div>
+            <div className="land-preview-group">Channels</div>
+            {['root', 'dev', 'art', 'lounge'].map((channel, index) => (
+              <div key={channel} className={`land-preview-channel ${index === 0 ? 'land-preview-channel-active' : ''}`}>
+                <span>#</span>
+                {channel}
+              </div>
+            ))}
+            <div className="land-preview-group">Voice</div>
+            <div className="land-preview-channel land-preview-voice">
+              <VoiceSmIcon />
+              voice-1
+            </div>
+          </div>
+          <div className="land-preview-chat">
+            <div className="land-preview-chat-head">
+              <div>
+                <span>#</span>
+                root
+              </div>
+              <div className="land-preview-tools">
+                <span>Threads</span>
+                <span>Search</span>
+                <span>Media</span>
+              </div>
+            </div>
+            <div className="land-preview-message">
+              <div className="land-preview-avatar">k</div>
+              <div>
+                <div className="land-preview-name">kain <span>today</span></div>
+                <p>Session reclaimed cleanly. Phone and desktop are both attached.</p>
+              </div>
+            </div>
+            <div className="land-preview-message">
+              <div className="land-preview-avatar land-preview-avatar-gold">o</div>
+              <div>
+                <div className="land-preview-name">ocean <span>live</span></div>
+                <p>LADON voice is encrypted, linked to the channel, and ready.</p>
+                <div className="land-preview-pill-row">
+                  <span>VEIL active</span>
+                  <span>2 clients</span>
+                  <span>IRCv3</span>
+                </div>
+              </div>
+            </div>
+            <div className="land-preview-composer">Message #root</div>
+          </div>
+          <div className="land-preview-members">
+            <div className="land-preview-group">Online</div>
+            {['kain', 'trev', 'services', 'ocean'].map((nick) => (
+              <div key={nick} className="land-preview-member">
+                <span className="land-preview-presence" />
+                {nick}
+              </div>
+            ))}
+            <div className="land-preview-status">
+              <strong>Network health</strong>
+              <span>Synced links, active sessions, no relay dependency.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <ChanstatsPreview />
+
+      {/* ── Capabilities ───────────────────────────────────────────── */}
+      <section className="land-capabilities" aria-label="Ocean capabilities">
+        <div className="land-section-heading land-section-heading-compact">
+          <span className="land-section-kicker">Feature map</span>
+          <h2 className="land-section-title">Built for real communities, not a demo room.</h2>
+        </div>
+        <div className="land-cap-grid">
+          {([
+            ['Chat', ['Threaded replies', 'Reactions and edits', 'Pins, search, history', 'Embeds and media cards']],
+            ['Voice and media', ['LADON channel voice', 'Encrypted sessions', 'Media gallery', 'Whiteboard collaboration']],
+            ['Identity', ['SASL login', 'Session reclaim', 'Multi-client nick support', 'Token-based resume']],
+            ['Operations', ['Services awareness', 'Moderation tools', 'Channel browser', 'Network status views']],
+          ] as Array<[string, string[]]>).map(([title, items]) => (
+            <div key={title} className="land-cap-card">
+              <h3>{title}</h3>
+              <ul>
+                {items.map((item) => (
+                  <li key={item}>
+                    <span className="land-cap-check" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Connect ───────────────────────────────────────────────── */}
+      <section id="connect" className="land-connect">
+        <div className="land-section-heading">
+          <span className="land-section-kicker">Connect</span>
+          <h2 className="land-section-title">Use the web app or bring your own IRC client.</h2>
+          <p className="land-section-copy">
+            The website is the front door, Ocean is the rich client, and the
+            network remains open enough for standard IRC tooling.
+          </p>
+        </div>
+        <div className="land-connect-grid">
+          <div className="land-connect-card land-connect-card-primary">
+            <span className="land-connect-label">Recommended</span>
+            <h3>Ocean web app</h3>
+            <p>Full chat, voice, media, settings, session resume, and community tooling in the browser.</p>
+            <Link href="/login" className="land-connect-action">
+              Open Ocean <ArrowRight size={13} />
+            </Link>
+          </div>
+          <div className="land-connect-card">
+            <span className="land-connect-label">IRC</span>
+            <h3>TLS client access</h3>
+            <p>Use any IRCv3 client with TLS and SASL for a direct protocol connection.</p>
+            <code>eshmaki.me:6697</code>
+          </div>
+          <div className="land-connect-card">
+            <span className="land-connect-label">Start here</span>
+            <h3>Main channel</h3>
+            <p>Join the shared lobby, see live community state, then branch into focused rooms.</p>
+            <code>#root</code>
+          </div>
+        </div>
+      </section>
+
+      {/* ── FAQ ───────────────────────────────────────────────────── */}
+      <section className="land-faq">
+        <div className="land-section-heading land-section-heading-compact">
+          <span className="land-section-kicker">FAQ</span>
+          <h2 className="land-section-title">Answers before the first login.</h2>
+        </div>
+        <div className="land-faq-grid">
+          {([
+            ['Do I need Ocean?', 'No. Ocean is the polished web client, but the network speaks IRCv3 so native clients can connect too.'],
+            ['Can I stay connected from multiple devices?', 'Yes. Session reclaim is designed for multiple clients on the same nick without kicking out the others.'],
+            ['Is voice part of IRC?', 'Voice uses LADON over Ophion so channel voice belongs to the same open network instead of a separate relay stack.'],
+            ['Where should I start?', 'Open Ocean, sign in, and join #root. The app exposes channels, members, voice, search, and settings in the main workspace.'],
+          ] as Array<[string, string]>).map(([question, answer]) => (
+            <article key={question} className="land-faq-item">
+              <h3>{question}</h3>
+              <p>{answer}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
       {/* ── Community ───────────────────────────────────────────────── */}
       <section className="land-community">
         <div className="land-community-bg" aria-hidden>
@@ -297,7 +469,7 @@ export default function LandingPage() {
             Ophion ↗
           </a>
         </nav>
-        <p className="land-footer-copy">© {new Date().getFullYear()} eshmaki.me</p>
+        <p className="land-footer-copy">© 2026 eshmaki.me</p>
       </footer>
 
       <style>{`
@@ -762,6 +934,423 @@ export default function LandingPage() {
           letter-spacing: 0.02em;
         }
 
+        /* ── Shared section headings ── */
+        .land-section-heading {
+          position: relative; z-index: 1;
+          max-width: 740px;
+          margin: 0 auto 28px;
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 12px;
+        }
+        .land-section-heading-compact { margin-bottom: 22px; }
+        .land-section-kicker {
+          display: inline-flex;
+          align-items: center;
+          width: fit-content;
+          padding: 5px 10px;
+          border-radius: 999px;
+          border: 1px solid var(--accent-border);
+          background: var(--accent-subtle);
+          color: var(--accent);
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+        }
+        .land-section-title {
+          margin: 0;
+          color: var(--text-primary);
+          font-size: clamp(2rem, 4vw, 3rem);
+          font-weight: 850;
+          line-height: 1.08;
+          letter-spacing: -0.03em;
+        }
+        .land-section-copy {
+          margin: 0;
+          color: var(--text-secondary);
+          font-size: clamp(0.98rem, 1.4vw, 1.08rem);
+          line-height: 1.65;
+        }
+
+        /* ── Product preview ── */
+        .land-preview {
+          position: relative; z-index: 1;
+          padding: 10px clamp(20px, 5vw, 80px) 90px;
+          max-width: 1240px;
+          margin: 0 auto;
+        }
+        .land-app-preview {
+          display: grid;
+          grid-template-columns: 72px 220px minmax(0, 1fr) 190px;
+          min-height: 430px;
+          overflow: hidden;
+          border-radius: 22px;
+          border: 1px solid var(--border-normal);
+          background:
+            linear-gradient(180deg, rgba(14,165,233,0.07), transparent 34%),
+            color-mix(in srgb, var(--bg-base) 92%, transparent);
+          box-shadow: 0 32px 90px rgba(0,0,0,0.45), inset 0 1px 0 var(--accent-border);
+        }
+        .land-preview-rail,
+        .land-preview-sidebar,
+        .land-preview-chat,
+        .land-preview-members {
+          min-width: 0;
+          border-right: 1px solid var(--border-subtle);
+        }
+        .land-preview-rail {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 12px;
+          padding: 18px 0;
+          background: rgba(0,0,0,0.28);
+        }
+        .land-preview-orb {
+          width: 42px; height: 42px;
+          border-radius: 14px;
+          display: grid; place-items: center;
+          color: var(--text-muted);
+          background: var(--bg-elevated);
+          border: 1px solid var(--border-subtle);
+          font-size: 13px;
+          font-weight: 800;
+        }
+        .land-preview-orb-active {
+          color: var(--bg-void);
+          background: linear-gradient(135deg, var(--accent), var(--gold));
+          box-shadow: 0 0 24px var(--accent-glow);
+        }
+        .land-preview-sidebar {
+          padding: 18px 14px;
+          background: rgba(0,0,0,0.16);
+        }
+        .land-preview-server {
+          color: var(--text-primary);
+          font-size: 14px;
+          font-weight: 800;
+          margin-bottom: 18px;
+        }
+        .land-preview-group {
+          color: var(--text-muted);
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          margin: 16px 0 8px;
+        }
+        .land-preview-channel,
+        .land-preview-member {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          height: 34px;
+          padding: 0 10px;
+          border-radius: 8px;
+          color: var(--text-secondary);
+          font-size: 13px;
+          font-weight: 600;
+        }
+        .land-preview-channel span {
+          color: var(--text-muted);
+          font-family: var(--font-mono);
+        }
+        .land-preview-channel-active {
+          color: var(--accent);
+          background: var(--accent-subtle);
+          border: 1px solid var(--accent-border);
+        }
+        .land-preview-voice {
+          color: var(--status-online);
+          background: rgba(52,211,153,0.08);
+          border: 1px solid rgba(52,211,153,0.18);
+        }
+        .land-preview-voice svg { width: 12px; height: 12px; }
+        .land-preview-chat {
+          display: flex;
+          flex-direction: column;
+          background: rgba(2,6,23,0.22);
+        }
+        .land-preview-chat-head {
+          min-height: 58px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          padding: 0 20px;
+          border-bottom: 1px solid var(--border-subtle);
+          color: var(--text-primary);
+          font-size: 15px;
+          font-weight: 800;
+        }
+        .land-preview-chat-head span { color: var(--text-muted); margin-right: 4px; }
+        .land-preview-tools {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+        .land-preview-tools span,
+        .land-preview-pill-row span {
+          margin: 0;
+          padding: 4px 8px;
+          border-radius: 999px;
+          color: var(--text-secondary);
+          background: var(--bg-elevated);
+          border: 1px solid var(--border-subtle);
+          font-size: 11px;
+          font-weight: 700;
+        }
+        .land-preview-message {
+          display: grid;
+          grid-template-columns: 38px minmax(0, 1fr);
+          gap: 12px;
+          padding: 20px;
+          border-bottom: 1px solid var(--border-subtle);
+        }
+        .land-preview-avatar {
+          width: 38px; height: 38px;
+          border-radius: 12px;
+          display: grid; place-items: center;
+          color: var(--bg-void);
+          background: var(--accent);
+          font-size: 14px;
+          font-weight: 900;
+        }
+        .land-preview-avatar-gold { background: var(--gold); }
+        .land-preview-name {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: var(--text-primary);
+          font-size: 13px;
+          font-weight: 800;
+          margin-bottom: 4px;
+        }
+        .land-preview-name span {
+          color: var(--text-muted);
+          font-size: 11px;
+          font-weight: 600;
+        }
+        .land-preview-message p {
+          margin: 0;
+          color: var(--text-secondary);
+          font-size: 13px;
+          line-height: 1.55;
+        }
+        .land-preview-pill-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin-top: 10px;
+        }
+        .land-preview-composer {
+          margin: auto 20px 20px;
+          min-height: 44px;
+          display: flex;
+          align-items: center;
+          padding: 0 14px;
+          border-radius: 12px;
+          color: var(--text-muted);
+          background: var(--bg-elevated);
+          border: 1px solid var(--border-subtle);
+          font-size: 13px;
+        }
+        .land-preview-members {
+          border-right: 0;
+          padding: 18px 14px;
+          background: rgba(0,0,0,0.12);
+        }
+        .land-preview-presence {
+          width: 7px; height: 7px;
+          border-radius: 50%;
+          background: var(--status-online);
+          box-shadow: 0 0 8px rgba(52,211,153,0.55);
+        }
+        .land-preview-status {
+          margin-top: 22px;
+          padding: 14px;
+          border-radius: 12px;
+          background: var(--accent-subtle);
+          border: 1px solid var(--accent-border);
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+        .land-preview-status strong {
+          color: var(--accent);
+          font-size: 12px;
+        }
+        .land-preview-status span {
+          color: var(--text-secondary);
+          font-size: 12px;
+          line-height: 1.45;
+        }
+
+        /* ── Capabilities ── */
+        .land-capabilities {
+          position: relative; z-index: 1;
+          max-width: 1240px;
+          margin: 0 auto;
+          padding: 0 clamp(20px, 5vw, 80px) 90px;
+        }
+        .land-cap-grid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 14px;
+        }
+        .land-cap-card {
+          border: 1px solid var(--border-subtle);
+          border-radius: 16px;
+          padding: 22px;
+          background: color-mix(in srgb, var(--bg-base) 86%, transparent);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+        }
+        .land-cap-card h3 {
+          margin: 0 0 14px;
+          color: var(--text-primary);
+          font-size: 1rem;
+          letter-spacing: -0.01em;
+        }
+        .land-cap-card ul {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 11px;
+        }
+        .land-cap-card li {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          color: var(--text-secondary);
+          font-size: 13px;
+          line-height: 1.35;
+        }
+        .land-cap-check {
+          width: 7px; height: 7px;
+          border-radius: 50%;
+          background: var(--accent);
+          box-shadow: 0 0 8px var(--accent-glow);
+          flex-shrink: 0;
+        }
+
+        /* ── Connect ── */
+        .land-connect {
+          position: relative; z-index: 1;
+          max-width: 1240px;
+          margin: 0 auto;
+          padding: 0 clamp(20px, 5vw, 80px) 90px;
+        }
+        .land-connect-grid {
+          display: grid;
+          grid-template-columns: 1.2fr 1fr 1fr;
+          gap: 14px;
+        }
+        .land-connect-card {
+          min-height: 230px;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 12px;
+          padding: 26px;
+          border-radius: 18px;
+          border: 1px solid var(--border-subtle);
+          background: color-mix(in srgb, var(--bg-base) 88%, transparent);
+        }
+        .land-connect-card-primary {
+          background:
+            radial-gradient(circle at 20% 20%, var(--accent-subtle), transparent 58%),
+            color-mix(in srgb, var(--bg-elevated) 88%, transparent);
+          border-color: var(--accent-border);
+        }
+        .land-connect-label {
+          color: var(--accent);
+          background: var(--accent-subtle);
+          border: 1px solid var(--accent-border);
+          border-radius: 999px;
+          padding: 4px 9px;
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+        }
+        .land-connect-card h3 {
+          margin: 0;
+          color: var(--text-primary);
+          font-size: 1.15rem;
+          letter-spacing: -0.02em;
+        }
+        .land-connect-card p {
+          margin: 0;
+          color: var(--text-secondary);
+          font-size: 0.9rem;
+          line-height: 1.6;
+        }
+        .land-connect-card code {
+          margin-top: auto;
+          color: var(--gold);
+          background: rgba(0,0,0,0.36);
+          border: 1px solid var(--border-normal);
+          border-radius: 8px;
+          padding: 8px 10px;
+          font-family: var(--font-mono);
+          font-size: 12px;
+        }
+        .land-connect-action {
+          margin-top: auto;
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          color: var(--bg-void);
+          background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+          border-radius: 10px;
+          padding: 10px 14px;
+          font-size: 13px;
+          font-weight: 800;
+          text-decoration: none;
+        }
+        .land-connect-action:hover { text-decoration: none; color: var(--bg-void); }
+        @media (max-width: 980px) {
+          .land-connect-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+
+        /* ── FAQ ── */
+        .land-faq {
+          position: relative; z-index: 1;
+          max-width: 1120px;
+          margin: 0 auto;
+          padding: 0 clamp(20px, 5vw, 80px) 80px;
+        }
+        .land-faq-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 14px;
+        }
+        .land-faq-item {
+          border: 1px solid var(--border-subtle);
+          border-radius: 16px;
+          background: color-mix(in srgb, var(--bg-base) 84%, transparent);
+          padding: 22px;
+        }
+        .land-faq-item h3 {
+          margin: 0 0 8px;
+          color: var(--text-primary);
+          font-size: 0.98rem;
+          letter-spacing: -0.01em;
+        }
+        .land-faq-item p {
+          margin: 0;
+          color: var(--text-secondary);
+          font-size: 0.88rem;
+          line-height: 1.6;
+        }
+
         /* ── Community ── */
         .land-community {
           position: relative; z-index: 1;
@@ -951,6 +1540,39 @@ export default function LandingPage() {
           .land-card-h3 { font-size: 1.05rem; }
           .land-card-p { font-size: 0.85rem; }
 
+          .land-section-heading { margin-bottom: 20px; align-items: flex-start; text-align: left; }
+          .land-section-title { font-size: clamp(1.75rem, 8vw, 2.25rem); }
+          .land-preview, .land-capabilities, .land-connect, .land-faq {
+            padding-left: 12px;
+            padding-right: 12px;
+            padding-bottom: 64px;
+          }
+          .land-app-preview {
+            grid-template-columns: 56px minmax(0, 1fr);
+            min-height: auto;
+            border-radius: 18px;
+          }
+          .land-preview-rail { grid-row: 1 / span 3; }
+          .land-preview-sidebar { border-right: 0; }
+          .land-preview-chat {
+            grid-column: 2;
+            border-top: 1px solid var(--border-subtle);
+            border-right: 0;
+          }
+          .land-preview-chat-head { align-items: flex-start; flex-direction: column; padding: 14px; gap: 10px; }
+          .land-preview-tools { justify-content: flex-start; }
+          .land-preview-message { padding: 16px 14px; }
+          .land-preview-composer { margin: 10px 14px 14px; }
+          .land-preview-members {
+            grid-column: 2;
+            border-top: 1px solid var(--border-subtle);
+            padding: 14px;
+          }
+          .land-cap-grid,
+          .land-connect-grid,
+          .land-faq-grid { grid-template-columns: 1fr; }
+          .land-connect-card { min-height: 0; padding: 22px; }
+
           .land-community { margin: 10px 12px; padding: 44px 20px; border-radius: 20px; }
           .land-community-h2 { font-size: clamp(1.8rem, 8vw, 2.4rem); }
           .land-community-p { font-size: 0.95rem; }
@@ -976,6 +1598,15 @@ export default function LandingPage() {
           .land-card-inner { padding: 18px 14px; }
           .land-community { margin: 10px 8px; padding: 36px 16px; }
           .land-features { padding: 0 8px 56px; }
+          .land-preview, .land-capabilities, .land-connect, .land-faq {
+            padding-left: 8px;
+            padding-right: 8px;
+          }
+          .land-preview-message {
+            grid-template-columns: 32px minmax(0, 1fr);
+            gap: 10px;
+          }
+          .land-preview-avatar { width: 32px; height: 32px; border-radius: 10px; }
           .land-hero { padding: calc(72px + env(safe-area-inset-top, 0px)) 12px 56px; }
           .land-nav { padding: env(safe-area-inset-top, 0px) 12px 0; }
         }
@@ -1254,6 +1885,7 @@ function WaveformVis() {
       </defs>
       {bars.map((h, i) => {
         const barH = h * 48;
+        const peakH = barH * (0.72 + (i % 6) * 0.08);
         const x = i * (200 / bars.length) + 2;
         const barW = 200 / bars.length - 4;
         return (
@@ -1264,7 +1896,7 @@ function WaveformVis() {
             opacity={0.55 + h * 0.45}>
             <animate
               attributeName="height"
-              values={`${barH};${barH * (0.7 + Math.random() * 0.6)};${barH}`}
+              values={`${barH};${peakH};${barH}`}
               dur={`${1.2 + (i % 5) * 0.3}s`}
               repeatCount="indefinite"
               begin={`${i * 0.08}s`}
@@ -1273,7 +1905,7 @@ function WaveformVis() {
             />
             <animate
               attributeName="y"
-              values={`${(60 - barH) / 2};${(60 - barH * (0.7 + 0.3)) / 2};${(60 - barH) / 2}`}
+              values={`${(60 - barH) / 2};${(60 - peakH) / 2};${(60 - barH) / 2}`}
               dur={`${1.2 + (i % 5) * 0.3}s`}
               repeatCount="indefinite"
               begin={`${i * 0.08}s`}

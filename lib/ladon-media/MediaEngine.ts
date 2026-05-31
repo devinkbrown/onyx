@@ -28,17 +28,64 @@ const SAMPLE_RATE    = 48000;
 const AUDIO_CHANNELS = 2;
 const AUDIO_QUALITY: OpvoxQuality = 2;
 const VIDEO_QUALITY  = 70;
-const VIDEO_FPS      = 15;
-const VIDEO_WIDTH    = 320;
-const VIDEO_HEIGHT   = 240;
-const SCREEN_WIDTH   = 1280;
-const SCREEN_HEIGHT  = 720;
+const VIDEO_FPS      = 60;
+const VIDEO_WIDTH    = 1920;
+const VIDEO_HEIGHT   = 1080;
+const SCREEN_FPS     = 60;
+const SCREEN_WIDTH   = 3840;
+const SCREEN_HEIGHT  = 2160;
 const SPEAKING_RMS   = 0.012;
 const SPEAKING_POLL_MS = 120;
 
 const MCHUNK_BIN = 120;   /* binary bytes per chunk (→ 160 base64) */
 const SMALL_BIN  = 105;   /* single-msg threshold in binary bytes */
 const WASM_URL   = '/opcodec_wasm.js';
+const MAX_MCHUNK_TOTAL = 65535;
+
+type VideoCaptureProfile = {
+  width: number;
+  height: number;
+  fps: number;
+  quality: number;
+  profile: 'camera' | 'screen';
+  screenShare?: boolean;
+};
+
+type StreamQuality = 'auto' | '1080p60' | '4k60';
+
+const CAMERA_PROFILE: VideoCaptureProfile = {
+  width: VIDEO_WIDTH,
+  height: VIDEO_HEIGHT,
+  fps: VIDEO_FPS,
+  quality: VIDEO_QUALITY,
+  profile: 'camera',
+};
+
+const CAMERA_PROFILE_4K60: VideoCaptureProfile = {
+  width: SCREEN_WIDTH,
+  height: SCREEN_HEIGHT,
+  fps: SCREEN_FPS,
+  quality: 82,
+  profile: 'camera',
+};
+
+const SCREEN_PROFILE_4K60: VideoCaptureProfile = {
+  width: SCREEN_WIDTH,
+  height: SCREEN_HEIGHT,
+  fps: SCREEN_FPS,
+  quality: 85,
+  profile: 'screen',
+  screenShare: true,
+};
+
+const SCREEN_PROFILE_1080P60: VideoCaptureProfile = {
+  width: 1920,
+  height: 1080,
+  fps: 60,
+  quality: 82,
+  profile: 'screen',
+  screenShare: true,
+};
 
 /* Adaptive bitrate thresholds */
 const BW_TIER_GOOD  = 300_000;
@@ -71,6 +118,33 @@ function msgpackArray1(a: string): Uint8Array {
   return out;
 }
 
+function videoProfileFor(kind: MediaKind, quality: StreamQuality = '4k60', broadcast = false): VideoCaptureProfile {
+  if (kind === 'screen') {
+    if (quality === '1080p60' || quality === 'auto') return SCREEN_PROFILE_1080P60;
+    return SCREEN_PROFILE_4K60;
+  }
+  if (kind === 'video' && broadcast && quality === '4k60') return CAMERA_PROFILE_4K60;
+  return CAMERA_PROFILE;
+}
+
+function parseVideoJoinPayload(payload: string): VideoCaptureProfile {
+  const [wRaw, hRaw, qRaw, fpsRaw, screenRaw] = payload.trim().split(/\s+/);
+  const screenShare = screenRaw === 'screen' || screenRaw === 'true' || screenRaw === '1';
+  const fallback = screenShare ? SCREEN_PROFILE_4K60 : CAMERA_PROFILE;
+  const width = Number.parseInt(wRaw ?? '', 10);
+  const height = Number.parseInt(hRaw ?? '', 10);
+  const quality = Number.parseInt(qRaw ?? '', 10);
+  const fps = Number.parseInt(fpsRaw ?? '', 10);
+  return {
+    width: Number.isFinite(width) && width > 0 ? width : fallback.width,
+    height: Number.isFinite(height) && height > 0 ? height : fallback.height,
+    quality: Number.isFinite(quality) ? Math.max(0, Math.min(100, quality)) : fallback.quality,
+    fps: Number.isFinite(fps) && fps > 0 ? Math.max(1, Math.min(60, fps)) : fallback.fps,
+    profile: screenShare ? 'screen' : 'camera',
+    screenShare,
+  };
+}
+
 // -------------------------------------------------------------------
 // Main engine
 // -------------------------------------------------------------------
@@ -91,6 +165,7 @@ export class LadonMediaEngine {
 
   private audEnc: OpvoxEncoder | null = null;
   private vidEnc: OpvisEncoder | null = null;
+  private localVideoProfile: VideoCaptureProfile | null = null;
 
   private audioCtx:     AudioContext | null = null;
   private audioWorklet: AudioWorkletNode | ScriptProcessorNode | null = null;
@@ -163,8 +238,14 @@ export class LadonMediaEngine {
       setTimeout(() => {
         if (this.client && this.activeRoom === room) {
           this.mediaframeCmd(room, 'VOICE_JOIN', `${SAMPLE_RATE} ${AUDIO_CHANNELS}`);
-          if (this.localKind === 'video' || this.localKind === 'screen')
-            this.mediaframeCmd(room, 'VIDEO_JOIN', `${VIDEO_WIDTH} ${VIDEO_HEIGHT} ${VIDEO_QUALITY} ${VIDEO_FPS}`);
+          if (this.localKind === 'video' || this.localKind === 'screen') {
+            const profile = this.localVideoProfile ?? videoProfileFor(this.localKind);
+            this.mediaframeCmd(
+              room,
+              'VIDEO_JOIN',
+              `${profile.width} ${profile.height} ${profile.quality} ${profile.fps}${profile.screenShare ? ' screen' : ''}`,
+            );
+          }
           this.mediaframeCmd(room, 'ROSTER');
         }
       }, 500);
@@ -243,15 +324,32 @@ export class LadonMediaEngine {
     return this.cb.enableVideoCalls?.() ?? true;
   }
 
-  private async capture(kind: MediaKind): Promise<MediaStream> {
+  private async capture(kind: MediaKind, quality: StreamQuality = '4k60', broadcast = false): Promise<MediaStream> {
     if (this.localStream && this.localKind === kind) return this.localStream;
     if (this.localStream) this.releaseMedia();
     if (!this.mediaAllowed(kind)) throw new Error(`${kind} media is disabled`);
     const devs = navigator.mediaDevices;
     if (!devs) throw new Error('Media devices unavailable');
+    const profile = videoProfileFor(kind, quality, broadcast);
     const stream = kind === 'screen'
-      ? await devs.getDisplayMedia({ video: true, audio: true })
-      : await devs.getUserMedia({ audio: true, video: kind === 'video' });
+      ? await devs.getDisplayMedia({
+          video: {
+            width: { ideal: profile.width, max: profile.width },
+            height: { ideal: profile.height, max: profile.height },
+            frameRate: { ideal: profile.fps, max: profile.fps },
+          },
+          audio: true,
+        })
+      : await devs.getUserMedia({
+          audio: true,
+          video: kind === 'video'
+            ? {
+                width: { ideal: profile.width, max: profile.width },
+                height: { ideal: profile.height, max: profile.height },
+                frameRate: { ideal: profile.fps, max: profile.fps },
+              }
+            : false,
+        });
     this.localStream = stream;
     this.localKind   = kind;
     this.cb.onLocalStream(stream);
@@ -278,6 +376,7 @@ export class LadonMediaEngine {
     this.localStream?.getTracks().forEach(t => t.stop());
     this.localStream = null;
     this.localKind   = null;
+    this.localVideoProfile = null;
     this.cb.onLocalStream(null);
   }
 
@@ -385,18 +484,25 @@ export class LadonMediaEngine {
   // Video capture + encode loop
   // ----------------------------------------------------------------
 
-  private async startVideoCapture(stream: MediaStream, w = VIDEO_WIDTH, h = VIDEO_HEIGHT) {
+  private async startVideoCapture(stream: MediaStream, profile: VideoCaptureProfile = CAMERA_PROFILE) {
     this.stopVideoCapture();
+    this.localVideoProfile = profile;
     const wasm = await this.ensureWasm();
-    this.vidEnc = wasm.videoEncoder(w, h, VIDEO_QUALITY);
+    this.vidEnc = wasm.videoEncoder(
+      profile.width,
+      profile.height,
+      profile.quality,
+      profile.profile,
+      profile.fps,
+    );
     const video = document.createElement('video');
     video.srcObject = stream; video.muted = true;
     await video.play();
     this.vidCapture = video;
     const canvas = document.createElement('canvas');
-    canvas.width = w; canvas.height = h;
+    canvas.width = profile.width; canvas.height = profile.height;
     this.vidCanvas = canvas;
-    this.vidFrameTimer = setInterval(() => this.onVideoTick(), 1000 / VIDEO_FPS);
+    this.vidFrameTimer = setInterval(() => this.onVideoTick(), 1000 / profile.fps);
   }
 
   private onVideoTick() {
@@ -425,6 +531,7 @@ export class LadonMediaEngine {
     this.vidFrameTimer = null;
     this.vidCapture?.pause(); this.vidCapture = null; this.vidCanvas = null;
     this.vidEnc?.destroy(); this.vidEnc = null;
+    this.localVideoProfile = null;
   }
 
   // ----------------------------------------------------------------
@@ -477,6 +584,10 @@ export class LadonMediaEngine {
     }
     const fid   = (++this.localFid) & 0xFFFF;
     const total = Math.ceil(data.length / MCHUNK_BIN);
+    if (total > MAX_MCHUNK_TOTAL) {
+      this.cb.onError(`Encoded ${ftype.toLowerCase()} is too large for LADON MCHUNK transport`);
+      return;
+    }
     for (let n = 1; n <= total; n++) {
       const start = (n - 1) * MCHUNK_BIN;
       const slice = data.subarray(start, start + MCHUNK_BIN);
@@ -512,13 +623,15 @@ export class LadonMediaEngine {
   async joinVideo(channel: string) {
     try {
       const stream = await this.capture('video');
+      const profile = videoProfileFor('video');
       await this.ensureWasm();
       this.setActiveRoom(channel);
       this.mediaframeCmd(channel, 'VOICE_JOIN', `${SAMPLE_RATE} ${AUDIO_CHANNELS}`);
-      this.mediaframeCmd(channel, 'VIDEO_JOIN', `${VIDEO_WIDTH} ${VIDEO_HEIGHT} ${VIDEO_QUALITY} ${VIDEO_FPS}`);
+      this.mediaframeCmd(channel, 'VIDEO_JOIN',
+        `${profile.width} ${profile.height} ${profile.quality} ${profile.fps}`);
       this.mediaframeCmd(channel, 'ROSTER');
       await this.startAudioCapture(stream);
-      await this.startVideoCapture(stream);
+      await this.startVideoCapture(stream, profile);
       this.startSpeakingMeter(stream);
       this.startGc();
     } catch (err) {
@@ -599,13 +712,46 @@ export class LadonMediaEngine {
     const target = channel ?? this.activeRoom;
     if (!target) { this.cb.onError('No active room for screen share'); return; }
     try {
+      const profile = videoProfileFor('screen');
       await this.capture('screen');
+      this.setActiveRoom(target);
       this.mediaframeCmd(target, 'VIDEO_JOIN',
-        `${SCREEN_WIDTH} ${SCREEN_HEIGHT} ${VIDEO_QUALITY} ${VIDEO_FPS} true`);
-      if (this.localStream) await this.startVideoCapture(this.localStream, SCREEN_WIDTH, SCREEN_HEIGHT);
+        `${profile.width} ${profile.height} ${profile.quality} ${profile.fps} screen`);
+      if (this.localStream) await this.startVideoCapture(this.localStream, profile);
     } catch (err) {
       this.cb.onError(`Screen share failed: ${err}`);
     }
+  }
+
+  async startBroadcast(channel: string, kind: 'camera' | 'screen', quality: StreamQuality = '4k60') {
+    try {
+      const mediaKind: MediaKind = kind === 'screen' ? 'screen' : 'video';
+      const stream = await this.capture(mediaKind, quality, true);
+      const profile = videoProfileFor(mediaKind, quality, true);
+      await this.ensureWasm();
+      this.setActiveRoom(channel);
+      if (stream.getAudioTracks().length > 0) {
+        this.mediaframeCmd(channel, 'VOICE_JOIN', `${SAMPLE_RATE} ${AUDIO_CHANNELS}`);
+        await this.startAudioCapture(stream);
+        this.startSpeakingMeter(stream);
+      }
+      this.mediaframeCmd(channel, 'VIDEO_JOIN',
+        `${profile.width} ${profile.height} ${profile.quality} ${profile.fps}${profile.screenShare ? ' screen' : ''}`);
+      this.mediaframeCmd(channel, 'ROSTER');
+      await this.startVideoCapture(stream, profile);
+      this.startGc();
+    } catch (err) {
+      this.cb.onError(`Stream start failed: ${err}`);
+    }
+  }
+
+  stopBroadcast(channel?: string) {
+    const target = channel ?? this.activeRoom ?? '';
+    if (target) {
+      this.mediaframeCmd(target, 'VIDEO_LEAVE');
+      this.mediaframeCmd(target, 'VOICE_LEAVE');
+    }
+    this.setIdle();
   }
 
   // ----------------------------------------------------------------
@@ -654,13 +800,30 @@ export class LadonMediaEngine {
     if (subtype.startsWith('MCHUNK/')) {
       const parts = subtype.slice(7).split('/');
       if (parts.length < 4) return;
-      const [ftype, fidS, nS, totalS] = parts;
+      const serverChunk = parts.length >= 5;
+      const ftype = parts[0];
+      const senderNick = serverChunk ? parts[1] : fromNick;
+      const fidS = serverChunk ? parts[2] : parts[1];
+      const nS = serverChunk ? parts[3] : parts[2];
+      const totalS = serverChunk ? parts[4] : parts[3];
       const fid = parseInt(fidS, 10), n = parseInt(nS, 10), total = parseInt(totalS, 10);
       if (isNaN(fid) || isNaN(n) || isNaN(total)) return;
       const chunk = Uint8Array.from(atob(payload), c => c.charCodeAt(0));
-      const frame = this.assembler.ingest(fromNick, ftype, fid, n, total, chunk);
-      if (frame) this.dispatchFrame(fromNick, channel, ftype, frame);
+      const frame = this.assembler.ingest(senderNick, ftype, fid, n, total, chunk);
+      if (frame) this.dispatchFrame(senderNick, channel, ftype, frame);
       return;
+    }
+
+    if (subtype.includes('/')) {
+      const [legacyType, senderNick] = subtype.split('/', 2);
+      if (senderNick && (legacyType === 'AUDIO_FRAME' || legacyType === 'VIDEO_FRAME' || legacyType === 'VIDEO_KEYFRAME')) {
+        const ftype = legacyType === 'AUDIO_FRAME'
+          ? 'AUDIO'
+          : legacyType === 'VIDEO_KEYFRAME' ? 'KEYFRAME' : 'FRAME';
+        this.dispatchFrame(senderNick, channel, ftype,
+                           Uint8Array.from(atob(payload), c => c.charCodeAt(0)));
+        return;
+      }
     }
 
     if (subtype === 'AUDIO' || subtype === 'KEYFRAME' || subtype === 'FRAME') {
@@ -684,10 +847,9 @@ export class LadonMediaEngine {
         break;
       }
       case 'VIDEO_JOIN': {
+        const profile = parseVideoJoinPayload(payload);
         const pm = this.registry.getOrCreate(fromNick, channel, 'video');
-        this.ensureWasm().then(wasm => {
-          if (!pm.vidDec) pm.vidDec = wasm.videoDecoder(VIDEO_WIDTH, VIDEO_HEIGHT);
-        });
+        this.registry.setVideoParams(fromNick, profile.width, profile.height, profile.screenShare ? 'screen' : 'video', profile.fps);
         this.cb.onPeerState?.(pm.state);
         break;
       }
@@ -695,7 +857,12 @@ export class LadonMediaEngine {
       case 'VIDEO_LEAVE': {
         const pm = this.registry.get(fromNick);
         if (pm) {
-          if (subtype === 'VIDEO_LEAVE') { pm.vidDec?.destroy(); pm.vidDec = null; pm.state.hasVideo = false; }
+          if (subtype === 'VIDEO_LEAVE') {
+            pm.vidDec?.destroy(); pm.vidDec = null; pm.vidCanvas = null;
+            pm.screenVidDec?.destroy(); pm.screenVidDec = null; pm.screenCanvas = null;
+            pm.screenStream?.getTracks().forEach(t => t.stop()); pm.screenStream = null;
+            pm.state.canvas = null; pm.state.hasVideo = false;
+          }
           else { pm.audDec?.destroy(); pm.audDec = null; }
           this.cb.onPeerState?.(pm.state);
         }
@@ -704,10 +871,12 @@ export class LadonMediaEngine {
       case 'VIDEO_KEYREQ':
         if (this.vidEnc && this.activeRoom && this.vidCapture && this.vidCanvas) {
           const ctx = this.vidCanvas.getContext('2d', { willReadFrequently: true });
+          const w = this.vidCanvas.width;
+          const h = this.vidCanvas.height;
           if (ctx) {
-            ctx.drawImage(this.vidCapture, 0, 0, VIDEO_WIDTH, VIDEO_HEIGHT);
+            ctx.drawImage(this.vidCapture, 0, 0, w, h);
             const { y, u, v } = rgbaToYuv420(
-              ctx.getImageData(0, 0, VIDEO_WIDTH, VIDEO_HEIGHT).data, VIDEO_WIDTH, VIDEO_HEIGHT);
+              ctx.getImageData(0, 0, w, h).data, w, h);
             const encoded = this.vidEnc.encode(y, u, v, true);
             if (encoded.length) this.sendFrame(this.activeRoom, 'KEYFRAME', encoded);
           }
@@ -991,6 +1160,8 @@ export class LadonMediaEngine {
 
     if (ftype === 'AUDIO') {
       this.registry.decodeAudio(pm, frame).catch(err => onErr('voice', err));
+    } else if (pm.state.kind === 'screen') {
+      this.registry.decodeScreenVideo(pm, frame, ftype).catch(err => onErr('screen', err));
     } else {
       this.registry.decodeVideo(pm, frame, ftype).catch(err => onErr('video', err));
     }

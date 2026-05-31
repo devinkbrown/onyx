@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { IRCClient } from '@/lib/irc/client';
-import type { IRCMessage, Channel, ChatMessage, ConnectionStatus, ChannelUser, MessageReaction } from '@/lib/irc/types';
+import type { IRCMessage, Channel, ChatMessage, ConnectionStatus, MessageReaction } from '@/lib/irc/types';
 import type { LadonPeerState, LadonRoomStats, CallState } from '@/lib/ladon-media/types';
 import { parseActivity } from '@/lib/activity';
 
@@ -623,7 +623,7 @@ export interface OnyxState {
   setHistoryLoading(target: string, loading: boolean): void;
   setHistoryExhausted(target: string): void;
   /** Fetch older messages. before = msgid of the oldest currently-loaded message */
-  loadHistory(target: string, before?: string): void;
+  loadHistory(target: string, before?: string | ChatMessage): void;
 
   // raw log
   toggleRawLog(): void;
@@ -1192,7 +1192,7 @@ export interface OnyxState {
   goLiveChannel: string | null;
   openGoLiveModal: (channel: string) => void;
   closeGoLiveModal: () => void;
-  startStream: (channel: string, title: string, category: string, mode: 'camera' | 'screen', key?: string) => void;
+  startStream: (channel: string, title: string, category: string, mode: 'camera' | 'screen', key?: string, quality?: StreamQuality) => void;
   endStream: (channel: string) => void;
   raidChannel: (channel: string, target: string) => void;
   createStreamPoll: (channel: string, question: string, options: string[], durationSec?: number) => void;
@@ -1213,7 +1213,10 @@ export interface StreamInfo {
   startedAt: number;
   viewers: number;
   mode: 'camera' | 'screen';
+  quality: StreamQuality;
 }
+
+export type StreamQuality = 'auto' | '1080p60' | '4k60';
 
 export interface RaidInfo {
   raider: string;
@@ -1237,6 +1240,27 @@ export interface StreamPollInfo {
 
 let _uidCounter = 0;
 const uid = () => `onyx-${Date.now()}-${++_uidCounter}`;
+
+const HISTORY_PAGE_SIZE = 50;
+
+function hasChatHistoryCap(client: IRCClient | null | undefined): boolean {
+  return Boolean(
+    client?.negotiatedCaps?.has('draft/chathistory') ||
+    client?.negotiatedCaps?.has('chathistory'),
+  );
+}
+
+function historyReference(before: string | ChatMessage): string {
+  if (typeof before === 'string') {
+    if (before.startsWith('msgid=') || before.startsWith('timestamp=')) return before;
+    return before.startsWith('onyx-') ? `timestamp=${new Date().toISOString()}` : `msgid=${before}`;
+  }
+
+  if (before.id && !before.id.startsWith('onyx-')) {
+    return before.id.startsWith('msgid=') ? before.id : `msgid=${before.id}`;
+  }
+  return `timestamp=${before.time.toISOString()}`;
+}
 
 function emptyChannel(name: string): Channel {
   return {
@@ -1413,7 +1437,7 @@ export const useOnyxStore = create<OnyxState>()(
     server: null,
     connectionStatus: 'disconnected',
     reconnectIn: 0,
-    autoReconnect: true,
+    autoReconnect: false,
     latencyMs: null,
     serverStats: null,
     activeView: { kind: 'home' },
@@ -1534,7 +1558,11 @@ export const useOnyxStore = create<OnyxState>()(
       async startScreenshare() {
         try {
           const stream = await navigator.mediaDevices.getDisplayMedia({
-            video: { frameRate: 15, width: { max: 1920 }, height: { max: 1080 } },
+            video: {
+              frameRate: { ideal: 60, max: 60 },
+              width: { ideal: 3840, max: 3840 },
+              height: { ideal: 2160, max: 2160 },
+            },
             audio: false,
           });
           set(s => ({ voice: { ...s.voice, screenshareActive: true, screenshareStream: stream } }));
@@ -1600,7 +1628,7 @@ export const useOnyxStore = create<OnyxState>()(
       _connectNick = nick;
       _saslAccount = null;
 
-      set({ status: 'connecting', connectionStatus: 'connecting', ourNick: nick, autoReconnect: true });
+      set({ status: 'connecting', connectionStatus: 'connecting', ourNick: nick, autoReconnect: false });
       _nickAliasTryIdx = 0;
 
       const client = new IRCClient({
@@ -1693,7 +1721,7 @@ export const useOnyxStore = create<OnyxState>()(
         status: 'disconnected',
         connectionStatus: 'disconnected',
         reconnectIn: 0,
-        autoReconnect: true,
+        autoReconnect: false,
         channels: new Map(),
         dms: new Map(),
         server: null,
@@ -1779,7 +1807,16 @@ export const useOnyxStore = create<OnyxState>()(
 
     // ── requestHistory ───────────────────────────────────────────────────
     requestHistory(channel, limit = 50) {
-      get().client?.sendRaw('CHATHISTORY', 'LATEST', channel, '*', String(limit));
+      const key = channel.toLowerCase();
+      const { client, historyLoading, historyExhausted } = get();
+      if (historyLoading.get(key) || historyExhausted.get(key)) return;
+      if (!hasChatHistoryCap(client)) {
+        get().setHistoryExhausted(channel);
+        return;
+      }
+
+      get().setHistoryLoading(channel, true);
+      client?.sendRaw('CHATHISTORY', 'LATEST', channel, '*', String(limit));
     },
 
     // ── toggleMemberList ─────────────────────────────────────────────────
@@ -2090,7 +2127,7 @@ export const useOnyxStore = create<OnyxState>()(
       const lastSent = _typingLastSent.get(key) ?? 0;
       if (now - lastSent < 4000) return; // rate limit: at most once per 4s
       _typingLastSent.set(key, now);
-      client.tagmsg(target, { '+typing': 'active' });
+      client.tagmsg(target, { '+draft/typing': 'active' });
     },
 
     sendTypingStop(target) {
@@ -2098,7 +2135,7 @@ export const useOnyxStore = create<OnyxState>()(
       if (!client) return;
       if (!client.negotiatedCaps.has('draft/typing')) return;
       _typingLastSent.delete(target.toLowerCase()); // reset rate limit so next start fires immediately
-      client.tagmsg(target, { '+typing': 'done' });
+      client.tagmsg(target, { '+draft/typing': 'done' });
     },
 
     // ── channel info ──────────────────────────────────────────────────────
@@ -2534,20 +2571,18 @@ export const useOnyxStore = create<OnyxState>()(
       const { historyLoading, historyExhausted, client } = get();
       if (historyLoading.get(key) || historyExhausted.get(key)) return;
 
-      const hasHistoryCap =
-        client?.negotiatedCaps?.has('draft/chathistory') ||
-        client?.negotiatedCaps?.has('chathistory');
-
-      if (!hasHistoryCap) {
+      if (!hasChatHistoryCap(client)) {
         // Server doesn't support CHATHISTORY — mark exhausted immediately
         get().setHistoryExhausted(target);
         return;
       }
 
       get().setHistoryLoading(target, true);
-      const beforeArg = before ?? '*';
-      // CHATHISTORY target BEFORE <msgref> <count> — each param is separate
-      client?.sendRaw('CHATHISTORY', target, 'BEFORE', beforeArg, '50');
+      if (before) {
+        client?.sendRaw('CHATHISTORY', 'BEFORE', target, historyReference(before), String(HISTORY_PAGE_SIZE));
+      } else {
+        client?.sendRaw('CHATHISTORY', 'LATEST', target, '*', String(HISTORY_PAGE_SIZE));
+      }
     },
 
     // ── raw log ───────────────────────────────────────────────────────────
@@ -2707,7 +2742,11 @@ export const useOnyxStore = create<OnyxState>()(
     toggleSoftIgnore(nick) {
       set(s => {
         const n = new Set(s.softIgnoreList);
-        n.has(nick) ? n.delete(nick) : n.add(nick);
+        if (n.has(nick)) {
+          n.delete(nick);
+        } else {
+          n.add(nick);
+        }
         _saveSoftIgnoreList(n);
         return { softIgnoreList: n };
       });
@@ -2771,20 +2810,29 @@ export const useOnyxStore = create<OnyxState>()(
             _pingTimestamps.set(cookie, t);
             get().client?.sendRaw('PING', cookie);
           }
-          // Auto-join configured channels (fall back to #root on eshmaki.me)
+          // Auto-join configured channels (fall back to #root on eshmaki.me).
+          // SKIP this blind autojoin storm when the server advertised
+          // `ophion/session-sync`: in that mode the server itself pushes JOIN +
+          // NAMES/topic + CHATHISTORY replay for every channel the account's
+          // session is live in, so reconnect reclaims the live session without
+          // the client guessing from localStorage. Falls back to the old
+          // behavior on servers that don't ACK the cap (backward compatible).
           {
-            const { autoJoinChannels } = get();
-            const serverUrl = get().server?.url ?? '';
-            const isDefault = serverUrl.includes('eshmaki.me');
-            const channels = autoJoinChannels.length > 0
-              ? autoJoinChannels
-              : (isDefault ? ['#root'] : []);
-            if (channels.length > 0) {
-              setTimeout(() => {
-                for (const ch of channels) {
-                  get().client?.sendRaw('JOIN', ch);
-                }
-              }, 1000);
+            const sessionSync = get().client?.sessionSyncActive ?? false;
+            if (!sessionSync) {
+              const { autoJoinChannels } = get();
+              const serverUrl = get().server?.url ?? '';
+              const isDefault = serverUrl.includes('eshmaki.me');
+              const channels = autoJoinChannels.length > 0
+                ? autoJoinChannels
+                : (isDefault ? ['#root'] : []);
+              if (channels.length > 0) {
+                setTimeout(() => {
+                  for (const ch of channels) {
+                    get().client?.sendRaw('JOIN', ch);
+                  }
+                }, 1000);
+              }
             }
           }
           // Reset nick alias counter — we successfully registered
@@ -2848,7 +2896,7 @@ export const useOnyxStore = create<OnyxState>()(
             });
             // Track session join history
             get().addJoinHistory(ch);
-            // Kick off initial history fetch (CHATHISTORY BEFORE * 50)
+            // Kick off initial history fetch (CHATHISTORY LATEST #channel * 50)
             get().loadHistory(ch);
             // Fetch WHO data for away status
             get().client?.sendRaw('WHO', ch);
@@ -3218,15 +3266,6 @@ export const useOnyxStore = create<OnyxState>()(
             break;
           }
 
-          // ── Handle incoming CTCP TYPING from others ──────────────────────
-          const ctcpTypingMatch = text.match(/^\x01TYPING ([01])\x01$/);
-          if (ctcpTypingMatch) {
-            const isTyping = ctcpTypingMatch[1] === '1';
-            const typingTarget = isChan(target) ? target : sender;
-            get().setTyping(typingTarget, sender, isTyping);
-            break;
-          }
-
           // ── Handle incoming CTCP POLL_VOTE from others ───────────────────
           const ctcpPollVoteMatch = text.match(/^\x01POLL_VOTE ([^\s]+) (\d+)\x01$/);
           if (ctcpPollVoteMatch) {
@@ -3304,11 +3343,15 @@ export const useOnyxStore = create<OnyxState>()(
               if (sub === 'START') {
                 const title = (() => { try { return decodeURIComponent(ctcpArgs[1] ?? ''); } catch { return ctcpArgs[1] ?? ''; } })();
                 const category = (() => { try { return decodeURIComponent(ctcpArgs[2] ?? ''); } catch { return ctcpArgs[2] ?? ''; } })();
+                const mode = ctcpArgs[3] === 'screen' ? 'screen' : 'camera';
+                const quality = (ctcpArgs[4] === 'auto' || ctcpArgs[4] === '1080p60' || ctcpArgs[4] === '4k60')
+                  ? ctcpArgs[4] as StreamQuality
+                  : '4k60';
                 set(s => ({
                   streams: new Map(s.streams).set(key, {
                     channel: chan, streamer: sender, title, category,
                     live: true, startedAt: Math.floor(Date.now() / 1000),
-                    viewers: 0, mode: 'camera' as const,
+                    viewers: 0, mode, quality,
                   }),
                 }));
               } else if (sub === 'END') {
@@ -3747,7 +3790,11 @@ export const useOnyxStore = create<OnyxState>()(
           const tagTarget = params[0] ?? '';
 
           // Typing indicator
-          const typingVal = msg.tags['+typing'] ?? msg.tags['typing'];
+          const typingVal =
+            msg.tags['+draft/typing'] ??
+            msg.tags['draft/typing'] ??
+            msg.tags['+typing'] ??
+            msg.tags['typing'];
           if (typingVal && nick) {
             const { ourNick: myNick } = get();
             // For DMs the TAGMSG target is our own nick; store under sender's nick
@@ -4091,8 +4138,16 @@ export const useOnyxStore = create<OnyxState>()(
                   const channels = new Map(s.channels);
                   const c = channels.get(batchKey);
                   if (c) {
-                    // Prepend historical messages (oldest first) before existing live messages
-                    const merged = [...batchMsgs, ...c.messages];
+                    // Prepend historical messages (oldest first) before existing
+                    // live messages, deduped by server msgid. Without this, a
+                    // session-sync reconnect would replay CHATHISTORY into a
+                    // channel that still holds the same messages (state survives
+                    // auto-reconnect), duplicating every message. CHATHISTORY
+                    // messages carry a server msgid as ChatMessage.id; locally
+                    // generated ids (uid()) never collide with those.
+                    const existingIds = new Set(c.messages.map(m => m.id));
+                    const newHistory = batchMsgs.filter(m => !existingIds.has(m.id));
+                    const merged = [...newHistory, ...c.messages];
                     channels.set(batchKey, { ...c, messages: merged });
                     return { channels };
                   }
@@ -5437,8 +5492,9 @@ export const useOnyxStore = create<OnyxState>()(
     }),
     clearChannelEvents: (channel) => set(s => {
       const key = channel.toLowerCase();
-      const { [key]: _removed, ...rest } = s.channelEvents;
-      return { channelEvents: rest };
+      const channelEvents = { ...s.channelEvents };
+      delete channelEvents[key];
+      return { channelEvents };
     }),
     showEventLog: false,
     openEventLog: () => set({ showEventLog: true }),
@@ -5612,9 +5668,10 @@ export const useOnyxStore = create<OnyxState>()(
       return { displayNameOverrides: overrides };
     }),
     clearDisplayNameOverride: (nick) => set(s => {
-      const { [nick]: _, ...rest } = s.displayNameOverrides;
-      _saveDisplayNameOverrides(rest);
-      return { displayNameOverrides: rest };
+      const displayNameOverrides = { ...s.displayNameOverrides };
+      delete displayNameOverrides[nick];
+      _saveDisplayNameOverrides(displayNameOverrides);
+      return { displayNameOverrides };
     }),
     selfDisplayName: _loadSelfDisplayName(),
     setSelfDisplayName: (name) => {
@@ -5749,9 +5806,9 @@ export const useOnyxStore = create<OnyxState>()(
           },
           video: withVideo ? {
             deviceId: voice.cameraDeviceId ?? undefined,
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            frameRate: { ideal: 30 },
+            width: { ideal: 1920, max: 1920 },
+            height: { ideal: 1080, max: 1080 },
+            frameRate: { ideal: 60, max: 60 },
           } : false,
         });
       } catch {
@@ -5834,7 +5891,12 @@ export const useOnyxStore = create<OnyxState>()(
       } else {
         try {
           const videoStream = await navigator.mediaDevices.getUserMedia({
-            video: { deviceId: voice.cameraDeviceId ?? undefined, width: { ideal: 1280 }, height: { ideal: 720 } },
+            video: {
+              deviceId: voice.cameraDeviceId ?? undefined,
+              width: { ideal: 1920, max: 1920 },
+              height: { ideal: 1080, max: 1080 },
+              frameRate: { ideal: 60, max: 60 },
+            },
             audio: false,
           });
           get().setVoiceCallState({ cameraOn: true, cameraStream: videoStream });
@@ -5943,19 +6005,24 @@ export const useOnyxStore = create<OnyxState>()(
     openServerStats: () => set({ showServerStats: true }),
     closeServerStats: () => set({ showServerStats: false }),
 
-    startStream: (channel, title, category, mode, key) => {
+    startStream: (channel, title, category, mode, key, quality = '4k60') => {
       const { client, ourNick } = get();
       if (!client) return;
       const info: StreamInfo = {
         channel, streamer: ourNick, title, category, live: true,
-        startedAt: Math.floor(Date.now() / 1000), viewers: 0, mode,
+        startedAt: Math.floor(Date.now() / 1000), viewers: 0, mode, quality,
       };
       set(s => ({ streams: new Map(s.streams).set(channel.toLowerCase(), info) }));
       client.sendRaw('JOIN', `%%${channel}`);
       const t = encodeURIComponent(title);
       const c = encodeURIComponent(category);
-      client.sendRaw('PRIVMSG', channel, `\x01LADON_STREAM START ${t} ${c}\x01`);
+      client.sendRaw('PRIVMSG', channel, `\x01LADON_STREAM START ${t} ${c} ${mode} ${quality}\x01`);
       if (key) client.sendRaw('PRIVMSG', channel, `\x01LADON_STREAM KEY ${encodeURIComponent(key)}\x01`);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('ocean:stream-start', {
+          detail: { channel, mode, quality },
+        }));
+      }
     },
 
     endStream: (channel) => {
@@ -5963,6 +6030,11 @@ export const useOnyxStore = create<OnyxState>()(
       if (!client) return;
       client.sendRaw('PART', `%%${channel}`);
       client.sendRaw('PRIVMSG', channel, '\x01LADON_STREAM END\x01');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('ocean:stream-stop', {
+          detail: { channel },
+        }));
+      }
       set(s => {
         const next = new Map(s.streams);
         next.delete(channel.toLowerCase());

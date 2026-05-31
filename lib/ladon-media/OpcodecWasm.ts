@@ -255,24 +255,23 @@ export class OpvisEncoder {
   readonly height: number;
   readonly profile: OpvisProfile;
   private readonly OUT_CAP: number;
-  /** Frames between forced keyframes (screen share: 150 @ 4fps ≈ ~5s; camera: 30 @ 30fps ≈ 1s) */
+  /** Frames between forced keyframes (screen share ≈5s; camera ≈1s) */
   readonly keyframeInterval: number;
-  /** Target frame rate — screen share uses 4fps, camera 30fps */
+  /** Target frame rate requested by the capture pipeline. */
   readonly targetFps: number;
   private frameCount = 0;
 
-  constructor(m: EmModule, width: number, height: number, quality: number, profile: OpvisProfile = 'camera') {
+  constructor(m: EmModule, width: number, height: number, quality: number, profile: OpvisProfile = 'camera', fps = 60) {
     this.m       = m;
     this.width   = width;
     this.height  = height;
     this.profile = profile;
     this.OUT_CAP = width * height * 2 + 65536;
 
-    /* Screen share: lower quality (sharp text survives lower bitrate better),
-     * slower keyframe interval, lower fps. Camera: use caller's quality, 1s keyframes. */
+    /* Screen share keeps source frame rate; only the keyframe interval changes. */
     const encQuality  = profile === 'screen' ? Math.max(quality, 75) : quality;
-    this.keyframeInterval = profile === 'screen' ? 150 : 30;
-    this.targetFps        = profile === 'screen' ? 4   : 30;
+    this.targetFps = Math.max(1, Math.min(60, Math.round(fps)));
+    this.keyframeInterval = profile === 'screen' ? this.targetFps * 5 : this.targetFps;
 
     this.handle = m.ccall('opvis_wasm_enc_create', 'number',
                           ['number', 'number', 'number'],
@@ -392,8 +391,8 @@ export class OpcodecWasm {
     return new OpvoxDecoder(this.m, sampleRate, quality);
   }
 
-  videoEncoder(width: number, height: number, quality: number, profile: OpvisProfile = 'camera'): OpvisEncoder {
-    return new OpvisEncoder(this.m, width, height, quality, profile);
+  videoEncoder(width: number, height: number, quality: number, profile: OpvisProfile = 'camera', fps = 60): OpvisEncoder {
+    return new OpvisEncoder(this.m, width, height, quality, profile, fps);
   }
 
   videoDecoder(width: number, height: number): OpvisDecoder {

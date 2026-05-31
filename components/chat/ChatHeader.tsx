@@ -52,10 +52,12 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
   const [topicExpanded, setTopicExpanded] = useState(false);
   const [showTopicHistory, setShowTopicHistory] = useState(false);
   const [showThreadList, setShowThreadList] = useState(false);
+  const [showChannelTools, setShowChannelTools] = useState(false);
   // Track whether Enter was pressed so blur doesn't cancel the save
   const enterPressedRef = useRef(false);
   const topicHistoryRef = useRef<HTMLDivElement>(null);
   const threadListRef = useRef<HTMLDivElement>(null);
+  const channelToolsRef = useRef<HTMLDivElement>(null);
 
   const topicHistory       = useOnyxStore(s => s.topicHistory);
   const addTopicHistory    = useOnyxStore(s => s.addTopicHistory);
@@ -127,7 +129,7 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
   const isDMMuted          = useOnyxStore(s => s.isDMMuted);
   const openDMMedia        = useOnyxStore(s => s.openDMMedia);
   const voice              = useOnyxStore(s => s.voice);
-  const startDmCall        = useOnyxStore(s => (s as any).startDmCall as ((nick: string, withVideo?: boolean) => void) | undefined);
+  const startDmCall        = useOnyxStore(s => s.startDmCall);
 
   const pinnedCount = activeView.kind === 'channel'
     ? (pinnedMessages.get(activeView.channel.toLowerCase()) ?? []).length
@@ -214,7 +216,7 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
     if (activeView.kind !== 'channel' || !client) return;
     // Use CHATHISTORY BEFORE with an ISO timestamp to jump to that date
     const ts = `timestamp=${date.toISOString()}`;
-    client.sendRaw('CHATHISTORY', activeView.channel, 'BEFORE', ts, '50');
+    client.sendRaw('CHATHISTORY', 'BEFORE', activeView.channel, ts, '50');
   }, [activeView, client]);
 
   const handleTopicClick = () => {
@@ -257,19 +259,15 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
     enterPressedRef.current = false;
   };
 
-  // Update topicDraft when topic prop changes (external updates)
-  useEffect(() => {
-    if (!topicEditing) {
-      setTopicDraft(topic || '');
-    }
-  }, [topic, topicEditing]);
-
   // Collapse expanded topic when switching channels
   useEffect(() => {
-    setTopicExpanded(false);
-    setTopicEditing(false);
-    setShowDMSearch(false);
-    setShowTopicHistory(false);
+    queueMicrotask(() => {
+      setTopicExpanded(false);
+      setTopicEditing(false);
+      setShowDMSearch(false);
+      setShowTopicHistory(false);
+      setShowChannelTools(false);
+    });
   }, [activeView]);
 
   // Close topic history on outside click
@@ -295,6 +293,18 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [showThreadList]);
+
+  // Close channel tools on outside click
+  useEffect(() => {
+    if (!showChannelTools) return;
+    const handler = (e: MouseEvent) => {
+      if (channelToolsRef.current && !channelToolsRef.current.contains(e.target as Node)) {
+        setShowChannelTools(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showChannelTools]);
 
   // Listen for the ocean:channel-search custom event (fired by Ctrl+F shortcut)
   useEffect(() => {
@@ -431,6 +441,7 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
                         key={i}
                         className="ch-topic-hist-item"
                         role="option"
+                        aria-selected="false"
                         onClick={() => {
                           if (canEditTopic && activeView.kind === 'channel' && client) {
                             client.sendRaw('TOPIC', activeView.channel, t);
@@ -496,7 +507,7 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
         {!isChannel && activeView.kind === 'dm' && (
           <>
             {voice.callState === 'idle' && (
-              <>
+              <div className="ch-head-action-group ch-head-action-group--calls" aria-label="Call controls">
                 <Tooltip text="Voice Call" side="bottom">
                   <button
                     className="ch-head-btn ch-head-btn--call"
@@ -515,74 +526,79 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
                     <VideoCallIcon />
                   </button>
                 </Tooltip>
-              </>
+              </div>
             )}
 
-            <Tooltip text={dmPinCount > 0 ? `Pinned Messages (${dmPinCount})` : 'Pinned Messages'} side="bottom">
-              <button
-                className={`ch-head-btn ch-head-btn--pin ${dmPinCount > 0 ? 'ch-head-btn--pin-active' : ''}`}
-                aria-label="Pinned messages in DM"
-                onClick={() => openDMPins(dmNick)}
-              >
-                <PinIcon />
-                {dmPinCount > 0 && (
-                  <span className="ch-head-pin-badge">{dmPinCount > 9 ? '9+' : dmPinCount}</span>
-                )}
-              </button>
-            </Tooltip>
+            <div className="ch-head-action-group ch-head-action-group--messages" aria-label="Direct message tools">
+              <Tooltip text={dmPinCount > 0 ? `Pinned Messages (${dmPinCount})` : 'Pinned Messages'} side="bottom">
+                <button
+                  className={`ch-head-btn ch-head-btn--pin ${dmPinCount > 0 ? 'ch-head-btn--pin-active' : ''}`}
+                  aria-label="Pinned messages in DM"
+                  onClick={() => openDMPins(dmNick)}
+                >
+                  <PinIcon />
+                  {dmPinCount > 0 && (
+                    <span className="ch-head-pin-badge">{dmPinCount > 9 ? '9+' : dmPinCount}</span>
+                  )}
+                </button>
+              </Tooltip>
 
-            <Tooltip text={dmMuted ? 'Unmute DM' : 'Mute DM'} side="bottom">
-              <button
-                className={`ch-head-btn ${dmMuted ? 'ch-head-btn--active' : ''}`}
-                aria-label={dmMuted ? 'Unmute DM' : 'Mute DM'}
-                aria-pressed={dmMuted}
-                onClick={() => dmMuted ? unmuteDM(dmNick) : muteDM(dmNick)}
-              >
-                {dmMuted ? <MuteOnIcon /> : <MuteOffIcon />}
-              </button>
-            </Tooltip>
+              <Tooltip text={dmMuted ? 'Unmute DM' : 'Mute DM'} side="bottom">
+                <button
+                  className={`ch-head-btn ${dmMuted ? 'ch-head-btn--active' : ''}`}
+                  aria-label={dmMuted ? 'Unmute DM' : 'Mute DM'}
+                  aria-pressed={dmMuted}
+                  onClick={() => dmMuted ? unmuteDM(dmNick) : muteDM(dmNick)}
+                >
+                  {dmMuted ? <MuteOnIcon /> : <MuteOffIcon />}
+                </button>
+              </Tooltip>
 
-            <Tooltip text="Search Messages" side="bottom">
-              <button
-                className={`ch-head-btn ${showDMSearch ? 'ch-head-btn--active' : ''}`}
-                aria-label="Search DM messages"
-                aria-pressed={showDMSearch}
-                onClick={() => setShowDMSearch(v => !v)}
-              >
-                <SearchIcon />
-              </button>
-            </Tooltip>
+              <Tooltip text="Search Messages" side="bottom">
+                <button
+                  className={`ch-head-btn ${showDMSearch ? 'ch-head-btn--active' : ''}`}
+                  aria-label="Search DM messages"
+                  aria-pressed={showDMSearch}
+                  onClick={() => setShowDMSearch(v => !v)}
+                >
+                  <SearchIcon />
+                </button>
+              </Tooltip>
 
-            <Tooltip text="Media &amp; Files" side="bottom">
-              <button
-                className="ch-head-btn"
-                aria-label="DM media gallery"
-                onClick={openDMMedia}
-              >
-                <MediaIcon />
-              </button>
-            </Tooltip>
+              <Tooltip text="Media &amp; Files" side="bottom">
+                <button
+                  className="ch-head-btn"
+                  aria-label="DM media gallery"
+                  onClick={openDMMedia}
+                >
+                  <MediaIcon />
+                </button>
+              </Tooltip>
+            </div>
 
-            <Tooltip text="View Profile" side="bottom">
-              <button
-                ref={dmProfileAnchorRef}
-                className="ch-head-btn"
-                aria-label="View user profile"
-                onClick={() => {
-                  if (dmProfileAnchorRef.current) {
-                    const rect = dmProfileAnchorRef.current.getBoundingClientRect();
-                    openUserProfileCard(dmNick, { x: rect.left, y: rect.bottom + 4 });
-                  }
-                }}
-              >
-                <ProfileIcon />
-              </button>
-            </Tooltip>
+            <div className="ch-head-action-group ch-head-action-group--tools" aria-label="Profile tools">
+              <Tooltip text="View Profile" side="bottom">
+                <button
+                  ref={dmProfileAnchorRef}
+                  className="ch-head-btn"
+                  aria-label="View user profile"
+                  onClick={() => {
+                    if (dmProfileAnchorRef.current) {
+                      const rect = dmProfileAnchorRef.current.getBoundingClientRect();
+                      openUserProfileCard(dmNick, { x: rect.left, y: rect.bottom + 4 });
+                    }
+                  }}
+                >
+                  <ProfileIcon />
+                </button>
+              </Tooltip>
+            </div>
           </>
         )}
 
         {isChannel && (
           <>
+            <div className="ch-head-action-group ch-head-action-group--status" aria-label="Channel status">
             {/* ── Member count chip — click to open member list ─────────── */}
             <Tooltip text={showMemberList ? 'Close member list' : 'Open member list'} side="bottom">
               <button
@@ -600,333 +616,382 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
             {activeView.kind === 'channel' && (
               <NotifyLevelButton channel={activeView.channel} />
             )}
-
-            <Tooltip text="Load History" side="bottom">
-              <button className="ch-head-btn" onClick={loadHistory} aria-label="Load history">
-                <HistoryIcon />
-              </button>
-            </Tooltip>
-
-            <Tooltip text="Invite to Channel" side="bottom">
-              <button className="ch-head-btn" onClick={openInviteModal} aria-label="Invite to channel">
-                <InviteIcon />
-              </button>
-            </Tooltip>
-
-            <Tooltip text="Search (Ctrl+F)" side="bottom">
-              <button
-                className={`ch-head-btn ${showSearch ? 'ch-head-btn--active' : ''}`}
-                aria-label="Search messages"
-                onClick={() => {
-                  if (showSearch) {
-                    handleSearchClose();
-                  } else {
-                    setShowSearch(true);
-                  }
-                }}
-              >
-                <SearchIcon />
-              </button>
-            </Tooltip>
-
-            <Tooltip text="Search Messages" side="bottom">
-              <button
-                className="ch-head-btn"
-                aria-label="Search messages in channel"
-                onClick={openMessageSearch}
-              >
-                <SearchMessagesIcon />
-              </button>
-            </Tooltip>
-
-            <Tooltip text="Event Log" side="bottom">
-              <button
-                className={`ch-head-btn ${showEventLog ? 'ch-head-btn--active' : ''}`}
-                aria-label="Channel event log"
-                aria-pressed={showEventLog}
-                onClick={openEventLog}
-              >
-                <EventLogIcon />
-              </button>
-            </Tooltip>
-
-            <Tooltip text="Channel Info" side="bottom">
-              <button
-                className="ch-head-btn"
-                aria-label="Channel info"
-                onClick={() => activeView.kind === 'channel' && openChannelInfo(activeView.channel)}
-              >
-                <InfoIcon />
-              </button>
-            </Tooltip>
-
-            <Tooltip text={pinnedCount > 0 ? `Pinned Messages (${pinnedCount})` : 'Pinned Messages'} side="bottom">
-              <button
-                className={`ch-head-btn ch-head-btn--pin ${pinnedCount > 0 ? 'ch-head-btn--pin-active' : ''}`}
-                aria-label="Pinned messages"
-                onClick={openPinnedMessages}
-              >
-                <PinIcon />
-                {pinnedCount > 0 && (
-                  <span className="ch-head-pin-badge">{pinnedCount > 9 ? '9+' : pinnedCount}</span>
-                )}
-              </button>
-            </Tooltip>
-
-            <Tooltip text="Manage Access" side="bottom">
-              <button
-                className="ch-head-btn"
-                aria-label="Manage access list"
-                onClick={openAccessList}
-              >
-                <AccessIcon />
-              </button>
-            </Tooltip>
-
-            {(myModes.has('o') || myModes.has('a') || myModes.has('q')) && (
-              <Tooltip text="Channel Moderation" side="bottom">
-                <button
-                  className={`ch-head-btn ch-head-btn--shield ${showModerationPanel ? 'ch-head-btn--active' : ''}`}
-                  aria-label="Channel moderation tools"
-                  onClick={openModerationPanel}
-                >
-                  <ShieldHeaderIcon />
-                </button>
-              </Tooltip>
-            )}
-
-            <Tooltip text={bookmarks.length > 0 ? `Bookmarks (${bookmarks.length})` : 'Bookmarks'} side="bottom">
-              <button
-                className={`ch-head-btn ch-head-btn--bookmark ${bookmarks.length > 0 ? 'ch-head-btn--bookmark-active' : ''}`}
-                aria-label="Bookmarks"
-                onClick={openBookmarks}
-              >
-                <BookmarkHeaderIcon />
-                {bookmarks.length > 0 && (
-                  <span className="ch-head-bookmark-badge">
-                    {bookmarks.length > 9 ? '9+' : bookmarks.length}
-                  </span>
-                )}
-              </button>
-            </Tooltip>
-
-            <Tooltip text="Media Gallery" side="bottom">
-              <button
-                className={`ch-head-btn ch-head-btn--media ${showMediaGallery ? 'ch-head-btn--active' : ''}`}
-                aria-label="Media gallery"
-                onClick={openMediaGallery}
-              >
-                <MediaIcon />
-              </button>
-            </Tooltip>
-
-            <Tooltip text="Export Chat History" side="bottom">
-              <button
-                className="ch-head-btn"
-                aria-label="Export chat history"
-                onClick={openExportModal}
-              >
-                <ExportIcon />
-              </button>
-            </Tooltip>
-
-            {/* ── Go Live / End Stream ── */}
-            {(() => {
-              const chanKey = activeView.kind === 'channel' ? activeView.channel.toLowerCase() : '';
-              const liveStream = chanKey ? streams.get(chanKey) : undefined;
-              if (liveStream?.live) {
-                return (
-                  <Tooltip text="End Stream" side="bottom">
-                    <button
-                      className="ch-head-btn ch-head-btn--end-stream"
-                      aria-label="End stream"
-                      onClick={() => activeView.kind === 'channel' && endStream(activeView.channel)}
-                    >
-                      <StopStreamIcon />
-                    </button>
-                  </Tooltip>
-                );
-              }
-              return (
-                <Tooltip text="Go Live" side="bottom">
-                  <button
-                    className="ch-head-btn ch-head-btn--go-live"
-                    aria-label="Go Live"
-                    onClick={() => activeView.kind === 'channel' && openGoLiveModal(activeView.channel)}
-                  >
-                    <GoLiveIcon />
-                  </button>
-                </Tooltip>
-              );
-            })()}
-
-            <Tooltip text={showWhiteboard ? 'Close Whiteboard' : 'Open Whiteboard'} side="bottom">
-              <button
-                className={`ch-head-btn ${showWhiteboard ? 'ch-head-btn--active' : ''}`}
-                aria-label={showWhiteboard ? 'Close whiteboard' : 'Open whiteboard'}
-                aria-pressed={showWhiteboard}
-                onClick={() => showWhiteboard ? closeWhiteboard() : openWhiteboard()}
-              >
-                <WhiteboardIcon />
-              </button>
-            </Tooltip>
-
-            <Tooltip text={showSpatialPad ? 'Close Spatial Audio' : 'Spatial Audio'} side="bottom">
-              <button
-                className={`ch-head-btn ${showSpatialPad ? 'ch-head-btn--active' : ''}`}
-                aria-label={showSpatialPad ? 'Close spatial audio pad' : 'Open spatial audio pad'}
-                aria-pressed={showSpatialPad}
-                onClick={() => showSpatialPad ? closeSpatialPad() : openSpatialPad()}
-              >
-                <SpatialIcon />
-              </button>
-            </Tooltip>
-
-            <Tooltip text={showBreakoutSidebar ? 'Close Breakout Rooms' : 'Breakout Rooms'} side="bottom">
-              <button
-                className={`ch-head-btn ${showBreakoutSidebar ? 'ch-head-btn--active' : ''}`}
-                aria-label={showBreakoutSidebar ? 'Close breakout rooms' : 'Open breakout rooms'}
-                aria-pressed={showBreakoutSidebar}
-                onClick={() => showBreakoutSidebar ? closeBreakoutSidebar() : openBreakoutSidebar()}
-              >
-                <BreakoutIcon />
-              </button>
-            </Tooltip>
-
-            {/* Thread list */}
-            {threadParentMessages.length > 0 && (
-              <div className="ch-thread-list-wrap" ref={threadListRef}>
-                <Tooltip text={`Threads (${threadParentMessages.length})`} side="bottom">
-                  <button
-                    className={`ch-head-btn ch-thread-list-btn${showThreadList ? ' ch-head-btn--active' : ''}`}
-                    aria-label="View threads"
-                    aria-expanded={showThreadList}
-                    onClick={() => setShowThreadList(v => !v)}
-                    type="button"
-                  >
-                    <ThreadsIcon />
-                  </button>
-                </Tooltip>
-                {showThreadList && (
-                  <div className="ch-thread-list-dropdown" role="dialog" aria-label="Channel threads">
-                    <div className="ch-thread-list-header">Threads</div>
-
-                    {/* Active threads */}
-                    {threadParentMessages
-                      .filter(m => !archivedThreads.has(m.id))
-                      .map(m => {
-                        const count = threadReplyCountMap.get(m.id) ?? 0;
-                        const lastTime = threadLastReplyMap.get(m.id);
-                        const isActive = activeThreads.has(m.id);
-                        return (
-                          <button
-                            key={m.id}
-                            className="ch-thread-list-item"
-                            onClick={() => { openThread(m.id); setShowThreadList(false); }}
-                            type="button"
-                          >
-                            <div className="ch-thread-item-text">
-                              {m.deleted ? '(deleted)' : m.text.slice(0, 72) + (m.text.length > 72 ? '…' : '')}
-                            </div>
-                            <div className="ch-thread-item-meta">
-                              <span className="ch-thread-item-count">{count} {count === 1 ? 'reply' : 'replies'}</span>
-                              {lastTime && (
-                                <span className="ch-thread-item-time">
-                                  {lastTime.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                </span>
-                              )}
-                              {isActive && <span className="ch-thread-item-active-dot" aria-label="Active" />}
-                            </div>
-                          </button>
-                        );
-                      })
-                    }
-
-                    {/* Archived section */}
-                    {threadParentMessages.some(m => archivedThreads.has(m.id)) && (
-                      <>
-                        <button
-                          className="ch-thread-list-section-toggle"
-                          onClick={() => setThreadListArchiveExpanded(v => !v)}
-                          type="button"
-                          aria-expanded={threadListArchiveExpanded}
-                        >
-                          <span>{threadListArchiveExpanded ? '▾' : '▸'}</span>
-                          <span>Archived</span>
-                        </button>
-                        {threadListArchiveExpanded && threadParentMessages
-                          .filter(m => archivedThreads.has(m.id))
-                          .map(m => {
-                            const count = threadReplyCountMap.get(m.id) ?? 0;
-                            const lastTime = threadLastReplyMap.get(m.id);
-                            return (
-                              <button
-                                key={m.id}
-                                className="ch-thread-list-item ch-thread-list-item--archived"
-                                onClick={() => { openThread(m.id); setShowThreadList(false); }}
-                                type="button"
-                              >
-                                <div className="ch-thread-item-text">
-                                  <span className="ch-thread-item-lock">🔒</span>
-                                  {m.deleted ? '(deleted)' : m.text.slice(0, 68) + (m.text.length > 68 ? '…' : '')}
-                                </div>
-                                <div className="ch-thread-item-meta">
-                                  <span className="ch-thread-item-count">{count} {count === 1 ? 'reply' : 'replies'}</span>
-                                  {lastTime && (
-                                    <span className="ch-thread-item-time">
-                                      {lastTime.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                    </span>
-                                  )}
-                                </div>
-                              </button>
-                            );
-                          })
-                        }
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <Tooltip text="Jump to Date" side="bottom">
-              <DateJumpPicker onJump={handleDateJump} />
-            </Tooltip>
-
-            {channel && channel.messages.length > 0 && (
-              <Tooltip text="Message activity heatmap (7 days × 24 hours)" side="bottom">
-                <div className="ch-head-heatmap">
-                  <ActivityHeatmap messages={channel.messages} />
-                </div>
-              </Tooltip>
-            )}
-
-            <div className="ch-head-sep" />
-
-            <div className="ch-head-members-count" aria-label={`${memberCount} members`}>
-              <PeopleIcon />
-              <span>{memberCount}</span>
             </div>
 
-            <Tooltip text={showMemberList ? 'Hide Members' : 'Show Members'} side="bottom">
-              <button
-                className={`ch-head-btn ${showMemberList ? 'ch-head-btn--active' : ''}`}
-                onClick={toggleMemberList}
-                aria-label="Toggle member list"
-              >
-                <MemberListIcon />
-              </button>
-            </Tooltip>
+            <div className="ch-head-action-group ch-head-action-group--messages" aria-label="Message tools">
+              <Tooltip text="Search (Ctrl+F)" side="bottom">
+                <button
+                  className={`ch-head-btn ${showSearch ? 'ch-head-btn--active' : ''}`}
+                  aria-label="Search messages"
+                  onClick={() => {
+                    if (showSearch) {
+                      handleSearchClose();
+                    } else {
+                      setShowSearch(true);
+                    }
+                  }}
+                >
+                  <SearchIcon />
+                </button>
+              </Tooltip>
 
-            <Tooltip text="Leave Channel" side="bottom">
-              <button
-                className="ch-head-btn ch-head-btn--danger"
-                onClick={() => partChannel(activeView.kind === 'channel' ? activeView.channel : '')}
-                aria-label="Leave channel"
-              >
-                <LeaveIcon />
-              </button>
-            </Tooltip>
+              {threadParentMessages.length > 0 && (
+                <div className="ch-thread-list-wrap" ref={threadListRef}>
+                  <Tooltip text={`Threads (${threadParentMessages.length})`} side="bottom">
+                    <button
+                      className={`ch-head-btn ch-thread-list-btn${showThreadList ? ' ch-head-btn--active' : ''}`}
+                      aria-label="View threads"
+                      aria-expanded={showThreadList}
+                      onClick={() => setShowThreadList(v => !v)}
+                      type="button"
+                    >
+                      <ThreadsIcon />
+                    </button>
+                  </Tooltip>
+                  {showThreadList && (
+                    <div className="ch-thread-list-dropdown" role="dialog" aria-label="Channel threads">
+                      <div className="ch-thread-list-header">Threads</div>
+
+                      {/* Active threads */}
+                      {threadParentMessages
+                        .filter(m => !archivedThreads.has(m.id))
+                        .map(m => {
+                          const count = threadReplyCountMap.get(m.id) ?? 0;
+                          const lastTime = threadLastReplyMap.get(m.id);
+                          const isActive = activeThreads.has(m.id);
+                          return (
+                            <button
+                              key={m.id}
+                              className="ch-thread-list-item"
+                              onClick={() => { openThread(m.id); setShowThreadList(false); }}
+                              type="button"
+                            >
+                              <div className="ch-thread-item-text">
+                                {m.deleted ? '(deleted)' : m.text.slice(0, 72) + (m.text.length > 72 ? '…' : '')}
+                              </div>
+                              <div className="ch-thread-item-meta">
+                                <span className="ch-thread-item-count">{count} {count === 1 ? 'reply' : 'replies'}</span>
+                                {lastTime && (
+                                  <span className="ch-thread-item-time">
+                                    {lastTime.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                )}
+                                {isActive && <span className="ch-thread-item-active-dot" aria-label="Active" />}
+                              </div>
+                            </button>
+                          );
+                        })
+                      }
+
+                      {/* Archived section */}
+                      {threadParentMessages.some(m => archivedThreads.has(m.id)) && (
+                        <>
+                          <button
+                            className="ch-thread-list-section-toggle"
+                            onClick={() => setThreadListArchiveExpanded(v => !v)}
+                            type="button"
+                            aria-expanded={threadListArchiveExpanded}
+                          >
+                            <span>{threadListArchiveExpanded ? '▾' : '▸'}</span>
+                            <span>Archived</span>
+                          </button>
+                          {threadListArchiveExpanded && threadParentMessages
+                            .filter(m => archivedThreads.has(m.id))
+                            .map(m => {
+                              const count = threadReplyCountMap.get(m.id) ?? 0;
+                              const lastTime = threadLastReplyMap.get(m.id);
+                              return (
+                                <button
+                                  key={m.id}
+                                  className="ch-thread-list-item ch-thread-list-item--archived"
+                                  onClick={() => { openThread(m.id); setShowThreadList(false); }}
+                                  type="button"
+                                >
+                                  <div className="ch-thread-item-text">
+                                    <span className="ch-thread-item-lock">🔒</span>
+                                    {m.deleted ? '(deleted)' : m.text.slice(0, 68) + (m.text.length > 68 ? '…' : '')}
+                                  </div>
+                                  <div className="ch-thread-item-meta">
+                                    <span className="ch-thread-item-count">{count} {count === 1 ? 'reply' : 'replies'}</span>
+                                    {lastTime && (
+                                      <span className="ch-thread-item-time">
+                                        {lastTime.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                      </span>
+                                    )}
+                                  </div>
+                                </button>
+                              );
+                            })
+                          }
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <Tooltip text={pinnedCount > 0 ? `Pinned Messages (${pinnedCount})` : 'Pinned Messages'} side="bottom">
+                <button
+                  className={`ch-head-btn ch-head-btn--pin ${pinnedCount > 0 ? 'ch-head-btn--pin-active' : ''}`}
+                  aria-label="Pinned messages"
+                  onClick={openPinnedMessages}
+                >
+                  <PinIcon />
+                  {pinnedCount > 0 && (
+                    <span className="ch-head-pin-badge">{pinnedCount > 9 ? '9+' : pinnedCount}</span>
+                  )}
+                </button>
+              </Tooltip>
+
+              <Tooltip text="Jump to Date" side="bottom">
+                <DateJumpPicker onJump={handleDateJump} />
+              </Tooltip>
+            </div>
+
+            <div className="ch-head-tools-wrap" ref={channelToolsRef}>
+              <Tooltip text="Channel tools" side="bottom">
+                <button
+                  className={`ch-head-btn ch-head-btn--tools ${showChannelTools ? 'ch-head-btn--active' : ''}`}
+                  aria-label="Open channel tools"
+                  aria-expanded={showChannelTools}
+                  onClick={() => setShowChannelTools(v => !v)}
+                  type="button"
+                >
+                  <MoreIcon />
+                </button>
+              </Tooltip>
+
+              {showChannelTools && (
+                <div className="ch-tools-menu" role="menu" aria-label="Channel tools">
+                  <div className="ch-tools-section-label">Channel</div>
+                  <button
+                    className="ch-tools-item"
+                    role="menuitem"
+                    onClick={() => { openInviteModal(); setShowChannelTools(false); }}
+                    type="button"
+                  >
+                    <InviteIcon />
+                    <span className="ch-tools-copy">
+                      <span className="ch-tools-title">Invite people</span>
+                      <span className="ch-tools-desc">Bring someone into this channel</span>
+                    </span>
+                  </button>
+                  <button
+                    className="ch-tools-item"
+                    role="menuitem"
+                    onClick={() => {
+                      if (activeView.kind === 'channel') openChannelInfo(activeView.channel);
+                      setShowChannelTools(false);
+                    }}
+                    type="button"
+                  >
+                    <InfoIcon />
+                    <span className="ch-tools-copy">
+                      <span className="ch-tools-title">Channel info</span>
+                      <span className="ch-tools-desc">Topic, modes, and details</span>
+                    </span>
+                  </button>
+                  <button
+                    className="ch-tools-item"
+                    role="menuitem"
+                    onClick={() => { openAccessList(); setShowChannelTools(false); }}
+                    type="button"
+                  >
+                    <AccessIcon />
+                    <span className="ch-tools-copy">
+                      <span className="ch-tools-title">Access list</span>
+                      <span className="ch-tools-desc">Review channel permissions</span>
+                    </span>
+                  </button>
+                  {(myModes.has('o') || myModes.has('a') || myModes.has('q')) && (
+                    <button
+                      className={`ch-tools-item ${showModerationPanel ? 'ch-tools-item--active' : ''}`}
+                      role="menuitem"
+                      onClick={() => { openModerationPanel(); setShowChannelTools(false); }}
+                      type="button"
+                    >
+                      <ShieldHeaderIcon />
+                      <span className="ch-tools-copy">
+                        <span className="ch-tools-title">Moderation</span>
+                        <span className="ch-tools-desc">Manage channel controls</span>
+                      </span>
+                    </button>
+                  )}
+
+                  <div className="ch-tools-section-label">Messages</div>
+                  <button
+                    className="ch-tools-item"
+                    role="menuitem"
+                    onClick={() => { loadHistory(); setShowChannelTools(false); }}
+                    type="button"
+                  >
+                    <HistoryIcon />
+                    <span className="ch-tools-copy">
+                      <span className="ch-tools-title">Load history</span>
+                      <span className="ch-tools-desc">Fetch more recent context</span>
+                    </span>
+                  </button>
+                  <button
+                    className="ch-tools-item"
+                    role="menuitem"
+                    onClick={() => { openMessageSearch(); setShowChannelTools(false); }}
+                    type="button"
+                  >
+                    <SearchMessagesIcon />
+                    <span className="ch-tools-copy">
+                      <span className="ch-tools-title">Advanced search</span>
+                      <span className="ch-tools-desc">Search across message history</span>
+                    </span>
+                  </button>
+                  <button
+                    className={`ch-tools-item ${showEventLog ? 'ch-tools-item--active' : ''}`}
+                    role="menuitem"
+                    onClick={() => { openEventLog(); setShowChannelTools(false); }}
+                    type="button"
+                  >
+                    <EventLogIcon />
+                    <span className="ch-tools-copy">
+                      <span className="ch-tools-title">Event log</span>
+                      <span className="ch-tools-desc">Joins, parts, modes, and notices</span>
+                    </span>
+                  </button>
+                  <button
+                    className={`ch-tools-item ${bookmarks.length > 0 ? 'ch-tools-item--active' : ''}`}
+                    role="menuitem"
+                    onClick={() => { openBookmarks(); setShowChannelTools(false); }}
+                    type="button"
+                  >
+                    <BookmarkHeaderIcon />
+                    <span className="ch-tools-copy">
+                      <span className="ch-tools-title">Bookmarks</span>
+                      <span className="ch-tools-desc">{bookmarks.length > 0 ? `${bookmarks.length} saved` : 'Saved messages and places'}</span>
+                    </span>
+                  </button>
+
+                  <div className="ch-tools-section-label">Media</div>
+                  <button
+                    className={`ch-tools-item ${showMediaGallery ? 'ch-tools-item--active' : ''}`}
+                    role="menuitem"
+                    onClick={() => { openMediaGallery(); setShowChannelTools(false); }}
+                    type="button"
+                  >
+                    <MediaIcon />
+                    <span className="ch-tools-copy">
+                      <span className="ch-tools-title">Media gallery</span>
+                      <span className="ch-tools-desc">Images, files, and embeds</span>
+                    </span>
+                  </button>
+                  <button
+                    className="ch-tools-item"
+                    role="menuitem"
+                    onClick={() => { openExportModal(); setShowChannelTools(false); }}
+                    type="button"
+                  >
+                    <ExportIcon />
+                    <span className="ch-tools-copy">
+                      <span className="ch-tools-title">Export chat</span>
+                      <span className="ch-tools-desc">Download channel history</span>
+                    </span>
+                  </button>
+                  {(() => {
+                    const chanKey = activeView.kind === 'channel' ? activeView.channel.toLowerCase() : '';
+                    const liveStream = chanKey ? streams.get(chanKey) : undefined;
+                    return (
+                      <button
+                        className={`ch-tools-item ${liveStream?.live ? 'ch-tools-item--active' : ''}`}
+                        role="menuitem"
+                        onClick={() => {
+                          if (activeView.kind === 'channel') {
+                            if (liveStream?.live) endStream(activeView.channel);
+                            else openGoLiveModal(activeView.channel);
+                          }
+                          setShowChannelTools(false);
+                        }}
+                        type="button"
+                      >
+                        {liveStream?.live ? <StopStreamIcon /> : <GoLiveIcon />}
+                        <span className="ch-tools-copy">
+                          <span className="ch-tools-title">{liveStream?.live ? 'End stream' : 'Go live'}</span>
+                          <span className="ch-tools-desc">{liveStream?.live ? 'Stop the current stream' : 'Start a live session'}</span>
+                        </span>
+                      </button>
+                    );
+                  })()}
+                  <button
+                    className={`ch-tools-item ${showWhiteboard ? 'ch-tools-item--active' : ''}`}
+                    role="menuitem"
+                    onClick={() => {
+                      if (showWhiteboard) closeWhiteboard();
+                      else openWhiteboard();
+                      setShowChannelTools(false);
+                    }}
+                    type="button"
+                  >
+                    <WhiteboardIcon />
+                    <span className="ch-tools-copy">
+                      <span className="ch-tools-title">Whiteboard</span>
+                      <span className="ch-tools-desc">Shared drawing space</span>
+                    </span>
+                  </button>
+                  <button
+                    className={`ch-tools-item ${showSpatialPad ? 'ch-tools-item--active' : ''}`}
+                    role="menuitem"
+                    onClick={() => {
+                      if (showSpatialPad) closeSpatialPad();
+                      else openSpatialPad();
+                      setShowChannelTools(false);
+                    }}
+                    type="button"
+                  >
+                    <SpatialIcon />
+                    <span className="ch-tools-copy">
+                      <span className="ch-tools-title">Spatial audio</span>
+                      <span className="ch-tools-desc">Open the channel audio pad</span>
+                    </span>
+                  </button>
+                  <button
+                    className={`ch-tools-item ${showBreakoutSidebar ? 'ch-tools-item--active' : ''}`}
+                    role="menuitem"
+                    onClick={() => {
+                      if (showBreakoutSidebar) closeBreakoutSidebar();
+                      else openBreakoutSidebar();
+                      setShowChannelTools(false);
+                    }}
+                    type="button"
+                  >
+                    <BreakoutIcon />
+                    <span className="ch-tools-copy">
+                      <span className="ch-tools-title">Breakout rooms</span>
+                      <span className="ch-tools-desc">Create smaller side rooms</span>
+                    </span>
+                  </button>
+
+                  {channel && channel.messages.length > 0 && (
+                    <div className="ch-tools-activity" aria-label="Message activity heatmap">
+                      <span className="ch-tools-title">Activity</span>
+                      <ActivityHeatmap messages={channel.messages} />
+                    </div>
+                  )}
+
+                  <div className="ch-tools-divider" />
+                  <button
+                    className="ch-tools-item ch-tools-item--danger"
+                    role="menuitem"
+                    onClick={() => {
+                      partChannel(activeView.kind === 'channel' ? activeView.channel : '');
+                      setShowChannelTools(false);
+                    }}
+                    type="button"
+                  >
+                    <LeaveIcon />
+                    <span className="ch-tools-copy">
+                      <span className="ch-tools-title">Leave channel</span>
+                      <span className="ch-tools-desc">Remove it from your channel list</span>
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>
@@ -981,12 +1046,16 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 0 16px;
+          padding: 0 14px;
           border-bottom: 1px solid var(--border-normal);
-          background: var(--bg-base);
+          background:
+            linear-gradient(180deg, rgba(255,255,255,0.026), rgba(255,255,255,0)),
+            color-mix(in srgb, var(--bg-base) 94%, var(--accent) 6%);
           flex-shrink: 0;
-          gap: 12px;
+          gap: 10px;
           box-shadow: 0 1px 0 rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.18);
+          min-width: 0;
+          box-sizing: border-box;
         }
 
         .ch-head-left {
@@ -1016,8 +1085,9 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           overflow: hidden;
           text-overflow: ellipsis;
           flex-shrink: 0;
-          max-width: 200px;
+          max-width: min(240px, 28vw);
           letter-spacing: -0.01em;
+          line-height: 1.25;
         }
 
         .ch-head-divider {
@@ -1073,6 +1143,7 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           flex: 1;
           overflow: hidden;
           position: relative;
+          max-width: 100%;
         }
         .ch-head-topic-area--editable {
           cursor: text;
@@ -1265,39 +1336,209 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
         .ch-head-actions {
           display: flex;
           align-items: center;
-          gap: 4px;
+          gap: 6px;
           flex-shrink: 0;
+          min-width: 0;
+          max-width: min(920px, 64vw);
+          overflow: visible;
+          padding: 2px 0;
+        }
+
+        .ch-head-action-group {
+          display: inline-flex;
+          align-items: center;
+          gap: 2px;
+          height: 34px;
+          padding: 2px;
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-md);
+          background: color-mix(in srgb, var(--bg-deep) 68%, transparent);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.018);
+          flex: 0 0 auto;
+        }
+        .ch-head-action-group--status {
+          background: color-mix(in srgb, var(--accent-subtle) 48%, var(--bg-deep));
+          border-color: var(--accent-border);
+        }
+        .ch-head-action-group--danger {
+          background: color-mix(in srgb, var(--danger-subtle) 28%, var(--bg-deep));
+          border-color: color-mix(in srgb, var(--danger) 24%, transparent);
+        }
+
+        .ch-head-tools-wrap {
+          position: relative;
+          flex: 0 0 auto;
         }
 
         .ch-head-btn {
-          width: 28px; height: 28px;
+          width: 30px; height: 30px;
           border-radius: var(--r-sm);
           background: none; border: none; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
           color: var(--text-muted);
-          transition: background var(--t-fast), color var(--t-fast), transform 120ms cubic-bezier(0.34,1.56,0.64,1);
+          transition: background var(--t-fast), color var(--t-fast), box-shadow var(--t-fast);
           flex-shrink: 0;
           position: relative;
         }
         .ch-head-btn:hover {
           background: var(--bg-float);
           color: var(--text-primary);
-          transform: scale(1.08);
+          box-shadow: inset 0 0 0 1px var(--border-subtle);
         }
-        .ch-head-btn:active { transform: scale(0.92); }
+        .ch-head-btn:active { background: var(--accent-subtle); }
         .ch-head-btn--active { color: var(--accent); }
         .ch-head-btn--active:hover { color: var(--accent); background: var(--accent-subtle); }
         .ch-head-btn--danger:hover { background: var(--danger-subtle); color: var(--danger); }
 
+        .ch-head-btn--tools {
+          border: 1px solid var(--border-subtle);
+          background: color-mix(in srgb, var(--bg-deep) 68%, transparent);
+        }
+
+        .ch-tools-menu {
+          position: absolute;
+          top: calc(100% + 8px);
+          right: 0;
+          z-index: 350;
+          width: min(340px, calc(100vw - 20px));
+          max-height: min(640px, calc(100vh - 88px));
+          overflow-y: auto;
+          padding: 8px;
+          border: 1px solid var(--border-normal);
+          border-radius: var(--r-lg);
+          background:
+            linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0)),
+            var(--bg-float);
+          box-shadow: 0 18px 48px rgba(0,0,0,0.48), 0 0 0 1px rgba(255,255,255,0.025);
+          scrollbar-width: thin;
+          scrollbar-color: var(--border-normal) transparent;
+          animation: ch-tools-in 120ms var(--ease-out, ease) both;
+        }
+
+        @keyframes ch-tools-in {
+          from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .ch-tools-section-label {
+          padding: 8px 8px 5px;
+          font-size: 10px;
+          line-height: 1;
+          font-weight: 800;
+          color: var(--text-muted);
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+        }
+
+        .ch-tools-item {
+          width: 100%;
+          min-height: 44px;
+          display: grid;
+          grid-template-columns: 28px minmax(0, 1fr);
+          align-items: center;
+          gap: 9px;
+          padding: 7px 8px;
+          border: 1px solid transparent;
+          border-radius: var(--r-sm);
+          background: transparent;
+          color: var(--text-secondary);
+          cursor: pointer;
+          text-align: left;
+          font: inherit;
+          transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+        }
+
+        .ch-tools-item:hover,
+        .ch-tools-item--active {
+          background: var(--ch-hover-bg);
+          border-color: var(--border-subtle);
+          color: var(--text-primary);
+        }
+
+        .ch-tools-item--active {
+          box-shadow: inset 3px 0 0 var(--accent);
+        }
+
+        .ch-tools-item--danger {
+          color: var(--danger);
+        }
+
+        .ch-tools-item--danger:hover {
+          background: var(--danger-subtle);
+          border-color: color-mix(in srgb, var(--danger) 28%, transparent);
+        }
+
+        .ch-tools-item svg {
+          justify-self: center;
+          width: 16px;
+          height: 16px;
+          opacity: 0.78;
+        }
+
+        .ch-tools-copy {
+          display: grid;
+          gap: 2px;
+          min-width: 0;
+        }
+
+        .ch-tools-title {
+          font-size: 13px;
+          font-weight: 650;
+          color: currentColor;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          line-height: 1.2;
+        }
+
+        .ch-tools-desc {
+          font-size: 11px;
+          color: var(--text-muted);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          line-height: 1.25;
+        }
+
+        .ch-tools-activity {
+          margin: 6px 4px;
+          padding: 8px;
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-sm);
+          background: color-mix(in srgb, var(--bg-deep) 72%, transparent);
+          display: grid;
+          gap: 7px;
+        }
+
+        .ch-tools-divider {
+          height: 1px;
+          margin: 7px 4px;
+          background: var(--border-subtle);
+        }
+
         @media (prefers-reduced-motion: reduce) {
           .ch-head-btn { transition: background var(--t-fast), color var(--t-fast); }
-          .ch-head-btn:hover, .ch-head-btn:active { transform: none; }
         }
 
         @media (max-width: 768px) {
           .ch-head-btn { width: 32px; height: 32px; }
           .ch-head { padding: 0 10px; gap: 8px; }
           .ch-head-title { font-size: 14px; max-width: 140px; }
+          .ch-head-actions {
+            max-width: 54vw;
+            gap: 4px;
+            overflow: visible;
+          }
+          .ch-head-action-group {
+            height: 36px;
+          }
+          .ch-head-action-group--tools,
+          .ch-head-action-group--collab {
+            display: none;
+          }
+          .ch-head-topic-area,
+          .ch-head-divider,
+          .ch-topic-hist-wrap { display: none; }
           .ch-mode-badges { display: none; }
           .ch-head-heatmap { display: none; }
           .ch-head-members-count { display: none; }
@@ -1310,10 +1551,10 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           align-items: center;
           gap: 5px;
           padding: 3px 9px 3px 7px;
-          height: 28px;
+          height: 30px;
           border-radius: var(--r-sm);
           background: none;
-          border: none;
+          border: 1px solid transparent;
           cursor: pointer;
           color: var(--text-muted);
           font-size: 12px;
@@ -1323,7 +1564,7 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           white-space: nowrap;
           flex-shrink: 0;
         }
-        .ch-head-member-chip:hover { background: var(--bg-float); color: var(--text-primary); }
+        .ch-head-member-chip:hover { background: var(--bg-float); border-color: var(--border-subtle); color: var(--text-primary); }
         .ch-head-member-chip--active { color: var(--accent); }
         .ch-head-member-chip--active:hover { background: var(--accent-subtle); color: var(--accent); }
         .ch-head-member-chip svg { flex-shrink: 0; }
@@ -1556,20 +1797,6 @@ const InfoIcon = () => (
   </svg>
 );
 
-const PeopleIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-    <path d="M7 7a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM1 13s-1 0-1-1 1-4 7-4 7 3 7 4-1 1-1 1H1z"/>
-  </svg>
-);
-
-const MemberListIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-    <path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
-    <path fillRule="evenodd" d="M5.216 14A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1h4.216z"/>
-    <path d="M4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/>
-  </svg>
-);
-
 const LeaveIcon = () => (
   <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5">
     <path d="M9 3L14 7.5L9 12M14 7.5H5" strokeLinecap="round" strokeLinejoin="round" />
@@ -1723,6 +1950,14 @@ const MembersIcon = () => (
     <circle cx="9" cy="7" r="4"/>
     <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
     <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+  </svg>
+);
+
+const MoreIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor" aria-hidden>
+    <circle cx="3.5" cy="7.5" r="1.25" />
+    <circle cx="7.5" cy="7.5" r="1.25" />
+    <circle cx="11.5" cy="7.5" r="1.25" />
   </svg>
 );
 

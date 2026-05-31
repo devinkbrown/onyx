@@ -19,6 +19,7 @@ export default function Button({
   children,
   disabled,
   className = '',
+  type = 'button',
   ...rest
 }: Props) {
   const base = 'btn';
@@ -31,6 +32,7 @@ export default function Button({
       <button
         className={`${base} ${variantClass} ${sizeClass} ${widthClass} ${className}`}
         disabled={disabled || loading}
+        type={type}
         {...rest}
       >
         {/* Only show built-in spinner when loading AND caller didn't provide

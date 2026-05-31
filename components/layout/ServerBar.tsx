@@ -217,11 +217,13 @@ export default function ServerBar() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: 12px 0;
-          gap: 4px;
+          padding: 10px 0;
+          gap: 6px;
           overflow-y: auto;
           overflow-x: hidden;
           border-right: 1px solid var(--border-subtle);
+          min-height: 0;
+          scrollbar-width: none;
         }
         .server-bar::-webkit-scrollbar { display: none; }
 
@@ -230,7 +232,7 @@ export default function ServerBar() {
           width: 44px;
           height: 44px;
           border-radius: 50%;
-          border: none;
+          border: 1px solid transparent;
           cursor: pointer;
           display: flex;
           align-items: center;
@@ -242,16 +244,16 @@ export default function ServerBar() {
             opacity 150ms var(--ease-out);
           position: relative;
           flex-shrink: 0;
-          transform: scale(1);
+          transform: translateZ(0);
         }
         .server-btn:hover {
           border-radius: 12px;
-          transform: scale(1.136); /* 44→50px equivalent */
+          background-clip: padding-box;
+          box-shadow: 0 0 0 1px var(--border-normal), 0 8px 20px rgba(0,0,0,0.22);
         }
         .server-btn--active {
           border-radius: 12px !important;
-          transform: scale(1.136) !important;
-          box-shadow: 0 0 0 0 transparent;
+          box-shadow: 0 0 0 1px var(--accent-border), 0 8px 22px rgba(0,0,0,0.28);
         }
         /* Server icon glow on active */
         .server-btn:not(.server-btn--home):not(.server-btn--add).server-btn--active {
@@ -290,7 +292,6 @@ export default function ServerBar() {
           background: var(--success);
           color: #fff;
           border: 1.5px solid var(--success);
-          transform: scale(1.05);
           border-radius: 12px;
         }
 
@@ -363,12 +364,15 @@ export default function ServerBar() {
           flex-shrink: 0;
           margin: 4px 0;
           opacity: 0.6;
+          flex-shrink: 0;
         }
 
         /* Wrapper for badge positioning */
         .server-btn-wrap {
           position: relative;
           flex-shrink: 0;
+          width: 44px;
+          height: 44px;
         }
 
         /* Unread / mention badge */
@@ -477,6 +481,10 @@ export default function ServerBar() {
             transition-duration: 0.001ms !important;
           }
         }
+
+        @media (max-width: 768px) {
+          .server-bar { display: none; }
+        }
       `}</style>
     </div>
   );
@@ -486,14 +494,6 @@ function HomeIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
       <path d="M10.707 2.293a1 1 0 0 0-1.414 0l-7 7A1 1 0 0 0 3 11h1v6a1 1 0 0 0 1 1h4v-4h2v4h4a1 1 0 0 0 1-1v-6h1a1 1 0 0 0 .707-1.707l-7-7z" />
-    </svg>
-  );
-}
-
-function PlusIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
-      <path d="M9 1a1 1 0 0 1 1 1v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H2a1 1 0 1 1 0-2h6V2a1 1 0 0 1 1-1z" />
     </svg>
   );
 }

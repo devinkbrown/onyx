@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import Avatar from '@/components/ui/Avatar';
 
@@ -38,28 +38,24 @@ export default function ForwardMessageModal() {
     return () => document.removeEventListener('keydown', handler);
   }, [close]);
 
-  if (!forwardingMessage) return null;
-
-  // Build destination list: channels + DMs
   interface Destination {
     id: string;
     label: string;
     kind: 'channel' | 'dm';
   }
 
-  const allChannels: Destination[] = Array.from(channels.values()).map(ch => ({
-    id: ch.name,
-    label: ch.name,
-    kind: 'channel',
-  }));
-
-  const allDMs: Destination[] = Array.from(dms.values()).map(dm => ({
-    id: dm.nick,
-    label: dm.nick,
-    kind: 'dm',
-  }));
-
-  const destinations: Destination[] = [...allChannels, ...allDMs];
+  const destinations: Destination[] = useMemo(() => [
+    ...Array.from(channels.values()).map(ch => ({
+      id: ch.name,
+      label: ch.name,
+      kind: 'channel' as const,
+    })),
+    ...Array.from(dms.values()).map(dm => ({
+      id: dm.nick,
+      label: dm.nick,
+      kind: 'dm' as const,
+    })),
+  ], [channels, dms]);
 
   const q = query.toLowerCase();
   const filtered = q
@@ -83,10 +79,12 @@ export default function ForwardMessageModal() {
       }
     }
     close();
-  }, [selected, forwardingMessage, sendMessage, navigate, destinations, close]);
+  }, [selected, forwardingMessage, comment, sendMessage, navigate, destinations, close]);
 
   const truncate = (text: string, max: number) =>
     text.length > max ? text.slice(0, max) + '…' : text;
+
+  if (!forwardingMessage) return null;
 
   return (
     <div

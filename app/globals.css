@@ -523,7 +523,7 @@ body.reduce-motion *, body.reduce-motion *::before, body.reduce-motion *::after 
 
   /* ── Touch targets — all buttons get minimum 44×44px ── */
   /* Exempt: inline icon buttons inside running text (.inline-btn) */
-  button:not(.inline-btn):not(.ch-section-add):not(.ch-sort-btn):not(.fmt-btn) {
+  button:not(.inline-btn):not(.ch-section-add):not(.ch-sort-btn):not(.fmt-btn):not(.member-refresh-btn):not(.member-search-clear):not(.user-bar-btn):not(.ch-head-btn):not(.ch-head-member-chip) {
     min-height: 44px;
     min-width: 44px;
   }

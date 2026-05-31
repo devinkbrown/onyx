@@ -45,7 +45,19 @@ export function useLadonMedia() {
       onPeerState(peer) {
         const peers = new Map(useOnyxStore.getState().voice.peers);
         peers.set(peer.nick, peer);
-        setVoiceState({ peers });
+        const videoParticipants = new Map(useOnyxStore.getState().voice.videoParticipants);
+        const existingVideo = videoParticipants.get(peer.nick);
+        const screenStream = engineRef.current?.getScreenStream(peer.nick) ?? null;
+        const canvasStream = !screenStream && peer.canvas && 'captureStream' in peer.canvas
+          ? (peer.canvas as HTMLCanvasElement & { captureStream(fps?: number): MediaStream }).captureStream(60)
+          : null;
+        const mediaStream = screenStream ?? canvasStream;
+        if (peer.hasVideo && mediaStream && existingVideo !== mediaStream) {
+          videoParticipants.set(peer.nick, mediaStream);
+        } else if (!peer.hasVideo) {
+          videoParticipants.delete(peer.nick);
+        }
+        setVoiceState({ peers, videoParticipants });
       },
       onPeerLeft(nick) {
         const peers = new Map(useOnyxStore.getState().voice.peers);
@@ -111,6 +123,35 @@ export function useLadonMedia() {
       engineRef.current?.setClient(null);
     };
   }, [client, setVoiceState, addNotification]);
+
+  useEffect(() => {
+    const startHandler = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        channel: string;
+        mode: 'camera' | 'screen';
+        quality?: 'auto' | '1080p60' | '4k60';
+      }>).detail;
+      if (!detail?.channel) return;
+      void engineRef.current?.startBroadcast(
+        `%%${detail.channel}`,
+        detail.mode,
+        detail.quality ?? '4k60',
+      );
+    };
+
+    const stopHandler = (event: Event) => {
+      const detail = (event as CustomEvent<{ channel: string }>).detail;
+      if (!detail?.channel) return;
+      engineRef.current?.stopBroadcast(`%%${detail.channel}`);
+    };
+
+    window.addEventListener('ocean:stream-start', startHandler);
+    window.addEventListener('ocean:stream-stop', stopHandler);
+    return () => {
+      window.removeEventListener('ocean:stream-start', startHandler);
+      window.removeEventListener('ocean:stream-stop', stopHandler);
+    };
+  }, []);
 
   // ── Announce screenshare start / stop to channel ──────────────────────────
   useEffect(() => {

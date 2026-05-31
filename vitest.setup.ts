@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom';
+import React from 'react';
 
 // ── localStorage polyfill for jsdom ──────────────────────────────────────────
 const store: Record<string, string> = {};
@@ -22,7 +23,6 @@ vi.mock('next/navigation', () => ({
 // Stub next/link
 vi.mock('next/link', () => ({
   default: ({ children, href, ...rest }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string; children?: React.ReactNode }) => {
-    const React = require('react');
     return React.createElement('a', { href, ...rest }, children);
   },
 }));

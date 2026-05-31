@@ -35,7 +35,6 @@ import ChannelJoinModal from '../modals/ChannelJoinModal';
 import MediaGalleryPanel from '../modals/MediaGalleryPanel';
 import ServicesPanel from '../modals/ServicesPanel';
 import ConnectionBanner from '../ui/ConnectionBanner';
-import ConnectionStatusBar from '../ui/ConnectionStatusBar';
 import RawLogPanel from '../ui/RawLogPanel';
 import WhoisPanel from '../modals/WhoisPanel';
 import NotificationCenter from '../ui/NotificationCenter';
@@ -190,6 +189,7 @@ export default function AppShell({ children }: Props) {
   const openSettings         = useOnyxStore(s => s.openSettings);
   const sidebarWidth         = useOnyxStore(s => s.sidebarWidth);
   const setSidebarWidth      = useOnyxStore(s => s.setSidebarWidth);
+  const compactSidebar       = useOnyxStore(s => s.compactSidebar);
   const showWhiteboard       = useOnyxStore(s => s.showWhiteboard);
   const closeWhiteboard      = useOnyxStore(s => s.closeWhiteboard);
   const showGoLiveModal      = useOnyxStore(s => s.showGoLiveModal);
@@ -216,7 +216,7 @@ export default function AppShell({ children }: Props) {
     swipeIsTracking.current = touch.clientX <= 30;
   }, []);
 
-  const onSwipeTouchMove = useCallback((_e: React.TouchEvent) => {
+  const onSwipeTouchMove = useCallback(() => {
     // tracking state only — no action mid-move needed
   }, []);
 
@@ -363,8 +363,8 @@ export default function AppShell({ children }: Props) {
 
       {/* Channel / DM sidebar */}
       <div
-        className={`app-sidebar ${(mobileSidebarOpen || mobilePanel === 'channels') ? 'app-sidebar--open' : ''}`}
-        style={{ width: sidebarWidth }}
+        className={`app-sidebar${compactSidebar ? ' app-sidebar--compact' : ''} ${(mobileSidebarOpen || mobilePanel === 'channels') ? 'app-sidebar--open' : ''}`}
+        style={{ width: compactSidebar ? 52 : sidebarWidth }}
       >
         <ChannelSidebar
           onNavigate={() => { closeMobileSidebar(); setMobilePanel('chat'); }}
@@ -416,9 +416,6 @@ export default function AppShell({ children }: Props) {
 
         {/* Connection status banner */}
         <ConnectionBanner />
-
-        {/* Latency / connection quality indicator */}
-        <ConnectionStatusBar />
 
         {/* Voice bar (shows when in a call) */}
         {voice.callState !== 'idle' && <VoiceBar />}
@@ -660,6 +657,7 @@ export default function AppShell({ children }: Props) {
           overflow: hidden;
           background: var(--bg-void);
           position: relative;
+          isolation: isolate;
         }
 
         /* ── Sidebar ── */
@@ -668,10 +666,21 @@ export default function AppShell({ children }: Props) {
           flex-direction: column;
           width: var(--sidebar-w);
           flex-shrink: 0;
-          background: var(--bg-deep);
+          height: 100%;
+          min-width: 208px;
+          max-width: 360px;
+          background:
+            linear-gradient(180deg, rgba(255,255,255,0.018), rgba(255,255,255,0) 120px),
+            var(--bg-deep);
           border-right: 1px solid var(--border-subtle);
           transition: transform 200ms var(--ease-out);
           position: relative;
+          min-height: 0;
+        }
+
+        .app-sidebar--compact {
+          min-width: 52px;
+          max-width: 52px;
         }
 
         /* ── PWA install button ── */
@@ -711,6 +720,7 @@ export default function AppShell({ children }: Props) {
           background: transparent;
           transition: background var(--t-fast);
         }
+        .app-sidebar--compact .sidebar-resize-handle { display: none; }
         .sidebar-resize-handle:hover {
           background: var(--accent-border);
         }
@@ -721,7 +731,9 @@ export default function AppShell({ children }: Props) {
           display: flex;
           flex-direction: column;
           overflow: hidden;
-          background: var(--bg-base);
+          background:
+            radial-gradient(circle at 50% -140px, var(--accent-glow), transparent 280px),
+            linear-gradient(180deg, color-mix(in srgb, var(--bg-base) 92%, var(--accent) 8%), var(--bg-base) 220px);
           min-width: 0;
           position: relative;
         }
@@ -730,11 +742,15 @@ export default function AppShell({ children }: Props) {
         .app-member-list {
           width: var(--member-list-w);
           flex-shrink: 0;
-          background: var(--bg-deep);
+          height: 100%;
+          background:
+            linear-gradient(180deg, rgba(255,255,255,0.018), rgba(255,255,255,0) 120px),
+            var(--bg-deep);
           border-left: 1px solid var(--border-subtle);
           overflow-y: auto;
           position: relative;
           z-index: 1;
+          min-height: 0;
         }
 
         /* ── Spatial pad floating host ── */
@@ -813,7 +829,9 @@ export default function AppShell({ children }: Props) {
             left: 0; top: 0; bottom: 0;
             z-index: 200;
             transform: translateX(calc(-100% - var(--server-bar-w)));
-            width: var(--sidebar-w);
+            width: min(var(--sidebar-w), 88vw) !important;
+            max-width: 360px;
+            min-width: 0;
             /* Smooth spring slide */
             transition: transform 300ms cubic-bezier(0.16,1,0.3,1),
                         box-shadow 300ms cubic-bezier(0.16,1,0.3,1);

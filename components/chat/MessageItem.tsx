@@ -15,7 +15,6 @@ import { hasIrcFormatting, stripIrcFormatting } from '@/lib/ircColors';
 import PollMessage, { POLL_PATTERN } from '@/components/chat/PollMessage';
 import { getNickColor } from '@/lib/nick-color';
 import { STICKER_PATTERN, STICKER_PACKS } from '@/lib/stickers';
-import QuickReactBar from '@/components/chat/QuickReactBar';
 import AvatarStack from '@/components/ui/AvatarStack';
 import { getDisplayName } from '@/lib/display-name';
 
@@ -32,14 +31,6 @@ interface Props {
   /** Callback to jump to a specific message by ID */
   onJumpToMessage?: (msgId: string) => void;
 }
-
-// IRC mode → prefix character (highest privilege first)
-const MSG_MODE_PREFIX: Record<string, string> = {
-  q: '~',
-  a: '&',
-  o: '@',
-  v: '+',
-};
 
 // ── Segment types ──────────────────────────────────────────────────────────────
 
@@ -398,6 +389,7 @@ function InlineImage({ url, fullWidth = false }: InlineImageProps) {
       style={{ cursor: 'pointer' }}
     >
       {!loaded && <div className="msg-img-placeholder" aria-hidden />}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={url}
         alt=""
@@ -458,6 +450,7 @@ function parseCustomEmoji(
     const ce = customEmoji.find(e => e.name === m![1]);
     if (!ce) continue;
     if (m.index > last) parts.push(text.slice(last, m.index));
+    /* eslint-disable @next/next/no-img-element */
     parts.push(
       <img
         key={`ce-${m.index}`}
@@ -467,6 +460,7 @@ function parseCustomEmoji(
         style={{ height: '20px', verticalAlign: 'middle', borderRadius: '2px', display: 'inline' }}
       />
     );
+    /* eslint-enable @next/next/no-img-element */
     last = m.index + m[0].length;
   }
   if (last < text.length) parts.push(text.slice(last));
@@ -1021,6 +1015,35 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
   // Link URLs in this message — used for embed suppression button visibility
   const msgLinkUrls = useMemo(() => extractLinkUrls(text), [text]);
 
+  const scrollToParent = useCallback(() => {
+    if (!replyTo) return;
+    if (onJumpToMessage) {
+      onJumpToMessage(replyTo.id);
+      return;
+    }
+    const el = document.querySelector(`[data-msg-id="${replyTo.id}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('msg--focused');
+      setTimeout(() => el.classList.remove('msg--focused'), 1500);
+    }
+  }, [replyTo, onJumpToMessage]);
+
+  const isSelected = selectedMessages.has(message.id);
+
+  const handleMsgClick = useCallback((e: React.MouseEvent) => {
+    if (e.shiftKey) {
+      e.preventDefault();
+      enterSelectMode();
+      toggleMessageSelection(message.id);
+      return;
+    }
+    if (isSelectMode) {
+      e.preventDefault();
+      toggleMessageSelection(message.id);
+    }
+  }, [isSelectMode, enterSelectMode, toggleMessageSelection, message.id]);
+
   // ── Event messages ─────────────────────────────────────────────────────
 
   // Nick change — rendered with special old→new styling
@@ -1123,20 +1146,6 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
     );
   }
 
-  const scrollToParent = useCallback(() => {
-    if (!replyTo) return;
-    if (onJumpToMessage) {
-      onJumpToMessage(replyTo.id);
-      return;
-    }
-    const el = document.querySelector(`[data-msg-id="${replyTo.id}"]`);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      el.classList.add('msg--focused');
-      setTimeout(() => el.classList.remove('msg--focused'), 1500);
-    }
-  }, [replyTo, onJumpToMessage]);
-
   // ── Collapsed nick placeholder ─────────────────────────────────────────
   const isCollapsed = from && collapsedNicks.has(from.toLowerCase());
   if (isCollapsed) {
@@ -1171,21 +1180,6 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
     );
   }
 
-  const isSelected = selectedMessages.has(message.id);
-
-  const handleMsgClick = useCallback((e: React.MouseEvent) => {
-    if (e.shiftKey) {
-      e.preventDefault();
-      enterSelectMode();
-      toggleMessageSelection(message.id);
-      return;
-    }
-    if (isSelectMode) {
-      e.preventDefault();
-      toggleMessageSelection(message.id);
-    }
-  }, [isSelectMode, enterSelectMode, toggleMessageSelection, message.id]);
-
   // ── Normal message ─────────────────────────────────────────────────────
   return (
     <div
@@ -1193,7 +1187,7 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
       ref={setRef}
       role="article"
       aria-label={`Message from ${from} at ${timeStr}`}
-      aria-selected={isSelectMode ? isSelected : undefined}
+      data-selected={isSelectMode ? isSelected : undefined}
       className={`msg-item ${grouped ? 'msg-grouped' : ''} ${highlight ? 'msg-item--highlight' : ''} ${isMe ? 'msg-item--self' : ''} ${isSelected ? 'msg-item--selected' : ''} ${animNew ? 'msg-new' : ''}`}
       style={{ paddingTop: grouped ? 2 : 10, paddingBottom: grouped ? 2 : 4 }}
       onClick={handleMsgClick}
@@ -1440,7 +1434,17 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
               )}
             </>
           )}
-          <button className="action-btn" title="More options" aria-label="More options">
+          <button
+            className="action-btn"
+            title="More options"
+            aria-label="More options"
+            type="button"
+            onClick={e => {
+              e.stopPropagation();
+              const rect = e.currentTarget.getBoundingClientRect();
+              setContextMenu({ x: rect.right, y: rect.bottom });
+            }}
+          >
             <MoreIcon />
           </button>
         </div>
