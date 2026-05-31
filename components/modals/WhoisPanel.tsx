@@ -27,14 +27,6 @@ const DATE_FMT = new Intl.DateTimeFormat(undefined, {
   minute: '2-digit',
 });
 
-// ── Nick color ────────────────────────────────────────────────────────────────
-
-function nickHue(nick: string): number {
-  let h = 0;
-  for (let i = 0; i < nick.length; i++) h = (h * 31 + nick.charCodeAt(i)) & 0xffff;
-  return h % 360;
-}
-
 // ── Skeleton row ──────────────────────────────────────────────────────────────
 
 function SkeletonRow({ width = '70%' }: { width?: string }) {
@@ -98,8 +90,6 @@ export default function WhoisPanel() {
     openUserProfile(nick);
     closeWhois();
   }, [openUserProfile, nick, closeWhois]);
-
-  const hue = nickHue(nick);
 
   // Channels: show first 10, count overflow
   const allChannels = info?.channels ?? [];

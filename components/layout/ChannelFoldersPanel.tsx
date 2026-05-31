@@ -19,12 +19,6 @@ interface DragState {
 
 // ── Folder header context menu ─────────────────────────────────────────────────
 
-interface FolderMenuState {
-  folderId: string;
-  x: number;
-  y: number;
-}
-
 function FolderContextMenu({
   folderId,
   folderName,
@@ -164,7 +158,6 @@ function MoveToFolderMenu({
 }) {
   const addChannelToFolder = useOnyxStore(s => s.addChannelToFolder);
   const createFolder = useOnyxStore(s => s.createFolder);
-  const channelFolders = useOnyxStore(s => s.channelFolders);
 
   const handleMove = (folderId: string) => {
     addChannelToFolder(channel, folderId);
@@ -246,7 +239,6 @@ function FolderChannelRow({
   channelName,
   active,
   onClick,
-  onContextMenu,
   onMoveContextMenu,
   draggable,
   onDragStart,
@@ -356,7 +348,7 @@ function FolderSection({
     e.dataTransfer.setData('text/plain', channel);
   };
 
-  const handleDragEnd = () => (_e: React.DragEvent) => {
+  const handleDragEnd = () => () => {
     setDragOverChannel(null);
     setIsDragOverFolder(false);
   };
@@ -365,12 +357,6 @@ function FolderSection({
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     setIsDragOverFolder(true);
-  };
-
-  const handleDragOverChannel = (channel: string) => (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setDragOverChannel(channel);
   };
 
   const handleDragLeave = () => {

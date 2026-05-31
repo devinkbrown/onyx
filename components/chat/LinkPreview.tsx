@@ -268,7 +268,7 @@ function heuristicData(url: string, platform: Platform): UnfurlData | null {
     if (id) {
       let title: string | undefined;
       try {
-        const sp = new URL(url).searchParams;
+        new URL(url);
         // v param doesn't give us a title, but let's include the ID as a hint
         title = `YouTube · ${id}`;
       } catch {

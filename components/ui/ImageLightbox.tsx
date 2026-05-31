@@ -96,12 +96,6 @@ export default function ImageLightbox({ src, alt = '', onClose, images, currentI
     }
   }, [scale, resetTransform]);
 
-  const getTouchDist = (e: React.TouchEvent): number => {
-    const a = e.touches[0];
-    const b = e.touches[1];
-    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-  };
-
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (e.touches.length === 2) {
       touchStartRef.current = { dist: Math.hypot(

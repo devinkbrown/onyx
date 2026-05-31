@@ -105,12 +105,6 @@ function NotificationCard({ note, isRead, onActivate, onDismiss }: CardProps) {
     }
   };
 
-  const handleDismissClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setDismissing(true);
-    setTimeout(() => onDismiss(note.id), 280);
-  };
-
   return (
     <div
       className={[
@@ -291,7 +285,7 @@ function EmptyState() {
 
 // ── Overflow banner ───────────────────────────────────────────────────────────
 
-function OverflowBanner({ count, onShowAll }: { count: number; onShowAll: () => void }) {
+function OverflowBanner({ onShowAll }: { onShowAll: () => void }) {
   return (
     <div className="nc-overflow">
       <span className="nc-overflow-label">10+ unread notifications</span>
@@ -464,7 +458,7 @@ export default function NotificationCenter({ onClose }: Props) {
 
         {/* Overflow banner */}
         {!showAll && unreadCount > OVERFLOW_THRESHOLD && (
-          <OverflowBanner count={unreadCount} onShowAll={() => setShowAll(true)} />
+          <OverflowBanner onShowAll={() => setShowAll(true)} />
         )}
 
         {/* Content */}

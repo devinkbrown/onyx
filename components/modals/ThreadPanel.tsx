@@ -13,18 +13,6 @@ const ARCHIVE_DURATION_OPTIONS: { label: string; minutes: number }[] = [
   { label: '1 week',  minutes: 10080 },
 ];
 
-const TIME_FMT = new Intl.DateTimeFormat(undefined, {
-  month: 'short',
-  day: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-});
-
-const SHORT_TIME_FMT = new Intl.DateTimeFormat(undefined, {
-  hour: '2-digit',
-  minute: '2-digit',
-});
-
 export default function ThreadPanel() {
   const closeThread              = useOnyxStore(s => s.closeThread);
   const threadParentId           = useOnyxStore(s => s.threadParentId);

@@ -118,7 +118,7 @@ const TIME_FORMAT_OPTIONS: Array<{ id: TimeFormat; label: string; preview: strin
 ];
 
 export default function ThemeModal() {
-  const { theme: uiTheme, setTheme: setUiTheme, fontSize: uiFontSize, setFontSize: setUiFontSize } = useTheme();
+  const { setTheme: setUiTheme, fontSize: uiFontSize, setFontSize: setUiFontSize } = useTheme();
   const activeTheme        = useOnyxStore(s => s.activeTheme);
   const setTheme           = useOnyxStore(s => s.setTheme);
   const closeThemeModal    = useOnyxStore(s => s.closeThemeModal);

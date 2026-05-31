@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback, useState, KeyboardEvent } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import type { ChatMessage } from '@/lib/irc/types';
 import { useOnyxStore } from '@/lib/store';
 import { showToast } from '@/components/ui/Toast';
@@ -133,10 +133,9 @@ export default function MessageContextMenu({
   x, y, message, isOwnMessage, isPinned, onClose,
 }: Props) {
   const menuRef = useRef<HTMLDivElement>(null);
-  const [focusIdx, setFocusIdx] = useState(-1);
+  const [, setFocusIdx] = useState(-1);
   const [pos, setPos] = useState({ top: y, left: x });
 
-  const addLocalReaction    = useOnyxStore(s => s.addLocalReaction);
   const addReaction         = useOnyxStore(s => s.addReaction);
   const setReplyingTo       = useOnyxStore(s => s.setReplyingTo);
   const setForwardingMessage = useOnyxStore(s => s.setForwardingMessage);

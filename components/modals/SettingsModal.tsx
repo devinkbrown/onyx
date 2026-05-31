@@ -6,7 +6,6 @@ import Button from '@/components/ui/Button';
 import Avatar from '@/components/ui/Avatar';
 import {
   type AppearanceSettings,
-  type MessageDensity,
   loadAppearance,
   saveAppearance,
   applyAppearance,

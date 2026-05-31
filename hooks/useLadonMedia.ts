@@ -106,7 +106,7 @@ export function useLadonMedia() {
       onError(msg) {
         addNotification({ type: 'error', text: `Voice: ${msg}` });
       },
-      onDecodeError(_peer, _type, _err) {
+      onDecodeError() {
         // Decode errors are non-fatal; engine handles recovery internally
       },
       enableVideoCalls: () => true,

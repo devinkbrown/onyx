@@ -31,7 +31,7 @@ const BUTTONS: FmtButton[] = [
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export default function FormatToolbar({ textareaRef, onFormat, visible }: FormatToolbarProps) {
+export default function FormatToolbar({ onFormat, visible }: FormatToolbarProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Animate in/out via data attribute

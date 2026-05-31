@@ -5,7 +5,7 @@
  * message routing, peer state management, and VoiceBar controls — using
  * mocked IRC client and media engine.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Minimal IRCClient stub

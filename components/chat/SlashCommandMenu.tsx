@@ -140,8 +140,6 @@ export default function SlashCommandMenu({
   query,
   selectedIndex,
   onSelect,
-  onClose,
-  onNavigate,
 }: SlashCommandMenuProps) {
   const filtered = filterCommands(query);
   const grouped  = groupByCategory(filtered);

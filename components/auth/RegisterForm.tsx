@@ -111,7 +111,6 @@ const STRENGTH_LABELS: Record<PasswordStrength, string> = {
 export default function RegisterForm({ onSwitch }: Props) {
   const connect   = useOnyxStore(s => s.connect);
   const sendRaw   = useOnyxStore(s => s.sendRaw);
-  const status    = useOnyxStore(s => s.status);
 
   const [step,          setStep]          = useState<Step>('fill');
   const [nick,          setNick]          = useState('');

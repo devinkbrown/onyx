@@ -352,7 +352,7 @@ export default function MessageSearch({ onClose }: Props) {
       <div className="msearch-results">
         {!showHint && results.length === 0 && (
           <div className="msearch-empty">
-            No messages match <strong>"{query}"</strong>
+            No messages match <strong>&quot;{query}&quot;</strong>
           </div>
         )}
 

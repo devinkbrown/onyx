@@ -747,7 +747,8 @@ function AccountTab({ account, ourNick, send }: AccountTabProps) {
   const toggleFlag = (f: AccountFlag, on: boolean) => {
     setFlags(prev => {
       const next = new Set(prev);
-      on ? next.add(f) : next.delete(f);
+      if (on) next.add(f);
+      else next.delete(f);
       return next;
     });
     send('SET', f, on ? 'ON' : 'OFF');
@@ -1180,7 +1181,8 @@ function ChannelTab({ channels, ourNick, send }: ChannelTabProps) {
     setChansetFlags(prev => {
       const next = new Map(prev);
       const flagSet = new Set(next.get(chan) ?? []);
-      on ? flagSet.add(opt) : flagSet.delete(opt);
+      if (on) flagSet.add(opt);
+      else flagSet.delete(opt);
       next.set(chan, flagSet);
       return next;
     });

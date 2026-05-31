@@ -108,13 +108,11 @@ function formatUptime(since: Date): string {
 
 export default function ConnectionStatusBar() {
   const connectionStatus  = useOnyxStore(s => s.connectionStatus);
-  const reconnectIn       = useOnyxStore(s => s.reconnectIn);
   const latencyMs         = useOnyxStore(s => s.latencyMs);
   const latencyHistory    = useOnyxStore(s => s.latencyHistory);
   const connectedAt       = useOnyxStore(s => s.connectedAt);
   const reconnectNow      = useOnyxStore(s => s.reconnectNow);
   const server            = useOnyxStore(s => s.server);
-  const connect           = useOnyxStore(s => s.connect);
   const openServerInfo    = useOnyxStore(s => s.openServerInfo);
 
   const [uptime, setUptime] = useState<string>('');

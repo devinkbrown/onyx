@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface SlowModeBarProps {
   seconds: number;
@@ -10,7 +10,6 @@ interface SlowModeBarProps {
 
 export default function SlowModeBar({ seconds, lastSentAt, onCountdownEnd }: SlowModeBarProps) {
   const [remaining, setRemaining] = useState(0);
-  const animKeyRef = useRef(0);
 
   useEffect(() => {
     if (!lastSentAt || lastSentAt <= 0) {

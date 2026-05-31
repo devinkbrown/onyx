@@ -260,7 +260,7 @@ export default function SearchOverlay() {
           {/* Results */}
           {showResults && results.length === 0 && (
             <div className="so-empty">
-              No messages found for <strong>"{trimmedQuery}"</strong>
+              No messages found for <strong>&quot;{trimmedQuery}&quot;</strong>
             </div>
           )}
 

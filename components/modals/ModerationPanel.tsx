@@ -23,7 +23,6 @@ export default function ModerationPanel() {
   const closeModerationPanel = useOnyxStore(s => s.closeModerationPanel);
   const activeView           = useOnyxStore(s => s.activeView);
   const client               = useOnyxStore(s => s.client);
-  const channels             = useOnyxStore(s => s.channels);
   const moderationLog        = useOnyxStore(s => s.moderationLog);
   const banList              = useOnyxStore(s => s.banList);
   const fetchBanList         = useOnyxStore(s => s.fetchBanList);
