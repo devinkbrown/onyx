@@ -502,18 +502,8 @@ export default function VoiceBar() {
       <style>{`
         /* ── Keyframes ── */
         @keyframes speaking-pulse {
-          0%, 100% {
-            box-shadow:
-              0 0 0 0   rgba(52, 211, 153, 0),
-              0 0 0 2.5px var(--status-online, #34d399),
-              0 0 8px  rgba(52, 211, 153, 0.5);
-          }
-          50% {
-            box-shadow:
-              0 0 0 5px  rgba(52, 211, 153, 0),
-              0 0 0 2.5px var(--status-online, #34d399),
-              0 0 18px rgba(52, 211, 153, 0.35);
-          }
+          0%, 100% { opacity: 0.38; transform: scale(0.94); filter: drop-shadow(0 0 3px var(--status-online, #34d399)); }
+          50%      { opacity: 0.9;  transform: scale(1.14); filter: drop-shadow(0 0 7px var(--status-online, #34d399)); }
         }
 
         @keyframes vb-fadein {
@@ -532,9 +522,10 @@ export default function VoiceBar() {
           flex-direction: column;
           gap: 0;
           background: linear-gradient(180deg,
-            rgba(52, 211, 153, 0.07) 0%,
-            rgba(52, 211, 153, 0.03) 100%);
-          border-top: 1px solid rgba(52, 211, 153, 0.25);
+            var(--bg-base, #0c1828) 0%,
+            var(--bg-deep, #06101d) 100%);
+          border-top: 1px solid var(--accent-border);
+          box-shadow: var(--shadow-md);
           flex-shrink: 0;
           animation: vb-fadein 220ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
         }
@@ -543,16 +534,24 @@ export default function VoiceBar() {
         .vb-header {
           display: flex;
           align-items: center;
-          gap: 7px;
-          padding: 9px 14px 5px;
+          gap: 8px;
+          padding: 10px 14px 7px;
+          background: linear-gradient(180deg, var(--bg-deep, #06101d), transparent);
+          border-bottom: 1px solid var(--border-subtle);
         }
 
         /* Animated waveform dots — shown when not speaking; pulses when connected */
         .vb-waveform {
           display: flex;
           align-items: center;
+          justify-content: center;
           gap: 2px;
-          height: 14px;
+          width: 28px;
+          height: 22px;
+          border-radius: var(--r-sm, 6px);
+          background: var(--accent-subtle);
+          border: 1px solid var(--accent-border);
+          box-shadow: var(--shadow-sm);
           flex-shrink: 0;
         }
         .vb-waveform-bar {
@@ -568,27 +567,28 @@ export default function VoiceBar() {
         .vb-waveform-bar:nth-child(4) { height: 10px; animation-delay: 0.15s; }
 
         .vb-channel-name {
-          font-size: 11.5px;
+          min-width: 0;
+          font-size: 12px;
           font-weight: 700;
-          color: var(--status-online, #34d399);
+          color: var(--text-primary);
           flex: 1;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-          letter-spacing: 0.03em;
+          letter-spacing: 0;
           text-transform: uppercase;
         }
         .vb-duration {
           font-size: 11px;
-          color: var(--status-online, #34d399);
+          color: var(--text-secondary);
           font-variant-numeric: tabular-nums;
           flex-shrink: 0;
-          background: rgba(52, 211, 153, 0.1);
-          padding: 2px 7px;
+          background: var(--bg-elevated, #132131);
+          padding: 3px 8px;
           border-radius: var(--r-full, 9999px);
-          border: 1px solid rgba(52, 211, 153, 0.2);
+          border: 1px solid var(--border-normal);
           font-weight: 600;
-          letter-spacing: 0.02em;
+          letter-spacing: 0;
         }
         .vb-codec-warn {
           display: flex;
@@ -598,29 +598,47 @@ export default function VoiceBar() {
           opacity: 0.85;
           flex-shrink: 0;
           cursor: default;
-          padding: 2px;
+          padding: 3px;
+          border-radius: var(--r-xs, 3px);
+          background: var(--bg-elevated, #132131);
+          border: 1px solid var(--border-subtle);
         }
         .vb-codec-warn:hover { opacity: 1; }
 
         /* ── Participant grid ── */
         .vb-grid {
           display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 8px;
-          padding: 6px 14px 4px;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 7px;
+          padding: 8px 14px 6px;
         }
 
         .vb-tile {
+          position: relative;
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 4px;
+          gap: 5px;
           min-width: 0;
+          min-height: 78px;
+          padding: 7px 5px 6px;
+          border-radius: var(--r-md, 8px);
+          background: var(--bg-elevated, #132131);
+          border: 1px solid var(--border-subtle);
+          box-shadow: var(--shadow-sm);
+          transition: transform var(--t-fast, 150ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1)),
+                      opacity var(--t-fast, 150ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1)),
+                      filter var(--t-fast, 150ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1));
+        }
+        .vb-tile:hover {
+          background: var(--bg-float, #1a2c40);
+          border-color: var(--border-normal);
+          transform: translateY(-1px);
         }
 
         .vb-tile-avatar {
           position: relative;
-          width: 46px; height: 46px;
+          width: 44px; height: 44px;
           border-radius: 50%;
           display: flex;
           align-items: center;
@@ -628,19 +646,37 @@ export default function VoiceBar() {
           font-size: 14px;
           font-weight: 700;
           color: rgba(255,255,255,0.92);
-          letter-spacing: 0.02em;
+          letter-spacing: 0;
           user-select: none;
-          transition: box-shadow 200ms ease, opacity 200ms;
+          transition: transform var(--t-fast, 150ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1)),
+                      opacity var(--t-fast, 150ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1)),
+                      filter var(--t-fast, 150ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1));
           flex-shrink: 0;
-          box-shadow: 0 0 0 2px transparent, 0 2px 8px rgba(0,0,0,0.4);
+          box-shadow: 0 0 0 2px var(--bg-deep, #06101d), var(--shadow-sm);
+          isolation: isolate;
+        }
+        .vb-tile-avatar::before {
+          content: '';
+          position: absolute;
+          inset: -5px;
+          border: 1px solid var(--status-online, #34d399);
+          border-radius: 50%;
+          opacity: 0;
+          transform: scale(0.94);
+          pointer-events: none;
+          z-index: -1;
         }
 
         .vb-tile-avatar--speaking {
-          animation: speaking-pulse 900ms ease-in-out infinite;
+          box-shadow: 0 0 0 2px var(--status-online, #34d399), var(--shadow-sm);
+          filter: drop-shadow(0 0 4px var(--status-online, #34d399));
+        }
+        .vb-tile-avatar--speaking::before {
+          animation: speaking-pulse 900ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) infinite;
         }
 
         .vb-tile-avatar--muted {
-          box-shadow: 0 0 0 2.5px rgba(248, 113, 113, 0.6), 0 2px 8px rgba(0,0,0,0.4);
+          box-shadow: 0 0 0 2px var(--danger, #f87171), var(--shadow-sm);
           opacity: 0.72;
         }
 
@@ -662,30 +698,30 @@ export default function VoiceBar() {
         }
 
         .vb-tile-avatar--deafened {
-          box-shadow: 0 0 0 2px rgba(100,120,140,0.35), 0 2px 8px rgba(0,0,0,0.4);
-          opacity: 0.45;
-          filter: grayscale(0.5);
+          box-shadow: 0 0 0 2px var(--text-muted), var(--shadow-sm);
+          opacity: 0.5;
+          filter: grayscale(0.45);
         }
 
         .vb-tile-you-badge {
           position: absolute;
           bottom: -3px; right: -5px;
           background: var(--accent, #0ea5e9);
-          color: #fff;
+          color: var(--text-primary);
           font-size: 7.5px;
           font-weight: 800;
           padding: 1px 4px;
           border-radius: 5px;
-          letter-spacing: 0.05em;
+          letter-spacing: 0;
           line-height: 1.5;
           white-space: nowrap;
-          box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+          box-shadow: var(--shadow-sm);
         }
 
         .vb-tile-name {
           font-size: 10px;
           color: var(--text-secondary);
-          max-width: 54px;
+          max-width: 100%;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
@@ -697,14 +733,27 @@ export default function VoiceBar() {
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 3px;
-          max-width: 54px;
+          gap: 4px;
+          width: 100%;
+          min-width: 0;
+          max-width: 64px;
         }
 
         .vb-tile-status {
-          font-size: 11px;
+          position: absolute;
+          top: 5px;
+          right: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 17px;
+          height: 17px;
+          border-radius: var(--r-full, 9999px);
+          background: var(--bg-float, #1a2c40);
+          border: 1px solid var(--border-subtle);
+          font-size: 10px;
           line-height: 1;
-          min-height: 13px;
+          box-shadow: var(--shadow-sm);
         }
 
         .vb-tile-status--speaking {
@@ -721,8 +770,11 @@ export default function VoiceBar() {
           display: flex;
           align-items: center;
           justify-content: center;
-          width: 46px; height: 46px;
-          border-radius: 50%;
+          justify-self: center;
+          align-self: stretch;
+          width: 100%;
+          min-height: 78px;
+          border-radius: var(--r-md, 8px);
           background: var(--bg-elevated, rgba(19,33,49,0.9));
           border: 1px dashed var(--border-normal);
           font-size: 12px;
@@ -730,21 +782,35 @@ export default function VoiceBar() {
           color: var(--text-muted);
           cursor: default;
           user-select: none;
-          letter-spacing: 0.02em;
+          letter-spacing: 0;
+          box-shadow: var(--shadow-sm);
         }
 
         /* ── Mic gate bar ── */
         .vb-gate-wrap {
-          padding: 2px 14px 3px;
+          position: relative;
+          padding: 4px 14px 5px;
           display: flex;
           align-items: center;
-          height: 14px;
+          height: 17px;
+        }
+        .vb-gate-wrap::before {
+          content: '';
+          position: absolute;
+          left: 14px;
+          right: 14px;
+          height: 3px;
+          border-radius: var(--r-full, 9999px);
+          background: var(--bg-elevated, #132131);
+          border: 1px solid var(--border-subtle);
         }
         .vb-gate-bar {
+          position: relative;
+          z-index: 1;
           width: 100%;
           height: 3px;
-          border-radius: 2px;
-          transition: transform 55ms linear, background 220ms;
+          border-radius: var(--r-full, 9999px);
+          transition: transform 55ms linear, opacity var(--t-fast, 150ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1));
           transform-origin: left;
           transform: scaleX(var(--gate-level, 0));
         }
@@ -758,13 +824,12 @@ export default function VoiceBar() {
           background: var(--text-muted);
           opacity: 0.22;
           transform: scaleX(1);
-          height: 2px;
         }
 
         /* ── Divider ── */
         .vb-divider {
           height: 1px;
-          background: var(--border-subtle);
+          background: linear-gradient(90deg, transparent, var(--border-normal), transparent);
           margin: 0 14px;
         }
 
@@ -773,90 +838,133 @@ export default function VoiceBar() {
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 8px;
-          padding: 9px 14px 11px;
+          gap: 7px;
+          padding: 10px 14px 12px;
         }
 
         .vb-btn {
-          width: 38px; height: 38px;
+          position: relative;
+          width: 40px; height: 40px;
           border-radius: 50%;
-          border: 1px solid transparent;
+          border: 1px solid var(--border-subtle);
           background: var(--bg-elevated, rgba(19,33,49,0.8));
           cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
           color: var(--text-secondary);
-          transition: background 150ms, color 150ms, transform 80ms, border-color 150ms, box-shadow 150ms;
+          box-shadow: var(--shadow-sm);
+          overflow: hidden;
+          transition: transform var(--t-fast, 150ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1)),
+                      opacity var(--t-fast, 150ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1)),
+                      filter var(--t-fast, 150ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1));
+          flex-shrink: 0;
+        }
+        .vb-btn::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          background: var(--accent-subtle);
+          opacity: 0;
+          transform: scale(0.92);
+          pointer-events: none;
+          transition: opacity var(--t-fast, 150ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1)),
+                      transform var(--t-fast, 150ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1));
+        }
+        .vb-btn svg,
+        .vb-btn span {
+          position: relative;
+          z-index: 1;
           flex-shrink: 0;
         }
         .vb-btn:hover {
           background: var(--bg-float, rgba(26,44,64,0.9));
           color: var(--text-primary);
           border-color: var(--border-normal);
-          box-shadow: var(--shadow-sm);
+          filter: brightness(1.08);
+        }
+        .vb-btn:hover::before {
+          opacity: 1;
+          transform: scale(1);
+        }
+        .vb-btn:focus-visible {
+          outline: 2px solid var(--accent, #0ea5e9);
+          outline-offset: 2px;
         }
         .vb-btn:active {
-          transform: scale(0.91);
+          transform: scale(0.94);
         }
 
         /* Muted = red mic — prominent danger state */
         .vb-btn--active-danger {
-          background: rgba(248, 113, 113, 0.18);
+          background: var(--danger-subtle);
           color: var(--danger, #f87171);
-          border-color: rgba(248, 113, 113, 0.45);
-          box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.1) inset,
-                      0 0 8px rgba(248, 113, 113, 0.12);
+          border-color: var(--danger, #f87171);
+          box-shadow: var(--shadow-sm);
+        }
+        .vb-btn--active-danger::before {
+          background: var(--danger-subtle);
+          opacity: 1;
+          transform: scale(1);
         }
         .vb-btn--active-danger:hover {
-          background: rgba(248, 113, 113, 0.28);
-          border-color: rgba(248, 113, 113, 0.6);
-          box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.15) inset,
-                      0 0 12px rgba(248, 113, 113, 0.2);
+          background: var(--danger-subtle);
+          border-color: var(--danger-hover, #ef4444);
         }
 
         /* Deafened uses separate grey state */
         .vb-btn--active-deaf {
-          background: rgba(100, 120, 140, 0.18);
+          background: var(--bg-overlay, #213550);
           color: var(--text-muted);
-          border-color: rgba(100, 120, 140, 0.3);
-          opacity: 0.8;
+          border-color: var(--border-normal);
+          opacity: 0.86;
+        }
+        .vb-btn--active-deaf::before {
+          background: var(--bg-float, #1a2c40);
+          opacity: 1;
+          transform: scale(1);
         }
         .vb-btn--active-deaf:hover {
-          background: rgba(100, 120, 140, 0.28);
-          border-color: rgba(100, 120, 140, 0.45);
+          background: var(--bg-overlay, #213550);
+          border-color: var(--accent-border);
           opacity: 1;
         }
 
         .vb-btn--active-blue {
-          background: rgba(14, 165, 233, 0.14);
+          background: var(--accent-subtle);
           color: var(--accent, #0ea5e9);
-          border-color: rgba(14, 165, 233, 0.32);
+          border-color: var(--accent-border);
+        }
+        .vb-btn--active-blue::before {
+          opacity: 1;
+          transform: scale(1);
         }
         .vb-btn--active-blue:hover {
-          background: rgba(14, 165, 233, 0.24);
-          border-color: rgba(14, 165, 233, 0.5);
+          background: var(--accent-subtle);
+          border-color: var(--accent-hover, #38bdf8);
         }
 
         /* Leave: red, prominent pill — stands out clearly */
         .vb-btn--leave {
-          background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-          color: #fff;
-          border-color: rgba(220, 38, 38, 0.5);
-          box-shadow: 0 2px 10px rgba(220, 38, 38, 0.4),
-                      0 1px 0 rgba(255,255,255,0.08) inset;
+          background: linear-gradient(135deg, var(--danger-hover, #ef4444) 0%, var(--danger, #f87171) 100%);
+          color: var(--text-primary);
+          border-color: var(--danger, #f87171);
+          box-shadow: var(--shadow-md);
           border-radius: var(--r-full, 9999px);
           padding: 0 14px;
           width: auto;
-          gap: 5px;
+          gap: 6px;
           font-size: 11px;
           font-weight: 700;
-          letter-spacing: 0.03em;
+          letter-spacing: 0;
+        }
+        .vb-btn--leave::before {
+          background: var(--danger-subtle);
         }
         .vb-btn--leave:hover {
-          background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-          box-shadow: 0 3px 14px rgba(220, 38, 38, 0.55),
-                      0 1px 0 rgba(255,255,255,0.12) inset;
+          background: linear-gradient(135deg, var(--danger, #f87171) 0%, var(--danger-hover, #ef4444) 100%);
+          filter: brightness(1.05);
         }
 
         /* ── Self-preview pip ── */
@@ -880,8 +988,8 @@ export default function VoiceBar() {
 
         /* ── Video grid ── */
         @keyframes vb-speaking-glow {
-          0%, 100% { box-shadow: 0 0 0 2px var(--status-online, #34d399), 0 0 12px rgba(52,211,153,0.3); }
-          50%       { box-shadow: 0 0 0 2.5px var(--status-online, #34d399), 0 0 20px rgba(52,211,153,0.12); }
+          0%, 100% { filter: drop-shadow(0 0 3px var(--status-online, #34d399)); }
+          50%      { filter: drop-shadow(0 0 8px var(--status-online, #34d399)); }
         }
 
         .voice-video-grid {
@@ -907,7 +1015,9 @@ export default function VoiceBar() {
           background: var(--bg-void);
           aspect-ratio: 16/9;
           border: 2px solid transparent;
-          transition: border-color 200ms;
+          transition: filter var(--t-fast, 150ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1)),
+                      opacity var(--t-fast, 150ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1)),
+                      transform var(--t-fast, 150ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1));
         }
 
         .voice-video-tile video {
@@ -981,6 +1091,29 @@ export default function VoiceBar() {
           border-radius: 4px;
           letter-spacing: 0.04em;
           flex-shrink: 0;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .voice-bar,
+          .vb-waveform-bar,
+          .vb-tile-avatar--speaking::before,
+          .voice-video-tile--speaking {
+            animation: none;
+          }
+          .voice-bar,
+          .vb-tile,
+          .vb-tile-avatar,
+          .vb-gate-bar,
+          .vb-btn,
+          .vb-btn::before,
+          .voice-video-tile {
+            transition: none;
+          }
+          .voice-bar,
+          .vb-tile:hover,
+          .vb-btn:active {
+            transform: none;
+          }
         }
       `}</style>
     </div>

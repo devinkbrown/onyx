@@ -170,11 +170,14 @@ export default function HomeView() {
           <OceanHeroWave />
         </div>
 
+        <div className="hv-hero-eyebrow">Midnight IRC</div>
         <h1 className="hv-hero-title">
-          <span className="hv-hero-gradient">Welcome to Ocean</span>
+          <span className="hv-hero-gradient">Ocean</span>
         </h1>
         <p className="hv-hero-subtitle">
-          {ourNick ? `Connected as ${ourNick}` : 'Select a channel to start chatting'}
+          {ourNick
+            ? <>Connected as <strong>{ourNick}</strong> on {networkName || 'your network'}</>
+            : 'A quiet command center for channels, DMs, and network signals'}
         </p>
 
         {/* Spotlight shortcut hint */}
@@ -210,21 +213,25 @@ export default function HomeView() {
             <span className="hv-quick-card-icon"><IconChannels /></span>
             <span className="hv-quick-card-title">Browse Channels</span>
             <span className="hv-quick-card-desc">Explore all available channels</span>
+            <span className="hv-quick-card-cta">Open</span>
           </button>
           <button className="hv-quick-card hv-quick-card--1" onClick={() => setShowNewDM(v => !v)}>
             <span className="hv-quick-card-icon"><IconDM /></span>
             <span className="hv-quick-card-title">Start a DM</span>
             <span className="hv-quick-card-desc">Message someone directly</span>
+            <span className="hv-quick-card-cta">Compose</span>
           </button>
           <button className="hv-quick-card hv-quick-card--2" onClick={openSearchOverlay}>
             <span className="hv-quick-card-icon"><IconSearch /></span>
             <span className="hv-quick-card-title">Search Messages</span>
             <span className="hv-quick-card-desc">Find messages across channels</span>
+            <span className="hv-quick-card-cta">Search</span>
           </button>
           <button className="hv-quick-card hv-quick-card--3" onClick={() => setShowGroupDM(true)}>
             <span className="hv-quick-card-icon"><IconGroup /></span>
             <span className="hv-quick-card-title">Group DM</span>
             <span className="hv-quick-card-desc">Chat with multiple people</span>
+            <span className="hv-quick-card-cta">Create</span>
           </button>
         </div>
       </div>
@@ -353,8 +360,21 @@ export default function HomeView() {
               </div>
             ) : (
               <div className="hv-empty">
-                <OceanWaveIllustration />
-                <p className="hv-empty-text">No conversations yet — find someone to message</p>
+                <div className="hv-empty-art">
+                  <OceanWaveIllustration />
+                </div>
+                <div className="hv-empty-copy">
+                  <h3 className="hv-empty-title">No direct messages yet</h3>
+                  <p className="hv-empty-text">Start a private thread or open your friends panel when you are ready to talk.</p>
+                </div>
+                <div className="hv-empty-actions">
+                  <button className="hv-btn-primary" onClick={() => setShowNewDM(true)}>
+                    Start a DM
+                  </button>
+                  <button className="hv-btn-ghost" onClick={openFriendsPanel}>
+                    Friends
+                  </button>
+                </div>
               </div>
             )}
           </section>
@@ -398,10 +418,18 @@ export default function HomeView() {
               </>
             ) : (
               <div className="hv-empty hv-empty--sm">
-                <p className="hv-empty-text">No channels yet — join one to get started</p>
-                <button className="hv-btn-primary hv-mt" onClick={openChannelBrowser}>
-                  Browse channels
-                </button>
+                <div className="hv-empty-copy">
+                  <h3 className="hv-empty-title">No channels joined</h3>
+                  <p className="hv-empty-text">Browse the network and pin a few rooms to make this deck come alive.</p>
+                </div>
+                <div className="hv-empty-actions">
+                  <button className="hv-btn-primary" onClick={openChannelBrowser}>
+                    Browse channels
+                  </button>
+                  <button className="hv-btn-ghost" onClick={toggleSpotlight}>
+                    Command
+                  </button>
+                </div>
               </div>
             )}
           </section>
@@ -621,12 +649,14 @@ export default function HomeView() {
           margin-bottom: 28px;
           position: relative;
           z-index: 1;
-          transition: background var(--t-fast), border-color var(--t-fast), box-shadow var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
         }
         .hv-spotlight-hint:hover {
           background: var(--bg-float);
           border-color: var(--accent-border);
-          box-shadow: 0 4px 16px rgba(14,165,233,0.1);
+          box-shadow: var(--shadow-md);
+          transform: translateY(-1px);
+          filter: brightness(1.05);
         }
         .hv-spotlight-hint-text {
           font-size: 13px;
@@ -660,9 +690,9 @@ export default function HomeView() {
           flex-direction: column;
           align-items: center;
           text-align: center;
-          padding: 48px 24px 36px;
+          padding: 56px 24px 38px;
           position: relative;
-          margin-bottom: 8px;
+          margin-bottom: 10px;
         }
 
         .hv-hero-glow {
@@ -679,17 +709,29 @@ export default function HomeView() {
         .hv-hero-wave {
           position: relative;
           z-index: 1;
-          margin-bottom: 22px;
+          margin-bottom: 20px;
+          filter: drop-shadow(var(--glow));
+        }
+
+        .hv-hero-eyebrow {
+          position: relative;
+          z-index: 1;
+          margin-bottom: 8px;
+          color: var(--gold);
+          font-size: 11px;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0;
         }
 
         .hv-hero-title {
           position: relative;
           z-index: 1;
-          font-size: clamp(28px, 4.5vw, 42px);
+          font-size: 46px;
           font-weight: 800;
-          letter-spacing: -0.8px;
-          line-height: 1.1;
-          margin: 0 0 10px;
+          letter-spacing: 0;
+          line-height: 1;
+          margin: 0 0 12px;
         }
 
         .hv-hero-gradient {
@@ -702,11 +744,18 @@ export default function HomeView() {
         .hv-hero-subtitle {
           position: relative;
           z-index: 1;
-          font-size: 14px;
+          max-width: 560px;
+          font-size: 15px;
           color: var(--text-muted);
-          margin: 0 0 16px;
+          margin: 0 0 18px;
           font-weight: 400;
-          letter-spacing: 0.01em;
+          letter-spacing: 0;
+          line-height: 1.55;
+        }
+
+        .hv-hero-subtitle strong {
+          color: var(--text-primary);
+          font-weight: 700;
         }
 
         /* Stats row */
@@ -719,8 +768,8 @@ export default function HomeView() {
           background: var(--bg-elevated);
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-full);
-          padding: 8px 20px;
-          margin-bottom: 28px;
+          padding: 9px 22px;
+          margin-bottom: 30px;
           box-shadow: var(--shadow-sm);
         }
 
@@ -740,13 +789,13 @@ export default function HomeView() {
           max-width: 110px;
           overflow: hidden;
           text-overflow: ellipsis;
-          letter-spacing: -0.02em;
+          letter-spacing: 0;
         }
 
         .hv-stat-label {
           font-size: 9px;
           font-weight: 700;
-          letter-spacing: 0.08em;
+          letter-spacing: 0;
           text-transform: uppercase;
           color: var(--text-muted);
         }
@@ -763,17 +812,20 @@ export default function HomeView() {
           position: relative;
           z-index: 1;
           display: flex;
-          gap: 10px;
+          gap: 12px;
           flex-wrap: wrap;
           justify-content: center;
         }
 
         .hv-quick-card {
-          width: 152px;
-          background: var(--bg-elevated);
+          width: 158px;
+          min-height: 158px;
+          background:
+            linear-gradient(180deg, color-mix(in srgb, var(--bg-float) 34%, transparent), transparent),
+            var(--bg-elevated);
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-lg);
-          padding: 16px 14px 14px;
+          padding: 16px;
           display: flex;
           flex-direction: column;
           align-items: flex-start;
@@ -783,11 +835,9 @@ export default function HomeView() {
           text-align: left;
           position: relative;
           overflow: hidden;
-          transition: transform 200ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)),
-                      box-shadow 200ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)),
-                      border-color 200ms;
+          transition: transform var(--t-normal) var(--ease-out), filter var(--t-normal) var(--ease-out);
           opacity: 0;
-          animation: hv-card-in 350ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
+          animation: hv-card-in 350ms var(--ease-out) both;
         }
 
         .hv-quick-card::before {
@@ -802,8 +852,9 @@ export default function HomeView() {
 
         .hv-quick-card:hover {
           transform: translateY(-3px);
-          box-shadow: 0 10px 28px rgba(14,165,233,0.12), 0 0 0 1px var(--accent-border);
+          box-shadow: var(--shadow-lg), 0 0 0 1px var(--accent-border);
           border-color: var(--accent-border);
+          filter: brightness(1.04);
         }
 
         .hv-quick-card:hover::before { opacity: 1; }
@@ -830,11 +881,13 @@ export default function HomeView() {
           background: var(--accent-subtle);
           border: 1px solid var(--accent-border);
           color: var(--accent);
-          transition: background var(--t-fast), border-color var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
         }
         .hv-quick-card:hover .hv-quick-card-icon {
           background: rgba(14,165,233,0.16);
           border-color: var(--accent);
+          transform: translateY(-1px);
+          filter: brightness(1.1);
         }
         /* Each card gets a distinct hue */
         .hv-quick-card--0 .hv-quick-card-icon { background: rgba(14,165,233,0.1); border-color: rgba(14,165,233,0.22); color: #38bdf8; }
@@ -847,13 +900,29 @@ export default function HomeView() {
           font-weight: 700;
           color: var(--text-primary);
           line-height: 1.3;
-          letter-spacing: -0.01em;
+          letter-spacing: 0;
         }
 
         .hv-quick-card-desc {
           font-size: 11px;
           color: var(--text-muted);
           line-height: 1.45;
+        }
+
+        .hv-quick-card-cta {
+          margin-top: auto;
+          padding-top: 10px;
+          font-size: 11px;
+          font-weight: 800;
+          color: var(--accent-hover);
+          opacity: 0.74;
+          transform: translateX(0);
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out);
+        }
+
+        .hv-quick-card:hover .hv-quick-card-cta {
+          opacity: 1;
+          transform: translateX(3px);
         }
 
         .hv-command-strip {
@@ -882,14 +951,15 @@ export default function HomeView() {
           text-align: left;
           font-family: inherit;
           box-shadow: 0 8px 22px rgba(0,0,0,0.12);
-          transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast), transform var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
         }
 
         .hv-signal-card:hover {
           background: var(--bg-float);
           border-color: var(--accent-border);
           color: var(--text-primary);
-          transform: translateY(-1px);
+          transform: translateY(-2px);
+          filter: brightness(1.04);
         }
 
         .hv-signal-icon {
@@ -932,7 +1002,7 @@ export default function HomeView() {
           font-size: 10px;
           font-weight: 700;
           text-transform: uppercase;
-          letter-spacing: 0.06em;
+          letter-spacing: 0;
           color: var(--text-muted);
           overflow: hidden;
           text-overflow: ellipsis;
@@ -970,13 +1040,15 @@ export default function HomeView() {
 
         /* ── Panel ──────────────────────────────────────────────────── */
         .hv-panel {
-          background: var(--bg-elevated);
+          background:
+            linear-gradient(180deg, color-mix(in srgb, var(--bg-float) 18%, transparent), transparent 62%),
+            var(--bg-elevated);
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-lg);
-          padding: 20px;
+          padding: 22px;
           display: flex;
           flex-direction: column;
-          gap: 14px;
+          gap: 16px;
           position: relative;
           overflow: hidden;
         }
@@ -987,7 +1059,7 @@ export default function HomeView() {
           height: 1px;
           background: linear-gradient(90deg, transparent, var(--border-normal), transparent);
         }
-        .hv-panel--sm { padding: 16px; gap: 12px; }
+        .hv-panel--sm { padding: 17px; gap: 13px; }
 
         .hv-panel-header {
           display: flex;
@@ -999,7 +1071,7 @@ export default function HomeView() {
         .hv-panel-title {
           font-size: 11px;
           font-weight: 700;
-          letter-spacing: 0.09em;
+          letter-spacing: 0;
           text-transform: uppercase;
           color: var(--text-muted);
           margin: 0;
@@ -1019,11 +1091,13 @@ export default function HomeView() {
           color: var(--accent);
           cursor: pointer; font-size: 12px; font-weight: 600;
           font-family: inherit;
-          transition: background var(--t-fast), border-color var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
         }
         .hv-header-btn:hover {
           background: rgba(14,165,233,0.18);
           border-color: var(--accent);
+          transform: translateY(-1px);
+          filter: brightness(1.06);
         }
         .hv-header-btn--subtle {
           background: var(--bg-deep);
@@ -1053,12 +1127,14 @@ export default function HomeView() {
           border: 1px solid transparent;
           cursor: pointer;
           text-align: left;
-          transition: background var(--t-fast), border-color var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
           width: 100%;
         }
         .hv-dm-row:hover {
           background: var(--ch-hover-bg);
           border-color: var(--border-subtle);
+          transform: translateX(2px);
+          filter: brightness(1.04);
         }
 
         .hv-dm-avatar-wrap {
@@ -1136,11 +1212,40 @@ export default function HomeView() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 12px;
-          padding: 28px 16px;
+          gap: 16px;
+          padding: 34px 18px;
           text-align: center;
+          background: color-mix(in srgb, var(--bg-deep) 56%, transparent);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-lg);
         }
-        .hv-empty--sm { padding: 16px; }
+        .hv-empty--sm { padding: 24px 18px; }
+
+        .hv-empty-art {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 96px;
+          height: 64px;
+          border-radius: var(--r-xl);
+          background: var(--accent-subtle);
+          border: 1px solid var(--accent-border);
+          box-shadow: var(--glow);
+        }
+
+        .hv-empty-copy {
+          display: grid;
+          justify-items: center;
+          gap: 6px;
+        }
+
+        .hv-empty-title {
+          margin: 0;
+          color: var(--text-primary);
+          font-size: 15px;
+          font-weight: 800;
+          letter-spacing: 0;
+        }
 
         .hv-empty-text {
           font-size: 13px;
@@ -1148,6 +1253,14 @@ export default function HomeView() {
           line-height: 1.5;
           margin: 0;
           max-width: 280px;
+        }
+
+        .hv-empty-actions {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          flex-wrap: wrap;
         }
 
         .hv-mt { margin-top: 4px; }
@@ -1166,7 +1279,7 @@ export default function HomeView() {
           padding: 11px 13px;
           text-align: left;
           cursor: pointer;
-          transition: background var(--t-fast), border-color var(--t-fast), box-shadow var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
           display: flex;
           flex-direction: column;
           gap: 4px;
@@ -1177,6 +1290,8 @@ export default function HomeView() {
           background: var(--bg-float);
           border-color: var(--accent-border);
           box-shadow: 0 4px 12px rgba(14,165,233,0.08);
+          transform: translateY(-1px);
+          filter: brightness(1.04);
         }
 
         /* accent left-edge on hover */
@@ -1215,7 +1330,7 @@ export default function HomeView() {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-          letter-spacing: -0.01em;
+          letter-spacing: 0;
         }
 
         .hv-ch-topic {
@@ -1232,7 +1347,7 @@ export default function HomeView() {
           font-size: 10px;
           color: var(--text-muted);
           font-weight: 500;
-          letter-spacing: 0.02em;
+          letter-spacing: 0;
         }
 
         .hv-browse-link {
@@ -1245,10 +1360,10 @@ export default function HomeView() {
           font-family: inherit;
           padding: 4px 0 0;
           text-align: left;
-          transition: color var(--t-fast);
-          letter-spacing: 0.01em;
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out);
+          letter-spacing: 0;
         }
-        .hv-browse-link:hover { color: var(--accent-hover); }
+        .hv-browse-link:hover { color: var(--accent-hover); transform: translateX(2px); opacity: 0.9; }
 
         /* ── Recent Channels ────────────────────────────────────────── */
         .hv-recent-pills {
@@ -1270,13 +1385,15 @@ export default function HomeView() {
           font-weight: 600;
           font-family: inherit;
           color: var(--text-secondary);
-          transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
           user-select: none;
         }
         .hv-recent-pill:hover {
           background: var(--ch-hover-bg);
           border-color: var(--accent-border);
           color: var(--text-primary);
+          transform: translateY(-1px);
+          filter: brightness(1.04);
         }
         .hv-recent-pill--active {
           background: rgba(124, 90, 245, 0.1);
@@ -1314,12 +1431,14 @@ export default function HomeView() {
           font-weight: 500;
           color: var(--text-secondary);
           text-align: left;
-          transition: background var(--t-fast), color var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
           width: 100%;
         }
         .hv-action-row:hover {
           background: var(--ch-hover-bg);
           color: var(--text-primary);
+          transform: translateX(2px);
+          filter: brightness(1.04);
         }
 
         .hv-action-icon { font-size: 16px; line-height: 1; flex-shrink: 0; }
@@ -1340,7 +1459,7 @@ export default function HomeView() {
           padding: 0 2px;
           font-size: 10px;
           font-weight: 800;
-          letter-spacing: 0.08em;
+          letter-spacing: 0;
           text-transform: uppercase;
           color: var(--text-muted);
         }
@@ -1366,13 +1485,15 @@ export default function HomeView() {
           cursor: pointer;
           font-family: inherit;
           text-align: left;
-          transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
         }
 
         .hv-launch-tile:hover {
           background: var(--ch-hover-bg);
           border-color: var(--border-subtle);
           color: var(--text-primary);
+          transform: translateX(2px);
+          filter: brightness(1.04);
         }
 
         .hv-launch-icon {
@@ -1459,9 +1580,9 @@ export default function HomeView() {
           cursor: pointer;
           color: var(--text-secondary);
           flex-shrink: 0;
-          transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
         }
-        .hv-copy-btn:hover { background: var(--bg-float); color: var(--text-primary); }
+        .hv-copy-btn:hover { background: var(--bg-float); color: var(--text-primary); transform: translateY(-1px); filter: brightness(1.06); }
         .hv-copy-btn--copied { color: var(--status-online); border-color: rgba(52,211,153,0.4); }
 
         /* ── Server Info ────────────────────────────────────────────── */
@@ -1479,7 +1600,7 @@ export default function HomeView() {
           font-size: 15px;
           font-weight: 700;
           color: var(--text-primary);
-          letter-spacing: -0.2px;
+          letter-spacing: 0;
           margin-bottom: 3px;
         }
 
@@ -1512,7 +1633,7 @@ export default function HomeView() {
         .hv-feature-badge {
           font-size: 10px;
           font-weight: 700;
-          letter-spacing: 0.04em;
+          letter-spacing: 0;
           padding: 2px 7px;
           border-radius: var(--r-full);
           background: var(--accent-subtle);
@@ -1552,10 +1673,10 @@ export default function HomeView() {
           font-size: 12px;
           font-weight: 600;
           font-family: inherit;
-          transition: opacity 120ms;
+          transition: opacity var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
           white-space: nowrap;
         }
-        .hv-btn-primary:hover:not(:disabled) { opacity: 0.85; }
+        .hv-btn-primary:hover:not(:disabled) { opacity: 0.92; transform: translateY(-1px); filter: brightness(1.06); }
         .hv-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
 
         .hv-btn-ghost {
@@ -1568,10 +1689,10 @@ export default function HomeView() {
           font-size: 12px;
           font-weight: 500;
           font-family: inherit;
-          transition: color var(--t-fast), border-color var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
           white-space: nowrap;
         }
-        .hv-btn-ghost:hover { color: var(--text-secondary); border-color: var(--border-normal); }
+        .hv-btn-ghost:hover { color: var(--text-secondary); border-color: var(--border-normal); transform: translateY(-1px); filter: brightness(1.06); }
 
         /* ── Activity Feed ──────────────────────────────────────────── */
         .activity-feed {
@@ -1588,7 +1709,7 @@ export default function HomeView() {
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-md);
           overflow: hidden;
-          transition: border-color var(--t-fast), background var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
         }
 
         .activity-item-btn {
@@ -1604,6 +1725,8 @@ export default function HomeView() {
         .activity-item:hover {
           border-color: var(--accent-border);
           background: var(--bg-float);
+          transform: translateY(-1px);
+          filter: brightness(1.03);
         }
 
         .activity-item-header {
@@ -1622,7 +1745,7 @@ export default function HomeView() {
           padding: 1px 6px;
           border-radius: var(--r-sm);
           flex-shrink: 0;
-          letter-spacing: 0.02em;
+          letter-spacing: 0;
         }
 
         .activity-time {
@@ -1658,6 +1781,47 @@ export default function HomeView() {
           to   { opacity: 1; transform: translateY(0); }
         }
         .animate-fade-in { animation: fade-in 200ms var(--ease-out) both; }
+
+        .hv-root button:focus-visible,
+        .hv-root input:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .hv-root *,
+          .hv-root *::before,
+          .hv-root *::after {
+            animation-duration: 0ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0ms !important;
+          }
+
+          .animate-fade-in,
+          .hv-quick-card {
+            animation: none !important;
+            opacity: 1;
+          }
+
+          .hv-spotlight-hint:hover,
+          .hv-quick-card:hover,
+          .hv-quick-card:hover .hv-quick-card-icon,
+          .hv-quick-card:hover .hv-quick-card-cta,
+          .hv-signal-card:hover,
+          .hv-header-btn:hover,
+          .hv-dm-row:hover,
+          .hv-ch-card:hover,
+          .hv-browse-link:hover,
+          .hv-recent-pill:hover,
+          .hv-action-row:hover,
+          .hv-launch-tile:hover,
+          .hv-copy-btn:hover,
+          .hv-btn-primary:hover,
+          .hv-btn-ghost:hover,
+          .activity-item:hover {
+            transform: none;
+          }
+        }
       `}</style>
     </div>
   );
