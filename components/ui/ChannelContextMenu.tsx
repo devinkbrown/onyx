@@ -131,14 +131,20 @@ export default function ChannelContextMenu({ channel, x, y, onClose }: Props) {
       aria-label={`Channel options for ${channel}`}
     >
       {/* Notifications trigger */}
-      <div className="ctx-item ctx-item--submenu" onClick={() => setNotifyOpen(o => !o)}>
+      <button
+        className="ctx-item ctx-item--submenu"
+        onClick={() => setNotifyOpen(o => !o)}
+        role="menuitem"
+        aria-haspopup="true"
+        aria-expanded={notifyOpen}
+      >
         <span className="ctx-icon">🔔</span>
         Notifications
-        <span className="ctx-arrow">{notifyOpen ? '▲' : '▼'}</span>
-      </div>
+        <span className="ctx-arrow" aria-hidden="true">{notifyOpen ? '▲' : '▼'}</span>
+      </button>
 
       {notifyOpen && (
-        <div className="ctx-submenu">
+        <div className="ctx-submenu" role="group" aria-label="Notification level">
           {notifyLabels.map(({ level, icon, label }) => (
             <button
               key={level}
@@ -149,7 +155,7 @@ export default function ChannelContextMenu({ channel, x, y, onClose }: Props) {
             >
               <span className="ctx-icon">{icon}</span>
               {label}
-              {current === level && <span className="ctx-check">✓</span>}
+              {current === level && <span className="ctx-check" aria-hidden="true">✓</span>}
             </button>
           ))}
         </div>

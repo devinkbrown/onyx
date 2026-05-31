@@ -491,6 +491,7 @@ body.reduce-motion *, body.reduce-motion *::before, body.reduce-motion *::after 
   animation-duration: 0.001ms !important;
   animation-iteration-count: 1 !important;
   transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
 }
 
 /* ── OS-level reduced motion — always respected ── */
@@ -499,6 +500,7 @@ body.reduce-motion *, body.reduce-motion *::before, body.reduce-motion *::after 
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
@@ -639,6 +641,7 @@ body.reduce-motion *, body.reduce-motion *::before, body.reduce-motion *::after 
   animation-duration: 0.001ms !important;
   animation-iteration-count: 1 !important;
   transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
 }
 
 /* ── Chat background patterns ─────────────────────────────────────────── */
@@ -780,11 +783,13 @@ body.bubble-mode .chat-msg-wrap {
 }
 
 /* ── Respect OS reduce-motion preference ───────────────────────── */
+/* NOTE: duplicate intentional — this block is kept as a fallback declaration
+   that browsers parse in document order; the canonical block is above. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
-    animation-duration: 0.01ms !important;
+    animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
 }
@@ -864,9 +869,9 @@ body.bubble-mode .chat-msg-wrap {
 [data-reduce-motion="true"] *,
 [data-reduce-motion="true"] *::before,
 [data-reduce-motion="true"] *::after {
-  animation-duration: 0.01ms !important;
+  animation-duration: 0.001ms !important;
   animation-iteration-count: 1 !important;
-  transition-duration: 0.01ms !important;
+  transition-duration: 0.001ms !important;
   scroll-behavior: auto !important;
 }
 
