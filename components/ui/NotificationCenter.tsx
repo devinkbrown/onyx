@@ -81,10 +81,10 @@ function NotificationCard({ note, isRead, onActivate, onDismiss }: CardProps) {
   const preview = note.text.length > 100 ? note.text.slice(0, 100) + '…' : note.text;
 
   const borderColor = {
-    mention: 'var(--gold, #e8b84b)',
+    mention: 'var(--warning)',
     dm:      'var(--accent)',
-    system:  '#3b82f6',
-    error:   'var(--danger, #ed4245)',
+    system:  'var(--success)',
+    error:   'var(--danger)',
   }[note.type] ?? 'var(--border-normal)';
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -562,11 +562,13 @@ export default function NotificationCenter({ onClose }: Props) {
           width: 340px;
           max-height: 100vh;
           z-index: 620;
-          background: var(--bg-float, #1a2c40);
+          background:
+            radial-gradient(circle at 18% 0%, var(--accent-glow) 0, transparent 34%),
+            linear-gradient(180deg, var(--bg-float) 0%, var(--bg-elevated) 48%, var(--bg-deep) 100%);
           border-left: 1px solid var(--border-normal);
           display: flex;
           flex-direction: column;
-          box-shadow: -12px 0 48px rgba(0,0,0,0.65), -4px 0 16px rgba(0,0,0,0.35);
+          box-shadow: var(--shadow-xl);
           overflow: hidden;
         }
 
@@ -583,8 +585,8 @@ export default function NotificationCenter({ onClose }: Props) {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 0 12px;
-          height: 52px;
+          padding: 0 14px 0 16px;
+          height: 56px;
           border-bottom: 1px solid var(--border-subtle);
           flex-shrink: 0;
         }
@@ -599,14 +601,14 @@ export default function NotificationCenter({ onClose }: Props) {
           gap: 4px;
         }
         .nc-header-title {
-          font-size: 13px;
+          font-size: 14px;
           font-weight: 700;
-          letter-spacing: 0.03em;
+          letter-spacing: 0.02em;
           color: var(--text-primary);
         }
         .nc-header-badge {
-          background: var(--gold, #e8b84b);
-          color: #1a1510;
+          background: var(--gold);
+          color: var(--bg-void);
           font-size: 10px;
           font-weight: 800;
           line-height: 1;
@@ -615,6 +617,7 @@ export default function NotificationCenter({ onClose }: Props) {
           min-width: 20px;
           text-align: center;
           letter-spacing: 0.02em;
+          box-shadow: 0 0 16px var(--gold-subtle);
         }
         .nc-mark-all {
           font-size: 11px;
@@ -626,7 +629,7 @@ export default function NotificationCenter({ onClose }: Props) {
           padding: 4px 10px;
           border-radius: var(--r-sm, 4px);
           font-family: inherit;
-          transition: background var(--t-fast, 150ms), border-color var(--t-fast, 150ms);
+          transition: opacity var(--t-fast, 150ms);
           white-space: nowrap;
           letter-spacing: 0.01em;
         }
@@ -648,7 +651,7 @@ export default function NotificationCenter({ onClose }: Props) {
           padding: 4px 6px;
           border-radius: var(--r-sm, 4px);
           font-family: inherit;
-          transition: color var(--t-fast, 150ms);
+          transition: opacity var(--t-fast, 150ms);
           white-space: nowrap;
           text-decoration: underline;
           text-underline-offset: 2px;
@@ -664,27 +667,28 @@ export default function NotificationCenter({ onClose }: Props) {
           display: flex;
           align-items: center;
           justify-content: center;
-          background: none;
-          border: none;
+          background: color-mix(in oklch, var(--bg-overlay) 42%, transparent);
+          border: 1px solid var(--border-subtle);
           cursor: pointer;
           color: var(--text-secondary);
           border-radius: var(--r-sm, 4px);
-          transition: background var(--t-fast, 150ms), color var(--t-fast, 150ms);
+          transition: transform var(--t-fast, 150ms), opacity var(--t-fast, 150ms);
           flex-shrink: 0;
         }
-        .nc-close:hover { background: var(--bg-overlay); color: var(--text-primary); }
+        .nc-close:hover { background: var(--bg-overlay); color: var(--text-primary); transform: translateY(-1px); }
+        .nc-close:active { transform: translateY(0); }
 
         /* ── Filter tabs ── */
         .nc-tabs {
           display: flex;
-          gap: 0;
-          padding: 0 14px;
+          gap: 4px;
+          padding: 8px 14px;
           border-bottom: 1px solid var(--border-subtle);
           flex-shrink: 0;
         }
         .nc-tab {
           position: relative;
-          padding: 10px 12px;
+          padding: 7px 10px;
           font-size: 12px;
           font-weight: 600;
           color: var(--text-muted);
@@ -692,19 +696,22 @@ export default function NotificationCenter({ onClose }: Props) {
           border: none;
           cursor: pointer;
           font-family: inherit;
-          transition: color var(--t-fast, 150ms);
           letter-spacing: 0.02em;
+          border-radius: var(--r-sm);
         }
-        .nc-tab:hover { color: var(--text-secondary); }
-        .nc-tab--active { color: var(--text-primary); }
+        .nc-tab:hover { color: var(--text-secondary); background: var(--bg-elevated); }
+        .nc-tab--active {
+          color: var(--text-primary);
+          background: color-mix(in oklch, var(--accent) 12%, transparent);
+        }
         .nc-tab--active::after {
           content: '';
           position: absolute;
-          bottom: -1px;
-          left: 0;
-          right: 0;
+          bottom: 3px;
+          left: 10px;
+          right: 10px;
           height: 2px;
-          background: var(--gold, #e8b84b);
+          background: var(--gold);
           border-radius: 2px 2px 0 0;
         }
 
@@ -733,7 +740,7 @@ export default function NotificationCenter({ onClose }: Props) {
           padding: 3px 10px;
           cursor: pointer;
           font-family: inherit;
-          transition: background var(--t-fast, 150ms);
+          transition: opacity var(--t-fast, 150ms);
         }
         .nc-overflow-btn:hover {
           background: color-mix(in oklch, var(--gold, #e8b84b) 25%, transparent);
@@ -743,7 +750,7 @@ export default function NotificationCenter({ onClose }: Props) {
         .nc-body {
           flex: 1;
           overflow-y: auto;
-          padding-bottom: 8px;
+          padding: 8px 10px 12px;
         }
         .nc-body::-webkit-scrollbar { width: 4px; }
         .nc-body::-webkit-scrollbar-track { background: transparent; }
@@ -751,10 +758,10 @@ export default function NotificationCenter({ onClose }: Props) {
 
         /* ── Date group ── */
         .nc-group {
-          margin-top: 4px;
+          margin-top: 6px;
         }
         .nc-group-label {
-          padding: 10px 16px 4px;
+          padding: 10px 6px 6px;
           font-size: 10px;
           font-weight: 800;
           letter-spacing: 0.1em;
@@ -765,32 +772,42 @@ export default function NotificationCenter({ onClose }: Props) {
         /* ── Card wrap (swipe container) ── */
         .nc-card-wrap {
           position: relative;
-          overflow: hidden;
-          transition: transform 280ms cubic-bezier(0.16, 1, 0.3, 1), opacity 280ms ease;
+          overflow: visible;
+          margin: 0 0 8px;
+          animation: nc-card-wrap-enter var(--t-normal) var(--ease-out) both;
+          transition: transform var(--t-normal) var(--ease-out), opacity var(--t-normal) var(--ease-out);
         }
         .nc-card-wrap.nc-card--dismissing {
           opacity: 0;
-          max-height: 0;
-          margin: 0;
-          padding: 0;
-          overflow: hidden;
-          transition: transform 280ms cubic-bezier(0.16, 1, 0.3, 1), opacity 280ms ease, max-height 200ms ease 200ms;
+          filter: blur(2px);
+          transition: transform var(--t-normal) var(--ease-in), opacity var(--t-normal) var(--ease-in), filter var(--t-normal) var(--ease-in);
+        }
+        @keyframes nc-card-wrap-enter {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+        @keyframes nc-card-enter {
+          from { opacity: 0; transform: translate3d(18px, 4px, 0); }
+          to   { opacity: 1; transform: translate3d(0, 0, 0); }
         }
 
         /* Swipe delete stripe (visible as card is swiped) */
         .nc-card-delete-stripe {
           position: absolute;
-          right: 0;
-          top: 0;
-          bottom: 0;
-          width: 48px;
-          background: var(--danger, #ed4245);
+          right: 1px;
+          top: 1px;
+          bottom: 1px;
+          width: 52px;
+          background:
+            linear-gradient(90deg, transparent, var(--danger-subtle) 28%, var(--danger));
           display: flex;
           align-items: center;
           justify-content: center;
-          color: #fff;
+          color: var(--text-primary);
           font-size: 14px;
           z-index: 0;
+          border-radius: 0 var(--r-md) var(--r-md) 0;
+          box-shadow: inset 1px 0 0 var(--danger-subtle);
         }
 
         /* ── Card button ── */
@@ -798,37 +815,56 @@ export default function NotificationCenter({ onClose }: Props) {
           position: relative;
           display: flex;
           align-items: flex-start;
-          gap: 10px;
+          gap: 11px;
           width: 100%;
-          min-height: 44px;
-          padding: 10px 12px 10px 16px;
-          background: transparent;
-          border: none;
-          border-bottom: 1px solid var(--border-subtle);
+          min-height: 58px;
+          padding: 12px 13px 12px 16px;
+          background:
+            linear-gradient(135deg, color-mix(in oklch, var(--nc-type-color, var(--accent)) 8%, transparent), transparent 44%),
+            var(--bg-elevated);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-md);
           cursor: pointer;
           font-family: inherit;
           text-align: left;
-          transition: background var(--t-fast, 150ms);
+          transition: transform var(--t-fast), opacity var(--t-fast), filter var(--t-fast);
           z-index: 1;
+          box-shadow: var(--shadow-sm);
+          animation: nc-card-enter var(--t-normal) var(--ease-out) both;
         }
         .nc-card:hover {
-          background: var(--bg-elevated);
+          background:
+            linear-gradient(135deg, color-mix(in oklch, var(--nc-type-color, var(--accent)) 12%, transparent), transparent 50%),
+            var(--bg-float);
+          border-color: color-mix(in oklch, var(--nc-type-color, var(--accent)) 38%, var(--border-normal));
+          box-shadow: var(--shadow-md);
+          transform: translateY(-1px);
+        }
+        .nc-card:active { transform: translateY(0); }
+        .nc-card:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
         }
         .nc-card:hover .nc-card-arrow { opacity: 1; }
 
         .nc-card--unread .nc-card {
-          background: var(--accent-subtle);
+          background:
+            linear-gradient(135deg, color-mix(in oklch, var(--nc-type-color, var(--accent)) 16%, transparent), transparent 56%),
+            color-mix(in oklch, var(--bg-float) 78%, var(--accent-subtle));
+          border-color: color-mix(in oklch, var(--nc-type-color, var(--accent)) 34%, var(--border-normal));
+          box-shadow: var(--shadow-md), 0 0 20px color-mix(in oklch, var(--nc-type-color, var(--accent)) 10%, transparent);
         }
 
         /* Left type border — 2px for unread accent */
         .nc-card-border {
           position: absolute;
           left: 0;
-          top: 6px;
-          bottom: 6px;
-          width: 2px;
+          top: 10px;
+          bottom: 10px;
+          width: 3px;
           background: var(--nc-type-color, var(--accent));
-          border-radius: 0 2px 2px 0;
+          border-radius: 0 var(--r-xs) var(--r-xs) 0;
+          box-shadow: 0 0 14px color-mix(in oklch, var(--nc-type-color, var(--accent)) 38%, transparent);
         }
         .nc-card--read .nc-card-border {
           opacity: 0.3;
@@ -837,20 +873,20 @@ export default function NotificationCenter({ onClose }: Props) {
         /* Unread dot */
         .nc-card-dot {
           position: absolute;
-          top: 10px;
-          right: 10px;
-          width: 7px;
-          height: 7px;
+          top: 11px;
+          right: 11px;
+          width: 6px;
+          height: 6px;
           border-radius: 50%;
-          background: var(--accent, #0ea5e9);
-          box-shadow: 0 0 6px color-mix(in oklch, var(--accent, #0ea5e9) 60%, transparent);
+          background: var(--nc-type-color, var(--accent));
+          box-shadow: 0 0 10px color-mix(in oklch, var(--nc-type-color, var(--accent)) 58%, transparent);
         }
 
         /* Avatar */
         .nc-card-avatar {
           flex-shrink: 0;
-          width: 32px;
-          height: 32px;
+          width: 34px;
+          height: 34px;
           border-radius: 50%;
           display: flex;
           align-items: center;
@@ -859,6 +895,7 @@ export default function NotificationCenter({ onClose }: Props) {
           font-weight: 700;
           color: rgba(255,255,255,0.92);
           margin-top: 2px;
+          box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--text-primary) 18%, transparent), 0 0 18px color-mix(in oklch, var(--nc-type-color, var(--accent)) 16%, transparent);
         }
 
         /* Body */
@@ -867,7 +904,8 @@ export default function NotificationCenter({ onClose }: Props) {
           min-width: 0;
           display: flex;
           flex-direction: column;
-          gap: 2px;
+          gap: 3px;
+          padding-top: 1px;
         }
         .nc-card-meta {
           display: flex;
@@ -891,11 +929,14 @@ export default function NotificationCenter({ onClose }: Props) {
           overflow: hidden;
           text-overflow: ellipsis;
           max-width: 90px;
+          padding: 1px 5px;
+          border-radius: var(--r-xs);
+          background: color-mix(in oklch, var(--bg-overlay) 44%, transparent);
         }
         .nc-card-preview {
           font-size: 13px;
           color: var(--text-secondary);
-          line-height: 1.45;
+          line-height: 1.5;
           word-break: break-word;
           display: -webkit-box;
           -webkit-line-clamp: 2;
@@ -908,9 +949,9 @@ export default function NotificationCenter({ onClose }: Props) {
 
         /* Mention highlight */
         .nc-mention-hl {
-          background: color-mix(in oklch, var(--gold, #e8b84b) 20%, transparent);
-          color: var(--gold, #e8b84b);
-          border-radius: 3px;
+          background: var(--gold-subtle);
+          color: var(--gold);
+          border-radius: var(--r-xs);
           padding: 0 2px;
         }
 
@@ -919,7 +960,7 @@ export default function NotificationCenter({ onClose }: Props) {
           display: flex;
           flex-direction: column;
           align-items: flex-end;
-          gap: 6px;
+          gap: 7px;
           flex-shrink: 0;
           padding-top: 1px;
           margin-left: 4px;
@@ -931,7 +972,7 @@ export default function NotificationCenter({ onClose }: Props) {
         }
         .nc-card-arrow {
           font-size: 14px;
-          color: var(--text-muted);
+          color: var(--nc-type-color, var(--accent));
           opacity: 0;
           transition: opacity var(--t-fast, 150ms), transform var(--t-fast, 150ms);
         }
@@ -944,21 +985,26 @@ export default function NotificationCenter({ onClose }: Props) {
         .nc-channel-group {
           position: relative;
         }
+        .nc-channel-group:not(.nc-channel-group--expanded) .nc-card-wrap {
+          margin-bottom: 0;
+        }
         .nc-group-stack {
           display: flex;
           align-items: center;
           gap: 8px;
           width: 100%;
-          padding: 6px 12px 6px 52px;
-          background: color-mix(in oklch, var(--bg-overlay) 40%, transparent);
-          border: none;
-          border-bottom: 1px solid var(--border-subtle);
+          padding: 7px 12px 8px 54px;
+          background: color-mix(in oklch, var(--bg-overlay) 54%, transparent);
+          border: 1px solid var(--border-subtle);
+          border-top: none;
+          border-radius: 0 0 var(--r-md) var(--r-md);
           cursor: pointer;
           font-family: inherit;
           text-align: left;
-          transition: background var(--t-fast, 150ms);
+          transition: transform var(--t-fast), opacity var(--t-fast);
+          box-shadow: var(--shadow-sm);
         }
-        .nc-group-stack:hover { background: var(--bg-overlay); }
+        .nc-group-stack:hover { background: var(--bg-overlay); transform: translateY(1px); }
         .nc-group-avatars {
           display: flex;
           gap: -4px;
@@ -975,6 +1021,7 @@ export default function NotificationCenter({ onClose }: Props) {
           color: rgba(255,255,255,0.9);
           border: 1.5px solid var(--bg-deep);
           margin-left: -4px;
+          box-shadow: 0 0 0 1px var(--border-subtle);
         }
         .nc-group-mini-avatar:first-child { margin-left: 0; }
         .nc-group-more {
@@ -1011,7 +1058,7 @@ export default function NotificationCenter({ onClose }: Props) {
           font-size: 11px;
           font-weight: 600;
           color: var(--text-muted);
-          transition: background var(--t-fast, 150ms);
+          transition: opacity var(--t-fast, 150ms);
         }
         .nc-group-collapse:hover { background: var(--bg-overlay); }
 
@@ -1030,7 +1077,7 @@ export default function NotificationCenter({ onClose }: Props) {
           font-family: inherit;
           cursor: pointer;
           text-align: center;
-          transition: background var(--t-fast, 150ms), color var(--t-fast, 150ms);
+          transition: opacity var(--t-fast, 150ms);
         }
         .nc-older-toggle:hover {
           background: var(--bg-overlay);
@@ -1131,12 +1178,37 @@ export default function NotificationCenter({ onClose }: Props) {
           font-weight: 600;
           font-family: inherit;
           cursor: pointer;
-          transition: background var(--t-fast, 150ms), color var(--t-fast, 150ms);
+          transition: opacity var(--t-fast, 150ms);
           text-align: left;
         }
         .nc-settings-link:hover {
           background: var(--bg-overlay);
           color: var(--text-secondary);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .nc-backdrop,
+          .animate-nc-in,
+          .nc-card-wrap,
+          .nc-card {
+            animation: none;
+          }
+          .nc-card-wrap,
+          .nc-card,
+          .nc-card-arrow,
+          .nc-group-stack,
+          .nc-close {
+            transition: none;
+          }
+          .nc-card:hover,
+          .nc-card:hover .nc-card-arrow,
+          .nc-group-stack:hover,
+          .nc-close:hover {
+            transform: none;
+          }
+          .nc-card-wrap.nc-card--dismissing {
+            filter: none;
+          }
         }
 
         @media (max-width: 480px) {

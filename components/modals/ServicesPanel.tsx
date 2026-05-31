@@ -297,73 +297,97 @@ export default function ServicesPanel() {
         .svc-backdrop {
           position: fixed; inset: 0; z-index: 615;
           display: flex; align-items: stretch; justify-content: flex-end;
+          background: linear-gradient(90deg, transparent, var(--bg-void));
         }
 
         .svc-panel {
-          width: 340px; max-width: 95vw;
-          background: var(--bg-deep);
-          border-left: 1px solid var(--border-normal);
+          width: 368px; max-width: 95vw;
+          background: linear-gradient(180deg, var(--bg-base), var(--bg-deep));
+          border-left: 1px solid var(--accent-border);
           display: flex; flex-direction: column;
           overflow: hidden;
-          box-shadow: -8px 0 40px rgba(0, 0, 0, 0.45);
+          box-shadow: var(--shadow-xl), var(--glow);
         }
 
         /* Header */
         .svc-header {
           display: flex; align-items: center; justify-content: space-between;
-          padding: 0 16px;
-          height: 56px;
+          padding: 0 18px;
+          height: 64px;
+          background: var(--bg-deep);
           border-bottom: 1px solid var(--border-subtle);
           flex-shrink: 0;
-          gap: 12px;
+          gap: 14px;
         }
         .svc-header-left {
-          display: flex; align-items: center; gap: 10px; min-width: 0;
+          display: flex; align-items: center; gap: 12px; min-width: 0;
         }
         .svc-title {
-          font-size: 14px; font-weight: 700; color: var(--text-primary);
-          line-height: 1.2;
+          font-size: 15px; font-weight: 800; color: var(--text-primary);
+          line-height: 1.15;
         }
         .svc-subtitle {
-          font-size: 10px; color: var(--text-muted);
-          margin: 0; line-height: 1;
+          font-size: 11px; color: var(--text-secondary);
+          margin: 3px 0 0; line-height: 1.15;
         }
         .svc-close {
-          width: 28px; height: 28px; flex-shrink: 0;
-          background: none; border: none; cursor: pointer;
+          width: 30px; height: 30px; flex-shrink: 0;
+          background: var(--bg-elevated); border: 1px solid var(--border-subtle); cursor: pointer;
           display: flex; align-items: center; justify-content: center;
-          color: var(--text-muted); border-radius: var(--r-xs);
-          transition: background var(--t-fast), color var(--t-fast);
+          color: var(--text-secondary); border-radius: var(--r-sm);
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
         }
-        .svc-close:hover { background: var(--ch-hover-bg); color: var(--text-primary); }
+        .svc-close:hover {
+          background: var(--bg-float);
+          border-color: var(--accent-border);
+          color: var(--text-primary);
+          filter: brightness(1.08);
+        }
+        .svc-close:active { transform: translateY(1px); }
 
         /* Tabs */
         .svc-tabs-wrap {
           border-bottom: 1px solid var(--border-subtle);
           flex-shrink: 0;
+          background: var(--bg-deep);
+          padding: 8px 10px 0;
         }
         .svc-tabs {
           display: flex;
-          padding: 0 12px;
-          gap: 2px;
+          padding: 0;
+          gap: 4px;
         }
         .svc-tabs--bot {
           border-top: 1px solid var(--border-subtle);
-          padding-top: 2px;
+          margin-top: 6px;
+          padding-top: 6px;
         }
         .svc-tab {
-          padding: 7px 9px;
-          font-size: 11px; font-weight: 600;
+          flex: 1 1 0;
+          padding: 8px 7px;
+          font-size: 11px; font-weight: 700;
           color: var(--text-muted);
-          background: none; border: none; cursor: pointer;
+          background: transparent; border: 1px solid transparent; cursor: pointer;
           border-bottom: 2px solid transparent;
+          border-radius: var(--r-sm) var(--r-sm) 0 0;
           margin-bottom: -1px;
-          transition: color var(--t-fast), border-color var(--t-fast);
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
           white-space: nowrap;
         }
-        .svc-tab:hover { color: var(--text-primary); }
+        .svc-tab:hover {
+          background: var(--bg-elevated);
+          color: var(--text-primary);
+          filter: brightness(1.04);
+        }
+        .svc-tab:active { transform: translateY(1px); }
         .svc-tab--active {
-          color: var(--accent);
+          background: var(--accent-subtle);
+          border-color: var(--accent-border);
+          border-bottom-color: var(--accent);
+          color: var(--accent-hover);
+          box-shadow: var(--shadow-sm);
+        }
+        .svc-tab--active:hover {
           border-bottom-color: var(--accent);
         }
         .svc-tab--bot {
@@ -374,53 +398,70 @@ export default function ServicesPanel() {
         .svc-tab--bot:hover { opacity: 1; }
         .svc-tab--bot.svc-tab--active {
           opacity: 1;
-          color: var(--gold, #e8b84b);
-          border-bottom-color: var(--gold, #e8b84b);
+          background: var(--gold-subtle);
+          border-color: var(--accent-border);
+          border-bottom-color: var(--gold);
+          color: var(--gold);
         }
 
         /* Body */
         .svc-body {
           flex: 1; overflow-y: auto;
           display: flex; flex-direction: column;
-          padding: 14px 14px;
-          gap: 18px;
+          padding: 18px 16px 20px;
+          gap: 20px;
           min-height: 0;
+          scrollbar-width: thin;
+          scrollbar-color: var(--accent-border) var(--bg-deep);
+        }
+        .svc-body::-webkit-scrollbar { width: 6px; }
+        .svc-body::-webkit-scrollbar-thumb {
+          background: var(--accent-border);
+          border-radius: var(--r-full);
         }
 
         /* Section */
         .svc-section {
-          display: flex; flex-direction: column; gap: 8px;
+          display: flex; flex-direction: column; gap: 10px;
+          padding: 0 0 2px;
         }
         .svc-section-label {
-          font-size: 10px; font-weight: 700;
-          letter-spacing: 0.07em; text-transform: uppercase;
-          color: var(--text-muted);
+          font-size: 10px; font-weight: 800;
+          letter-spacing: 0.08em; text-transform: uppercase;
+          color: var(--text-secondary);
+          padding: 0 2px;
+        }
+        .svc-section > p {
+          line-height: 1.45;
           padding: 0 2px;
         }
 
         /* Status row */
         .svc-status-row {
-          display: flex; align-items: center; gap: 8px;
-          padding: 8px 12px;
+          display: flex; align-items: center; gap: 10px;
+          padding: 10px 12px;
           background: var(--bg-elevated);
-          border: 1px solid var(--border-subtle);
+          border: 1px solid var(--border-normal);
           border-radius: var(--r-md);
           font-size: 13px;
+          box-shadow: var(--shadow-sm);
         }
         .svc-status-badge {
-          font-size: 10px; font-weight: 700;
-          padding: 2px 6px; border-radius: var(--r-full);
+          min-width: 24px; height: 22px;
+          display: inline-flex; align-items: center; justify-content: center;
+          font-size: 10px; font-weight: 800;
+          padding: 0 7px; border-radius: var(--r-full);
           flex-shrink: 0;
         }
         .svc-badge--ok {
-          background: oklch(30% 0.1 150 / 0.25);
-          color: oklch(65% 0.18 150);
-          border: 1px solid oklch(65% 0.18 150 / 0.4);
+          background: var(--gold-subtle);
+          color: var(--success);
+          border: 1px solid var(--border-normal);
         }
         .svc-badge--none {
-          background: oklch(30% 0.15 15 / 0.2);
-          color: oklch(65% 0.2 15);
-          border: 1px solid oklch(65% 0.2 15 / 0.4);
+          background: var(--danger-subtle);
+          color: var(--danger);
+          border: 1px solid var(--border-normal);
         }
         .svc-status-text {
           color: var(--text-secondary);
@@ -431,189 +472,228 @@ export default function ServicesPanel() {
 
         /* Form */
         .svc-form-row {
-          display: flex; flex-direction: column; gap: 4px;
+          display: flex; flex-direction: column; gap: 6px;
         }
         .svc-form-label {
           font-size: 10px; font-weight: 600;
           color: var(--text-muted); padding: 0 2px;
           letter-spacing: 0.04em;
+          line-height: 1.35;
         }
         .svc-form-inline {
-          display: flex; gap: 6px; align-items: center;
+          display: flex; gap: 7px; align-items: center;
         }
         .svc-input {
           flex: 1;
           background: var(--bg-base);
           border: 1px solid var(--border-normal);
           border-radius: var(--r-sm);
-          padding: 6px 9px;
+          padding: 8px 10px;
           font-size: 12px;
           color: var(--text-primary);
           font-family: inherit;
           min-width: 0;
-          transition: border-color var(--t-fast), box-shadow var(--t-fast);
         }
+        .svc-input:hover { border-color: var(--accent-border); }
         .svc-input:focus {
           outline: none;
-          border-color: var(--accent-border, oklch(65% 0.24 255 / 0.5));
-          box-shadow: 0 0 0 2px var(--accent-subtle, oklch(65% 0.24 255 / 0.1));
+          background: var(--bg-elevated);
+          border-color: var(--accent-border);
+          box-shadow: 0 0 0 2px var(--accent-subtle);
         }
         .svc-input::placeholder { color: var(--text-muted); }
 
         /* Buttons */
         .svc-btn {
-          padding: 5px 10px;
-          font-size: 12px; font-weight: 600;
+          min-height: 32px;
+          padding: 7px 11px;
+          font-size: 12px; font-weight: 700;
           background: var(--bg-elevated);
           border: 1px solid var(--border-normal);
           border-radius: var(--r-sm);
           color: var(--text-primary);
           cursor: pointer;
           white-space: nowrap;
-          transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+          box-shadow: var(--shadow-sm);
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
         }
         .svc-btn:hover {
-          background: var(--accent-subtle, oklch(65% 0.24 255 / 0.15));
-          border-color: var(--accent-border, oklch(65% 0.24 255 / 0.5));
-          color: var(--accent);
+          background: var(--bg-float);
+          border-color: var(--accent-border);
+          color: var(--accent-hover);
+          filter: brightness(1.05);
+        }
+        .svc-btn:active {
+          transform: translateY(1px);
         }
         .svc-btn--accent {
           background: var(--accent);
           border-color: var(--accent);
-          color: #fff;
+          color: var(--bg-void);
         }
         .svc-btn--accent:hover {
-          opacity: 0.88;
+          background: var(--accent-hover);
+          border-color: var(--accent-hover);
+          color: var(--bg-void);
         }
         .svc-btn--gold {
-          background: oklch(40% 0.12 70 / 0.3);
-          border-color: oklch(70% 0.18 70 / 0.6);
-          color: var(--gold, #e8b84b);
+          background: var(--gold-subtle);
+          border-color: var(--accent-border);
+          color: var(--gold);
         }
         .svc-btn--gold:hover {
-          background: oklch(70% 0.18 70 / 0.2);
-          border-color: var(--gold, #e8b84b);
+          background: var(--bg-float);
+          border-color: var(--gold);
+          color: var(--gold);
         }
         .svc-btn--sm {
-          padding: 3px 8px;
+          min-height: 26px;
+          padding: 4px 8px;
           font-size: 11px;
         }
         .svc-btn--danger {
-          background: oklch(30% 0.15 15 / 0.2);
-          border-color: oklch(65% 0.25 15 / 0.5);
-          color: oklch(70% 0.2 15);
+          background: var(--danger-subtle);
+          border-color: var(--border-normal);
+          color: var(--danger);
         }
         .svc-btn--danger:hover {
-          background: oklch(65% 0.25 15);
-          border-color: oklch(65% 0.25 15);
-          color: #fff;
+          background: var(--danger);
+          border-color: var(--danger);
+          color: var(--bg-void);
         }
         .svc-btn:disabled {
           opacity: 0.4; cursor: not-allowed;
+          filter: none;
+          transform: none;
         }
 
         /* Toggle row */
         .svc-toggle-row {
           display: flex; align-items: center; justify-content: space-between;
-          padding: 7px 10px;
+          padding: 9px 10px;
           background: var(--bg-elevated);
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-md);
           gap: 12px;
+          box-shadow: var(--shadow-sm);
+          transition: transform var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
+        }
+        .svc-toggle-row:hover {
+          border-color: var(--border-normal);
+          filter: brightness(1.04);
         }
         .svc-toggle-info { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
         .svc-toggle-name { font-size: 12px; font-weight: 600; color: var(--text-primary); }
-        .svc-toggle-desc { font-size: 10px; color: var(--text-muted); }
+        .svc-toggle-desc { font-size: 10px; color: var(--text-muted); line-height: 1.35; }
         .svc-toggle {
           position: relative; width: 32px; height: 18px; flex-shrink: 0;
-          background: var(--border-normal);
+          background: var(--bg-overlay);
           border-radius: var(--r-full);
-          border: none; cursor: pointer;
-          transition: background var(--t-fast);
+          border: 1px solid var(--border-normal); cursor: pointer;
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
         }
         .svc-toggle::after {
           content: ''; position: absolute;
-          top: 2px; left: 2px;
+          top: 1px; left: 1px;
           width: 14px; height: 14px;
-          background: #fff; border-radius: 50%;
-          transition: transform var(--t-fast);
+          background: var(--text-primary); border-radius: 50%;
+          box-shadow: var(--shadow-sm);
+          transition: transform var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
         }
+        .svc-toggle:hover { filter: brightness(1.08); }
         .svc-toggle--on { background: var(--accent); }
         .svc-toggle--on::after { transform: translateX(14px); }
 
         /* Channel list */
-        .svc-ch-list { display: flex; flex-direction: column; gap: 4px; }
+        .svc-ch-list { display: flex; flex-direction: column; gap: 6px; }
         .svc-ch-row {
           display: flex; align-items: center; gap: 8px;
-          padding: 7px 10px;
+          padding: 9px 10px;
           background: var(--bg-elevated);
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-md);
-          transition: border-color var(--t-fast);
+          box-shadow: var(--shadow-sm);
+          transition: transform var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
         }
-        .svc-ch-row:hover { border-color: var(--border-normal); }
+        .svc-ch-row:hover {
+          border-color: var(--border-normal);
+          filter: brightness(1.04);
+        }
         .svc-ch-name {
           font-size: 12px; font-weight: 600; color: var(--text-primary);
           flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         .svc-ch-badge {
           font-size: 10px; font-weight: 700;
-          padding: 1px 5px; border-radius: var(--r-full);
-          background: var(--accent-subtle, oklch(65% 0.24 255 / 0.15));
-          border: 1px solid var(--accent-border, oklch(65% 0.24 255 / 0.4));
-          color: var(--accent);
+          padding: 2px 6px; border-radius: var(--r-full);
+          background: var(--accent-subtle);
+          border: 1px solid var(--accent-border);
+          color: var(--accent-hover);
           flex-shrink: 0;
         }
 
         /* Confirm panel */
         .svc-confirm {
-          display: flex; flex-direction: column; gap: 8px;
+          display: flex; flex-direction: column; gap: 10px;
           padding: 12px;
-          background: oklch(30% 0.15 15 / 0.15);
-          border: 1px solid oklch(65% 0.25 15 / 0.4);
+          background: var(--danger-subtle);
+          border: 1px solid var(--border-normal);
           border-radius: var(--r-md);
+          box-shadow: var(--shadow-sm);
         }
         .svc-confirm-msg {
           font-size: 12px; color: var(--text-secondary); line-height: 1.5;
+          margin: 0;
         }
         .svc-confirm-actions {
-          display: flex; gap: 6px; justify-content: flex-end;
+          display: flex; gap: 8px; justify-content: flex-end;
         }
 
         /* Separator */
         .svc-hr {
           border: none;
           border-top: 1px solid var(--border-subtle);
-          margin: 4px 0;
+          margin: 6px 0;
         }
 
         /* Reply log */
         .svc-reply-section {
           flex-shrink: 0;
-          border-top: 1px solid var(--border-subtle);
-          padding: 10px 14px;
-          background: var(--bg-base);
+          border-top: 1px solid var(--border-normal);
+          padding: 12px 14px 14px;
+          background: var(--bg-deep);
+          box-shadow: var(--shadow-sm);
         }
         .svc-reply-header {
           display: flex; align-items: center; justify-content: space-between;
-          margin-bottom: 6px;
+          margin-bottom: 8px;
         }
         .svc-clear-btn {
-          font-size: 10px; color: var(--text-muted);
-          background: none; border: none; cursor: pointer;
-          padding: 0 2px;
-          transition: color var(--t-fast);
+          font-size: 10px; font-weight: 700; color: var(--text-muted);
+          background: var(--bg-elevated); border: 1px solid var(--border-subtle); cursor: pointer;
+          padding: 3px 7px;
+          border-radius: var(--r-xs);
+          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
         }
-        .svc-clear-btn:hover { color: var(--text-secondary); }
+        .svc-clear-btn:hover {
+          color: var(--text-secondary);
+          border-color: var(--border-normal);
+          filter: brightness(1.05);
+        }
+        .svc-clear-btn:active { transform: translateY(1px); }
         .svc-reply-log {
-          max-height: 110px; overflow-y: auto;
-          display: flex; flex-direction: column; gap: 2px;
+          max-height: 124px; overflow-y: auto;
+          display: flex; flex-direction: column; gap: 3px;
+          padding: 6px;
+          background: var(--bg-void);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-md);
           scrollbar-width: thin;
-          scrollbar-color: var(--accent-border, rgba(14,165,233,0.28)) transparent;
+          scrollbar-color: var(--accent-border) var(--bg-void);
         }
         .svc-reply-log::-webkit-scrollbar { width: 3px; }
         .svc-reply-log::-webkit-scrollbar-thumb {
-          background: var(--accent-border, rgba(14,165,233,0.28));
+          background: var(--accent-border);
           border-radius: 2px;
         }
         .svc-reply-empty {
@@ -624,12 +704,11 @@ export default function ServicesPanel() {
           display: flex; gap: 6px; align-items: baseline;
           font-size: 11px;
           line-height: 1.4;
-          padding: 1px 2px;
-          border-radius: 2px;
-          transition: background 80ms;
+          padding: 3px 4px;
+          border-radius: var(--r-xs);
         }
         .svc-reply-line:hover {
-          background: rgba(255,255,255,0.03);
+          background: var(--bg-base);
         }
         .svc-reply-time {
           color: var(--text-muted); flex-shrink: 0;
@@ -637,7 +716,7 @@ export default function ServicesPanel() {
           opacity: 0.7;
         }
         .svc-reply-source {
-          color: var(--gold, #e8b84b); flex-shrink: 0;
+          color: var(--gold); flex-shrink: 0;
           font-family: var(--font-mono, monospace);
           font-weight: 700; font-size: 10px;
         }
@@ -650,11 +729,12 @@ export default function ServicesPanel() {
         /* Memo items */
         .svc-memo-list { display: flex; flex-direction: column; gap: 6px; }
         .svc-memo-item {
-          padding: 8px 10px;
+          padding: 9px 10px;
           background: var(--bg-elevated);
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-md);
           display: flex; flex-direction: column; gap: 3px;
+          box-shadow: var(--shadow-sm);
         }
         .svc-memo-header {
           display: flex; align-items: center; justify-content: space-between; gap: 6px;
@@ -668,7 +748,7 @@ export default function ServicesPanel() {
         .svc-nick-list { display: flex; flex-wrap: wrap; gap: 4px; }
         .svc-nick-chip {
           font-size: 11px; font-weight: 600;
-          padding: 2px 8px; border-radius: var(--r-full);
+          padding: 3px 8px; border-radius: var(--r-full);
           background: var(--bg-elevated);
           border: 1px solid var(--border-normal);
           color: var(--text-secondary);
@@ -679,14 +759,28 @@ export default function ServicesPanel() {
 
         /* Bot tab info note */
         .svc-bot-note {
-          font-size: 11px; color: var(--text-muted);
-          padding: 6px 10px;
-          background: oklch(40% 0.12 70 / 0.08);
-          border: 1px solid oklch(70% 0.18 70 / 0.2);
+          font-size: 11px; color: var(--text-secondary);
+          padding: 9px 10px;
+          background: var(--gold-subtle);
+          border: 1px solid var(--accent-border);
           border-radius: var(--r-md);
           line-height: 1.5;
+          box-shadow: var(--shadow-sm);
         }
-        .svc-bot-note strong { color: var(--gold, #e8b84b); font-weight: 700; }
+        .svc-bot-note strong { color: var(--gold); font-weight: 700; }
+
+        @media (prefers-reduced-motion: reduce) {
+          .svc-close,
+          .svc-tab,
+          .svc-btn,
+          .svc-toggle-row,
+          .svc-toggle,
+          .svc-toggle::after,
+          .svc-ch-row,
+          .svc-clear-btn {
+            transition: none;
+          }
+        }
       `}</style>
     </div>
   );
@@ -1870,7 +1964,7 @@ function HostServTab({ sendToBot }: HostServTabProps) {
           </div>
         </div>
         {status === 'sent' && (
-          <p style={{ fontSize: 11, color: 'var(--gold, #e8b84b)', margin: 0 }}>
+          <p style={{ fontSize: 11, color: 'var(--gold)', margin: 0 }}>
             Request sent. Check the reply log for confirmation.
           </p>
         )}

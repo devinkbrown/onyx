@@ -6,7 +6,7 @@
 // purges the old cache, and clients pick up the new build instead of serving
 // a stale cache-first bundle. A stale SW silently breaks features baked in at
 // build time (e.g. the media-upload URL).
-const CACHE_NAME = 'ocean-shell-v2-20260531';
+const CACHE_NAME = 'ocean-shell-v3-20260601-polish';
 
 // App shell assets to precache on install
 const PRECACHE_URLS = [

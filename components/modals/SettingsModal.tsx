@@ -121,13 +121,13 @@ export default function SettingsModal() {
 
         .settings-overlay {
           position: fixed; inset: 0;
-          background: rgba(0,0,0,0.72);
+          background: color-mix(in srgb, var(--bg-void, #030810) 86%, transparent);
           z-index: 500;
           display: flex; align-items: center; justify-content: center;
           padding: 24px;
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
-          animation: settings-fade-in 160ms ease both;
+          animation: settings-fade-in var(--t-fast, 150ms) var(--ease-out, ease) both;
         }
         @keyframes settings-fade-in {
           from { opacity: 0; }
@@ -135,77 +135,89 @@ export default function SettingsModal() {
         }
 
         .settings-modal {
-          background: var(--bg-elevated, #132131);
+          background:
+            radial-gradient(circle at 8% 0%, var(--accent-glow, rgba(14,165,233,0.18)), transparent 34%),
+            linear-gradient(135deg, var(--bg-elevated, #132131), var(--bg-base, #0c1828) 54%, var(--bg-deep, #06101d));
           border: 1px solid var(--border-normal);
           border-radius: var(--r-xl, 16px);
-          width: 100%; max-width: 800px;
+          width: 100%; max-width: 920px;
           height: 82dvh; max-height: 640px;
           display: flex;
           overflow: hidden;
-          box-shadow: var(--shadow-lg, 0 8px 32px rgba(0,0,0,0.65)), 0 0 0 1px rgba(14,165,233,0.06) inset;
-          animation: settings-scale-in 200ms cubic-bezier(0.16,1,0.3,1) both;
+          box-shadow: var(--shadow-xl, 0 24px 64px rgba(0,0,0,0.75)), var(--glow, 0 0 32px rgba(14,165,233,0.2));
+          animation: settings-scale-in var(--t-normal, 260ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
         }
 
         .settings-nav {
-          width: 210px; flex-shrink: 0;
-          background: var(--bg-deep, #06101d);
-          padding: 24px 12px 20px;
-          display: flex; flex-direction: column; gap: 2px;
+          width: 232px; flex-shrink: 0;
+          background: linear-gradient(180deg, var(--bg-deep, #06101d), var(--bg-void, #030810));
+          padding: 26px 14px 20px;
+          display: flex; flex-direction: column; gap: 4px;
           border-right: 1px solid var(--border-subtle);
           overflow-y: auto;
         }
 
         .settings-nav-title {
-          font-size: 10px; font-weight: 800;
-          letter-spacing: 0.12em; text-transform: uppercase;
-          color: var(--text-muted); padding: 0 10px;
-          margin-bottom: 10px;
+          font-size: 11px; font-weight: 800;
+          letter-spacing: 0.14em; text-transform: uppercase;
+          color: var(--gold, #67e8f9); padding: 0 12px;
+          margin-bottom: 14px;
         }
 
         .settings-tab {
           display: flex; align-items: center; gap: 10px;
-          padding: 0 10px; height: 34px;
-          border-radius: var(--r-sm, 6px);
-          background: none; border: none; cursor: pointer;
+          padding: 0 12px; height: 38px;
+          border-radius: var(--r-md, 8px);
+          background: transparent; border: 1px solid transparent; cursor: pointer;
           text-align: left; font-size: 13px; font-weight: 500;
           color: var(--text-secondary);
-          transition: background 120ms ease, color 120ms ease;
+          transition: transform var(--t-fast, 150ms) var(--ease-out, ease), opacity var(--t-fast, 150ms) var(--ease-out, ease), filter var(--t-fast, 150ms) var(--ease-out, ease);
           width: 100%;
           position: relative;
+          overflow: hidden;
         }
         .settings-tab::before {
           content: '';
           position: absolute;
-          left: 0; top: 6px; bottom: 6px;
-          width: 2px; border-radius: 2px;
-          background: var(--accent);
+          left: 0; top: 7px; bottom: 7px;
+          width: 3px; border-radius: var(--r-full);
+          background: var(--gold, #67e8f9);
           opacity: 0;
-          transition: opacity 120ms ease;
+          transition: opacity var(--t-fast, 150ms) var(--ease-out, ease);
         }
         .settings-tab:hover {
-          background: rgba(255,255,255,0.04);
+          background: var(--ch-hover-bg, rgba(14,165,233,0.07));
           color: var(--text-primary);
+          transform: translateX(2px);
         }
         .settings-tab--active {
-          background: color-mix(in srgb, var(--accent, #0ea5e9) 10%, transparent);
-          color: var(--accent);
+          background: var(--accent-subtle);
+          border-color: var(--accent-border);
+          color: var(--text-primary);
           font-weight: 600;
+          box-shadow: var(--shadow-sm, 0 1px 4px rgba(0,0,0,0.5));
         }
         .settings-tab--active::before { opacity: 1; }
         .settings-tab:focus-visible {
           outline: 2px solid var(--accent);
-          outline-offset: -2px;
+          outline-offset: 2px;
         }
 
         .settings-tab-icon {
-          width: 18px; display: flex; align-items: center; flex-shrink: 0;
+          width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+          border-radius: var(--r-sm, 6px);
           opacity: 0.75;
         }
-        .settings-tab--active .settings-tab-icon { opacity: 1; }
+        .settings-tab--active .settings-tab-icon {
+          color: var(--accent, #0ea5e9);
+          background: var(--accent-subtle);
+          opacity: 1;
+        }
 
         .settings-content {
-          flex: 1; overflow-y: auto; padding: 32px;
+          flex: 1; overflow-y: auto; padding: 34px 38px 36px;
           position: relative;
+          background: linear-gradient(180deg, color-mix(in srgb, var(--bg-base, #0c1828) 82%, transparent), var(--bg-deep, #06101d));
           scrollbar-width: thin;
           scrollbar-color: var(--border-normal) transparent;
         }
@@ -217,23 +229,40 @@ export default function SettingsModal() {
         }
 
         .settings-close {
-          position: absolute; top: 16px; right: 16px;
-          width: 28px; height: 28px;
-          border-radius: 50%; border: 1px solid var(--border-subtle);
-          background: var(--bg-elevated);
+          position: absolute; top: 18px; right: 18px;
+          width: 30px; height: 30px;
+          border-radius: var(--r-full); border: 1px solid var(--border-subtle);
+          background: var(--bg-float);
           color: var(--text-muted); cursor: pointer;
           display: flex; align-items: center; justify-content: center;
           font-size: 12px; font-weight: 700; line-height: 1;
-          transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+          transition: transform var(--t-fast, 150ms) var(--ease-out, ease), opacity var(--t-fast, 150ms) var(--ease-out, ease), filter var(--t-fast, 150ms) var(--ease-out, ease);
         }
         .settings-close:hover {
           background: var(--bg-overlay);
           color: var(--text-primary);
           border-color: var(--border-normal);
+          transform: scale(1.04);
         }
         .settings-close:focus-visible {
           outline: 2px solid var(--accent);
           outline-offset: 2px;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .settings-overlay,
+          .settings-modal {
+            animation: none;
+          }
+          .settings-tab,
+          .settings-tab::before,
+          .settings-close {
+            transition: none;
+          }
+          .settings-tab:hover,
+          .settings-close:hover {
+            transform: none;
+          }
         }
       `}</style>
     </div>
@@ -607,13 +636,14 @@ function AppearanceTab() {
           border: 2px solid var(--border-normal);
           background: var(--bg-elevated);
           cursor: pointer;
-          transition: border-color 120ms, background 120ms;
+          transition: transform var(--t-fast, 150ms) var(--ease-out, ease), filter var(--t-fast, 150ms) var(--ease-out, ease), opacity var(--t-fast, 150ms) var(--ease-out, ease);
           position: relative;
           font-family: inherit;
         }
         .ap-theme-card:hover:not(.ap-theme-card--disabled) {
           border-color: var(--accent-border);
           background: var(--bg-overlay);
+          transform: translateY(-1px);
         }
         .ap-theme-card--active {
           border-color: var(--accent) !important;
@@ -663,13 +693,14 @@ function AppearanceTab() {
           border: 1.5px solid var(--border-normal);
           background: var(--bg-elevated);
           cursor: pointer;
-          transition: border-color 100ms, background 100ms;
+          transition: transform var(--t-fast, 150ms) var(--ease-out, ease), filter var(--t-fast, 150ms) var(--ease-out, ease), opacity var(--t-fast, 150ms) var(--ease-out, ease);
           font-family: inherit;
           text-align: left;
         }
         .ap-density-item:hover {
           border-color: var(--accent-border);
           background: var(--bg-overlay);
+          transform: translateY(-1px);
         }
         .ap-density-item--active {
           border-color: var(--accent) !important;
@@ -728,7 +759,7 @@ function AppearanceTab() {
           background: var(--bg-overlay);
           cursor: pointer;
           position: relative;
-          transition: background 200ms ease;
+          border: 1px solid var(--border-subtle);
           flex-shrink: 0;
           padding: 0;
         }
@@ -738,9 +769,9 @@ function AppearanceTab() {
           top: 3px; left: 3px;
           width: 18px; height: 18px;
           border-radius: 50%;
-          background: #fff;
+          background: var(--text-primary);
           box-shadow: 0 1px 3px rgba(0,0,0,0.35);
-          transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+          transition: transform var(--t-normal, 260ms) var(--ease-spring, cubic-bezier(0.175,0.885,0.32,1.275));
           display: block;
         }
         .ap-toggle--on .ap-toggle-thumb { transform: translateX(20px); }
@@ -1167,8 +1198,8 @@ function VoiceTab() {
         .vt-perm-banner {
           display: flex; align-items: center; gap: 12px;
           padding: 14px 16px;
-          background: rgba(224,84,84,0.1);
-          border: 1px solid rgba(224,84,84,0.3);
+          background: var(--danger-subtle);
+          border: 1px solid color-mix(in srgb, var(--danger) 34%, transparent);
           border-radius: var(--r-md);
           margin-bottom: 4px;
         }
@@ -1178,12 +1209,12 @@ function VoiceTab() {
         .vt-perm-btn {
           margin-left: auto; flex-shrink: 0;
           padding: 6px 14px; border-radius: var(--r-sm);
-          background: var(--accent); color: #fff;
+          background: var(--accent); color: var(--text-primary);
           border: none; cursor: pointer; font-size: 13px; font-weight: 600;
           font-family: inherit;
-          transition: opacity 120ms;
+          transition: opacity var(--t-fast, 150ms) var(--ease-out, ease), transform var(--t-fast, 150ms) var(--ease-out, ease);
         }
-        .vt-perm-btn:hover { opacity: 0.85; }
+        .vt-perm-btn:hover { opacity: 0.88; transform: translateY(-1px); }
 
         .vt-device-row {
           display: flex; align-items: center; gap: 8px;
@@ -1195,7 +1226,7 @@ function VoiceTab() {
           background: var(--bg-deep); border: 1px solid var(--border-normal);
           color: var(--text-primary); font-size: 13px; font-family: inherit;
           cursor: pointer;
-          transition: border-color 150ms ease, box-shadow 150ms ease;
+          transition: filter var(--t-fast, 150ms) var(--ease-out, ease);
           appearance: none;
           background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23888' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
           background-repeat: no-repeat;
@@ -1215,10 +1246,10 @@ function VoiceTab() {
           background: var(--bg-void); color: var(--text-secondary);
           cursor: pointer; font-size: 16px; font-weight: 700;
           display: flex; align-items: center; justify-content: center;
-          transition: background 120ms, color 120ms;
+          transition: transform var(--t-fast, 150ms) var(--ease-out, ease), filter var(--t-fast, 150ms) var(--ease-out, ease), opacity var(--t-fast, 150ms) var(--ease-out, ease);
           font-family: inherit;
         }
-        .vt-icon-btn:hover { background: var(--bg-elevated); color: var(--text-primary); }
+        .vt-icon-btn:hover { background: var(--bg-elevated); color: var(--text-primary); transform: translateY(-1px); }
 
         .vt-meter-row {
           display: flex; align-items: center; gap: 10px; margin-top: 8px;
@@ -1241,13 +1272,13 @@ function VoiceTab() {
           border: 1px solid var(--border-subtle);
           background: var(--bg-void); color: var(--text-secondary);
           cursor: pointer; font-size: 12px; font-weight: 600; font-family: inherit;
-          transition: all 120ms;
+          transition: transform var(--t-fast, 150ms) var(--ease-out, ease), filter var(--t-fast, 150ms) var(--ease-out, ease), opacity var(--t-fast, 150ms) var(--ease-out, ease);
         }
-        .vt-test-btn:hover { border-color: var(--accent-border); color: var(--text-primary); }
+        .vt-test-btn:hover { border-color: var(--accent-border); color: var(--text-primary); transform: translateY(-1px); }
         .vt-test-btn--active {
-          background: rgba(224,84,84,0.12);
-          border-color: rgba(224,84,84,0.4);
-          color: #e05454;
+          background: var(--danger-subtle);
+          border-color: color-mix(in srgb, var(--danger) 42%, transparent);
+          color: var(--danger);
         }
 
         .vt-slider-row {
@@ -1283,15 +1314,16 @@ function VoiceTab() {
           width: 44px; height: 24px; border-radius: 999px;
           border: none; background: var(--bg-overlay);
           cursor: pointer; position: relative; flex-shrink: 0;
-          transition: background 200ms ease; padding: 0;
+          border: 1px solid var(--border-subtle);
+          padding: 0;
         }
         .vt-toggle--on { background: var(--accent); }
         .vt-toggle-thumb {
           position: absolute; top: 3px; left: 3px;
           width: 18px; height: 18px; border-radius: 50%;
-          background: #fff;
+          background: var(--text-primary);
           box-shadow: 0 1px 3px rgba(0,0,0,0.35);
-          transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+          transition: transform var(--t-normal, 260ms) var(--ease-spring, cubic-bezier(0.175,0.885,0.32,1.275));
           display: block;
         }
         .vt-toggle--on .vt-toggle-thumb { transform: translateX(20px); }
@@ -1304,9 +1336,9 @@ function VoiceTab() {
           border: 1px solid var(--border-subtle);
           background: var(--bg-void); color: var(--text-secondary);
           cursor: pointer; font-size: 12px; font-weight: 600; font-family: inherit;
-          transition: all 120ms;
+          transition: transform var(--t-fast, 150ms) var(--ease-out, ease), filter var(--t-fast, 150ms) var(--ease-out, ease), opacity var(--t-fast, 150ms) var(--ease-out, ease);
         }
-        .vt-sens-btn:hover { border-color: var(--accent-border); color: var(--text-primary); }
+        .vt-sens-btn:hover { border-color: var(--accent-border); color: var(--text-primary); transform: translateY(-1px); }
         .vt-sens-btn--active {
           background: var(--accent-subtle);
           border-color: var(--accent);
@@ -1337,11 +1369,11 @@ function VoiceTab() {
           border: 1px solid var(--accent-border);
           background: var(--accent-subtle); color: var(--accent);
           cursor: pointer; font-size: 12px; font-weight: 600; font-family: inherit;
-          transition: all 120ms; white-space: nowrap;
+          transition: transform var(--t-fast, 150ms) var(--ease-out, ease), filter var(--t-fast, 150ms) var(--ease-out, ease), opacity var(--t-fast, 150ms) var(--ease-out, ease); white-space: nowrap;
         }
-        .vt-ptt-bind-btn:hover { background: var(--accent); color: #fff; }
+        .vt-ptt-bind-btn:hover { background: var(--accent); color: var(--text-primary); transform: translateY(-1px); }
         .vt-ptt-bind-btn--listening {
-          background: var(--accent); color: #fff;
+          background: var(--accent); color: var(--text-primary);
           animation: vt-pulse 1.2s ease-in-out infinite;
         }
         @keyframes vt-pulse {
@@ -1353,9 +1385,9 @@ function VoiceTab() {
           border: 1px solid var(--border-subtle);
           background: none; color: var(--text-muted);
           cursor: pointer; font-size: 12px; font-family: inherit;
-          transition: all 120ms;
+          transition: transform var(--t-fast, 150ms) var(--ease-out, ease), filter var(--t-fast, 150ms) var(--ease-out, ease), opacity var(--t-fast, 150ms) var(--ease-out, ease);
         }
-        .vt-ptt-cancel:hover { color: var(--text-primary); border-color: var(--border-normal); }
+        .vt-ptt-cancel:hover { color: var(--text-primary); border-color: var(--border-normal); transform: translateY(-1px); }
 
         .vt-info-banner {
           display: flex; align-items: flex-start; gap: 8px;
@@ -1365,6 +1397,30 @@ function VoiceTab() {
           font-size: 12px; color: var(--text-secondary); line-height: 1.5;
         }
         .vt-info-icon { flex-shrink: 0; font-size: 14px; }
+
+        @media (prefers-reduced-motion: reduce) {
+          .vt-perm-btn,
+          .vt-select,
+          .vt-icon-btn,
+          .vt-test-btn,
+          .vt-toggle-thumb,
+          .vt-sens-btn,
+          .vt-ptt-bind-btn,
+          .vt-ptt-cancel {
+            transition: none;
+          }
+          .vt-perm-btn:hover,
+          .vt-icon-btn:hover,
+          .vt-test-btn:hover,
+          .vt-sens-btn:hover,
+          .vt-ptt-bind-btn:hover,
+          .vt-ptt-cancel:hover {
+            transform: none;
+          }
+          .vt-ptt-bind-btn--listening {
+            animation: none;
+          }
+        }
       `}</style>
     </div>
   );
@@ -1581,8 +1637,8 @@ function NotificationsTab() {
           padding: 1px 6px; border-radius: 999px;
           text-transform: uppercase; letter-spacing: 0.04em;
         }
-        .nt-perm-badge--granted  { background: rgba(67,181,129,0.15); color: #43b581; }
-        .nt-perm-badge--denied   { background: rgba(224,84,84,0.15);  color: #e05454; }
+        .nt-perm-badge--granted  { background: color-mix(in srgb, var(--success) 16%, transparent); color: var(--success); }
+        .nt-perm-badge--denied   { background: var(--danger-subtle); color: var(--danger); }
         .nt-perm-badge--default  { background: var(--bg-overlay); color: var(--text-muted); }
 
         .nt-toggle {
@@ -1590,15 +1646,16 @@ function NotificationsTab() {
           border-radius: 999px; border: none;
           background: var(--bg-overlay);
           cursor: pointer; position: relative;
-          transition: background 200ms ease; flex-shrink: 0; padding: 0;
+          border: 1px solid var(--border-subtle);
+          flex-shrink: 0; padding: 0;
         }
         .nt-toggle--on { background: var(--accent); }
         .nt-toggle-thumb {
           position: absolute; top: 3px; left: 3px;
           width: 18px; height: 18px; border-radius: 50%;
-          background: #fff;
+          background: var(--text-primary);
           box-shadow: 0 1px 3px rgba(0,0,0,0.35);
-          transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+          transition: transform var(--t-normal, 260ms) var(--ease-spring, cubic-bezier(0.175,0.885,0.32,1.275));
           display: block;
         }
         .nt-toggle--on .nt-toggle-thumb { transform: translateX(20px); }
@@ -1611,12 +1668,13 @@ function NotificationsTab() {
           padding: 10px 14px; border-radius: var(--r-md);
           border: 1.5px solid var(--border-normal);
           background: var(--bg-elevated); cursor: pointer;
-          transition: border-color 100ms, background 100ms;
+          transition: transform var(--t-fast, 150ms) var(--ease-out, ease), filter var(--t-fast, 150ms) var(--ease-out, ease), opacity var(--t-fast, 150ms) var(--ease-out, ease);
           font-family: inherit; text-align: left;
         }
         .nt-radio-item:hover {
           border-color: var(--accent-border);
           background: var(--bg-overlay);
+          transform: translateY(-1px);
         }
         .nt-radio-item--active {
           border-color: var(--accent) !important;
@@ -1676,11 +1734,24 @@ function NotificationsTab() {
           background: var(--bg-overlay); color: var(--text-muted);
           cursor: pointer; font-size: 16px; line-height: 1;
           display: flex; align-items: center; justify-content: center;
-          transition: background 100ms, color 100ms;
+          transition: transform var(--t-fast, 150ms) var(--ease-out, ease), filter var(--t-fast, 150ms) var(--ease-out, ease), opacity var(--t-fast, 150ms) var(--ease-out, ease);
           font-family: inherit; padding: 0;
         }
         .nt-remove-btn:hover {
-          background: rgba(224,84,84,0.15); color: #e05454;
+          background: var(--danger-subtle); color: var(--danger);
+          transform: scale(1.04);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .nt-toggle-thumb,
+          .nt-radio-item,
+          .nt-remove-btn {
+            transition: none;
+          }
+          .nt-radio-item:hover,
+          .nt-remove-btn:hover {
+            transform: none;
+          }
         }
       `}</style>
     </div>
@@ -1732,19 +1803,26 @@ const sharedToggleStyles = `
     border-radius: 999px; border: none;
     background: var(--bg-overlay);
     cursor: pointer; position: relative;
-    transition: background 200ms ease; flex-shrink: 0; padding: 0;
+    border: 1px solid var(--border-subtle);
+    flex-shrink: 0; padding: 0;
   }
   .st-toggle:disabled { cursor: not-allowed; }
   .st-toggle--on { background: var(--accent); }
   .st-toggle-thumb {
     position: absolute; top: 3px; left: 3px;
     width: 18px; height: 18px; border-radius: 50%;
-    background: #fff;
+    background: var(--text-primary);
     box-shadow: 0 1px 3px rgba(0,0,0,0.35);
-    transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform var(--t-normal, 260ms) var(--ease-spring, cubic-bezier(0.175,0.885,0.32,1.275));
     display: block;
   }
   .st-toggle--on .st-toggle-thumb { transform: translateX(20px); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .st-toggle-thumb {
+      transition: none;
+    }
+  }
 `;
 
 // ── Accessibility Tab ──────────────────────────────────────────────────────────
@@ -1858,10 +1936,10 @@ function AccessibilityTab() {
           padding: 10px 14px; border-radius: var(--r-md);
           border: 1.5px solid var(--border-normal);
           background: var(--bg-elevated); cursor: pointer;
-          transition: border-color 100ms, background 100ms;
+          transition: transform var(--t-fast, 150ms) var(--ease-out, ease), filter var(--t-fast, 150ms) var(--ease-out, ease), opacity var(--t-fast, 150ms) var(--ease-out, ease);
           font-family: inherit; text-align: left;
         }
-        .acc-density-item:hover { border-color: var(--accent-border); background: var(--bg-overlay); }
+        .acc-density-item:hover { border-color: var(--accent-border); background: var(--bg-overlay); transform: translateY(-1px); }
         .acc-density-item--active { border-color: var(--accent) !important; background: var(--accent-subtle) !important; }
         .acc-density-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
         .acc-density-item--active .acc-density-dot { background: var(--accent); }
@@ -1884,9 +1962,20 @@ function AccessibilityTab() {
           background: var(--accent-subtle); color: var(--accent);
           border: 1px solid var(--accent-border); cursor: pointer;
           font-size: 13px; font-weight: 600; font-family: inherit;
-          transition: background 120ms, color 120ms;
+          transition: transform var(--t-fast, 150ms) var(--ease-out, ease), filter var(--t-fast, 150ms) var(--ease-out, ease), opacity var(--t-fast, 150ms) var(--ease-out, ease);
         }
-        .acc-shortcut-btn:hover { background: var(--accent); color: #fff; }
+        .acc-shortcut-btn:hover { background: var(--accent); color: var(--text-primary); transform: translateY(-1px); }
+
+        @media (prefers-reduced-motion: reduce) {
+          .acc-density-item,
+          .acc-shortcut-btn {
+            transition: none;
+          }
+          .acc-density-item:hover,
+          .acc-shortcut-btn:hover {
+            transform: none;
+          }
+        }
       `}</style>
     </div>
   );
@@ -2268,11 +2357,21 @@ function AdvancedTab() {
           background: var(--bg-overlay); color: var(--text-muted);
           cursor: pointer; font-size: 14px; line-height: 1;
           display: flex; align-items: center; justify-content: center;
-          transition: background 100ms, color 100ms;
+          transition: transform var(--t-fast, 150ms) var(--ease-out, ease), filter var(--t-fast, 150ms) var(--ease-out, ease), opacity var(--t-fast, 150ms) var(--ease-out, ease);
           font-family: inherit; padding: 0;
         }
         .ign-chip-remove:hover {
-          background: rgba(224,84,84,0.15); color: #e05454;
+          background: var(--danger-subtle); color: var(--danger);
+          transform: scale(1.04);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .ign-chip-remove {
+            transition: none;
+          }
+          .ign-chip-remove:hover {
+            transform: none;
+          }
         }
       `}</style>
       <style>{tabStyles}</style>
@@ -2283,22 +2382,25 @@ function AdvancedTab() {
 // ── Shared styles ──────────────────────────────────────────────────────────────
 
 const tabStyles = `
-  .tab-body { display: flex; flex-direction: column; gap: 28px; padding-right: 4px; }
+  .tab-body { display: flex; flex-direction: column; gap: 24px; padding-right: 4px; }
 
   .tab-title {
-    font-size: 22px; font-weight: 800; color: var(--text-primary);
-    letter-spacing: -0.4px; line-height: 1.2;
-    padding-bottom: 4px;
-    border-bottom: 1px solid var(--border-subtle);
+    font-size: 24px; font-weight: 800; color: var(--text-primary);
+    letter-spacing: 0; line-height: 1.15;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-normal);
   }
 
-  .settings-section { display: flex; flex-direction: column; gap: 10px; }
+  .settings-section {
+    display: flex; flex-direction: column; gap: 12px;
+    padding-top: 2px;
+  }
 
   .settings-section-title {
-    font-size: 10px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
-    color: var(--text-muted);
+    font-size: 10.5px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--gold);
     display: flex; align-items: center; gap: 10px;
-    padding-bottom: 2px;
+    padding-bottom: 1px;
   }
   .settings-section-title::after {
     content: ''; flex: 1; height: 1px;
@@ -2310,21 +2412,23 @@ const tabStyles = `
     margin: 0;
   }
 
-  .settings-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .settings-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
   .settings-input {
     flex: 1; min-width: 180px;
-    height: 36px;
-    padding: 0 12px; border-radius: var(--r-md, 8px);
-    background: var(--bg-deep, #06101d); border: 1px solid var(--border-normal);
+    height: 38px;
+    padding: 0 13px; border-radius: var(--r-md, 8px);
+    background: var(--bg-base, #0c1828); border: 1px solid var(--border-normal);
     color: var(--text-primary); font-size: 13.5px; font-family: inherit;
-    transition: border-color 150ms ease, box-shadow 150ms ease;
+    transition: filter var(--t-fast, 150ms) var(--ease-out, ease);
     box-sizing: border-box;
   }
+  .settings-input:hover { filter: brightness(1.05); }
   .settings-input:focus {
     outline: none;
     border-color: var(--accent, #0ea5e9);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #0ea5e9) 16%, transparent);
+    filter: none;
   }
   .settings-input::placeholder { color: var(--text-muted); }
   .settings-textarea {
@@ -2334,10 +2438,11 @@ const tabStyles = `
 
   .profile-row {
     display: flex; align-items: center; gap: 20px;
-    padding: 16px 20px;
-    background: linear-gradient(135deg, var(--bg-elevated), var(--bg-float));
+    padding: 18px 20px;
+    background: linear-gradient(135deg, var(--bg-float), var(--bg-elevated));
     border-radius: var(--r-lg, 12px);
-    border: 1px solid var(--border-subtle);
+    border: 1px solid var(--accent-border);
+    box-shadow: var(--shadow-sm);
   }
   .profile-nick { font-size: 20px; font-weight: 700; color: var(--text-primary); }
   .profile-account { font-size: 13px; color: var(--accent); margin-top: 2px; font-weight: 500; }
@@ -2360,9 +2465,9 @@ const tabStyles = `
   .kv-list { display: flex; flex-direction: column; gap: 6px; }
   .kv-row {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 9px 12px;
-    background: var(--bg-elevated); border-radius: var(--r-sm);
-    border: 1px solid var(--border-subtle);
+    padding: 10px 12px;
+    background: var(--bg-base); border-radius: var(--r-md);
+    border: 1px solid var(--border-normal);
     font-size: 13px; color: var(--text-secondary);
   }
   .kv-row code {
@@ -2374,6 +2479,23 @@ const tabStyles = `
   .settings-alias-inputs { display: flex; flex-direction: column; gap: 8px; }
   .settings-alias-inputs .settings-input { min-width: unset; flex: unset; width: 100%; }
   .settings-alias-notice { color: var(--warning, #fbbf24); font-weight: 600; }
+
+  .settings-content button:focus-visible,
+  .settings-content select:focus-visible,
+  .settings-content input:focus-visible,
+  .settings-content textarea:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .settings-input {
+      transition: none;
+    }
+    .settings-input:hover {
+      filter: none;
+    }
+  }
 `;
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
