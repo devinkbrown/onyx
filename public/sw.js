@@ -2,7 +2,11 @@
  * Handles push notifications and a minimal cache-first shell strategy.
  */
 
-const CACHE_NAME = 'ocean-shell-v1';
+// NOTE: bump this version on every deploy so the service worker re-installs,
+// purges the old cache, and clients pick up the new build instead of serving
+// a stale cache-first bundle. A stale SW silently breaks features baked in at
+// build time (e.g. the media-upload URL).
+const CACHE_NAME = 'ocean-shell-v2-20260531';
 
 // App shell assets to precache on install
 const PRECACHE_URLS = [
