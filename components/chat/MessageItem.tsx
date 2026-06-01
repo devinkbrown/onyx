@@ -54,10 +54,35 @@ export function extractImageUrls(text: string): string[] {
 }
 
 function extractLinkUrls(text: string): string[] {
-  const urls = text.match(/(https?:\/\/[^\s<>"']+)/g) ?? [];
+  const urls: string[] = [];
+  const markdownImageUrls = new Set<string>();
+  const trimUrl = (url: string) => {
+    let out = url.replace(/[.,;!?]+$/g, '');
+    while (out.endsWith(')')) {
+      const opens = (out.match(/\(/g) ?? []).length;
+      const closes = (out.match(/\)/g) ?? []).length;
+      if (closes <= opens) break;
+      out = out.slice(0, -1);
+    }
+    return out.replace(/[.,;!?]+$/g, '');
+  };
+
+  text.replace(/!\[[^\]]*\]\((https?:\/\/[^\s)]+)\)/g, (_, url: string) => {
+    markdownImageUrls.add(trimUrl(url));
+    return '';
+  });
+  text.replace(/(?<!!)\[[^\]]+\]\((https?:\/\/[^\s)]+)\)/g, (_, url: string) => {
+    urls.push(trimUrl(url));
+    return '';
+  });
+  for (const url of text.match(/(https?:\/\/[^\s<>"']+)/g) ?? []) {
+    urls.push(trimUrl(url));
+  }
+
   // Deduplicate: same URL appearing multiple times should only preview once.
   const seen = new Set<string>();
   return urls.filter(u => {
+    if (markdownImageUrls.has(u)) return false;
     if (isImageUrl(u)) return false;
     if (seen.has(u)) return false;
     seen.add(u);
@@ -121,9 +146,42 @@ export function parseMessageContent(raw: string): Segment[] {
     }
   }
 
+  // Post-process no-extension markdown image syntax separately. Extension URLs
+  // are left on the existing raw-URL path to preserve current behavior.
+  const markdownExpanded: Segment[] = [];
+  for (const seg of segments) {
+    if (seg.type !== 'text') {
+      markdownExpanded.push(seg);
+      continue;
+    }
+
+    const mdImgRe = /!\[[^\]]*\]\((https?:\/\/[^\s)]+)\)/g;
+    let last = 0;
+    let matched = false;
+    let m: RegExpExecArray | null;
+    mdImgRe.lastIndex = 0;
+    while ((m = mdImgRe.exec(seg.content)) !== null) {
+      const url = m[1];
+      if (isImageUrl(url)) continue;
+      matched = true;
+      if (m.index > last) {
+        const before = seg.content.slice(last, m.index);
+        if (before.trim()) markdownExpanded.push({ type: 'text', content: before });
+      }
+      markdownExpanded.push({ type: 'image', url });
+      last = m.index + m[0].length;
+    }
+    if (!matched) {
+      markdownExpanded.push(seg);
+    } else if (last < seg.content.length) {
+      const after = seg.content.slice(last);
+      if (after.trim()) markdownExpanded.push({ type: 'text', content: after });
+    }
+  }
+
   // Post-process: break image URLs (including data URIs) out of text segments
   const expanded: Segment[] = [];
-  for (const seg of segments) {
+  for (const seg of markdownExpanded) {
     if (seg.type !== 'text') {
       expanded.push(seg);
       continue;
@@ -509,23 +567,27 @@ function CollapsibleMessage({ text, children }: CollapsibleMessageProps) {
   );
 }
 
-// ── Highlight word splitter ────────────────────────────────────────────────────
+// ── Highlight word renderer ────────────────────────────────────────────────────
 
 /**
- * Splits plain text around highlighted words and returns an array of
- * plain strings and <mark> elements. Safe for use inside React render.
+ * Injects highlight marks into rendered text nodes while leaving HTML tags and
+ * entities from renderText() intact.
  */
-function highlightText(text: string, words: string[]): React.ReactNode {
-  if (words.length === 0) return text;
-  const escaped = words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+function highlightHtml(html: string, words: string[]): string {
+  const escaped = words
+    .map(w => w.trim())
+    .filter(Boolean)
+    .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  if (escaped.length === 0) return html;
   const re = new RegExp(`(${escaped.join('|')})`, 'gi');
-  const parts = text.split(re);
-  if (parts.length === 1) return text;
-  return parts.map((part, i) =>
-    re.test(part)
-      ? <mark key={i} className="highlight-word">{part}</mark>
-      : part
-  );
+  return html
+    .split(/(<[^>]+>|&[a-zA-Z0-9#]+;)/g)
+    .map(part => (part.startsWith('<') || part.startsWith('&')) ? part : part.replace(re, '<mark class="highlight-word">$1</mark>'))
+    .join('');
+}
+
+function renderTextWithHighlights(text: string, words: string[]): string {
+  return highlightHtml(renderText(text), words);
 }
 
 // ── Message body renderer ──────────────────────────────────────────────────────
@@ -652,12 +714,9 @@ function MessageBody({
     );
   }
 
-  // Collect non-image segments to check if there is any text content
-  const hasTextContent = segments.some(s => s.type !== 'image');
-
   return (
     <CollapsibleMessage text={text}>
-      {/* Text segments first, then images below — unless it's a sole image */}
+      {/* Text segments and mixed images render in-flow; sole images render below. */}
       <div
         className="msg-text"
         onClick={(e) => {
@@ -690,25 +749,16 @@ function MessageBody({
                 <span key={i}>
                   {parts.map((p, j) =>
                     typeof p === 'string'
-                      ? <span key={j} dangerouslySetInnerHTML={{ __html: renderText(p) }} />
+                      ? <span key={j} dangerouslySetInnerHTML={{ __html: renderTextWithHighlights(p, hlWords) }} />
                       : p
                   )}
-                </span>
-              );
-            }
-            // When highlight words are active, split the plain text into
-            // React nodes so <mark> elements can be injected inline.
-            if (hlWords.length > 0) {
-              return (
-                <span key={i}>
-                  {highlightText(seg.content, hlWords)}
                 </span>
               );
             }
             return (
               <span
                 key={i}
-                dangerouslySetInnerHTML={{ __html: renderText(seg.content) }}
+                dangerouslySetInnerHTML={{ __html: renderTextWithHighlights(seg.content, hlWords) }}
               />
             );
           }
@@ -738,17 +788,6 @@ function MessageBody({
       {isSoleImage && (
         <div className="msg-embeds msg-embeds--sole">
           <InlineImage url={(segments[0] as { type: 'image'; url: string }).url} fullWidth />
-        </div>
-      )}
-
-      {/* Mixed: images that appear after text — render below text block */}
-      {hasTextContent && segments.some(s => s.type === 'image') && (
-        <div className="msg-embeds">
-          {segments
-            .filter((s): s is { type: 'image'; url: string } => s.type === 'image')
-            .map((s, i) => (
-              <InlineImage key={i} url={s.url} />
-            ))}
         </div>
       )}
 

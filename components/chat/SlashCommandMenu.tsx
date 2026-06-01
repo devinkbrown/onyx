@@ -22,17 +22,12 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   // Navigation
   { name: 'join',    usage: '/join #channel [key]', description: 'Join a channel',              category: 'navigation' },
   { name: 'part',    usage: '/part [channel] [reason]', description: 'Leave a channel',         category: 'navigation' },
-  { name: 'close',   usage: '/close',              description: 'Close current tab',            category: 'navigation' },
   { name: 'back',    usage: '/back',               description: 'Return from away',             category: 'navigation' },
-  { name: 'forward', usage: '/forward',            description: 'Mark as back / go forward',    category: 'navigation' },
   // Messaging
   { name: 'me',        usage: '/me action',        description: 'Perform an action (emote)',    category: 'messaging' },
-  { name: 'say',       usage: '/say text',         description: 'Send a message literally',     category: 'messaging' },
   { name: 'msg',       usage: '/msg nick text',    description: 'Send a direct message',        category: 'messaging' },
   { name: 'notice',   usage: '/notice nick text', description: 'Send a NOTICE to a nick',      category: 'messaging' },
-  { name: 'reply',     usage: '/reply text',       description: 'Reply to last message',        category: 'messaging' },
   { name: 'clear',     usage: '/clear',            description: 'Clear message history locally',category: 'messaging' },
-  { name: 'dm',        usage: '/dm nick',          description: 'Open a DM conversation',       category: 'messaging' },
   { name: 'schedule',  usage: '/schedule',         description: 'Schedule a message for later', category: 'messaging' },
   { name: 'shrug',     usage: '/shrug',            description: 'Insert ¯\\_(ツ)_/¯',           category: 'fun' },
   { name: 'tableflip', usage: '/tableflip',        description: 'Insert (╯°□°）╯︵ ┻━┻',       category: 'fun' },
@@ -40,10 +35,6 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { name: 'spoiler',  usage: '/spoiler <text>',    description: 'Wrap text in spoiler tags',    category: 'fun' },
   // Account
   { name: 'ns',       usage: '/ns',                description: 'Open account services',        category: 'account' },
-  { name: 'identify', usage: '/identify password', description: 'Identify to NickServ',         category: 'account' },
-  { name: 'register', usage: '/register email password', description: 'Register your account',  category: 'account' },
-  { name: 'ghost',    usage: '/ghost nick',        description: 'Disconnect a stale session',   category: 'account' },
-  { name: 'recover',  usage: '/recover nick password', description: 'Recover a nick',           category: 'account' },
   { name: 'nick',     usage: '/nick newnick',      description: 'Change your nickname',         category: 'account' },
   // Channel
   { name: 'cs',      usage: '/cs',                 description: 'Open channel services',        category: 'channel' },
@@ -59,16 +50,11 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { name: 'mode',    usage: '/mode modes',         description: 'Set channel or user modes',    category: 'channel' },
   // Moderation
   { name: 'quiet',     usage: '/quiet nick',          description: 'Quiet a user (+q mode)',        category: 'moderation' },
-  { name: 'mute',       usage: '/mute nick',           description: 'Mute a user',                  category: 'moderation' },
-  { name: 'silence',    usage: '/silence mask',        description: 'Silence a hostmask',           category: 'moderation' },
   { name: 'ignore',     usage: '/ignore nick',         description: 'Ignore a user locally',        category: 'moderation' },
   { name: 'unignore',   usage: '/unignore nick',       description: 'Stop ignoring a user',         category: 'moderation' },
   { name: 'ignorelist', usage: '/ignorelist',          description: 'Open the ignore list',         category: 'moderation' },
   // Voice
-  { name: 'deafen',  usage: '/deafen',             description: 'Toggle deafen in voice',       category: 'voice' },
   { name: 'vhost',   usage: '/vhost request|take|off', description: 'Virtual host management',  category: 'voice' },
-  { name: 'stage',   usage: '/stage [#channel]',   description: 'Start a stage channel',        category: 'voice' },
-  { name: 'endstage', usage: '/endstage',          description: 'End the current stage',        category: 'voice' },
   // Messaging extras
   { name: 'highlight', usage: '/highlight',         description: 'Manage highlight words',       category: 'messaging' },
   { name: 'export',    usage: '/export',            description: 'Export channel history to file', category: 'messaging' },
@@ -77,8 +63,6 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   // Developer
   { name: 'oper',    usage: '/oper [username]',     description: 'IRC operator login',           category: 'developer' },
   { name: 'raw',     usage: '/raw text',           description: 'Send a raw IRC command',       category: 'developer' },
-  { name: 'debug',   usage: '/debug',              description: 'Toggle debug panel',           category: 'developer' },
-  { name: 'rawlog',  usage: '/rawlog',             description: 'Toggle raw log viewer',        category: 'developer' },
   { name: 'memo',    usage: '/memo',               description: 'Open memo services',           category: 'developer' },
   { name: 'whois',   usage: '/whois nick',         description: 'Query user information',       category: 'developer' },
   { name: 'away',    usage: '/away [reason]',      description: 'Set away status',              category: 'developer' },
