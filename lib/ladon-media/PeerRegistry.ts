@@ -23,6 +23,7 @@ export interface PeerMedia {
   screenCanvas:   HTMLCanvasElement | null;
   screenStream:   MediaStream | null;
   panner:         StereoPannerNode | null;
+  outputGain:     GainNode | null;
   lastKeyW:       number;
   lastKeyH:       number;
   lastScreenKeyW: number;
@@ -60,6 +61,9 @@ export class PeerRegistry {
   private readonly videoW: number;
   private readonly videoH: number;
   private readonly speakingRms: number;
+  private outputDeviceId: string | null = null;
+  private outputVolume = 0.8;
+  private deafened = false;
 
   readonly peerLevels    = new Map<string, number>();
   readonly decodeErrors  = new Map<string, number>();
@@ -101,7 +105,7 @@ export class PeerRegistry {
         state: { nick, channel, kind, speaking: false, muted: false, hasVideo: false, canvas: null },
         audDec: null, vidDec: null, audCtx: null,
         screenVidDec: null, vidCanvas: null, screenCanvas: null, screenStream: null,
-        panner: null, lastKeyW: 0, lastKeyH: 0, lastScreenKeyW: 0, lastScreenKeyH: 0,
+        panner: null, outputGain: null, lastKeyW: 0, lastKeyH: 0, lastScreenKeyW: 0, lastScreenKeyH: 0,
         videoW: this.videoW, videoH: this.videoH, screenW: this.videoW, screenH: this.videoH,
         videoFps: 60, screenFps: 60,
         vidImageData: null, screenImageData: null,
@@ -112,7 +116,7 @@ export class PeerRegistry {
       state: { nick, channel, kind, speaking: false, muted: false, hasVideo: false, canvas: null },
       audDec: null, vidDec: null, audCtx: null,
       screenVidDec: null, vidCanvas: null, screenCanvas: null, screenStream: null,
-      panner: null, lastKeyW: 0, lastKeyH: 0, lastScreenKeyW: 0, lastScreenKeyH: 0,
+      panner: null, outputGain: null, lastKeyW: 0, lastKeyH: 0, lastScreenKeyW: 0, lastScreenKeyH: 0,
       videoW: this.videoW, videoH: this.videoH, screenW: this.videoW, screenH: this.videoH,
       videoFps: 60, screenFps: 60,
       vidImageData: null, screenImageData: null,
@@ -132,6 +136,7 @@ export class PeerRegistry {
     pm.screenVidDec?.destroy();
     pm.audCtx?.close().catch(() => {});
     pm.panner?.disconnect();
+    pm.outputGain?.disconnect();
     pm.screenStream?.getTracks().forEach(t => t.stop());
     this.peers.delete(key);
     this.peerLevels.delete(key);
@@ -148,6 +153,7 @@ export class PeerRegistry {
     pm.screenVidDec?.destroy(); pm.screenVidDec = null;
     pm.audCtx?.close().catch(() => {}); pm.audCtx  = null;
     pm.panner?.disconnect();    pm.panner       = null;
+    pm.outputGain?.disconnect(); pm.outputGain  = null;
     pm.screenStream?.getTracks().forEach(t => t.stop());
     pm.screenStream  = null;
     pm.screenCanvas  = null;
@@ -172,6 +178,26 @@ export class PeerRegistry {
 
   getScreenStream(nick: string): MediaStream | null {
     return this.peers.get(nick.toLowerCase())?.screenStream ?? null;
+  }
+
+  setOutput(deviceId: string | null, volume: number): void {
+    this.outputDeviceId = deviceId;
+    this.outputVolume = Math.max(0, Math.min(1, volume));
+    for (const pm of this.peers.values()) {
+      if (pm.outputGain) pm.outputGain.gain.value = this.deafened ? 0 : this.outputVolume;
+      this.applySink(pm);
+    }
+  }
+
+  setDeafened(deafened: boolean): void {
+    this.deafened = deafened;
+    for (const pm of this.peers.values()) {
+      if (pm.outputGain) pm.outputGain.gain.value = deafened ? 0 : this.outputVolume;
+      if (pm.audCtx) {
+        if (deafened) pm.audCtx.suspend().catch(() => {});
+        else pm.audCtx.resume().catch(() => {});
+      }
+    }
   }
 
   setVideoParams(nick: string, width: number, height: number, kind: MediaKind, fps = 60): void {
@@ -230,6 +256,7 @@ export class PeerRegistry {
     }
 
     const ctx = pm.audCtx;
+    this.applySink(pm);
     // OpvoxDecoder returns OPVOX_FRAME_48K mono Int16 samples.
     // Create a stereo AudioBuffer and copy the same mono data to both channels.
     const buf = ctx.createBuffer(2, OPVOX_FRAME_48K, this.sampleRate);
@@ -267,9 +294,21 @@ export class PeerRegistry {
     const src = ctx.createBufferSource();
     src.buffer = buf;
     if (!pm.panner) pm.panner = ctx.createStereoPanner();
+    if (!pm.outputGain) {
+      pm.outputGain = ctx.createGain();
+      pm.outputGain.gain.value = this.deafened ? 0 : this.outputVolume;
+      pm.panner.connect(pm.outputGain);
+      pm.outputGain.connect(ctx.destination);
+    }
     src.connect(pm.panner);
-    pm.panner.connect(ctx.destination);
     src.start(ctx.currentTime);
+  }
+
+  private applySink(pm: PeerMedia): void {
+    if (!pm.audCtx) return;
+    const ctxWithSink = pm.audCtx as AudioContext & { setSinkId?: (sinkId: string) => Promise<void> };
+    if (typeof ctxWithSink.setSinkId !== 'function') return;
+    ctxWithSink.setSinkId(this.outputDeviceId ?? '').catch(() => {});
   }
 
   async decodeVideo(pm: PeerMedia, frame: Uint8Array, ftype: string): Promise<void> {

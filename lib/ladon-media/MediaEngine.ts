@@ -20,6 +20,16 @@ import type {
 
 export type { CallState, VoiceCallState, MediaKind, LadonPeerState, LadonRoomStats, NetworkQualityTier, LadonMediaCallbacks, LadonChannelInfo };
 
+let mountedEngine: LadonMediaEngine | null = null;
+
+export function setMountedLadonMediaEngine(engine: LadonMediaEngine | null): void {
+  mountedEngine = engine;
+}
+
+export function getMountedLadonMediaEngine(): LadonMediaEngine | null {
+  return mountedEngine;
+}
+
 // -------------------------------------------------------------------
 // Internal constants
 // -------------------------------------------------------------------
@@ -41,6 +51,7 @@ const MCHUNK_BIN = 120;   /* binary bytes per chunk (→ 160 base64) */
 const SMALL_BIN  = 105;   /* single-msg threshold in binary bytes */
 const WASM_URL   = '/opcodec_wasm.js';
 const MAX_MCHUNK_TOTAL = 65535;
+const MAX_MCHUNK_BYTES = MCHUNK_BIN * MAX_MCHUNK_TOTAL;
 
 type VideoCaptureProfile = {
   width: number;
@@ -204,6 +215,7 @@ export class LadonMediaEngine {
   private veilGroupKeyPromise: Promise<VeilGroup> | null = null;
   private veilIdentity: VeilIdentity | null = null;
   private veilIdentityPromise: Promise<VeilIdentity> | null = null;
+  private incomingKind: MediaKind;
 
   /* PTT */
   private pttMode   = false;
@@ -228,6 +240,7 @@ export class LadonMediaEngine {
   constructor(callbacks: LadonMediaCallbacks, options: { kind: MediaKind } = { kind: 'video' }) {
     this.cb          = callbacks;
     this.defaultKind = options.kind;
+    this.incomingKind = options.kind;
 
     this.registry.onPeerStateChanged = s => this.cb.onPeerState?.(s);
     this.registry.onPeerLeft         = n => this.cb.onPeerLeft(n);
@@ -276,6 +289,7 @@ export class LadonMediaEngine {
   }
 
   getLocalStream()  { return this.localStream; }
+  getLocalKind()    { return this.localKind; }
   getCallState()    { return { callState: this.callState, callWith: this.callWith, callChannel: this.activeRoom }; }
 
   getPeers(): Map<string, LadonPeerState> {
@@ -285,6 +299,15 @@ export class LadonMediaEngine {
   }
 
   getPresenceList(): string[] { return Array.from(this.presenceList); }
+
+  setOutput(deviceId: string | null, volumePercent: number): void {
+    this.registry.setOutput(deviceId, volumePercent / 100);
+  }
+
+  setDeafened(deafened: boolean): void {
+    this.registry.setDeafened(deafened);
+    if (this.activeRoom) this.mediaframeCmd(this.activeRoom, deafened ? 'DEAFEN' : 'UNDEAFEN');
+  }
 
   async getLocalVeilFingerprint(): Promise<string> {
     const id = await this.ensureVeilIdentity();
@@ -339,6 +362,14 @@ export class LadonMediaEngine {
     const devs = navigator.mediaDevices;
     if (!devs) throw new Error('Media devices unavailable');
     const profile = videoProfileFor(kind, quality, broadcast);
+    const settings = this.cb.getMediaSettings?.();
+    const audio: boolean | MediaTrackConstraints = kind === 'screen'
+      ? true
+      : {
+          deviceId: settings?.inputDeviceId ? { exact: settings.inputDeviceId } : undefined,
+          noiseSuppression: settings?.noiseSuppression ?? true,
+          echoCancellation: settings?.echoCancellation ?? true,
+        };
     const stream = kind === 'screen'
       ? await devs.getDisplayMedia({
           video: {
@@ -349,9 +380,10 @@ export class LadonMediaEngine {
           audio: true,
         })
       : await devs.getUserMedia({
-          audio: true,
+          audio,
           video: kind === 'video'
             ? {
+                deviceId: settings?.cameraDeviceId ? { exact: settings.cameraDeviceId } : undefined,
                 width: { ideal: profile.width, max: profile.width },
                 height: { ideal: profile.height, max: profile.height },
                 frameRate: { ideal: profile.fps, max: profile.fps },
@@ -745,6 +777,10 @@ export class LadonMediaEngine {
       this.client.sendRaw('MEDIAFRAME', channel, ftype, LadonMediaEngine.toB64(data));
       return;
     }
+    if (data.length > MAX_MCHUNK_BYTES) {
+      this.cb.onError(`Encoded ${ftype.toLowerCase()} is too large for LADON MCHUNK transport`);
+      return;
+    }
     const fid   = (++this.localFid) & 0xFFFF;
     const total = Math.ceil(data.length / MCHUNK_BIN);
     if (total > MAX_MCHUNK_TOTAL) {
@@ -775,6 +811,7 @@ export class LadonMediaEngine {
       this.setActiveRoom(channel);
       this.mediaframeCmd(channel, 'VOICE_JOIN', `${SAMPLE_RATE} ${AUDIO_CHANNELS}`);
       this.mediaframeCmd(channel, 'ROSTER');
+      this.sendVeilHandshake(channel).catch(() => {});
       await this.startAudioCapture(stream);
       this.startSpeakingMeter(stream);
       this.startGc();
@@ -793,6 +830,7 @@ export class LadonMediaEngine {
       this.mediaframeCmd(channel, 'VIDEO_JOIN',
         `${profile.width} ${profile.height} ${profile.quality} ${profile.fps}`);
       this.mediaframeCmd(channel, 'ROSTER');
+      this.sendVeilHandshake(channel).catch(() => {});
       await this.startAudioCapture(stream);
       await this.startVideoCapture(stream, profile);
       this.startSpeakingMeter(stream);
@@ -811,7 +849,23 @@ export class LadonMediaEngine {
 
   setMuted(muted: boolean) {
     if (!this.activeRoom) return;
+    this.localStream?.getAudioTracks().forEach(t => { t.enabled = !muted; });
     this.mediaframeCmd(this.activeRoom, muted ? 'MUTE' : 'UNMUTE');
+  }
+
+  async startCamera(channel?: string) {
+    const target = channel ?? this.activeRoom;
+    if (!target) { this.cb.onError('No active room for camera'); return; }
+    await this.joinVideo(target);
+  }
+
+  stopCamera() {
+    if (!this.activeRoom || this.localKind !== 'video' || !this.localStream) return;
+    this.stopVideoCapture();
+    this.localStream.getVideoTracks().forEach(t => t.stop());
+    this.mediaframeCmd(this.activeRoom, 'VIDEO_LEAVE');
+    this.localKind = 'voice';
+    this.cb.onLocalStream(this.localStream);
   }
 
   requestKeyframe(channel: string) { this.mediaframeCmd(channel, 'VIDEO_KEYREQ'); }
@@ -880,6 +934,8 @@ export class LadonMediaEngine {
       this.setActiveRoom(target);
       this.mediaframeCmd(target, 'VIDEO_JOIN',
         `${profile.width} ${profile.height} ${profile.quality} ${profile.fps} screen`);
+      this.mediaframeCmd(target, 'ROSTER');
+      this.sendVeilHandshake(target).catch(() => {});
       if (this.localStream) await this.startVideoCapture(this.localStream, profile);
     } catch (err) {
       this.cb.onError(`Screen share failed: ${err}`);
@@ -901,6 +957,7 @@ export class LadonMediaEngine {
       this.mediaframeCmd(channel, 'VIDEO_JOIN',
         `${profile.width} ${profile.height} ${profile.quality} ${profile.fps}${profile.screenShare ? ' screen' : ''}`);
       this.mediaframeCmd(channel, 'ROSTER');
+      this.sendVeilHandshake(channel).catch(() => {});
       await this.startVideoCapture(stream, profile);
       this.startGc();
     } catch (err) {
@@ -928,6 +985,8 @@ export class LadonMediaEngine {
       await this.ensureWasm();
       this.setCallState('ringing_out', nick, null);
       this.startRingTimer(nick);
+      this.client?.sendRaw('MEDIAFRAME', nick, 'RING', kind);
+      this.sendVeilHandshake(nick).catch(() => {});
       if (kind === 'voice' || kind === 'video') { await this.startAudioCapture(stream); this.startSpeakingMeter(stream); }
       if (kind === 'video') await this.startVideoCapture(stream);
     } catch (err) { this.cb.onError(`Call start failed: ${err}`); }
@@ -935,6 +994,12 @@ export class LadonMediaEngine {
 
   hangup(nick: string)   { this.client?.sendRaw('MEDIAFRAME', nick, 'HANGUP'); this.setIdle(); }
   rejectCall(nick: string) { this.client?.sendRaw('MEDIAFRAME', nick, 'REJECT'); this.setIdle(); }
+
+  noteIncomingCall(nick: string, kind: MediaKind = this.defaultKind) {
+    this.incomingKind = kind;
+    this.setCallState('ringing_in', nick, null);
+    this.startRingTimer(nick);
+  }
 
   /** Local-preview stereo pan for a remote peer (SpatialPad UI). */
   setPeerPan(nick: string, pan: number): void {
@@ -944,14 +1009,23 @@ export class LadonMediaEngine {
   async acceptIncomingCall() {
     if (!this.callWith) return;
     try {
-      const stream = await this.capture(this.defaultKind);
+      const kind = this.incomingKind;
+      const stream = await this.capture(kind);
       await this.ensureWasm();
       this.clearRingTimer();
+      this.activeRoom = this.callWith;
       this.setCallState('in_call', this.callWith, null);
-      if (this.defaultKind === 'voice' || this.defaultKind === 'video') {
+      this.mediaframeCmd(this.callWith, 'ACCEPT');
+      this.mediaframeCmd(this.callWith, 'VOICE_JOIN', `${SAMPLE_RATE} ${AUDIO_CHANNELS}`);
+      if (kind === 'video') {
+        const profile = videoProfileFor('video');
+        this.mediaframeCmd(this.callWith, 'VIDEO_JOIN', `${profile.width} ${profile.height} ${profile.quality} ${profile.fps}`);
+      }
+      this.sendVeilHandshake(this.callWith).catch(() => {});
+      if (kind === 'voice' || kind === 'video') {
         await this.startAudioCapture(stream); this.startSpeakingMeter(stream);
       }
-      if (this.defaultKind === 'video') await this.startVideoCapture(stream);
+      if (kind === 'video') await this.startVideoCapture(stream);
     } catch (err) { this.cb.onError(`Accept failed: ${err}`); }
   }
 
@@ -1004,7 +1078,7 @@ export class LadonMediaEngine {
         const pm = this.registry.getOrCreate(fromNick, channel, 'voice');
         this.cb.onPeerState?.(pm.state);
         if (this.callState === 'in_call' && this.activeRoom) {
-          const localNick = (this.client as unknown as { nick?: string })?.nick ?? '';
+          const localNick = this.getLocalNick();
           this.sendFrame(this.activeRoom, 'NEGO_OFFER', msgpackArray3(localNick, 'opus', 2000));
         }
         break;
@@ -1160,7 +1234,7 @@ export class LadonMediaEngine {
       case 'VIDEO_KICK': {
         try {
           const info = JSON.parse(payload) as { target?: string };
-          const myNick = (this.client as unknown as { nick?: string })?.nick ?? '';
+          const myNick = this.getLocalNick();
           if (!myNick || info.target?.toLowerCase() === myNick.toLowerCase()) {
             this.setIdle();
             this.cb.onError(`You were removed from ${subtype === 'VOICE_KICK' ? 'voice' : 'video'} by ${fromNick}`);
@@ -1206,12 +1280,16 @@ export class LadonMediaEngine {
         break;
       case 'VEIL_HANDSHAKE': {
         const peerKeyBytes = Uint8Array.from(atob(payload), c => c.charCodeAt(0));
-        VeilSession.create().then(async vs => {
+        const existing = this.veilSessions.get(fromNick.toLowerCase());
+        const shouldReply = !existing?.established;
+        (existing ? Promise.resolve(existing) : this.createVeilSession()).then(async vs => {
           await vs.ingestPeerKey(peerKeyBytes);
           this.veilSessions.set(fromNick.toLowerCase(), vs);
-          const ourPub = await vs.exportPublicKey();
-          const target = this.activeRoom ?? fromNick;
-          this.client?.send?.(`MEDIA ${target} VEIL_HANDSHAKE :${LadonMediaEngine.toB64(ourPub)}`);
+          if (shouldReply) {
+            const ourPub = await this.exportVeilPublicKey(vs);
+            const target = this.activeRoom ?? fromNick;
+            this.client?.send?.(`MEDIA ${target} VEIL_HANDSHAKE :${LadonMediaEngine.toB64(ourPub)}`);
+          }
           if (this.cb.onVeilState) {
             const fp = await vs.getFingerprint();
             this.cb.onVeilState(fromNick, vs.epoch, fp);
@@ -1252,8 +1330,13 @@ export class LadonMediaEngine {
         break;
       }
       case 'VEIL_GROUP_KEY': {
-        /* payload: base64(wrapped_group_key_for_me) */
-        const wrapped = Uint8Array.from(atob(payload), c => c.charCodeAt(0));
+        /* payload: base64(wrapped_key) or sender:target:base64(wrapped_key) */
+        const parts = payload.split(':');
+        const wrappedB64 = parts.length >= 3 ? parts.slice(2).join(':') : payload;
+        const targetNick = parts.length >= 3 ? parts[1] : '';
+        const myNick = this.getLocalNick().toLowerCase();
+        if (targetNick && myNick && targetNick.toLowerCase() !== myNick) break;
+        const wrapped = Uint8Array.from(atob(wrappedB64), c => c.charCodeAt(0));
         const vs = this.veilSessions.get(fromNick.toLowerCase());
         if (vs?.established) {
           VeilGroup.importKey(wrapped, vs).then(group => {
@@ -1299,11 +1382,19 @@ export class LadonMediaEngine {
         break;
       case 'RING':
         this.registry.getOrCreate(fromNick, null, 'voice');
-        this.setCallState('ringing_in', fromNick, null);
-        this.startRingTimer(fromNick);
+        this.noteIncomingCall(fromNick, payload === 'video' ? 'video' : 'voice');
         break;
       case 'ACCEPT':
-        this.clearRingTimer(); this.setCallState('in_call', fromNick, null); break;
+        this.clearRingTimer();
+        this.activeRoom = fromNick;
+        this.setCallState('in_call', fromNick, null);
+        this.mediaframeCmd(fromNick, 'VOICE_JOIN', `${SAMPLE_RATE} ${AUDIO_CHANNELS}`);
+        if (this.localKind === 'video') {
+          const profile = this.localVideoProfile ?? videoProfileFor('video');
+          this.mediaframeCmd(fromNick, 'VIDEO_JOIN', `${profile.width} ${profile.height} ${profile.quality} ${profile.fps}`);
+        }
+        this.sendVeilHandshake(fromNick).catch(() => {});
+        break;
       case 'REJECT':
       case 'HANGUP':
       case 'LEAVE':
@@ -1359,6 +1450,35 @@ export class LadonMediaEngine {
       };
       window.addEventListener('beforeunload', this.unloadHandler);
     }
+  }
+
+  private getLocalNick(): string {
+    return this.cb.getLocalNick?.() ?? '';
+  }
+
+  private async createVeilSession(): Promise<VeilSession> {
+    try {
+      const id = await this.ensureVeilIdentity();
+      return VeilSession.fromKeyPair(id.keyPair);
+    } catch {
+      return VeilSession.create();
+    }
+  }
+
+  private async exportVeilPublicKey(session: VeilSession): Promise<Uint8Array> {
+    try {
+      const id = await this.ensureVeilIdentity();
+      return id.exportPublicKey();
+    } catch {
+      return session.exportPublicKey();
+    }
+  }
+
+  private async sendVeilHandshake(target: string): Promise<void> {
+    if (!this.client || !target) return;
+    const id = await this.ensureVeilIdentity();
+    const pub = await id.exportPublicKey();
+    this.client.send?.(`MEDIA ${target} VEIL_HANDSHAKE :${LadonMediaEngine.toB64(pub)}`);
   }
 
   private setCallState(state: CallState, nick: string, channel: string | null) {
@@ -1462,7 +1582,7 @@ export class LadonMediaEngine {
       }
       group = await this.veilGroupKeyPromise;
     }
-    const myNick = (this.client as unknown as { nick?: string })?.nick ?? '';
+    const myNick = this.getLocalNick();
     for (const [nick, vs] of established) {
       const wrapped = await group.exportKeyFor(vs);
       const b64 = LadonMediaEngine.toB64(wrapped);

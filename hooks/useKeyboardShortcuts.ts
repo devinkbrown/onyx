@@ -31,7 +31,8 @@ export function useKeyboardShortcuts() {
   const channels              = useOnyxStore(s => s.channels);
   const dms                   = useOnyxStore(s => s.dms);
   const status                = useOnyxStore(s => s.status);
-  const setVoiceCallState     = useOnyxStore(s => s.setVoiceCallState);
+  const toggleMute            = useOnyxStore(s => s.toggleMute);
+  const toggleDeafen          = useOnyxStore(s => s.toggleDeafen);
   const openSearchOverlay     = useOnyxStore(s => s.openSearchOverlay);
   const openKeyboardShortcuts = useOnyxStore(s => s.openKeyboardShortcuts);
   const toggleFocusMode       = useOnyxStore(s => s.toggleFocusMode);
@@ -125,15 +126,15 @@ export function useKeyboardShortcuts() {
       // ── Push-to-Talk (unmute while key held) ─────────────────────────
       // PTT works regardless of whether a text field is focused,
       // but only while a call is active.
-      const { pushToTalk, pushToTalkKey, callState } = useOnyxStore.getState().voice;
+      const { pushToTalk, pushToTalkKey, callState, muted } = useOnyxStore.getState().voice;
       if (
         pushToTalk &&
         pushToTalkKey &&
         callState !== 'idle' &&
-        e.code === pushToTalkKey
+        matchesShortcut(e, pushToTalkKey)
       ) {
         e.preventDefault();
-        setVoiceCallState({ muted: false });
+        if (muted) toggleMute();
         return;
       }
 
@@ -160,8 +161,7 @@ export function useKeyboardShortcuts() {
       // ── Ctrl/Cmd + Shift + D → Toggle deafen ─────────────────────────
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'D') {
         e.preventDefault();
-        const { deafened } = useOnyxStore.getState().voice;
-        setVoiceCallState({ deafened: !deafened });
+        toggleDeafen();
         return;
       }
 
@@ -287,14 +287,14 @@ export function useKeyboardShortcuts() {
 
     const handleUp = (e: KeyboardEvent) => {
       // ── Push-to-Talk release (re-mute) ────────────────────────────────
-      const { pushToTalk, pushToTalkKey, callState } = useOnyxStore.getState().voice;
+      const { pushToTalk, pushToTalkKey, callState, muted } = useOnyxStore.getState().voice;
       if (
         pushToTalk &&
         pushToTalkKey &&
         callState !== 'idle' &&
-        e.code === pushToTalkKey
+        matchesShortcut(e, pushToTalkKey)
       ) {
-        setVoiceCallState({ muted: true });
+        if (!muted) toggleMute();
       }
     };
 
@@ -304,5 +304,19 @@ export function useKeyboardShortcuts() {
       document.removeEventListener('keydown', handleDown);
       document.removeEventListener('keyup',   handleUp);
     };
-  }, [status, openSettings, openSearchOverlay, openKeyboardShortcuts, toggleMemberList, navigate, activeView, channels, dms, setVoiceCallState, toggleFocusMode, markRead, markChannelRead]);
+  }, [status, openSettings, openSearchOverlay, openKeyboardShortcuts, toggleMemberList, navigate, activeView, channels, dms, toggleMute, toggleDeafen, toggleFocusMode, markRead, markChannelRead]);
+}
+
+function matchesShortcut(e: KeyboardEvent, shortcut: string): boolean {
+  const parts = shortcut.split('+');
+  const code = parts[parts.length - 1];
+  const wantsCtrl = parts.includes('Ctrl');
+  const wantsShift = parts.includes('Shift');
+  const wantsAlt = parts.includes('Alt');
+  const wantsMeta = parts.includes('Meta');
+  return e.code === code &&
+    e.ctrlKey === wantsCtrl &&
+    e.shiftKey === wantsShift &&
+    e.altKey === wantsAlt &&
+    e.metaKey === wantsMeta;
 }

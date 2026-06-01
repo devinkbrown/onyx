@@ -1,7 +1,7 @@
 'use client';
 
 import { useOnyxStore } from '@/lib/store';
-import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react';
+import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import Tooltip from '@/components/ui/Tooltip';
 import SpeakingBars from './SpeakingBars';
 import VoiceParticipantCard from './VoiceParticipantCard';
@@ -223,12 +223,14 @@ function videoGridColumns(count: number): string {
 // ── VoiceBar ──────────────────────────────────────────────────────────────────
 export default function VoiceBar() {
   const voice           = useOnyxStore(s => s.voice);
-  const setVoiceState   = useOnyxStore(s => s.setVoiceCallState);
   const ourNick         = useOnyxStore(s => s.ourNick);
-  const client          = useOnyxStore(s => s.client);
   const setSpeakingNick = useOnyxStore(s => s.setSpeakingNick);
+  const toggleMuteAction = useOnyxStore(s => s.toggleMute);
+  const toggleDeafenAction = useOnyxStore(s => s.toggleDeafen);
+  const toggleCameraAction = useOnyxStore(s => s.toggleCamera);
+  const leaveVoiceChannel = useOnyxStore(s => s.leaveVoiceChannel);
 
-  const { callState, callChannel, peers, muted, deafened, screenshareActive, cameraDeviceId, localStream, videoParticipants } = voice;
+  const { callState, callChannel, peers, muted, deafened, screenshareActive, cameraDeviceId, localStream, videoParticipants, cameraOn, cameraStream } = voice;
   const isInCall = callState === 'in_call';
 
   const duration  = useCallDuration(isInCall);
@@ -243,43 +245,18 @@ export default function VoiceBar() {
     }
   }, [peers, setSpeakingNick]);
 
-  // ── Deafen: suspend/resume all peer AudioContexts via a module-level ref ──
-  // PeerRegistry AudioContexts are internal, so we mute via each peer's
-  // audCtx gain. We achieve this by toggling audCtx suspend/resume.
-  // The actual suspension is handled by the MediaEngine; here we just
-  // record the intent in store state. VoiceBar triggers the UI state change.
-  useEffect(() => {
-    // The deafened flag is already tracked inside voice.deafened.
-    // We update the store so other consumers (VoiceParticipantCard etc.) see it.
-    // Actual audio muting is handled by PeerRegistry on the MediaEngine side.
-  }, [deafened]);
-
   // ── Camera ─────────────────────────────────────────────────────────────────
-  const [cameraOn, setCameraOn] = useState(false);
-  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [hasVideoInput, setHasVideoInput] = useState(true);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // Show video grid when we have remote video participants or local camera is on
   const showVideoGrid = videoParticipants.size > 0 || cameraOn || screenshareActive;
 
-  const startCamera = useCallback(async () => {
-    try {
-      const constraints: MediaStreamConstraints = {
-        video: cameraDeviceId ? { deviceId: { exact: cameraDeviceId } } : true,
-      };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      setCameraStream(stream);
-      setCameraOn(true);
-    } catch {
-      setCameraOn(false);
-    }
-  }, [cameraDeviceId]);
-
-  const stopCamera = useCallback(() => {
-    cameraStream?.getTracks().forEach(t => t.stop());
-    setCameraStream(null);
-    setCameraOn(false);
-  }, [cameraStream]);
+  useEffect(() => {
+    navigator.mediaDevices?.enumerateDevices()
+      .then(devices => setHasVideoInput(devices.some(d => d.kind === 'videoinput')))
+      .catch(() => setHasVideoInput(true));
+  }, []);
 
   useEffect(() => {
     if (videoRef.current && cameraStream) {
@@ -287,33 +264,16 @@ export default function VoiceBar() {
     }
   }, [cameraStream]);
 
-  useEffect(() => {
-    if (!isInCall && cameraOn) stopCamera();
-  }, [isInCall, cameraOn, stopCamera]);
-
   // ── Controls ───────────────────────────────────────────────────────────────
-  const toggleMute       = () => setVoiceState({ muted: !muted });
-  const toggleDeafen     = () => setVoiceState({ deafened: !deafened });
+  const toggleMute       = () => toggleMuteAction();
+  const toggleDeafen     = () => toggleDeafenAction();
   const toggleScreenshare = () => {
     const v = useOnyxStore.getState().voice;
     if (screenshareActive) v.stopScreenshare();
     else void v.startScreenshare();
   };
-  const toggleCamera = () => cameraOn ? stopCamera() : void startCamera();
-
-  const hangUp = () => {
-    if (client && callChannel) {
-      client.sendRaw('MEDIAFRAME', callChannel, 'VOICE_LEAVE', '');
-    }
-    stopCamera();
-    setVoiceState({
-      callState: 'idle',
-      callWith: '',
-      callChannel: null,
-      peers: new Map(),
-      localStream: null,
-    });
-  };
+  const toggleCamera = () => void toggleCameraAction();
+  const hangUp = () => leaveVoiceChannel();
 
   if (!isInCall) return null;
 
@@ -334,7 +294,7 @@ export default function VoiceBar() {
   const visibleParticipants = allParticipants.slice(0, MAX_GRID);
   const overflow = allParticipants.length - MAX_GRID;
 
-  const hasCamera = !!cameraDeviceId;
+  const hasCamera = hasVideoInput || !cameraDeviceId;
   const channelLabel = callChannel ?? 'Voice';
 
   return (

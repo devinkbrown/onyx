@@ -210,7 +210,7 @@ export default function StageView() {
   const handleMuteToggle = useCallback(() => {
     const next = !muted;
     setMuted(next);
-    useOnyxStore.getState().setVoiceCallState({ muted: next });
+    useOnyxStore.getState().toggleMute();
   }, [muted]);
 
   if (!stageChannel) return null;

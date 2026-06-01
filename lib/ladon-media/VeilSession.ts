@@ -40,6 +40,10 @@ export class VeilSession {
     return new VeilSession(kp);
   }
 
+  static fromKeyPair(kp: CryptoKeyPair): VeilSession {
+    return new VeilSession(kp);
+  }
+
   /** Return raw uncompressed public key bytes (65 bytes, 0x04 prefix). */
   async exportPublicKey(): Promise<Uint8Array> {
     const raw = await crypto.subtle.exportKey('raw', this.keyPair.publicKey);

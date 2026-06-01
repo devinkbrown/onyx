@@ -26,7 +26,7 @@ export class ChunkAssembler {
   private static readonly MAX_CHUNK_BYTES = 65536;
 
   // Maximum byte size of a fully reassembled frame.
-  private static readonly MAX_FRAME_BYTES = 65535;
+  private static readonly MAX_FRAME_BYTES = 120 * 65535;
 
   // Stale slot expiry: discard incomplete assemblies after 8 s.
   private static readonly TIMEOUT_MS = 8_000;
