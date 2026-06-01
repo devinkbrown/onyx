@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import { getMountedLadonMediaEngine as _e2eGetEngine } from '@/lib/ladon-media/MediaEngine';
 import { useSwipe } from '@/hooks/useSwipe';
 import ImageLightbox from '@/components/ui/ImageLightbox';
 import MobileBottomNav from './MobileBottomNav';
@@ -122,6 +123,7 @@ export default function AppShell({ children }: Props) {
   useEffect(() => {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('e2e')) {
       (window as Window & { __ocean?: typeof useOnyxStore }).__ocean = useOnyxStore;
+      (window as unknown as Record<string, unknown>).__getEngine = _e2eGetEngine;
     }
   }, []);
 

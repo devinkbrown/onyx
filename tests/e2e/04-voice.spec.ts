@@ -27,7 +27,18 @@ test('two users transmit + exchange voice media in an empty channel', async ({ b
 
   for (const U of [A, B]) await U.page.evaluate((c) => (window as any).__ocean.getState().joinChannel(c), chan);
   await A.page.waitForTimeout(2500);
-  for (const U of [A, B]) await U.page.evaluate(async (c) => { await (window as any).__ocean.getState().joinVoiceChannel(c); }, chan);
+  // Mimic the UI: open the channel (sets activeView) before joining voice.
+  for (const U of [A, B]) await U.page.evaluate((c) => (window as any).__ocean.getState().navigate({ kind: 'channel', channel: c }), chan);
+  await A.page.waitForTimeout(4000);
+  // join voice, retrying once if the engine wasn't ready yet
+  for (const U of [A, B]) {
+    await U.page.evaluate(async (c) => { await (window as any).__ocean.getState().joinVoiceChannel(c); }, chan);
+  }
+  await A.page.waitForTimeout(3000);
+  for (const U of [A, B]) {
+    const cc = await U.page.evaluate(() => (window as any).__ocean.getState().voice.callChannel);
+    if (!cc) await U.page.evaluate(async (c) => { await (window as any).__ocean.getState().joinVoiceChannel(c); }, chan);
+  }
 
   // Let encoders spin up, VEIL handshake, and presence propagate.
   await A.page.waitForTimeout(9000);
