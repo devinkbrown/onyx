@@ -138,7 +138,6 @@ export function useLadonMedia() {
     if (!engineRef.current) {
       engineRef.current = new LadonMediaEngine(callbacks, { kind: 'voice' });
       setMountedLadonMediaEngine(engineRef.current);
-      if (typeof window !== 'undefined') { const w = window as unknown as Record<string, number>; w.__engineCreated = (w.__engineCreated ?? 0) + 1; }
     }
 
     engineRef.current.setClient(client);

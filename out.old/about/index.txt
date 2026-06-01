@@ -1,0 +1,467 @@
+1:"$Sreact.fragment"
+3:I[85642,["/_next/static/chunks/00ktukjj8~_~f.js","/_next/static/chunks/0283twftxyv1-.js","/_next/static/chunks/0biz17~jcm.mj.js"],"default"]
+4:I[5870,["/_next/static/chunks/00ktukjj8~_~f.js","/_next/static/chunks/0283twftxyv1-.js","/_next/static/chunks/0biz17~jcm.mj.js"],"default"]
+5:I[76084,["/_next/static/chunks/00ktukjj8~_~f.js","/_next/static/chunks/0283twftxyv1-.js","/_next/static/chunks/0biz17~jcm.mj.js"],"default"]
+b:I[89378,["/_next/static/chunks/00ktukjj8~_~f.js","/_next/static/chunks/0283twftxyv1-.js","/_next/static/chunks/0biz17~jcm.mj.js"],"default",1]
+:HL["/_next/static/chunks/0jf6gu.tnlr7b.css","style"]
+:HL["/_next/static/media/83afe278b6a6bb3c-s.p.0q-301v4kxxnr.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+:HL["https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Roboto:wght@400;500&family=JetBrains+Mono:wght@400;500&family=Fira+Code:wght@400;500&display=swap","style"]
+2:T667,(function(){
+  try {
+    var legacy = localStorage.getItem('ocean-theme');
+    var active = localStorage.getItem('ocean-active-theme');
+    var display = localStorage.getItem('ocean-display-theme');
+    var activeValid = ['ocean','abyss','midnight','bathyal','coral','kelp','brine','onyx','amoled','arctic','ash','light','system'];
+    var displayValid = ['midnight','onyx','ash','amoled','light','system'];
+    if (activeValid.indexOf(active) === -1) {
+      active = activeValid.indexOf(legacy) !== -1 ? legacy : 'ocean';
+      localStorage.setItem('ocean-active-theme', active);
+    }
+    if (display === 'onyx' && !localStorage.getItem('ocean-theme-v2')) {
+      display = 'midnight';
+      localStorage.setItem('ocean-display-theme', 'midnight');
+      localStorage.setItem('ocean-theme-v2', '1');
+    }
+    if (displayValid.indexOf(display) === -1) {
+      display = displayValid.indexOf(legacy) !== -1 ? legacy : 'midnight';
+      if (display === 'onyx' && !localStorage.getItem('ocean-theme-v2')) {
+        display = 'midnight';
+        localStorage.setItem('ocean-theme-v2', '1');
+      }
+      localStorage.setItem('ocean-display-theme', display);
+    }
+    if (active === 'system' || display === 'system') {
+      document.documentElement.setAttribute('data-theme', window.matchMedia('(prefers-color-scheme: dark)').matches ? 'midnight' : 'light');
+    } else if (active && active !== 'ocean') {
+      document.documentElement.setAttribute('data-theme', active);
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+  } catch(e) {
+    document.documentElement.removeAttribute('data-theme');
+  }
+})();0:{"P":null,"c":["","about",""],"q":"","i":false,"f":[[["",{"children":["about",{"children":["__PAGE__",{}]}]},"$undefined","$undefined",16],[["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/_next/static/chunks/0jf6gu.tnlr7b.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}],["$","script","script-0",{"src":"/_next/static/chunks/00ktukjj8~_~f.js","async":true,"nonce":"$undefined"}],["$","script","script-1",{"src":"/_next/static/chunks/0283twftxyv1-.js","async":true,"nonce":"$undefined"}],["$","script","script-2",{"src":"/_next/static/chunks/0biz17~jcm.mj.js","async":true,"nonce":"$undefined"}]],["$","html",null,{"lang":"en","className":"inter_c15e96cb-module__0bjUvq__variable","children":[["$","head",null,{"children":[["$","script",null,{"dangerouslySetInnerHTML":{"__html":"$2"}}],["$","link",null,{"rel":"preconnect","href":"https://fonts.googleapis.com"}],["$","link",null,{"rel":"preconnect","href":"https://fonts.gstatic.com","crossOrigin":"anonymous"}],["$","link",null,{"href":"https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Roboto:wght@400;500&family=JetBrains+Mono:wght@400;500&family=Fira+Code:wght@400;500&display=swap","rel":"stylesheet"}]]}],["$","body",null,{"className":"h-full overflow-hidden","children":[["$","$L3",null,{}],["$","$L4",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":404}],"$L6"]}]}]],[]],"forbidden":"$undefined","unauthorized":"$undefined"}]]}]]}]]}],{"children":["$L7",{"children":["$L8",{},null,false,null]},null,false,"$@9"]},null,false,null],"$La",false]],"m":"$undefined","G":["$b",["$Lc"]],"S":true,"h":null,"s":"$undefined","l":"$undefined","p":"$undefined","d":"$undefined","b":"Gt7ZH3VwPsbfM3fTiP4J9"}
+d:I[35397,["/_next/static/chunks/00ktukjj8~_~f.js","/_next/static/chunks/0283twftxyv1-.js","/_next/static/chunks/0biz17~jcm.mj.js","/_next/static/chunks/00qdfsxg7lbzt.js"],""]
+1c:I[85219,["/_next/static/chunks/00ktukjj8~_~f.js","/_next/static/chunks/0283twftxyv1-.js","/_next/static/chunks/0biz17~jcm.mj.js"],"ViewportBoundary"]
+1e:I[85219,["/_next/static/chunks/00ktukjj8~_~f.js","/_next/static/chunks/0283twftxyv1-.js","/_next/static/chunks/0biz17~jcm.mj.js"],"MetadataBoundary"]
+1f:"$Sreact.suspense"
+6:["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]
+7:["$","$1","c",{"children":[null,["$","$L4",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","forbidden":"$undefined","unauthorized":"$undefined"}]]}]
+8:["$","$1","c",{"children":[["$","main",null,{"className":"about-root","children":[["$","a",null,{"href":"#about-main","className":"about-skip-link","children":"Skip to main content"}],["$","div",null,{"className":"about-depth","aria-hidden":true,"children":[["$","div",null,{"className":"about-depth-ray about-depth-ray-1"}],["$","div",null,{"className":"about-depth-ray about-depth-ray-2"}]]}],["$","nav",null,{"className":"about-nav","children":[["$","$Ld",null,{"href":"/","className":"about-nav-logo","children":[["$","svg",null,{"width":28,"height":28,"viewBox":"0 0 28 28","fill":"none","children":[["$","circle",null,{"cx":"14","cy":"14","r":"12","stroke":"var(--accent)","strokeWidth":"1.5","fill":"var(--accent-subtle)"}],["$","path",null,{"d":"M4 14c3-4 6-4 6 0s3 4 6 0 3-4 6 0","stroke":"var(--accent)","strokeWidth":"1.5","strokeLinecap":"round","fill":"none"}],["$","path",null,{"d":"M4 17c3-3 6-3 6 0s3 3 6 0 3-3 6 0","stroke":"var(--gold)","strokeWidth":"1","strokeLinecap":"round","fill":"none","opacity":"0.5"}]]}],["$","span",null,{"className":"about-nav-wordmark","children":"Ocean"}]]}],["$","div",null,{"className":"about-nav-links","children":[["$","$Ld",null,{"href":"/","className":"about-nav-link","children":"Home"}],["$","$Ld",null,{"href":"/login","className":"about-nav-cta","children":["Open Ocean",["$","svg",null,{"width":13,"height":13,"viewBox":"0 0 14 14","fill":"none","stroke":"currentColor","strokeWidth":"2","strokeLinecap":"round","strokeLinejoin":"round","children":["$","path",null,{"d":"M2.5 7h9M8 3.5L11.5 7 8 10.5"}]}]]}]]}]]}],["$","div",null,{"id":"about-main","className":"about-hero","children":[["$","div",null,{"className":"about-hero-orb","aria-hidden":true}],["$","div",null,{"className":"about-container","children":[["$","div",null,{"className":"about-badge","children":[["$","span",null,{"className":"about-badge-dot"}],"About"]}],["$","h1",null,{"className":"about-h1","children":["The eshmaki.me",["$","br",null,{}],"community"]}],["$","p",null,{"className":"about-lead","children":"An independent network for people who care about open protocols, real conversations, and building things together."}],["$","div",null,{"className":"about-hero-meta","aria-hidden":true,"children":[["$","div",null,{"className":"about-stat","children":[["$","span",null,{"className":"about-stat-val","children":"#root"}],["$","span",null,{"className":"about-stat-label","children":"main channel"}]]}],["$","div",null,{"className":"about-stat-divider"}],["$","div",null,{"className":"about-stat","children":[["$","span",null,{"className":"about-stat-val","children":"6697"}],["$","span",null,{"className":"about-stat-label","children":"TLS port"}]]}],["$","div",null,{"className":"about-stat-divider"}],["$","div",null,{"className":"about-stat","children":[["$","span",null,{"className":"about-stat-val","children":"P-256"}],["$","span",null,{"className":"about-stat-label","children":"VEIL encryption"}]]}]]}]]}]]}],["$","div",null,{"className":"about-container about-body","children":[["$","section",null,{"className":"about-section","children":[["$","div",null,{"className":"about-section-label","children":[["$","span",null,{"className":"about-section-label-line"}],["$","span",null,{"children":"What is Ocean?"}]]}],["$","h2",null,{"className":"about-h2","children":"Built on IRC. Beyond IRC."}],["$","div",null,{"className":"about-prose","children":[["$","p",null,{"children":"Ocean is the modern web client for the eshmaki.me IRC network. It brings the communication features you expect from modern platforms — voice, reactions, rich media, threads — while staying faithful to the open IRC protocol underneath."}],["$","p",null,{"children":["Everything runs on ",["$","strong",null,{"children":"Ophion"}],", a custom IRC server built from the ground up to support modern clients without abandoning IRC compatibility. Any standard IRC client can still connect. Ocean is just the best way to experience the network."]}]]}]]}],["$","section",null,{"className":"about-section","children":[["$","div",null,{"className":"about-section-label","children":[["$","span",null,{"className":"about-section-label-line"}],["$","span",null,{"children":"The Technology"}]]}],["$","h2",null,{"className":"about-h2","children":"Four layers, one network."}],["$","div",null,{"className":"about-tech-grid","children":[["$","a",null,{"href":"https://github.com/devinkbrown/ophion","target":"_blank","rel":"noopener noreferrer","style":{"textDecoration":"none","display":"block"},"children":["$","div",null,{"className":"tech-card","style":{"--card-accent":"#0ea5e9"},"children":["$Le","$Lf","$L10","$L11"]}]}],"$L12","$L13","$L14"]}]]}],"$L15","$L16"]}],"$L17","$L18"]}],["$L19"],"$L1a"]}]
+1b:[]
+9:"$W1b"
+a:["$","$1","h",{"children":[null,["$","$L1c",null,{"children":"$L1d"}],["$","div",null,{"hidden":true,"children":["$","$L1e",null,{"children":["$","$1f",null,{"name":"Next.Metadata","children":"$L20"}]}]}],["$","meta",null,{"name":"next-size-adjust","content":""}]]}]
+c:["$","link","0",{"rel":"stylesheet","href":"/_next/static/chunks/0jf6gu.tnlr7b.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}]
+22:I[85219,["/_next/static/chunks/00ktukjj8~_~f.js","/_next/static/chunks/0283twftxyv1-.js","/_next/static/chunks/0biz17~jcm.mj.js"],"OutletBoundary"]
+e:["$","div",null,{"className":"tech-card-header","children":[["$","span",null,{"className":"tech-tag","children":"IRC Server"}],["$","span",null,{"className":"tech-detail","children":"eshmaki.me:6697"}]]}]
+f:["$","div",null,{"className":"tech-name","children":"Ophion"}]
+10:["$","div",null,{"className":"tech-desc","children":"A custom IRC server built for performance and modern protocol extensions. Supports IRCv3, IRCX, CHATHISTORY, and full SASL auth including session tokens."}]
+11:["$","span",null,{"className":"tech-link-hint","children":"View source ↗"}]
+12:["$","div",null,{"className":"tech-card","style":{"--card-accent":"#67e8f9"},"children":[["$","div",null,{"className":"tech-card-header","children":[["$","span",null,{"className":"tech-tag","children":"Media Protocol"}],["$","span",null,{"className":"tech-detail","children":"Native transport · No relay"}]]}],["$","div",null,{"className":"tech-name","children":"LADON"}],["$","div",null,{"className":"tech-desc","children":"Proprietary voice and video protocol built over IRC messaging. Native transport — no relay servers, no third-party infrastructure. Spatial audio and video delivered through the Ophion network."}],"$undefined"]}]
+13:["$","div",null,{"className":"tech-card","style":{"--card-accent":"#0ea5e9"},"children":[["$","div",null,{"className":"tech-card-header","children":[["$","span",null,{"className":"tech-tag","children":"Encryption"}],["$","span",null,{"className":"tech-detail","children":"P-256 ECDH · AES-256-GCM"}]]}],["$","div",null,{"className":"tech-name","children":"VEIL"}],["$","div",null,{"className":"tech-desc","children":"P-256 ECDH key exchange with AES-256-GCM encryption for every LADON session. Group session keys derived with forward secrecy — no plaintext voice leaves your device."}],"$undefined"]}]
+14:["$","div",null,{"className":"tech-card","style":{"--card-accent":"#38bdf8"},"children":[["$","div",null,{"className":"tech-card-header","children":[["$","span",null,{"className":"tech-tag","children":"Web Client"}],["$","span",null,{"className":"tech-detail","children":"open source"}]]}],["$","div",null,{"className":"tech-name","children":"Ocean"}],["$","div",null,{"className":"tech-desc","children":"Next.js static export with Zustand state management. Dark luxury design system, bento layouts, and a full-featured IRC client under the hood."}],"$undefined"]}]
+15:["$","section",null,{"className":"about-section","children":[["$","div",null,{"className":"about-section-label","children":[["$","span",null,{"className":"about-section-label-line"}],["$","span",null,{"children":"Principles"}]]}],["$","h2",null,{"className":"about-h2","children":"Why we built this."}],["$","div",null,{"className":"about-principles","children":[["$","div","01",{"className":"about-principle","children":[["$","div",null,{"className":"about-principle-n","children":"01"}],["$","div",null,{"children":[["$","div",null,{"className":"about-principle-title","children":"Open protocol"}],["$","div",null,{"className":"about-principle-body","children":"IRC is 35+ years old for good reason. Federated, simple, and proven. We extend it — we don't replace it."}]]}]]}],["$","div","02",{"className":"about-principle","children":[["$","div",null,{"className":"about-principle-n","children":"02"}],["$","div",null,{"children":[["$","div",null,{"className":"about-principle-title","children":"No third parties"}],["$","div",null,{"className":"about-principle-body","children":"Voice goes through Ophion, not Google, not Amazon. Your conversations don't pass through infrastructure you don't control."}]]}]]}],["$","div","03",{"className":"about-principle","children":[["$","div",null,{"className":"about-principle-n","children":"03"}],["$","div",null,{"children":[["$","div",null,{"className":"about-principle-title","children":"Privacy by design"}],["$","div",null,{"className":"about-principle-body","children":"Session tokens replace stored passwords. VEIL encrypts voice before it leaves your device. No analytics, no tracking."}]]}]]}],["$","div","04",{"className":"about-principle","children":[["$","div",null,{"className":"about-principle-n","children":"04"}],["$","div",null,{"children":[["$","div",null,{"className":"about-principle-title","children":"Actually good software"}],["$","div",null,{"className":"about-principle-body","children":"Not \"good for IRC\". Just good. Spatial audio, live reactions, collaborative whiteboard, rich embeds — done right."}]]}]]}]]}]]}]
+16:["$","section",null,{"className":"about-section about-connect-section","children":[["$","div",null,{"className":"about-section-label","children":[["$","span",null,{"className":"about-section-label-line"}],["$","span",null,{"children":"Connect"}]]}],["$","h2",null,{"className":"about-h2","children":"Join the network."}],["$","div",null,{"className":"about-connect-grid","children":[["$","a",null,{"href":"https://github.com/devinkbrown/ophion","target":"_blank","rel":"noopener noreferrer","className":"about-link-card","children":[["$","div",null,{"className":"about-link-icon","children":["$","svg",null,{"width":"30","height":"30","viewBox":"0 0 24 24","fill":"none","children":["$","path",null,{"d":"M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z","fill":"var(--text-secondary)"}]}]}],["$","div",null,{"className":"about-link-text","children":[["$","div",null,{"className":"about-link-title","children":"Ophion on GitHub"}],["$","div",null,{"className":"about-link-sub","children":"github.com/devinkbrown/ophion"}]]}],["$","span",null,{"className":"about-link-arrow","children":"↗"}]]}],["$","div",null,{"className":"about-link-card","children":[["$","div",null,{"className":"about-link-icon about-link-icon-irc","children":["$","svg",null,{"width":"30","height":"30","viewBox":"0 0 32 32","fill":"none","children":[["$","rect",null,{"width":"32","height":"32","rx":"8","fill":"var(--accent-subtle)"}],["$","path",null,{"d":"M8 11h16M8 16h12M8 21h8","stroke":"var(--accent)","strokeWidth":"1.5","strokeLinecap":"round"}],["$","circle",null,{"cx":"24","cy":"21","r":"4","fill":"var(--accent-subtle)","stroke":"var(--accent)","strokeWidth":"1.2"}],["$","path",null,{"d":"M22.5 21l1 1 2-2","stroke":"var(--accent)","strokeWidth":"1.1","strokeLinecap":"round","strokeLinejoin":"round"}]]}]}],["$","div",null,{"className":"about-link-text","children":[["$","div",null,{"className":"about-link-title","children":"IRC Direct"}],["$","div",null,{"className":"about-link-sub","children":"eshmaki.me · port 6697 (TLS)"}]]}]]}]]}],["$","div",null,{"className":"about-cta-box","children":[["$","div",null,{"className":"about-cta-box-bg","aria-hidden":true}],["$","div",null,{"className":"about-cta-inner","children":[["$","h3",null,{"className":"about-cta-h3","children":"Ready to dive in?"}],["$","p",null,{"className":"about-cta-p","children":["Join us in ",["$","code",null,{"className":"about-cta-code","children":"#root"}]," — the main channel on eshmaki.me."]}],["$","div",null,{"className":"about-cta-actions","children":[["$","$Ld",null,{"href":"/login","className":"about-btn-primary","children":["Open Ocean",["$","svg",null,{"width":14,"height":14,"viewBox":"0 0 14 14","fill":"none","stroke":"currentColor","strokeWidth":"2","strokeLinecap":"round","strokeLinejoin":"round","children":["$","path",null,{"d":"M2.5 7h9M8 3.5L11.5 7 8 10.5"}]}]]}],["$","$Ld",null,{"href":"/","className":"about-btn-ghost","children":"Back to home"}]]}]]}]]}]]}]
+17:["$","footer",null,{"className":"about-footer","children":[["$","div",null,{"className":"about-footer-logo","children":[["$","svg",null,{"width":20,"height":20,"viewBox":"0 0 28 28","fill":"none","children":[["$","circle",null,{"cx":"14","cy":"14","r":"12","stroke":"var(--accent)","strokeWidth":"1.5","fill":"var(--accent-subtle)"}],["$","path",null,{"d":"M4 14c3-4 6-4 6 0s3 4 6 0 3-4 6 0","stroke":"var(--accent)","strokeWidth":"1.5","strokeLinecap":"round","fill":"none"}],["$","path",null,{"d":"M4 17c3-3 6-3 6 0s3 3 6 0 3-3 6 0","stroke":"var(--gold)","strokeWidth":"1","strokeLinecap":"round","fill":"none","opacity":"0.5"}]]}],["$","span",null,{"children":"Ocean"}]]}],["$","nav",null,{"className":"about-footer-links","aria-label":"Footer","children":[["$","$Ld",null,{"href":"/","className":"about-footer-link","children":"Home"}],["$","$Ld",null,{"href":"/login","className":"about-footer-link","children":"Sign In"}],["$","a",null,{"href":"https://github.com/devinkbrown/ophion","target":"_blank","rel":"noopener noreferrer","className":"about-footer-link","children":"Ophion ↗"}]]}],["$","p",null,{"className":"about-footer-copy","children":["© ",2026," eshmaki.me"]}]]}]
+21:T4745,
+        /* ════════════════════════════════════════════════════════════
+           OCEAN ABOUT PAGE
+           ════════════════════════════════════════════════════════════ */
+
+        /* Override app shell's global overflow: hidden so this page scrolls */
+        html, body { overflow: auto; overflow-x: hidden; }
+
+        /* ── Skip link ── */
+        .about-skip-link {
+          position: absolute;
+          top: -40px;
+          left: 0;
+          background: var(--accent);
+          color: #fff;
+          padding: 8px 16px;
+          text-decoration: none;
+          z-index: 9999;
+          border-radius: 0 0 6px 0;
+          transition: top 150ms;
+          font-size: 14px;
+          font-weight: 600;
+        }
+        .about-skip-link:focus { top: 0; }
+
+        .about-root {
+          background: var(--bg-void);
+          color: var(--text-primary);
+          min-height: 100dvh;
+          overflow-x: clip;
+          font-family: 'Inter', system-ui, sans-serif;
+        }
+
+        /* ── Atmospheric depth rays ── */
+        .about-depth {
+          position: fixed; inset: 0; pointer-events: none; z-index: 0;
+          overflow: hidden;
+        }
+        .about-depth-ray {
+          position: absolute; width: 1px; top: 0; bottom: 0;
+          background: linear-gradient(to bottom,
+            transparent 0%,
+            color-mix(in srgb, var(--accent) 70%, transparent) 20%,
+            color-mix(in srgb, var(--accent) 20%, transparent) 60%,
+            transparent 100%
+          );
+          transform-origin: top center;
+        }
+        .about-depth-ray-1 { left: 20%; opacity: 0.05; transform: rotate(-3deg) scaleX(70); animation: ray-drift 14s ease-in-out infinite; }
+        .about-depth-ray-2 { left: 80%; opacity: 0.04; transform: rotate(3deg)  scaleX(90); animation: ray-drift 18s ease-in-out infinite reverse; }
+        @keyframes ray-drift {
+          0%, 100% { opacity: 0.04; }
+          50%       { opacity: 0.08; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .about-depth-ray, .about-badge-dot, .about-cta-box-bg { animation: none !important; }
+        }
+
+        /* ── Nav ── */
+        .about-nav {
+          position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 0 clamp(20px, 5vw, 80px); height: 60px;
+          background: color-mix(in srgb, var(--bg-void) 72%, transparent);
+          backdrop-filter: blur(24px) saturate(1.5);
+          border-bottom: 1px solid var(--border-subtle);
+        }
+        .about-nav-logo {
+          display: flex; align-items: center; gap: 9px; text-decoration: none;
+        }
+        .about-nav-wordmark {
+          font-size: 16px; font-weight: 700; letter-spacing: -0.3px; color: var(--text-primary);
+        }
+        .about-nav-links { display: flex; align-items: center; gap: 20px; }
+        .about-nav-link {
+          font-size: 14px; font-weight: 500; color: var(--text-secondary);
+          text-decoration: none; transition: color 0.2s;
+        }
+        .about-nav-link:hover { color: var(--text-primary); }
+        .about-nav-cta {
+          display: flex; align-items: center; gap: 6px;
+          font-size: 13px; font-weight: 600; color: var(--bg-void);
+          background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+          text-decoration: none; padding: 7px 16px; border-radius: 20px;
+          transition: opacity 0.2s, transform 0.15s;
+          box-shadow: 0 0 16px var(--accent-glow);
+        }
+        .about-nav-cta:hover { opacity: 0.9; transform: translateY(-1px); text-decoration: none; }
+
+        /* ── Hero ── */
+        .about-hero {
+          position: relative; z-index: 1;
+          padding-top: 60px;
+          overflow: hidden;
+          border-bottom: 1px solid var(--border-subtle);
+        }
+        .about-hero-orb {
+          position: absolute; width: 700px; height: 700px;
+          border-radius: 50%; filter: blur(120px);
+          background: radial-gradient(circle, var(--accent) 0%, transparent 65%);
+          top: -280px; right: -120px; opacity: 0.08; pointer-events: none;
+        }
+
+        /* ── Container ── */
+        .about-container {
+          position: relative; z-index: 1;
+          max-width: 880px; margin: 0 auto;
+          padding: clamp(48px, 6vw, 80px) clamp(20px, 5vw, 64px);
+        }
+
+        /* ── Badge ── */
+        .about-badge {
+          display: inline-flex; align-items: center; gap: 8px;
+          font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+          text-transform: uppercase; color: var(--accent);
+          padding: 5px 12px; border-radius: 20px;
+          background: var(--accent-subtle); border: 1px solid var(--accent-border);
+          margin-bottom: 24px; width: fit-content;
+        }
+        .about-badge-dot {
+          width: 6px; height: 6px; border-radius: 50%;
+          background: var(--accent); flex-shrink: 0;
+          box-shadow: 0 0 6px var(--accent-glow);
+          animation: dot-pulse 2s ease-in-out infinite;
+        }
+        @keyframes dot-pulse {
+          0%, 100% { box-shadow: 0 0 4px var(--accent-glow); }
+          50%       { box-shadow: 0 0 10px var(--accent); }
+        }
+
+        .about-h1 {
+          font-size: clamp(2.4rem, 5.5vw, 4.2rem); font-weight: 900;
+          letter-spacing: -0.04em; line-height: 1.05; margin: 0 0 20px;
+          color: var(--text-primary);
+        }
+        .about-lead {
+          font-size: clamp(1rem, 1.6vw, 1.2rem); line-height: 1.72;
+          color: var(--text-secondary); max-width: 560px; margin: 0 0 36px;
+        }
+
+        /* Hero meta stats */
+        .about-hero-meta {
+          display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
+          padding: 20px 24px;
+          background: color-mix(in srgb, var(--bg-elevated) 60%, transparent);
+          border: 1px solid var(--border-subtle);
+          border-radius: 14px;
+          width: fit-content;
+          backdrop-filter: blur(8px);
+        }
+        .about-stat { display: flex; flex-direction: column; gap: 3px; }
+        .about-stat-val {
+          font-family: var(--font-mono); font-size: 14px; font-weight: 700;
+          color: var(--accent); letter-spacing: 0.02em;
+        }
+        .about-stat-label {
+          font-size: 10px; font-weight: 600; letter-spacing: 0.07em;
+          text-transform: uppercase; color: var(--text-muted);
+        }
+        .about-stat-divider {
+          width: 1px; height: 32px; background: var(--border-subtle); flex-shrink: 0;
+        }
+
+        /* ── Body ── */
+        .about-body { padding-top: 0; }
+        .about-section { margin-bottom: 80px; }
+
+        /* Section label */
+        .about-section-label {
+          display: flex; align-items: center; gap: 12px;
+          font-size: 10px; font-weight: 800; letter-spacing: 0.12em;
+          text-transform: uppercase; color: var(--text-muted);
+          margin-bottom: 14px;
+        }
+        .about-section-label-line {
+          display: block; width: 24px; height: 1px; background: var(--accent-border); flex-shrink: 0;
+        }
+
+        .about-h2 {
+          font-size: clamp(1.5rem, 2.8vw, 2.2rem); font-weight: 800;
+          letter-spacing: -0.03em; color: var(--text-primary); margin: 0 0 32px;
+          line-height: 1.15;
+        }
+
+        /* Prose */
+        .about-prose { display: flex; flex-direction: column; gap: 16px; }
+        .about-prose p {
+          font-size: clamp(0.95rem, 1.3vw, 1.05rem); line-height: 1.78;
+          color: var(--text-secondary); margin: 0;
+        }
+        .about-prose strong { color: var(--text-primary); font-weight: 600; }
+
+        /* Tech grid */
+        .about-tech-grid {
+          display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;
+        }
+        @media (max-width: 600px) { .about-tech-grid { grid-template-columns: 1fr; } }
+
+        /* Principles */
+        .about-principles { display: flex; flex-direction: column; gap: 12px; }
+        .about-principle {
+          display: flex; align-items: flex-start; gap: 24px;
+          padding: 22px 24px;
+          background: color-mix(in srgb, var(--bg-deep) 90%, transparent);
+          border: 1px solid var(--border-subtle); border-radius: 14px;
+          transition: border-color 0.25s var(--ease-out), transform 0.2s var(--ease-out), box-shadow 0.25s var(--ease-out);
+        }
+        .about-principle:hover {
+          border-color: var(--accent-border);
+          transform: translateX(4px);
+          box-shadow: 0 0 24px var(--accent-glow);
+        }
+        .about-principle-n {
+          font-size: 11px; font-weight: 800; font-family: var(--font-mono);
+          color: var(--accent); opacity: 0.65; flex-shrink: 0; margin-top: 3px;
+          letter-spacing: 0.05em;
+        }
+        .about-principle-title { font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; }
+        .about-principle-body { font-size: 14px; line-height: 1.65; color: var(--text-secondary); }
+
+        /* Connect */
+        .about-connect-grid { display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
+        .about-link-card {
+          display: flex; align-items: center; gap: 16px;
+          padding: 18px 24px;
+          background: color-mix(in srgb, var(--bg-deep) 90%, transparent);
+          border: 1px solid var(--border-normal); border-radius: 14px;
+          text-decoration: none;
+          transition: border-color 0.25s var(--ease-out), transform 0.2s var(--ease-out), box-shadow 0.25s var(--ease-out);
+        }
+        .about-link-card:hover {
+          border-color: var(--accent-border); transform: translateX(4px);
+          box-shadow: 0 0 20px var(--accent-glow);
+          text-decoration: none;
+        }
+        .about-link-icon { flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+        .about-link-icon-irc { opacity: 0.85; }
+        .about-link-text { flex: 1; }
+        .about-link-title { font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+        .about-link-sub { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); }
+        .about-link-arrow { font-size: 18px; color: var(--text-muted); flex-shrink: 0; transition: color 0.2s, transform 0.2s; }
+        .about-link-card:hover .about-link-arrow { color: var(--accent); transform: translate(2px, -2px); }
+
+        /* CTA box */
+        .about-cta-box {
+          position: relative; overflow: hidden;
+          border-radius: 20px;
+          border: 1px solid var(--border-normal);
+          background: linear-gradient(145deg, var(--bg-elevated) 0%, var(--bg-deep) 100%);
+          box-shadow: inset 0 1px 0 var(--accent-border), 0 16px 48px rgba(0,0,0,0.4);
+        }
+        .about-cta-box-bg {
+          position: absolute; inset: 0;
+          background: radial-gradient(ellipse at 70% 50%, var(--accent-subtle) 0%, transparent 65%);
+          animation: cta-shimmer 6s ease-in-out infinite;
+        }
+        @keyframes cta-shimmer {
+          0%, 100% { opacity: 0.7; transform: scale(1); }
+          50%       { opacity: 1; transform: scale(1.05); }
+        }
+        .about-cta-inner {
+          position: relative; z-index: 1;
+          padding: clamp(32px, 5vw, 56px) clamp(24px, 4vw, 48px);
+          display: flex; flex-direction: column; gap: 16px;
+        }
+        .about-cta-h3 {
+          font-size: clamp(1.4rem, 2.5vw, 1.9rem); font-weight: 800;
+          letter-spacing: -0.03em; color: var(--text-primary); margin: 0;
+        }
+        .about-cta-p {
+          font-size: clamp(0.95rem, 1.3vw, 1.05rem); color: var(--text-secondary);
+          line-height: 1.65; margin: 0;
+        }
+        .about-cta-code {
+          font-family: var(--font-mono); font-size: 0.9em;
+          color: var(--accent); background: var(--accent-subtle);
+          padding: 1px 6px; border-radius: 4px;
+          border: 1px solid var(--accent-border);
+        }
+        .about-cta-actions {
+          display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+          margin-top: 8px;
+        }
+        .about-btn-primary {
+          display: inline-flex; align-items: center; gap: 7px;
+          padding: 13px 26px; border-radius: var(--r-md);
+          font-size: 14px; font-weight: 700; color: var(--bg-void);
+          background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+          text-decoration: none;
+          box-shadow: 0 4px 20px var(--accent-glow), 0 0 0 1px var(--accent-border);
+          transition: transform 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+        }
+        .about-btn-primary:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 32px var(--accent-glow), 0 0 0 1px var(--accent);
+          text-decoration: none; color: var(--bg-void);
+        }
+        .about-btn-ghost {
+          display: inline-flex; align-items: center; gap: 6px;
+          padding: 13px 22px; border-radius: var(--r-md);
+          font-size: 14px; font-weight: 500;
+          color: var(--text-secondary); text-decoration: none;
+          border: 1px solid var(--border-normal); background: var(--accent-subtle);
+          transition: color 0.2s, border-color 0.2s, transform 0.2s var(--ease-out);
+        }
+        .about-btn-ghost:hover {
+          color: var(--text-primary); border-color: var(--accent-border);
+          transform: translateY(-1px); text-decoration: none;
+        }
+
+        /* ── Footer ── */
+        .about-footer {
+          position: relative; z-index: 1;
+          display: grid; grid-template-columns: 1fr auto auto;
+          align-items: center; gap: 24px 40px;
+          padding: 40px clamp(20px, 5vw, 80px);
+          border-top: 1px solid var(--border-subtle);
+          margin-top: 20px;
+        }
+        .about-footer-logo { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: var(--text-primary); }
+        .about-footer-links { display: flex; align-items: center; gap: 20px; }
+        .about-footer-link { font-size: 13px; color: var(--text-muted); text-decoration: none; transition: color 0.2s; }
+        .about-footer-link:hover { color: var(--text-secondary); text-decoration: none; }
+        .about-footer-copy { font-size: 12px; color: var(--text-muted); margin: 0; white-space: nowrap; }
+
+        /* ── Mobile ── */
+        @media (max-width: 640px) {
+          .about-nav { height: 52px; padding: 0 16px; }
+          .about-nav-link { display: none; }
+          .about-nav-wordmark { font-size: 15px; }
+          .about-nav-cta { font-size: 12px; padding: 6px 14px; }
+
+          .about-container { padding: 36px 16px; }
+          .about-h1 { font-size: clamp(2.1rem, 8vw, 2.8rem); }
+          .about-hero-meta { gap: 16px; padding: 16px 18px; }
+          .about-stat-val { font-size: 13px; }
+
+          .about-section { margin-bottom: 56px; }
+          .about-h2 { font-size: 1.4rem; }
+          .about-principle { flex-direction: column; gap: 10px; padding: 18px; }
+          .about-principle:hover { transform: translateX(0) translateY(-2px); }
+
+          .about-link-card { padding: 14px 16px; }
+          .about-cta-inner { padding: 28px 20px; }
+          .about-cta-actions { flex-direction: column; align-items: stretch; }
+          .about-btn-primary, .about-btn-ghost { justify-content: center; text-align: center; }
+
+          .about-footer { grid-template-columns: 1fr; text-align: center; padding: 28px 16px; gap: 16px; }
+          .about-footer-links { justify-content: center; flex-wrap: wrap; }
+        }
+
+        /* ── Tech cards ── */
+        .tech-card {
+          padding: 24px; background: color-mix(in srgb, var(--bg-deep) 90%, transparent);
+          border: 1px solid var(--border-normal); border-radius: 16px;
+          display: flex; flex-direction: column; gap: 12px;
+          transition: border-color 0.25s var(--ease-out), transform 0.2s var(--ease-out), box-shadow 0.25s var(--ease-out);
+          position: relative; overflow: hidden; height: 100%;
+        }
+        .tech-card::before {
+          content: '';
+          position: absolute; top: 0; left: 20px; right: 20px; height: 1px;
+          background: linear-gradient(90deg, transparent, var(--card-accent, var(--accent)), transparent);
+          opacity: 0.3; transition: opacity 0.25s;
+        }
+        a:hover .tech-card {
+          border-color: color-mix(in srgb, var(--card-accent, var(--accent)) 40%, transparent);
+          transform: translateY(-3px);
+          box-shadow: 0 12px 36px rgba(0,0,0,0.45), 0 0 24px color-mix(in srgb, var(--card-accent, var(--accent)) 15%, transparent);
+        }
+        a:hover .tech-card::before { opacity: 0.7; }
+        .tech-card-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .tech-tag {
+          font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+          text-transform: uppercase;
+          padding: 3px 10px; border-radius: 100px;
+          color: var(--card-accent, var(--accent));
+          background: color-mix(in srgb, var(--card-accent, var(--accent)) 12%, transparent);
+          border: 1px solid color-mix(in srgb, var(--card-accent, var(--accent)) 28%, transparent);
+        }
+        .tech-detail {
+          font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
+          color: var(--text-muted); font-family: var(--font-mono);
+        }
+        .tech-name {
+          font-size: clamp(1.6rem, 3vw, 2rem); font-weight: 900; letter-spacing: -0.04em;
+          color: var(--card-accent, var(--accent));
+          line-height: 1;
+        }
+        .tech-desc { font-size: 13.5px; line-height: 1.65; color: var(--text-secondary); flex: 1; }
+        .tech-link-hint {
+          font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+          color: var(--card-accent, var(--accent)); opacity: 0.7;
+          margin-top: 4px; display: block;
+        }
+      18:["$","style",null,{"children":"$21"}]
+19:["$","script","script-0",{"src":"/_next/static/chunks/00qdfsxg7lbzt.js","async":true,"nonce":"$undefined"}]
+1a:["$","$L22",null,{"children":["$","$1f",null,{"name":"Next.MetadataOutlet","children":"$@23"}]}]
+1d:[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes, viewport-fit=cover, interactive-widget=resizes-content"}],["$","meta","2",{"name":"theme-color","content":"#07070a"}]]
+24:I[21571,["/_next/static/chunks/00ktukjj8~_~f.js","/_next/static/chunks/0283twftxyv1-.js","/_next/static/chunks/0biz17~jcm.mj.js"],"IconMark"]
+20:[["$","title","0",{"children":"Ocean"}],["$","meta","1",{"name":"description","content":"A better way to talk."}],["$","link","2",{"rel":"manifest","href":"/manifest.json","crossOrigin":"$undefined"}],["$","meta","3",{"name":"mobile-web-app-capable","content":"yes"}],["$","meta","4",{"name":"apple-mobile-web-app-title","content":"Ocean"}],["$","meta","5",{"name":"apple-mobile-web-app-status-bar-style","content":"black-translucent"}],["$","link","6",{"rel":"icon","href":"/favicon.ico?favicon.0x3dzn~oxb6tn.ico","sizes":"256x256","type":"image/x-icon"}],["$","link","7",{"rel":"icon","href":"/favicon.ico"}],["$","link","8",{"rel":"apple-touch-icon","href":"/apple-touch-icon.png"}],["$","$L24","9",{}]]
+23:null
