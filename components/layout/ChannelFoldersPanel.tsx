@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import type { ChannelFolder } from '@/lib/store';
 import type { Channel } from '@/lib/irc/types';
@@ -239,6 +239,7 @@ function FolderChannelRow({
   channelName,
   active,
   onClick,
+  onContextMenu,
   onMoveContextMenu,
   draggable,
   onDragStart,
@@ -259,10 +260,12 @@ function FolderChannelRow({
   const channelUnread   = useOnyxStore(s => s.channelUnread);
   const channelMentions = useOnyxStore(s => s.channelMentions);
   const channelNotify   = useOnyxStore(s => s.channelNotify);
+  const channelColors   = useOnyxStore(s => s.channelColors);
   const displayName = channelName.replace(/^[#&]/, '');
   const isForum = forumChannels.has(channelName.toLowerCase());
   const key = channelName.toLowerCase();
   const muted = channelNotify.get(key) === 'none';
+  const channelColor = channelColors.get(key);
   const unreadCount = muted ? 0 : (channelUnread[key] ?? 0);
   const mentionCount = muted ? 0 : (channelMentions[key] ?? 0);
   const hasUnread = unreadCount > 0;
@@ -270,6 +273,12 @@ function FolderChannelRow({
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
+    onContextMenu(e);
+  };
+
+  const handleMoveClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     onMoveContextMenu(e);
   };
 
@@ -285,6 +294,7 @@ function FolderChannelRow({
       aria-current={active ? 'page' : undefined}
     >
       <span className="cfp-drag-handle" title="Drag to reorder" aria-hidden>⠿</span>
+      {channelColor && <span className="cfp-color-dot" style={{ background: channelColor }} aria-hidden />}
       <span className={`cfp-hash${isForum ? ' cfp-hash--forum' : ''}`} aria-hidden>
         {isForum ? '📋' : '#'}
       </span>
@@ -299,6 +309,15 @@ function FolderChannelRow({
           {unreadCount > 99 ? '99+' : unreadCount}
         </span>
       )}
+      <button
+        className="cfp-move-btn"
+        type="button"
+        onClick={handleMoveClick}
+        aria-label={`Move ${displayName} to folder`}
+        title="Move to folder"
+      >
+        ⋯
+      </button>
     </div>
   );
 }
@@ -331,16 +350,12 @@ function FolderSection({
 
   const isDefault = folder.id === 'default';
   const isCollapsed = folder.collapsed;
+  const visibleChannels = folder.channels.filter(ch => channelObjects.has(ch.toLowerCase()));
 
   const handleFolderHeaderContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     setFolderMenu({ x: e.clientX, y: e.clientY });
   };
-
-  const handleLongPress = useCallback(() => {
-    // Long-press opens rename/delete menu via a timer
-  }, []);
-  void handleLongPress;
 
   const handleDragStart = (channel: string, folderId: string) => (e: React.DragEvent) => {
     dragRef.current = { channel, sourceFolderId: folderId };
@@ -434,7 +449,7 @@ function FolderSection({
       >
         <span className="cfp-chevron" aria-hidden style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}>▶</span>
         <span className="cfp-folder-name">{folder.name}</span>
-        <span className="cfp-folder-count">{folder.channels.length}</span>
+        <span className="cfp-folder-count">{visibleChannels.length}</span>
       </div>
 
       {/* Folder body */}
@@ -445,10 +460,8 @@ function FolderSection({
           onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
           onDrop={handleDrop(null)}
         >
-          {folder.channels.map(ch => {
-            const chan = channelObjects.get(ch.toLowerCase());
+          {visibleChannels.map(ch => {
             const displayName = ch;
-            void chan;
             return (
               <FolderChannelRow
                 key={ch}
@@ -464,7 +477,7 @@ function FolderSection({
               />
             );
           })}
-          {folder.channels.length === 0 && (
+          {visibleChannels.length === 0 && (
             <span
               className={`cfp-empty${isDragOverFolder ? ' cfp-empty--drag-over' : ''}`}
               onDragOver={handleDragOver}
@@ -606,6 +619,14 @@ function FolderSection({
         .cfp-row:hover .cfp-drag-handle { opacity: 1; }
         .cfp-row:active .cfp-drag-handle { cursor: grabbing; }
 
+        .cfp-color-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          flex-shrink: 0;
+          margin-right: 2px;
+        }
+
         .cfp-hash {
           font-size: 16px;
           font-weight: 500;
@@ -629,6 +650,33 @@ function FolderSection({
         .cfp-row:hover .cfp-name,
         .cfp-row--active .cfp-name { color: var(--ch-unread, var(--text-primary)); }
         .cfp-name--unread { color: var(--text-normal, var(--text-primary)); font-weight: 600; }
+
+        .cfp-move-btn {
+          width: 20px;
+          height: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          border: none;
+          border-radius: var(--r-xs, 3px);
+          background: transparent;
+          color: var(--text-muted);
+          cursor: pointer;
+          opacity: 0;
+          font: inherit;
+          line-height: 1;
+          transition: opacity 80ms, color 80ms, background 80ms;
+        }
+        .cfp-row:hover .cfp-move-btn,
+        .cfp-row--active .cfp-move-btn,
+        .cfp-move-btn:focus-visible {
+          opacity: 1;
+        }
+        .cfp-move-btn:hover {
+          background: var(--ch-hover-bg, rgba(255,255,255,0.04));
+          color: var(--text-primary);
+        }
 
         .cfp-badge {
           min-width: 16px; height: 16px;
@@ -659,7 +707,6 @@ export default function ChannelFoldersPanel({
   const channelFolders = useOnyxStore(s => s.channelFolders);
   const addChannelToFolder = useOnyxStore(s => s.addChannelToFolder);
   const createFolder = useOnyxStore(s => s.createFolder);
-  const channelFolders2 = useOnyxStore(s => s.channelFolders);
 
   const dragRef = useRef<DragState | null>(null);
 
@@ -679,20 +726,14 @@ export default function ChannelFoldersPanel({
 
   const unassigned = channels.filter(ch => !assignedChannels.has(ch.name.toLowerCase()));
 
-  // Auto-assign unassigned channels to the default folder on first render
-  // (We do this imperatively; React's render phase should stay pure)
-  const [autoAssigned, setAutoAssigned] = useState(false);
-  if (!autoAssigned && unassigned.length > 0) {
-    setAutoAssigned(true);
-    // Defer to next tick to avoid state updates during render
-    setTimeout(() => {
-      const defaultFolder = channelFolders2.find(f => f.id === 'default') ?? channelFolders2[0];
-      if (!defaultFolder) return;
-      for (const ch of unassigned) {
-        addChannelToFolder(ch.name, defaultFolder.id);
-      }
-    }, 0);
-  }
+  useEffect(() => {
+    if (unassigned.length === 0) return;
+    const defaultFolder = channelFolders.find(f => f.id === 'default') ?? channelFolders[0];
+    if (!defaultFolder) return;
+    for (const ch of unassigned) {
+      addChannelToFolder(ch.name, defaultFolder.id);
+    }
+  }, [addChannelToFolder, channelFolders, unassigned]);
 
   const handleNewFolder = () => {
     const name = prompt('New folder name:');

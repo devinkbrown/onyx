@@ -8,6 +8,7 @@ export function usePushNotifications() {
   const dms = useOnyxStore(s => s.dms);
   const pushNotificationsEnabled = useOnyxStore(s => s.pushNotificationsEnabled);
   const channelNotify = useOnyxStore(s => s.channelNotify);
+  const mutedDMs = useOnyxStore(s => s.mutedDMs);
   const prevChannelMsgCountRef = useRef<Map<string, number>>(new Map());
   const prevDmMsgCountRef = useRef<Map<string, number>>(new Map());
   const permissionRef = useRef<NotificationPermission>('default');
@@ -91,6 +92,10 @@ export function usePushNotifications() {
     if (!ourNick) return;
 
     dms.forEach((dm, nick) => {
+      if (mutedDMs.has(nick.toLowerCase())) {
+        prevDmMsgCountRef.current.set(nick, dm.messages.length);
+        return;
+      }
       const prevCount = prevDmMsgCountRef.current.get(nick) ?? 0;
       const newCount = dm.messages.length;
 
@@ -109,5 +114,5 @@ export function usePushNotifications() {
 
       prevDmMsgCountRef.current.set(nick, newCount);
     });
-  }, [dms, ourNick, sendNotification]);
+  }, [dms, ourNick, sendNotification, mutedDMs]);
 }

@@ -48,6 +48,7 @@ export default function ServerBar() {
 
   const unreadNotifications = notifications.filter(n => !readNotificationIds.has(n.id)).length;
   const unreadAnnouncements = announcements.filter(a => !a.read).length;
+  const firstChannel = channels.values().next().value;
 
   const onlineFriendCount = (() => {
     let n = 0;
@@ -77,7 +78,7 @@ export default function ServerBar() {
             <button
               className={`server-btn ${activeView.kind === 'channel' ? 'server-btn--active' : ''}`}
               style={{ background: server.icon }}
-              onClick={() => navigate({ kind: 'channel', channel: '' })}
+              onClick={() => firstChannel ? navigate({ kind: 'channel', channel: firstChannel.name }) : navigate({ kind: 'home' })}
               aria-label={server.name}
             >
               <span className="server-btn-initial">{server.name.slice(0, 2).toUpperCase()}</span>

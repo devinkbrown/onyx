@@ -1428,6 +1428,27 @@ function _saveChannelColors(colors: Map<string, string>): void {
   } catch {}
 }
 
+function _loadChannelNotify(): Map<string, 'all' | 'mentions' | 'none'> {
+  if (typeof window === 'undefined') return new Map();
+  try {
+    const raw = localStorage.getItem('ocean-channel-notify');
+    if (!raw) return new Map();
+    return new Map(Object.entries(JSON.parse(raw) as Record<string, 'mentions' | 'none'>));
+  } catch { return new Map(); }
+}
+
+function _saveChannelNotify(notify: Map<string, 'all' | 'mentions' | 'none'>): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const persisted = [...notify].filter(([, level]) => level !== 'all');
+    localStorage.setItem('ocean-channel-notify', JSON.stringify(Object.fromEntries(persisted)));
+  } catch {}
+}
+
+function _loadCompactSidebar(): boolean {
+  return typeof window !== 'undefined' && localStorage.getItem('ocean-compact-sidebar') === '1';
+}
+
 // ── Store ─────────────────────────────────────────────────────────────────────
 
 export const useOnyxStore = create<OnyxState>()(
@@ -1463,7 +1484,7 @@ export const useOnyxStore = create<OnyxState>()(
     softIgnoreList: _loadSoftIgnoreList(),
     revealedMessages: new Set<string>(),
     collapsedNicks: new Set<string>(),
-    channelNotify: new Map(),
+    channelNotify: _loadChannelNotify(),
     whoisData: new Map(),
     showWhois: false,
     whoisNick: null,
@@ -2372,6 +2393,7 @@ export const useOnyxStore = create<OnyxState>()(
         } else {
           channelNotify.set(key, level);
         }
+        _saveChannelNotify(channelNotify);
         return { channelNotify };
       });
     },
@@ -2933,11 +2955,16 @@ export const useOnyxStore = create<OnyxState>()(
             set(s => {
               const channels = new Map(s.channels);
               channels.delete(key);
+              const channelFolders = s.channelFolders.map(f => ({
+                ...f,
+                channels: f.channels.filter(c => c.toLowerCase() !== key),
+              }));
+              _saveChannelFolders(channelFolders);
               const active = s.activeView;
               const next: ActiveView = active.kind === 'channel' && active.channel.toLowerCase() === key
                 ? { kind: 'home' }
                 : active;
-              return { channels, activeView: next };
+              return { channels, channelFolders, activeView: next };
             });
           } else {
             const partReason = params[1] ?? '';
@@ -5226,8 +5253,13 @@ export const useOnyxStore = create<OnyxState>()(
     closeConnectionProfiles: () => set({ showConnectionProfiles: false }),
 
     // ── Compact sidebar ────────────────────────────────────────────────────────
-    compactSidebar: false,
-    setCompactSidebar: (compact) => set({ compactSidebar: compact }),
+    compactSidebar: _loadCompactSidebar(),
+    setCompactSidebar: (compact) => {
+      if (typeof window !== 'undefined') {
+        try { localStorage.setItem('ocean-compact-sidebar', compact ? '1' : '0'); } catch {}
+      }
+      set({ compactSidebar: compact });
+    },
 
     // ── Channel color labels ───────────────────────────────────────────────────
     channelColors: _loadChannelColors(),

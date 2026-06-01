@@ -25,6 +25,12 @@ export default function ChannelContextMenu({ channel, x, y, onClose }: Props) {
   const nsfwChannels     = useOnyxStore(s => s.nsfwChannels);
   const markChannelNsfw  = useOnyxStore(s => s.markChannelNsfw);
   const unmarkChannelNsfw = useOnyxStore(s => s.unmarkChannelNsfw);
+  const starredChannels  = useOnyxStore(s => s.starredChannels);
+  const starChannel      = useOnyxStore(s => s.starChannel);
+  const unstarChannel    = useOnyxStore(s => s.unstarChannel);
+  const autoJoinChannels = useOnyxStore(s => s.autoJoinChannels);
+  const addAutoJoin      = useOnyxStore(s => s.addAutoJoin);
+  const removeAutoJoin   = useOnyxStore(s => s.removeAutoJoin);
 
   const current: NotifyLevel = channelNotify.get(channel.toLowerCase()) ?? 'all';
   const currentColor = channelColors.get(channel.toLowerCase()) ?? '#0ea5e9';
@@ -106,6 +112,27 @@ export default function ChannelContextMenu({ channel, x, y, onClose }: Props) {
 
   const hasColor = channelColors.has(channel.toLowerCase());
   const isNsfw = nsfwChannels.has(channel.toLowerCase());
+  const channelKey = channel.toLowerCase();
+  const isStarred = starredChannels.has(channelKey);
+  const isAutoJoin = autoJoinChannels.includes(channelKey);
+
+  const handleStarToggle = () => {
+    if (isStarred) {
+      unstarChannel(channelKey);
+    } else {
+      starChannel(channelKey);
+    }
+    onClose();
+  };
+
+  const handleAutoJoinToggle = () => {
+    if (isAutoJoin) {
+      removeAutoJoin(channelKey);
+    } else {
+      addAutoJoin(channelKey);
+    }
+    onClose();
+  };
 
   const handleNsfwToggle = () => {
     if (isNsfw) {
@@ -178,6 +205,28 @@ export default function ChannelContextMenu({ channel, x, y, onClose }: Props) {
       <button className="ctx-item" onClick={handleCopyName} role="menuitem">
         <span className="ctx-icon">📋</span>
         Copy name
+      </button>
+
+      <div className="ctx-separator" role="separator" />
+
+      <button
+        className={`ctx-item${isStarred ? ' ctx-item--star-active' : ''}`}
+        onClick={handleStarToggle}
+        role="menuitemcheckbox"
+        aria-checked={isStarred}
+      >
+        <span className="ctx-icon">{isStarred ? '★' : '☆'}</span>
+        {isStarred ? 'Unstar Channel' : 'Star Channel'}
+      </button>
+
+      <button
+        className={`ctx-item${isAutoJoin ? ' ctx-item--auto-active' : ''}`}
+        onClick={handleAutoJoinToggle}
+        role="menuitemcheckbox"
+        aria-checked={isAutoJoin}
+      >
+        <span className="ctx-icon">🕐</span>
+        {isAutoJoin ? 'Remove Auto-Join' : 'Auto-Join on Connect'}
       </button>
 
       <div className="ctx-separator" role="separator" />
@@ -268,6 +317,8 @@ export default function ChannelContextMenu({ channel, x, y, onClose }: Props) {
         .ctx-item--danger:hover { background: rgba(240,71,71,0.12); color: var(--danger, #f04747); }
         .ctx-item--muted-active { color: var(--accent); }
         .ctx-item--nsfw-active { color: #f87171; }
+        .ctx-item--star-active { color: #e8b84b; }
+        .ctx-item--auto-active { color: var(--accent); }
         .ctx-item--sub { padding-left: 14px; font-size: 13px; }
 
         .ctx-icon { font-size: 14px; flex-shrink: 0; line-height: 1; }

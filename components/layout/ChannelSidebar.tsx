@@ -279,7 +279,7 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
         )}
 
         {/* ── Sort control ─────────────────────────────────────────────── */}
-        {connectionStatus !== 'connecting' && textLikeChannels.length > 1 && (
+        {compactSidebar && connectionStatus !== 'connecting' && textLikeChannels.length > 1 && (
           <div className="ch-sort-bar">
             <span className="ch-sort-label">Channels</span>
             <SortCycleButton order={channelSortOrder} onClick={() => {
