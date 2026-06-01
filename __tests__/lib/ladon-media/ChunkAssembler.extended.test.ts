@@ -125,42 +125,35 @@ describe('ChunkAssembler (extended)', () => {
     expect(r2).not.toBeNull();
   });
 
-  // ── Post-reassembly byte cap (> 65535) ─────────────────────────────────────
+  // ── Post-reassembly byte cap ───────────────────────────────────────────────
+  // MAX_FRAME_BYTES = 120 * 65535 = 7_864_200; each chunk must be <= 65536
+  // (MAX_CHUNK_BYTES), so an over-size frame needs many chunks, not huge ones.
+  const MAX_FRAME = 120 * 65535;
 
   it('returns null when reassembled frame exceeds MAX_FRAME_BYTES', () => {
-    // MAX_FRAME_BYTES = 120 * 65535 = 7_864_200; 3 × 2_700_000 = 8_100_000 > cap
-    const chunkSize = 2_700_000;
-    asm.ingest('ivy', 'vid', 10, 1, 3, makeChunk(0xAA, chunkSize));
-    asm.ingest('ivy', 'vid', 10, 2, 3, makeChunk(0xBB, chunkSize));
-    const r = asm.ingest('ivy', 'vid', 10, 3, 3, makeChunk(0xCC, chunkSize));
-
+    // 121 × 65000 = 7_865_000 > MAX_FRAME (7_864_200)
+    const chunkSize = 65000, total = 121;
+    let r: Uint8Array | null = null;
+    for (let i = 1; i <= total; i++) r = asm.ingest('ivy', 'vid', 10, i, total, makeChunk(i & 0xff, chunkSize));
     expect(r).toBeNull();
   });
 
   it('slot is cleaned up after over-size frame is rejected', () => {
-    // Arrange: assemble an oversized frame (3 × 2_700_000 = 8.1MB > MAX_FRAME_BYTES)
-    const chunkSize = 2_700_000;
-    asm.ingest('jay', 'vid', 11, 1, 3, makeChunk(0xAA, chunkSize));
-    asm.ingest('jay', 'vid', 11, 2, 3, makeChunk(0xBB, chunkSize));
-    asm.ingest('jay', 'vid', 11, 3, 3, makeChunk(0xCC, chunkSize));
-
-    // Act: try a fresh single-chunk frame on the same slot key
+    const chunkSize = 65000, total = 121; // 7_865_000 > MAX_FRAME
+    for (let i = 1; i <= total; i++) asm.ingest('jay', 'vid', 11, i, total, makeChunk(i & 0xff, chunkSize));
+    // A fresh single-chunk frame on the same slot key completes (old slot deleted)
     const r = asm.ingest('jay', 'vid', 11, 1, 1, makeChunk(0x01, 4));
-
-    // Assert: new slot opens and completes because old slot was deleted
     expect(r).not.toBeNull();
     expect(r!.length).toBe(4);
   });
 
   it('accepts reassembled frame exactly at MAX_FRAME_BYTES', () => {
-    // total exactly 120 * 65535 = 7_864_200: 3 × 2_621_400
-    const chunkSize = 2_621_400;
-    asm.ingest('kim', 'vid', 20, 1, 3, makeChunk(0xAA, chunkSize));
-    asm.ingest('kim', 'vid', 20, 2, 3, makeChunk(0xBB, chunkSize));
-    const r = asm.ingest('kim', 'vid', 20, 3, 3, makeChunk(0xCC, chunkSize));
-
+    // 120 × 65535 = 7_864_200 = MAX_FRAME exactly (not over)
+    const chunkSize = 65535, total = 120;
+    let r: Uint8Array | null = null;
+    for (let i = 1; i <= total; i++) r = asm.ingest('kim', 'vid', 20, i, total, makeChunk(i & 0xff, chunkSize));
     expect(r).not.toBeNull();
-    expect(r!.length).toBe(65535);
+    expect(r!.length).toBe(MAX_FRAME);
   });
 
   // ── GC expiry timing ───────────────────────────────────────────────────────
