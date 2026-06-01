@@ -57,4 +57,13 @@ export interface LadonMediaCallbacks {
   enableVideoCalls?: () => boolean;
   enableVoiceCalls?: () => boolean;
   getMediaQuality?:  () => { audioQuality: 0 | 1 | 2; videoQuality: number; noiseSuppress: boolean };
+  getMediaSettings?: () => {
+    inputDeviceId: string | null;
+    cameraDeviceId: string | null;
+    outputDeviceId: string | null;
+    outputVolume: number;
+    noiseSuppression: boolean;
+    echoCancellation: boolean;
+  };
+  getLocalNick?:      () => string;
 }

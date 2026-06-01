@@ -51,7 +51,6 @@ export default function UserSettingsBar() {
   const userStatus        = useOnyxStore(s => s.userStatus);
   const setUserStatus     = useOnyxStore(s => s.setUserStatus);
   const openSettings      = useOnyxStore(s => s.openSettings);
-  const setVoiceCallState = useOnyxStore(s => s.setVoiceCallState);
   const client            = useOnyxStore(s => s.client);
   const customStatus          = useOnyxStore(s => s.customStatus);
   const customStatusExpiry    = useOnyxStore(s => s.customStatusExpiry);
@@ -123,15 +122,15 @@ export default function UserSettingsBar() {
   const account = server?.account ?? null;
 
   const toggleMute = () => {
+    useOnyxStore.getState().toggleMute();
     const next = !voice.muted;
-    setVoiceCallState({ muted: next });
     if (voice.callState === 'idle') {
       client?.sendRaw('AWAY', next ? 'AFK' : '');
     }
   };
 
   const toggleDeafen = () => {
-    setVoiceCallState({ deafened: !voice.deafened });
+    useOnyxStore.getState().toggleDeafen();
   };
 
   const isMuted    = voice.muted;

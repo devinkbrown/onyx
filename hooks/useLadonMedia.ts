@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useOnyxStore } from '@/lib/store';
-import { LadonMediaEngine } from '@/lib/ladon-media/MediaEngine';
+import { LadonMediaEngine, setMountedLadonMediaEngine } from '@/lib/ladon-media/MediaEngine';
 import type { LadonMediaCallbacks } from '@/lib/ladon-media/types';
 import type { IRCMessage } from '@/lib/irc/types';
 
@@ -29,6 +29,9 @@ export function useLadonMedia() {
   const setVoiceState   = useOnyxStore(s => s.setVoiceCallState);
   const addNotification = useOnyxStore(s => s.addNotification);
   const screenshareActive = useOnyxStore(s => s.voice.screenshareActive);
+  const deafened        = useOnyxStore(s => s.voice.deafened);
+  const outputDeviceId  = useOnyxStore(s => s.voice.outputDeviceId);
+  const outputVolume    = useOnyxStore(s => s.voice.outputVolume);
   const activeView      = useOnyxStore(s => s.activeView);
 
   const engineRef         = useRef<LadonMediaEngine | null>(null);
@@ -96,7 +99,14 @@ export function useLadonMedia() {
         setVoiceState({ peers });
       },
       onLocalStream(stream) {
-        setVoiceState({ localStream: stream });
+        const kind = engineRef.current?.getLocalKind() ?? null;
+        setVoiceState({
+          localStream: stream,
+          cameraStream: kind === 'video' ? stream : null,
+          cameraOn: kind === 'video' && !!stream,
+          screenshareStream: kind === 'screen' ? stream : null,
+          screenshareActive: kind === 'screen' && !!stream,
+        });
       },
       onRoomStats(ch, stats) {
         const roomStats = new Map(useOnyxStore.getState().voice.roomStats);
@@ -111,10 +121,23 @@ export function useLadonMedia() {
       },
       enableVideoCalls: () => true,
       enableVoiceCalls: () => true,
+      getMediaSettings: () => {
+        const v = useOnyxStore.getState().voice;
+        return {
+          inputDeviceId: v.inputDeviceId,
+          cameraDeviceId: v.cameraDeviceId,
+          outputDeviceId: v.outputDeviceId,
+          outputVolume: v.outputVolume,
+          noiseSuppression: v.noiseSuppression,
+          echoCancellation: v.echoCancellation,
+        };
+      },
+      getLocalNick: () => useOnyxStore.getState().ourNick,
     };
 
     if (!engineRef.current) {
       engineRef.current = new LadonMediaEngine(callbacks, { kind: 'voice' });
+      setMountedLadonMediaEngine(engineRef.current);
     }
 
     engineRef.current.setClient(client);
@@ -144,6 +167,14 @@ export function useLadonMedia() {
       engineRef.current?.setClient(null);
     };
   }, [client, setVoiceState, addNotification]);
+
+  useEffect(() => {
+    engineRef.current?.setOutput(outputDeviceId, outputVolume);
+  }, [outputDeviceId, outputVolume]);
+
+  useEffect(() => {
+    engineRef.current?.setDeafened(deafened);
+  }, [deafened]);
 
   useEffect(() => {
     const startHandler = (event: Event) => {

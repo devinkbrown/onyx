@@ -5,6 +5,7 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { IRCClient } from '@/lib/irc/client';
 import type { IRCMessage, Channel, ChatMessage, ConnectionStatus, MessageReaction } from '@/lib/irc/types';
 import type { LadonPeerState, LadonRoomStats, CallState } from '@/lib/ladon-media/types';
+import { getMountedLadonMediaEngine } from '@/lib/ladon-media/MediaEngine';
 import { parseActivity } from '@/lib/activity';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -128,6 +129,64 @@ export interface VoiceState {
   // Local camera state
   cameraOn: boolean;
   cameraStream: MediaStream | null;
+}
+
+type StoredVoiceSettings = Pick<
+  VoiceState,
+  | 'inputDeviceId'
+  | 'outputDeviceId'
+  | 'outputVolume'
+  | 'vadEnabled'
+  | 'vadSensitivity'
+  | 'noiseSuppression'
+  | 'echoCancellation'
+  | 'pushToTalk'
+  | 'pushToTalkKey'
+  | 'cameraDeviceId'
+>;
+
+const VOICE_SETTINGS_KEY = 'ocean-voice-settings';
+
+function _loadVoiceSettings(): StoredVoiceSettings {
+  const defaults: StoredVoiceSettings = {
+    inputDeviceId: null,
+    outputDeviceId: null,
+    outputVolume: 80,
+    vadEnabled: true,
+    vadSensitivity: 'medium',
+    noiseSuppression: true,
+    echoCancellation: true,
+    pushToTalk: false,
+    pushToTalkKey: null,
+    cameraDeviceId: null,
+  };
+  if (typeof window === 'undefined') return defaults;
+  try {
+    const saved = JSON.parse(localStorage.getItem(VOICE_SETTINGS_KEY) ?? '{}') as Partial<StoredVoiceSettings>;
+    return { ...defaults, ...saved };
+  } catch {
+    return defaults;
+  }
+}
+
+function _saveVoiceSettings(voice: VoiceState): void {
+  if (typeof window === 'undefined') return;
+  const saved: StoredVoiceSettings = {
+    inputDeviceId: voice.inputDeviceId,
+    outputDeviceId: voice.outputDeviceId,
+    outputVolume: voice.outputVolume,
+    vadEnabled: voice.vadEnabled,
+    vadSensitivity: voice.vadSensitivity,
+    noiseSuppression: voice.noiseSuppression,
+    echoCancellation: voice.echoCancellation,
+    pushToTalk: voice.pushToTalk,
+    pushToTalkKey: voice.pushToTalkKey,
+    cameraDeviceId: voice.cameraDeviceId,
+  };
+  try {
+    localStorage.setItem(VOICE_SETTINGS_KEY, JSON.stringify(saved));
+    if (voice.pushToTalkKey) localStorage.setItem('ocean-ptt-key', voice.pushToTalkKey);
+  } catch {}
 }
 
 export interface Notification {
@@ -1540,55 +1599,29 @@ export const useOnyxStore = create<OnyxState>()(
       deafened: false,
       localStream: null,
       roomStats: new Map(),
-      inputDeviceId: null,
-      outputDeviceId: null,
-      outputVolume: 80,
-      vadEnabled: true,
-      vadSensitivity: 'medium',
-      noiseSuppression: true,
-      echoCancellation: true,
-      pushToTalk: false,
-      pushToTalkKey: null,
-      cameraDeviceId: null,
+      ..._loadVoiceSettings(),
       screenshareActive: false,
       screenshareStream: null,
       videoParticipants: new Map(),
       cameraOn: false,
       cameraStream: null,
       async startScreenshare() {
-        try {
-          const stream = await navigator.mediaDevices.getDisplayMedia({
-            video: {
-              frameRate: { ideal: 60, max: 60 },
-              width: { ideal: 3840, max: 3840 },
-              height: { ideal: 2160, max: 2160 },
-            },
-            audio: false,
-          });
-          set(s => ({ voice: { ...s.voice, screenshareActive: true, screenshareStream: stream } }));
-          const { client, activeView } = get();
-          const target = activeView.kind === 'channel' ? activeView.channel :
-                         activeView.kind === 'dm' ? activeView.nick : null;
-          if (target) {
-            client?.sendRaw('NOTICE', target, '\x01SCREENSHARE START\x01');
-          }
-          stream.getVideoTracks()[0]?.addEventListener('ended', () => {
-            get().voice.stopScreenshare();
-          });
-        } catch {
-          // User cancelled or permission denied — do nothing
-        }
+        const { activeView } = get();
+        const target = activeView.kind === 'channel' ? activeView.channel :
+                       activeView.kind === 'dm' ? activeView.nick : get().voice.callChannel;
+        if (!target) return;
+        await getMountedLadonMediaEngine()?.startScreenShare(target);
+        const stream = getMountedLadonMediaEngine()?.getLocalStream() ?? null;
+        set(s => ({ voice: { ...s.voice, screenshareActive: !!stream, screenshareStream: stream } }));
+        stream?.getVideoTracks()[0]?.addEventListener('ended', () => {
+          get().voice.stopScreenshare();
+        });
       },
       stopScreenshare() {
         const { voice } = get();
+        getMountedLadonMediaEngine()?.stopBroadcast(voice.callChannel ?? undefined);
         voice.screenshareStream?.getTracks().forEach(t => t.stop());
         set(s => ({ voice: { ...s.voice, screenshareActive: false, screenshareStream: null } }));
-        const { client, activeView } = get();
-        const target = activeView.kind === 'channel' ? activeView.channel :
-                       activeView.kind === 'dm' ? activeView.nick : null;
-        if (target) {
-          client?.sendRaw('NOTICE', target, '\x01SCREENSHARE STOP\x01');
-        }
       },
     },
 
@@ -1904,7 +1937,18 @@ export const useOnyxStore = create<OnyxState>()(
 
     // ── voice ─────────────────────────────────────────────────────────────
     setVoiceCallState(s) {
-      set(prev => ({ voice: { ...prev.voice, ...s } }));
+      set(prev => {
+        const voice = { ...prev.voice, ...s };
+        _saveVoiceSettings(voice);
+        return { voice };
+      });
+      const engine = getMountedLadonMediaEngine();
+      if (s.muted !== undefined) engine?.setMuted(s.muted);
+      if (s.deafened !== undefined) engine?.setDeafened(s.deafened);
+      if (s.outputDeviceId !== undefined || s.outputVolume !== undefined) {
+        const v = get().voice;
+        engine?.setOutput(v.outputDeviceId, v.outputVolume);
+      }
     },
     setVoiceParticipantSpeaking(nick, speaking) {
       set(prev => {
@@ -3413,6 +3457,7 @@ export const useOnyxStore = create<OnyxState>()(
             // ── LADON_CALL: DM voice/video call signaling ─────────────────
             if (ctcpCmd === 'LADON_CALL') {
               const callType = ctcpArgStr === 'VIDEO' ? 'VIDEO' : 'VOICE';
+              getMountedLadonMediaEngine()?.noteIncomingCall(sender, callType === 'VIDEO' ? 'video' : 'voice');
               get().setVoiceCallState({ callState: 'ringing_in', callWith: sender, callChannel: null });
               get().addToast({
                 variant: 'info',
@@ -3423,15 +3468,14 @@ export const useOnyxStore = create<OnyxState>()(
             }
             if (ctcpCmd === 'LADON_CALL_ACCEPT') {
               if (get().voice.callState === 'ringing_out') {
-                navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then(stream => {
-                  get().setVoiceCallState({ callState: 'in_call', localStream: stream });
-                }).catch(() => { /* permission denied — user will see OS prompt result */ });
+                getMountedLadonMediaEngine()?.handleMediaMessage(sender, sender, 'ACCEPT', '');
               }
               break;
             }
             if (ctcpCmd === 'LADON_CALL_REJECT') {
               if (get().voice.callState === 'ringing_out') {
                 get().setVoiceCallState({ callState: 'idle', callWith: '', callChannel: null });
+                getMountedLadonMediaEngine()?.handleMediaMessage(sender, sender, 'REJECT', '');
                 get().addToast({ variant: 'info', title: 'Call Declined', description: `${sender} declined the call` });
               }
               break;
@@ -5816,25 +5860,14 @@ export const useOnyxStore = create<OnyxState>()(
     voiceChannelParticipants: new Map(),
 
     async joinVoiceChannel(channel, withVideo = false) {
-      const { client, voice } = get();
+      const { client } = get();
       if (!client) return;
+      const engine = getMountedLadonMediaEngine();
+      if (!engine) return;
 
-      let stream: MediaStream | null = null;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: voice.echoCancellation,
-            noiseSuppression: voice.noiseSuppression,
-            deviceId: voice.inputDeviceId ?? undefined,
-          },
-          video: withVideo ? {
-            deviceId: voice.cameraDeviceId ?? undefined,
-            width: { ideal: 1920, max: 1920 },
-            height: { ideal: 1080, max: 1080 },
-            frameRate: { ideal: 60, max: 60 },
-          } : false,
-        });
-      } catch {
+      await (withVideo ? engine.joinVideo(channel) : engine.joinVoice(channel));
+      const stream = engine.getLocalStream();
+      if (!stream) {
         get().addToast({
           variant: 'error',
           title: 'Microphone Error',
@@ -5872,8 +5905,8 @@ export const useOnyxStore = create<OnyxState>()(
 
       const ch = voice.callChannel;
 
-      voice.localStream?.getTracks().forEach(t => t.stop());
-      voice.cameraStream?.getTracks().forEach(t => t.stop());
+      if (ch) getMountedLadonMediaEngine()?.leaveRoom(ch);
+      else if (voice.callWith) getMountedLadonMediaEngine()?.hangup(voice.callWith);
 
       if (client && ch) {
         client.sendRaw('PRIVMSG', ch, '\x01LADON_MEDIA LEAVE\x01');
@@ -5904,30 +5937,25 @@ export const useOnyxStore = create<OnyxState>()(
     async toggleCamera() {
       const { voice, client } = get();
       if (voice.callState !== 'in_call') return;
+      const engine = getMountedLadonMediaEngine();
+      if (!engine) return;
 
       if (voice.cameraOn) {
-        voice.cameraStream?.getTracks().filter(t => t.kind === 'video').forEach(t => t.stop());
-        get().setVoiceCallState({ cameraOn: false, cameraStream: null });
+        engine.stopCamera();
+        get().setVoiceCallState({ cameraOn: false, cameraStream: null, localStream: engine.getLocalStream() });
         if (client && voice.callChannel) {
           client.sendRaw('PRIVMSG', voice.callChannel, '\x01LADON_MEDIA VIDEO_OFF\x01');
         }
       } else {
-        try {
-          const videoStream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              deviceId: voice.cameraDeviceId ?? undefined,
-              width: { ideal: 1920, max: 1920 },
-              height: { ideal: 1080, max: 1080 },
-              frameRate: { ideal: 60, max: 60 },
-            },
-            audio: false,
-          });
-          get().setVoiceCallState({ cameraOn: true, cameraStream: videoStream });
-          if (client && voice.callChannel) {
-            client.sendRaw('PRIVMSG', voice.callChannel, '\x01LADON_MEDIA VIDEO_ON\x01');
-          }
-        } catch {
+        await engine.startCamera(voice.callChannel ?? voice.callWith);
+        const stream = engine.getLocalStream();
+        if (!stream?.getVideoTracks().length) {
           get().addToast({ variant: 'error', title: 'Camera Error', description: 'Could not access camera.' });
+          return;
+        }
+        get().setVoiceCallState({ cameraOn: true, cameraStream: stream, localStream: stream });
+        if (client && voice.callChannel) {
+          client.sendRaw('PRIVMSG', voice.callChannel, '\x01LADON_MEDIA VIDEO_ON\x01');
         }
       }
     },
@@ -5941,7 +5969,9 @@ export const useOnyxStore = create<OnyxState>()(
 
     toggleDeafen() {
       const { voice } = get();
-      get().setVoiceCallState({ deafened: !voice.deafened });
+      const deafened = !voice.deafened;
+      getMountedLadonMediaEngine()?.setDeafened(deafened);
+      get().setVoiceCallState({ deafened });
     },
 
     // ── DM Calling ────────────────────────────────────────────────────────────────
@@ -5953,6 +5983,7 @@ export const useOnyxStore = create<OnyxState>()(
 
       const callType = withVideo ? 'VIDEO' : 'VOICE';
       client.sendRaw('PRIVMSG', nick, `\x01LADON_CALL ${callType}\x01`);
+      void getMountedLadonMediaEngine()?.startCall(nick, withVideo ? 'video' : 'voice');
 
       setTimeout(() => {
         if (get().voice.callState === 'ringing_out') {
@@ -5966,13 +5997,7 @@ export const useOnyxStore = create<OnyxState>()(
       if (!client || voice.callState !== 'ringing_in') return;
 
       client.sendRaw('PRIVMSG', voice.callWith, '\x01LADON_CALL_ACCEPT\x01');
-
-      navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then(stream => {
-        get().setVoiceCallState({ callState: 'in_call', localStream: stream });
-      }).catch(() => {
-        get().addToast({ variant: 'error', title: 'Microphone Error', description: 'Could not access microphone.' });
-        get().endDmCall();
-      });
+      void getMountedLadonMediaEngine()?.acceptIncomingCall();
     },
 
     rejectDmCall() {
@@ -5980,6 +6005,7 @@ export const useOnyxStore = create<OnyxState>()(
       if (client && voice.callWith) {
         client.sendRaw('PRIVMSG', voice.callWith, '\x01LADON_CALL_REJECT\x01');
       }
+      if (voice.callWith) getMountedLadonMediaEngine()?.rejectCall(voice.callWith);
       get().setVoiceCallState({ callState: 'idle', callWith: '', callChannel: null });
     },
 
@@ -5991,6 +6017,7 @@ export const useOnyxStore = create<OnyxState>()(
       if (client && voice.callWith && voice.callState !== 'idle') {
         client.sendRaw('PRIVMSG', voice.callWith, '\x01LADON_CALL_END\x01');
       }
+      if (voice.callWith) getMountedLadonMediaEngine()?.hangup(voice.callWith);
 
       get().setVoiceCallState({
         callState: 'idle',
