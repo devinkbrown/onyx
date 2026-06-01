@@ -127,9 +127,9 @@ describe('ChunkAssembler (extended)', () => {
 
   // ── Post-reassembly byte cap (> 65535) ─────────────────────────────────────
 
-  it('returns null when reassembled frame exceeds MAX_FRAME_BYTES (65535)', () => {
-    // 3 chunks × 21846 bytes = 65538 bytes > 65535
-    const chunkSize = 21846;
+  it('returns null when reassembled frame exceeds MAX_FRAME_BYTES', () => {
+    // MAX_FRAME_BYTES = 120 * 65535 = 7_864_200; 3 × 2_700_000 = 8_100_000 > cap
+    const chunkSize = 2_700_000;
     asm.ingest('ivy', 'vid', 10, 1, 3, makeChunk(0xAA, chunkSize));
     asm.ingest('ivy', 'vid', 10, 2, 3, makeChunk(0xBB, chunkSize));
     const r = asm.ingest('ivy', 'vid', 10, 3, 3, makeChunk(0xCC, chunkSize));
@@ -138,8 +138,8 @@ describe('ChunkAssembler (extended)', () => {
   });
 
   it('slot is cleaned up after over-size frame is rejected', () => {
-    // Arrange: assemble an oversized frame (3 × 21846 = 65538 bytes)
-    const chunkSize = 21846;
+    // Arrange: assemble an oversized frame (3 × 2_700_000 = 8.1MB > MAX_FRAME_BYTES)
+    const chunkSize = 2_700_000;
     asm.ingest('jay', 'vid', 11, 1, 3, makeChunk(0xAA, chunkSize));
     asm.ingest('jay', 'vid', 11, 2, 3, makeChunk(0xBB, chunkSize));
     asm.ingest('jay', 'vid', 11, 3, 3, makeChunk(0xCC, chunkSize));
@@ -152,9 +152,9 @@ describe('ChunkAssembler (extended)', () => {
     expect(r!.length).toBe(4);
   });
 
-  it('accepts reassembled frame exactly at MAX_FRAME_BYTES (65535)', () => {
-    // 3 chunks where total is exactly 65535 bytes: 21845 + 21845 + 21845 = 65535
-    const chunkSize = 21845;
+  it('accepts reassembled frame exactly at MAX_FRAME_BYTES', () => {
+    // total exactly 120 * 65535 = 7_864_200: 3 × 2_621_400
+    const chunkSize = 2_621_400;
     asm.ingest('kim', 'vid', 20, 1, 3, makeChunk(0xAA, chunkSize));
     asm.ingest('kim', 'vid', 20, 2, 3, makeChunk(0xBB, chunkSize));
     const r = asm.ingest('kim', 'vid', 20, 3, 3, makeChunk(0xCC, chunkSize));
