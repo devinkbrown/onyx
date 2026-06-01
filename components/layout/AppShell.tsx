@@ -116,6 +116,15 @@ interface Props {
 }
 
 export default function AppShell({ children }: Props) {
+  // E2E test hook (inert unless ?e2e=1): exposes the store so the automated
+  // voice/video test harness can drive connect/join and inspect state without
+  // fragile UI selectors. No-op for normal users.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('e2e')) {
+      (window as Window & { __ocean?: typeof useOnyxStore }).__ocean = useOnyxStore;
+    }
+  }, []);
+
   const activeView          = useOnyxStore(s => s.activeView);
   const showMemberList      = useOnyxStore(s => s.showMemberList);
   const showSettings        = useOnyxStore(s => s.showSettings);
