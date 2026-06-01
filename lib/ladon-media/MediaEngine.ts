@@ -20,14 +20,19 @@ import type {
 
 export type { CallState, VoiceCallState, MediaKind, LadonPeerState, LadonRoomStats, NetworkQualityTier, LadonMediaCallbacks, LadonChannelInfo };
 
-let mountedEngine: LadonMediaEngine | null = null;
+// The mounted engine is a cross-module singleton. It MUST live on globalThis,
+// not a module-local `let`: the store (getMounted…) and the useLadonMedia hook
+// (setMounted…) can be bundled into separate chunks with separate module
+// instances, in which case a module-local leaves the store reading null forever
+// — so joinVoiceChannel no-ops and voice/video never starts.
+const MOUNTED_ENGINE_KEY = '__oceanMountedLadonEngine';
 
 export function setMountedLadonMediaEngine(engine: LadonMediaEngine | null): void {
-  mountedEngine = engine;
+  (globalThis as Record<string, unknown>)[MOUNTED_ENGINE_KEY] = engine;
 }
 
 export function getMountedLadonMediaEngine(): LadonMediaEngine | null {
-  return mountedEngine;
+  return ((globalThis as Record<string, unknown>)[MOUNTED_ENGINE_KEY] as LadonMediaEngine | null) ?? null;
 }
 
 // -------------------------------------------------------------------
