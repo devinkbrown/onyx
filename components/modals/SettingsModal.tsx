@@ -1416,18 +1416,14 @@ function VoiceTab() {
 }
 
 function NotificationsTab() {
-  const channelNotify    = useOnyxStore(s => s.channelNotify);
-  const setChannelNotify = useOnyxStore(s => s.setChannelNotify);
+  const channelNotify                   = useOnyxStore(s => s.channelNotify);
+  const setChannelNotify                = useOnyxStore(s => s.setChannelNotify);
+  const desktopEnabled                  = useOnyxStore(s => s.pushNotificationsEnabled);
+  const setDesktopEnabled               = useOnyxStore(s => s.setPushNotificationsEnabled);
+  const soundEnabled                    = useOnyxStore(s => s.soundEnabled);
+  const setSoundEnabled                 = useOnyxStore(s => s.setSoundEnabled);
 
   // ── Read / write localStorage prefs ─────────────────────────────────────
-  const [desktopEnabled, setDesktopEnabled] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true;
-    return localStorage.getItem('ocean-notif-desktop') !== 'false';
-  });
-  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return localStorage.getItem('ocean-notif-sounds') === 'true';
-  });
   const [notifLevel, setNotifLevel] = useState<'all' | 'mentions' | 'none'>(() => {
     if (typeof window === 'undefined') return 'all';
     const stored = localStorage.getItem('ocean-notif-level');
@@ -1444,23 +1440,22 @@ function NotificationsTab() {
   const toggleDesktop = async () => {
     if (!desktopEnabled) {
       // Enabling — request permission if needed
-      if ('Notification' in window && Notification.permission === 'default') {
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
         const result = await Notification.requestPermission();
         setPermState(result);
         if (result !== 'granted') return; // don't enable if denied
       }
-      setPermState(Notification.permission);
-      localStorage.setItem('ocean-notif-desktop', 'true');
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        setPermState(Notification.permission);
+      }
       setDesktopEnabled(true);
     } else {
-      localStorage.setItem('ocean-notif-desktop', 'false');
       setDesktopEnabled(false);
     }
   };
 
   const toggleSound = () => {
     const next = !soundEnabled;
-    localStorage.setItem('ocean-notif-sounds', next ? 'true' : 'false');
     setSoundEnabled(next);
     if (next) {
       // Preview the sound immediately

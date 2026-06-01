@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
-import { playNotificationSound } from '@/lib/sounds';
 
 function _channelFromNotification(n: { channel?: string }): string | null {
   return n.channel ? n.channel.toLowerCase() : null;
@@ -16,7 +15,7 @@ function _channelFromNotification(n: { channel?: string }): string | null {
  *     counts so users can see activity at a glance.
  *  2. Browser push notifications — fires a desktop notification for mentions
  *     and DMs when the window does not have focus, gated by localStorage prefs.
- *  3. Notification sound — plays a subtle beep when sounds are enabled.
+ *  3. OS notifications — emitted from the notification store only.
  *
  * Mount once at the AppShell level.
  */
@@ -28,6 +27,7 @@ export function useNotifications() {
   const totalUnreadMentions  = useOnyxStore(s => s.totalUnreadMentions);
   const channelNotify        = useOnyxStore(s => s.channelNotify);
   const ourNick              = useOnyxStore(s => s.ourNick);
+  const pushEnabled          = useOnyxStore(s => s.pushNotificationsEnabled);
   const seenCount            = useRef(0);
 
   // ── Document title badge ────────────────────────────────────────────────
@@ -70,6 +70,7 @@ export function useNotifications() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!('Notification' in window)) return;
+    if (!pushEnabled) return;
     if (Notification.permission === 'default') {
       // Request lazily — only after user has interacted with the page
       const handler = () => {
@@ -77,8 +78,9 @@ export function useNotifications() {
         window.removeEventListener('click', handler);
       };
       window.addEventListener('click', handler, { once: true });
+      return () => window.removeEventListener('click', handler);
     }
-  }, []);
+  }, [pushEnabled]);
 
   // ── Fire browser notifications and sounds for new mentions/DMs ──────────
   useEffect(() => {
@@ -92,9 +94,9 @@ export function useNotifications() {
     if (document.hasFocus()) return;
     if (isDndActive()) return;
 
-    // Read user prefs from localStorage
-    const desktopEnabled = localStorage.getItem('ocean-notif-desktop') !== 'false';
-    const soundEnabled   = localStorage.getItem('ocean-notif-sounds') === 'true';
+    if (!pushEnabled) return;
+
+    // Read filtering prefs from localStorage
     const notifLevel     = localStorage.getItem('ocean-notif-level') ?? 'all';
 
     for (const n of newOnes) {
@@ -121,13 +123,8 @@ export function useNotifications() {
         }
       }
 
-      // Play sound
-      if (soundEnabled) {
-        playNotificationSound();
-      }
-
       // Show desktop notification
-      if (desktopEnabled && Notification.permission === 'granted') {
+      if (Notification.permission === 'granted') {
         const title = n.type === 'dm'
           ? `Ocean — DM from ${n.from ?? 'someone'}`
           : `Ocean — ${n.from ?? 'someone'} mentioned you${n.channel ? ` in ${n.channel}` : ''}`;
@@ -146,5 +143,5 @@ export function useNotifications() {
         }
       }
     }
-  }, [notifications, isDndActive, channelNotify, ourNick]);
+  }, [notifications, isDndActive, channelNotify, ourNick, pushEnabled]);
 }

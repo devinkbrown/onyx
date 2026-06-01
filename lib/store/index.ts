@@ -1455,6 +1455,57 @@ function _loadCompactSidebar(): boolean {
   return typeof window !== 'undefined' && localStorage.getItem('ocean-compact-sidebar') === '1';
 }
 
+function _loadIdleAwayMinutes(): number {
+  if (typeof window === 'undefined') return 15;
+  const parsed = Number(localStorage.getItem('ocean-idle-away-minutes'));
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 15;
+}
+
+function _loadDndEnabled(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem('ocean-dnd-enabled') === 'true';
+}
+
+function _loadDndHour(key: string, fallback: number): number {
+  if (typeof window === 'undefined') return fallback;
+  const parsed = Number(localStorage.getItem(key));
+  return Number.isInteger(parsed) && parsed >= 0 && parsed <= 23 ? parsed : fallback;
+}
+
+function _loadDndUntil(): number | null {
+  if (typeof window === 'undefined') return null;
+  const parsed = Number(localStorage.getItem('ocean-dnd-until'));
+  return Number.isFinite(parsed) && parsed > Date.now() ? parsed : null;
+}
+
+function _loadSoundEnabled(): boolean {
+  if (typeof window === 'undefined') return true;
+  const stored = localStorage.getItem('ocean-sound');
+  if (stored !== null) return stored !== 'false';
+  const legacy = localStorage.getItem('ocean-notif-sounds');
+  return legacy === null ? true : legacy === 'true';
+}
+
+function _loadPushNotificationsEnabled(): boolean {
+  if (typeof window === 'undefined') return true;
+  const stored = localStorage.getItem('ocean-push-notifications');
+  if (stored !== null) return stored !== 'false';
+  const legacy = localStorage.getItem('ocean-notif-desktop');
+  return legacy === null ? true : legacy !== 'false';
+}
+
+function _loadEmojiSkinTone(): OnyxState['emojiSkinTone'] {
+  if (typeof window === 'undefined') return '';
+  const stored = localStorage.getItem('ocean-emoji-skin-tone');
+  return stored === '\u{1F3FB}' || stored === '\u{1F3FC}' || stored === '\u{1F3FD}' ||
+    stored === '\u{1F3FE}' || stored === '\u{1F3FF}' ? stored : '';
+}
+
+function _normalizeEmojiSkinTone(tone: string): OnyxState['emojiSkinTone'] {
+  return tone === '\u{1F3FB}' || tone === '\u{1F3FC}' || tone === '\u{1F3FD}' ||
+    tone === '\u{1F3FE}' || tone === '\u{1F3FF}' ? tone : '';
+}
+
 // ── Store ─────────────────────────────────────────────────────────────────────
 
 export const useOnyxStore = create<OnyxState>()(
@@ -4955,8 +5006,13 @@ export const useOnyxStore = create<OnyxState>()(
       get().client?.sendRaw('AWAY');
       set({ isAway: false, awayMessage: '' });
     },
-    idleAwayMinutes: 15,
-    setIdleAwayMinutes: (minutes) => set({ idleAwayMinutes: minutes }),
+    idleAwayMinutes: _loadIdleAwayMinutes(),
+    setIdleAwayMinutes: (minutes) => {
+      if (typeof window !== 'undefined') {
+        try { localStorage.setItem('ocean-idle-away-minutes', String(minutes)); } catch {}
+      }
+      set({ idleAwayMinutes: minutes });
+    },
 
     // ── IRC Operator ────────────────────────────────────────────────────
     isOper: false,
@@ -4998,10 +5054,7 @@ export const useOnyxStore = create<OnyxState>()(
     closeScheduledMessages: () => set({ showScheduledMessages: false }),
 
     // ── Sound settings ───────────────────────────────────────────────────
-    soundEnabled: (() => {
-      if (typeof window === 'undefined') return true;
-      return localStorage.getItem('ocean-sound') !== 'false';
-    })(),
+    soundEnabled: _loadSoundEnabled(),
     soundVolume: (() => {
       if (typeof window === 'undefined') return 0.5;
       return parseFloat(localStorage.getItem('ocean-sound-volume') || '0.5');
@@ -5016,10 +5069,7 @@ export const useOnyxStore = create<OnyxState>()(
     },
 
     // ── Push notifications ───────────────────────────────────────────────
-    pushNotificationsEnabled: (() => {
-      if (typeof window === 'undefined') return true;
-      return localStorage.getItem('ocean-push-notifications') !== 'false';
-    })(),
+    pushNotificationsEnabled: _loadPushNotificationsEnabled(),
     setPushNotificationsEnabled: (enabled) => {
       if (typeof window !== 'undefined') localStorage.setItem('ocean-push-notifications', String(enabled));
       set({ pushNotificationsEnabled: enabled });
@@ -5104,8 +5154,14 @@ export const useOnyxStore = create<OnyxState>()(
         return { recentEmojis: recent };
       });
     },
-    emojiSkinTone: '',
-    setEmojiSkinTone: (tone) => set({ emojiSkinTone: tone as '' | '\u{1F3FB}' | '\u{1F3FC}' | '\u{1F3FD}' | '\u{1F3FE}' | '\u{1F3FF}' }),
+    emojiSkinTone: _loadEmojiSkinTone(),
+    setEmojiSkinTone: (tone) => {
+      const normalized = _normalizeEmojiSkinTone(tone);
+      if (typeof window !== 'undefined') {
+        try { localStorage.setItem('ocean-emoji-skin-tone', normalized); } catch {}
+      }
+      set({ emojiSkinTone: normalized });
+    },
     emojiUsageCounts: _loadEmojiUsage(),
     incrementEmojiUsage: (emoji) => {
       set(s => {
@@ -5258,14 +5314,35 @@ export const useOnyxStore = create<OnyxState>()(
     closeAnnouncementsPanel: () => set({ showAnnouncementsPanel: false }),
 
     // ── Do Not Disturb ────────────────────────────────────────────────────
-    dndEnabled: false,
-    dndQuietStart: 22,
-    dndQuietEnd: 8,
-    dndUntil: null,
+    dndEnabled: _loadDndEnabled(),
+    dndQuietStart: _loadDndHour('ocean-dnd-quiet-start', 22),
+    dndQuietEnd: _loadDndHour('ocean-dnd-quiet-end', 8),
+    dndUntil: _loadDndUntil(),
     showDndModal: false,
-    setDndEnabled: (enabled) => set({ dndEnabled: enabled }),
-    setDndQuietHours: (start, end) => set({ dndQuietStart: start, dndQuietEnd: end }),
-    setDndUntil: (until) => set({ dndUntil: until }),
+    setDndEnabled: (enabled) => {
+      if (typeof window !== 'undefined') {
+        try { localStorage.setItem('ocean-dnd-enabled', String(enabled)); } catch {}
+      }
+      set({ dndEnabled: enabled });
+    },
+    setDndQuietHours: (start, end) => {
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('ocean-dnd-quiet-start', String(start));
+          localStorage.setItem('ocean-dnd-quiet-end', String(end));
+        } catch {}
+      }
+      set({ dndQuietStart: start, dndQuietEnd: end });
+    },
+    setDndUntil: (until) => {
+      if (typeof window !== 'undefined') {
+        try {
+          if (until === null) localStorage.removeItem('ocean-dnd-until');
+          else localStorage.setItem('ocean-dnd-until', String(until));
+        } catch {}
+      }
+      set({ dndUntil: until });
+    },
     isDndActive: () => {
       const { dndEnabled, dndQuietStart, dndQuietEnd, dndUntil } = get();
       // Timed override takes precedence

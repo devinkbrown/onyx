@@ -149,7 +149,7 @@ export function useKeyboardShortcuts() {
 
       // ── Escape → Focus chat input (when not in a text field) ─────────
       if (e.key === 'Escape') {
-        const chatInput = document.querySelector<HTMLTextAreaElement>('.chat-input-textarea');
+        const chatInput = document.querySelector<HTMLTextAreaElement>('.msg-textarea, .chat-input-textarea');
         if (chatInput) {
           e.preventDefault();
           chatInput.focus();

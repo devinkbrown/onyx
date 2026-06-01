@@ -72,31 +72,49 @@ export default function GifPicker({ onPick, onClose }: Props) {
   const [activeCat, setActiveCat] = useState(0);
 
   const searchRef = useRef<HTMLInputElement>(null);
+  const activeFetchRef = useRef<AbortController | null>(null);
   const debouncedQuery = useDebounce(query, 300);
 
-  const fetchGifs = useCallback(async (q: string) => {
+  const fetchGifs = useCallback(async (q: string, signal: AbortSignal) => {
     setLoading(true);
     setError(false);
     try {
       const url = q
         ? `${TENOR_BASE}/search?q=${encodeURIComponent(q)}&key=${TENOR_KEY}&limit=24&media_filter=gif`
         : `${TENOR_BASE}/featured?key=${TENOR_KEY}&limit=24&media_filter=gif`;
-      const res = await fetch(url);
+      const res = await fetch(url, { signal });
       if (!res.ok) throw new Error(`Tenor API error: ${res.status}`);
       const data: TenorResponse = await res.json();
       const items = (data.results ?? []).map(tenorToGifItem);
       setGifs(items);
-    } catch {
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       setError(true);
       setGifs([]);
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
   }, []);
 
+  const startFetch = useCallback((q: string) => {
+    activeFetchRef.current?.abort();
+    const controller = new AbortController();
+    activeFetchRef.current = controller;
+    void fetchGifs(q, controller.signal).finally(() => {
+      if (activeFetchRef.current === controller) activeFetchRef.current = null;
+    });
+    return controller;
+  }, [fetchGifs]);
+
   useEffect(() => {
-    fetchGifs(debouncedQuery);
-  }, [debouncedQuery, fetchGifs]);
+    const controller = startFetch(debouncedQuery);
+    return () => {
+      if (activeFetchRef.current === controller) {
+        controller.abort();
+        activeFetchRef.current = null;
+      }
+    };
+  }, [debouncedQuery, startFetch]);
 
   useEffect(() => {
     searchRef.current?.focus();
@@ -194,7 +212,7 @@ export default function GifPicker({ onPick, onClose }: Props) {
           <div className="gp-error">
             <span className="gp-error-icon">😔</span>
             <span>Could not load GIFs. Check your connection.</span>
-            <button className="gp-retry-btn" onClick={() => fetchGifs(debouncedQuery)}>
+            <button className="gp-retry-btn" onClick={() => startFetch(debouncedQuery)}>
               Try again
             </button>
           </div>

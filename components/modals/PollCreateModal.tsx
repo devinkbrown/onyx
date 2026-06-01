@@ -63,13 +63,12 @@ export default function PollCreateModal() {
         : null;
     if (!target) return;
 
-    const payload = JSON.stringify({
-      question: question.trim(),
-      options: options.filter(o => o.trim()).map(o => o.trim()),
-      duration: DURATION_OPTIONS[durationIdx].seconds,
-      multiVote,
-    });
-    sendMessage(target, `\x01POLL ${payload}\x01`);
+    const cleanPart = (part: string) => part.trim().replace(/[|\]]/g, ' ');
+    const pollParts = [
+      cleanPart(question),
+      ...options.filter(o => o.trim()).map(cleanPart),
+    ];
+    sendMessage(target, `[POLL: ${pollParts.join('|')}]`);
     closePollCreate();
   }, [canSubmit, activeView, question, options, durationIdx, multiVote, sendMessage, closePollCreate]);
 

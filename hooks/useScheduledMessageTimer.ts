@@ -10,8 +10,10 @@ export function useScheduledMessageTimer() {
   useEffect(() => {
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
+      const state = useOnyxStore.getState();
+      if (!state.client || state.status !== 'connected') return;
       const now = Date.now();
-      const due = useOnyxStore.getState().scheduledMessages.filter(m => m.sendAt <= now);
+      const due = state.scheduledMessages.filter(m => m.sendAt <= now);
       for (const msg of due) {
         sendMessage(msg.channel, msg.text);
         cancelScheduledMessage(msg.id);

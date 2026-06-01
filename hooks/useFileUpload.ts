@@ -81,8 +81,7 @@ export function useFileUpload(): {
       }
       return files.map(file => {
         const localUrl = URL.createObjectURL(file);
-        const isMedia = file.type.startsWith('image/') || file.type.startsWith('video/');
-        return { file, url: isMedia ? localUrl : null, localUrl };
+        return { file, url: null, localUrl };
       });
     }
 
