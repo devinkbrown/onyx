@@ -80,9 +80,15 @@ export default function ThemeProvider() {
   // so picking a pure-ocean theme (coral/kelp/brine/abyss/bathyal/arctic) while
   // the new-system theme was anything else silently did nothing.
   useEffect(() => {
-    const legacy = activeTheme && activeTheme !== 'ocean' ? activeTheme : null;
-    const finalTheme = storeTheme === 'system' ? resolvedTheme : (legacy ?? resolvedTheme);
-    document.documentElement.setAttribute('data-theme', finalTheme);
+    if (storeTheme === 'system' || activeTheme === 'system') {
+      document.documentElement.setAttribute('data-theme', resolvedTheme);
+      return;
+    }
+    if (activeTheme && activeTheme !== 'ocean') {
+      document.documentElement.setAttribute('data-theme', activeTheme);
+      return;
+    }
+    document.documentElement.removeAttribute('data-theme');
   }, [activeTheme, storeTheme, resolvedTheme]);
 
   // ── Apply fontSize from store ────────────────────────────────────────────────

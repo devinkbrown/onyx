@@ -860,7 +860,7 @@ const QuickSettingsPanel = forwardRef<HTMLDivElement, QuickSettingsPanelProps>(
     const accentColor     = useOnyxStore(s => s.accentColor);
     const setAccentColor  = useOnyxStore(s => s.setAccentColor);
 
-    const THEMES = ['ocean', 'midnight', 'forest', 'ember', 'arctic'] as const;
+    const THEMES = ['ocean', 'midnight', 'kelp', 'coral', 'arctic'] as const;
 
     // Close on Escape
     useEffect(() => {
@@ -1059,8 +1059,8 @@ const QuickSettingsPanel = forwardRef<HTMLDivElement, QuickSettingsPanelProps>(
           .qs-theme-dot--active { border-color: white; }
           .qs-theme-ocean   { background: #0ea5e9; }
           .qs-theme-midnight { background: #0ea5e9; }
-          .qs-theme-forest  { background: #22c55e; }
-          .qs-theme-ember   { background: #f97316; }
+          .qs-theme-kelp    { background: #22c55e; }
+          .qs-theme-coral   { background: #fb923c; }
           .qs-theme-arctic  { background: #58a6ff; }
           .qs-color-dot {
             width: 20px; height: 20px;

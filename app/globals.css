@@ -270,6 +270,32 @@
     --glow:       0 0 40px rgba(124,90,245,0.15);
   }
 
+  /* ── Theme: amoled — true black, warm instrument glow ── */
+  [data-theme="amoled"] {
+    --bg-void:     #000000;
+    --bg-deep:     #000000;
+    --bg-base:     #050505;
+    --bg-elevated: #0d0d0d;
+    --bg-float:    #151515;
+    --bg-overlay:  #1d1d1d;
+    --accent:         #e8b84b;
+    --accent-hover:   #f5ca66;
+    --accent-active:  #c9982f;
+    --accent-border:  rgba(232,184,75,0.30);
+    --accent-subtle:  rgba(232,184,75,0.08);
+    --accent-glow:    rgba(232,184,75,0.16);
+    --gold:           #00e5ff;
+    --gold-subtle:    rgba(0,229,255,0.08);
+    --text-primary:   #f7f3e8;
+    --text-secondary: #c8b990;
+    --text-muted:     #9f936f;
+    --border-normal:  rgba(232,184,75,0.12);
+    --border-subtle:  rgba(232,184,75,0.06);
+    --shadow-sm:  0 1px 4px rgba(0,0,0,0.8);
+    --shadow-md:  0 4px 24px rgba(0,0,0,0.9);
+    --glow:       0 0 40px rgba(232,184,75,0.12);
+  }
+
   /* ── Theme: arctic — polar melt, iceberg blues, near-white surface ── */
   [data-theme="arctic"] {
     --bg-void:     #080d12;
