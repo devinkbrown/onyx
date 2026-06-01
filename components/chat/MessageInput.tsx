@@ -90,12 +90,25 @@ const EMOJI_SHORTCUTS: Record<string, string> = {
 // ── Character counter constants ───────────────────────────────────────────────
 // IRC 512-byte limit. Subtract typical overhead: ":nick!user@host PRIVMSG #channel :\r\n"
 // Conservative overhead of ~60 bytes leaves ~452 usable. We show a counter
-// when within 200 chars of the limit, counting down remaining chars.
+// near the limit, counting down remaining IRC wire bytes.
 const IRC_LIMIT = 512;
 const IRC_OVERHEAD = 60; // conservative: nick!user@host + command + target + separators
 const CHAR_LIMIT_IRC = IRC_LIMIT - IRC_OVERHEAD; // ~452 usable bytes
 const CHAR_WARNING_AT = CHAR_LIMIT_IRC - 200;    // show counter when < 200 remaining
-const CHAR_LIMIT = CHAR_LIMIT_IRC;
+const IRC_TEXT_ENCODER = new TextEncoder();
+
+function ircBytes(value: string): number {
+  return IRC_TEXT_ENCODER.encode(value).length;
+}
+
+function getMaxPrivmsgWireBytes(target: string, text: string, replyId?: string): number {
+  const lines = text.split('\n').filter(l => l.trim());
+  if (lines.length === 0) return 0;
+  return Math.max(...lines.map((line, i) => {
+    const tags = replyId && i === 0 ? `@+draft/reply=${replyId} ` : '';
+    return ircBytes(`${tags}PRIVMSG ${target} :${line}\r\n`);
+  }));
+}
 
 // ── Preview renderer (same transforms as renderText in MessageItem) ───────────
 function previewHtml(text: string): string {
@@ -229,6 +242,13 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
     getText,
     setText: setTextWithCursor,
   });
+
+  const markMessageSent = useCallback(() => {
+    onMessageSent?.();
+    setSentFlash(true);
+    if (sentFlashTimerRef.current) clearTimeout(sentFlashTimerRef.current);
+    sentFlashTimerRef.current = setTimeout(() => setSentFlash(false), 500);
+  }, [onMessageSent]);
 
   // ── Slash command discovery menu ──
   const [slashMenuOpen,  setSlashMenuOpen]  = useState(false);
@@ -637,7 +657,15 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
     switch (cmd) {
       case 'me':
         if (!rest) { addNotification({ type: 'system', text: 'Usage: /me <action>' }); break; }
-        sendMessage(target, `\x01ACTION ${rest}\x01`);
+        {
+          const actionMessage = `\x01ACTION ${rest}\x01`;
+          if (getMaxPrivmsgWireBytes(target, actionMessage, replyingTo?.id) > IRC_LIMIT) {
+            addNotification({ type: 'system', text: 'Message is too long for the IRC wire limit' });
+            break;
+          }
+          sendMessage(target, actionMessage);
+        }
+        markMessageSent();
         break;
 
       case 'nick':
@@ -905,14 +933,20 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         break;
     }
     return true;
-  }, [addNotification, channels, client, clearMessages, ignoreUser, joinChannel, navigate, openExportModal, openHighlightModal, openIgnoreList, openOperPanel, openPollCreate, openScheduledMessages, openServerRulesModal, openServices, openWhois, sendMessage, setChannelJoinPrompt, setRawLogEnabled, target, toggleRawLog, unignoreUser]);
+  }, [addNotification, channels, client, clearMessages, ignoreUser, joinChannel, markMessageSent, navigate, openExportModal, openHighlightModal, openIgnoreList, openOperPanel, openPollCreate, openScheduledMessages, openServerRulesModal, openServices, openWhois, replyingTo?.id, sendMessage, setChannelJoinPrompt, setRawLogEnabled, target, toggleRawLog, unignoreUser]);
 
   // ── Computed: can send? ────────────────────────────────────────────────────
-  const canSend = (text.trim().length > 0 || attachments.length > 0) && !slowModeActive && text.length <= CHAR_LIMIT && !uploading;
+  const wireBytes = useMemo(
+    () => getMaxPrivmsgWireBytes(target, text, replyingTo?.id),
+    [target, text, replyingTo?.id],
+  );
+  const bytesRemaining = IRC_LIMIT - wireBytes;
+  const overCharLimit = wireBytes > IRC_LIMIT;
+  const canSend = (text.trim().length > 0 || attachments.length > 0) && !slowModeActive && !overCharLimit && !uploading;
 
   const submit = async () => {
     if (!canSend) return;
-    if (text.length > CHAR_LIMIT) return;
+    if (overCharLimit) return;
 
     const line = text.trim();
 
@@ -961,12 +995,12 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
       const base = line.startsWith('//') ? line.slice(1) : line;
       const msg = (base + attSuffix).trim();
       if (msg) {
+        if (getMaxPrivmsgWireBytes(target, msg, replyingTo?.id) > IRC_LIMIT) {
+          addNotification({ type: 'system', text: 'Message is too long for the IRC wire limit' });
+          return;
+        }
         sendMessage(target, msg);
-        onMessageSent?.();
-        // Trigger sent flash on the input bar
-        setSentFlash(true);
-        if (sentFlashTimerRef.current) clearTimeout(sentFlashTimerRef.current);
-        sentFlashTimerRef.current = setTimeout(() => setSentFlash(false), 500);
+        markMessageSent();
       }
     }
 
@@ -1132,15 +1166,12 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
     ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
   };
 
-  // ── Paste handler: capture image files from clipboard ──────────────────────
+  // ── Paste handler: capture files from clipboard ────────────────────────────
   const onPaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const files = e.clipboardData?.files;
     if (files && files.length > 0) {
-      const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
-      if (imageFiles.length > 0) {
-        e.preventDefault();
-        addFiles(imageFiles);
-      }
+      e.preventDefault();
+      addFiles(files);
     }
   }, [addFiles]);
 
@@ -1696,7 +1727,13 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           {showStickerPicker && (
             <StickerPicker
               onSelect={(sticker) => {
-                sendMessage(target, stickerToMessage(sticker));
+                if (slowModeActive || uploading) return;
+                const stickerMessage = stickerToMessage(sticker);
+                sendMessage(target, stickerMessage);
+                markMessageSent();
+                setHistory(h => [stickerMessage, ...h.slice(0, 99)]);
+                if (typingTimer.current) { clearTimeout(typingTimer.current); typingTimer.current = null; }
+                sendTypingStop(target);
                 setShowStickerPicker(false);
               }}
               onClose={() => setShowStickerPicker(false)}
@@ -1708,6 +1745,7 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
             aria-expanded={showStickerPicker}
             title="Stickers"
             type="button"
+            disabled={slowModeActive || uploading}
             onClick={() => {
               setShowStickerPicker(p => !p);
               setShowEmojiPicker(false);
@@ -1766,17 +1804,17 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           <EyeIcon />
         </button>
 
-        {/* Character counter — shows remaining chars when within 200 of IRC limit */}
-        {text.length >= CHAR_WARNING_AT && (
+        {/* Character counter — shows remaining IRC wire bytes near the limit */}
+        {wireBytes >= CHAR_WARNING_AT && (
           <span
             className={`msg-char-counter${
-              CHAR_LIMIT - text.length < 50 ? ' danger' :
-              CHAR_LIMIT - text.length < 100 ? ' warn' : ''
+              bytesRemaining < 50 ? ' danger' :
+              bytesRemaining < 100 ? ' warn' : ''
             }`}
             aria-live="polite"
-            aria-label={`${CHAR_LIMIT - text.length} characters remaining`}
+            aria-label={`${bytesRemaining} IRC bytes remaining`}
           >
-            {CHAR_LIMIT - text.length}
+            {bytesRemaining}
           </span>
         )}
 
@@ -1794,7 +1832,7 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           disabled={!canSend}
           type="button"
           aria-label={
-            text.length > CHAR_LIMIT ? 'Message too long' :
+            overCharLimit ? 'Message too long' :
             slowModeActive ? 'Slow mode active — wait for cooldown' :
             'Send message'
           }

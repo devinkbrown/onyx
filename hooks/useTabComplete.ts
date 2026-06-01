@@ -68,7 +68,7 @@ export function useTabComplete({ nicks, getText, setText }: TabCompleteOptions) 
 
     const beforeCursor = text.slice(0, cursorPos);
     const wordMatch = beforeCursor.match(/(\S+)$/);
-    if (!wordMatch) return true;
+    if (!wordMatch) return false;
 
     const prefix = wordMatch[1];
     const startPos = cursorPos - prefix.length;
@@ -78,7 +78,7 @@ export function useTabComplete({ nicks, getText, setText }: TabCompleteOptions) 
       n.toLowerCase().startsWith(prefixLower) && n.toLowerCase() !== prefixLower
     );
 
-    if (matches.length === 0) return true;
+    if (matches.length === 0) return false;
 
     const firstNick = matches[0];
     const isAtStart = startPos === 0;

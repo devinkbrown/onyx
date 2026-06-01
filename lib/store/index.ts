@@ -1769,8 +1769,8 @@ export const useOnyxStore = create<OnyxState>()(
         return;
       }
 
-      // Echo our own message (with reply context if set)
       const { replyingTo } = get();
+      const waitForServerEcho = client.negotiatedCaps.has('echo-message');
 
       // Send multiline as separate messages, with +draft/reply tag on first line when replying
       const lines = text.split('\n').filter(l => l.trim());
@@ -1783,19 +1783,21 @@ export const useOnyxStore = create<OnyxState>()(
         }
       }
 
-      const msg: ChatMessage = {
-        id: uid(),
-        time: new Date(),
-        from: ourNick,
-        text,
-        type: 'msg',
-        target,
-        ...(replyingTo ? { replyTo: { id: replyingTo.id, from: replyingTo.from, text: replyingTo.text } } : {}),
-      };
-      set(s => _addMessage(s, target, msg));
-      {
-        const _cp = get().client?.isupport.CHANTYPES ?? '#&';
-        if (target.length > 0 && _cp.includes(target[0])) get().updateChannelActivity(target);
+      if (!waitForServerEcho) {
+        const msg: ChatMessage = {
+          id: uid(),
+          time: new Date(),
+          from: ourNick,
+          text,
+          type: 'msg',
+          target,
+          ...(replyingTo ? { replyTo: { id: replyingTo.id, from: replyingTo.from, text: replyingTo.text } } : {}),
+        };
+        set(s => _addMessage(s, target, msg));
+        {
+          const _cp = get().client?.isupport.CHANTYPES ?? '#&';
+          if (target.length > 0 && _cp.includes(target[0])) get().updateChannelActivity(target);
+        }
       }
       if (replyingTo) set({ replyingTo: null });
     },
@@ -3460,7 +3462,7 @@ export const useOnyxStore = create<OnyxState>()(
             break;
           }
 
-          if (isSelf) break; // We already echoed our own messages
+          if (isSelf && !get().client?.negotiatedCaps.has('echo-message')) break; // We already echoed our own messages
 
           // ── Handle FORUM post encoding ───────────────────────────────────
           const forumMatch = text.match(/^\x01FORUM ([\s\S]+)\x01$/);
@@ -3497,7 +3499,7 @@ export const useOnyxStore = create<OnyxState>()(
           const draftReplyTag = tags['+draft/reply'] ?? tags['draft/reply'];
           if (draftReplyTag) {
             // Look up the referenced message to populate from/text fields
-            const replyKey = isChan(target) ? target.toLowerCase() : sender.toLowerCase();
+            const replyKey = isChan(target) ? target.toLowerCase() : (isSelf ? target : sender).toLowerCase();
             const replyMsgs = get().channels.get(replyKey)?.messages ?? get().dms.get(replyKey)?.messages ?? [];
             const parentMsg = replyMsgs.find(m => m.id === draftReplyTag);
             replyTo = {
@@ -3526,7 +3528,7 @@ export const useOnyxStore = create<OnyxState>()(
             ? true
             : mentionsMe(resolvedText, ourNick);
 
-          const msgTarget = isChannel ? target : sender;
+          const msgTarget = isChannel ? target : (isSelf ? target : sender);
           const msgKey = msgTarget.toLowerCase();
 
           const time = tags['time'] ? new Date(tags['time']) : new Date();
@@ -3557,10 +3559,11 @@ export const useOnyxStore = create<OnyxState>()(
             // 'mentions' → only count as unread if it mentions us or a channel-wide ping
             const isChannelWidePing = /\@(everyone|here)\b/i.test(displayText);
             const effectiveHighlight =
-              notifyLevel === 'none' ? false
+              isSelf ? false
+              : notifyLevel === 'none' ? false
               : notifyLevel === 'mentions' ? (mentionsMe(text, ourNick) || isChannelWidePing)
               : highlight;
-            const skipUnread = notifyLevel === 'none' || (notifyLevel === 'mentions' && !mentionsMe(text, ourNick) && !isChannelWidePing);
+            const skipUnread = isSelf || notifyLevel === 'none' || (notifyLevel === 'mentions' && !mentionsMe(text, ourNick) && !isChannelWidePing);
             set(s => _addChannelMessage(s, msgKey, msg, effectiveHighlight, skipUnread));
             get().updateChannelActivity(msgTarget);
             if (effectiveHighlight && notifyLevel !== 'none') {
@@ -3578,13 +3581,11 @@ export const useOnyxStore = create<OnyxState>()(
                 get().incrementUnread(msgTarget, isMention);
               }
             }
-          } else if (sender) {
-            // Guard: sender must be non-empty. A server-sourced NOTICE/PRIVMSG
-            // (prefix ":irc.server.com NOTICE nick :...") parses to nick=null
-            // → sender='', which would create a blank-nick DM entry in the
-            // sidebar. Route those to announcements instead.
-            set(s => _addDMMessage(s, sender, msg));
-            if (highlight && !get().isDMMuted(sender)) {
+          } else if (msgTarget) {
+            // Guard: server-sourced NOTICE/PRIVMSG with no nick/target would
+            // create a blank DM entry. Route those to announcements instead.
+            set(s => _addDMMessage(s, msgTarget, msg, isSelf));
+            if (!isSelf && highlight && !get().isDMMuted(sender)) {
               get().addNotification({ type: 'dm', text: displayText, from: sender });
             }
           } else {
@@ -6164,6 +6165,7 @@ function _addDMMessage(
   state: OnyxState,
   sender: string,
   msg: ChatMessage,
+  skipUnread = false,
 ): Partial<OnyxState> {
   const key = sender.toLowerCase();
   const dms = new Map(state.dms);
@@ -6179,7 +6181,8 @@ function _addDMMessage(
     state.activeView.nick.toLowerCase() === key;
 
   // For DMs from ignored users: keep conversation visible but show placeholder
-  const isIgnoredSender = state.ignoredUsers.has(key);
+  const isOwnMessage = msg.from.toLowerCase() === state.ourNick.toLowerCase();
+  const isIgnoredSender = !isOwnMessage && state.ignoredUsers.has(key);
   const isMuted = state.mutedDMs.has(key);
   const effectiveMsg: ChatMessage = isIgnoredSender
     ? { ...msg, text: 'Message from ignored user', type: 'system' }
@@ -6188,12 +6191,12 @@ function _addDMMessage(
   dms.set(key, {
     ...existing,
     messages: [...existing.messages.slice(-499), effectiveMsg],
-    unread: isActive ? 0 : (isIgnoredSender || isMuted) ? existing.unread : existing.unread + 1,
-    highlights: isActive ? 0 : (isIgnoredSender || isMuted) ? existing.highlights : existing.highlights + 1,
+    unread: isActive ? 0 : skipUnread ? existing.unread : (isIgnoredSender || isMuted) ? existing.unread : existing.unread + 1,
+    highlights: isActive ? 0 : skipUnread ? existing.highlights : (isIgnoredSender || isMuted) ? existing.highlights : existing.highlights + 1,
   });
 
   // Track first unread DM message id (only when not active)
-  if (!isActive && !state.firstUnreadId.has(key)) {
+  if (!isActive && !skipUnread && !state.firstUnreadId.has(key)) {
     const firstUnreadId = new Map(state.firstUnreadId);
     firstUnreadId.set(key, msg.id);
     return { dms, firstUnreadId };

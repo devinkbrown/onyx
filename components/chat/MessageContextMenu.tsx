@@ -148,6 +148,7 @@ export default function MessageContextMenu({
   const activeView          = useOnyxStore(s => s.activeView);
   const ourNick             = useOnyxStore(s => s.ourNick);
   const openUserProfileCard = useOnyxStore(s => s.openUserProfileCard);
+  const deleteMessage       = useOnyxStore(s => s.deleteMessage);
 
   const isDM = activeView.kind === 'dm';
   const dmNick = isDM ? activeView.nick : '';
@@ -296,13 +297,13 @@ export default function MessageContextMenu({
   });
 
   const handleMentionUser = () => run(() => {
-    window.dispatchEvent(
+    document.dispatchEvent(
       new CustomEvent('ocean:prefill-input', { detail: { text: `@${messageSender} ` } })
     );
   });
 
   const handleDelete = () => run(() => {
-    window.dispatchEvent(new CustomEvent('ocean:delete-message', { detail: { messageId: message.id } }));
+    deleteMessage(message.target, message.id);
   });
 
   const handleReport = () => run(() => {
