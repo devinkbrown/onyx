@@ -803,6 +803,7 @@ export interface OnyxState {
   banList: Map<string, Array<{ mask: string; setBy?: string; setAt?: number }>>;
   setBanList: (channel: string, bans: Array<{ mask: string; setBy?: string; setAt?: number }>) => void;
   fetchBanList: (channel: string) => void;
+  tempBan: (channel: string, mask: string, minutes: number) => void;
 
   // ── Highlight words ───────────────────────────────────────────────────
   highlightWords: string[];
@@ -1318,6 +1319,10 @@ function _now(): number {
 // ── Ban list accumulator (module-level) ───────────────────────────────────────
 /** channel.toLowerCase() → accumulated bans while RPL_BANLIST numerics arrive */
 const _banBuffer = new Map<string, Array<{ mask: string; setBy?: string; setAt?: number }>>();
+
+// ── Temp-ban timers (module-level) ─────────────────────────────────────────────
+/** channel/mask → timer; survives moderation panel unmounts and uses the current client when firing */
+const _tempBanTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 // ── Reconnect countdown (module-level) ────────────────────────────────────────
 let _reconnectAttempts = 0;
@@ -3165,6 +3170,24 @@ export const useOnyxStore = create<OnyxState>()(
             break; // do not display this as a visible message
           }
 
+          if (command === 'NOTICE' && !text.startsWith('\x01')) {
+            const rawSource = sender || msg.prefix || '';
+            const sourceUpper = rawSource.toUpperCase();
+            const textUpper = text.toUpperCase();
+            const serviceSource =
+              ['NickServ', 'ChanServ', 'HostServ', 'MemoServ'].find(s => s.toUpperCase() === sourceUpper) ??
+              (text.match(/^\[?(Account|Channel|Memo|VHost|NickServ|ChanServ|HostServ|MemoServ)\]?:?\s+/i)?.[1]) ??
+              (/\b(MEMO|MEMOS)\b/.test(textUpper) ? 'Memo' : undefined) ??
+              (/\bVHOST\b/.test(textUpper) ? 'VHost' : undefined) ??
+              (/\b(ACCESS LIST|HOST MASK|CERTIFICATE)\b/.test(textUpper) ? 'Account' : undefined) ??
+              (/\b(ACCOUNT|IDENTIFIED|REGISTERED|PASSWORD|EMAIL|GHOST|RECOVER|GROUPED|UNGROUP)\b/.test(textUpper) ? 'Account' : undefined);
+
+            if (serviceSource && !isChan(target)) {
+              get().addServiceNotice(serviceSource, text);
+              break;
+            }
+          }
+
           // ── Handle incoming CTCP SCREENSHARE from others ─────────────────
           if (text === '\x01SCREENSHARE START\x01') {
             get().addNotification({
@@ -3533,7 +3556,7 @@ export const useOnyxStore = create<OnyxState>()(
 
           // Use server-provided msgid when available (e.g. from CHATHISTORY batch)
           const serverMsgId = tags['msgid'] ?? tags['draft/msgid'];
-          const msg: ChatMessage = {
+          const chatMsg: ChatMessage = {
             id: serverMsgId ?? uid(),
             time,
             from: sender,
@@ -3547,7 +3570,7 @@ export const useOnyxStore = create<OnyxState>()(
           // ── If this PRIVMSG is part of a CHATHISTORY batch, collect it ────
           const batchTag = tags['batch'];
           if (batchTag && _batchCollectors.has(batchTag)) {
-            _batchCollectors.get(batchTag)!.messages.push(msg);
+            _batchCollectors.get(batchTag)!.messages.push(chatMsg);
             break;
           }
 
@@ -3561,7 +3584,7 @@ export const useOnyxStore = create<OnyxState>()(
               : notifyLevel === 'mentions' ? (mentionsMe(text, ourNick) || isChannelWidePing)
               : highlight;
             const skipUnread = notifyLevel === 'none' || (notifyLevel === 'mentions' && !mentionsMe(text, ourNick) && !isChannelWidePing);
-            set(s => _addChannelMessage(s, msgKey, msg, effectiveHighlight, skipUnread));
+            set(s => _addChannelMessage(s, msgKey, chatMsg, effectiveHighlight, skipUnread));
             get().updateChannelActivity(msgTarget);
             if (effectiveHighlight && notifyLevel !== 'none') {
               get().addNotification({ type: 'mention', text: displayText, from: sender, channel: msgTarget });
@@ -3583,14 +3606,14 @@ export const useOnyxStore = create<OnyxState>()(
             // (prefix ":irc.server.com NOTICE nick :...") parses to nick=null
             // → sender='', which would create a blank-nick DM entry in the
             // sidebar. Route those to announcements instead.
-            set(s => _addDMMessage(s, sender, msg));
+            set(s => _addDMMessage(s, sender, chatMsg));
             if (highlight && !get().isDMMuted(sender)) {
               get().addNotification({ type: 'dm', text: displayText, from: sender });
             }
           } else {
             // Server-sourced message with no nick — show as announcement
             get().addAnnouncement({
-              from: msg.target || 'Server',
+              from: chatMsg.target || 'Server',
               text: displayText,
               type: 'global-notice',
             });
@@ -3668,26 +3691,53 @@ export const useOnyxStore = create<OnyxState>()(
           const target = params[0];
           const key = target.toLowerCase();
           if (isChan(target)) {
+            const modeStr = params[1] ?? '';
+            const modeArgs = params.slice(2);
             set(s => {
               const channels = new Map(s.channels);
               const c = channels.get(key);
               if (!c) return {};
-              const modeStr = params.slice(1).join(' ');
-              const sysm = sysMsg(`${nick ?? 'server'} set mode ${modeStr}`, target);
+              const modeText = params.slice(1).join(' ');
+              const users = new Map(c.users);
+              const prefixModes = new Set(Object.keys(get().client?.modeToPrefix ?? { q: '.', o: '@', v: '+' }));
+              let adding = true;
+              let argIdx = 0;
+              let changedUsers = false;
+
+              for (const ch of modeStr) {
+                if (ch === '+') { adding = true; continue; }
+                if (ch === '-') { adding = false; continue; }
+                const consumesArg = ch === 'b' || prefixModes.has(ch) || (ch === 'z' && adding);
+                const modeArg = consumesArg ? modeArgs[argIdx++] : undefined;
+                if (!prefixModes.has(ch) || !modeArg) continue;
+                const userKey = modeArg.toLowerCase();
+                const user = users.get(userKey);
+                if (!user) continue;
+                const modes = new Set(user.modes);
+                if (adding) modes.add(ch);
+                else modes.delete(ch);
+                users.set(userKey, { ...user, modes });
+                changedUsers = true;
+              }
+
+              const sysm = sysMsg(`${nick ?? 'server'} set mode ${modeText}`, target);
               const msgs = [...(c.messages ?? []), sysm];
-              return { channels: new Map(channels).set(key, { ...c, messages: msgs } as Channel) };
+              return { channels: new Map(channels).set(key, { ...c, users: changedUsers ? users : c.users, messages: msgs } as Channel) };
             });
 
             // Emit audit entries for ban/unban/other mode changes
-            const modeStr = params[1] ?? '';
-            const modeArgs = params.slice(2);
+            const prefixModes = new Set(Object.keys(get().client?.modeToPrefix ?? { q: '.', o: '@', v: '+' }));
             let adding = true;
             let argIdx = 0;
+            let sawBan = false;
+            let sawOtherMode = false;
             for (const ch of modeStr) {
               if (ch === '+') { adding = true; continue; }
               if (ch === '-') { adding = false; continue; }
-              const modeArg = modeArgs[argIdx];
+              const consumesArg = ch === 'b' || prefixModes.has(ch) || (ch === 'z' && adding);
+              const modeArg = consumesArg ? modeArgs[argIdx++] : undefined;
               if (ch === 'b') {
+                sawBan = true;
                 get().addAuditEntry({
                   type: adding ? 'ban' : 'unban',
                   actor: nick ?? 'server',
@@ -3701,31 +3751,55 @@ export const useOnyxStore = create<OnyxState>()(
                   by: nick ?? 'server',
                   channel: target,
                 });
-                argIdx++;
+                if (modeArg) {
+                  set(s => {
+                    const banList = new Map(s.banList);
+                    const existing = banList.get(key) ?? [];
+                    banList.set(
+                      key,
+                      adding
+                        ? [...existing.filter(b => b.mask !== modeArg), { mask: modeArg, setBy: nick ?? 'server', setAt: Math.floor(Date.now() / 1000) }]
+                        : existing.filter(b => b.mask !== modeArg),
+                    );
+                    return { banList };
+                  });
+                }
               } else {
-                // Other mode chars — only emit one aggregate entry per MODE message
-                // (handled below after the loop — skip individual chars)
+                sawOtherMode = true;
+                const userExists = !!modeArg && !!get().channels.get(key)?.users.has(modeArg.toLowerCase());
+                if (prefixModes.has(ch) && modeArg && userExists) {
+                  get().addModerationEntry({
+                    action: adding ? `GRANT +${ch}` : `TAKE +${ch}`,
+                    target: modeArg,
+                    by: nick ?? 'server',
+                    channel: target,
+                  });
+                } else if (ch === 'z' || prefixModes.has(ch)) {
+                  get().addModerationEntry({
+                    action: 'MODE',
+                    target: `${adding ? '+' : '-'}${ch}${modeArg ? ` ${modeArg}` : ''}`,
+                    by: nick ?? 'server',
+                    channel: target,
+                  });
+                }
               }
             }
             // Check if this is a non-ban mode change (no +b/-b)
-            if (!modeStr.includes('b')) {
+            if (!sawBan && sawOtherMode) {
               get().addAuditEntry({
                 type: 'mode',
                 actor: nick ?? 'server',
                 channel: target,
                 detail: params.slice(1).join(' '),
               });
-            } else if (modeStr.replace(/[+\-b]/g, '').length > 0) {
+            } else if (sawBan && sawOtherMode) {
               // Mixed: has both ban and other chars — emit one more for the non-ban parts
-              const nonBanChars = modeStr.replace(/b/g, '').replace(/[^+\-a-zA-Z]/g, '');
-              if (nonBanChars.replace(/[+\-]/g, '').length > 0) {
-                get().addAuditEntry({
-                  type: 'mode',
-                  actor: nick ?? 'server',
-                  channel: target,
-                  detail: params.slice(1).join(' '),
-                });
-              }
+              get().addAuditEntry({
+                type: 'mode',
+                actor: nick ?? 'server',
+                channel: target,
+                detail: params.slice(1).join(' '),
+              });
             }
             // Emit channel event for mode change
             get().addChannelEvent(target, { type: 'mode', nick: nick ?? 'server', text: `${nick ?? 'server'} set mode ${params.slice(1).join(' ')}`, time: new Date() });
@@ -4490,6 +4564,22 @@ export const useOnyxStore = create<OnyxState>()(
           break;
         }
 
+        // ── IRCX access list numerics ───────────────────────────────────────
+        case '775': {
+          // :server 775 ournick #channel mask level
+          const ch775 = params[1] ?? '';
+          const mask775 = params[2] ?? '';
+          const level775 = params[3] ?? '';
+          if (ch775 && mask775) get().addServiceNotice('Channel', `${ch775} ACCESS ${mask775} ${level775}`.trim());
+          break;
+        }
+
+        case '776': {
+          const ch776 = params[1] ?? '';
+          get().addServiceNotice('Channel', ch776 ? `${ch776} access list complete` : 'Access list complete');
+          break;
+        }
+
         case '474': { // ERR_BANNEDFROMCHAN
           const channel474 = params[1] ?? '';
           get().addNotification({ type: 'error', text: `You are banned from ${channel474}` });
@@ -4518,6 +4608,7 @@ export const useOnyxStore = create<OnyxState>()(
         }
 
         case '491': { // ERR_NOOPERHOST
+          set({ isOper: false, operUsername: '' });
           get().addNotification({ type: 'error', text: 'OPER not authorized from your host' });
           break;
         }
@@ -4687,9 +4778,6 @@ export const useOnyxStore = create<OnyxState>()(
 
         // 381 RPL_YOUREOPER — we are now an IRC operator
         case '381': set({ isOper: true }); break;
-
-        // 491 ERR_NOOPERHOST — OPER failed (bad host / credentials)
-        case '491': set({ isOper: false, operUsername: '' }); break;
 
         // ── Latency tracking ─────────────────────────────────────────────
         case 'PONG': {
@@ -5011,6 +5099,24 @@ export const useOnyxStore = create<OnyxState>()(
     })),
     fetchBanList: (channel) => {
       get().client?.sendRaw('MODE', channel, '+b');
+    },
+    tempBan: (channel, mask, minutes) => {
+      const key = `${channel.toLowerCase()}\0${mask.toLowerCase()}`;
+      const existing = _tempBanTimers.get(key);
+      if (existing) clearTimeout(existing);
+      get().client?.sendRaw('MODE', channel, '+b', mask);
+
+      const fire = () => {
+        const { client, connectionStatus } = get();
+        if (client && connectionStatus === 'connected') {
+          client.sendRaw('MODE', channel, '-b', mask);
+          _tempBanTimers.delete(key);
+          return;
+        }
+        _tempBanTimers.set(key, setTimeout(fire, 30000));
+      };
+
+      _tempBanTimers.set(key, setTimeout(fire, Math.max(1, minutes) * 60 * 1000));
     },
 
     // ── Highlight words ───────────────────────────────────────────────────
