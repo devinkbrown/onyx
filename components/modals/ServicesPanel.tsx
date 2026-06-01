@@ -876,8 +876,7 @@ function AccountTab({ account, ourNick, sendAccount }: AccountTabProps) {
                 disabled={!regPw}
                 onClick={() => {
                   sendAccount('REGISTER', regPw);
-                  if (regEmail) sendAccount('SETEMAIL', regEmail);
-                  setRegPw(''); setRegEmail('');
+                  setRegPw('');
                 }}
               >Register</button>
             </div>
