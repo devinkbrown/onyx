@@ -670,14 +670,14 @@ export interface OnyxState {
   openThemeModal(): void;
   closeThemeModal(): void;
 
-  // ── Theme & display (ocean-theme / ocean-font-size) ───────────────────
+  // ── Theme & display ───────────────────────────────────────────────────
   /** New theme system: 'midnight' | 'onyx' | 'ash' | 'amoled' | 'light' | 'system' */
   theme: 'midnight' | 'onyx' | 'ash' | 'amoled' | 'light' | 'system';
   /** UI base font size in px (12 | 14 | 16 | 18 | 20) */
   fontSize: number;
-  /** Set UI theme and persist to localStorage 'ocean-theme' */
+  /** Set UI theme and persist to localStorage 'ocean-display-theme' */
   setDisplayTheme(theme: OnyxState['theme']): void;
-  /** Set UI font size and persist to localStorage 'ocean-font-size' */
+  /** Set UI font size and persist to localStorage 'ocean-ui-font-size' */
   setFontSize(size: number): void;
 
   // ── Message density ──────────────────────────────────────────────────
@@ -1524,7 +1524,7 @@ export const useOnyxStore = create<OnyxState>()(
     showServerRulesModal: false,
     mobileSidebarOpen: false,
     showSpotlight: false,
-    activeTheme: typeof window !== 'undefined' ? (localStorage.getItem('ocean-theme') || 'ocean') : 'ocean',
+    activeTheme: _loadActiveTheme(),
     showThemeModal: false,
     messageDensity: (() => {
       if (typeof window === 'undefined') return 'cozy';
@@ -2651,7 +2651,7 @@ export const useOnyxStore = create<OnyxState>()(
 
     // ── Theme ─────────────────────────────────────────────────────────────
     setTheme(theme) {
-      if (typeof window !== 'undefined') localStorage.setItem('ocean-theme', theme);
+      if (typeof window !== 'undefined') localStorage.setItem('ocean-active-theme', theme);
       set({ activeTheme: theme });
     },
 
@@ -5245,13 +5245,13 @@ export const useOnyxStore = create<OnyxState>()(
     },
 
     // ── Message font size ──────────────────────────────────────────────────────
-    messageFontSize: _loadFontSize(),
+    messageFontSize: _loadMessageFontSize(),
     setMessageFontSize: (size) => {
       if (typeof document !== 'undefined') {
         document.documentElement.style.setProperty('--msg-font-size', `${size}px`);
       }
       if (typeof window !== 'undefined') {
-        try { localStorage.setItem('ocean-font-size', String(size)); } catch {}
+        try { localStorage.setItem('ocean-message-font-size', String(size)); } catch {}
       }
       set({ messageFontSize: size });
     },
@@ -5279,10 +5279,13 @@ export const useOnyxStore = create<OnyxState>()(
     },
 
     // ── Chat background pattern ────────────────────────────────────────────────
-    chatBackground: 'solid',
+    chatBackground: _loadChatBackground(),
     setChatBackground: (bg) => {
       if (typeof document !== 'undefined') {
         document.documentElement.setAttribute('data-bg', bg);
+      }
+      if (typeof window !== 'undefined') {
+        try { localStorage.setItem('ocean-chat-background', bg); } catch {}
       }
       set({ chatBackground: bg });
     },
@@ -5798,13 +5801,13 @@ export const useOnyxStore = create<OnyxState>()(
     fontSize: _loadDisplayFontSize(),
     setDisplayTheme: (theme) => {
       if (typeof window !== 'undefined') {
-        try { localStorage.setItem('ocean-theme', theme); } catch {}
+        try { localStorage.setItem('ocean-display-theme', theme); } catch {}
       }
       set({ theme });
     },
     setFontSize: (size) => {
       if (typeof window !== 'undefined') {
-        try { localStorage.setItem('ocean-font-size', String(size)); } catch {}
+        try { localStorage.setItem('ocean-ui-font-size', String(size)); } catch {}
       }
       if (typeof document !== 'undefined') {
         document.documentElement.style.fontSize = size + 'px';
@@ -6413,12 +6416,40 @@ function _loadTimeFormat(): '12h' | '24h' | 'hidden' {
   return '24h';
 }
 
+// ── Theme persistence ─────────────────────────────────────────────────────────
+
+function _loadActiveTheme(): string {
+  if (typeof window === 'undefined') return 'ocean';
+  try {
+    const validThemes = [
+      'ocean',
+      'abyss',
+      'midnight',
+      'bathyal',
+      'coral',
+      'kelp',
+      'brine',
+      'onyx',
+      'amoled',
+      'arctic',
+      'ash',
+      'light',
+      'system',
+    ];
+    const stored = localStorage.getItem('ocean-active-theme');
+    if (stored && validThemes.includes(stored)) return stored;
+    const legacy = localStorage.getItem('ocean-theme');
+    return legacy && validThemes.includes(legacy) ? legacy : 'ocean';
+  } catch { return 'ocean'; }
+}
+
 // ── Font size persistence ──────────────────────────────────────────────────────
 
-function _loadFontSize(): number {
+function _loadMessageFontSize(): number {
   if (typeof window === 'undefined') return 14;
   try {
-    const v = parseInt(localStorage.getItem('ocean-font-size') ?? '14', 10);
+    const raw = localStorage.getItem('ocean-message-font-size') ?? localStorage.getItem('ocean-font-size') ?? '14';
+    const v = parseInt(raw, 10);
     return isNaN(v) ? 14 : Math.max(12, Math.min(20, v));
   } catch { return 14; }
 }
@@ -6441,20 +6472,10 @@ function _loadAccentColor(): string {
 
 export function _applyAccentColor(hex: string): void {
   if (typeof document === 'undefined') return;
-  // If hex is the default, remove the inline override so the theme CSS takes over
-  if (hex === '#0ea5e9') {
-    const root = document.documentElement;
-    root.style.removeProperty('--accent');
-    root.style.removeProperty('--accent-hover');
-    root.style.removeProperty('--accent-active');
-    root.style.removeProperty('--accent-border');
-    root.style.removeProperty('--accent-subtle');
-    root.style.removeProperty('--accent-glow');
-    return;
-  }
   const root = document.documentElement;
   root.style.setProperty('--accent', hex);
   root.style.setProperty('--accent-hover', hex);
+  root.style.setProperty('--accent-active', hex);
   root.style.setProperty('--accent-border', hex + '66');
   root.style.setProperty('--accent-subtle', hex + '1a');
   root.style.setProperty('--accent-glow', hex + '2e');
@@ -6469,6 +6490,15 @@ function _loadReducedMotion(): boolean {
     if (stored !== null) return stored === '1';
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   } catch { return false; }
+}
+
+function _loadChatBackground(): OnyxState['chatBackground'] {
+  if (typeof window === 'undefined') return 'solid';
+  try {
+    const stored = localStorage.getItem('ocean-chat-background');
+    if (stored === 'dots' || stored === 'grid' || stored === 'noise' || stored === 'diagonal') return stored;
+  } catch {}
+  return 'solid';
 }
 
 function _loadRecentEmojis(): string[] {
@@ -6631,11 +6661,11 @@ function _loadBoolPref(key: string): boolean {
 // ── Display theme persistence ─────────────────────────────────────────────────
 function _loadDisplayTheme(): OnyxState['theme'] {
   if (typeof window === 'undefined') return 'midnight';
-  const stored = localStorage.getItem('ocean-theme');
+  const stored = localStorage.getItem('ocean-display-theme') ?? localStorage.getItem('ocean-theme');
   // v2 migration: 'onyx' was the old default — migrate to 'midnight' unless
   // the user explicitly re-selected it after the migration flag was written.
   if (stored === 'onyx' && !localStorage.getItem('ocean-theme-v2')) {
-    localStorage.setItem('ocean-theme', 'midnight');
+    localStorage.setItem('ocean-display-theme', 'midnight');
     localStorage.setItem('ocean-theme-v2', '1');
     return 'midnight';
   }
@@ -6648,7 +6678,7 @@ function _loadDisplayTheme(): OnyxState['theme'] {
 // ── Display font size persistence ─────────────────────────────────────────────
 function _loadDisplayFontSize(): number {
   if (typeof window === 'undefined') return 16;
-  const raw = localStorage.getItem('ocean-font-size');
+  const raw = localStorage.getItem('ocean-ui-font-size') ?? localStorage.getItem('ocean-font-size');
   if (!raw) return 16;
   const v = parseInt(raw, 10);
   if (v === 12 || v === 14 || v === 16 || v === 18 || v === 20) return v;

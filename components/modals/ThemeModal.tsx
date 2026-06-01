@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import { useTheme } from '@/components/ui/ThemeProvider';
 import type { TimeFormat } from '@/lib/format-time';
@@ -40,16 +40,27 @@ interface ThemeDef {
 
 const THEMES: ThemeDef[] = [
   { id: 'ocean',    label: 'Ocean',    bg: '#06101d', sidebar: '#030810', accent: '#0ea5e9' },
+  { id: 'abyss',    label: 'Abyss',    bg: '#060f1c', sidebar: '#010408', accent: '#00d4ff' },
   { id: 'midnight', label: 'Midnight', bg: '#061020', sidebar: '#030810', accent: '#0ea5e9' },
-  { id: 'forest',   label: 'Forest',   bg: '#04150a', sidebar: '#010d05', accent: '#22c55e' },
-  { id: 'ember',    label: 'Ember',    bg: '#180900', sidebar: '#0d0500', accent: '#f97316' },
-  { id: 'arctic',   label: 'Arctic',   bg: '#161b22', sidebar: '#0d1117', accent: '#58a6ff' },
+  { id: 'bathyal',  label: 'Bathyal',  bg: '#002040', sidebar: '#000d1a', accent: '#3b82f6' },
+  { id: 'coral',    label: 'Coral',    bg: '#341c18', sidebar: '#180a08', accent: '#fb923c' },
+  { id: 'kelp',     label: 'Kelp',     bg: '#072012', sidebar: '#010a04', accent: '#22c55e' },
+  { id: 'brine',    label: 'Brine',    bg: '#181f23', sidebar: '#090d10', accent: '#2dd4bf' },
   { id: 'onyx',     label: 'Onyx',     bg: '#0a0a0a', sidebar: '#000000', accent: '#7c5af5', badge: 'OLED' },
-  { id: 'ash',      label: 'Ash',      bg: '#313338', sidebar: '#1e1f22', accent: '#5865f2' },
   { id: 'amoled',   label: 'AMOLED',   bg: '#050505', sidebar: '#000000', accent: '#e8b84b', badge: 'OLED' },
+  { id: 'arctic',   label: 'Arctic',   bg: '#161b22', sidebar: '#0d1117', accent: '#58a6ff' },
+  { id: 'ash',      label: 'Ash',      bg: '#313338', sidebar: '#1e1f22', accent: '#5865f2' },
   { id: 'light',    label: 'Light',    bg: '#f2f3f5', sidebar: '#e3e5e8', accent: '#5865f2' },
-  { id: 'system',   label: 'System',   bg: '#23272a', sidebar: '#18191c', accent: '#5865f2', badge: 'AUTO' },
 ];
+
+const SYSTEM_THEME: ThemeDef = {
+  id: 'system',
+  label: 'System',
+  bg: '#23272a',
+  sidebar: '#18191c',
+  accent: '#5865f2',
+  badge: 'AUTO',
+};
 
 const ACCENT_PRESETS: Array<{ label: string; color: string }> = [
   { label: 'Sky',     color: '#0ea5e9' },
@@ -118,7 +129,7 @@ const TIME_FORMAT_OPTIONS: Array<{ id: TimeFormat; label: string; preview: strin
 ];
 
 export default function ThemeModal() {
-  const { setTheme: setUiTheme, fontSize: uiFontSize, setFontSize: setUiFontSize } = useTheme();
+  const { theme: displayTheme, setTheme: setUiTheme, fontSize: uiFontSize, setFontSize: setUiFontSize } = useTheme();
   const activeTheme        = useOnyxStore(s => s.activeTheme);
   const setTheme           = useOnyxStore(s => s.setTheme);
   const closeThemeModal    = useOnyxStore(s => s.closeThemeModal);
@@ -148,11 +159,11 @@ export default function ThemeModal() {
   const setGlassSidebar    = useOnyxStore(s => s.setGlassSidebar);
 
   const [appliedFlash, setAppliedFlash] = useState<string | null>(null);
-  const [useSystemTheme, setUseSystemTheme] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   useDialogFocus(modalRef);
 
-  const activeThemeDef = THEMES.find(t => t.id === activeTheme) ?? THEMES[0];
+  const useSystemTheme = activeTheme === 'system' || displayTheme === 'system';
+  const activeThemeDef = useSystemTheme ? SYSTEM_THEME : (THEMES.find(t => t.id === activeTheme) ?? THEMES[0]);
 
   const handleSetTheme = useCallback((id: string) => {
     setTheme(id);
@@ -160,22 +171,10 @@ export default function ThemeModal() {
     if (id === 'midnight' || id === 'onyx' || id === 'ash' || id === 'amoled' || id === 'light' || id === 'system') {
       setUiTheme(id as 'midnight' | 'onyx' | 'ash' | 'amoled' | 'light' | 'system');
     }
-    setUseSystemTheme(id === 'system');
     setAppliedFlash(id);
     const timer = setTimeout(() => setAppliedFlash(null), 1000);
     return () => clearTimeout(timer);
   }, [setTheme, setUiTheme]);
-
-  // System theme detection
-  useEffect(() => {
-    if (!useSystemTheme) return;
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const apply = (dark: boolean) => setTheme(dark ? 'ocean' : 'ash');
-    apply(mq.matches);
-    const handler = (e: MediaQueryListEvent) => apply(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, [useSystemTheme, setTheme]);
 
   return (
     <div className="theme-modal-backdrop" onClick={closeThemeModal}>
@@ -243,7 +242,7 @@ export default function ThemeModal() {
         {/* ── System Theme ── */}
         <button
           className={`motion-toggle${useSystemTheme ? ' motion-toggle--active' : ''}`}
-          onClick={() => setUseSystemTheme(v => !v)}
+          onClick={() => handleSetTheme(useSystemTheme ? 'ocean' : 'system')}
           role="switch"
           aria-checked={useSystemTheme}
           style={{ marginTop: 14 }}
@@ -251,7 +250,7 @@ export default function ThemeModal() {
           <span className="motion-toggle-icon">🖥</span>
           <div className="motion-toggle-info">
             <span className="motion-toggle-label">Follow system theme</span>
-            <span className="motion-toggle-desc">Dark → Ocean · Light → Ash</span>
+            <span className="motion-toggle-desc">Dark → Midnight · Light → Light</span>
           </div>
           <div className={`toggle-track${useSystemTheme ? ' toggle-track--on' : ''}`}>
             <div className="toggle-thumb" />

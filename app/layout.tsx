@@ -32,20 +32,41 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={inter.variable}>
       <head>
         {/* Inline theme script — runs synchronously before CSS paints.
-            Migrates old 'onyx' default → 'midnight' and applies data-theme
-            immediately so there is no flash of wrong theme. */}
+            Migrates split theme keys and applies data-theme immediately so
+            there is no flash of wrong theme. */}
         <script dangerouslySetInnerHTML={{ __html: `(function(){
   try {
-    var t = localStorage.getItem('ocean-theme');
-    if (t === 'onyx' && !localStorage.getItem('ocean-theme-v2')) {
-      t = 'midnight';
-      localStorage.setItem('ocean-theme', 'midnight');
+    var legacy = localStorage.getItem('ocean-theme');
+    var active = localStorage.getItem('ocean-active-theme');
+    var display = localStorage.getItem('ocean-display-theme');
+    var activeValid = ['ocean','abyss','midnight','bathyal','coral','kelp','brine','onyx','amoled','arctic','ash','light','system'];
+    var displayValid = ['midnight','onyx','ash','amoled','light','system'];
+    if (activeValid.indexOf(active) === -1) {
+      active = activeValid.indexOf(legacy) !== -1 ? legacy : 'ocean';
+      localStorage.setItem('ocean-active-theme', active);
+    }
+    if (display === 'onyx' && !localStorage.getItem('ocean-theme-v2')) {
+      display = 'midnight';
+      localStorage.setItem('ocean-display-theme', 'midnight');
       localStorage.setItem('ocean-theme-v2', '1');
     }
-    var valid = ['midnight','onyx','ash','amoled','light'];
-    document.documentElement.setAttribute('data-theme', valid.indexOf(t) !== -1 ? t : 'midnight');
+    if (displayValid.indexOf(display) === -1) {
+      display = displayValid.indexOf(legacy) !== -1 ? legacy : 'midnight';
+      if (display === 'onyx' && !localStorage.getItem('ocean-theme-v2')) {
+        display = 'midnight';
+        localStorage.setItem('ocean-theme-v2', '1');
+      }
+      localStorage.setItem('ocean-display-theme', display);
+    }
+    if (active === 'system' || display === 'system') {
+      document.documentElement.setAttribute('data-theme', window.matchMedia('(prefers-color-scheme: dark)').matches ? 'midnight' : 'light');
+    } else if (active && active !== 'ocean') {
+      document.documentElement.setAttribute('data-theme', active);
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
   } catch(e) {
-    document.documentElement.setAttribute('data-theme', 'midnight');
+    document.documentElement.removeAttribute('data-theme');
   }
 })();` }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />

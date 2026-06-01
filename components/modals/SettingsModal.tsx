@@ -4,12 +4,6 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import Button from '@/components/ui/Button';
 import Avatar from '@/components/ui/Avatar';
-import {
-  type AppearanceSettings,
-  loadAppearance,
-  saveAppearance,
-  applyAppearance,
-} from '@/hooks/useAppearance';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { useDialogFocus } from './useDialogFocus';
 import CTCPSettingsSection from './CTCPSettingsSection';
@@ -495,7 +489,6 @@ function AccountTab() {
 type StoreDensity = 'cozy' | 'compact' | 'spacious';
 
 function AppearanceTab() {
-  const [settings, setSettings] = useState<AppearanceSettings>(() => loadAppearance());
   const [systemMotion] = useState(() =>
     typeof window !== 'undefined'
       ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -504,16 +497,12 @@ function AppearanceTab() {
 
   const messageDensity    = useOnyxStore(s => s.messageDensity);
   const setMessageDensity = useOnyxStore(s => s.setMessageDensity);
-
-  // Apply immediately as user tweaks
-  useEffect(() => {
-    applyAppearance(settings);
-    saveAppearance(settings);
-  }, [settings]);
-
-  const update = (patch: Partial<AppearanceSettings>) => {
-    setSettings(prev => ({ ...prev, ...patch }));
-  };
+  const activeTheme       = useOnyxStore(s => s.activeTheme);
+  const setTheme          = useOnyxStore(s => s.setTheme);
+  const fontSize          = useOnyxStore(s => s.fontSize);
+  const setFontSize       = useOnyxStore(s => s.setFontSize);
+  const reducedMotion     = useOnyxStore(s => s.reducedMotion);
+  const setReducedMotion  = useOnyxStore(s => s.setReducedMotion);
 
   const densityOptions: { value: StoreDensity; label: string; desc: string }[] = [
     { value: 'cozy',      label: 'Cozy',      desc: 'Default spacing, comfortable reading' },
@@ -530,13 +519,13 @@ function AppearanceTab() {
         <h3 className="settings-section-title">Theme</h3>
         <div className="ap-theme-grid">
           <button
-            className={`ap-theme-card ${settings.theme === 'dark' ? 'ap-theme-card--active' : ''}`}
-            onClick={() => update({ theme: 'dark' })}
-            aria-pressed={settings.theme === 'dark'}
+            className={`ap-theme-card ${activeTheme === 'ocean' ? 'ap-theme-card--active' : ''}`}
+            onClick={() => setTheme('ocean')}
+            aria-pressed={activeTheme === 'ocean'}
           >
             <div className="ap-theme-preview ap-theme-preview--dark" aria-hidden />
             <div className="ap-theme-label">Dark</div>
-            {settings.theme === 'dark' && <span className="ap-theme-check">✓</span>}
+            {activeTheme === 'ocean' && <span className="ap-theme-check">✓</span>}
           </button>
 
           <button
@@ -582,15 +571,15 @@ function AppearanceTab() {
           <input
             type="range"
             min={12}
-            max={18}
-            step={1}
-            value={settings.fontSize}
+            max={20}
+            step={2}
+            value={fontSize}
             className="ap-slider"
             aria-label="Font size"
-            onChange={e => update({ fontSize: Number(e.target.value) })}
+            onChange={e => setFontSize(Number(e.target.value))}
           />
           <span className="ap-font-label-lg">A</span>
-          <span className="ap-font-value">{settings.fontSize}px</span>
+          <span className="ap-font-value">{fontSize}px</span>
         </div>
       </div>
 
@@ -608,9 +597,9 @@ function AppearanceTab() {
           </div>
           <button
             role="switch"
-            aria-checked={settings.reduceMotion}
-            className={`ap-toggle ${settings.reduceMotion ? 'ap-toggle--on' : ''}`}
-            onClick={() => update({ reduceMotion: !settings.reduceMotion })}
+            aria-checked={reducedMotion}
+            className={`ap-toggle ${reducedMotion ? 'ap-toggle--on' : ''}`}
+            onClick={() => setReducedMotion(!reducedMotion)}
             aria-label="Reduce motion"
           >
             <span className="ap-toggle-thumb" aria-hidden />
