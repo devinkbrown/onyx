@@ -71,29 +71,24 @@ export default function ThemeProvider() {
     return () => mq.removeEventListener('change', handler);
   }, [storeTheme]);
 
-  // ── Apply data-theme ────────────────────────────────────────────────────────
+  // ── Apply data-theme (single source of truth) ───────────────────────────────
+  // The Theme modal always writes `activeTheme` (the full set of named themes)
+  // and only mirrors the overlapping ones into the new-system `theme`. Treat
+  // `activeTheme` as authoritative for the visual theme; `resolvedTheme` only
+  // governs the 'system' (auto light/dark) option. Previously two effects fought
+  // over data-theme and the legacy one was gated on storeTheme === 'midnight',
+  // so picking a pure-ocean theme (coral/kelp/brine/abyss/bathyal/arctic) while
+  // the new-system theme was anything else silently did nothing.
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', resolvedTheme);
-  }, [resolvedTheme]);
+    const legacy = activeTheme && activeTheme !== 'ocean' ? activeTheme : null;
+    const finalTheme = storeTheme === 'system' ? resolvedTheme : (legacy ?? resolvedTheme);
+    document.documentElement.setAttribute('data-theme', finalTheme);
+  }, [activeTheme, storeTheme, resolvedTheme]);
 
   // ── Apply fontSize from store ────────────────────────────────────────────────
   useEffect(() => {
     document.documentElement.style.fontSize = storeFontSize + 'px';
   }, [storeFontSize]);
-
-  // ── Legacy activeTheme support ──────────────────────────────────────────────
-  useEffect(() => {
-    const html = document.documentElement;
-    // Only override data-theme with the legacy system if the new theme is still
-    // at the default ('midnight'), so new-system themes take priority.
-    if (storeTheme === 'midnight') {
-      if (activeTheme === 'ocean' || activeTheme === 'midnight') {
-        // Legacy defaults map to midnight — leave the new system in control
-      } else {
-        html.setAttribute('data-theme', activeTheme);
-      }
-    }
-  }, [activeTheme, storeTheme]);
 
   useEffect(() => {
     document.documentElement.style.setProperty('--msg-font-size', `${messageFontSize}px`);
