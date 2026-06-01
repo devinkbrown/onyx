@@ -1242,6 +1242,7 @@ let _uidCounter = 0;
 const uid = () => `onyx-${Date.now()}-${++_uidCounter}`;
 
 const HISTORY_PAGE_SIZE = 50;
+const SERVICE_BOTS = new Set(['nickserv', 'chanserv', 'hostserv', 'memoserv']);
 
 function hasChatHistoryCap(client: IRCClient | null | undefined): boolean {
   return Boolean(
@@ -3163,6 +3164,10 @@ export const useOnyxStore = create<OnyxState>()(
               }).catch(() => { /* ignore */ });
             }
             break; // do not display this as a visible message
+          }
+
+          if (!isSelf && SERVICE_BOTS.has(sender.toLowerCase())) {
+            get().addServiceNotice(sender, text);
           }
 
           // ── Handle incoming CTCP SCREENSHARE from others ─────────────────

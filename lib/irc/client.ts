@@ -58,9 +58,9 @@ export class IRCClient {
   /** Available SASL mechanisms parsed from sasl cap value */
   private _saslMechs: string[] = [];
   /** Which SASL mechanism we're using */
-  private _saslMech: 'SCRAM-SHA-256' | 'PLAIN' | 'SESSION-TOKEN' | null = null;
+  private _saslMech: 'SCRAM-SHA-512' | 'SCRAM-SHA-256' | 'PLAIN' | 'SESSION-TOKEN' | null = null;
   /** SCRAM state between challenge/response steps */
-  private _scramState: { clientFirstMsgBare: string; nonce: string } | null = null;
+  private _scramState: { clientFirstMsgBare: string; nonce: string; hash: 'SHA-512' | 'SHA-256'; bits: number } | null = null;
   /** How many times we've appended _ to nick during registration */
   private _nickRetries = 0;
   /** SASL auth timeout guard */
@@ -352,22 +352,24 @@ export class IRCClient {
             if (this._capReqPending > 0) this._capReqPending--;
             if (caps.includes('sasl') && this.opts.password) {
               this._saslPending = true;
-              // Prefer SESSION-TOKEN when the caller supplied a stored token
-              // (identified by the sst_ prefix written by lib/credentials.ts).
-              // Fall back to PLAIN for normal password auth.
+              // Prefer strongest non-plaintext mechanisms before PLAIN.
               const isToken = (this.opts.password ?? '').startsWith('sst_');
               if (isToken && this._saslMechs.includes('SESSION-TOKEN')) {
                 this._saslMech = 'SESSION-TOKEN';
                 this.sendRaw('AUTHENTICATE', 'SESSION-TOKEN');
-              } else if (this._saslMechs.includes('PLAIN')) {
-                this._saslMech = 'PLAIN';
-                this.sendRaw('AUTHENTICATE', 'PLAIN');
+              } else if (this._saslMechs.includes('SCRAM-SHA-512')) {
+                this._saslMech = 'SCRAM-SHA-512';
+                this.sendRaw('AUTHENTICATE', 'SCRAM-SHA-512');
               } else if (this._saslMechs.includes('SCRAM-SHA-256')) {
                 this._saslMech = 'SCRAM-SHA-256';
                 this.sendRaw('AUTHENTICATE', 'SCRAM-SHA-256');
-              } else {
+              } else if (this._saslMechs.includes('PLAIN')) {
                 this._saslMech = 'PLAIN';
                 this.sendRaw('AUTHENTICATE', 'PLAIN');
+              } else {
+                this.opts.onError?.(`No supported SASL mechanism offered (${this._saslMechs.join(', ') || 'none'})`);
+                this.ws?.close(4003, 'Unsupported SASL mechanism');
+                return;
               }
               // Guard against server never responding to AUTHENTICATE
               this._saslTimer = setTimeout(() => {
@@ -443,7 +445,7 @@ export class IRCClient {
             const plain = btoa(`\0${nick}\0${pass}`);
             this.sendRaw('AUTHENTICATE', plain);
           }
-        } else if (this._saslMech === 'SCRAM-SHA-256') {
+        } else if (this._saslMech === 'SCRAM-SHA-256' || this._saslMech === 'SCRAM-SHA-512') {
           if (param === '+') {
             // Server ready — send client-first-message
             this._scramClientFirst();
@@ -468,15 +470,25 @@ export class IRCClient {
         break;
 
       case '904': // SASL fail
-      case '905':
+      case '905': {
+        const failedMech = this._saslMech;
         if (this._saslTimer) { clearTimeout(this._saslTimer); this._saslTimer = null; }
         this._saslPending = false;
         this._saslMech = null;
         this._scramState = null;
-        // Purge any stored session token — the server rejected it; next connect falls back to password
-        import('@/lib/credentials').then(({ clearSessionToken }) => clearSessionToken()).catch(() => {});
+        if (failedMech === 'SESSION-TOKEN') {
+          // Purge the rejected token and stop before CAP END; otherwise some
+          // servers continue registration and 001 us as an unauthenticated guest.
+          import('@/lib/credentials').then(({ clearSessionToken }) => {
+            clearSessionToken(this.opts.url, this._authNick);
+          }).catch(() => {});
+          this.opts.onError?.('Saved session token was rejected. Reconnect to authenticate with the saved password.');
+          this.ws?.close(4004, 'SESSION-TOKEN rejected');
+          break;
+        }
         this._finishCapIfReady();
         break;
+      }
 
       case '433': // Nickname in use
       case '432': // Erroneous nickname
@@ -605,13 +617,15 @@ export class IRCClient {
   }
 
   private _scramClientFirst() {
+    const hash = this._saslMech === 'SCRAM-SHA-512' ? 'SHA-512' : 'SHA-256';
+    const bits = hash === 'SHA-512' ? 512 : 256;
     const arr = new Uint8Array(18);
     crypto.getRandomValues(arr);
     const nonce = btoa(String.fromCharCode(...arr)).replace(/[+/=]/g, c =>
       c === '+' ? '-' : c === '/' ? '_' : ''
     );
     const clientFirstMsgBare = `n=${this._authNick},r=${nonce}`;
-    this._scramState = { clientFirstMsgBare, nonce };
+    this._scramState = { clientFirstMsgBare, nonce, hash, bits };
     const msg = `n,,${clientFirstMsgBare}`;
     this.sendRaw('AUTHENTICATE', btoa(msg));
   }
@@ -645,26 +659,26 @@ export class IRCClient {
     const enc = new TextEncoder();
     const salt = Uint8Array.from(atob(saltB64), c => c.charCodeAt(0));
 
-    // SaltedPassword = PBKDF2(password, salt, iterations, SHA-256)
+    // SaltedPassword = PBKDF2(password, salt, iterations, selected SCRAM hash)
     const rawKey = await crypto.subtle.importKey(
       'raw', enc.encode(this.opts.password ?? ''),
       'PBKDF2', false, ['deriveBits']
     );
     const saltedBits = await crypto.subtle.deriveBits(
-      { name: 'PBKDF2', hash: 'SHA-256', salt, iterations },
-      rawKey, 256
+      { name: 'PBKDF2', hash: state.hash, salt, iterations },
+      rawKey, state.bits
     );
     const saltedPass = new Uint8Array(saltedBits);
 
     const hmac = async (keyData: Uint8Array, data: Uint8Array) => {
       const k = await crypto.subtle.importKey(
-        'raw', keyData.buffer as ArrayBuffer, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+        'raw', keyData.buffer as ArrayBuffer, { name: 'HMAC', hash: state.hash }, false, ['sign']
       );
       return new Uint8Array(await crypto.subtle.sign('HMAC', k, data.buffer as ArrayBuffer));
     };
 
     const clientKey = await hmac(saltedPass, enc.encode('Client Key'));
-    const storedKeyBuf = await crypto.subtle.digest('SHA-256', clientKey);
+    const storedKeyBuf = await crypto.subtle.digest(state.hash, clientKey);
     const storedKey = new Uint8Array(storedKeyBuf);
 
     // c=biws is base64("n,,") — channel binding not supported

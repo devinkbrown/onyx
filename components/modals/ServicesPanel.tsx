@@ -10,7 +10,7 @@
  * service bots for servers that run them.
  * Replies are captured via serviceNotices in the store.
  *
- *   Native: IDENTIFY, REGISTER, SETPASS, SETEMAIL, SET, DROP,
+ *   Native: IDENTIFY, ACCOUNT REGISTER, SETPASS, SETEMAIL, SET, DROP,
  *           GROUP, UNGROUP, LISTGROUPS, ACCESS, CERT, SENDPASS,
  *           REGISTER #chan, CHANSET #chan option value, ACCESS #chan,
  *           MEMO SEND|LIST|READ|DEL|FORWARD,
@@ -822,7 +822,6 @@ const ACCOUNT_FLAGS: FlagDef[] = [
 function AccountTab({ account, ourNick, send }: AccountTabProps) {
   const [identifyPw, setIdentifyPw]     = useState('');
   const [identifyAcc, setIdentifyAcc]   = useState('');
-  const [regEmail, setRegEmail]         = useState('');
   const [regPw, setRegPw]               = useState('');
   const [oldPw, setOldPw]               = useState('');
   const [newPw, setNewPw]               = useState('');
@@ -929,16 +928,6 @@ function AccountTab({ account, ourNick, send }: AccountTabProps) {
         <div className="svc-section">
           <div className="svc-section-label">Register Nick</div>
           <div className="svc-form-row">
-            <label className="svc-form-label">Email</label>
-            <input
-              className="svc-input"
-              type="email"
-              placeholder="your@email.com"
-              value={regEmail}
-              onChange={e => setRegEmail(e.target.value)}
-            />
-          </div>
-          <div className="svc-form-row">
             <label className="svc-form-label">Password</label>
             <div className="svc-form-inline">
               <input
@@ -950,10 +939,10 @@ function AccountTab({ account, ourNick, send }: AccountTabProps) {
               />
               <button
                 className="svc-btn svc-btn--accent"
-                disabled={!regPw || !regEmail}
+                disabled={!regPw}
                 onClick={() => {
-                  send('REGISTER', regEmail, regPw);
-                  setRegPw(''); setRegEmail('');
+                  send('ACCOUNT', 'REGISTER', regPw);
+                  setRegPw('');
                 }}
               >Register</button>
             </div>

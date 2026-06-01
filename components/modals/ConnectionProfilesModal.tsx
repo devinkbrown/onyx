@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import { saveCredentials } from '@/lib/credentials';
 import { useDialogFocus } from './useDialogFocus';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -142,11 +143,20 @@ export default function ConnectionProfilesModal() {
     // Build WS URL from profile
     const scheme = draft.tls ? 'wss' : 'ws';
     const wsUrl = `${scheme}://${draft.host}:${draft.port}`;
+    const nick = draft.nick || ourNick || 'OceanUser';
+
+    if (draft.password) {
+      saveCredentials({
+        nick,
+        server: wsUrl,
+        password: draft.password,
+      });
+    }
 
     // Connect (re-uses existing connect action which handles disconnect + reconnect)
     connect({
       url: wsUrl,
-      nick: draft.nick || ourNick || 'OceanUser',
+      nick,
       password: draft.password || undefined,
     });
 

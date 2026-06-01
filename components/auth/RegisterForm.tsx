@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import type { IRCMessage } from '@/lib/irc/types';
 import FormField from '@/components/ui/FormField';
 import Button from '@/components/ui/Button';
 
@@ -106,6 +107,62 @@ const STRENGTH_LABELS: Record<PasswordStrength, string> = {
   strong: 'Strong',
 };
 
+const REGISTER_SUCCESS_RE = /\b(account|nick(?:name)?)\b.*\b(register(?:ed|ation)?|created|success(?:ful(?:ly)?)?)\b|\b(register(?:ed|ation)?|created|success(?:ful(?:ly)?)?)\b.*\b(account|nick(?:name)?)\b/i;
+const REGISTER_FAILURE_RE = /\b(already|exists|taken|invalid|fail(?:ed|ure)?|error|denied|reject(?:ed)?|missing|need|unknown command|too short)\b/i;
+
+function lastParam(msg: IRCMessage): string {
+  return msg.params[msg.params.length - 1] ?? '';
+}
+
+async function waitForAccountRegister(password: string, sendRaw: (line: string) => void): Promise<void> {
+  const client = useOnyxStore.getState().client;
+  if (!client) throw new Error('Connection failed');
+
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    let timeout: ReturnType<typeof setTimeout>;
+
+    const cleanup = () => {
+      client.extraMessageHandlers.delete(handler);
+      clearTimeout(timeout);
+    };
+    const finish = (err?: Error) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (err) reject(err);
+      else resolve();
+    };
+    const handler = (msg: IRCMessage) => {
+      const text = lastParam(msg);
+      const command = msg.command.toUpperCase();
+
+      if (command === '421' && (msg.params[1] ?? '').toUpperCase() === 'ACCOUNT') {
+        finish(new Error(text || 'ACCOUNT REGISTER is not supported by this server'));
+        return;
+      }
+
+      if (/^[45]\d\d$/.test(command) && text) {
+        finish(new Error(text));
+        return;
+      }
+
+      if (command !== 'NOTICE' && command !== 'PRIVMSG' && !/^[29]\d\d$/.test(command)) return;
+      if (REGISTER_FAILURE_RE.test(text)) {
+        finish(new Error(text));
+        return;
+      }
+      if (REGISTER_SUCCESS_RE.test(text)) {
+        finish();
+      }
+    };
+
+    client.extraMessageHandlers.add(handler);
+    timeout = setTimeout(() => finish(new Error('Registration response timed out')), 15000);
+    sendRaw(`ACCOUNT REGISTER ${password}`);
+  });
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function RegisterForm({ onSwitch }: Props) {
@@ -188,7 +245,7 @@ export default function RegisterForm({ onSwitch }: Props) {
 
       // Ophion built-in services: ACCOUNT REGISTER <password>
       // (no NickServ bot, no email parameter)
-      sendRaw(`ACCOUNT REGISTER ${password}`);
+      await waitForAccountRegister(password, sendRaw);
       setStep('verify');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');

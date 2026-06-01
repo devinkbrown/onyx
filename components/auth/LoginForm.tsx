@@ -22,6 +22,23 @@ const NICK_INVALID_RE = /[^a-zA-Z0-9\-_\[\]{}\\|`^]/;
 
 const CONNECTION_STEPS = ['Connecting…', 'Authenticating…', 'Loading channels…'];
 
+function validWsUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'wss:' || parsed.protocol === 'ws:' ? parsed.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function serverLabel(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
 // ── SVG Icons ────────────────────────────────────────────────────────────────
 
 function IconServer() {
@@ -121,11 +138,16 @@ export default function LoginForm({ onSwitch }: Props) {
 
   const handleAutoConnect = useCallback(() => {
     if (!savedCreds) return;
+    const savedServer = validWsUrl(savedCreds.server);
+    if (!savedServer) {
+      setError('Saved server URL is invalid');
+      setConnectAttempted(true);
+      return;
+    }
     setError('');
     setConnectAttempted(true);
-    // Always use DEFAULT_SERVER so stale saved URLs don't break reconnect
     connect({
-      url:      DEFAULT_SERVER,
+      url:      savedServer,
       nick:     savedCreds.nick,
       password: getAuthSecret(savedCreds),
     });
@@ -209,16 +231,16 @@ export default function LoginForm({ onSwitch }: Props) {
         </div>
         <div className="arc-info">
           <span className="arc-nick">{savedCreds.nick}</span>
-          <span className="arc-server">eshmaki.me</span>
+          <span className="arc-server">{serverLabel(savedCreds.server)}</span>
         </div>
-        {visibleLastError && (
+        {hasError && (
           <div className="arc-error" role="alert">
             <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true" style={{flexShrink:0,marginTop:1}}>
               <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.3" fill="none" />
               <path d="M7 4v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
               <circle cx="7" cy="10" r="0.8" fill="currentColor" />
             </svg>
-            {visibleLastError.text}
+            {error || visibleLastError?.text}
           </div>
         )}
 

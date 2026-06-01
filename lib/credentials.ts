@@ -3,12 +3,9 @@
  * Ocean — login credential persistence
  *
  * Storage layout (localStorage key: 'ocean-credentials'):
- *   nick        — IRC nickname
- *   server      — WebSocket URL
- *   password    — NickServ/SASL password (optional; omitted for guests)
- *   sessionToken— Ophion-issued short-lived token (replaces password when present)
- *   tokenExpiry — ISO timestamp; token is cleared after this
- *   savedAt     — ISO timestamp of last save
+ *   version     — storage schema version
+ *   activeKey   — last-used credential key
+ *   entries     — saved credentials keyed by normalized server + nick
  *
  * Session tokens are issued by Ophion after successful SASL auth via:
  *   NOTICE <nick> :SESSIONTOKEN <token> <expires_unix>
@@ -37,23 +34,102 @@ export interface SavedCredentials {
   savedAt: string;
 }
 
+interface CredentialsStore {
+  version: 2;
+  activeKey?: string;
+  entries: Record<string, SavedCredentials>;
+}
+
+function normalizeServer(server: string): string {
+  const trimmed = server.trim();
+  try {
+    const url = new URL(trimmed);
+    url.protocol = url.protocol.toLowerCase();
+    url.hostname = url.hostname.toLowerCase();
+    return url.toString().replace(/\/$/, '');
+  } catch {
+    return trimmed.toLowerCase().replace(/\/$/, '');
+  }
+}
+
+function credentialKey(server: string, nick: string): string {
+  return `${normalizeServer(server)}|${nick.trim().toLowerCase()}`;
+}
+
+function isSavedCredentials(value: unknown): value is SavedCredentials {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<SavedCredentials>;
+  return typeof candidate.nick === 'string'
+    && candidate.nick.length > 0
+    && typeof candidate.server === 'string'
+    && candidate.server.length > 0;
+}
+
+function readStore(): CredentialsStore | null {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem(KEY);
+  if (!raw) return null;
+
+  const parsed = JSON.parse(raw) as unknown;
+  if (
+    parsed
+    && typeof parsed === 'object'
+    && (parsed as { version?: unknown }).version === 2
+    && (parsed as { entries?: unknown }).entries
+    && typeof (parsed as { entries: unknown }).entries === 'object'
+  ) {
+    const entries: Record<string, SavedCredentials> = {};
+    for (const [key, value] of Object.entries((parsed as CredentialsStore).entries)) {
+      if (isSavedCredentials(value)) entries[key] = value;
+    }
+    return {
+      version: 2,
+      activeKey: typeof (parsed as CredentialsStore).activeKey === 'string'
+        ? (parsed as CredentialsStore).activeKey
+        : undefined,
+      entries,
+    };
+  }
+
+  // Legacy single-credential object.
+  if (isSavedCredentials(parsed)) {
+    const key = credentialKey(parsed.server, parsed.nick);
+    return { version: 2, activeKey: key, entries: { [key]: parsed } };
+  }
+
+  return null;
+}
+
+function writeStore(store: CredentialsStore): void {
+  localStorage.setItem(KEY, JSON.stringify(store));
+}
+
+function purgeExpiredTokens(store: CredentialsStore): boolean {
+  let changed = false;
+  for (const [key, creds] of Object.entries(store.entries)) {
+    if (creds.sessionToken && creds.tokenExpiry && Date.now() > new Date(creds.tokenExpiry).getTime()) {
+      store.entries[key] = {
+        ...creds,
+        sessionToken: undefined,
+        tokenExpiry: undefined,
+      };
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 /** Load credentials from localStorage. Returns null when nothing is saved. */
-export function loadCredentials(): SavedCredentials | null {
+export function loadCredentials(server?: string, nick?: string): SavedCredentials | null {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return null;
-    const creds = JSON.parse(raw) as SavedCredentials;
-    if (!creds.nick || !creds.server) return null;
-    // Purge expired session token transparently
-    if (creds.sessionToken && creds.tokenExpiry) {
-      if (Date.now() > new Date(creds.tokenExpiry).getTime()) {
-        creds.sessionToken = undefined;
-        creds.tokenExpiry  = undefined;
-        localStorage.setItem(KEY, JSON.stringify(creds));
-      }
-    }
-    return creds;
+    const store = readStore();
+    if (!store) return null;
+    if (purgeExpiredTokens(store)) writeStore(store);
+
+    const key = server && nick ? credentialKey(server, nick) : store.activeKey;
+    const creds = key ? store.entries[key] : Object.values(store.entries)[0];
+    return creds ?? null;
   } catch {
     return null;
   }
@@ -67,17 +143,25 @@ export function saveCredentials(opts: {
 }): void {
   if (typeof window === 'undefined') return;
   try {
-    // Preserve any existing session token
-    const existing = loadCredentials();
+    const store: CredentialsStore = readStore() ?? { version: 2, entries: {} };
+    purgeExpiredTokens(store);
+    const key = credentialKey(opts.server, opts.nick);
+    const existing = store.entries[key];
+    const preserveToken = existing
+      && normalizeServer(existing.server) === normalizeServer(opts.server)
+      && existing.nick.trim().toLowerCase() === opts.nick.trim().toLowerCase()
+      && existing.password === opts.password;
     const creds: SavedCredentials = {
       nick:         opts.nick,
       server:       opts.server,
       password:     opts.password,
-      sessionToken: existing?.sessionToken,
-      tokenExpiry:  existing?.tokenExpiry,
+      sessionToken: preserveToken ? existing.sessionToken : undefined,
+      tokenExpiry:  preserveToken ? existing.tokenExpiry : undefined,
       savedAt:      new Date().toISOString(),
     };
-    localStorage.setItem(KEY, JSON.stringify(creds));
+    store.entries[key] = creds;
+    store.activeKey = key;
+    writeStore(store);
     // Also keep legacy key so the nick field stays pre-filled
     localStorage.setItem('ocean-saved-nick', opts.nick);
   } catch { /* quota */ }
@@ -92,29 +176,41 @@ export function saveCredentials(opts: {
 export function storeSessionToken(token: string, expiresAt: number, canonicalNick?: string): void {
   if (typeof window === 'undefined') return;
   try {
-    const existing = loadCredentials();
-    if (!existing) return; // Only store tokens when we have base credentials
+    const store = readStore();
+    if (!store) return; // Only store tokens when we have base credentials
+    purgeExpiredTokens(store);
+    const activeKey = store.activeKey ?? Object.keys(store.entries)[0];
+    if (!activeKey) return;
+    const existing = store.entries[activeKey];
+    if (!existing) return;
     const expiry = new Date(expiresAt * 1000).toISOString();
+    const nick = canonicalNick ?? existing.nick;
     const creds: SavedCredentials = {
       ...existing,
-      nick:        canonicalNick ?? existing.nick,
+      nick,
       sessionToken: token,
       tokenExpiry:  expiry,
     };
-    localStorage.setItem(KEY, JSON.stringify(creds));
+    const nextKey = credentialKey(existing.server, nick);
+    if (nextKey !== activeKey) delete store.entries[activeKey];
+    store.entries[nextKey] = creds;
+    store.activeKey = nextKey;
+    writeStore(store);
     // Keep legacy nick key in sync
     if (canonicalNick) localStorage.setItem('ocean-saved-nick', canonicalNick);
   } catch { /* quota */ }
 }
 
 /** Clear stored session token (e.g. after 401 / failed reuse). */
-export function clearSessionToken(): void {
+export function clearSessionToken(server?: string, nick?: string): void {
   if (typeof window === 'undefined') return;
   try {
-    const existing = loadCredentials();
-    if (!existing) return;
-    const creds: SavedCredentials = { ...existing, sessionToken: undefined, tokenExpiry: undefined };
-    localStorage.setItem(KEY, JSON.stringify(creds));
+    const store = readStore();
+    if (!store) return;
+    const key = server && nick ? credentialKey(server, nick) : store.activeKey;
+    if (!key || !store.entries[key]) return;
+    store.entries[key] = { ...store.entries[key], sessionToken: undefined, tokenExpiry: undefined };
+    writeStore(store);
   } catch { /* quota */ }
 }
 
