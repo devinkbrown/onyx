@@ -28,11 +28,7 @@ import { useDialogFocus } from './useDialogFocus';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface ReplyLine {
-  id: string;
-  text: string;
-  ts: Date;
-}
+type SendAccount = (subcmd: string, ...params: string[]) => void;
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -49,41 +45,9 @@ export default function ServicesPanel() {
 
   const account = server?.account ?? null;
 
-  // ── Capture server reply NOTICEs (native commands) ───────────────────────
-  const [replies, setReplies] = useState<ReplyLine[]>([]);
-  const replyBodyRef   = useRef<HTMLDivElement>(null);
   const svcNoticeRef   = useRef<HTMLDivElement>(null);
-  const seenIds        = useRef<Set<string>>(new Set());
   const panelRef       = useRef<HTMLDivElement>(null);
   useDialogFocus(panelRef);
-
-  // Subscribe to ALL dms changes — server replies arrive as NOTICEs
-  useEffect(() => {
-    const unsub = useOnyxStore.subscribe(
-      s => s.dms,
-      (dms) => {
-        dms.forEach((conv) => {
-          const last = conv.messages[conv.messages.length - 1];
-          if (!last || seenIds.current.has(last.id)) return;
-          if (!conv.nick?.startsWith('#') && !conv.nick?.startsWith('&')) {
-            seenIds.current.add(last.id);
-            setReplies(prev => {
-              const next = [...prev, { id: last.id, text: last.text, ts: last.time as Date }];
-              return next.slice(-20);
-            });
-          }
-        });
-      },
-    );
-    return unsub;
-  }, []);
-
-  // Auto-scroll reply log
-  useEffect(() => {
-    if (replyBodyRef.current) {
-      replyBodyRef.current.scrollTop = replyBodyRef.current.scrollHeight;
-    }
-  }, [replies]);
 
   // Auto-scroll service notices log
   useEffect(() => {
@@ -106,16 +70,14 @@ export default function ServicesPanel() {
     client?.sendRaw(command, ...params);
   };
 
+  const sendAccount: SendAccount = (subcmd, ...params) => {
+    client?.sendRaw('ACCOUNT', subcmd, ...params);
+  };
+
   // ── Send PRIVMSG to a service bot ───────────────────────────────────────
   // formatIRCLine auto-prefixes the trailing param with ':' when needed
   const sendToBot = (bot: string, command: string) => {
     client?.sendRaw('PRIVMSG', bot, command);
-  };
-
-  // ── Clear reply log ────────────────────────────────────────────────────
-  const clearReplies = () => {
-    setReplies([]);
-    seenIds.current.clear();
   };
 
   const isBotTab = servicesTab === 'nickserv' || servicesTab === 'chanserv'
@@ -212,13 +174,13 @@ export default function ServicesPanel() {
         {/* Body */}
         <div className="svc-body">
           {servicesTab === 'account' && (
-            <AccountTab account={account} ourNick={ourNick} send={send} />
+            <AccountTab account={account} ourNick={ourNick} sendAccount={sendAccount} />
           )}
           {servicesTab === 'channel' && (
             <ChannelTab channels={channels} ourNick={ourNick} send={send} />
           )}
           {servicesTab === 'memos' && (
-            <MemosTab account={account} send={send} />
+            <MemosTab account={account} sendAccount={sendAccount} />
           )}
           {servicesTab === 'vhost' && (
             <VHostTab send={send} />
@@ -237,59 +199,31 @@ export default function ServicesPanel() {
           )}
         </div>
 
-        {/* Footer reply log — native tabs use dms, bot tabs use serviceNotices */}
-        {!isBotTab ? (
-          <div className="svc-reply-section">
-            <div className="svc-reply-header">
-              <span className="svc-section-label">Server Replies</span>
-              {replies.length > 0 && (
-                <button className="svc-clear-btn" onClick={clearReplies}>Clear</button>
-              )}
-            </div>
-            <div className="svc-reply-log" ref={replyBodyRef}>
-              {replies.length === 0 ? (
-                <span className="svc-reply-empty">
-                  Responses to commands appear here
-                </span>
-              ) : (
-                replies.map(r => (
-                  <div key={r.id} className="svc-reply-line">
-                    <span className="svc-reply-time">
-                      {r.ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                    <span className="svc-reply-text">{r.text}</span>
-                  </div>
-                ))
-              )}
-            </div>
+        <div className="svc-reply-section">
+          <div className="svc-reply-header">
+            <span className="svc-section-label">{isBotTab ? `${activeBot} Replies` : 'Server Replies'}</span>
+            {filteredNotices.length > 0 && (
+              <button className="svc-clear-btn" onClick={clearServiceNotices}>Clear</button>
+            )}
           </div>
-        ) : (
-          <div className="svc-reply-section">
-            <div className="svc-reply-header">
-              <span className="svc-section-label">{activeBot} Replies</span>
-              {filteredNotices.length > 0 && (
-                <button className="svc-clear-btn" onClick={clearServiceNotices}>Clear</button>
-              )}
-            </div>
-            <div className="svc-reply-log" ref={svcNoticeRef}>
-              {filteredNotices.length === 0 ? (
-                <span className="svc-reply-empty">
-                  {activeBot} responses appear here
-                </span>
-              ) : (
-                filteredNotices.map((n, i) => (
-                  <div key={i} className="svc-reply-line">
-                    <span className="svc-reply-time">
-                      {n.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                    <span className="svc-reply-source">{n.source}</span>
-                    <span className="svc-reply-text">{n.text}</span>
-                  </div>
-                ))
-              )}
-            </div>
+          <div className="svc-reply-log" ref={svcNoticeRef}>
+            {filteredNotices.length === 0 ? (
+              <span className="svc-reply-empty">
+                {isBotTab ? `${activeBot} responses appear here` : 'Responses to commands appear here'}
+              </span>
+            ) : (
+              filteredNotices.map((n, i) => (
+                <div key={i} className="svc-reply-line">
+                  <span className="svc-reply-time">
+                    {n.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <span className="svc-reply-source">{n.source}</span>
+                  <span className="svc-reply-text">{n.text}</span>
+                </div>
+              ))
+            )}
           </div>
-        )}
+        </div>
 
       </div>
 
@@ -791,7 +725,7 @@ export default function ServicesPanel() {
 interface AccountTabProps {
   account: string | null;
   ourNick: string;
-  send: (cmd: string, ...params: string[]) => void;
+  sendAccount: SendAccount;
 }
 
 type AccountFlag =
@@ -819,7 +753,7 @@ const ACCOUNT_FLAGS: FlagDef[] = [
   { flag: 'SASLONLY',    label: 'SASL Only',      desc: 'IDENTIFY rejected; SASL PLAIN only' },
 ];
 
-function AccountTab({ account, ourNick, send }: AccountTabProps) {
+function AccountTab({ account, ourNick, sendAccount }: AccountTabProps) {
   const [identifyPw, setIdentifyPw]     = useState('');
   const [identifyAcc, setIdentifyAcc]   = useState('');
   const [regPw, setRegPw]               = useState('');
@@ -844,7 +778,7 @@ function AccountTab({ account, ourNick, send }: AccountTabProps) {
       else next.delete(f);
       return next;
     });
-    send('SET', f, on ? 'ON' : 'OFF');
+    sendAccount('SET', f, on ? 'ON' : 'OFF');
   };
 
   return (
@@ -861,7 +795,7 @@ function AccountTab({ account, ourNick, send }: AccountTabProps) {
               </span>
               <button
                 className="svc-btn svc-btn--sm"
-                onClick={() => send('ACCOUNTINFO')}
+                onClick={() => sendAccount('INFO')}
               >Info</button>
             </>
           ) : (
@@ -898,9 +832,9 @@ function AccountTab({ account, ourNick, send }: AccountTabProps) {
                 onKeyDown={e => {
                   if (e.key === 'Enter' && identifyPw) {
                     if (identifyAcc) {
-                      send('IDENTIFY', identifyAcc, identifyPw);
+                      sendAccount('IDENTIFY', identifyAcc, identifyPw);
                     } else {
-                      send('IDENTIFY', identifyPw);
+                      sendAccount('IDENTIFY', identifyPw);
                     }
                     setIdentifyPw('');
                   }
@@ -911,9 +845,9 @@ function AccountTab({ account, ourNick, send }: AccountTabProps) {
                 disabled={!identifyPw}
                 onClick={() => {
                   if (identifyAcc) {
-                    send('IDENTIFY', identifyAcc, identifyPw);
+                    sendAccount('IDENTIFY', identifyAcc, identifyPw);
                   } else {
-                    send('IDENTIFY', identifyPw);
+                    sendAccount('IDENTIFY', identifyPw);
                   }
                   setIdentifyPw('');
                 }}
@@ -941,8 +875,9 @@ function AccountTab({ account, ourNick, send }: AccountTabProps) {
                 className="svc-btn svc-btn--accent"
                 disabled={!regPw}
                 onClick={() => {
-                  send('ACCOUNT', 'REGISTER', regPw);
-                  setRegPw('');
+                  sendAccount('REGISTER', regPw);
+                  if (regEmail) sendAccount('SETEMAIL', regEmail);
+                  setRegPw(''); setRegEmail('');
                 }}
               >Register</button>
             </div>
@@ -965,7 +900,7 @@ function AccountTab({ account, ourNick, send }: AccountTabProps) {
             <button
               className="svc-btn"
               disabled={!ghostNick}
-              onClick={() => { send('GHOST', ghostNick); setGhostNick(''); }}
+              onClick={() => { sendAccount('GHOST', ghostNick); setGhostNick(''); }}
             >Ghost</button>
           </div>
         </div>
@@ -991,9 +926,9 @@ function AccountTab({ account, ourNick, send }: AccountTabProps) {
               disabled={!recoverNick}
               onClick={() => {
                 if (recoverPw) {
-                  send('RECOVER', recoverNick, recoverPw);
+                  sendAccount('RECOVER', recoverNick, recoverPw);
                 } else {
-                  send('RECOVER', recoverNick);
+                  sendAccount('RECOVER', recoverNick);
                 }
                 setRecoverNick(''); setRecoverPw('');
               }}
@@ -1032,7 +967,7 @@ function AccountTab({ account, ourNick, send }: AccountTabProps) {
                   className="svc-btn"
                   disabled={!oldPw || !newPw}
                   onClick={() => {
-                    send('SETPASS', oldPw, newPw);
+                    sendAccount('SETPASS', oldPw, newPw);
                     setOldPw(''); setNewPw('');
                   }}
                 >Change</button>
@@ -1055,7 +990,7 @@ function AccountTab({ account, ourNick, send }: AccountTabProps) {
                 <button
                   className="svc-btn"
                   disabled={!email}
-                  onClick={() => { send('SETEMAIL', email); setEmail(''); }}
+                  onClick={() => { sendAccount('SETEMAIL', email); setEmail(''); }}
                 >Update</button>
               </div>
             </div>
@@ -1070,7 +1005,7 @@ function AccountTab({ account, ourNick, send }: AccountTabProps) {
               </label>
               <button
                 className="svc-btn"
-                onClick={() => send('GROUP')}
+                onClick={() => sendAccount('GROUP')}
                 style={{ alignSelf: 'flex-start' }}
               >Group Current Nick</button>
             </div>
@@ -1086,13 +1021,13 @@ function AccountTab({ account, ourNick, send }: AccountTabProps) {
                 <button
                   className="svc-btn"
                   disabled={!ungroupNick}
-                  onClick={() => { send('UNGROUP', ungroupNick); setUngroupNick(''); }}
+                  onClick={() => { sendAccount('UNGROUP', ungroupNick); setUngroupNick(''); }}
                 >Ungroup</button>
               </div>
             </div>
             <button
               className="svc-btn"
-              onClick={() => send('LISTGROUPS')}
+              onClick={() => sendAccount('LISTGROUPS')}
               style={{ alignSelf: 'flex-start' }}
             >List Grouped Nicks ↗</button>
           </div>
@@ -1114,17 +1049,17 @@ function AccountTab({ account, ourNick, send }: AccountTabProps) {
                 <button
                   className="svc-btn"
                   disabled={!accessMask}
-                  onClick={() => { send('ACCESS', 'ADD', accessMask); setAccessMask(''); }}
+                  onClick={() => { sendAccount('ACCESS', 'ADD', accessMask); setAccessMask(''); }}
                 >Add</button>
               </div>
             </div>
             <div className="svc-form-inline">
-              <button className="svc-btn svc-btn--sm" onClick={() => send('ACCESS', 'LIST')}>
+              <button className="svc-btn svc-btn--sm" onClick={() => sendAccount('ACCESS', 'LIST')}>
                 List Masks ↗
               </button>
               <button
                 className="svc-btn svc-btn--sm"
-                onClick={() => send('CERT', 'LIST')}
+                onClick={() => sendAccount('CERT', 'LIST')}
                 title="TLS certificate fingerprints"
               >
                 List Certs ↗
@@ -1162,7 +1097,7 @@ function AccountTab({ account, ourNick, send }: AccountTabProps) {
             <button
               className="svc-btn"
               style={{ alignSelf: 'flex-start' }}
-              onClick={() => send('SENDPASS')}
+              onClick={() => sendAccount('SENDPASS')}
             >Email Reset Token</button>
           </div>
 
@@ -1199,7 +1134,7 @@ function AccountTab({ account, ourNick, send }: AccountTabProps) {
                     className="svc-btn svc-btn--danger"
                     disabled={!dropPw}
                     onClick={() => {
-                      send('DROP', dropPw);
+                      sendAccount('DROP', dropPw);
                       setShowDrop(false); setDropPw('');
                     }}
                   >Drop Account</button>
@@ -1442,10 +1377,10 @@ function ChannelTab({ channels, ourNick, send }: ChannelTabProps) {
 
 interface MemosTabProps {
   account: string | null;
-  send: (cmd: string, ...params: string[]) => void;
+  sendAccount: SendAccount;
 }
 
-function MemosTab({ account, send }: MemosTabProps) {
+function MemosTab({ account, sendAccount }: MemosTabProps) {
   const [sendTo, setSendTo]     = useState('');
   const [sendText, setSendText] = useState('');
   const [readId, setReadId]     = useState('');
@@ -1473,7 +1408,7 @@ function MemosTab({ account, send }: MemosTabProps) {
         </p>
         <button
           className="svc-btn"
-          onClick={() => send('MEMO', 'LIST')}
+          onClick={() => sendAccount('MEMO', 'LIST')}
           style={{ alignSelf: 'flex-start' }}
         >Fetch Memo List ↗</button>
       </div>
@@ -1499,7 +1434,7 @@ function MemosTab({ account, send }: MemosTabProps) {
               onChange={e => setSendText(e.target.value)}
               onKeyDown={e => {
                 if (e.key === 'Enter' && sendTo && sendText) {
-                  send('MEMO', 'SEND', sendTo, sendText);
+                  sendAccount('MEMO', 'SEND', sendTo, sendText);
                   setSendText('');
                 }
               }}
@@ -1507,7 +1442,7 @@ function MemosTab({ account, send }: MemosTabProps) {
             <button
               className="svc-btn svc-btn--accent"
               disabled={!sendTo || !sendText}
-              onClick={() => { send('MEMO', 'SEND', sendTo, sendText); setSendText(''); }}
+              onClick={() => { sendAccount('MEMO', 'SEND', sendTo, sendText); setSendText(''); }}
             >Send</button>
           </div>
         </div>
@@ -1527,7 +1462,7 @@ function MemosTab({ account, send }: MemosTabProps) {
             <button
               className="svc-btn"
               disabled={!readId}
-              onClick={() => { send('MEMO', 'READ', readId); }}
+              onClick={() => { sendAccount('MEMO', 'READ', readId); }}
             >Read ↗</button>
           </div>
         </div>
@@ -1543,7 +1478,7 @@ function MemosTab({ account, send }: MemosTabProps) {
             <button
               className="svc-btn svc-btn--danger"
               disabled={!delId}
-              onClick={() => { send('MEMO', 'DEL', delId); setDelId(''); }}
+              onClick={() => { sendAccount('MEMO', 'DEL', delId); setDelId(''); }}
             >Delete</button>
           </div>
         </div>
@@ -1567,7 +1502,7 @@ function MemosTab({ account, send }: MemosTabProps) {
             <button
               className="svc-btn"
               disabled={!fwdId || !fwdTo}
-              onClick={() => { send('MEMO', 'FORWARD', fwdId, fwdTo); setFwdId(''); setFwdTo(''); }}
+              onClick={() => { sendAccount('MEMO', 'FORWARD', fwdId, fwdTo); setFwdId(''); setFwdTo(''); }}
             >Fwd</button>
           </div>
         </div>

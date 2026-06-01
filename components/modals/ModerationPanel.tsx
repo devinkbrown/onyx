@@ -26,6 +26,7 @@ export default function ModerationPanel() {
   const moderationLog        = useOnyxStore(s => s.moderationLog);
   const banList              = useOnyxStore(s => s.banList);
   const fetchBanList         = useOnyxStore(s => s.fetchBanList);
+  const tempBan              = useOnyxStore(s => s.tempBan);
 
   const channel = activeView.kind === 'channel' ? activeView.channel : '';
   const channelKey = channel.toLowerCase();
@@ -38,7 +39,6 @@ export default function ModerationPanel() {
   const [tempBanMins, setTempBanMins] = useState('10');
   const [auditFilter, setAuditFilter] = useState<AuditFilter>('all');
 
-  const tempBanTimerRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const panelRef        = useRef<HTMLDivElement>(null);
   useDialogFocus(panelRef);
 
@@ -48,12 +48,6 @@ export default function ModerationPanel() {
       fetchBanList(channel);
     }
   }, [tab, channel, fetchBanList]);
-
-  // Clean up temp-ban timers on unmount
-  useEffect(() => {
-    const timers = tempBanTimerRef.current;
-    return () => { timers.forEach(t => clearTimeout(t)); };
-  }, []);
 
   const nickToMask = (nick: string) =>
     nick.includes('!') || nick.includes('@') || nick.includes('*') ? nick : `${nick}!*@*`;
@@ -94,12 +88,7 @@ export default function ModerationPanel() {
     if (!target || !channel) return;
     const mask = nickToMask(target);
     const mins = parseInt(tempBanMins, 10) || 10;
-    send('MODE', channel, '+b', mask);
-    const timer = setTimeout(() => {
-      client?.sendRaw('MODE', channel, '-b', mask);
-      tempBanTimerRef.current.delete(mask);
-    }, mins * 60 * 1000);
-    tempBanTimerRef.current.set(mask, timer);
+    tempBan(channel, mask, mins);
     setTarget('');
   };
 
@@ -107,6 +96,7 @@ export default function ModerationPanel() {
     const m = mask ?? nickToMask(target);
     if (!m || !channel) return;
     send('MODE', channel, '-b', m);
+    setTimeout(() => fetchBanList(channel), 400);
     if (!mask) setTarget('');
   };
 
