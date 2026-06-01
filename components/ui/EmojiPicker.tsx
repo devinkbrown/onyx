@@ -208,7 +208,6 @@ interface TooltipState {
 export default function EmojiPicker({ onPick, onClose }: EmojiPickerProps) {
   const [query, setQuery] = useState('');
   const [activeCategoryId, setActiveCategoryId] = useState<string>('recent');
-  const [skinToneIndex, setSkinToneIndex] = useState(0);
   const [recent, setRecent] = useState<string[]>(() => loadRecent());
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [hoveredSkinEmoji, setHoveredSkinEmoji] = useState<string | null>(null);
@@ -217,12 +216,15 @@ export default function EmojiPicker({ onPick, onClose }: EmojiPickerProps) {
   const openCustomEmojiModal = useOnyxStore(s => s.openCustomEmojiModal);
   const incrementEmojiUsage = useOnyxStore(s => s.incrementEmojiUsage);
   const emojiUsageCounts = useOnyxStore(s => s.emojiUsageCounts);
+  const emojiSkinTone = useOnyxStore(s => s.emojiSkinTone);
+  const setEmojiSkinTone = useOnyxStore(s => s.setEmojiSkinTone);
 
   const searchRef = useRef<HTMLInputElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
   const debouncedQuery = useDebounce(query, 150);
+  const skinToneIndex = Math.max(0, SKIN_TONES.indexOf(emojiSkinTone));
 
   useEffect(() => {
     searchRef.current?.focus();
@@ -237,12 +239,12 @@ export default function EmojiPicker({ onPick, onClose }: EmojiPickerProps) {
   }, [onClose]);
 
   const applyTone = useCallback((e: string): string => {
-    if (skinToneIndex === 0) return e;
+    if (!emojiSkinTone) return e;
     if (SKIN_TONE_CAPABLE.has(e)) {
-      return e + SKIN_TONES[skinToneIndex];
+      return e + emojiSkinTone;
     }
     return e;
-  }, [skinToneIndex]);
+  }, [emojiSkinTone]);
 
   const handlePick = useCallback((raw: string) => {
     const final = applyTone(raw);
@@ -380,7 +382,7 @@ export default function EmojiPicker({ onPick, onClose }: EmojiPickerProps) {
               key={i}
               className={`ep-tone${skinToneIndex === i ? ' ep-tone--active' : ''}`}
               style={{ background: color }}
-              onClick={() => setSkinToneIndex(i)}
+              onClick={() => setEmojiSkinTone(SKIN_TONES[i] ?? '')}
               title={SKIN_TONE_LABELS[i]}
               aria-pressed={skinToneIndex === i}
               aria-label={SKIN_TONE_LABELS[i]}

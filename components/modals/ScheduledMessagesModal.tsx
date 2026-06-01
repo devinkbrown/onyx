@@ -26,6 +26,15 @@ function formatAbsolute(sendAt: number): string {
   });
 }
 
+function formatDateTimeLocalMin(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+  ].join('-') + `T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function ScheduledMessagesModal() {
@@ -64,7 +73,7 @@ export default function ScheduledMessagesModal() {
   }
 
   // min value for datetime-local: now rounded to the next minute
-  const nowIso = new Date(Date.now() + 60_000).toISOString().slice(0, 16);
+  const nowIso = formatDateTimeLocalMin(new Date(Date.now() + 60_000));
 
   return (
     <div

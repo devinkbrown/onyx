@@ -76,7 +76,6 @@ import { useAppearance } from '@/hooks/useAppearance';
 import { usePresence } from '@/hooks/usePresence';
 import { useScheduledMessageTimer } from '@/hooks/useScheduledMessageTimer';
 import { useAudioNotifications } from '@/hooks/useAudioNotifications';
-import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useIdleDetector } from '@/hooks/useIdleDetector';
 import { useCustomStatusExpiry } from '@/hooks/useCustomStatusExpiry';
 
@@ -298,8 +297,6 @@ export default function AppShell({ children }: Props) {
   useScheduledMessageTimer();
   // Audio notifications
   useAudioNotifications();
-  // OS push notifications for mentions and DMs
-  usePushNotifications();
   // Idle auto-away
   useIdleDetector();
   // Custom status expiry auto-clear
