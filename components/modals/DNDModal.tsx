@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
-import { useDialogFocus } from './useDialogFocus';
+import ModalShell from './ModalShell';
 
 function formatHour(h: number): string {
   if (h === 0) return '12:00 AM';
@@ -40,43 +39,26 @@ export default function DNDModal() {
   const setDndUntil     = useOnyxStore(s => s.setDndUntil);
   const closeDndModal   = useOnyxStore(s => s.closeDndModal);
 
-  const overlayRef = useRef<HTMLDivElement>(null);
-  const modalRef   = useRef<HTMLDivElement>(null);
-  useDialogFocus(modalRef);
-
-  // Close on Escape or backdrop click
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeDndModal();
-    };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [closeDndModal]);
-
   const activeNow = isDndActive();
 
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
   return (
-    <div
-      ref={overlayRef}
-      className="dnd-overlay"
-      onClick={(e) => { if (e.target === overlayRef.current) closeDndModal(); }}
+    <ModalShell
+      onClose={closeDndModal}
+      title={<><span className="dnd-moon" aria-hidden="true">🌙</span> Do Not Disturb</>}
+      kicker="Presence"
+      titleId="dnd-title"
+      size="sm"
+      closeLabel="Close Do Not Disturb settings"
+      flushBody
+      footer={
+        <button className="dnd-btn dnd-btn--primary" onClick={closeDndModal}>
+          Done
+        </button>
+      }
     >
-      <div className="dnd-modal" ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="dnd-title">
-        {/* Header */}
-        <div className="dnd-header">
-          <span className="dnd-moon" aria-hidden="true">🌙</span>
-          <h2 id="dnd-title" className="dnd-title">Do Not Disturb</h2>
-          <button
-            className="dnd-close"
-            onClick={closeDndModal}
-            aria-label="Close Do Not Disturb settings"
-          >
-            ✕
-          </button>
-        </div>
-
+      <div className="dnd-content">
         {/* Active indicator */}
         {activeNow && (
           <div className="dnd-active-badge" role="status" aria-live="polite">
@@ -104,11 +86,11 @@ export default function DNDModal() {
         {/* Quiet hours (shown when DND enabled) */}
         {dndEnabled && (
           <div className="dnd-quiet-section">
-            <div className="dnd-section-label">Quiet Hours</div>
+            <div className="label-caps dnd-section-label">Quiet Hours</div>
 
             <div className="dnd-hours-row">
               <div className="dnd-hours-field">
-                <label htmlFor="dnd-start" className="dnd-field-label">From</label>
+                <label htmlFor="dnd-start" className="label-caps dnd-field-label">From</label>
                 <select
                   id="dnd-start"
                   className="dnd-select"
@@ -124,7 +106,7 @@ export default function DNDModal() {
               <span className="dnd-hours-to" aria-hidden="true">—</span>
 
               <div className="dnd-hours-field">
-                <label htmlFor="dnd-end" className="dnd-field-label">To</label>
+                <label htmlFor="dnd-end" className="label-caps dnd-field-label">To</label>
                 <select
                   id="dnd-end"
                   className="dnd-select"
@@ -146,7 +128,7 @@ export default function DNDModal() {
 
         {/* Timed override section */}
         <div className="dnd-quiet-section">
-          <div className="dnd-section-label">Suppress Notifications</div>
+          <div className="label-caps dnd-section-label">Suppress Notifications</div>
           <div className="dnd-presets">
             {DND_PRESETS.map(preset => {
               const isActive = preset.value === -1
@@ -195,92 +177,21 @@ export default function DNDModal() {
             </p>
           )}
         </div>
-
-        {/* Footer */}
-        <div className="dnd-footer">
-          <button className="dnd-btn dnd-btn--primary" onClick={closeDndModal}>
-            Done
-          </button>
-        </div>
       </div>
 
       <style>{`
-        .dnd-overlay {
-          position: fixed;
-          inset: 0;
-          z-index: 800;
-          background: rgba(0, 0, 0, 0.6);
-          backdrop-filter: blur(4px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          animation: dnd-fade-in 120ms var(--ease-out, ease) both;
-        }
-        @keyframes dnd-fade-in {
-          from { opacity: 0; }
-          to   { opacity: 1; }
-        }
-
-        .dnd-modal {
-          width: 420px;
-          max-width: calc(100vw - 32px);
-          background: var(--bg-deep);
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-xl);
-          box-shadow: var(--shadow-xl);
-          overflow: hidden;
-          animation: dnd-slide-up 160ms var(--ease-out, ease) both;
-        }
-        @keyframes dnd-slide-up {
-          from { transform: translateY(12px) scale(0.98); opacity: 0; }
-          to   { transform: translateY(0) scale(1); opacity: 1; }
-        }
-
-        .dnd-header {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 18px 20px 16px;
-          border-bottom: 1px solid var(--border-subtle);
-        }
         .dnd-moon {
-          font-size: 20px;
+          font-size: 18px;
           line-height: 1;
-        }
-        .dnd-title {
-          flex: 1;
-          margin: 0;
-          font-size: 16px;
-          font-weight: 700;
-          color: var(--text-primary);
-        }
-        .dnd-close {
-          width: 28px;
-          height: 28px;
-          background: none;
-          border: none;
-          cursor: pointer;
-          color: var(--text-muted);
-          font-size: 14px;
-          border-radius: var(--r-sm, 6px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: background var(--t-fast, 80ms), color var(--t-fast, 80ms);
-          font-family: inherit;
-        }
-        .dnd-close:hover {
-          background: var(--ch-hover-bg, rgba(255,255,255,0.06));
-          color: var(--text-primary);
         }
 
         .dnd-active-badge {
-          margin: 12px 20px 0;
+          margin: var(--sp-3, 12px) var(--sp-5, 20px) 0;
           padding: 8px 12px;
           background: rgba(248,113,113,0.10);
           border: 1px solid rgba(248,113,113,0.28);
           border-radius: var(--r-sm);
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           font-weight: 600;
           color: var(--status-dnd);
           display: flex;
@@ -291,8 +202,8 @@ export default function DNDModal() {
         .dnd-row {
           display: flex;
           align-items: center;
-          gap: 12px;
-          padding: 16px 20px;
+          gap: var(--sp-3, 12px);
+          padding: var(--sp-4, 16px) var(--sp-5, 20px);
         }
         .dnd-toggle-row {
           cursor: pointer;
@@ -305,12 +216,12 @@ export default function DNDModal() {
           gap: 2px;
         }
         .dnd-row-label {
-          font-size: 14px;
+          font-size: var(--text-base, 14px);
           font-weight: 600;
           color: var(--text-primary);
         }
         .dnd-row-desc {
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           color: var(--text-muted);
         }
 
@@ -323,7 +234,7 @@ export default function DNDModal() {
           border: none;
           cursor: pointer;
           background: var(--bg-elevated, rgba(255,255,255,0.08));
-          transition: background var(--t-normal, 200ms);
+          transition: background var(--t-surface, 220ms);
           flex-shrink: 0;
           padding: 0;
         }
@@ -336,7 +247,7 @@ export default function DNDModal() {
           height: 16px;
           border-radius: 50%;
           background: var(--text-muted, #888);
-          transition: transform var(--t-normal, 200ms), background var(--t-normal, 200ms);
+          transition: transform var(--t-surface, 220ms), background var(--t-surface, 220ms);
         }
         .dnd-toggle--on .dnd-toggle-thumb {
           transform: translateX(18px);
@@ -345,16 +256,12 @@ export default function DNDModal() {
 
         /* Quiet hours section */
         .dnd-quiet-section {
-          padding: 16px 20px;
+          padding: var(--sp-4, 16px) var(--sp-5, 20px);
           border-bottom: 1px solid var(--border-subtle);
         }
+        .dnd-quiet-section:last-child { border-bottom: none; }
         .dnd-section-label {
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 0.07em;
-          text-transform: uppercase;
-          color: var(--text-muted);
-          margin-bottom: 12px;
+          margin-bottom: var(--sp-3, 12px);
         }
         .dnd-hours-row {
           display: flex;
@@ -367,13 +274,6 @@ export default function DNDModal() {
           gap: 4px;
           flex: 1;
         }
-        .dnd-field-label {
-          font-size: 11px;
-          font-weight: 600;
-          color: var(--text-muted);
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-        }
         .dnd-select {
           width: 100%;
           padding: 7px 10px;
@@ -381,11 +281,11 @@ export default function DNDModal() {
           border: 1px solid var(--border-normal);
           border-radius: var(--r-sm, 6px);
           color: var(--text-primary);
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           font-family: inherit;
           cursor: pointer;
           appearance: auto;
-          transition: border-color var(--t-fast, 80ms);
+          transition: border-color var(--t-control, 150ms);
         }
         .dnd-select:focus {
           outline: 2px solid var(--accent-border, rgba(14,165,233,0.5));
@@ -398,8 +298,8 @@ export default function DNDModal() {
           flex-shrink: 0;
         }
         .dnd-preview {
-          margin: 12px 0 0;
-          font-size: 12px;
+          margin: var(--sp-3, 12px) 0 0;
+          font-size: var(--text-xs, 12px);
           color: var(--text-muted);
           font-style: italic;
         }
@@ -409,7 +309,7 @@ export default function DNDModal() {
           display: flex;
           flex-wrap: wrap;
           gap: 6px;
-          margin-bottom: 8px;
+          margin-bottom: var(--sp-2, 8px);
         }
         .dnd-preset-btn {
           padding: 5px 12px;
@@ -417,11 +317,11 @@ export default function DNDModal() {
           border: 1px solid var(--border-normal);
           background: var(--bg-elevated, rgba(255,255,255,0.06));
           color: var(--text-secondary);
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           font-weight: 500;
           font-family: inherit;
           cursor: pointer;
-          transition: background var(--t-fast, 80ms), border-color var(--t-fast, 80ms), color var(--t-fast, 80ms);
+          transition: background var(--t-control, 150ms), border-color var(--t-control, 150ms), color var(--t-control, 150ms);
         }
         .dnd-preset-btn:hover {
           background: var(--accent-subtle, rgba(14,165,233,0.1));
@@ -445,21 +345,15 @@ export default function DNDModal() {
           color: var(--danger, #ef4444);
         }
 
-        /* Footer */
-        .dnd-footer {
-          display: flex;
-          justify-content: flex-end;
-          padding: 14px 20px;
-        }
         .dnd-btn {
           padding: 8px 20px;
           border-radius: var(--r-sm, 6px);
           border: none;
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           font-weight: 600;
           cursor: pointer;
           font-family: inherit;
-          transition: background var(--t-fast, 80ms), opacity var(--t-fast, 80ms);
+          transition: background var(--t-control, 150ms), opacity var(--t-control, 150ms);
         }
         .dnd-btn--primary {
           background: var(--accent, #0ea5e9);
@@ -467,6 +361,6 @@ export default function DNDModal() {
         }
         .dnd-btn--primary:hover { opacity: 0.88; }
       `}</style>
-    </div>
+    </ModalShell>
   );
 }

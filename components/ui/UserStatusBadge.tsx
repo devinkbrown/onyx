@@ -47,16 +47,9 @@ export function StatusDot({
           right: -1px;
         }
 
-        /* online — solid green + subtle pulse glow */
         .sdot--online {
           background: #23a55a;
-          animation: sdot-online-glow 2.5s ease-in-out infinite;
           transition: background 300ms ease;
-        }
-
-        @keyframes sdot-online-glow {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(35, 165, 90, 0.4); }
-          50%       { box-shadow: 0 0 0 4px rgba(35, 165, 90, 0); }
         }
 
         /* idle — solid amber, no animation */
@@ -119,10 +112,10 @@ export default function UserStatusBadge() {
           align-items: center;
           gap: 6px;
           padding: 4px 6px;
-          background: none;
+          background: var(--elev-tint-1, transparent);
           border: none;
           cursor: pointer;
-          border-radius: var(--r-sm, 4px);
+          border-radius: var(--r-xs, 4px) var(--r-md, 8px) var(--r-xs, 4px) var(--r-sm, 6px);
           width: 100%;
           text-align: left;
           transition: background var(--t-fast);
@@ -147,13 +140,7 @@ export default function UserStatusBadge() {
         /* online */
         .usb-dot--online {
           background: #23a55a;
-          animation: usb-online-glow 2.5s ease-in-out infinite;
           transition: background 300ms ease;
-        }
-
-        @keyframes usb-online-glow {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(35, 165, 90, 0.4); }
-          50%       { box-shadow: 0 0 0 4px rgba(35, 165, 90, 0); }
         }
 
         /* idle/away */

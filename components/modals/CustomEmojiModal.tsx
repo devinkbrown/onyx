@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
-import { useDialogFocus } from './useDialogFocus';
+import ModalShell from './ModalShell';
 
 const NAME_RE = /^[a-zA-Z0-9_-]{2,32}$/;
 const MAX_BASE64_LEN = 128 * 1024 * (4 / 3); // ~128KB in base64 chars
@@ -19,9 +19,7 @@ export default function CustomEmojiModal() {
   const [urlErr, setUrlErr]   = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
 
-  const dropRef   = useRef<HTMLDivElement>(null);
-  const modalRef  = useRef<HTMLDivElement>(null);
-  useDialogFocus(modalRef);
+  const dropRef = useRef<HTMLDivElement>(null);
 
   const validateName = (v: string): string => {
     if (!v) return 'Name is required';
@@ -81,149 +79,105 @@ export default function CustomEmojiModal() {
     (url.startsWith('https://') && url.length > 10);
 
   return (
-    <div className="cem-backdrop" onClick={e => { if (e.target === e.currentTarget) closeModal(); }}>
-      <div className="cem-modal" ref={modalRef} role="dialog" aria-modal aria-labelledby="cem-modal-title">
-        <div className="cem-header">
-          <h2 id="cem-modal-title" className="cem-title">Custom Emoji</h2>
-          <button className="cem-close" onClick={closeModal} aria-label="Close"><svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></button>
-        </div>
+    <ModalShell
+      onClose={closeModal}
+      title="Custom Emoji"
+      kicker="Expression"
+      titleId="cem-modal-title"
+      size="sm"
+      flushBody
+    >
+      {/* Existing emoji grid */}
+      <div className="cem-grid-section">
+        {customEmoji.length === 0 ? (
+          <p className="cem-empty">No custom emoji yet. Add one below.</p>
+        ) : (
+          <div className="cem-grid">
+            {customEmoji.map(ce => (
+              <div key={ce.name} className="cem-item">
+                <img src={ce.url} alt={ce.name} className="cem-thumb" />
+                <span className="cem-name">:{ce.name}:</span>
+                <button
+                  className="cem-remove"
+                  onClick={() => removeCustomEmoji(ce.name)}
+                  aria-label={`Remove :${ce.name}:`}
+                >
+                  <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+                    <path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/>
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
-        {/* Existing emoji grid */}
-        <div className="cem-grid-section">
-          {customEmoji.length === 0 ? (
-            <p className="cem-empty">No custom emoji yet. Add one below.</p>
+      <div className="cem-divider" />
+
+      {/* Add new emoji form */}
+      <div className="cem-form">
+        <h3 className="label-caps cem-form-title">Add New Emoji</h3>
+
+        {/* Drag-drop zone */}
+        <div
+          ref={dropRef}
+          className={`cem-dropzone${isDragOver ? ' cem-dropzone--over' : ''}`}
+          onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
+          onDragLeave={() => setIsDragOver(false)}
+          onDrop={onDrop}
+        >
+          {previewValid && url ? (
+            <img src={url} alt="preview" className="cem-preview-img" />
           ) : (
-            <div className="cem-grid">
-              {customEmoji.map(ce => (
-                <div key={ce.name} className="cem-item">
-                  <img src={ce.url} alt={ce.name} className="cem-thumb" />
-                  <span className="cem-name">:{ce.name}:</span>
-                  <button
-                    className="cem-remove"
-                    onClick={() => removeCustomEmoji(ce.name)}
-                    aria-label={`Remove :${ce.name}:`}
-                  >
-                    <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
-                      <path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/>
-                    </svg>
-                  </button>
-                </div>
-              ))}
-            </div>
+            <span className="cem-drop-hint">Drag an image here or browse below</span>
           )}
         </div>
 
-        <div className="cem-divider" />
+        <label className="cem-field">
+          <span className="cem-label">Image file</span>
+          <input
+            type="file"
+            accept="image/*"
+            className="cem-file-input"
+            onChange={onFileChange}
+          />
+        </label>
 
-        {/* Add new emoji form */}
-        <div className="cem-form">
-          <h3 className="cem-form-title">Add New Emoji</h3>
+        <label className="cem-field">
+          <span className="cem-label">— or — Image URL (https://)</span>
+          <input
+            type="url"
+            className={`cem-input${urlErr ? ' cem-input--err' : ''}`}
+            value={url.startsWith('data:') ? '' : url}
+            placeholder="https://example.com/emoji.png"
+            onChange={e => { setUrl(e.target.value); setUrlErr(''); }}
+          />
+          {urlErr && <span className="cem-err">{urlErr}</span>}
+        </label>
 
-          {/* Drag-drop zone */}
-          <div
-            ref={dropRef}
-            className={`cem-dropzone${isDragOver ? ' cem-dropzone--over' : ''}`}
-            onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
-            onDragLeave={() => setIsDragOver(false)}
-            onDrop={onDrop}
-          >
-            {previewValid && url ? (
-              <img src={url} alt="preview" className="cem-preview-img" />
-            ) : (
-              <span className="cem-drop-hint">Drag an image here or browse below</span>
-            )}
-          </div>
+        <label className="cem-field">
+          <span className="cem-label">Name (no colons needed)</span>
+          <input
+            type="text"
+            className={`cem-input${nameErr ? ' cem-input--err' : ''}`}
+            value={name}
+            placeholder="cool_emoji"
+            maxLength={32}
+            onChange={e => { setName(e.target.value); setNameErr(''); }}
+            onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
+          />
+          {nameErr && <span className="cem-err">{nameErr}</span>}
+          <span className="cem-hint">Preview: :{name || 'name'}:</span>
+        </label>
 
-          <label className="cem-field">
-            <span className="cem-label">Image file</span>
-            <input
-              type="file"
-              accept="image/*"
-              className="cem-file-input"
-              onChange={onFileChange}
-            />
-          </label>
-
-          <label className="cem-field">
-            <span className="cem-label">— or — Image URL (https://)</span>
-            <input
-              type="url"
-              className={`cem-input${urlErr ? ' cem-input--err' : ''}`}
-              value={url.startsWith('data:') ? '' : url}
-              placeholder="https://example.com/emoji.png"
-              onChange={e => { setUrl(e.target.value); setUrlErr(''); }}
-            />
-            {urlErr && <span className="cem-err">{urlErr}</span>}
-          </label>
-
-          <label className="cem-field">
-            <span className="cem-label">Name (no colons needed)</span>
-            <input
-              type="text"
-              className={`cem-input${nameErr ? ' cem-input--err' : ''}`}
-              value={name}
-              placeholder="cool_emoji"
-              maxLength={32}
-              onChange={e => { setName(e.target.value); setNameErr(''); }}
-              onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
-            />
-            {nameErr && <span className="cem-err">{nameErr}</span>}
-            <span className="cem-hint">Preview: :{name || 'name'}:</span>
-          </label>
-
-          <button className="cem-add-btn" onClick={handleAdd}>
-            Add Emoji
-          </button>
-        </div>
+        <button className="cem-add-btn" onClick={handleAdd}>
+          Add Emoji
+        </button>
       </div>
 
       <style>{`
-        .cem-backdrop {
-          position: fixed; inset: 0;
-          background: rgba(0,0,0,0.6);
-          display: flex; align-items: center; justify-content: center;
-          z-index: 500;
-          animation: cem-fade 120ms ease both;
-        }
-        @keyframes cem-fade { from { opacity: 0; } to { opacity: 1; } }
-
-        .cem-modal {
-          width: 480px;
-          max-height: 80vh;
-          background: var(--bg-float);
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-lg);
-          box-shadow: var(--shadow-xl);
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-          animation: cem-enter 160ms var(--ease-out) both;
-        }
-        @keyframes cem-enter {
-          from { opacity: 0; transform: scale(0.95) translateY(8px); }
-          to   { opacity: 1; transform: scale(1) translateY(0); }
-        }
-
-        .cem-header {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 16px 20px 12px;
-          border-bottom: 1px solid var(--border-subtle);
-          flex-shrink: 0;
-        }
-        .cem-title {
-          font-size: 16px; font-weight: 700; color: var(--text-primary);
-          margin: 0;
-        }
-        .cem-close {
-          background: none; border: none; color: var(--text-muted);
-          font-size: 20px; cursor: pointer; line-height: 1; padding: 2px 4px;
-          border-radius: var(--r-sm);
-          transition: color var(--t-fast), background var(--t-fast);
-        }
-        .cem-close:hover { color: var(--text-primary); background: var(--bg-overlay); }
-
         .cem-grid-section {
-          padding: 12px 16px;
+          padding: var(--sp-3, 12px) var(--sp-4, 16px);
           overflow-y: auto;
           max-height: 220px;
           flex-shrink: 0;
@@ -231,21 +185,21 @@ export default function CustomEmojiModal() {
           scrollbar-color: var(--border-normal) transparent;
         }
         .cem-empty {
-          color: var(--text-muted); font-size: 13px; text-align: center;
-          padding: 12px 0;
+          color: var(--text-muted); font-size: var(--text-sm, 13px); text-align: center;
+          padding: var(--sp-3, 12px) 0;
         }
         .cem-grid {
-          display: flex; flex-wrap: wrap; gap: 8px;
+          display: flex; flex-wrap: wrap; gap: var(--sp-2, 8px);
         }
         .cem-item {
           display: flex; flex-direction: column; align-items: center; gap: 0;
-          background: var(--bg-elevated);
+          background: var(--elev-tint-1, var(--bg-elevated));
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-md);
           padding: 8px 6px 6px;
           width: 68px;
           position: relative;
-          transition: border-color var(--t-fast), background var(--t-fast);
+          transition: border-color var(--t-control, 150ms), background var(--t-control, 150ms);
           cursor: default;
         }
         .cem-item:hover {
@@ -263,7 +217,7 @@ export default function CustomEmojiModal() {
           text-align: center;
           margin-top: 5px;
           opacity: 0;
-          transition: opacity var(--t-fast);
+          transition: opacity var(--t-control, 150ms);
         }
         .cem-item:hover .cem-name { opacity: 1; }
         .cem-remove {
@@ -274,9 +228,10 @@ export default function CustomEmojiModal() {
           width: 18px; height: 18px;
           display: flex; align-items: center; justify-content: center;
           opacity: 0;
-          transition: opacity var(--t-fast), color var(--t-fast), background var(--t-fast);
+          transition: opacity var(--t-control, 150ms), color var(--t-control, 150ms), background var(--t-control, 150ms);
         }
-        .cem-item:hover .cem-remove { opacity: 1; }
+        .cem-item:hover .cem-remove,
+        .cem-remove:focus-visible { opacity: 1; }
         .cem-remove:hover { color: var(--danger, #e04646); background: var(--danger-subtle); }
 
         .cem-divider {
@@ -284,19 +239,15 @@ export default function CustomEmojiModal() {
         }
 
         .cem-form {
-          padding: 16px 20px;
-          display: flex; flex-direction: column; gap: 12px;
+          padding: var(--sp-4, 16px) var(--sp-5, 20px);
+          display: flex; flex-direction: column; gap: var(--sp-4, 16px);
           overflow-y: auto;
           flex: 1;
           scrollbar-width: thin;
           scrollbar-color: var(--border-normal) transparent;
         }
         .cem-form-title {
-          font-size: 13px; font-weight: 700;
-          color: var(--text-secondary);
           margin: 0;
-          text-transform: uppercase;
-          letter-spacing: 0.6px;
         }
 
         .cem-dropzone {
@@ -304,15 +255,15 @@ export default function CustomEmojiModal() {
           border-radius: var(--r-md);
           height: 90px;
           display: flex; align-items: center; justify-content: center;
-          transition: border-color var(--t-fast), background var(--t-fast);
+          transition: border-color var(--t-control, 150ms), background var(--t-control, 150ms);
           cursor: default;
         }
         .cem-dropzone--over {
-          border-color: var(--accent);
+          border-color: var(--lux, var(--accent));
           background: var(--accent-subtle);
         }
         .cem-drop-hint {
-          font-size: 13px; color: var(--text-muted);
+          font-size: var(--text-sm, 13px); color: var(--text-muted);
         }
         .cem-preview-img {
           height: 70px; max-width: 100%;
@@ -323,25 +274,25 @@ export default function CustomEmojiModal() {
           display: flex; flex-direction: column; gap: 4px;
         }
         .cem-label {
-          font-size: 12px; color: var(--text-muted); font-weight: 600;
+          font-size: var(--text-xs, 12px); color: var(--text-muted); font-weight: 600;
         }
         .cem-file-input {
-          font-size: 12px; color: var(--text-secondary);
+          font-size: var(--text-xs, 12px); color: var(--text-secondary);
         }
         .cem-input {
           background: var(--bg-elevated);
           border: 1px solid var(--border-normal);
           border-radius: var(--r-md);
           padding: 7px 10px;
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           color: var(--text-primary);
           outline: none;
-          transition: border-color var(--t-fast);
+          transition: border-color var(--t-control, 150ms);
         }
         .cem-input:focus { border-color: var(--accent); }
         .cem-input--err { border-color: var(--danger, #e04646); }
-        .cem-err { font-size: 11px; color: var(--danger, #e04646); }
-        .cem-hint { font-size: 11px; color: var(--text-muted); }
+        .cem-err { font-size: var(--text-2xs, 11px); color: var(--danger, #e04646); }
+        .cem-hint { font-size: var(--text-2xs, 11px); color: var(--text-muted); }
 
         .cem-add-btn {
           align-self: flex-start;
@@ -349,47 +300,17 @@ export default function CustomEmojiModal() {
           border: none;
           border-radius: var(--r-md);
           color: #fff;
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           font-weight: 700;
           padding: 9px 22px;
           cursor: pointer;
           letter-spacing: 0.01em;
-          transition: background var(--t-fast), transform var(--t-fast);
+          transition: background var(--t-control, 150ms), transform var(--t-micro, 90ms);
           font-family: inherit;
         }
         .cem-add-btn:hover { background: var(--accent-hover, color-mix(in srgb, var(--accent) 85%, #fff)); }
         .cem-add-btn:active { transform: scale(0.97); }
-
-        /* Category tabs row for CEM */
-        .cem-tab-row {
-          display: flex;
-          gap: 4px;
-          padding: 0 0 8px;
-          overflow-x: auto;
-          scrollbar-width: none;
-          flex-shrink: 0;
-        }
-        .cem-tab-row::-webkit-scrollbar { display: none; }
-        .cem-tab {
-          padding: 3px 12px;
-          border-radius: var(--r-full);
-          font-size: 12px;
-          font-weight: 600;
-          border: 1px solid var(--border-subtle);
-          background: none;
-          color: var(--text-muted);
-          cursor: pointer;
-          white-space: nowrap;
-          transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
-          font-family: inherit;
-        }
-        .cem-tab:hover { color: var(--text-secondary); }
-        .cem-tab.active {
-          background: var(--accent-subtle);
-          border-color: var(--accent-border);
-          color: var(--accent);
-        }
       `}</style>
-    </div>
+    </ModalShell>
   );
 }

@@ -24,7 +24,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
-import { useDialogFocus } from './useDialogFocus';
+import ModalShell from './ModalShell';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -46,8 +46,6 @@ export default function ServicesPanel() {
   const account = server?.account ?? null;
 
   const svcNoticeRef   = useRef<HTMLDivElement>(null);
-  const panelRef       = useRef<HTMLDivElement>(null);
-  useDialogFocus(panelRef);
 
   // Auto-scroll service notices log
   useEffect(() => {
@@ -55,15 +53,6 @@ export default function ServicesPanel() {
       svcNoticeRef.current.scrollTop = svcNoticeRef.current.scrollHeight;
     }
   }, [serviceNotices]);
-
-  // Escape closes
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeServices();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [closeServices]);
 
   // ── Send raw IRC command directly to server ─────────────────────────────
   const send = (command: string, ...params: string[]) => {
@@ -109,38 +98,17 @@ export default function ServicesPanel() {
   ];
 
   return (
-    <div
-      className="svc-backdrop"
-      onClick={e => { if (e.target === e.currentTarget) closeServices(); }}
+    <ModalShell
+      onClose={closeServices}
+      variant="sheet"
+      size="md"
+      title="Account Services"
+      kicker={isBotTab ? 'Service bot commands via PRIVMSG' : 'Native server commands'}
+      titleId="svc-panel-title"
+      closeLabel="Close services panel"
+      flushBody
     >
-      <div
-        className="svc-panel animate-slide-right"
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="svc-panel-title"
-      >
-
-        {/* Header */}
-        <div className="svc-header">
-          <div className="svc-header-left">
-            <ShieldIcon />
-            <div>
-              <h2 id="svc-panel-title" className="svc-title">Account Services</h2>
-              <p className="svc-subtitle">
-                {isBotTab ? 'Service bot commands via PRIVMSG' : 'Native server commands'}
-              </p>
-            </div>
-          </div>
-          <button
-            className="svc-close"
-            onClick={closeServices}
-            aria-label="Close services panel"
-          >
-            <CloseIcon />
-          </button>
-        </div>
-
+      <div className="svc-layout">
         {/* Tab bar — two rows */}
         <div className="svc-tabs-wrap" role="tablist">
           <div className="svc-tabs svc-tabs--row">
@@ -228,56 +196,11 @@ export default function ServicesPanel() {
       </div>
 
       <style>{`
-        .svc-backdrop {
-          position: fixed; inset: 0; z-index: 615;
-          display: flex; align-items: stretch; justify-content: flex-end;
-          background: linear-gradient(90deg, transparent, var(--bg-void));
-        }
-
-        .svc-panel {
-          width: 368px; max-width: 95vw;
-          background: linear-gradient(180deg, var(--bg-base), var(--bg-deep));
-          border-left: 1px solid var(--accent-border);
+        .svc-layout {
           display: flex; flex-direction: column;
-          overflow: hidden;
-          box-shadow: var(--shadow-xl), var(--glow);
+          height: 100%;
+          min-height: 0;
         }
-
-        /* Header */
-        .svc-header {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 0 18px;
-          height: 64px;
-          background: var(--bg-deep);
-          border-bottom: 1px solid var(--border-subtle);
-          flex-shrink: 0;
-          gap: 14px;
-        }
-        .svc-header-left {
-          display: flex; align-items: center; gap: 12px; min-width: 0;
-        }
-        .svc-title {
-          font-size: 15px; font-weight: 800; color: var(--text-primary);
-          line-height: 1.15;
-        }
-        .svc-subtitle {
-          font-size: 11px; color: var(--text-secondary);
-          margin: 3px 0 0; line-height: 1.15;
-        }
-        .svc-close {
-          width: 30px; height: 30px; flex-shrink: 0;
-          background: var(--bg-elevated); border: 1px solid var(--border-subtle); cursor: pointer;
-          display: flex; align-items: center; justify-content: center;
-          color: var(--text-secondary); border-radius: var(--r-sm);
-          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
-        }
-        .svc-close:hover {
-          background: var(--bg-float);
-          border-color: var(--accent-border);
-          color: var(--text-primary);
-          filter: brightness(1.08);
-        }
-        .svc-close:active { transform: translateY(1px); }
 
         /* Tabs */
         .svc-tabs-wrap {
@@ -716,7 +639,7 @@ export default function ServicesPanel() {
           }
         }
       `}</style>
-    </div>
+    </ModalShell>
   );
 }
 
@@ -2038,18 +1961,3 @@ function MemoServTab({ sendToBot }: MemoServTabProps) {
   );
 }
 
-// ── Icons ─────────────────────────────────────────────────────────────────────
-
-const ShieldIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"
-    style={{ color: 'var(--accent)', flexShrink: 0 }}>
-    <path d="M8 1L2 3.5V8c0 3.3 2.5 6.1 6 7 3.5-.9 6-3.7 6-7V3.5L8 1zm-.5 9.8L4.6 7.9l1-.9L7.5 9l3.4-3.4 1 .9-4.4 4.3z"/>
-  </svg>
-);
-
-const CloseIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
-    stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-    <path d="M2 2l10 10M12 2L2 12" />
-  </svg>
-);

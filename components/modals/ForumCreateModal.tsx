@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import type { ForumPost } from '@/lib/store';
-import { useDialogFocus } from './useDialogFocus';
+import ModalShell from './ModalShell';
 
 const MAX_TITLE   = 100;
 const MAX_TAGS    = 5;
@@ -51,10 +51,7 @@ export default function ForumCreateModal() {
   const [titleError, setTitleError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const titleRef   = useRef<HTMLInputElement>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
-  const panelRef   = useRef<HTMLDivElement>(null);
-  useDialogFocus(panelRef);
+  const titleRef = useRef<HTMLInputElement>(null);
 
   const channelName = activeView.kind === 'channel' ? activeView.channel : '';
 
@@ -75,15 +72,6 @@ export default function ForumCreateModal() {
   useEffect(() => {
     titleRef.current?.focus();
   }, []);
-
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') closeForumCreate();
-  }, [closeForumCreate]);
-
-  useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
 
   function addTag(tag: string) {
     const clean = tag.trim().toLowerCase().replace(/\s+/g, '-').slice(0, 24);
@@ -151,129 +139,14 @@ export default function ForumCreateModal() {
   const canSubmit = title.trim().length > 0 && !submitting;
 
   return (
-    <div
-      className="fcm-overlay"
-      ref={overlayRef}
-      onClick={e => { if (e.target === overlayRef.current) closeForumCreate(); }}
-    >
-      <div className="fcm-panel" ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="fcm-modal-title">
-        {/* Header */}
-        <header className="fcm-header">
-          <span className="fcm-header-icon" aria-hidden>📋</span>
-          <h2 id="fcm-modal-title" className="fcm-title">New Post</h2>
-          <button className="fcm-close" onClick={closeForumCreate} aria-label="Close">
-            <CloseIcon />
-          </button>
-        </header>
-
-        <div className="fcm-body">
-          {/* Title */}
-          <div className="fcm-field">
-            <label className="fcm-label" htmlFor="fcm-title">
-              Title <span className="fcm-required">*</span>
-            </label>
-            <div className="fcm-input-wrap">
-              <input
-                id="fcm-title"
-                ref={titleRef}
-                type="text"
-                className={`fcm-input${titleError ? ' fcm-input--error' : ''}`}
-                placeholder="What's your post about?"
-                value={title}
-                maxLength={MAX_TITLE}
-                onChange={e => { setTitle(e.target.value); if (titleError) setTitleError(''); }}
-                aria-describedby={titleError ? 'fcm-title-error' : undefined}
-              />
-              <span className={`fcm-char-counter${title.length >= MAX_TITLE - 10 ? ' fcm-char-counter--warn' : ''}`}>
-                {title.length}/{MAX_TITLE}
-              </span>
-            </div>
-            {titleError && (
-              <span id="fcm-title-error" className="fcm-error-msg" role="alert">{titleError}</span>
-            )}
-          </div>
-
-          {/* Tags */}
-          <div className="fcm-field">
-            <label className="fcm-label" htmlFor="fcm-tag-input">
-              Tags
-              <span className="fcm-label-hint">
-                {tags.length}/{MAX_TAGS} — press Enter or , to add
-              </span>
-            </label>
-            <div className={`fcm-tag-box${tags.length >= MAX_TAGS ? ' fcm-tag-box--full' : ''}`}>
-              {tags.map(tag => {
-                const c = tagColor(tag);
-                return (
-                  <span
-                    key={tag}
-                    className="fcm-tag-chip"
-                    style={{ background: c.bg, color: c.text, border: `1px solid ${c.border}` }}
-                  >
-                    {tag}
-                    <button
-                      type="button"
-                      className="fcm-tag-remove"
-                      onClick={() => removeTag(tag)}
-                      aria-label={`Remove tag ${tag}`}
-                    >
-                      ×
-                    </button>
-                  </span>
-                );
-              })}
-              {tags.length < MAX_TAGS && (
-                <div className="fcm-tag-input-wrap">
-                  <input
-                    id="fcm-tag-input"
-                    type="text"
-                    className="fcm-tag-input"
-                    placeholder={tags.length === 0 ? 'Add tags…' : ''}
-                    value={tagInput}
-                    onChange={e => setTagInput(e.target.value)}
-                    onKeyDown={handleTagKeyDown}
-                    aria-label="New tag"
-                  />
-                  {suggestions.length > 0 && (
-                    <ul className="fcm-tag-suggestions" role="listbox">
-                      {suggestions.slice(0, 5).map(s => (
-                        <li key={s} role="option">
-                          <button
-                            type="button"
-                            className="fcm-tag-suggestion-item"
-                            onMouseDown={e => { e.preventDefault(); addTag(s); }}
-                          >
-                            {s}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Content */}
-          <div className="fcm-field fcm-field--grow">
-            <label className="fcm-label" htmlFor="fcm-content">
-              Content
-              <span className="fcm-label-hint">{content.length}/{MAX_CONTENT}</span>
-            </label>
-            <textarea
-              id="fcm-content"
-              className="fcm-textarea"
-              rows={6}
-              placeholder="Share more details about your post…"
-              value={content}
-              maxLength={MAX_CONTENT}
-              onChange={e => setContent(e.target.value)}
-            />
-          </div>
-        </div>
-
-        {/* Footer */}
-        <footer className="fcm-footer">
+    <ModalShell
+      onClose={closeForumCreate}
+      title="New Post"
+      kicker={channelName || 'Forum'}
+      titleId="fcm-modal-title"
+      size="md"
+      footer={
+        <>
           <button className="fcm-btn-cancel" onClick={closeForumCreate} type="button">
             Cancel
           </button>
@@ -286,98 +159,121 @@ export default function ForumCreateModal() {
           >
             {submitting ? 'Posting…' : 'Post'}
           </button>
-        </footer>
+        </>
+      }
+    >
+      <div className="fcm-body">
+        {/* Title */}
+        <div className="fcm-field">
+          <label className="fcm-label" htmlFor="fcm-title">
+            Title <span className="fcm-required">*</span>
+          </label>
+          <div className="fcm-input-wrap">
+            <input
+              id="fcm-title"
+              ref={titleRef}
+              type="text"
+              className={`fcm-input${titleError ? ' fcm-input--error' : ''}`}
+              placeholder="What's your post about?"
+              value={title}
+              maxLength={MAX_TITLE}
+              onChange={e => { setTitle(e.target.value); if (titleError) setTitleError(''); }}
+              aria-describedby={titleError ? 'fcm-title-error' : undefined}
+            />
+            <span className={`fcm-char-counter${title.length >= MAX_TITLE - 10 ? ' fcm-char-counter--warn' : ''}`}>
+              {title.length}/{MAX_TITLE}
+            </span>
+          </div>
+          {titleError && (
+            <span id="fcm-title-error" className="fcm-error-msg" role="alert">{titleError}</span>
+          )}
+        </div>
+
+        {/* Tags */}
+        <div className="fcm-field">
+          <label className="fcm-label" htmlFor="fcm-tag-input">
+            Tags
+            <span className="fcm-label-hint">
+              {tags.length}/{MAX_TAGS} — press Enter or , to add
+            </span>
+          </label>
+          <div className={`fcm-tag-box${tags.length >= MAX_TAGS ? ' fcm-tag-box--full' : ''}`}>
+            {tags.map(tag => {
+              const c = tagColor(tag);
+              return (
+                <span
+                  key={tag}
+                  className="fcm-tag-chip"
+                  style={{ background: c.bg, color: c.text, border: `1px solid ${c.border}` }}
+                >
+                  {tag}
+                  <button
+                    type="button"
+                    className="fcm-tag-remove"
+                    onClick={() => removeTag(tag)}
+                    aria-label={`Remove tag ${tag}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              );
+            })}
+            {tags.length < MAX_TAGS && (
+              <div className="fcm-tag-input-wrap">
+                <input
+                  id="fcm-tag-input"
+                  type="text"
+                  className="fcm-tag-input"
+                  placeholder={tags.length === 0 ? 'Add tags…' : ''}
+                  value={tagInput}
+                  onChange={e => setTagInput(e.target.value)}
+                  onKeyDown={handleTagKeyDown}
+                  aria-label="New tag"
+                />
+                {suggestions.length > 0 && (
+                  <ul className="fcm-tag-suggestions" role="listbox">
+                    {suggestions.slice(0, 5).map(s => (
+                      <li key={s} role="option">
+                        <button
+                          type="button"
+                          className="fcm-tag-suggestion-item"
+                          onMouseDown={e => { e.preventDefault(); addTag(s); }}
+                        >
+                          {s}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="fcm-field fcm-field--grow">
+          <label className="fcm-label" htmlFor="fcm-content">
+            Content
+            <span className="fcm-label-hint">{content.length}/{MAX_CONTENT}</span>
+          </label>
+          <textarea
+            id="fcm-content"
+            className="fcm-textarea"
+            rows={6}
+            placeholder="Share more details about your post…"
+            value={content}
+            maxLength={MAX_CONTENT}
+            onChange={e => setContent(e.target.value)}
+          />
+        </div>
       </div>
 
       <style>{`
-        .fcm-overlay {
-          position: fixed;
-          inset: 0;
-          z-index: 400;
-          background: rgba(0,0,0,0.6);
-          backdrop-filter: blur(4px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 20px;
-          animation: fcm-fade-in 0.15s ease both;
-        }
-
-        @keyframes fcm-fade-in {
-          from { opacity: 0; }
-          to   { opacity: 1; }
-        }
-
-        .fcm-panel {
-          background: var(--bg-elevated);
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-lg, 12px);
-          box-shadow: var(--shadow-xl, 0 24px 64px rgba(0,0,0,0.65)), 0 0 0 1px var(--border-subtle);
-          width: 100%;
-          max-width: 560px;
-          max-height: calc(100vh - 40px);
-          display: flex;
-          flex-direction: column;
-          animation: fcm-slide-up 0.18s cubic-bezier(0.16,1,0.3,1) both;
-          overflow: hidden;
-        }
-
-        @keyframes fcm-slide-up {
-          from { opacity: 0; transform: translateY(16px) scale(0.97); }
-          to   { opacity: 1; transform: translateY(0)   scale(1);    }
-        }
-
-        /* ── Header ── */
-        .fcm-header {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 16px 20px 14px;
-          border-bottom: 1px solid var(--border-subtle);
-          flex-shrink: 0;
-        }
-
-        .fcm-header-icon {
-          font-size: 18px;
-          line-height: 1;
-        }
-
-        .fcm-title {
-          flex: 1;
-          font-size: 15px;
-          font-weight: 700;
-          color: var(--text-primary);
-          margin: 0;
-          letter-spacing: -0.1px;
-        }
-
-        .fcm-close {
-          width: 28px;
-          height: 28px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: none;
-          border: none;
-          cursor: pointer;
-          color: var(--text-muted);
-          border-radius: var(--r-sm);
-          transition: background var(--t-fast), color var(--t-fast);
-          flex-shrink: 0;
-        }
-        .fcm-close:hover {
-          background: var(--bg-overlay);
-          color: var(--text-primary);
-        }
-
         /* ── Body ── */
         .fcm-body {
-          flex: 1;
-          overflow-y: auto;
-          padding: 18px 20px;
           display: flex;
           flex-direction: column;
-          gap: 16px;
+          gap: var(--sp-4, 16px);
           min-height: 0;
         }
 
@@ -396,7 +292,7 @@ export default function ForumCreateModal() {
           display: flex;
           align-items: baseline;
           gap: 6px;
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           font-weight: 700;
           text-transform: uppercase;
           letter-spacing: 0.06em;
@@ -408,7 +304,7 @@ export default function ForumCreateModal() {
         }
 
         .fcm-label-hint {
-          font-size: 11px;
+          font-size: var(--text-2xs, 11px);
           font-weight: 400;
           text-transform: none;
           letter-spacing: 0;
@@ -428,11 +324,11 @@ export default function ForumCreateModal() {
           border: 1px solid var(--border-normal);
           border-radius: var(--r-sm);
           /* Larger, more prominent title input */
-          font-size: 15px;
+          font-size: var(--text-md, 15px);
           font-weight: 600;
           color: var(--text-primary);
           font-family: inherit;
-          transition: border-color var(--t-fast), box-shadow var(--t-fast);
+          transition: border-color var(--t-control, 150ms), box-shadow var(--t-control, 150ms);
           box-sizing: border-box;
         }
         .fcm-input:focus {
@@ -459,7 +355,7 @@ export default function ForumCreateModal() {
         .fcm-char-counter--warn { color: var(--warning, #faa61a); }
 
         .fcm-error-msg {
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           color: var(--danger, #f04747);
           margin-top: 2px;
         }
@@ -475,7 +371,7 @@ export default function ForumCreateModal() {
           border-radius: var(--r-sm);
           min-height: 40px;
           align-items: center;
-          transition: border-color var(--t-fast), box-shadow var(--t-fast);
+          transition: border-color var(--t-control, 150ms), box-shadow var(--t-control, 150ms);
         }
         .fcm-tag-box:focus-within {
           border-color: var(--accent-border, rgba(14,165,233,0.5));
@@ -489,7 +385,7 @@ export default function ForumCreateModal() {
           gap: 4px;
           padding: 2px 8px;
           border-radius: 99px;
-          font-size: 11px;
+          font-size: var(--text-2xs, 11px);
           font-weight: 600;
           letter-spacing: 0.02em;
         }
@@ -503,7 +399,7 @@ export default function ForumCreateModal() {
           padding: 0;
           color: inherit;
           opacity: 0.6;
-          transition: opacity var(--t-fast);
+          transition: opacity var(--t-control, 150ms);
         }
         .fcm-tag-remove:hover { opacity: 1; }
 
@@ -517,7 +413,7 @@ export default function ForumCreateModal() {
           width: 100%;
           background: none;
           border: none;
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           font-family: inherit;
           color: var(--text-primary);
           outline: none;
@@ -530,10 +426,10 @@ export default function ForumCreateModal() {
           top: calc(100% + 4px);
           left: 0;
           z-index: 10;
-          background: var(--bg-float);
+          background: var(--elev-tint-2, var(--bg-float));
           border: 1px solid var(--border-normal);
           border-radius: var(--r-sm);
-          box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+          box-shadow: var(--elev-shadow-1, 0 4px 16px rgba(0,0,0,0.3));
           padding: 4px;
           min-width: 140px;
           list-style: none;
@@ -544,7 +440,7 @@ export default function ForumCreateModal() {
           display: block;
           width: 100%;
           padding: 5px 10px;
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           font-family: inherit;
           font-weight: 500;
           color: var(--text-primary);
@@ -553,7 +449,7 @@ export default function ForumCreateModal() {
           cursor: pointer;
           border-radius: 4px;
           text-align: left;
-          transition: background var(--t-fast);
+          transition: background var(--t-control, 150ms);
         }
         .fcm-tag-suggestion-item:hover { background: var(--bg-overlay); }
 
@@ -564,14 +460,14 @@ export default function ForumCreateModal() {
           border: 1px solid var(--border-normal);
           border-radius: var(--r-sm);
           padding: 12px 14px;
-          font-size: 14px;
+          font-size: var(--text-base, 14px);
           font-family: inherit;
           color: var(--text-primary);
           resize: vertical;
           /* Good default height */
           min-height: 160px;
           line-height: 1.65;
-          transition: border-color var(--t-fast), box-shadow var(--t-fast);
+          transition: border-color var(--t-control, 150ms), box-shadow var(--t-control, 150ms);
           box-sizing: border-box;
         }
         .fcm-textarea:focus {
@@ -581,28 +477,17 @@ export default function ForumCreateModal() {
         }
         .fcm-textarea::placeholder { color: var(--text-muted); }
 
-        /* ── Footer ── */
-        .fcm-footer {
-          display: flex;
-          align-items: center;
-          justify-content: flex-end;
-          gap: 10px;
-          padding: 14px 20px 16px;
-          border-top: 1px solid var(--border-subtle);
-          flex-shrink: 0;
-        }
-
         .fcm-btn-cancel {
           padding: 7px 16px;
           background: none;
           border: 1px solid var(--border-normal);
           border-radius: var(--r-sm);
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           font-weight: 600;
           font-family: inherit;
           color: var(--text-secondary);
           cursor: pointer;
-          transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+          transition: background var(--t-control, 150ms), color var(--t-control, 150ms), border-color var(--t-control, 150ms);
         }
         .fcm-btn-cancel:hover {
           background: var(--bg-overlay);
@@ -615,36 +500,24 @@ export default function ForumCreateModal() {
           background: var(--accent);
           border: none;
           border-radius: var(--r-sm);
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           font-weight: 700;
           font-family: inherit;
           color: #fff;
           cursor: pointer;
-          transition: opacity var(--t-fast), box-shadow var(--t-fast), transform var(--t-fast);
+          transition: opacity var(--t-control, 150ms), transform var(--t-micro, 90ms);
         }
         .fcm-btn-post:hover:not([disabled]) {
           opacity: 0.90;
-          box-shadow: 0 0 0 3px var(--accent-subtle), var(--glow, 0 0 16px var(--accent-glow));
-          transform: translateY(-1px);
         }
         .fcm-btn-post:active:not([disabled]) {
-          transform: translateY(0);
+          transform: scale(0.98);
         }
         .fcm-btn-post[disabled] {
           opacity: 0.38;
           cursor: not-allowed;
         }
       `}</style>
-    </div>
-  );
-}
-
-// ── Icons ──────────────────────────────────────────────────────────────────────
-
-function CloseIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-      <path d="M2 2l10 10M12 2L2 12" />
-    </svg>
+    </ModalShell>
   );
 }

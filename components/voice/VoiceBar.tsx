@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import Tooltip from '@/components/ui/Tooltip';
 import SpeakingBars from './SpeakingBars';
 import VoiceParticipantCard from './VoiceParticipantCard';
+import CaptionsOverlay from './CaptionsOverlay';
 import { OpcodecWasm } from '@/lib/ladon-media/OpcodecWasm';
 
 // ── Video participant tile ─────────────────────────────────────────────────────
@@ -32,9 +33,9 @@ function VoiceVideoTile({ nick, stream, isSelf, isSpeaking, isScreenshare }: Voi
   const cleanNick = nick.replace(/^[~@+.%]+/, '');
 
   return (
-    <div className={tileClass} aria-label={`${cleanNick}${isSelf ? ' (you)' : ''}`}>
+      <div className={tileClass} aria-label={`${cleanNick}${isSelf ? ' (you)' : ''}`} data-testid="voice-video-tile">
       <video ref={videoRef} autoPlay playsInline muted={isSelf} />
-      <div className="voice-video-bottom-row">
+      <div className="voice-video-bottom-row glass-2">
         {isScreenshare && (
           <span className="voice-video-screen-icon" aria-hidden="true">
             <MonitorIcon />
@@ -229,9 +230,14 @@ export default function VoiceBar() {
   const toggleDeafenAction = useOnyxStore(s => s.toggleDeafen);
   const toggleCameraAction = useOnyxStore(s => s.toggleCamera);
   const leaveVoiceChannel = useOnyxStore(s => s.leaveVoiceChannel);
+  const stageChannel     = useOnyxStore(s => s.stageChannel);
+  const stageHandRaised  = useOnyxStore(s => s.stageHandRaised);
+  const raiseHand        = useOnyxStore(s => s.raiseHand);
+  const lowerHand        = useOnyxStore(s => s.lowerHand);
 
   const { callState, callChannel, peers, muted, deafened, screenshareActive, cameraDeviceId, localStream, videoParticipants, cameraOn, cameraStream } = voice;
   const isInCall = callState === 'in_call';
+  const [captionsEnabled, setCaptionsEnabled] = useState(false);
 
   const duration  = useCallDuration(isInCall);
   const micLevel  = useLocalMicLevel(isInCall, localStream);
@@ -274,6 +280,11 @@ export default function VoiceBar() {
   };
   const toggleCamera = () => void toggleCameraAction();
   const hangUp = () => leaveVoiceChannel();
+  const toggleCaptions = () => setCaptionsEnabled(v => !v);
+  const toggleRaiseHand = () => {
+    if (stageHandRaised) lowerHand();
+    else raiseHand();
+  };
 
   if (!isInCall) return null;
 
@@ -298,7 +309,7 @@ export default function VoiceBar() {
   const channelLabel = callChannel ?? 'Voice';
 
   return (
-    <div className="voice-bar animate-fade-in">
+    <div className="voice-bar elev-2 animate-fade-in" data-testid="voice-bar">
 
       {/* ── Channel header ── */}
       <div className="vb-header">
@@ -378,6 +389,8 @@ export default function VoiceBar() {
         );
       })()}
 
+      {captionsEnabled && <CaptionsOverlay />}
+
       {/* ── Mic level bar ── */}
       <div className="vb-gate-wrap" title={muted ? 'Microphone muted' : 'Microphone level'}>
         <div
@@ -390,13 +403,14 @@ export default function VoiceBar() {
       <div className="vb-divider" aria-hidden="true" />
 
       {/* ── Controls ── */}
-      <div className="vb-controls">
+      <div className="vb-controls elev-3" data-testid="voice-control-dock">
         <Tooltip text={muted ? 'Unmute' : 'Mute'} side="top">
           <button
             className={`vb-btn ${muted ? 'vb-btn--active-danger' : ''}`}
             onClick={toggleMute}
             aria-label={muted ? 'Unmute microphone' : 'Mute microphone'}
             aria-pressed={muted}
+            data-testid="voice-mute-toggle"
           >
             {muted ? <MicOffIcon /> : <MicIcon />}
           </button>
@@ -420,6 +434,7 @@ export default function VoiceBar() {
               onClick={toggleCamera}
               aria-label={cameraOn ? 'Stop camera' : 'Start camera'}
               aria-pressed={cameraOn}
+              data-testid="voice-camera-toggle"
             >
               <CameraIcon />
             </button>
@@ -432,13 +447,40 @@ export default function VoiceBar() {
             onClick={toggleScreenshare}
             aria-label={screenshareActive ? 'Stop sharing screen' : 'Share screen'}
             aria-pressed={screenshareActive}
+            data-testid="voice-share-toggle"
           >
             <MonitorIcon />
           </button>
         </Tooltip>
 
+        <Tooltip text={captionsEnabled ? 'Hide captions' : 'Show captions'} side="top">
+          <button
+            className={`vb-btn ${captionsEnabled ? 'vb-btn--active-lux' : ''}`}
+            onClick={toggleCaptions}
+            aria-label={captionsEnabled ? 'Hide captions' : 'Show captions'}
+            aria-pressed={captionsEnabled}
+            data-testid="voice-captions-toggle"
+          >
+            <CaptionsIcon />
+          </button>
+        </Tooltip>
+
+        {stageChannel && (
+          <Tooltip text={stageHandRaised ? 'Lower hand' : 'Raise hand'} side="top">
+            <button
+              className={`vb-btn vb-btn--hand ${stageHandRaised ? 'vb-btn--active-lux' : ''}`}
+              onClick={toggleRaiseHand}
+              aria-label={stageHandRaised ? 'Lower hand' : 'Raise hand'}
+              aria-pressed={stageHandRaised}
+              data-testid="voice-raise-hand-toggle"
+            >
+              <HandIcon />
+            </button>
+          </Tooltip>
+        )}
+
         <Tooltip text="Leave voice channel" side="top">
-          <button className="vb-btn vb-btn--leave" onClick={hangUp} aria-label="Leave voice channel">
+          <button className="vb-btn vb-btn--leave" onClick={hangUp} aria-label="Leave voice channel" data-testid="voice-leave-button">
             <PhoneOffIcon />
             <span aria-hidden="true">Leave</span>
           </button>
@@ -462,8 +504,8 @@ export default function VoiceBar() {
       <style>{`
         /* ── Keyframes ── */
         @keyframes speaking-pulse {
-          0%, 100% { opacity: 0.38; transform: scale(0.94); filter: drop-shadow(0 0 3px var(--status-online, #34d399)); }
-          50%      { opacity: 0.9;  transform: scale(1.14); filter: drop-shadow(0 0 7px var(--status-online, #34d399)); }
+          0%, 100% { opacity: 0.48; transform: scale(0.94); }
+          50%      { opacity: 0.94; transform: scale(1.14); }
         }
 
         @keyframes vb-fadein {
@@ -480,12 +522,10 @@ export default function VoiceBar() {
         .voice-bar {
           display: flex;
           flex-direction: column;
-          gap: 0;
-          background: linear-gradient(180deg,
-            var(--bg-base, #0c1828) 0%,
-            var(--bg-deep, #06101d) 100%);
-          border-top: 1px solid var(--accent-border);
-          box-shadow: var(--shadow-md);
+          gap: var(--sp-2, 8px);
+          padding: var(--sp-2, 8px) var(--sp-3, 12px) var(--sp-3, 12px);
+          background: color-mix(in srgb, #050505 92%, var(--accent, #0ea5e9) 8%);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-2, 0 18px 44px rgba(0,0,0,.42));
           flex-shrink: 0;
           animation: vb-fadein 220ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
         }
@@ -494,10 +534,9 @@ export default function VoiceBar() {
         .vb-header {
           display: flex;
           align-items: center;
-          gap: 8px;
-          padding: 10px 14px 7px;
-          background: linear-gradient(180deg, var(--bg-deep, #06101d), transparent);
-          border-bottom: 1px solid var(--border-subtle);
+          gap: var(--sp-2, 8px);
+          padding: 0 var(--sp-1, 4px);
+          min-height: 28px;
         }
 
         /* Animated waveform dots — shown when not speaking; pulses when connected */
@@ -508,10 +547,9 @@ export default function VoiceBar() {
           gap: 2px;
           width: 28px;
           height: 22px;
-          border-radius: var(--r-sm, 6px);
-          background: var(--accent-subtle);
-          border: 1px solid var(--accent-border);
-          box-shadow: var(--shadow-sm);
+          border-radius: var(--r-sm, 6px) var(--r-lg, 14px) var(--r-xs, 4px) var(--r-md, 8px);
+          background: color-mix(in srgb, var(--accent, #0ea5e9) 12%, #050505 88%);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-1, 0 10px 26px rgba(0,0,0,.32));
           flex-shrink: 0;
         }
         .vb-waveform-bar {
@@ -528,7 +566,7 @@ export default function VoiceBar() {
 
         .vb-channel-name {
           min-width: 0;
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           font-weight: 700;
           color: var(--text-primary);
           flex: 1;
@@ -539,14 +577,13 @@ export default function VoiceBar() {
           text-transform: uppercase;
         }
         .vb-duration {
-          font-size: 11px;
+          font-size: var(--text-xs, 11px);
           color: var(--text-secondary);
           font-variant-numeric: tabular-nums;
           flex-shrink: 0;
-          background: var(--bg-elevated, #132131);
-          padding: 3px 8px;
-          border-radius: var(--r-full, 9999px);
-          border: 1px solid var(--border-normal);
+          background: color-mix(in srgb, #050505 84%, white 8%);
+          padding: 3px var(--sp-2, 8px);
+          border-radius: var(--r-lg, 14px) var(--r-xs, 4px) var(--r-lg, 14px) var(--r-sm, 6px);
           font-weight: 600;
           letter-spacing: 0;
         }
@@ -569,8 +606,8 @@ export default function VoiceBar() {
         .vb-grid {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 7px;
-          padding: 8px 14px 6px;
+          gap: var(--sp-2, 8px);
+          padding: 0 var(--sp-1, 4px);
         }
 
         .vb-tile {
@@ -581,18 +618,16 @@ export default function VoiceBar() {
           gap: 5px;
           min-width: 0;
           min-height: 78px;
-          padding: 7px 5px 6px;
-          border-radius: var(--r-md, 8px);
-          background: var(--bg-elevated, #132131);
-          border: 1px solid var(--border-subtle);
-          box-shadow: var(--shadow-sm);
+          padding: var(--sp-2, 8px) var(--sp-1, 4px);
+          border-radius: var(--r-sm, 6px) var(--r-xl, 16px) var(--r-md, 8px) var(--r-lg, 14px);
+          background: color-mix(in srgb, #050505 86%, var(--accent, #0ea5e9) 8%);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-1, 0 10px 26px rgba(0,0,0,.32));
           transition: transform var(--t-fast, 150ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1)),
                       opacity var(--t-fast, 150ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1)),
                       filter var(--t-fast, 150ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1));
         }
         .vb-tile:hover {
-          background: var(--bg-float, #1a2c40);
-          border-color: var(--border-normal);
+          background: color-mix(in srgb, #050505 78%, var(--accent, #0ea5e9) 12%);
           transform: translateY(-1px);
         }
 
@@ -612,7 +647,7 @@ export default function VoiceBar() {
                       opacity var(--t-fast, 150ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1)),
                       filter var(--t-fast, 150ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1));
           flex-shrink: 0;
-          box-shadow: 0 0 0 2px var(--bg-deep, #06101d), var(--shadow-sm);
+          box-shadow: 0 0 0 2px #050505, var(--elev-shadow-1, 0 10px 26px rgba(0,0,0,.32));
           isolation: isolate;
         }
         .vb-tile-avatar::before {
@@ -628,8 +663,7 @@ export default function VoiceBar() {
         }
 
         .vb-tile-avatar--speaking {
-          box-shadow: 0 0 0 2px var(--status-online, #34d399), var(--shadow-sm);
-          filter: drop-shadow(0 0 4px var(--status-online, #34d399));
+          box-shadow: 0 0 0 2px var(--status-online, #34d399), var(--elev-shadow-1, 0 10px 26px rgba(0,0,0,.32));
         }
         .vb-tile-avatar--speaking::before {
           animation: speaking-pulse 900ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) infinite;
@@ -717,7 +751,7 @@ export default function VoiceBar() {
         }
 
         .vb-tile-status--speaking {
-          filter: drop-shadow(0 0 4px rgba(52,211,153,0.8));
+          color: var(--status-online, #34d399);
         }
 
         .vb-tile-hover-card {
@@ -775,10 +809,7 @@ export default function VoiceBar() {
           transform: scaleX(var(--gate-level, 0));
         }
         .vb-gate-bar--active {
-          background: linear-gradient(90deg,
-            var(--status-online, #34d399) 0%,
-            rgba(52, 211, 153, 0.6) 100%);
-          box-shadow: 0 0 6px rgba(52, 211, 153, 0.45);
+          background: var(--status-online, #34d399);
         }
         .vb-gate-bar--muted {
           background: var(--text-muted);
@@ -789,31 +820,38 @@ export default function VoiceBar() {
         /* ── Divider ── */
         .vb-divider {
           height: 1px;
-          background: linear-gradient(90deg, transparent, var(--border-normal), transparent);
+          background: color-mix(in srgb, white 7%, transparent);
           margin: 0 14px;
         }
 
         /* ── Controls ── */
         .vb-controls {
+          position: relative;
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 7px;
-          padding: 10px 14px 12px;
+          gap: var(--sp-2, 8px);
+          width: fit-content;
+          max-width: 100%;
+          margin: 0 auto;
+          padding: var(--sp-2, 8px);
+          border-radius: var(--r-2xl, 20px) var(--r-lg, 14px) var(--r-xl, 16px) var(--r-md, 8px);
+          background: color-mix(in srgb, #050505 76%, var(--accent, #0ea5e9) 8%);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-3, 0 24px 60px rgba(0,0,0,.52));
         }
 
         .vb-btn {
           position: relative;
           width: 40px; height: 40px;
-          border-radius: 50%;
-          border: 1px solid var(--border-subtle);
-          background: var(--bg-elevated, rgba(19,33,49,0.8));
+          border-radius: var(--r-md, 8px) var(--r-xl, 16px) var(--r-sm, 6px) var(--r-lg, 14px);
+          border: 0;
+          background: color-mix(in srgb, #050505 80%, white 7%);
           cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
           color: var(--text-secondary);
-          box-shadow: var(--shadow-sm);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-1, 0 10px 26px rgba(0,0,0,.32));
           overflow: hidden;
           transition: transform var(--t-fast, 150ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1)),
                       opacity var(--t-fast, 150ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1)),
@@ -839,10 +877,9 @@ export default function VoiceBar() {
           flex-shrink: 0;
         }
         .vb-btn:hover {
-          background: var(--bg-float, rgba(26,44,64,0.9));
+          background: color-mix(in srgb, #050505 70%, white 10%);
           color: var(--text-primary);
-          border-color: var(--border-normal);
-          filter: brightness(1.08);
+          transform: translateY(-1px);
         }
         .vb-btn:hover::before {
           opacity: 1;
@@ -853,15 +890,13 @@ export default function VoiceBar() {
           outline-offset: 2px;
         }
         .vb-btn:active {
-          transform: scale(0.94);
+          transform: translateY(0) scale(0.98);
         }
 
         /* Muted = red mic — prominent danger state */
         .vb-btn--active-danger {
-          background: var(--danger-subtle);
+          background: color-mix(in srgb, var(--danger, #f87171) 18%, #050505 82%);
           color: var(--danger, #f87171);
-          border-color: var(--danger, #f87171);
-          box-shadow: var(--shadow-sm);
         }
         .vb-btn--active-danger::before {
           background: var(--danger-subtle);
@@ -869,15 +904,13 @@ export default function VoiceBar() {
           transform: scale(1);
         }
         .vb-btn--active-danger:hover {
-          background: var(--danger-subtle);
-          border-color: var(--danger-hover, #ef4444);
+          background: color-mix(in srgb, var(--danger, #f87171) 24%, #050505 76%);
         }
 
         /* Deafened uses separate grey state */
         .vb-btn--active-deaf {
-          background: var(--bg-overlay, #213550);
+          background: color-mix(in srgb, white 10%, #050505 90%);
           color: var(--text-muted);
-          border-color: var(--border-normal);
           opacity: 0.86;
         }
         .vb-btn--active-deaf::before {
@@ -886,32 +919,35 @@ export default function VoiceBar() {
           transform: scale(1);
         }
         .vb-btn--active-deaf:hover {
-          background: var(--bg-overlay, #213550);
-          border-color: var(--accent-border);
+          background: color-mix(in srgb, white 14%, #050505 86%);
           opacity: 1;
         }
 
         .vb-btn--active-blue {
-          background: var(--accent-subtle);
+          background: color-mix(in srgb, var(--accent, #0ea5e9) 18%, #050505 82%);
           color: var(--accent, #0ea5e9);
-          border-color: var(--accent-border);
         }
         .vb-btn--active-blue::before {
           opacity: 1;
           transform: scale(1);
         }
         .vb-btn--active-blue:hover {
-          background: var(--accent-subtle);
-          border-color: var(--accent-hover, #38bdf8);
+          background: color-mix(in srgb, var(--accent, #0ea5e9) 24%, #050505 76%);
+        }
+
+        .vb-btn--active-lux {
+          background: color-mix(in srgb, var(--lux, #d8b96a) 18%, #050505 82%);
+          color: var(--lux, #d8b96a);
+        }
+        .vb-btn--active-lux:hover {
+          background: color-mix(in srgb, var(--lux, #d8b96a) 24%, #050505 76%);
         }
 
         /* Leave: red, prominent pill — stands out clearly */
         .vb-btn--leave {
-          background: linear-gradient(135deg, var(--danger-hover, #ef4444) 0%, var(--danger, #f87171) 100%);
+          background: color-mix(in srgb, var(--danger, #f87171) 28%, #050505 72%);
           color: var(--text-primary);
-          border-color: var(--danger, #f87171);
-          box-shadow: var(--shadow-md);
-          border-radius: var(--r-full, 9999px);
+          border-radius: var(--r-xl, 16px) var(--r-md, 8px) var(--r-2xl, 20px) var(--r-sm, 6px);
           padding: 0 14px;
           width: auto;
           gap: 6px;
@@ -923,8 +959,7 @@ export default function VoiceBar() {
           background: var(--danger-subtle);
         }
         .vb-btn--leave:hover {
-          background: linear-gradient(135deg, var(--danger, #f87171) 0%, var(--danger-hover, #ef4444) 100%);
-          filter: brightness(1.05);
+          background: color-mix(in srgb, var(--danger, #f87171) 36%, #050505 64%);
         }
 
         /* ── Self-preview pip ── */
@@ -935,8 +970,7 @@ export default function VoiceBar() {
           width: 84px; height: 63px;
           border-radius: var(--r-md, 8px);
           overflow: hidden;
-          border: 1.5px solid rgba(124, 90, 245, 0.55);
-          box-shadow: 0 4px 20px rgba(0,0,0,0.6), 0 0 0 1px rgba(14,165,233,0.2);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-2, 0 18px 44px rgba(0,0,0,.42));
           z-index: 200;
           background: #000;
         }
@@ -947,19 +981,19 @@ export default function VoiceBar() {
         }
 
         /* ── Video grid ── */
-        @keyframes vb-speaking-glow {
-          0%, 100% { filter: drop-shadow(0 0 3px var(--status-online, #34d399)); }
-          50%      { filter: drop-shadow(0 0 8px var(--status-online, #34d399)); }
+        @keyframes vb-speaking-ring {
+          0%, 100% { opacity: 0.52; transform: scale(0.995); }
+          50%      { opacity: 1; transform: scale(1.015); }
         }
 
         .voice-video-grid {
           display: grid;
-          gap: 5px;
-          padding: 5px;
+          gap: var(--sp-2, 8px);
+          padding: var(--sp-2, 8px);
           background: #000;
-          border-radius: var(--r-md, 8px);
-          margin: 8px;
-          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-sm, 6px) var(--r-2xl, 20px) var(--r-md, 8px) var(--r-xl, 16px);
+          margin: 0;
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-2, 0 18px 44px rgba(0,0,0,.42));
         }
 
         /* Single tile — centered, max 2/3 width */
@@ -970,11 +1004,12 @@ export default function VoiceBar() {
 
         .voice-video-tile {
           position: relative;
-          border-radius: var(--r-sm, 6px);
+          border-radius: var(--r-xs, 4px) var(--r-xl, 16px) var(--r-sm, 6px) var(--r-md, 8px);
           overflow: hidden;
-          background: var(--bg-void);
+          background: #000;
           aspect-ratio: 16/9;
-          border: 2px solid transparent;
+          border: 0;
+          box-shadow: inset 0 0 0 1px rgba(255,255,255,0.055);
           transition: filter var(--t-fast, 150ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1)),
                       opacity var(--t-fast, 150ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1)),
                       transform var(--t-fast, 150ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1));
@@ -992,32 +1027,41 @@ export default function VoiceBar() {
           transform: scaleX(-1);
         }
         .voice-video-tile--self {
-          border-color: rgba(14,165,233,0.6);
-          box-shadow: 0 0 0 1px rgba(14,165,233,0.2) inset;
+          box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent, #0ea5e9) 42%, white 10%);
         }
 
-        /* Speaking: green glow border */
+        /* Speaking: the one permitted luminous ring */
         .voice-video-tile--speaking {
-          animation: vb-speaking-glow 950ms ease-in-out infinite;
-          border-color: var(--status-online, #34d399);
+          box-shadow: inset 0 0 0 2px var(--status-online, #34d399), 0 0 18px color-mix(in srgb, var(--status-online, #34d399) 62%, transparent);
+        }
+        .voice-video-tile--speaking::after {
+          content: '';
+          position: absolute;
+          inset: var(--sp-1, 4px);
+          border-radius: inherit;
+          border: 1px solid var(--status-online, #34d399);
+          pointer-events: none;
+          animation: vb-speaking-ring 950ms ease-in-out infinite;
         }
 
         /* Screenshare: accent border */
         .voice-video-tile--screenshare {
-          border-color: rgba(14,165,233,0.55);
+          box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent, #0ea5e9) 54%, white 8%);
         }
 
         /* Bottom label row */
         .voice-video-bottom-row {
           position: absolute;
-          bottom: 0;
-          left: 0;
-          right: 0;
+          bottom: var(--sp-2, 8px);
+          left: var(--sp-2, 8px);
+          right: var(--sp-2, 8px);
           display: flex;
           align-items: center;
           gap: 5px;
-          padding: 20px 8px 7px;
-          background: linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0) 100%);
+          width: fit-content;
+          max-width: calc(100% - var(--sp-4, 16px));
+          padding: var(--sp-1, 4px) var(--sp-2, 8px);
+          border-radius: var(--r-sm, 6px) var(--r-lg, 14px) var(--r-xs, 4px) var(--r-md, 8px);
           pointer-events: none;
         }
 
@@ -1036,7 +1080,6 @@ export default function VoiceBar() {
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          text-shadow: 0 1px 4px rgba(0,0,0,0.95);
           display: flex;
           align-items: center;
           gap: 5px;
@@ -1125,6 +1168,22 @@ const MonitorIcon = () => (
   <svg width="16" height="16" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <rect x="1" y="2" width="13" height="9" rx="1.5" />
     <path d="M5 13h5M7.5 11v2" />
+  </svg>
+);
+
+const CaptionsIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="3" width="12" height="10" rx="2" />
+    <path d="M5 7h2.2M5 10h1.4M9 7h2M8.5 10H11" />
+  </svg>
+);
+
+const HandIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M5.4 8.2V3.6a1 1 0 0 1 2 0v3.7" />
+    <path d="M7.4 7.1V2.8a1 1 0 0 1 2 0v4.5" />
+    <path d="M9.4 7.3V4a1 1 0 0 1 2 0v5.6" />
+    <path d="M5.4 8.8 4.2 7.6a1 1 0 0 0-1.5 1.3l2.8 3.5c.7.9 1.8 1.4 3 1.4h.7a3.2 3.2 0 0 0 3.2-3.2V7.2" />
   </svg>
 );
 

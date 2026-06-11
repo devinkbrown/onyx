@@ -89,17 +89,15 @@ export default function ScreensharePreview() {
             flex-direction: column;
             align-items: center;
             gap: 10px;
-            border: 1px solid rgba(14,165,233,0.3);
-            border-radius: 10px;
-            background: var(--bg-deep);
+            border-radius: var(--r-sm, 6px) var(--r-xl, 16px) var(--r-md, 8px) var(--r-lg, 14px);
+            background: color-mix(in srgb, #050505 88%, var(--accent, #0ea5e9) 7%);
             padding: 16px 14px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(14,165,233,0.1);
+            box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-2, 0 18px 44px rgba(0,0,0,.42));
           }
 
           .screenshare-init-icon {
             font-size: 28px;
             line-height: 1;
-            filter: drop-shadow(0 2px 6px rgba(14,165,233,0.4));
           }
 
           .screenshare-init-title {
@@ -137,7 +135,7 @@ export default function ScreensharePreview() {
             min-width: 0;
             font-size: 11px;
             padding: 4px 6px;
-            border-radius: 4px;
+            border-radius: var(--r-xs, 4px) var(--r-lg, 14px) var(--r-xs, 4px) var(--r-sm, 6px);
             background: var(--bg-surface);
             color: var(--text-primary);
             border: 1px solid var(--border);
@@ -151,10 +149,10 @@ export default function ScreensharePreview() {
           .screenshare-start-btn {
             width: 100%;
             padding: 7px 0;
-            background: var(--accent);
+            background: color-mix(in srgb, var(--accent, #0ea5e9) 24%, #050505 76%);
             color: white;
             border: none;
-            border-radius: 5px;
+            border-radius: var(--r-md, 8px) var(--r-xl, 16px) var(--r-sm, 6px) var(--r-lg, 14px);
             font-size: 12px;
             font-weight: 600;
             cursor: pointer;
@@ -162,7 +160,7 @@ export default function ScreensharePreview() {
             letter-spacing: 0.01em;
           }
           .screenshare-start-btn:hover {
-            background: var(--accent-hover);
+            background: color-mix(in srgb, var(--accent, #0ea5e9) 32%, #050505 68%);
           }
           .screenshare-start-btn:active {
             opacity: 0.85;
@@ -206,11 +204,10 @@ export default function ScreensharePreview() {
           display: flex;
           flex-direction: column;
           gap: 6px;
-          border: 2px solid var(--danger);
-          border-radius: 8px;
-          background: var(--bg-deep);
+          border-radius: var(--r-sm, 6px) var(--r-xl, 16px) var(--r-md, 8px) var(--r-lg, 14px);
+          background: color-mix(in srgb, #050505 88%, var(--danger, #f87171) 8%);
           padding: 8px;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(248,113,113,0.15);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-2, 0 18px 44px rgba(0,0,0,.42));
         }
 
         .screenshare-sharing-to {
@@ -228,13 +225,12 @@ export default function ScreensharePreview() {
           letter-spacing: 0.02em;
           text-align: center;
           padding-bottom: 4px;
-          border-bottom: 1px solid rgba(248,113,113,0.2);
         }
 
         .screenshare-video {
           width: 100%;
           aspect-ratio: 16 / 9;
-          border-radius: 4px;
+          border-radius: var(--r-xs, 4px) var(--r-lg, 14px) var(--r-xs, 4px) var(--r-sm, 6px);
           object-fit: contain;
           background: #000;
         }
@@ -242,17 +238,17 @@ export default function ScreensharePreview() {
         .screenshare-stop {
           width: 100%;
           padding: 6px 0;
-          background: var(--danger-subtle);
+          background: color-mix(in srgb, var(--danger, #f87171) 18%, #050505 82%);
           color: var(--danger);
-          border: 1px solid rgba(248,113,113,0.3);
-          border-radius: 4px;
+          border: none;
+          border-radius: var(--r-md, 8px) var(--r-xl, 16px) var(--r-sm, 6px) var(--r-lg, 14px);
           font-size: 12px;
           font-weight: 600;
           cursor: pointer;
           transition: background 150ms ease;
         }
         .screenshare-stop:hover {
-          background: rgba(239,68,68,0.25);
+          background: color-mix(in srgb, var(--danger, #f87171) 26%, #050505 74%);
         }
       `}</style>
     </div>

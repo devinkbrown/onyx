@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
-import { useDialogFocus } from './useDialogFocus';
+import ModalShell from './ModalShell';
 
 // ── Pure export functions ──────────────────────────────────────────────────────
 
@@ -79,8 +79,6 @@ const SYSTEM_TYPES = new Set(['join', 'part', 'quit', 'nick', 'mode', 'kick', 't
 
 export default function ChatExportModal() {
   const closeExportModal  = useOnyxStore(s => s.closeExportModal);
-  const cardRef = useRef<HTMLDivElement>(null);
-  useDialogFocus(cardRef);
   const addNotification   = useOnyxStore(s => s.addNotification);
   const activeView        = useOnyxStore(s => s.activeView);
   const channels          = useOnyxStore(s => s.channels);
@@ -95,15 +93,6 @@ export default function ChatExportModal() {
   const [fromDate, setFromDate]               = useState('');
   const [toDate, setToDate]                   = useState('');
   const [includeSystem, setIncludeSystem]     = useState(false);
-
-  // Close on Escape
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeExportModal();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [closeExportModal]);
 
   const buildFilteredMessages = useCallback((): ChatMessage[] => {
     let msgs = rawMessages;
@@ -123,6 +112,8 @@ export default function ChatExportModal() {
 
     return msgs;
   }, [rawMessages, includeSystem, allMessages, fromDate, toDate]);
+
+  const filteredCount = buildFilteredMessages().length;
 
   const handleExport = () => {
     const msgs = buildFilteredMessages();
@@ -152,23 +143,22 @@ export default function ChatExportModal() {
     closeExportModal();
   };
 
-  const filteredCount = buildFilteredMessages().length;
-
   return (
-    <div className="export-modal" onClick={e => { if (e.target === e.currentTarget) closeExportModal(); }}>
-      <div className="export-card" ref={cardRef} role="dialog" aria-modal="true" aria-labelledby="export-modal-title">
-
-        {/* Header */}
-        <div className="export-header">
-          <h2 id="export-modal-title" className="export-title">
-            <span className="export-title-icon">📤</span>
-            Export Chat History
-          </h2>
-          <button className="export-close" onClick={closeExportModal} aria-label="Close export modal">
-            <CloseIcon />
-          </button>
-        </div>
-
+    <ModalShell
+      onClose={closeExportModal}
+      title="Export Chat History"
+      kicker="Archive"
+      titleId="export-modal-title"
+      size="sm"
+      closeLabel="Close export modal"
+      footer={
+        <button className="export-btn" onClick={handleExport} disabled={filteredCount === 0}>
+          <DownloadIcon />
+          Export {filteredCount > 0 ? `${filteredCount} message${filteredCount !== 1 ? 's' : ''}` : '(no messages)'}
+        </button>
+      }
+    >
+      <div className="export-content">
         {/* Channel info */}
         <div className="export-channel-info">
           <span className="export-channel-name">#{channelName.replace(/^[#&]/, '')}</span>
@@ -178,7 +168,7 @@ export default function ChatExportModal() {
 
         {/* Format selection */}
         <div className="export-section">
-          <div className="export-section-label">Format</div>
+          <div className="label-caps export-section-label">Format</div>
           <div className="export-format-group">
             {([
               { value: 'txt',  icon: '📄', label: 'Plain text',  ext: '.txt'  },
@@ -206,7 +196,7 @@ export default function ChatExportModal() {
 
         {/* Date range */}
         <div className="export-section">
-          <div className="export-section-label">Date range</div>
+          <div className="label-caps export-section-label">Date range</div>
           <label className="export-toggle-row">
             <input
               type="checkbox"
@@ -255,125 +245,45 @@ export default function ChatExportModal() {
             <span className="export-toggle-hint">(joins, parts, modes)</span>
           </label>
         </div>
-
-        {/* Export button */}
-        <button className="export-btn" onClick={handleExport} disabled={filteredCount === 0}>
-          <DownloadIcon />
-          Export {filteredCount > 0 ? `${filteredCount} message${filteredCount !== 1 ? 's' : ''}` : '(no messages)'}
-        </button>
       </div>
 
       <style>{`
-        .export-modal {
-          position: fixed;
-          inset: 0;
-          z-index: 50;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: rgba(0,0,0,0.6);
-          backdrop-filter: blur(4px);
-          -webkit-backdrop-filter: blur(4px);
-        }
-
-        .export-card {
-          background: var(--bg-deep);
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-xl, 16px);
-          padding: 24px;
-          width: 420px;
-          max-width: calc(100vw - 32px);
-          box-shadow: var(--shadow-xl, 0 24px 64px rgba(0,0,0,0.64));
+        .export-content {
           display: flex;
           flex-direction: column;
-          gap: 20px;
-          animation: export-in 160ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
-        }
-
-        @keyframes export-in {
-          from { opacity: 0; transform: scale(0.97) translateY(6px); }
-          to   { opacity: 1; transform: scale(1) translateY(0); }
-        }
-
-        .export-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-        }
-
-        .export-title {
-          font-size: 16px;
-          font-weight: 700;
-          color: var(--text-primary);
-          margin: 0;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .export-title-icon {
-          font-size: 18px;
-          line-height: 1;
-        }
-
-        .export-close {
-          width: 28px;
-          height: 28px;
-          border-radius: var(--r-sm, 6px);
-          border: none;
-          background: none;
-          cursor: pointer;
-          color: var(--text-muted);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: background var(--t-fast, 150ms), color var(--t-fast, 150ms);
-          flex-shrink: 0;
-        }
-        .export-close:hover {
-          background: var(--ch-hover-bg);
-          color: var(--text-primary);
+          gap: var(--sp-4, 16px);
         }
 
         .export-channel-info {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: var(--sp-2, 8px);
           padding: 10px 12px;
-          background: var(--bg-elevated, var(--bg-float));
+          background: var(--elev-tint-1, var(--bg-elevated, var(--bg-float)));
           border-radius: var(--r-md, 8px);
           border: 1px solid var(--border-subtle);
         }
 
         .export-channel-name {
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           font-weight: 700;
           color: var(--text-primary);
         }
 
         .export-sep {
           color: var(--text-muted);
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
         }
 
         .export-msg-count {
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           color: var(--text-secondary);
         }
 
         .export-section {
           display: flex;
           flex-direction: column;
-          gap: 8px;
-        }
-
-        .export-section-label {
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-          color: var(--text-muted);
+          gap: var(--sp-2, 8px);
         }
 
         .export-format-group {
@@ -391,7 +301,7 @@ export default function ChatExportModal() {
           border: 1px solid var(--border-subtle);
           background: var(--bg-elevated);
           cursor: pointer;
-          transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+          transition: border-color var(--t-control, 150ms), background var(--t-control, 150ms), box-shadow var(--t-control, 150ms);
           user-select: none;
         }
         .export-format-option:hover {
@@ -414,14 +324,14 @@ export default function ChatExportModal() {
         }
 
         .export-format-label {
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           font-weight: 600;
           color: var(--text-primary);
           flex: 1;
         }
 
         .export-format-ext {
-          font-size: 11px;
+          font-size: var(--text-2xs, 11px);
           color: var(--text-muted);
           font-family: var(--font-mono, monospace);
           background: var(--bg-base);
@@ -447,20 +357,20 @@ export default function ChatExportModal() {
         }
 
         .export-toggle-label {
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           font-weight: 600;
           color: var(--text-primary);
         }
 
         .export-toggle-hint {
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           color: var(--text-muted);
         }
 
         .export-date-range {
           display: flex;
-          gap: 12px;
-          margin-top: 4px;
+          gap: var(--sp-3, 12px);
+          margin-top: var(--sp-1, 4px);
         }
 
         .export-date-field {
@@ -471,7 +381,7 @@ export default function ChatExportModal() {
         }
 
         .export-date-label {
-          font-size: 11px;
+          font-size: var(--text-2xs, 11px);
           color: var(--text-muted);
           font-weight: 600;
           letter-spacing: 0.04em;
@@ -483,12 +393,12 @@ export default function ChatExportModal() {
           border: 1px solid var(--border-normal);
           border-radius: var(--r-sm, 6px);
           color: var(--text-primary);
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           padding: 6px 8px;
           outline: none;
           width: 100%;
           box-sizing: border-box;
-          transition: border-color 0.15s;
+          transition: border-color var(--t-control, 150ms);
           color-scheme: dark;
         }
         .export-date-input:focus {
@@ -500,44 +410,32 @@ export default function ChatExportModal() {
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 8px;
+          gap: var(--sp-2, 8px);
           width: 100%;
           padding: 12px 16px;
           background: var(--accent, #0ea5e9);
           color: #fff;
-          font-size: 14px;
+          font-size: var(--text-base, 14px);
           font-weight: 700;
           border: none;
           border-radius: var(--r-md, 8px);
           cursor: pointer;
-          transition: opacity 0.15s, transform 0.1s, box-shadow 0.15s;
-          box-shadow: 0 4px 16px var(--accent-glow, rgba(14,165,233,0.35));
+          transition: opacity var(--t-control, 150ms), transform var(--t-micro, 90ms);
           font-family: inherit;
           letter-spacing: 0.01em;
         }
         .export-btn:hover:not(:disabled) {
           opacity: 0.92;
-          box-shadow: 0 6px 24px var(--accent-glow, rgba(14,165,233,0.45));
         }
         .export-btn:active:not(:disabled) {
           transform: scale(0.98);
-          box-shadow: 0 2px 8px var(--accent-glow, rgba(14,165,233,0.25));
         }
         .export-btn:disabled {
           opacity: 0.4;
           cursor: not-allowed;
-          box-shadow: none;
         }
       `}</style>
-    </div>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-      <path d="M2.146 2.146a.5.5 0 0 1 .708 0L7 6.293l4.146-4.147a.5.5 0 0 1 .708.708L7.707 7l4.147 4.146a.5.5 0 0 1-.708.708L7 7.707 2.854 11.854a.5.5 0 0 1-.708-.708L6.293 7 2.146 2.854a.5.5 0 0 1 0-.708z"/>
-    </svg>
+    </ModalShell>
   );
 }
 

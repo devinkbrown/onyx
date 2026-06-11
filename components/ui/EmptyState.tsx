@@ -1,13 +1,15 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import type React from 'react';
 
 export interface EmptyStateProps {
-  icon: string;
-  title: string;
+  icon?: React.ReactNode;
+  title?: string;
   description?: string;
   action?: { label: string; onClick: () => void };
   size?: 'sm' | 'md' | 'lg';
+  variant?: 'default' | 'historyExhausted';
+  className?: string;
 }
 
 export default function EmptyState({
@@ -16,40 +18,32 @@ export default function EmptyState({
   description,
   action,
   size = 'md',
+  variant = 'default',
+  className = '',
 }: EmptyStateProps) {
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = rootRef.current;
-    if (!el) return;
-    el.style.opacity = '0';
-    el.style.transform = 'translateY(12px)';
-    const raf = requestAnimationFrame(() => {
-      el.style.transition = 'opacity 420ms cubic-bezier(0.16,1,0.3,1), transform 420ms cubic-bezier(0.16,1,0.3,1)';
-      el.style.opacity = '1';
-      el.style.transform = 'translateY(0)';
-    });
-    return () => cancelAnimationFrame(raf);
-  }, []);
+  const resolvedTitle = title ?? (variant === 'historyExhausted' ? 'You have reached the sea floor' : 'Nothing here yet');
+  const resolvedDescription = description ?? (variant === 'historyExhausted'
+    ? 'There are no older messages to surface in this channel.'
+    : undefined);
 
   return (
-    <div ref={rootRef} className={`es-root es-root--${size}`} aria-live="polite">
-      {/* Ocean depth decorations */}
-      <div className="es-depth" aria-hidden="true">
-        <div className="es-depth-ring es-depth-ring--1" />
-        <div className="es-depth-ring es-depth-ring--2" />
-        <div className="es-depth-ring es-depth-ring--3" />
+    <div
+      className={`es-root es-root--${size} es-root--${variant} ${className}`.trim()}
+      aria-live="polite"
+      data-testid="empty-state"
+    >
+      <div className="es-figure" aria-hidden="true">
+        <span className="es-ring es-ring--outer" />
+        <span className="es-ring es-ring--middle" />
+        <span className="es-ring es-ring--inner" />
+        <span className="es-current" />
+        {icon && <span className="es-icon">{icon}</span>}
       </div>
 
-      <div className={`es-icon-wrap es-icon-wrap--${size}`} aria-hidden="true">
-        <div className="es-icon-glow" />
-        <span className={`es-icon es-icon--${size}`}>{icon}</span>
-      </div>
-
-      <p className="es-title">{title}</p>
-      {description && <p className="es-desc">{description}</p>}
+      <h2 className="es-title">{resolvedTitle}</h2>
+      {resolvedDescription && <p className="es-desc">{resolvedDescription}</p>}
       {action && (
-        <button className="es-action" onClick={action.onClick}>
+        <button className="es-action" type="button" onClick={action.onClick}>
           {action.label}
         </button>
       )}
@@ -62,141 +56,131 @@ export default function EmptyState({
           align-items: center;
           justify-content: center;
           text-align: center;
-          gap: 8px;
+          gap: var(--sp-3, 12px);
           overflow: hidden;
+          padding: var(--sp-16, 64px);
+          color: var(--text-primary, #eef4ff);
         }
-        .es-root--sm { padding: 28px 20px; }
-        .es-root--md { padding: 48px 24px; }
-        .es-root--lg { padding: 64px 32px; }
 
-        /* Depth rings — faint concentric halos */
-        .es-depth {
+        .es-figure {
+          position: relative;
+          width: 112px;
+          height: 112px;
+          display: grid;
+          place-items: center;
+          margin-bottom: var(--sp-2, 8px);
+        }
+        .es-root--sm .es-figure {
+          width: 88px;
+          height: 88px;
+        }
+        .es-root--lg .es-figure {
+          width: 136px;
+          height: 136px;
+        }
+        .es-ring {
+          position: absolute;
+          inset: 0;
+          border-radius: 50%;
+          border: 1px solid color-mix(in srgb, var(--text-muted, #6d7890) 30%, transparent);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.035);
+        }
+        .es-ring--middle {
+          inset: 17%;
+          opacity: 0.72;
+        }
+        .es-ring--inner {
+          inset: 34%;
+          opacity: 0.55;
+        }
+        .es-current {
+          position: relative;
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          background: color-mix(in srgb, var(--lux, #d8b96a) 72%, var(--bg-deep, #05080e));
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-1, 0 8px 18px rgba(0,0,0,.28));
+        }
+        .es-icon {
           position: absolute;
           inset: 0;
           display: flex;
           align-items: center;
           justify-content: center;
-          pointer-events: none;
-        }
-        .es-depth-ring {
-          position: absolute;
-          border-radius: 50%;
-          border: 1px solid var(--accent, #0ea5e9);
-        }
-        .es-depth-ring--1 {
-          width: 80px; height: 80px;
-          opacity: 0.06;
-        }
-        .es-depth-ring--2 {
-          width: 140px; height: 140px;
-          opacity: 0.04;
-        }
-        .es-depth-ring--3 {
-          width: 200px; height: 200px;
-          opacity: 0.025;
-        }
-        .es-root--sm .es-depth-ring--1 { width: 60px; height: 60px; }
-        .es-root--sm .es-depth-ring--2 { width: 100px; height: 100px; }
-        .es-root--sm .es-depth-ring--3 { width: 140px; height: 140px; }
-        .es-root--lg .es-depth-ring--1 { width: 100px; height: 100px; }
-        .es-root--lg .es-depth-ring--2 { width: 180px; height: 180px; }
-        .es-root--lg .es-depth-ring--3 { width: 260px; height: 260px; }
-
-        /* Icon wrapper with glow */
-        .es-icon-wrap {
-          position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin-bottom: 6px;
-          z-index: 1;
-        }
-        .es-icon-wrap--sm { width: 48px; height: 48px; }
-        .es-icon-wrap--md { width: 60px; height: 60px; }
-        .es-icon-wrap--lg { width: 80px; height: 80px; }
-
-        .es-icon-glow {
-          position: absolute;
-          inset: -8px;
-          border-radius: 50%;
-          background: radial-gradient(circle, var(--accent-glow, rgba(14,165,233,0.18)) 0%, transparent 70%);
-          filter: blur(4px);
-        }
-
-        .es-icon {
-          position: relative;
-          z-index: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 100%;
-          height: 100%;
+          color: var(--text-muted, #7f8da3);
+          font-size: var(--text-2xl, 24px);
           line-height: 1;
+          transform: translateY(-1px);
         }
-        .es-icon--sm { font-size: 24px; }
-        .es-icon--md { font-size: 32px; }
-        .es-icon--lg { font-size: 44px; }
 
         .es-title {
           position: relative;
           z-index: 1;
-          margin: 4px 0 0;
-          font-size: 15px;
-          font-weight: 700;
-          color: var(--text-primary, #dff0ff);
-          letter-spacing: -0.1px;
-          line-height: 1.3;
+          margin: 0;
+          font-family: var(--font-display), Georgia, serif;
+          font-size: var(--text-xl, 1.25rem);
+          font-weight: 650;
+          color: var(--text-primary, #eef4ff);
+          letter-spacing: 0;
+          line-height: 1.2;
         }
-        .es-root--sm .es-title { font-size: 13px; margin-top: 2px; }
-        .es-root--lg .es-title { font-size: 18px; }
+        .es-root--sm .es-title { font-size: var(--text-lg, 1.0625rem); }
+        .es-root--lg .es-title { font-size: var(--text-2xl, 1.5rem); }
 
         .es-desc {
           position: relative;
           z-index: 1;
           margin: 0;
-          font-size: 13px;
-          color: var(--text-muted, #3d6480);
+          font-size: var(--text-sm, .8125rem);
+          color: var(--text-muted, #7f8da3);
           line-height: 1.55;
-          max-width: 260px;
+          max-width: 320px;
           text-align: center;
         }
-        .es-root--sm .es-desc { font-size: 12px; max-width: 220px; }
-        .es-root--lg .es-desc { font-size: 14px; max-width: 300px; }
 
         .es-action {
           position: relative;
           z-index: 1;
-          margin-top: 10px;
-          padding: 0 18px;
-          height: 36px;
-          border-radius: var(--r-md, 8px);
-          background: linear-gradient(135deg, var(--accent, #0ea5e9), color-mix(in srgb, var(--accent, #0ea5e9) 80%, #06b6d4));
-          color: #fff;
-          border: 1px solid rgba(255,255,255,0.1);
+          margin-top: var(--sp-2, 8px);
+          min-height: 36px;
+          padding: 0 var(--sp-4, 16px);
+          border-radius: var(--r-md, 8px) var(--r-sm, 6px) var(--r-lg, 12px) var(--r-sm, 6px);
+          background: color-mix(in srgb, var(--accent, #0ea5e9) 86%, #000 14%);
+          color: var(--accent-contrast, #fff);
+          border: 1px solid color-mix(in srgb, var(--accent, #0ea5e9) 42%, transparent);
           cursor: pointer;
-          font-size: 13px;
-          font-weight: 600;
+          font-size: var(--text-sm, .8125rem);
+          font-weight: 700;
           font-family: inherit;
-          letter-spacing: 0.01em;
+          letter-spacing: 0;
           transition:
-            box-shadow 160ms cubic-bezier(0.16,1,0.3,1),
-            transform 160ms cubic-bezier(0.16,1,0.3,1);
+            background var(--t-control, 150ms) var(--ease-out, cubic-bezier(.16,1,.3,1)),
+            transform var(--t-control, 150ms) var(--ease-out, cubic-bezier(.16,1,.3,1));
           white-space: nowrap;
           display: inline-flex;
           align-items: center;
-          box-shadow: 0 2px 8px var(--accent-glow, rgba(14,165,233,0.25));
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), 0 1px 2px rgba(0,0,0,.32);
         }
         .es-action:hover {
-          box-shadow: 0 4px 16px var(--accent-glow, rgba(14,165,233,0.45));
+          background: color-mix(in srgb, var(--accent, #0ea5e9) 92%, #000 8%);
           transform: translateY(-1px);
         }
         .es-action:active {
-          box-shadow: 0 1px 4px rgba(0,0,0,0.3);
           transform: translateY(0);
         }
         .es-action:focus-visible {
           outline: 2px solid var(--accent, #0ea5e9);
           outline-offset: 2px;
+        }
+
+        @media (prefers-reduced-motion: no-preference) {
+          .es-root {
+            animation: es-enter var(--t-overlay-in, 320ms) var(--ease-out, cubic-bezier(.16,1,.3,1)) both;
+          }
+          @keyframes es-enter {
+            from { opacity: 0; transform: translateY(var(--sp-3, 12px)); }
+            to { opacity: 1; transform: translateY(0); }
+          }
         }
       `}</style>
     </div>

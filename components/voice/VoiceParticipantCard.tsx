@@ -103,16 +103,10 @@ export default function VoiceParticipantCard({
           display: flex;
           align-items: flex-start;
           gap: 10px;
-          background: linear-gradient(155deg,
-            var(--bg-float, #1a2c40) 0%,
-            var(--bg-deep, #06101d) 100%);
-          border: 1px solid var(--border-normal, rgba(14,165,233,0.15));
-          border-radius: var(--r-lg, 12px);
+          background: color-mix(in srgb, #050505 86%, var(--accent, #0ea5e9) 8%);
+          border-radius: var(--r-sm, 6px) var(--r-xl, 16px) var(--r-md, 8px) var(--r-lg, 14px);
           padding: 12px 14px;
-          box-shadow:
-            0 12px 36px rgba(0,0,0,0.55),
-            0 2px 8px rgba(0,0,0,0.35),
-            0 0 0 1px rgba(14,165,233,0.05) inset;
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-2, 0 18px 44px rgba(0,0,0,.42));
           min-width: 190px;
           animation: vpc-pop 140ms cubic-bezier(0.16,1,0.3,1) both;
           pointer-events: none;
@@ -128,7 +122,7 @@ export default function VoiceParticipantCard({
           flex-shrink: 0;
         }
 
-        /* Speaking ring: two-layer glow for premium feel */
+        /* Speaking ring: the one permitted luminous voice treatment */
         .vpc-speaking-ring {
           position: absolute;
           inset: -4px;
@@ -148,9 +142,9 @@ export default function VoiceParticipantCard({
         }
 
         @keyframes vpc-ring-pulse {
-          0%   { opacity: 1;   box-shadow: 0 0 0 0   rgba(52,211,153,0.45); }
-          60%  { opacity: 0.7; box-shadow: 0 0 0 6px rgba(52,211,153,0);    }
-          100% { opacity: 1;   box-shadow: 0 0 0 0   rgba(52,211,153,0.45); }
+          0%   { opacity: 1; transform: scale(0.96); }
+          60%  { opacity: 0.7; transform: scale(1.12); }
+          100% { opacity: 1; transform: scale(0.96); }
         }
 
         .vpc-body {
@@ -265,7 +259,6 @@ export default function VoiceParticipantCard({
           height: 6px;
           border-radius: 50%;
           flex-shrink: 0;
-          box-shadow: 0 0 4px currentColor;
         }
 
         .vpc-quality-label {

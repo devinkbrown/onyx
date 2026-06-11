@@ -4,6 +4,7 @@ import { useMemo, useState, useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
 import ImageLightbox from '@/components/ui/ImageLightbox';
+import ModalShell from './ModalShell';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -168,17 +169,17 @@ export default function MediaGalleryPanel() {
   ];
 
   return (
-    <>
-      <aside className="mgp-root" aria-label="Media gallery">
-        {/* Top bar */}
-        <div className="mgp-topbar">
-          <span className="mgp-title">
-            Media
-            {allMedia.length > 0 && (
-              <span className="mgp-count">{allMedia.length}</span>
-            )}
-          </span>
-
+    <ModalShell
+      onClose={closeMediaGallery}
+      variant="sheet"
+      size="sm"
+      title="Media"
+      kicker={activeView.kind === 'channel' ? activeView.channel : activeView.kind === 'dm' ? `DM with ${activeView.nick}` : 'Gallery'}
+      titleId="mgp-title"
+      closeLabel="Close media gallery"
+      headerExtra={
+        <>
+          {allMedia.length > 0 && <span className="mgp-count">{allMedia.length}</span>}
           <div className="mgp-filters" role="tablist">
             {tabs.map(t => (
               <button
@@ -192,60 +193,53 @@ export default function MediaGalleryPanel() {
               </button>
             ))}
           </div>
+        </>
+      }
+      flushBody
+    >
+      {/* Search */}
+      <div className="mgp-search-row">
+        <input
+          className="mgp-search"
+          type="search"
+          placeholder="Search by nick or URL…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          aria-label="Search media"
+        />
+      </div>
 
-          <button
-            className="mgp-close"
-            onClick={closeMediaGallery}
-            aria-label="Close media gallery"
-          >
-            ×
-          </button>
-        </div>
-
-        {/* Search */}
-        <div className="mgp-search-row">
-          <input
-            className="mgp-search"
-            type="search"
-            placeholder="Search by nick or URL…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            aria-label="Search media"
-          />
-        </div>
-
-        {/* Content */}
-        <div className="mgp-content">
-          {loading ? (
-            <div className="mgp-grid">
-              {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
-                <div key={i} className="mgp-cell mgp-skeleton" aria-hidden="true" />
-              ))}
-            </div>
-          ) : grouped.length === 0 ? (
-            <div className="mgp-empty">
-              <span className="mgp-empty-icon" aria-hidden="true">🖼️</span>
-              <p>No media yet</p>
-            </div>
-          ) : (
-            grouped.map(group => (
-              <div key={group.label}>
-                <p className="mgp-month-label">{group.label}</p>
-                <div className="mgp-grid">
-                  {group.items.map((item, i) => (
-                    <MediaCell
-                      key={`${item.msgId}-${i}`}
-                      item={item}
-                      onClick={() => handleCellClick(item)}
-                      onJump={e => jumpToMessage(item.msgId, e)}
-                    />
-                  ))}
-                </div>
+      {/* Content */}
+      <div className="mgp-content">
+        {loading ? (
+          <div className="mgp-grid">
+            {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
+              <div key={i} className="mgp-cell mgp-skeleton" aria-hidden="true" />
+            ))}
+          </div>
+        ) : grouped.length === 0 ? (
+          <div className="mgp-empty">
+            <span className="mgp-empty-icon" aria-hidden="true">🖼️</span>
+            <p>No media yet</p>
+          </div>
+        ) : (
+          grouped.map(group => (
+            <div key={group.label}>
+              <p className="label-caps mgp-month-label">{group.label}</p>
+              <div className="mgp-grid">
+                {group.items.map((item, i) => (
+                  <MediaCell
+                    key={`${item.msgId}-${i}`}
+                    item={item}
+                    onClick={() => handleCellClick(item)}
+                    onJump={e => jumpToMessage(item.msgId, e)}
+                  />
+                ))}
               </div>
-            ))
-          )}
-        </div>
-      </aside>
+            </div>
+          ))
+        )}
+      </div>
 
       {/* Lightbox */}
       {lightboxIndex !== null && imageUrls.length > 0 && (
@@ -259,7 +253,7 @@ export default function MediaGalleryPanel() {
       )}
 
       <style>{css}</style>
-    </>
+    </ModalShell>
   );
 }
 
@@ -330,45 +324,8 @@ function JumpIcon() {
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
 const css = `
-  .mgp-root {
-    position: fixed;
-    top: 0; right: 0; bottom: 0;
-    width: 360px;
-    z-index: 620;
-    background: var(--bg-deep);
-    border-left: 1px solid var(--border-subtle);
-    display: flex;
-    flex-direction: column;
-    box-shadow: -4px 0 24px rgba(0,0,0,0.3);
-    animation: mgp-slide-in 180ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
-  }
-
-  @keyframes mgp-slide-in {
-    from { opacity: 0; transform: translateX(16px); }
-    to   { opacity: 1; transform: translateX(0); }
-  }
-
-  .mgp-topbar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border-subtle);
-    flex-shrink: 0;
-  }
-
-  .mgp-title {
-    font-weight: 700;
-    font-size: 14px;
-    color: var(--text-primary);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex: 1;
-  }
-
   .mgp-count {
-    font-size: 11px;
+    font-size: var(--text-2xs, 11px);
     font-weight: 700;
     background: var(--bg-float, var(--bg-elevated));
     color: var(--text-secondary);
@@ -386,13 +343,13 @@ const css = `
   .mgp-filter {
     padding: 3px 10px;
     border-radius: 12px;
-    font-size: 12px;
+    font-size: var(--text-xs, 12px);
     font-weight: 600;
     cursor: pointer;
     border: 1px solid var(--border-subtle);
     background: none;
     color: var(--text-muted);
-    transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+    transition: background var(--t-control, 150ms), border-color var(--t-control, 150ms), color var(--t-control, 150ms);
   }
   .mgp-filter:hover { color: var(--text-secondary); }
   .mgp-filter.active {
@@ -401,23 +358,8 @@ const css = `
     color: #fff;
   }
 
-  .mgp-close {
-    width: 28px; height: 28px;
-    border-radius: var(--r-sm);
-    background: none; border: none; cursor: pointer;
-    font-size: 20px; line-height: 1;
-    color: var(--text-muted);
-    display: flex; align-items: center; justify-content: center;
-    transition: background var(--t-fast), color var(--t-fast);
-    flex-shrink: 0;
-  }
-  .mgp-close:hover {
-    background: var(--ch-hover-bg);
-    color: var(--text-primary);
-  }
-
   .mgp-search-row {
-    padding: 8px 12px;
+    padding: var(--sp-2, 8px) var(--sp-3, 12px);
     border-bottom: 1px solid var(--border-subtle);
     flex-shrink: 0;
   }
@@ -429,30 +371,20 @@ const css = `
     border: 1px solid var(--border-subtle);
     border-radius: 6px;
     color: var(--text-normal);
-    font-size: 12px;
+    font-size: var(--text-xs, 12px);
     outline: none;
-    transition: border-color var(--t-fast);
+    transition: border-color var(--t-control, 150ms);
     box-sizing: border-box;
   }
   .mgp-search:focus { border-color: var(--accent); }
   .mgp-search::placeholder { color: var(--text-muted); }
 
   .mgp-content {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 8px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border-normal) transparent;
+    padding: var(--sp-2, 8px);
   }
 
   .mgp-month-label {
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-muted);
-    padding: 8px 4px 4px;
+    padding: var(--sp-2, 8px) var(--sp-1, 4px) var(--sp-1, 4px);
     margin: 0;
   }
 
@@ -460,7 +392,7 @@ const css = `
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 3px;
-    margin-bottom: 8px;
+    margin-bottom: var(--sp-2, 8px);
   }
 
   .mgp-cell {
@@ -480,7 +412,7 @@ const css = `
     width: 100%; height: 100%;
     object-fit: cover;
     display: block;
-    transition: transform 220ms var(--ease-out, ease);
+    transition: transform var(--t-surface, 220ms) var(--ease-out, ease);
   }
   .mgp-cell:hover img { transform: scale(1.07); }
 
@@ -527,7 +459,7 @@ const css = `
     inset: 0;
     background: rgba(0,0,0,0.4);
     opacity: 0;
-    transition: opacity 0.15s;
+    transition: opacity var(--t-control, 150ms);
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
@@ -554,7 +486,7 @@ const css = `
     display: flex; align-items: center; justify-content: center;
     color: rgba(255,255,255,0.9);
     padding: 0;
-    transition: background 120ms;
+    transition: background var(--t-micro, 90ms);
     flex-shrink: 0;
   }
   .mgp-jump-btn:hover { background: rgba(0,0,0,0.75); }
@@ -570,6 +502,9 @@ const css = `
   @keyframes mgp-shimmer {
     from { background-position: -200% 0; }
     to   { background-position:  200% 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mgp-skeleton { animation: none; }
   }
 
   .mgp-empty {
@@ -587,7 +522,7 @@ const css = `
     line-height: 1;
   }
   .mgp-empty p {
-    font-size: 13px;
+    font-size: var(--text-sm, 13px);
     color: var(--text-muted);
     margin: 0;
     line-height: 1.5;

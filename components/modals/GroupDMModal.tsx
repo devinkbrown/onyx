@@ -1,7 +1,7 @@
 'use client';
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { useOnyxStore } from '@/lib/store';
-import { useDialogFocus } from './useDialogFocus';
+import ModalShell from './ModalShell';
 
 export default function GroupDMModal() {
   const closeGroupDM    = useOnyxStore(s => s.closeGroupDM);
@@ -14,8 +14,6 @@ export default function GroupDMModal() {
 
   const [query, setQuery]       = useState('');
   const [selected, setSelected] = useState<string[]>([]);
-  const panelRef = useRef<HTMLDivElement>(null);
-  useDialogFocus(panelRef);
 
   // Collect all known nicks (friends + online channel members) excluding ourselves
   const candidates = useMemo(() => {
@@ -57,14 +55,27 @@ export default function GroupDMModal() {
   }
 
   return (
-    <div className="gdm-backdrop" onClick={closeGroupDM}>
-      <div className="gdm-panel" ref={panelRef} onClick={e => e.stopPropagation()} role="dialog" aria-modal aria-labelledby="gdm-modal-title">
-
-        <header className="gdm-header">
-          <h2 id="gdm-modal-title" className="gdm-title">New Group Conversation</h2>
-          <button className="gdm-close" onClick={closeGroupDM} aria-label="Close"><svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></button>
-        </header>
-
+    <ModalShell
+      onClose={closeGroupDM}
+      title="New Group Conversation"
+      kicker="Direct messages"
+      titleId="gdm-modal-title"
+      size="sm"
+      flushBody
+      footer={
+        <>
+          <button className="gdm-cancel" onClick={closeGroupDM}>Cancel</button>
+          <button
+            className="gdm-start"
+            disabled={selected.length < 2 || !client}
+            onClick={startGroup}
+          >
+            Start Group
+          </button>
+        </>
+      }
+    >
+      <div className="gdm-content">
         {/* Selected user chips */}
         {selected.length > 0 && (
           <div className="gdm-chips">
@@ -112,83 +123,22 @@ export default function GroupDMModal() {
             </li>
           ))}
         </ul>
-
-        <footer className="gdm-footer">
-          <button className="gdm-cancel" onClick={closeGroupDM}>Cancel</button>
-          <button
-            className="gdm-start"
-            disabled={selected.length < 2 || !client}
-            onClick={startGroup}
-          >
-            Start Group
-          </button>
-        </footer>
       </div>
 
       <style>{`
-        .gdm-backdrop {
-          position: fixed;
-          inset: 0;
-          background: rgba(3,8,16,0.72);
-          backdrop-filter: blur(6px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 900;
-        }
-
-        .gdm-panel {
-          background: var(--bg-deep);
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-xl);
-          width: min(480px, 94vw);
-          max-height: 80vh;
+        .gdm-content {
           display: flex;
           flex-direction: column;
-          box-shadow: var(--shadow-xl);
-          overflow: hidden;
-          animation: scaleIn 180ms var(--ease-out) both;
+          min-height: 0;
+          height: 100%;
         }
-
-        .gdm-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 18px 24px 15px;
-          border-bottom: 1px solid var(--border-subtle);
-          flex-shrink: 0;
-          background: var(--bg-elevated);
-        }
-
-        .gdm-title {
-          font-size: 16px;
-          font-weight: 700;
-          color: var(--text-primary);
-          margin: 0;
-        }
-
-        .gdm-close {
-          background: none;
-          border: none;
-          color: var(--text-muted);
-          font-size: 15px;
-          cursor: pointer;
-          width: 28px;
-          height: 28px;
-          border-radius: var(--r-sm);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: color var(--t-fast), background var(--t-fast);
-        }
-        .gdm-close:hover { color: var(--text-primary); background: var(--bg-overlay); }
 
         /* Chips */
         .gdm-chips {
           display: flex;
           flex-wrap: wrap;
           gap: 6px;
-          padding: 12px 16px 0;
+          padding: var(--sp-3, 12px) var(--sp-4, 16px) 0;
           flex-shrink: 0;
         }
 
@@ -199,11 +149,11 @@ export default function GroupDMModal() {
           background: var(--accent-subtle);
           border: 1px solid var(--accent-border);
           color: var(--accent);
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           font-weight: 600;
           padding: 3px 8px 3px 4px;
           border-radius: var(--r-full);
-          transition: background var(--t-fast);
+          transition: background var(--t-control, 150ms);
         }
         .gdm-chip:hover { background: rgba(14,165,233,0.18); }
 
@@ -230,26 +180,26 @@ export default function GroupDMModal() {
           font-size: 11px;
           line-height: 1;
           opacity: 0.6;
-          transition: opacity var(--t-fast);
+          transition: opacity var(--t-control, 150ms);
         }
         .gdm-chip-remove:hover { opacity: 1; }
 
         /* Search */
         .gdm-search-wrap {
-          padding: 12px 16px 8px;
+          padding: var(--sp-3, 12px) var(--sp-4, 16px) var(--sp-2, 8px);
           flex-shrink: 0;
         }
 
         .gdm-search {
           width: 100%;
-          background: var(--bg-elevated);
+          background: var(--elev-tint-1, var(--bg-elevated));
           border: 1px solid var(--border-normal);
           border-radius: var(--r-sm);
           color: var(--text-primary);
-          font-size: 14px;
+          font-size: var(--text-base, 14px);
           padding: 9px 14px;
           outline: none;
-          transition: border-color var(--t-fast), background var(--t-fast);
+          transition: border-color var(--t-control, 150ms), background var(--t-control, 150ms);
           box-sizing: border-box;
           font-family: inherit;
         }
@@ -264,17 +214,18 @@ export default function GroupDMModal() {
         .gdm-list {
           list-style: none;
           margin: 0;
-          padding: 0 8px 8px;
+          padding: 0 var(--sp-2, 8px) var(--sp-2, 8px);
           overflow-y: auto;
           flex: 1;
-          min-height: 0;
+          min-height: 120px;
+          max-height: 320px;
         }
 
         .gdm-empty {
           text-align: center;
           color: var(--text-muted);
-          font-size: 13px;
-          padding: 24px;
+          font-size: var(--text-sm, 13px);
+          padding: var(--sp-6, 24px);
         }
 
         .gdm-item {
@@ -282,12 +233,12 @@ export default function GroupDMModal() {
           display: flex;
           align-items: center;
           gap: 10px;
-          padding: 8px 12px;
+          padding: var(--sp-2, 8px) var(--sp-3, 12px);
           background: none;
           border: none;
           border-radius: var(--r-sm);
           cursor: pointer;
-          transition: background var(--t-fast);
+          transition: background var(--t-control, 150ms);
           text-align: left;
           font-family: inherit;
         }
@@ -302,7 +253,7 @@ export default function GroupDMModal() {
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           font-weight: 700;
           color: var(--accent);
           flex-shrink: 0;
@@ -310,7 +261,7 @@ export default function GroupDMModal() {
 
         .gdm-item-nick {
           flex: 1;
-          font-size: 14px;
+          font-size: var(--text-base, 14px);
           color: var(--text-secondary);
           font-weight: 500;
         }
@@ -321,32 +272,21 @@ export default function GroupDMModal() {
           font-size: 18px;
           font-weight: 300;
           line-height: 1;
-          transition: opacity var(--t-fast);
+          transition: opacity var(--t-control, 150ms);
         }
         .gdm-item:hover .gdm-item-add { opacity: 0.8; }
-
-        /* Footer */
-        .gdm-footer {
-          display: flex;
-          justify-content: flex-end;
-          gap: 10px;
-          padding: 14px 20px;
-          border-top: 1px solid var(--border-subtle);
-          flex-shrink: 0;
-          background: var(--bg-elevated);
-        }
 
         .gdm-cancel {
           background: none;
           border: 1px solid var(--border-normal);
           color: var(--text-secondary);
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           font-weight: 600;
           padding: 8px 18px;
           border-radius: var(--r-sm);
           cursor: pointer;
           font-family: inherit;
-          transition: background var(--t-fast), color var(--t-fast);
+          transition: background var(--t-control, 150ms), color var(--t-control, 150ms);
         }
         .gdm-cancel:hover { background: var(--bg-overlay); color: var(--text-primary); }
 
@@ -354,17 +294,17 @@ export default function GroupDMModal() {
           background: var(--accent);
           border: none;
           color: #fff;
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           font-weight: 700;
           padding: 8px 20px;
           border-radius: var(--r-sm);
           cursor: pointer;
           font-family: inherit;
-          transition: background var(--t-fast), opacity var(--t-fast);
+          transition: background var(--t-control, 150ms), opacity var(--t-control, 150ms);
         }
         .gdm-start:hover:not(:disabled) { background: var(--accent-hover); }
         .gdm-start:disabled { opacity: 0.35; cursor: not-allowed; }
       `}</style>
-    </div>
+    </ModalShell>
   );
 }

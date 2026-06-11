@@ -4,6 +4,10 @@ import { useState, useMemo, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import type { ForumPost } from '@/lib/store';
 import Avatar from '@/components/ui/Avatar';
+import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
+import OfflineMessagesBanner from '@/components/ui/OfflineMessagesBanner';
+import SkeletonMessage from './SkeletonMessage';
 
 // ── Forum tag helpers (stored in topic as [tags:tag1,tag2,tag3]) ──────────────
 
@@ -145,6 +149,9 @@ export default function ForumView() {
   const channels        = useOnyxStore(s => s.channels);
   const client          = useOnyxStore(s => s.client);
   const ourNick         = useOnyxStore(s => s.ourNick);
+  const status          = useOnyxStore(s => s.status);
+  const connectionStatus = useOnyxStore(s => s.connectionStatus);
+  const reconnectNow    = useOnyxStore(s => s.reconnectNow);
 
   const [sortOrder, setSortOrder]           = useState<SortOrder>('activity');
   const [activeTags, setActiveTags]         = useState<Set<string>>(new Set());
@@ -155,6 +162,8 @@ export default function ForumView() {
 
   const channelName = activeView.kind === 'channel' ? activeView.channel : '';
   const rawPosts    = forumPosts[channelName.toLowerCase()] ?? [];
+  const forumLoading = (connectionStatus === 'connecting' || connectionStatus === 'reconnecting') && rawPosts.length === 0;
+  const forumError = status === 'error';
 
   // Derive op status and topic from channel
   const channel = channels.get(channelName.toLowerCase());
@@ -225,6 +234,8 @@ export default function ForumView() {
 
   return (
     <div className="forum-view">
+      <OfflineMessagesBanner channel={channelName} />
+
       {/* Header */}
       <header className="forum-header">
         <div className="forum-header-left">
@@ -355,21 +366,23 @@ export default function ForumView() {
 
       {/* Post feed */}
       <div className="forum-feed" role="feed">
-        {sorted.length === 0 ? (
-          <div className="forum-empty">
-            <span className="forum-empty-icon" aria-hidden>📋</span>
-            <p className="forum-empty-title">No posts yet</p>
-            <p className="forum-empty-sub">
-              {activeTags.size > 0
-                ? 'No posts match the selected tags.'
-                : 'Be the first to start a discussion.'}
-            </p>
-            {activeTags.size === 0 && (
-              <button className="forum-empty-cta" onClick={openForumCreate}>
-                Create Post
-              </button>
-            )}
-          </div>
+        {forumError ? (
+          <ErrorState
+            title="Forum posts are unavailable"
+            message="Ocean could not refresh this channel's forum posts from the current connection."
+            details={`ForumView failed for ${channelName || 'unknown channel'} while connection status was ${connectionStatus}.`}
+            onRetry={reconnectNow}
+          />
+        ) : forumLoading ? (
+          <SkeletonMessage count={5} />
+        ) : sorted.length === 0 ? (
+          <EmptyState
+            icon="[]"
+            title={activeTags.size > 0 ? 'No matching posts' : 'No posts yet'}
+            description={activeTags.size > 0 ? 'No posts match the selected tags.' : 'Be the first to start a discussion.'}
+            action={activeTags.size === 0 ? { label: 'Create Post', onClick: openForumCreate } : undefined}
+            size="md"
+          />
         ) : (
           sorted.map(post => (
             <PostCard

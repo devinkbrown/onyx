@@ -186,9 +186,10 @@ export default function SlashCommandMenu({
   return (
     <div
       ref={listRef}
-      className="scm-popup"
+      className="scm-popup elev-3"
       role="listbox"
       aria-label="Slash command suggestions"
+      data-testid="slash-command-menu"
     >
       <div className="scm-list">
         {rows}
@@ -206,15 +207,13 @@ export default function SlashCommandMenu({
           display: flex;
           flex-direction: column;
           max-height: 240px;
-          background: var(--bg-deep);
           backdrop-filter: blur(16px) saturate(1.4);
           -webkit-backdrop-filter: blur(16px) saturate(1.4);
-          border: 1px solid var(--border-subtle);
-          border-radius: var(--r-lg);
-          box-shadow: var(--shadow-xl), 0 0 0 1px var(--accent-border);
+          border: 1px solid color-mix(in srgb, var(--lux, #d8b96a) 16%, var(--border-subtle));
+          border-radius: var(--r-xl, 18px) var(--r-md, 10px) var(--r-lg, 14px) var(--r-sm, 6px);
           overflow: hidden;
-          z-index: 60;
-          animation: scm-rise 150ms var(--ease-out) both;
+          z-index: var(--z-popover, 100);
+          animation: scm-rise var(--t-control, 150ms) var(--ease-out) both;
         }
 
         @keyframes scm-rise {
@@ -228,11 +227,11 @@ export default function SlashCommandMenu({
           min-height: 0;
           overscroll-behavior: contain;
           scrollbar-width: thin;
-          scrollbar-color: var(--accent-border) transparent;
+          scrollbar-color: color-mix(in srgb, var(--lux, #d8b96a) 35%, transparent) transparent;
         }
         .scm-list::-webkit-scrollbar { width: 3px; }
         .scm-list::-webkit-scrollbar-thumb {
-          background: var(--accent-border);
+          background: color-mix(in srgb, var(--lux, #d8b96a) 35%, transparent);
           border-radius: 2px;
         }
 
@@ -261,33 +260,33 @@ export default function SlashCommandMenu({
           border: none;
           cursor: pointer;
           text-align: left;
-          transition: background var(--t-fast);
+          transition: background var(--t-control, 150ms) var(--ease-out);
         }
         .scm-item:hover {
-          background: var(--accent-subtle);
+          background: color-mix(in srgb, var(--lux, #d8b96a) 10%, transparent);
         }
         .scm-item--selected {
-          background: var(--accent-subtle);
+          background: color-mix(in srgb, var(--lux, #d8b96a) 14%, transparent);
         }
         .scm-item--selected:hover {
-          background: rgba(124, 90, 245, 0.14);
+          background: color-mix(in srgb, var(--lux, #d8b96a) 14%, transparent);
         }
 
         .scm-cmd-name {
           font-size: 13px;
           font-weight: 600;
-          color: var(--accent);
+          color: var(--lux, #d8b96a);
           font-family: var(--font-mono);
           flex-shrink: 0;
           min-width: 90px;
           white-space: nowrap;
         }
         .scm-item--selected .scm-cmd-name {
-          color: var(--accent-hover);
+          color: color-mix(in srgb, var(--lux, #d8b96a) 82%, white);
         }
 
         .scm-match {
-          background: var(--accent-subtle);
+          background: color-mix(in srgb, var(--lux, #d8b96a) 16%, transparent);
           color: inherit;
           border-radius: 2px;
           padding: 0 2px;
@@ -314,11 +313,19 @@ export default function SlashCommandMenu({
           padding: 5px 12px;
           font-size: 10px;
           color: var(--text-muted);
-          border-top: 1px solid var(--border-subtle);
+          border-top: 1px solid color-mix(in srgb, var(--lux, #d8b96a) 12%, var(--border-subtle));
           letter-spacing: 0.04em;
           text-align: center;
-          background: var(--bg-void);
+          background: color-mix(in srgb, var(--bg-void, #030812) 88%, var(--lux, #d8b96a));
           user-select: none;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .scm-popup {
+            animation: none !important;
+          }
+          .scm-item {
+            transition: none !important;
+          }
         }
       `}</style>
     </div>

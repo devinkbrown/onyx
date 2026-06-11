@@ -1,966 +1,792 @@
 'use client';
 
-import { useState, useEffect, useRef, FormEvent } from 'react';
+import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useOnyxStore } from '@/lib/store';
-import type { IRCMessage } from '@/lib/irc/types';
-import FormField from '@/components/ui/FormField';
-import Button from '@/components/ui/Button';
 
 interface Props {
   onSwitch: () => void;
 }
 
 const DEFAULT_SERVER = process.env.NEXT_PUBLIC_IRC_WS ?? 'wss://eshmaki.me:8080';
+const NICK_RE = /^[a-zA-Z0-9\-_\[\]{}\\|`^]{1,30}$/;
 
-type Step = 'fill' | 'verify';
+type RegisterStep = 0 | 1 | 2;
+type StrengthLevel = 0 | 1 | 2 | 3 | 4;
 
-// ── SVG Icons ────────────────────────────────────────────────────────────────
+const STEP_LABELS = ['Identity', 'Password', 'Confirm'] as const;
 
-function IconUser() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <circle cx="8" cy="5.5" r="2.5" stroke="currentColor" strokeWidth="1.3" fill="none" />
-      <path d="M2.5 13.5C2.5 11.015 5.015 9 8 9s5.5 2.015 5.5 4.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none" />
-    </svg>
-  );
-}
-
-function IconLock() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <rect x="3" y="7" width="10" height="7.5" rx="1.5" stroke="currentColor" strokeWidth="1.3" fill="none" />
-      <path d="M5 7V5a3 3 0 016 0v2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none" />
-      <circle cx="8" cy="10.5" r="1.2" fill="currentColor" />
-    </svg>
-  );
-}
-
-function IconServer() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <rect x="1" y="2" width="14" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.3" fill="none" />
-      <rect x="1" y="9" width="14" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.3" fill="none" />
-      <circle cx="12.5" cy="4.5" r="1" fill="currentColor" />
-      <circle cx="12.5" cy="11.5" r="1" fill="currentColor" />
-    </svg>
-  );
-}
-
-function IconEye({ off }: { off?: boolean }) {
-  if (off) {
-    return (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-        <path d="M2 2l12 12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-        <path d="M6.5 4.2C7 4.07 7.5 4 8 4c3.5 0 6 4 6 4s-.65 1.1-1.8 2.1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none" />
-        <path d="M4.2 5.7C2.9 6.8 2 8 2 8s2.5 4 6 4c.9 0 1.75-.24 2.5-.64" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none" />
-        <path d="M6.5 9.4A2 2 0 009.4 6.6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none" />
-      </svg>
-    );
-  }
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path d="M2 8s2.5-4 6-4 6 4 6 4-2.5 4-6 4-6-4-6-4z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none" />
-      <circle cx="8" cy="8" r="1.8" stroke="currentColor" strokeWidth="1.3" fill="none" />
-    </svg>
-  );
-}
-
-function IconCheck() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <circle cx="8" cy="8" r="6.5" fill="rgba(52,211,153,0.15)" stroke="var(--success)" strokeWidth="1.2" />
-      <path d="M5 8l2.2 2.2L11 5.5" stroke="var(--success)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function IconSpinner() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className="spin-icon">
-      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeOpacity="0.2" />
-      <path d="M8 2a6 6 0 016 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-// ── Password strength ─────────────────────────────────────────────────────────
-
-type PasswordStrength = 'none' | 'weak' | 'medium' | 'strong';
-
-function getPasswordStrength(pw: string): PasswordStrength {
-  if (!pw) return 'none';
+function passwordStrength(password: string): StrengthLevel {
+  if (!password) return 0;
   let score = 0;
-  if (pw.length >= 8)  score++;
-  if (pw.length >= 12) score++;
-  if (/[A-Z]/.test(pw)) score++;
-  if (/[0-9]/.test(pw)) score++;
-  if (/[^A-Za-z0-9]/.test(pw)) score++;
-  if (score <= 1) return 'weak';
-  if (score <= 3) return 'medium';
-  return 'strong';
+  if (password.length >= 8) score++;
+  if (password.length >= 12) score++;
+  if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++;
+  if (/\d/.test(password) || /[^A-Za-z0-9]/.test(password)) score++;
+  return Math.min(score, 4) as StrengthLevel;
 }
 
-const STRENGTH_LABELS: Record<PasswordStrength, string> = {
-  none:   '',
-  weak:   'Weak',
-  medium: 'Medium',
-  strong: 'Strong',
-};
+function waitForConnected(): Promise<void> {
+  if (useOnyxStore.getState().status === 'connected') return Promise.resolve();
 
-const REGISTER_SUCCESS_RE = /\b(account|nick(?:name)?)\b.*\b(register(?:ed|ation)?|created|success(?:ful(?:ly)?)?)\b|\b(register(?:ed|ation)?|created|success(?:ful(?:ly)?)?)\b.*\b(account|nick(?:name)?)\b/i;
-const REGISTER_FAILURE_RE = /\b(already|exists|taken|invalid|fail(?:ed|ure)?|error|denied|reject(?:ed)?|missing|need|unknown command|too short)\b/i;
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      unsub();
+      reject(new Error('Connection timed out'));
+    }, 15000);
 
-function lastParam(msg: IRCMessage): string {
-  return msg.params[msg.params.length - 1] ?? '';
-}
+    const unsub = useOnyxStore.subscribe(
+      state => state.status,
+      status => {
+        if (status === 'connected') {
+          window.clearTimeout(timeout);
+          unsub();
+          resolve();
+        }
 
-async function waitForAccountRegister(password: string, sendRaw: (line: string) => void): Promise<void> {
-  const client = useOnyxStore.getState().client;
-  if (!client) throw new Error('Connection failed');
-
-  await new Promise<void>((resolve, reject) => {
-    let settled = false;
-    let timeout: ReturnType<typeof setTimeout>;
-
-    const cleanup = () => {
-      client.extraMessageHandlers.delete(handler);
-      clearTimeout(timeout);
-    };
-    const finish = (err?: Error) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      if (err) reject(err);
-      else resolve();
-    };
-    const handler = (msg: IRCMessage) => {
-      const text = lastParam(msg);
-      const command = msg.command.toUpperCase();
-
-      if (command === '421' && (msg.params[1] ?? '').toUpperCase() === 'ACCOUNT') {
-        finish(new Error(text || 'ACCOUNT REGISTER is not supported by this server'));
-        return;
-      }
-
-      if (/^[45]\d\d$/.test(command) && text) {
-        finish(new Error(text));
-        return;
-      }
-
-      if (command !== 'NOTICE' && command !== 'PRIVMSG' && !/^[29]\d\d$/.test(command)) return;
-      if (REGISTER_FAILURE_RE.test(text)) {
-        finish(new Error(text));
-        return;
-      }
-      if (REGISTER_SUCCESS_RE.test(text)) {
-        finish();
-      }
-    };
-
-    client.extraMessageHandlers.add(handler);
-    timeout = setTimeout(() => finish(new Error('Registration response timed out')), 15000);
-    sendRaw(`ACCOUNT REGISTER ${password}`);
+        if (status === 'error') {
+          window.clearTimeout(timeout);
+          unsub();
+          reject(new Error('Connection failed'));
+        }
+      },
+    );
   });
 }
 
-// ── Component ────────────────────────────────────────────────────────────────
-
 export default function RegisterForm({ onSwitch }: Props) {
-  const connect   = useOnyxStore(s => s.connect);
-  const sendRaw   = useOnyxStore(s => s.sendRaw);
+  const connect = useOnyxStore(s => s.connect);
+  const registerAccount = useOnyxStore(s => s.registerAccount);
+  const verifyAccount = useOnyxStore(s => s.verifyAccount);
+  const registerPending = useOnyxStore(s => s.registerPending);
+  const registerError = useOnyxStore(s => s.registerError);
+  const verifyRequired = useOnyxStore(s => s.verifyRequired);
 
-  const [step,          setStep]          = useState<Step>('fill');
-  const [nick,          setNick]          = useState('');
-  const [password,      setPassword]      = useState('');
-  const [confirm,       setConfirm]       = useState('');
-  const [showPassword,  setShowPassword]  = useState(false);
-  const [showConfirm,   setShowConfirm]   = useState(false);
-  const [server,        setServer]        = useState(DEFAULT_SERVER);
-  const [advanced,      setAdvanced]      = useState(false);
-  const [error,         setError]         = useState('');
-  const [shake,         setShake]         = useState(false);
-  const [loading,       setLoading]       = useState(false);
-
-  // Inline validation touched state
-  const [nickTouched,     setNickTouched]     = useState(false);
-  const [passwordTouched, setPasswordTouched] = useState(false);
-  const [confirmTouched,  setConfirmTouched]  = useState(false);
+  const [step, setStep] = useState<RegisterStep>(0);
+  const [direction, setDirection] = useState<1 | -1>(1);
+  const [nick, setNick] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [verifyCode, setVerifyCode] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [localError, setLocalError] = useState('');
+  const [shakeField, setShakeField] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const [complete, setComplete] = useState(false);
 
   const nickRef = useRef<HTMLInputElement>(null);
 
-  // Auto-focus nick field on mount
   useEffect(() => {
     nickRef.current?.focus();
   }, []);
 
-  const strength     = getPasswordStrength(password);
-  const passwordsMatch = confirm.length > 0 && password === confirm;
-  const passwordsMismatch = confirm.length > 0 && password !== confirm;
+  useEffect(() => {
+    if (!submitted || registerPending || registerError || verifyRequired) return;
+    setComplete(true);
+  }, [registerError, registerPending, submitted, verifyRequired]);
 
-  // Inline validation
-  const nickInline    = nickTouched && !nick.trim()    ? 'Nickname required' : '';
-  const pwInline      = passwordTouched && !password   ? 'Password required'
-                      : passwordTouched && password.length < 6 ? 'Minimum 6 characters' : '';
-  const confirmInline = confirmTouched && passwordsMismatch ? 'Passwords do not match' : '';
+  const cleanNick = nick.trim();
+  const nickError = cleanNick && !NICK_RE.test(cleanNick)
+    ? 'Use 1-30 IRC-safe characters'
+    : '';
+  const availability = useMemo(() => {
+    if (!cleanNick) return 'Enter a nickname';
+    if (nickError) return 'Not ready';
+    if (cleanNick.length < 3) return 'Still too short';
+    return 'Looks available';
+  }, [cleanNick, nickError]);
 
-  const triggerShake = () => {
-    setShake(true);
-    setTimeout(() => setShake(false), 600);
+  const strength = passwordStrength(password);
+  const strengthText = ['Add a password', 'Fragile', 'Usable', 'Strong', 'Lacquered'][strength];
+  const passwordError = password && password.length < 8 ? 'Use at least 8 characters' : '';
+  const confirmError = confirm && password !== confirm ? 'Passwords do not match' : '';
+  const activeError = localError || registerError || '';
+
+  const setStepSafely = (next: RegisterStep) => {
+    setDirection(next > step ? 1 : -1);
+    setStep(next);
+    setLocalError('');
   };
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    setNickTouched(true);
-    setPasswordTouched(true);
-    setConfirmTouched(true);
+  const shake = (field: string, message: string) => {
+    setLocalError(message);
+    setShakeField(field);
+    window.setTimeout(() => setShakeField(''), 240);
+  };
 
-    if (!nick.trim())         { setError('Nickname required'); triggerShake(); return; }
-    if (!password)            { setError('Password required'); triggerShake(); return; }
-    if (password.length < 6)  { setError('Password must be at least 6 characters'); triggerShake(); return; }
-    if (password !== confirm) { setError('Passwords do not match'); triggerShake(); return; }
-    setError('');
-    setLoading(true);
+  const next = () => {
+    if (step === 0) {
+      if (!cleanNick) return shake('nick', 'Nickname is required');
+      if (nickError || cleanNick.length < 3) return shake('nick', nickError || 'Use at least 3 characters');
+      return setStepSafely(1);
+    }
 
-    try {
-      // Connect without a password so we join as the requested nick (unregistered)
-      connect({ url: server.trim(), nick: nick.trim(), realname: nick.trim() });
-
-      // Wait for the connection to reach 'connected'. Guard against the race
-      // where status flips before subscribe() is called.
-      await new Promise<void>((resolve, reject) => {
-        // Check immediately in case already connected (shouldn't happen on a fresh
-        // connect, but guard it anyway)
-        if (useOnyxStore.getState().status === 'connected') { resolve(); return; }
-
-        const unsub = useOnyxStore.subscribe(
-          s => s.status,
-          s => {
-            if (s === 'connected') { unsub(); resolve(); }
-            if (s === 'error')     { unsub(); reject(new Error('Connection failed')); }
-          },
-        );
-        // 15 s hard timeout
-        setTimeout(() => { unsub(); reject(new Error('Connection timed out')); }, 15000);
-      });
-
-      // Ophion built-in services: ACCOUNT REGISTER <password>
-      // (no NickServ bot, no email parameter)
-      await waitForAccountRegister(password, sendRaw);
-      setStep('verify');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed');
-    } finally {
-      setLoading(false);
+    if (step === 1) {
+      if (!password) return shake('password', 'Password is required');
+      if (password.length < 8) return shake('password', 'Use at least 8 characters');
+      return setStepSafely(2);
     }
   };
 
-  if (step === 'verify') {
-    return (
-      <div className="verify-step animate-fade-in">
-        <div className="verify-icon" aria-hidden="true">
-          <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-            <circle cx="24" cy="24" r="22" fill="rgba(52,211,153,0.1)" stroke="var(--success)" strokeWidth="1.5" />
-            <path d="M14 24l7 7 13-14" stroke="var(--success)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-          </svg>
-        </div>
-        <h3 className="verify-title">Account created!</h3>
-        <p className="verify-text">
-          <strong className="verify-nick">{nick}</strong> is registered.
-          Sign in with your nickname and password to get started.
-        </p>
-        <p className="verify-subtext">
-          Your account is active immediately — no verification step needed.
-        </p>
-        <button className="link-btn" onClick={onSwitch}>Sign in →</button>
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
 
-        <style>{`
-          .verify-step { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 8px 0; text-align: center; }
-          .verify-icon { margin-bottom: 4px; animation: check-pop 0.4s cubic-bezier(0.34,1.56,0.64,1); }
-          @keyframes check-pop {
-            from { transform: scale(0.5); opacity: 0; }
-            to   { transform: scale(1); opacity: 1; }
-          }
-          .verify-title { font-size: 18px; font-weight: 700; color: var(--text-primary); margin: 0; }
-          .verify-text { font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin: 0; }
-          .verify-nick { color: var(--accent); font-weight: 600; }
-          .verify-subtext { font-size: 13px; color: var(--text-muted); margin: 0; }
-          .link-btn {
-            color: var(--accent);
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 14px;
-            margin-top: 4px;
-            font-family: inherit;
-            transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
-          }
-          .link-btn:hover {
-            color: var(--text-link-hover);
-            text-decoration: underline;
-            transform: translateY(-1px);
-            filter: brightness(1.06);
-          }
-          .link-btn:active {
-            transform: translateY(0);
-            opacity: 0.76;
-          }
-          @media (prefers-reduced-motion: reduce) {
-            .verify-step,
-            .verify-icon {
-              animation: none;
-            }
-            .link-btn {
-              transition-duration: 0.001ms;
-            }
-            .link-btn:hover,
-            .link-btn:active {
-              transform: none;
-            }
-          }
-        `}</style>
+    if (complete) {
+      onSwitch();
+      return;
+    }
+
+    if (verifyRequired) {
+      if (!verifyCode.trim()) {
+        shake('verify', 'Verification code is required');
+        return;
+      }
+      setSubmitted(true);
+      setLocalError('');
+      verifyAccount(cleanNick, verifyCode.trim());
+      return;
+    }
+
+    if (password !== confirm) {
+      shake('confirm', 'Passwords do not match');
+      return;
+    }
+
+    if (password.length < 8 || !cleanNick || nickError) {
+      shake('confirm', 'Check your identity and password first');
+      return;
+    }
+
+    try {
+      setSubmitted(true);
+      setLocalError('');
+      connect({ url: DEFAULT_SERVER, nick: cleanNick, realname: cleanNick });
+      await waitForConnected();
+      registerAccount(cleanNick, email.trim() || undefined, password);
+    } catch (error) {
+      setSubmitted(false);
+      shake('confirm', error instanceof Error ? error.message : 'Registration failed');
+    }
+  };
+
+  if (complete) {
+    return (
+      <div className="register-form register-complete" data-testid="register-complete">
+        <div className="complete-mark" aria-hidden="true">
+          <CheckIcon />
+        </div>
+        <p className="step-kicker label-caps">Registered</p>
+        <h3>Access created</h3>
+        <p><strong>{cleanNick}</strong> is ready for Ocean. Sign in with the same password to enter.</p>
+        <button type="button" className="lux-button" onClick={onSwitch}>Sign in</button>
+        <RegisterStyles />
       </div>
     );
   }
 
   return (
-    <form onSubmit={submit} className={`auth-form-fields${shake ? ' form-shake' : ''}`} noValidate>
-      <div className="register-brand">
-        <div className="register-brand-mark" aria-hidden="true">
-          <span className="register-brand-core" />
-        </div>
-        <div className="register-brand-copy">
-          <span className="register-kicker">Ocean registry</span>
-          <h1 className="register-title">Claim the midnight</h1>
-          <p className="register-subtitle">eshmaki.me IRC account</p>
-        </div>
+    <form
+      className="register-form"
+      data-testid="register-form"
+      data-direction={direction}
+      onSubmit={submit}
+      noValidate
+    >
+      <div className="stepper" aria-label={`Step ${step + 1} of 3`}>
+        {STEP_LABELS.map((label, index) => (
+          <button
+            key={label}
+            type="button"
+            className="step-dot"
+            data-active={index === step}
+            data-done={index < step}
+            disabled={index > step}
+            onClick={() => setStepSafely(index as RegisterStep)}
+          >
+            <span>{index + 1}</span>
+            {label}
+          </button>
+        ))}
       </div>
 
-      {/* Username */}
-      <FormField label="Username" required>
-        <div className="input-wrap">
-          <span className="input-icon input-icon--left" aria-hidden="true">
-            <IconUser />
-          </span>
-          <input
-            ref={nickRef}
-            type="text"
-            placeholder="coolname"
-            value={nick}
-            onChange={e => setNick(e.target.value)}
-            onBlur={() => setNickTouched(true)}
-            autoComplete="username"
-            maxLength={30}
-            className={`onyx-input onyx-input--has-icon${nickInline ? ' onyx-input--error' : ''}`}
-            disabled={loading}
-          />
-        </div>
-        {nickInline && <span className="field-hint field-hint--error">{nickInline}</span>}
-      </FormField>
-
-      {/* Password */}
-      <FormField label="Password" required>
-        <div className="input-wrap">
-          <span className="input-icon input-icon--left" aria-hidden="true">
-            <IconLock />
-          </span>
-          <input
-            type={showPassword ? 'text' : 'password'}
-            placeholder="••••••••"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            onBlur={() => setPasswordTouched(true)}
-            autoComplete="new-password"
-            className={`onyx-input onyx-input--has-icon onyx-input--has-icon-right${pwInline ? ' onyx-input--error' : ''}`}
-            disabled={loading}
-          />
-          <button
-            type="button"
-            className="eye-toggle"
-            onClick={() => setShowPassword(v => !v)}
-            aria-label={showPassword ? 'Hide password' : 'Show password'}
-            tabIndex={-1}
-          >
-            <IconEye off={showPassword} />
-          </button>
-        </div>
-        {/* Password strength bar */}
-        {password.length > 0 && (
-          <div className="strength-wrap" aria-label={`Password strength: ${STRENGTH_LABELS[strength]}`}>
-            <div className="strength-bar">
-              <div className={`strength-fill strength-fill--${strength}`} />
+      <div className="slide-lock">
+        {step === 0 && (
+          <section className="step-panel" data-testid="register-step-identity">
+            <p className="step-kicker label-caps">Step 1</p>
+            <h3>Choose your identity</h3>
+            <FloatingField label="Nickname" active={Boolean(nick)} error={shakeField === 'nick' || Boolean(nickError)}>
+              <input
+                ref={nickRef}
+                data-testid="register-nick"
+                value={nick}
+                onChange={event => {
+                  setNick(event.target.value);
+                  setLocalError('');
+                }}
+                autoComplete="username"
+                maxLength={30}
+              />
+            </FloatingField>
+            <div className="availability" data-state={!cleanNick || nickError || cleanNick.length < 3 ? 'pending' : 'available'}>
+              <span aria-hidden="true" />
+              {availability}
             </div>
-            <span className={`strength-label strength-label--${strength}`}>
-              {STRENGTH_LABELS[strength]}
-            </span>
-          </div>
+            <FloatingField label="Recovery email" active={Boolean(email)} aside="Optional">
+              <input
+                data-testid="register-email"
+                value={email}
+                type="email"
+                onChange={event => setEmail(event.target.value)}
+                autoComplete="email"
+              />
+            </FloatingField>
+          </section>
         )}
-        {pwInline && <span className="field-hint field-hint--error">{pwInline}</span>}
-      </FormField>
 
-      {/* Confirm password */}
-      <FormField label="Confirm Password" required>
-        <div className="input-wrap">
-          <span className="input-icon input-icon--left" aria-hidden="true">
-            <IconLock />
-          </span>
-          <input
-            type={showConfirm ? 'text' : 'password'}
-            placeholder="••••••••"
-            value={confirm}
-            onChange={e => setConfirm(e.target.value)}
-            onBlur={() => setConfirmTouched(true)}
-            autoComplete="new-password"
-            className={`onyx-input onyx-input--has-icon onyx-input--has-icon-right${confirmInline ? ' onyx-input--error' : passwordsMatch ? ' onyx-input--success' : ''}`}
-            disabled={loading}
-          />
-          {passwordsMatch ? (
-            <span className="confirm-check">
-              <IconCheck />
-            </span>
-          ) : (
-            <button
-              type="button"
-              className="eye-toggle"
-              onClick={() => setShowConfirm(v => !v)}
-              aria-label={showConfirm ? 'Hide password' : 'Show password'}
-              tabIndex={-1}
-            >
-              <IconEye off={showConfirm} />
-            </button>
-          )}
-        </div>
-        {confirmInline && <span className="field-hint field-hint--error">{confirmInline}</span>}
-        {passwordsMatch && <span className="field-hint field-hint--success">Passwords match</span>}
-      </FormField>
+        {step === 1 && (
+          <section className="step-panel" data-testid="register-step-password">
+            <p className="step-kicker label-caps">Step 2</p>
+            <h3>Set the key</h3>
+            <FloatingField label="Password" active={Boolean(password)} error={shakeField === 'password' || Boolean(passwordError)}>
+              <input
+                data-testid="register-password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={event => {
+                  setPassword(event.target.value);
+                  setLocalError('');
+                }}
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                className="field-icon-button"
+                onClick={() => setShowPassword(value => !value)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+              </button>
+            </FloatingField>
+            <div className="strength" aria-label={`Password strength: ${strengthText}`}>
+              {[1, 2, 3, 4].map(segment => (
+                <span key={segment} data-lit={segment <= strength} data-level={strength} />
+              ))}
+            </div>
+            <p className="strength-copy">{strengthText}</p>
+          </section>
+        )}
 
-      {/* Advanced toggle */}
-      <button
-        type="button"
-        className="advanced-toggle"
-        onClick={() => setAdvanced(a => !a)}
-      >
-        <span className={`advanced-arrow${advanced ? ' open' : ''}`} aria-hidden="true">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-            <path d="M3 2l4 3-4 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </span>
-        Advanced
-      </button>
+        {step === 2 && (
+          <section className="step-panel" data-testid="register-step-confirm">
+            <p className="step-kicker label-caps">Step 3</p>
+            <h3>{verifyRequired ? 'Verify access' : 'Confirm access'}</h3>
+            {!verifyRequired ? (
+              <>
+                <FloatingField label="Confirm password" active={Boolean(confirm)} error={shakeField === 'confirm' || Boolean(confirmError)}>
+                  <input
+                    data-testid="register-confirm"
+                    type={showConfirm ? 'text' : 'password'}
+                    value={confirm}
+                    onChange={event => {
+                      setConfirm(event.target.value);
+                      setLocalError('');
+                    }}
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    className="field-icon-button"
+                    onClick={() => setShowConfirm(value => !value)}
+                    aria-label={showConfirm ? 'Hide password' : 'Show password'}
+                  >
+                    {showConfirm ? <EyeOffIcon /> : <EyeIcon />}
+                  </button>
+                </FloatingField>
+                <div className="confirm-card elev-1">
+                  <span className="label-caps">Account</span>
+                  <strong>{cleanNick || 'nickname'}</strong>
+                  <small>{email.trim() || 'No recovery email'}</small>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="verify-copy">
+                  The server requested a verification code before activating <strong>{cleanNick}</strong>.
+                </p>
+                <FloatingField label="Verification code" active={Boolean(verifyCode)} error={shakeField === 'verify'}>
+                  <input
+                    data-testid="register-verify"
+                    value={verifyCode}
+                    onChange={event => {
+                      setVerifyCode(event.target.value);
+                      setLocalError('');
+                    }}
+                    autoComplete="one-time-code"
+                  />
+                </FloatingField>
+              </>
+            )}
+          </section>
+        )}
+      </div>
 
-      {advanced && (
-        <FormField label="Server">
-          <div className="input-wrap">
-            <span className="input-icon input-icon--left" aria-hidden="true">
-              <IconServer />
-            </span>
-            <input
-              type="text"
-              placeholder="wss://server/gateway"
-              value={server}
-              onChange={e => setServer(e.target.value)}
-              className="onyx-input onyx-input--has-icon onyx-input--mono"
-              disabled={loading}
-            />
-          </div>
-        </FormField>
+      {activeError && (
+        <p className="form-error" role="alert" data-testid="register-error">
+          {activeError}
+        </p>
       )}
 
-      {error && (
-        <div className="auth-error" role="alert">
-          <span className="auth-error-icon" aria-hidden="true">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.3" fill="none" />
-              <path d="M7 4v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-              <circle cx="7" cy="10" r="0.8" fill="currentColor" />
-            </svg>
-          </span>
-          {error}
-        </div>
-      )}
+      <div className="register-actions">
+        {step > 0 && !verifyRequired && (
+          <button type="button" className="quiet-button" onClick={() => setStepSafely((step - 1) as RegisterStep)}>
+            Back
+          </button>
+        )}
+        {step < 2 ? (
+          <button type="button" className="lux-button" onClick={next}>
+            Continue
+          </button>
+        ) : (
+          <button type="submit" className="lux-button" disabled={registerPending} data-testid="register-submit">
+            {registerPending ? 'Creating' : verifyRequired ? 'Verify' : 'Create account'}
+          </button>
+        )}
+      </div>
 
-      <Button type="submit" variant="primary" fullWidth loading={loading} className="register-submit">
-        {loading ? (
-          <span className="btn-loading-inner">
-            <IconSpinner />
-            Creating account…
-          </span>
-        ) : 'Create Account'}
-      </Button>
-
-      <p className="switch-link">
-        Already have an account?{' '}
-        <button type="button" className="link-btn" onClick={onSwitch}>
-          Sign in
-        </button>
+      <p className="switch-line">
+        Already registered? <button type="button" onClick={onSwitch}>Sign in</button>
       </p>
 
-      <style>{`
-        .auth-form-fields {
-          display: flex;
-          flex-direction: column;
-          gap: 15px;
-        }
-
-        .register-brand {
-          display: grid;
-          grid-template-columns: auto 1fr;
-          align-items: center;
-          gap: 14px;
-          padding: 2px 0 6px;
-        }
-        .register-brand-mark {
-          width: 46px;
-          height: 46px;
-          border-radius: var(--r-lg);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background:
-            linear-gradient(145deg, color-mix(in srgb, var(--gold) 16%, var(--bg-overlay)), var(--bg-base)),
-            var(--bg-base);
-          border: 1px solid var(--accent-border);
-          box-shadow:
-            inset 0 1px 0 rgba(255,255,255,0.08),
-            0 12px 24px rgba(0,0,0,0.28),
-            0 0 26px var(--accent-glow);
-          position: relative;
-          overflow: hidden;
-          transition: transform var(--t-normal) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
-        }
-        .register-brand-mark::before,
-        .register-brand-mark::after {
-          content: '';
-          position: absolute;
-          inset: 8px;
-          border: 1px solid var(--border-normal);
-          border-radius: 50%;
-          opacity: 0.74;
-        }
-        .register-brand-mark::after {
-          inset: 15px;
-          border-color: var(--gold);
-          opacity: 0.5;
-        }
-        .register-brand-core {
-          width: 9px;
-          height: 9px;
-          border-radius: 50%;
-          background: var(--gold);
-          box-shadow:
-            0 0 0 5px var(--gold-subtle),
-            0 0 22px var(--gold);
-          z-index: 1;
-        }
-        .auth-form-fields:hover .register-brand-mark {
-          transform: translateY(-1px) scale(1.02);
-          filter: brightness(1.05);
-        }
-        .register-brand-copy {
-          min-width: 0;
-        }
-        .register-kicker {
-          display: block;
-          margin-bottom: 2px;
-          font-size: 10px;
-          font-weight: 850;
-          letter-spacing: 0;
-          line-height: 1.1;
-          text-transform: uppercase;
-          color: var(--gold);
-        }
-        .register-title {
-          margin: 0;
-          color: var(--text-primary);
-          font-size: 34px;
-          font-weight: 900;
-          line-height: 0.98;
-          letter-spacing: 0;
-        }
-        .register-subtitle {
-          margin: 7px 0 0;
-          color: var(--text-muted);
-          font-size: 13px;
-          font-weight: 550;
-        }
-
-        /* ── Shake animation on submit failure ── */
-        @keyframes form-shake {
-          0%, 100% { transform: translateX(0); }
-          15%       { transform: translateX(-5px); }
-          30%       { transform: translateX(5px); }
-          45%       { transform: translateX(-4px); }
-          60%       { transform: translateX(4px); }
-          75%       { transform: translateX(-2px); }
-          90%       { transform: translateX(2px); }
-        }
-        .form-shake { animation: form-shake 0.55s cubic-bezier(0.36,0.07,0.19,0.97) both; }
-
-        /* ── Input wrapper ── */
-        .input-wrap {
-          position: relative;
-          display: flex;
-          align-items: center;
-          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
-        }
-        .input-wrap:hover {
-          transform: translateY(-1px);
-          filter: brightness(1.04);
-        }
-        .input-wrap:focus-within {
-          transform: translateY(-1px);
-          filter: brightness(1.08);
-        }
-
-        /* ── Input icon ── */
-        .input-icon {
-          position: absolute;
-          top: 50%;
-          transform: translateY(-50%);
-          display: flex;
-          align-items: center;
-          pointer-events: none;
-          color: var(--text-muted);
-          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
-          z-index: 1;
-        }
-        .input-icon--left { left: 13px; }
-        .input-wrap:focus-within .input-icon--left {
-          color: var(--accent);
-          transform: translateY(-50%) scale(1.04);
-          filter: drop-shadow(0 0 8px var(--accent-glow));
-        }
-
-        /* ── Base input ── */
-        .onyx-input {
-          width: 100%;
-          height: 46px;
-          padding: 0 14px;
-          background:
-            linear-gradient(180deg, color-mix(in srgb, var(--bg-elevated) 42%, transparent), transparent),
-            var(--bg-base);
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-lg);
-          color: var(--text-primary);
-          font-size: 14px;
-          font-family: inherit;
-          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
-          box-sizing: border-box;
-          box-shadow:
-            inset 0 1px 0 rgba(255,255,255,0.035),
-            0 1px 0 rgba(0,0,0,0.22);
-        }
-        .onyx-input::placeholder {
-          color: var(--text-muted);
-          opacity: 0.62;
-        }
-        .onyx-input--has-icon { padding-left: 40px; }
-        .onyx-input--has-icon-right { padding-right: 44px; }
-        .onyx-input--mono {
-          font-family: var(--font-mono, 'ui-monospace', monospace);
-          font-size: 13px;
-          letter-spacing: 0;
-        }
-
-        /* Focus — accent glow ring */
-        .onyx-input:focus {
-          outline: none;
-          background: var(--bg-elevated);
-          border-color: var(--accent);
-          box-shadow:
-            inset 0 1px 0 rgba(255,255,255,0.06),
-            0 0 0 1px var(--accent-border),
-            0 0 0 4px var(--accent-subtle),
-            0 12px 28px rgba(0,0,0,0.18);
-        }
-        .onyx-input:hover:not(:focus):not(:disabled) {
-          border-color: var(--accent-border);
-          background: var(--bg-elevated);
-        }
-        .onyx-input:active:not(:disabled) {
-          filter: brightness(0.98);
-        }
-        .onyx-input:disabled { opacity: 0.45; cursor: not-allowed; }
-
-        /* Error state */
-        .onyx-input--error {
-          border-color: rgba(248,113,113,0.6);
-          background: rgba(248,113,113,0.03);
-        }
-        .onyx-input--error:focus {
-          border-color: var(--danger);
-          box-shadow: 0 0 0 4px rgba(248,113,113,0.15);
-        }
-
-        /* Success state */
-        .onyx-input--success {
-          border-color: rgba(52,211,153,0.5);
-          background: rgba(52,211,153,0.03);
-        }
-        .onyx-input--success:focus {
-          border-color: var(--success);
-          box-shadow: 0 0 0 4px rgba(52,211,153,0.12);
-        }
-
-        /* Field hints */
-        .field-hint { display: block; font-size: 12px; margin-top: 5px; }
-        .field-hint--error   { color: var(--danger); }
-        .field-hint--success { color: var(--success); }
-
-        /* ── Password strength bar ── */
-        .strength-wrap {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          margin-top: 7px;
-        }
-        .strength-bar {
-          flex: 1;
-          height: 3px;
-          background: var(--border-subtle);
-          border-radius: var(--r-full);
-          overflow: hidden;
-        }
-        .strength-fill {
-          height: 100%;
-          width: 100%;
-          border-radius: var(--r-full);
-          transform-origin: left center;
-          transition: transform var(--t-normal) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
-        }
-        .strength-fill--none   { transform: scaleX(0); background: transparent; }
-        .strength-fill--weak   { transform: scaleX(0.33); background: var(--danger); }
-        .strength-fill--medium { transform: scaleX(0.66); background: var(--warning); }
-        .strength-fill--strong { transform: scaleX(1); background: var(--success); }
-
-        .strength-label {
-          font-size: 11px;
-          font-weight: 600;
-          letter-spacing: 0;
-          min-width: 40px;
-          text-align: right;
-        }
-        .strength-label--weak   { color: var(--danger); }
-        .strength-label--medium { color: var(--warning); }
-        .strength-label--strong { color: var(--success); }
-
-        /* ── Password visibility toggle ── */
-        .eye-toggle {
-          position: absolute;
-          right: 10px;
-          top: 50%;
-          transform: translateY(-50%);
-          width: 30px;
-          height: 30px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: none;
-          border: none;
-          cursor: pointer;
-          color: var(--text-muted);
-          border-radius: var(--r-sm);
-          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
-          z-index: 2;
-          padding: 0;
-        }
-        .eye-toggle:hover {
-          color: var(--text-secondary);
-          background: rgba(14,165,233,0.08);
-          transform: translateY(-50%) scale(1.04);
-          filter: brightness(1.08);
-        }
-        .eye-toggle:active {
-          transform: translateY(-50%) scale(0.96);
-          filter: brightness(0.92);
-        }
-        .eye-toggle:focus-visible {
-          outline: 2px solid var(--accent);
-          outline-offset: 1px;
-        }
-
-        /* ── Confirm checkmark ── */
-        .confirm-check {
-          position: absolute;
-          right: 10px;
-          top: 50%;
-          transform: translateY(-50%);
-          display: flex;
-          align-items: center;
-          pointer-events: none;
-          z-index: 2;
-          animation: check-pop 0.25s cubic-bezier(0.34,1.56,0.64,1);
-        }
-        @keyframes check-pop {
-          from { transform: translateY(-50%) scale(0.6); opacity: 0; }
-          to   { transform: translateY(-50%) scale(1); opacity: 1; }
-        }
-
-        /* ── Advanced toggle ── */
-        .advanced-toggle {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 13px;
-          color: var(--text-secondary);
-          background: none;
-          border: none;
-          cursor: pointer;
-          padding: 1px 0 2px;
-          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
-          align-self: flex-start;
-          font-family: inherit;
-        }
-        .advanced-toggle:hover {
-          color: var(--text-primary);
-          transform: translateY(-1px);
-          filter: brightness(1.06);
-        }
-        .advanced-toggle:active {
-          transform: translateY(0);
-          opacity: 0.76;
-        }
-        .advanced-arrow {
-          display: inline-block;
-          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
-          font-size: 11px;
-        }
-        .advanced-arrow.open { transform: rotate(90deg); }
-
-        /* ── Error banner ── */
-        .auth-error {
-          display: flex;
-          align-items: flex-start;
-          gap: 8px;
-          padding: 10px 14px;
-          background: rgba(248,113,113,0.07);
-          border: 1px solid rgba(248,113,113,0.3);
-          border-radius: var(--r-md);
-          color: var(--danger);
-          font-size: 13px;
-          line-height: 1.5;
-          animation: fadeIn 180ms var(--ease-out);
-        }
-        .auth-error-icon {
-          flex-shrink: 0;
-          margin-top: 1px;
-          display: flex;
-        }
-
-        /* ── Footer links ── */
-        .switch-link {
-          text-align: center;
-          font-size: 13px;
-          color: var(--text-secondary);
-          margin: 0;
-          padding-top: 1px;
-        }
-        .link-btn {
-          color: var(--accent);
-          background: none;
-          border: none;
-          cursor: pointer;
-          font-size: inherit;
-          font-family: inherit;
-          padding: 2px 3px;
-          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
-        }
-        .link-btn:hover {
-          color: var(--text-link-hover);
-          text-decoration: underline;
-          transform: translateY(-1px);
-          filter: brightness(1.06);
-        }
-        .link-btn:active {
-          transform: translateY(0);
-          opacity: 0.76;
-        }
-
-        /* ── Spinner in button ── */
-        .btn-loading-inner {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-        }
-        .spin-icon {
-          animation: spin-anim 0.8s linear infinite;
-        }
-        @keyframes spin-anim {
-          from { transform: rotate(0deg); }
-          to   { transform: rotate(360deg); }
-        }
-
-        .auth-form-fields .btn {
-          height: 46px;
-          border-radius: var(--r-lg);
-          transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
-        }
-        .auth-form-fields .register-submit {
-          margin-top: 2px;
-          letter-spacing: 0;
-          text-transform: uppercase;
-          box-shadow:
-            0 10px 24px rgba(0,0,0,0.34),
-            0 0 0 1px rgba(255,255,255,0.09) inset,
-            0 0 24px var(--accent-glow);
-        }
-        .auth-form-fields .register-submit:hover:not(:disabled) {
-          transform: translateY(-1px);
-          filter: brightness(1.05) drop-shadow(0 8px 20px var(--accent-glow));
-        }
-        .auth-form-fields .register-submit:active:not(:disabled) {
-          transform: translateY(0) scale(0.99);
-          filter: brightness(0.95);
-        }
-
-        @media (max-width: 420px) {
-          .register-brand {
-            gap: 12px;
-          }
-          .register-brand-mark {
-            width: 42px;
-            height: 42px;
-          }
-          .register-title {
-            font-size: 27px;
-          }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          .form-shake,
-          .confirm-check,
-          .spin-icon,
-          .auth-error {
-            animation: none;
-          }
-          .register-brand-mark,
-          .input-wrap,
-          .input-icon,
-          .onyx-input,
-          .strength-fill,
-          .eye-toggle,
-          .advanced-toggle,
-          .advanced-arrow,
-          .auth-form-fields .btn,
-          .link-btn {
-            transition-duration: 0.001ms;
-          }
-          .auth-form-fields:hover .register-brand-mark,
-          .input-wrap:hover,
-          .input-wrap:focus-within,
-          .input-wrap:focus-within .input-icon--left,
-          .eye-toggle:hover,
-          .eye-toggle:active,
-          .advanced-toggle:hover,
-          .advanced-toggle:active,
-          .auth-form-fields .register-submit:hover:not(:disabled),
-          .auth-form-fields .register-submit:active:not(:disabled),
-          .link-btn:hover,
-          .link-btn:active {
-            transform: none;
-          }
-        }
-      `}</style>
+      <RegisterStyles />
     </form>
+  );
+}
+
+function FloatingField({
+  active,
+  aside,
+  children,
+  error,
+  label,
+}: {
+  active: boolean;
+  aside?: string;
+  children: ReactNode;
+  error?: boolean;
+  label: string;
+}) {
+  return (
+    <label className="float-field" data-active={active} data-error={Boolean(error)}>
+      <span className="float-label">{label}</span>
+      {children}
+      {aside && <span className="float-aside">{aside}</span>}
+    </label>
+  );
+}
+
+function RegisterStyles() {
+  return (
+    <style>{`
+      .register-form {
+        display: flex;
+        flex-direction: column;
+        gap: var(--sp-4, 16px);
+      }
+
+      .stepper {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: var(--sp-2, 8px);
+      }
+
+      .step-dot {
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: var(--sp-2, 8px);
+        border: 0;
+        border-radius: var(--r-lg, 12px) var(--r-sm, 6px) var(--r-md, 8px) var(--r-xs, 4px);
+        background: color-mix(in srgb, var(--bg-base) 88%, var(--lux) 12%);
+        color: var(--text-muted);
+        cursor: pointer;
+        font: inherit;
+        font-size: var(--text-xs, .75rem);
+        font-weight: 800;
+        padding: var(--sp-2, 8px);
+      }
+
+      .step-dot span {
+        width: 20px;
+        height: 20px;
+        display: grid;
+        place-items: center;
+        border-radius: var(--r-xs, 4px);
+        background: color-mix(in srgb, var(--text-muted) 14%, transparent);
+        color: var(--text-secondary);
+      }
+
+      .step-dot[data-active="true"] {
+        color: var(--lux);
+        background: color-mix(in srgb, var(--lux) 13%, var(--bg-elevated));
+      }
+
+      .step-dot[data-active="true"] span,
+      .step-dot[data-done="true"] span {
+        background: var(--lux);
+        color: var(--bg-void);
+      }
+
+      .step-dot:disabled {
+        cursor: not-allowed;
+        opacity: .48;
+      }
+
+      .slide-lock {
+        min-height: 274px;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .step-panel {
+        display: flex;
+        flex-direction: column;
+        gap: var(--sp-4, 16px);
+        animation: step-slide var(--t-surface, 220ms) var(--ease-out) both;
+      }
+
+      .register-form[data-direction="-1"] .step-panel {
+        animation-name: step-slide-back;
+      }
+
+      @keyframes step-slide {
+        from { opacity: 0; transform: translateX(18px); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+
+      @keyframes step-slide-back {
+        from { opacity: 0; transform: translateX(-18px); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+
+      .step-kicker,
+      .step-panel h3,
+      .register-complete h3,
+      .register-complete p {
+        margin: 0;
+      }
+
+      .step-panel h3,
+      .register-complete h3 {
+        font-family: var(--font-display);
+        font-size: var(--text-2xl, 1.5rem);
+        line-height: 1.1;
+        color: var(--text-primary);
+      }
+
+      .float-field {
+        position: relative;
+        display: block;
+      }
+
+      .float-field input {
+        width: 100%;
+        height: 54px;
+        border: 0;
+        border-radius: var(--r-lg, 12px) var(--r-sm, 6px) var(--r-md, 8px) var(--r-lg, 12px);
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.035), transparent),
+          color-mix(in srgb, var(--bg-base) 94%, var(--lux) 6%);
+        color: var(--text-primary);
+        caret-color: var(--lux);
+        font: inherit;
+        font-size: var(--text-md, .9375rem);
+        padding: 18px 48px 6px 16px;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.045), 0 1px 0 rgba(0,0,0,.26);
+        outline: 1px solid color-mix(in srgb, var(--border-normal) 70%, transparent);
+        outline-offset: -1px;
+        transition: outline-color var(--t-control, 150ms) var(--ease-out), background var(--t-control, 150ms) var(--ease-out), transform var(--t-control, 150ms) var(--ease-out);
+      }
+
+      .float-field[data-error="true"] input {
+        animation: field-shake var(--t-surface, 220ms) var(--ease-out);
+        outline-color: color-mix(in srgb, var(--danger) 78%, transparent);
+      }
+
+      @keyframes field-shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-2px); }
+        50% { transform: translateX(2px); }
+        75% { transform: translateX(-2px); }
+      }
+
+      .float-field input:focus {
+        outline-color: var(--lux);
+        background: color-mix(in srgb, var(--bg-elevated) 92%, var(--lux) 8%);
+      }
+
+      .float-label {
+        position: absolute;
+        left: 16px;
+        top: 17px;
+        z-index: 1;
+        color: var(--text-muted);
+        font-size: var(--text-sm, .8125rem);
+        font-weight: 760;
+        pointer-events: none;
+        transform-origin: left center;
+        transition: transform var(--t-control, 150ms) var(--ease-out), color var(--t-control, 150ms) var(--ease-out);
+      }
+
+      .float-field:focus-within .float-label,
+      .float-field[data-active="true"] .float-label {
+        color: var(--lux);
+        transform: translateY(-11px) scale(.78);
+      }
+
+      .float-aside {
+        position: absolute;
+        right: 15px;
+        top: 50%;
+        color: var(--text-muted);
+        font-size: var(--text-2xs, .6875rem);
+        font-weight: 850;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        transform: translateY(-50%);
+      }
+
+      .field-icon-button {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        width: 34px;
+        height: 34px;
+        display: grid;
+        place-items: center;
+        border: 0;
+        border-radius: var(--r-sm, 6px);
+        background: transparent;
+        color: var(--text-muted);
+        cursor: pointer;
+        transform: translateY(-50%);
+      }
+
+      .availability {
+        display: flex;
+        align-items: center;
+        gap: var(--sp-2, 8px);
+        color: var(--text-muted);
+        font-size: var(--text-sm, .8125rem);
+        font-weight: 700;
+      }
+
+      .availability span {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--warning, #f59e0b);
+      }
+
+      .availability[data-state="available"] {
+        color: var(--status-online, #3ba55d);
+      }
+
+      .availability[data-state="available"] span {
+        background: var(--status-online, #3ba55d);
+      }
+
+      .strength {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: var(--sp-2, 8px);
+      }
+
+      .strength span {
+        height: 7px;
+        border-radius: var(--r-xs, 4px);
+        background: color-mix(in srgb, var(--text-muted) 18%, transparent);
+      }
+
+      .strength span[data-lit="true"][data-level="1"] { background: var(--danger); }
+      .strength span[data-lit="true"][data-level="2"] { background: var(--warning); }
+      .strength span[data-lit="true"][data-level="3"] { background: color-mix(in srgb, var(--lux) 76%, var(--status-online)); }
+      .strength span[data-lit="true"][data-level="4"] { background: var(--status-online, #3ba55d); }
+
+      .strength-copy,
+      .verify-copy,
+      .form-error,
+      .switch-line,
+      .register-complete p {
+        margin: 0;
+        color: var(--text-secondary);
+        font-size: var(--text-sm, .8125rem);
+        line-height: 1.5;
+      }
+
+      .form-error {
+        color: var(--danger);
+        padding: var(--sp-3, 12px);
+        border-radius: var(--r-md, 8px) var(--r-xs, 4px) var(--r-md, 8px) var(--r-sm, 6px);
+        background: color-mix(in srgb, var(--danger) 10%, transparent);
+        box-shadow: inset 2px 0 0 var(--danger);
+      }
+
+      .confirm-card {
+        display: flex;
+        flex-direction: column;
+        gap: var(--sp-1, 4px);
+        padding: var(--sp-4, 16px);
+        border-radius: var(--r-lg, 12px) var(--r-sm, 6px) var(--r-md, 8px) var(--r-lg, 12px);
+        background: var(--bg-elevated);
+      }
+
+      .confirm-card strong {
+        color: var(--text-primary);
+        font-family: var(--font-display);
+        font-size: var(--text-xl, 1.25rem);
+      }
+
+      .confirm-card small {
+        color: var(--text-muted);
+      }
+
+      .register-actions {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: var(--sp-3, 12px);
+        align-items: center;
+      }
+
+      .register-actions .lux-button {
+        grid-column: 2;
+      }
+
+      .register-actions .lux-button:first-child {
+        grid-column: 1 / -1;
+      }
+
+      .lux-button,
+      .quiet-button {
+        height: 48px;
+        border: 0;
+        border-radius: var(--r-md, 8px) var(--r-lg, 12px) var(--r-sm, 6px) var(--r-md, 8px);
+        cursor: pointer;
+        font: inherit;
+        font-size: var(--text-sm, .8125rem);
+        font-weight: 850;
+      }
+
+      .lux-button {
+        background: color-mix(in srgb, var(--accent) 88%, black 12%);
+        color: white;
+        letter-spacing: .05em;
+        text-transform: uppercase;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 16px 28px rgba(0,0,0,.28);
+      }
+
+      .quiet-button {
+        min-width: 92px;
+        padding: 0 var(--sp-4, 16px);
+        background: color-mix(in srgb, var(--bg-base) 88%, var(--lux) 12%);
+        color: var(--text-secondary);
+      }
+
+      .lux-button:hover:not(:disabled),
+      .lux-button:focus-visible,
+      .quiet-button:hover,
+      .quiet-button:focus-visible {
+        filter: brightness(1.06);
+        outline: none;
+      }
+
+      .lux-button:disabled {
+        cursor: wait;
+        opacity: .62;
+      }
+
+      .switch-line {
+        color: var(--text-muted);
+        text-align: center;
+      }
+
+      .switch-line button {
+        border: 0;
+        background: transparent;
+        color: var(--lux);
+        cursor: pointer;
+        font: inherit;
+        font-weight: 760;
+      }
+
+      .register-complete {
+        align-items: center;
+        text-align: center;
+        padding-top: var(--sp-8, 32px);
+      }
+
+      .complete-mark {
+        width: 64px;
+        height: 64px;
+        display: grid;
+        place-items: center;
+        border-radius: var(--r-2xl, 20px) var(--r-md, 8px) var(--r-lg, 12px) var(--r-sm, 6px);
+        background: color-mix(in srgb, var(--status-online) 14%, var(--bg-elevated));
+        color: var(--status-online);
+      }
+
+      .complete-mark svg {
+        width: 34px;
+        height: 34px;
+      }
+
+      @media (max-width: 380px) {
+        .step-dot {
+          flex-direction: column;
+          gap: var(--sp-1, 4px);
+          font-size: var(--text-2xs, .6875rem);
+        }
+
+        .slide-lock {
+          min-height: 300px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .step-panel,
+        .float-field[data-error="true"] input,
+        .float-field input,
+        .float-label {
+          animation: none;
+          transition-duration: .001ms;
+        }
+      }
+    `}</style>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M5 12.5 9.2 17 19 7" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden="true">
+      <path d="M2.5 8.5s2.35-4 6-4 6 4 6 4-2.35 4-6 4-6-4-6-4Z" stroke="currentColor" strokeWidth="1.35" />
+      <circle cx="8.5" cy="8.5" r="1.9" stroke="currentColor" strokeWidth="1.35" />
+    </svg>
+  );
+}
+
+function EyeOffIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden="true">
+      <path d="M3 3l11 11" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
+      <path d="M6.5 4.8a6.7 6.7 0 0 1 2-.3c3.65 0 6 4 6 4a9.5 9.5 0 0 1-1.8 2.1M4.4 6.1A9.4 9.4 0 0 0 2.5 8.5s2.35 4 6 4c.82 0 1.58-.2 2.25-.52" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
+    </svg>
   );
 }

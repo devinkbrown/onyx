@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import Avatar from '@/components/ui/Avatar';
-import { useDialogFocus } from './useDialogFocus';
+import ModalShell from './ModalShell';
 
 export default function ForwardMessageModal() {
   const forwardingMessage  = useOnyxStore(s => s.forwardingMessage);
@@ -17,8 +17,6 @@ export default function ForwardMessageModal() {
   const [selected, setSelected] = useState<string | null>(null);
   const [comment, setComment]   = useState('');
   const inputRef  = useRef<HTMLInputElement>(null);
-  const modalRef  = useRef<HTMLDivElement>(null);
-  useDialogFocus(modalRef);
 
   const close = useCallback(() => {
     setForwardingMessage(null);
@@ -31,15 +29,6 @@ export default function ForwardMessageModal() {
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
-
-  // Escape to close
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [close]);
 
   interface Destination {
     id: string;
@@ -90,20 +79,29 @@ export default function ForwardMessageModal() {
   if (!forwardingMessage) return null;
 
   return (
-    <div
-      className="fwd-backdrop"
-      onClick={e => { if (e.target === e.currentTarget) close(); }}
-    >
-      <div className="fwd-modal" ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="fwd-modal-title">
-
-        {/* Header */}
-        <div className="fwd-header">
-          <h2 id="fwd-modal-title" className="fwd-title">Forward Message</h2>
-          <button className="fwd-close" onClick={close} aria-label="Close">
-            <CloseIcon />
+    <ModalShell
+      onClose={close}
+      title="Forward Message"
+      kicker="Share"
+      titleId="fwd-modal-title"
+      size="sm"
+      flushBody
+      footer={
+        <>
+          <button className="fwd-btn fwd-btn--cancel" onClick={close}>
+            Cancel
           </button>
-        </div>
-
+          <button
+            className={`fwd-btn fwd-btn--confirm ${selected ? 'fwd-btn--confirm-active' : ''}`}
+            onClick={handleForward}
+            disabled={!selected}
+          >
+            Forward
+          </button>
+        </>
+      }
+    >
+      <div className="fwd-content">
         {/* Original message preview */}
         <div className="fwd-preview">
           <div className="fwd-preview-header">
@@ -154,7 +152,7 @@ export default function ForwardMessageModal() {
 
         {/* Optional comment */}
         <div className="fwd-comment-wrap">
-          <label className="fwd-comment-label" htmlFor="fwd-comment">
+          <label className="label-caps fwd-comment-label" htmlFor="fwd-comment">
             Add a comment <span className="fwd-comment-optional">(optional)</span>
           </label>
           <textarea
@@ -168,71 +166,18 @@ export default function ForwardMessageModal() {
             aria-label="Optional comment to prepend"
           />
         </div>
-
-        {/* Actions */}
-        <div className="fwd-footer">
-          <button className="fwd-btn fwd-btn--cancel" onClick={close}>
-            Cancel
-          </button>
-          <button
-            className={`fwd-btn fwd-btn--confirm ${selected ? 'fwd-btn--confirm-active' : ''}`}
-            onClick={handleForward}
-            disabled={!selected}
-          >
-            Forward
-          </button>
-        </div>
       </div>
 
       <style>{`
-        .fwd-backdrop {
-          position: fixed; inset: 0; z-index: 700;
-          background: rgba(0, 0, 0, 0.6);
-          backdrop-filter: blur(4px);
-          display: flex; align-items: center; justify-content: center;
-          padding: 16px;
-        }
-
-        .fwd-modal {
-          width: 400px; max-width: 100%;
-          background: var(--bg-deep);
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-lg, 12px);
-          box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+        .fwd-content {
           display: flex; flex-direction: column;
-          overflow: hidden;
-          animation: fwd-appear 150ms var(--ease-out) both;
         }
-
-        @keyframes fwd-appear {
-          from { opacity: 0; transform: scale(0.96) translateY(8px); }
-          to   { opacity: 1; transform: scale(1) translateY(0); }
-        }
-
-        /* Header */
-        .fwd-header {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 14px 16px 12px;
-          border-bottom: 1px solid var(--border-subtle);
-        }
-        .fwd-title {
-          font-size: 15px; font-weight: 700; color: var(--text-primary);
-          letter-spacing: -0.2px; margin: 0;
-        }
-        .fwd-close {
-          width: 26px; height: 26px;
-          background: none; border: none; cursor: pointer;
-          display: flex; align-items: center; justify-content: center;
-          color: var(--text-muted); border-radius: var(--r-xs);
-          transition: background var(--t-fast), color var(--t-fast);
-        }
-        .fwd-close:hover { background: var(--ch-hover-bg); color: var(--text-primary); }
 
         /* Preview */
         .fwd-preview {
-          margin: 10px 12px;
+          margin: var(--sp-3, 12px) var(--sp-3, 12px) 0;
           padding: 10px 12px 10px 10px;
-          background: var(--bg-elevated);
+          background: var(--elev-tint-1, var(--bg-elevated));
           border: 1px solid var(--border-subtle);
           border-left: 3px solid var(--accent-border);
           border-radius: var(--r-md);
@@ -242,10 +187,10 @@ export default function ForwardMessageModal() {
           display: flex; align-items: center; gap: 6px;
         }
         .fwd-preview-nick {
-          font-size: 12px; font-weight: 700; color: var(--text-primary);
+          font-size: var(--text-xs, 12px); font-weight: 700; color: var(--text-primary);
         }
         .fwd-preview-text {
-          font-size: 13px; color: var(--text-secondary);
+          font-size: var(--text-sm, 13px); color: var(--text-secondary);
           line-height: 1.5; margin: 0;
           word-break: break-word;
           display: -webkit-box;
@@ -256,14 +201,14 @@ export default function ForwardMessageModal() {
 
         /* Search */
         .fwd-search-wrap {
-          display: flex; align-items: center; gap: 8px;
-          margin: 4px 12px 8px;
+          display: flex; align-items: center; gap: var(--sp-2, 8px);
+          margin: var(--sp-3, 12px) var(--sp-3, 12px) var(--sp-2, 8px);
           padding: 6px 10px;
-          background: var(--bg-elevated);
+          background: var(--elev-tint-1, var(--bg-elevated));
           border: 1px solid var(--border-normal);
           border-radius: var(--r-sm);
           color: var(--text-muted);
-          transition: border-color var(--t-fast);
+          transition: border-color var(--t-control, 150ms);
         }
         .fwd-search-wrap:focus-within {
           border-color: var(--accent);
@@ -271,7 +216,7 @@ export default function ForwardMessageModal() {
         }
         .fwd-search {
           flex: 1; background: none; border: none; outline: none;
-          font-size: 14px; color: var(--text-primary);
+          font-size: var(--text-base, 14px); color: var(--text-primary);
           font-family: inherit;
         }
         .fwd-search::placeholder { color: var(--text-muted); }
@@ -279,24 +224,24 @@ export default function ForwardMessageModal() {
         /* List */
         .fwd-list {
           flex: 1; overflow-y: auto; max-height: 240px;
-          padding: 0 8px 8px;
+          padding: 0 var(--sp-2, 8px) var(--sp-2, 8px);
           display: flex; flex-direction: column; gap: 1px;
           scrollbar-width: thin;
           scrollbar-color: var(--border-normal) transparent;
         }
 
         .fwd-empty {
-          font-size: 13px; color: var(--text-muted);
-          text-align: center; padding: 20px; margin: 0;
+          font-size: var(--text-sm, 13px); color: var(--text-muted);
+          text-align: center; padding: var(--sp-5, 20px); margin: 0;
         }
 
         .fwd-item {
-          display: flex; align-items: center; gap: 8px;
+          display: flex; align-items: center; gap: var(--sp-2, 8px);
           width: 100%; padding: 7px 10px;
           border: none; background: none; cursor: pointer;
           border-radius: var(--r-sm);
           text-align: left;
-          transition: background var(--t-fast);
+          transition: background var(--t-control, 150ms);
           color: var(--text-secondary);
         }
         .fwd-item:hover { background: var(--ch-hover-bg); color: var(--text-primary); }
@@ -307,38 +252,33 @@ export default function ForwardMessageModal() {
         .fwd-item--selected:hover { background: var(--accent-subtle); }
 
         .fwd-item-sigil {
-          font-size: 14px; font-weight: 700; width: 16px;
+          font-size: var(--text-base, 14px); font-weight: 700; width: 16px;
           flex-shrink: 0; color: var(--text-muted);
           text-align: center;
         }
         .fwd-item--selected .fwd-item-sigil { color: var(--accent); }
 
         .fwd-item-label {
-          flex: 1; font-size: 14px; font-weight: 500;
+          flex: 1; font-size: var(--text-base, 14px); font-weight: 500;
           overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
 
         /* Comment */
         .fwd-comment-wrap {
-          padding: 4px 12px 10px;
+          padding: var(--sp-1, 4px) var(--sp-3, 12px) var(--sp-3, 12px);
           display: flex;
           flex-direction: column;
-          gap: 4px;
+          gap: var(--sp-1, 4px);
           border-top: 1px solid var(--border-subtle);
         }
         .fwd-comment-label {
-          font-size: 11px;
-          font-weight: 600;
-          color: var(--text-muted);
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-          padding-top: 8px;
+          padding-top: var(--sp-2, 8px);
         }
         .fwd-comment-optional {
           font-weight: 400;
           text-transform: none;
           letter-spacing: 0;
-          font-size: 11px;
+          font-size: var(--text-2xs, 11px);
         }
         .fwd-comment {
           resize: vertical;
@@ -348,11 +288,11 @@ export default function ForwardMessageModal() {
           border: 1px solid var(--border-normal);
           border-radius: var(--r-sm);
           padding: 7px 10px;
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           color: var(--text-primary);
           font-family: inherit;
           outline: none;
-          transition: border-color var(--t-fast);
+          transition: border-color var(--t-control, 150ms);
           scrollbar-width: thin;
         }
         .fwd-comment:focus {
@@ -361,18 +301,11 @@ export default function ForwardMessageModal() {
         }
         .fwd-comment::placeholder { color: var(--text-muted); }
 
-        /* Footer */
-        .fwd-footer {
-          display: flex; justify-content: flex-end; gap: 8px;
-          padding: 12px 14px;
-          border-top: 1px solid var(--border-subtle);
-        }
-
         .fwd-btn {
-          font-size: 14px; font-weight: 600;
+          font-size: var(--text-base, 14px); font-weight: 600;
           padding: 7px 18px; border-radius: var(--r-sm);
           border: 1px solid transparent; cursor: pointer;
-          transition: opacity var(--t-fast), background var(--t-fast);
+          transition: opacity var(--t-control, 150ms), background var(--t-control, 150ms);
         }
         .fwd-btn--cancel {
           background: var(--bg-elevated);
@@ -395,18 +328,11 @@ export default function ForwardMessageModal() {
         .fwd-btn--confirm-active:hover { opacity: 0.88; }
         .fwd-btn:disabled { cursor: default; }
       `}</style>
-    </div>
+    </ModalShell>
   );
 }
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
-
-const CloseIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
-    stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-    <path d="M2 2l10 10M12 2L2 12" />
-  </svg>
-);
 
 const SearchIcon = () => (
   <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">

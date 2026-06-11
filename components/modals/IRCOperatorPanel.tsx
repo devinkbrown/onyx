@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useOnyxStore } from '@/lib/store';
-import { useDialogFocus } from './useDialogFocus';
+import ModalShell from './ModalShell';
 
 type OperTab = 'users' | 'server' | 'channels';
 
@@ -498,116 +498,28 @@ export default function IRCOperatorPanel() {
   const isOper       = useOnyxStore(s => s.isOper);
   const closeOperPanel = useOnyxStore(s => s.closeOperPanel);
 
-  const backdropRef = useRef<HTMLDivElement>(null);
-  const panelRef    = useRef<HTMLDivElement>(null);
-  useDialogFocus(panelRef);
-
-  // Close on Escape
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeOperPanel();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [closeOperPanel]);
-
-  const handleBackdropClick = useCallback((e: React.MouseEvent) => {
-    if (e.target === backdropRef.current) closeOperPanel();
-  }, [closeOperPanel]);
-
   return (
-    <div
-      className="op-backdrop"
-      ref={backdropRef}
-      onClick={handleBackdropClick}
+    <ModalShell
+      onClose={closeOperPanel}
+      title={isOper ? 'IRC Operator Dashboard' : 'IRC Operator Login'}
+      kicker="Elevated access"
+      titleId="op-panel-title"
+      size="md"
+      className="op-card"
+      flushBody
     >
-      <div className="op-panel" ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="op-panel-title">
-        {/* Title bar */}
-        <div className="op-header">
-          <h2 id="op-panel-title" className="op-title">
-            {isOper ? 'IRC Operator Dashboard' : 'IRC Operator Login'}
-          </h2>
-          <button className="op-close" onClick={closeOperPanel} aria-label="Close"><svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></button>
-        </div>
-
-        {/* Content */}
-        <div className="op-body">
-          {isOper ? <OperDashboard /> : <OperLogin onClose={closeOperPanel} />}
-        </div>
+      {/* Content */}
+      <div className="op-body">
+        {isOper ? <OperDashboard /> : <OperLogin onClose={closeOperPanel} />}
       </div>
 
       <style>{`
-        /* ── Backdrop ── */
-        .op-backdrop {
-          position: fixed;
-          inset: 0;
-          z-index: 800;
-          background: rgba(3, 8, 16, 0.75);
-          backdrop-filter: blur(6px);
-          -webkit-backdrop-filter: blur(6px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          animation: op-fade 160ms cubic-bezier(0.16,1,0.3,1) both;
+        /* Operator gold accents on the shared shell */
+        .op-card {
+          border-color: rgba(248, 185, 56, 0.22);
         }
-
-        @keyframes op-fade {
-          from { opacity: 0; }
-          to   { opacity: 1; }
-        }
-
-        /* ── Panel ── */
-        .op-panel {
-          width: min(600px, 96vw);
-          max-height: min(88vh, 720px);
-          display: flex;
-          flex-direction: column;
-          background: var(--bg-deep, #06101d);
-          border: 1px solid rgba(248, 185, 56, 0.22);
-          border-radius: 12px;
-          box-shadow:
-            0 0 0 1px rgba(248, 185, 56, 0.08) inset,
-            0 24px 64px rgba(0,0,0,0.72),
-            0 0 40px rgba(248, 185, 56, 0.06);
-          overflow: hidden;
-          animation: op-rise 200ms cubic-bezier(0.16,1,0.3,1) both;
-        }
-
-        @keyframes op-rise {
-          from { opacity: 0; transform: translateY(12px) scale(0.97); }
-          to   { opacity: 1; transform: translateY(0) scale(1); }
-        }
-
-        /* ── Header ── */
-        .op-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 16px 20px;
-          border-bottom: 1px solid rgba(248, 185, 56, 0.14);
-          background: rgba(248, 185, 56, 0.04);
-          flex-shrink: 0;
-        }
-
-        .op-title {
-          font-size: 15px;
-          font-weight: 700;
+        .op-card .mshell-title {
           color: #f8b938;
-          letter-spacing: 0.01em;
-          margin: 0;
-        }
-
-        .op-close {
-          width: 28px; height: 28px;
-          background: none; border: none; cursor: pointer;
-          color: #4a7090; font-size: 14px;
-          display: flex; align-items: center; justify-content: center;
-          border-radius: 6px;
-          transition: background 120ms, color 120ms;
-        }
-        .op-close:hover {
-          background: rgba(255,255,255,0.06);
-          color: #dff0ff;
         }
 
         /* ── Body ── */
@@ -936,6 +848,6 @@ export default function IRCOperatorPanel() {
           justify-content: flex-end;
         }
       `}</style>
-    </div>
+    </ModalShell>
   );
 }

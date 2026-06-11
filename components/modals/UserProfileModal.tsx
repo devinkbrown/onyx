@@ -1,9 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import type { CSSProperties } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import Avatar from '@/components/ui/Avatar';
 import { useDialogFocus } from './useDialogFocus';
+import ProfileMetadataEditor, { type ProfileMetadataDraft } from '@/components/ui/ProfileMetadataEditor';
+import RoleBadge, { highestRoleMode } from '@/components/ui/RoleBadge';
 
 // ── Nick color helpers ────────────────────────────────────────────────────────
 
@@ -13,12 +16,12 @@ function nickHue(nick: string): number {
   return Math.abs(hash) % 360;
 }
 
-function bannerGradient(nick: string, bannerColor?: string): string {
+function bannerTint(nick: string, bannerColor?: string): string {
   if (bannerColor) {
-    return `linear-gradient(135deg, ${bannerColor} 0%, color-mix(in srgb, ${bannerColor} 60%, #000) 100%)`;
+    return bannerColor;
   }
   const hue = nickHue(nick);
-  return `linear-gradient(135deg, hsl(${hue}, 55%, 25%) 0%, hsl(${(hue + 40) % 360}, 45%, 15%) 100%)`;
+  return `hsl(${hue}, 44%, 34%)`;
 }
 
 // ── Linkify helper ────────────────────────────────────────────────────────────
@@ -97,10 +100,9 @@ interface ModeBadgeProps {
 }
 
 function ModeBadge({ modes }: ModeBadgeProps) {
-  if (modes.has('q')) return <span className="upm-mode-badge upm-mode-owner">Owner</span>;
-  if (modes.has('o')) return <span className="upm-mode-badge upm-mode-op">Op</span>;
-  if (modes.has('v')) return <span className="upm-mode-badge upm-mode-voice">Voice</span>;
-  return null;
+  const modeToPrefix = useOnyxStore(s => s.isupportModeToPrefix);
+  const mode = highestRoleMode(modes, modeToPrefix);
+  return mode ? <RoleBadge mode={mode} /> : null;
 }
 
 // ── Local note textarea ───────────────────────────────────────────────────────
@@ -209,40 +211,28 @@ interface EditPanelProps {
 function EditPanel({ nick, onClose }: EditPanelProps) {
   const selfBio         = useOnyxStore(s => s.selfBio);
   const selfPronouns    = useOnyxStore(s => s.selfPronouns);
-  const selfBannerUrl   = useOnyxStore(s => s.selfBannerUrl);
   const selfDisplayName = useOnyxStore(s => s.selfDisplayName);
   const invisibleMode   = useOnyxStore(s => s.invisibleMode);
   const setSelfBio         = useOnyxStore(s => s.setSelfBio);
   const setSelfPronouns    = useOnyxStore(s => s.setSelfPronouns);
-  const setSelfBannerUrl   = useOnyxStore(s => s.setSelfBannerUrl);
   const setSelfDisplayName = useOnyxStore(s => s.setSelfDisplayName);
   const setInvisibleMode   = useOnyxStore(s => s.setInvisibleMode);
   const setUserProfile     = useOnyxStore(s => s.setUserProfile);
   const getUserProfile     = useOnyxStore(s => s.getUserProfile);
 
-  const [draftBio, setDraftBio]         = useState(selfBio);
-  const [draftPronouns, setDraftPronouns] = useState(selfPronouns);
-  const [draftBannerUrl, setDraftBannerUrl] = useState(selfBannerUrl);
-  const [draftDisplayName, setDraftDisplayName] = useState(selfDisplayName);
-  const [showBannerInput, setShowBannerInput] = useState(false);
+  const existing = getUserProfile(nick);
+  const accentColor = existing?.bannerColor ?? bannerTint(nick);
 
-  // Live preview banner style
-  const previewBannerStyle = draftBannerUrl
-    ? { backgroundImage: `url(${draftBannerUrl})`, backgroundSize: 'cover', backgroundPosition: 'center top' }
-    : { background: bannerGradient(nick) };
-
-  const handleSave = () => {
-    setSelfBio(draftBio);
-    setSelfPronouns(draftPronouns);
-    setSelfBannerUrl(draftBannerUrl);
-    setSelfDisplayName(draftDisplayName);
+  const handleSave = (draft: ProfileMetadataDraft) => {
+    setSelfBio(draft.bio);
+    setSelfPronouns(draft.pronouns);
+    setSelfDisplayName(draft.displayName);
     // Sync into userProfiles so view mode shows fresh data immediately
-    const existing = getUserProfile(nick) ?? { nick };
     setUserProfile(nick, {
-      ...existing,
-      bio: draftBio,
-      pronouns: draftPronouns,
-      bannerUrl: draftBannerUrl,
+      ...(existing ?? { nick }),
+      bio: draft.bio,
+      pronouns: draft.pronouns,
+      bannerColor: draft.accentColor,
     });
     onClose();
   };
@@ -251,27 +241,7 @@ function EditPanel({ nick, onClose }: EditPanelProps) {
     <div className="upm-layout">
       {/* Left column — live preview */}
       <div className="upm-left">
-        <div className="upm-banner" style={previewBannerStyle} aria-hidden />
-        <button
-          className="upm-banner-edit-btn"
-          onClick={() => setShowBannerInput(v => !v)}
-          aria-label="Edit banner image"
-        >
-          Edit Banner
-        </button>
-        {showBannerInput && (
-          <div className="upm-edit-field upm-banner-field">
-            <label className="upm-edit-label" htmlFor="upm-banner-url">Banner URL</label>
-            <input
-              id="upm-banner-url"
-              className="upm-edit-input"
-              type="url"
-              value={draftBannerUrl}
-              onChange={e => setDraftBannerUrl(e.target.value)}
-              placeholder="https://example.com/banner.jpg"
-            />
-          </div>
-        )}
+        <div className="upm-banner" style={{ '--upm-accent': accentColor } as CSSProperties & Record<string, string>} aria-hidden />
 
         <div className="upm-avatar-wrap">
           <div className="upm-avatar-border">
@@ -281,78 +251,30 @@ function EditPanel({ nick, onClose }: EditPanelProps) {
 
         <div className="upm-identity">
           <h2 className="upm-nick">
-            {draftDisplayName || nick}
+            {selfDisplayName || nick}
             <span className="upm-mode-badge upm-mode-self">You</span>
           </h2>
-          {draftPronouns && (
-            <p className="upm-pronouns">{draftPronouns}</p>
+          {selfPronouns && (
+            <p className="upm-pronouns">{selfPronouns}</p>
           )}
-          {draftBio && (
-            <p className="upm-preview-bio">{draftBio}</p>
+          {selfBio && (
+            <p className="upm-preview-bio">{selfBio}</p>
           )}
         </div>
       </div>
 
       {/* Right column — edit fields */}
       <div className="upm-right">
-        <div className="upm-edit-header">
-          <h3 className="upm-edit-title">Edit Profile</h3>
-        </div>
-
         <div className="upm-edit-scroll">
-          <div className="upm-edit-field">
-            <label className="upm-edit-label" htmlFor="upm-display-name">Display Name</label>
-            <input
-              id="upm-display-name"
-              className="upm-edit-input"
-              type="text"
-              value={draftDisplayName}
-              onChange={e => setDraftDisplayName(e.target.value)}
-              placeholder={nick}
-              maxLength={32}
-            />
-          </div>
-
-          <div className="upm-edit-field">
-            <label className="upm-edit-label" htmlFor="upm-pronouns">Pronouns</label>
-            <input
-              id="upm-pronouns"
-              className="upm-edit-input"
-              type="text"
-              value={draftPronouns}
-              onChange={e => setDraftPronouns(e.target.value)}
-              placeholder="e.g. they/them"
-              maxLength={32}
-            />
-          </div>
-
-          <div className="upm-edit-field">
-            <label className="upm-edit-label" htmlFor="upm-bio">
-              About Me
-              <span className="upm-char-count">{draftBio.length}/190</span>
-            </label>
-            <textarea
-              id="upm-bio"
-              className="upm-edit-textarea"
-              value={draftBio}
-              onChange={e => setDraftBio(e.target.value.slice(0, 190))}
-              placeholder="Tell others a bit about yourself"
-              rows={4}
-              maxLength={190}
-            />
-          </div>
-
-          <div className="upm-edit-field">
-            <label className="upm-edit-label" htmlFor="upm-banner-url-main">Banner Image URL</label>
-            <input
-              id="upm-banner-url-main"
-              className="upm-edit-input"
-              type="url"
-              value={draftBannerUrl}
-              onChange={e => setDraftBannerUrl(e.target.value)}
-              placeholder="https://example.com/banner.jpg"
-            />
-          </div>
+          <ProfileMetadataEditor
+            nick={nick}
+            initialDisplayName={selfDisplayName}
+            initialPronouns={selfPronouns}
+            initialBio={selfBio}
+            initialAccentColor={accentColor}
+            onSave={handleSave}
+            onCancel={onClose}
+          />
 
           <div className="upm-edit-field">
             <div className="upm-invisible-row">
@@ -373,14 +295,6 @@ function EditPanel({ nick, onClose }: EditPanelProps) {
           </div>
         </div>
 
-        <div className="upm-actions">
-          <button className="upm-btn upm-btn-primary" onClick={handleSave}>
-            Save Changes
-          </button>
-          <button className="upm-btn upm-btn-ghost" onClick={onClose}>
-            Cancel
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -537,9 +451,9 @@ export default function UserProfileModal() {
 
   const bannerStyle = userBannerUrl
     ? { backgroundImage: `url(${userBannerUrl})`, backgroundSize: 'cover', backgroundPosition: 'center top' }
-    : userPicture
+  : userPicture
     ? { backgroundImage: `url(${userPicture})`, backgroundSize: 'cover', backgroundPosition: 'center top' }
-    : { background: bannerGradient(nick, richProfile?.bannerColor) };
+    : { '--upm-accent': bannerTint(nick, richProfile?.bannerColor) } as CSSProperties & Record<string, string>;
 
   const displayName = isSelf && selfDisplayName ? selfDisplayName : nick;
   const isSelfEdited = isSelf && selfDisplayName && selfDisplayName !== nick;
@@ -813,9 +727,7 @@ export default function UserProfileModal() {
           display: flex;
           align-items: center;
           justify-content: center;
-          background:
-            radial-gradient(circle at 50% 18%, var(--accent-glow), transparent 34%),
-            color-mix(in srgb, var(--bg-void) 86%, transparent);
+          background: var(--scrim, color-mix(in srgb, var(--bg-void) 86%, transparent));
           backdrop-filter: blur(10px);
           -webkit-backdrop-filter: blur(10px);
           padding: 20px;
@@ -826,15 +738,11 @@ export default function UserProfileModal() {
           position: relative;
           width: 100%;
           max-width: 720px;
-          background:
-            linear-gradient(180deg,
-              color-mix(in srgb, var(--bg-float) 22%, var(--bg-elevated)) 0%,
-              var(--bg-elevated) 46%,
-              var(--bg-deep) 100%);
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-xl);
+          background: var(--elev-tint-3, var(--bg-elevated));
+          border: 0;
+          border-radius: var(--r-xl, 16px) var(--r-sm, 6px) var(--r-lg, 14px) var(--r-md, 10px);
           overflow: hidden;
-          box-shadow: var(--shadow-xl), var(--glow);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-3, 0 28px 80px rgba(0,0,0,.48));
           max-height: 90dvh;
           isolation: isolate;
         }
@@ -844,7 +752,7 @@ export default function UserProfileModal() {
           position: absolute;
           inset: 0 0 auto;
           height: 1px;
-          background: linear-gradient(90deg, transparent, var(--accent-border), transparent);
+          background: color-mix(in srgb, var(--upm-accent, var(--accent)) 34%, transparent);
           pointer-events: none;
           z-index: 1;
         }
@@ -853,7 +761,7 @@ export default function UserProfileModal() {
           from { opacity: 0; transform: scale(0.96); }
           to   { opacity: 1; transform: scale(1); }
         }
-        .animate-scale-in { animation: scale-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+        .animate-scale-in { animation: scale-in var(--t-overlay-in, 320ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both; }
 
         /* ── Close button ── */
         .upm-close {
@@ -864,7 +772,8 @@ export default function UserProfileModal() {
           width: 30px;
           height: 30px;
           border-radius: var(--r-full);
-          border: 1px solid var(--border-normal);
+          border: 0;
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
           background: color-mix(in srgb, var(--bg-void) 62%, transparent);
           color: var(--text-secondary);
           display: flex;
@@ -876,7 +785,6 @@ export default function UserProfileModal() {
         .upm-close:hover {
           background: var(--bg-float);
           color: var(--text-primary);
-          border-color: var(--accent-border);
           transform: scale(1.04);
         }
 
@@ -890,29 +798,25 @@ export default function UserProfileModal() {
         .upm-left {
           width: 280px;
           flex-shrink: 0;
-          border-right: 1px solid var(--border-subtle);
+          box-shadow: inset -1px 0 0 var(--border-subtle);
           display: flex;
           flex-direction: column;
           position: relative;
-          background:
-            linear-gradient(180deg,
-              color-mix(in srgb, var(--bg-base) 64%, transparent) 0%,
-              var(--bg-deep) 100%);
+          background: var(--elev-tint-1, var(--bg-deep));
         }
 
         .upm-banner {
           height: 132px;
           position: relative;
           flex-shrink: 0;
+          background: color-mix(in srgb, var(--upm-accent, var(--accent)) 42%, var(--bg-deep) 58%);
         }
 
         .upm-banner::after {
           content: '';
           position: absolute;
           inset: 0;
-          background:
-            linear-gradient(180deg, transparent 40%, color-mix(in srgb, var(--bg-deep) 84%, transparent) 100%),
-            linear-gradient(90deg, color-mix(in srgb, var(--bg-void) 35%, transparent), transparent 46%, color-mix(in srgb, var(--bg-void) 28%, transparent));
+          background: color-mix(in srgb, var(--bg-void) 18%, transparent);
           pointer-events: none;
         }
 
@@ -957,11 +861,9 @@ export default function UserProfileModal() {
           display: inline-flex;
           border-radius: var(--r-full);
           padding: 3px;
-          background: linear-gradient(135deg, var(--accent), var(--gold));
-          border: 1px solid var(--accent-border);
-          box-shadow:
-            0 0 0 5px var(--bg-deep),
-            0 10px 28px color-mix(in srgb, var(--accent) 22%, transparent);
+          background: color-mix(in srgb, var(--upm-accent, var(--accent)) 36%, var(--elev-tint-2, var(--bg-float)) 64%);
+          border: 0;
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-1, 0 8px 18px rgba(0,0,0,.24));
           line-height: 0;
         }
 
@@ -992,7 +894,7 @@ export default function UserProfileModal() {
           border-radius: var(--r-full);
           padding: 2px 7px;
           text-transform: uppercase;
-          letter-spacing: 0.05em;
+          letter-spacing: 0;
         }
 
         .upm-account {
@@ -1010,8 +912,9 @@ export default function UserProfileModal() {
           color: var(--gold);
           margin: 0 0 8px;
           font-weight: 700;
-          border: 1px solid var(--accent-border);
-          background: var(--gold-subtle);
+          border: 0;
+          background: color-mix(in srgb, var(--elev-tint-1, var(--bg-elevated)) 86%, var(--lux, #d8b96a) 14%);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
           border-radius: var(--r-full);
           padding: 3px 8px;
         }
@@ -1041,7 +944,7 @@ export default function UserProfileModal() {
           border-radius: var(--r-full);
           flex-shrink: 0;
           display: inline-block;
-          box-shadow: 0 0 0 3px var(--accent-subtle), 0 0 18px currentColor;
+          box-shadow: 0 0 0 3px var(--bg-deep), 0 0 0 5px color-mix(in srgb, currentColor 28%, transparent);
         }
 
         /* ── Mode badges ── */
@@ -1050,7 +953,7 @@ export default function UserProfileModal() {
           font-weight: 700;
           padding: 4px 9px;
           border-radius: var(--r-full);
-          letter-spacing: 0.05em;
+          letter-spacing: 0;
           text-transform: uppercase;
           line-height: 1;
         }
@@ -1068,7 +971,8 @@ export default function UserProfileModal() {
           align-items: center;
           gap: 6px;
           padding: 8px 10px;
-          border: 1px solid var(--border-subtle);
+          border: 0;
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
           border-radius: var(--r-md);
           background: color-mix(in srgb, var(--bg-base) 72%, transparent);
         }
@@ -1081,19 +985,17 @@ export default function UserProfileModal() {
 
         .upm-activity-card {
           margin-top: 14px;
-          background:
-            linear-gradient(180deg,
-              color-mix(in srgb, var(--bg-float) 18%, var(--bg-base)) 0%,
-              var(--bg-base) 100%);
-          border: 1px solid var(--border-normal);
+          background: var(--elev-tint-1, var(--bg-base));
+          border: 0;
           border-radius: var(--r-md);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
           padding: 10px 12px;
         }
 
         .upm-activity-label {
           font-size: 10px;
           font-weight: 700;
-          letter-spacing: 0.06em;
+          letter-spacing: 0;
           text-transform: uppercase;
           color: var(--text-muted);
           margin-bottom: 4px;
@@ -1125,7 +1027,7 @@ export default function UserProfileModal() {
         /* ── Tabs ── */
         .upm-tabs {
           display: flex;
-          border-bottom: 1px solid var(--border-subtle);
+          box-shadow: inset 0 -1px 0 var(--border-subtle);
           padding: 0 18px;
           flex-shrink: 0;
           background: color-mix(in srgb, var(--bg-deep) 42%, transparent);
@@ -1161,7 +1063,8 @@ export default function UserProfileModal() {
           font-weight: 700;
           background: var(--accent-subtle);
           color: var(--accent-hover);
-          border: 1px solid var(--accent-border);
+          border: 0;
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
           padding: 1px 6px;
           border-radius: var(--r-full);
           min-width: 18px;
@@ -1185,13 +1088,13 @@ export default function UserProfileModal() {
           font-size: 11px;
           font-weight: 700;
           text-transform: uppercase;
-          letter-spacing: 0.1em;
+          letter-spacing: 0;
           color: var(--text-muted);
           margin: 0 0 8px;
           display: flex; align-items: center; gap: 8px;
         }
         .upm-section-label::after {
-          content: ''; flex: 1; height: 1px; background: var(--border-subtle);
+          content: ''; flex: 1; height: 1px; background: color-mix(in srgb, var(--text-muted) 24%, transparent);
         }
 
         /* ── About Me ── */
@@ -1232,7 +1135,7 @@ export default function UserProfileModal() {
           gap: 10px;
           padding: 10px 18px;
           width: 100%;
-          background: none;
+          background: transparent;
           border: none;
           cursor: pointer;
           font-family: inherit;
@@ -1240,7 +1143,7 @@ export default function UserProfileModal() {
           transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out);
         }
         .upm-mutual-channel:hover {
-          background: var(--bg-base);
+          background: var(--elev-tint-1, var(--bg-base));
           transform: translateX(2px);
         }
 
@@ -1270,9 +1173,10 @@ export default function UserProfileModal() {
         .upm-note-textarea {
           width: 100%;
           min-height: 80px;
-          border: 1px solid var(--border-subtle);
+          border: 0;
           border-radius: var(--r-md);
-          background: var(--bg-deep);
+          background: var(--elev-tint-1, var(--bg-deep));
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), inset 0 0 0 1px var(--border-subtle);
           color: var(--text-secondary, var(--text-primary));
           font-size: 14px;
           font-family: inherit;
@@ -1288,7 +1192,7 @@ export default function UserProfileModal() {
           font-style: italic;
         }
         .upm-note-textarea:focus {
-          border-color: var(--accent-border);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), inset 0 0 0 1px var(--accent-border);
           color: var(--text-normal, var(--text-primary));
         }
 
@@ -1297,7 +1201,7 @@ export default function UserProfileModal() {
           display: flex;
           gap: 8px;
           padding: 14px 18px 16px;
-          border-top: 1px solid var(--border-subtle);
+          box-shadow: inset 0 1px 0 var(--border-subtle);
           flex-shrink: 0;
           flex-wrap: wrap;
           background: color-mix(in srgb, var(--bg-deep) 60%, transparent);
@@ -1308,12 +1212,13 @@ export default function UserProfileModal() {
           align-items: center;
           gap: 6px;
           padding: 9px 16px;
-          border-radius: var(--r-md);
+          border-radius: var(--r-sm, 6px) var(--r-md, 10px) var(--r-sm, 6px) var(--r-lg, 14px);
           font-size: 13px;
           font-weight: 600;
           font-family: inherit;
           cursor: pointer;
-          border: 1px solid transparent;
+          border: 0;
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
           transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out), filter var(--t-fast) var(--ease-out);
           white-space: nowrap;
         }
@@ -1327,31 +1232,26 @@ export default function UserProfileModal() {
         }
 
         .upm-btn-primary {
-          background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+          background: color-mix(in srgb, var(--accent) 82%, #05070a);
           color: var(--text-primary);
-          border-color: var(--accent-border);
-          box-shadow: 0 8px 22px var(--accent-glow);
         }
         .upm-btn-primary:hover { filter: brightness(1.05); }
 
         .upm-btn-secondary {
-          background: var(--bg-base);
+          background: var(--elev-tint-1, var(--bg-base));
           color: var(--text-primary);
-          border-color: var(--border-normal);
         }
         .upm-btn-secondary:hover { background: var(--bg-overlay); }
 
         .upm-btn-ghost {
           background: transparent;
           color: var(--text-muted);
-          border-color: var(--border-subtle);
         }
         .upm-btn-ghost:hover { color: var(--text-secondary); background: var(--bg-elevated); }
 
         .upm-btn-danger {
           background: var(--danger-subtle);
           color: var(--danger);
-          border-color: color-mix(in srgb, var(--danger) 38%, transparent);
         }
         .upm-btn-danger:hover { background: color-mix(in srgb, var(--danger) 18%, transparent); }
 
@@ -1365,7 +1265,7 @@ export default function UserProfileModal() {
         /* ── Edit mode ── */
         .upm-edit-header {
           padding: 18px 18px 0;
-          border-bottom: 1px solid var(--border-subtle);
+          box-shadow: inset 0 -1px 0 var(--border-subtle);
           padding-bottom: 14px;
           flex-shrink: 0;
           background: color-mix(in srgb, var(--bg-deep) 42%, transparent);
@@ -1377,7 +1277,7 @@ export default function UserProfileModal() {
           color: var(--text-normal, var(--text-primary));
           margin: 0;
           text-transform: uppercase;
-          letter-spacing: 0.05em;
+          letter-spacing: 0;
         }
 
         .upm-edit-scroll {
@@ -1399,7 +1299,7 @@ export default function UserProfileModal() {
           font-size: 11px;
           font-weight: 700;
           text-transform: uppercase;
-          letter-spacing: 0.05em;
+          letter-spacing: 0;
           color: var(--text-muted);
           margin-bottom: 6px;
         }
@@ -1416,9 +1316,10 @@ export default function UserProfileModal() {
           width: 100%;
           height: 36px;
           padding: 0 12px;
-          border: 1px solid var(--border-normal);
+          border: 0;
           border-radius: var(--r-md);
-          background: var(--bg-deep);
+          background: var(--elev-tint-1, var(--bg-deep));
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), inset 0 0 0 1px var(--border-normal);
           color: var(--text-primary);
           font-size: 14px;
           font-family: inherit;
@@ -1427,17 +1328,17 @@ export default function UserProfileModal() {
           transition: none;
         }
         .upm-edit-input:focus {
-          border-color: var(--accent-border);
-          box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), inset 0 0 0 1px var(--accent-border), 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
         }
         .upm-edit-input::placeholder { color: var(--text-muted); }
 
         .upm-edit-textarea {
           width: 100%;
           padding: 8px 12px;
-          border: 1px solid var(--border-normal);
+          border: 0;
           border-radius: var(--r-md);
-          background: var(--bg-deep);
+          background: var(--elev-tint-1, var(--bg-deep));
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), inset 0 0 0 1px var(--border-normal);
           color: var(--text-primary);
           font-size: 14px;
           font-family: inherit;
@@ -1449,8 +1350,7 @@ export default function UserProfileModal() {
           transition: none;
         }
         .upm-edit-textarea:focus {
-          border-color: var(--accent-border);
-          box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), inset 0 0 0 1px var(--accent-border), 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
         }
         .upm-edit-textarea::placeholder { color: var(--text-muted); }
 

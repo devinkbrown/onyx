@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { useOnyxStore } from '@/lib/store';
-import { useDialogFocus } from './useDialogFocus';
+import ModalShell from './ModalShell';
 
 type SortKey = 'members' | 'name';
 
@@ -19,9 +19,6 @@ export default function ChannelBrowserModal() {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('members');
   const [page, setPage] = useState(1);
-
-  const modalRef = useRef<HTMLDivElement>(null);
-  useDialogFocus(modalRef);
 
   const joinedKeys = useMemo(() => new Set([...channels.keys()]), [channels]);
 
@@ -50,235 +47,149 @@ export default function ChannelBrowserModal() {
   };
 
   return (
-    <div className="cbrowser-backdrop" onClick={closeChannelBrowser}>
-      <div
-        className="cbrowser-modal"
-        onClick={(e) => e.stopPropagation()}
-        ref={modalRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="cbrowser-title"
-      >
-        {/* Header */}
-        <div className="cbrowser-header">
-          <div className="cbrowser-header-left">
-            <GridIcon />
-            <h2 id="cbrowser-title" className="cbrowser-title">Browse Channels</h2>
-            <span className="cbrowser-count">
-              {channelListLoading ? '…' : filtered.length}
-            </span>
+    <ModalShell
+      onClose={closeChannelBrowser}
+      title="Browse Channels"
+      kicker="Discover"
+      titleId="cbrowser-title"
+      size="lg"
+      flushBody
+      headerExtra={
+        <>
+          <span className="cbrowser-count">
+            {channelListLoading ? '…' : filtered.length}
+          </span>
+          <div className="cbrowser-search-wrap">
+            <SearchIcon />
+            <input
+              className="cbrowser-search"
+              type="text"
+              placeholder="Search channels or topics…"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              autoFocus
+            />
           </div>
+          <button
+            className="cbrowser-icon-btn"
+            onClick={refreshChannelList}
+            title="Refresh list"
+            aria-label="Refresh channel list"
+          >
+            <RefreshIcon spinning={channelListLoading} />
+          </button>
+        </>
+      }
+    >
+      {/* Sort controls */}
+      <div className="cbrowser-toolbar">
+        <span className="label-caps cbrowser-sort-label">Sort by:</span>
+        <button
+          className={`cbrowser-sort-btn ${sortKey === 'members' ? 'cbrowser-sort-btn--active' : ''}`}
+          onClick={() => setSortKey('members')}
+        >
+          Members
+        </button>
+        <button
+          className={`cbrowser-sort-btn ${sortKey === 'name' ? 'cbrowser-sort-btn--active' : ''}`}
+          onClick={() => setSortKey('name')}
+        >
+          Name
+        </button>
+      </div>
 
-          <div className="cbrowser-header-right">
-            <div className="cbrowser-search-wrap">
-              <SearchIcon />
-              <input
-                className="cbrowser-search"
-                type="text"
-                placeholder="Search channels or topics…"
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(1);
-                }}
-                autoFocus
-              />
-            </div>
-
-            <button
-              className="cbrowser-icon-btn"
-              onClick={refreshChannelList}
-              title="Refresh list"
-              aria-label="Refresh channel list"
-            >
-              <RefreshIcon spinning={channelListLoading} />
-            </button>
-
-            <button
-              className="cbrowser-icon-btn cbrowser-close"
-              onClick={closeChannelBrowser}
-              aria-label="Close"
-            >
-              ×
-            </button>
-          </div>
+      {/* Table */}
+      <div className="cbrowser-body">
+        {/* Column headers */}
+        <div className="cbrowser-row cbrowser-row--header">
+          <span className="cbrowser-col-name">Channel</span>
+          <span className="cbrowser-col-count">Members</span>
+          <span className="cbrowser-col-topic">Topic</span>
+          <span className="cbrowser-col-action" />
         </div>
 
-        {/* Sort controls */}
-        <div className="cbrowser-toolbar">
-          <span className="cbrowser-sort-label">Sort by:</span>
-          <button
-            className={`cbrowser-sort-btn ${sortKey === 'members' ? 'cbrowser-sort-btn--active' : ''}`}
-            onClick={() => setSortKey('members')}
-          >
-            Members
-          </button>
-          <button
-            className={`cbrowser-sort-btn ${sortKey === 'name' ? 'cbrowser-sort-btn--active' : ''}`}
-            onClick={() => setSortKey('name')}
-          >
-            Name
-          </button>
-        </div>
-
-        {/* Table */}
-        <div className="cbrowser-body">
-          {/* Column headers */}
-          <div className="cbrowser-row cbrowser-row--header">
-            <span className="cbrowser-col-name">Channel</span>
-            <span className="cbrowser-col-count">Members</span>
-            <span className="cbrowser-col-topic">Topic</span>
-            <span className="cbrowser-col-action" />
-          </div>
-
-          {/* Loading shimmer */}
-          {channelListLoading && channelList.length === 0 && (
-            <>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="cbrowser-row cbrowser-row--shimmer">
-                  <span className="shimmer shimmer-name" />
-                  <span className="shimmer shimmer-count" />
-                  <span className="shimmer shimmer-topic" />
-                  <span className="shimmer shimmer-btn" />
-                </div>
-              ))}
-            </>
-          )}
-
-          {/* Empty state */}
-          {!channelListLoading && filtered.length === 0 && (
-            <div className="cbrowser-empty">
-              {search
-                ? `No channels matching "${search}"`
-                : 'No channels available'}
-            </div>
-          )}
-
-          {/* Channel rows */}
-          {visible.map((ch) => {
-            const joined = joinedKeys.has(ch.name.toLowerCase());
-            return (
-              <div key={ch.name} className="cbrowser-row cbrowser-row--data">
-                <span className="cbrowser-col-name">
-                  <span className="cbrowser-pill">{ch.name}</span>
-                </span>
-                <span className="cbrowser-col-count">
-                  <span className="cbrowser-member-pill">
-                    <span className="cbrowser-member-icon">👥</span>
-                    {ch.count.toLocaleString()}
-                  </span>
-                </span>
-                <span className="cbrowser-col-topic" title={ch.topic}>
-                  {ch.topic.length > 400
-                    ? ch.topic.slice(0, 400) + '…'
-                    : ch.topic || (
-                        <span className="cbrowser-no-topic">No topic set</span>
-                      )}
-                </span>
-                <span className="cbrowser-col-action">
-                  <button
-                    className={`cbrowser-join-btn ${joined ? 'cbrowser-join-btn--joined' : ''}`}
-                    onClick={() => !joined && handleJoin(ch.name)}
-                    disabled={joined}
-                  >
-                    {joined ? 'Joined ✓' : 'Join'}
-                  </button>
-                </span>
+        {/* Loading shimmer */}
+        {channelListLoading && channelList.length === 0 && (
+          <>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="cbrowser-row cbrowser-row--shimmer">
+                <span className="shimmer shimmer-name" />
+                <span className="shimmer shimmer-count" />
+                <span className="shimmer shimmer-topic" />
+                <span className="shimmer shimmer-btn" />
               </div>
-            );
-          })}
+            ))}
+          </>
+        )}
 
-          {/* Load more */}
-          {hasMore && (
-            <div className="cbrowser-load-more">
-              <button
-                className="cbrowser-load-btn"
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Load more ({filtered.length - visible.length} remaining)
-              </button>
+        {/* Empty state */}
+        {!channelListLoading && filtered.length === 0 && (
+          <div className="cbrowser-empty">
+            {search
+              ? `No channels matching "${search}"`
+              : 'No channels available'}
+          </div>
+        )}
+
+        {/* Channel rows */}
+        {visible.map((ch) => {
+          const joined = joinedKeys.has(ch.name.toLowerCase());
+          return (
+            <div key={ch.name} className="cbrowser-row cbrowser-row--data">
+              <span className="cbrowser-col-name">
+                <span className="cbrowser-pill">{ch.name}</span>
+              </span>
+              <span className="cbrowser-col-count">
+                <span className="cbrowser-member-pill">
+                  <span className="cbrowser-member-icon">👥</span>
+                  {ch.count.toLocaleString()}
+                </span>
+              </span>
+              <span className="cbrowser-col-topic" title={ch.topic}>
+                {ch.topic.length > 400
+                  ? ch.topic.slice(0, 400) + '…'
+                  : ch.topic || (
+                      <span className="cbrowser-no-topic">No topic set</span>
+                    )}
+              </span>
+              <span className="cbrowser-col-action">
+                <button
+                  className={`cbrowser-join-btn ${joined ? 'cbrowser-join-btn--joined' : ''}`}
+                  onClick={() => !joined && handleJoin(ch.name)}
+                  disabled={joined}
+                >
+                  {joined ? 'Joined ✓' : 'Join'}
+                </button>
+              </span>
             </div>
-          )}
-        </div>
+          );
+        })}
+
+        {/* Load more */}
+        {hasMore && (
+          <div className="cbrowser-load-more">
+            <button
+              className="cbrowser-load-btn"
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Load more ({filtered.length - visible.length} remaining)
+            </button>
+          </div>
+        )}
       </div>
 
       <style>{`
-        .cbrowser-backdrop {
-          position: fixed;
-          inset: 0;
-          z-index: 800;
-          background: rgba(0, 0, 0, 0.75);
-          backdrop-filter: blur(8px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 40px 16px;
-          overflow-y: auto;
-        }
-
-        .cbrowser-modal {
-          width: 640px;
-          max-width: calc(100vw - 32px);
-          height: 500px;
-          max-height: calc(100vh - 80px);
-          background: var(--bg-deep);
-          border-radius: var(--r-xl);
-          border: 1px solid var(--border-normal);
-          box-shadow: var(--shadow-xl), 0 0 0 1px var(--accent-border);
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-          animation: cbrowser-in 180ms var(--ease-out) both;
-        }
-
-        @keyframes cbrowser-in {
-          from { opacity: 0; transform: scale(0.97) translateY(6px); }
-          to   { opacity: 1; transform: scale(1)    translateY(0); }
-        }
-
-        /* ── Header ── */
-        .cbrowser-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          padding: 14px 18px;
-          border-bottom: 1px solid var(--border-subtle);
-          flex-shrink: 0;
-          background: var(--bg-elevated);
-        }
-
-        .cbrowser-header-left {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          min-width: 0;
-        }
-
-        .cbrowser-title {
-          font-size: 15px;
-          font-weight: 700;
-          color: var(--text-primary);
-          letter-spacing: -0.2px;
-          margin: 0;
-          white-space: nowrap;
-        }
-
         .cbrowser-count {
-          font-size: 11px;
+          font-size: var(--text-2xs, 11px);
           font-weight: 700;
           color: var(--accent);
           background: var(--accent-subtle);
           border: 1px solid var(--accent-border);
           border-radius: var(--r-full);
           padding: 1px 8px;
-          flex-shrink: 0;
-        }
-
-        .cbrowser-header-right {
-          display: flex;
-          align-items: center;
-          gap: 8px;
           flex-shrink: 0;
         }
 
@@ -303,10 +214,10 @@ export default function ChannelBrowserModal() {
           background: var(--bg-void);
           border: 1px solid var(--border-normal);
           border-radius: var(--r-md);
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           color: var(--text-primary);
           font-family: inherit;
-          transition: border-color var(--t-fast), box-shadow var(--t-fast);
+          transition: border-color var(--t-control, 150ms), box-shadow var(--t-control, 150ms);
         }
         .cbrowser-search:focus {
           outline: none;
@@ -328,7 +239,7 @@ export default function ChannelBrowserModal() {
           cursor: pointer;
           border-radius: var(--r-sm);
           color: var(--text-secondary);
-          transition: background var(--t-fast), color var(--t-fast);
+          transition: background var(--t-control, 150ms), color var(--t-control, 150ms);
           flex-shrink: 0;
         }
         .cbrowser-icon-btn:hover {
@@ -336,29 +247,17 @@ export default function ChannelBrowserModal() {
           color: var(--text-primary);
         }
 
-        .cbrowser-close {
-          font-size: 22px;
-          line-height: 1;
-          font-weight: 300;
-        }
-
         /* ── Toolbar ── */
         .cbrowser-toolbar {
           display: flex;
           align-items: center;
           gap: 6px;
-          padding: 8px 18px;
+          padding: var(--sp-2, 8px) 18px;
           border-bottom: 1px solid var(--border-subtle);
           flex-shrink: 0;
-          background: var(--bg-deep);
         }
 
         .cbrowser-sort-label {
-          font-size: 11px;
-          font-weight: 700;
-          color: var(--text-muted);
-          text-transform: uppercase;
-          letter-spacing: 0.07em;
           margin-right: 4px;
         }
 
@@ -368,10 +267,10 @@ export default function ChannelBrowserModal() {
           border: 1px solid var(--border-subtle);
           background: none;
           cursor: pointer;
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           font-weight: 600;
           color: var(--text-secondary);
-          transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+          transition: background var(--t-control, 150ms), color var(--t-control, 150ms), border-color var(--t-control, 150ms);
           font-family: inherit;
         }
         .cbrowser-sort-btn:hover {
@@ -388,10 +287,8 @@ export default function ChannelBrowserModal() {
         /* ── Body / table ── */
         .cbrowser-body {
           flex: 1;
-          overflow-y: auto;
+          min-height: 360px;
           padding: 6px 0 12px;
-          scrollbar-width: thin;
-          scrollbar-color: var(--border-normal) transparent;
         }
 
         /* Grid: name | count | topic | action */
@@ -419,18 +316,19 @@ export default function ChannelBrowserModal() {
         .cbrowser-row--data {
           border-radius: var(--r-sm);
           margin: 0 6px;
-          transition: background var(--t-fast);
+          transition: background var(--t-control, 150ms);
           position: relative;
         }
         .cbrowser-row--data:hover {
-          background: var(--accent-subtle);
+          background: var(--elev-tint-1, var(--accent-subtle));
         }
         /* Show join button only on hover */
         .cbrowser-row--data .cbrowser-join-btn:not(.cbrowser-join-btn--joined) {
           opacity: 0;
-          transition: opacity var(--t-fast), background var(--t-fast);
+          transition: opacity var(--t-control, 150ms), background var(--t-control, 150ms);
         }
-        .cbrowser-row--data:hover .cbrowser-join-btn:not(.cbrowser-join-btn--joined) {
+        .cbrowser-row--data:hover .cbrowser-join-btn:not(.cbrowser-join-btn--joined),
+        .cbrowser-row--data:focus-within .cbrowser-join-btn:not(.cbrowser-join-btn--joined) {
           opacity: 1;
         }
 
@@ -450,7 +348,7 @@ export default function ChannelBrowserModal() {
           border-radius: var(--r-xs);
           padding: 2px 7px;
           font-family: var(--font-mono, monospace);
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           font-weight: 600;
           color: var(--text-primary);
           white-space: nowrap;
@@ -475,7 +373,7 @@ export default function ChannelBrowserModal() {
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-full);
           padding: 2px 8px;
-          font-size: 11px;
+          font-size: var(--text-2xs, 11px);
           font-weight: 600;
           color: var(--text-muted);
         }
@@ -486,7 +384,7 @@ export default function ChannelBrowserModal() {
         }
 
         .cbrowser-col-topic {
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           color: var(--text-muted);
           white-space: nowrap;
           overflow: hidden;
@@ -511,10 +409,10 @@ export default function ChannelBrowserModal() {
           border: none;
           background: var(--accent);
           color: #fff;
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           font-weight: 700;
           cursor: pointer;
-          transition: opacity var(--t-fast), background var(--t-fast);
+          transition: opacity var(--t-control, 150ms), background var(--t-control, 150ms);
           white-space: nowrap;
           font-family: inherit;
           letter-spacing: 0.02em;
@@ -553,6 +451,9 @@ export default function ChannelBrowserModal() {
           0%   { background-position: 200% 0; }
           100% { background-position: -200% 0; }
         }
+        @media (prefers-reduced-motion: reduce) {
+          .shimmer { animation: none; }
+        }
 
         .shimmer-name  { width: 140px; height: 24px; border-radius: var(--r-xs); }
         .shimmer-count { width: 60px;  height: 20px; border-radius: var(--r-full); }
@@ -561,7 +462,7 @@ export default function ChannelBrowserModal() {
 
         /* Load more */
         .cbrowser-load-more {
-          padding: 12px 18px;
+          padding: var(--sp-3, 12px) 18px;
           text-align: center;
         }
 
@@ -571,10 +472,10 @@ export default function ChannelBrowserModal() {
           border: 1px solid var(--border-normal);
           background: none;
           color: var(--text-secondary);
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           font-weight: 500;
           cursor: pointer;
-          transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+          transition: background var(--t-control, 150ms), color var(--t-control, 150ms), border-color var(--t-control, 150ms);
           font-family: inherit;
         }
         .cbrowser-load-btn:hover {
@@ -588,22 +489,12 @@ export default function ChannelBrowserModal() {
           padding: 48px 20px;
           text-align: center;
           color: var(--text-muted);
-          font-size: 14px;
+          font-size: var(--text-base, 14px);
           line-height: 1.6;
         }
 
         /* Responsive */
         @media (max-width: 640px) {
-          .cbrowser-backdrop {
-            padding: 0;
-            align-items: flex-end;
-          }
-          .cbrowser-modal {
-            width: 100%;
-            height: auto;
-            border-radius: var(--r-xl) var(--r-xl) 0 0;
-            max-height: 85dvh;
-          }
           .cbrowser-row {
             grid-template-columns: 1fr 70px 80px;
           }
@@ -611,30 +502,11 @@ export default function ChannelBrowserModal() {
           .cbrowser-search { width: 150px; }
         }
       `}</style>
-    </div>
+    </ModalShell>
   );
 }
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
-
-function GridIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 18 18"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      style={{ color: 'var(--accent)', flexShrink: 0 }}
-    >
-      <rect x="1.5" y="1.5" width="6" height="6" rx="1.5" />
-      <rect x="10.5" y="1.5" width="6" height="6" rx="1.5" />
-      <rect x="1.5" y="10.5" width="6" height="6" rx="1.5" />
-      <rect x="10.5" y="10.5" width="6" height="6" rx="1.5" />
-    </svg>
-  );
-}
 
 function SearchIcon() {
   return (

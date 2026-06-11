@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import IrcText from '@/components/chat/IrcText';
-import { useDialogFocus } from './useDialogFocus';
+import ModalShell from './ModalShell';
 
 // Detect lines that look like ASCII art
 function isArtLine(line: string): boolean {
@@ -29,9 +29,6 @@ export default function MotdModal() {
   const [dontShow, setDontShow] = useState(false);
   const [search,   setSearch]   = useState('');
   const [copied,   setCopied]   = useState(false);
-
-  const panelRef = useRef<HTMLDivElement>(null);
-  useDialogFocus(panelRef);
 
   const lines = useMemo(() => (motd ?? '').split('\n'), [motd]);
 
@@ -65,52 +62,24 @@ export default function MotdModal() {
   if (!motd) return null;
 
   return (
-    <div className="motd-backdrop">
-      <div className="motd-panel" ref={panelRef} role="dialog" aria-modal aria-labelledby="motd-title">
-        <div className="motd-header">
-          <h2 className="motd-title" id="motd-title">
-            Welcome to {networkName}
-          </h2>
-          <button
-            className="motd-copy-btn"
-            onClick={handleCopy}
-            title="Copy MOTD as plain text"
-            aria-label="Copy MOTD as plain text"
-          >
-            {copied ? '✓ Copied' : 'Copy'}
-          </button>
-        </div>
-
-        <div className="motd-search-wrap">
-          <input
-            type="search"
-            className="motd-search"
-            placeholder="Search MOTD…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            aria-label="Search MOTD content"
-          />
-          {search && filteredLines.length !== lines.length && (
-            <span className="motd-search-count" aria-live="polite">
-              {filteredLines.length} of {lines.length} lines
-            </span>
-          )}
-        </div>
-
-        <div className="motd-body">
-          <div className="motd-lines">
-            {filteredLines.map((line, i) => (
-              <div
-                key={i}
-                className={`motd-line${isArtLine(line) ? ' motd-line--art' : ''}`}
-              >
-                <IrcText text={line || '​'} />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="motd-footer">
+    <ModalShell
+      onClose={closeMotd}
+      title={`Welcome to ${networkName}`}
+      kicker="Message of the day"
+      titleId="motd-title"
+      size="md"
+      headerExtra={
+        <button
+          className="motd-copy-btn"
+          onClick={handleCopy}
+          title="Copy MOTD as plain text"
+          aria-label="Copy MOTD as plain text"
+        >
+          {copied ? '✓ Copied' : 'Copy'}
+        </button>
+      }
+      footer={
+        <>
           <label className="motd-no-show">
             <input
               type="checkbox"
@@ -122,70 +91,48 @@ export default function MotdModal() {
           <button className="motd-dismiss" onClick={handleDismiss}>
             Dismiss
           </button>
-        </div>
+        </>
+      }
+    >
+      <div className="motd-search-wrap">
+        <input
+          type="search"
+          className="motd-search"
+          placeholder="Search MOTD…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          aria-label="Search MOTD content"
+        />
+        {search && filteredLines.length !== lines.length && (
+          <span className="motd-search-count" aria-live="polite">
+            {filteredLines.length} of {lines.length} lines
+          </span>
+        )}
+      </div>
+
+      <div className="motd-lines">
+        {filteredLines.map((line, i) => (
+          <div
+            key={i}
+            className={`motd-line${isArtLine(line) ? ' motd-line--art' : ''}`}
+          >
+            <IrcText text={line || '​'} />
+          </div>
+        ))}
       </div>
 
       <style>{`
-        .motd-backdrop {
-          position: fixed;
-          inset: 0;
-          z-index: 600;
-          background: rgba(0, 0, 0, 0.65);
-          backdrop-filter: blur(4px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 24px;
-        }
-
-        .motd-panel {
-          width: 100%;
-          max-width: 600px;
-          background: var(--bg-float);
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-lg);
-          box-shadow: var(--shadow-lg);
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-          animation: motd-in 180ms var(--ease-out) both;
-          max-height: calc(100vh - 48px);
-        }
-
-        @keyframes motd-in {
-          from { opacity: 0; transform: translateY(-8px) scale(0.98); }
-          to   { opacity: 1; transform: translateY(0) scale(1); }
-        }
-
-        .motd-header {
-          padding: 20px 24px 14px;
-          flex-shrink: 0;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          border-bottom: 1px solid var(--border-subtle);
-        }
-
-        .motd-title {
-          font-size: 17px;
-          font-weight: 700;
-          color: var(--text-primary);
-          margin: 0;
-          flex: 1;
-          letter-spacing: -0.01em;
-        }
-
         .motd-copy-btn {
           padding: 5px 12px;
           border-radius: var(--r-sm);
           border: 1px solid var(--border-normal);
-          background: var(--bg-elevated);
+          background: var(--elev-tint-1, var(--bg-elevated));
           color: var(--text-secondary);
           cursor: pointer;
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           font-weight: 600;
           font-family: inherit;
-          transition: all var(--t-fast);
+          transition: all var(--t-control, 150ms);
           flex-shrink: 0;
         }
         .motd-copy-btn:hover {
@@ -194,43 +141,36 @@ export default function MotdModal() {
         }
 
         .motd-search-wrap {
-          padding: 10px 24px 8px;
-          flex-shrink: 0;
+          padding-bottom: var(--sp-2, 8px);
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: var(--sp-3, 12px);
         }
 
         .motd-search {
           flex: 1;
-          background: var(--bg-elevated);
+          background: var(--elev-tint-1, var(--bg-elevated));
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-md, 6px);
           padding: 6px 10px;
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           color: var(--text-primary);
           outline: none;
           font-family: inherit;
-          transition: border-color 0.15s;
+          transition: border-color var(--t-control, 150ms);
         }
         .motd-search::placeholder { color: var(--text-muted); }
         .motd-search:focus { border-color: var(--accent-border); }
 
         .motd-search-count {
-          font-size: 11px;
+          font-size: var(--text-2xs, 11px);
           color: var(--text-muted);
           white-space: nowrap;
           flex-shrink: 0;
         }
 
-        .motd-body {
-          flex: 1;
-          overflow: hidden;
-          padding: 0 24px 4px;
-        }
-
         .motd-lines {
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           line-height: 1.65;
           background: var(--bg-elevated);
           border: 1px solid var(--border-subtle);
@@ -266,24 +206,15 @@ export default function MotdModal() {
           color: var(--text-primary);
         }
 
-        .motd-footer {
-          padding: 12px 24px 20px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          flex-shrink: 0;
-          border-top: 1px solid var(--border-subtle);
-        }
-
         .motd-no-show {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: var(--sp-2, 8px);
           cursor: pointer;
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           color: var(--text-muted);
           user-select: none;
+          margin-right: auto;
         }
 
         .motd-no-show input[type="checkbox"] {
@@ -298,7 +229,7 @@ export default function MotdModal() {
         }
 
         .motd-dismiss {
-          font-size: 14px;
+          font-size: var(--text-base, 14px);
           font-weight: 600;
           padding: 7px 20px;
           border-radius: var(--r-sm);
@@ -306,7 +237,7 @@ export default function MotdModal() {
           background: var(--accent);
           color: #fff;
           cursor: pointer;
-          transition: opacity var(--t-fast);
+          transition: opacity var(--t-control, 150ms);
           flex-shrink: 0;
           font-family: inherit;
         }
@@ -315,6 +246,6 @@ export default function MotdModal() {
           opacity: 0.88;
         }
       `}</style>
-    </div>
+    </ModalShell>
   );
 }

@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import { saveCredentials } from '@/lib/credentials';
-import { useDialogFocus } from './useDialogFocus';
+import ModalShell from './ModalShell';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -89,8 +89,6 @@ export default function ConnectionProfilesModal() {
     return loaded[0]?.id ?? 'default';
   });
   const [draft, setDraft] = useState<ConnectionProfile | null>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
-  useDialogFocus(cardRef);
 
   // Sync draft whenever active profile changes
   useEffect(() => {
@@ -194,167 +192,15 @@ export default function ConnectionProfilesModal() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div
-      className="conn-modal"
-      onClick={e => { if (e.target === e.currentTarget) closeConnectionProfiles(); }}
-    >
-      <div className="conn-card" ref={cardRef} role="dialog" aria-modal="true" aria-labelledby="conn-modal-title">
-
-        {/* Header */}
-        <div className="conn-header">
-          <span id="conn-modal-title" className="conn-title">Connection Profiles</span>
-          <button
-            className="conn-btn-secondary"
-            style={{ padding: '4px 10px', fontSize: '12px' }}
-            onClick={closeConnectionProfiles}
-            aria-label="Close"
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="conn-body">
-
-          {/* Sidebar: profile list */}
-          <div className="conn-sidebar">
-            {profiles.map(p => (
-              <div
-                key={p.id}
-                className={`conn-profile-item ${p.id === activeId ? 'active' : ''}`}
-                onClick={() => handleSelectProfile(p.id)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={e => e.key === 'Enter' && handleSelectProfile(p.id)}
-                aria-pressed={p.id === activeId}
-              >
-                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {p.name || 'Unnamed'}
-                </span>
-                {profiles.length > 1 && (
-                  <button
-                    className="conn-profile-del"
-                    onClick={e => { e.stopPropagation(); handleDeleteProfile(p.id); }}
-                    aria-label={`Delete profile ${p.name}`}
-                    title="Delete"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            ))}
-
-            <button className="conn-new-btn" onClick={handleNewProfile}>
-              <span>＋</span> New Profile
-            </button>
-          </div>
-
-          {/* Editor */}
-          {draft && (
-            <div className="conn-editor">
-
-              <div className="conn-field">
-                <label className="conn-label" htmlFor="cp-name">Profile Name</label>
-                <input
-                  id="cp-name"
-                  className="conn-input"
-                  value={draft.name}
-                  onChange={e => patchDraft({ name: e.target.value })}
-                  placeholder="My IRC Server"
-                />
-              </div>
-
-              <div className="conn-field">
-                <label className="conn-label" htmlFor="cp-host">Server Host</label>
-                <input
-                  id="cp-host"
-                  className="conn-input"
-                  value={draft.host}
-                  onChange={e => patchDraft({ host: e.target.value })}
-                  placeholder="irc.server.net"
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <div className="conn-field" style={{ flex: '1 0 80px' }}>
-                  <label className="conn-label" htmlFor="cp-port">Port</label>
-                  <input
-                    id="cp-port"
-                    className="conn-input"
-                    type="number"
-                    min={1}
-                    max={65535}
-                    value={draft.port}
-                    onChange={e => patchDraft({ port: parseInt(e.target.value, 10) || 6697 })}
-                  />
-                </div>
-
-                <div className="conn-field" style={{ flex: '1', justifyContent: 'flex-end', paddingTop: '4px' }}>
-                  <label className="conn-label">TLS</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '4px' }}>
-                    <button
-                      role="switch"
-                      aria-checked={draft.tls}
-                      className={`conn-toggle ${draft.tls ? 'conn-toggle--on' : ''}`}
-                      onClick={() => patchDraft({ tls: !draft.tls })}
-                    >
-                      <span className="conn-toggle-thumb" />
-                    </button>
-                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                      {draft.tls ? 'Enabled' : 'Disabled'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="conn-field">
-                <label className="conn-label" htmlFor="cp-nick">Nickname</label>
-                <input
-                  id="cp-nick"
-                  className="conn-input"
-                  value={draft.nick}
-                  onChange={e => patchDraft({ nick: e.target.value })}
-                  placeholder="YourNick"
-                />
-              </div>
-
-              <div className="conn-field">
-                <label className="conn-label" htmlFor="cp-pass">
-                  Password <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, fontSize: '11px', color: 'var(--text-muted)' }}>(optional)</span>
-                </label>
-                <input
-                  id="cp-pass"
-                  className="conn-input"
-                  type="password"
-                  value={draft.password ?? ''}
-                  onChange={e => patchDraft({ password: e.target.value })}
-                  placeholder="NickServ password"
-                  autoComplete="new-password"
-                />
-              </div>
-
-              <div className="conn-field">
-                <label className="conn-label" htmlFor="cp-channels">
-                  Auto-join Channels <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, fontSize: '11px', color: 'var(--text-muted)' }}>(one per line)</span>
-                </label>
-                <textarea
-                  id="cp-channels"
-                  className="conn-input"
-                  rows={3}
-                  value={draft.channels.join('\n')}
-                  onChange={e => handleChannelsText(e.target.value)}
-                  placeholder={'#general\n#help'}
-                  style={{ resize: 'vertical', minHeight: '72px' }}
-                />
-              </div>
-
-            </div>
-          )}
-
-        </div>
-
-        {/* Footer */}
-        <div className="conn-footer">
+    <ModalShell
+      onClose={closeConnectionProfiles}
+      title="Connection Profiles"
+      kicker="Network"
+      titleId="conn-modal-title"
+      size="md"
+      flushBody
+      footer={
+        <>
           <button className="conn-btn-secondary" onClick={closeConnectionProfiles}>
             Cancel
           </button>
@@ -369,41 +215,174 @@ export default function ConnectionProfilesModal() {
           >
             {connectionStatus === 'connected' ? 'Reconnect' : 'Connect'}
           </button>
+        </>
+      }
+    >
+      <div className="conn-body">
+
+        {/* Sidebar: profile list */}
+        <div className="conn-sidebar">
+          {profiles.map(p => (
+            <div
+              key={p.id}
+              className={`conn-profile-item ${p.id === activeId ? 'active' : ''}`}
+              onClick={() => handleSelectProfile(p.id)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={e => e.key === 'Enter' && handleSelectProfile(p.id)}
+              aria-pressed={p.id === activeId}
+            >
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {p.name || 'Unnamed'}
+              </span>
+              {profiles.length > 1 && (
+                <button
+                  className="conn-profile-del"
+                  onClick={e => { e.stopPropagation(); handleDeleteProfile(p.id); }}
+                  aria-label={`Delete profile ${p.name}`}
+                  title="Delete"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          ))}
+
+          <button className="conn-new-btn" onClick={handleNewProfile}>
+            <span>＋</span> New Profile
+          </button>
         </div>
+
+        {/* Editor */}
+        {draft && (
+          <div className="conn-editor">
+
+            <div className="conn-field">
+              <label className="label-caps conn-label" htmlFor="cp-name">Profile Name</label>
+              <input
+                id="cp-name"
+                className="conn-input"
+                value={draft.name}
+                onChange={e => patchDraft({ name: e.target.value })}
+                placeholder="My IRC Server"
+              />
+            </div>
+
+            <div className="conn-field">
+              <label className="label-caps conn-label" htmlFor="cp-host">Server Host</label>
+              <input
+                id="cp-host"
+                className="conn-input"
+                value={draft.host}
+                onChange={e => patchDraft({ host: e.target.value })}
+                placeholder="irc.server.net"
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <div className="conn-field" style={{ flex: '1 0 80px' }}>
+                <label className="label-caps conn-label" htmlFor="cp-port">Port</label>
+                <input
+                  id="cp-port"
+                  className="conn-input"
+                  type="number"
+                  min={1}
+                  max={65535}
+                  value={draft.port}
+                  onChange={e => patchDraft({ port: parseInt(e.target.value, 10) || 6697 })}
+                />
+              </div>
+
+              <div className="conn-field" style={{ flex: '1', justifyContent: 'flex-end', paddingTop: '4px' }}>
+                <label className="label-caps conn-label">TLS</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '4px' }}>
+                  <button
+                    role="switch"
+                    aria-checked={draft.tls}
+                    className={`conn-toggle ${draft.tls ? 'conn-toggle--on' : ''}`}
+                    onClick={() => patchDraft({ tls: !draft.tls })}
+                  >
+                    <span className="conn-toggle-thumb" />
+                  </button>
+                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    {draft.tls ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="conn-field">
+              <label className="label-caps conn-label" htmlFor="cp-nick">Nickname</label>
+              <input
+                id="cp-nick"
+                className="conn-input"
+                value={draft.nick}
+                onChange={e => patchDraft({ nick: e.target.value })}
+                placeholder="YourNick"
+              />
+            </div>
+
+            <div className="conn-field">
+              <label className="label-caps conn-label" htmlFor="cp-pass">
+                Password <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, fontSize: '11px', color: 'var(--text-muted)' }}>(optional)</span>
+              </label>
+              <input
+                id="cp-pass"
+                className="conn-input"
+                type="password"
+                value={draft.password ?? ''}
+                onChange={e => patchDraft({ password: e.target.value })}
+                placeholder="NickServ password"
+                autoComplete="new-password"
+              />
+            </div>
+
+            <div className="conn-field">
+              <label className="label-caps conn-label" htmlFor="cp-channels">
+                Auto-join Channels <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, fontSize: '11px', color: 'var(--text-muted)' }}>(one per line)</span>
+              </label>
+              <textarea
+                id="cp-channels"
+                className="conn-input"
+                rows={3}
+                value={draft.channels.join('\n')}
+                onChange={e => handleChannelsText(e.target.value)}
+                placeholder={'#general\n#help'}
+                style={{ resize: 'vertical', minHeight: '72px' }}
+              />
+            </div>
+
+          </div>
+        )}
 
       </div>
 
       <style>{`
-        .conn-modal { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.65); backdrop-filter: blur(4px); animation: scaleIn 180ms var(--ease-out) both; }
-        .conn-card { background: var(--bg-deep); border: 1px solid var(--border-normal); border-radius: var(--r-xl, 16px); width: 540px; max-width: calc(100vw - 32px); max-height: 82vh; box-shadow: var(--shadow-xl); display: flex; flex-direction: column; overflow: hidden; }
-        .conn-header { padding: 18px 24px 15px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; background: var(--bg-elevated); flex-shrink: 0; }
-        .conn-title { font-size: 16px; font-weight: 700; color: var(--text-primary); flex: 1; }
-        .conn-body { display: flex; flex: 1; overflow: hidden; }
-        .conn-sidebar { width: 188px; border-right: 1px solid var(--border-subtle); padding: 10px 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; flex-shrink: 0; background: var(--bg-deep); }
-        .conn-profile-item { padding: 9px 10px; border-radius: var(--r-sm); cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 13px; font-weight: 500; border: 1px solid transparent; transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast); }
-        .conn-profile-item:hover { background: var(--bg-elevated); color: var(--text-primary); }
-        .conn-profile-item.active { background: var(--accent-subtle); color: var(--accent); border-color: var(--accent-border); font-weight: 600; }
-        .conn-profile-del { margin-left: auto; width: 20px; height: 20px; border-radius: 50%; border: none; background: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; transition: background var(--t-fast), color var(--t-fast); flex-shrink: 0; }
+        .conn-body { display: flex; flex: 1; overflow: hidden; min-height: 380px; }
+        .conn-sidebar { width: 188px; border-right: 1px solid var(--border-subtle); padding: 10px 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; flex-shrink: 0; }
+        .conn-profile-item { position: relative; padding: 9px 10px 9px 14px; border-radius: var(--r-sm); cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: var(--text-sm, 13px); font-weight: 500; border: 1px solid transparent; transition: background var(--t-control, 150ms), color var(--t-control, 150ms), border-color var(--t-control, 150ms); }
+        .conn-profile-item:hover { background: var(--elev-tint-1, var(--bg-elevated)); color: var(--text-primary); }
+        .conn-profile-item.active { background: var(--elev-tint-2, var(--accent-subtle)); color: var(--text-primary); border-color: var(--border-subtle); font-weight: 600; }
+        .conn-profile-item.active::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 14px; border-radius: 2px; background: var(--lux, var(--accent)); }
+        .conn-profile-del { margin-left: auto; width: 20px; height: 20px; border-radius: 50%; border: none; background: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; transition: background var(--t-control, 150ms), color var(--t-control, 150ms); flex-shrink: 0; }
         .conn-profile-del:hover { background: var(--danger-subtle); color: var(--danger); }
-        .conn-editor { flex: 1; padding: 16px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+        .conn-editor { flex: 1; padding: var(--sp-4, 16px) var(--sp-5, 20px); overflow-y: auto; display: flex; flex-direction: column; gap: var(--sp-4, 16px); }
         .conn-field { display: flex; flex-direction: column; gap: 5px; }
-        .conn-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
-        .conn-input { background: var(--bg-elevated); border: 1px solid var(--border-normal); border-radius: var(--r-sm); padding: 8px 12px; color: var(--text-primary); font-size: 13px; font-family: inherit; outline: none; transition: border-color var(--t-fast), background var(--t-fast); }
+        .conn-input { background: var(--bg-elevated); border: 1px solid var(--border-normal); border-radius: var(--r-sm); padding: 8px 12px; color: var(--text-primary); font-size: var(--text-sm, 13px); font-family: inherit; outline: none; transition: border-color var(--t-control, 150ms), background var(--t-control, 150ms); }
         .conn-input:focus { border-color: var(--accent-border); background: var(--bg-float); }
         .conn-input::placeholder { color: var(--text-muted); }
-        .conn-footer { padding: 14px 20px; border-top: 1px solid var(--border-subtle); display: flex; gap: 8px; justify-content: flex-end; flex-shrink: 0; background: var(--bg-elevated); }
-        .conn-btn-primary { padding: 8px 20px; border-radius: var(--r-sm); border: none; background: var(--accent); color: white; cursor: pointer; font-size: 13px; font-weight: 600; font-family: inherit; transition: background var(--t-fast), opacity var(--t-fast); }
+        .conn-btn-primary { padding: 8px 20px; border-radius: var(--r-sm); border: none; background: var(--accent); color: white; cursor: pointer; font-size: var(--text-sm, 13px); font-weight: 600; font-family: inherit; transition: background var(--t-control, 150ms), opacity var(--t-control, 150ms); }
         .conn-btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
         .conn-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
-        .conn-btn-secondary { padding: 8px 16px; border-radius: var(--r-sm); border: 1px solid var(--border-normal); background: none; color: var(--text-secondary); cursor: pointer; font-size: 13px; font-family: inherit; transition: background var(--t-fast), color var(--t-fast); }
+        .conn-btn-secondary { padding: 8px 16px; border-radius: var(--r-sm); border: 1px solid var(--border-normal); background: none; color: var(--text-secondary); cursor: pointer; font-size: var(--text-sm, 13px); font-family: inherit; transition: background var(--t-control, 150ms), color var(--t-control, 150ms); }
         .conn-btn-secondary:hover { background: var(--bg-overlay); color: var(--text-primary); }
-        .conn-new-btn { padding: 8px 10px; border-radius: var(--r-sm); border: 1px dashed var(--border-normal); background: none; color: var(--text-muted); cursor: pointer; font-size: 12px; font-family: inherit; display: flex; align-items: center; gap: 6px; margin-top: auto; transition: border-color var(--t-fast), color var(--t-fast), background var(--t-fast); }
+        .conn-new-btn { padding: 8px 10px; border-radius: var(--r-sm); border: 1px dashed var(--border-normal); background: none; color: var(--text-muted); cursor: pointer; font-size: var(--text-xs, 12px); font-family: inherit; display: flex; align-items: center; gap: 6px; margin-top: auto; transition: border-color var(--t-control, 150ms), color var(--t-control, 150ms), background var(--t-control, 150ms); }
         .conn-new-btn:hover { border-color: var(--accent-border); color: var(--accent); background: var(--accent-subtle); }
-        .conn-toggle { position: relative; width: 36px; height: 20px; border-radius: 10px; border: none; background: var(--border-normal); cursor: pointer; transition: background var(--t-fast); padding: 0; flex-shrink: 0; }
+        .conn-toggle { position: relative; width: 36px; height: 20px; border-radius: 10px; border: none; background: var(--border-normal); cursor: pointer; transition: background var(--t-control, 150ms); padding: 0; flex-shrink: 0; }
         .conn-toggle--on { background: var(--accent); }
-        .conn-toggle-thumb { position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: white; transition: transform var(--t-fast); display: block; }
+        .conn-toggle-thumb { position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: white; transition: transform var(--t-control, 150ms); display: block; }
         .conn-toggle--on .conn-toggle-thumb { transform: translateX(16px); }
       `}</style>
-    </div>
+    </ModalShell>
   );
 }

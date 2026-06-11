@@ -6,15 +6,17 @@ interface Props {
 
 export default function SkeletonMessage({ count = 8 }: Props) {
   return (
-    <div className="skel-msg-list" aria-hidden="true">
+    <div className="skel-msg-list" aria-hidden="true" data-testid="skeleton-message">
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className={`skel-msg-row skel-row-${i + 1}`}>
           <div className="skeleton-avatar skel-msg-avatar" />
           <div className="skel-msg-body">
-            <div className="skeleton-item skel-msg-nick" />
+            <div className="skel-msg-head">
+              <div className="skeleton-item skel-msg-nick" />
+              <div className="skeleton-item skel-msg-time" />
+            </div>
             <div className="skeleton-item skel-msg-line1" />
             <div className="skeleton-item skel-msg-line2" />
-            <div className="skeleton-item skel-msg-line3" />
           </div>
         </div>
       ))}
@@ -28,109 +30,112 @@ export default function SkeletonMessage({ count = 8 }: Props) {
         .skeleton-item {
           background: linear-gradient(
             90deg,
-            var(--bg-elevated) 25%,
-            var(--bg-float)    50%,
-            var(--bg-elevated) 75%
+            var(--elev-tint-1, var(--bg-elevated)) 25%,
+            var(--elev-tint-3, var(--bg-float)) 50%,
+            var(--elev-tint-1, var(--bg-elevated)) 75%
           );
           background-size: 200% 100%;
-          animation: skel-msg-shimmer 1.6s ease-in-out infinite;
-          border-radius: 6px;
+          animation: skel-msg-shimmer 1.8s var(--ease-out, ease) infinite;
+          border-radius: var(--r-xs, 4px) var(--r-sm, 6px) var(--r-xs, 4px) var(--r-md, 8px);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
         }
 
         .skeleton-avatar {
           background: linear-gradient(
             90deg,
-            var(--bg-elevated) 25%,
-            var(--bg-float)    50%,
-            var(--bg-elevated) 75%
+            var(--elev-tint-1, var(--bg-elevated)) 25%,
+            var(--elev-tint-3, var(--bg-float)) 50%,
+            var(--elev-tint-1, var(--bg-elevated)) 75%
           );
           background-size: 200% 100%;
-          animation: skel-msg-shimmer 1.6s ease-in-out infinite;
+          animation: skel-msg-shimmer 1.8s var(--ease-out, ease) infinite;
           border-radius: 50%;
           flex-shrink: 0;
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
         }
 
         .skel-msg-list {
           display: flex;
           flex-direction: column;
-          gap: 20px;
-          padding: 20px 16px 12px;
+          gap: var(--sp-4, 16px);
+          padding: var(--sp-5, 20px) var(--sp-4, 16px) var(--sp-3, 12px);
           flex: 1;
         }
 
         .skel-msg-row {
           display: flex;
           align-items: flex-start;
-          gap: 14px;
+          gap: var(--sp-3, 12px);
+          min-height: 36px;
         }
 
-        /* 40px avatar per spec */
         .skel-msg-avatar {
-          width: 40px;
-          height: 40px;
+          width: 36px;
+          height: 36px;
         }
 
         .skel-msg-body {
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 6px;
           flex: 1;
+          min-width: 0;
+          padding-top: 2px;
         }
 
-        /* Nick + timestamp line */
+        .skel-msg-head {
+          display: flex;
+          align-items: center;
+          gap: var(--sp-2, 8px);
+          height: 14px;
+        }
+
         .skel-msg-nick {
-          height: 11px;
-          width: 90px;
+          height: 10px;
+          width: 92px;
         }
 
-        /* 3 lines of content per message */
+        .skel-msg-time {
+          height: 8px;
+          width: 38px;
+          opacity: 0.72;
+        }
+
         .skel-msg-line1,
-        .skel-msg-line2,
-        .skel-msg-line3 {
-          height: 12px;
-          border-radius: 6px;
+        .skel-msg-line2 {
+          height: 10px;
         }
 
         /* Vary content line widths per row — three lines each */
         .skel-row-1  .skel-msg-line1 { width: 90%; }
         .skel-row-1  .skel-msg-line2 { width: 60%; }
-        .skel-row-1  .skel-msg-line3 { width: 40%; }
 
         .skel-row-2  .skel-msg-line1 { width: 75%; }
         .skel-row-2  .skel-msg-line2 { width: 55%; }
-        .skel-row-2  .skel-msg-line3 { display: none; }
 
         .skel-row-3  .skel-msg-line1 { width: 88%; }
         .skel-row-3  .skel-msg-line2 { width: 70%; }
-        .skel-row-3  .skel-msg-line3 { width: 40%; }
 
         .skel-row-4  .skel-msg-line1 { width: 65%; }
         .skel-row-4  .skel-msg-line2 { display: none; }
-        .skel-row-4  .skel-msg-line3 { display: none; }
 
         .skel-row-5  .skel-msg-line1 { width: 82%; }
         .skel-row-5  .skel-msg-line2 { width: 50%; }
-        .skel-row-5  .skel-msg-line3 { display: none; }
 
         .skel-row-6  .skel-msg-line1 { width: 92%; }
         .skel-row-6  .skel-msg-line2 { width: 78%; }
-        .skel-row-6  .skel-msg-line3 { width: 40%; }
 
         .skel-row-7  .skel-msg-line1 { width: 58%; }
         .skel-row-7  .skel-msg-line2 { display: none; }
-        .skel-row-7  .skel-msg-line3 { display: none; }
 
         .skel-row-8  .skel-msg-line1 { width: 77%; }
         .skel-row-8  .skel-msg-line2 { width: 62%; }
-        .skel-row-8  .skel-msg-line3 { display: none; }
 
         .skel-row-9  .skel-msg-line1 { width: 85%; }
         .skel-row-9  .skel-msg-line2 { width: 68%; }
-        .skel-row-9  .skel-msg-line3 { width: 40%; }
 
         .skel-row-10 .skel-msg-line1 { width: 70%; }
         .skel-row-10 .skel-msg-line2 { display: none; }
-        .skel-row-10 .skel-msg-line3 { display: none; }
 
         /* Stagger animation delay per row */
         .skel-row-1  .skeleton-item, .skel-row-1  .skeleton-avatar { animation-delay:   0ms; }
@@ -143,6 +148,14 @@ export default function SkeletonMessage({ count = 8 }: Props) {
         .skel-row-8  .skeleton-item, .skel-row-8  .skeleton-avatar { animation-delay: 560ms; }
         .skel-row-9  .skeleton-item, .skel-row-9  .skeleton-avatar { animation-delay: 640ms; }
         .skel-row-10 .skeleton-item, .skel-row-10 .skeleton-avatar { animation-delay: 720ms; }
+
+        @media (prefers-reduced-motion: reduce) {
+          .skeleton-item,
+          .skeleton-avatar {
+            animation: none;
+            background-position: 50% 50%;
+          }
+        }
       `}</style>
     </div>
   );

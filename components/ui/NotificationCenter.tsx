@@ -135,7 +135,7 @@ function NotificationCard({ note, isRead, onActivate, onDismiss }: CardProps) {
         {!isRead && <span className="nc-card-dot" aria-hidden />}
 
         {/* Avatar */}
-        <span className="nc-card-avatar" style={{ background: `linear-gradient(135deg, ${nickColor}, color-mix(in oklch, ${nickColor} 60%, #000))` }}>
+        <span className="nc-card-avatar" style={{ background: `color-mix(in srgb, ${nickColor} 84%, #000)` }}>
           {note.from
             ? note.from.replace(/^[~@+.]+/, '').charAt(0).toUpperCase()
             : <TypeIcon type={note.type} />
@@ -234,7 +234,7 @@ function ChannelGroup({ channel, notes, readIds, onActivate, onDismiss }: Channe
               className="nc-group-mini-avatar"
               style={{
                 background: n.from
-                  ? `linear-gradient(135deg, ${getNickColor(n.from)}, color-mix(in oklch, ${getNickColor(n.from)} 60%, #000))`
+                  ? `color-mix(in srgb, ${getNickColor(n.from)} 84%, #000)`
                   : 'var(--bg-overlay)'
               }}
             >
@@ -274,7 +274,7 @@ function EmptyState() {
         <div className="nc-empty-ring nc-empty-ring--3" />
       </div>
       <div className="nc-empty-icon-wrap" aria-hidden>
-        <div className="nc-empty-icon-glow" />
+        <div className="nc-empty-icon-depth" />
         <div className="nc-empty-icon">🔔</div>
       </div>
       <div className="nc-empty-title">All clear</div>
@@ -562,13 +562,11 @@ export default function NotificationCenter({ onClose }: Props) {
           width: 340px;
           max-height: 100vh;
           z-index: 620;
-          background:
-            radial-gradient(circle at 18% 0%, var(--accent-glow) 0, transparent 34%),
-            linear-gradient(180deg, var(--bg-float) 0%, var(--bg-elevated) 48%, var(--bg-deep) 100%);
+          background: var(--elev-tint-3, var(--bg-elevated));
           border-left: 1px solid var(--border-normal);
           display: flex;
           flex-direction: column;
-          box-shadow: var(--shadow-xl);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-3, 0 28px 80px rgba(0,0,0,.48));
           overflow: hidden;
         }
 
@@ -617,7 +615,7 @@ export default function NotificationCenter({ onClose }: Props) {
           min-width: 20px;
           text-align: center;
           letter-spacing: 0.02em;
-          box-shadow: 0 0 16px var(--gold-subtle);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
         }
         .nc-mark-all {
           font-size: 11px;
@@ -798,8 +796,7 @@ export default function NotificationCenter({ onClose }: Props) {
           top: 1px;
           bottom: 1px;
           width: 52px;
-          background:
-            linear-gradient(90deg, transparent, var(--danger-subtle) 28%, var(--danger));
+          background: color-mix(in srgb, var(--danger, #f04747) 22%, var(--elev-tint-1, #132131));
           display: flex;
           align-items: center;
           justify-content: center;
@@ -819,9 +816,7 @@ export default function NotificationCenter({ onClose }: Props) {
           width: 100%;
           min-height: 58px;
           padding: 12px 13px 12px 16px;
-          background:
-            linear-gradient(135deg, color-mix(in oklch, var(--nc-type-color, var(--accent)) 8%, transparent), transparent 44%),
-            var(--bg-elevated);
+          background: color-mix(in srgb, var(--nc-type-color, var(--accent)) 8%, var(--elev-tint-1, var(--bg-elevated)));
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-md);
           cursor: pointer;
@@ -829,15 +824,13 @@ export default function NotificationCenter({ onClose }: Props) {
           text-align: left;
           transition: transform var(--t-fast), opacity var(--t-fast), filter var(--t-fast);
           z-index: 1;
-          box-shadow: var(--shadow-sm);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-1, 0 8px 24px rgba(0,0,0,.28));
           animation: nc-card-enter var(--t-normal) var(--ease-out) both;
         }
         .nc-card:hover {
-          background:
-            linear-gradient(135deg, color-mix(in oklch, var(--nc-type-color, var(--accent)) 12%, transparent), transparent 50%),
-            var(--bg-float);
+          background: color-mix(in srgb, var(--nc-type-color, var(--accent)) 12%, var(--elev-tint-2, var(--bg-float)));
           border-color: color-mix(in oklch, var(--nc-type-color, var(--accent)) 38%, var(--border-normal));
-          box-shadow: var(--shadow-md);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-2, 0 18px 48px rgba(0,0,0,.38));
           transform: translateY(-1px);
         }
         .nc-card:active { transform: translateY(0); }
@@ -848,11 +841,9 @@ export default function NotificationCenter({ onClose }: Props) {
         .nc-card:hover .nc-card-arrow { opacity: 1; }
 
         .nc-card--unread .nc-card {
-          background:
-            linear-gradient(135deg, color-mix(in oklch, var(--nc-type-color, var(--accent)) 16%, transparent), transparent 56%),
-            color-mix(in oklch, var(--bg-float) 78%, var(--accent-subtle));
+          background: color-mix(in srgb, var(--nc-type-color, var(--accent)) 16%, var(--elev-tint-2, var(--bg-float)));
           border-color: color-mix(in oklch, var(--nc-type-color, var(--accent)) 34%, var(--border-normal));
-          box-shadow: var(--shadow-md), 0 0 20px color-mix(in oklch, var(--nc-type-color, var(--accent)) 10%, transparent);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-2, 0 18px 48px rgba(0,0,0,.38));
         }
 
         /* Left type border — 2px for unread accent */
@@ -864,7 +855,7 @@ export default function NotificationCenter({ onClose }: Props) {
           width: 3px;
           background: var(--nc-type-color, var(--accent));
           border-radius: 0 var(--r-xs) var(--r-xs) 0;
-          box-shadow: 0 0 14px color-mix(in oklch, var(--nc-type-color, var(--accent)) 38%, transparent);
+          box-shadow: none;
         }
         .nc-card--read .nc-card-border {
           opacity: 0.3;
@@ -879,7 +870,7 @@ export default function NotificationCenter({ onClose }: Props) {
           height: 6px;
           border-radius: 50%;
           background: var(--nc-type-color, var(--accent));
-          box-shadow: 0 0 10px color-mix(in oklch, var(--nc-type-color, var(--accent)) 58%, transparent);
+          box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 20%, transparent);
         }
 
         /* Avatar */
@@ -1002,7 +993,7 @@ export default function NotificationCenter({ onClose }: Props) {
           font-family: inherit;
           text-align: left;
           transition: transform var(--t-fast), opacity var(--t-fast);
-          box-shadow: var(--shadow-sm);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-1, 0 8px 24px rgba(0,0,0,.28));
         }
         .nc-group-stack:hover { background: var(--bg-overlay); transform: translateY(1px); }
         .nc-group-avatars {
@@ -1021,7 +1012,7 @@ export default function NotificationCenter({ onClose }: Props) {
           color: rgba(255,255,255,0.9);
           border: 1.5px solid var(--bg-deep);
           margin-left: -4px;
-          box-shadow: 0 0 0 1px var(--border-subtle);
+          box-shadow: inset 0 0 0 1px var(--border-subtle);
         }
         .nc-group-mini-avatar:first-child { margin-left: 0; }
         .nc-group-more {
@@ -1116,7 +1107,7 @@ export default function NotificationCenter({ onClose }: Props) {
         .nc-empty-ring--2 { width: 140px; height: 140px; opacity: 0.04; }
         .nc-empty-ring--3 { width: 200px; height: 200px; opacity: 0.02; }
 
-        /* Icon glow */
+        /* Empty icon */
         .nc-empty-icon-wrap {
           position: relative;
           width: 60px;
@@ -1127,12 +1118,8 @@ export default function NotificationCenter({ onClose }: Props) {
           margin-bottom: 4px;
           z-index: 1;
         }
-        .nc-empty-icon-glow {
-          position: absolute;
-          inset: -10px;
-          border-radius: 50%;
-          background: radial-gradient(circle, var(--accent-glow, rgba(14,165,233,0.15)) 0%, transparent 70%);
-          filter: blur(4px);
+        .nc-empty-icon-depth {
+          display: none;
         }
         .nc-empty-icon {
           position: relative;
@@ -1185,6 +1172,28 @@ export default function NotificationCenter({ onClose }: Props) {
           background: var(--bg-overlay);
           color: var(--text-secondary);
         }
+        .nc-mark-all:active,
+        .nc-clear-all:active,
+        .nc-close:active,
+        .nc-tab:active,
+        .nc-overflow-btn:active,
+        .nc-group-stack:active,
+        .nc-group-collapse:active,
+        .nc-older-toggle:active,
+        .nc-settings-link:active {
+          transform: translateY(0.5px);
+        }
+        .nc-clear-all:focus-visible,
+        .nc-close:focus-visible,
+        .nc-tab:focus-visible,
+        .nc-overflow-btn:focus-visible,
+        .nc-group-stack:focus-visible,
+        .nc-group-collapse:focus-visible,
+        .nc-older-toggle:focus-visible,
+        .nc-settings-link:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
+        }
 
         @media (prefers-reduced-motion: reduce) {
           .nc-backdrop,
@@ -1203,7 +1212,16 @@ export default function NotificationCenter({ onClose }: Props) {
           .nc-card:hover,
           .nc-card:hover .nc-card-arrow,
           .nc-group-stack:hover,
-          .nc-close:hover {
+          .nc-close:hover,
+          .nc-mark-all:active,
+          .nc-clear-all:active,
+          .nc-close:active,
+          .nc-tab:active,
+          .nc-overflow-btn:active,
+          .nc-group-stack:active,
+          .nc-group-collapse:active,
+          .nc-older-toggle:active,
+          .nc-settings-link:active {
             transform: none;
           }
           .nc-card-wrap.nc-card--dismissing {

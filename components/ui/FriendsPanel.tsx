@@ -3,6 +3,9 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import { getNickColor } from '@/lib/nick-color';
+import SkeletonMember from '@/components/chat/SkeletonMember';
+import PanelEmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
 
 // ── Deterministic avatar hue from nick ───────────────────────────────────────
 
@@ -238,6 +241,9 @@ export default function FriendsPanel() {
   const toggleSoftIgnore  = useOnyxStore(s => s.toggleSoftIgnore);
   const addToWatchList    = useOnyxStore(s => s.addToWatchList);
   const navigate          = useOnyxStore(s => s.navigate);
+  const status            = useOnyxStore(s => s.status);
+  const connectionStatus  = useOnyxStore(s => s.connectionStatus);
+  const reconnectNow      = useOnyxStore(s => s.reconnectNow);
 
   const [tab, setTab] = useState<Tab>('online');
 
@@ -287,6 +293,10 @@ export default function FriendsPanel() {
   const onlineCount   = onlineFriends.length;
 
   const blockedList = [...softIgnoreList].sort((a, b) => a.localeCompare(b));
+  const panelLoading = (connectionStatus === 'connecting' || connectionStatus === 'reconnecting') &&
+    friends.size === 0 &&
+    blockedList.length === 0;
+  const panelError = status === 'error';
 
   return (
     <>
@@ -334,12 +344,22 @@ export default function FriendsPanel() {
 
         {/* Body */}
         <div className="fp-body">
-          {tab === 'online' && (
+          {panelError ? (
+            <ErrorState
+              title="Friends are unavailable"
+              message="Ocean could not refresh your friends and watch list from the current connection."
+              details={`FriendsPanel failed while connection status was ${connectionStatus}.`}
+              onRetry={reconnectNow}
+            />
+          ) : panelLoading ? (
+            <SkeletonMember count={10} />
+          ) : tab === 'online' && (
             onlineFriends.length === 0
-              ? <EmptyState
-                  icon={<OnlineIllustration />}
+              ? <PanelEmptyState
+                  icon="o"
                   title="Nobody online yet"
-                  sub="Your friends will appear here when they connect."
+                  description="Your friends will appear here when they connect."
+                  size="sm"
                 />
               : <div className="fp-list">
                   {onlineFriends.map(f => (
@@ -355,12 +375,14 @@ export default function FriendsPanel() {
                 </div>
           )}
 
-          {tab === 'all' && (
+          {!panelError && !panelLoading && tab === 'all' && (
             allFriends.length === 0
-              ? <EmptyState
-                  icon={<PeopleIllustration />}
+              ? <PanelEmptyState
+                  icon="++"
                   title="No friends yet"
-                  sub="Add someone using the Add Friend tab."
+                  description="Add someone using the Add Friend tab."
+                  action={{ label: 'Add Friend', onClick: () => setTab('add') }}
+                  size="sm"
                 />
               : <div className="fp-list">
                   {allFriends.map(f => (
@@ -376,20 +398,22 @@ export default function FriendsPanel() {
                 </div>
           )}
 
-          {tab === 'pending' && (
-            <EmptyState
-              icon={<PendingIllustration />}
+          {!panelError && !panelLoading && tab === 'pending' && (
+            <PanelEmptyState
+              icon="..."
               title="No pending requests"
-              sub="Friend requests will appear here when you receive them."
+              description="Friend requests will appear here when you receive them."
+              size="sm"
             />
           )}
 
-          {tab === 'blocked' && (
+          {!panelError && !panelLoading && tab === 'blocked' && (
             blockedList.length === 0
-              ? <EmptyState
-                  icon={<BlockIllustration />}
+              ? <PanelEmptyState
+                  icon="x"
                   title="Nobody blocked"
-                  sub="Users you block will appear here."
+                  description="Users you block will appear here."
+                  size="sm"
                 />
               : <div className="fp-list">
                   {blockedList.map(nick => (
@@ -402,7 +426,7 @@ export default function FriendsPanel() {
                 </div>
           )}
 
-          {tab === 'add' && (
+          {!panelError && !panelLoading && tab === 'add' && (
             <AddFriendTab onAdd={handleAddFriend} />
           )}
         </div>

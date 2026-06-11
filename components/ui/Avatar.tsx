@@ -68,7 +68,7 @@ export default function Avatar({
   const isGif      = !!src?.match(/\.gif($|\?)/i);
 
   /* Box-shadow builds up in layers:
-     1. speaking glow (or nothing)
+     1. speaking ring (or nothing)
      2. status ring (or nothing) */
   let boxShadow: string | undefined;
 
@@ -90,13 +90,14 @@ export default function Avatar({
         className,
       ].filter(Boolean).join(' ')}
       style={{ width: size, height: size }}
+      tabIndex={showTooltip ? 0 : undefined}
       aria-label={status ? `${nick}, ${status}` : nick}
     >
       {/* Core circle */}
       <span
         className="av-inner"
         style={{
-          background: src ? 'transparent' : `linear-gradient(135deg, ${nickColor}, ${darkColor})`,
+          background: src ? 'transparent' : `color-mix(in srgb, ${nickColor} 84%, ${darkColor})`,
           width: size,
           height: size,
           fontSize,
@@ -161,9 +162,17 @@ export default function Avatar({
           flex-shrink: 0;
           border-radius: 50%;
           transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1);
+          outline: none;
         }
         .av-wrap:hover {
-          transform: scale(1.04);
+          transform: translateY(-1px);
+        }
+        .av-wrap:active {
+          transform: translateY(0.5px);
+        }
+        .av-wrap:focus-visible {
+          outline: 2px solid var(--accent, #0ea5e9);
+          outline-offset: 2px;
         }
 
         .av-inner {
@@ -242,12 +251,7 @@ export default function Avatar({
           z-index: 2;
         }
         .av-status-dot--online {
-          box-shadow: 0 0 0 0 rgba(35, 165, 90, 0.4);
-          animation: av-online-pulse 2.5s ease-in-out infinite;
-        }
-        @keyframes av-online-pulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(35, 165, 90, 0.4); }
-          50%       { box-shadow: 0 0 0 3px rgba(35, 165, 90, 0); }
+          box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 28%, transparent);
         }
         .av-status-dot--offline { opacity: 0.5; }
 
@@ -307,6 +311,27 @@ export default function Avatar({
 
         .av-wrap:hover .av-tooltip {
           opacity: 1;
+        }
+        .av-wrap:focus-visible .av-tooltip {
+          opacity: 1;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .av-wrap,
+          .av-inner,
+          .av-status-dot,
+          .av-tooltip {
+            transition-duration: 1ms;
+          }
+          .av-animated .av-inner,
+          .av-speaking .av-inner,
+          .av-animated.av-speaking .av-inner {
+            animation-duration: 1ms;
+            animation-iteration-count: 1;
+          }
+          .av-wrap:hover,
+          .av-wrap:active {
+            transform: none;
+          }
         }
       `}</style>
     </span>

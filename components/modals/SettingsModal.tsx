@@ -4,8 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import Button from '@/components/ui/Button';
 import Avatar from '@/components/ui/Avatar';
-import { useFocusTrap } from '@/hooks/useFocusTrap';
-import { useDialogFocus } from './useDialogFocus';
+import ModalShell from './ModalShell';
 import CTCPSettingsSection from './CTCPSettingsSection';
 
 type Tab = 'account' | 'appearance' | 'voice' | 'notifications' | 'accessibility' | 'developer' | 'streamer' | 'advanced';
@@ -26,34 +25,16 @@ export default function SettingsModal() {
   const settingsTab   = useOnyxStore(s => s.settingsTab);
   const [tab, setTab] = useState<Tab>(settingsTab as Tab ?? 'account');
 
-  const modalRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(modalRef, true);
-  useDialogFocus(modalRef);
-
-  // Close on Escape
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeSettings();
-    };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [closeSettings]);
-
-  const stopProp = (e: React.MouseEvent) => e.stopPropagation();
-
   return (
-    <div
-      className="settings-overlay"
-      onClick={closeSettings}
+    <ModalShell
+      onClose={closeSettings}
+      size="lg"
+      showClose={false}
+      ariaLabel="Settings"
+      flushBody
+      className="settings-modal"
     >
-      <div
-        className="settings-modal animate-scale-in"
-        onClick={stopProp}
-        ref={modalRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="settings-modal-title"
-      >
+      <div className="settings-layout">
         {/* Sidebar */}
         <nav className="settings-nav" aria-label="Settings navigation">
           <h2 id="settings-modal-title" className="settings-nav-title">Settings</h2>
@@ -108,38 +89,16 @@ export default function SettingsModal() {
       </div>
 
       <style>{`
-        @keyframes settings-scale-in {
-          from { opacity: 0; transform: scale(0.96); }
-          to   { opacity: 1; transform: scale(1); }
-        }
-
-        .settings-overlay {
-          position: fixed; inset: 0;
-          background: color-mix(in srgb, var(--bg-void, #030810) 86%, transparent);
-          z-index: 500;
-          display: flex; align-items: center; justify-content: center;
-          padding: 24px;
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          animation: settings-fade-in var(--t-fast, 150ms) var(--ease-out, ease) both;
-        }
-        @keyframes settings-fade-in {
-          from { opacity: 0; }
-          to   { opacity: 1; }
-        }
-
         .settings-modal {
-          background:
-            radial-gradient(circle at 8% 0%, var(--accent-glow, rgba(14,165,233,0.18)), transparent 34%),
-            linear-gradient(135deg, var(--bg-elevated, #132131), var(--bg-base, #0c1828) 54%, var(--bg-deep, #06101d));
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-xl, 16px);
-          width: 100%; max-width: 920px;
-          height: 82dvh; max-height: 640px;
+          height: min(82vh, 640px);
+          max-width: 920px;
+          width: calc(100vw - var(--sp-12, 48px));
+        }
+
+        .settings-layout {
           display: flex;
-          overflow: hidden;
-          box-shadow: var(--shadow-xl, 0 24px 64px rgba(0,0,0,0.75)), var(--glow, 0 0 32px rgba(14,165,233,0.2));
-          animation: settings-scale-in var(--t-normal, 260ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
+          height: 100%;
+          min-height: 0;
         }
 
         .settings-nav {
@@ -152,9 +111,10 @@ export default function SettingsModal() {
         }
 
         .settings-nav-title {
-          font-size: 11px; font-weight: 800;
-          letter-spacing: 0.14em; text-transform: uppercase;
-          color: var(--gold, #67e8f9); padding: 0 12px;
+          font-family: var(--font-display, inherit);
+          font-size: var(--text-sm, 13px); font-weight: 600;
+          letter-spacing: 0.1em; text-transform: uppercase;
+          color: var(--text-muted); padding: 0 12px;
           margin-bottom: 14px;
         }
 
@@ -163,9 +123,9 @@ export default function SettingsModal() {
           padding: 0 12px; height: 38px;
           border-radius: var(--r-md, 8px);
           background: transparent; border: 1px solid transparent; cursor: pointer;
-          text-align: left; font-size: 13px; font-weight: 500;
+          text-align: left; font-size: var(--text-sm, 13px); font-weight: 500;
           color: var(--text-secondary);
-          transition: transform var(--t-fast, 150ms) var(--ease-out, ease), opacity var(--t-fast, 150ms) var(--ease-out, ease), filter var(--t-fast, 150ms) var(--ease-out, ease);
+          transition: background var(--t-control, 150ms) var(--ease-out, ease), color var(--t-control, 150ms) var(--ease-out, ease);
           width: 100%;
           position: relative;
           overflow: hidden;
@@ -173,23 +133,22 @@ export default function SettingsModal() {
         .settings-tab::before {
           content: '';
           position: absolute;
-          left: 0; top: 7px; bottom: 7px;
+          left: 0; top: 50%; transform: translateY(-50%);
+          height: 14px;
           width: 3px; border-radius: var(--r-full);
-          background: var(--gold, #67e8f9);
+          background: var(--lux, var(--gold, #67e8f9));
           opacity: 0;
-          transition: opacity var(--t-fast, 150ms) var(--ease-out, ease);
+          transition: opacity var(--t-control, 150ms) var(--ease-out, ease);
         }
         .settings-tab:hover {
-          background: var(--ch-hover-bg, rgba(14,165,233,0.07));
+          background: var(--elev-tint-1, var(--ch-hover-bg, rgba(14,165,233,0.07)));
           color: var(--text-primary);
-          transform: translateX(2px);
         }
         .settings-tab--active {
-          background: var(--accent-subtle);
-          border-color: var(--accent-border);
+          background: var(--elev-tint-2, var(--accent-subtle));
+          border-color: var(--border-subtle);
           color: var(--text-primary);
           font-weight: 600;
-          box-shadow: var(--shadow-sm, 0 1px 4px rgba(0,0,0,0.5));
         }
         .settings-tab--active::before { opacity: 1; }
         .settings-tab:focus-visible {
@@ -244,22 +203,17 @@ export default function SettingsModal() {
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .settings-overlay,
-          .settings-modal {
-            animation: none;
-          }
           .settings-tab,
           .settings-tab::before,
           .settings-close {
             transition: none;
           }
-          .settings-tab:hover,
           .settings-close:hover {
             transform: none;
           }
         }
       `}</style>
-    </div>
+    </ModalShell>
   );
 }
 

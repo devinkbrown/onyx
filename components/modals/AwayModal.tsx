@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
-import { useDialogFocus } from './useDialogFocus';
+import ModalShell from './ModalShell';
 
 const PRESETS = [
   { emoji: '🍽️', label: 'Lunch',    message: 'Out for lunch' },
@@ -33,23 +33,10 @@ export default function AwayModal() {
 
   const [draft, setDraft] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const panelRef    = useRef<HTMLDivElement>(null);
-
-  // Focus textarea on open + restore focus on close
-  useDialogFocus(panelRef);
 
   useEffect(() => {
     textareaRef.current?.focus();
   }, []);
-
-  // Close on Escape
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeAwayModal();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [closeAwayModal]);
 
   const handleSet = () => {
     const msg = draft.trim();
@@ -58,24 +45,14 @@ export default function AwayModal() {
   };
 
   return (
-    <div
-      className="away-backdrop"
-      onClick={e => { if (e.target === e.currentTarget) closeAwayModal(); }}
+    <ModalShell
+      onClose={closeAwayModal}
+      title="Set Away Status"
+      kicker="Presence"
+      titleId="away-modal-title"
+      size="sm"
     >
-      <div
-        className="away-panel"
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="away-modal-title"
-      >
-        <div className="away-header">
-          <h2 id="away-modal-title" className="away-title">Set Away Status</h2>
-          <button className="away-close" onClick={closeAwayModal} aria-label="Close">
-            <CloseIcon />
-          </button>
-        </div>
-
+      <div className="away-content">
         {isAway ? (
           // ── Currently away — show current message + clear button ──────────
           <div className="away-current">
@@ -144,65 +121,15 @@ export default function AwayModal() {
       </div>
 
       <style>{`
-        .away-backdrop {
-          position: fixed;
-          inset: 0;
-          z-index: 900;
-          background: rgba(0, 0, 0, 0.6);
-          backdrop-filter: blur(3px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .away-panel {
-          width: 400px;
-          max-width: calc(100vw - 32px);
-          background: var(--bg-deep);
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-xl);
-          padding: 20px;
+        .away-content {
           display: flex;
           flex-direction: column;
-          gap: 16px;
-          box-shadow: var(--shadow-xl);
-          animation: scaleIn 180ms var(--ease-out) both;
-        }
-
-        .away-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-
-        .away-title {
-          font-size: 16px;
-          font-weight: 700;
-          color: var(--text-primary);
-          margin: 0;
-        }
-
-        .away-close {
-          width: 28px;
-          height: 28px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: none;
-          border: none;
-          cursor: pointer;
-          color: var(--text-muted);
-          border-radius: var(--r-sm, 6px);
-          transition: background var(--t-fast), color var(--t-fast);
-        }
-        .away-close:hover {
-          background: var(--ch-hover-bg);
-          color: var(--text-primary);
+          gap: var(--sp-4, 16px);
         }
 
         .away-presets {
           display: flex;
-          gap: 8px;
+          gap: var(--sp-2, 8px);
           flex-wrap: wrap;
         }
 
@@ -211,14 +138,14 @@ export default function AwayModal() {
           align-items: center;
           gap: 5px;
           padding: 6px 12px;
-          background: var(--bg-elevated);
+          background: var(--elev-tint-1, var(--bg-elevated));
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-full);
           cursor: pointer;
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           font-family: inherit;
           color: var(--text-secondary);
-          transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+          transition: background var(--t-control, 150ms), border-color var(--t-control, 150ms), color var(--t-control, 150ms);
         }
         .away-preset:hover {
           background: var(--accent-subtle);
@@ -242,12 +169,12 @@ export default function AwayModal() {
           border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
           border-radius: var(--r-md, 8px);
           color: var(--text-primary);
-          font-size: 14px;
+          font-size: var(--text-base, 14px);
           font-family: inherit;
           resize: vertical;
           min-height: 72px;
           box-sizing: border-box;
-          transition: border-color var(--t-fast);
+          transition: border-color var(--t-control, 150ms);
         }
         .away-textarea:focus {
           outline: none;
@@ -256,7 +183,7 @@ export default function AwayModal() {
         .away-textarea::placeholder { color: var(--text-muted); }
 
         .away-counter {
-          font-size: 11px;
+          font-size: var(--text-2xs, 11px);
           color: var(--text-muted);
           text-align: right;
         }
@@ -267,11 +194,11 @@ export default function AwayModal() {
           color: #fff;
           border: none;
           border-radius: var(--r-md);
-          font-size: 14px;
+          font-size: var(--text-base, 14px);
           font-weight: 600;
           font-family: inherit;
           cursor: pointer;
-          transition: background var(--t-fast), opacity var(--t-fast);
+          transition: background var(--t-control, 150ms), opacity var(--t-control, 150ms);
           align-self: flex-end;
         }
         .away-btn-set:hover:not(:disabled) { background: var(--accent-hover); }
@@ -287,13 +214,13 @@ export default function AwayModal() {
         }
 
         .away-current-label {
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           color: var(--text-secondary);
           margin: 0;
         }
 
         .away-current-msg {
-          font-size: 15px;
+          font-size: var(--text-md, 15px);
           font-weight: 500;
           color: var(--text-primary);
           background: var(--bg-base, #0c1828);
@@ -310,12 +237,12 @@ export default function AwayModal() {
           border: 1px solid var(--border-normal, rgba(255,255,255,0.1));
           color: var(--text-secondary);
           border-radius: var(--r-md, 8px);
-          font-size: 14px;
+          font-size: var(--text-base, 14px);
           font-weight: 600;
           font-family: inherit;
           cursor: pointer;
           align-self: flex-end;
-          transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+          transition: background var(--t-control, 150ms), border-color var(--t-control, 150ms), color var(--t-control, 150ms);
         }
         .away-btn-clear:hover {
           background: var(--ch-hover-bg);
@@ -327,8 +254,8 @@ export default function AwayModal() {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 12px;
-          padding-top: 12px;
+          gap: var(--sp-3, 12px);
+          padding-top: var(--sp-3, 12px);
           border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
         }
 
@@ -343,7 +270,7 @@ export default function AwayModal() {
         }
 
         .away-idle-label {
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           font-weight: 500;
           color: var(--text-secondary);
         }
@@ -354,28 +281,20 @@ export default function AwayModal() {
           border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
           border-radius: var(--r-md, 8px);
           color: var(--text-primary);
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           font-family: inherit;
           cursor: pointer;
           appearance: none;
           background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23607d8b' stroke-width='1.5' stroke-linecap='round' fill='none'/%3E%3C/svg%3E");
           background-repeat: no-repeat;
           background-position: right 8px center;
-          transition: border-color var(--t-fast);
+          transition: border-color var(--t-control, 150ms);
         }
         .away-idle-select:focus {
           outline: none;
           border-color: var(--accent-border, rgba(14,165,233,0.5));
         }
       `}</style>
-    </div>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-      <path d="M2 2l10 10M12 2L2 12" />
-    </svg>
+    </ModalShell>
   );
 }

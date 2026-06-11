@@ -45,10 +45,9 @@ export default function OutgoingCallOverlay() {
         }
         .ocall-box {
           display: flex; flex-direction: column; align-items: center; gap: 14px;
-          background: linear-gradient(160deg, var(--bg-elevated) 0%, var(--bg-deep) 100%);
-          border: 1px solid var(--accent-border);
-          border-radius: 20px; padding: 40px 56px;
-          box-shadow: 0 24px 60px rgba(0,0,0,0.6), 0 0 0 1px var(--accent-subtle), 0 0 32px var(--accent-glow);
+          background: color-mix(in srgb, #050505 88%, var(--accent, #0ea5e9) 7%);
+          border-radius: var(--r-md, 8px) var(--r-2xl, 20px) var(--r-lg, 14px) var(--r-xl, 16px); padding: 40px 56px;
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-3, 0 24px 60px rgba(0,0,0,.52));
         }
 
         /* ── Avatar with expanding rings ── */
@@ -97,12 +96,12 @@ export default function OutgoingCallOverlay() {
         }
         .ocall-cancel {
           margin-top: 4px; padding: 10px 24px;
-          background: #f04747; color: white; border: none;
-          border-radius: 24px; font-size: 15px; font-weight: 600; cursor: pointer;
+          background: color-mix(in srgb, var(--danger, #f87171) 28%, #050505 72%); color: white; border: none;
+          border-radius: var(--r-xl, 16px) var(--r-sm, 6px) var(--r-2xl, 20px) var(--r-md, 8px); font-size: 15px; font-weight: 600; cursor: pointer;
           display: flex; align-items: center; gap: 8px;
           font-family: inherit;
           transition: opacity 0.15s, transform 0.1s;
-          box-shadow: 0 4px 16px rgba(240,71,71,0.4);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-1, 0 10px 26px rgba(0,0,0,.32));
         }
         .ocall-cancel:hover { opacity: 0.88; transform: scale(1.03); }
         .ocall-cancel:active { transform: scale(0.97); }

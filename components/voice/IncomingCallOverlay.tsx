@@ -55,11 +55,10 @@ export default function IncomingCallOverlay() {
         }
         .icall-box {
           display: flex; flex-direction: column; align-items: center; gap: 12px;
-          background: linear-gradient(160deg, var(--bg-elevated) 0%, var(--bg-deep) 100%);
-          border: 1px solid var(--accent-border);
-          border-radius: 20px;
+          background: color-mix(in srgb, #050505 88%, var(--accent, #0ea5e9) 7%);
+          border-radius: var(--r-md, 8px) var(--r-2xl, 20px) var(--r-lg, 14px) var(--r-xl, 16px);
           padding: 36px 48px;
-          box-shadow: 0 24px 60px rgba(0,0,0,0.6), 0 0 0 1px var(--accent-subtle), 0 0 32px var(--accent-glow);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-3, 0 24px 60px rgba(0,0,0,.52));
           text-align: center;
           animation: icall-box-in 0.32s cubic-bezier(0.16, 1, 0.3, 1);
         }
@@ -95,17 +94,17 @@ export default function IncomingCallOverlay() {
         }
         .icall-actions { display: flex; gap: 24px; margin-top: 8px; }
         .icall-btn {
-          width: 60px; height: 60px; border-radius: 50%; border: none;
+          width: 60px; height: 60px; border-radius: var(--r-xl, 16px) var(--r-sm, 6px) var(--r-2xl, 20px) var(--r-md, 8px); border: none;
           cursor: pointer;
           display: flex; align-items: center; justify-content: center;
-          transition: transform 0.15s, box-shadow 0.15s;
+          transition: transform 0.15s, background 0.15s;
           color: #fff;
           font-family: inherit;
         }
         .icall-btn:hover  { transform: scale(1.1); }
         .icall-btn:active { transform: scale(0.95); }
-        .icall-btn--reject { background: #f04747; box-shadow: 0 4px 16px rgba(240,71,71,0.4); }
-        .icall-btn--accept { background: var(--status-online, #34d399); box-shadow: 0 4px 16px rgba(52,211,153,0.4); }
+        .icall-btn--reject { background: color-mix(in srgb, var(--danger, #f87171) 28%, #050505 72%); }
+        .icall-btn--accept { background: color-mix(in srgb, var(--status-online, #34d399) 28%, #050505 72%); }
       `}</style>
     </div>
   );

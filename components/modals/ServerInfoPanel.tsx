@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import ModalShell from './ModalShell';
 
 type SIPTab = 'info' | 'isupport';
 
@@ -53,227 +54,156 @@ export default function ServerInfoPanel() {
   const isupportEntries = Object.entries(isupportTokens).sort(([a], [b]) => a.localeCompare(b));
 
   return (
-    <>
-      <div className="sip-backdrop" onClick={closeServerInfo} aria-hidden />
-      <aside className="sip" role="complementary" aria-label="Server information">
-        <header className="sip-header">
-          <span className="sip-title">Server Info</span>
-          <button
-            className="sip-close"
-            onClick={closeServerInfo}
-            aria-label="Close server info"
-          >
-            ✕
-          </button>
-        </header>
-
-        {/* Tab bar */}
-        <div className="sip-tabs">
-          <button
-            className={`sip-tab ${tab === 'info' ? 'sip-tab--active' : ''}`}
-            onClick={() => setTab('info')}
-          >
-            Overview
-          </button>
-          <button
-            className={`sip-tab ${tab === 'isupport' ? 'sip-tab--active' : ''}`}
-            onClick={() => setTab('isupport')}
-          >
-            ISUPPORT
-            {isupportEntries.length > 0 && (
-              <span className="sip-tab-badge">{isupportEntries.length}</span>
-            )}
-          </button>
-        </div>
-
-        <div className="sip-body">
-
-          {tab === 'info' && (
-            <>
-              {/* ── Server ── */}
-              <section className="sip-section">
-                <h3 className="sip-section-title">Server</h3>
-                <dl className="sip-dl">
-                  <div className="sip-row">
-                    <dt>Network</dt>
-                    <dd>{networkName || '—'}</dd>
-                  </div>
-                  <div className="sip-row">
-                    <dt>Host</dt>
-                    <dd className="sip-mono">{hostname}</dd>
-                  </div>
-                </dl>
-              </section>
-
-              {/* ── Version ── */}
-              <section className="sip-section">
-                <h3 className="sip-section-title">Version</h3>
-                <dl className="sip-dl">
-                  <div className="sip-row">
-                    <dt>Software</dt>
-                    <dd className="sip-mono">{serverVersion ?? '—'}</dd>
-                  </div>
-                </dl>
-              </section>
-
-              {/* ── Stats ── */}
-              <section className="sip-section">
-                <h3 className="sip-section-title">Network Stats</h3>
-                <div className="sip-stat-grid">
-                  <div className="sip-stat-card">
-                    <span className="sip-stat-value sip-stat-value--accent">
-                      {serverStats?.users ?? '—'}
-                    </span>
-                    <span className="sip-stat-label">Users</span>
-                  </div>
-                  <div className="sip-stat-card">
-                    <span className="sip-stat-value">
-                      {serverStats?.channels ?? '—'}
-                    </span>
-                    <span className="sip-stat-label">Channels</span>
-                  </div>
-                  <div className="sip-stat-card">
-                    <span className="sip-stat-value">
-                      {serverStats?.servers ?? '—'}
-                    </span>
-                    <span className="sip-stat-label">Servers</span>
-                  </div>
-                  <div className="sip-stat-card">
-                    <span className="sip-stat-value">
-                      {serverStats?.opers ?? '—'}
-                    </span>
-                    <span className="sip-stat-label">Opers</span>
-                  </div>
-                </div>
-              </section>
-
-              {/* ── Capabilities ── */}
-              <section className="sip-section">
-                <h3 className="sip-section-title">Capabilities</h3>
-                {serverCapabilities.length === 0 ? (
-                  <p className="sip-empty">No capabilities negotiated</p>
-                ) : (
-                  <ul className="sip-caps">
-                    {serverCapabilities.map(cap => (
-                      <li key={cap} className="sip-cap-tag">{cap}</li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-
-              {/* ── Your session ── */}
-              <section className="sip-section">
-                <h3 className="sip-section-title">Your Session</h3>
-                <dl className="sip-dl">
-                  <div className="sip-row">
-                    <dt>Nick</dt>
-                    <dd className="sip-mono">{ourNick || '—'}</dd>
-                  </div>
-                  <div className="sip-row">
-                    <dt>Account</dt>
-                    <dd className="sip-mono">{server?.account ?? '—'}</dd>
-                  </div>
-                  <div className="sip-row">
-                    <dt>Connected</dt>
-                    <dd>{uptime}</dd>
-                  </div>
-                  <div className="sip-row">
-                    <dt>Ping</dt>
-                    <dd>{latencyMs !== null ? `${latencyMs}ms` : '—'}</dd>
-                  </div>
-                </dl>
-              </section>
-            </>
+    <ModalShell
+      onClose={closeServerInfo}
+      variant="sheet"
+      size="sm"
+      title="Server Info"
+      kicker={networkName || 'Network'}
+      titleId="sip-title"
+      closeLabel="Close server info"
+      flushBody
+    >
+      {/* Tab bar */}
+      <div className="sip-tabs">
+        <button
+          className={`sip-tab ${tab === 'info' ? 'sip-tab--active' : ''}`}
+          onClick={() => setTab('info')}
+        >
+          Overview
+        </button>
+        <button
+          className={`sip-tab ${tab === 'isupport' ? 'sip-tab--active' : ''}`}
+          onClick={() => setTab('isupport')}
+        >
+          ISUPPORT
+          {isupportEntries.length > 0 && (
+            <span className="sip-tab-badge">{isupportEntries.length}</span>
           )}
+        </button>
+      </div>
 
-          {tab === 'isupport' && (
-            <section className="sip-section sip-section--isupport">
-              <h3 className="sip-section-title">ISUPPORT Tokens</h3>
-              {isupportEntries.length === 0 ? (
-                <p className="sip-empty">No ISUPPORT tokens received yet</p>
-              ) : (
-                <div className="sip-isupport-grid">
-                  {isupportEntries.map(([key, val]) => (
-                    <div key={key} className="sip-isupport-row">
-                      <span className="sip-isupport-key">{key}</span>
-                      <span className="sip-isupport-val">{val || <span className="sip-isupport-empty">—</span>}</span>
-                    </div>
-                  ))}
+      <div className="sip-body">
+
+        {tab === 'info' && (
+          <>
+            {/* ── Server ── */}
+            <section className="sip-section">
+              <h3 className="sip-section-title">Server</h3>
+              <dl className="sip-dl">
+                <div className="sip-row">
+                  <dt>Network</dt>
+                  <dd>{networkName || '—'}</dd>
                 </div>
+                <div className="sip-row">
+                  <dt>Host</dt>
+                  <dd className="sip-mono">{hostname}</dd>
+                </div>
+              </dl>
+            </section>
+
+            {/* ── Version ── */}
+            <section className="sip-section">
+              <h3 className="sip-section-title">Version</h3>
+              <dl className="sip-dl">
+                <div className="sip-row">
+                  <dt>Software</dt>
+                  <dd className="sip-mono">{serverVersion ?? '—'}</dd>
+                </div>
+              </dl>
+            </section>
+
+            {/* ── Stats ── */}
+            <section className="sip-section">
+              <h3 className="sip-section-title">Network Stats</h3>
+              <div className="sip-stat-grid">
+                <div className="sip-stat-card">
+                  <span className="sip-stat-value sip-stat-value--accent">
+                    {serverStats?.users ?? '—'}
+                  </span>
+                  <span className="sip-stat-label">Users</span>
+                </div>
+                <div className="sip-stat-card">
+                  <span className="sip-stat-value">
+                    {serverStats?.channels ?? '—'}
+                  </span>
+                  <span className="sip-stat-label">Channels</span>
+                </div>
+                <div className="sip-stat-card">
+                  <span className="sip-stat-value">
+                    {serverStats?.servers ?? '—'}
+                  </span>
+                  <span className="sip-stat-label">Servers</span>
+                </div>
+                <div className="sip-stat-card">
+                  <span className="sip-stat-value">
+                    {serverStats?.opers ?? '—'}
+                  </span>
+                  <span className="sip-stat-label">Opers</span>
+                </div>
+              </div>
+            </section>
+
+            {/* ── Capabilities ── */}
+            <section className="sip-section">
+              <h3 className="sip-section-title">Capabilities</h3>
+              {serverCapabilities.length === 0 ? (
+                <p className="sip-empty">No capabilities negotiated</p>
+              ) : (
+                <ul className="sip-caps">
+                  {serverCapabilities.map(cap => (
+                    <li key={cap} className="sip-cap-tag">{cap}</li>
+                  ))}
+                </ul>
               )}
             </section>
-          )}
 
-        </div>
-      </aside>
+            {/* ── Your session ── */}
+            <section className="sip-section">
+              <h3 className="sip-section-title">Your Session</h3>
+              <dl className="sip-dl">
+                <div className="sip-row">
+                  <dt>Nick</dt>
+                  <dd className="sip-mono">{ourNick || '—'}</dd>
+                </div>
+                <div className="sip-row">
+                  <dt>Account</dt>
+                  <dd className="sip-mono">{server?.account ?? '—'}</dd>
+                </div>
+                <div className="sip-row">
+                  <dt>Connected</dt>
+                  <dd>{uptime}</dd>
+                </div>
+                <div className="sip-row">
+                  <dt>Ping</dt>
+                  <dd>{latencyMs !== null ? `${latencyMs}ms` : '—'}</dd>
+                </div>
+              </dl>
+            </section>
+          </>
+        )}
+
+        {tab === 'isupport' && (
+          <section className="sip-section sip-section--isupport">
+            <h3 className="sip-section-title">ISUPPORT Tokens</h3>
+            {isupportEntries.length === 0 ? (
+              <p className="sip-empty">No ISUPPORT tokens received yet</p>
+            ) : (
+              <div className="sip-isupport-grid">
+                {isupportEntries.map(([key, val]) => (
+                  <div key={key} className="sip-isupport-row">
+                    <span className="sip-isupport-key">{key}</span>
+                    <span className="sip-isupport-val">{val || <span className="sip-isupport-empty">—</span>}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+      </div>
 
       <style>{`
-        .sip-backdrop {
-          position: fixed;
-          inset: 0;
-          z-index: 49;
-          background: transparent;
-        }
-
-        .sip {
-          position: fixed;
-          top: 0;
-          right: 0;
-          bottom: 0;
-          width: 320px;
-          z-index: 50;
-          display: flex;
-          flex-direction: column;
-          background: var(--bg-elevated, #132131);
-          border-left: 1px solid var(--border-normal, rgba(14,165,233,0.15));
-          box-shadow: -12px 0 48px rgba(0,0,0,0.55), -1px 0 0 rgba(14,165,233,0.06);
-          animation: sip-slide-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
-        }
-
-        @keyframes sip-slide-in {
-          from { transform: translateX(100%); opacity: 0; }
-          to   { transform: translateX(0);    opacity: 1; }
-        }
-
-        .sip-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 16px 16px 12px;
-          border-bottom: 1px solid var(--border-subtle, rgba(14,165,233,0.08));
-          flex-shrink: 0;
-          background: linear-gradient(180deg, rgba(14,165,233,0.04) 0%, transparent 100%);
-        }
-
-        .sip-title {
-          font-size: 13px;
-          font-weight: 700;
-          color: var(--text-primary, #dff0ff);
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-        }
-
-        .sip-close {
-          width: 28px;
-          height: 28px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: none;
-          border: 1px solid transparent;
-          cursor: pointer;
-          color: var(--text-muted, #3d6480);
-          font-size: 13px;
-          line-height: 1;
-          border-radius: var(--r-sm, 6px);
-          transition: color 120ms, background 120ms, border-color 120ms;
-        }
-        .sip-close:hover {
-          color: var(--text-primary, #dff0ff);
-          background: var(--bg-float, rgba(26,44,64,0.9));
-          border-color: var(--border-subtle, rgba(14,165,233,0.08));
-        }
-
         /* Tabs */
         .sip-tabs {
           display: flex;
@@ -291,10 +221,10 @@ export default function ServerInfoPanel() {
           border: none;
           cursor: pointer;
           font-family: inherit;
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           font-weight: 600;
           color: var(--text-muted, #3d6480);
-          transition: color 140ms;
+          transition: color var(--t-control, 150ms);
           white-space: nowrap;
           letter-spacing: 0.01em;
         }
@@ -307,9 +237,8 @@ export default function ServerInfoPanel() {
           left: 0;
           right: 0;
           height: 2px;
-          background: var(--accent, #0ea5e9);
+          background: var(--lux, var(--accent, #0ea5e9));
           border-radius: 2px 2px 0 0;
-          box-shadow: 0 -1px 6px rgba(14,165,233,0.4);
         }
         .sip-tab-badge {
           font-size: 9.5px;
@@ -322,24 +251,15 @@ export default function ServerInfoPanel() {
         }
 
         .sip-body {
-          flex: 1;
-          overflow-y: auto;
           padding: 6px 0 24px;
-          scrollbar-width: thin;
-          scrollbar-color: rgba(14,165,233,0.15) transparent;
-        }
-        .sip-body::-webkit-scrollbar { width: 3px; }
-        .sip-body::-webkit-scrollbar-thumb {
-          background: rgba(14,165,233,0.15);
-          border-radius: 2px;
         }
 
         .sip-section {
-          padding: 12px 16px 10px;
+          padding: var(--sp-3, 12px) var(--sp-4, 16px) 10px;
           border-bottom: 1px solid var(--border-subtle, rgba(14,165,233,0.06));
         }
         .sip-section:last-child { border-bottom: none; }
-        .sip-section--isupport { padding-bottom: 24px; }
+        .sip-section--isupport { padding-bottom: var(--sp-6, 24px); }
 
         .sip-section-title {
           font-size: 10px;
@@ -369,7 +289,7 @@ export default function ServerInfoPanel() {
           display: flex;
           flex-direction: column;
           gap: 2px;
-          transition: border-color 120ms, background 120ms;
+          transition: border-color var(--t-control, 150ms), background var(--t-control, 150ms);
         }
         .sip-stat-card:hover {
           border-color: rgba(14,165,233,0.2);
@@ -383,6 +303,7 @@ export default function ServerInfoPanel() {
           line-height: 1;
           font-variant-numeric: tabular-nums;
           letter-spacing: -0.02em;
+          font-family: var(--font-display, inherit);
         }
         .sip-stat-value--accent { color: var(--accent, #0ea5e9); }
 
@@ -408,14 +329,14 @@ export default function ServerInfoPanel() {
           border-radius: var(--r-sm, 6px);
           padding: 4px 6px;
           margin: 0 -6px;
-          transition: background 80ms;
+          transition: background var(--t-micro, 90ms);
         }
         .sip-row:hover {
           background: rgba(14,165,233,0.04);
         }
 
         .sip-row dt {
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           color: var(--text-muted, #3d6480);
           flex-shrink: 0;
           width: 112px;
@@ -440,7 +361,7 @@ export default function ServerInfoPanel() {
         }
 
         .sip-empty {
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           color: var(--text-muted, #3d6480);
           margin: 0;
           font-style: italic;
@@ -465,7 +386,7 @@ export default function ServerInfoPanel() {
           border-radius: 999px;
           color: var(--accent, #0ea5e9);
           white-space: nowrap;
-          transition: background 100ms, border-color 100ms;
+          transition: background var(--t-micro, 90ms), border-color var(--t-micro, 90ms);
         }
         .sip-cap-tag:hover {
           background: rgba(14,165,233,0.14);
@@ -485,7 +406,7 @@ export default function ServerInfoPanel() {
           align-items: start;
           padding: 4px 6px;
           border-radius: var(--r-sm, 6px);
-          transition: background 100ms;
+          transition: background var(--t-micro, 90ms);
           margin: 0 -6px;
         }
         .sip-isupport-row:hover {
@@ -493,7 +414,7 @@ export default function ServerInfoPanel() {
         }
         .sip-isupport-key {
           font-family: var(--font-mono, 'JetBrains Mono', monospace);
-          font-size: 11px;
+          font-size: var(--text-2xs, 11px);
           font-weight: 700;
           color: var(--accent, #0ea5e9);
           letter-spacing: 0.03em;
@@ -501,7 +422,7 @@ export default function ServerInfoPanel() {
         }
         .sip-isupport-val {
           font-family: var(--font-mono, 'JetBrains Mono', monospace);
-          font-size: 11px;
+          font-size: var(--text-2xs, 11px);
           color: var(--text-primary, #dff0ff);
           word-break: break-all;
           text-align: right;
@@ -509,11 +430,7 @@ export default function ServerInfoPanel() {
         .sip-isupport-empty {
           color: var(--text-muted, #3d6480);
         }
-
-        @media (max-width: 768px) {
-          .sip { width: 100%; }
-        }
       `}</style>
-    </>
+    </ModalShell>
   );
 }

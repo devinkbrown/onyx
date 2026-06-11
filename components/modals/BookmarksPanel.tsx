@@ -1,11 +1,10 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
 import Avatar from '@/components/ui/Avatar';
 import EmptyState from '@/components/ui/EmptyState';
-import { useDialogFocus } from './useDialogFocus';
+import ModalShell from './ModalShell';
 
 const TIME_FMT = new Intl.DateTimeFormat(undefined, {
   month: 'short',
@@ -19,18 +18,6 @@ export default function BookmarksPanel() {
   const bookmarks       = useOnyxStore(s => s.bookmarks);
   const removeBookmark  = useOnyxStore(s => s.removeBookmark);
   const navigate        = useOnyxStore(s => s.navigate);
-
-  const panelRef = useRef<HTMLDivElement>(null);
-  useDialogFocus(panelRef);
-
-  // Escape to close
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeBookmarks();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [closeBookmarks]);
 
   const handleCardClick = (msg: ChatMessage) => {
     // Navigate to the bookmarked message's target
@@ -48,151 +35,90 @@ export default function BookmarksPanel() {
   };
 
   return (
-    <div
-      className="bm-backdrop"
-      onClick={e => { if (e.target === e.currentTarget) closeBookmarks(); }}
+    <ModalShell
+      onClose={closeBookmarks}
+      variant="sheet"
+      size="sm"
+      title="Bookmarks"
+      kicker="Saved messages"
+      titleId="bm-panel-title"
+      closeLabel="Close bookmarks"
+      headerExtra={bookmarks.length > 0 ? <span className="bm-count">{bookmarks.length}</span> : undefined}
+      flushBody
     >
-      <div
-        className="bm-panel animate-slide-right"
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="bm-panel-title"
-      >
-
-        {/* Header */}
-        <div className="bm-header">
-          <div className="bm-header-left">
-            <BookmarkIcon />
-            <h2 id="bm-panel-title" className="bm-title">Bookmarks</h2>
-            {bookmarks.length > 0 && (
-              <span className="bm-count">{bookmarks.length}</span>
-            )}
-          </div>
-          <button
-            className="bm-close"
-            onClick={closeBookmarks}
-            aria-label="Close bookmarks"
-          >
-            <CloseIcon />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="bm-body">
-          {bookmarks.length === 0 ? (
-            <EmptyState
-              icon="🔖"
-              title="No bookmarks yet"
-              description="Right-click any message to bookmark it"
-              size="md"
-            />
-          ) : (
-            <ul className="bm-list" role="list">
-              {[...bookmarks].reverse().map(msg => (
-                <li
-                  key={msg.id}
-                  className="bm-card"
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Go to message from ${msg.from}`}
-                  onClick={() => handleCardClick(msg)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      handleCardClick(msg);
-                    }
-                  }}
-                >
-                  <div className="bm-card-header">
-                    <Avatar nick={msg.from} size={24} />
-                    <span className="bm-card-nick">{msg.from}</span>
-                    <span className="bm-card-target">
-                      {msg.target.startsWith('#') || msg.target.startsWith('&')
-                        ? msg.target
-                        : `@${msg.target}`}
-                    </span>
-                    <time className="bm-card-time">
-                      {TIME_FMT.format(msg.time)}
-                    </time>
-                    <button
-                      className="bm-remove-btn"
-                      title="Remove bookmark"
-                      onClick={e => {
-                        e.stopPropagation();
-                        removeBookmark(msg.id);
-                      }}
-                      aria-label={`Remove bookmark for message from ${msg.from}`}
-                    >
-                      <RemoveIcon />
-                    </button>
-                  </div>
-                  <p className="bm-card-text">
-                    {msg.deleted
-                      ? <em className="bm-deleted">Message deleted</em>
-                      : msg.text
-                    }
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+      <div className="bm-body">
+        {bookmarks.length === 0 ? (
+          <EmptyState
+            icon="🔖"
+            title="No bookmarks yet"
+            description="Right-click any message to bookmark it"
+            size="md"
+          />
+        ) : (
+          <ul className="bm-list" role="list">
+            {[...bookmarks].reverse().map(msg => (
+              <li
+                key={msg.id}
+                className="bm-card"
+                role="button"
+                tabIndex={0}
+                aria-label={`Go to message from ${msg.from}`}
+                onClick={() => handleCardClick(msg)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleCardClick(msg);
+                  }
+                }}
+              >
+                <div className="bm-card-header">
+                  <Avatar nick={msg.from} size={24} />
+                  <span className="bm-card-nick">{msg.from}</span>
+                  <span className="bm-card-target">
+                    {msg.target.startsWith('#') || msg.target.startsWith('&')
+                      ? msg.target
+                      : `@${msg.target}`}
+                  </span>
+                  <time className="bm-card-time">
+                    {TIME_FMT.format(msg.time)}
+                  </time>
+                  <button
+                    className="bm-remove-btn"
+                    title="Remove bookmark"
+                    onClick={e => {
+                      e.stopPropagation();
+                      removeBookmark(msg.id);
+                    }}
+                    aria-label={`Remove bookmark for message from ${msg.from}`}
+                  >
+                    <RemoveIcon />
+                  </button>
+                </div>
+                <p className="bm-card-text">
+                  {msg.deleted
+                    ? <em className="bm-deleted">Message deleted</em>
+                    : msg.text
+                  }
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <style>{`
-        .bm-backdrop {
-          position: fixed; inset: 0; z-index: 640;
-          display: flex; align-items: stretch; justify-content: flex-end;
-        }
-
-        .bm-panel {
-          width: 380px; max-width: 95vw;
-          background: var(--bg-deep);
-          border-left: 1px solid var(--border-normal);
-          display: flex; flex-direction: column;
-          overflow: hidden;
-          box-shadow: -12px 0 48px rgba(0, 0, 0, 0.55), -1px 0 0 var(--border-subtle);
-        }
-
-        /* Header */
-        .bm-header {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 0 16px;
-          height: var(--header-h, 48px);
-          border-bottom: 1px solid var(--border-subtle);
-          flex-shrink: 0;
-          background: var(--bg-elevated);
-        }
-        .bm-header-left {
-          display: flex; align-items: center; gap: 8px;
-        }
-        .bm-title {
-          font-size: 14px; font-weight: 700; color: var(--text-primary);
-          letter-spacing: -0.1px;
-        }
         .bm-count {
-          font-size: 11px; font-weight: 700;
+          font-size: var(--text-2xs, 11px); font-weight: 700;
           padding: 1px 7px; border-radius: var(--r-full);
           background: var(--gold-subtle);
           border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent);
           color: var(--gold);
         }
-        .bm-close {
-          width: 28px; height: 28px;
-          background: none; border: none; cursor: pointer;
-          display: flex; align-items: center; justify-content: center;
-          color: var(--text-muted); border-radius: var(--r-sm);
-          transition: background var(--t-fast), color var(--t-fast);
-        }
-        .bm-close:hover { background: var(--ch-hover-bg); color: var(--text-primary); }
 
-        /* Body */
         .bm-body {
-          flex: 1; overflow-y: auto; padding: 12px;
-          display: flex; flex-direction: column; gap: 8px;
-          scrollbar-width: thin;
-          scrollbar-color: var(--border-normal) transparent;
+          padding: var(--sp-3, 12px);
+          display: flex; flex-direction: column; gap: var(--sp-2, 8px);
+          min-height: 100%;
         }
 
         /* List */
@@ -203,13 +129,13 @@ export default function BookmarksPanel() {
 
         /* Card */
         .bm-card {
-          background: var(--bg-elevated);
+          background: var(--elev-tint-1, var(--bg-elevated));
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-md);
           padding: 11px 12px;
           display: flex; flex-direction: column; gap: 7px;
           cursor: pointer;
-          transition: border-color var(--t-fast), background var(--t-fast), box-shadow var(--t-fast);
+          transition: border-color var(--t-control, 150ms), background var(--t-control, 150ms), box-shadow var(--t-control, 150ms);
           outline: none;
           position: relative;
         }
@@ -227,12 +153,12 @@ export default function BookmarksPanel() {
           display: flex; align-items: center; gap: 7px;
         }
         .bm-card-nick {
-          font-size: 13px; font-weight: 700; color: var(--text-primary);
+          font-size: var(--text-sm, 13px); font-weight: 700; color: var(--text-primary);
           overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         /* Channel badge */
         .bm-card-target {
-          font-size: 11px; font-weight: 600; color: var(--accent);
+          font-size: var(--text-2xs, 11px); font-weight: 600; color: var(--accent);
           background: var(--accent-subtle);
           border: 1px solid var(--accent-border);
           border-radius: var(--r-xs);
@@ -242,7 +168,7 @@ export default function BookmarksPanel() {
           overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         .bm-card-time {
-          font-size: 11px; color: var(--text-muted); flex: 1;
+          font-size: var(--text-2xs, 11px); color: var(--text-muted); flex: 1;
           text-align: right;
           font-variant-numeric: tabular-nums;
           flex-shrink: 0;
@@ -255,17 +181,18 @@ export default function BookmarksPanel() {
           display: flex; align-items: center; justify-content: center;
           color: var(--text-muted); border-radius: var(--r-xs);
           opacity: 0;
-          transition: opacity var(--t-fast), background var(--t-fast), color var(--t-fast);
+          transition: opacity var(--t-control, 150ms), background var(--t-control, 150ms), color var(--t-control, 150ms);
           flex-shrink: 0;
         }
-        .bm-card:hover .bm-remove-btn { opacity: 1; }
+        .bm-card:hover .bm-remove-btn,
+        .bm-remove-btn:focus-visible { opacity: 1; }
         .bm-remove-btn:hover {
           background: var(--danger-subtle);
           color: var(--danger);
         }
 
         .bm-card-text {
-          font-size: 13px; color: var(--text-secondary);
+          font-size: var(--text-sm, 13px); color: var(--text-secondary);
           line-height: 1.55; margin: 0;
           word-break: break-word;
           display: -webkit-box;
@@ -279,32 +206,12 @@ export default function BookmarksPanel() {
           color: var(--text-muted);
           font-style: italic;
         }
-
-        @keyframes slide-right {
-          from { opacity: 0; transform: translateX(8px); }
-          to   { opacity: 1; transform: translateX(0); }
-        }
-        .animate-slide-right { animation: slide-right 180ms var(--ease-out) both; }
       `}</style>
-    </div>
+    </ModalShell>
   );
 }
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
-
-const BookmarkIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"
-    style={{ color: 'var(--gold)', flexShrink: 0 }}>
-    <path d="M2 2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v10.5a.5.5 0 0 1-.777.416L7 10.101l-4.223 2.815A.5.5 0 0 1 2 12.5V2zm1 0v9.566l3.723-2.482a.5.5 0 0 1 .554 0L11 11.566V2H3z"/>
-  </svg>
-);
-
-const CloseIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
-    stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-    <path d="M2 2l10 10M12 2L2 12" />
-  </svg>
-);
 
 const RemoveIcon = () => (
   <svg width="12" height="12" viewBox="0 0 12 12" fill="none"

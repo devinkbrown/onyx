@@ -30,6 +30,11 @@ function fmtCountdown(ms: number): string {
   return `${m}:${String(r).padStart(2, '0')}`;
 }
 
+function nickInitial(nick: string | null, fallback: string): string {
+  const clean = (nick || fallback).replace(/^[~@+.%]+/, '').trim();
+  return (clean[0] || '?').toUpperCase();
+}
+
 const AUTO_CLOSE_PRESETS = [
   { label: 'No timer',  secs: 0 },
   { label: '5 min',     secs:  5 * 60 },
@@ -138,6 +143,13 @@ function RoomCard(p: RoomCardProps) {
 
       {/* Meta row */}
       <div className="bk-card-meta">
+        <span className="bk-facepile" aria-hidden>
+          {Array.from({ length: Math.min(3, Math.max(room.memberCount, 1)) }).map((_, index) => (
+            <span key={index} className="bk-face" style={{ marginLeft: index === 0 ? 0 : -5 }}>
+              {index === 0 ? nickInitial(room.creator, room.name) : index + 1}
+            </span>
+          ))}
+        </span>
         <span>{room.memberCount} {room.memberCount === 1 ? 'member' : 'members'}</span>
         {room.creator && <span>· {room.creator}</span>}
         {remaining !== null && (
@@ -360,11 +372,10 @@ export function BreakoutSidebar({ channel, onClose }: BreakoutSidebarProps) {
           flex-direction: column;
           width: 280px;
           height: 100%;
-          background: var(--bg-deep);
-          border-left: 1px solid var(--border-normal);
+          background: color-mix(in srgb, #050505 88%, var(--accent, #0ea5e9) 7%);
           overflow: hidden;
           flex-shrink: 0;
-          box-shadow: -4px 0 20px rgba(0,0,0,0.35);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-3, 0 24px 60px rgba(0,0,0,.52));
         }
 
         /* Mobile: full-screen panel */
@@ -384,9 +395,8 @@ export function BreakoutSidebar({ channel, onClose }: BreakoutSidebarProps) {
           justify-content: space-between;
           gap: 8px;
           padding: 13px 14px 12px;
-          border-bottom: 1px solid var(--border-subtle);
           flex-shrink: 0;
-          background: var(--bg-elevated);
+          background: color-mix(in srgb, #050505 78%, white 6%);
         }
         .bk-sidebar-title {
           display: flex;
@@ -404,7 +414,7 @@ export function BreakoutSidebar({ channel, onClose }: BreakoutSidebarProps) {
           padding: 0 5px;
           background: var(--accent-subtle);
           color: var(--accent);
-          border-radius: var(--r-full);
+          border-radius: var(--r-lg, 14px) var(--r-xs, 4px) var(--r-md, 8px) var(--r-xl, 16px);
           font-size: 10px;
           font-weight: 700;
           display: flex;
@@ -438,7 +448,7 @@ export function BreakoutSidebar({ channel, onClose }: BreakoutSidebarProps) {
           justify-content: center;
           background: none;
           border: none;
-          border-radius: var(--r-sm);
+          border-radius: var(--r-sm, 6px) var(--r-lg, 14px) var(--r-xs, 4px) var(--r-md, 8px);
           cursor: pointer;
           color: var(--text-muted);
           transition: background var(--t-fast), color var(--t-fast);
@@ -450,21 +460,37 @@ export function BreakoutSidebar({ channel, onClose }: BreakoutSidebarProps) {
 
         /* Room card */
         .bk-card {
+          position: relative;
           padding: 10px 12px;
           margin-bottom: 8px;
-          border-radius: var(--r-md);
-          border: 1px solid var(--border-subtle);
-          background: var(--bg-elevated);
-          transition: border-color var(--t-fast), background var(--t-fast), box-shadow var(--t-fast);
+          border-radius: var(--r-sm, 6px) var(--r-2xl, 20px) var(--r-md, 8px) var(--r-xl, 16px);
+          background: color-mix(in srgb, #050505 82%, var(--accent, #0ea5e9) 7%);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-1, 0 10px 26px rgba(0,0,0,.32));
+          overflow: hidden;
+          transition: background var(--t-surface, 220ms) var(--ease-out, cubic-bezier(.16,1,.3,1)),
+                      transform var(--t-surface, 220ms) var(--ease-out, cubic-bezier(.16,1,.3,1));
         }
         .bk-card:hover {
-          border-color: var(--border-normal);
-          background: var(--bg-float);
+          background: color-mix(in srgb, #050505 76%, var(--accent, #0ea5e9) 11%);
+          transform: translateY(-1px);
         }
         .bk-card--active {
-          border-color: var(--accent-border);
-          background: var(--bg-float);
-          box-shadow: inset 0 0 0 1px var(--accent-border), 0 0 0 1px var(--accent-glow);
+          background: color-mix(in srgb, var(--lux, #d8b96a) 12%, #050505 88%);
+          animation: bk-handoff var(--t-overlay-in, 320ms) var(--ease-spring, cubic-bezier(.34,1.4,.4,1)) both;
+        }
+        .bk-card--active::after {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 8px;
+          bottom: 8px;
+          width: 3px;
+          border-radius: 0 var(--r-sm, 6px) var(--r-sm, 6px) 0;
+          background: var(--lux, #d8b96a);
+        }
+        @keyframes bk-handoff {
+          from { transform: translateX(10px); opacity: .72; }
+          to { transform: translateX(0); opacity: 1; }
         }
 
         .bk-card-name-row {
@@ -515,6 +541,30 @@ export function BreakoutSidebar({ channel, onClose }: BreakoutSidebarProps) {
           margin-top: 3px;
           flex-wrap: wrap;
         }
+        .bk-facepile {
+          display: inline-flex;
+          align-items: center;
+          margin-right: 2px;
+        }
+        .bk-face {
+          width: 18px;
+          height: 18px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          background: color-mix(in srgb, var(--accent, #0ea5e9) 18%, #050505 82%);
+          color: var(--text-primary);
+          box-shadow: 0 0 0 2px #050505;
+          font-size: 9px;
+          font-weight: 800;
+          font-variant-numeric: tabular-nums;
+        }
+        .bk-face:first-child {
+          margin-left: 0;
+          background: color-mix(in srgb, var(--lux, #d8b96a) 18%, #050505 82%);
+          color: var(--lux, #d8b96a);
+        }
         .bk-card-urgent {
           color: var(--danger) !important;
           font-variant-numeric: tabular-nums;
@@ -532,7 +582,7 @@ export function BreakoutSidebar({ channel, onClose }: BreakoutSidebarProps) {
           font-size: 11px;
           font-weight: 600;
           padding: 4px 10px;
-          border-radius: var(--r-sm);
+          border-radius: var(--r-md, 8px) var(--r-xl, 16px) var(--r-sm, 6px) var(--r-lg, 14px);
           border: none;
           cursor: pointer;
           transition: background var(--t-fast), color var(--t-fast), opacity var(--t-fast);
@@ -542,10 +592,10 @@ export function BreakoutSidebar({ channel, onClose }: BreakoutSidebarProps) {
         .bk-btn:disabled { opacity: 0.4; cursor: default; }
 
         .bk-btn--primary {
-          background: var(--accent);
-          color: #fff;
+          background: color-mix(in srgb, var(--accent, #0ea5e9) 24%, #050505 76%);
+          color: var(--text-primary);
         }
-        .bk-btn--primary:hover:not(:disabled) { background: var(--accent-hover); }
+        .bk-btn--primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent, #0ea5e9) 32%, #050505 68%); }
 
         .bk-btn--ghost {
           background: var(--bg-float);
@@ -558,9 +608,8 @@ export function BreakoutSidebar({ channel, onClose }: BreakoutSidebarProps) {
         }
 
         .bk-btn--danger {
-          background: transparent;
+          background: color-mix(in srgb, var(--danger, #f87171) 12%, #050505 88%);
           color: var(--danger);
-          border: 1px solid rgba(248,113,113,0.3);
         }
         .bk-btn--danger:hover:not(:disabled) {
           background: var(--danger-subtle);
@@ -584,8 +633,8 @@ export function BreakoutSidebar({ channel, onClose }: BreakoutSidebarProps) {
           padding: 10px;
           margin-bottom: 10px;
           background: var(--bg-elevated);
-          border-radius: var(--r-md);
-          border: 1px solid var(--border-normal);
+          border-radius: var(--r-sm, 6px) var(--r-xl, 16px) var(--r-md, 8px) var(--r-lg, 14px);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-1, 0 10px 26px rgba(0,0,0,.32));
           display: flex;
           flex-direction: column;
           gap: 8px;
@@ -604,7 +653,7 @@ export function BreakoutSidebar({ channel, onClose }: BreakoutSidebarProps) {
           background: var(--bg-float);
           color: var(--text-primary);
           border: 1px solid var(--border-normal);
-          border-radius: var(--r-sm);
+          border-radius: var(--r-sm, 6px) var(--r-lg, 14px) var(--r-xs, 4px) var(--r-md, 8px);
           outline: none;
           box-sizing: border-box;
           font-family: inherit;
@@ -619,6 +668,17 @@ export function BreakoutSidebar({ channel, onClose }: BreakoutSidebarProps) {
         .bk-create-row {
           display: flex;
           gap: 6px;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .bk-card,
+          .bk-card--active {
+            animation: none;
+            transition: none;
+          }
+          .bk-card:hover {
+            transform: none;
+          }
         }
       `}</style>
     </div>

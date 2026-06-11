@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
 import type { IRCClient } from '@/lib/irc/client';
-import { useDialogFocus } from './useDialogFocus';
+import ModalShell from './ModalShell';
 
 type Tab = 'overview' | 'members' | 'pins' | 'stats' | 'settings';
 
@@ -107,8 +107,6 @@ export default function ChannelInfoModal() {
   const [editingTopic, setEditingTopic]   = useState(false);
   const [topicDraft, setTopicDraft]       = useState('');
   const topicInputRef                     = useRef<HTMLTextAreaElement>(null);
-  const panelRef                          = useRef<HTMLDivElement>(null);
-  useDialogFocus(panelRef);
 
   // Re-request props each time modal opens
   useEffect(() => {
@@ -133,17 +131,19 @@ export default function ChannelInfoModal() {
     }
   }, [editingTopic]);
 
-  // Escape to close (or cancel edit)
+  // While editing the topic, Escape cancels the edit instead of closing the
+  // dialog (capture phase so it pre-empts ModalShell's Escape handler).
   useEffect(() => {
+    if (!editingTopic) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (editingTopic) { setEditingTopic(false); return; }
-        closeChannelInfo();
+        e.stopPropagation();
+        setEditingTopic(false);
       }
     };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [editingTopic, closeChannelInfo]);
+    document.addEventListener('keydown', handler, { capture: true });
+    return () => document.removeEventListener('keydown', handler, { capture: true });
+  }, [editingTopic]);
 
   // ── Derived data ───────────────────────────────────────────────────────
   const displayName  = channelName.replace(/^[#&]/, '');
@@ -213,14 +213,16 @@ export default function ChannelInfoModal() {
   if (isOp) tabs.push('settings');
 
   return (
-    <div className="ci-backdrop" onClick={e => { if (e.target === e.currentTarget) closeChannelInfo(); }}>
-      <div
-        className="ci-panel animate-slide-right"
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="ci-panel-title"
-      >
+    <ModalShell
+      onClose={closeChannelInfo}
+      variant="sheet"
+      size="md"
+      showClose={false}
+      ariaLabel={`Channel info for ${channelName}`}
+      flushBody
+      className="ci-panel"
+    >
+      <div className="ci-layout">
 
         {/* ── Banner ────────────────────────────────────────────────── */}
         <div
@@ -471,7 +473,7 @@ export default function ChannelInfoModal() {
       </div>
 
       <style>{styles}</style>
-    </div>
+    </ModalShell>
   );
 }
 
@@ -871,21 +873,10 @@ const SearchIcon = () => (
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = `
-  .ci-backdrop {
-    position: fixed; inset: 0; z-index: 700;
-    background: rgba(3, 8, 16, 0.6);
-    backdrop-filter: blur(4px);
-    display: flex; align-items: stretch; justify-content: flex-end;
-  }
-
-  .ci-panel {
-    width: 420px; max-width: 95vw;
-    height: 100%;
-    background: var(--bg-deep);
-    border-left: 1px solid var(--border-normal);
+  .ci-layout {
     display: flex; flex-direction: column;
-    overflow: hidden;
-    box-shadow: -12px 0 48px rgba(0, 0, 0, 0.55), -1px 0 0 var(--border-subtle);
+    height: 100%;
+    min-height: 0;
   }
 
   /* Banner */

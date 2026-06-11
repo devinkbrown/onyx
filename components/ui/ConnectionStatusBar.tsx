@@ -188,12 +188,12 @@ export default function ConnectionStatusBar() {
             user-select: none;
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
-            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-1, 0 8px 24px rgba(0,0,0,.28));
             pointer-events: auto;
           }
           .csb-pill--high {
-            background: rgba(248, 113, 113, 0.1);
-            border: 1px solid rgba(248, 113, 113, 0.3);
+            background: color-mix(in srgb, var(--danger, #f87171) 12%, var(--elev-tint-1, #132131));
+            border: 1px solid color-mix(in srgb, var(--danger, #f87171) 24%, transparent);
             color: #f87171;
           }
           .csb-pill-icon { font-size: 10px; line-height: 1; opacity: 0.8; }
@@ -206,9 +206,12 @@ export default function ConnectionStatusBar() {
             line-height: 1;
             padding: 0 2px;
             opacity: 0.7;
-            transition: opacity 120ms;
+            border-radius: var(--r-xs, 4px);
+            transition: opacity var(--t-control, 150ms), background var(--t-control, 150ms), transform var(--t-micro, 90ms);
           }
-          .csb-reconnect-btn:hover { opacity: 1; }
+          .csb-reconnect-btn:hover { opacity: 1; background: color-mix(in srgb, currentColor 12%, transparent); transform: translateY(-1px); }
+          .csb-reconnect-btn:active { opacity: 0.85; transform: translateY(0.5px); }
+          .csb-reconnect-btn:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
           .csb-sparkline-wrap { display: flex; align-items: center; }
           .csb-sparkline-group { position: relative; }
           .csb-sparkline-stats {
@@ -264,8 +267,8 @@ export default function ConnectionStatusBar() {
             align-items: center;
             gap: 5px;
             padding: 4px 10px;
-            background: rgba(251, 191, 36, 0.08);
-            border: 1px solid rgba(251, 191, 36, 0.25);
+            background: color-mix(in srgb, var(--warning, #fbbf24) 11%, var(--elev-tint-1, #132131));
+            border: 1px solid color-mix(in srgb, var(--warning, #fbbf24) 22%, transparent);
             border-radius: 999px;
             color: #fbbf24;
             font-size: 11px;
@@ -274,7 +277,7 @@ export default function ConnectionStatusBar() {
             user-select: none;
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
-            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-1, 0 8px 24px rgba(0,0,0,.28));
           }
           .csb-pill-icon { font-size: 10px; line-height: 1; opacity: 0.8; }
           .csb-sparkline-wrap { display: flex; align-items: center; }
@@ -318,9 +321,11 @@ export default function ConnectionStatusBar() {
             padding: 0 2px;
             opacity: 0.6;
             border-radius: var(--r-sm);
-            transition: opacity 120ms;
+            transition: opacity var(--t-control, 150ms), background var(--t-control, 150ms), transform var(--t-micro, 90ms);
           }
-          .csb-info-btn:hover { opacity: 1; }
+          .csb-info-btn:hover { opacity: 1; background: color-mix(in srgb, currentColor 10%, transparent); transform: translateY(-1px); }
+          .csb-info-btn:active { opacity: 0.85; transform: translateY(0.5px); }
+          .csb-info-btn:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
         `}</style>
       </div>
     );
@@ -350,7 +355,7 @@ export default function ConnectionStatusBar() {
             align-items: center;
             gap: 5px;
             padding: 3px 10px 3px 8px;
-            background: var(--bg-elevated);
+            background: var(--elev-tint-1, var(--bg-elevated));
             border: 1px solid var(--border-subtle);
             border-radius: 999px;
             color: var(--text-muted);
@@ -358,7 +363,7 @@ export default function ConnectionStatusBar() {
             font-weight: 500;
             user-select: none;
             pointer-events: auto;
-            box-shadow: var(--shadow-sm);
+            box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-1, 0 8px 24px rgba(0,0,0,.28));
             letter-spacing: 0.01em;
           }
           /* Green connected dot */
@@ -369,7 +374,7 @@ export default function ConnectionStatusBar() {
             height: 6px;
             border-radius: 50%;
             background: var(--status-online);
-            box-shadow: 0 0 5px rgba(52,211,153,0.5);
+            box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 24%, transparent);
             flex-shrink: 0;
           }
           .csb-quiet-ms { opacity: 0.8; font-variant-numeric: tabular-nums; }
@@ -414,9 +419,11 @@ export default function ConnectionStatusBar() {
             padding: 0 2px;
             opacity: 0.6;
             border-radius: var(--r-sm);
-            transition: opacity 120ms;
+            transition: opacity var(--t-control, 150ms), background var(--t-control, 150ms), transform var(--t-micro, 90ms);
           }
-          .csb-info-btn:hover { opacity: 1; }
+          .csb-info-btn:hover { opacity: 1; background: color-mix(in srgb, currentColor 10%, transparent); transform: translateY(-1px); }
+          .csb-info-btn:active { opacity: 0.85; transform: translateY(0.5px); }
+          .csb-info-btn:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
         `}</style>
       </div>
     );

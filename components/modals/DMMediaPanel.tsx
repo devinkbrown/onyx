@@ -4,6 +4,7 @@ import { useMemo, useState, useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
 import ImageLightbox from '@/components/ui/ImageLightbox';
+import ModalShell from './ModalShell';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -152,83 +153,74 @@ export default function DMMediaPanel({ nick, onClose }: Props) {
   ];
 
   return (
-    <>
-      <div className="dm-media-panel" role="complementary" aria-label="DM media gallery">
-        {/* Header */}
-        <div className="dm-media-header">
-          <span className="dm-media-title">
-            Media &amp; Files
-            {allMedia.length > 0 && (
-              <span className="dm-media-count">{allMedia.length}</span>
-            )}
-          </span>
+    <ModalShell
+      onClose={onClose}
+      variant="sheet"
+      size="sm"
+      title={<>Media &amp; Files</>}
+      kicker={`DM with ${nick}`}
+      titleId="dm-media-title"
+      closeLabel="Close media panel"
+      headerExtra={allMedia.length > 0 ? <span className="dm-media-count">{allMedia.length}</span> : undefined}
+      flushBody
+    >
+      {/* Filter tabs */}
+      <div className="dm-media-tabs" role="tablist">
+        {tabs.map(t => (
           <button
-            className="dm-media-close-btn"
-            onClick={onClose}
-            aria-label="Close media panel"
+            key={t.id}
+            role="tab"
+            aria-selected={filter === t.id}
+            className={`dm-media-tab${filter === t.id ? ' active' : ''}`}
+            onClick={() => setFilter(t.id)}
           >
-            ✕
+            {t.label}
           </button>
-        </div>
+        ))}
+      </div>
 
-        {/* Filter tabs */}
-        <div className="dm-media-tabs" role="tablist">
-          {tabs.map(t => (
-            <button
-              key={t.id}
-              role="tab"
-              aria-selected={filter === t.id}
-              className={`dm-media-tab${filter === t.id ? ' active' : ''}`}
-              onClick={() => setFilter(t.id)}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+      {/* Search */}
+      <div className="dm-media-search-row">
+        <input
+          className="dm-media-search"
+          type="search"
+          placeholder="Search by nick or URL…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          aria-label="Search media"
+        />
+      </div>
 
-        {/* Search */}
-        <div className="dm-media-search-row">
-          <input
-            className="dm-media-search"
-            type="search"
-            placeholder="Search by nick or URL…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            aria-label="Search media"
-          />
-        </div>
-
-        {/* Body */}
-        <div className="dm-media-body">
-          {loading ? (
-            <div className="dm-media-grid dm-media-grid--skeleton">
-              {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
-                <div key={i} className="dm-media-cell dm-media-skeleton" aria-hidden="true" />
-              ))}
-            </div>
-          ) : grouped.length === 0 ? (
-            <div className="dm-media-empty">
-              <span className="dm-media-empty-icon" aria-hidden="true">🖼️</span>
-              <p>No media yet.</p>
-            </div>
-          ) : (
-            grouped.map(group => (
-              <div key={group.label} className="dm-media-day-group">
-                <p className="dm-media-day-label">{group.label}</p>
-                <div className="dm-media-grid">
-                  {group.items.map((item, i) => (
-                    <DMMediaCell
-                      key={`${item.msgId}-${i}`}
-                      item={item}
-                      onClick={() => handleCellClick(item)}
-                      onJump={e => jumpToMessage(item.msgId, e)}
-                    />
-                  ))}
-                </div>
+      {/* Body */}
+      <div className="dm-media-body">
+        {loading ? (
+          <div className="dm-media-grid dm-media-grid--skeleton">
+            {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
+              <div key={i} className="dm-media-cell dm-media-skeleton" aria-hidden="true" />
+            ))}
+          </div>
+        ) : grouped.length === 0 ? (
+          <div className="dm-media-empty">
+            <span className="dm-media-empty-icon" aria-hidden="true">🖼️</span>
+            <p>No media yet.</p>
+          </div>
+        ) : (
+          grouped.map(group => (
+            <div key={group.label} className="dm-media-day-group">
+              <p className="label-caps dm-media-day-label">{group.label}</p>
+              <div className="dm-media-grid">
+                {group.items.map((item, i) => (
+                  <DMMediaCell
+                    key={`${item.msgId}-${i}`}
+                    item={item}
+                    onClick={() => handleCellClick(item)}
+                    onJump={e => jumpToMessage(item.msgId, e)}
+                  />
+                ))}
               </div>
-            ))
-          )}
-        </div>
+            </div>
+          ))
+        )}
       </div>
 
       {/* Lightbox */}
@@ -243,7 +235,7 @@ export default function DMMediaPanel({ nick, onClose }: Props) {
       )}
 
       <style>{css}</style>
-    </>
+    </ModalShell>
   );
 }
 
@@ -317,41 +309,8 @@ function DmJumpIcon() {
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
 const css = `
-  .dm-media-panel {
-    position: fixed;
-    right: 0; top: 0; bottom: 0;
-    z-index: 50;
-    width: 300px;
-    background: var(--bg-deep);
-    border-left: 1px solid var(--border-normal);
-    display: flex;
-    flex-direction: column;
-    box-shadow: -4px 0 24px rgba(0,0,0,0.3);
-    animation: dm-media-slide-in 0.2s ease both;
-  }
-  @keyframes dm-media-slide-in {
-    from { transform: translateX(100%); }
-    to   { transform: translateX(0); }
-  }
-
-  .dm-media-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 16px;
-    border-bottom: 1px solid var(--border-subtle);
-    flex-shrink: 0;
-  }
-  .dm-media-title {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--text-primary);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
   .dm-media-count {
-    font-size: 11px;
+    font-size: var(--text-2xs, 11px);
     font-weight: 700;
     background: var(--bg-float, var(--bg-elevated));
     color: var(--text-secondary);
@@ -359,18 +318,6 @@ const css = `
     border-radius: 99px;
     padding: 1px 6px;
     line-height: 1.6;
-  }
-  .dm-media-close-btn {
-    width: 28px; height: 28px;
-    background: none; border: none; cursor: pointer;
-    color: var(--text-secondary); font-size: 14px;
-    border-radius: var(--r-sm);
-    display: flex; align-items: center; justify-content: center;
-    transition: background var(--t-fast), color var(--t-fast);
-  }
-  .dm-media-close-btn:hover {
-    background: var(--ch-hover-bg);
-    color: var(--text-primary);
   }
 
   .dm-media-tabs {
@@ -381,22 +328,22 @@ const css = `
     flex-shrink: 0;
   }
   .dm-media-tab {
-    font-size: 12px;
+    font-size: var(--text-xs, 12px);
     font-weight: 600;
     padding: 4px 10px 7px;
     background: none; border: none; cursor: pointer;
     color: var(--text-muted);
     border-bottom: 2px solid transparent;
-    transition: color var(--t-fast), border-color var(--t-fast);
+    transition: color var(--t-control, 150ms), border-color var(--t-control, 150ms);
   }
   .dm-media-tab:hover { color: var(--text-secondary); }
   .dm-media-tab.active {
     color: var(--accent);
-    border-bottom-color: var(--accent);
+    border-bottom-color: var(--lux, var(--accent));
   }
 
   .dm-media-search-row {
-    padding: 8px 10px;
+    padding: var(--sp-2, 8px) 10px;
     border-bottom: 1px solid var(--border-subtle);
     flex-shrink: 0;
   }
@@ -407,20 +354,16 @@ const css = `
     border: 1px solid var(--border-subtle);
     border-radius: 6px;
     color: var(--text-normal);
-    font-size: 12px;
+    font-size: var(--text-xs, 12px);
     outline: none;
-    transition: border-color var(--t-fast);
+    transition: border-color var(--t-control, 150ms);
     box-sizing: border-box;
   }
   .dm-media-search:focus { border-color: var(--accent); }
   .dm-media-search::placeholder { color: var(--text-muted); }
 
   .dm-media-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 8px 0;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border-normal) transparent;
+    padding: var(--sp-2, 8px) 0;
   }
 
   .dm-media-empty {
@@ -429,7 +372,7 @@ const css = `
     align-items: center;
     justify-content: center;
     gap: 10px;
-    padding: 40px 20px;
+    padding: var(--sp-10, 40px) var(--sp-5, 20px);
     text-align: center;
   }
   .dm-media-empty-icon {
@@ -438,21 +381,16 @@ const css = `
     line-height: 1;
   }
   .dm-media-empty p {
-    font-size: 13px;
+    font-size: var(--text-sm, 13px);
     color: var(--text-muted);
     margin: 0;
   }
 
   .dm-media-day-group {
-    margin-bottom: 8px;
+    margin-bottom: var(--sp-2, 8px);
   }
   .dm-media-day-label {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--text-muted);
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    padding: 8px 12px 4px;
+    padding: var(--sp-2, 8px) var(--sp-3, 12px) var(--sp-1, 4px);
     margin: 0;
   }
 
@@ -463,7 +401,7 @@ const css = `
     padding: 0 4px;
   }
   .dm-media-grid--skeleton {
-    padding: 8px;
+    padding: var(--sp-2, 8px);
   }
 
   .dm-media-cell {
@@ -483,7 +421,7 @@ const css = `
     width: 100%; height: 100%;
     object-fit: cover;
     display: block;
-    transition: transform 220ms var(--ease-out, ease);
+    transition: transform var(--t-surface, 220ms) var(--ease-out, ease);
   }
   .dm-media-cell:hover img { transform: scale(1.06); }
 
@@ -555,7 +493,7 @@ const css = `
     display: flex; align-items: center; justify-content: center;
     color: rgba(255,255,255,0.9);
     padding: 0;
-    transition: background 120ms;
+    transition: background var(--t-micro, 90ms);
     flex-shrink: 0;
   }
   .dm-media-jump-btn:hover { background: rgba(0,0,0,0.75); }
@@ -571,5 +509,8 @@ const css = `
   @keyframes dm-media-shimmer {
     from { background-position: -200% 0; }
     to   { background-position:  200% 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dm-media-skeleton { animation: none; }
   }
 `;

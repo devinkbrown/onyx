@@ -49,9 +49,12 @@ export default function OnboardingModal() {
   const TOTAL_STEPS = 4;
 
   function handleSaveProfile() {
-    // Send BIO via IRCX PROP if supported
-    if (isIRCX && bio.trim() && client) {
-      client.sendRaw('PROP', '*', 'BIO', bio.trim());
+    if (isIRCX && bio.trim()) {
+      // OCEAN-INTEGRATION: Serial integration wires this event to profile metadata persistence.
+      window.dispatchEvent(new CustomEvent('ocean:metadata-set', {
+        detail: { bio: bio.trim() },
+      }));
+      client?.sendRaw('PROP', '*', 'BIO', bio.trim());
     }
     setProfileSaved(true);
     nextOnboardingStep();
@@ -95,7 +98,7 @@ export default function OnboardingModal() {
         {/* ── Step 0: Welcome ── */}
         {onboardingStep === 0 && (
           <div className="onb-step" key="step-0">
-            <div className="onb-hero-emoji" role="img" aria-label="Ocean wave">🌊</div>
+            <div className="onb-hero-mark" aria-hidden="true"><OceanMark /></div>
             <h2 className="onb-title">Welcome to Ocean</h2>
             <p className="onb-subtitle">Connected to <strong>{serverUrl}</strong></p>
             <p className="onb-body">
@@ -202,7 +205,7 @@ export default function OnboardingModal() {
         {/* ── Step 3: All set ── */}
         {onboardingStep === 3 && (
           <div className="onb-step" key="step-3">
-            <div className="onb-hero-emoji onb-hero-emoji--celebrate" role="img" aria-label="Party">🎉</div>
+            <div className="onb-hero-mark onb-hero-mark--celebrate" aria-hidden="true"><CheckIcon /></div>
             <h2 className="onb-title">You&apos;re ready!</h2>
 
             <ul className="onb-checklist">
@@ -218,7 +221,6 @@ export default function OnboardingModal() {
             </ul>
 
             <p className="onb-tip">
-              <span className="onb-tip-icon">💡</span>
               Tip: Press <kbd className="onb-kbd">?</kbd> anytime to see keyboard shortcuts
             </p>
 
@@ -268,10 +270,12 @@ export default function OnboardingModal() {
         .onb-modal {
           width: 100%;
           max-width: 480px;
-          background: var(--bg-2, var(--bg-elevated));
-          border: 1px solid var(--border-subtle);
-          border-radius: 12px;
-          box-shadow: 0 24px 64px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(14,165,233,0.06) inset;
+          background:
+            linear-gradient(180deg, var(--elev-tint-2, transparent), transparent 42%),
+            var(--bg-2, var(--bg-elevated));
+          border: 0;
+          border-radius: var(--r-2xl, 20px) var(--r-md, 8px) var(--r-lg, 12px) var(--r-sm, 6px);
+          box-shadow: var(--elev-highlight), var(--elev-shadow-3);
           padding: 36px 32px 32px;
           display: flex;
           flex-direction: column;
@@ -295,13 +299,12 @@ export default function OnboardingModal() {
           transition: background 220ms ease, width 220ms ease, transform 220ms ease;
         }
         .onb-dot--active {
-          background: var(--accent);
+          background: var(--lux);
           width: 22px;
           transform: none;
-          box-shadow: 0 0 8px rgba(14,165,233,0.4);
         }
         .onb-dot--done {
-          background: color-mix(in srgb, var(--accent) 45%, transparent);
+          background: color-mix(in srgb, var(--lux) 45%, transparent);
         }
 
         /* ── Step container ── */
@@ -314,14 +317,25 @@ export default function OnboardingModal() {
           animation: onb-step-in 220ms ease both;
         }
 
-        /* ── Hero emoji ── */
-        .onb-hero-emoji {
-          font-size: 56px;
-          line-height: 1;
+        /* ── Hero mark ── */
+        .onb-hero-mark {
+          width: 68px;
+          height: 68px;
+          display: grid;
+          place-items: center;
+          border-radius: var(--r-2xl, 20px) var(--r-md, 8px) var(--r-lg, 12px) var(--r-sm, 6px);
+          background:
+            linear-gradient(180deg, rgba(255,255,255,.045), transparent),
+            color-mix(in srgb, var(--bg-elevated) 88%, var(--lux) 12%);
+          color: var(--lux);
+          box-shadow: var(--elev-highlight), var(--elev-shadow-2);
           margin-bottom: 4px;
-          user-select: none;
         }
-        .onb-hero-emoji--celebrate {
+        .onb-hero-mark svg {
+          width: 36px;
+          height: 36px;
+        }
+        .onb-hero-mark--celebrate {
           animation: onb-celebrate 600ms var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
         }
 
@@ -382,10 +396,11 @@ export default function OnboardingModal() {
         .onb-textarea {
           width: 100%;
           box-sizing: border-box;
-          background: var(--bg-deep);
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-md, 8px);
+          background: color-mix(in srgb, var(--bg-base) 94%, var(--lux) 6%);
+          border: 0;
+          border-radius: var(--r-lg, 12px) var(--r-sm, 6px) var(--r-md, 8px) var(--r-lg, 12px);
           color: var(--text-primary);
+          caret-color: var(--lux);
           font-size: 14px;
           font-family: inherit;
           padding: 10px 12px;
@@ -395,8 +410,7 @@ export default function OnboardingModal() {
           outline: none;
         }
         .onb-textarea:focus {
-          border-color: var(--accent-border);
-          box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+          box-shadow: inset 0 0 0 1px var(--lux);
         }
         .onb-textarea::placeholder {
           color: var(--text-muted);
@@ -413,9 +427,9 @@ export default function OnboardingModal() {
           align-items: center;
           gap: 8px;
           padding: 10px 12px;
-          border-radius: var(--r-md, 8px);
+          border-radius: var(--r-lg, 12px) var(--r-sm, 6px) var(--r-md, 8px) var(--r-xs, 4px);
           background: var(--bg-deep);
-          border: 1px solid var(--border-normal);
+          border: 0;
           color: var(--text-secondary);
           font-size: 13px;
           font-weight: 500;
@@ -431,8 +445,8 @@ export default function OnboardingModal() {
         }
         .onb-status-option--active {
           background: var(--accent-subtle);
-          border-color: var(--accent-border);
           color: var(--text-primary);
+          box-shadow: inset 2px 0 0 var(--lux), var(--elev-shadow-1);
         }
         .onb-status-dot {
           width: 9px;
@@ -453,15 +467,15 @@ export default function OnboardingModal() {
           align-items: center;
           gap: 10px;
           padding: 10px 14px;
-          border-radius: var(--r-md, 8px);
+          border-radius: var(--r-lg, 12px) var(--r-sm, 6px) var(--r-md, 8px) var(--r-xs, 4px);
           background: var(--bg-deep);
-          border: 1px solid var(--border-normal);
+          border: 0;
           cursor: pointer;
           transition: background 150ms ease, border-color 150ms ease;
         }
         .onb-channel-item:has(.onb-checkbox:checked) {
           background: var(--accent-subtle);
-          border-color: var(--accent-border);
+          box-shadow: inset 2px 0 0 var(--lux), var(--elev-shadow-1);
         }
         .onb-channel-item:hover {
           background: var(--ch-hover-bg);
@@ -512,9 +526,9 @@ export default function OnboardingModal() {
         .onb-tip {
           font-size: 13px;
           color: var(--text-muted);
-          background: var(--bg-deep);
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-md, 8px);
+          background: color-mix(in srgb, var(--bg-base) 94%, var(--lux) 6%);
+          border: 0;
+          border-radius: var(--r-lg, 12px) var(--r-sm, 6px) var(--r-md, 8px) var(--r-xs, 4px);
           padding: 10px 14px;
           display: flex;
           align-items: center;
@@ -522,10 +536,6 @@ export default function OnboardingModal() {
           width: 100%;
           box-sizing: border-box;
           margin: 4px 0;
-        }
-        .onb-tip-icon {
-          flex-shrink: 0;
-          font-size: 16px;
         }
         .onb-kbd {
           display: inline-flex;
@@ -545,21 +555,21 @@ export default function OnboardingModal() {
         .onb-btn-primary {
           width: 100%;
           height: 40px;
-          background: var(--accent);
+          background: color-mix(in srgb, var(--accent) 88%, black 12%);
           color: #fff;
           border: none;
-          border-radius: 9999px;
+          border-radius: var(--r-md, 8px) var(--r-lg, 12px) var(--r-sm, 6px) var(--r-md, 8px);
           font-size: 15px;
           font-weight: 700;
           font-family: inherit;
           cursor: pointer;
           margin-top: 8px;
-          transition: opacity 150ms ease, transform 100ms ease, box-shadow 150ms ease;
+          transition: opacity 150ms ease, transform 100ms ease, filter 150ms ease;
           letter-spacing: 0.02em;
-          box-shadow: 0 2px 12px rgba(14,165,233,0.3);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 16px 28px rgba(0,0,0,.28);
         }
         .onb-btn-primary:hover:not(:disabled) {
-          opacity: 0.9;
+          filter: brightness(1.06);
           transform: translateY(-1px);
         }
         .onb-btn-primary:active:not(:disabled) {
@@ -606,6 +616,17 @@ export default function OnboardingModal() {
 }
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
+
+function OceanMark() {
+  return (
+    <svg viewBox="0 0 36 36" fill="none" aria-hidden="true">
+      <circle cx="18" cy="18" r="13" stroke="currentColor" strokeOpacity=".42" strokeWidth="1.4" />
+      <circle cx="18" cy="18" r="7" stroke="currentColor" strokeOpacity=".28" strokeWidth="1.4" />
+      <path d="M18 18 26 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="18" cy="18" r="2.6" fill="currentColor" />
+    </svg>
+  );
+}
 
 function CheckIcon() {
   return (

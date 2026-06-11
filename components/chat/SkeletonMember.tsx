@@ -6,7 +6,7 @@ interface Props {
 
 export default function SkeletonMember({ count = 10 }: Props) {
   return (
-    <div className="skel-ml-list" aria-hidden="true">
+    <div className="skel-ml-list" aria-hidden="true" data-testid="skeleton-member">
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className={`skel-ml-row skel-mlrow-${i + 1}`}>
           <div className="skel-ml-avatar-el" />
@@ -23,44 +23,45 @@ export default function SkeletonMember({ count = 10 }: Props) {
         .skel-ml-item {
           background: linear-gradient(
             90deg,
-            var(--bg-elevated) 25%,
-            var(--bg-float)    50%,
-            var(--bg-elevated) 75%
+            var(--elev-tint-1, var(--bg-elevated)) 25%,
+            var(--elev-tint-3, var(--bg-float)) 50%,
+            var(--elev-tint-1, var(--bg-elevated)) 75%
           );
           background-size: 200% 100%;
-          animation: skel-ml-shimmer 1.6s ease-in-out infinite;
-          border-radius: 4px;
+          animation: skel-ml-shimmer 1.8s var(--ease-out, ease) infinite;
+          border-radius: var(--r-xs, 4px) var(--r-sm, 6px) var(--r-xs, 4px) var(--r-md, 8px);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
         }
 
         .skel-ml-avatar-el {
           background: linear-gradient(
             90deg,
-            var(--bg-elevated) 25%,
-            var(--bg-float)    50%,
-            var(--bg-elevated) 75%
+            var(--elev-tint-1, var(--bg-elevated)) 25%,
+            var(--elev-tint-3, var(--bg-float)) 50%,
+            var(--elev-tint-1, var(--bg-elevated)) 75%
           );
           background-size: 200% 100%;
-          animation: skel-ml-shimmer 1.6s ease-in-out infinite;
+          animation: skel-ml-shimmer 1.8s var(--ease-out, ease) infinite;
           border-radius: 50%;
           flex-shrink: 0;
-          /* 24px avatar per spec */
-          width: 24px;
-          height: 24px;
+          width: 28px;
+          height: 28px;
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
         }
 
         .skel-ml-list {
           display: flex;
           flex-direction: column;
-          gap: 2px;
-          padding: 8px 8px;
+          gap: var(--sp-1, 4px);
+          padding: var(--sp-2, 8px);
         }
 
         .skel-ml-row {
           display: flex;
           align-items: center;
-          gap: 9px;
-          padding: 4px 8px;
-          height: 32px;
+          gap: var(--sp-2, 8px);
+          padding: 0 var(--sp-2, 8px);
+          height: 36px;
         }
 
         /* Vary name widths */
@@ -86,6 +87,14 @@ export default function SkeletonMember({ count = 10 }: Props) {
         .skel-mlrow-8  .skel-ml-item, .skel-mlrow-8  .skel-ml-avatar-el { animation-delay: 490ms; }
         .skel-mlrow-9  .skel-ml-item, .skel-mlrow-9  .skel-ml-avatar-el { animation-delay: 560ms; }
         .skel-mlrow-10 .skel-ml-item, .skel-mlrow-10 .skel-ml-avatar-el { animation-delay: 630ms; }
+
+        @media (prefers-reduced-motion: reduce) {
+          .skel-ml-item,
+          .skel-ml-avatar-el {
+            animation: none;
+            background-position: 50% 50%;
+          }
+        }
       `}</style>
     </div>
   );

@@ -2,7 +2,7 @@
 
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useOnyxStore } from '@/lib/store';
-import { useDialogFocus } from './useDialogFocus';
+import ModalShell from './ModalShell';
 
 export default function IgnoreListModal() {
   const ignoredUsers    = useOnyxStore(s => s.ignoredUsers);
@@ -14,22 +14,11 @@ export default function IgnoreListModal() {
 
   const [addNick, setAddNick] = useState('');
   const inputRef  = useRef<HTMLInputElement>(null);
-  const modalRef  = useRef<HTMLDivElement>(null);
-  useDialogFocus(modalRef);
 
   // Focus input on mount
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
-
-  // Escape to close
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeIgnoreList();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [closeIgnoreList]);
 
   const handleAdd = useCallback(() => {
     const nick = addNick.trim();
@@ -50,22 +39,17 @@ export default function IgnoreListModal() {
   const sortedSoftIgnore = [...softIgnoreList].sort((a, b) => a.localeCompare(b));
 
   return (
-    <div
-      className="ign-backdrop"
-      onClick={e => { if (e.target === e.currentTarget) closeIgnoreList(); }}
+    <ModalShell
+      onClose={closeIgnoreList}
+      title="Ignored Users"
+      kicker="Privacy"
+      titleId="ign-modal-title"
+      size="sm"
+      flushBody
     >
-      <div className="ign-modal" ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="ign-modal-title">
-
-        {/* Header */}
-        <div className="ign-header">
-          <h2 id="ign-modal-title" className="ign-title">Ignored Users</h2>
-          <button className="ign-close" onClick={closeIgnoreList} aria-label="Close">
-            <CloseIcon />
-          </button>
-        </div>
-
+      <div className="ign-content">
         {/* ── Section 1: IRC SILENCE (server-side) ─────────────────────────── */}
-        <div className="ign-section-label">IRC SILENCE — server-side</div>
+        <div className="label-caps ign-section-label">IRC SILENCE — server-side</div>
         <p className="ign-info">The server drops all messages from these users before they reach you.</p>
 
         {/* Add field */}
@@ -115,7 +99,7 @@ export default function IgnoreListModal() {
 
         {/* ── Section 2: Hidden users (local only) ─────────────────────────── */}
         <div className="ign-section-sep" role="separator" />
-        <div className="ign-section-label">Hidden users — local only</div>
+        <div className="label-caps ign-section-label">Hidden users — local only</div>
         <p className="ign-info">Messages from these users are hidden locally. They don&apos;t know you&apos;ve hidden them.</p>
 
         <div className="ign-list" role="list" aria-label="Locally hidden nicks">
@@ -136,68 +120,29 @@ export default function IgnoreListModal() {
             ))
           )}
         </div>
-
       </div>
 
       <style>{`
-        .ign-backdrop {
-          position: fixed; inset: 0; z-index: 700;
-          background: rgba(0, 0, 0, 0.55);
-          backdrop-filter: blur(4px);
-          display: flex; align-items: center; justify-content: center;
-          padding: 16px;
-        }
-
-        .ign-modal {
-          width: 400px; max-width: 100%;
-          background: var(--bg-deep);
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-lg, 12px);
-          box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--border-subtle);
+        .ign-content {
           display: flex; flex-direction: column;
-          overflow: hidden;
-          animation: ign-appear 150ms var(--ease-out) both;
-          max-height: 80vh;
+          padding-bottom: var(--sp-3, 12px);
         }
-
-        @keyframes ign-appear {
-          from { opacity: 0; transform: scale(0.96) translateY(8px); }
-          to   { opacity: 1; transform: scale(1) translateY(0); }
-        }
-
-        .ign-header {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 14px 16px 12px;
-          border-bottom: 1px solid var(--border-subtle);
-        }
-        .ign-title {
-          font-size: 15px; font-weight: 700; color: var(--text-primary);
-          letter-spacing: -0.2px; margin: 0;
-        }
-        .ign-close {
-          width: 26px; height: 26px;
-          background: none; border: none; cursor: pointer;
-          display: flex; align-items: center; justify-content: center;
-          color: var(--text-muted); border-radius: var(--r-xs);
-          transition: background var(--t-fast), color var(--t-fast);
-        }
-        .ign-close:hover { background: var(--ch-hover-bg); color: var(--text-primary); }
 
         .ign-info {
-          font-size: 12px; color: var(--text-muted);
-          margin: 10px 16px 0; padding: 0;
+          font-size: var(--text-xs, 12px); color: var(--text-muted);
+          margin: var(--sp-2, 8px) var(--sp-4, 16px) 0; padding: 0;
         }
 
         .ign-add-row {
-          display: flex; align-items: center; gap: 8px;
-          padding: 10px 12px;
+          display: flex; align-items: center; gap: var(--sp-2, 8px);
+          padding: var(--sp-3, 12px);
         }
         .ign-add-wrap {
           flex: 1;
-          background: var(--bg-elevated);
+          background: var(--elev-tint-1, var(--bg-elevated));
           border: 1px solid var(--border-normal);
           border-radius: var(--r-sm);
-          transition: border-color var(--t-fast);
+          transition: border-color var(--t-control, 150ms);
         }
         .ign-add-wrap:focus-within {
           border-color: var(--accent);
@@ -206,20 +151,20 @@ export default function IgnoreListModal() {
         .ign-add-input {
           width: 100%; padding: 7px 10px;
           background: none; border: none; outline: none;
-          font-size: 14px; color: var(--text-primary);
+          font-size: var(--text-base, 14px); color: var(--text-primary);
           font-family: inherit;
         }
         .ign-add-input::placeholder { color: var(--text-muted); }
 
         .ign-add-btn {
           flex-shrink: 0;
-          font-size: 13px; font-weight: 600;
+          font-size: var(--text-sm, 13px); font-weight: 600;
           padding: 7px 14px; border-radius: var(--r-sm);
           border: 1px solid var(--border-normal);
-          background: var(--bg-elevated);
+          background: var(--elev-tint-1, var(--bg-elevated));
           color: var(--text-muted);
           cursor: default; opacity: 0.6;
-          transition: background var(--t-fast), color var(--t-fast), opacity var(--t-fast);
+          transition: background var(--t-control, 150ms), color var(--t-control, 150ms), opacity var(--t-control, 150ms);
           white-space: nowrap;
         }
         .ign-add-btn--active {
@@ -232,16 +177,16 @@ export default function IgnoreListModal() {
         .ign-add-btn:disabled { cursor: default; }
 
         .ign-list {
-          flex: 1; overflow-y: auto; max-height: 280px;
-          padding: 0 8px 12px;
+          overflow-y: auto; max-height: 280px;
+          padding: 0 var(--sp-2, 8px) var(--sp-3, 12px);
           display: flex; flex-direction: column; gap: 1px;
           scrollbar-width: thin;
           scrollbar-color: var(--border-normal) transparent;
         }
 
         .ign-empty {
-          font-size: 13px; color: var(--text-muted);
-          text-align: center; padding: 20px; margin: 0;
+          font-size: var(--text-sm, 13px); color: var(--text-muted);
+          text-align: center; padding: var(--sp-5, 20px); margin: 0;
         }
 
         .ign-row {
@@ -249,7 +194,7 @@ export default function IgnoreListModal() {
           padding: 7px 10px;
           border-radius: var(--r-sm);
           border: 1px solid transparent;
-          transition: background var(--t-fast), border-color var(--t-fast);
+          transition: background var(--t-control, 150ms), border-color var(--t-control, 150ms);
         }
         .ign-row:hover {
           background: var(--accent-subtle, rgba(14,165,233,0.05));
@@ -271,7 +216,7 @@ export default function IgnoreListModal() {
           background: rgba(248,113,113,0.08);
           color: var(--danger, #f87171);
           cursor: pointer;
-          transition: background var(--t-fast), border-color var(--t-fast);
+          transition: background var(--t-control, 150ms), border-color var(--t-control, 150ms);
         }
         .ign-remove-btn:hover {
           background: rgba(248,113,113,0.18);
@@ -290,12 +235,7 @@ export default function IgnoreListModal() {
         }
 
         .ign-section-label {
-          font-size: 10px;
-          font-weight: 700;
-          color: var(--text-muted);
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
-          padding: 10px 16px 4px;
+          padding: var(--sp-3, 12px) var(--sp-4, 16px) var(--sp-1, 4px);
         }
 
         .ign-section-sep {
@@ -304,15 +244,6 @@ export default function IgnoreListModal() {
           margin: 6px 12px 2px;
         }
       `}</style>
-    </div>
+    </ModalShell>
   );
 }
-
-// ── Icon ───────────────────────────────────────────────────────────────────────
-
-const CloseIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
-    stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-    <path d="M2 2l10 10M12 2L2 12" />
-  </svg>
-);

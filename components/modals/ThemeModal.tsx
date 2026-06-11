@@ -3,7 +3,7 @@ import { useState, useCallback, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import { useTheme } from '@/components/ui/ThemeProvider';
 import type { TimeFormat } from '@/lib/format-time';
-import { useDialogFocus } from './useDialogFocus';
+import ModalShell from './ModalShell';
 
 type Density = 'cozy' | 'compact' | 'spacious';
 type BgPattern = 'solid' | 'dots' | 'grid' | 'noise' | 'diagonal';
@@ -51,6 +51,8 @@ const THEMES: ThemeDef[] = [
   { id: 'arctic',   label: 'Arctic',   bg: '#161b22', sidebar: '#0d1117', accent: '#58a6ff' },
   { id: 'ash',      label: 'Ash',      bg: '#313338', sidebar: '#1e1f22', accent: '#5865f2' },
   { id: 'light',    label: 'Light',    bg: '#f2f3f5', sidebar: '#e3e5e8', accent: '#5865f2' },
+  { id: 'lacquer',  label: 'Lacquer',  bg: '#161210', sidebar: '#0a0a0c', accent: '#d8b96a' },
+  { id: 'pearl',    label: 'Pearl',    bg: '#faf6ee', sidebar: '#ece6dc', accent: '#5d8a72' },
 ];
 
 const SYSTEM_THEME: ThemeDef = {
@@ -159,8 +161,6 @@ export default function ThemeModal() {
   const setGlassSidebar    = useOnyxStore(s => s.setGlassSidebar);
 
   const [appliedFlash, setAppliedFlash] = useState<string | null>(null);
-  const modalRef = useRef<HTMLDivElement>(null);
-  useDialogFocus(modalRef);
 
   const useSystemTheme = activeTheme === 'system' || displayTheme === 'system';
   const activeThemeDef = useSystemTheme ? SYSTEM_THEME : (THEMES.find(t => t.id === activeTheme) ?? THEMES[0]);
@@ -177,16 +177,14 @@ export default function ThemeModal() {
   }, [setTheme, setUiTheme]);
 
   return (
-    <div className="theme-modal-backdrop" onClick={closeThemeModal}>
-      <div className="theme-modal" ref={modalRef} onClick={e => e.stopPropagation()} role="dialog" aria-modal aria-labelledby="theme-modal-title">
-
-        <div className="theme-modal-header">
-          <h2 id="theme-modal-title" className="theme-modal-title">Appearance</h2>
-          <button className="theme-modal-close" onClick={closeThemeModal} aria-label="Close">
-            <CloseIcon />
-          </button>
-        </div>
-
+    <ModalShell
+      onClose={closeThemeModal}
+      title="Appearance"
+      kicker="Personalize"
+      titleId="theme-modal-title"
+      size="md"
+    >
+      <div className="theme-modal-content">
         <div className="theme-current-row">
           <span className="theme-current-label">
             Current theme: <strong>{activeThemeDef.label}</strong>
@@ -560,82 +558,9 @@ export default function ThemeModal() {
       </div>
 
       <style>{`
-        .theme-modal-backdrop {
-          position: fixed;
-          inset: 0;
-          background: rgba(0,0,0,0.72);
+        .theme-modal-content {
           display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 900;
-          backdrop-filter: blur(10px);
-          -webkit-backdrop-filter: blur(10px);
-          animation: fadeIn var(--t-fast) var(--ease-out) both;
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to   { opacity: 1; }
-        }
-
-        .theme-modal {
-          background: var(--bg-elevated, #132131);
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-xl, 16px);
-          padding: 26px;
-          width: 520px;
-          max-width: calc(100vw - 32px);
-          max-height: calc(100dvh - 64px);
-          overflow-y: auto;
-          box-shadow: var(--shadow-xl, 0 24px 64px rgba(0,0,0,0.75)), 0 0 0 1px var(--border-subtle) inset;
-          animation: scaleIn var(--t-normal) var(--ease-out) both;
-          scrollbar-width: thin;
-          scrollbar-color: var(--border-normal) transparent;
-        }
-        .theme-modal::-webkit-scrollbar { width: 4px; }
-        .theme-modal::-webkit-scrollbar-track { background: transparent; }
-        .theme-modal::-webkit-scrollbar-thumb { background: var(--border-normal); border-radius: 2px; }
-        @keyframes scaleIn {
-          from { opacity: 0; transform: scale(0.96) translateY(8px); }
-          to   { opacity: 1; transform: scale(1) translateY(0); }
-        }
-
-        .theme-modal-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 8px;
-        }
-
-        .theme-modal-title {
-          font-size: 18px;
-          font-weight: 700;
-          color: var(--text-primary);
-          margin: 0;
-        }
-
-        .theme-modal-close {
-          width: 28px;
-          height: 28px;
-          border-radius: 50%;
-          border: 1px solid var(--border-subtle);
-          background: var(--bg-elevated);
-          color: var(--text-muted);
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: transform var(--t-fast) var(--ease-out);
-          flex-shrink: 0;
-        }
-        .theme-modal-close:hover {
-          background: var(--bg-overlay);
-          color: var(--text-primary);
-          border-color: var(--border-normal);
-          transform: translateY(-1px);
-        }
-        .theme-modal-close:focus-visible {
-          outline: 2px solid var(--accent);
-          outline-offset: 2px;
+          flex-direction: column;
         }
 
         .theme-current-row {
@@ -1568,15 +1493,7 @@ export default function ThemeModal() {
           }
         }
       `}</style>
-    </div>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <path d="M1 1l12 12M13 1L1 13" />
-    </svg>
+    </ModalShell>
   );
 }
 

@@ -14,10 +14,11 @@ function nickInitial(nick: string): string {
 
 export default function AvatarStack({ nicks, max = 5 }: Props) {
   const visible = nicks.slice(0, max);
+  const overflow = Math.max(0, nicks.length - visible.length);
   if (visible.length === 0) return null;
 
   return (
-    <span className="avatar-stack" aria-label={`Participants: ${visible.join(', ')}`}>
+    <span className="avatar-stack" aria-label={`Participants: ${nicks.join(', ')}`} data-testid="avatar-stack">
       {visible.map((nick, i) => (
         <span
           key={nick}
@@ -33,6 +34,11 @@ export default function AvatarStack({ nicks, max = 5 }: Props) {
           {nickInitial(nick)}
         </span>
       ))}
+      {overflow > 0 && (
+        <span className="avatar-stack-overflow" aria-hidden>
+          +{overflow}
+        </span>
+      )}
 
       <style>{`
         .avatar-stack {
@@ -50,12 +56,12 @@ export default function AvatarStack({ nicks, max = 5 }: Props) {
           font-size: 10px;
           font-weight: 700;
           color: rgba(255,255,255,0.92);
-          border: 2px solid var(--bg-deep);
+          border: 0;
           position: relative;
           flex-shrink: 0;
           user-select: none;
           letter-spacing: 0.01em;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-1, 0 8px 18px rgba(0,0,0,.24));
           transition: transform 120ms var(--ease-out, ease), z-index 0s;
         }
         .avatar-stack-item:hover {
@@ -73,8 +79,9 @@ export default function AvatarStack({ nicks, max = 5 }: Props) {
           font-size: 9px;
           font-weight: 700;
           color: var(--text-secondary);
-          background: var(--bg-elevated);
-          border: 2px solid var(--bg-deep);
+          background: var(--elev-tint-1, var(--bg-elevated));
+          border: 0;
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-1, 0 8px 18px rgba(0,0,0,.24));
           margin-left: -8px;
           flex-shrink: 0;
           user-select: none;

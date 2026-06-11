@@ -6,7 +6,7 @@ import type { AuditEntry } from '@/lib/store';
 import Avatar from '@/components/ui/Avatar';
 import Button from '@/components/ui/Button';
 import type { IRCMessage } from '@/lib/irc/types';
-import { useDialogFocus } from './useDialogFocus';
+import ModalShell from './ModalShell';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -43,21 +43,17 @@ interface InviteEntry {
 export default function ServerSettingsModal() {
   const closeServerSettings = useOnyxStore(s => s.closeServerSettings);
   const [tab, setTab] = useState<ServerTab>('overview');
-  const modalRef = useRef<HTMLDivElement>(null);
-  useDialogFocus(modalRef);
-
-  const stopProp = (e: React.MouseEvent) => e.stopPropagation();
 
   return (
-    <div className="ss-overlay" onClick={closeServerSettings}>
-      <div
-        className="ss-modal animate-scale-in"
-        onClick={stopProp}
-        ref={modalRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="ss-modal-title"
-      >
+    <ModalShell
+      onClose={closeServerSettings}
+      size="lg"
+      showClose={false}
+      ariaLabel="Server settings"
+      flushBody
+      className="ss-modal"
+    >
+      <div className="ss-layout">
         {/* Sidebar */}
         <nav className="ss-nav">
           <h2 id="ss-modal-title" className="ss-nav-title">Server Settings</h2>
@@ -89,25 +85,14 @@ export default function ServerSettingsModal() {
       </div>
 
       <style>{`
-        .ss-overlay {
-          position: fixed; inset: 0;
-          background: rgba(0,0,0,0.75);
-          z-index: 500;
-          display: flex; align-items: center; justify-content: center;
-          padding: 24px;
-          backdrop-filter: blur(8px);
-          -webkit-backdrop-filter: blur(8px);
+        .ss-modal {
+          height: min(85vh, 680px);
         }
 
-        .ss-modal {
-          background: var(--bg-2, var(--bg-elevated));
-          border: 1px solid var(--border-subtle);
-          border-radius: 12px;
-          width: 100%; max-width: 860px;
-          height: 85dvh; max-height: 680px;
+        .ss-layout {
           display: flex;
-          overflow: hidden;
-          box-shadow: var(--shadow-xl);
+          height: 100%;
+          min-height: 0;
         }
 
         .ss-nav {
@@ -119,35 +104,46 @@ export default function ServerSettingsModal() {
         }
 
         .ss-nav-title {
-          font-size: 11px; font-weight: 700;
-          letter-spacing: 0.1em; text-transform: uppercase;
+          font-family: var(--font-display, inherit);
+          font-size: var(--text-sm, 13px); font-weight: 600;
+          letter-spacing: 0.06em; text-transform: uppercase;
           color: var(--text-muted); padding: 0 8px;
-          margin-bottom: 8px;
+          margin-bottom: var(--sp-2, 8px);
         }
 
         .settings-tab {
+          position: relative;
           display: flex; align-items: center; gap: 10px;
-          padding: 0 10px; height: 30px;
+          padding: 0 10px 0 14px; height: 32px;
           border-radius: var(--r-sm);
           background: none; border: none;
-          border-left: 2px solid transparent;
           cursor: pointer;
           text-align: left; font-size: 13.5px; font-weight: 500;
           color: var(--text-secondary);
-          transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+          transition: background var(--t-control, 150ms), color var(--t-control, 150ms);
           width: 100%;
         }
-        .settings-tab:hover { background: var(--ch-hover-bg); color: var(--text-primary); }
+        .settings-tab:hover { background: var(--elev-tint-1, var(--ch-hover-bg)); color: var(--text-primary); }
         .settings-tab--active {
-          background: var(--accent-subtle);
-          color: var(--accent);
-          border-left-color: var(--accent);
+          background: var(--elev-tint-2, var(--accent-subtle));
+          color: var(--text-primary);
+          font-weight: 600;
+        }
+        .settings-tab--active::before {
+          content: '';
+          position: absolute;
+          left: 0; top: 50%; transform: translateY(-50%);
+          width: 3px; height: 14px;
+          border-radius: 2px;
+          background: var(--lux, var(--accent));
         }
         .settings-tab-icon { width: 18px; display: flex; align-items: center; flex-shrink: 0; }
 
         .ss-content {
           flex: 1; overflow-y: auto; padding: 32px;
           position: relative;
+          scrollbar-width: thin;
+          scrollbar-color: var(--border-normal) transparent;
         }
 
         .ss-close {
@@ -158,21 +154,15 @@ export default function ServerSettingsModal() {
           color: var(--text-muted); cursor: pointer;
           display: flex; align-items: center; justify-content: center;
           font-size: 13px; font-weight: 600; line-height: 1;
-          transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+          transition: background var(--t-control, 150ms), color var(--t-control, 150ms), border-color var(--t-control, 150ms);
         }
         .ss-close:hover {
           background: var(--bg-overlay);
           color: var(--text-primary);
           border-color: var(--border-normal);
         }
-
-        @keyframes scale-in {
-          from { opacity: 0; transform: scale(0.96); }
-          to   { opacity: 1; transform: scale(1); }
-        }
-        .animate-scale-in { animation: scale-in 180ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both; }
       `}</style>
-    </div>
+    </ModalShell>
   );
 }
 

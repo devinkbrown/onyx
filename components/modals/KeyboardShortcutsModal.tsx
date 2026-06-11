@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
-import { useDialogFocus } from './useDialogFocus';
+import ModalShell from './ModalShell';
 
 // ── Key chip helpers ──────────────────────────────────────────────────────────
 
@@ -71,258 +70,148 @@ function Section({ title, children }: SectionProps) {
 
 export default function KeyboardShortcutsModal() {
   const closeKeyboardShortcuts = useOnyxStore(s => s.closeKeyboardShortcuts);
-  const modalRef = useRef<HTMLDivElement>(null);
-  useDialogFocus(modalRef);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        closeKeyboardShortcuts();
-      }
-    };
-    document.addEventListener('keydown', onKey, { capture: true });
-    return () => document.removeEventListener('keydown', onKey, { capture: true });
-  }, [closeKeyboardShortcuts]);
 
   return (
-    <div
-      className="ks-backdrop"
-      onClick={closeKeyboardShortcuts}
+    <ModalShell
+      onClose={closeKeyboardShortcuts}
+      title="Keyboard Shortcuts"
+      kicker="Reference"
+      titleId="ks-modal-title"
+      size="lg"
     >
-      <div
-        className="ks-modal"
-        ref={modalRef}
-        role="dialog"
-        aria-modal
-        aria-labelledby="ks-modal-title"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="ks-header">
-          <h2 id="ks-modal-title" className="ks-title">Keyboard Shortcuts</h2>
-          <button
-            className="ks-close"
-            onClick={closeKeyboardShortcuts}
-            aria-label="Close"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M3 3l10 10M13 3L3 13" />
-            </svg>
-          </button>
+      {/* Two-column grid: left = Navigation + Voice, right = Messaging + App */}
+      <div className="ks-grid">
+
+        {/* LEFT COLUMN */}
+        <div className="ks-col">
+          <Section title="Navigation">
+            <Row
+              keys={<Combo parts={['Ctrl', 'K']} />}
+              desc="Open search"
+            />
+            <Row
+              keys={<Keys><Alt /><Sep /><K>↑</K></Keys>}
+              desc="Previous channel"
+            />
+            <Row
+              keys={<Keys><Alt /><Sep /><K>↓</K></Keys>}
+              desc="Next channel"
+            />
+            <Row
+              keys={<Keys><Alt /><Sep /><K>Shift</K><Sep /><K>↑</K></Keys>}
+              desc="Prev unread channel"
+            />
+            <Row
+              keys={<Keys><Alt /><Sep /><K>Shift</K><Sep /><K>↓</K></Keys>}
+              desc="Next unread channel"
+            />
+            <Row
+              keys={<Combo parts={['Ctrl', 'B']} />}
+              desc="Toggle member list"
+            />
+            <Row
+              keys={<Combo parts={['Ctrl', 'Shift', 'F']} />}
+              desc="Toggle focus mode"
+            />
+            <Row
+              keys={<Combo parts={['Ctrl', 'L']} />}
+              desc="Scroll to bottom"
+            />
+            <Row
+              keys={<Keys><K>Esc</K></Keys>}
+              desc="Close panel / cancel"
+            />
+          </Section>
+
+          <Section title="Voice">
+            <Row
+              keys={<Keys><K>M</K></Keys>}
+              desc="Toggle mute (in call)"
+            />
+            <Row
+              keys={<Keys><K>D</K></Keys>}
+              desc="Toggle deafen (in call)"
+            />
+            <Row
+              keys={<Keys><K>PTT key</K></Keys>}
+              desc="Push to talk (when enabled)"
+            />
+          </Section>
         </div>
 
-        {/* Two-column grid: left = Navigation + Voice, right = Messaging + App */}
-        <div className="ks-grid">
+        {/* RIGHT COLUMN */}
+        <div className="ks-col">
+          <Section title="Messaging">
+            <Row
+              keys={<Keys><K>Enter</K></Keys>}
+              desc="Send message"
+            />
+            <Row
+              keys={<Combo parts={['Shift', 'Enter']} />}
+              desc="New line"
+            />
+            <Row
+              keys={<Keys><K>↑</K></Keys>}
+              desc="Edit last message"
+            />
+            <Row
+              keys={<Combo parts={['Ctrl', 'B']} />}
+              desc="Bold"
+            />
+            <Row
+              keys={<Combo parts={['Ctrl', 'I']} />}
+              desc="Italic"
+            />
+            <Row
+              keys={<Combo parts={['Ctrl', '`']} />}
+              desc="Inline code"
+            />
+            <Row
+              keys={<Keys><K>Tab</K></Keys>}
+              desc="Autocomplete"
+            />
+            <Row
+              keys={<Keys><K>@nick</K></Keys>}
+              desc="Mention user"
+            />
+            <Row
+              keys={<Keys><K>#channel</K></Keys>}
+              desc="Link channel"
+            />
+            <Row
+              keys={<Keys><K>:emoji:</K></Keys>}
+              desc="Insert emoji"
+            />
+          </Section>
 
-          {/* LEFT COLUMN */}
-          <div className="ks-col">
-            <Section title="Navigation">
-              <Row
-                keys={<Combo parts={['Ctrl', 'K']} />}
-                desc="Open search"
-              />
-              <Row
-                keys={<Keys><Alt /><Sep /><K>↑</K></Keys>}
-                desc="Previous channel"
-              />
-              <Row
-                keys={<Keys><Alt /><Sep /><K>↓</K></Keys>}
-                desc="Next channel"
-              />
-              <Row
-                keys={<Keys><Alt /><Sep /><K>Shift</K><Sep /><K>↑</K></Keys>}
-                desc="Prev unread channel"
-              />
-              <Row
-                keys={<Keys><Alt /><Sep /><K>Shift</K><Sep /><K>↓</K></Keys>}
-                desc="Next unread channel"
-              />
-              <Row
-                keys={<Combo parts={['Ctrl', 'B']} />}
-                desc="Toggle member list"
-              />
-              <Row
-                keys={<Combo parts={['Ctrl', 'Shift', 'F']} />}
-                desc="Toggle focus mode"
-              />
-              <Row
-                keys={<Combo parts={['Ctrl', 'L']} />}
-                desc="Scroll to bottom"
-              />
-              <Row
-                keys={<Keys><K>Esc</K></Keys>}
-                desc="Close panel / cancel"
-              />
-            </Section>
-
-            <Section title="Voice">
-              <Row
-                keys={<Keys><K>M</K></Keys>}
-                desc="Toggle mute (in call)"
-              />
-              <Row
-                keys={<Keys><K>D</K></Keys>}
-                desc="Toggle deafen (in call)"
-              />
-              <Row
-                keys={<Keys><K>PTT key</K></Keys>}
-                desc="Push to talk (when enabled)"
-              />
-            </Section>
-          </div>
-
-          {/* RIGHT COLUMN */}
-          <div className="ks-col">
-            <Section title="Messaging">
-              <Row
-                keys={<Keys><K>Enter</K></Keys>}
-                desc="Send message"
-              />
-              <Row
-                keys={<Combo parts={['Shift', 'Enter']} />}
-                desc="New line"
-              />
-              <Row
-                keys={<Keys><K>↑</K></Keys>}
-                desc="Edit last message"
-              />
-              <Row
-                keys={<Combo parts={['Ctrl', 'B']} />}
-                desc="Bold"
-              />
-              <Row
-                keys={<Combo parts={['Ctrl', 'I']} />}
-                desc="Italic"
-              />
-              <Row
-                keys={<Combo parts={['Ctrl', '`']} />}
-                desc="Inline code"
-              />
-              <Row
-                keys={<Keys><K>Tab</K></Keys>}
-                desc="Autocomplete"
-              />
-              <Row
-                keys={<Keys><K>@nick</K></Keys>}
-                desc="Mention user"
-              />
-              <Row
-                keys={<Keys><K>#channel</K></Keys>}
-                desc="Link channel"
-              />
-              <Row
-                keys={<Keys><K>:emoji:</K></Keys>}
-                desc="Insert emoji"
-              />
-            </Section>
-
-            <Section title="App">
-              <Row
-                keys={<Combo parts={['Ctrl', ',']} />}
-                desc="Open settings"
-              />
-              <Row
-                keys={<Keys><Combo parts={['Ctrl', '/']} /><span className="ks-or">or</span><K>?</K></Keys>}
-                desc="This screen"
-              />
-              <Row
-                keys={<Keys><K>F</K><span className="ks-or">or</span><Combo parts={['Ctrl', 'F']} /></Keys>}
-                desc="Search in channel"
-              />
-              <Row
-                keys={<Combo parts={['Ctrl', 'Shift', 'M']} />}
-                desc="Mark all as read"
-              />
-            </Section>
-          </div>
-
+          <Section title="App">
+            <Row
+              keys={<Combo parts={['Ctrl', ',']} />}
+              desc="Open settings"
+            />
+            <Row
+              keys={<Keys><Combo parts={['Ctrl', '/']} /><span className="ks-or">or</span><K>?</K></Keys>}
+              desc="This screen"
+            />
+            <Row
+              keys={<Keys><K>F</K><span className="ks-or">or</span><Combo parts={['Ctrl', 'F']} /></Keys>}
+              desc="Search in channel"
+            />
+            <Row
+              keys={<Combo parts={['Ctrl', 'Shift', 'M']} />}
+              desc="Mark all as read"
+            />
+          </Section>
         </div>
 
-        {/* Footer hint */}
-        <p className="ks-footer">
-          Press <kbd className="ks-kbd">Esc</kbd> or click outside to close
-        </p>
       </div>
 
+      {/* Footer hint */}
+      <p className="ks-footer">
+        Press <kbd className="ks-kbd">Esc</kbd> or click outside to close
+      </p>
+
       <style>{`
-        /* Backdrop with heavy blur */
-        .ks-backdrop {
-          position: fixed;
-          inset: 0;
-          z-index: 500;
-          background: rgba(3, 8, 16, 0.75);
-          backdrop-filter: blur(10px) saturate(0.8);
-          -webkit-backdrop-filter: blur(10px) saturate(0.8);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 16px;
-        }
-
-        .ks-modal {
-          background: var(--bg-deep, #06101d);
-          border: 1px solid var(--border-normal, rgba(14,165,233,0.15));
-          border-radius: var(--r-xl, 14px);
-          width: 620px;
-          max-width: 100%;
-          max-height: 84vh;
-          overflow-y: auto;
-          padding: 24px;
-          box-shadow:
-            0 32px 80px rgba(0,0,0,0.65),
-            0 0 0 1px rgba(14,165,233,0.04) inset;
-          animation: ks-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
-          scrollbar-width: thin;
-          scrollbar-color: rgba(14,165,233,0.15) transparent;
-        }
-        .ks-modal::-webkit-scrollbar { width: 3px; }
-        .ks-modal::-webkit-scrollbar-thumb {
-          background: rgba(14,165,233,0.15);
-          border-radius: 2px;
-        }
-
-        @keyframes ks-in {
-          from { opacity: 0; transform: scale(0.94) translateY(10px); }
-          to   { opacity: 1; transform: scale(1) translateY(0); }
-        }
-
-        .ks-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 22px;
-          padding-bottom: 16px;
-          border-bottom: 1px solid var(--border-subtle, rgba(14,165,233,0.08));
-        }
-
-        .ks-title {
-          font-size: 16px;
-          font-weight: 700;
-          color: var(--text-primary, #dff0ff);
-          letter-spacing: -0.01em;
-        }
-
-        .ks-close {
-          width: 30px;
-          height: 30px;
-          border: 1px solid transparent;
-          background: none;
-          color: var(--text-muted, #3d6480);
-          cursor: pointer;
-          border-radius: var(--r-sm, 6px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: background 120ms, color 120ms, border-color 120ms;
-          flex-shrink: 0;
-        }
-        .ks-close:hover {
-          background: var(--bg-float, rgba(26,44,64,0.9));
-          border-color: var(--border-subtle, rgba(14,165,233,0.08));
-          color: var(--text-primary, #dff0ff);
-        }
-
         .ks-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -335,7 +224,7 @@ export default function KeyboardShortcutsModal() {
         }
 
         .ks-section {
-          margin-bottom: 4px;
+          margin-bottom: var(--sp-1, 4px);
         }
 
         .ks-section-title {
@@ -357,7 +246,7 @@ export default function KeyboardShortcutsModal() {
           padding: 5px 6px;
           gap: 10px;
           border-radius: var(--r-sm, 6px);
-          transition: background 80ms;
+          transition: background var(--t-micro, 90ms);
           margin: 0 -6px;
         }
         .ks-row:hover {
@@ -411,7 +300,7 @@ export default function KeyboardShortcutsModal() {
         }
 
         .ks-desc {
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           color: var(--text-secondary, #7aa8c4);
           text-align: right;
           flex: 1;
@@ -423,16 +312,15 @@ export default function KeyboardShortcutsModal() {
           margin-top: 22px;
           padding-top: 14px;
           border-top: 1px solid var(--border-subtle, rgba(14,165,233,0.08));
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           color: var(--text-muted, #3d6480);
           text-align: center;
         }
 
         @media (max-width: 560px) {
           .ks-grid { grid-template-columns: 1fr; }
-          .ks-modal { padding: 16px; }
         }
       `}</style>
-    </div>
+    </ModalShell>
   );
 }

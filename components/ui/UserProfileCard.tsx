@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import type { CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { useOnyxStore } from '@/lib/store';
 import Avatar from './Avatar';
 import UserNotesModal from '@/components/modals/UserNotesModal';
 import { getNickColor } from '@/lib/nick-color';
 import { parseActivity } from '@/lib/activity';
+import RoleBadge, { highestRoleMode } from './RoleBadge';
 
 // ── Nick color helpers ─────────────────────────────────────────────────────────
 
@@ -16,9 +18,9 @@ function nickHue(nick: string): number {
   return Math.abs(hash) % 360;
 }
 
-function bannerGradient(nick: string): string {
+function bannerColor(nick: string): string {
   const hue = nickHue(nick);
-  return `linear-gradient(135deg, hsl(${hue},55%,25%) 0%, hsl(${(hue + 40) % 360},45%,15%) 100%)`;
+  return `hsl(${hue}, 44%, 34%)`;
 }
 
 // ── Blocked nicks localStorage helpers ────────────────────────────────────────
@@ -86,12 +88,14 @@ export default function UserProfileCard({ nick, anchor }: Props) {
   const cardRef = useRef<HTMLDivElement>(null);
 
   const channels           = useOnyxStore(s => s.channels);
+  const activeView         = useOnyxStore(s => s.activeView);
   const dms                = useOnyxStore(s => s.dms);
   const userProps          = useOnyxStore(s => s.userProps);
   const whoisData          = useOnyxStore(s => s.whoisData);
   const ourNick            = useOnyxStore(s => s.ourNick);
   const userStatus         = useOnyxStore(s => s.userStatus);
   const client             = useOnyxStore(s => s.client);
+  const modeToPrefix       = useOnyxStore(s => s.isupportModeToPrefix);
   const navigate           = useOnyxStore(s => s.navigate);
   const addFriend          = useOnyxStore(s => s.addFriend);
   const removeFriend       = useOnyxStore(s => s.removeFriend);
@@ -174,6 +178,8 @@ export default function UserProfileCard({ nick, anchor }: Props) {
   const props = userProps.get(nick.toLowerCase()) ?? {};
   const accountName = whois?.account ?? dmConv?.account ?? props.ACCOUNT ?? null;
   const idleSecs = whois?.idleSecs;
+  const profileAccent = props.ACCENT ?? props.Accent ?? props.BANNERCOLOR ?? getUserProfile(nick)?.bannerColor ?? bannerColor(nick);
+  const sessionSyncActive = Boolean(client?.sessionSyncActive);
 
   // ── Activity / rich presence ──────────────────────────────────────────────
   const userActivities = useOnyxStore(s => s.userActivities);
@@ -221,6 +227,10 @@ export default function UserProfileCard({ nick, anchor }: Props) {
     idle:    'Idle',
     offline: 'Offline',
   };
+  const channelUser = activeView.kind === 'channel'
+    ? channels.get(activeView.channel.toLowerCase())?.users.get(nick.toLowerCase())
+    : undefined;
+  const roleMode = highestRoleMode(channelUser?.modes, modeToPrefix);
 
   // ── Card position — clamp to viewport ────────────────────────────────────
 
@@ -274,10 +284,16 @@ export default function UserProfileCard({ nick, anchor }: Props) {
     <div
       ref={cardRef}
       className="upc-card"
-      style={{ left, top, transformOrigin: `${anchor.x < left ? 'left' : 'right'} top` }}
+      style={{
+        left,
+        top,
+        transformOrigin: `${anchor.x < left ? 'left' : 'right'} top`,
+        '--upc-accent': profileAccent,
+      } as CSSProperties & Record<string, string | number>}
       role="dialog"
       aria-label={`${nick} profile`}
       aria-modal="false"
+      data-testid="user-profile-card"
     >
       {/* Close button */}
       <button
@@ -291,7 +307,7 @@ export default function UserProfileCard({ nick, anchor }: Props) {
       </button>
 
       {/* Banner */}
-      <div className="upc-banner" style={{ background: bannerGradient(nick) }} aria-hidden />
+      <div className="upc-banner" aria-hidden />
 
       {/* Avatar overlapping banner */}
       <div className="upc-avatar-wrap">
@@ -303,6 +319,7 @@ export default function UserProfileCard({ nick, anchor }: Props) {
         {/* Display name + nick */}
         <div className="upc-name-row">
           <div className="upc-nick">{hasDisplayNameOverride ? currentDisplayName : nick}</div>
+          {roleMode && <RoleBadge mode={roleMode} compact />}
           <button
             className="upc-edit-displayname-btn"
             onClick={() => { setDisplayNameInput(currentDisplayName); setEditingDisplayName(true); }}
@@ -360,6 +377,13 @@ export default function UserProfileCard({ nick, anchor }: Props) {
             <span className="upc-idle">{formatIdle(idleSecs)}</span>
           )}
         </div>
+
+        {(sessionSyncActive || accountName) && (
+          <div className="upc-session-row" data-testid="profile-session-indicator">
+            <span className={`upc-session-dot${sessionSyncActive ? ' upc-session-dot--active' : ''}`} aria-hidden />
+            <span>{sessionSyncActive ? 'Multi-session synced' : 'Bouncer identity'}</span>
+          </div>
+        )}
 
         {/* Activity card (rich presence) */}
         {activity && (
@@ -486,17 +510,17 @@ const styles = `
   .upc-card {
     position: fixed;
     width: ${CARD_W}px;
-    background: var(--bg-deep);
-    border: 1px solid var(--border-normal);
-    border-radius: var(--r-xl);
-    box-shadow: var(--shadow-xl);
+    background: var(--elev-tint-3, var(--bg-deep));
+    border: 0;
+    border-radius: var(--r-xl, 16px) var(--r-sm, 6px) var(--r-lg, 14px) var(--r-md, 10px);
+    box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-3, 0 28px 80px rgba(0,0,0,.48));
     overflow: hidden;
     z-index: 1300;
-    animation: upc-in 160ms var(--ease-out) both;
+    animation: upc-in var(--t-overlay-in, 320ms) var(--ease-out) both;
   }
 
   @keyframes upc-in {
-    from { opacity: 0; transform: scale(0.9); }
+    from { opacity: 0; transform: translateY(4px) scale(0.96); }
     to   { opacity: 1; transform: scale(1);   }
   }
 
@@ -508,14 +532,14 @@ const styles = `
     width: 26px;
     height: 26px;
     border-radius: var(--r-full);
-    background: rgba(0,0,0,0.35);
+    background: color-mix(in srgb, var(--bg-void) 68%, transparent);
     border: none;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     color: rgba(255,255,255,0.7);
-    transition: background var(--t-fast), color var(--t-fast);
+    transition: background var(--t-control, 150ms), color var(--t-control, 150ms);
   }
   .upc-close:hover {
     background: rgba(0,0,0,0.6);
@@ -525,6 +549,8 @@ const styles = `
   .upc-banner {
     height: 72px;
     flex-shrink: 0;
+    background: color-mix(in srgb, var(--upc-accent) 42%, var(--bg-deep) 58%);
+    box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--upc-accent) 24%, transparent);
   }
 
   .upc-avatar-wrap {
@@ -549,7 +575,8 @@ const styles = `
   }
 
   .upc-nick {
-    font-size: 18px;
+    font-size: var(--text-xl, 1.25rem);
+    font-family: var(--font-display), Georgia, serif;
     font-weight: 700;
     color: var(--text-primary);
     line-height: 1.2;
@@ -573,9 +600,9 @@ const styles = `
     border: none;
     cursor: pointer;
     padding: 2px 4px;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-xs, 4px);
     opacity: 0;
-    transition: opacity var(--t-fast), background var(--t-fast);
+    transition: opacity var(--t-control, 150ms), background var(--t-control, 150ms);
     font-size: 13px;
     line-height: 1;
   }
@@ -591,9 +618,10 @@ const styles = `
 
   .upc-displayname-input {
     width: 100%;
-    background: var(--bg-elevated);
-    border: 1px solid var(--accent-border);
-    border-radius: var(--r-sm);
+    background: var(--elev-tint-1, var(--bg-elevated));
+    border: 0;
+    border-radius: var(--r-md, 10px) var(--r-sm, 6px) var(--r-lg, 14px) var(--r-sm, 6px);
+    box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), inset 0 0 0 1px var(--accent-border);
     padding: 5px 9px;
     font-size: 13px;
     color: var(--text-primary);
@@ -610,22 +638,23 @@ const styles = `
 
   .upc-displayname-save {
     flex: 1;
-    background: var(--accent);
+    background: color-mix(in srgb, var(--accent) 82%, #05070a);
     border: none;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm, 6px) var(--r-md, 10px) var(--r-sm, 6px) var(--r-lg, 14px);
     padding: 4px 10px;
     font-size: 12px;
     font-weight: 600;
     color: #fff;
     cursor: pointer;
     font-family: inherit;
-    transition: background var(--t-fast);
+    transition: background var(--t-control, 150ms);
   }
   .upc-displayname-save:hover { background: var(--accent-hover, color-mix(in srgb, var(--accent) 85%, #fff)); }
 
   .upc-displayname-clear {
     background: none;
-    border: 1px solid var(--border-normal);
+    border: 0;
+    box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), inset 0 0 0 1px var(--border-normal);
     border-radius: var(--r-sm);
     padding: 4px 10px;
     font-size: 12px;
@@ -638,7 +667,8 @@ const styles = `
 
   .upc-displayname-cancel {
     background: none;
-    border: 1px solid var(--border-subtle);
+    border: 0;
+    box-shadow: inset 0 0 0 1px var(--border-subtle);
     border-radius: var(--r-sm);
     padding: 4px 10px;
     font-size: 12px;
@@ -667,6 +697,31 @@ const styles = `
     height: 8px;
     border-radius: var(--r-full);
     flex-shrink: 0;
+    box-shadow: 0 0 0 2px var(--bg-deep), 0 0 0 4px color-mix(in srgb, currentColor 30%, transparent);
+  }
+
+  .upc-session-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    width: fit-content;
+    margin-top: 2px;
+    padding: 5px 8px;
+    border-radius: var(--r-sm, 6px) var(--r-md, 10px) var(--r-sm, 6px) var(--r-lg, 14px);
+    background: color-mix(in srgb, var(--elev-tint-1, var(--bg-elevated)) 84%, var(--upc-accent) 10%);
+    box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
+    color: var(--text-secondary);
+    font-size: var(--text-xs, .75rem);
+    font-weight: 700;
+  }
+  .upc-session-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-muted);
+  }
+  .upc-session-dot--active {
+    background: var(--lux, #d8b96a);
   }
 
   .upc-status-label {
@@ -682,8 +737,9 @@ const styles = `
   }
 
   .upc-activity-card {
-    background: var(--bg-overlay, rgba(255,255,255,0.05));
-    border-radius: 8px;
+    background: var(--elev-tint-1, rgba(255,255,255,0.05));
+    border-radius: var(--r-md, 10px) var(--r-sm, 6px) var(--r-lg, 14px) var(--r-sm, 6px);
+    box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
     padding: 10px 12px;
     margin-top: 6px;
     display: flex;
@@ -706,7 +762,7 @@ const styles = `
   .upc-activity-type {
     font-size: 11px;
     font-weight: 700;
-    letter-spacing: 0.04em;
+    letter-spacing: 0;
     text-transform: uppercase;
     color: var(--text-muted);
   }
@@ -732,8 +788,9 @@ const styles = `
     font-size: 11px;
     font-weight: 600;
     color: var(--accent);
-    background: var(--accent-subtle);
-    border: 1px solid var(--accent-border);
+    background: var(--elev-tint-1, var(--accent-subtle));
+    border: 0;
+    box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
     padding: 2px 8px;
     border-radius: var(--r-full);
     cursor: pointer;
@@ -748,29 +805,31 @@ const styles = `
     display: flex;
     gap: 8px;
     padding-top: 10px;
-    border-top: 1px solid var(--border-subtle);
+    box-shadow: inset 0 1px 0 var(--border-subtle);
     margin-top: 6px;
   }
 
   .upc-btn {
     flex: 1;
-    background: var(--bg-float);
-    border: 1px solid var(--border-normal);
-    border-radius: var(--r-sm);
+    background: var(--elev-tint-1, var(--bg-float));
+    border: 0;
+    border-radius: var(--r-sm, 6px) var(--r-md, 10px) var(--r-sm, 6px) var(--r-lg, 14px);
+    box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
     padding: 8px;
     font-size: 13px;
     font-weight: 500;
     color: var(--text-secondary);
     cursor: pointer;
-    transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+    transition: background var(--t-control, 150ms), color var(--t-control, 150ms), transform var(--t-control, 150ms);
   }
   .upc-btn:hover {
-    background: var(--bg-overlay);
+    background: var(--elev-tint-2, var(--bg-overlay));
     color: var(--text-primary);
+    transform: translateY(-1px);
   }
 
   .upc-btn--primary {
-    background: var(--accent);
+    background: color-mix(in srgb, var(--accent) 82%, #05070a);
     border-color: transparent;
     color: #fff;
   }
@@ -781,9 +840,10 @@ const styles = `
   }
 
   .upc-note-preview {
-    background: rgba(251,191,36,0.06);
-    border: 1px solid rgba(251,191,36,0.15);
-    border-radius: 6px;
+    background: color-mix(in srgb, var(--elev-tint-1, var(--bg-elevated)) 86%, var(--lux, #d8b96a) 10%);
+    border: 0;
+    border-radius: var(--r-md, 10px) var(--r-sm, 6px) var(--r-lg, 14px) var(--r-sm, 6px);
+    box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
     padding: 8px 10px;
     margin-top: 6px;
   }
@@ -791,10 +851,10 @@ const styles = `
   .upc-note-label {
     font-size: 11px;
     font-weight: 600;
-    color: rgba(251,191,36,0.7);
+    color: var(--lux, #d8b96a);
     margin-bottom: 3px;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: 0;
   }
 
   .upc-note-text {
@@ -813,22 +873,22 @@ const styles = `
 
   .upc-btn-ghost {
     flex: 1;
-    background: none;
+    background: transparent;
     border: none;
     padding: 5px 4px;
     font-size: 12px;
     color: var(--text-muted);
     cursor: pointer;
     text-align: left;
-    border-radius: var(--r-sm);
-    transition: background var(--t-fast), color var(--t-fast);
+    border-radius: var(--r-sm, 6px);
+    transition: background var(--t-control, 150ms), color var(--t-control, 150ms);
   }
   .upc-btn-ghost:hover {
-    background: var(--bg-float);
+    background: var(--elev-tint-1, var(--bg-float));
     color: var(--text-primary);
   }
   .upc-btn-ghost--active {
-    color: var(--gold, #e8b84b);
+    color: var(--lux, #d8b96a);
   }
   .upc-btn-ghost--danger {
     color: var(--text-muted);
@@ -863,8 +923,9 @@ const styles = `
   .upc-color-swatch {
     width: 24px;
     height: 24px;
-    border-radius: 50%;
-    border: 2px solid var(--border-normal);
+    border-radius: var(--r-xs, 4px) var(--r-md, 10px) var(--r-xs, 4px) var(--r-sm, 6px);
+    border: 0;
+    box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-1, 0 8px 18px rgba(0,0,0,.22));
     cursor: pointer;
     flex-shrink: 0;
     display: block;
@@ -891,9 +952,10 @@ const styles = `
     font-size: 11px;
     font-weight: 600;
     color: var(--text-muted);
-    background: none;
-    border: 1px solid var(--border-subtle);
+    background: var(--elev-tint-1, transparent);
+    border: 0;
     border-radius: var(--r-xs, 4px);
+    box-shadow: inset 0 0 0 1px var(--border-subtle);
     padding: 2px 8px;
     cursor: pointer;
     transition: color var(--t-fast, 150ms), border-color var(--t-fast, 150ms), background var(--t-fast, 150ms);
@@ -903,5 +965,19 @@ const styles = `
     color: var(--text-primary);
     border-color: var(--border-normal);
     background: var(--bg-float, rgba(255,255,255,0.06));
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .upc-card {
+      animation: none;
+    }
+    .upc-btn,
+    .upc-close,
+    .upc-edit-displayname-btn,
+    .upc-btn-ghost {
+      transition: none;
+    }
+    .upc-btn:hover {
+      transform: none;
+    }
   }
 `;

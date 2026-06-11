@@ -100,9 +100,10 @@ export default function MentionDropdown({
     <>
       <div
         ref={listRef}
-        className="mention-dropdown"
+        className="mention-dropdown elev-3"
         role="listbox"
         aria-label="Mention autocomplete"
+        data-testid="mention-dropdown"
         style={{ position: 'fixed', bottom: 0, left: 0, width: 280 }}
       >
         {members.map((m, i) => {
@@ -143,18 +144,16 @@ export default function MentionDropdown({
         .mention-dropdown {
           max-height: 216px;
           overflow-y: auto;
-          background: var(--bg-deep);
-          border: 1px solid var(--border-subtle);
-          border-radius: var(--r-lg);
-          box-shadow: var(--shadow-xl), 0 0 0 1px var(--accent-border);
+          border: 1px solid color-mix(in srgb, var(--lux, #d8b96a) 16%, var(--border-subtle));
+          border-radius: var(--r-xl, 18px) var(--r-md, 10px) var(--r-lg, 14px) var(--r-sm, 6px);
           display: flex;
           flex-direction: column;
-          z-index: 200;
+          z-index: var(--z-popover, 100);
           min-width: 320px;
           width: 320px;
           scrollbar-width: thin;
-          scrollbar-color: var(--accent-border) transparent;
-          animation: mention-rise 140ms var(--ease-out) both;
+          scrollbar-color: color-mix(in srgb, var(--lux, #d8b96a) 35%, transparent) transparent;
+          animation: mention-rise var(--t-control, 150ms) var(--ease-out) both;
         }
         @keyframes mention-rise {
           from { opacity: 0; transform: translateY(6px) scale(0.97); }
@@ -173,23 +172,23 @@ export default function MentionDropdown({
           text-align: left;
           width: 100%;
           flex-shrink: 0;
-          transition: background var(--t-fast);
+          transition: background var(--t-control, 150ms) var(--ease-out);
         }
         .mention-row:hover {
-          background: var(--accent-subtle);
+          background: color-mix(in srgb, var(--lux, #d8b96a) 10%, transparent);
         }
         .mention-row--selected {
-          background: var(--accent-subtle);
+          background: color-mix(in srgb, var(--lux, #d8b96a) 14%, transparent);
         }
         .mention-row--selected:hover {
-          background: var(--accent-subtle);
+          background: color-mix(in srgb, var(--lux, #d8b96a) 14%, transparent);
         }
 
         .mention-avatar {
           width: 24px;
           height: 24px;
           border-radius: 50%;
-          background: var(--accent);
+          background: color-mix(in srgb, var(--lux, #d8b96a) 72%, var(--accent));
           opacity: 0.8;
           display: flex;
           align-items: center;
@@ -225,7 +224,15 @@ export default function MentionDropdown({
           flex: 1;
         }
         .mention-row--selected .mention-nick {
-          color: var(--accent);
+          color: var(--lux, #d8b96a);
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .mention-dropdown {
+            animation: none !important;
+          }
+          .mention-row {
+            transition: none !important;
+          }
         }
       `}</style>
     </>

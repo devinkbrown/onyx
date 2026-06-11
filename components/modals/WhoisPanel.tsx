@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import Avatar from '@/components/ui/Avatar';
+import ModalShell from './ModalShell';
 
 // ── Time helpers ──────────────────────────────────────────────────────────────
 
@@ -65,15 +66,6 @@ export default function WhoisPanel() {
   const info    = whoisData.get(nick.toLowerCase());
   const loading = info?.loading ?? true;
 
-  // Escape to close
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeWhois();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [closeWhois]);
-
   const goToChannel = useCallback((channel: string) => {
     // Strip leading mode prefixes to get the channel name
     const bare = channel.replace(/^[@+%~&]+/, '');
@@ -99,225 +91,160 @@ export default function WhoisPanel() {
   const signOnDate = info?.signOnTs ? new Date(info.signOnTs * 1000) : null;
 
   return (
-    <>
-      <aside className="whois-panel animate-whois-in" role="complementary" aria-label={`User info for ${nick}`}>
-        {/* Header */}
-        <div className="whois-header">
-          <span className="whois-header-title">User Info</span>
-          <button
-            className="whois-close"
-            onClick={closeWhois}
-            aria-label="Close user info panel"
-          >
-            <CloseIcon />
-          </button>
-        </div>
-
-        <div className="whois-body">
-          {/* Identity section */}
-          <div className="whois-identity">
-            <div className="whois-avatar-wrap">
-              <Avatar nick={nick} size={64} />
-            </div>
-            <div className="whois-nick">{nick}</div>
-
-            {loading ? (
-              <>
-                <SkeletonRow width="55%" />
-                <SkeletonRow width="40%" />
-              </>
-            ) : (
-              <>
-                {info?.username && info.host && (
-                  <div className="whois-userhost">
-                    {info.username}@{info.host}
-                  </div>
-                )}
-                {info?.realname && (
-                  <div className="whois-realname">{info.realname}</div>
-                )}
-                {info?.account && (
-                  <div className="whois-account">
-                    <span className="whois-account-icon" aria-label="Logged in">
-                      <NickServIcon />
-                    </span>
-                    {info.account}
-                  </div>
-                )}
-              </>
-            )}
+    <ModalShell
+      onClose={closeWhois}
+      variant="sheet"
+      size="sm"
+      title="User Info"
+      kicker="Whois"
+      titleId="whois-panel-title"
+      closeLabel="Close user info panel"
+      ariaLabel={`User info for ${nick}`}
+      flushBody
+    >
+      <div className="whois-body">
+        {/* Identity section */}
+        <div className="whois-identity">
+          <div className="whois-avatar-wrap">
+            <Avatar nick={nick} size={64} />
           </div>
+          <div className="whois-nick">{nick}</div>
 
-          <div className="whois-divider" />
-
-          {/* Connection section */}
-          <section className="whois-section">
-            <div className="whois-section-label">Connection</div>
-            {loading ? (
-              <>
-                <SkeletonRow width="80%" />
-                <SkeletonRow width="60%" />
-                <SkeletonRow width="70%" />
-              </>
-            ) : (
-              <>
-                {(info?.server || info?.serverInfo) && (
-                  <div className="whois-row">
-                    <span className="whois-row-label">Server</span>
-                    <span className="whois-row-value">
-                      {info.server}{info.serverInfo ? ` — ${info.serverInfo}` : ''}
-                    </span>
-                  </div>
-                )}
-                {info?.idleSecs !== undefined && (
-                  <div className="whois-row">
-                    <span className="whois-row-label">Idle</span>
-                    <span className="whois-row-value">
-                      {formatIdleDuration(info.idleSecs)}
-                    </span>
-                  </div>
-                )}
-                {signOnDate && (
-                  <div className="whois-row">
-                    <span className="whois-row-label">Connected</span>
-                    <span className="whois-row-value">
-                      {DATE_FMT.format(signOnDate)}
-                    </span>
-                  </div>
-                )}
-                {info?.realHost && (
-                  <div className="whois-row">
-                    <span className="whois-row-label">Real host</span>
-                    <code className="whois-row-code">{info.realHost}</code>
-                  </div>
-                )}
-              </>
-            )}
-          </section>
-
-          {/* Channels section */}
-          {(loading || visibleChannels.length > 0) && (
+          {loading ? (
             <>
-              <div className="whois-divider" />
-              <section className="whois-section">
-                <div className="whois-section-label">Channels</div>
-                {loading ? (
-                  <div className="whois-pills-skeleton">
-                    <SkeletonRow width="60px" />
-                    <SkeletonRow width="80px" />
-                    <SkeletonRow width="50px" />
-                  </div>
-                ) : (
-                  <div className="whois-pills">
-                    {visibleChannels.map(ch => (
-                      <ChannelPill key={ch} name={ch} onClick={() => goToChannel(ch)} />
-                    ))}
-                    {overflowCount > 0 && (
-                      <span className="whois-overflow">+{overflowCount} more</span>
-                    )}
-                  </div>
-                )}
-              </section>
+              <SkeletonRow width="55%" />
+              <SkeletonRow width="40%" />
+            </>
+          ) : (
+            <>
+              {info?.username && info.host && (
+                <div className="whois-userhost">
+                  {info.username}@{info.host}
+                </div>
+              )}
+              {info?.realname && (
+                <div className="whois-realname">{info.realname}</div>
+              )}
+              {info?.account && (
+                <div className="whois-account">
+                  <span className="whois-account-icon" aria-label="Logged in">
+                    <NickServIcon />
+                  </span>
+                  {info.account}
+                </div>
+              )}
             </>
           )}
-
-          {/* Flags section */}
-          {!loading && (info?.isOper || info?.special) && (
-            <>
-              <div className="whois-divider" />
-              <section className="whois-section">
-                <div className="whois-section-label">Flags</div>
-                {info.isOper && (
-                  <div className="whois-badge-oper">
-                    <StarIcon />
-                    IRC Operator
-                  </div>
-                )}
-                {info.special && (
-                  <div className="whois-special">{info.special}</div>
-                )}
-              </section>
-            </>
-          )}
-
-          <div className="whois-divider" />
-
-          {/* Actions */}
-          <section className="whois-section whois-actions">
-            <button className="whois-btn whois-btn--primary" onClick={openDM}>
-              Send Message
-            </button>
-            <button className="whois-btn whois-btn--secondary" onClick={viewProfile}>
-              View Profile
-            </button>
-          </section>
         </div>
-      </aside>
+
+        <div className="whois-divider" />
+
+        {/* Connection section */}
+        <section className="whois-section">
+          <div className="label-caps whois-section-label">Connection</div>
+          {loading ? (
+            <>
+              <SkeletonRow width="80%" />
+              <SkeletonRow width="60%" />
+              <SkeletonRow width="70%" />
+            </>
+          ) : (
+            <>
+              {(info?.server || info?.serverInfo) && (
+                <div className="whois-row">
+                  <span className="whois-row-label">Server</span>
+                  <span className="whois-row-value">
+                    {info.server}{info.serverInfo ? ` — ${info.serverInfo}` : ''}
+                  </span>
+                </div>
+              )}
+              {info?.idleSecs !== undefined && (
+                <div className="whois-row">
+                  <span className="whois-row-label">Idle</span>
+                  <span className="whois-row-value">
+                    {formatIdleDuration(info.idleSecs)}
+                  </span>
+                </div>
+              )}
+              {signOnDate && (
+                <div className="whois-row">
+                  <span className="whois-row-label">Connected</span>
+                  <span className="whois-row-value">
+                    {DATE_FMT.format(signOnDate)}
+                  </span>
+                </div>
+              )}
+              {info?.realHost && (
+                <div className="whois-row">
+                  <span className="whois-row-label">Real host</span>
+                  <code className="whois-row-code">{info.realHost}</code>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+
+        {/* Channels section */}
+        {(loading || visibleChannels.length > 0) && (
+          <>
+            <div className="whois-divider" />
+            <section className="whois-section">
+              <div className="label-caps whois-section-label">Channels</div>
+              {loading ? (
+                <div className="whois-pills-skeleton">
+                  <SkeletonRow width="60px" />
+                  <SkeletonRow width="80px" />
+                  <SkeletonRow width="50px" />
+                </div>
+              ) : (
+                <div className="whois-pills">
+                  {visibleChannels.map(ch => (
+                    <ChannelPill key={ch} name={ch} onClick={() => goToChannel(ch)} />
+                  ))}
+                  {overflowCount > 0 && (
+                    <span className="whois-overflow">+{overflowCount} more</span>
+                  )}
+                </div>
+              )}
+            </section>
+          </>
+        )}
+
+        {/* Flags section */}
+        {!loading && (info?.isOper || info?.special) && (
+          <>
+            <div className="whois-divider" />
+            <section className="whois-section">
+              <div className="label-caps whois-section-label">Flags</div>
+              {info.isOper && (
+                <div className="whois-badge-oper">
+                  <StarIcon />
+                  IRC Operator
+                </div>
+              )}
+              {info.special && (
+                <div className="whois-special">{info.special}</div>
+              )}
+            </section>
+          </>
+        )}
+
+        <div className="whois-divider" />
+
+        {/* Actions */}
+        <section className="whois-section whois-actions">
+          <button className="whois-btn whois-btn--primary" onClick={openDM}>
+            Send Message
+          </button>
+          <button className="whois-btn whois-btn--secondary" onClick={viewProfile}>
+            View Profile
+          </button>
+        </section>
+      </div>
 
       <style>{`
-        .whois-panel {
-          position: fixed;
-          right: 0;
-          top: 0;
-          bottom: 0;
-          width: 360px;
-          z-index: 610;
-          background: var(--bg-deep);
-          border-left: 1px solid var(--border-normal);
-          display: flex;
-          flex-direction: column;
-          box-shadow: -12px 0 48px rgba(0,0,0,0.55), -1px 0 0 var(--border-subtle);
-          overflow: hidden;
-        }
-
-        @keyframes whois-slide-in {
-          from { opacity: 0; transform: translateX(24px); }
-          to   { opacity: 1; transform: translateX(0); }
-        }
-        .animate-whois-in {
-          animation: whois-slide-in 200ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
-        }
-
-        /* Header */
-        .whois-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 0 16px;
-          height: var(--header-h, 48px);
-          border-bottom: 1px solid var(--border-subtle);
-          flex-shrink: 0;
-          background: var(--bg-elevated);
-        }
-        .whois-header-title {
-          font-size: 11px;
-          font-weight: 800;
-          letter-spacing: 0.08em;
-          color: var(--text-muted);
-          text-transform: uppercase;
-        }
-        .whois-close {
-          width: 28px;
-          height: 28px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: none;
-          border: none;
-          cursor: pointer;
-          color: var(--text-muted);
-          border-radius: var(--r-sm);
-          transition: background var(--t-fast, 150ms), color var(--t-fast, 150ms);
-        }
-        .whois-close:hover { background: var(--ch-hover-bg); color: var(--text-primary); }
-
-        /* Body */
         .whois-body {
-          flex: 1;
-          overflow-y: auto;
-          padding-bottom: 16px;
-          scrollbar-width: thin;
-          scrollbar-color: var(--border-normal) transparent;
+          padding-bottom: var(--sp-4, 16px);
         }
 
         /* Identity */
@@ -325,22 +252,23 @@ export default function WhoisPanel() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: 24px 16px 16px;
+          padding: var(--sp-6, 24px) var(--sp-4, 16px) var(--sp-4, 16px);
           gap: 6px;
           text-align: center;
         }
         .whois-avatar-wrap {
-          margin-bottom: 8px;
+          margin-bottom: var(--sp-2, 8px);
           position: relative;
         }
         .whois-nick {
-          font-size: 20px;
-          font-weight: 800;
+          font-family: var(--font-display, inherit);
+          font-size: var(--text-xl, 20px);
+          font-weight: 700;
           color: var(--text-primary);
           letter-spacing: -0.02em;
         }
         .whois-userhost {
-          font-size: 11px;
+          font-size: var(--text-2xs, 11px);
           font-family: var(--font-mono, monospace);
           color: var(--text-muted);
           word-break: break-all;
@@ -349,14 +277,14 @@ export default function WhoisPanel() {
         }
         .whois-userhost:hover { color: var(--text-secondary); }
         .whois-realname {
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           color: var(--text-secondary);
         }
         .whois-account {
           display: inline-flex;
           align-items: center;
           gap: 5px;
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           color: var(--accent);
           background: var(--accent-subtle);
           border: 1px solid var(--accent-border);
@@ -374,19 +302,14 @@ export default function WhoisPanel() {
         .whois-divider {
           height: 1px;
           background: var(--border-subtle);
-          margin: 0 16px;
+          margin: 0 var(--sp-4, 16px);
         }
 
         /* Sections */
         .whois-section {
-          padding: 12px 16px;
+          padding: var(--sp-3, 12px) var(--sp-4, 16px);
         }
         .whois-section-label {
-          font-size: 10px;
-          font-weight: 800;
-          letter-spacing: 0.09em;
-          text-transform: uppercase;
-          color: var(--text-muted);
           margin-bottom: 10px;
         }
 
@@ -394,13 +317,13 @@ export default function WhoisPanel() {
         .whois-row {
           display: flex;
           align-items: flex-start;
-          gap: 12px;
+          gap: var(--sp-3, 12px);
           padding: 5px 0;
           border-bottom: 1px solid var(--border-subtle);
         }
         .whois-row:last-child { border-bottom: none; }
         .whois-row-label {
-          font-size: 11px;
+          font-size: var(--text-2xs, 11px);
           font-weight: 600;
           color: var(--text-muted);
           text-transform: uppercase;
@@ -410,17 +333,17 @@ export default function WhoisPanel() {
           padding-top: 1px;
         }
         .whois-row-value {
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           color: var(--text-secondary);
           word-break: break-word;
           flex: 1;
           cursor: text;
           user-select: all;
-          transition: color var(--t-fast);
+          transition: color var(--t-control, 150ms);
         }
         .whois-row-value:hover { color: var(--text-primary); }
         .whois-row-code {
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           font-family: var(--font-mono, monospace);
           color: var(--text-secondary);
           word-break: break-all;
@@ -443,14 +366,14 @@ export default function WhoisPanel() {
           display: inline-flex;
           align-items: center;
           padding: 3px 9px;
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           font-weight: 600;
-          background: var(--bg-elevated);
+          background: var(--elev-tint-1, var(--bg-elevated));
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-sm);
           color: var(--text-secondary);
           cursor: pointer;
-          transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+          transition: background var(--t-control, 150ms), color var(--t-control, 150ms), border-color var(--t-control, 150ms);
           font-family: inherit;
         }
         .whois-pill:hover {
@@ -464,7 +387,7 @@ export default function WhoisPanel() {
           margin-right: 1px;
         }
         .whois-overflow {
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           color: var(--text-muted);
           padding: 3px 0;
           align-self: center;
@@ -479,12 +402,12 @@ export default function WhoisPanel() {
           background: var(--gold-subtle);
           border: 1px solid color-mix(in srgb, var(--gold) 35%, transparent);
           border-radius: var(--r-full);
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           font-weight: 700;
           color: var(--gold);
         }
         .whois-special {
-          font-size: 13px;
+          font-size: var(--text-sm, 13px);
           color: var(--text-secondary);
           margin-top: 6px;
         }
@@ -493,18 +416,18 @@ export default function WhoisPanel() {
         .whois-actions {
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: var(--sp-2, 8px);
         }
         .whois-btn {
           width: 100%;
           padding: 10px 16px;
           border-radius: var(--r-md);
-          font-size: 14px;
+          font-size: var(--text-base, 14px);
           font-weight: 600;
           cursor: pointer;
           border: none;
           font-family: inherit;
-          transition: background var(--t-fast, 150ms), opacity var(--t-fast, 150ms);
+          transition: background var(--t-control, 150ms), opacity var(--t-control, 150ms);
         }
         .whois-btn--primary {
           background: var(--accent);
@@ -535,26 +458,15 @@ export default function WhoisPanel() {
           0%   { background-position: 200% 0; }
           100% { background-position: -200% 0; }
         }
-
-        @media (max-width: 768px) {
-          .whois-panel {
-            width: 100%;
-          }
+        @media (prefers-reduced-motion: reduce) {
+          .whois-skeleton { animation: none; }
         }
       `}</style>
-    </>
+    </ModalShell>
   );
 }
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
-
-function CloseIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <path d="M3 3l10 10M13 3L3 13" />
-    </svg>
-  );
-}
 
 function NickServIcon() {
   return (

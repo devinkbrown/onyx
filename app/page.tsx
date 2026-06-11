@@ -46,19 +46,13 @@ export default function LandingPage() {
             </div>
 
             <h1 className="land-h1">
-              Go{' '}
-              <span className="land-h1-deep">
-                <span className="land-h1-word">deeper</span>
-                <span className="land-h1-underwave" aria-hidden />
-              </span>
-              <br />
-              than Discord.
+              Ocean for<br />
+              eshmaki.me
             </h1>
 
             <p className="land-lead">
-              Open-protocol community chat. Native voice and encryption
-              built into the protocol — no relay servers, no third-party
-              infrastructure. Start in <span className="land-inline-channel">#root</span>.
+              Open-protocol community chat with LADON media and VEIL encryption
+              carried through Ophion. Start in <span className="land-inline-channel">#root</span>.
             </p>
 
             <div className="land-hero-actions">
@@ -242,7 +236,7 @@ export default function LandingPage() {
           </p>
         </div>
 
-        <div className="land-app-preview" aria-label="Ocean app interface preview">
+        <div className="land-app-preview elev-2" aria-label="Ocean app interface preview">
           <div className="land-preview-rail" aria-hidden>
             <div className="land-preview-orb land-preview-orb-active">O</div>
             <div className="land-preview-orb">#</div>
@@ -653,9 +647,10 @@ export default function LandingPage() {
 
         /* Heading */
         .land-h1 {
-          font-size: clamp(3.2rem, 6vw, 5.8rem);
-          font-weight: 900;
-          letter-spacing: -0.04em;
+          font-family: var(--font-display);
+          font-size: var(--text-hero);
+          font-weight: 800;
+          letter-spacing: 0;
           line-height: 1.0;
           color: var(--text-primary);
           margin: 0;
@@ -694,15 +689,15 @@ export default function LandingPage() {
           display: inline-flex; align-items: center; gap: 7px;
           padding: 13px 26px; border-radius: var(--r-md);
           font-size: 14px; font-weight: 700; color: var(--bg-void);
-          background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+          background: color-mix(in srgb, var(--accent) 88%, black 12%);
           text-decoration: none;
-          box-shadow: 0 4px 20px var(--accent-glow), 0 0 0 1px var(--accent-border);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 16px 28px rgba(0,0,0,.28);
           transition: transform 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
           letter-spacing: 0.01em;
         }
         .land-btn-primary:hover {
           transform: translateY(-2px);
-          box-shadow: 0 8px 36px var(--accent-glow), 0 0 0 1px var(--accent);
+          filter: brightness(1.06);
           text-decoration: none; color: var(--bg-void);
         }
         .land-btn-ghost {
@@ -1013,12 +1008,11 @@ export default function LandingPage() {
           grid-template-columns: 72px 220px minmax(0, 1fr) 190px;
           min-height: 430px;
           overflow: hidden;
-          border-radius: 22px;
-          border: 1px solid var(--border-normal);
+          border-radius: var(--r-2xl, 20px) var(--r-md, 8px) var(--r-lg, 12px) var(--r-sm, 6px);
+          border: 0;
           background:
             linear-gradient(180deg, rgba(14,165,233,0.07), transparent 34%),
             color-mix(in srgb, var(--bg-base) 92%, transparent);
-          box-shadow: 0 32px 90px rgba(0,0,0,0.45), inset 0 1px 0 var(--accent-border);
         }
         .land-preview-rail,
         .land-preview-sidebar,

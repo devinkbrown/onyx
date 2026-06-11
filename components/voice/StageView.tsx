@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, type CSSProperties } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import type { ChannelUser } from '@/lib/irc/types';
 import ChatArea from '@/components/chat/ChatArea';
@@ -155,6 +155,7 @@ export default function StageView() {
   const stageChannel      = useOnyxStore(s => s.stageChannel);
   const stageRaisedHands  = useOnyxStore(s => s.stageRaisedHands);
   const isStageHost       = useOnyxStore(s => s.isStageHost);
+  const isOper            = useOnyxStore(s => s.isOper);
   const isStageSpeaker    = useOnyxStore(s => s.isStageSpeaker);
   const stageHandRaised   = useOnyxStore(s => s.stageHandRaised);
   const pendingSpeakInvite = useOnyxStore(s => s.pendingSpeakInvite);
@@ -189,6 +190,11 @@ export default function StageView() {
     const removeRaisedHand = useOnyxStore.getState().removeRaisedHand;
     removeRaisedHand(nick);
   }, []);
+
+  const handleLowerAll = useCallback(() => {
+    const removeRaisedHand = useOnyxStore.getState().removeRaisedHand;
+    for (const nick of stageRaisedHands) removeRaisedHand(nick);
+  }, [stageRaisedHands]);
 
   const handleInvite = useCallback((nick: string) => {
     inviteToSpeak(nick);
@@ -256,6 +262,25 @@ export default function StageView() {
             </span>
           </div>
         </header>
+
+        {stageRaisedHands.length > 0 && (
+          <div className="sv-queue-strip glass-2 elev-2" aria-label="Raised hand queue" data-testid="stage-hand-queue">
+            <span className="sv-queue-label label-caps">Queue</span>
+            <div className="sv-queue-list">
+              {stageRaisedHands.map((nick, index) => (
+                <span key={nick} className="sv-queue-chip" style={{ '--queue-index': index } as CSSProperties}>
+                  <span className="sv-queue-rank">{index + 1}</span>
+                  {nick}
+                </span>
+              ))}
+            </div>
+            {(isStageHost || isOper) && (
+              <button className="sv-queue-clear" type="button" onClick={handleLowerAll}>
+                Lower all
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Speakers grid */}
         <section className="sv-speakers-section" aria-label="Speakers">
@@ -344,9 +369,10 @@ export default function StageView() {
           ) : (
             <>
               <button
-                className={`stage-hand-btn${stageHandRaised ? ' stage-hand-btn--active' : ''}`}
+                className={`stage-hand-btn elev-2${stageHandRaised ? ' stage-hand-btn--active' : ''}`}
                 onClick={handleRaiseHand}
                 aria-pressed={stageHandRaised}
+                data-testid="stage-raise-hand-toggle"
               >
                 {stageHandRaised ? '✋ Lower Hand' : '🙋 Raise Hand'}
               </button>
@@ -431,11 +457,12 @@ export default function StageView() {
           flex: 1;
           display: flex;
           flex-direction: column;
-          padding: 32px 40px 24px;
+          padding: var(--sp-8, 32px) var(--sp-10, 40px) var(--sp-6, 24px);
           overflow-y: auto;
           min-width: 0;
-          gap: 32px;
+          gap: var(--sp-8, 32px);
           position: relative;
+          background: #000;
         }
 
         /* ── Header ── */
@@ -443,7 +470,7 @@ export default function StageView() {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 16px;
+          gap: var(--sp-4, 16px);
         }
 
         .sv-header-left {
@@ -458,10 +485,11 @@ export default function StageView() {
         }
 
         .sv-channel-name {
-          font-size: 24px;
-          font-weight: 800;
+          font-family: var(--font-display), Georgia, serif;
+          font-size: var(--text-2xl, 1.5rem);
+          font-weight: 700;
           color: var(--text-primary, #dff0ff);
-          letter-spacing: -0.5px;
+          letter-spacing: 0;
         }
 
         .sv-header-right {
@@ -475,14 +503,92 @@ export default function StageView() {
           align-items: center;
           gap: 6px;
           padding: 4px 10px;
-          border-radius: 20px;
-          background: rgba(239, 68, 68, 0.15);
-          border: 1px solid rgba(239, 68, 68, 0.4);
-          font-size: 12px;
+          border-radius: var(--r-lg, 14px) var(--r-xs, 4px) var(--r-md, 8px) var(--r-xl, 16px);
+          background: color-mix(in srgb, var(--danger, #f87171) 16%, #050505 84%);
+          font-size: var(--text-xs, 12px);
           font-weight: 800;
           letter-spacing: 0.1em;
           color: #f87171;
           text-transform: uppercase;
+        }
+
+        .sv-queue-strip {
+          display: flex;
+          align-items: center;
+          gap: var(--sp-3, 12px);
+          min-height: 46px;
+          padding: var(--sp-2, 8px) var(--sp-3, 12px);
+          border-radius: var(--r-md, 8px) var(--r-2xl, 20px) var(--r-sm, 6px) var(--r-xl, 16px);
+          overflow: hidden;
+        }
+
+        .sv-queue-label {
+          flex: 0 0 auto;
+          color: var(--text-muted, #7aa8c4);
+        }
+
+        .sv-queue-list {
+          display: flex;
+          align-items: center;
+          gap: var(--sp-2, 8px);
+          min-width: 0;
+          overflow-x: auto;
+          scrollbar-width: thin;
+        }
+
+        .sv-queue-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: var(--sp-1, 4px);
+          flex: 0 0 auto;
+          max-width: 150px;
+          padding: 5px var(--sp-2, 8px);
+          border-radius: var(--r-lg, 14px) var(--r-xs, 4px) var(--r-md, 8px) var(--r-xl, 16px);
+          background: color-mix(in srgb, var(--lux, #d8b96a) 13%, #050505 87%);
+          color: var(--text-primary, #dff0ff);
+          font-size: var(--text-xs, .75rem);
+          font-weight: 700;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          animation: queue-chip-in var(--t-surface, 220ms) var(--ease-spring, cubic-bezier(.34,1.4,.4,1)) both;
+          animation-delay: calc(var(--queue-index, 0) * 35ms);
+        }
+
+        .sv-queue-rank {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 16px;
+          height: 16px;
+          border-radius: var(--r-xs, 4px) var(--r-md, 8px) var(--r-xs, 4px) var(--r-sm, 6px);
+          background: color-mix(in srgb, var(--lux, #d8b96a) 26%, #050505 74%);
+          color: var(--lux, #d8b96a);
+          font-variant-numeric: tabular-nums;
+        }
+
+        .sv-queue-clear {
+          flex: 0 0 auto;
+          padding: 6px var(--sp-3, 12px);
+          border: 0;
+          border-radius: var(--r-md, 8px) var(--r-xl, 16px) var(--r-sm, 6px) var(--r-lg, 14px);
+          background: color-mix(in srgb, var(--danger, #f87171) 16%, #050505 84%);
+          color: var(--danger, #f87171);
+          font: inherit;
+          font-size: var(--text-xs, .75rem);
+          font-weight: 800;
+          cursor: pointer;
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-1, 0 10px 26px rgba(0,0,0,.32));
+        }
+
+        .sv-queue-clear:focus-visible {
+          outline: 2px solid var(--lux, #d8b96a);
+          outline-offset: 2px;
+        }
+
+        @keyframes queue-chip-in {
+          from { opacity: 0; transform: translateY(8px) scale(.96); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
         }
 
         .sv-live-dot {
@@ -643,10 +749,10 @@ export default function StageView() {
 
         /* ── Raised hands ── */
         .sv-hands-section {
-          background: rgba(14, 165, 233, 0.05);
-          border: 1px solid rgba(14, 165, 233, 0.12);
-          border-radius: 12px;
-          padding: 16px 20px;
+          background: color-mix(in srgb, #050505 86%, var(--accent, #0ea5e9) 8%);
+          border-radius: var(--r-sm, 6px) var(--r-2xl, 20px) var(--r-md, 8px) var(--r-xl, 16px);
+          padding: var(--sp-4, 16px) var(--sp-5, 20px);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-1, 0 10px 26px rgba(0,0,0,.32));
         }
 
         .sv-hands-list {
@@ -661,8 +767,8 @@ export default function StageView() {
           justify-content: space-between;
           gap: 12px;
           padding: 8px 10px;
-          border-radius: 8px;
-          background: rgba(6, 16, 29, 0.6);
+          border-radius: var(--r-md, 8px) var(--r-xl, 16px) var(--r-sm, 6px) var(--r-lg, 14px);
+          background: color-mix(in srgb, #050505 78%, white 7%);
         }
 
         .sv-hand-nick {
@@ -784,7 +890,6 @@ export default function StageView() {
           background: rgba(14, 165, 233, 0.28);
           border: 1px solid rgba(14, 165, 233, 0.6);
           color: #38bdf8;
-          box-shadow: 0 0 12px rgba(14, 165, 233, 0.25);
         }
 
         .sv-btn--muted {
@@ -819,28 +924,29 @@ export default function StageView() {
           display: inline-block;
         }
         .stage-hand-btn {
-          background: rgba(124, 90, 245, 0.15);
-          border: 1px solid var(--accent, #0ea5e9);
-          color: var(--accent, #0ea5e9);
-          border-radius: 20px;
-          padding: 8px 16px;
+          background: color-mix(in srgb, var(--lux, #d8b96a) 11%, #050505 89%);
+          border: 0;
+          color: var(--lux, #d8b96a);
+          border-radius: var(--r-xl, 16px) var(--r-sm, 6px) var(--r-2xl, 20px) var(--r-md, 8px);
+          padding: var(--sp-2, 8px) var(--sp-4, 16px);
           cursor: pointer;
-          font-weight: 600;
-          font-size: 14px;
+          font-weight: 800;
+          font-size: var(--text-sm, .8125rem);
           font-family: inherit;
-          transition: background 150ms;
+          transition: transform var(--t-control, 150ms) var(--ease-spring, cubic-bezier(.34,1.4,.4,1)),
+                      background var(--t-control, 150ms) var(--ease-out, cubic-bezier(.16,1,.3,1));
           white-space: nowrap;
         }
         .stage-hand-btn:hover {
-          background: rgba(124, 90, 245, 0.25);
+          background: color-mix(in srgb, var(--lux, #d8b96a) 17%, #050505 83%);
+          transform: translateY(-1px) scale(1.02);
         }
         .stage-hand-btn--active {
-          background: rgba(245, 158, 11, 0.15);
-          border-color: #f59e0b;
-          color: #f59e0b;
+          background: color-mix(in srgb, var(--lux, #d8b96a) 22%, #050505 78%);
+          color: var(--lux, #d8b96a);
         }
         .stage-hand-btn--active:hover {
-          background: rgba(245, 158, 11, 0.25);
+          background: color-mix(in srgb, var(--lux, #d8b96a) 28%, #050505 72%);
         }
 
         /* ── Speak invite card ── */
@@ -910,6 +1016,24 @@ export default function StageView() {
             flex-wrap: wrap;
             bottom: 90px;
             white-space: normal;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .sv-live-dot,
+          .sv-avatar-ring,
+          .stage-hand-raised,
+          .sv-queue-chip {
+            animation: none;
+          }
+          .stage-hand-btn,
+          .sv-btn,
+          .sv-chat-sidebar {
+            transition: none;
+          }
+          .stage-hand-btn:hover,
+          .sv-btn:hover {
+            transform: none;
           }
         }
       `}</style>

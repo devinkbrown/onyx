@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useSpatial, type SpatialPeer } from '@/hooks/useSpatial';
 
 interface SpatialPadProps {
@@ -24,6 +24,20 @@ function nickColor(nick: string): string {
   return `hsl(${hue}, 70%, 65%)`;
 }
 
+function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => setReduced(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+
+  return reduced;
+}
+
 /**
  * SpatialPad — polar radar UI for LADON listener-centric spatial audio.
  *
@@ -37,8 +51,17 @@ function nickColor(nick: string): string {
 export function SpatialPad({ channel, size = 360, onClose }: SpatialPadProps) {
   const { self, peers, moveSelf, isChannel } = useSpatial(channel);
   const padRef = useRef<HTMLDivElement | null>(null);
+  const inertiaRef = useRef<number | null>(null);
+  const velocityRef = useRef({ x: 0, y: 0 });
+  const currentPosRef = useRef({ x: self.x, y: self.y, z: self.z });
+  const lastPointerRef = useRef<{ x: number; y: number; t: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const [selfZ, setSelfZ] = useState(0);
+  const reducedMotion = usePrefersReducedMotion();
+
+  useEffect(() => {
+    currentPosRef.current = { x: self.x, y: self.y, z: self.z };
+  }, [self.x, self.y, self.z]);
 
   // Render self separately at visual centre — always 0,0 from listener POV
   const others = useMemo(() => peers.filter(p => !p.isSelf), [peers]);
@@ -76,28 +99,96 @@ export function SpatialPad({ channel, size = 360, onClose }: SpatialPadProps) {
     };
   }, []);
 
+  const stopInertia = useCallback(() => {
+    if (inertiaRef.current !== null) cancelAnimationFrame(inertiaRef.current);
+    inertiaRef.current = null;
+  }, []);
+
+  const moveTo = useCallback((x: number, y: number, z = selfZ) => {
+    const next = { x: Math.max(-1, Math.min(1, x)), y: Math.max(-1, Math.min(1, y)), z };
+    currentPosRef.current = next;
+    moveSelf(next);
+  }, [moveSelf, selfZ]);
+
+  const startInertia = useCallback(() => {
+    if (reducedMotion) return;
+    let vx = velocityRef.current.x;
+    let vy = velocityRef.current.y;
+    if (Math.hypot(vx, vy) < 0.00045) return;
+    let last = performance.now();
+
+    const tick = (now: number) => {
+      const dt = Math.min(32, now - last);
+      last = now;
+      const pos = currentPosRef.current;
+      let nextX = pos.x + vx * dt;
+      let nextY = pos.y + vy * dt;
+      if (nextX <= -1 || nextX >= 1) {
+        nextX = Math.max(-1, Math.min(1, nextX));
+        vx = 0;
+      }
+      if (nextY <= -1 || nextY >= 1) {
+        nextY = Math.max(-1, Math.min(1, nextY));
+        vy = 0;
+      }
+      moveTo(nextX, nextY, selfZ);
+      const friction = Math.pow(0.9, dt / 16);
+      vx *= friction;
+      vy *= friction;
+      if (Math.hypot(vx, vy) > 0.00008) {
+        inertiaRef.current = requestAnimationFrame(tick);
+      } else {
+        inertiaRef.current = null;
+      }
+    };
+
+    inertiaRef.current = requestAnimationFrame(tick);
+  }, [moveTo, reducedMotion, selfZ]);
+
+  useEffect(() => () => stopInertia(), [stopInertia]);
+
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isChannel) return;
+    stopInertia();
     (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
     setDragging(true);
     const pt = fromPointer(e.clientX, e.clientY);
-    if (pt) moveSelf({ x: pt.x, y: pt.y, z: selfZ });
+    if (pt) {
+      velocityRef.current = { x: 0, y: 0 };
+      lastPointerRef.current = { ...pt, t: performance.now() };
+      moveTo(pt.x, pt.y, selfZ);
+    }
   };
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!dragging) return;
     const pt = fromPointer(e.clientX, e.clientY);
-    if (pt) moveSelf({ x: pt.x, y: pt.y, z: selfZ });
+    if (pt) {
+      const now = performance.now();
+      const prev = lastPointerRef.current;
+      if (prev) {
+        const dt = Math.max(8, now - prev.t);
+        velocityRef.current = {
+          x: (pt.x - prev.x) / dt,
+          y: (pt.y - prev.y) / dt,
+        };
+      }
+      lastPointerRef.current = { ...pt, t: now };
+      moveTo(pt.x, pt.y, selfZ);
+    }
   };
 
   const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     try { (e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId); } catch { /* noop */ }
     setDragging(false);
+    lastPointerRef.current = null;
+    startInertia();
   };
 
   const speakingCount = others.filter(p => p.speaking).length;
   const inVoiceCount  = others.filter(p => p.inVoice).length;
   const halfPx        = size / 2;
+  const selfPoint     = toPixel(self.x, self.y);
 
   const rings: { r: number; label: string }[] = [
     { r: 0.33, label: 'Near' },
@@ -185,8 +276,8 @@ export function SpatialPad({ channel, size = 360, onClose }: SpatialPadProps) {
                   width:   dotSize,
                   height:  dotSize,
                   borderColor: p.speaking ? color : p.inVoice ? `${color}66` : 'rgba(255,255,255,0.08)',
-                  boxShadow: p.speaking ? `0 0 10px ${color}80` : 'none',
-                  transition: 'left 0.2s cubic-bezier(0.22, 1, 0.36, 1), top 0.2s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.15s, box-shadow 0.15s',
+                  boxShadow: 'var(--elev-shadow-1, 0 10px 26px rgba(0,0,0,.32))',
+                  transition: reducedMotion ? 'none' : 'left var(--t-surface, 220ms) var(--ease-out, cubic-bezier(.16,1,.3,1)), top var(--t-surface, 220ms) var(--ease-out, cubic-bezier(.16,1,.3,1)), border-color var(--t-control, 150ms)',
                 }}
                 title={p.nick}
                 aria-label={`${p.nick}${p.speaking ? ' — speaking' : ''}`}
@@ -210,8 +301,9 @@ export function SpatialPad({ channel, size = 360, onClose }: SpatialPadProps) {
           {/* Self dot (always at visual centre; dragging changes listener coords) */}
           <div
             className={`sp-self${dragging ? ' sp-self--dragging' : ''}`}
-            style={{ left: halfPx, top: halfPx }}
+            style={{ left: selfPoint.px, top: selfPoint.py }}
             aria-label="You (listener position)"
+            data-testid="spatial-self-token"
           >
             <span className="sp-self-icon" aria-hidden>◉</span>
           </div>
@@ -260,12 +352,11 @@ export function SpatialPad({ channel, size = 360, onClose }: SpatialPadProps) {
         .sp-root {
           display: flex;
           flex-direction: column;
-          gap: 10px;
-          padding: 14px;
-          background: linear-gradient(160deg, var(--bg-elevated) 0%, var(--bg-deep) 100%);
-          border: 1px solid var(--accent-border);
-          border-radius: 12px;
-          box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 0 1px var(--accent-subtle);
+          gap: var(--sp-3, 12px);
+          padding: var(--sp-4, 16px);
+          background: color-mix(in srgb, #050505 88%, var(--accent, #0ea5e9) 7%);
+          border-radius: var(--r-sm, 6px) var(--r-2xl, 20px) var(--r-md, 8px) var(--r-xl, 16px);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-3, 0 24px 60px rgba(0,0,0,.52));
           width: fit-content;
           box-sizing: border-box;
           user-select: none;
@@ -323,15 +414,14 @@ export function SpatialPad({ channel, size = 360, onClose }: SpatialPadProps) {
           width: var(--sp-size);
           height: var(--sp-size);
           border-radius: 50%;
-          background: radial-gradient(circle at 50% 50%,
-            var(--accent-subtle) 0%,
-            rgba(14,165,233,0.01) 50%,
-            rgba(0,0,0,0.3) 100%);
-          border: 1px solid var(--border-normal);
+          background:
+            repeating-radial-gradient(circle at center, rgba(255,255,255,0.06) 0 1px, transparent 1px 28px),
+            color-mix(in srgb, #000 92%, var(--accent, #0ea5e9) 8%);
           overflow: hidden;
           cursor: crosshair;
           touch-action: none;
           flex-shrink: 0;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.05), inset 0 0 0 1px rgba(255,255,255,.06);
         }
         .sp-pad--readonly { cursor: default; }
         .sp-pad--dragging { cursor: grabbing; }
@@ -339,7 +429,7 @@ export function SpatialPad({ channel, size = 360, onClose }: SpatialPadProps) {
         .sp-ring {
           position: absolute;
           border-radius: 50%;
-          border: 1px solid var(--accent-subtle);
+          border: 1px solid color-mix(in srgb, var(--accent, #0ea5e9) 24%, transparent);
           pointer-events: none;
         }
         .sp-ring-label {
@@ -356,7 +446,7 @@ export function SpatialPad({ channel, size = 360, onClose }: SpatialPadProps) {
 
         .sp-cross-h, .sp-cross-v {
           position: absolute;
-          background: var(--accent-subtle);
+          background: color-mix(in srgb, var(--accent, #0ea5e9) 18%, transparent);
           pointer-events: none;
         }
         .sp-cross-h {
@@ -387,7 +477,7 @@ export function SpatialPad({ channel, size = 360, onClose }: SpatialPadProps) {
           position: absolute;
           transform: translate(-50%, -50%);
           border-radius: 50%;
-          background: var(--bg-elevated);
+          background: color-mix(in srgb, #050505 76%, white 8%);
           border: 2px solid rgba(255,255,255,0.08);
           display: flex;
           align-items: center;
@@ -428,8 +518,7 @@ export function SpatialPad({ channel, size = 360, onClose }: SpatialPadProps) {
           left: 50%;
           transform: translateX(-50%);
           background: rgba(3, 8, 16, 0.9);
-          border: 1px solid var(--border-normal);
-          border-radius: 4px;
+          border-radius: var(--r-xs, 4px) var(--r-lg, 14px) var(--r-xs, 4px) var(--r-sm, 6px);
           padding: 2px 6px;
           font-size: 10px;
           font-weight: 600;
@@ -475,23 +564,25 @@ export function SpatialPad({ channel, size = 360, onClose }: SpatialPadProps) {
           width: 32px;
           height: 32px;
           transform: translate(-50%, -50%);
-          border-radius: 50%;
-          background: var(--accent-subtle);
-          border: 2px solid var(--accent);
+          border-radius: var(--r-xl, 16px) var(--r-sm, 6px) var(--r-xl, 16px) var(--r-md, 8px);
+          background: color-mix(in srgb, var(--lux, #d8b96a) 24%, #050505 76%);
+          border: 0;
           display: flex;
           align-items: center;
           justify-content: center;
-          box-shadow: 0 0 12px var(--accent-glow);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-2, 0 18px 44px rgba(0,0,0,.42));
           pointer-events: none;
           z-index: 2;
-          transition: box-shadow 0.15s;
+          transition: transform var(--t-control, 150ms) var(--ease-spring, cubic-bezier(.34,1.4,.4,1)),
+                      background var(--t-control, 150ms) var(--ease-out, cubic-bezier(.16,1,.3,1));
         }
         .sp-self--dragging {
-          box-shadow: 0 0 20px var(--accent-glow), 0 0 0 3px var(--accent-subtle);
+          background: color-mix(in srgb, var(--lux, #d8b96a) 34%, #050505 66%);
+          transform: translate(-50%, -50%) scale(1.08);
         }
         .sp-self-icon {
           font-size: 14px;
-          color: var(--accent);
+          color: var(--lux, #d8b96a);
           line-height: 1;
         }
 
@@ -535,13 +626,27 @@ export function SpatialPad({ channel, size = 360, onClose }: SpatialPadProps) {
           color: var(--text-secondary);
         }
         .sp-nearest strong {
-          color: var(--accent);
+          color: var(--lux, #d8b96a);
           font-weight: 600;
         }
         .sp-readonly-note {
           font-size: 11px;
           color: var(--text-muted);
           font-style: italic;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .sp-peer,
+          .sp-peer--speaking,
+          .sp-peer-pulse,
+          .sp-audio-bar,
+          .sp-self {
+            animation: none;
+            transition: none;
+          }
+          .sp-self--dragging {
+            transform: translate(-50%, -50%);
+          }
         }
       `}</style>
     </div>

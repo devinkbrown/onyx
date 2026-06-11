@@ -11,7 +11,7 @@ import MentionDropdown from '@/components/chat/MentionDropdown';
 import EmojiAutocomplete, { searchEmoji } from '@/components/chat/EmojiAutocomplete';
 import { stickerToMessage } from '@/lib/stickers';
 import FloodWarningBar from '@/components/chat/FloodWarningBar';
-import AttachmentPreview, { PendingAttachment, getAttachmentType, formatBytes } from '@/components/chat/AttachmentPreview';
+import AttachmentPreview, { PendingAttachment, AttachmentUploadState, getAttachmentType, formatBytes } from '@/components/chat/AttachmentPreview';
 import { useFileUpload } from '@/hooks/useFileUpload';
 
 const FLOOD_WINDOW_MS = 2000;
@@ -19,6 +19,11 @@ const MAX_ATTACHMENTS = 10;
 const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25 MB
 const FLOOD_THRESHOLD = 3;
 const FLOOD_COOLDOWN_MS = 3000;
+
+const CODE_LANGUAGES = [
+  'text', 'bash', 'css', 'diff', 'go', 'html', 'ini', 'irc', 'json', 'jsx',
+  'lua', 'md', 'python', 'rust', 'sql', 'tsx', 'typescript', 'yaml',
+];
 
 interface Props {
   target: string;
@@ -143,9 +148,45 @@ interface AutocompleteState {
   selectedIndex: number;
 }
 
+interface CodeLangState {
+  open: boolean;
+  query: string;
+  triggerStart: number;
+  selectedIndex: number;
+}
+
+interface PendingPasteState {
+  text: string;
+  start: number;
+  end: number;
+}
+
 const EMPTY_AC: AutocompleteState = {
   mode: 'none', query: '', triggerStart: 0, items: [], selectedIndex: 0,
 };
+
+const EMPTY_CODE_LANG: CodeLangState = {
+  open: false, query: '', triggerStart: 0, selectedIndex: 0,
+};
+
+function getLineCount(value: string): number {
+  return Math.max(1, value.split('\n').length);
+}
+
+function hasOpenCodeRegion(value: string): boolean {
+  const fences = value.match(/```/g);
+  return Boolean(fences && fences.length >= 1);
+}
+
+function detectCodeLanguage(textVal: string, cursorPos: number): Omit<CodeLangState, 'open' | 'selectedIndex'> | null {
+  const before = textVal.slice(0, cursorPos);
+  const match = before.match(/(?:^|\n)```([a-z0-9+#.-]{0,20})$/i);
+  if (!match) return null;
+  return {
+    query: match[1].toLowerCase(),
+    triggerStart: cursorPos - match[1].length,
+  };
+}
 
 export default function MessageInput({ target, placeholder, droppedFile, onDroppedFileConsumed, slowModeActive, onMessageSent }: Props) {
   const sendMessage        = useOnyxStore(s => s.sendMessage);
@@ -200,6 +241,8 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
   // Feature: pending attachments
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [pendingPaste, setPendingPaste] = useState<PendingPasteState | null>(null);
+  const [codeLang, setCodeLang] = useState<CodeLangState>(EMPTY_CODE_LANG);
   const { upload, uploading, progress: uploadProgress } = useFileUpload();
   const dragCounterRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -374,6 +417,8 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
   // ref so keydown handlers always read fresh state without stale closure
   const acRef = useRef<AutocompleteState>(EMPTY_AC);
   acRef.current = ac;
+  const codeLangRef = useRef<CodeLangState>(EMPTY_CODE_LANG);
+  codeLangRef.current = codeLang;
 
   // Close emoji picker on outside click
   useEffect(() => {
@@ -572,6 +617,37 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
     requestAnimationFrame(() => {
       ta.focus();
       ta.setSelectionRange(newCursor, newCursor);
+    });
+  }, [text]);
+
+  const insertAtRange = useCallback((inserted: string, start: number, end: number) => {
+    const ta = textareaRef.current;
+    const newText = text.slice(0, start) + inserted + text.slice(end);
+    const newCursor = start + inserted.length;
+    setText(newText);
+    setPendingPaste(null);
+    requestAnimationFrame(() => {
+      ta?.focus();
+      ta?.setSelectionRange(newCursor, newCursor);
+      if (ta) {
+        ta.style.height = 'auto';
+        ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
+      }
+    });
+  }, [text]);
+
+  const applyCodeLanguage = useCallback((language: string) => {
+    const ta = textareaRef.current;
+    const state = codeLangRef.current;
+    if (!ta || !state.open) return;
+    const cursorPos = ta.selectionStart;
+    const nextText = text.slice(0, state.triggerStart) + language + text.slice(cursorPos);
+    const nextCursor = state.triggerStart + language.length;
+    setText(nextText);
+    setCodeLang(EMPTY_CODE_LANG);
+    requestAnimationFrame(() => {
+      ta.focus();
+      ta.setSelectionRange(nextCursor, nextCursor);
     });
   }, [text]);
 
@@ -943,6 +1019,29 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
   const bytesRemaining = IRC_LIMIT - wireBytes;
   const overCharLimit = wireBytes > IRC_LIMIT;
   const canSend = (text.trim().length > 0 || attachments.length > 0) && !slowModeActive && !overCharLimit && !uploading;
+  const lineCount = getLineCount(text);
+  const showLineGutter = lineCount > 4 && !showPreview;
+  const codeRegionActive = hasOpenCodeRegion(text) && !showPreview;
+  const filteredCodeLanguages = useMemo(() => (
+    codeLang.query
+      ? CODE_LANGUAGES.filter(lang => lang.startsWith(codeLang.query)).slice(0, 8)
+      : CODE_LANGUAGES.slice(0, 8)
+  ), [codeLang.query]);
+  const uploadProgressMap = useMemo(() => {
+    if (attachments.length === 0) return undefined;
+    const map = new Map<string, AttachmentUploadState>();
+    attachments.forEach((attachment, i) => {
+      const entry = uploadProgress[i];
+      if (entry || attachment.uploadError) {
+        map.set(attachment.id, {
+          progress: entry?.progress ?? 0,
+          done: entry?.done,
+          error: entry?.error ?? attachment.uploadError,
+        });
+      }
+    });
+    return map.size > 0 ? map : undefined;
+  }, [attachments, uploadProgress]);
 
   const submit = async () => {
     if (!canSend) return;
@@ -974,7 +1073,28 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
     // Upload attachments if media server configured, else fall back to text annotation
     let attSuffix = '';
     if (attachmentSnapshot.length > 0) {
+      setAttachments(prev => prev.map(att => (
+        attachmentSnapshot.some(snapshot => snapshot.id === att.id)
+          ? { ...att, uploadError: undefined }
+          : att
+      )));
       const results = await upload(attachmentSnapshot.map(a => a.file));
+      const failedResults = results
+        .map((result, idx) => ({ result, attachment: attachmentSnapshot[idx] }))
+        .filter(({ result }) => Boolean(result.error));
+
+      if (failedResults.length > 0) {
+        setAttachments(prev => prev.map(att => {
+          const failed = failedResults.find(({ attachment }) => attachment.id === att.id);
+          return failed ? { ...att, uploadError: failed.result.error } : att;
+        }));
+        addNotification({
+          type: 'error',
+          text: `${failedResults.length} upload${failedResults.length === 1 ? '' : 's'} failed. Retry from the composer.`,
+        });
+        return;
+      }
+
       attSuffix = results.map(r => {
         const isImage = r.file.type.startsWith('image/');
         const isVideo = r.file.type.startsWith('video/');
@@ -1044,6 +1164,31 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     const curAc  = acRef.current;
     const curSlash = slashMenuRef.current;
+    const curCodeLang = codeLangRef.current;
+
+    // ── Code fence language menu navigation ──
+    if (curCodeLang.open && filteredCodeLanguages.length > 0) {
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setCodeLang(prev => ({ ...prev, selectedIndex: (prev.selectedIndex - 1 + filteredCodeLanguages.length) % filteredCodeLanguages.length }));
+        return;
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setCodeLang(prev => ({ ...prev, selectedIndex: (prev.selectedIndex + 1) % filteredCodeLanguages.length }));
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        applyCodeLanguage(filteredCodeLanguages[curCodeLang.selectedIndex] ?? filteredCodeLanguages[0]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setCodeLang(EMPTY_CODE_LANG);
+        return;
+      }
+    }
 
     // ── Slash command menu navigation ──
     if (curSlash.open) {
@@ -1172,8 +1317,20 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
     if (files && files.length > 0) {
       e.preventDefault();
       addFiles(files);
+      return;
     }
-  }, [addFiles]);
+
+    const pastedText = e.clipboardData?.getData('text/plain') ?? '';
+    if (pastedText.includes('\n')) {
+      e.preventDefault();
+      const ta = textareaRef.current;
+      setPendingPaste({
+        text: pastedText,
+        start: ta?.selectionStart ?? text.length,
+        end: ta?.selectionEnd ?? text.length,
+      });
+    }
+  }, [addFiles, text.length]);
 
   // ── Drag and drop (full-page overlay) ──────────────────────────────────────
   useEffect(() => {
@@ -1234,6 +1391,16 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
 
     const ta = textareaRef.current;
     const cursorPos = ta ? ta.selectionStart : text.length;
+    const nextCodeLang = detectCodeLanguage(text, cursorPos);
+    if (nextCodeLang && hasOpenCodeRegion(text)) {
+      setCodeLang(prev => (
+        prev.open && prev.query === nextCodeLang.query
+          ? { ...prev, triggerStart: nextCodeLang.triggerStart }
+          : { open: true, query: nextCodeLang.query, triggerStart: nextCodeLang.triggerStart, selectedIndex: 0 }
+      ));
+    } else {
+      setCodeLang(EMPTY_CODE_LANG);
+    }
     const next = detectAutocomplete(text, cursorPos);
     setAc(prev => {
       // preserve selectedIndex when only items change
@@ -1263,7 +1430,7 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
     }
 
     return (
-      <div className="ac-popup" role="listbox" aria-label="Autocomplete suggestions">
+      <div className="ac-popup elev-3" role="listbox" aria-label="Autocomplete suggestions">
         {ac.items.map((item, i) => {
           const isSelected = i === ac.selectedIndex;
 
@@ -1317,8 +1484,8 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
     <div className="msg-input-wrap">
       {/* Drag-over overlay (covers full viewport) */}
       {isDragOver && (
-        <div className="drop-overlay" aria-hidden="true">
-          <div className="drop-overlay__inner">
+        <div className="drop-overlay" aria-hidden="true" data-testid="composer-drop-overlay">
+          <div className="drop-overlay__inner elev-3">
             <DropIcon />
             <span className="drop-overlay__label">Drop files to share</span>
           </div>
@@ -1398,9 +1565,11 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         <AttachmentPreview
           attachments={attachments}
           onRemove={removeAttachment}
-          uploadProgressMap={uploading ? new Map(
-            attachments.map((a, i) => [a.id, uploadProgress[i]?.progress ?? 0])
-          ) : undefined}
+          onRetry={() => {
+            setAttachments(prev => prev.map(att => ({ ...att, uploadError: undefined })));
+            void submit();
+          }}
+          uploadProgressMap={uploadProgressMap}
         />
       )}
 
@@ -1442,9 +1611,69 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         />
       )}
 
+      {codeLang.open && filteredCodeLanguages.length > 0 && (
+        <div className="code-lang-menu elev-3" role="listbox" aria-label="Code language suggestions" data-testid="code-language-menu">
+          {filteredCodeLanguages.map((language, i) => (
+            <button
+              key={language}
+              className={`code-lang-item${i === codeLang.selectedIndex ? ' code-lang-item--selected' : ''}`}
+              type="button"
+              role="option"
+              aria-selected={i === codeLang.selectedIndex}
+              onMouseDown={e => {
+                e.preventDefault();
+                applyCodeLanguage(language);
+              }}
+            >
+              {language}
+            </button>
+          ))}
+        </div>
+      )}
+
       <FloodWarningBar visible={floodWarning} cooldownMs={FLOOD_COOLDOWN_MS} cooldownStart={floodCooldownStart} />
 
-      <div className={`msg-input-bar${sentFlash ? ' msg-input-bar--sent' : ''}${attachments.length > 0 ? ' msg-input-bar--has-attachments' : ''}${text.length > 0 && !showPreview ? ' msg-input-bar--typing' : ''}${slowModeActive ? ' msg-input-bar--slow' : ''}${uploading ? ' msg-input-bar--uploading' : ''}`}>
+      {pendingPaste && (
+        <div className="paste-prompt elev-3" role="dialog" aria-label="Confirm multiline paste" data-testid="paste-newlines-prompt">
+          <span className="paste-prompt__copy">
+            Paste {getLineCount(pendingPaste.text)} lines?
+          </span>
+          <button
+            className="paste-prompt__btn paste-prompt__btn--primary"
+            type="button"
+            onMouseDown={e => {
+              e.preventDefault();
+              insertAtRange(pendingPaste.text, pendingPaste.start, pendingPaste.end);
+            }}
+          >
+            Keep lines
+          </button>
+          <button
+            className="paste-prompt__btn"
+            type="button"
+            onMouseDown={e => {
+              e.preventDefault();
+              insertAtRange(pendingPaste.text.replace(/\s*\n\s*/g, ' '), pendingPaste.start, pendingPaste.end);
+            }}
+          >
+            Flatten
+          </button>
+          <button
+            className="paste-prompt__dismiss"
+            type="button"
+            aria-label="Cancel paste"
+            onMouseDown={e => {
+              e.preventDefault();
+              setPendingPaste(null);
+              requestAnimationFrame(() => textareaRef.current?.focus());
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      <div className={`msg-input-bar elev-2${sentFlash ? ' msg-input-bar--sent' : ''}${attachments.length > 0 ? ' msg-input-bar--has-attachments' : ''}${text.length > 0 && !showPreview ? ' msg-input-bar--typing' : ''}${slowModeActive ? ' msg-input-bar--slow' : ''}${uploading ? ' msg-input-bar--uploading' : ''}${codeRegionActive ? ' msg-input-bar--code' : ''}`} data-testid="message-composer">
         {/* ── Mobile bottom sheet (shown when expander is open on mobile) ── */}
         {mobileToolbarOpen && (
           <div className="mobile-tool-sheet" role="toolbar" aria-label="Message tools">
@@ -1562,7 +1791,7 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           </button>
 
           {showFormatMenu && (
-            <div className="format-popover" role="toolbar" aria-label="Text formatting">
+            <div className="format-popover elev-3" role="toolbar" aria-label="Text formatting">
               <button
                 className="fmt-btn"
                 title="Bold (Ctrl+B)"
@@ -1629,60 +1858,95 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
             dangerouslySetInnerHTML={{ __html: previewHtml(text) }}
           />
         ) : (
-        <textarea
-          ref={textareaRef}
-          className="msg-textarea"
-          placeholder={
-            placeholder ??
-            (target.startsWith('#') || target.startsWith('&')
-              ? `Message ${target}`
-              : `Message @${target}`)
-          }
-          value={text}
-          onChange={e => {
-            const prev = text;
-            const next = e.target.value;
-            setText(next);
-            setIsDraft(false);
-            resetCycle();
-            if (next.length > 0) {
-              sendTyping();
-            }
-            // Emoji autocomplete detection: `:word` at or before cursor (2+ chars)
-            const cursorPos = e.target.selectionStart ?? next.length;
-            const beforeCursor = next.slice(0, cursorPos);
-            const emojiMatch = beforeCursor.match(/(?:^|\s):([a-z0-9_]{2,})$/i);
-            if (emojiMatch) {
-              const q = emojiMatch[1].toLowerCase();
-              const hits = searchEmoji(q);
-              if (hits.length > 0) {
-                emojiAcTriggerStart.current = cursorPos - emojiMatch[1].length - 1; // position of ':'
-                setEmojiAcQuery(q);
-              } else {
-                setEmojiAcQuery(null);
+          <div className={`composer-editor${showLineGutter ? ' composer-editor--gutter' : ''}${codeRegionActive ? ' composer-editor--code' : ''}`}>
+            {showLineGutter && (
+              <div className="composer-line-gutter" aria-hidden="true">
+                {Array.from({ length: Math.min(lineCount, 12) }, (_, i) => (
+                  <span key={i}>{i + 1}</span>
+                ))}
+              </div>
+            )}
+            {codeRegionActive && (
+              <span className="composer-code-chip" aria-hidden="true">
+                code
+              </span>
+            )}
+            <textarea
+              ref={textareaRef}
+              className="msg-textarea"
+              placeholder={
+                placeholder ??
+                (target.startsWith('#') || target.startsWith('&')
+                  ? `Message ${target}`
+                  : `Message @${target}`)
               }
-            } else {
-              setEmojiAcQuery(null);
-            }
-            if (next.length === 0 && prev.length > 0) {
-              sendTypingStop(target);
-            }
-          }}
-          onKeyDown={onKeyDown}
-          onInput={onInput}
-          onPaste={onPaste}
-          onBlur={() => {
-            // Delay so that mousedown on menu items / toolbar buttons fires before blur closes things
-            setTimeout(() => {
-              setSlashMenuOpen(false);
-              setSlashQuery('');
-            }, 150);
-          }}
-          rows={1}
-          aria-label="Message input"
-          autoComplete="off"
-          spellCheck
-        />
+              value={text}
+              onChange={e => {
+                const prev = text;
+                let next = e.target.value;
+                let nextCursor: number | null = null;
+                const cursorPos = e.target.selectionStart ?? next.length;
+                const typedFence = next.slice(Math.max(0, cursorPos - 3), cursorPos) === '```'
+                  && prev.slice(Math.max(0, cursorPos - 3), cursorPos) !== '```';
+                if (typedFence) {
+                  const beforeFence = next.slice(0, cursorPos - 3);
+                  const afterFence = next.slice(cursorPos);
+                  const atLineStart = cursorPos === 3 || beforeFence.endsWith('\n');
+                  if (atLineStart && !afterFence.startsWith('\n```')) {
+                    next = `${beforeFence}\`\`\`\n\n\`\`\`${afterFence}`;
+                    nextCursor = beforeFence.length + 4;
+                  }
+                }
+                setText(next);
+                setIsDraft(false);
+                resetCycle();
+                if (next.length > 0) {
+                  sendTyping();
+                }
+                // Emoji autocomplete detection: `:word` at or before cursor (2+ chars)
+                const effectiveCursorPos = nextCursor ?? cursorPos;
+                const beforeCursor = next.slice(0, effectiveCursorPos);
+                const emojiMatch = beforeCursor.match(/(?:^|\s):([a-z0-9_]{2,})$/i);
+                if (emojiMatch) {
+                  const q = emojiMatch[1].toLowerCase();
+                  const hits = searchEmoji(q);
+                  if (hits.length > 0) {
+                    emojiAcTriggerStart.current = effectiveCursorPos - emojiMatch[1].length - 1; // position of ':'
+                    setEmojiAcQuery(q);
+                  } else {
+                    setEmojiAcQuery(null);
+                  }
+                } else {
+                  setEmojiAcQuery(null);
+                }
+                if (next.length === 0 && prev.length > 0) {
+                  sendTypingStop(target);
+                }
+                if (nextCursor !== null) {
+                  requestAnimationFrame(() => {
+                    textareaRef.current?.setSelectionRange(nextCursor, nextCursor);
+                    textareaRef.current?.focus();
+                  });
+                }
+              }}
+              onKeyDown={onKeyDown}
+              onInput={onInput}
+              onPaste={onPaste}
+              onBlur={() => {
+                // Delay so that mousedown on menu items / toolbar buttons fires before blur closes things
+                setTimeout(() => {
+                  setSlashMenuOpen(false);
+                  setSlashQuery('');
+                }, 150);
+              }}
+              rows={1}
+              aria-label="Message input"
+              autoComplete="off"
+              spellCheck
+              data-testid="message-input-textarea"
+            />
+            <span className="composer-enter-hint" aria-hidden="true">Shift+Enter newline</span>
+          </div>
         )}
 
         {text.length > 0 && !showPreview && (
@@ -1843,7 +2107,7 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
 
       <style>{`
         .msg-input-wrap {
-          padding: 0 16px 16px;
+          padding: 0 var(--sp-4, 16px) var(--sp-4, 16px);
           flex-shrink: 0;
           position: relative;
         }
@@ -1858,40 +2122,34 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         .drop-overlay {
           position: fixed;
           inset: 0;
-          background:
-            radial-gradient(circle at center, var(--accent-subtle), transparent 48%),
-            linear-gradient(180deg, var(--bg-void), var(--bg-deep));
-          border: 1px solid var(--accent-border);
-          border-radius: var(--r-lg);
+          background: var(--scrim, rgba(2,6,12,.65));
           z-index: 9999;
           display: flex;
           align-items: center;
           justify-content: center;
           pointer-events: none;
-          animation: drop-overlay-in var(--t-normal) var(--ease-out) both;
+          animation: drop-overlay-in var(--t-overlay-in, 320ms) var(--ease-out) both;
         }
         .drop-overlay__inner {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 14px;
-          padding: 28px 34px;
-          background: var(--bg-elevated);
-          border: 1px solid var(--accent-border);
-          border-radius: var(--r-xl);
-          box-shadow: var(--shadow-xl), var(--glow);
+          gap: var(--sp-4, 16px);
+          padding: var(--sp-8, 32px) var(--sp-10, 40px);
+          border: 1px dashed var(--lux, #d8b96a);
+          border-radius: var(--r-xl, 18px) var(--r-md, 10px) var(--r-2xl, 20px) var(--r-lg, 14px);
         }
         .drop-overlay__label {
-          font-size: 20px;
+          font-size: var(--text-xl, 20px);
           font-weight: 700;
           letter-spacing: 0;
           color: var(--text-primary);
+          font-family: var(--font-display, Georgia, serif);
         }
         .drop-overlay__icon {
           width: 50px;
           height: 50px;
-          color: var(--gold);
-          filter: drop-shadow(0 0 12px var(--accent-glow));
+          color: var(--lux, #d8b96a);
           opacity: 0.95;
         }
         @keyframes drop-overlay-in {
@@ -1969,13 +2227,7 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         .reply-preview__cancel:hover { color: var(--text-primary); background: var(--bg-float); }
 
         .msg-input-wrap .attachment-strip {
-          gap: 12px;
-          padding: 12px 14px 11px;
-          background:
-            linear-gradient(180deg, var(--bg-float), var(--bg-elevated));
-          border-color: var(--border-normal);
-          border-radius: var(--r-lg) var(--r-lg) 0 0;
-          box-shadow: var(--shadow-sm);
+          border-radius: var(--r-xl, 18px) var(--r-lg, 14px) 0 0;
         }
         .msg-input-wrap .attachment-item {
           filter: drop-shadow(0 4px 12px var(--bg-void));
@@ -1987,10 +2239,7 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         }
         .msg-input-wrap .att-thumb,
         .msg-input-wrap .att-file {
-          background: var(--bg-deep);
-          border: 1px solid var(--accent-border);
-          border-radius: var(--r-lg);
-          box-shadow: inset 0 0 0 1px var(--border-subtle);
+          border-color: color-mix(in srgb, var(--lux, #d8b96a) 18%, var(--border-subtle));
         }
         .msg-input-wrap .att-thumb-img,
         .msg-input-wrap .att-play-overlay {
@@ -2011,39 +2260,36 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         .msg-input-wrap .attachment-remove:hover {
           color: var(--text-primary);
           background: var(--danger);
-          filter: drop-shadow(0 0 8px var(--danger-subtle));
         }
 
         .msg-input-bar {
-          display: flex; align-items: flex-end; gap: 4px;
-          background:
-            linear-gradient(180deg, var(--bg-float), var(--bg-elevated));
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-lg);
-          padding: 7px 9px 7px 7px;
+          display: flex;
+          align-items: flex-end;
+          gap: var(--sp-1, 4px);
+          border: 1px solid color-mix(in srgb, var(--lux, #d8b96a) 10%, var(--border-normal));
+          border-radius: var(--r-2xl, 20px) var(--r-xl, 16px) var(--r-lg, 12px) var(--r-xl, 16px);
+          padding: var(--sp-2, 8px) var(--sp-3, 12px) var(--sp-2, 8px) var(--sp-2, 8px);
           position: relative;
-          box-shadow: var(--shadow-sm);
+          isolation: isolate;
         }
         .msg-input-bar::before {
           content: '';
           position: absolute;
-          inset: -1px;
+          inset: 1px;
           border-radius: inherit;
-          border: 1px solid var(--accent-border);
-          box-shadow: var(--glow);
+          border: 1px solid color-mix(in srgb, var(--lux, #d8b96a) 22%, transparent);
           opacity: 0;
           pointer-events: none;
+          transition: opacity var(--t-control, 150ms) var(--ease-out);
         }
         .msg-input-bar:hover:not(:focus-within) {
-          border-color: var(--accent-border);
-          box-shadow: var(--shadow-md);
+          border-color: color-mix(in srgb, var(--lux, #d8b96a) 20%, var(--border-normal));
         }
         .msg-input-bar--has-attachments {
-          border-radius: 0 0 var(--r-lg) var(--r-lg);
+          border-radius: 0 0 var(--r-lg, 12px) var(--r-xl, 16px);
         }
         .msg-input-bar:focus-within {
-          border-color: var(--accent-border);
-          box-shadow: var(--shadow-lg), 0 0 0 3px var(--accent-subtle);
+          border-color: color-mix(in srgb, var(--lux, #d8b96a) 38%, var(--border-normal));
         }
         .msg-input-bar:focus-within::before {
           opacity: 1;
@@ -2056,7 +2302,10 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           filter: saturate(0.86);
         }
         .msg-input-bar--uploading {
-          box-shadow: var(--shadow-md), 0 0 0 1px var(--accent-subtle);
+          border-color: color-mix(in srgb, var(--lux, #d8b96a) 34%, var(--border-normal));
+        }
+        .msg-input-bar--code {
+          background: color-mix(in srgb, var(--elev-tint-2) 82%, #000 18%);
         }
 
         .composer-left-tools {
@@ -2067,8 +2316,8 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           gap: 2px;
           padding: 2px;
           border: 1px solid var(--border-subtle);
-          border-radius: var(--r-md);
-          background: var(--bg-base);
+          border-radius: var(--r-lg, 14px) var(--r-xs, 4px) var(--r-md, 10px) var(--r-sm, 6px);
+          background: var(--elev-tint-1, var(--bg-base));
           flex-shrink: 0;
         }
 
@@ -2080,10 +2329,8 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           align-items: center;
           gap: 4px;
           padding: 6px;
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-md);
-          background: var(--bg-float);
-          box-shadow: var(--shadow-md);
+          border: 1px solid color-mix(in srgb, var(--lux, #d8b96a) 16%, var(--border-normal));
+          border-radius: var(--r-lg, 14px) var(--r-sm, 6px) var(--r-xl, 18px) var(--r-md, 10px);
           z-index: 80;
           animation: format-popover-in var(--t-fast) var(--ease-out) both;
         }
@@ -2099,9 +2346,9 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           width: 8px;
           height: 8px;
           transform: rotate(45deg);
-          background: var(--bg-float);
-          border-right: 1px solid var(--border-normal);
-          border-bottom: 1px solid var(--border-normal);
+          background: var(--elev-tint-3);
+          border-right: 1px solid color-mix(in srgb, var(--lux, #d8b96a) 16%, var(--border-normal));
+          border-bottom: 1px solid color-mix(in srgb, var(--lux, #d8b96a) 16%, var(--border-normal));
         }
 
         /* [pickers: gif / sticker / emoji] — subtle left gap */
@@ -2145,13 +2392,88 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           transition: transform var(--t-fast) var(--ease-out), opacity var(--t-fast) var(--ease-out);
         }
         .fmt-btn:hover { color: var(--text-secondary); background: var(--bg-overlay); border-color: var(--border-subtle); transform: translateY(-1px); }
+
+        .composer-editor {
+          position: relative;
+          flex: 1;
+          min-width: 0;
+          display: grid;
+          grid-template-columns: 1fr;
+          align-items: end;
+        }
+        .composer-editor--gutter {
+          grid-template-columns: 34px minmax(0, 1fr);
+          column-gap: var(--sp-2, 8px);
+        }
+        .composer-editor--code {
+          border-radius: var(--r-lg, 14px) var(--r-sm, 6px) var(--r-xl, 18px) var(--r-md, 10px);
+          background: color-mix(in srgb, var(--bg-void, #030812) 52%, transparent);
+          padding: var(--sp-2, 8px) var(--sp-2, 8px) var(--sp-2, 8px) 0;
+          align-items: start;
+        }
+        .composer-line-gutter {
+          align-self: stretch;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 0;
+          padding: 4px 0 4px var(--sp-2, 8px);
+          color: var(--text-muted);
+          font-family: var(--font-mono, ui-monospace, monospace);
+          font-size: var(--text-2xs, 11px);
+          line-height: 1.5;
+          opacity: 0.72;
+          user-select: none;
+        }
+        .composer-code-chip {
+          position: absolute;
+          right: var(--sp-2, 8px);
+          top: calc(-1 * var(--sp-3, 12px));
+          z-index: 1;
+          border-radius: var(--r-xs, 4px) var(--r-md, 10px) var(--r-xs, 4px) var(--r-sm, 6px);
+          background: var(--lux, #d8b96a);
+          color: var(--bg-void, #030812);
+          font-family: var(--font-mono, ui-monospace, monospace);
+          font-size: var(--text-2xs, 11px);
+          font-weight: 800;
+          line-height: 1;
+          padding: 3px 6px;
+          text-transform: uppercase;
+        }
+        .composer-enter-hint {
+          position: absolute;
+          right: var(--sp-2, 8px);
+          bottom: -16px;
+          color: var(--text-muted);
+          font-size: var(--text-2xs, 11px);
+          line-height: 1;
+          pointer-events: none;
+          opacity: 0;
+          transform: translateY(-2px);
+          transition: opacity var(--t-control, 150ms) var(--ease-out), transform var(--t-control, 150ms) var(--ease-out);
+        }
+        .msg-input-bar:focus-within .composer-enter-hint,
+        .composer-editor--gutter .composer-enter-hint,
+        .composer-editor--code .composer-enter-hint {
+          opacity: 0.78;
+          transform: translateY(0);
+        }
         .msg-textarea {
           flex: 1; background: none; border: none; outline: none; resize: none;
-          color: var(--text-primary); font-size: 15px; font-family: inherit;
+          color: var(--text-primary); font-size: var(--text-base, 15px); font-family: var(--font-ui, inherit);
           line-height: 1.5; min-height: 24px; max-height: 200px;
           padding: 4px 2px; overflow-y: auto;
-          caret-color: var(--gold);
-          text-shadow: 0 0 14px var(--accent-glow);
+          caret-color: var(--lux, #d8b96a);
+          width: 100%;
+          min-width: 0;
+          grid-column: 1;
+        }
+        .composer-editor--gutter .msg-textarea {
+          grid-column: 2;
+        }
+        .composer-editor--code .msg-textarea {
+          font-family: var(--font-mono, ui-monospace, monospace);
+          font-size: var(--text-sm, 13px);
         }
         .msg-textarea::placeholder { color: var(--text-muted); opacity: 0.9; }
         .msg-textarea:focus::placeholder { color: var(--text-secondary); }
@@ -2182,7 +2504,6 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           background: var(--bg-overlay);
           border-color: var(--border-subtle);
           transform: translateY(-1px);
-          filter: drop-shadow(0 0 7px var(--accent-glow));
         }
         .input-action:active { transform: scale(0.92); }
         .input-action--primary {
@@ -2321,18 +2642,20 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         }
         .send-btn:hover:not(:disabled) {
           transform: translateY(-1px);
-          filter: drop-shadow(0 0 8px var(--accent-glow));
         }
         .send-btn:active {
           transform: scale(0.88);
         }
         .send-btn--active {
-          background: var(--accent);
+          background: var(--lux, #d8b96a);
           color: var(--bg-void);
-          border-color: var(--accent);
-          box-shadow: 0 0 0 1px var(--accent-border), var(--glow);
+          border-color: color-mix(in srgb, var(--lux, #d8b96a) 72%, var(--border-normal));
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), 0 8px 20px rgba(0,0,0,0.28);
         }
-        .send-btn--active:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+        .send-btn--active:hover {
+          background: color-mix(in srgb, var(--lux, #d8b96a) 88%, white);
+          border-color: color-mix(in srgb, var(--lux, #d8b96a) 72%, var(--border-normal));
+        }
         .send-btn:disabled {
           cursor: not-allowed;
           opacity: 0.5;
@@ -2388,18 +2711,112 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         .comp-item { padding: 3px 8px; border-radius: var(--r-sm); font-size: 13px; color: var(--text-secondary); }
         .comp-item--active { background: var(--accent-subtle); color: var(--accent); }
 
+        .paste-prompt,
+        .code-lang-menu {
+          position: absolute;
+          z-index: var(--z-popover, 100);
+          border: 1px solid color-mix(in srgb, var(--lux, #d8b96a) 16%, var(--border-normal));
+          border-radius: var(--r-xl, 18px) var(--r-md, 10px) var(--r-lg, 14px) var(--r-sm, 6px);
+          animation: composer-popover-in var(--t-control, 150ms) var(--ease-out) both;
+        }
+
+        @keyframes composer-popover-in {
+          from { opacity: 0; transform: translateY(6px) scale(0.98); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .paste-prompt {
+          right: var(--sp-4, 16px);
+          bottom: calc(100% + var(--sp-2, 8px));
+          display: flex;
+          align-items: center;
+          gap: var(--sp-2, 8px);
+          padding: var(--sp-2, 8px);
+        }
+
+        .paste-prompt__copy {
+          color: var(--text-secondary);
+          font-size: var(--text-xs, 12px);
+          font-weight: 700;
+          white-space: nowrap;
+        }
+
+        .paste-prompt__btn,
+        .paste-prompt__dismiss {
+          border: 0;
+          cursor: pointer;
+          font-size: var(--text-xs, 12px);
+          font-weight: 800;
+          line-height: 1;
+        }
+
+        .paste-prompt__btn {
+          border-radius: var(--r-xs, 4px) var(--r-md, 10px) var(--r-xs, 4px) var(--r-sm, 6px);
+          background: var(--elev-tint-1, var(--bg-base));
+          color: var(--text-secondary);
+          padding: 7px 9px;
+        }
+
+        .paste-prompt__btn--primary {
+          background: var(--lux, #d8b96a);
+          color: var(--bg-void, #030812);
+        }
+
+        .paste-prompt__dismiss {
+          width: 24px;
+          height: 24px;
+          border-radius: var(--r-full, 999px);
+          background: transparent;
+          color: var(--text-muted);
+        }
+
+        .paste-prompt__btn:hover,
+        .paste-prompt__dismiss:hover {
+          color: var(--text-primary);
+          background: color-mix(in srgb, var(--lux, #d8b96a) 18%, var(--elev-tint-1));
+        }
+
+        .code-lang-menu {
+          left: var(--sp-4, 16px);
+          bottom: calc(100% + var(--sp-2, 8px));
+          display: grid;
+          grid-template-columns: repeat(2, minmax(90px, 1fr));
+          gap: 2px;
+          width: min(320px, calc(100% - var(--sp-8, 32px)));
+          max-height: 220px;
+          overflow: auto;
+          padding: var(--sp-2, 8px);
+        }
+
+        .code-lang-item {
+          border: 0;
+          border-radius: var(--r-xs, 4px) var(--r-md, 10px) var(--r-xs, 4px) var(--r-sm, 6px);
+          background: transparent;
+          color: var(--text-secondary);
+          cursor: pointer;
+          font-family: var(--font-mono, ui-monospace, monospace);
+          font-size: var(--text-xs, 12px);
+          line-height: 1;
+          padding: 8px 9px;
+          text-align: left;
+        }
+
+        .code-lang-item:hover,
+        .code-lang-item--selected {
+          background: color-mix(in srgb, var(--lux, #d8b96a) 14%, transparent);
+          color: var(--lux, #d8b96a);
+        }
+
         /* ── Inline autocomplete popup ── */
         .ac-popup {
           position: absolute;
           bottom: calc(100% + 8px);
           left: 16px; right: 16px;
           max-height: 240px; overflow-y: auto;
-          background: var(--bg-float);
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-md);
-          box-shadow: var(--shadow-md);
+          border: 1px solid color-mix(in srgb, var(--lux, #d8b96a) 16%, var(--border-normal));
+          border-radius: var(--r-xl, 18px) var(--r-md, 10px) var(--r-lg, 14px) var(--r-sm, 6px);
           display: flex; flex-direction: column;
-          z-index: 50;
+          z-index: var(--z-popover, 100);
         }
 
         .ac-item {
@@ -2409,9 +2826,9 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           transition: opacity var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-out);
           flex-shrink: 0;
         }
-        .ac-item:hover { background: var(--ch-hover-bg); transform: translateX(2px); }
-        .ac-item--selected { background: var(--accent-subtle); }
-        .ac-item--selected:hover { background: var(--accent-subtle); }
+        .ac-item:hover { background: color-mix(in srgb, var(--lux, #d8b96a) 10%, transparent); transform: translateX(2px); }
+        .ac-item--selected { background: color-mix(in srgb, var(--lux, #d8b96a) 14%, transparent); }
+        .ac-item--selected:hover { background: color-mix(in srgb, var(--lux, #d8b96a) 14%, transparent); }
 
         /* Mention avatar */
         .ac-avatar {
@@ -2426,14 +2843,14 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
           flex: 1;
         }
-        .ac-item--selected .ac-label { color: var(--accent); }
+        .ac-item--selected .ac-label { color: var(--lux, #d8b96a); }
 
         /* Channel hash */
         .ac-channel-hash {
           font-size: 14px; font-weight: 700;
           color: var(--text-muted); flex-shrink: 0;
         }
-        .ac-item--selected .ac-channel-hash { color: var(--accent); }
+        .ac-item--selected .ac-channel-hash { color: var(--lux, #d8b96a); }
 
         .ac-channel-count {
           font-size: 11px; color: var(--text-muted);
@@ -2551,6 +2968,8 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           .drop-overlay,
           .reply-preview,
           .format-popover,
+          .paste-prompt,
+          .code-lang-menu,
           .mobile-tool-sheet,
           .msg-input-bar--sent::before,
           .msg-typing-dot {
@@ -2563,6 +2982,7 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           .mobile-expand-icon,
           .mobile-tool-btn,
           .send-btn,
+          .composer-enter-hint,
           .cmd-suggest-item,
           .ac-item {
             transition: none !important;

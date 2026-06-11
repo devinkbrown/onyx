@@ -52,10 +52,11 @@ export default function FormatToolbar({ onFormat, visible }: FormatToolbarProps)
   return (
     <div
       ref={containerRef}
-      className="fmt-toolbar"
+      className="fmt-toolbar elev-2"
       aria-label="Text formatting toolbar"
       aria-hidden={!visible}
       data-hidden={visible ? undefined : ''}
+      data-testid="format-toolbar"
     >
       {BUTTONS.map((btn) => (
         <button
@@ -78,12 +79,13 @@ export default function FormatToolbar({ onFormat, visible }: FormatToolbarProps)
         .fmt-toolbar {
           display: flex;
           align-items: center;
-          gap: 2px;
+          gap: var(--sp-1, 4px);
           height: 36px;
-          padding: 0 6px;
+          padding: 0 var(--sp-2, 8px);
+          border-radius: var(--r-lg, 14px) var(--r-xs, 4px) var(--r-md, 10px) var(--r-sm, 6px);
           opacity: 1;
           transform: translateY(0);
-          transition: opacity 150ms ease, transform 150ms ease;
+          transition: opacity var(--t-control, 150ms) var(--ease-out), transform var(--t-control, 150ms) var(--ease-out);
           pointer-events: auto;
         }
         .fmt-toolbar[data-hidden] {
@@ -94,18 +96,18 @@ export default function FormatToolbar({ onFormat, visible }: FormatToolbarProps)
         .fmt-toolbar-btn {
           width: 28px;
           height: 28px;
-          border-radius: var(--r-sm);
-          border: 1px solid var(--border-subtle);
+          border-radius: var(--r-xs, 4px) var(--r-md, 10px) var(--r-xs, 4px) var(--r-sm, 6px);
+          border: 1px solid transparent;
           background: transparent;
           cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
           color: var(--text-muted);
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           font-weight: 600;
           flex-shrink: 0;
-          transition: color var(--t-fast), background var(--t-fast), border-color var(--t-fast);
+          transition: color var(--t-control, 150ms) var(--ease-out), background var(--t-control, 150ms) var(--ease-out), border-color var(--t-control, 150ms) var(--ease-out);
           line-height: 1;
           padding: 0;
         }
@@ -117,12 +119,18 @@ export default function FormatToolbar({ onFormat, visible }: FormatToolbarProps)
         .fmt-toolbar-btn:hover {
           background: var(--bg-elevated);
           color: var(--text-primary);
-          border-color: var(--border-muted);
+          border-color: color-mix(in srgb, var(--lux, #d8b96a) 16%, var(--border-muted));
         }
         .fmt-toolbar-btn:active {
-          background: var(--accent-subtle);
-          color: var(--accent);
-          border-color: var(--accent-border);
+          background: color-mix(in srgb, var(--lux, #d8b96a) 14%, transparent);
+          color: var(--lux, #d8b96a);
+          border-color: color-mix(in srgb, var(--lux, #d8b96a) 30%, var(--border-subtle));
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .fmt-toolbar,
+          .fmt-toolbar-btn {
+            transition: none !important;
+          }
         }
         @media (max-width: 480px) {
           .fmt-toolbar { display: none; }

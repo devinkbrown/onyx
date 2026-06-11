@@ -6,7 +6,7 @@ interface Props {
 
 export default function SkeletonChannel({ count = 6 }: Props) {
   return (
-    <div className="skel-ch-list" aria-hidden="true">
+    <div className="skel-ch-list" aria-hidden="true" data-testid="skeleton-channel">
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className={`skel-ch-row skel-chrow-${i + 1}`}>
           <div className="skel-ch-item skel-ch-icon" />
@@ -26,35 +26,36 @@ export default function SkeletonChannel({ count = 6 }: Props) {
         .skel-ch-item {
           background: linear-gradient(
             90deg,
-            var(--bg-elevated) 25%,
-            var(--bg-float)    50%,
-            var(--bg-elevated) 75%
+            var(--elev-tint-1, var(--bg-elevated)) 25%,
+            var(--elev-tint-3, var(--bg-float)) 50%,
+            var(--elev-tint-1, var(--bg-elevated)) 75%
           );
           background-size: 200% 100%;
-          animation: skel-ch-shimmer 1.6s ease-in-out infinite;
-          border-radius: 4px;
+          animation: skel-ch-shimmer 1.8s var(--ease-out, ease) infinite;
+          border-radius: var(--r-xs, 4px) var(--r-sm, 6px) var(--r-xs, 4px) var(--r-md, 8px);
           flex-shrink: 0;
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
         }
 
         .skel-ch-list {
           display: flex;
           flex-direction: column;
-          gap: 2px;
-          padding: 6px 8px;
+          gap: var(--sp-1, 4px);
+          padding: var(--sp-2, 8px);
         }
 
-        /* 28px compact row height */
         .skel-ch-row {
           display: flex;
           align-items: center;
-          gap: 7px;
-          height: 28px;
-          padding: 0 8px;
+          gap: var(--sp-2, 8px);
+          height: 36px;
+          padding: 0 var(--sp-2, 8px);
         }
 
         .skel-ch-icon {
-          width: 12px;
-          height: 11px;
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
         }
 
         /* Name + count in one line with space-between */
@@ -67,7 +68,7 @@ export default function SkeletonChannel({ count = 6 }: Props) {
         }
 
         .skel-ch-name  { height: 11px; }
-        .skel-ch-count { height: 11px; width: 20px; border-radius: 6px; }
+        .skel-ch-count { height: 12px; width: 22px; border-radius: var(--r-sm, 6px); }
 
         /* Vary name widths */
         .skel-chrow-1  .skel-ch-name { width:  88px; }
@@ -97,6 +98,13 @@ export default function SkeletonChannel({ count = 6 }: Props) {
         .skel-chrow-8  .skel-ch-item { animation-delay: 490ms; }
         .skel-chrow-9  .skel-ch-item { animation-delay: 560ms; }
         .skel-chrow-10 .skel-ch-item { animation-delay: 630ms; }
+
+        @media (prefers-reduced-motion: reduce) {
+          .skel-ch-item {
+            animation: none;
+            background-position: 50% 50%;
+          }
+        }
       `}</style>
     </div>
   );

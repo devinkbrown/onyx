@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useOnyxStore } from '@/lib/store';
-import { useDialogFocus } from './useDialogFocus';
+import ModalShell from './ModalShell';
 
 type ActionTab = 'actions' | 'banlist' | 'auditlog';
 type AuditFilter = 'all' | 'kick' | 'ban' | 'mode';
@@ -38,9 +38,6 @@ export default function ModerationPanel() {
   const [slowSecs, setSlowSecs] = useState('5');
   const [tempBanMins, setTempBanMins] = useState('10');
   const [auditFilter, setAuditFilter] = useState<AuditFilter>('all');
-
-  const panelRef        = useRef<HTMLDivElement>(null);
-  useDialogFocus(panelRef);
 
   // Fetch ban list when switching to that tab
   useEffect(() => {
@@ -144,26 +141,18 @@ export default function ModerationPanel() {
   };
 
   return (
-    <div className="modpanel-overlay">
-      <div className="modpanel" ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="modpanel-title">
-        {/* Header */}
-        <div className="modpanel-header">
-          <div className="modpanel-header-left">
-            <ShieldIcon />
-            <span id="modpanel-title" className="modpanel-title">
-              Channel Moderation
-              {channel && <span className="modpanel-chan"> — {channel}</span>}
-            </span>
-          </div>
-          <button
-            className="modpanel-close"
-            onClick={closeModerationPanel}
-            aria-label="Close moderation panel"
-          >
-            <CloseIcon />
-          </button>
-        </div>
-
+    <ModalShell
+      onClose={closeModerationPanel}
+      variant="sheet"
+      size="md"
+      title="Channel Moderation"
+      kicker={channel || 'Moderation'}
+      titleId="modpanel-title"
+      closeLabel="Close moderation panel"
+      flushBody
+      danger
+    >
+      <div className="modpanel">
         {/* Tabs */}
         <div className="modpanel-tabs" role="tablist">
           {(['actions', 'banlist', 'auditlog'] as ActionTab[]).map(t => (
@@ -375,78 +364,11 @@ export default function ModerationPanel() {
       </div>
 
       <style>{`
-        .modpanel-overlay {
-          position: fixed;
-          inset: 0;
-          z-index: 800;
-          display: flex;
-          align-items: flex-start;
-          justify-content: flex-end;
-          pointer-events: none;
-        }
-
         .modpanel {
-          pointer-events: all;
-          width: 380px;
-          max-width: 100vw;
-          height: 100%;
-          max-height: 100dvh;
-          background: var(--bg-deep);
-          border-left: 1px solid var(--border-subtle);
           display: flex;
           flex-direction: column;
-          overflow: hidden;
-          animation: modpanel-slide-in 180ms var(--ease-out) both;
-        }
-
-        @keyframes modpanel-slide-in {
-          from { opacity: 0; transform: translateX(24px); }
-          to   { opacity: 1; transform: translateX(0); }
-        }
-
-        .modpanel-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 14px 16px;
-          border-bottom: 1px solid var(--border-subtle);
-          flex-shrink: 0;
-          gap: 8px;
-        }
-
-        .modpanel-header-left {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          min-width: 0;
-        }
-
-        .modpanel-title {
-          font-size: 15px;
-          font-weight: 700;
-          color: var(--text-primary);
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .modpanel-chan {
-          color: var(--accent);
-          font-weight: 600;
-        }
-
-        .modpanel-close {
-          width: 28px; height: 28px;
-          background: none; border: none; cursor: pointer;
-          display: flex; align-items: center; justify-content: center;
-          color: var(--text-muted);
-          border-radius: var(--r-sm);
-          transition: background var(--t-fast), color var(--t-fast);
-          flex-shrink: 0;
-        }
-        .modpanel-close:hover {
-          background: var(--ch-hover-bg);
-          color: var(--text-primary);
+          height: 100%;
+          min-height: 0;
         }
 
         /* Tabs */
@@ -784,26 +706,7 @@ export default function ModerationPanel() {
           margin: 0;
         }
 
-        @media (max-width: 480px) {
-          .modpanel { width: 100vw; }
-        }
       `}</style>
-    </div>
-  );
-}
-
-function ShieldIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style={{ color: 'var(--accent)', flexShrink: 0 }}>
-      <path d="M5.338 1.59a61.44 61.44 0 0 0-2.837.856.481.481 0 0 0-.328.39c-.554 4.157.726 7.19 2.253 9.188a10.725 10.725 0 0 0 2.287 2.233c.346.244.652.42.893.533.12.057.218.095.293.118a.55.55 0 0 0 .101.025.615.615 0 0 0 .1-.025c.076-.023.174-.061.294-.118.24-.113.547-.29.893-.533a10.726 10.726 0 0 0 2.287-2.233c1.527-1.997 2.807-5.031 2.253-9.188a.48.48 0 0 0-.328-.39c-.651-.213-1.75-.56-2.837-.855C9.552 1.29 8.531 1.067 8 1.067c-.53 0-1.552.223-2.662.524zM5.072.56C6.157.265 7.31 0 8 0s1.843.265 2.928.56c1.11.3 2.229.655 2.887.87a1.54 1.54 0 0 1 1.044 1.262c.596 4.477-.787 7.795-2.465 9.99a11.775 11.775 0 0 1-2.517 2.453 7.159 7.159 0 0 1-1.048.625c-.28.132-.581.24-.829.24s-.548-.108-.829-.24a7.158 7.158 0 0 1-1.048-.625 11.777 11.777 0 0 1-2.517-2.453C1.928 10.487.545 7.169 1.141 2.692A1.54 1.54 0 0 1 2.185 1.43 62.456 62.456 0 0 1 5.072.56z"/>
-    </svg>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <path d="M1 1l12 12M13 1L1 13" />
-    </svg>
+    </ModalShell>
   );
 }

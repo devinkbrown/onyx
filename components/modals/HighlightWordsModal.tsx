@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
-import { useDialogFocus } from './useDialogFocus';
+import ModalShell from './ModalShell';
 
 export default function HighlightWordsModal() {
   const highlightWords    = useOnyxStore(s => s.highlightWords);
@@ -12,21 +12,10 @@ export default function HighlightWordsModal() {
 
   const [draft, setDraft] = useState('');
   const inputRef  = useRef<HTMLInputElement>(null);
-  const modalRef  = useRef<HTMLDivElement>(null);
-
-  useDialogFocus(modalRef);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeHighlightModal();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [closeHighlightModal]);
 
   const handleAdd = useCallback(() => {
     const trimmed = draft.trim();
@@ -49,26 +38,14 @@ export default function HighlightWordsModal() {
   const previewText = `Hey, someone mentioned ${previewWord} in the channel today!`;
 
   return (
-    <div
-      className="hlm-overlay"
-      onClick={e => { if (e.target === e.currentTarget) closeHighlightModal(); }}
+    <ModalShell
+      onClose={closeHighlightModal}
+      title={<><span className="hlm-icon" aria-hidden>✦</span> Highlight Words</>}
+      kicker="Notifications"
+      titleId="hlm-modal-title"
+      size="sm"
     >
-      <div className="hlm-modal" ref={modalRef} role="dialog" aria-modal aria-labelledby="hlm-modal-title">
-        {/* Header */}
-        <div className="hlm-header">
-          <div className="hlm-title-row">
-            <span className="hlm-icon" aria-hidden>✦</span>
-            <h2 id="hlm-modal-title" className="hlm-title">Highlight Words</h2>
-          </div>
-          <button
-            className="hlm-close"
-            onClick={closeHighlightModal}
-            aria-label="Close"
-          >
-            ×
-          </button>
-        </div>
-
+      <div className="hlm-content">
         <p className="hlm-subtitle">
           Messages containing these words will be highlighted in gold.
         </p>
@@ -117,7 +94,7 @@ export default function HighlightWordsModal() {
 
         {/* Preview */}
         <div className="hlm-preview-section">
-          <div className="hlm-preview-label">Preview</div>
+          <div className="label-caps hlm-preview-label">Preview</div>
           <div className="hlm-preview-bubble">
             <span className="hlm-preview-nick">user</span>
             <span className="hlm-preview-text">
@@ -130,7 +107,7 @@ export default function HighlightWordsModal() {
       </div>
 
       <style>{styles}</style>
-    </div>
+    </ModalShell>
   );
 }
 
@@ -145,54 +122,10 @@ function renderPreview(text: string, word: string): React.ReactNode {
 }
 
 const styles = `
-  .hlm-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 50;
-    background: rgba(0, 0, 0, 0.65);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    animation: hlm-fade-in 120ms ease both;
-  }
-
-  @keyframes hlm-fade-in {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-  }
-
-  .hlm-modal {
-    width: 440px;
-    max-width: calc(100vw - 32px);
-    background: var(--bg-deep, #060f1b);
-    border: 1px solid var(--border-normal, rgba(14,165,233,0.18));
-    border-radius: 12px;
-    padding: 24px;
+  .hlm-content {
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(14,165,233,0.08);
-    animation: hlm-slide-up 160ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
-  }
-
-  @keyframes hlm-slide-up {
-    from { opacity: 0; transform: translateY(12px) scale(0.97); }
-    to   { opacity: 1; transform: translateY(0)   scale(1);    }
-  }
-
-  .hlm-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 8px;
-  }
-
-  .hlm-title-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    gap: var(--sp-4, 16px);
   }
 
   .hlm-icon {
@@ -201,57 +134,29 @@ const styles = `
     line-height: 1;
   }
 
-  .hlm-title {
-    font-size: 17px;
-    font-weight: 700;
-    color: var(--text-primary, #dff0ff);
-    margin: 0;
-  }
-
-  .hlm-close {
-    width: 28px;
-    height: 28px;
-    border: none;
-    background: none;
-    cursor: pointer;
-    font-size: 20px;
-    color: var(--text-muted, #3d6480);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 6px;
-    flex-shrink: 0;
-    transition: color 150ms, background 150ms;
-    line-height: 1;
-  }
-  .hlm-close:hover {
-    color: var(--text-primary, #dff0ff);
-    background: rgba(14,165,233,0.08);
-  }
-
   .hlm-subtitle {
-    font-size: 13px;
+    font-size: var(--text-sm, 13px);
     color: var(--text-muted, #3d6480);
-    margin: -8px 0 0;
+    margin: 0;
     line-height: 1.5;
   }
 
   .hlm-input-row {
     display: flex;
-    gap: 8px;
+    gap: var(--sp-2, 8px);
   }
 
   .hlm-input {
     flex: 1;
-    background: var(--bg-elevated, rgba(14,165,233,0.04));
+    background: var(--elev-tint-1, var(--bg-elevated, rgba(14,165,233,0.04)));
     border: 1px solid var(--border-normal, rgba(14,165,233,0.18));
-    border-radius: 8px;
+    border-radius: var(--r-md, 8px);
     color: var(--text-primary, #dff0ff);
-    font-size: 14px;
+    font-size: var(--text-base, 14px);
     padding: 8px 12px;
     outline: none;
     font-family: inherit;
-    transition: border-color 150ms, box-shadow 150ms;
+    transition: border-color var(--t-control, 150ms), box-shadow var(--t-control, 150ms);
   }
   .hlm-input::placeholder { color: var(--text-muted, #3d6480); }
   .hlm-input:focus {
@@ -264,12 +169,12 @@ const styles = `
     background: var(--accent, #0ea5e9);
     color: #fff;
     border: none;
-    border-radius: 8px;
-    font-size: 14px;
+    border-radius: var(--r-md, 8px);
+    font-size: var(--text-base, 14px);
     font-weight: 600;
     cursor: pointer;
     font-family: inherit;
-    transition: opacity 150ms;
+    transition: opacity var(--t-control, 150ms);
     flex-shrink: 0;
   }
   .hlm-add-btn:hover:not(:disabled) { opacity: 0.85; }
@@ -293,7 +198,7 @@ const styles = `
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    transition: background 120ms, border-color 120ms;
+    transition: background var(--t-micro, 90ms), border-color var(--t-micro, 90ms);
   }
   .hlm-chip:hover {
     background: rgba(251,191,36,0.17);
@@ -314,7 +219,7 @@ const styles = `
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: color 120ms, background 120ms;
+    transition: color var(--t-micro, 90ms), background var(--t-micro, 90ms);
     flex-shrink: 0;
   }
   .hlm-chip-remove:hover {
@@ -323,12 +228,12 @@ const styles = `
   }
 
   .hlm-empty {
-    font-size: 13px;
+    font-size: var(--text-sm, 13px);
     color: var(--text-muted, #3d6480);
     font-style: italic;
     margin: 0;
     text-align: center;
-    padding: 8px 0;
+    padding: var(--sp-2, 8px) 0;
   }
 
   .hlm-preview-section {
@@ -336,30 +241,22 @@ const styles = `
     padding-top: 14px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-  }
-
-  .hlm-preview-label {
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-muted, #3d6480);
+    gap: var(--sp-2, 8px);
   }
 
   .hlm-preview-bubble {
-    background: var(--bg-elevated, rgba(14,165,233,0.04));
+    background: var(--elev-tint-1, var(--bg-elevated, rgba(14,165,233,0.04)));
     border: 1px solid var(--border-subtle, rgba(14,165,233,0.08));
-    border-radius: 8px;
+    border-radius: var(--r-md, 8px);
     padding: 10px 12px;
-    font-size: 14px;
+    font-size: var(--text-base, 14px);
     display: flex;
-    gap: 8px;
+    gap: var(--sp-2, 8px);
     align-items: baseline;
   }
 
   .hlm-preview-nick {
-    font-size: 14px;
+    font-size: var(--text-base, 14px);
     font-weight: 700;
     color: var(--accent, #0ea5e9);
     flex-shrink: 0;

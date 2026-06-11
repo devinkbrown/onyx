@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useCallback } from 'react';
+import type { CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { useOnyxStore } from '@/lib/store';
 import Avatar from './Avatar';
@@ -13,9 +14,9 @@ function nickHue(nick: string): number {
   return Math.abs(hash) % 360;
 }
 
-function bannerGradient(nick: string): string {
+function bannerColor(nick: string): string {
   const hue = nickHue(nick);
-  return `linear-gradient(135deg, hsl(${hue},55%,25%) 0%, hsl(${(hue + 40) % 360},45%,15%) 100%)`;
+  return `hsl(${hue}, 44%, 34%)`;
 }
 
 // ── Status helpers ────────────────────────────────────────────────────────────
@@ -88,6 +89,7 @@ export default function MiniUserCard({ nick, anchorEl, onClose, onOpenProfile }:
   const props      = userProps.get(nick.toLowerCase()) ?? {};
   const bio        = props.BIO   ?? props.Bio   ?? '';
   const statusText = props.STATUS ?? props.Status ?? '';
+  const profileAccent = props.ACCENT ?? props.Accent ?? props.BANNERCOLOR ?? bannerColor(nick);
 
   // Determine user's status in DMs or channel
   const dmConv        = dms.get(nick.toLowerCase());
@@ -162,6 +164,7 @@ export default function MiniUserCard({ nick, anchorEl, onClose, onOpenProfile }:
   }, [navigate, nick, onClose]);
 
   const handleMention = useCallback(() => {
+    // OCEAN-INTEGRATION: composer listens for mention insertion requests from profile surfaces.
     window.dispatchEvent(
       new CustomEvent('ocean:mention', { detail: { nick } })
     );
@@ -179,16 +182,16 @@ export default function MiniUserCard({ nick, anchorEl, onClose, onOpenProfile }:
     <div
       ref={cardRef}
       className="mini-card"
-      style={{ left, top }}
+      style={{ left, top, '--mini-accent': profileAccent } as CSSProperties & Record<string, string | number>}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       role="dialog"
       aria-label={`${nick} profile card`}
+      data-testid="mini-user-card"
     >
       {/* Banner strip */}
       <div
         className="mini-card-banner"
-        style={{ background: bannerGradient(nick) }}
         aria-hidden
       />
 
@@ -279,24 +282,25 @@ const styles = `
   .mini-card {
     position: fixed;
     width: 240px;
-    background: var(--bg-deep);
-    border: 1px solid var(--border-normal);
-    border-radius: var(--r-xl);
-    box-shadow: var(--shadow-xl);
+    background: var(--elev-tint-3, var(--bg-deep));
+    border: 0;
+    border-radius: var(--r-xl, 16px) var(--r-sm, 6px) var(--r-lg, 14px) var(--r-md, 10px);
+    box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-3, 0 28px 80px rgba(0,0,0,.48));
     overflow: hidden;
     z-index: 1200;
-    animation: mini-card-in 150ms var(--ease-out) both;
+    animation: mini-card-in var(--t-overlay-in, 320ms) var(--ease-out) both;
     transform-origin: top left;
   }
 
   @keyframes mini-card-in {
-    from { opacity: 0; transform: scale(0.92); }
+    from { opacity: 0; transform: translateY(4px) scale(0.96); }
     to   { opacity: 1; transform: scale(1);    }
   }
 
   .mini-card-banner {
     height: 64px;
     flex-shrink: 0;
+    background: color-mix(in srgb, var(--mini-accent) 42%, var(--bg-deep) 58%);
   }
 
   .mini-card-avatar-wrap {
@@ -314,7 +318,8 @@ const styles = `
   }
 
   .mini-card-nick {
-    font-size: 16px;
+    font-size: var(--text-lg, 1.0625rem);
+    font-family: var(--font-display), Georgia, serif;
     font-weight: 700;
     color: var(--text-primary);
     line-height: 1.2;
@@ -339,6 +344,7 @@ const styles = `
     height: 8px;
     border-radius: var(--r-full);
     flex-shrink: 0;
+    box-shadow: 0 0 0 2px var(--bg-deep), 0 0 0 4px color-mix(in srgb, currentColor 30%, transparent);
   }
 
   .mini-card-status-label {
@@ -376,8 +382,9 @@ const styles = `
     font-size: 11px;
     font-weight: 600;
     color: var(--accent);
-    background: var(--accent-subtle);
-    border: 1px solid var(--accent-border);
+    background: var(--elev-tint-1, var(--accent-subtle));
+    border: 0;
+    box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
     padding: 2px 7px;
     border-radius: var(--r-full);
   }
@@ -386,7 +393,7 @@ const styles = `
     display: flex;
     gap: 6px;
     padding-top: 10px;
-    border-top: 1px solid var(--border-subtle);
+    box-shadow: inset 0 1px 0 var(--border-subtle);
     margin-top: 8px;
     /* Hidden by default, revealed on hover */
     opacity: 0;
@@ -400,25 +407,26 @@ const styles = `
 
   .mini-card-btn {
     flex: 1;
-    background: var(--bg-float);
-    border: 1px solid var(--border-normal);
-    border-radius: var(--r-sm);
+    background: var(--elev-tint-1, var(--bg-float));
+    border: 0;
+    border-radius: var(--r-sm, 6px) var(--r-md, 10px) var(--r-sm, 6px) var(--r-lg, 14px);
+    box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
     padding: 6px;
     font-size: 12px;
     font-weight: 600;
     color: var(--text-secondary);
     cursor: pointer;
-    transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+    transition: background var(--t-control, 150ms), color var(--t-control, 150ms), transform var(--t-control, 150ms);
   }
 
   .mini-card-btn:hover {
-    background: var(--bg-overlay);
+    background: var(--elev-tint-2, var(--bg-overlay));
     color: var(--text-primary);
-    border-color: var(--border-normal);
+    transform: translateY(-1px);
   }
 
   .mini-card-btn--primary {
-    background: var(--accent);
+    background: color-mix(in srgb, var(--accent) 82%, #05070a);
     border-color: transparent;
     color: #fff;
   }
@@ -442,5 +450,17 @@ const styles = `
 
   .mini-card-profile-link:hover {
     color: var(--accent);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mini-card,
+    .mini-card-actions,
+    .mini-card-btn,
+    .mini-card-profile-link {
+      animation: none;
+      transition: none;
+    }
+    .mini-card-btn:hover {
+      transform: none;
+    }
   }
 `;

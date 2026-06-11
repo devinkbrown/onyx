@@ -149,7 +149,7 @@ function ToastCard({
 
   const handleDismiss = useCallback(() => {
     setIsDismissing(true);
-    const t = setTimeout(dismiss, 300);
+    const t = setTimeout(dismiss, 200);
     return () => clearTimeout(t);
   }, [dismiss]);
 
@@ -229,22 +229,21 @@ function ToastCard({
           display: flex;
           flex-direction: column;
           width: 300px;
-          background: var(--bg-float);
+          background: var(--elev-tint-2, var(--bg-float));
           border: 1px solid var(--border-subtle);
-          border-radius: 8px;
-          box-shadow: var(--shadow-lg);
+          border-radius: var(--r-md, 8px) var(--r-lg, 12px) var(--r-sm, 6px) var(--r-md, 8px);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-2, 0 18px 48px rgba(0,0,0,.38));
           overflow: hidden;
           pointer-events: all;
-          animation: toast-in 250ms cubic-bezier(0.16, 1, 0.3, 1) both;
-          transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
-                      opacity 200ms ease,
-                      box-shadow 200ms ease;
+          animation: toast-in var(--t-overlay-in, 320ms) var(--ease-out, cubic-bezier(.16,1,.3,1)) both;
+          transition: transform var(--t-overlay-out, 200ms) var(--ease-in, cubic-bezier(.7,0,.84,0)),
+                      opacity var(--t-overlay-out, 200ms) var(--ease-in, cubic-bezier(.7,0,.84,0)),
+                      box-shadow var(--t-surface, 220ms) var(--ease-out, cubic-bezier(.16,1,.3,1));
         }
         .toast-card:hover {
           box-shadow:
-            0 12px 40px rgba(0,0,0,0.7),
-            0 0 0 1px var(--border-normal),
-            0 1px 0 rgba(255,255,255,0.05) inset;
+            var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)),
+            var(--elev-shadow-3, 0 28px 80px rgba(0,0,0,.48));
         }
 
         .toast-card--out {
@@ -256,13 +255,13 @@ function ToastCard({
           left: 0;
           top: 0;
           bottom: 0;
-          width: 3px;
-          border-radius: 8px 0 0 8px;
+          width: 4px;
+          border-radius: var(--r-sm, 6px) 0 0 var(--r-md, 8px);
           flex-shrink: 0;
         }
 
         .toast-content {
-          padding: 11px 12px 9px 16px;
+          padding: var(--sp-3, 12px) var(--sp-3, 12px) var(--sp-2, 8px) var(--sp-5, 20px);
           display: flex;
           flex-direction: column;
           gap: 4px;
@@ -284,15 +283,15 @@ function ToastCard({
 
         .toast-title {
           flex: 1;
-          font-size: 13px;
+          font-size: var(--text-sm, 0.8125rem);
           font-weight: 600;
           color: var(--text-primary);
           line-height: 1.3;
-          letter-spacing: 0.01em;
+          letter-spacing: 0;
         }
 
         .toast-description {
-          font-size: 12px;
+          font-size: var(--text-xs, 0.75rem);
           color: var(--text-secondary);
           line-height: 1.5;
           margin: 0 0 2px 28px;
@@ -306,15 +305,20 @@ function ToastCard({
           font-size: 11px;
           font-weight: 700;
           padding: 2px 6px;
-          border-radius: 4px;
+          border-radius: var(--r-xs, 4px) var(--r-sm, 6px) var(--r-xs, 4px) var(--r-md, 8px);
           letter-spacing: 0.05em;
           text-transform: uppercase;
-          transition: opacity 0.15s, background 0.15s;
+          transition: opacity var(--t-control, 150ms), background var(--t-control, 150ms), transform var(--t-micro, 90ms);
           flex-shrink: 0;
         }
         .toast-undo:hover {
           opacity: 0.85;
           background: color-mix(in oklch, currentColor 20%, transparent);
+        }
+        .toast-undo:active { transform: translateY(0.5px); }
+        .toast-undo:focus-visible {
+          outline: 2px solid currentColor;
+          outline-offset: 2px;
         }
 
         .toast-close {
@@ -325,12 +329,12 @@ function ToastCard({
           width: 20px;
           height: 20px;
           padding: 0;
-          border-radius: 4px;
+          border-radius: var(--r-xs, 4px) var(--r-md, 8px) var(--r-xs, 4px) var(--r-sm, 6px);
           display: flex;
           align-items: center;
           justify-content: center;
           opacity: 0.5;
-          transition: opacity 0.15s, color 0.15s, background 0.15s;
+          transition: opacity var(--t-control, 150ms), color var(--t-control, 150ms), background var(--t-control, 150ms), transform var(--t-micro, 90ms);
           flex-shrink: 0;
           position: absolute;
           top: 8px;
@@ -344,9 +348,14 @@ function ToastCard({
           color: var(--text-primary);
           background: rgba(255,255,255,0.08);
         }
+        .toast-close:active { transform: translateY(0.5px); }
+        .toast-close:focus-visible {
+          outline: 2px solid currentColor;
+          outline-offset: 2px;
+        }
 
         .toast-progress {
-          height: 2px;
+          height: 1px;
           width: 100%;
           animation: toast-progress linear both;
           flex-shrink: 0;
@@ -355,16 +364,24 @@ function ToastCard({
         }
 
         @keyframes toast-in {
-          from { transform: translateX(110%); opacity: 0; }
-          to   { transform: translateX(0);    opacity: 1; }
+          from { transform: translate3d(110%, 0, 0); opacity: 0; }
+          to   { transform: translate3d(0, 0, 0);    opacity: 1; }
         }
         @keyframes toast-out {
-          from { transform: translateX(0);    opacity: 1; max-height: 120px; margin-bottom: 0; }
-          to   { transform: translateX(110%); opacity: 0; max-height: 0;     margin-bottom: -8px; }
+          from { transform: translate3d(0, 0, 0);    opacity: 1; }
+          to   { transform: translate3d(110%, 0, 0); opacity: 0; }
         }
         @keyframes toast-progress {
-          from { width: 100%; }
-          to   { width: 0%;   }
+          from { transform: scaleX(1); }
+          to   { transform: scaleX(0); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .toast-card,
+          .toast-card--out,
+          .toast-progress {
+            animation-duration: 1ms;
+            transition-duration: 1ms;
+          }
         }
       `}</style>
     </div>
@@ -389,7 +406,7 @@ function GroupCard({
   useEffect(() => {
     const t = setTimeout(() => {
       setIsDismissing(true);
-      setTimeout(dismiss, 300);
+      setTimeout(dismiss, 200);
     }, DEFAULT_DURATION[firstVariant]);
     return () => clearTimeout(t);
   }, [group.key, firstVariant, dismiss]);
@@ -426,7 +443,7 @@ function GroupCard({
           </button>
           <button
             className="toast-close"
-            onClick={() => { setIsDismissing(true); setTimeout(dismiss, 300); }}
+            onClick={() => { setIsDismissing(true); setTimeout(dismiss, 200); }}
             aria-label="Dismiss all"
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
@@ -455,22 +472,30 @@ function GroupCard({
           display: flex;
           flex-direction: column;
           width: 300px;
-          background: var(--bg-float);
+          background: var(--elev-tint-2, var(--bg-float));
           border: 1px solid var(--border-subtle);
-          border-radius: 8px;
-          box-shadow: var(--shadow-lg);
+          border-radius: var(--r-md, 8px) var(--r-lg, 12px) var(--r-sm, 6px) var(--r-md, 8px);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-2, 0 18px 48px rgba(0,0,0,.38));
           overflow: hidden;
           pointer-events: all;
-          animation: toast-in 250ms cubic-bezier(0.16, 1, 0.3, 1) both;
+          animation: toast-in var(--t-overlay-in, 320ms) var(--ease-out, cubic-bezier(.16,1,.3,1)) both;
         }
         .toast-group--out {
-          animation: toast-out 200ms cubic-bezier(0.7, 0, 0.84, 0) both;
+          animation: toast-out var(--t-overlay-out, 200ms) var(--ease-in, cubic-bezier(.7,0,.84,0)) both;
+        }
+        @keyframes toast-in {
+          from { transform: translate3d(110%, 0, 0); opacity: 0; }
+          to   { transform: translate3d(0, 0, 0);    opacity: 1; }
+        }
+        @keyframes toast-out {
+          from { transform: translate3d(0, 0, 0);    opacity: 1; }
+          to   { transform: translate3d(110%, 0, 0); opacity: 0; }
         }
         .toast-group-bar {
           position: absolute;
           left: 0; top: 0; bottom: 0;
-          width: 3px;
-          border-radius: 8px 0 0 8px;
+          width: 4px;
+          border-radius: var(--r-sm, 6px) 0 0 var(--r-md, 8px);
         }
         .toast-group-content {
           padding: 12px 14px 12px 17px;
@@ -495,12 +520,17 @@ function GroupCard({
           cursor: pointer;
           color: var(--text-muted, #8888aa);
           padding: 3px;
-          border-radius: 4px;
+          border-radius: var(--r-xs, 4px) var(--r-sm, 6px) var(--r-xs, 4px) var(--r-md, 8px);
           display: flex;
           align-items: center;
-          transition: color 0.15s;
+          transition: color var(--t-control, 150ms), background var(--t-control, 150ms), transform var(--t-micro, 90ms);
         }
-        .toast-group-expand:hover { color: var(--text-primary, #e8e8f0); }
+        .toast-group-expand:hover { color: var(--text-primary, #e8e8f0); background: color-mix(in srgb, currentColor 8%, transparent); }
+        .toast-group-expand:active { transform: translateY(0.5px); }
+        .toast-group-expand:focus-visible {
+          outline: 2px solid currentColor;
+          outline-offset: 2px;
+        }
         .toast-group-items {
           display: flex;
           flex-direction: column;
@@ -522,6 +552,12 @@ function GroupCard({
         .toast-group-item-desc {
           font-size: 11px;
           color: var(--text-muted, #8888aa);
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .toast-group,
+          .toast-group--out {
+            animation-duration: 1ms;
+          }
         }
       `}</style>
     </div>

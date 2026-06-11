@@ -10,24 +10,7 @@ import MemberContextMenu from '@/components/ui/MemberContextMenu';
 import { getNickColor } from '@/lib/nick-color';
 import EmptyState from '@/components/ui/EmptyState';
 import { parseActivity, activityShort } from '@/lib/activity';
-
-/* ── Role definitions ──────────────────────────────────────────── */
-
-/* Ophion PREFIX=(qov).@+  — q='.', o='@', v='+'.  No 'a' or 'h'. */
-const ROLE_STYLES: Record<string, { label: string; color: string; bg: string }> = {
-  q: { label: 'Owner', color: '#fbbf24', bg: 'rgba(251,191,36,0.12)' },
-  o: { label: 'Op',    color: '#a78bfa', bg: 'rgba(167,139,250,0.12)' },
-  v: { label: 'Voice', color: '#34d399', bg: 'rgba(52,211,153,0.12)' },
-};
-
-const ROLE_ORDER = ['q', 'o', 'v', ''] as const;
-
-const GROUP_LABELS: Record<string, string> = {
-  q: 'Owners',
-  o: 'Ops',
-  v: 'Voice',
-  '': 'Members',
-};
+import RoleBadge, { highestRoleMode, roleGroupLabel, roleMetaFromMode } from '@/components/ui/RoleBadge';
 
 type SortMode = 'role' | 'alpha' | 'online-first' | 'recent';
 
@@ -40,17 +23,10 @@ const SORT_LABELS: Record<SortMode, string> = {
 
 const SORT_CYCLE: SortMode[] = ['role', 'alpha', 'online-first', 'recent'];
 
-function getHighestRole(modes: Set<string>): string {
-  for (const mode of ['q', 'o', 'v'] as const) {
-    if (modes.has(mode)) return mode;
-  }
-  return '';
-}
-
 interface Group {
   key: string;
   label: string;
-  color: string | null;
+  mode: string;
   members: ChannelUser[];
 }
 
@@ -77,6 +53,7 @@ export default function MemberList() {
   const setMemberListSort = useOnyxStore(s => s.setMemberListSort);
   const client            = useOnyxStore(s => s.client);
   const connectionStatus  = useOnyxStore(s => s.connectionStatus);
+  const modeToPrefix      = useOnyxStore(s => s.isupportModeToPrefix);
   const [search, setSearch] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const [ctxMenu, setCtxMenu] = useState<CtxMenuState | null>(null);
@@ -122,7 +99,7 @@ export default function MemberList() {
       const sorted = [...members].sort((a, b) =>
         a.nick.localeCompare(b.nick, undefined, { sensitivity: 'base' })
       );
-      return [{ key: '__all', label: 'Members', color: null, members: sorted }];
+      return [{ key: '__all', label: 'Members', mode: '', members: sorted }];
     }
 
     if (memberListSort === 'online-first') {
@@ -133,8 +110,8 @@ export default function MemberList() {
         a.nick.localeCompare(b.nick, undefined, { sensitivity: 'base' })
       );
       const result: Group[] = [];
-      if (online.length > 0) result.push({ key: '__online', label: 'Online', color: '#23a55a', members: online });
-      if (away.length > 0) result.push({ key: '__away', label: 'Away', color: '#f0b232', members: away });
+      if (online.length > 0) result.push({ key: '__online', label: 'Online', mode: '', members: online });
+      if (away.length > 0) result.push({ key: '__away', label: 'Away', mode: '', members: away });
       return result;
     }
 
@@ -142,23 +119,23 @@ export default function MemberList() {
       const sorted = [...members].sort((a, b) =>
         a.nick.localeCompare(b.nick, undefined, { sensitivity: 'base' })
       );
-      return [{ key: '__all', label: 'Members', color: null, members: sorted }];
+      return [{ key: '__all', label: 'Members', mode: '', members: sorted }];
     }
 
     // Default: by role
     const byMode = new Map<string, ChannelUser[]>();
     for (const u of members) {
-      const role = getHighestRole(u.modes);
+      const role = highestRoleMode(u.modes, modeToPrefix);
       if (!byMode.has(role)) byMode.set(role, []);
       byMode.get(role)!.push(u);
     }
 
-    return ROLE_ORDER
-      .filter(m => byMode.has(m))
+    return [...Object.keys(modeToPrefix), '']
+      .filter((m, index, arr) => arr.indexOf(m) === index && byMode.has(m))
       .map(m => ({
         key:     m,
-        label:   GROUP_LABELS[m] ?? 'Members',
-        color:   ROLE_STYLES[m]?.color ?? null,
+        label:   roleGroupLabel(m, modeToPrefix),
+        mode:    m,
         members: byMode.get(m)!.sort((a, b) => {
           // Within each role: online first, then alpha
           const aAway = a.away ? 1 : 0;
@@ -167,7 +144,7 @@ export default function MemberList() {
           return a.nick.localeCompare(b.nick, undefined, { sensitivity: 'base' });
         }),
       }));
-  }, [channel, isFiltering, filteredMembers, memberListSort]);
+  }, [channel, isFiltering, filteredMembers, memberListSort, modeToPrefix]);
 
   const toggleGroup = (groupKey: string) => {
     setCollapsedGroups(prev => {
@@ -197,7 +174,7 @@ export default function MemberList() {
   };
 
   return (
-    <div className="ml-root">
+    <div className="ml-root" data-testid="member-list">
       <div className="ml-header">
         <span className="ml-title">
           Members<span className="ml-title-count"> — {total}</span>
@@ -225,6 +202,7 @@ export default function MemberList() {
           onChange={e => setSearch(e.target.value)}
           onKeyDown={handleKeyDown}
           aria-label="Search members"
+          data-testid="member-search"
         />
         {search && (
           <button
@@ -275,24 +253,26 @@ export default function MemberList() {
             return (
               <div key={g.key} className="ml-group">
                 <button
-                  className="ml-group-label ml-group-label--btn"
-                  style={g.color ? { color: g.color } : undefined}
+                  className="ml-group-label ml-group-label--btn label-caps"
                   onClick={() => toggleGroup(g.key)}
                   aria-expanded={!isCollapsed}
                   aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${g.label}`}
+                  data-testid="member-group-header"
                 >
                   <span className={`ml-group-arrow${isCollapsed ? ' ml-group-arrow--collapsed' : ''}`} aria-hidden>
                     <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M1.5 2.5l2.5 3 2.5-3"/>
                     </svg>
                   </span>
-                  {g.label} — {g.members.length}
+                  {g.mode && <RoleBadge mode={g.mode} compact />}
+                  <span>{g.label}</span>
+                  <span className="ml-group-count">{g.members.length}</span>
                 </button>
                 {!isCollapsed && g.members.map(u => (
                   <MemberRow
                     key={u.nick}
                     user={u}
-                    role={memberListSort === 'role' ? g.key : getHighestRole(u.modes)}
+                    role={memberListSort === 'role' ? g.mode : highestRoleMode(u.modes, modeToPrefix)}
                     onContextMenu={handleMemberRightClick}
                   />
                 ))}
@@ -319,6 +299,7 @@ export default function MemberList() {
           flex-direction: column;
           height: 100%;
           overflow: hidden;
+          background: color-mix(in srgb, var(--bg-deep) 96%, var(--accent) 2%);
         }
 
         .ml-header {
@@ -326,17 +307,18 @@ export default function MemberList() {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 0 12px;
-          border-bottom: 1px solid var(--border-subtle);
+          padding: 0 var(--sp-3, 12px);
+          background: var(--elev-tint-1, color-mix(in srgb, var(--bg-deep) 94%, var(--accent) 2%));
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
           flex-shrink: 0;
           box-sizing: border-box;
           gap: 8px;
         }
 
         .ml-title {
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           font-weight: 700;
-          letter-spacing: 0.06em;
+          letter-spacing: 0;
           text-transform: uppercase;
           color: var(--text-secondary);
           min-width: 0;
@@ -346,7 +328,7 @@ export default function MemberList() {
         }
 
         .ml-title-count {
-          font-size: 11px;
+          font-size: var(--text-2xs, 11px);
           font-weight: 600;
           color: var(--text-muted);
           font-variant-numeric: tabular-nums;
@@ -364,21 +346,21 @@ export default function MemberList() {
           display: flex;
           align-items: center;
           gap: 3px;
-          background: none;
-          border: 1px solid transparent;
+          background: var(--elev-tint-1, transparent);
+          border: 0;
           cursor: pointer;
           color: var(--text-muted);
-          font-size: 10px;
+          font-size: var(--text-2xs, 10px);
           font-family: inherit;
           padding: 3px 6px;
-          border-radius: var(--r-sm, 4px);
-          transition: color var(--t-fast), background var(--t-fast);
+          border-radius: var(--r-xs, 4px) var(--r-md, 8px) var(--r-xs, 4px) var(--r-sm, 6px);
+          transition: color var(--t-control, 150ms), background var(--t-control, 150ms);
           white-space: nowrap;
         }
         .ml-sort-btn:hover {
           color: var(--text-secondary);
-          background: var(--bg-float);
-          border-color: var(--border-subtle);
+          background: var(--elev-tint-2, var(--bg-float));
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
         }
         .ml-sort-btn:active {
           background: var(--accent-subtle);
@@ -387,15 +369,15 @@ export default function MemberList() {
 
         .ml-sort-label {
           font-weight: 600;
-          letter-spacing: 0.04em;
+          letter-spacing: 0;
           text-transform: uppercase;
         }
 
         /* Member count is now inline in the title — .ml-count removed */
 
         .member-search-wrap {
-          padding: 8px 10px;
-          border-bottom: 1px solid var(--border-subtle);
+          padding: var(--sp-2, 8px) var(--sp-3, 12px);
+          background: color-mix(in srgb, var(--bg-deep) 90%, transparent);
           flex-shrink: 0;
           position: relative;
           display: flex;
@@ -405,23 +387,23 @@ export default function MemberList() {
 
         .member-search-input {
           flex: 1;
-          background: var(--bg-deep);
-          border: 1px solid var(--border-subtle);
-          border-radius: var(--r-md, 6px);
+          background: var(--elev-tint-1, var(--bg-deep));
+          border: 0;
+          border-radius: var(--r-md, 10px) var(--r-sm, 6px) var(--r-lg, 14px) var(--r-sm, 6px);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), inset 0 0 0 1px var(--border-subtle);
           min-width: 0;
           height: 30px;
           padding: 5px 28px 5px 10px;
-          font-size: 12px;
+          font-size: var(--text-xs, 12px);
           color: var(--text-primary);
           outline: none;
           font-family: inherit;
-          transition: border-color var(--t-fast), box-shadow var(--t-fast);
+          transition: box-shadow var(--t-control, 150ms);
           box-sizing: border-box;
         }
         .member-search-input::placeholder { color: var(--text-muted); }
         .member-search-input:focus {
-          border-color: var(--accent-border);
-          box-shadow: 0 0 0 2px var(--accent-subtle);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), inset 0 0 0 1px var(--accent-border), 0 0 0 2px var(--accent-subtle);
         }
 
         .member-search-clear {
@@ -429,14 +411,14 @@ export default function MemberList() {
           right: 44px;
           top: 50%;
           transform: translateY(-50%);
-          background: none;
+          background: transparent;
           border: none;
           cursor: pointer;
           color: var(--text-muted);
           font-size: 15px;
           line-height: 1;
           padding: 2px 3px;
-          border-radius: var(--r-xs);
+          border-radius: var(--r-xs, 4px);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -448,22 +430,22 @@ export default function MemberList() {
           flex-shrink: 0;
           width: 30px;
           height: 30px;
-          border-radius: var(--r-sm);
-          border: 1px solid transparent;
-          background: none;
+          border-radius: var(--r-sm, 6px) var(--r-md, 10px) var(--r-sm, 6px) var(--r-xs, 4px);
+          border: 0;
+          background: var(--elev-tint-1, transparent);
           color: var(--text-muted);
           cursor: pointer;
           font-size: 15px;
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: color var(--t-fast), background var(--t-fast), border-color var(--t-fast), transform 0.35s;
+          transition: color var(--t-control, 150ms), background var(--t-control, 150ms), transform var(--t-surface, 220ms);
           padding: 0;
         }
         .member-refresh-btn:hover {
           color: var(--text-secondary);
-          background: var(--bg-float);
-          border-color: var(--border-normal);
+          background: var(--elev-tint-2, var(--bg-float));
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
         }
         .member-refresh-btn:active { transform: rotate(180deg); }
 
@@ -479,34 +461,26 @@ export default function MemberList() {
         .ml-scroll {
           flex: 1;
           overflow-y: auto;
-          padding: 6px 8px 12px;
+          padding: var(--sp-2, 8px) var(--sp-2, 8px) var(--sp-3, 12px);
           min-height: 0;
           scrollbar-gutter: stable;
         }
 
-        /* Group: add subtle top separator for visual rhythm */
         .ml-group {
-          margin-bottom: 8px;
-        }
-        .ml-group + .ml-group {
-          border-top: 1px solid var(--border-subtle);
-          padding-top: 6px;
-          margin-top: 2px;
+          margin-bottom: var(--sp-2, 8px);
         }
 
         .ml-group-label {
-          padding: 8px 8px 4px;
-          font-size: 10px;
+          padding: var(--sp-2, 8px) var(--sp-2, 8px) var(--sp-1, 4px);
+          font-size: var(--text-2xs, 10px);
           font-weight: 700;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
           color: var(--text-muted);
         }
 
         .ml-group-label--btn {
           display: flex;
           align-items: center;
-          gap: 5px;
+          gap: var(--sp-2, 8px);
           width: 100%;
           background: none;
           border: none;
@@ -514,12 +488,12 @@ export default function MemberList() {
           font-family: inherit;
           text-align: left;
           user-select: none;
-          border-radius: var(--r-sm, 4px);
-          transition: color var(--t-fast), background var(--t-fast);
+          border-radius: var(--r-xs, 4px) var(--r-md, 10px) var(--r-xs, 4px) var(--r-sm, 6px);
+          transition: color var(--t-control, 150ms), background var(--t-control, 150ms);
         }
         .ml-group-label--btn:hover {
           color: var(--text-secondary);
-          background: var(--ch-hover-bg);
+          background: var(--elev-tint-1, var(--ch-hover-bg));
         }
 
         .ml-group-arrow {
@@ -530,6 +504,21 @@ export default function MemberList() {
           flex-shrink: 0;
         }
         .ml-group-arrow--collapsed { transform: rotate(-90deg); }
+
+        .ml-group-count {
+          margin-left: auto;
+          color: var(--text-muted);
+          font-variant-numeric: tabular-nums;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .ml-sort-btn,
+          .member-search-input,
+          .member-refresh-btn,
+          .ml-group-label--btn {
+            transition: none;
+          }
+        }
 
         .ml-no-results {
           display: flex;
@@ -591,12 +580,12 @@ function MemberRow({
   role: string;
   onContextMenu: (e: React.MouseEvent, member: ChannelUser) => void;
 }) {
-  const roleStyle            = ROLE_STYLES[role] ?? null;
   const userProps            = useOnyxStore(s => s.userProps);
   const userActivities       = useOnyxStore(s => s.userActivities);
   const openUserProfile      = useOnyxStore(s => s.openUserProfile);
   const speakingNicks        = useOnyxStore(s => s.speakingNicks);
   const displayNameOverrides = useOnyxStore(s => s.displayNameOverrides);
+  const modeToPrefix         = useOnyxStore(s => s.isupportModeToPrefix);
   const nickProps            = userProps.get(user.nick.toLowerCase()) ?? {};
   const statusText           = nickProps.STATUS ?? nickProps.Status ?? '';
   const storedActivity       = userActivities[user.nick.toLowerCase()];
@@ -610,8 +599,9 @@ function MemberRow({
   const avatarStatus: 'online' | 'idle' | 'offline' =
     presence === 'away' ? 'idle' : 'online';
   const isSpeaking      = speakingNicks.has(user.nick);
+  const roleMeta        = role ? roleMetaFromMode(role, modeToPrefix) : null;
 
-  const roleLabel       = roleStyle?.label ?? 'Member';
+  const roleLabel       = roleMeta?.label ?? 'Member';
   const presenceLabel   = presence === 'away' ? 'away' : 'online';
   const memberAriaLabel = `${hasDisplayName ? displayName : user.nick}, ${roleLabel}, ${presenceLabel}`;
 
@@ -623,11 +613,12 @@ function MemberRow({
   return (
     <UserPopover nick={user.nick}>
       <div
-        className={`mr-row${user.away ? ' mr-row--away' : ''}`}
+        className={`mr-row${user.away ? ' mr-row--away' : ''}${roleMeta?.tone === 'owner' ? ' mr-row--owner' : ''}`}
         onClick={handleClick}
         onContextMenu={e => onContextMenu(e, user)}
         role="listitem"
         tabIndex={0}
+        data-testid="member-row"
         onKeyDown={e => {
           if (e.key === 'Enter' || e.key === ' ') handleClick(e as unknown as React.MouseEvent);
         }}
@@ -637,9 +628,9 @@ function MemberRow({
           <Avatar
             nick={user.nick}
             size={32}
-            status={avatarStatus}
             speaking={isSpeaking}
           />
+          <span className={`mr-presence mr-presence--${avatarStatus}`} aria-hidden />
         </div>
 
         <div className="mr-text">
@@ -671,6 +662,8 @@ function MemberRow({
           <span className="mr-bot-badge">BOT</span>
         )}
 
+        {role && <RoleBadge mode={role} compact />}
+
 
         <style>{`
           .mr-row {
@@ -680,11 +673,18 @@ function MemberRow({
             gap: 9px;
             min-height: 38px;
             padding: 5px 8px;
-            border-radius: var(--r-sm);
+            border-radius: var(--r-xs, 4px) var(--r-md, 10px) var(--r-xs, 4px) var(--r-lg, 14px);
             cursor: pointer;
-            transition: background var(--t-fast), opacity var(--t-fast);
+            transition: background var(--t-control, 150ms) var(--ease-out, ease), opacity var(--t-control, 150ms) var(--ease-out, ease), transform var(--t-control, 150ms) var(--ease-out, ease), box-shadow var(--t-control, 150ms) var(--ease-out, ease);
           }
-          .mr-row:hover { background: var(--ch-hover-bg); }
+          .mr-row:hover {
+            background: var(--elev-tint-1, color-mix(in srgb, var(--bg-elevated) 94%, var(--accent) 2%));
+            box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-1, 0 8px 18px rgba(0,0,0,.22));
+            transform: translateX(2px);
+          }
+          .mr-row--owner:hover {
+            background: color-mix(in srgb, var(--elev-tint-1, var(--bg-elevated)) 90%, var(--lux, #d8b96a) 10%);
+          }
           .mr-row:focus-visible {
             outline: 2px solid var(--accent-border);
             outline-offset: -1px;
@@ -698,6 +698,31 @@ function MemberRow({
             flex-shrink: 0;
             width: 32px;
             height: 32px;
+          }
+
+          .mr-presence {
+            position: absolute;
+            right: -1px;
+            bottom: -1px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--status-offline, #80848e);
+            box-shadow:
+              0 0 0 2px var(--bg-deep),
+              0 0 0 4px color-mix(in srgb, currentColor 32%, transparent);
+          }
+          .mr-presence--online {
+            background: var(--status-online, #23a55a);
+            color: var(--status-online, #23a55a);
+          }
+          .mr-presence--idle {
+            background: var(--status-idle, #f0b232);
+            color: var(--status-idle, #f0b232);
+          }
+          .mr-presence--offline {
+            background: var(--status-offline, #80848e);
+            color: var(--status-offline, #80848e);
           }
 
           .mr-text {
@@ -782,6 +807,15 @@ function MemberRow({
             margin-left: 4px;
             vertical-align: middle;
             flex-shrink: 0;
+          }
+
+          @media (prefers-reduced-motion: reduce) {
+            .mr-row {
+              transition: none;
+            }
+            .mr-row:hover {
+              transform: none;
+            }
           }
 
         `}</style>

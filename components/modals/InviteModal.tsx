@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
-import { useDialogFocus } from './useDialogFocus';
+import ModalShell from './ModalShell';
 
 // ── Invite link with expiry ───────────────────────────────────────────────────
 
@@ -124,7 +124,7 @@ function CopyableBox({ label, value }: { label: string; value: string }) {
 
   return (
     <div className="inv-field">
-      <span className="inv-field-label">{label}</span>
+      <span className="label-caps inv-field-label">{label}</span>
       <div className="inv-copy-row">
         <pre className="inv-pre">{value}</pre>
         <button
@@ -154,9 +154,6 @@ export default function InviteModal() {
   const hasKey  = channel?.modes?.includes('k') ?? false;
   const keyValue = props['KEY'] ?? props['key'] ?? null;
 
-  const modalRef = useRef<HTMLDivElement>(null);
-  useDialogFocus(modalRef);
-
   const shareText = [
     `Join me in ${channelName} on Ocean`,
     `Server: ${hostname}`,
@@ -183,92 +180,63 @@ export default function InviteModal() {
     setExpiresAt(null);
   }, []);
 
-  // Close on Escape
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeInviteModal();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [closeInviteModal]);
-
   if (!channelName) return null;
 
   return (
-    <div className="inv-overlay">
-      <div className="inv-modal" ref={modalRef} role="dialog" aria-modal aria-labelledby="inv-modal-title">
-        {/* Header */}
-        <div className="inv-header">
-          <div className="inv-title-row">
-            <LinkIcon />
-            <h2 id="inv-modal-title" className="inv-title">Invite to {channelName}</h2>
-          </div>
-          <button
-            className="inv-close"
-            onClick={closeInviteModal}
-            aria-label="Close invite modal"
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-              <path d="M2 2l10 10M12 2L2 12" />
-            </svg>
-          </button>
-        </div>
+    <ModalShell
+      onClose={closeInviteModal}
+      title={`Invite to ${channelName}`}
+      kicker="Share"
+      titleId="inv-modal-title"
+      size="sm"
+      closeLabel="Close invite modal"
+    >
+      <div className="inv-body">
+        <CopyableBox label="Share text" value={shareText} />
+        <CopyableBox label="IRC command" value={ircCommand} />
 
-        {/* Body */}
-        <div className="inv-body">
-          <CopyableBox label="Share text" value={shareText} />
-          <CopyableBox label="IRC command" value={ircCommand} />
-
-          {/* ── Invite link with expiry ── */}
-          <div className="inv-field">
-            <span className="inv-field-label">Invite link</span>
-            {inviteLink ? (
-              <InviteLinkBox value={inviteLink} expiresAt={expiresAt} onReset={resetLink} />
-            ) : (
-              <div className="inv-gen-row">
-                <div className="inv-expiry-select">
-                  {EXPIRY_OPTIONS.map((opt, i) => (
-                    <button
-                      key={opt.label}
-                      className={`inv-expiry-btn ${expiryIdx === i ? 'inv-expiry-btn--active' : ''}`}
-                      onClick={() => setExpiryIdx(i)}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-                <button className="inv-gen-btn" onClick={generateLink}>
-                  Generate link
-                </button>
+        {/* ── Invite link with expiry ── */}
+        <div className="inv-field">
+          <span className="label-caps inv-field-label">Invite link</span>
+          {inviteLink ? (
+            <InviteLinkBox value={inviteLink} expiresAt={expiresAt} onReset={resetLink} />
+          ) : (
+            <div className="inv-gen-row">
+              <div className="inv-expiry-select">
+                {EXPIRY_OPTIONS.map((opt, i) => (
+                  <button
+                    key={opt.label}
+                    className={`inv-expiry-btn ${expiryIdx === i ? 'inv-expiry-btn--active' : ''}`}
+                    onClick={() => setExpiryIdx(i)}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
               </div>
-            )}
-          </div>
-
-          {hasKey && (
-            <div className="inv-key-warning">
-              <KeyIcon />
-              <div className="inv-key-text">
-                <span className="inv-key-title">This channel requires a password (invite key)</span>
-                {keyValue && (
-                  <span className="inv-key-value">Key: <code>{keyValue}</code></span>
-                )}
-              </div>
+              <button className="inv-gen-btn" onClick={generateLink}>
+                Generate link
+              </button>
             </div>
           )}
         </div>
+
+        {hasKey && (
+          <div className="inv-key-warning">
+            <KeyIcon />
+            <div className="inv-key-text">
+              <span className="inv-key-title">This channel requires a password (invite key)</span>
+              {keyValue && (
+                <span className="inv-key-value">Key: <code>{keyValue}</code></span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <style>{styles}</style>
-    </div>
+    </ModalShell>
   );
 }
-
-const LinkIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
-    <path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1.002 1.002 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4.018 4.018 0 0 1-.128-1.287z"/>
-    <path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243L6.586 4.672z"/>
-  </svg>
-);
 
 const KeyIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
@@ -278,87 +246,10 @@ const KeyIcon = () => (
 );
 
 const styles = `
-  .inv-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 50;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.72);
-    backdrop-filter: blur(6px);
-    animation: inv-fade-in 150ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
-  }
-
-  @keyframes inv-fade-in {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-  }
-
-  .inv-modal {
-    width: 440px;
-    max-width: calc(100vw - 32px);
-    background: var(--bg-deep);
-    border: 1px solid var(--border-normal);
-    border-radius: var(--r-xl, 16px);
-    box-shadow: var(--shadow-xl, 0 24px 64px rgba(0,0,0,0.5)), 0 0 0 1px var(--accent-border);
-    overflow: hidden;
-    animation: inv-scale-in 180ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
-  }
-
-  @keyframes inv-scale-in {
-    from { opacity: 0; transform: scale(0.95) translateY(6px); }
-    to   { opacity: 1; transform: scale(1)    translateY(0);   }
-  }
-
-  .inv-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--border-subtle);
-    background: var(--bg-elevated);
-  }
-
-  .inv-title-row {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    color: var(--accent);
-  }
-
-  .inv-title {
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0;
-    line-height: 1.2;
-  }
-
-  .inv-close {
-    width: 30px;
-    height: 30px;
-    border-radius: var(--r-md, 8px);
-    background: none;
-    border: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-muted);
-    transition: background var(--t-fast, 150ms), color var(--t-fast, 150ms);
-    flex-shrink: 0;
-  }
-  .inv-close:hover {
-    background: var(--ch-hover-bg, rgba(255,255,255,0.06));
-    color: var(--text-primary);
-  }
-
   .inv-body {
-    padding: 20px;
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: var(--sp-4, 16px);
   }
 
   /* ── Section dividers ── */
@@ -368,14 +259,6 @@ const styles = `
     gap: 7px;
   }
 
-  .inv-field-label {
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-muted);
-  }
-
   .inv-copy-row {
     display: flex;
     align-items: stretch;
@@ -383,7 +266,7 @@ const styles = `
     border: 1px solid var(--border-normal);
     border-radius: var(--r-md, 8px);
     overflow: hidden;
-    transition: border-color var(--t-fast);
+    transition: border-color var(--t-control, 150ms);
   }
   .inv-copy-row:hover {
     border-color: var(--accent-border);
@@ -394,7 +277,7 @@ const styles = `
     margin: 0;
     padding: 10px 13px;
     font-family: var(--font-mono, 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace);
-    font-size: 12px;
+    font-size: var(--text-xs, 12px);
     line-height: 1.65;
     color: var(--text-secondary);
     white-space: pre-wrap;
@@ -412,10 +295,10 @@ const styles = `
     border-left: 1px solid var(--border-subtle);
     background: var(--bg-elevated, rgba(255,255,255,0.04));
     color: var(--text-muted);
-    font-size: 12px;
+    font-size: var(--text-xs, 12px);
     font-weight: 700;
     cursor: pointer;
-    transition: background var(--t-fast, 150ms), color var(--t-fast, 150ms);
+    transition: background var(--t-control, 150ms), color var(--t-control, 150ms);
     font-family: inherit;
     min-width: 82px;
     text-align: center;
@@ -457,13 +340,13 @@ const styles = `
   }
 
   .inv-key-title {
-    font-size: 13px;
+    font-size: var(--text-sm, 13px);
     font-weight: 600;
     color: var(--gold, #e8b84b);
   }
 
   .inv-key-value {
-    font-size: 12px;
+    font-size: var(--text-xs, 12px);
     color: var(--text-secondary);
   }
 
@@ -473,7 +356,7 @@ const styles = `
     padding: 1px 6px;
     border-radius: var(--r-xs);
     border: 1px solid var(--border-subtle);
-    font-size: 12px;
+    font-size: var(--text-xs, 12px);
     color: var(--text-primary);
   }
 
@@ -503,7 +386,7 @@ const styles = `
     font-weight: 500;
   }
   .inv-countdown {
-    font-size: 12px;
+    font-size: var(--text-xs, 12px);
     font-weight: 700;
     color: var(--accent);
     font-family: var(--font-mono, 'JetBrains Mono', 'Fira Code', monospace);
@@ -520,7 +403,7 @@ const styles = `
     font-size: 11.5px;
     cursor: pointer;
     font-family: inherit;
-    transition: background var(--t-fast), color var(--t-fast);
+    transition: background var(--t-control, 150ms), color var(--t-control, 150ms);
   }
   .inv-regen-btn:hover { background: var(--bg-float); color: var(--text-primary); }
 
@@ -540,11 +423,11 @@ const styles = `
     border: 1px solid var(--border-normal);
     background: var(--bg-elevated);
     color: var(--text-muted);
-    font-size: 12px;
+    font-size: var(--text-xs, 12px);
     font-weight: 600;
     cursor: pointer;
     font-family: inherit;
-    transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+    transition: background var(--t-control, 150ms), border-color var(--t-control, 150ms), color var(--t-control, 150ms);
   }
   .inv-expiry-btn:hover { border-color: var(--accent-border); color: var(--text-secondary); background: var(--bg-float); }
   .inv-expiry-btn--active {
@@ -559,11 +442,11 @@ const styles = `
     border: none;
     background: var(--accent);
     color: #fff;
-    font-size: 13px;
+    font-size: var(--text-sm, 13px);
     font-weight: 700;
     cursor: pointer;
     font-family: inherit;
-    transition: background var(--t-fast);
+    transition: background var(--t-control, 150ms);
     letter-spacing: 0.01em;
   }
   .inv-gen-btn:hover { background: var(--accent-hover); }

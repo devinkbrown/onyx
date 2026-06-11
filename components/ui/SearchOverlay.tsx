@@ -5,6 +5,7 @@ import { useOnyxStore } from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
 import type { ActiveView } from '@/lib/store';
 import { stripIrcFormatting } from '@/lib/ircColors';
+import useReducedMotionGuard from '@/hooks/useReducedMotionGuard';
 
 const TIME_FMT = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
@@ -35,6 +36,7 @@ export default function SearchOverlay() {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef  = useRef<HTMLDivElement>(null);
+  const { reducedMotion } = useReducedMotionGuard();
 
   const closeSearchOverlay = useOnyxStore(s => s.closeSearchOverlay);
   const navigate            = useOnyxStore(s => s.navigate);
@@ -134,11 +136,11 @@ export default function SearchOverlay() {
     // Scroll to the message after navigation settles
     setTimeout(() => {
       const el = document.querySelector(`[data-msg-id="${r.message.id}"]`);
-      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el?.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'center' });
       el?.classList.add('msg--jump-highlight');
       setTimeout(() => el?.classList.remove('msg--jump-highlight'), 2000);
     }, 120);
-  }, [closeSearchOverlay, navigate]);
+  }, [closeSearchOverlay, navigate, reducedMotion]);
 
   const selectRecent = useCallback((r: RecentChannel) => {
     closeSearchOverlay();
@@ -196,7 +198,7 @@ export default function SearchOverlay() {
 
       {/* Panel */}
       <div
-        className="so-panel animate-fade-scale"
+        className="so-panel glass-2 elev-3 animate-fade-scale"
         role="dialog"
         aria-modal
         aria-label="Global search"
@@ -344,10 +346,10 @@ export default function SearchOverlay() {
           width: 560px;
           max-width: calc(100vw - 32px);
           max-height: 70vh;
-          background: var(--bg-elevated);
+          background: var(--elev-tint-3, var(--bg-elevated));
           border: 1px solid var(--border-normal);
-          border-radius: var(--r-lg);
-          box-shadow: var(--shadow-xl), 0 0 0 1px var(--accent-border);
+          border-radius: var(--r-lg, 12px) var(--r-2xl, 20px) var(--r-md, 8px) var(--r-lg, 12px);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-3, 0 28px 80px rgba(0,0,0,.48));
           z-index: 901;
           display: flex;
           flex-direction: column;
@@ -366,7 +368,7 @@ export default function SearchOverlay() {
           gap: 10px;
           padding: 14px 18px;
           border-bottom: 1px solid var(--border-subtle);
-          background: var(--bg-float);
+          background: color-mix(in srgb, var(--elev-tint-2, var(--bg-float)) 84%, transparent);
           flex-shrink: 0;
         }
 
@@ -389,10 +391,12 @@ export default function SearchOverlay() {
           color: var(--text-muted);
           border-radius: var(--r-sm);
           display: flex; align-items: center; justify-content: center;
-          transition: color var(--t-fast), background var(--t-fast);
+          transition: color var(--t-fast), background var(--t-fast), transform var(--t-micro, 90ms);
           flex-shrink: 0;
         }
-        .so-clear:hover { color: var(--text-primary); background: var(--bg-overlay); }
+        .so-clear:hover { color: var(--text-primary); background: var(--bg-overlay); transform: translateY(-1px); }
+        .so-clear:active { transform: translateY(0.5px); }
+        .so-clear:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
         .so-esc-hint {
           font-size: 11px;
@@ -445,10 +449,12 @@ export default function SearchOverlay() {
           border: none;
           cursor: pointer;
           text-align: left;
-          transition: background var(--t-fast);
+          transition: background var(--t-fast), color var(--t-fast), transform var(--t-micro, 90ms);
           border-radius: 0;
         }
         .so-recent-item:hover { background: var(--accent-subtle); }
+        .so-recent-item:active { transform: translateY(0.5px); }
+        .so-recent-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
         .so-recent-item--active { background: var(--accent-subtle); }
 
         .so-recent-sigil {
@@ -509,10 +515,12 @@ export default function SearchOverlay() {
           border: none;
           cursor: pointer;
           text-align: left;
-          transition: background var(--t-fast);
+          transition: background var(--t-fast), transform var(--t-micro, 90ms);
           border-left: 2px solid transparent;
         }
         .so-result:hover { background: var(--accent-subtle); }
+        .so-result:active { transform: translateY(0.5px); }
+        .so-result:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
         .so-result--selected {
           background: var(--accent-subtle);
           border-left: 2px solid var(--accent);
@@ -565,7 +573,7 @@ export default function SearchOverlay() {
           flex-shrink: 0;
           font-size: 11px;
           color: var(--text-muted);
-          background: var(--bg-deep);
+          background: color-mix(in srgb, var(--elev-tint-1, var(--bg-deep)) 82%, transparent);
         }
 
         .so-footer kbd {
@@ -585,6 +593,24 @@ export default function SearchOverlay() {
         @keyframes jump-pulse {
           0%   { background: var(--accent-subtle); }
           100% { background: transparent; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .so-backdrop,
+          .animate-fade-scale,
+          .msg--jump-highlight {
+            animation-duration: 1ms;
+          }
+          .so-clear,
+          .so-recent-item,
+          .so-result {
+            transition-duration: 1ms;
+          }
+          .so-clear:hover,
+          .so-clear:active,
+          .so-recent-item:active,
+          .so-result:active {
+            transform: none;
+          }
         }
       `}</style>
     </>

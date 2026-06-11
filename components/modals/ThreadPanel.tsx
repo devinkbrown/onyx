@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
-import { useDialogFocus } from './useDialogFocus';
 import Avatar from '@/components/ui/Avatar';
+import ModalShell from './ModalShell';
 
 const ARCHIVE_DURATION_OPTIONS: { label: string; minutes: number }[] = [
   { label: '1 hour',  minutes: 60 },
@@ -35,17 +35,6 @@ export default function ThreadPanel() {
   const settingsRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const bodyRef     = useRef<HTMLDivElement>(null);
-  const panelRef    = useRef<HTMLDivElement>(null);
-  useDialogFocus(panelRef);
-
-  // Escape to close
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeThread();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [closeThread]);
 
   // Mark thread as seen when the panel opens
   useEffect(() => {
@@ -147,69 +136,55 @@ export default function ThreadPanel() {
   if (!parentMessage) return null;
 
   return (
-    <div
-      className="thread-backdrop"
-      onClick={e => { if (e.target === e.currentTarget) closeThread(); }}
-    >
-      <div
-        className="thread-panel animate-slide-right"
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="thread-panel-title"
-      >
-
-        {/* Header */}
-        <div className="thread-header">
-          <div className="thread-header-left">
-            <ThreadIcon />
-            <h2 id="thread-panel-title" className="thread-title">Thread</h2>
-            {replies.length > 0 && (
-              <span className="thread-count">{replies.length} {replies.length === 1 ? 'reply' : 'replies'}</span>
-            )}
-            {isArchived && <span className="thread-archived-chip">Archived</span>}
-          </div>
-          <div className="thread-header-right">
-            {/* Auto-archive settings */}
-            <div className="thread-settings-wrap" ref={settingsRef}>
-              <button
-                className={`thread-settings-btn${showSettings ? ' thread-settings-btn--active' : ''}`}
-                onClick={() => setShowSettings(v => !v)}
-                aria-label="Thread settings"
-                aria-expanded={showSettings}
-                title="Auto-archive settings"
-              >
-                <GearIcon />
-              </button>
-              {showSettings && (
-                <div className="thread-settings-dropdown" role="menu" aria-label="Auto-archive duration">
-                  <div className="thread-settings-header">Auto-archive after</div>
-                  {ARCHIVE_DURATION_OPTIONS.map(opt => (
-                    <button
-                      key={opt.minutes}
-                      className={`thread-settings-item${threadAutoArchiveMinutes === opt.minutes ? ' thread-settings-item--active' : ''}`}
-                      role="menuitemradio"
-                      aria-checked={threadAutoArchiveMinutes === opt.minutes}
-                      onClick={() => { setThreadAutoArchiveMinutes(opt.minutes); setShowSettings(false); }}
-                      type="button"
-                    >
-                      {opt.label}
-                      {threadAutoArchiveMinutes === opt.minutes && <CheckIcon />}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+    <ModalShell
+      onClose={closeThread}
+      variant="sheet"
+      size="sm"
+      title="Thread"
+      kicker={target || 'Conversation'}
+      titleId="thread-panel-title"
+      closeLabel="Close thread"
+      headerExtra={
+        <>
+          {replies.length > 0 && (
+            <span className="thread-count">{replies.length} {replies.length === 1 ? 'reply' : 'replies'}</span>
+          )}
+          {isArchived && <span className="thread-archived-chip">Archived</span>}
+          {/* Auto-archive settings */}
+          <div className="thread-settings-wrap" ref={settingsRef}>
             <button
-              className="thread-close"
-              onClick={closeThread}
-              aria-label="Close thread"
+              className={`thread-settings-btn${showSettings ? ' thread-settings-btn--active' : ''}`}
+              onClick={() => setShowSettings(v => !v)}
+              aria-label="Thread settings"
+              aria-expanded={showSettings}
+              title="Auto-archive settings"
             >
-              <CloseIcon />
+              <GearIcon />
             </button>
+            {showSettings && (
+              <div className="thread-settings-dropdown" role="menu" aria-label="Auto-archive duration">
+                <div className="label-caps thread-settings-header">Auto-archive after</div>
+                {ARCHIVE_DURATION_OPTIONS.map(opt => (
+                  <button
+                    key={opt.minutes}
+                    className={`thread-settings-item${threadAutoArchiveMinutes === opt.minutes ? ' thread-settings-item--active' : ''}`}
+                    role="menuitemradio"
+                    aria-checked={threadAutoArchiveMinutes === opt.minutes}
+                    onClick={() => { setThreadAutoArchiveMinutes(opt.minutes); setShowSettings(false); }}
+                    type="button"
+                  >
+                    {opt.label}
+                    {threadAutoArchiveMinutes === opt.minutes && <CheckIcon />}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-
+        </>
+      }
+      flushBody
+    >
+      <div className="thread-layout">
         {/* Body */}
         <div className="thread-body" ref={bodyRef}>
 
@@ -287,53 +262,23 @@ export default function ThreadPanel() {
       </div>
 
       <style>{`
-        .thread-backdrop {
-          position: fixed; inset: 0; z-index: 650;
-          display: flex; align-items: stretch; justify-content: flex-end;
-        }
-
-        .thread-panel {
-          width: 360px; max-width: 95vw;
+        .thread-layout {
+          display: flex;
+          flex-direction: column;
           height: 100%;
-          background: var(--bg-deep);
-          border-left: 1px solid var(--border-normal);
-          display: flex; flex-direction: column;
-          overflow: hidden;
-          box-shadow: -12px 0 48px rgba(0, 0, 0, 0.55), -1px 0 0 var(--border-subtle);
+          min-height: 0;
         }
 
-        .thread-header {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 0 16px;
-          height: var(--header-h, 48px);
-          border-bottom: 1px solid var(--border-subtle);
-          flex-shrink: 0;
-          background: var(--bg-elevated);
-        }
-        .thread-header-left {
-          display: flex; align-items: center; gap: 8px;
-        }
-        .thread-title {
-          font-size: 14px; font-weight: 700; color: var(--text-primary);
-          letter-spacing: -0.1px;
-        }
         .thread-count {
-          font-size: 11px; font-weight: 700;
+          font-size: var(--text-2xs, 11px); font-weight: 700;
           padding: 1px 7px; border-radius: var(--r-full);
           background: var(--accent-subtle); border: 1px solid var(--accent-border);
           color: var(--accent);
+          white-space: nowrap;
         }
-        .thread-close {
-          width: 28px; height: 28px;
-          background: none; border: none; cursor: pointer;
-          display: flex; align-items: center; justify-content: center;
-          color: var(--text-muted); border-radius: var(--r-sm);
-          transition: background var(--t-fast), color var(--t-fast);
-        }
-        .thread-close:hover { background: var(--ch-hover-bg); color: var(--text-primary); }
 
         .thread-body {
-          flex: 1; overflow-y: auto; padding: 12px;
+          flex: 1; overflow-y: auto; padding: var(--sp-3, 12px);
           display: flex; flex-direction: column; gap: 2px;
           scrollbar-width: thin;
           scrollbar-color: var(--border-normal) transparent;
@@ -343,10 +288,10 @@ export default function ThreadPanel() {
         .thread-jump-to-parent {
           display: inline-flex; align-items: center; gap: 5px;
           background: none; border: none; cursor: pointer;
-          font-size: 11px; font-weight: 700; color: var(--text-muted);
+          font-size: var(--text-2xs, 11px); font-weight: 700; color: var(--text-muted);
           padding: 4px 8px; border-radius: var(--r-sm);
-          margin-bottom: 8px;
-          transition: color var(--t-fast), background var(--t-fast);
+          margin-bottom: var(--sp-2, 8px);
+          transition: color var(--t-control, 150ms), background var(--t-control, 150ms);
           font-family: inherit;
           text-transform: uppercase;
           letter-spacing: 0.04em;
@@ -357,18 +302,18 @@ export default function ThreadPanel() {
 
         /* Parent message card — quoted bg */
         .thread-parent-msg {
-          background: var(--bg-elevated);
+          background: var(--elev-tint-1, var(--bg-elevated));
           border: 1px solid var(--border-subtle);
           border-left: 3px solid var(--accent);
           border-radius: var(--r-md);
           padding: 10px 12px;
-          margin-bottom: 8px;
+          margin-bottom: var(--sp-2, 8px);
         }
 
         /* Divider */
         .thread-divider {
-          display: flex; align-items: center; gap: 8px;
-          padding: 8px 0; flex-shrink: 0;
+          display: flex; align-items: center; gap: var(--sp-2, 8px);
+          padding: var(--sp-2, 8px) 0; flex-shrink: 0;
         }
         .thread-divider-line {
           flex: 1; height: 1px; background: var(--border-subtle);
@@ -381,8 +326,8 @@ export default function ThreadPanel() {
         }
 
         .thread-empty-hint {
-          font-size: 13px; color: var(--text-muted);
-          text-align: center; padding: 16px; margin: 0;
+          font-size: var(--text-sm, 13px); color: var(--text-muted);
+          text-align: center; padding: var(--sp-4, 16px); margin: 0;
           font-style: italic;
         }
 
@@ -391,7 +336,7 @@ export default function ThreadPanel() {
           display: flex; gap: 10px;
           padding: 6px 4px;
           border-radius: var(--r-sm);
-          transition: background var(--t-fast);
+          transition: background var(--t-control, 150ms);
         }
         .thread-msg-card:hover { background: var(--accent-subtle); }
         .thread-msg-card--parent {
@@ -405,20 +350,20 @@ export default function ThreadPanel() {
           margin-bottom: 2px;
         }
         .thread-msg-nick {
-          font-size: 14px; font-weight: 700; color: var(--text-primary);
+          font-size: var(--text-base, 14px); font-weight: 700; color: var(--text-primary);
         }
         .thread-msg-time {
-          font-size: 11px; color: var(--text-muted);
+          font-size: var(--text-2xs, 11px); color: var(--text-muted);
           font-variant-numeric: tabular-nums;
         }
         .thread-msg-text {
-          font-size: 14px; line-height: 1.55; color: var(--text-secondary);
+          font-size: var(--text-base, 14px); line-height: 1.55; color: var(--text-secondary);
           word-break: break-word; white-space: pre-wrap;
         }
         .thread-msg-card--parent .thread-msg-nick { color: var(--accent); }
         .thread-msg-card--parent .thread-msg-text { color: var(--text-primary); }
         .thread-msg-deleted {
-          font-size: 13px; color: var(--text-muted); font-style: italic;
+          font-size: var(--text-sm, 13px); color: var(--text-muted); font-style: italic;
         }
 
         /* Reply input */
@@ -426,10 +371,9 @@ export default function ThreadPanel() {
           padding: 10px 12px 12px;
           border-top: 1px solid var(--border-subtle);
           flex-shrink: 0;
-          background: var(--bg-elevated);
         }
         .thread-input-row {
-          display: flex; align-items: flex-end; gap: 8px;
+          display: flex; align-items: flex-end; gap: var(--sp-2, 8px);
         }
         .thread-textarea-wrap {
           flex: 1; min-width: 0;
@@ -440,14 +384,14 @@ export default function ThreadPanel() {
           border: 1px solid var(--border-normal);
           border-radius: var(--r-md);
           color: var(--text-primary);
-          font-size: 14px;
+          font-size: var(--text-base, 14px);
           line-height: 1.5;
           padding: 8px 12px;
           resize: none;
           outline: none;
           font-family: inherit;
           box-sizing: border-box;
-          transition: border-color var(--t-fast), box-shadow var(--t-fast);
+          transition: border-color var(--t-control, 150ms), box-shadow var(--t-control, 150ms);
           max-height: 120px;
           overflow-y: auto;
           field-sizing: content;
@@ -465,26 +409,14 @@ export default function ThreadPanel() {
           border: 1px solid var(--border-subtle);
           color: var(--text-muted); cursor: pointer;
           display: flex; align-items: center; justify-content: center;
-          transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+          transition: background var(--t-control, 150ms), color var(--t-control, 150ms), border-color var(--t-control, 150ms);
         }
         .thread-send-btn--active {
           background: var(--accent);
           border-color: var(--accent);
           color: #fff;
-          box-shadow: 0 2px 8px var(--accent-glow);
         }
         .thread-send-btn:disabled { opacity: 0.45; cursor: default; }
-
-        @keyframes slide-right {
-          from { opacity: 0; transform: translateX(8px); }
-          to   { opacity: 1; transform: translateX(0); }
-        }
-        .animate-slide-right { animation: slide-right 180ms var(--ease-out) both; }
-
-        /* ── Header right section ── */
-        .thread-header-right {
-          display: flex; align-items: center; gap: 4px;
-        }
 
         /* ── Archived chip in header ── */
         .thread-archived-chip {
@@ -494,6 +426,7 @@ export default function ThreadPanel() {
           border: 1px solid rgba(248,113,113,0.25);
           color: var(--danger);
           text-transform: uppercase;
+          white-space: nowrap;
         }
 
         /* ── Settings button ── */
@@ -503,7 +436,7 @@ export default function ThreadPanel() {
           background: none; border: none; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
           color: var(--text-muted); border-radius: var(--r-sm);
-          transition: background var(--t-fast), color var(--t-fast);
+          transition: background var(--t-control, 150ms), color var(--t-control, 150ms);
         }
         .thread-settings-btn:hover,
         .thread-settings-btn--active {
@@ -514,31 +447,30 @@ export default function ThreadPanel() {
         .thread-settings-dropdown {
           position: absolute; top: calc(100% + 4px); right: 0;
           z-index: 200;
-          background: var(--bg-float);
+          background: var(--elev-tint-2, var(--bg-float));
           border: 1px solid var(--border-normal);
           border-radius: var(--r-md);
-          box-shadow: var(--shadow-md);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-2, var(--shadow-md));
           min-width: 168px;
           padding: 4px 0;
           animation: settings-pop 120ms var(--ease-out) both;
         }
         @keyframes settings-pop {
           from { opacity: 0; transform: translateY(-4px); }
-          to   { opacity: 1; transform: translateY(0); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .thread-settings-dropdown { animation: none; }
         }
         .thread-settings-header {
-          font-size: 10px; font-weight: 700;
-          letter-spacing: 0.07em; text-transform: uppercase;
-          color: var(--text-muted);
           padding: 7px 12px 4px;
         }
         .thread-settings-item {
           display: flex; align-items: center; justify-content: space-between;
           width: 100%; padding: 7px 12px;
           background: none; border: none; cursor: pointer;
-          font-size: 13px; font-family: inherit;
+          font-size: var(--text-sm, 13px); font-family: inherit;
           color: var(--text-secondary);
-          transition: background var(--t-fast), color var(--t-fast);
+          transition: background var(--t-control, 150ms), color var(--t-control, 150ms);
         }
         .thread-settings-item:hover {
           background: var(--ch-hover-bg); color: var(--text-primary);
@@ -547,12 +479,12 @@ export default function ThreadPanel() {
 
         /* ── Archived banner ── */
         .thread-archived-banner {
-          display: flex; align-items: center; gap: 8px;
+          display: flex; align-items: center; gap: var(--sp-2, 8px);
           padding: 8px 12px; margin: 6px 0;
           background: var(--bg-elevated);
           border: 1px solid var(--border-normal);
           border-radius: var(--r-md);
-          font-size: 13px; color: var(--text-muted);
+          font-size: var(--text-sm, 13px); color: var(--text-muted);
           flex-shrink: 0;
         }
 
@@ -562,7 +494,7 @@ export default function ThreadPanel() {
           cursor: text;
         }
       `}</style>
-    </div>
+    </ModalShell>
   );
 }
 
@@ -601,20 +533,6 @@ const UpArrowIcon = () => (
   <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M6 10V2M2 6l4-4 4 4" />
-  </svg>
-);
-
-const ThreadIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor"
-    style={{ color: 'var(--accent)', flexShrink: 0 }}>
-    <path d="M2 2.5A.5.5 0 0 1 2.5 2h10a.5.5 0 0 1 0 1h-10A.5.5 0 0 1 2 2.5zM2 5.5A.5.5 0 0 1 2.5 5h8a.5.5 0 0 1 0 1h-8A.5.5 0 0 1 2 5.5zm0 3A.5.5 0 0 1 2.5 8h6a.5.5 0 0 1 0 1h-6A.5.5 0 0 1 2 8.5zm0 3A.5.5 0 0 1 2.5 11h4a.5.5 0 0 1 0 1h-4A.5.5 0 0 1 2 11.5z"/>
-  </svg>
-);
-
-const CloseIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
-    stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-    <path d="M2 2l10 10M12 2L2 12" />
   </svg>
 );
 

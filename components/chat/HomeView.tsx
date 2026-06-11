@@ -3,10 +3,15 @@
 import { useState, useMemo } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import Avatar from '@/components/ui/Avatar';
+import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
 import NewGroupDMModal from '@/components/ui/NewGroupDMModal';
+import OfflineMessagesBanner from '@/components/ui/OfflineMessagesBanner';
 import ServerStatsWidget from '@/components/ui/ServerStatsWidget';
 import { stripIrcFormatting } from '@/lib/ircColors';
 import type { ChatMessage } from '@/lib/irc/types';
+import SkeletonChannel from './SkeletonChannel';
+import SkeletonMessage from './SkeletonMessage';
 
 function SearchHintIcon() {
   return (
@@ -51,6 +56,9 @@ export default function HomeView() {
   const streams            = useOnyxStore(s => s.streams);
   const latencyMs          = useOnyxStore(s => s.latencyMs);
   const connectedAt        = useOnyxStore(s => s.connectedAt);
+  const status             = useOnyxStore(s => s.status);
+  const connectionStatus   = useOnyxStore(s => s.connectionStatus);
+  const reconnectNow       = useOnyxStore(s => s.reconnectNow);
 
   const [showGroupDM,    setShowGroupDM]    = useState(false);
   const [showInviteTip,  setShowInviteTip]  = useState(false);
@@ -77,6 +85,10 @@ export default function HomeView() {
     dmList.reduce((sum, dm) => sum + (dm.unread ?? 0), 0);
 
   const liveStreams = [...streams.values()].filter(stream => stream.live);
+  const homeLoading = (connectionStatus === 'connecting' || connectionStatus === 'reconnecting') &&
+    dmList.length === 0 &&
+    channelList.length === 0;
+  const homeError = status === 'error';
   const connectedSince = connectedAt
     ? connectedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : '—';
@@ -162,6 +174,8 @@ export default function HomeView() {
 
   return (
     <div className="hv-root">
+      <OfflineMessagesBanner />
+
       {/* ── Hero section ──────────────────────────────────────────── */}
       <div className="hv-hero animate-fade-in">
         <div className="hv-hero-glow" aria-hidden />
@@ -322,7 +336,16 @@ export default function HomeView() {
             )}
 
             {/* DM list */}
-            {dmList.length > 0 ? (
+            {homeError ? (
+              <ErrorState
+                title="Direct messages are unavailable"
+                message="Ocean could not refresh this inbox from the current connection."
+                details={`HomeView direct messages failed while connection status was ${connectionStatus}.`}
+                onRetry={reconnectNow}
+              />
+            ) : homeLoading ? (
+              <SkeletonMessage count={3} />
+            ) : dmList.length > 0 ? (
               <div className="hv-dm-list">
                 {dmList.map(dm => {
                   const last = dm.messages.at(-1);
@@ -359,23 +382,13 @@ export default function HomeView() {
                 })}
               </div>
             ) : (
-              <div className="hv-empty">
-                <div className="hv-empty-art">
-                  <OceanWaveIllustration />
-                </div>
-                <div className="hv-empty-copy">
-                  <h3 className="hv-empty-title">No direct messages yet</h3>
-                  <p className="hv-empty-text">Start a private thread or open your friends panel when you are ready to talk.</p>
-                </div>
-                <div className="hv-empty-actions">
-                  <button className="hv-btn-primary" onClick={() => setShowNewDM(true)}>
-                    Start a DM
-                  </button>
-                  <button className="hv-btn-ghost" onClick={openFriendsPanel}>
-                    Friends
-                  </button>
-                </div>
-              </div>
+              <EmptyState
+                icon="~"
+                title="No direct messages yet"
+                description="Start a private thread when you are ready to talk."
+                action={{ label: 'Start a DM', onClick: () => setShowNewDM(true) }}
+                size="md"
+              />
             )}
           </section>
 
@@ -385,7 +398,16 @@ export default function HomeView() {
               <h2 className="hv-panel-title">Your Channels</h2>
             </div>
 
-            {channelList.length > 0 ? (
+            {homeError ? (
+              <ErrorState
+                title="Channels are unavailable"
+                message="Ocean could not refresh your joined channels from the current connection."
+                details={`HomeView channels failed while connection status was ${connectionStatus}.`}
+                onRetry={reconnectNow}
+              />
+            ) : homeLoading ? (
+              <SkeletonChannel count={6} />
+            ) : channelList.length > 0 ? (
               <>
                 <div className="hv-channel-grid">
                   {channelList.map(ch => {
@@ -417,29 +439,31 @@ export default function HomeView() {
                 </button>
               </>
             ) : (
-              <div className="hv-empty hv-empty--sm">
-                <div className="hv-empty-copy">
-                  <h3 className="hv-empty-title">No channels joined</h3>
-                  <p className="hv-empty-text">Browse the network and pin a few rooms to make this deck come alive.</p>
-                </div>
-                <div className="hv-empty-actions">
-                  <button className="hv-btn-primary" onClick={openChannelBrowser}>
-                    Browse channels
-                  </button>
-                  <button className="hv-btn-ghost" onClick={toggleSpotlight}>
-                    Command
-                  </button>
-                </div>
-              </div>
+              <EmptyState
+                icon="#"
+                title="No channels joined"
+                description="Browse the network and pin a few rooms to make this deck come alive."
+                action={{ label: 'Browse channels', onClick: openChannelBrowser }}
+                size="sm"
+              />
             )}
           </section>
 
           {/* Activity Feed */}
-          {recentActivity.length > 0 && (
-            <section className="hv-panel">
-              <div className="hv-panel-header">
-                <h2 className="hv-panel-title">Recent Activity</h2>
-              </div>
+          <section className="hv-panel">
+            <div className="hv-panel-header">
+              <h2 className="hv-panel-title">Recent Activity</h2>
+            </div>
+            {homeError ? (
+              <ErrorState
+                title="Recent activity is unavailable"
+                message="Ocean could not collect recent messages from this connection."
+                details={`HomeView recent activity failed while connection status was ${connectionStatus}.`}
+                onRetry={reconnectNow}
+              />
+            ) : homeLoading ? (
+              <SkeletonMessage count={4} />
+            ) : recentActivity.length > 0 ? (
               <ul className="activity-feed" role="list">
                 {recentActivity.map(({ channel, msg }) => {
                   const isSystem = msg.type !== 'msg' && msg.type !== 'action';
@@ -469,8 +493,15 @@ export default function HomeView() {
                   );
                 })}
               </ul>
-            </section>
-          )}
+            ) : (
+              <EmptyState
+                icon="."
+                title="No recent activity"
+                description="Messages from your joined channels will appear here."
+                size="sm"
+              />
+            )}
+          </section>
         </div>
 
         {/* ── Right column ─────────────────────────────────────────── */}

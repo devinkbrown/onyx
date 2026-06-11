@@ -437,7 +437,7 @@ export default function SpotlightSearch() {
 
   return (
     <div className="sl-backdrop" onClick={closeSpotlight} role="dialog" aria-modal aria-label="Spotlight search">
-      <div className="sl-modal" onClick={e => e.stopPropagation()}>
+      <div className="sl-modal glass-2 elev-3" onClick={e => e.stopPropagation()}>
 
         {/* Search input */}
         <div className="sl-input-row">
@@ -483,6 +483,7 @@ export default function SpotlightSearch() {
                         onClick={() => activate(result)}
                         role="option"
                         aria-selected={isSelected}
+                        tabIndex={isSelected ? 0 : -1}
                       >
                         <span className="sl-result-icon sl-icon-channel">#</span>
                         <span className="sl-result-name">
@@ -511,6 +512,7 @@ export default function SpotlightSearch() {
                         onClick={() => activate(result)}
                         role="option"
                         aria-selected={isSelected}
+                        tabIndex={isSelected ? 0 : -1}
                       >
                         <span className="sl-people-avatar" aria-hidden>
                           {result.nick.slice(0, 1).toUpperCase()}
@@ -543,6 +545,7 @@ export default function SpotlightSearch() {
                         onClick={() => activate(result)}
                         role="option"
                         aria-selected={isSelected}
+                        tabIndex={isSelected ? 0 : -1}
                       >
                         <span className={`sl-msg-channel${isDirectMessage ? ' sl-msg-dm' : ''}`}>
                           {isDirectMessage ? displayChannel : `#${displayChannel}`}
@@ -573,6 +576,7 @@ export default function SpotlightSearch() {
                         onClick={() => activate(result)}
                         role="option"
                         aria-selected={isSelected}
+                        tabIndex={isSelected ? 0 : -1}
                       >
                         <span className="sl-result-icon sl-icon-command">/</span>
                         <span className="sl-result-name">
@@ -623,16 +627,14 @@ export default function SpotlightSearch() {
         .sl-modal {
           width: 580px;
           max-width: calc(100vw - 32px);
-          background: color-mix(in oklch, var(--bg-elevated) 90%, transparent);
+          background: color-mix(in srgb, var(--elev-tint-3, var(--bg-elevated)) 90%, transparent);
           backdrop-filter: blur(24px) saturate(1.4);
           -webkit-backdrop-filter: blur(24px) saturate(1.4);
           border: 1px solid var(--border-normal);
-          border-radius: 14px;
+          border-radius: var(--r-lg, 12px) var(--r-2xl, 20px) var(--r-md, 8px) var(--r-lg, 12px);
           box-shadow:
-            0 0 0 1px var(--accent-border),
-            0 32px 80px rgba(0, 0, 0, 0.8),
-            0 8px 32px rgba(14, 165, 233, 0.06),
-            inset 0 1px 0 rgba(255, 255, 255, 0.04);
+            var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)),
+            var(--elev-shadow-3, 0 28px 80px rgba(0,0,0,.48));
           overflow: hidden;
           display: flex;
           flex-direction: column;
@@ -652,7 +654,7 @@ export default function SpotlightSearch() {
           border-bottom: 1px solid var(--border-subtle);
           gap: 11px;
           flex-shrink: 0;
-          background: rgba(26, 44, 64, 0.6);
+          background: color-mix(in srgb, var(--elev-tint-2, var(--bg-float)) 74%, transparent);
         }
 
         .sl-search-icon {
@@ -740,7 +742,7 @@ export default function SpotlightSearch() {
           gap: 10px;
           padding: 0 16px;
           cursor: pointer;
-          transition: background 100ms ease;
+          transition: background var(--t-micro, 90ms) var(--ease-out, cubic-bezier(.16,1,.3,1)), transform var(--t-micro, 90ms) var(--ease-out, cubic-bezier(.16,1,.3,1));
           font-size: 14px;
           min-height: 46px;
           border-left: 2px solid transparent;
@@ -749,6 +751,16 @@ export default function SpotlightSearch() {
 
         .sl-result-row:hover {
           background: rgba(14, 165, 233, 0.06);
+          transform: translateY(-1px);
+        }
+
+        .sl-result-row:active {
+          transform: translateY(0.5px);
+        }
+
+        .sl-result-row:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: -2px;
         }
 
         .sl-result-row.sl-selected {
@@ -902,7 +914,7 @@ export default function SpotlightSearch() {
           color: var(--text-muted);
           flex-shrink: 0;
           flex-wrap: wrap;
-          background: rgba(6, 16, 29, 0.7);
+          background: color-mix(in srgb, var(--elev-tint-1, var(--bg-deep)) 82%, transparent);
         }
 
         .sl-footer kbd {
@@ -929,6 +941,19 @@ export default function SpotlightSearch() {
           .sl-footer { display: none; }
           .sl-modal { border-radius: var(--r-lg) var(--r-lg) 0 0; }
           .sl-backdrop { align-items: flex-end; padding-top: 0; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .sl-backdrop,
+          .sl-modal {
+            animation-duration: 1ms;
+          }
+          .sl-result-row {
+            transition-duration: 1ms;
+          }
+          .sl-result-row:hover,
+          .sl-result-row:active {
+            transform: none;
+          }
         }
       `}</style>
     </div>

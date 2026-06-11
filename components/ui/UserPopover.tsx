@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import type { CSSProperties } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import type { IRCMessage } from '@/lib/irc/types';
 import { parseActivity } from '@/lib/activity';
 import Avatar from './Avatar';
+import RoleBadge, { highestRoleMode } from './RoleBadge';
 
 interface Props {
   nick: string;
@@ -23,6 +25,12 @@ interface WhoisInfo {
 }
 
 type PopoverPlacement = 'above-left' | 'above-right' | 'below-left' | 'below-right';
+
+function fallbackAccent(nick: string): string {
+  let hash = 0;
+  for (const c of nick) hash = (hash * 31 + c.charCodeAt(0)) & 0xffffffff;
+  return `hsl(${Math.abs(hash) % 360}, 44%, 34%)`;
+}
 
 export default function UserPopover({ nick, children }: Props) {
   const [open,      setOpen]      = useState(false);
@@ -43,6 +51,7 @@ export default function UserPopover({ nick, children }: Props) {
   const openUserProfile  = useOnyxStore(s => s.openUserProfile);
   const getUserProfile   = useOnyxStore(s => s.getUserProfile);
   const selfPronouns     = useOnyxStore(s => s.selfPronouns);
+  const modeToPrefix     = useOnyxStore(s => s.isupportModeToPrefix);
 
   const userActivities   = useOnyxStore(s => s.userActivities);
 
@@ -139,6 +148,7 @@ export default function UserPopover({ nick, children }: Props) {
   const userStatus = nickProps.STATUS ?? nickProps.Status ?? '';
   const userPicture = nickProps.PICTURE ?? nickProps.Picture ?? '';
   const richProfile = getUserProfile(nick);
+  const profileAccent = nickProps.ACCENT ?? nickProps.Accent ?? nickProps.BANNERCOLOR ?? richProfile?.bannerColor ?? fallbackAccent(nick);
   const userPronouns = isSelf ? selfPronouns : (richProfile?.pronouns ?? '');
 
   const storedActivity = userActivities[nick.toLowerCase()];
@@ -148,6 +158,7 @@ export default function UserPopover({ nick, children }: Props) {
   const channelUser = activeView.kind === 'channel'
     ? channels.get(activeView.channel.toLowerCase())?.users.get(nick.toLowerCase())
     : undefined;
+  const roleMode = highestRoleMode(channelUser?.modes, modeToPrefix);
 
   const kick = () => {
     if (client && activeView.kind === 'channel') {
@@ -169,6 +180,7 @@ export default function UserPopover({ nick, children }: Props) {
   };
 
   const mention = () => {
+    // OCEAN-INTEGRATION: composer listens for this UI event and inserts the mention text.
     window.dispatchEvent(new CustomEvent('ocean:insert-mention', { detail: { nick } }));
     setOpen(false);
   };
@@ -183,14 +195,36 @@ export default function UserPopover({ nick, children }: Props) {
     setOpen(v => !v);
   }, [computePlacement]);
 
+  const handleTriggerKeyDown = (e: React.KeyboardEvent<HTMLSpanElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleOpen();
+    } else if (e.key === 'Escape') {
+      setOpen(false);
+    }
+  };
+
   return (
     <span className="upop-wrap" ref={popoverRef}>
-      <span ref={triggerRef} onClick={handleOpen} style={{ cursor: 'pointer' }}>
+      <span
+        ref={triggerRef}
+        onClick={handleOpen}
+        onKeyDown={handleTriggerKeyDown}
+        className="upop-trigger"
+        role="button"
+        tabIndex={0}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+      >
         {children}
       </span>
 
       {open && (
-        <div className={`upop-card upop-card--${placement} animate-scale-in`}>
+        <div
+          className={`upop-card upop-card--${placement} animate-scale-in elev-3`}
+          style={{ '--upop-accent': profileAccent } as CSSProperties & Record<string, string>}
+          data-testid="user-popover"
+        >
           {/* Banner */}
           <div
             className="upop-banner"
@@ -212,6 +246,7 @@ export default function UserPopover({ nick, children }: Props) {
             <div className="upop-nick">{nick}</div>
             {whois?.account && <div className="upop-account">@{whois.account}</div>}
             {userPronouns && <div className="upop-pronouns">{userPronouns}</div>}
+            {roleMode && <div className="upop-role"><RoleBadge mode={roleMode} /></div>}
             {userStatus && <div className="upop-status">💬 {userStatus}</div>}
             {whois?.away && <div className="upop-away">Away: {whois.away}</div>}
           </div>
@@ -287,23 +322,26 @@ export default function UserPopover({ nick, children }: Props) {
 
       <style>{`
         .upop-wrap { position: relative; display: inline; }
+        .upop-trigger {
+          cursor: pointer;
+          border-radius: var(--r-xs, 4px);
+          outline: none;
+        }
+        .upop-trigger:focus-visible {
+          box-shadow: 0 0 0 2px var(--accent-border);
+        }
 
         /* ── Card ── */
         .upop-card {
           position: absolute;
-          z-index: 800;
+          z-index: var(--z-popover, 100);
           width: 284px;
-          background: var(--bg-float, #1a2c40);
+          background: var(--elev-tint-3, var(--bg-float, #1a2c40));
           backdrop-filter: blur(16px) saturate(1.3);
           -webkit-backdrop-filter: blur(16px) saturate(1.3);
-          border: 1px solid var(--border-normal, rgba(14,165,233,0.15));
-          border-radius: 12px;
+          border: 0;
+          border-radius: var(--r-xl, 16px) var(--r-sm, 6px) var(--r-lg, 14px) var(--r-md, 10px);
           overflow: hidden;
-          box-shadow:
-            0 0 0 1px var(--accent-border, rgba(14,165,233,0.1)),
-            0 28px 72px rgba(0,0,0,0.8),
-            0 8px 24px rgba(0,0,0,0.5),
-            inset 0 1px 0 rgba(255,255,255,0.04);
         }
 
         /* ── Placement variants ── */
@@ -314,20 +352,17 @@ export default function UserPopover({ nick, children }: Props) {
 
         /* ── Scale-from-origin animation ── */
         @keyframes upop-scale-in {
-          from { opacity: 0; transform: scale(0.88); }
+          from { opacity: 0; transform: translateY(4px) scale(0.96); }
           to   { opacity: 1; transform: scale(1); }
         }
         .animate-scale-in {
-          animation: upop-scale-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+          animation: upop-scale-in var(--t-overlay-in, 320ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
         }
 
         /* ── Banner ── */
         .upop-banner {
           height: 64px;
-          background: linear-gradient(135deg,
-            #0c2a4a 0%,
-            var(--accent, #0ea5e9) 55%,
-            var(--gold, #67e8f9) 100%);
+          background: color-mix(in srgb, var(--upop-accent) 42%, var(--bg-deep) 58%);
           flex-shrink: 0;
           position: relative;
         }
@@ -335,7 +370,7 @@ export default function UserPopover({ nick, children }: Props) {
           content: '';
           position: absolute;
           inset: 0;
-          background: linear-gradient(to bottom, transparent 50%, var(--bg-float, #1a2c40) 100%);
+          background: color-mix(in srgb, var(--bg-void) 16%, transparent);
         }
 
         /* ── Avatar ── */
@@ -364,10 +399,11 @@ export default function UserPopover({ nick, children }: Props) {
         .upop-self-badge {
           font-size: 10px;
           font-weight: 700;
-          letter-spacing: 0.06em;
-          background: var(--accent-subtle, rgba(14,165,233,0.12));
-          color: var(--accent, #0ea5e9);
-          border: 1px solid var(--accent-border, rgba(14,165,233,0.28));
+          letter-spacing: 0;
+          background: var(--elev-tint-1, rgba(14,165,233,0.12));
+          color: var(--text-secondary);
+          border: 0;
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
           padding: 2px 8px;
           border-radius: var(--r-full, 9999px);
           margin-bottom: 6px;
@@ -376,11 +412,12 @@ export default function UserPopover({ nick, children }: Props) {
         /* ── Identity ── */
         .upop-identity { padding: 8px 14px 2px; }
         .upop-nick {
-          font-size: 16px;
+          font-size: var(--text-lg, 16px);
+          font-family: var(--font-display), Georgia, serif;
           font-weight: 700;
           color: var(--text-primary, #dff0ff);
           line-height: 1.2;
-          letter-spacing: -0.02em;
+          letter-spacing: 0;
         }
         .upop-account {
           font-size: 12px;
@@ -397,10 +434,15 @@ export default function UserPopover({ nick, children }: Props) {
           margin-top: 4px;
           padding: 2px 8px;
           background: rgba(240,178,50,0.08);
-          border: 1px solid rgba(240,178,50,0.2);
+          border: 0;
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
           border-radius: var(--r-full, 9999px);
         }
         .upop-away::before { content: '◉'; font-size: 8px; }
+        .upop-role {
+          display: flex;
+          margin-top: 6px;
+        }
 
         /* ── Loading ── */
         .upop-loading {
@@ -441,7 +483,7 @@ export default function UserPopover({ nick, children }: Props) {
           font-size: 10px;
           font-weight: 700;
           text-transform: uppercase;
-          letter-spacing: 0.08em;
+          letter-spacing: 0;
           color: var(--text-muted, #3d6480);
         }
         .upop-host {
@@ -454,9 +496,10 @@ export default function UserPopover({ nick, children }: Props) {
         .upop-oper-badge {
           font-size: 11px;
           font-weight: 700;
-          color: var(--gold, #67e8f9);
-          background: rgba(103,232,249,0.08);
-          border: 1px solid rgba(103,232,249,0.22);
+          color: var(--lux, #d8b96a);
+          background: color-mix(in srgb, var(--elev-tint-1, var(--bg-elevated)) 86%, var(--lux, #d8b96a) 14%);
+          border: 0;
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
           padding: 2px 8px;
           border-radius: var(--r-full, 9999px);
         }
@@ -482,16 +525,17 @@ export default function UserPopover({ nick, children }: Props) {
           gap: 8px;
           margin: 6px 12px 0;
           padding: 7px 10px;
-          background: rgba(14,165,233,0.06);
-          border: 1px solid var(--accent-border, rgba(14,165,233,0.14));
-          border-radius: 8px;
+          background: var(--elev-tint-1, rgba(14,165,233,0.06));
+          border: 0;
+          border-radius: var(--r-md, 10px) var(--r-sm, 6px) var(--r-lg, 14px) var(--r-sm, 6px);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
         }
         .upop-activity-emoji { font-size: 16px; flex-shrink: 0; line-height: 1; }
         .upop-activity-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
         .upop-activity-type {
           font-size: 9px;
           font-weight: 700;
-          letter-spacing: 0.08em;
+          letter-spacing: 0;
           text-transform: uppercase;
           color: var(--accent, #0ea5e9);
         }
@@ -524,9 +568,8 @@ export default function UserPopover({ nick, children }: Props) {
           display: flex;
           flex-direction: column;
           gap: 5px;
-          border-top: 1px solid var(--border-subtle, rgba(14,165,233,0.08));
           margin-top: 6px;
-          background: rgba(6,16,29,0.3);
+          background: color-mix(in srgb, var(--bg-deep) 62%, transparent);
         }
 
         .upop-action-btn {
@@ -536,18 +579,18 @@ export default function UserPopover({ nick, children }: Props) {
           gap: 7px;
           width: 100%;
           padding: 8px 12px;
-          border-radius: 8px;
+          border-radius: var(--r-sm, 6px) var(--r-md, 10px) var(--r-sm, 6px) var(--r-lg, 14px);
           font-size: 13px;
           font-weight: 600;
           font-family: inherit;
           cursor: pointer;
-          transition: background 120ms ease, border-color 120ms ease, color 120ms ease, transform 80ms ease;
-          border: 1px solid transparent;
+          transition: background var(--t-control, 150ms) var(--ease-out, ease), color var(--t-control, 150ms) var(--ease-out, ease), transform var(--t-micro, 90ms) var(--ease-out, ease);
+          border: 0;
         }
         .upop-action-btn:active { transform: scale(0.97); }
 
         .upop-action-btn--primary {
-          background: var(--accent, #0ea5e9);
+          background: color-mix(in srgb, var(--accent, #0ea5e9) 82%, #05070a);
           color: #fff;
           border-color: transparent;
         }
@@ -556,13 +599,12 @@ export default function UserPopover({ nick, children }: Props) {
         }
 
         .upop-action-btn--ghost {
-          background: transparent;
+          background: var(--elev-tint-1, transparent);
           color: var(--text-secondary, #7aa8c4);
-          border-color: var(--border-subtle, rgba(14,165,233,0.08));
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
         }
         .upop-action-btn--ghost:hover {
-          background: var(--bg-overlay, #213550);
-          border-color: var(--border-normal, rgba(14,165,233,0.15));
+          background: var(--elev-tint-2, #213550);
           color: var(--text-primary, #dff0ff);
         }
 
@@ -571,7 +613,7 @@ export default function UserPopover({ nick, children }: Props) {
           gap: 5px;
           margin-top: 2px;
           padding-top: 6px;
-          border-top: 1px solid var(--border-subtle, rgba(14,165,233,0.06));
+          box-shadow: inset 0 1px 0 var(--border-subtle, rgba(14,165,233,0.06));
         }
         .upop-mod-actions .upop-action-btn--ghost {
           font-size: 12px;
@@ -582,6 +624,18 @@ export default function UserPopover({ nick, children }: Props) {
           color: #f87171;
           border-color: rgba(248,113,113,0.3);
           background: rgba(248,113,113,0.06);
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .animate-scale-in,
+          .upop-loading::before {
+            animation: none;
+          }
+          .upop-action-btn {
+            transition: none;
+          }
+          .upop-action-btn:active {
+            transform: none;
+          }
         }
       `}</style>
     </span>

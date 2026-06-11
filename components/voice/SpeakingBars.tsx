@@ -64,7 +64,6 @@ export default function SpeakingBars({ speaking, size = 'sm' }: SpeakingBarsProp
 
         .sb-wrap--speaking .sb-bar {
           background: var(--status-online, #34d399);
-          box-shadow: 0 0 4px rgba(52,211,153,0.5);
         }
 
         .sb-wrap--speaking .sb-bar--1 {
