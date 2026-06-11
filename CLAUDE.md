@@ -1,6 +1,6 @@
 # Ocean — IRC Webchat
 
-Modern IRC client backed by the Ophion IRC engine. Dark luxury design.
+Modern IRC client backed by the Orochi IRC engine (pure-Zig successor to Ophion; source at /home/kain/orochi). Dark luxury design.
 
 ## Stack
 - **Next.js 16** (App Router, static export)
@@ -10,7 +10,7 @@ Modern IRC client backed by the Ophion IRC engine. Dark luxury design.
 
 ## Key libs (do NOT rewrite these from scratch)
 - `lib/irc/` — IRC WebSocket client with SASL PLAIN/SCRAM, CAP, IRCv3, IRCX
-- `lib/ladon-media/` — LADON/Ophion voice+video engine (NOT WebRTC)
+- `lib/ladon-media/` — Orochi voice+video engine (NOT WebRTC); signaling = MEDIA subcommands + NOTE MEDIA events
   - VeilSession.ts — P-256 ECDH + AES-256-GCM encryption
   - MediaEngine.ts — voice/video send+recv, adaptive bitrate
   - VeilGroup.ts — group session key derivation
@@ -18,8 +18,8 @@ Modern IRC client backed by the Ophion IRC engine. Dark luxury design.
   - PeerRegistry.ts — per-peer audio/video decode
 
 ## Voice / Audio
-Voice and video use the **LADON/Ophion media protocol**, NOT WebRTC.
-Transport: IRC messages (MEDIAFRAME / MCHUNK commands over WebSocket).
+Voice and video use the **Orochi media protocol**, NOT WebRTC.
+Transport: IRC messages (MEDIA subcommands + NOTE MEDIA events over WebSocket).
 No STUN/TURN servers needed.
 
 ## IRC → Ocean concept mapping
@@ -31,11 +31,11 @@ No STUN/TURN servers needed.
 | +q (owner) | Owner role (gold) |
 | +o (operator) | Op role (violet) |
 | +v (voice) | Voice role (green) |
-| Ophion account (built-in) | Ocean account |
+| Orochi account (built-in) | Ocean account |
 | CHATHISTORY | Message history |
 | IRCX PROP | Channel/user properties |
 | IRCX ACCESS | Permission overrides |
-| LADON MEDIAFRAME | Voice/video channel |
+| MEDIA subcommands + NOTE MEDIA | Voice/video channel |
 
 ## Build
 ```bash
@@ -48,7 +48,7 @@ pnpm dev            # development server
 bash deploy/deploy.sh       # copies out/ to nginx webroot
 ```
 
-Configure `NEXT_PUBLIC_IRC_WS` in `.env.local` to point to your Ophion wsockd endpoint.
+Configure `NEXT_PUBLIC_IRC_WS` in `.env.local` to point to your Orochi WebSocket endpoint; `NEXT_PUBLIC_MEDIA_URL` points at the nexus-upload proxy (`/upload` POST, files under `/uploads`).
 
 ## Design system
 All design tokens live in `app/globals.css` under `:root`.
@@ -60,16 +60,16 @@ All design tokens live in `app/globals.css` under `:root`.
 
 ## Auth features integrated
 - **SASL PLAIN** — direct password login
-- **SASL SESSION-TOKEN** — persistent login via Ophion-issued 30-day tokens (auto-selected when token present)
-- **SCRAM-SHA-256/512** — preferred if server advertises it (auto-selected)
+- **SESSION TOKEN / RESUME** — persistent login: after SASL, request `SESSION TOKEN` (arrives as `NOTE SESSION TOKEN`); reconnect with `SESSION RESUME <token>`
+- **SCRAM-SHA-256** — preferred when advertised (Orochi: sasl=PLAIN,EXTERNAL,SCRAM-SHA-256)
 - **CERTFP** — future: cert-based auth
 - **IDENTIFY** — automatic on connect when password provided
 - **ACCOUNT GHOST** — kill a stale session using Ophion's built-in services (no NickServ)
 - **ACCOUNT** tag — account name auto-populates from server
 
-## Services (Ophion built-in — NO NickServ bot)
-Ophion services are built into the ircd. Commands are sent as `ACCOUNT <subcommand>`, not `PRIVMSG NickServ`.
-Server notices from services arrive as `:<server> NOTICE <nick> :<Service>: <message>`.
-- `ACCOUNT GHOST <nick>` — kill a stale session claiming your nick
-- `ACCOUNT RECOVER <nick> <password>` — reclaim a nick without being identified
-- `ACCOUNT REGISTER <password>` — register an account
+## Services (Orochi built-in — NO NickServ bot)
+Orochi services are real server commands; results arrive as standard replies (NOTE/FAIL/WARN), not NOTICE text.
+- `REGISTER` / `VERIFY` — account signup (draft/account-registration)
+- `IDENTIFY` / `LOGOUT` / `DROP` / `ACCOUNTINFO` / `ACCOUNTSET` — account lifecycle
+- `GHOST <nick>` — kill a stale session claiming your nick
+- `CERTADD` / `CERTLIST` / `CERTDEL` — certificate fingerprint binding
