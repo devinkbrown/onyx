@@ -1,18 +1,29 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { hasIrcFormatting, parseIrcFormatting } from '@/lib/ircColors';
+import { classifyMessageEmbeds } from '@/lib/embeds';
+import MessageEmbed from '@/components/chat/MessageEmbed';
 
 interface Props {
   text: string;
   className?: string;
+  /** Render rich embed cards for classified URLs after the text flow. Default on. */
+  embeds?: boolean;
 }
 
 type IrcSegment =
   | { type: 'text'; content: string }
   | { type: 'code'; lang: string; code: string };
 
+type TextRun =
+  | { type: 'plain'; content: string }
+  | { type: 'spoiler'; content: string }
+  | { type: 'inline-code'; content: string };
+
 const CODE_FENCE_RE = /```([^\n`]*)\n([\s\S]*?)```/g;
+const SPOILER_RE = /\|\|([\s\S]+?)\|\|/g;
+const INLINE_CODE_RE = /`([^`\n]+)`/g;
 
 function splitCodeFences(text: string): IrcSegment[] {
   const segments: IrcSegment[] = [];
@@ -37,6 +48,44 @@ function splitCodeFences(text: string): IrcSegment[] {
   }
 
   return segments.length > 0 ? segments : [{ type: 'text', content: text }];
+}
+
+function splitByPattern(
+  text: string,
+  re: RegExp,
+  kind: 'spoiler' | 'inline-code',
+): TextRun[] {
+  const runs: TextRun[] = [];
+  let last = 0;
+  let match: RegExpExecArray | null;
+  re.lastIndex = 0;
+
+  while ((match = re.exec(text)) !== null) {
+    if (match.index > last) {
+      runs.push({ type: 'plain', content: text.slice(last, match.index) });
+    }
+    runs.push({ type: kind, content: match[1] });
+    last = match.index + match[0].length;
+  }
+
+  if (last < text.length) {
+    runs.push({ type: 'plain', content: text.slice(last) });
+  }
+
+  return runs;
+}
+
+/** Split a text segment into plain / ||spoiler|| / `inline code` runs. */
+function splitTextRuns(text: string): TextRun[] {
+  const runs: TextRun[] = [];
+  for (const run of splitByPattern(text, SPOILER_RE, 'spoiler')) {
+    if (run.type === 'plain') {
+      runs.push(...splitByPattern(run.content, INLINE_CODE_RE, 'inline-code'));
+    } else {
+      runs.push(run);
+    }
+  }
+  return runs;
 }
 
 function IrcCodeBlock({ lang, code }: { lang: string; code: string }) {
@@ -65,7 +114,35 @@ function IrcCodeBlock({ lang, code }: { lang: string; code: string }) {
   );
 }
 
-function IrcFormattedText({ text, className }: Props) {
+function SpoilerChip({ content }: { content: string }) {
+  const [revealed, setRevealed] = useState(false);
+
+  const toggle = useCallback(() => setRevealed(r => !r), []);
+  const onKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setRevealed(r => !r);
+    }
+  }, []);
+
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      aria-pressed={revealed}
+      aria-label={revealed ? 'Hide spoiler' : 'Reveal spoiler'}
+      className={`irc-spoiler ${revealed ? 'irc-spoiler--revealed' : ''}`}
+      onClick={toggle}
+      onKeyDown={onKeyDown}
+    >
+      <span className="irc-spoiler-body" aria-hidden={!revealed}>
+        <IrcFormattedText text={content} />
+      </span>
+    </span>
+  );
+}
+
+function IrcFormattedText({ text, className }: { text: string; className?: string }) {
   if (!hasIrcFormatting(text)) {
     return <span className={className}>{text}</span>;
   }
@@ -101,15 +178,40 @@ function IrcFormattedText({ text, className }: Props) {
   );
 }
 
-export default function IrcText({ text, className }: Props) {
+function IrcTextRuns({ text }: { text: string }) {
+  const runs = splitTextRuns(text);
+
+  return (
+    <>
+      {runs.map((run, i) => {
+        if (run.type === 'spoiler') {
+          return <SpoilerChip key={i} content={run.content} />;
+        }
+        if (run.type === 'inline-code') {
+          return <code key={i} className="irc-inline-code">{run.content}</code>;
+        }
+        return <IrcFormattedText key={i} text={run.content} />;
+      })}
+    </>
+  );
+}
+
+export default function IrcText({ text, className, embeds = true }: Props) {
   const segments = splitCodeFences(text);
+  const embedList = useMemo(
+    () => (embeds ? classifyMessageEmbeds(text) : []),
+    [text, embeds],
+  );
 
   return (
     <span className={className}>
       {segments.map((segment, index) => (
         segment.type === 'code'
           ? <IrcCodeBlock key={index} lang={segment.lang} code={segment.code} />
-          : <IrcFormattedText key={index} text={segment.content} />
+          : <IrcTextRuns key={index} text={segment.content} />
+      ))}
+      {embedList.map((embed) => (
+        <MessageEmbed key={embed.url} embed={embed} />
       ))}
       <style>{`
         .irc-code-block {
@@ -167,8 +269,44 @@ export default function IrcText({ text, className }: Props) {
           white-space: pre;
           overflow-x: auto;
         }
+        .irc-inline-code {
+          font-family: var(--font-mono, ui-monospace, monospace);
+          font-size: 0.92em;
+          color: var(--text-primary, #dce8f4);
+          background: var(--bg-deep, #07111d);
+          border: 1px solid var(--border-subtle, rgba(255,255,255,.08));
+          border-radius: var(--r-xs, 4px);
+          padding: 1px 5px;
+        }
+        .irc-spoiler {
+          display: inline-block;
+          border-radius: var(--r-xs, 4px);
+          background: color-mix(in srgb, var(--bg-deep, #07111d) 80%, var(--lux, #d8b96a));
+          padding: 0 4px;
+          cursor: pointer;
+          transition: background var(--t-control, 150ms) var(--ease-out, ease-out);
+        }
+        .irc-spoiler:focus-visible {
+          outline: 2px solid var(--accent, #0ea5e9);
+          outline-offset: 1px;
+        }
+        .irc-spoiler-body {
+          filter: blur(5px);
+          user-select: none;
+          transition: filter var(--t-control, 150ms) var(--ease-out, ease-out);
+        }
+        .irc-spoiler--revealed {
+          cursor: default;
+          background: color-mix(in srgb, var(--bg-deep, #07111d) 55%, transparent);
+        }
+        .irc-spoiler--revealed .irc-spoiler-body {
+          filter: none;
+          user-select: text;
+        }
         @media (prefers-reduced-motion: reduce) {
           .irc-code-copy { transition: none !important; }
+          .irc-spoiler,
+          .irc-spoiler-body { transition: none !important; }
         }
       `}</style>
     </span>
