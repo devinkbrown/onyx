@@ -7071,6 +7071,8 @@ function _loadActiveTheme(): string {
       'arctic',
       'ash',
       'light',
+      'lacquer',
+      'pearl',
       'system',
     ];
     const stored = localStorage.getItem('ocean-active-theme');
