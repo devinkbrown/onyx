@@ -56,12 +56,45 @@ describe('Package A design-token foundation', () => {
     ].forEach((token) => expect(css, token).toContain(token));
   });
 
+  const THEME_IDS = [
+    'abyss', 'midnight', 'bathyal', 'coral', 'kelp', 'brine',
+    'onyx', 'amoled', 'arctic', 'ash', 'light',
+    'lacquer', 'pearl',
+  ];
+
+  /** Every theme block must define the full curated token set. */
+  const REQUIRED_THEME_TOKENS = [
+    '--bg-void:',
+    '--bg-deep:',
+    '--bg-base:',
+    '--bg-elevated:',
+    '--bg-float:',
+    '--bg-overlay:',
+    '--accent:',
+    '--accent-hover:',
+    '--lux:',
+    '--elev-tint-1:',
+    '--elev-tint-2:',
+    '--elev-tint-3:',
+    '--mention-bg:',
+    '--reaction-bg:',
+    '--reaction-bg-active:',
+    '--scrim:',
+    '--text-primary:',
+    '--text-muted:',
+    '--border-subtle:',
+    '--border-normal:',
+  ];
+
+  const themeBlock = (themeId: string): string => {
+    const match = css.match(new RegExp(`\\[data-theme="${themeId}"\\]\\s*\\{([\\s\\S]*?)\\n\\s*\\}`));
+    expect(match, `${themeId} theme exists`).toBeTruthy();
+    return match?.[1] ?? '';
+  };
+
   it('defines luxury, elevation, mention, and reaction tokens for every theme surface', () => {
-    const themeIds = ['abyss', 'midnight', 'bathyal', 'coral', 'kelp', 'brine', 'onyx', 'amoled', 'arctic', 'ash', 'light'];
-    for (const themeId of themeIds) {
-      const match = css.match(new RegExp(`\\[data-theme="${themeId}"\\]\\s*\\{([\\s\\S]*?)\\n\\s*\\}`));
-      expect(match, `${themeId} theme exists`).toBeTruthy();
-      const block = match?.[1] ?? '';
+    for (const themeId of THEME_IDS) {
+      const block = themeBlock(themeId);
       expect(block, `${themeId} --lux`).toContain('--lux:');
       expect(block, `${themeId} --elev-tint-1`).toContain('--elev-tint-1:');
       expect(block, `${themeId} --mention-bg`).toContain('--mention-bg:');
@@ -73,6 +106,37 @@ describe('Package A design-token foundation', () => {
     expect(highContrast?.[1]).toContain('--elev-tint-1:');
     expect(highContrast?.[1]).toContain('--mention-bg:');
     expect(highContrast?.[1]).toContain('--reaction-bg:');
+    expect(highContrast?.[1]).toContain('--scrim:');
+  });
+
+  it('defines the full curated token set in every theme block, including the showcase themes', () => {
+    for (const themeId of THEME_IDS) {
+      const block = themeBlock(themeId);
+      for (const token of REQUIRED_THEME_TOKENS) {
+        expect(block, `${themeId} ${token}`).toContain(token);
+      }
+    }
+  });
+
+  it('gives the showcase themes their flagship palettes', () => {
+    const lacquer = themeBlock('lacquer');
+    expect(lacquer, 'lacquer near-black canvas').toContain('--bg-void:     #0a0a0c');
+    expect(lacquer, 'lacquer champagne lux').toContain('--lux:           #d8b96a');
+    expect(lacquer, 'lacquer steel-blue accent').toContain('--accent:        #6e8ca6');
+
+    const pearl = themeBlock('pearl');
+    expect(pearl, 'pearl is a light theme').toContain('color-scheme: light');
+    expect(pearl, 'pearl antique gold lux').toContain('--lux:           #8f6a14');
+    expect(pearl, 'pearl celadon accent').toContain('--accent:        #5d8a72');
+    expect(pearl, 'pearl ink text').toContain('--text-primary:   #211f1a');
+  });
+
+  it('keeps per-theme muted text annotated with computed contrast ratios', () => {
+    for (const themeId of THEME_IDS) {
+      const block = themeBlock(themeId);
+      const mutedLine = block.split('\n').find((line) => line.includes('--text-muted:'));
+      expect(mutedLine, `${themeId} --text-muted has a contrast comment`).toMatch(/\d+(\.\d+)?:1/);
+    }
   });
 
   it('keeps reduced-motion, contrast, and density systems consolidated', () => {

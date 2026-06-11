@@ -35,8 +35,8 @@
     --text-primary:   #dff0ff;
     --text-secondary: #7aa8c4;
     --text-muted:     #6090a8; /* raised from #3d6480; ≥4.69:1 on bg-elevated, ≥5.79:1 on bg-void */
-    --text-link:      #38bdf8;
-    --text-link-hover:#7dd3fc;
+    --text-link:      var(--accent-hover);                                  /* follows each theme's accent */
+    --text-link-hover: color-mix(in srgb, var(--accent-hover) 62%, white);
 
     /* ── Status ── */
     --status-online:  #34d399;
@@ -51,11 +51,11 @@
     --success:       #34d399;
     --warning:       #fbbf24;
 
-    /* ── Channel list ── */
-    --ch-active-bg:  rgba(14, 165, 233, 0.14);
-    --ch-hover-bg:   rgba(14, 165, 233, 0.07);
-    --ch-unread:     #dff0ff;
-    --ch-read:       #6090a8; /* raised with text-muted; >=5.50:1 on bg-deep */
+    /* ── Channel list (bound to theme tokens so every palette stays coherent) ── */
+    --ch-active-bg:  color-mix(in srgb, var(--accent) 14%, transparent);
+    --ch-hover-bg:   color-mix(in srgb, var(--accent) 7%, transparent);
+    --ch-unread:     var(--text-primary);
+    --ch-read:       var(--text-muted); /* tracks per-theme muted; muted is AA-checked per theme */
 
     /* ── Borders ── */
     --border-subtle: rgba(14, 165, 233, 0.08);
@@ -68,7 +68,7 @@
     --shadow-md:  0 4px 16px rgba(0,0,0,0.55);
     --shadow-lg:  0 8px 32px rgba(0,0,0,0.65);
     --shadow-xl:  0 24px 64px rgba(0,0,0,0.75), 0 0 0 1px rgba(14,165,233,0.1);
-    --glow:       0 0 32px rgba(14,165,233,0.2);
+    --glow:       0 0 32px color-mix(in srgb, var(--accent) 20%, transparent);
 
     /* ── Radii ── */
     --r-xs:   3px;
@@ -184,7 +184,7 @@
     --accent-subtle: rgba(0, 212, 255, 0.09);
     --accent-border: rgba(0, 212, 255, 0.25);
     --accent-glow:   rgba(0, 212, 255, 0.18);
-    --lux:           color-mix(in srgb, #d8b96a 72%, var(--accent) 28%);
+    --lux:           #c9c08a;   /* cold-water champagne — chilled toward the bio-electric cyan */
     --lux-subtle:    color-mix(in srgb, var(--lux) 14%, transparent);
     --gold:          var(--lux);
     --gold-subtle:   var(--lux-subtle);
@@ -203,6 +203,8 @@
     --shadow-md:  0 4px 20px rgba(0,0,0,0.8);
     --glow:       0 0 40px rgba(0,212,255,0.15);
     --status-online: #00ffc8;
+    /* signature: pressure darkness — the heaviest scrim in the line */
+    --scrim:         rgba(0,4,10,.78);
   }
 
   /* ── Theme: midnight — twilight zone, last traces of sunlight ── */
@@ -219,7 +221,7 @@
     --accent-subtle: rgba(14,165,233,0.10);
     --accent-border: rgba(14,165,233,0.28);
     --accent-glow:   rgba(14,165,233,0.18);
-    --lux:           color-mix(in srgb, #d8b96a 72%, var(--accent) 28%);
+    --lux:           #d8b96a;   /* canonical Deep Lacquer champagne — midnight is the reference dark */
     --lux-subtle:    color-mix(in srgb, var(--lux) 14%, transparent);
     --gold:          var(--lux);
     --gold-subtle:   var(--lux-subtle);
@@ -231,9 +233,11 @@
     --reaction-bg-active: color-mix(in srgb, var(--lux) 22%, var(--bg-float));
     --text-primary:   #dff0ff;
     --text-secondary: #7aa8c4;
-    --text-muted:     #6090a8; /* raised from #3d6480; >=4.69:1 on bg-elevated */
+    --text-muted:     #6694ac; /* raised from #6090a8; 4.73:1 on bg-elevated #122440 */
     --border-normal:  rgba(14,165,233,0.15);
     --border-subtle:  rgba(14,165,233,0.08);
+    /* signature: open-water scrim — faint blue cast under overlays */
+    --scrim:          rgba(2,8,18,.66);
   }
 
   /* ── Theme: bathyal — bathypelagic, deep blue-black ── */
@@ -250,7 +254,7 @@
     --accent-subtle: rgba(59,130,246,0.10);
     --accent-border: rgba(59,130,246,0.28);
     --accent-glow:   rgba(59,130,246,0.18);
-    --lux:           color-mix(in srgb, #d8b96a 72%, var(--accent) 28%);
+    --lux:           #c6bb82;   /* cool brass — gold read through cold blue water */
     --lux-subtle:    color-mix(in srgb, var(--lux) 14%, transparent);
     --gold:          var(--lux);
     --gold-subtle:   var(--lux-subtle);
@@ -262,10 +266,12 @@
     --reaction-bg-active: color-mix(in srgb, var(--lux) 22%, var(--bg-float));
     --text-primary:   #dbeafe;
     --text-secondary: #6da3d8;
-    --text-muted:     #6088c0; /* raised from #2e5580; >=4.51:1 on bg-base */
+    --text-muted:     #7aa2d4; /* raised from #6088c0; 5.17:1 on bg-elevated #002e5a, 6.20:1 on bg-base */
     --border-normal:  rgba(59,130,246,0.15);
     --border-subtle:  rgba(59,130,246,0.07);
     --status-online:  #22d3ee;
+    /* signature: deep-column scrim — saturated blue-black */
+    --scrim:          rgba(0,10,24,.72);
   }
 
   /* ── Theme: coral — shallow reef, sunlit warm water ── */
@@ -282,7 +288,7 @@
     --accent-subtle: rgba(251,146,60,0.10);
     --accent-border: rgba(251,146,60,0.28);
     --accent-glow:   rgba(251,146,60,0.18);
-    --lux:           color-mix(in srgb, #d8b96a 72%, var(--accent) 28%);
+    --lux:           #e0b87a;   /* sun-warmed gold — champagne pushed toward reef light */
     --lux-subtle:    color-mix(in srgb, var(--lux) 14%, transparent);
     --gold:          var(--lux);
     --gold-subtle:   var(--lux-subtle);
@@ -294,12 +300,14 @@
     --reaction-bg-active: color-mix(in srgb, var(--lux) 22%, var(--bg-float));
     --text-primary:   #fff3ee;
     --text-secondary: #d4a090;
-    --text-muted:     #c08078; /* raised from #8a5545; >=4.98:1 on bg-base */
+    --text-muted:     #cc9088; /* raised from #c08078; 5.15:1 on bg-elevated #432620, 5.97:1 on bg-base */
     --border-normal:  rgba(251,146,60,0.15);
     --border-subtle:  rgba(251,146,60,0.08);
     --status-online:  #4ade80;
     --shadow-sm:  0 1px 4px rgba(0,0,0,0.5), 0 0 0 1px rgba(251,146,60,0.04);
     --glow:       0 0 32px rgba(251,146,60,0.20);
+    /* signature: warm rock-shadow scrim — the only red-cast overlay in the line */
+    --scrim:          rgba(24,9,6,.68);
   }
 
   /* ── Theme: kelp — dark Pacific coast, tannin greens ── */
@@ -316,7 +324,7 @@
     --accent-subtle: rgba(34,197,94,0.09);
     --accent-border: rgba(34,197,94,0.25);
     --accent-glow:   rgba(34,197,94,0.18);
-    --lux:           color-mix(in srgb, #d8b96a 72%, var(--accent) 28%);
+    --lux:           #c9b768;   /* olive gold — champagne steeped in tannin */
     --lux-subtle:    color-mix(in srgb, var(--lux) 14%, transparent);
     --gold:          var(--lux);
     --gold-subtle:   var(--lux-subtle);
@@ -328,10 +336,12 @@
     --reaction-bg-active: color-mix(in srgb, var(--lux) 22%, var(--bg-float));
     --text-primary:   #edfdf4;
     --text-secondary: #7dcf9a;
-    --text-muted:     #5a9870; /* raised from #3a7055; >=5.03:1 on bg-base */
+    --text-muted:     #68a87e; /* raised from #5a9870; 5.26:1 on bg-elevated #0d2e1a */
     --border-normal:  rgba(34,197,94,0.15);
     --border-subtle:  rgba(34,197,94,0.07);
     --status-online:  #34d399;
+    /* signature: canopy-shadow scrim — green-black filtered light */
+    --scrim:          rgba(1,10,5,.72);
   }
 
   /* ── Theme: brine — salt flats & mineral sea, desaturated grey-teal ── */
@@ -348,7 +358,7 @@
     --accent-subtle: rgba(45,212,191,0.09);
     --accent-border: rgba(45,212,191,0.25);
     --accent-glow:   rgba(45,212,191,0.16);
-    --lux:           color-mix(in srgb, #d8b96a 72%, var(--accent) 28%);
+    --lux:           #c4b377;   /* mineral gold — desaturated, salt-bleached */
     --lux-subtle:    color-mix(in srgb, var(--lux) 14%, transparent);
     --gold:          var(--lux);
     --gold-subtle:   var(--lux-subtle);
@@ -360,27 +370,29 @@
     --reaction-bg-active: color-mix(in srgb, var(--lux) 22%, var(--bg-float));
     --text-primary:   #e8f6f5;
     --text-secondary: #7abab5;
-    --text-muted:     #5a9898; /* raised from #3d7070; >=5.07:1 on bg-base */
+    --text-muted:     #5a9898; /* 4.56:1 on bg-elevated #1f282d, >=5.07:1 on bg-base */
     --border-normal:  rgba(45,212,191,0.13);
     --border-subtle:  rgba(45,212,191,0.06);
     --status-online:  #34d399;
+    /* signature: grey-teal haze scrim — the most neutral of the sea scrims */
+    --scrim:          rgba(8,13,14,.68);
   }
 
   /* ── Theme: onyx — true black (OLED), electric blue-violet ── */
   [data-theme="onyx"] {
     --bg-void:     #000000;
     --bg-deep:     #000000;
-    --bg-base:     #080808;
-    --bg-elevated: #111111;
-    --bg-float:    #181818;
-    --bg-overlay:  #202020;
+    --bg-base:     #080808;   /* pure neutral floor for OLED */
+    --bg-elevated: #121118;   /* violet creeps in as surfaces lift… */
+    --bg-float:    #18161f;
+    --bg-overlay:  #1f1c29;   /* …strongest at the top of the stack */
     --accent:         #7c5af5;   /* deep-sea bioluminescent violet */
     --accent-hover:   #9b79ff;
     --accent-active:  #6d4de0;
     --accent-border:  rgba(124,90,245,0.30);
     --accent-subtle:  rgba(124,90,245,0.08);
     --accent-glow:    rgba(124,90,245,0.16);
-    --lux:            color-mix(in srgb, #d8b96a 72%, var(--accent) 28%);
+    --lux:            #b08d45;   /* deep brass — heavier, darker gold against true black */
     --lux-subtle:     color-mix(in srgb, var(--lux) 14%, transparent);
     --gold:           var(--lux);
     --gold-subtle:    var(--lux-subtle);
@@ -392,29 +404,31 @@
     --reaction-bg-active: color-mix(in srgb, var(--lux) 22%, var(--bg-float));
     --text-primary:   #f0f4ff;
     --text-secondary: #a0a8c8;
-    --text-muted:     #7880b0; /* raised from #505880; >=5.26:1 on bg-base */
+    --text-muted:     #7880b0; /* 4.93:1 on bg-elevated #121118, >=5.26:1 on bg-base */
     --border-normal:  rgba(124,90,245,0.12);
     --border-subtle:  rgba(124,90,245,0.06);
     --shadow-sm:  0 1px 4px rgba(0,0,0,0.8);
     --shadow-md:  0 4px 24px rgba(0,0,0,0.9);
     --glow:       0 0 40px rgba(124,90,245,0.15);
+    /* signature: total-black scrim — overlays float on void */
+    --scrim:          rgba(0,0,0,.80);
   }
 
   /* ── Theme: amoled — true black, warm instrument glow ── */
   [data-theme="amoled"] {
     --bg-void:     #000000;
     --bg-deep:     #000000;
-    --bg-base:     #050505;
-    --bg-elevated: #0d0d0d;
-    --bg-float:    #151515;
-    --bg-overlay:  #1d1d1d;
+    --bg-base:     #050505;   /* pure black floor */
+    --bg-elevated: #0e0d0a;   /* warm tungsten undertone grows upward… */
+    --bg-float:    #161310;
+    --bg-overlay:  #1e1a14;   /* …instrument-panel warmth at the top */
     --accent:         #e8b84b;
     --accent-hover:   #f5ca66;
     --accent-active:  #c9982f;
     --accent-border:  rgba(232,184,75,0.30);
     --accent-subtle:  rgba(232,184,75,0.08);
     --accent-glow:    rgba(232,184,75,0.16);
-    --lux:            color-mix(in srgb, #d8b96a 72%, var(--accent) 28%);
+    --lux:            #b98b2f;   /* aged amber brass — sits below the gold accent so lux moments stay distinct */
     --lux-subtle:     color-mix(in srgb, var(--lux) 14%, transparent);
     --gold:           var(--lux);
     --gold-subtle:    var(--lux-subtle);
@@ -426,12 +440,14 @@
     --reaction-bg-active: color-mix(in srgb, var(--lux) 22%, var(--bg-float));
     --text-primary:   #f7f3e8;
     --text-secondary: #c8b990;
-    --text-muted:     #9f936f;
+    --text-muted:     #9f936f; /* 6.36:1 on bg-elevated #0e0d0a */
     --border-normal:  rgba(232,184,75,0.12);
     --border-subtle:  rgba(232,184,75,0.06);
     --shadow-sm:  0 1px 4px rgba(0,0,0,0.8);
     --shadow-md:  0 4px 24px rgba(0,0,0,0.9);
     --glow:       0 0 40px rgba(232,184,75,0.12);
+    /* signature: lamp-off scrim — deepest black with a breath of warmth */
+    --scrim:          rgba(2,1,0,.82);
   }
 
   /* ── Theme: arctic — polar melt, iceberg blues, near-white surface ── */
@@ -448,7 +464,7 @@
     --accent-subtle: rgba(96,165,250,0.09);
     --accent-border: rgba(96,165,250,0.25);
     --accent-glow:   rgba(96,165,250,0.16);
-    --lux:           color-mix(in srgb, #d8b96a 72%, var(--accent) 28%);
+    --lux:           #d3c48f;   /* cooler champagne — platinum-leaning gold for polar light */
     --lux-subtle:    color-mix(in srgb, var(--lux) 14%, transparent);
     --gold:          var(--lux);
     --gold-subtle:   var(--lux-subtle);
@@ -460,10 +476,12 @@
     --reaction-bg-active: color-mix(in srgb, var(--lux) 22%, var(--bg-float));
     --text-primary:   #f0f7ff;
     --text-secondary: #94b8d4;
-    --text-muted:     #6090b0; /* raised from #4a7090; >=4.83:1 on bg-base */
+    --text-muted:     #7aa4c2; /* raised from #6090b0; 5.47:1 on bg-elevated #1c2a3d */
     --border-normal:  rgba(96,165,250,0.14);
     --border-subtle:  rgba(96,165,250,0.07);
     --status-online:  #34d399;
+    /* signature: ice-fog scrim — the lightest dark scrim in the line */
+    --scrim:          rgba(7,13,19,.60);
   }
 
   /* ── Theme: ash — neutral, desaturated deep gray ── */
@@ -480,7 +498,7 @@
     --accent-border:  rgba(88,101,242,0.28);
     --accent-subtle:  rgba(88,101,242,0.08);
     --accent-glow:    rgba(88,101,242,0.14);
-    --lux:            color-mix(in srgb, #d8b96a 72%, var(--accent) 28%);
+    --lux:            #c2ab6d;   /* smoked gold — muted to match the ash neutrality */
     --lux-subtle:     color-mix(in srgb, var(--lux) 14%, transparent);
     --gold:           var(--lux);
     --gold-subtle:    var(--lux-subtle);
@@ -492,9 +510,98 @@
     --reaction-bg-active: color-mix(in srgb, var(--lux) 22%, var(--bg-float));
     --text-primary:   #f2f3f5;
     --text-secondary: #b5bac1;
-    --text-muted:     #848890; /* raised from #72767d; >=4.53:1 on bg-base */
+    --text-muted:     #90949e; /* raised from #848890; 4.78:1 on bg-elevated #28292d */
     --border-normal:  rgba(255,255,255,0.09);
     --border-subtle:  rgba(255,255,255,0.05);
+    /* signature: smoke scrim — pure neutral, no sea cast */
+    --scrim:          rgba(13,13,15,.68);
+  }
+
+  /* ── Theme: lacquer — the flagship. True near-black canvas, dark-walnut
+        undertones rising through the surface ladder, desaturated steel-blue
+        accent, and champagne --lux reserved as THE moment of light ── */
+  [data-theme="lacquer"] {
+    --bg-void:     #0a0a0c;   /* true near-black canvas */
+    --bg-deep:     #0f0d0d;   /* first warmth enters */
+    --bg-base:     #161210;   /* walnut heartwood */
+    --bg-elevated: #1d1815;   /* rubbed lacquer */
+    --bg-float:    #251e1a;   /* raised grain */
+    --bg-overlay:  #2e2620;   /* polished top coat */
+    --accent:        #6e8ca6;   /* desaturated steel blue — recedes so lux can lead */
+    --accent-hover:  #8aa6bf;
+    --accent-active: #587590;
+    --accent-subtle: rgba(110,140,166,0.10);
+    --accent-border: rgba(110,140,166,0.28);
+    --accent-glow:   rgba(110,140,166,0.14);
+    --lux:           #d8b96a;   /* full champagne — the single point of brilliance */
+    --lux-subtle:    color-mix(in srgb, var(--lux) 14%, transparent);
+    --gold:          var(--lux);
+    --gold-subtle:   var(--lux-subtle);
+    --elev-tint-1:   color-mix(in srgb, var(--bg-elevated) 98%, var(--accent));
+    --elev-tint-2:   color-mix(in srgb, var(--bg-float) 97%, var(--accent));
+    --elev-tint-3:   color-mix(in srgb, var(--bg-overlay) 96%, var(--accent));
+    --mention-bg:    color-mix(in srgb, var(--lux) 18%, transparent);
+    --reaction-bg:   color-mix(in srgb, var(--bg-float) 82%, var(--accent) 18%);
+    --reaction-bg-active: color-mix(in srgb, var(--lux) 22%, var(--bg-float));
+    --text-primary:   #ece7e0;
+    --text-secondary: #b5aa9b;
+    --text-muted:     #9a8f80; /* 5.86:1 on bg-base #161210, 5.17:1 on bg-float #251e1a */
+    --border-normal:  rgba(236,231,224,0.10);
+    --border-subtle:  rgba(236,231,224,0.05);
+    --shadow-sm:  0 1px 4px rgba(0,0,0,0.6), 0 0 0 1px rgba(216,185,106,0.03);
+    --shadow-md:  0 4px 20px rgba(0,0,0,0.7);
+    --glow:       0 0 32px rgba(216,185,106,0.10);  /* the one champagne halo */
+    /* signature: walnut scrim — warm black, never blue */
+    --scrim:          rgba(8,6,4,.76);
+  }
+
+  /* ── Theme: pearl — light luxury. Warm porcelain surfaces, ink text,
+        muted celadon accent, antique gold lux. All text tokens AA-checked ── */
+  [data-theme="pearl"] {
+    --bg-void:     #ece6dc;   /* warm linen page */
+    --bg-deep:     #f4efe6;   /* unglazed porcelain */
+    --bg-base:     #faf6ee;   /* porcelain body */
+    --bg-elevated: #fffdf8;   /* glazed surface */
+    --bg-float:    #ffffff;   /* nacre highlight */
+    --bg-overlay:  #ffffff;   /* full lift */
+    --bg-hover:    rgba(33,31,26,0.05);
+    --bg-active:   color-mix(in srgb, var(--accent) 14%, transparent);
+    --accent:        #5d8a72;   /* muted celadon */
+    --accent-hover:  #4c7660;
+    --accent-active: #3f664f;
+    --accent-subtle: rgba(93,138,114,0.10);
+    --accent-border: rgba(93,138,114,0.28);
+    --accent-glow:   rgba(93,138,114,0.12);
+    --lux:           #8f6a14;   /* antique gold — dark enough to read on porcelain; 4.87:1 on bg-elevated, 4.60:1 on bg-base */
+    --lux-subtle:    color-mix(in srgb, var(--lux) 15%, transparent);
+    --gold:          var(--lux);
+    --gold-subtle:   var(--lux-subtle);
+    --elev-tint-1:   color-mix(in srgb, var(--bg-elevated) 98%, var(--accent));
+    --elev-tint-2:   color-mix(in srgb, var(--bg-float) 97%, var(--accent));
+    --elev-tint-3:   color-mix(in srgb, var(--bg-overlay) 96%, var(--accent));
+    --elev-highlight: inset 0 1px 0 rgba(255,255,255,.85);
+    --elev-shadow-1: 0 8px 24px rgba(58,48,30,.10);
+    --elev-shadow-2: 0 18px 42px rgba(58,48,30,.14);
+    --elev-shadow-3: 0 28px 70px rgba(58,48,30,.18);
+    --mention-bg:    color-mix(in srgb, var(--lux) 16%, transparent);
+    --reaction-bg:   color-mix(in srgb, var(--bg-base) 80%, var(--accent) 20%);
+    --reaction-bg-active: color-mix(in srgb, var(--lux) 22%, var(--bg-float));
+    --text-primary:   #211f1a; /* ink; 13.26:1 on bg-void, 16.19:1 on bg-elevated */
+    --text-secondary: #5d5749; /* 6.66:1 on bg-base */
+    --text-muted:     #686356; /* 5.89:1 on bg-elevated, 5.55:1 on bg-base, 4.82:1 on bg-void */
+    --text-link:      #2f6b52; /* 5.82:1 on bg-base */
+    --text-link-hover:#25543f;
+    --border-normal:  rgba(33,31,26,0.14);
+    --border-subtle:  rgba(33,31,26,0.08);
+    --status-offline: #99948a;
+    --shadow-sm:  0 1px 3px rgba(58,48,30,0.12);
+    --shadow-md:  0 4px 12px rgba(58,48,30,0.15);
+    --shadow-lg:  0 8px 30px rgba(58,48,30,0.18);
+    --glow:       0 0 32px rgba(93,138,114,0.14);
+    --unread:     var(--lux);
+    /* signature: pearl-mist scrim — warm white veil instead of darkness */
+    --scrim:          rgba(250,246,238,.72);
+    color-scheme: light;
   }
 }
 
@@ -552,7 +659,7 @@ body {
 code, kbd {
   font-family: var(--font-mono);
   font-size: 0.875em;
-  background: rgba(14,165,233,0.08);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
   padding: 1px 5px;
   border-radius: var(--r-xs);
   border: 1px solid var(--border-subtle);
@@ -969,6 +1076,8 @@ body.bubble-mode .chat-msg-wrap {
   --mention-bg: color-mix(in srgb, var(--lux) 24%, transparent);
   --reaction-bg: color-mix(in srgb, var(--bg-float) 76%, var(--accent) 24%);
   --reaction-bg-active: color-mix(in srgb, var(--lux) 28%, var(--bg-float));
+  /* signature: maximum-occlusion scrim for unambiguous layering */
+  --scrim: rgba(0,0,0,.88);
 }
 [data-contrast="high"] .chat-msg-wrap:hover,
 [data-high-contrast="true"] .chat-msg-wrap:hover { background: #1a1a1a; }
@@ -1008,17 +1117,29 @@ body.bubble-mode .chat-msg-wrap {
   --bg-void: #f2f3f5;
   --bg-deep: #ffffff;
   --bg-surface: #e3e5e8;
+  /* full ladder defined so no dark-theme surfaces leak through */
+  --bg-base: #fafbfc;
   --bg-elevated: #ffffff;
+  --bg-float: #fdfdfe;
+  --bg-overlay: #ffffff;
   --bg-hover: rgba(0,0,0,0.06);
   --bg-active: rgba(0,0,0,0.12);
   --text-primary: #060607;
   --text-secondary: #4e5058;
-  --text-muted: #606468; /* raised from #80848e; >=5.37:1 on bg-void (light) */
+  --text-muted: #606468; /* raised from #80848e; 4.73:1 on bg-surface #e3e5e8, 5.97:1 on bg-elevated */
   --text-link: #006ce7;
+  --text-link-hover: #0054b3;
   --accent: #5865f2;
   --accent-hover: #4752c4;
+  --accent-active: #3a45b0;
+  --accent-subtle: rgba(88,101,242,0.08);
+  --accent-border: rgba(88,101,242,0.25);
+  --accent-glow: rgba(88,101,242,0.12);
   --border: rgba(0,0,0,0.08);
   --border-strong: rgba(0,0,0,0.16);
+  --border-subtle: rgba(0,0,0,0.07);
+  --border-normal: rgba(0,0,0,0.13);
+  --status-offline: #8a9099;
   --msg-bg-hover: rgba(0,0,0,0.03);
   --msg-mention-bg: rgba(250,166,26,0.1);
   --scrollbar-thumb: rgba(0,0,0,0.2);
@@ -1041,6 +1162,7 @@ body.bubble-mode .chat-msg-wrap {
   --reaction-bg: color-mix(in srgb, var(--bg-surface) 78%, var(--accent) 22%);
   --reaction-bg-active: color-mix(in srgb, var(--lux) 24%, var(--bg-deep));
   --unread: var(--lux);
+  /* signature: paper scrim — cool white veil */
   --scrim: rgba(255,255,255,.72);
   color-scheme: light;
 }
