@@ -588,8 +588,9 @@ export class IRCClient {
       if (cap === 'draft/search') return false;
       // labeled-response: no @label= request/response correlation in Ocean.
       if (cap === 'labeled-response') return false;
-      // draft/channel-rename: no RENAME command handler.
-      if (cap === 'draft/channel-rename') return false;
+      // draft/channel-rename: requested — the store handles the native
+      // `:renamer RENAME #old #new [:reason]` line and migrates channel state
+      // (messages, membership, unread, active view) under the new key.
       // draft/file-upload: Ocean uses HTTP POST to a media server;
       // the IRC-level file-upload protocol is not implemented.
       if (cap === 'draft/file-upload') return false;

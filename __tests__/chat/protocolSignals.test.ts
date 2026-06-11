@@ -26,14 +26,14 @@ describe('IRCv3 protocol signals', () => {
     useOnyxStore.setState({ monitoredNicks: new Set() });
   });
 
-  it('sends typing notifications with the draft/typing message tag', () => {
+  it('sends typing notifications with the +typing client tag (draft/typing cap)', () => {
     const client = installClient();
 
     useOnyxStore.getState().sendTypingStart('#root');
     useOnyxStore.getState().sendTypingStop('#root');
 
-    expect(client.tagmsg).toHaveBeenNthCalledWith(1, '#root', { '+draft/typing': 'active' });
-    expect(client.tagmsg).toHaveBeenNthCalledWith(2, '#root', { '+draft/typing': 'done' });
+    expect(client.tagmsg).toHaveBeenNthCalledWith(1, '#root', { '+typing': 'active' });
+    expect(client.tagmsg).toHaveBeenNthCalledWith(2, '#root', { '+typing': 'done' });
   });
 
   it('loads recent channel history with CHATHISTORY LATEST', () => {
