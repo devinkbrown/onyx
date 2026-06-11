@@ -214,15 +214,16 @@ export default function ServerBar() {
         .server-bar {
           width: var(--server-bar-w);
           flex-shrink: 0;
-          background: var(--bg-void);
+          background: color-mix(in srgb, var(--bg-void) 92%, black);
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: 10px 0;
-          gap: 6px;
+          padding: var(--sp-2, 8px) 0;
+          gap: var(--sp-2, 8px);
           overflow-y: auto;
           overflow-x: hidden;
-          border-right: 1px solid var(--border-subtle);
+          border-right: 1px solid color-mix(in srgb, var(--border-subtle) 72%, transparent);
+          box-shadow: inset -1px 0 0 color-mix(in srgb, var(--text-primary) 3%, transparent);
           min-height: 0;
           scrollbar-width: none;
         }
@@ -230,58 +231,68 @@ export default function ServerBar() {
 
         /* ── Server icon button ── */
         .server-btn {
-          width: 44px;
-          height: 44px;
-          border-radius: 50%;
-          border: 1px solid transparent;
+          width: 64px;
+          height: 64px;
+          border-radius: 21px;
+          border: 1px solid color-mix(in srgb, var(--text-primary) 7%, transparent);
           cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
           transition:
-            border-radius 200ms var(--ease-out),
-            background 150ms var(--ease-out),
-            transform 200ms var(--ease-out),
-            opacity 150ms var(--ease-out);
+            border-radius var(--t-control, 150ms) var(--ease-out),
+            background var(--t-control, 150ms) var(--ease-out),
+            transform var(--t-control, 150ms) var(--ease-out),
+            opacity var(--t-control, 150ms) var(--ease-out),
+            box-shadow var(--t-control, 150ms) var(--ease-out);
           position: relative;
           flex-shrink: 0;
           transform: translateZ(0);
+          background: var(--elev-tint-1, color-mix(in srgb, var(--bg-deep) 92%, var(--accent) 2%));
+          color: var(--text-secondary);
+          box-shadow:
+            var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)),
+            var(--elev-shadow-1, 0 12px 28px rgba(0,0,0,.28));
         }
         .server-btn:hover {
-          border-radius: 12px;
+          border-radius: 18px;
           background-clip: padding-box;
-          box-shadow: 0 0 0 1px var(--border-normal), 0 8px 20px rgba(0,0,0,0.22);
+          background: var(--elev-tint-2, color-mix(in srgb, var(--bg-elevated) 88%, var(--accent) 3%));
+          border-color: color-mix(in srgb, var(--text-primary) 12%, transparent);
+          transform: translateY(-1px);
         }
         .server-btn--active {
-          border-radius: 12px !important;
-          box-shadow: 0 0 0 1px var(--accent-border), 0 8px 22px rgba(0,0,0,0.28);
-        }
-        /* Server icon glow on active */
-        .server-btn:not(.server-btn--home):not(.server-btn--add).server-btn--active {
-          box-shadow: 0 4px 20px rgba(14, 165, 233, 0.35), 0 0 0 1px rgba(14, 165, 233, 0.18);
+          border-radius: 18px !important;
+          color: var(--text-primary);
+          border-color: color-mix(in srgb, var(--lux, #d8b96a) 40%, transparent);
+          box-shadow:
+            var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)),
+            var(--elev-shadow-2, 0 18px 38px rgba(0,0,0,.38));
         }
 
         /* Active indicator bar on the left */
         .server-btn::before {
           content: '';
           position: absolute;
-          left: -12px;
+          left: 5px;
+          top: 10px;
           width: 3px;
-          background: var(--accent);
-          border-radius: 0 var(--r-xs) var(--r-xs) 0;
-          transition: height 200ms var(--ease-out), opacity 150ms var(--ease-out);
+          height: 44px;
+          background: var(--lux, #d8b96a);
+          border-radius: 999px;
+          transform: scaleY(0);
+          transform-origin: center;
+          transition: transform var(--t-control, 150ms) var(--ease-out), opacity var(--t-control, 150ms) var(--ease-out);
           opacity: 0;
-          height: 0;
         }
-        .server-btn:hover::before { height: 20px; opacity: 0.7; }
-        .server-btn--active::before { height: 40px; opacity: 1; background: var(--accent); }
+        .server-btn:hover::before { transform: scaleY(0.45); opacity: 0.65; }
+        .server-btn--active::before { transform: scaleY(1); opacity: 1; }
 
         .server-btn--home {
-          background: var(--bg-deep);
           color: var(--text-primary);
         }
-        .server-btn--home:hover { background: var(--accent); color: #fff; }
-        .server-btn--home.server-btn--active { background: var(--accent); color: #fff; }
+        .server-btn--home:hover { color: var(--text-primary); }
+        .server-btn--home.server-btn--active { color: var(--lux, #d8b96a); }
 
         /* Add server button */
         .server-btn--add {
@@ -297,38 +308,33 @@ export default function ServerBar() {
         }
 
         .server-btn--bell {
-          background: var(--bg-deep);
           color: var(--text-secondary);
         }
-        .server-btn--bell:hover { background: var(--bg-overlay); color: var(--text-primary); }
-        .server-btn--bell.server-btn--active { background: var(--accent); color: #fff; }
+        .server-btn--bell:hover { color: var(--text-primary); }
+        .server-btn--bell.server-btn--active { color: var(--lux, #d8b96a); }
 
         .server-btn--theme {
-          background: var(--bg-deep);
           color: var(--text-secondary);
         }
-        .server-btn--theme:hover { background: var(--bg-overlay); color: var(--text-primary); }
-        .server-btn--theme.server-btn--active { background: var(--accent); color: #fff; }
+        .server-btn--theme:hover { color: var(--text-primary); }
+        .server-btn--theme.server-btn--active { color: var(--lux, #d8b96a); }
 
         .server-btn--connprofile {
-          background: var(--bg-deep);
           color: var(--text-secondary);
         }
-        .server-btn--connprofile:hover { background: var(--bg-overlay); color: var(--text-primary); }
-        .server-btn--connprofile.server-btn--active { background: var(--accent); color: #fff; }
+        .server-btn--connprofile:hover { color: var(--text-primary); }
+        .server-btn--connprofile.server-btn--active { color: var(--lux, #d8b96a); }
 
         .server-btn--help {
-          background: var(--bg-deep);
           color: var(--text-muted);
         }
-        .server-btn--help:hover { background: var(--bg-overlay); color: var(--text-secondary); }
+        .server-btn--help:hover { color: var(--text-secondary); }
 
         .server-btn--friends {
-          background: var(--bg-deep);
           color: var(--text-secondary);
         }
-        .server-btn--friends:hover { background: var(--bg-overlay); color: var(--text-primary); }
-        .server-btn--friends.server-btn--active { background: var(--accent); color: #fff; }
+        .server-btn--friends:hover { color: var(--text-primary); }
+        .server-btn--friends.server-btn--active { color: var(--lux, #d8b96a); }
 
         /* ── Badges ── */
         .server-badge--online {
@@ -354,16 +360,16 @@ export default function ServerBar() {
           font-size: 14px;
           font-weight: 700;
           color: #fff;
-          letter-spacing: -0.5px;
+          letter-spacing: 0;
         }
 
         .server-separator {
           width: 32px;
-          height: 2px;
-          background: var(--border-normal);
+          height: 1px;
+          background: color-mix(in srgb, var(--text-primary) 10%, transparent);
           border-radius: var(--r-full);
           flex-shrink: 0;
-          margin: 4px 0;
+          margin: var(--sp-1, 4px) 0;
           opacity: 0.6;
           flex-shrink: 0;
         }
@@ -372,8 +378,8 @@ export default function ServerBar() {
         .server-btn-wrap {
           position: relative;
           flex-shrink: 0;
-          width: 44px;
-          height: 44px;
+          width: 64px;
+          height: 64px;
         }
 
         /* Unread / mention badge */
@@ -399,12 +405,12 @@ export default function ServerBar() {
           width: 10px;
           height: 10px;
           border-radius: 50%;
-          background: var(--accent);
+          background: var(--unread, var(--lux, #d8b96a));
           border: 2px solid var(--bg-void);
           opacity: 0.8;
         }
         .server-badge--gold {
-          background: var(--gold, #e8b84b);
+          background: var(--lux, var(--gold, #e8b84b));
           color: #000;
           font-size: 10px;
           font-weight: 700;
@@ -417,18 +423,16 @@ export default function ServerBar() {
         }
 
         .server-btn--bookmark {
-          background: var(--bg-deep);
           color: var(--text-secondary);
         }
-        .server-btn--bookmark:hover { background: var(--bg-overlay); color: var(--gold, #e8b84b); }
-        .server-btn--bookmark.server-btn--active { background: var(--gold, #e8b84b); color: #000; }
+        .server-btn--bookmark:hover { color: var(--lux, var(--gold, #e8b84b)); }
+        .server-btn--bookmark.server-btn--active { color: var(--lux, var(--gold, #e8b84b)); }
 
         .server-btn--announce {
-          background: var(--bg-deep);
           color: var(--text-secondary);
         }
-        .server-btn--announce:hover { background: var(--bg-overlay); color: #e8b84b; }
-        .server-btn--announce.server-btn--active { background: #e8b84b; color: #000; }
+        .server-btn--announce:hover { color: var(--lux, #d8b96a); }
+        .server-btn--announce.server-btn--active { color: var(--lux, #d8b96a); }
 
         .server-badge--announce-pulse {
           position: absolute;
@@ -437,7 +441,7 @@ export default function ServerBar() {
           width: 9px;
           height: 9px;
           border-radius: 50%;
-          background: #e8b84b;
+          background: var(--lux, #d8b96a);
           border: 2px solid var(--bg-void);
           pointer-events: none;
           animation: announce-pulse 1.8s ease-in-out infinite;

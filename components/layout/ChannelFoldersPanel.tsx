@@ -514,17 +514,24 @@ function FolderSection({
       )}
 
       <style>{`
-        .cfp-folder { margin-bottom: 6px; }
+        .cfp-folder { margin-bottom: 8px; }
 
         .cfp-folder-header {
           display: flex; align-items: center; gap: 4px;
-          padding: 5px 6px 3px 6px;
+          min-height: 28px;
+          padding: var(--sp-1, 4px) var(--sp-2, 8px);
           cursor: pointer;
           user-select: none;
-          border-radius: var(--r-sm, 4px);
-          transition: background 80ms;
+          border: 1px solid transparent;
+          border-radius: var(--r-md, 8px);
+          transition:
+            background var(--t-micro, 90ms) var(--ease-out),
+            border-color var(--t-micro, 90ms) var(--ease-out);
         }
-        .cfp-folder-header:hover { background: var(--ch-hover-bg, rgba(255,255,255,0.04)); }
+        .cfp-folder-header:hover {
+          background: var(--elev-tint-1, color-mix(in srgb, var(--bg-elevated) 66%, var(--ch-hover-bg)));
+          border-color: var(--border-subtle);
+        }
         .cfp-folder-header--drag-over {
           background: var(--accent-subtle, rgba(14,165,233,0.12));
           outline: 1px dashed var(--accent, #0ea5e9);
@@ -542,12 +549,12 @@ function FolderSection({
 
         .cfp-folder-name {
           flex: 1;
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 0.07em;
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 0.11em;
           text-transform: uppercase;
           color: var(--text-secondary);
-          transition: color 80ms;
+          transition: color var(--t-micro, 90ms);
           overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         .cfp-folder-header:hover .cfp-folder-name { color: var(--text-primary); }
@@ -557,8 +564,8 @@ function FolderSection({
           font-weight: 700;
           color: var(--text-muted);
           flex-shrink: 0;
-          background: var(--accent-subtle);
-          border: 1px solid var(--accent-border);
+          background: color-mix(in srgb, var(--bg-float) 58%, transparent);
+          border: 1px solid var(--border-subtle);
           border-radius: var(--r-full);
           padding: 0 5px;
           min-width: 16px;
@@ -572,7 +579,7 @@ function FolderSection({
         .cfp-folder-body {
           display: flex;
           flex-direction: column;
-          gap: 1px;
+          gap: 2px;
         }
 
         .cfp-empty {
@@ -592,15 +599,54 @@ function FolderSection({
 
         .cfp-row {
           display: flex; align-items: center; gap: 6px;
-          padding: 4px 8px 4px 12px;
+          position: relative;
+          min-height: 32px;
+          padding: 0 var(--sp-2, 8px) 0 var(--sp-3, 12px);
+          border: 1px solid transparent;
           border-radius: var(--r-sm, 4px);
-          margin: 0 6px;
+          margin: 0 4px;
           cursor: pointer;
           user-select: none;
-          transition: background 80ms;
+          transition:
+            background var(--t-micro, 90ms) var(--ease-out),
+            border-color var(--t-micro, 90ms) var(--ease-out);
         }
-        .cfp-row:hover { background: var(--ch-hover-bg, rgba(255,255,255,0.04)); }
-        .cfp-row--active { background: var(--ch-active-bg, rgba(14,165,233,0.2)) !important; }
+        .cfp-row:hover {
+          background: var(--elev-tint-1, color-mix(in srgb, var(--bg-elevated) 66%, var(--ch-hover-bg)));
+          border-color: var(--border-subtle);
+        }
+        .cfp-row--active {
+          background: var(--elev-tint-2, color-mix(in srgb, var(--bg-elevated) 86%, var(--lux, #d8b96a) 4%)) !important;
+          border-color: color-mix(in srgb, var(--lux, #d8b96a) 22%, transparent) !important;
+          box-shadow:
+            var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)),
+            var(--elev-shadow-1, 0 10px 20px rgba(0,0,0,.22));
+        }
+        .cfp-row--active::before {
+          content: '';
+          position: absolute;
+          left: 4px;
+          top: 7px;
+          bottom: 7px;
+          width: 2px;
+          border-radius: 999px;
+          background: var(--lux, #d8b96a);
+        }
+        .cfp-row--unread:not(.cfp-row--active) {
+          background: var(--elev-tint-1, color-mix(in srgb, var(--bg-deep) 90%, var(--lux, #d8b96a) 3%));
+          border-color: color-mix(in srgb, var(--lux, #d8b96a) 14%, transparent);
+        }
+        .cfp-row--unread:not(.cfp-row--active)::after {
+          content: '';
+          position: absolute;
+          left: 7px;
+          top: 50%;
+          width: 5px;
+          height: 5px;
+          border-radius: 50%;
+          background: var(--unread, var(--lux, #d8b96a));
+          transform: translateY(-50%);
+        }
         .cfp-row--drag-over {
           background: var(--accent-subtle, rgba(14,165,233,0.12));
           outline: 1px dashed var(--accent, #0ea5e9);
@@ -637,7 +683,7 @@ function FolderSection({
         }
         .cfp-hash--forum { font-size: 12px; }
         .cfp-row:hover .cfp-hash,
-        .cfp-row--active .cfp-hash { color: var(--text-secondary); }
+        .cfp-row--active .cfp-hash { color: var(--lux, #d8b96a); }
 
         .cfp-name {
           flex: 1;
@@ -648,7 +694,7 @@ function FolderSection({
           transition: color 80ms;
         }
         .cfp-row:hover .cfp-name,
-        .cfp-row--active .cfp-name { color: var(--ch-unread, var(--text-primary)); }
+        .cfp-row--active .cfp-name { color: var(--text-primary); }
         .cfp-name--unread { color: var(--text-normal, var(--text-primary)); font-weight: 600; }
 
         .cfp-move-btn {
@@ -687,7 +733,10 @@ function FolderSection({
           flex-shrink: 0;
         }
         .cfp-badge--mention { background: var(--danger, #ed4245); }
-        .cfp-badge--unread  { background: var(--text-muted); }
+        .cfp-badge--unread  {
+          background: var(--unread, var(--lux, #d8b96a));
+          color: color-mix(in srgb, var(--bg-void) 90%, black);
+        }
       `}</style>
     </div>
   );

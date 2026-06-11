@@ -10,6 +10,16 @@ export interface IRCMessage {
   raw: string;
 }
 
+export type StandardReplyKind = 'NOTE' | 'FAIL' | 'WARN';
+
+export interface StandardReply {
+  kind: StandardReplyKind;
+  command: string;
+  code: string;
+  context: string[];
+  description: string;
+}
+
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
 export type MessageType =
@@ -86,8 +96,10 @@ export interface Channel {
 
 export interface ISupport {
   PREFIX: Record<string, string>;   // mode → prefix char, e.g. { q:'~', o:'@', v:'+' }
+  PREFIX_MODES: Record<string, string>; // prefix char → mode letter, e.g. { '@':'o' }
   CHANMODES: string[];
   CHANTYPES: string;
+  CHANLIMITS: Record<string, number>;
   NETWORK: string;
   CASEMAPPING: string;
   MODES: number;
@@ -97,11 +109,13 @@ export interface ISupport {
   IRCX: boolean;
   MAXDATA: number;
   COMICCHAT: string;   // e.g. 'DATA' — method used for comic chat signalling
-  LADONMEDIA: string;  // e.g. 'MEDIA' — method used for LADON media signalling
+  /** Deprecated compatibility field. Orochi media is gated by caps/NOTE MEDIA, not LADONMEDIA. */
+  LADONMEDIA: string;
   MAXMEDIA: number;
   MEDIAUMODES: string;
   MEDIAMUTE: string;
-  MEDIAFRAME: string;  // supported MEDIAFRAME subtypes list
+  /** Deprecated compatibility field. Orochi does not use IRC MEDIAFRAME. */
+  MEDIAFRAME: string;
   MEDIACHUNK: number;  // max base64 chars per MCHUNK chunk (0 = not supported)
   SILENCE: number;     // max silence list entries (0 = not supported)
 }

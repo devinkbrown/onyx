@@ -459,10 +459,12 @@ export default function AppShell({ children }: Props) {
         )}
 
         {/* Chat or home */}
-        {activeView.kind === 'home'
-          ? children
-          : <ChatArea />
-        }
+        <div className="chat-column elev-1">
+          {activeView.kind === 'home'
+            ? children
+            : <ChatArea />
+          }
+        </div>
       </div>
 
       {/* Right member list — desktop: shown normally; mobile: shown when mobilePanel === 'members' */}
@@ -700,11 +702,10 @@ export default function AppShell({ children }: Props) {
           height: 100%;
           min-width: 208px;
           max-width: 360px;
-          background:
-            linear-gradient(180deg, rgba(255,255,255,0.018), rgba(255,255,255,0) 120px),
-            var(--bg-deep);
-          border-right: 1px solid var(--border-subtle);
-          transition: transform 200ms var(--ease-out);
+          background: color-mix(in srgb, var(--bg-deep) 94%, var(--bg-void));
+          border-right: 1px solid color-mix(in srgb, var(--border-subtle) 82%, transparent);
+          box-shadow: inset 1px 0 0 color-mix(in srgb, var(--text-primary) 4%, transparent);
+          transition: transform var(--t-surface, 220ms) var(--ease-out);
           position: relative;
           min-height: 0;
         }
@@ -762,11 +763,25 @@ export default function AppShell({ children }: Props) {
           display: flex;
           flex-direction: column;
           overflow: hidden;
-          background:
-            radial-gradient(circle at 50% -140px, var(--accent-glow), transparent 280px),
-            linear-gradient(180deg, color-mix(in srgb, var(--bg-base) 92%, var(--accent) 8%), var(--bg-base) 220px);
+          background: var(--bg-base);
+          padding: var(--sp-2, 8px);
           min-width: 0;
           position: relative;
+          gap: var(--sp-2, 8px);
+        }
+
+        .chat-column {
+          flex: 1;
+          min-height: 0;
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          border-radius: var(--r-xl, 16px);
+          background: var(--elev-tint-1, color-mix(in srgb, var(--bg-deep) 90%, var(--accent) 2%));
+          box-shadow:
+            var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)),
+            var(--elev-shadow-1, 0 18px 44px rgba(0,0,0,.32));
         }
 
         /* ── Member list ── */
@@ -774,10 +789,9 @@ export default function AppShell({ children }: Props) {
           width: var(--member-list-w);
           flex-shrink: 0;
           height: 100%;
-          background:
-            linear-gradient(180deg, rgba(255,255,255,0.018), rgba(255,255,255,0) 120px),
-            var(--bg-deep);
-          border-left: 1px solid var(--border-subtle);
+          background: color-mix(in srgb, var(--bg-deep) 94%, var(--bg-void));
+          border-left: 1px solid color-mix(in srgb, var(--border-subtle) 82%, transparent);
+          box-shadow: inset 1px 0 0 color-mix(in srgb, var(--text-primary) 4%, transparent);
           overflow-y: auto;
           position: relative;
           z-index: 1;
@@ -834,9 +848,14 @@ export default function AppShell({ children }: Props) {
         .mobile-overlay {
           display: none;
           position: fixed; inset: 0; z-index: 100;
-          background: rgba(0,0,0,0.65);
-          backdrop-filter: blur(6px) saturate(0.7);
-          -webkit-backdrop-filter: blur(6px) saturate(0.7);
+          background: var(--scrim, rgba(2,6,12,.65));
+          backdrop-filter: blur(var(--glass-blur, 12px)) saturate(0.82);
+          -webkit-backdrop-filter: blur(var(--glass-blur, 12px)) saturate(0.82);
+          animation: mobile-scrim-in var(--t-overlay-in, 320ms) var(--ease-out) both;
+        }
+        @keyframes mobile-scrim-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
 
         /* ── Mobile breakpoint ── */
@@ -847,6 +866,9 @@ export default function AppShell({ children }: Props) {
           /* Main shell bottom pad accounts for bottom nav + safe area */
           .app-shell {
             padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+          }
+          .app-main {
+            padding: var(--sp-2, 8px);
           }
 
           /* Mobile topbar gets larger menu button touch target */
@@ -863,13 +885,17 @@ export default function AppShell({ children }: Props) {
             width: min(var(--sidebar-w), 88vw) !important;
             max-width: 360px;
             min-width: 0;
-            /* Smooth spring slide */
-            transition: transform 300ms cubic-bezier(0.16,1,0.3,1),
-                        box-shadow 300ms cubic-bezier(0.16,1,0.3,1);
+            border-radius: 0 var(--r-xl, 16px) var(--r-xl, 16px) 0;
+            border-right: 1px solid color-mix(in srgb, var(--text-primary) 10%, transparent);
+            transition:
+              transform var(--t-overlay-in, 320ms) var(--ease-out),
+              box-shadow var(--t-overlay-in, 320ms) var(--ease-out);
           }
           .app-sidebar--open {
             transform: translateX(0);
-            box-shadow: 4px 0 32px rgba(0,0,0,0.6);
+            box-shadow:
+              var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)),
+              var(--elev-shadow-3, 18px 0 56px rgba(0,0,0,.54));
           }
 
           .app-member-list { display: none; }

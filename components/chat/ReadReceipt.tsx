@@ -71,7 +71,7 @@ export default function ReadReceipt({ nick, msgTimestamp }: ReadReceiptProps) {
           gap: 5px;
           padding: 1px 18px 5px;
           font-size: 11px;
-          color: var(--accent);
+          color: var(--lux, #d8b96a);
           user-select: none;
           opacity: 0;
           animation: rr-fade-in 200ms var(--ease-out, ease) 120ms both;
@@ -90,6 +90,9 @@ export default function ReadReceipt({ nick, msgTimestamp }: ReadReceiptProps) {
           opacity: 0.7;
           font-variant-numeric: tabular-nums;
           letter-spacing: 0.01em;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .read-receipt { animation: none !important; opacity: 0.82; }
         }
       `}</style>
     </div>

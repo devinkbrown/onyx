@@ -223,19 +223,19 @@ const replyQuoteStyles = `
   .rq-wrap {
     display: flex; align-items: stretch; gap: 9px;
     padding: 5px 10px 5px 0;
-    margin: 2px 0 5px;
+    margin: 2px 0 var(--sp-1, 4px);
     cursor: pointer;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-sm, 6px);
     max-width: 100%;
     overflow: hidden;
-    background: color-mix(in srgb, var(--bg-elevated) 34%, transparent);
+    background: color-mix(in srgb, var(--bg-elevated, #132131) 34%, transparent);
     box-shadow: inset 0 0 0 1px var(--border-subtle);
   }
-  .rq-wrap:hover { background: var(--accent-subtle); }
+  .rq-wrap:hover { background: color-mix(in srgb, var(--lux, #d8b96a) 8%, transparent); }
   .rq-wrap:focus-visible { outline: 2px solid var(--accent, #0ea5e9); outline-offset: 2px; border-radius: var(--r-xs, 4px); }
   .rq-bar {
     width: 3px; flex-shrink: 0; align-self: stretch;
-    background: var(--accent); border-radius: 3px;
+    background: var(--lux, #d8b96a); border-radius: 3px;
     min-height: 16px;
     opacity: 0.9;
   }
@@ -244,7 +244,7 @@ const replyQuoteStyles = `
     overflow: hidden; min-width: 0;
   }
   .rq-nick {
-    font-size: 12px; font-weight: 750; color: var(--accent);
+    font-size: 12px; font-weight: 750; color: var(--lux, #d8b96a);
     white-space: nowrap; flex-shrink: 0;
   }
   .rq-text {
@@ -283,7 +283,6 @@ function ReplyQuote({ replyTo, onClick }: ReplyQuoteProps) {
         <span className="rq-nick">{replyTo.from}</span>
         <span className="rq-text">{displayText}</span>
       </div>
-      <style>{replyQuoteStyles}</style>
     </div>
   );
 }
@@ -397,7 +396,7 @@ function CodeBlock({ code, lang }: CodeBlockProps) {
   return (
     <div className="msg-code-block">
       <div className="msg-code-header">
-        {lang && <span className="msg-code-lang">{lang}</span>}
+        <span className="msg-code-lang">{lang || 'text'}</span>
         <button className="msg-code-copy" onClick={handleCopy} aria-label="Copy code">
           {copied ? 'Copied!' : 'Copy'}
         </button>
@@ -416,7 +415,6 @@ function CodeBlock({ code, lang }: CodeBlockProps) {
           </table>
         </code>
       </pre>
-      <style>{codeBlockStyles}</style>
     </div>
   );
 }
@@ -457,7 +455,6 @@ function InlineImage({ url, fullWidth = false }: InlineImageProps) {
         onError={() => setErrored(true)}
         style={{ cursor: 'pointer' }}
       />
-      <style>{imageStyles}</style>
     </span>
   );
 }
@@ -480,7 +477,6 @@ function Spoiler({ content }: SpoilerProps) {
       aria-expanded={revealed}
     >
       {revealed ? content : <span className="msg-spoiler-label">Spoiler</span>}
-      <style>{spoilerStyles}</style>
     </span>
   );
 }
@@ -562,7 +558,6 @@ function CollapsibleMessage({ text, children }: CollapsibleMessageProps) {
         </svg>
         {expanded ? 'Show less' : `Show more · ${lineCount} lines`}
       </button>
-      <style>{collapsibleStyles}</style>
     </div>
   );
 }
@@ -626,13 +621,7 @@ function MessageBody({
   if (redacted) {
     return (
       <>
-        <span className="msg-redacted">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden>
-            <path d="M7 1a6 6 0 1 1 0 12A6 6 0 0 1 7 1zm0 1a5 5 0 1 0 0 10A5 5 0 0 0 7 2zm-.5 3h1v4h-1V5zm0 5h1v1h-1v-1z"/>
-          </svg>
-          Message deleted
-        </span>
-        <style>{`.msg-redacted{display:inline-flex;align-items:center;gap:6px;color:var(--text-muted);font-style:italic;font-size:13px;border:1px solid var(--border-subtle);border-radius:4px;padding:2px 8px;background:var(--bg-overlay);}`}</style>
+        <span className="msg-redacted">◌ message removed</span>
       </>
     );
   }
@@ -651,27 +640,6 @@ function MessageBody({
       <div className="msg-sticker" title={tooltip} aria-label={`${tooltip}: ${emoji}`}>
         <span className="msg-sticker-emoji" aria-hidden>{emoji}</span>
         <span className="msg-sticker-pack">{packName}</span>
-        <style>{`
-          .msg-sticker {
-            display: inline-flex;
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 2px;
-            padding: 4px 0;
-          }
-          .msg-sticker-emoji {
-            font-size: 3.5rem;
-            line-height: 1;
-            display: block;
-          }
-          .msg-sticker-pack {
-            font-size: 10px;
-            color: var(--text-muted);
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-          }
-        `}</style>
       </div>
     );
   }
@@ -1101,7 +1069,7 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
         <span className="msg-nick-change-arrow"> → </span>
         <span className="msg-nick-change-new">{newNick}</span>
         {timeStr && <time className="msg-nick-change-time">{timeStr}</time>}
-        <style>{nickChangeStyles}</style>
+        <MessageItemStyles />
       </div>
     );
   }
@@ -1120,7 +1088,7 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
           {!parsed.nick && !parsed.action && <span className="msg-event-action">{text}</span>}
         </span>
         {timeStr && <time className="msg-event-time">{timeStr}</time>}
-        <style>{eventStyles}</style>
+        <MessageItemStyles />
       </div>
     );
   }
@@ -1128,12 +1096,12 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
   // ── Action (/me) ───────────────────────────────────────────────────────
   if (isAction) {
     return (
-      <div className={`msg-item ${grouped ? 'msg-grouped' : ''} ${highlight ? 'msg-item--highlight' : ''}`} style={{ paddingTop: grouped ? 2 : 9, paddingBottom: grouped ? 2 : 5 }}>
+      <div className={`msg-item ${grouped ? 'msg-grouped' : ''} ${highlight ? 'msg-item--highlight' : ''}`}>
         {!grouped && (
-          <div className="msg-avatar-col" style={{ width: 40, flexShrink: 0 }} />
+          <div className="msg-avatar-col" />
         )}
         {grouped && (
-          <div className="msg-avatar-col" style={{ width: 40, flexShrink: 0, position: 'relative' }}>
+          <div className="msg-avatar-col msg-avatar-col--grouped">
             {timeStr && (
               <time className="msg-grouped-time msg-ts-spacer" aria-hidden>
                 {timeStr}
@@ -1148,7 +1116,7 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
             {' '}<span dangerouslySetInnerHTML={{ __html: rendered }} />
           </div>
         </div>
-        <style>{msgStyles}</style>
+        <MessageItemStyles />
       </div>
     );
   }
@@ -1160,7 +1128,7 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
         <span className="msg-notice-prefix">[{from}]</span>
         <span dangerouslySetInnerHTML={{ __html: rendered }} />
         {timeStr && <time className="msg-event-time">{timeStr}</time>}
-        <style>{noticeStyles}</style>
+        <MessageItemStyles />
       </div>
     );
   }
@@ -1180,7 +1148,7 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
           <span className="msg-whisper-text" dangerouslySetInnerHTML={{ __html: rendered }} />
         </div>
         {timeStr && <time className="msg-event-time">{timeStr}</time>}
-        <style>{whisperStyles}</style>
+        <MessageItemStyles />
       </div>
     );
   }
@@ -1197,7 +1165,7 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
             Show
           </button>
         </div>
-        <style>{collapsedStyles}</style>
+        <MessageItemStyles />
       </>
     );
   }
@@ -1214,7 +1182,7 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
         <button className="msg-hidden-reveal" onClick={() => revealMessage(message.id)}>
           Show message
         </button>
-        <style>{hiddenMsgStyles}</style>
+        <MessageItemStyles />
       </div>
     );
   }
@@ -1227,8 +1195,7 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
       role="article"
       aria-label={`Message from ${from} at ${timeStr}`}
       data-selected={isSelectMode ? isSelected : undefined}
-      className={`msg-item ${grouped ? 'msg-grouped' : ''} ${highlight ? 'msg-item--highlight' : ''} ${isMe ? 'msg-item--self' : ''} ${isSelected ? 'msg-item--selected' : ''} ${animNew ? 'msg-new' : ''}`}
-      style={{ paddingTop: grouped ? 2 : 9, paddingBottom: grouped ? 2 : 5 }}
+      className={`msg-item ${grouped ? 'msg-grouped' : ''} ${redacted ? 'msg-item--redacted' : ''} ${highlight ? 'msg-item--highlight' : ''} ${isMe ? 'msg-item--self' : ''} ${isSelected ? 'msg-item--selected' : ''} ${animNew ? 'msg-new' : ''}`}
       onClick={handleMsgClick}
       onContextMenu={e => {
         e.preventDefault();
@@ -1237,10 +1204,10 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
     >
       {/* Avatar column */}
       {!grouped && (
-        <div className="msg-avatar-col" style={{ width: 40, flexShrink: 0 }} />
+        <div className="msg-avatar-col" />
       )}
       {grouped && (
-        <div className="msg-avatar-col" style={{ width: 40, flexShrink: 0, position: 'relative' }}>
+        <div className="msg-avatar-col msg-avatar-col--grouped">
           {timeStr && (
             <time className="msg-grouped-time msg-ts-spacer" aria-hidden>
               {timeStr}
@@ -1514,7 +1481,7 @@ export default function MessageItem({ message, isMe, compact, isGrouped = false,
         />
       )}
 
-      <style>{msgStyles}</style>
+      <MessageItemStyles />
     </div>
   );
 }
@@ -1818,6 +1785,7 @@ const msgStyles = `
     .msg-actions,
     .msg-actions-bar,
     .action-btn,
+    .msg-redacted,
     .av-pop,
     .msg-inline-edit,
     .msg-jump-highlight {
@@ -1829,12 +1797,43 @@ const msgStyles = `
 
   .msg-item {
     display: flex;
-    gap: 11px;
-    padding: 2px 16px;
+    gap: var(--sp-3, 12px);
+    padding: var(--msg-head-pad-y, 5px) var(--sp-4, 16px);
+    min-height: 36px;
     position: relative;
     isolation: isolate;
+    align-items: flex-start;
   }
-  .msg-item:hover { background: rgba(14,165,233,0.045); }
+  .msg-list[data-density] .msg-item {
+    padding-top: var(--msg-head-pad-y, 5px) !important;
+    padding-bottom: var(--msg-head-pad-y, 5px) !important;
+  }
+  .msg-list[data-density] .msg-item.msg-grouped {
+    padding-top: var(--msg-grouped-pad-y, 1px) !important;
+    padding-bottom: var(--msg-grouped-pad-y, 1px) !important;
+  }
+  .msg-list[data-density="compact"] .msg-text,
+  .msg-list[data-density="compact"] .msg-action,
+  .msg-list[data-density="compact"] .msg-body {
+    font-size: var(--text-sm, .8125rem);
+    line-height: 1.42;
+  }
+  .msg-list[data-density="cozy"] .msg-text,
+  .msg-list[data-density="cozy"] .msg-action,
+  .msg-list[data-density="cozy"] .msg-body {
+    font-size: var(--text-base, .875rem);
+    line-height: 1.52;
+  }
+  .msg-list[data-density="spacious"] .msg-text,
+  .msg-list[data-density="comfortable"] .msg-text,
+  .msg-list[data-density="spacious"] .msg-action,
+  .msg-list[data-density="comfortable"] .msg-action,
+  .msg-list[data-density="spacious"] .msg-body,
+  .msg-list[data-density="comfortable"] .msg-body {
+    font-size: var(--text-md, .9375rem);
+    line-height: 1.58;
+  }
+  .msg-item:hover { background: color-mix(in srgb, var(--bg-elevated, #132131) 42%, transparent); }
   .msg-item--highlight {
     background: color-mix(in srgb, var(--gold) 8%, transparent);
     border-left: 3px solid var(--gold);
@@ -1845,10 +1844,10 @@ const msgStyles = `
 
   /* Own messages: very subtle warm-blue tint so self-messages stand out slightly */
   .msg-item--self:not(.msg-item--highlight):not(.msg-item--selected) {
-    background: rgba(14,165,233,0.022);
+    background: color-mix(in srgb, var(--bg-elevated, #132131) 18%, transparent);
   }
   .msg-item--self:not(.msg-item--highlight):not(.msg-item--selected):hover {
-    background: rgba(14,165,233,0.06);
+    background: color-mix(in srgb, var(--bg-elevated, #132131) 48%, transparent);
   }
 
   /* Mention highlight: accent left border + faint background when @nick matches */
@@ -1867,7 +1866,13 @@ const msgStyles = `
     background: color-mix(in srgb, var(--accent, #0ea5e9) 12%, transparent);
   }
 
-  .msg-body { flex: 1; min-width: 0; }
+  .msg-avatar-col {
+    width: 36px;
+    min-width: 36px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .msg-body { flex: 1; min-width: 0; padding-top: 1px; }
   .msg-meta { display: flex; align-items: baseline; gap: 7px; margin-bottom: 3px; min-height: 18px; }
 
   .msg-nick {
@@ -1876,7 +1881,6 @@ const msgStyles = `
     cursor: pointer;
     letter-spacing: 0;
     line-height: 1.25;
-    text-shadow: 0 0 18px var(--accent-glow);
   }
   .msg-nick:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 
@@ -1912,6 +1916,52 @@ const msgStyles = `
     user-select: none;
   }
 
+  .msg-sticker {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: var(--sp-1, 4px) 0;
+  }
+  .msg-sticker-emoji {
+    font-size: 3.5rem;
+    line-height: 1;
+    display: block;
+  }
+  .msg-sticker-pack {
+    font-size: var(--text-2xs, .6875rem);
+    color: var(--text-muted);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .msg-redacted {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: var(--text-sm, .8125rem);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--r-sm, 6px);
+    padding: 2px var(--sp-2, 8px);
+    background: color-mix(in srgb, var(--bg-elevated, #132131) 54%, transparent);
+    clip-path: inset(0 0 0 0);
+    animation: msg-redacted-collapse var(--t-surface, 220ms) var(--ease-in, cubic-bezier(.7,0,.84,0)) both;
+    will-change: clip-path, opacity;
+  }
+
+  .msg-item--redacted {
+    min-height: 28px;
+  }
+
+  @keyframes msg-redacted-collapse {
+    0% { clip-path: inset(0 0 0 0); opacity: 0; }
+    45% { clip-path: inset(0 40% 0 0); opacity: 0.56; }
+    100% { clip-path: inset(0 0 0 0); opacity: 0.76; }
+  }
+
   .msg-time-compact {
     position: absolute; left: 20px; top: 50%; transform: translateY(-50%);
     font-size: 10px; color: var(--text-muted);
@@ -1924,12 +1974,13 @@ const msgStyles = `
 
   /* ── Grouped messages (same sender, within 5 min, same day) ── */
   .msg-item.msg-grouped {
-    padding-top: 2px;
-    padding-bottom: 2px;
+    padding-top: var(--msg-grouped-pad-y, 1px);
+    padding-bottom: var(--msg-grouped-pad-y, 1px);
+    min-height: auto;
     margin-top: 0;
   }
   .msg-item:not(.msg-grouped) {
-    margin-top: 8px;
+    margin-top: 0;
   }
   .msg-grouped .msg-avatar-col {
     visibility: hidden;
@@ -1948,9 +1999,9 @@ const msgStyles = `
     top: 50%;
     transform: translateY(-50%);
     white-space: nowrap;
-    width: 52px;
+    width: 36px;
     text-align: right;
-    padding-right: 8px;
+    padding-right: var(--sp-1, 4px);
     pointer-events: none;
   }
   .msg-item:hover .msg-grouped-time {
@@ -2058,7 +2109,6 @@ const msgStyles = `
     border: 1px solid var(--accent-border);
     font-weight: 700;
     cursor: pointer;
-    box-shadow: 0 0 14px var(--accent-glow);
   }
   .highlight-word {
     background: var(--gold-subtle);
@@ -2068,7 +2118,6 @@ const msgStyles = `
     padding: 0 4px;
     font-weight: 750;
     font-style: normal;
-    box-shadow: 0 0 16px var(--accent-glow);
   }
   .msg-link {
     color: var(--accent-hover);
@@ -2139,15 +2188,16 @@ const msgStyles = `
 
   /* Hover actions */
   .msg-actions {
-    position: absolute; top: -5px; right: 12px;
+    position: absolute; top: -18px; right: var(--sp-3, 12px);
     display: flex; align-items: center; gap: 2px;
-    background: color-mix(in srgb, var(--bg-overlay) 88%, transparent);
-    border: 1px solid var(--border-normal);
-    border-radius: var(--r-md);
-    padding: 3px 5px;
-    opacity: 0; transition: opacity var(--t-fast);
+    background: color-mix(in srgb, var(--bg-elevated, #132131) 92%, transparent);
+    border: 1px solid var(--border-subtle, rgba(255,255,255,.08));
+    border-radius: var(--r-full, 9999px);
+    padding: 3px 6px;
+    opacity: 0;
+    transition: opacity var(--t-micro, 90ms) var(--ease-out, ease);
     z-index: 20;
-    box-shadow: var(--shadow-lg), 0 0 18px var(--accent-glow);
+    box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-2, 0 10px 28px rgba(0,0,0,.38));
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
   }
@@ -2156,13 +2206,13 @@ const msgStyles = `
   /* Smooth slide + scale in for the actions bar on hover */
   .msg-actions-bar {
     opacity: 0;
-    transform: translateY(-5px) scale(0.96);
+    transform: translateY(5px);
     transform-origin: top right;
-    transition: opacity var(--t-fast) var(--ease-out), transform var(--t-normal) var(--ease-spring);
+    transition: opacity var(--t-micro, 90ms) var(--ease-out, ease), transform var(--t-micro, 90ms) var(--ease-out, ease);
   }
   .msg-item:hover .msg-actions-bar {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -2176,10 +2226,10 @@ const msgStyles = `
     width: 28px; height: 28px;
     border: none; background: none; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    color: var(--text-muted); border-radius: var(--r-xs);
+    color: var(--text-muted); border-radius: var(--r-full, 9999px);
     transition: opacity var(--t-fast), transform var(--t-fast) var(--ease-out);
   }
-  .action-btn:hover { background: var(--bg-float); color: var(--text-primary); transform: translateY(-1px); }
+  .action-btn:hover { background: color-mix(in srgb, var(--lux, #d8b96a) 10%, transparent); color: var(--text-primary); transform: translateY(-1px); }
   .action-btn:active { transform: translateY(0); opacity: 0.78; }
   .action-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .action-btn--edit:hover  { color: var(--accent); }
@@ -2462,7 +2512,7 @@ const whisperStyles = `
   .msg-whisper {
     display: flex; align-items: flex-start; gap: 10px;
     padding: 8px 16px; margin: 2px 0;
-    background: linear-gradient(90deg, rgba(14,165,233,0.06) 0%, transparent 100%);
+    background: color-mix(in srgb, var(--bg-elevated, #132131) 42%, transparent);
     border-left: 2px solid var(--accent);
     border-radius: 0 var(--r-sm) var(--r-sm) 0;
     font-size: 14px;
@@ -2488,9 +2538,9 @@ const codeBlockStyles = `
   .msg-code-header {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    gap: 8px;
-    padding: 6px 12px;
+    justify-content: space-between;
+    gap: var(--sp-2, 8px);
+    padding: 6px var(--sp-3, 12px);
     background: color-mix(in srgb, var(--bg-elevated) 62%, transparent);
     border-bottom: 1px solid var(--border-subtle);
     min-height: 31px;
@@ -2498,16 +2548,20 @@ const codeBlockStyles = `
 
   .msg-code-lang {
     font-family: var(--font-mono);
-    font-size: 11px;
-    color: var(--gold);
+    font-size: var(--text-2xs, .6875rem);
+    color: var(--lux, #d8b96a);
     text-transform: lowercase;
     letter-spacing: 0;
-    flex: 1;
+    border: 1px solid color-mix(in srgb, var(--lux, #d8b96a) 28%, transparent);
+    border-radius: var(--r-xs, 4px);
+    padding: 1px 7px;
+    line-height: 1.5;
   }
 
   .msg-code-copy {
-    font-size: 11px;
-    font-weight: 600;
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs, .6875rem);
+    font-weight: 700;
     color: var(--text-muted);
     background: none;
     border: 1px solid var(--border-subtle);
@@ -2522,9 +2576,9 @@ const codeBlockStyles = `
     opacity: 1;
   }
   .msg-code-copy:hover {
-    color: var(--accent);
-    border-color: var(--accent-border);
-    background: var(--accent-subtle);
+    color: var(--lux, #d8b96a);
+    border-color: color-mix(in srgb, var(--lux, #d8b96a) 42%, transparent);
+    background: color-mix(in srgb, var(--lux, #d8b96a) 9%, transparent);
     opacity: 1;
   }
 
@@ -2797,8 +2851,7 @@ const collapsibleStyles = `
   .collapsible-body--collapsed {
     max-height: 220px;
     overflow: hidden;
-    -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
-    mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+    border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,.08));
   }
 
   .collapsible-body--expanded { max-height: none; overflow: visible; }
@@ -2827,6 +2880,25 @@ const collapsibleStyles = `
     opacity: 0.8;
   }
 `;
+
+const messageItemStyles = `
+${replyQuoteStyles}
+${msgStyles}
+${eventStyles}
+${nickChangeStyles}
+${noticeStyles}
+${whisperStyles}
+${codeBlockStyles}
+${imageStyles}
+${spoilerStyles}
+${collapsedStyles}
+${hiddenMsgStyles}
+${collapsibleStyles}
+`;
+
+function MessageItemStyles() {
+  return <style>{messageItemStyles}</style>;
+}
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
 

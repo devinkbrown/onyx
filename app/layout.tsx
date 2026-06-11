@@ -1,11 +1,24 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter } from 'next/font/google';
+import { Fraunces, Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import ThemeProvider from '@/components/ui/ThemeProvider';
 
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
+  display: 'swap',
+});
+
+const fraunces = Fraunces({
+  subsets: ['latin'],
+  variable: '--font-fraunces',
+  display: 'swap',
+  axes: ['SOFT', 'WONK', 'opsz'],
+});
+
+const jetBrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-jbmono',
   display: 'swap',
 });
 
@@ -29,7 +42,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={`${inter.variable} ${fraunces.variable} ${jetBrainsMono.variable}`}>
       <head>
         {/* Inline theme script — runs synchronously before CSS paints.
             Migrates split theme keys and applies data-theme immediately so
@@ -69,12 +82,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     document.documentElement.removeAttribute('data-theme');
   }
 })();` }} />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Roboto:wght@400;500&family=JetBrains+Mono:wght@400;500&family=Fira+Code:wght@400;500&display=swap"
-          rel="stylesheet"
-        />
       </head>
       <body className="h-full overflow-hidden">
         <ThemeProvider />

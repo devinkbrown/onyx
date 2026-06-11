@@ -364,11 +364,9 @@ export default function UserSettingsBar() {
           align-items: center;
           padding: 7px 8px;
           gap: 6px;
-          background:
-            linear-gradient(180deg, rgba(255,255,255,0.018), rgba(255,255,255,0)),
-            var(--bg-void);
-          border-top: 1px solid var(--border-subtle);
-          box-shadow: 0 -1px 0 var(--border-subtle);
+          background: var(--elev-tint-1, color-mix(in srgb, var(--bg-void) 92%, var(--accent) 2%));
+          border-top: 1px solid color-mix(in srgb, var(--border-subtle) 82%, transparent);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
           flex-shrink: 0;
           position: relative;
           box-sizing: border-box;
@@ -380,10 +378,12 @@ export default function UserSettingsBar() {
           bottom: calc(100% + 8px);
           left: 8px;
           width: 220px;
-          background: var(--bg-float);
+          background: var(--elev-tint-3, var(--bg-float));
           border: 1px solid var(--border-normal);
           border-radius: var(--r-lg);
-          box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+          box-shadow:
+            var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)),
+            var(--elev-shadow-3, 0 20px 50px rgba(0,0,0,.45));
           padding: 6px;
           z-index: 500;
           animation: sp-pop 120ms var(--ease-out) both;
@@ -469,7 +469,7 @@ export default function UserSettingsBar() {
         }
         .user-bar-avatar-btn:hover {
           background: var(--ch-hover-bg);
-          box-shadow: 0 0 0 2px var(--accent-border);
+          box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lux, #d8b96a) 24%, transparent);
         }
         .user-bar-avatar-btn:focus-visible {
           outline: 2px solid var(--accent-border);

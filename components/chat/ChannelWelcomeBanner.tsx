@@ -97,9 +97,7 @@ export default function ChannelWelcomeBanner({ channel, topic, memberCount, onDi
           display: flex;
           align-items: flex-start;
           gap: 0;
-          background: linear-gradient(135deg,
-            rgba(14,165,233,0.08) 0%,
-            var(--bg-elevated, #132131) 60%);
+          background: color-mix(in srgb, var(--bg-elevated, #132131) 88%, var(--lux, #d8b96a) 4%);
           border-bottom: 1px solid var(--border-subtle);
           padding: 12px 16px 14px;
           position: relative;
@@ -110,9 +108,8 @@ export default function ChannelWelcomeBanner({ channel, topic, memberCount, onDi
           top: 0;
           bottom: 0;
           width: 3px;
-          background: linear-gradient(180deg, var(--accent, #0ea5e9) 0%, var(--gold, #e8b84b) 100%);
+          background: var(--lux, #d8b96a);
           border-radius: 0 2px 2px 0;
-          box-shadow: 0 0 8px rgba(14,165,233,0.35);
         }
         .cwb-content {
           flex: 1;
@@ -128,7 +125,7 @@ export default function ChannelWelcomeBanner({ channel, topic, memberCount, onDi
         .cwb-sigil {
           font-size: 18px;
           font-weight: 800;
-          color: var(--accent, #0ea5e9);
+          color: var(--lux, #d8b96a);
           line-height: 1;
           opacity: 0.8;
         }
@@ -180,13 +177,13 @@ export default function ChannelWelcomeBanner({ channel, topic, memberCount, onDi
           line-height: 1;
           padding: 3px 5px;
           border-radius: var(--r-xs);
-          transition: color var(--t-fast), background var(--t-fast);
+          transition: color var(--t-control, 150ms), background var(--t-control, 150ms);
           align-self: flex-start;
           margin-top: 2px;
         }
         .cwb-dismiss:hover {
           color: var(--text-primary);
-          background: var(--ch-hover-bg, rgba(14,165,233,0.07));
+          background: color-mix(in srgb, var(--lux, #d8b96a) 8%, transparent);
         }
         .cwb-progress-track {
           position: absolute;
@@ -198,7 +195,7 @@ export default function ChannelWelcomeBanner({ channel, topic, memberCount, onDi
         }
         .cwb-progress-fill {
           height: 100%;
-          background: var(--accent, #0ea5e9);
+          background: var(--lux, #d8b96a);
           opacity: 0.55;
           transition: width 50ms linear;
         }

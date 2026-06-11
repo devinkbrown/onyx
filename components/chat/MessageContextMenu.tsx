@@ -420,14 +420,14 @@ export default function MessageContextMenu({
 const styles = `
   .mctx {
     position: fixed;
-    background: var(--bg-surface, #1e1f22);
+    background: var(--bg-elevated, #1e1f22);
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
-    border-radius: 6px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    border-radius: var(--r-md, 8px);
+    box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-3, 0 16px 42px rgba(0,0,0,.48));
     min-width: 200px;
-    padding: 4px 0;
+    padding: var(--sp-1, 4px) 0;
     z-index: 1500;
-    animation: mctx-in 120ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: mctx-in var(--t-overlay-in, 320ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
     transform-origin: top left;
     user-select: none;
   }
@@ -460,18 +460,18 @@ const styles = `
     cursor: pointer;
     font-size: 18px;
     line-height: 1;
-    transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1),
-                background 100ms ease;
+    transition: transform var(--t-micro, 90ms) var(--ease-out, ease),
+                background var(--t-micro, 90ms) ease;
     flex-shrink: 0;
   }
 
   .mctx-quick-btn:hover {
-    background: var(--bg-overlay, rgba(255,255,255,0.07));
-    transform: scale(1.25);
+    background: color-mix(in srgb, var(--lux, #d8b96a) 10%, transparent);
+    transform: translateY(-1px);
   }
 
   .mctx-quick-btn:active {
-    transform: scale(1.1);
+    transform: translateY(0);
   }
 
   /* ── Separator ── */
@@ -498,13 +498,13 @@ const styles = `
     text-align: left;
     cursor: pointer;
     white-space: nowrap;
-    transition: background 80ms ease;
+    transition: background var(--t-micro, 90ms) ease;
     outline: none;
   }
 
   .mctx-item:hover,
   .mctx-item:focus-visible {
-    background: var(--bg-overlay, rgba(255,255,255,0.07));
+    background: color-mix(in srgb, var(--lux, #d8b96a) 8%, transparent);
   }
 
   .mctx-item--danger {

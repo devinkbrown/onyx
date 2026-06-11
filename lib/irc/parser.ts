@@ -1,4 +1,4 @@
-import type { IRCMessage } from './types';
+import type { IRCMessage, StandardReply } from './types';
 
 /**
  * Parse a single IRC line into a structured IRCMessage.
@@ -166,4 +166,90 @@ export function parsePREFIX(value: string): {
     prefixToMode[prefixes[i]] = modes[i];
   }
   return { modeToPrefix, prefixToMode };
+}
+
+export function parseCHANLIMIT(value: string): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const part of value.split(',').filter(Boolean)) {
+    const idx = part.indexOf(':');
+    if (idx <= 0) continue;
+    const types = part.slice(0, idx);
+    const limit = Number.parseInt(part.slice(idx + 1), 10);
+    if (!Number.isFinite(limit)) continue;
+    for (const ch of types) out[ch] = limit;
+  }
+  return out;
+}
+
+export function normalizeCase(value: string, casemapping: string): string {
+  if (casemapping.toLowerCase() === 'ascii') return value.toLowerCase();
+  return value.toLowerCase()
+    .replace(/\[/g, '{')
+    .replace(/\]/g, '}')
+    .replace(/\\/g, '|')
+    .replace(/\^/g, '~');
+}
+
+export type SaslMechanism = 'SCRAM-SHA-256' | 'PLAIN' | 'EXTERNAL';
+
+export function selectSaslMechanism(
+  offered: string[],
+  opts: { hasPassword: boolean; hasClientCert?: boolean },
+): SaslMechanism | null {
+  const mechs = new Set(offered.map(m => m.toUpperCase()));
+  if (mechs.has('SCRAM-SHA-256') && opts.hasPassword) return 'SCRAM-SHA-256';
+  if (mechs.has('PLAIN') && opts.hasPassword) return 'PLAIN';
+  if (mechs.has('EXTERNAL') && opts.hasClientCert) return 'EXTERNAL';
+  return null;
+}
+
+export function parseStandardReply(msg: IRCMessage): StandardReply | null {
+  if (msg.command !== 'NOTE' && msg.command !== 'FAIL' && msg.command !== 'WARN') return null;
+  const [command, code, ...rest] = msg.params;
+  if (!command) return null;
+  const description = rest.length > 0 ? rest[rest.length - 1] : '';
+  const context = rest.length > 1 ? rest.slice(0, -1) : [];
+  return {
+    kind: msg.command,
+    command: command.toUpperCase(),
+    code: (code ?? '').toUpperCase(),
+    context,
+    description,
+  };
+}
+
+export function parseSessionTokenNote(msg: IRCMessage): string | null {
+  const reply = parseStandardReply(msg);
+  if (!reply || reply.kind !== 'NOTE' || reply.command !== 'SESSION' || reply.code !== 'TOKEN') return null;
+  return reply.description || null;
+}
+
+export function buildSessionResumeLine(token: string): string {
+  return formatIRCLine('SESSION', 'RESUME', token);
+}
+
+export function parseMonitorNumeric(msg: IRCMessage): {
+  kind: 'online' | 'offline' | 'full';
+  targets: string[];
+  limit?: number;
+  description?: string;
+} | null {
+  if (msg.command === '730' || msg.command === '731') {
+    const targets = (msg.params[1] ?? msg.params[0] ?? '')
+      .split(',')
+      .map(t => t.trim())
+      .filter(Boolean);
+    return { kind: msg.command === '730' ? 'online' : 'offline', targets };
+  }
+  if (msg.command === '734') {
+    const limit = Number.parseInt(msg.params[1] ?? '', 10);
+    const targetParam = msg.params.length >= 4 ? msg.params[2] : '';
+    return {
+      kind: 'full',
+      targets: targetParam.split(',').map(t => t.trim()).filter(Boolean),
+      limit: Number.isFinite(limit) ? limit : undefined,
+      description: msg.params[msg.params.length - 1] ?? '',
+    };
+  }
+  return null;
 }

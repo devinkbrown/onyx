@@ -4,6 +4,9 @@ import {
   formatIRCLine,
   parseNamesPrefix,
   parsePREFIX,
+  parseCHANLIMIT,
+  parseMonitorNumeric,
+  parseStandardReply,
 } from '@/lib/irc/parser';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -89,11 +92,10 @@ describe('parseIRCMessage', () => {
     expect(msg.params[0]).toBe('+');
   });
 
-  it('parses NOTICE from server', () => {
-    const msg = parseIRCMessage(':irc.eshmaki.me NOTICE devin :SESSIONTOKEN sst_abc123 1900000000');
-    expect(msg.command).toBe('NOTICE');
-    expect(msg.params[0]).toBe('devin');
-    expect(msg.params[1]).toBe('SESSIONTOKEN sst_abc123 1900000000');
+  it('parses NOTE SESSION TOKEN from server', () => {
+    const msg = parseIRCMessage(':orochi.local NOTE SESSION TOKEN :abcdef');
+    expect(msg.command).toBe('NOTE');
+    expect(msg.params).toEqual(['SESSION', 'TOKEN', 'abcdef']);
   });
 
   it('upper-cases the command', () => {
@@ -121,7 +123,7 @@ describe('formatIRCLine', () => {
   });
 
   it('adds colon when trailing param starts with :', () => {
-    expect(formatIRCLine('NOTICE', 'nick', ':SESSIONTOKEN abc')).toBe('NOTICE nick ::SESSIONTOKEN abc\r\n');
+    expect(formatIRCLine('NOTE', 'SESSION', 'TOKEN', ':abcdef')).toBe('NOTE SESSION TOKEN ::abcdef\r\n');
   });
 
   it('does not add colon to a simple trailing param without spaces', () => {
@@ -151,6 +153,12 @@ describe('parsePREFIX', () => {
     expect(prefixToMode['@']).toBe('o');
   });
 
+  it('parses Orochi PREFIX positionally with founder ! as q tier', () => {
+    const { modeToPrefix, prefixToMode } = parsePREFIX('(Qqov)!.@+');
+    expect(modeToPrefix).toEqual({ Q: '!', q: '.', o: '@', v: '+' });
+    expect(prefixToMode).toEqual({ '!': 'Q', '.': 'q', '@': 'o', '+': 'v' });
+  });
+
   it('returns empty maps for malformed value', () => {
     const { modeToPrefix, prefixToMode } = parsePREFIX('INVALID');
     expect(Object.keys(modeToPrefix)).toHaveLength(0);
@@ -161,6 +169,54 @@ describe('parsePREFIX', () => {
     const { modeToPrefix } = parsePREFIX('(ov)@+');
     expect(modeToPrefix['o']).toBe('@');
     expect(modeToPrefix['v']).toBe('+');
+  });
+});
+
+describe('parseCHANLIMIT', () => {
+  it('parses Orochi channel limits', () => {
+    expect(parseCHANLIMIT('#&:50')).toEqual({ '#': 50, '&': 50 });
+  });
+});
+
+describe('parseStandardReply', () => {
+  it('parses FAIL with context and description', () => {
+    const reply = parseStandardReply(parseIRCMessage(':orochi.local FAIL REGISTER ACCOUNT_EXISTS kain :Account already exists'));
+    expect(reply).toEqual({
+      kind: 'FAIL',
+      command: 'REGISTER',
+      code: 'ACCOUNT_EXISTS',
+      context: ['kain'],
+      description: 'Account already exists',
+    });
+  });
+
+  it('parses WARN', () => {
+    const reply = parseStandardReply(parseIRCMessage(':orochi.local WARN CHATHISTORY RATE_LIMITED #root :Slow down'));
+    expect(reply?.kind).toBe('WARN');
+    expect(reply?.command).toBe('CHATHISTORY');
+    expect(reply?.code).toBe('RATE_LIMITED');
+  });
+});
+
+describe('parseMonitorNumeric', () => {
+  it('parses MONITOR online and offline numerics', () => {
+    expect(parseMonitorNumeric(parseIRCMessage(':orochi.local 730 me :alice!u@h,bob!u@h'))).toEqual({
+      kind: 'online',
+      targets: ['alice!u@h', 'bob!u@h'],
+    });
+    expect(parseMonitorNumeric(parseIRCMessage(':orochi.local 731 me :carol'))).toEqual({
+      kind: 'offline',
+      targets: ['carol'],
+    });
+  });
+
+  it('parses MONITOR full limit', () => {
+    expect(parseMonitorNumeric(parseIRCMessage(':orochi.local 734 me 128 alice,bob :Monitor list is full'))).toEqual({
+      kind: 'full',
+      targets: ['alice', 'bob'],
+      limit: 128,
+      description: 'Monitor list is full',
+    });
   });
 });
 

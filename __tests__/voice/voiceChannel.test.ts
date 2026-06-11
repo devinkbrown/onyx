@@ -14,7 +14,7 @@ import { describe, it, expect, vi } from 'vitest';
 class MockIRCClient {
   extraMessageHandlers: Set<(m: Record<string, unknown>) => void> = new Set();
   sent: string[] = [];
-  isupport = { LADONMEDIA: 'MEDIA', PREFIX: { q: '~', o: '@', v: '+' } };
+  isupport = { PREFIX: { q: '.', o: '@', v: '+' } };
   capValues: Map<string, string> = new Map();
 
   sendRaw(...parts: string[]) {
@@ -27,62 +27,45 @@ class MockIRCClient {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Voice join / leave CTCP PRIVMSG payloads
+// Voice join / leave MEDIA commands
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('Voice channel CTCP signaling', () => {
-  it('JOIN sends correct CTCP PRIVMSG', () => {
+describe('Voice channel MEDIA signaling', () => {
+  it('JOIN sends correct MEDIA command', () => {
     const client = new MockIRCClient();
     const channel = '#root';
 
-    // Simulates what useLadonMedia.announceJoin() does
-    client.sendRaw('PRIVMSG', channel, '\x01LADON_MEDIA JOIN\x01');
+    client.sendRaw('MEDIA', 'JOIN', channel, 'voice');
 
     expect(client.sent).toHaveLength(1);
-    expect(client.sent[0]).toBe('PRIVMSG #root \x01LADON_MEDIA JOIN\x01');
+    expect(client.sent[0]).toBe('MEDIA JOIN #root voice');
   });
 
-  it('LEAVE sends correct CTCP PRIVMSG', () => {
+  it('LEAVE sends correct MEDIA command', () => {
     const client = new MockIRCClient();
     const channel = '#voice';
 
-    client.sendRaw('PRIVMSG', channel, '\x01LADON_MEDIA LEAVE\x01');
+    client.sendRaw('MEDIA', 'LEAVE', channel);
 
-    expect(client.sent[0]).toBe('PRIVMSG #voice \x01LADON_MEDIA LEAVE\x01');
+    expect(client.sent[0]).toBe('MEDIA LEAVE #voice');
   });
 
-  it('SCREENSHARE_START sends correct CTCP PRIVMSG', () => {
+  it('screenshare start sends MEDIA JOIN screen', () => {
     const client = new MockIRCClient();
     const channel = '#root';
 
-    client.sendRaw('PRIVMSG', channel, '\x01LADON_MEDIA SCREENSHARE_START\x01');
+    client.sendRaw('MEDIA', 'JOIN', channel, 'screen');
 
-    expect(client.sent[0]).toBe('PRIVMSG #root \x01LADON_MEDIA SCREENSHARE_START\x01');
+    expect(client.sent[0]).toBe('MEDIA JOIN #root screen');
   });
 
-  it('SCREENSHARE_STOP sends correct CTCP PRIVMSG', () => {
+  it('screenshare stop sends MEDIA LEAVE', () => {
     const client = new MockIRCClient();
     const channel = '#root';
 
-    client.sendRaw('PRIVMSG', channel, '\x01LADON_MEDIA SCREENSHARE_STOP\x01');
+    client.sendRaw('MEDIA', 'LEAVE', channel);
 
-    expect(client.sent[0]).toBe('PRIVMSG #root \x01LADON_MEDIA SCREENSHARE_STOP\x01');
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// HangUp MEDIAFRAME
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe('Voice hang-up MEDIAFRAME', () => {
-  it('sends MEDIAFRAME VOICE_LEAVE on hang up', () => {
-    const client = new MockIRCClient();
-    const callChannel = '#root';
-
-    // Simulates VoiceBar.hangUp()
-    client.sendRaw('MEDIAFRAME', callChannel, 'VOICE_LEAVE', '');
-
-    expect(client.sent[0]).toBe('MEDIAFRAME #root VOICE_LEAVE ');
+    expect(client.sent[0]).toBe('MEDIA LEAVE #root');
   });
 });
 
@@ -91,30 +74,15 @@ describe('Voice hang-up MEDIAFRAME', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('LADON media message handler routing', () => {
-  it('routes MEDIA command to handler', () => {
+  it('routes NOTE MEDIA command to handler', () => {
     const client = new MockIRCClient();
     const handler = vi.fn();
     client.extraMessageHandlers.add(handler);
 
     const mediaMsg = {
-      command: 'MEDIA',
-      params: ['#root', 'VOICE_FRAME', 'base64data=='],
-      nick: 'alice',
-    };
-    client.simulateMessage(mediaMsg);
-
-    expect(handler).toHaveBeenCalledWith(mediaMsg);
-  });
-
-  it('routes LADONMEDIA command to handler', () => {
-    const client = new MockIRCClient();
-    const handler = vi.fn();
-    client.extraMessageHandlers.add(handler);
-
-    const mediaMsg = {
-      command: 'LADONMEDIA',
-      params: ['#voice', 'VOICE_JOIN', ''],
-      nick: 'bob',
+      command: 'NOTE',
+      params: ['MEDIA', '#root', 'JOIN', 'alice', 'voice'],
+      nick: null,
     };
     client.simulateMessage(mediaMsg);
 
@@ -125,20 +93,19 @@ describe('LADON media message handler routing', () => {
     const client = new MockIRCClient();
 
     // Simulate the filtering logic in useLadonMedia
-    const mediaCmd = (client.isupport.LADONMEDIA || 'MEDIA').toUpperCase();
     const received: string[] = [];
 
     client.extraMessageHandlers.add((msg) => {
-      const cmd = (msg as { command: string }).command;
-      if (cmd !== mediaCmd && cmd !== 'MEDIA' && cmd !== 'LADONMEDIA') return;
-      received.push(cmd);
+      const { command, params } = msg as { command: string; params: string[] };
+      if (command !== 'NOTE' || params[0] !== 'MEDIA') return;
+      received.push(params[2]);
     });
 
     client.simulateMessage({ command: 'PRIVMSG', params: ['#root', 'hi'], nick: 'x' });
-    client.simulateMessage({ command: 'MEDIA',    params: ['#root', 'V', ''], nick: 'y' });
+    client.simulateMessage({ command: 'NOTE', params: ['MEDIA', '#root', 'JOIN', 'y', 'voice'], nick: null });
     client.simulateMessage({ command: 'JOIN',     params: ['#root'], nick: 'z' });
 
-    expect(received).toEqual(['MEDIA']);
+    expect(received).toEqual(['JOIN']);
   });
 
   it('ignores messages with missing nick, target, or subtype', () => {
@@ -147,21 +114,22 @@ describe('LADON media message handler routing', () => {
 
     client.extraMessageHandlers.add((msg) => {
       const { command, params, nick } = msg as { command: string; params: string[]; nick: string };
-      if (command !== 'MEDIA') return;
-      const target  = params[0];
-      const subtype = params[1];
-      if (!nick || !target || !subtype) return;
-      handled.push({ nick, target, subtype });
+      if (command !== 'NOTE' || params[0] !== 'MEDIA') return;
+      const target  = params[1];
+      const subtype = params[2];
+      const fromNick = params[3];
+      if (!fromNick || !target || !subtype) return;
+      handled.push({ nick: fromNick, target, subtype });
     });
 
     // Missing nick
-    client.simulateMessage({ command: 'MEDIA', params: ['#root', 'V', ''], nick: '' });
+    client.simulateMessage({ command: 'NOTE', params: ['MEDIA', '#root', 'JOIN', '', 'voice'], nick: null });
     // Missing target
-    client.simulateMessage({ command: 'MEDIA', params: ['', 'V', ''], nick: 'alice' });
+    client.simulateMessage({ command: 'NOTE', params: ['MEDIA', '', 'JOIN', 'alice', 'voice'], nick: null });
     // Missing subtype
-    client.simulateMessage({ command: 'MEDIA', params: ['#root', '', ''], nick: 'alice' });
+    client.simulateMessage({ command: 'NOTE', params: ['MEDIA', '#root', '', 'alice'], nick: null });
     // Valid
-    client.simulateMessage({ command: 'MEDIA', params: ['#root', 'VOICE_FRAME', 'data'], nick: 'alice' });
+    client.simulateMessage({ command: 'NOTE', params: ['MEDIA', '#root', 'JOIN', 'alice', 'voice'], nick: null });
 
     expect(handled).toHaveLength(1);
   });

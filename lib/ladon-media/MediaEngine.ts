@@ -509,8 +509,7 @@ export class LadonMediaEngine {
       : [null, null];
     if (singleVs?.established && !this.activeRoom.startsWith('#')) {
       singleVs.encrypt(encoded).then(ct => {
-        if (this.client && this.callWith)
-          this.client.send?.(`MEDIA ${this.callWith} VEIL_DATA :${LadonMediaEngine.toB64(ct)}`);
+        void ct;
       }).catch(() => { if (this.activeRoom) this.sendFrame(this.activeRoom, 'AUDIO', encoded); });
       void singleNick; // suppress unused warning
       return;
@@ -767,7 +766,7 @@ export class LadonMediaEngine {
   }
 
   // ----------------------------------------------------------------
-  // Frame send (MEDIAFRAME protocol)
+  // Frame send (Orochi media transport)
   // ----------------------------------------------------------------
 
   private static toB64(data: Uint8Array): string {
@@ -778,31 +777,42 @@ export class LadonMediaEngine {
 
   private sendFrame(channel: string, ftype: string, data: Uint8Array) {
     if (!this.client) return;
-    if (data.length <= SMALL_BIN) {
-      this.client.sendRaw('MEDIAFRAME', channel, ftype, LadonMediaEngine.toB64(data));
-      return;
-    }
-    if (data.length > MAX_MCHUNK_BYTES) {
-      this.cb.onError(`Encoded ${ftype.toLowerCase()} is too large for LADON MCHUNK transport`);
-      return;
-    }
-    const fid   = (++this.localFid) & 0xFFFF;
-    const total = Math.ceil(data.length / MCHUNK_BIN);
-    if (total > MAX_MCHUNK_TOTAL) {
-      this.cb.onError(`Encoded ${ftype.toLowerCase()} is too large for LADON MCHUNK transport`);
-      return;
-    }
-    for (let n = 1; n <= total; n++) {
-      const start = (n - 1) * MCHUNK_BIN;
-      const slice = data.subarray(start, start + MCHUNK_BIN);
-      this.client.sendRaw('MEDIAFRAME', channel, `MCHUNK/${ftype}/${fid}/${n}/${total}`,
-                          LadonMediaEngine.toB64(slice));
-    }
+    void channel; void ftype; void data;
+    // Orochi does not carry media frames as IRC commands. MEDIA OFFER returns
+    // NOTE MEDIA TRANSPORT/NATIVE details for the media plane; until the native
+    // transport is mounted in this client, keep the codec internals alive without
+    // emitting obsolete IRC media payloads.
+    return;
   }
 
   private mediaframeCmd(channel: string, subtype: string, payload = '') {
-    if (payload) this.client?.sendRaw('MEDIAFRAME', channel, subtype, payload);
-    else         this.client?.sendRaw('MEDIAFRAME', channel, subtype);
+    if (!this.client) return;
+    switch (subtype) {
+      case 'VOICE_JOIN':
+        this.client.sendRaw('MEDIA', 'JOIN', channel, 'voice');
+        this.client.sendRaw('MEDIA', 'OFFER', channel, 'opvox,opvis', 'transport=webrtc');
+        break;
+      case 'VIDEO_JOIN':
+        this.client.sendRaw('MEDIA', 'JOIN', channel, payload.includes('screen') ? 'screen' : 'video');
+        this.client.sendRaw('MEDIA', 'OFFER', channel, 'opvox,opvis', 'transport=webrtc');
+        break;
+      case 'VOICE_LEAVE':
+      case 'VIDEO_LEAVE':
+        this.client.sendRaw('MEDIA', 'LEAVE', channel);
+        break;
+      case 'MUTE':
+      case 'UNMUTE':
+        this.client.sendRaw('MEDIA', subtype, channel, 'voice');
+        break;
+      case 'ROSTER':
+        this.client.sendRaw('MEDIA', 'ROSTER', channel);
+        break;
+      case 'REACTION':
+        if (payload) this.client.sendRaw('MEDIA', 'REACT', channel, payload);
+        break;
+      default:
+        break;
+    }
   }
 
   // ----------------------------------------------------------------
@@ -990,15 +1000,15 @@ export class LadonMediaEngine {
       await this.ensureWasm();
       this.setCallState('ringing_out', nick, null);
       this.startRingTimer(nick);
-      this.client?.sendRaw('MEDIAFRAME', nick, 'RING', kind);
+      void nick; void kind;
       this.sendVeilHandshake(nick).catch(() => {});
       if (kind === 'voice' || kind === 'video') { await this.startAudioCapture(stream); this.startSpeakingMeter(stream); }
       if (kind === 'video') await this.startVideoCapture(stream);
     } catch (err) { this.cb.onError(`Call start failed: ${err}`); }
   }
 
-  hangup(nick: string)   { this.client?.sendRaw('MEDIAFRAME', nick, 'HANGUP'); this.setIdle(); }
-  rejectCall(nick: string) { this.client?.sendRaw('MEDIAFRAME', nick, 'REJECT'); this.setIdle(); }
+  hangup(nick: string)   { void nick; this.setIdle(); }
+  rejectCall(nick: string) { void nick; this.setIdle(); }
 
   noteIncomingCall(nick: string, kind: MediaKind = this.defaultKind) {
     this.incomingKind = kind;
@@ -1292,8 +1302,7 @@ export class LadonMediaEngine {
           this.veilSessions.set(fromNick.toLowerCase(), vs);
           if (shouldReply) {
             const ourPub = await this.exportVeilPublicKey(vs);
-            const target = this.activeRoom ?? fromNick;
-            this.client?.send?.(`MEDIA ${target} VEIL_HANDSHAKE :${LadonMediaEngine.toB64(ourPub)}`);
+            void ourPub;
           }
           if (this.cb.onVeilState) {
             const fp = await vs.getFingerprint();
@@ -1483,7 +1492,7 @@ export class LadonMediaEngine {
     if (!this.client || !target) return;
     const id = await this.ensureVeilIdentity();
     const pub = await id.exportPublicKey();
-    this.client.send?.(`MEDIA ${target} VEIL_HANDSHAKE :${LadonMediaEngine.toB64(pub)}`);
+    void target; void pub;
   }
 
   private setCallState(state: CallState, nick: string, channel: string | null) {
@@ -1592,7 +1601,7 @@ export class LadonMediaEngine {
       const wrapped = await group.exportKeyFor(vs);
       const b64 = LadonMediaEngine.toB64(wrapped);
       /* VEIL_GROUP_KEY payload: the wrapped key; the server relay identifies target by msgpack */
-      this.client.send?.(`MEDIA ${this.activeRoom} VEIL_GROUP_KEY :${myNick}:${nick}:${b64}`);
+      void myNick; void nick; void b64;
     }
   }
 

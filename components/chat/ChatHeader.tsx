@@ -53,6 +53,8 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
   const [showTopicHistory, setShowTopicHistory] = useState(false);
   const [showThreadList, setShowThreadList] = useState(false);
   const [showChannelTools, setShowChannelTools] = useState(false);
+  const [renameEditing, setRenameEditing] = useState(false);
+  const [renameDraft, setRenameDraft] = useState(title.replace(/^[#&@]/, ''));
   // Track whether Enter was pressed so blur doesn't cancel the save
   const enterPressedRef = useRef(false);
   const topicHistoryRef = useRef<HTMLDivElement>(null);
@@ -83,6 +85,9 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
   const channelModes = channel?.modes ?? '';
   const canEditTopic = isChannel && (
     myModes.has('o') || myModes.has('a') || myModes.has('q') || !channelModes.includes('t')
+  );
+  const canRenameChannel = isChannel && activeView.kind === 'channel' && (
+    myModes.has('o') || myModes.has('a') || myModes.has('q')
   );
 
   const openEventLog          = useOnyxStore(s => s.openEventLog);
@@ -259,6 +264,45 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
     enterPressedRef.current = false;
   };
 
+  const startRename = () => {
+    if (!canRenameChannel) return;
+    setRenameDraft(title.replace(/^[#&@]/, ''));
+    setRenameEditing(true);
+  };
+
+  const cancelRename = () => {
+    setRenameDraft(title.replace(/^[#&@]/, ''));
+    setRenameEditing(false);
+  };
+
+  const submitRename = () => {
+    if (!canRenameChannel || activeView.kind !== 'channel') return;
+    const clean = renameDraft.trim().replace(/^[#&]/, '');
+    if (!clean) {
+      cancelRename();
+      return;
+    }
+    const sigil = activeView.channel.match(/^[#&]/)?.[0] ?? '#';
+    const newName = `${sigil}${clean}`;
+    if (newName.toLowerCase() !== activeView.channel.toLowerCase()) {
+      // OCEAN-INTEGRATION: serial integration pass wires this intent to RENAME.
+      window.dispatchEvent(new CustomEvent('ocean:channel-rename', {
+        detail: { channel: activeView.channel, newName },
+      }));
+    }
+    setRenameEditing(false);
+  };
+
+  const handleRenameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submitRename();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelRename();
+    }
+  };
+
   // Collapse expanded topic when switching channels
   useEffect(() => {
     queueMicrotask(() => {
@@ -267,8 +311,10 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
       setShowDMSearch(false);
       setShowTopicHistory(false);
       setShowChannelTools(false);
+      setRenameEditing(false);
+      setRenameDraft(title.replace(/^[#&@]/, ''));
     });
-  }, [activeView]);
+  }, [activeView, title]);
 
   // Close topic history on outside click
   useEffect(() => {
@@ -361,7 +407,34 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
             )}
           </div>
         ) : (
-          <h2 className="ch-head-title">{title.replace(/^[#&@]/, '')}</h2>
+          <div className={`ch-head-title-wrap${canRenameChannel ? ' ch-head-title-wrap--renameable' : ''}`}>
+            {renameEditing ? (
+              <input
+                className="ch-head-rename-input"
+                value={renameDraft}
+                onChange={e => setRenameDraft(e.target.value)}
+                onKeyDown={handleRenameKeyDown}
+                onBlur={cancelRename}
+                autoFocus
+                aria-label="Rename channel"
+              />
+            ) : (
+              <>
+                <h2 className="ch-head-title">{title.replace(/^[#&@]/, '')}</h2>
+                {canRenameChannel && (
+                  <button
+                    className="ch-head-rename-btn"
+                    type="button"
+                    onClick={startRename}
+                    aria-label="Rename channel"
+                    title="Rename channel"
+                  >
+                    <RenamePencilIcon />
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         )}
 
         {isChannel && (
@@ -1047,14 +1120,13 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           align-items: center;
           justify-content: space-between;
           padding: 0 12px 0 16px;
-          border-bottom: 1px solid var(--border-normal);
-          background:
-            linear-gradient(90deg, var(--accent-subtle), transparent 42%),
-            linear-gradient(180deg, rgba(255,255,255,0.026), rgba(255,255,255,0)),
-            color-mix(in srgb, var(--bg-base) 94%, var(--accent) 6%);
+          border-bottom: 1px solid color-mix(in srgb, var(--border-normal) 82%, transparent);
+          background: var(--elev-tint-1, color-mix(in srgb, var(--bg-deep) 92%, var(--accent) 2%));
           flex-shrink: 0;
           gap: 12px;
-          box-shadow: var(--shadow-sm);
+          box-shadow:
+            var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)),
+            var(--elev-shadow-1, 0 10px 24px rgba(0,0,0,.22));
           min-width: 0;
           box-sizing: border-box;
         }
@@ -1071,24 +1143,93 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
         .ch-head-sigil {
           font-size: 19px;
           font-weight: 700;
-          color: var(--accent);
+          color: var(--lux, #d8b96a);
           flex-shrink: 0;
           line-height: 1;
           opacity: 0.82;
-          text-shadow: 0 0 14px var(--accent-glow);
+        }
+
+        .ch-head-title-wrap {
+          display: inline-flex;
+          align-items: center;
+          gap: var(--sp-1, 4px);
+          min-width: 0;
+          flex-shrink: 0;
+          max-width: min(320px, 34vw);
+        }
+        .ch-head-title-wrap--renameable {
+          padding-right: 2px;
         }
 
         .ch-head-title {
-          font-size: 16px;
-          font-weight: 750;
+          font-family: var(--font-display, Georgia, serif);
+          font-size: var(--text-xl, 1.25rem);
+          font-weight: 650;
           color: var(--text-primary);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
           flex-shrink: 0;
-          max-width: min(260px, 30vw);
+          max-width: 100%;
           line-height: 1.15;
-          text-shadow: 0 1px 0 rgba(0,0,0,0.38);
+          letter-spacing: 0;
+        }
+
+        .ch-head-rename-btn {
+          width: 24px;
+          height: 24px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0;
+          border: 1px solid transparent;
+          border-radius: var(--r-sm, 6px);
+          background: transparent;
+          color: var(--text-muted);
+          cursor: pointer;
+          opacity: 0;
+          transform: translateX(-2px);
+          transition:
+            opacity var(--t-micro, 90ms) var(--ease-out),
+            transform var(--t-micro, 90ms) var(--ease-out),
+            color var(--t-micro, 90ms) var(--ease-out),
+            background var(--t-micro, 90ms) var(--ease-out);
+          flex: 0 0 auto;
+        }
+        .ch-head-title-wrap--renameable:hover .ch-head-rename-btn,
+        .ch-head-rename-btn:focus-visible {
+          opacity: 1;
+          transform: translateX(0);
+        }
+        .ch-head-rename-btn:hover {
+          color: var(--lux, #d8b96a);
+          background: color-mix(in srgb, var(--lux, #d8b96a) 10%, transparent);
+          border-color: color-mix(in srgb, var(--lux, #d8b96a) 18%, transparent);
+        }
+        .ch-head-rename-btn:focus-visible {
+          outline: 2px solid color-mix(in srgb, var(--lux, #d8b96a) 70%, transparent);
+          outline-offset: 1px;
+        }
+
+        .ch-head-rename-input {
+          width: min(220px, 30vw);
+          height: 32px;
+          border: 1px solid color-mix(in srgb, var(--lux, #d8b96a) 34%, transparent);
+          border-radius: var(--r-sm, 6px);
+          background: var(--elev-tint-2, color-mix(in srgb, var(--bg-elevated) 86%, var(--lux, #d8b96a) 4%));
+          color: var(--text-primary);
+          box-shadow:
+            var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)),
+            var(--elev-shadow-1, 0 10px 24px rgba(0,0,0,.28));
+          font-family: var(--font-display, Georgia, serif);
+          font-size: var(--text-lg, 1.0625rem);
+          font-weight: 650;
+          letter-spacing: 0;
+          padding: 0 var(--sp-2, 8px);
+          outline: none;
+        }
+        .ch-head-rename-input:focus {
+          border-color: var(--lux, #d8b96a);
         }
 
         .ch-head-divider {
@@ -1171,7 +1312,7 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           line-height: 1.35;
         }
         .ch-head-topic-area--editable:hover .ch-head-topic {
-          background: var(--accent-subtle);
+          background: color-mix(in srgb, var(--lux, #d8b96a) 8%, transparent);
           color: var(--text-secondary);
         }
         .ch-head-topic--empty {
@@ -1187,9 +1328,9 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           flex-shrink: 0;
           font-size: 11px;
           font-weight: 700;
-          color: var(--accent-hover);
-          background: var(--accent-subtle);
-          border: 1px solid var(--accent-border);
+          color: var(--lux, #d8b96a);
+          background: color-mix(in srgb, var(--lux, #d8b96a) 10%, transparent);
+          border: 1px solid color-mix(in srgb, var(--lux, #d8b96a) 18%, transparent);
           border-radius: var(--r-full);
           cursor: pointer;
           padding: 2px 7px;
@@ -1207,7 +1348,7 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           opacity: 0;
           transition: opacity 150ms;
           pointer-events: none;
-          color: var(--accent-hover);
+          color: var(--lux, #d8b96a);
           line-height: 1;
         }
         .ch-head-topic-area--editable:hover .ch-head-topic-pencil {
@@ -1227,17 +1368,19 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           font-size: 13px;
           color: var(--text-primary);
           background: var(--bg-elevated);
-          border: 1px solid var(--accent);
+          border: 1px solid color-mix(in srgb, var(--lux, #d8b96a) 34%, transparent);
           border-radius: var(--r-sm);
           outline: none;
           width: 100%;
           padding: 5px 9px;
           box-sizing: border-box;
-          box-shadow: 0 0 0 1px var(--accent-border), var(--shadow-sm);
+          box-shadow:
+            var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)),
+            var(--elev-shadow-1, 0 10px 24px rgba(0,0,0,.28));
         }
         .ch-head-topic-input:focus {
-          border-color: var(--accent);
-          box-shadow: 0 0 0 1px var(--accent-border);
+          border-color: var(--lux, #d8b96a);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
         }
 
         .ch-head-topic-counter {
@@ -1365,17 +1508,15 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           padding: 2px;
           border: 1px solid var(--border-subtle);
           border-radius: var(--r-lg);
-          background:
-            linear-gradient(180deg, rgba(255,255,255,0.025), transparent),
-            color-mix(in srgb, var(--bg-deep) 76%, transparent);
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.024), var(--shadow-sm);
+          background: var(--elev-tint-1, color-mix(in srgb, var(--bg-deep) 92%, var(--accent) 2%));
+          box-shadow:
+            var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)),
+            var(--elev-shadow-1, 0 8px 18px rgba(0,0,0,.2));
           flex: 0 0 auto;
         }
         .ch-head-action-group--status {
-          background:
-            linear-gradient(180deg, rgba(255,255,255,0.03), transparent),
-            color-mix(in srgb, var(--accent-subtle) 48%, var(--bg-deep));
-          border-color: var(--accent-border);
+          background: color-mix(in srgb, var(--bg-deep) 88%, var(--lux, #d8b96a) 3%);
+          border-color: color-mix(in srgb, var(--lux, #d8b96a) 18%, transparent);
         }
         .ch-head-action-group--danger {
           background: color-mix(in srgb, var(--danger-subtle) 28%, var(--bg-deep));
@@ -1414,14 +1555,12 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
 
         .ch-head-btn--tools {
           border: 1px solid var(--border-subtle);
-          background:
-            linear-gradient(180deg, rgba(255,255,255,0.025), transparent),
-            color-mix(in srgb, var(--bg-deep) 72%, transparent);
+          background: color-mix(in srgb, var(--bg-deep) 72%, transparent);
         }
         .ch-head-btn--tools.ch-head-btn--active {
-          border-color: var(--accent-border);
-          background: var(--accent-subtle);
-          box-shadow: 0 0 0 1px var(--accent-border), 0 0 18px var(--accent-glow);
+          border-color: color-mix(in srgb, var(--lux, #d8b96a) 28%, transparent);
+          background: color-mix(in srgb, var(--lux, #d8b96a) 10%, transparent);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
         }
 
         .ch-tools-menu {
@@ -1435,11 +1574,10 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           padding: 9px;
           border: 1px solid var(--border-normal);
           border-radius: var(--r-lg);
-          background:
-            linear-gradient(135deg, var(--accent-subtle), transparent 42%),
-            linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0)),
-            var(--bg-float);
-          box-shadow: var(--shadow-xl), 0 0 24px var(--accent-glow);
+          background: var(--elev-tint-3, var(--bg-float));
+          box-shadow:
+            var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)),
+            var(--elev-shadow-3, 0 22px 56px rgba(0,0,0,.48));
           scrollbar-width: thin;
           scrollbar-color: var(--border-normal) transparent;
           animation: ch-tools-in 120ms var(--ease-out, ease) both;
@@ -1480,10 +1618,8 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
 
         .ch-tools-item:hover,
         .ch-tools-item--active {
-          background:
-            linear-gradient(90deg, var(--accent-subtle), transparent 88%),
-            color-mix(in srgb, var(--bg-elevated) 70%, transparent);
-          border-color: var(--accent-border);
+          background: color-mix(in srgb, var(--bg-elevated) 88%, var(--lux, #d8b96a) 3%);
+          border-color: color-mix(in srgb, var(--lux, #d8b96a) 18%, transparent);
           color: var(--text-primary);
         }
         .ch-tools-item:hover {
@@ -1491,7 +1627,7 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
         }
 
         .ch-tools-item--active {
-          box-shadow: inset 2px 0 0 var(--accent), 0 0 18px var(--accent-glow);
+          box-shadow: inset 2px 0 0 var(--lux, #d8b96a);
         }
 
         .ch-tools-item--danger {
@@ -1509,7 +1645,6 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           height: 16px;
           opacity: 0.78;
           color: var(--text-muted);
-          filter: drop-shadow(0 0 8px var(--accent-glow));
         }
         .ch-tools-item:hover svg,
         .ch-tools-item--active svg {
@@ -1848,6 +1983,13 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
 const ChatHeaderHamburgerIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
     <path d="M2 4h12M2 8h12M2 12h12" />
+  </svg>
+);
+
+const RenamePencilIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M8.7 2.2l3.1 3.1" />
+    <path d="M2.2 11.8l3.3-.7 6.4-6.4a1.5 1.5 0 0 0-2.1-2.1L3.4 9l-.7 3.3z" />
   </svg>
 );
 

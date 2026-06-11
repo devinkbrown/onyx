@@ -161,10 +161,12 @@ export default function MobileBottomNav() {
             right: 0;
             height: calc(60px + env(safe-area-inset-bottom, 0px));
             padding-bottom: env(safe-area-inset-bottom, 0px);
-            background: var(--bg-void);
-            border-top: 1px solid var(--border-subtle);
+            background: var(--elev-tint-2, color-mix(in srgb, var(--bg-void) 90%, var(--accent) 3%));
+            border-top: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
             z-index: 210;
-            box-shadow: 0 -4px 32px rgba(0,0,0,0.6);
+            box-shadow:
+              var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)),
+              var(--elev-shadow-2, 0 -14px 36px rgba(0,0,0,.42));
           }
         }
 
@@ -199,7 +201,7 @@ export default function MobileBottomNav() {
         }
 
         .mbn-tab--active {
-          color: var(--accent);
+          color: var(--lux, #d8b96a);
         }
 
         .mbn-icon-wrap {
@@ -233,8 +235,8 @@ export default function MobileBottomNav() {
           width: 28px;
           height: 2px;
           border-radius: 0 0 2px 2px;
-          background: var(--accent);
-          box-shadow: 0 0 8px rgba(14, 165, 233, 0.6);
+          background: var(--lux, #d8b96a);
+          box-shadow: none;
           animation: mbn-bar-in 200ms var(--ease-spring, cubic-bezier(0.175,0.885,0.32,1.275)) both;
         }
 
@@ -251,7 +253,7 @@ export default function MobileBottomNav() {
           min-width: 16px;
           height: 16px;
           padding: 0 4px;
-          background: var(--accent);
+          background: var(--unread, var(--lux, #d8b96a));
           color: #fff;
           border-radius: var(--r-full, 9999px);
           font-size: 10px;
@@ -260,7 +262,7 @@ export default function MobileBottomNav() {
           align-items: center;
           justify-content: center;
           line-height: 1;
-          box-shadow: 0 1px 6px rgba(0,0,0,0.5);
+          box-shadow: var(--elev-shadow-1, 0 6px 14px rgba(0,0,0,.24));
           border: 1.5px solid var(--bg-void);
         }
 

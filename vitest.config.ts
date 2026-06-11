@@ -7,7 +7,9 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
     // Playwright specs live in tests/e2e and must not be collected by vitest.
-    exclude: ['**/node_modules/**', '**/dist/**', 'tests/e2e/**'],
+    // .wt holds parked git worktrees on old branches; their stale specs must
+    // not be collected against the current tree.
+    exclude: ['**/node_modules/**', '**/dist/**', 'tests/e2e/**', '.wt/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],

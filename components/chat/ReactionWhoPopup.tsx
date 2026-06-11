@@ -62,19 +62,19 @@ const rwpStyles = `
     z-index: 9000;
     pointer-events: none;
     transform: translateX(-50%) translateY(-100%);
-    animation: rwp-in 0.12s ease;
+    animation: rwp-in var(--t-micro, 90ms) var(--ease-out, ease);
   }
   @keyframes rwp-in {
     from { opacity: 0; transform: translateX(-50%) translateY(calc(-100% + 6px)); }
     to   { opacity: 1; transform: translateX(-50%) translateY(-100%); }
   }
   .rwp-card {
-    background: var(--bg-overlay, #1a2b3d);
+    background: var(--bg-elevated, #1a2b3d);
     border: 1px solid var(--border-normal, rgba(255,255,255,0.1));
-    border-radius: 8px;
+    border-radius: var(--r-md, 8px);
     padding: 8px 12px;
     max-width: 220px;
-    box-shadow: var(--shadow-lg, 0 8px 24px rgba(0,0,0,0.5));
+    box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-3, 0 16px 42px rgba(0,0,0,.48));
   }
   .rwp-header {
     display: flex;
@@ -97,5 +97,8 @@ const rwpStyles = `
     border-left: 5px solid transparent;
     border-right: 5px solid transparent;
     border-top: 5px solid var(--border-normal, rgba(255,255,255,0.1));
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rwp { animation: none !important; }
   }
 `;

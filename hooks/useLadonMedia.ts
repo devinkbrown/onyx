@@ -12,17 +12,9 @@ import type { IRCMessage } from '@/lib/irc/types';
  * Creates and wires the LADON MediaEngine to the Ocean store.
  * Mount once at AppShell level.
  *
- * LADON messages arrive as the 'MEDIA' or 'LADONMEDIA' IRC command
- * (the server advertises which one via ISUPPORT LADONMEDIA=<cmd>).
- * Each message: MEDIA <target> <subtype> [<payload>]
- *
- * Screenshare signaling uses CTCP-style LADON_MEDIA messages:
- *   START: PRIVMSG #channel :\x01LADON_MEDIA SCREENSHARE_START\x01
- *   STOP:  PRIVMSG #channel :\x01LADON_MEDIA SCREENSHARE_STOP\x01
- *
- * Voice join/leave:
- *   JOIN:  PRIVMSG #channel :\x01LADON_MEDIA JOIN\x01
- *   LEAVE: PRIVMSG #channel :\x01LADON_MEDIA LEAVE\x01
+ * Orochi media signaling arrives as NOTE MEDIA events:
+ *   NOTE MEDIA <#channel> <verb> <nick> [detail...]
+ * Local controls are sent with MEDIA <verb> <#channel> ...
  */
 export function useLadonMedia() {
   const client          = useOnyxStore(s => s.client);
@@ -144,16 +136,13 @@ export function useLadonMedia() {
 
     if (!client) return;
 
-    const mediaCmd = (client.isupport.LADONMEDIA || 'MEDIA').toUpperCase();
-
     const fn = (msg: IRCMessage) => {
-      const cmd = msg.command;
-      if (cmd !== mediaCmd && cmd !== 'MEDIA' && cmd !== 'LADONMEDIA') return;
+      if (msg.command !== 'NOTE' || (msg.params[0] ?? '').toUpperCase() !== 'MEDIA') return;
 
-      const target   = msg.params[0];
-      const subtype  = msg.params[1];
-      const payload  = msg.params[2] ?? '';
-      const fromNick = msg.nick ?? '';
+      const target   = msg.params[1];
+      const subtype  = (msg.params[2] ?? '').toUpperCase();
+      const fromNick = msg.params[3] ?? '';
+      const payload  = msg.params.slice(4).join(' ');
 
       if (!fromNick || !target || !subtype) return;
 
@@ -212,9 +201,9 @@ export function useLadonMedia() {
     const wasActive = prevShareRef.current;
 
     if (screenshareActive && !wasActive) {
-      client.sendRaw('PRIVMSG', channel, '\x01LADON_MEDIA SCREENSHARE_START\x01');
+      client.sendRaw('MEDIA', 'JOIN', channel, 'screen');
     } else if (!screenshareActive && wasActive) {
-      client.sendRaw('PRIVMSG', channel, '\x01LADON_MEDIA SCREENSHARE_STOP\x01');
+      client.sendRaw('MEDIA', 'LEAVE', channel);
     }
 
     prevShareRef.current = screenshareActive;
@@ -223,13 +212,13 @@ export function useLadonMedia() {
   // ── Voice join / leave helpers ────────────────────────────────────────────
   const announceJoin = useCallback(() => {
     if (client && channel) {
-      client.sendRaw('PRIVMSG', channel, '\x01LADON_MEDIA JOIN\x01');
+      client.sendRaw('MEDIA', 'JOIN', channel, 'voice');
     }
   }, [client, channel]);
 
   const announceLeave = useCallback(() => {
     if (client && channel) {
-      client.sendRaw('PRIVMSG', channel, '\x01LADON_MEDIA LEAVE\x01');
+      client.sendRaw('MEDIA', 'LEAVE', channel);
     }
   }, [client, channel]);
 

@@ -4,6 +4,8 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { IRCClient } from '@/lib/irc/client';
 import type { IRCMessage, Channel, ChatMessage, ConnectionStatus, MessageReaction } from '@/lib/irc/types';
+import { loadCredentials } from '@/lib/credentials';
+import { parseCHANLIMIT, parseMonitorNumeric, parsePREFIX, parseSessionTokenNote, parseStandardReply } from '@/lib/irc/parser';
 import type { LadonPeerState, LadonRoomStats, CallState } from '@/lib/ladon-media/types';
 import { getMountedLadonMediaEngine } from '@/lib/ladon-media/MediaEngine';
 import { parseActivity } from '@/lib/activity';
@@ -337,6 +339,19 @@ export interface OnyxState {
   networkName: string;
   /** Parsed ISUPPORT tokens from 005 — key=token name, value=token value or '' */
   serverFeatures: Map<string, string>;
+  isupportPrefixToMode: Record<string, string>;
+  isupportModeToPrefix: Record<string, string>;
+  chanLimits: Record<string, number>;
+  caseMapping: string;
+  mediaAvailable: boolean;
+  canEditMessages: boolean;
+
+  // ── Account registration protocol ────────────────────────────────────
+  registerPending: boolean;
+  registerError: string | null;
+  verifyRequired: boolean;
+  registerAccount(account: string, email: string | undefined, password: string): void;
+  verifyAccount(account: string, code: string): void;
 
   // ── MONITOR ─────────────────────────────────────────────────────────
   /** Tracks which nicks we've added to the MONITOR list */
@@ -1123,7 +1138,7 @@ export interface OnyxState {
   // ── ISUPPORT token store (all 005 tokens, not just known ones) ───────────
   isupportTokens: Record<string, string>;
 
-  // ── WATCH list (IRC WATCH command) ───────────────────────────────────────
+  // ── Watch list (IRCv3 MONITOR command) ──────────────────────────────────
   watchList: Array<{ nick: string; online: boolean; lastSeen?: Date }>;
   addToWatchList: (nick: string) => void;
   removeFromWatchList: (nick: string) => void;
@@ -1401,7 +1416,7 @@ let _saslAccount: string | null = null;
 
 // ── Nick reclaim timer (module-level) ────────────────────────────────────────
 /**
- * When we land on an alias nick after SESSION-TOKEN auth, this interval
+ * When we land on an alias nick after SASL auth, this interval
  * periodically sends NICK <desiredNick> until the zombie dies and the nick
  * is freed.  Handles ping-timeout zombies that aren't yet marked dead on
  * the server when we first attempt the reclaim.
@@ -1616,6 +1631,15 @@ export const useOnyxStore = create<OnyxState>()(
     isIRCX: false,
     networkName: 'Ocean',
     serverFeatures: new Map(),
+    isupportPrefixToMode: { '.': 'q', '@': 'o', '+': 'v' },
+    isupportModeToPrefix: { q: '.', o: '@', v: '+' },
+    chanLimits: {},
+    caseMapping: 'rfc1459',
+    mediaAvailable: false,
+    canEditMessages: false,
+    registerPending: false,
+    registerError: null,
+    verifyRequired: false,
     notifications: [],
     readNotificationIds: new Set(),
     showNotificationCenter: false,
@@ -1741,6 +1765,7 @@ export const useOnyxStore = create<OnyxState>()(
 
       set({ status: 'connecting', connectionStatus: 'connecting', ourNick: nick, autoReconnect: false });
       _nickAliasTryIdx = 0;
+      const savedCreds = loadCredentials(url, nick);
 
       const client = new IRCClient({
         url,
@@ -1748,6 +1773,7 @@ export const useOnyxStore = create<OnyxState>()(
         realname: realname ?? nick,
         username: nick,
         password,
+        sessionToken: savedCreds?.sessionToken,
         onConnected() {
           _clearReconnectCountdown();
           _reconnectAttempts = 0;
@@ -1785,6 +1811,12 @@ export const useOnyxStore = create<OnyxState>()(
           get().addRawLogEntry(dir, line);
         },
       });
+      client.onCapChange = () => {
+        set({
+          canEditMessages: client.negotiatedCaps.has('draft/message-editing'),
+          mediaAvailable: client.negotiatedCaps.has('standard-replies') || client.capValues.has('standard-replies'),
+        });
+      };
 
       client.connect();
 
@@ -1916,6 +1948,23 @@ export const useOnyxStore = create<OnyxState>()(
     // ── sendRaw ──────────────────────────────────────────────────────────
     sendRaw(line) {
       get().client?.send(line + '\r\n');
+    },
+
+    registerAccount(account, email, password) {
+      const { client } = get();
+      if (!client) return;
+      set({ registerPending: true, registerError: null, verifyRequired: false });
+      client.sendRaw('REGISTER', account, email?.trim() || '*', password);
+      // OCEAN-UI: RegisterForm should call registerAccount() and render
+      // registerPending/registerError/verifyRequired instead of parsing NOTICE text.
+    },
+
+    verifyAccount(account, code) {
+      const { client } = get();
+      if (!client) return;
+      set({ registerPending: true, registerError: null });
+      client.sendRaw('VERIFY', account, code);
+      // OCEAN-UI: verification UI should call verifyAccount(account, code).
     },
 
     // ── requestHistory ───────────────────────────────────────────────────
@@ -2153,12 +2202,11 @@ export const useOnyxStore = create<OnyxState>()(
 
     editMessage(target, messageId, newText) {
       const { client, ourNick } = get();
+      if (!client?.negotiatedCaps.has('draft/message-editing')) return;
       const key = target.toLowerCase();
 
       // Send EDIT command to the server (draft/message-editing cap)
-      if (client) {
-        client.sendRaw('EDIT', target, messageId, `:${newText}`);
-      }
+      client.sendRaw('EDIT', target, messageId, newText);
 
       // Optimistic local update — only for our own messages
       const applyEdit = (messages: ChatMessage[]): ChatMessage[] =>
@@ -2910,6 +2958,72 @@ export const useOnyxStore = create<OnyxState>()(
       // Use server-advertised CHANTYPES for channel detection; fall back to '#&'.
       const chanPfx = get().client?.isupport.CHANTYPES ?? '#&';
       const isChan = (t: string): boolean => t.length > 0 && chanPfx.includes(t[0]);
+      const standard = parseStandardReply(msg);
+      if (standard) {
+        if (standard.kind === 'NOTE' && standard.command === 'SESSION' && standard.code === 'TOKEN') {
+          const token = parseSessionTokenNote(msg);
+          if (token) {
+            const canonicalNick = _saslAccount ?? undefined;
+            import('@/lib/credentials').then(({ storeSessionToken }) => {
+              storeSessionToken(token, undefined, canonicalNick);
+            }).catch(() => {});
+          }
+          return;
+        }
+        if (standard.kind === 'FAIL' && standard.command === 'SESSION') {
+          import('@/lib/credentials').then(({ clearSessionToken }) => {
+            clearSessionToken(get().server?.url, _connectNick || get().ourNick);
+          }).catch(() => {});
+          get().addNotification({ type: 'error', text: standard.description || `SESSION ${standard.code}` });
+          return;
+        }
+        if (standard.command === 'REGISTER' || standard.command === 'VERIFY') {
+          if (standard.kind === 'FAIL') {
+            set({ registerPending: false, registerError: standard.description || standard.code, verifyRequired: false });
+          }
+          return;
+        }
+        if (standard.kind === 'FAIL' && standard.command === 'CHATHISTORY') {
+          const target = standard.context.find(p => isChan(p));
+          if (target) {
+            get().setHistoryLoading(target, false);
+            get().setHistoryExhausted(target);
+          }
+          return;
+        }
+        if (standard.command === 'MEDIA') {
+          const channel = standard.code;
+          const verb = (standard.context[0] ?? '').toUpperCase();
+          const actor = standard.context[1] ?? nick ?? '';
+          const detail = standard.context.slice(2).join(' ') || standard.description;
+          if (channel && actor) {
+            const chKey = channel.toLowerCase();
+            if (verb === 'JOIN' || verb === 'ROSTER') {
+              set(s => {
+                const map = new Map(s.voiceChannelParticipants);
+                const pSet = new Set(map.get(chKey) ?? []);
+                pSet.add(actor);
+                map.set(chKey, pSet);
+                return { voiceChannelParticipants: map, mediaAvailable: true };
+              });
+            } else if (verb === 'LEAVE') {
+              set(s => {
+                const map = new Map(s.voiceChannelParticipants);
+                const pSet = new Set(map.get(chKey) ?? []);
+                pSet.delete(actor);
+                map.set(chKey, pSet);
+                return { voiceChannelParticipants: map, mediaAvailable: true };
+              });
+            }
+            getMountedLadonMediaEngine()?.handleMediaMessage(actor, channel, verb, detail);
+          } else {
+            set({ mediaAvailable: true });
+          }
+          return;
+        }
+        get().addServiceNotice(standard.command, `${standard.kind} ${standard.code}${standard.description ? `: ${standard.description}` : ''}`);
+        return;
+      }
 
       switch (command) {
 
@@ -2975,7 +3089,7 @@ export const useOnyxStore = create<OnyxState>()(
             const isAlias = connectedNick.toLowerCase() !== desiredNick.toLowerCase();
             set({ currentNickIsAlias: isAlias });
 
-            // If we landed on an alias after SESSION-TOKEN auth, the server
+            // If we landed on an alias after SASL auth, the server
             // already evicted the stale session in stoken_step — just reclaim
             // the nick directly. No GHOST needed.
             if (isAlias && _saslAccount) {
@@ -2986,12 +3100,11 @@ export const useOnyxStore = create<OnyxState>()(
               _startNickReclaim(desiredNick);
             }
           }
-          // Send WATCH list to server
+          // Send watch list to server through IRCv3 MONITOR.
           {
             const { watchList: wl } = get();
             if (wl.length > 0) {
-              const watchArgs = wl.map(w => `+${w.nick}`).join(' ');
-              get().client?.sendRaw(`WATCH ${watchArgs}`);
+              get().client?.sendRaw('MONITOR', '+', wl.map(w => w.nick).join(','));
             }
           }
           break;
@@ -3000,6 +3113,24 @@ export const useOnyxStore = create<OnyxState>()(
         case 'ACCOUNT': {
           const account = params[0] === '*' ? null : params[0];
           set(s => ({ server: s.server ? { ...s.server, account } : null }));
+          break;
+        }
+
+        case 'REGISTER': {
+          const sub = (params[0] ?? '').toUpperCase();
+          if (sub === 'SUCCESS') {
+            set({ registerPending: false, registerError: null, verifyRequired: false });
+          } else if (sub === 'VERIFICATION_REQUIRED') {
+            set({ registerPending: false, registerError: null, verifyRequired: true });
+          }
+          break;
+        }
+
+        case 'VERIFY': {
+          const sub = (params[0] ?? '').toUpperCase();
+          if (sub === 'SUCCESS') {
+            set({ registerPending: false, registerError: null, verifyRequired: false });
+          }
           break;
         }
 
@@ -3277,24 +3408,6 @@ export const useOnyxStore = create<OnyxState>()(
             break;
           }
 
-          // ── Ophion session token (login persistence) ─────────────────────
-          // Wire format: NOTICE <nick> :SESSIONTOKEN <token> <unix_expiry>
-          // Ophion sends this after successful SASL to avoid storing passwords.
-          if (!isSelf && text.startsWith('SESSIONTOKEN ')) {
-            const parts = text.split(' ');
-            const token   = parts[1];
-            const expiry  = parseInt(parts[2] ?? '0', 10);
-            if (token && expiry > 0) {
-              // Pass the canonical account name so saved credentials always
-              // store 'kain' not 'kain_', fixing future auto-connect nicks.
-              const canonicalNick = _saslAccount ?? undefined;
-              import('@/lib/credentials').then(({ storeSessionToken }) => {
-                storeSessionToken(token, expiry, canonicalNick);
-              }).catch(() => { /* ignore */ });
-            }
-            break; // do not display this as a visible message
-          }
-
           if (command === 'NOTICE' && !text.startsWith('\x01') && !isChan(target)) {
             const rawSource = sender || msg.prefix || '';
             const sourceUpper = rawSource.toUpperCase();
@@ -3460,138 +3573,6 @@ export const useOnyxStore = create<OnyxState>()(
             const ctcpCmd = spaceIdx === -1 ? ctcpBody : ctcpBody.slice(0, spaceIdx);
             const ctcpArgStr = spaceIdx === -1 ? '' : ctcpBody.slice(spaceIdx + 1);
             const ctcpArgs = ctcpArgStr ? ctcpArgStr.split(' ') : [];
-
-            // ── LADON_MEDIA: voice channel presence ───────────────────────
-            if (ctcpCmd === 'LADON_MEDIA') {
-              const ch = target.toLowerCase();
-              if (ctcpArgStr === 'JOIN') {
-                set(s => {
-                  const map = new Map(s.voiceChannelParticipants);
-                  const pSet = new Set(map.get(ch) ?? []);
-                  pSet.add(sender);
-                  map.set(ch, pSet);
-                  return { voiceChannelParticipants: map };
-                });
-              } else if (ctcpArgStr === 'LEAVE') {
-                set(s => {
-                  const map = new Map(s.voiceChannelParticipants);
-                  const pSet = new Set(map.get(ch) ?? []);
-                  pSet.delete(sender);
-                  map.set(ch, pSet);
-                  return { voiceChannelParticipants: map };
-                });
-              }
-              break;
-            }
-
-            // ── LADON_STREAM: channel streaming ──────────────────────────
-            if (ctcpCmd === 'LADON_STREAM') {
-              const sub = ctcpArgs[0] ?? '';
-              const chan = target;
-              const key = chan.toLowerCase();
-              if (sub === 'START') {
-                const title = (() => { try { return decodeURIComponent(ctcpArgs[1] ?? ''); } catch { return ctcpArgs[1] ?? ''; } })();
-                const category = (() => { try { return decodeURIComponent(ctcpArgs[2] ?? ''); } catch { return ctcpArgs[2] ?? ''; } })();
-                const mode = ctcpArgs[3] === 'screen' ? 'screen' : 'camera';
-                const quality = (ctcpArgs[4] === 'auto' || ctcpArgs[4] === '1080p60' || ctcpArgs[4] === '4k60')
-                  ? ctcpArgs[4] as StreamQuality
-                  : '4k60';
-                set(s => ({
-                  streams: new Map(s.streams).set(key, {
-                    channel: chan, streamer: sender, title, category,
-                    live: true, startedAt: Math.floor(Date.now() / 1000),
-                    viewers: 0, mode, quality,
-                  }),
-                }));
-              } else if (sub === 'END') {
-                set(s => { const next = new Map(s.streams); next.delete(key); return { streams: next }; });
-              } else if (sub === 'VIEWERS') {
-                const n = parseInt(ctcpArgs[1] ?? '0', 10);
-                set(s => {
-                  const stream = s.streams.get(key);
-                  if (!stream) return {};
-                  return { streams: new Map(s.streams).set(key, { ...stream, viewers: n }) };
-                });
-              } else if (sub === 'RAID') {
-                set(s => ({
-                  raids: new Map(s.raids).set(key, {
-                    raider: sender, from: chan, viewers: 0, timestamp: Date.now(),
-                  }),
-                }));
-                setTimeout(() => set(s => { const next = new Map(s.raids); next.delete(key); return { raids: next }; }), 15000);
-              }
-              break;
-            }
-
-            // ── LADON_POLL: channel stream polls ──────────────────────────
-            if (ctcpCmd === 'LADON_POLL') {
-              const sub = ctcpArgs[0] ?? '';
-              const chan = target;
-              const key = chan.toLowerCase();
-              if (sub === 'CREATE') {
-                const parts = ctcpArgs.slice(1).map(p => { try { return decodeURIComponent(p); } catch { return p; } });
-                const [question, ...options] = parts;
-                if (question && options.length >= 2) {
-                  set(s => ({
-                    streamPolls: new Map(s.streamPolls).set(key, {
-                      channel: chan, question, options,
-                      votes: options.map(() => 0), myVote: null,
-                      createdBy: sender, endsAt: Date.now() + 60000, active: true,
-                    }),
-                  }));
-                }
-              } else if (sub === 'VOTE') {
-                const idx = parseInt(ctcpArgs[1] ?? '-1', 10);
-                set(s => {
-                  const poll = s.streamPolls.get(key);
-                  if (!poll || idx < 0 || idx >= poll.options.length) return {};
-                  const votes = [...poll.votes];
-                  votes[idx] = (votes[idx] ?? 0) + 1;
-                  return { streamPolls: new Map(s.streamPolls).set(key, { ...poll, votes }) };
-                });
-              } else if (sub === 'END') {
-                set(s => {
-                  const poll = s.streamPolls.get(key);
-                  if (!poll) return {};
-                  return { streamPolls: new Map(s.streamPolls).set(key, { ...poll, active: false }) };
-                });
-              }
-              break;
-            }
-
-            // ── LADON_CALL: DM voice/video call signaling ─────────────────
-            if (ctcpCmd === 'LADON_CALL') {
-              const callType = ctcpArgStr === 'VIDEO' ? 'VIDEO' : 'VOICE';
-              getMountedLadonMediaEngine()?.noteIncomingCall(sender, callType === 'VIDEO' ? 'video' : 'voice');
-              get().setVoiceCallState({ callState: 'ringing_in', callWith: sender, callChannel: null });
-              get().addToast({
-                variant: 'info',
-                title: `Incoming ${callType} Call`,
-                description: `${sender} is calling you`,
-              });
-              break;
-            }
-            if (ctcpCmd === 'LADON_CALL_ACCEPT') {
-              if (get().voice.callState === 'ringing_out') {
-                getMountedLadonMediaEngine()?.handleMediaMessage(sender, sender, 'ACCEPT', '');
-              }
-              break;
-            }
-            if (ctcpCmd === 'LADON_CALL_REJECT') {
-              if (get().voice.callState === 'ringing_out') {
-                get().setVoiceCallState({ callState: 'idle', callWith: '', callChannel: null });
-                getMountedLadonMediaEngine()?.handleMediaMessage(sender, sender, 'REJECT', '');
-                get().addToast({ variant: 'info', title: 'Call Declined', description: `${sender} declined the call` });
-              }
-              break;
-            }
-            if (ctcpCmd === 'LADON_CALL_END') {
-              if (get().voice.callState === 'in_call' && get().voice.callWith.toLowerCase() === sender.toLowerCase()) {
-                get().endDmCall();
-                get().addToast({ variant: 'info', title: 'Call Ended', description: `${sender} ended the call` });
-              }
-              break;
-            }
 
             const { ctcpEnabled, ctcpVersionReply, ctcpTimeEnabled, ctcpPingEnabled, client: ircClient } = get();
             if (ctcpEnabled && ircClient) {
@@ -3930,6 +3911,10 @@ export const useOnyxStore = create<OnyxState>()(
             }
             // Emit channel event for mode change
             get().addChannelEvent(target, { type: 'mode', nick: nick ?? 'server', text: `${nick ?? 'server'} set mode ${params.slice(1).join(' ')}`, time: new Date() });
+          } else if (target.toLowerCase() === get().ourNick.toLowerCase()) {
+            const modeStr = params[1] ?? '';
+            if (modeStr.includes('+') && modeStr.includes('o')) set({ isOper: true });
+            if (modeStr.includes('-') && modeStr.includes('o')) set({ isOper: false });
           }
           break;
         }
@@ -4131,32 +4116,6 @@ export const useOnyxStore = create<OnyxState>()(
           break;
         }
 
-        // ── LADON spatial audio — inbound peer positions ──────────────────
-        // :nick!u@h MEDIA <channel> SPATIAL <json>
-        case 'MEDIA': {
-          const mediaChan = params[0];
-          const mediaType = params[1];
-          if (!mediaChan || mediaType !== 'SPATIAL' || !nick) break;
-          try {
-            const pos = JSON.parse(params[2] ?? '{}') as { x?: unknown; y?: unknown; z?: unknown };
-            const x = typeof pos.x === 'number' ? pos.x : 0;
-            const y = typeof pos.y === 'number' ? pos.y : 0;
-            const z = typeof pos.z === 'number' ? pos.z : 0;
-            const chanKey = mediaChan.toLowerCase();
-            const nickKey = nick.toLowerCase();
-            set(s => {
-              const sp      = new Map(s.spatialPositions);
-              const chanMap = new Map(
-                sp.get(chanKey) ?? new Map<string, { x: number; y: number; z: number; t: number }>()
-              );
-              chanMap.set(nickKey, { x, y, z, t: Date.now() });
-              sp.set(chanKey, chanMap);
-              return { spatialPositions: sp };
-            });
-          } catch { /* malformed JSON — ignore */ }
-          break;
-        }
-
         // ── Whiteboard — handled by useWhiteboard() hook via client.extraMessageHandlers ──
         // WHITEBOARD messages are consumed directly in hooks/useWhiteboard.ts
         // using client.extraMessageHandlers; no global store state needed.
@@ -4248,7 +4207,8 @@ export const useOnyxStore = create<OnyxState>()(
 
         // ── MONITOR presence ──────────────────────────────────────────────
         case '730': { // RPL_MONONLINE :nick!user@host,...
-          const targets = (params[1] ?? '').split(',').filter(Boolean);
+          const parsed = parseMonitorNumeric(msg);
+          const targets = parsed?.targets ?? [];
           set(s => {
             const dms = new Map(s.dms);
             for (const fullhost of targets) {
@@ -4267,7 +4227,8 @@ export const useOnyxStore = create<OnyxState>()(
         }
 
         case '731': { // RPL_MONOFFLINE :nick,...
-          const offTargets = (params[1] ?? '').split(',').filter(Boolean);
+          const parsed = parseMonitorNumeric(msg);
+          const offTargets = parsed?.targets ?? [];
           set(s => {
             const dms = new Map(s.dms);
             for (const monNick of offTargets) {
@@ -4286,6 +4247,17 @@ export const useOnyxStore = create<OnyxState>()(
         case '732': // RPL_MONLIST — ignore (just a list of currently watched nicks)
         case '733': // RPL_ENDOFMONLIST
           break;
+
+        case '734': { // ERR_MONLISTFULL — params include the configured limit.
+          const parsed = parseMonitorNumeric(msg);
+          get().addNotification({
+            type: 'error',
+            text: parsed?.limit
+              ? `MONITOR list is full (${parsed.limit} targets)`
+              : (parsed?.description || 'MONITOR list is full'),
+          });
+          break;
+        }
 
         // ── WHISPER (IRCX in-channel DM) ─────────────────────────────────
         case 'WHISPER': {
@@ -4431,36 +4403,46 @@ export const useOnyxStore = create<OnyxState>()(
         case '005': {
           // params[0] = our nick, last param = ":are supported..." — skip both
           const tokens005 = params.slice(1, -1);
-          const knownTokens = new Set([
-            'CASEMAPPING', 'CHANMODES', 'CHANLIMIT', 'MAXNICKLEN', 'CHANNELLEN',
-            'NICKLEN', 'TOPICLEN', 'STATUSMSG', 'PREFIX', 'NETWORK', 'CHANTYPES',
-          ]);
           set(s => {
             const serverFeatures = new Map(s.serverFeatures);
             const newIsupportTokens: Record<string, string> = {};
             let networkUpdate: string | null = null;
+            let isupportPrefixToMode = s.isupportPrefixToMode;
+            let isupportModeToPrefix = s.isupportModeToPrefix;
+            let chanLimits = s.chanLimits;
+            let caseMapping = s.caseMapping;
             for (const token of tokens005) {
               const eqIdx = token.indexOf('=');
               const key = eqIdx === -1 ? token : token.slice(0, eqIdx);
               const val = eqIdx === -1 ? '' : token.slice(eqIdx + 1);
-              if (knownTokens.has(key)) {
-                serverFeatures.set(key, val);
-              }
+              serverFeatures.set(key, val);
               newIsupportTokens[key] = val;
               if (key === 'NETWORK' && val) {
                 networkUpdate = val;
               }
+              if (key === 'PREFIX') {
+                const parsed = parsePREFIX(val);
+                isupportPrefixToMode = parsed.prefixToMode;
+                isupportModeToPrefix = parsed.modeToPrefix;
+              }
+              if (key === 'CHANLIMIT') chanLimits = parseCHANLIMIT(val);
+              if (key === 'CASEMAPPING' && val) caseMapping = val;
             }
             const isupportTokens = { ...s.isupportTokens, ...newIsupportTokens };
             if (networkUpdate) {
               return {
                 serverFeatures,
                 isupportTokens,
+                isupportPrefixToMode,
+                isupportModeToPrefix,
+                chanLimits,
+                caseMapping,
+                mediaAvailable: serverFeatures.has('standard-replies'),
                 networkName: networkUpdate,
                 server: s.server ? { ...s.server, name: networkUpdate, network: networkUpdate } : null,
               };
             }
-            return { serverFeatures, isupportTokens };
+            return { serverFeatures, isupportTokens, isupportPrefixToMode, isupportModeToPrefix, chanLimits, caseMapping };
           });
           break;
         }
@@ -4592,7 +4574,7 @@ export const useOnyxStore = create<OnyxState>()(
           break;
         }
 
-        // ── WATCH numerics ────────────────────────────────────────────────
+        // ── legacy watch numerics ─────────────────────────────────────────
         case '600': { // RPL_LOGON — nick came online
           // :server 600 yournick watchedNick user host time :logged on
           const watchNick600 = params[1] ?? '';
@@ -5065,7 +5047,11 @@ export const useOnyxStore = create<OnyxState>()(
     openOperPanel: () => set({ showOperPanel: true }),
     closeOperPanel: () => set({ showOperPanel: false }),
     operLogin: (username, password) => {
-      get().client?.sendRaw('OPER', username, password);
+      void password;
+      get().addNotification({
+        type: 'system',
+        text: 'Orochi grants IRC operator status from the authenticated SASL account.',
+      });
       set({ operUsername: username });
     },
     operAction: (command, ...args) => {
@@ -5817,7 +5803,7 @@ export const useOnyxStore = create<OnyxState>()(
     // ── ISUPPORT token store ──────────────────────────────────────────────
     isupportTokens: {},
 
-    // ── WATCH list ────────────────────────────────────────────────────────
+    // ── Watch list / MONITOR ──────────────────────────────────────────────
     watchList: _loadWatchList(),
     addToWatchList: (nick) => {
       const { watchList, client } = get();
@@ -5825,14 +5811,14 @@ export const useOnyxStore = create<OnyxState>()(
       const next = [...watchList, { nick, online: false }];
       _saveWatchList(next);
       set({ watchList: next });
-      client?.sendRaw('WATCH', `+${nick}`);
+      client?.sendRaw('MONITOR', '+', nick);
     },
     removeFromWatchList: (nick) => {
       const { watchList, client } = get();
       const next = watchList.filter(w => w.nick.toLowerCase() !== nick.toLowerCase());
       _saveWatchList(next);
       set({ watchList: next });
-      client?.sendRaw('WATCH', `-${nick}`);
+      client?.sendRaw('MONITOR', '-', nick);
     },
     setWatchOnline: (nick, online, time) => set(s => ({
       watchList: s.watchList.map(w =>
@@ -6107,11 +6093,6 @@ export const useOnyxStore = create<OnyxState>()(
         cameraStream: withVideo ? stream : null,
       });
 
-      client.sendRaw('PRIVMSG', channel, '\x01LADON_MEDIA JOIN\x01');
-      if (withVideo) {
-        client.sendRaw('PRIVMSG', channel, '\x01LADON_MEDIA VIDEO_ON\x01');
-      }
-
       const { ourNick } = get();
       set(s => {
         const map = new Map(s.voiceChannelParticipants);
@@ -6131,9 +6112,7 @@ export const useOnyxStore = create<OnyxState>()(
       if (ch) getMountedLadonMediaEngine()?.leaveRoom(ch);
       else if (voice.callWith) getMountedLadonMediaEngine()?.hangup(voice.callWith);
 
-      if (client && ch) {
-        client.sendRaw('PRIVMSG', ch, '\x01LADON_MEDIA LEAVE\x01');
-      }
+      void client;
 
       get().setVoiceCallState({
         callState: 'idle',
@@ -6166,9 +6145,7 @@ export const useOnyxStore = create<OnyxState>()(
       if (voice.cameraOn) {
         engine.stopCamera();
         get().setVoiceCallState({ cameraOn: false, cameraStream: null, localStream: engine.getLocalStream() });
-        if (client && voice.callChannel) {
-          client.sendRaw('PRIVMSG', voice.callChannel, '\x01LADON_MEDIA VIDEO_OFF\x01');
-        }
+        void client;
       } else {
         await engine.startCamera(voice.callChannel ?? voice.callWith);
         const stream = engine.getLocalStream();
@@ -6177,9 +6154,7 @@ export const useOnyxStore = create<OnyxState>()(
           return;
         }
         get().setVoiceCallState({ cameraOn: true, cameraStream: stream, localStream: stream });
-        if (client && voice.callChannel) {
-          client.sendRaw('PRIVMSG', voice.callChannel, '\x01LADON_MEDIA VIDEO_ON\x01');
-        }
+        void client;
       }
     },
 
@@ -6204,9 +6179,9 @@ export const useOnyxStore = create<OnyxState>()(
 
       get().setVoiceCallState({ callState: 'ringing_out', callWith: nick, callChannel: null });
 
-      const callType = withVideo ? 'VIDEO' : 'VOICE';
-      client.sendRaw('PRIVMSG', nick, `\x01LADON_CALL ${callType}\x01`);
       void getMountedLadonMediaEngine()?.startCall(nick, withVideo ? 'video' : 'voice');
+      // OCEAN-UI: DM call affordances need an Orochi-backed room/channel flow;
+      // do not emit legacy CTCP call messages.
 
       setTimeout(() => {
         if (get().voice.callState === 'ringing_out') {
@@ -6219,15 +6194,13 @@ export const useOnyxStore = create<OnyxState>()(
       const { client, voice } = get();
       if (!client || voice.callState !== 'ringing_in') return;
 
-      client.sendRaw('PRIVMSG', voice.callWith, '\x01LADON_CALL_ACCEPT\x01');
+      void client;
       void getMountedLadonMediaEngine()?.acceptIncomingCall();
     },
 
     rejectDmCall() {
       const { client, voice } = get();
-      if (client && voice.callWith) {
-        client.sendRaw('PRIVMSG', voice.callWith, '\x01LADON_CALL_REJECT\x01');
-      }
+      void client;
       if (voice.callWith) getMountedLadonMediaEngine()?.rejectCall(voice.callWith);
       get().setVoiceCallState({ callState: 'idle', callWith: '', callChannel: null });
     },
@@ -6237,9 +6210,7 @@ export const useOnyxStore = create<OnyxState>()(
       voice.localStream?.getTracks().forEach(t => t.stop());
       voice.cameraStream?.getTracks().forEach(t => t.stop());
 
-      if (client && voice.callWith && voice.callState !== 'idle') {
-        client.sendRaw('PRIVMSG', voice.callWith, '\x01LADON_CALL_END\x01');
-      }
+      void client;
       if (voice.callWith) getMountedLadonMediaEngine()?.hangup(voice.callWith);
 
       get().setVoiceCallState({
@@ -6289,8 +6260,9 @@ export const useOnyxStore = create<OnyxState>()(
       client.sendRaw('JOIN', `%%${channel}`);
       const t = encodeURIComponent(title);
       const c = encodeURIComponent(category);
-      client.sendRaw('PRIVMSG', channel, `\x01LADON_STREAM START ${t} ${c} ${mode} ${quality}\x01`);
-      if (key) client.sendRaw('PRIVMSG', channel, `\x01LADON_STREAM KEY ${encodeURIComponent(key)}\x01`);
+      void t; void c; void key;
+      client.sendRaw('MEDIA', 'JOIN', channel, mode === 'screen' ? 'screen' : 'video');
+      client.sendRaw('MEDIA', 'OFFER', channel, 'opvox,opvis', 'transport=webrtc');
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('ocean:stream-start', {
           detail: { channel, mode, quality },
@@ -6302,7 +6274,7 @@ export const useOnyxStore = create<OnyxState>()(
       const { client } = get();
       if (!client) return;
       client.sendRaw('PART', `%%${channel}`);
-      client.sendRaw('PRIVMSG', channel, '\x01LADON_STREAM END\x01');
+      client.sendRaw('MEDIA', 'LEAVE', channel);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('ocean:stream-stop', {
           detail: { channel },
@@ -6319,7 +6291,7 @@ export const useOnyxStore = create<OnyxState>()(
       const { client } = get();
       if (!client) return;
       const t = target.startsWith('#') ? target : `#${target}`;
-      client.sendRaw('PRIVMSG', channel, `\x01LADON_STREAM RAID ${t}\x01`);
+      client.sendRaw('MEDIA', 'BREAKOUT', channel, t.replace(/^#/, ''));
     },
 
     createStreamPoll: (channel, question, options, durationSec = 60) => {
@@ -6331,14 +6303,15 @@ export const useOnyxStore = create<OnyxState>()(
         endsAt: Date.now() + durationSec * 1000, active: true,
       };
       set(s => ({ streamPolls: new Map(s.streamPolls).set(channel.toLowerCase(), poll) }));
-      const args = [question, ...options].map(encodeURIComponent).join(' ');
-      client.sendRaw('PRIVMSG', channel, `\x01LADON_POLL CREATE ${args}\x01`);
+      void client;
+      // OCEAN-UI: stream polls need a new Orochi-backed transport; no legacy CTCP.
     },
 
     voteStreamPoll: (channel, optionIndex) => {
       const { client } = get();
       if (!client) return;
-      client.sendRaw('PRIVMSG', channel, `\x01LADON_POLL VOTE ${optionIndex}\x01`);
+      void client;
+      // OCEAN-UI: stream poll votes need a new Orochi-backed transport; no legacy CTCP.
       set(s => {
         const key = channel.toLowerCase();
         const poll = s.streamPolls.get(key);
@@ -6848,7 +6821,7 @@ function _saveNickAliases(aliases: string[]): void {
   try { localStorage.setItem('ocean-nick-aliases', JSON.stringify(aliases)); } catch {}
 }
 
-// ── WATCH list persistence ────────────────────────────────────────────────────
+// ── Watch list persistence ────────────────────────────────────────────────────
 function _loadWatchList(): Array<{ nick: string; online: boolean; lastSeen?: Date }> {
   if (typeof window === 'undefined') return [];
   try {

@@ -131,12 +131,13 @@ describe('storeSessionToken', () => {
     expect(creds?.tokenExpiry).toBeDefined();
   });
 
-  it('token is returned as auth secret', () => {
+  it('stores token without replacing the auth secret', () => {
     saveCredentials({ nick: 'devin', server: 'wss://x', password: 'pw' });
     const expiry = Math.floor(Date.now() / 1000) + 3600;
     storeSessionToken('sst_token', expiry);
     const creds = loadCredentials()!;
-    expect(getAuthSecret(creds)).toBe('sst_token');
+    expect(creds.sessionToken).toBe('sst_token');
+    expect(getAuthSecret(creds)).toBe('pw');
   });
 });
 
@@ -179,13 +180,13 @@ describe('clearCredentials', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('getAuthSecret', () => {
-  it('prefers token over password', () => {
+  it('returns the password even when a resume token is present', () => {
     const creds = {
       nick: 'x', server: 'wss://x', password: 'pass',
       sessionToken: 'sst_token',
       savedAt: new Date().toISOString(),
     };
-    expect(getAuthSecret(creds)).toBe('sst_token');
+    expect(getAuthSecret(creds)).toBe('pass');
   });
 
   it('falls back to password when no token', () => {

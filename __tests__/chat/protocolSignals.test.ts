@@ -23,6 +23,7 @@ describe('IRCv3 protocol signals', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useOnyxStore.getState().sendTypingStop('#test-reset');
+    useOnyxStore.setState({ monitoredNicks: new Set() });
   });
 
   it('sends typing notifications with the draft/typing message tag', () => {
@@ -59,5 +60,30 @@ describe('IRCv3 protocol signals', () => {
     useOnyxStore.getState().loadHistory('#root', oldest);
 
     expect(client.sendRaw).toHaveBeenCalledWith('CHATHISTORY', 'BEFORE', '#root', 'timestamp=2026-05-30T01:02:03.000Z', '50');
+  });
+
+  it('sends friend presence through MONITOR', () => {
+    const client = installClient();
+
+    useOnyxStore.getState().monitorAdd('alice');
+
+    expect(client.sendRaw).toHaveBeenCalledWith('MONITOR', '+', 'alice');
+  });
+
+  it('does not send EDIT when draft/message-editing is absent', () => {
+    const client = installClient();
+
+    useOnyxStore.getState().editMessage('#root', 'msg-1', 'changed');
+
+    expect(client.sendRaw).not.toHaveBeenCalledWith('EDIT', '#root', 'msg-1', 'changed');
+  });
+
+  it('sends EDIT when draft/message-editing is ACKed', () => {
+    const client = installClient();
+    client.negotiatedCaps.add('draft/message-editing');
+
+    useOnyxStore.getState().editMessage('#root', 'msg-1', 'changed');
+
+    expect(client.sendRaw).toHaveBeenCalledWith('EDIT', '#root', 'msg-1', 'changed');
   });
 });

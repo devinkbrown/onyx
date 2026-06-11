@@ -29,7 +29,7 @@ export default function UnreadJumpBadge({ count, onClick }: UnreadJumpBadgeProps
 
   if (!visible) return null;
 
-  const label = `${count} new message${count === 1 ? '' : 's'}`;
+  const label = `${count} new`;
 
   return (
     <button
@@ -54,9 +54,9 @@ export default function UnreadJumpBadge({ count, onClick }: UnreadJumpBadgeProps
           gap: 6px;
           padding: 7px 16px 7px 12px;
 
-          background: var(--accent);
-          color: #fff;
-          border: none;
+          background: color-mix(in srgb, var(--bg-elevated, #132131) 88%, transparent);
+          color: var(--lux, #d8b96a);
+          border: 1px solid color-mix(in srgb, var(--lux, #d8b96a) 34%, transparent);
           border-radius: 9999px;
           cursor: pointer;
 
@@ -65,20 +65,16 @@ export default function UnreadJumpBadge({ count, onClick }: UnreadJumpBadgeProps
           line-height: 1;
           white-space: nowrap;
           box-shadow:
-            0 4px 20px rgba(0,0,0,0.4),
-            0 0 0 1px rgba(255,255,255,0.12) inset,
-            0 0 16px var(--accent-glow, rgba(14,165,233,0.35));
+            var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)),
+            var(--elev-shadow-2, 0 10px 28px rgba(0,0,0,.38));
 
           animation: ujb-bounce-in 280ms var(--ease-spring, cubic-bezier(0.175,0.885,0.32,1.275)) both;
-          transition: background 120ms, box-shadow 120ms, transform 120ms;
+          transition: background var(--t-control, 150ms), border-color var(--t-control, 150ms), transform var(--t-micro, 90ms) var(--ease-out, ease);
         }
 
         .ujb-pill:hover {
-          background: var(--accent-hover, var(--accent));
-          box-shadow:
-            0 6px 24px rgba(0,0,0,0.45),
-            0 0 0 1px rgba(255,255,255,0.14) inset,
-            0 0 22px var(--accent-glow, rgba(14,165,233,0.45));
+          background: color-mix(in srgb, var(--bg-elevated, #132131) 78%, var(--lux, #d8b96a) 8%);
+          border-color: color-mix(in srgb, var(--lux, #d8b96a) 52%, transparent);
           transform: translateX(-50%) translateY(-1px);
         }
 

@@ -1,6 +1,14 @@
 'use client';
 
-import { parseIRCMessage, formatIRCLine, parsePREFIX } from './parser';
+import {
+  buildSessionResumeLine,
+  parseCHANLIMIT,
+  parseIRCMessage,
+  formatIRCLine,
+  parsePREFIX,
+  selectSaslMechanism,
+  type SaslMechanism,
+} from './parser';
 import type { IRCMessage, ISupport } from './types';
 
 export type IRCEventHandler = (msg: IRCMessage) => void;
@@ -12,6 +20,8 @@ export interface IRCClientOptions {
   realname?: string;
   username?: string;
   password?: string;     // SASL PLAIN password
+  sessionToken?: string; // Orochi SESSION RESUME token
+  hasClientCert?: boolean;
   /** called for every parsed message */
   onMessage: IRCEventHandler;
   onRaw?: RawHandler;
@@ -38,8 +48,8 @@ export class IRCClient {
   private opts: IRCClientOptions;
   /**
    * The nick passed to the constructor — never mutated even when the server
-   * sends 433 and we fall back to kain_.  Used as the SASL authcid so that
-   * SESSION-TOKEN (and PLAIN) always identify against the original nick/account.
+   * sends 433 and we fall back to kain_. Used as the SASL authcid so PLAIN
+   * and SCRAM always identify against the original nick/account.
    */
   private _authNick: string;
   private reconnectDelay = RECONNECT_BASE;
@@ -58,9 +68,9 @@ export class IRCClient {
   /** Available SASL mechanisms parsed from sasl cap value */
   private _saslMechs: string[] = [];
   /** Which SASL mechanism we're using */
-  private _saslMech: 'SCRAM-SHA-512' | 'SCRAM-SHA-256' | 'PLAIN' | 'SESSION-TOKEN' | null = null;
+  private _saslMech: SaslMechanism | null = null;
   /** SCRAM state between challenge/response steps */
-  private _scramState: { clientFirstMsgBare: string; nonce: string; hash: 'SHA-512' | 'SHA-256'; bits: number } | null = null;
+  private _scramState: { clientFirstMsgBare: string; nonce: string; hash: 'SHA-256'; bits: number } | null = null;
   /** How many times we've appended _ to nick during registration */
   private _nickRetries = 0;
   /** SASL auth timeout guard */
@@ -82,8 +92,10 @@ export class IRCClient {
 
   isupport: ISupport = {
     PREFIX: { q: '.', o: '@', v: '+' },
+    PREFIX_MODES: { '.': 'q', '@': 'o', '+': 'v' },
     CHANMODES: [],
     CHANTYPES: '#&',
+    CHANLIMITS: {},
     NETWORK: 'IRCXNet',
     CASEMAPPING: 'rfc1459',
     MODES: 4,
@@ -97,7 +109,7 @@ export class IRCClient {
     MAXMEDIA: 2048,
     MEDIAUMODES: '',
     MEDIAMUTE: '',
-    MEDIAFRAME: '',      // MEDIAFRAME=VOICE_JOIN,VIDEO_JOIN,... — supported subtypes
+    MEDIAFRAME: '',
     MEDIACHUNK: 0,       // MEDIACHUNK=160 — max base64 chars per MCHUNK chunk
     SILENCE: 0,          // SILENCE=20 — max entries in server-side silence list
   };
@@ -350,22 +362,15 @@ export class IRCClient {
             }
             if (caps.length > 0) this.onCapChange?.();
             if (this._capReqPending > 0) this._capReqPending--;
-            if (caps.includes('sasl') && this.opts.password) {
+            if (caps.includes('sasl') && (this.opts.password || this.opts.hasClientCert)) {
               this._saslPending = true;
-              // Prefer strongest non-plaintext mechanisms before PLAIN.
-              const isToken = (this.opts.password ?? '').startsWith('sst_');
-              if (isToken && this._saslMechs.includes('SESSION-TOKEN')) {
-                this._saslMech = 'SESSION-TOKEN';
-                this.sendRaw('AUTHENTICATE', 'SESSION-TOKEN');
-              } else if (this._saslMechs.includes('SCRAM-SHA-512')) {
-                this._saslMech = 'SCRAM-SHA-512';
-                this.sendRaw('AUTHENTICATE', 'SCRAM-SHA-512');
-              } else if (this._saslMechs.includes('SCRAM-SHA-256')) {
-                this._saslMech = 'SCRAM-SHA-256';
-                this.sendRaw('AUTHENTICATE', 'SCRAM-SHA-256');
-              } else if (this._saslMechs.includes('PLAIN')) {
-                this._saslMech = 'PLAIN';
-                this.sendRaw('AUTHENTICATE', 'PLAIN');
+              const mech = selectSaslMechanism(this._saslMechs, {
+                hasPassword: Boolean(this.opts.password),
+                hasClientCert: Boolean(this.opts.hasClientCert),
+              });
+              if (mech) {
+                this._saslMech = mech;
+                this.sendRaw('AUTHENTICATE', mech);
               } else {
                 this.opts.onError?.(`No supported SASL mechanism offered (${this._saslMechs.join(', ') || 'none'})`);
                 this.ws?.close(4003, 'Unsupported SASL mechanism');
@@ -428,16 +433,7 @@ export class IRCClient {
 
       case 'AUTHENTICATE': {
         const param = msg.params[0] ?? '';
-        if (this._saslMech === 'SESSION-TOKEN') {
-          if (param === '+') {
-            // Wire: base64(authcid NUL token)
-            // Use _authNick (original nick) — opts.nick may have been mutated
-            // to 'kain_' by the 433 handler before AUTHENTICATE fires.
-            const authcid = this._authNick;
-            const token   = this.opts.password ?? '';
-            this.sendRaw('AUTHENTICATE', btoa(`${authcid}\0${token}`));
-          }
-        } else if (this._saslMech === 'PLAIN') {
+        if (this._saslMech === 'PLAIN') {
           if (param === '+') {
             // Use _authNick for the same reason — post-433, opts.nick is the alias.
             const nick = this._authNick;
@@ -445,7 +441,9 @@ export class IRCClient {
             const plain = btoa(`\0${nick}\0${pass}`);
             this.sendRaw('AUTHENTICATE', plain);
           }
-        } else if (this._saslMech === 'SCRAM-SHA-256' || this._saslMech === 'SCRAM-SHA-512') {
+        } else if (this._saslMech === 'EXTERNAL') {
+          if (param === '+') this.sendRaw('AUTHENTICATE', '+');
+        } else if (this._saslMech === 'SCRAM-SHA-256') {
           if (param === '+') {
             // Server ready — send client-first-message
             this._scramClientFirst();
@@ -466,26 +464,19 @@ export class IRCClient {
         this._saslPending = false;
         this._saslMech = null;
         this._scramState = null;
+        if (this.opts.sessionToken) {
+          this.send(buildSessionResumeLine(this.opts.sessionToken));
+        }
+        this.sendRaw('SESSION', 'TOKEN');
         this._finishCapIfReady();
         break;
 
       case '904': // SASL fail
       case '905': {
-        const failedMech = this._saslMech;
         if (this._saslTimer) { clearTimeout(this._saslTimer); this._saslTimer = null; }
         this._saslPending = false;
         this._saslMech = null;
         this._scramState = null;
-        if (failedMech === 'SESSION-TOKEN') {
-          // Purge the rejected token and stop before CAP END; otherwise some
-          // servers continue registration and 001 us as an unauthenticated guest.
-          import('@/lib/credentials').then(({ clearSessionToken }) => {
-            clearSessionToken(this.opts.url, this._authNick);
-          }).catch(() => {});
-          this.opts.onError?.('Saved session token was rejected. Reconnect to authenticate with the saved password.');
-          this.ws?.close(4004, 'SESSION-TOKEN rejected');
-          break;
-        }
         this._finishCapIfReady();
         break;
       }
@@ -583,7 +574,7 @@ export class IRCClient {
       // STARTTLS upgrade: Ocean already uses WSS; requesting this is wrong.
       if (cap === 'tls') return false;
       // SASL: only request when we have credentials to send.
-      if (cap === 'sasl') return Boolean(this.opts.password);
+      if (cap === 'sasl') return Boolean(this.opts.password || this.opts.hasClientCert);
       // no-implicit-names: Ocean relies on the automatic 353 NAMREPLY on
       // JOIN to populate the member list; opting in would suppress it.
       if (cap === 'no-implicit-names') return false;
@@ -617,8 +608,8 @@ export class IRCClient {
   }
 
   private _scramClientFirst() {
-    const hash = this._saslMech === 'SCRAM-SHA-512' ? 'SHA-512' : 'SHA-256';
-    const bits = hash === 'SHA-512' ? 512 : 256;
+    const hash = 'SHA-256';
+    const bits = 256;
     const arr = new Uint8Array(18);
     crypto.getRandomValues(arr);
     const nonce = btoa(String.fromCharCode(...arr)).replace(/[+/=]/g, c =>
@@ -704,17 +695,10 @@ export class IRCClient {
       switch (key) {
         case 'PREFIX': {
           const { modeToPrefix, prefixToMode } = parsePREFIX(val);
-          // ophion displays owner as '.' but may advertise '~' in PREFIX.
-          // Keep the server's prefix char in prefixToMode so NAMES parsing works,
-          // but override the display char to '.' so the nicklist shows '.' for owners.
-          if ('q' in modeToPrefix) {
-            modeToPrefix['q'] = '.';      // display as '.'
-            prefixToMode['.'] = 'q';      // also accept '.' from NAMES
-            // original '~' → 'q' remains in prefixToMode for servers that send '~'
-          }
           this.modeToPrefix = modeToPrefix;
           this.prefixToMode = prefixToMode;
           this.isupport.PREFIX = modeToPrefix;
+          this.isupport.PREFIX_MODES = prefixToMode;
           break;
         }
         case 'NETWORK':
@@ -732,8 +716,11 @@ export class IRCClient {
         case 'TOPICLEN':
           this.isupport.TOPICLEN = parseInt(val, 10);
           break;
-        case 'MAXCHANNELS':
         case 'CHANLIMIT':
+          this.isupport.CHANLIMITS = parseCHANLIMIT(val);
+          this.isupport.MAXCHANNELS = Object.values(this.isupport.CHANLIMITS)[0] ?? this.isupport.MAXCHANNELS;
+          break;
+        case 'MAXCHANNELS':
           this.isupport.MAXCHANNELS = parseInt(val, 10);
           break;
         case 'MODES':
@@ -751,9 +738,6 @@ export class IRCClient {
         case 'COMICCHAT':
           this.isupport.COMICCHAT = val;
           break;
-        case 'LADONMEDIA':
-          this.isupport.LADONMEDIA = val || 'MEDIA';
-          break;
         case 'MAXMEDIA':
           this.isupport.MAXMEDIA = parseInt(val, 10) || 2048;
           break;
@@ -762,9 +746,6 @@ export class IRCClient {
           break;
         case 'MEDIAMUTE':
           this.isupport.MEDIAMUTE = val;
-          break;
-        case 'MEDIAFRAME':
-          this.isupport.MEDIAFRAME = val;
           break;
         case 'MEDIACHUNK':
           this.isupport.MEDIACHUNK = parseInt(val, 10) || 160;

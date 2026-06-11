@@ -198,22 +198,22 @@ export default function QuickReactBar({ onReact, onReply, onMore }: QuickReactBa
 const quickReactStyles = `
   .quick-react-bar {
     position: absolute;
-    top: -18px;
-    right: 8px;
+    top: -20px;
+    right: var(--sp-3, 12px);
     z-index: 20;
     display: flex;
     align-items: center;
     gap: 1px;
-    background: var(--bg-float, #1a2c40);
-    border: 1px solid var(--border-normal);
+    background: color-mix(in srgb, var(--bg-elevated, #132131) 92%, transparent);
+    border: 1px solid var(--border-subtle, rgba(255,255,255,.08));
     border-radius: var(--r-full, 9999px);
-    padding: 3px 7px;
-    box-shadow: var(--shadow-md, 0 4px 16px rgba(0,0,0,0.5));
-    animation: qrb-in 130ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
+    padding: 3px 6px;
+    box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-2, 0 10px 28px rgba(0,0,0,.38));
+    animation: qrb-in var(--t-micro, 90ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
   }
   @keyframes qrb-in {
-    from { opacity: 0; transform: translateY(4px) scale(0.95); }
-    to   { opacity: 1; transform: translateY(0) scale(1); }
+    from { opacity: 0; transform: translateY(5px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
   .qrb-btn {
     width: 28px;
@@ -227,17 +227,17 @@ const quickReactStyles = `
     align-items: center;
     justify-content: center;
     font-size: 14px;
-    transition: background 120ms, color 120ms, transform 120ms var(--ease-spring, cubic-bezier(0.175,0.885,0.32,1.275));
+    transition: background var(--t-micro, 90ms), color var(--t-micro, 90ms), transform var(--t-micro, 90ms) var(--ease-out, ease);
     font-family: inherit;
   }
   .qrb-btn:hover {
-    background: var(--bg-elevated);
+    background: color-mix(in srgb, var(--lux, #d8b96a) 10%, transparent);
     color: var(--text-primary);
-    transform: scale(1.12);
+    transform: translateY(-1px);
   }
   .qrb-btn--active {
-    background: var(--accent-subtle);
-    color: var(--accent);
+    background: color-mix(in srgb, var(--lux, #d8b96a) 12%, transparent);
+    color: var(--lux, #d8b96a);
   }
   .qrb-divider {
     width: 1px;
@@ -250,15 +250,15 @@ const quickReactStyles = `
     position: absolute;
     bottom: calc(100% + 8px);
     right: 0;
-    background: var(--bg-float, #1a2c40);
+    background: var(--bg-elevated, #132131);
     border: 1px solid var(--border-normal);
-    border-radius: var(--r-lg, 12px);
+    border-radius: var(--r-md, 8px);
     padding: 6px 9px;
     display: flex;
     gap: 2px;
     align-items: center;
-    box-shadow: var(--shadow-lg, 0 8px 32px rgba(0,0,0,0.65));
-    animation: qrb-in 110ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
+    box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-3, 0 16px 42px rgba(0,0,0,.48));
+    animation: qrb-in var(--t-micro, 90ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
     z-index: 30;
   }
   .quick-emoji-btn {
@@ -272,11 +272,11 @@ const quickReactStyles = `
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 100ms, transform 150ms var(--ease-spring, cubic-bezier(0.175,0.885,0.32,1.275));
+    transition: background var(--t-micro, 90ms), transform var(--t-micro, 90ms) var(--ease-out, ease);
   }
   .quick-emoji-btn:hover {
-    background: var(--bg-elevated);
-    transform: scale(1.2);
+    background: color-mix(in srgb, var(--lux, #d8b96a) 10%, transparent);
+    transform: translateY(-1px);
   }
   .quick-emoji-btn--more {
     font-size: 13px;
@@ -304,12 +304,12 @@ const quickReactStyles = `
     position: absolute;
     bottom: calc(100% + 8px);
     right: 0;
-    background: var(--bg-float, #1a2c40);
+    background: var(--bg-elevated, #132131);
     border: 1px solid var(--border-normal);
-    border-radius: var(--r-lg, 12px);
+    border-radius: var(--r-md, 8px);
     padding: 11px 11px 9px;
-    box-shadow: var(--shadow-lg, 0 8px 32px rgba(0,0,0,0.65));
-    animation: qrb-in 110ms var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
+    box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-3, 0 16px 42px rgba(0,0,0,.48));
+    animation: qrb-in var(--t-micro, 90ms) var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both;
     z-index: 30;
     width: 224px;
   }
@@ -335,19 +335,32 @@ const quickReactStyles = `
     font-size: 19px;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    transition: background 100ms, border-color 100ms, transform 150ms var(--ease-spring, cubic-bezier(0.175,0.885,0.32,1.275));
+    transition: background var(--t-micro, 90ms), border-color var(--t-micro, 90ms), transform var(--t-micro, 90ms) var(--ease-out, ease);
   }
   .qrb-configure-btn:hover {
-    background: var(--bg-elevated);
-    transform: scale(1.18);
+    background: color-mix(in srgb, var(--lux, #d8b96a) 10%, transparent);
+    transform: translateY(-1px);
   }
   .qrb-configure-btn--active {
-    background: var(--accent-subtle);
-    border-color: var(--accent-border);
+    background: color-mix(in srgb, var(--lux, #d8b96a) 12%, transparent);
+    border-color: color-mix(in srgb, var(--lux, #d8b96a) 38%, transparent);
   }
   .qrb-configure-btn--active:hover {
-    background: var(--accent-subtle);
-    border-color: var(--accent);
-    transform: scale(1.12);
+    background: color-mix(in srgb, var(--lux, #d8b96a) 16%, transparent);
+    border-color: var(--lux, #d8b96a);
+    transform: translateY(-1px);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .quick-react-bar,
+    .quick-emoji-popup,
+    .qrb-configure-popup {
+      animation: none !important;
+    }
+    .qrb-btn,
+    .quick-emoji-btn,
+    .qrb-configure-btn {
+      transition: none !important;
+      transform: none !important;
+    }
   }
 `;

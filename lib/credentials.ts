@@ -7,12 +7,10 @@
  *   activeKey   — last-used credential key
  *   entries     — saved credentials keyed by normalized server + nick
  *
- * Session tokens are issued by Ophion after successful SASL auth via:
- *   NOTICE <nick> :SESSIONTOKEN <token> <expires_unix>
- * When a valid token is present Ocean uses AUTHENTICATE SESSION-TOKEN
- * (the IRC client detects the "sst_" prefix and selects the mechanism
- * automatically).  This way the user's actual password never needs to be
- * persisted.
+ * Session tokens are issued by Orochi after successful SASL auth via:
+ *   NOTE SESSION TOKEN :<token>
+ * Saved tokens are reused with SESSION RESUME after SASL succeeds. They are
+ * not SASL mechanisms and must not replace the account password.
  *
  * When no token is present (first login or expired) the password is used
  * for SASL PLAIN / SCRAM.  The password is stored in plain text — same as
@@ -26,7 +24,7 @@ export interface SavedCredentials {
   server: string;
   /** NickServ / SASL password — only set when user opted in AND no valid token */
   password?: string;
-  /** Ophion-issued short-lived session token */
+  /** Orochi-issued session resume token */
   sessionToken?: string;
   /** Token validity deadline — ISO string */
   tokenExpiry?: string;
@@ -173,7 +171,7 @@ export function saveCredentials(opts: {
  * canonicalNick — if provided, overwrites the stored nick with the account
  *   name so future auto-connects use the real nick, not a '_'-suffixed alias.
  */
-export function storeSessionToken(token: string, expiresAt: number, canonicalNick?: string): void {
+export function storeSessionToken(token: string, expiresAt?: number, canonicalNick?: string): void {
   if (typeof window === 'undefined') return;
   try {
     const store = readStore();
@@ -183,7 +181,7 @@ export function storeSessionToken(token: string, expiresAt: number, canonicalNic
     if (!activeKey) return;
     const existing = store.entries[activeKey];
     if (!existing) return;
-    const expiry = new Date(expiresAt * 1000).toISOString();
+    const expiry = expiresAt ? new Date(expiresAt * 1000).toISOString() : undefined;
     const nick = canonicalNick ?? existing.nick;
     const creds: SavedCredentials = {
       ...existing,
@@ -228,9 +226,5 @@ export function clearCredentials(): void {
  * Prefers session token; falls back to password; falls back to undefined.
  */
 export function getAuthSecret(creds: SavedCredentials): string | undefined {
-  if (creds.sessionToken) {
-    // Ophion accepts the token as if it were the SASL password
-    return creds.sessionToken;
-  }
   return creds.password;
 }

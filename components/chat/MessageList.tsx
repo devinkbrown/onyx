@@ -7,6 +7,7 @@ import MessageItem from './MessageItem';
 import TypingIndicator from './TypingIndicator';
 import ReadReceipt, { updateDmReadAt } from './ReadReceipt';
 import SkeletonMessage from './SkeletonMessage';
+import UnreadDivider from './UnreadDivider';
 import { useOnyxStore } from '@/lib/store';
 import Avatar from '@/components/ui/Avatar';
 import { getNickColor } from '@/lib/nick-color';
@@ -66,6 +67,8 @@ export default function MessageList({ messages, target, searchActive, searchMatc
   const unreadMsgId    = firstUnreadId.get(targetKey) ?? null;
   const isHistLoading  = historyLoading.get(targetKey) ?? false;
   const isHistExhausted = historyExhausted.get(targetKey) ?? false;
+  const unreadIndex = unreadMsgId ? messages.findIndex(m => m.id === unreadMsgId) : -1;
+  const unreadCount = unreadIndex >= 0 ? messages.length - unreadIndex : 0;
 
   // Expose scrollToBottom to parent via ref
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
@@ -329,13 +332,7 @@ export default function MessageList({ messages, target, searchActive, searchMatc
                 <span className="date-separator-line" />
               </div>
             )}
-            {showSeparator && (
-              <div className="ml-unread-sep" role="separator" aria-label="New messages">
-                <span className="ml-unread-sep__line" />
-                <span className="ml-unread-sep__label">New Messages</span>
-                <span className="ml-unread-sep__line" />
-              </div>
-            )}
+            {showSeparator && <UnreadDivider />}
             <div className="msg-group">
               {group.map((msg, mi) => {
                 const currentFlatIndex = flatMsgIndex++;
@@ -393,7 +390,7 @@ export default function MessageList({ messages, target, searchActive, searchMatc
             if (unreadMsgId) clearFirstUnread(target);
           }}
         >
-          ↓ Jump to Present
+          {unreadCount > 0 ? `↓ ${unreadCount} new` : '↓ Jump to Present'}
         </button>
       )}
 
@@ -401,11 +398,26 @@ export default function MessageList({ messages, target, searchActive, searchMatc
         .msg-list {
           flex: 1;
           overflow-y: auto;
-          padding: 16px 0 80px;
+          padding: var(--sp-4, 16px) 0 80px;
           display: flex;
           flex-direction: column;
           position: relative;
           transition: opacity 100ms ease;
+          --msg-group-gap: var(--sp-4, 16px);
+          --msg-intra-gap: 2px;
+          --msg-head-pad-y: 5px;
+          --msg-grouped-pad-y: 1px;
+        }
+        .msg-list[data-density="compact"] {
+          --msg-group-gap: var(--sp-3, 12px);
+          --msg-head-pad-y: 2px;
+          --msg-grouped-pad-y: 0px;
+        }
+        .msg-list[data-density="spacious"],
+        .msg-list[data-density="comfortable"] {
+          --msg-group-gap: var(--sp-5, 20px);
+          --msg-head-pad-y: 7px;
+          --msg-grouped-pad-y: 2px;
         }
         .channel-switching {
           opacity: 0;
@@ -420,7 +432,10 @@ export default function MessageList({ messages, target, searchActive, searchMatc
         .msg-group {
           display: flex;
           flex-direction: column;
+          gap: var(--msg-intra-gap);
+          margin-bottom: var(--msg-group-gap);
         }
+        .msg-group:last-of-type { margin-bottom: 0; }
 
         .scroll-anchor { height: 8px; }
 
@@ -451,8 +466,7 @@ export default function MessageList({ messages, target, searchActive, searchMatc
         .msg-empty-dots-bg {
           position: absolute;
           inset: 0;
-          background-image: radial-gradient(circle, rgba(14,165,233,0.06) 1px, transparent 1px);
-          background-size: 28px 28px;
+          background: color-mix(in srgb, var(--bg-elevated, #132131) 28%, transparent);
           pointer-events: none;
         }
 
@@ -472,7 +486,6 @@ export default function MessageList({ messages, target, searchActive, searchMatc
         .msg-empty-icon {
           font-size: 36px;
           line-height: 1;
-          filter: drop-shadow(0 2px 8px rgba(14,165,233,0.35));
         }
 
         .msg-empty-channel-title {
@@ -600,56 +613,23 @@ export default function MessageList({ messages, target, searchActive, searchMatc
           font-weight: 600;
         }
 
-        /* ── Unread separator ───────────────────────────────────────── */
-        .ml-unread-sep {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 4px 16px;
-          margin: 8px 0;
-          animation: ml-unread-sep-in 300ms var(--ease-out) both;
-        }
-        @keyframes ml-unread-sep-in {
-          from { opacity: 0; transform: scaleX(0.96); }
-          to   { opacity: 1; transform: scaleX(1); }
-        }
-        .ml-unread-sep__line {
-          flex: 1;
-          height: 1px;
-          background: var(--accent);
-          opacity: 0.4;
-        }
-        .ml-unread-sep__label {
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 0.07em;
-          text-transform: uppercase;
-          color: var(--accent);
-          white-space: nowrap;
-          padding: 2px 8px;
-          background: var(--accent-subtle);
-          border: 1px solid var(--accent-border);
-          border-radius: var(--r-full);
-          opacity: 0.9;
-        }
-
         /* ── Jump to Present button ─────────────────────────────────── */
         .ml-jump-btn {
           position: sticky;
           bottom: 20px;
           left: 50%;
           transform: translateX(-50%);
-          background: var(--accent);
-          color: #fff;
-          border: none;
+          background: color-mix(in srgb, var(--bg-elevated, #132131) 88%, transparent);
+          color: var(--lux, #d8b96a);
+          border: 1px solid color-mix(in srgb, var(--lux, #d8b96a) 34%, transparent);
           border-radius: var(--r-full);
-          padding: 7px 18px;
+          padding: 7px 16px;
           font-size: 12px;
           font-weight: 700;
-          letter-spacing: 0.03em;
+          letter-spacing: 0.02em;
           cursor: pointer;
-          box-shadow: 0 4px 20px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.08);
-          transition: background var(--t-fast), box-shadow var(--t-fast), transform var(--t-fast);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-2, 0 10px 28px rgba(0,0,0,.38));
+          transition: background var(--t-control, 150ms), border-color var(--t-control, 150ms), transform var(--t-micro, 90ms) var(--ease-out, cubic-bezier(.16,1,.3,1));
           white-space: nowrap;
           z-index: 10;
           display: flex;
@@ -657,8 +637,8 @@ export default function MessageList({ messages, target, searchActive, searchMatc
           gap: 6px;
         }
         .ml-jump-btn:hover {
-          background: var(--accent-hover);
-          box-shadow: 0 6px 24px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.12);
+          background: color-mix(in srgb, var(--bg-elevated, #132131) 78%, var(--lux, #d8b96a) 8%);
+          border-color: color-mix(in srgb, var(--lux, #d8b96a) 52%, transparent);
           transform: translateX(-50%) translateY(-1px);
         }
 

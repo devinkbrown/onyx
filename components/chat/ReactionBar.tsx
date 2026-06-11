@@ -159,8 +159,8 @@ const styles = `
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 4px;
-    margin-top: 5px;
+    gap: var(--sp-1, 4px);
+    margin-top: var(--sp-1, 4px);
   }
 
   .rb-pill {
@@ -168,39 +168,38 @@ const styles = `
     align-items: center;
     gap: 5px;
     height: 26px;
-    padding: 0 9px;
-    border-radius: 6px;
-    border: 1px solid var(--border-subtle);
-    background: var(--bg-elevated);
+    padding: 0 var(--sp-2, 8px);
+    border-radius: var(--r-full, 9999px);
+    border: 1px solid color-mix(in srgb, var(--reaction-bg, var(--bg-elevated)) 72%, var(--border-subtle, rgba(255,255,255,.08)));
+    background: var(--reaction-bg, var(--bg-elevated));
     cursor: pointer;
-    font-size: 13px;
+    font-size: var(--text-sm, .8125rem);
     color: var(--text-secondary);
-    transition: background 150ms ease, border-color 150ms ease, transform 150ms var(--ease-spring, cubic-bezier(0.175,0.885,0.32,1.275)), box-shadow 150ms ease;
+    transition: background var(--t-control, 150ms) var(--ease-out, ease), border-color var(--t-control, 150ms) var(--ease-out, ease), transform var(--t-micro, 90ms) var(--ease-out, ease);
     line-height: 1;
     white-space: nowrap;
     user-select: none;
   }
   .rb-pill:hover {
-    border-color: var(--accent-border);
-    background: var(--accent-subtle);
-    transform: scale(1.08);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    border-color: color-mix(in srgb, var(--lux, #d8b96a) 38%, var(--border-subtle, transparent));
+    background: color-mix(in srgb, var(--reaction-bg, var(--bg-elevated)) 82%, var(--lux, #d8b96a) 8%);
+    transform: translateY(-1px);
   }
   .rb-pill--mine {
-    border-color: var(--accent-border);
-    background: var(--accent-subtle);
-    color: var(--accent);
-    box-shadow: 0 0 0 0.5px var(--accent-border) inset;
+    border-color: color-mix(in srgb, var(--lux, #d8b96a) 44%, transparent);
+    background: var(--reaction-bg-active, color-mix(in srgb, var(--lux, #d8b96a) 14%, transparent));
+    color: var(--lux, #d8b96a);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
   }
   .rb-pill--mine:hover {
-    background: rgba(var(--accent-rgb, 14,165,233), 0.16);
-    transform: scale(1.08);
+    background: color-mix(in srgb, var(--reaction-bg-active, transparent) 88%, var(--lux, #d8b96a) 8%);
+    transform: translateY(-1px);
   }
 
   @keyframes reaction-pop {
     0%   { transform: scale(1); }
-    35%  { transform: scale(1.45) rotate(-10deg); }
-    65%  { transform: scale(0.88) rotate(5deg); }
+    35%  { transform: scale(1.35) rotate(-8deg); }
+    65%  { transform: scale(0.92) rotate(4deg); }
     100% { transform: scale(1) rotate(0deg); }
   }
 
@@ -210,14 +209,14 @@ const styles = `
   }
 
   .rb-emoji { font-size: 14px; line-height: 1; display: inline-block; }
-  .rb-emoji--pop { animation: reaction-pop 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+  .rb-emoji--pop { animation: reaction-pop 360ms var(--ease-spring, cubic-bezier(.34,1.4,.4,1)) both; }
   .rb-count {
     font-size: 11.5px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     color: var(--text-secondary);
   }
-  .rb-pill--mine .rb-count { color: var(--accent); }
+  .rb-pill--mine .rb-count { color: var(--lux, #d8b96a); }
 
   .rb-picker-anchor { position: relative; }
 
@@ -227,18 +226,17 @@ const styles = `
     justify-content: center;
     width: 26px;
     height: 26px;
-    border-radius: 6px;
-    border: 1px dashed var(--border-normal);
+    border-radius: var(--r-full, 9999px);
+    border: 1px dashed color-mix(in srgb, var(--lux, #d8b96a) 30%, var(--border-normal, transparent));
     background: none;
     cursor: pointer;
     color: var(--text-muted);
-    transition: background 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease;
+    transition: background var(--t-control, 150ms) ease, border-color var(--t-control, 150ms) ease, color var(--t-control, 150ms) ease, transform var(--t-micro, 90ms) var(--ease-out, ease);
   }
   .rb-add-btn:hover {
-    border-color: var(--accent-border);
-    background: var(--accent-subtle);
-    color: var(--accent);
-    transform: scale(1.08);
+    border-color: color-mix(in srgb, var(--lux, #d8b96a) 46%, transparent);
+    background: color-mix(in srgb, var(--lux, #d8b96a) 10%, transparent);
+    color: var(--lux, #d8b96a);
+    transform: translateY(-1px);
   }
 `;
-
