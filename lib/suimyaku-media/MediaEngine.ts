@@ -7,32 +7,32 @@ import {
   OPVOX_FRAME_48K,
   type OpvoxQuality,
 } from './OpcodecWasm';
-import { VeilSession } from './VeilSession';
-import { VeilGroup } from './VeilGroup';
-import { VeilIdentity } from './VeilIdentity';
+import { TsumugiSession } from './TsumugiSession';
+import { TsumugiGroup } from './TsumugiGroup';
+import { TsumugiIdentity } from './TsumugiIdentity';
 import { ChunkAssembler } from './ChunkAssembler';
 import { PeerRegistry } from './PeerRegistry';
 import type {
   CallState, VoiceCallState, MediaKind,
-  LadonPeerState, LadonRoomStats, NetworkQualityTier,
-  LadonMediaCallbacks, LadonChannelInfo,
+  SuimyakuPeerState, SuimyakuRoomStats, NetworkQualityTier,
+  SuimyakuMediaCallbacks, SuimyakuChannelInfo,
 } from './types';
 
-export type { CallState, VoiceCallState, MediaKind, LadonPeerState, LadonRoomStats, NetworkQualityTier, LadonMediaCallbacks, LadonChannelInfo };
+export type { CallState, VoiceCallState, MediaKind, SuimyakuPeerState, SuimyakuRoomStats, NetworkQualityTier, SuimyakuMediaCallbacks, SuimyakuChannelInfo };
 
 // The mounted engine is a cross-module singleton. It MUST live on globalThis,
-// not a module-local `let`: the store (getMounted…) and the useLadonMedia hook
+// not a module-local `let`: the store (getMounted…) and the useSuimyakuMedia hook
 // (setMounted…) can be bundled into separate chunks with separate module
 // instances, in which case a module-local leaves the store reading null forever
 // — so joinVoiceChannel no-ops and voice/video never starts.
-const MOUNTED_ENGINE_KEY = '__oceanMountedLadonEngine';
+const MOUNTED_ENGINE_KEY = '__oceanMountedSuimyakuEngine';
 
-export function setMountedLadonMediaEngine(engine: LadonMediaEngine | null): void {
+export function setMountedSuimyakuMediaEngine(engine: SuimyakuMediaEngine | null): void {
   (globalThis as Record<string, unknown>)[MOUNTED_ENGINE_KEY] = engine;
 }
 
-export function getMountedLadonMediaEngine(): LadonMediaEngine | null {
-  return ((globalThis as Record<string, unknown>)[MOUNTED_ENGINE_KEY] as LadonMediaEngine | null) ?? null;
+export function getMountedSuimyakuMediaEngine(): SuimyakuMediaEngine | null {
+  return ((globalThis as Record<string, unknown>)[MOUNTED_ENGINE_KEY] as SuimyakuMediaEngine | null) ?? null;
 }
 
 // -------------------------------------------------------------------
@@ -165,9 +165,9 @@ function parseVideoJoinPayload(payload: string): VideoCaptureProfile {
 // Main engine
 // -------------------------------------------------------------------
 
-export class LadonMediaEngine {
+export class SuimyakuMediaEngine {
   private client: IRCClient | null = null;
-  private readonly cb: LadonMediaCallbacks;
+  private readonly cb: SuimyakuMediaCallbacks;
   private readonly defaultKind: MediaKind;
 
   private wasm:      OpcodecWasm | null = null;
@@ -215,11 +215,11 @@ export class LadonMediaEngine {
   private presenceList      = new Set<string>();
   private negotiatedBitrate = new Map<string, number>();
   private audioLevelTimer: ReturnType<typeof setInterval> | null = null;
-  private veilSessions = new Map<string, VeilSession>();
-  private veilGroupKey: VeilGroup | null = null;
-  private veilGroupKeyPromise: Promise<VeilGroup> | null = null;
-  private veilIdentity: VeilIdentity | null = null;
-  private veilIdentityPromise: Promise<VeilIdentity> | null = null;
+  private tsumugiSessions = new Map<string, TsumugiSession>();
+  private tsumugiGroupKey: TsumugiGroup | null = null;
+  private tsumugiGroupKeyPromise: Promise<TsumugiGroup> | null = null;
+  private tsumugiIdentity: TsumugiIdentity | null = null;
+  private tsumugiIdentityPromise: Promise<TsumugiIdentity> | null = null;
   private incomingKind: MediaKind;
 
   /* PTT */
@@ -242,7 +242,7 @@ export class LadonMediaEngine {
   private lastLossRate  = 0;
   private lastDecodeAt  = 0;
 
-  constructor(callbacks: LadonMediaCallbacks, options: { kind: MediaKind } = { kind: 'video' }) {
+  constructor(callbacks: SuimyakuMediaCallbacks, options: { kind: MediaKind } = { kind: 'video' }) {
     this.cb          = callbacks;
     this.defaultKind = options.kind;
     this.incomingKind = options.kind;
@@ -297,8 +297,8 @@ export class LadonMediaEngine {
   getLocalKind()    { return this.localKind; }
   getCallState()    { return { callState: this.callState, callWith: this.callWith, callChannel: this.activeRoom }; }
 
-  getPeers(): Map<string, LadonPeerState> {
-    const out = new Map<string, LadonPeerState>();
+  getPeers(): Map<string, SuimyakuPeerState> {
+    const out = new Map<string, SuimyakuPeerState>();
     for (const pm of this.registry.all()) out.set(pm.state.nick, pm.state);
     return out;
   }
@@ -314,22 +314,22 @@ export class LadonMediaEngine {
     if (this.activeRoom) this.mediaframeCmd(this.activeRoom, deafened ? 'DEAFEN' : 'UNDEAFEN');
   }
 
-  async getLocalVeilFingerprint(): Promise<string> {
-    const id = await this.ensureVeilIdentity();
+  async getLocalTsumugiFingerprint(): Promise<string> {
+    const id = await this.ensureTsumugiIdentity();
     return id.getFingerprint();
   }
 
-  private ensureVeilIdentity(): Promise<VeilIdentity> {
-    if (this.veilIdentity) return Promise.resolve(this.veilIdentity);
+  private ensureTsumugiIdentity(): Promise<TsumugiIdentity> {
+    if (this.tsumugiIdentity) return Promise.resolve(this.tsumugiIdentity);
     // Memoize the in-flight load so concurrent callers share one identity,
     // and reset on failure so a later call can retry instead of spinning
-    // forever (VeilIdentity.load() can reject in insecure contexts).
-    if (!this.veilIdentityPromise) {
-      this.veilIdentityPromise = VeilIdentity.load()
-        .then(id => { this.veilIdentity = id; return id; })
-        .catch(err => { this.veilIdentityPromise = null; throw err; });
+    // forever (TsumugiIdentity.load() can reject in insecure contexts).
+    if (!this.tsumugiIdentityPromise) {
+      this.tsumugiIdentityPromise = TsumugiIdentity.load()
+        .then(id => { this.tsumugiIdentity = id; return id; })
+        .catch(err => { this.tsumugiIdentityPromise = null; throw err; });
     }
-    return this.veilIdentityPromise;
+    return this.tsumugiIdentityPromise;
   }
 
   getScreenStream(nick: string): MediaStream | null {
@@ -496,16 +496,16 @@ export class LadonMediaEngine {
     if (!this.audEnc || !this.activeRoom) return;
     const encoded = this.audEnc.encode(i16);
     if (!encoded || !encoded.length) return;
-    /* Use VEIL group encryption if a group key is established (multi-party room) */
-    if (this.veilGroupKey) {
-      this.veilGroupKey.encrypt(encoded).then(ct => {
-        if (this.activeRoom) this.sendFrame(this.activeRoom, 'VEIL_DATA', ct);
+    /* Use TSUMUGI group encryption if a group key is established (multi-party room) */
+    if (this.tsumugiGroupKey) {
+      this.tsumugiGroupKey.encrypt(encoded).then(ct => {
+        if (this.activeRoom) this.sendFrame(this.activeRoom, 'TSUMUGI_DATA', ct);
       }).catch(() => { if (this.activeRoom) this.sendFrame(this.activeRoom, 'AUDIO', encoded); });
       return;
     }
-    /* Use per-peer VEIL for 1:1 (no active room participants besides 1 peer) */
-    const [singleNick, singleVs] = this.veilSessions.size === 1
-      ? [...this.veilSessions.entries()][0]
+    /* Use per-peer TSUMUGI for 1:1 (no active room participants besides 1 peer) */
+    const [singleNick, singleVs] = this.tsumugiSessions.size === 1
+      ? [...this.tsumugiSessions.entries()][0]
       : [null, null];
     if (singleVs?.established && !this.activeRoom.startsWith('#')) {
       singleVs.encrypt(encoded).then(ct => {
@@ -558,7 +558,7 @@ export class LadonMediaEngine {
     this.stopVideoCapture();
     this.localVideoProfile = profile;
 
-    if (LadonMediaEngine.supportsWorkerCapture()) {
+    if (SuimyakuMediaEngine.supportsWorkerCapture()) {
       await this.startVideoCaptureWorker(stream, profile);
     } else {
       await this.startVideoCaptureFallback(stream, profile);
@@ -601,7 +601,7 @@ export class LadonMediaEngine {
         return;
       }
       if (msg.type === 'error') {
-        console.warn('[ladon/worker]', msg.msg);
+        console.warn('[suimyaku/worker]', msg.msg);
         return;
       }
       if (msg.type === 'encoded' && msg.data && msg.ftype && this.activeRoom) {
@@ -612,7 +612,7 @@ export class LadonMediaEngine {
     };
 
     worker.onerror = (ev) => {
-      console.error('[ladon/worker] uncaught:', ev.message);
+      console.error('[suimyaku/worker] uncaught:', ev.message);
     };
 
     /* Clone the video track so the worker can consume it independently via
@@ -826,7 +826,7 @@ export class LadonMediaEngine {
       this.setActiveRoom(channel);
       this.mediaframeCmd(channel, 'VOICE_JOIN', `${SAMPLE_RATE} ${AUDIO_CHANNELS}`);
       this.mediaframeCmd(channel, 'ROSTER');
-      this.sendVeilHandshake(channel).catch(() => {});
+      this.sendTsumugiHandshake(channel).catch(() => {});
       await this.startAudioCapture(stream);
       this.startSpeakingMeter(stream);
       this.startGc();
@@ -845,7 +845,7 @@ export class LadonMediaEngine {
       this.mediaframeCmd(channel, 'VIDEO_JOIN',
         `${profile.width} ${profile.height} ${profile.quality} ${profile.fps}`);
       this.mediaframeCmd(channel, 'ROSTER');
-      this.sendVeilHandshake(channel).catch(() => {});
+      this.sendTsumugiHandshake(channel).catch(() => {});
       await this.startAudioCapture(stream);
       await this.startVideoCapture(stream, profile);
       this.startSpeakingMeter(stream);
@@ -950,7 +950,7 @@ export class LadonMediaEngine {
       this.mediaframeCmd(target, 'VIDEO_JOIN',
         `${profile.width} ${profile.height} ${profile.quality} ${profile.fps} screen`);
       this.mediaframeCmd(target, 'ROSTER');
-      this.sendVeilHandshake(target).catch(() => {});
+      this.sendTsumugiHandshake(target).catch(() => {});
       if (this.localStream) await this.startVideoCapture(this.localStream, profile);
     } catch (err) {
       this.cb.onError(`Screen share failed: ${err}`);
@@ -972,7 +972,7 @@ export class LadonMediaEngine {
       this.mediaframeCmd(channel, 'VIDEO_JOIN',
         `${profile.width} ${profile.height} ${profile.quality} ${profile.fps}${profile.screenShare ? ' screen' : ''}`);
       this.mediaframeCmd(channel, 'ROSTER');
-      this.sendVeilHandshake(channel).catch(() => {});
+      this.sendTsumugiHandshake(channel).catch(() => {});
       await this.startVideoCapture(stream, profile);
       this.startGc();
     } catch (err) {
@@ -1001,7 +1001,7 @@ export class LadonMediaEngine {
       this.setCallState('ringing_out', nick, null);
       this.startRingTimer(nick);
       void nick; void kind;
-      this.sendVeilHandshake(nick).catch(() => {});
+      this.sendTsumugiHandshake(nick).catch(() => {});
       if (kind === 'voice' || kind === 'video') { await this.startAudioCapture(stream); this.startSpeakingMeter(stream); }
       if (kind === 'video') await this.startVideoCapture(stream);
     } catch (err) { this.cb.onError(`Call start failed: ${err}`); }
@@ -1036,7 +1036,7 @@ export class LadonMediaEngine {
         const profile = videoProfileFor('video');
         this.mediaframeCmd(this.callWith, 'VIDEO_JOIN', `${profile.width} ${profile.height} ${profile.quality} ${profile.fps}`);
       }
-      this.sendVeilHandshake(this.callWith).catch(() => {});
+      this.sendTsumugiHandshake(this.callWith).catch(() => {});
       if (kind === 'voice' || kind === 'video') {
         await this.startAudioCapture(stream); this.startSpeakingMeter(stream);
       }
@@ -1172,7 +1172,7 @@ export class LadonMediaEngine {
         break;
       }
       case 'STATS': {
-        try { this.cb.onRoomStats?.(channel, JSON.parse(payload) as LadonRoomStats); } catch { /* */ }
+        try { this.cb.onRoomStats?.(channel, JSON.parse(payload) as SuimyakuRoomStats); } catch { /* */ }
         break;
       }
       case 'MEDIA_STATS': {
@@ -1293,57 +1293,57 @@ export class LadonMediaEngine {
         if (this.client && this.activeRoom)
           this.client.send?.(`MEDIA ${this.activeRoom} MEDIA_PONG2 :${payload}`);
         break;
-      case 'VEIL_HANDSHAKE': {
+      case 'TSUMUGI_HANDSHAKE': {
         const peerKeyBytes = Uint8Array.from(atob(payload), c => c.charCodeAt(0));
-        const existing = this.veilSessions.get(fromNick.toLowerCase());
+        const existing = this.tsumugiSessions.get(fromNick.toLowerCase());
         const shouldReply = !existing?.established;
-        (existing ? Promise.resolve(existing) : this.createVeilSession()).then(async vs => {
+        (existing ? Promise.resolve(existing) : this.createTsumugiSession()).then(async vs => {
           await vs.ingestPeerKey(peerKeyBytes);
-          this.veilSessions.set(fromNick.toLowerCase(), vs);
+          this.tsumugiSessions.set(fromNick.toLowerCase(), vs);
           if (shouldReply) {
-            const ourPub = await this.exportVeilPublicKey(vs);
+            const ourPub = await this.exportTsumugiPublicKey(vs);
             void ourPub;
           }
-          if (this.cb.onVeilState) {
+          if (this.cb.onTsumugiState) {
             const fp = await vs.getFingerprint();
-            this.cb.onVeilState(fromNick, vs.epoch, fp);
+            this.cb.onTsumugiState(fromNick, vs.epoch, fp);
           }
-          /* When all known peers have VEIL sessions and we're in a room,
+          /* When all known peers have TSUMUGI sessions and we're in a room,
            * create/refresh the group key and distribute it. */
-          if (this.activeRoom) this.maybeDistributeVeilGroup().catch(() => {});
+          if (this.activeRoom) this.maybeDistributeTsumugiGroup().catch(() => {});
         }).catch(() => {});
         break;
       }
-      case 'VEIL_RATCHET': {
-        const vs = this.veilSessions.get(fromNick.toLowerCase());
+      case 'TSUMUGI_RATCHET': {
+        const vs = this.tsumugiSessions.get(fromNick.toLowerCase());
         if (vs) vs.ratchet().then(async () => {
-          if (this.cb.onVeilState) {
+          if (this.cb.onTsumugiState) {
             const fp = await vs.getFingerprint();
-            this.cb.onVeilState(fromNick, vs.epoch, fp);
+            this.cb.onTsumugiState(fromNick, vs.epoch, fp);
           }
         }).catch(() => {});
         break;
       }
-      case 'VEIL_DATA': {
+      case 'TSUMUGI_DATA': {
         const ct = Uint8Array.from(atob(payload), c => c.charCodeAt(0));
         /* Try group key first (multi-party) */
-        if (this.veilGroupKey) {
-          this.veilGroupKey.decrypt(ct)
+        if (this.tsumugiGroupKey) {
+          this.tsumugiGroupKey.decrypt(ct)
             .then(pt => this.dispatchFrame(fromNick, channel, 'AUDIO', pt))
             .catch(() => {
               /* Fall back to per-peer session */
-              const vs = this.veilSessions.get(fromNick.toLowerCase());
+              const vs = this.tsumugiSessions.get(fromNick.toLowerCase());
               if (vs?.established)
                 vs.decrypt(ct).then(pt => this.dispatchFrame(fromNick, channel, 'AUDIO', pt)).catch(() => {});
             });
         } else {
-          const vs = this.veilSessions.get(fromNick.toLowerCase());
+          const vs = this.tsumugiSessions.get(fromNick.toLowerCase());
           if (!vs?.established) break;
           vs.decrypt(ct).then(pt => this.dispatchFrame(fromNick, channel, 'AUDIO', pt)).catch(() => {});
         }
         break;
       }
-      case 'VEIL_GROUP_KEY': {
+      case 'TSUMUGI_GROUP_KEY': {
         /* payload: base64(wrapped_key) or sender:target:base64(wrapped_key) */
         const parts = payload.split(':');
         const wrappedB64 = parts.length >= 3 ? parts.slice(2).join(':') : payload;
@@ -1351,10 +1351,10 @@ export class LadonMediaEngine {
         const myNick = this.getLocalNick().toLowerCase();
         if (targetNick && myNick && targetNick.toLowerCase() !== myNick) break;
         const wrapped = Uint8Array.from(atob(wrappedB64), c => c.charCodeAt(0));
-        const vs = this.veilSessions.get(fromNick.toLowerCase());
+        const vs = this.tsumugiSessions.get(fromNick.toLowerCase());
         if (vs?.established) {
-          VeilGroup.importKey(wrapped, vs).then(group => {
-            this.veilGroupKey = group;
+          TsumugiGroup.importKey(wrapped, vs).then(group => {
+            this.tsumugiGroupKey = group;
           }).catch(() => {});
         }
         break;
@@ -1407,7 +1407,7 @@ export class LadonMediaEngine {
           const profile = this.localVideoProfile ?? videoProfileFor('video');
           this.mediaframeCmd(fromNick, 'VIDEO_JOIN', `${profile.width} ${profile.height} ${profile.quality} ${profile.fps}`);
         }
-        this.sendVeilHandshake(fromNick).catch(() => {});
+        this.sendTsumugiHandshake(fromNick).catch(() => {});
         break;
       case 'REJECT':
       case 'HANGUP':
@@ -1470,27 +1470,27 @@ export class LadonMediaEngine {
     return this.cb.getLocalNick?.() ?? '';
   }
 
-  private async createVeilSession(): Promise<VeilSession> {
+  private async createTsumugiSession(): Promise<TsumugiSession> {
     try {
-      const id = await this.ensureVeilIdentity();
-      return VeilSession.fromKeyPair(id.keyPair);
+      const id = await this.ensureTsumugiIdentity();
+      return TsumugiSession.fromKeyPair(id.keyPair);
     } catch {
-      return VeilSession.create();
+      return TsumugiSession.create();
     }
   }
 
-  private async exportVeilPublicKey(session: VeilSession): Promise<Uint8Array> {
+  private async exportTsumugiPublicKey(session: TsumugiSession): Promise<Uint8Array> {
     try {
-      const id = await this.ensureVeilIdentity();
+      const id = await this.ensureTsumugiIdentity();
       return id.exportPublicKey();
     } catch {
       return session.exportPublicKey();
     }
   }
 
-  private async sendVeilHandshake(target: string): Promise<void> {
+  private async sendTsumugiHandshake(target: string): Promise<void> {
     if (!this.client || !target) return;
-    const id = await this.ensureVeilIdentity();
+    const id = await this.ensureTsumugiIdentity();
     const pub = await id.exportPublicKey();
     void target; void pub;
   }
@@ -1507,9 +1507,9 @@ export class LadonMediaEngine {
     if (this.audioLevelTimer) { clearInterval(this.audioLevelTimer); this.audioLevelTimer = null; }
     this.registry.peerLevels.clear();
     this.registry.decodeErrors.clear();
-    this.veilSessions.clear();
-    this.veilGroupKey = null;
-    this.veilGroupKeyPromise = null;
+    this.tsumugiSessions.clear();
+    this.tsumugiGroupKey = null;
+    this.tsumugiGroupKeyPromise = null;
     if (this.gcTimer) { clearInterval(this.gcTimer); this.gcTimer = null; }
     this.suggestedBps = 0; this.networkTier = 0; this.videoSkipCount = 0;
     this.audioQuality = AUDIO_QUALITY; this.nearCapacityFired = false;
@@ -1531,7 +1531,7 @@ export class LadonMediaEngine {
       if (this.callState === 'ringing_out' || this.callState === 'ringing_in') {
         this.hangup(target); this.cb.onError('Media request timed out');
       }
-    }, LadonMediaEngine.RING_TIMEOUT_MS);
+    }, SuimyakuMediaEngine.RING_TIMEOUT_MS);
   }
 
   private clearRingTimer() {
@@ -1579,28 +1579,28 @@ export class LadonMediaEngine {
     }
   }
 
-  private async maybeDistributeVeilGroup() {
+  private async maybeDistributeTsumugiGroup() {
     if (!this.activeRoom || !this.client) return;
-    const established = [...this.veilSessions.entries()].filter(([, vs]) => vs.established);
+    const established = [...this.tsumugiSessions.entries()].filter(([, vs]) => vs.established);
     if (established.length === 0) return;
     /* Create or reuse group key. Memoize the in-flight creation so two
      * concurrent handshakes resolving in the same tick can't each build a
      * separate group key (the second would clobber the first, making the
      * first peer's traffic undecryptable). */
-    let group = this.veilGroupKey;
+    let group = this.tsumugiGroupKey;
     if (!group) {
-      if (!this.veilGroupKeyPromise) {
-        this.veilGroupKeyPromise = VeilGroup.create()
-          .then(g => { this.veilGroupKey = g; return g; })
-          .catch(err => { this.veilGroupKeyPromise = null; throw err; });
+      if (!this.tsumugiGroupKeyPromise) {
+        this.tsumugiGroupKeyPromise = TsumugiGroup.create()
+          .then(g => { this.tsumugiGroupKey = g; return g; })
+          .catch(err => { this.tsumugiGroupKeyPromise = null; throw err; });
       }
-      group = await this.veilGroupKeyPromise;
+      group = await this.tsumugiGroupKeyPromise;
     }
     const myNick = this.getLocalNick();
     for (const [nick, vs] of established) {
       const wrapped = await group.exportKeyFor(vs);
-      const b64 = LadonMediaEngine.toB64(wrapped);
-      /* VEIL_GROUP_KEY payload: the wrapped key; the server relay identifies target by msgpack */
+      const b64 = SuimyakuMediaEngine.toB64(wrapped);
+      /* TSUMUGI_GROUP_KEY payload: the wrapped key; the server relay identifies target by msgpack */
       void myNick; void nick; void b64;
     }
   }
@@ -1668,10 +1668,10 @@ registerProcessor('opvox-capture', OpvoxCapture);
 // Convenience subclasses
 // ----------------------------------------------------------------
 
-export class VideoEngine extends LadonMediaEngine {
-  constructor(callbacks: LadonMediaCallbacks) { super(callbacks, { kind: 'video' }); }
+export class VideoEngine extends SuimyakuMediaEngine {
+  constructor(callbacks: SuimyakuMediaCallbacks) { super(callbacks, { kind: 'video' }); }
 }
 
-export class VoiceEngine extends LadonMediaEngine {
-  constructor(callbacks: LadonMediaCallbacks) { super(callbacks, { kind: 'voice' }); }
+export class VoiceEngine extends SuimyakuMediaEngine {
+  constructor(callbacks: SuimyakuMediaCallbacks) { super(callbacks, { kind: 'voice' }); }
 }

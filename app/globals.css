@@ -556,7 +556,7 @@
   }
 
   /* ── Theme: pearl — light luxury. Warm porcelain surfaces, ink text,
-        muted celadon accent, antique gold lux. All text tokens AA-checked ── */
+        muted cesuimyaku accent, antique gold lux. All text tokens AA-checked ── */
   [data-theme="pearl"] {
     --bg-void:     #ece6dc;   /* warm linen page */
     --bg-deep:     #f4efe6;   /* unglazed porcelain */
@@ -566,7 +566,7 @@
     --bg-overlay:  #ffffff;   /* full lift */
     --bg-hover:    rgba(33,31,26,0.05);
     --bg-active:   color-mix(in srgb, var(--accent) 14%, transparent);
-    --accent:        #5d8a72;   /* muted celadon */
+    --accent:        #5d8a72;   /* muted cesuimyaku */
     --accent-hover:  #4c7660;
     --accent-active: #3f664f;
     --accent-subtle: rgba(93,138,114,0.10);
@@ -599,7 +599,7 @@
     --shadow-lg:  0 8px 30px rgba(58,48,30,0.18);
     --glow:       0 0 32px rgba(93,138,114,0.14);
     --unread:     var(--lux);
-    /* signature: pearl-mist scrim — warm white veil instead of darkness */
+    /* signature: pearl-mist scrim — warm white tsumugi instead of darkness */
     --scrim:          rgba(250,246,238,.72);
     color-scheme: light;
   }
@@ -1162,7 +1162,7 @@ body.bubble-mode .chat-msg-wrap {
   --reaction-bg: color-mix(in srgb, var(--bg-surface) 78%, var(--accent) 22%);
   --reaction-bg-active: color-mix(in srgb, var(--lux) 24%, var(--bg-deep));
   --unread: var(--lux);
-  /* signature: paper scrim — cool white veil */
+  /* signature: paper scrim — cool white tsumugi */
   --scrim: rgba(255,255,255,.72);
   color-scheme: light;
 }

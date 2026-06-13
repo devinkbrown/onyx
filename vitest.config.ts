@@ -19,7 +19,7 @@ export default defineConfig({
         'components/**/*.tsx',
       ],
       exclude: [
-        'lib/ladon-media/OpcodecWasm.ts',
+        'lib/suimyaku-media/OpcodecWasm.ts',
         '**/*.d.ts',
       ],
     },

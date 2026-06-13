@@ -54,7 +54,7 @@ export default function AboutPage() {
             <div className="about-stat-divider" />
             <div className="about-stat">
               <span className="about-stat-val">P-256</span>
-              <span className="about-stat-label">VEIL encryption</span>
+              <span className="about-stat-label">TSUMUGI encryption</span>
             </div>
           </div>
         </div>
@@ -78,7 +78,7 @@ export default function AboutPage() {
               open IRC protocol underneath.
             </p>
             <p>
-              Everything runs on <strong>Ophion</strong>, a custom IRC server built
+              Everything runs on <strong>Orochi</strong>, a custom IRC server built
               from the ground up to support modern clients without abandoning IRC
               compatibility. Any standard IRC client can still connect. Ocean is
               just the best way to experience the network.
@@ -95,25 +95,25 @@ export default function AboutPage() {
           <h2 className="about-h2">Four layers, one network.</h2>
           <div className="about-tech-grid">
             <TechCard
-              name="Ophion"
+              name="Orochi"
               tag="IRC Server"
               accentColor="#0ea5e9"
               desc="A custom IRC server built for performance and modern protocol extensions. Supports IRCv3, IRCX, CHATHISTORY, and full SASL auth including session tokens."
-              href="https://github.com/devinkbrown/ophion"
+              href="https://github.com/devinkbrown/orochi"
               detail="eshmaki.me:6697"
             />
             <TechCard
-              name="LADON"
+              name="SUIMYAKU"
               tag="Media Protocol"
               accentColor="#67e8f9"
-              desc="Proprietary voice and video protocol built over IRC messaging. Native transport — no relay servers, no third-party infrastructure. Spatial audio and video delivered through the Ophion network."
+              desc="Proprietary voice and video protocol built over IRC messaging. Native transport — no relay servers, no third-party infrastructure. Spatial audio and video delivered through the Orochi network."
               detail="Native transport · No relay"
             />
             <TechCard
-              name="VEIL"
+              name="TSUMUGI"
               tag="Encryption"
               accentColor="#0ea5e9"
-              desc="P-256 ECDH key exchange with AES-256-GCM encryption for every LADON session. Group session keys derived with forward secrecy — no plaintext voice leaves your device."
+              desc="P-256 ECDH key exchange with AES-256-GCM encryption for every SUIMYAKU session. Group session keys derived with forward secrecy — no plaintext voice leaves your device."
               detail="P-256 ECDH · AES-256-GCM"
             />
             <TechCard
@@ -143,12 +143,12 @@ export default function AboutPage() {
               {
                 n: '02',
                 title: 'No third parties',
-                body: 'Voice goes through Ophion, not Google, not Amazon. Your conversations don\'t pass through infrastructure you don\'t control.',
+                body: 'Voice goes through Orochi, not Google, not Amazon. Your conversations don\'t pass through infrastructure you don\'t control.',
               },
               {
                 n: '03',
                 title: 'Privacy by design',
-                body: 'Session tokens replace stored passwords. VEIL encrypts voice before it leaves your device. No analytics, no tracking.',
+                body: 'Session tokens replace stored passwords. TSUMUGI encrypts voice before it leaves your device. No analytics, no tracking.',
               },
               {
                 n: '04',
@@ -175,13 +175,13 @@ export default function AboutPage() {
           </div>
           <h2 className="about-h2">Join the network.</h2>
           <div className="about-connect-grid">
-            <a href="https://github.com/devinkbrown/ophion" target="_blank" rel="noopener noreferrer" className="about-link-card">
+            <a href="https://github.com/devinkbrown/orochi" target="_blank" rel="noopener noreferrer" className="about-link-card">
               <div className="about-link-icon">
                 <GithubIcon />
               </div>
               <div className="about-link-text">
-                <div className="about-link-title">Ophion on GitHub</div>
-                <div className="about-link-sub">github.com/devinkbrown/ophion</div>
+                <div className="about-link-title">Orochi on GitHub</div>
+                <div className="about-link-sub">github.com/devinkbrown/orochi</div>
               </div>
               <span className="about-link-arrow">↗</span>
             </a>
@@ -224,7 +224,7 @@ export default function AboutPage() {
         <nav className="about-footer-links" aria-label="Footer">
           <Link href="/" className="about-footer-link">Home</Link>
           <Link href="/login" className="about-footer-link">Sign In</Link>
-          <a href="https://github.com/devinkbrown/ophion" target="_blank" rel="noopener noreferrer" className="about-footer-link">Ophion ↗</a>
+          <a href="https://github.com/devinkbrown/orochi" target="_blank" rel="noopener noreferrer" className="about-footer-link">Orochi ↗</a>
         </nav>
         <p className="about-footer-copy">© {new Date().getFullYear()} eshmaki.me</p>
       </footer>

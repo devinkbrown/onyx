@@ -6,8 +6,8 @@ import { IRCClient } from '@/lib/irc/client';
 import type { IRCMessage, Channel, ChatMessage, ConnectionStatus, MessageReaction } from '@/lib/irc/types';
 import { loadCredentials } from '@/lib/credentials';
 import { parseCHANLIMIT, parseMonitorNumeric, parsePREFIX, parseSessionTokenNote, parseStandardReply } from '@/lib/irc/parser';
-import type { LadonPeerState, LadonRoomStats, CallState } from '@/lib/ladon-media/types';
-import { getMountedLadonMediaEngine } from '@/lib/ladon-media/MediaEngine';
+import type { SuimyakuPeerState, SuimyakuRoomStats, CallState } from '@/lib/suimyaku-media/types';
+import { getMountedSuimyakuMediaEngine } from '@/lib/suimyaku-media/MediaEngine';
 import { parseActivity } from '@/lib/activity';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -106,11 +106,11 @@ export interface VoiceState {
   callState: CallState;
   callWith: string;
   callChannel: string | null;
-  peers: Map<string, LadonPeerState>;
+  peers: Map<string, SuimyakuPeerState>;
   muted: boolean;
   deafened: boolean;
   localStream: MediaStream | null;
-  roomStats: Map<string, LadonRoomStats>;
+  roomStats: Map<string, SuimyakuRoomStats>;
 
   // Audio / device settings
   inputDeviceId: string | null;
@@ -131,7 +131,7 @@ export interface VoiceState {
   startScreenshare(): Promise<void>;
   stopScreenshare(): void;
 
-  // Video participants: nick → MediaStream from LADON media engine
+  // Video participants: nick → MediaStream from SUIMYAKU media engine
   videoParticipants: Map<string, MediaStream>;
 
   // Local camera state
@@ -472,7 +472,7 @@ export interface OnyxState {
   showServices: boolean;
   servicesTab: 'account' | 'channel' | 'memos' | 'vhost' | 'nickserv' | 'chanserv' | 'hostserv' | 'memoserv';
 
-  // ── Service notices (replies from Ophion built-in services: Account, Channel, Memo, etc.) ──
+  // ── Service notices (replies from Orochi built-in services: Account, Channel, Memo, etc.) ──
   serviceNotices: Array<{ source: string; text: string; time: Date }>;
   addServiceNotice(source: string, text: string): void;
   clearServiceNotices(): void;
@@ -1095,11 +1095,11 @@ export interface OnyxState {
   channelWelcomeSeen: Set<string>;
   markWelcomeSeen: (channel: string) => void;
 
-  // ── Voice / LADON speaking + channel tracking ─────────────────────────────
+  // ── Voice / SUIMYAKU speaking + channel tracking ─────────────────────────────
   /** Set of nicks currently speaking (updated from PeerRegistry VAD) */
   speakingNicks: Set<string>;
   setSpeakingNick: (nick: string, speaking: boolean) => void;
-  /** Channel names identified as LADON voice channels (prefix + or mode V) */
+  /** Channel names identified as SUIMYAKU voice channels (prefix + or mode V) */
   voiceChannels: string[];
   addVoiceChannel: (channel: string) => void;
   removeVoiceChannel: (channel: string) => void;
@@ -1736,8 +1736,8 @@ export const useOnyxStore = create<OnyxState>()(
         const target = activeView.kind === 'channel' ? activeView.channel :
                        activeView.kind === 'dm' ? activeView.nick : get().voice.callChannel;
         if (!target) return;
-        await getMountedLadonMediaEngine()?.startScreenShare(target);
-        const stream = getMountedLadonMediaEngine()?.getLocalStream() ?? null;
+        await getMountedSuimyakuMediaEngine()?.startScreenShare(target);
+        const stream = getMountedSuimyakuMediaEngine()?.getLocalStream() ?? null;
         set(s => ({ voice: { ...s.voice, screenshareActive: !!stream, screenshareStream: stream } }));
         stream?.getVideoTracks()[0]?.addEventListener('ended', () => {
           get().voice.stopScreenshare();
@@ -1745,7 +1745,7 @@ export const useOnyxStore = create<OnyxState>()(
       },
       stopScreenshare() {
         const { voice } = get();
-        getMountedLadonMediaEngine()?.stopBroadcast(voice.callChannel ?? undefined);
+        getMountedSuimyakuMediaEngine()?.stopBroadcast(voice.callChannel ?? undefined);
         voice.screenshareStream?.getTracks().forEach(t => t.stop());
         set(s => ({ voice: { ...s.voice, screenshareActive: false, screenshareStream: null } }));
       },
@@ -2105,7 +2105,7 @@ export const useOnyxStore = create<OnyxState>()(
         _saveVoiceSettings(voice);
         return { voice };
       });
-      const engine = getMountedLadonMediaEngine();
+      const engine = getMountedSuimyakuMediaEngine();
       if (s.muted !== undefined) engine?.setMuted(s.muted);
       if (s.deafened !== undefined) engine?.setDeafened(s.deafened);
       if (s.outputDeviceId !== undefined || s.outputVolume !== undefined) {
@@ -3123,7 +3123,7 @@ export const useOnyxStore = create<OnyxState>()(
                 return { voiceChannelParticipants: map, mediaAvailable: true };
               });
             }
-            getMountedLadonMediaEngine()?.handleMediaMessage(actor, channel, verb, detail);
+            getMountedSuimyakuMediaEngine()?.handleMediaMessage(actor, channel, verb, detail);
           } else {
             set({ mediaAvailable: true });
           }
@@ -3159,7 +3159,7 @@ export const useOnyxStore = create<OnyxState>()(
           }
           // Auto-join configured channels (fall back to #root on eshmaki.me).
           // SKIP this blind autojoin storm when the server advertised
-          // `ophion/session-sync`: in that mode the server itself pushes JOIN +
+          // `orochi/session-sync`: in that mode the server itself pushes JOIN +
           // NAMES/topic + CHATHISTORY replay for every channel the account's
           // session is live in, so reconnect reclaims the live session without
           // the client guessing from localStorage. Falls back to the old
@@ -5955,7 +5955,7 @@ export const useOnyxStore = create<OnyxState>()(
       channelWelcomeSeen: new Set([...s.channelWelcomeSeen, channel.toLowerCase()]),
     })),
 
-    // ── Voice / LADON speaking + channel tracking ────────────────────────────
+    // ── Voice / SUIMYAKU speaking + channel tracking ────────────────────────────
     speakingNicks: new Set<string>(),
     setSpeakingNick: (nick, speaking) => set(s => {
       const next = new Set(s.speakingNicks);
@@ -6361,7 +6361,7 @@ export const useOnyxStore = create<OnyxState>()(
     async joinVoiceChannel(channel, withVideo = false) {
       const { client } = get();
       if (!client) return;
-      const engine = getMountedLadonMediaEngine();
+      const engine = getMountedSuimyakuMediaEngine();
       if (!engine) return;
 
       await (withVideo ? engine.joinVideo(channel) : engine.joinVoice(channel));
@@ -6399,8 +6399,8 @@ export const useOnyxStore = create<OnyxState>()(
 
       const ch = voice.callChannel;
 
-      if (ch) getMountedLadonMediaEngine()?.leaveRoom(ch);
-      else if (voice.callWith) getMountedLadonMediaEngine()?.hangup(voice.callWith);
+      if (ch) getMountedSuimyakuMediaEngine()?.leaveRoom(ch);
+      else if (voice.callWith) getMountedSuimyakuMediaEngine()?.hangup(voice.callWith);
 
       void client;
 
@@ -6429,7 +6429,7 @@ export const useOnyxStore = create<OnyxState>()(
     async toggleCamera() {
       const { voice, client } = get();
       if (voice.callState !== 'in_call') return;
-      const engine = getMountedLadonMediaEngine();
+      const engine = getMountedSuimyakuMediaEngine();
       if (!engine) return;
 
       if (voice.cameraOn) {
@@ -6458,7 +6458,7 @@ export const useOnyxStore = create<OnyxState>()(
     toggleDeafen() {
       const { voice } = get();
       const deafened = !voice.deafened;
-      getMountedLadonMediaEngine()?.setDeafened(deafened);
+      getMountedSuimyakuMediaEngine()?.setDeafened(deafened);
       get().setVoiceCallState({ deafened });
     },
 
@@ -6469,7 +6469,7 @@ export const useOnyxStore = create<OnyxState>()(
 
       get().setVoiceCallState({ callState: 'ringing_out', callWith: nick, callChannel: null });
 
-      void getMountedLadonMediaEngine()?.startCall(nick, withVideo ? 'video' : 'voice');
+      void getMountedSuimyakuMediaEngine()?.startCall(nick, withVideo ? 'video' : 'voice');
       // OCEAN-UI: DM call affordances need an Orochi-backed room/channel flow;
       // do not emit legacy CTCP call messages.
 
@@ -6485,13 +6485,13 @@ export const useOnyxStore = create<OnyxState>()(
       if (!client || voice.callState !== 'ringing_in') return;
 
       void client;
-      void getMountedLadonMediaEngine()?.acceptIncomingCall();
+      void getMountedSuimyakuMediaEngine()?.acceptIncomingCall();
     },
 
     rejectDmCall() {
       const { client, voice } = get();
       void client;
-      if (voice.callWith) getMountedLadonMediaEngine()?.rejectCall(voice.callWith);
+      if (voice.callWith) getMountedSuimyakuMediaEngine()?.rejectCall(voice.callWith);
       get().setVoiceCallState({ callState: 'idle', callWith: '', callChannel: null });
     },
 
@@ -6501,7 +6501,7 @@ export const useOnyxStore = create<OnyxState>()(
       voice.cameraStream?.getTracks().forEach(t => t.stop());
 
       void client;
-      if (voice.callWith) getMountedLadonMediaEngine()?.hangup(voice.callWith);
+      if (voice.callWith) getMountedSuimyakuMediaEngine()?.hangup(voice.callWith);
 
       get().setVoiceCallState({
         callState: 'idle',

@@ -1132,7 +1132,7 @@ function VoiceTab() {
         </div>
         <div className="vt-info-banner">
           <span className="vt-info-icon">🔒</span>
-          Video is transmitted over the encrypted LADON protocol. No third-party relay servers are used.
+          Video is transmitted over the encrypted SUIMYAKU protocol. No third-party relay servers are used.
         </div>
       </div>
 
@@ -2140,7 +2140,7 @@ function AdvancedTab() {
 
   const hasHistory  = client?.negotiatedCaps?.has('draft/chathistory') || client?.negotiatedCaps?.has('chathistory');
   const hasExtended = client?.isupport.IRCX;
-  const hasVoice    = !!client?.isupport.LADONMEDIA;
+  const hasVoice    = !!client?.isupport.SUIMYAKUMEDIA;
 
   return (
     <div className="tab-body">

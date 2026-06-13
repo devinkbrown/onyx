@@ -1,16 +1,16 @@
 import { describe, it, expect } from 'vitest';
 
-// We test parseLadonCap by importing the hook file and calling the exported
-// flag-parsing logic indirectly.  Since parseLadonCap is not directly exported
-// we re-implement the same test logic against useLadonFlags by simulating
+// We test parseSuimyakuCap by importing the hook file and calling the exported
+// flag-parsing logic indirectly.  Since parseSuimyakuCap is not directly exported
+// we re-implement the same test logic against useSuimyakuFlags by simulating
 // what happens inside it.  The pure function is inlined here for unit testing.
 
-function parseLadonCap(raw: string) {
-  type LadonFlags = {
+function parseSuimyakuCap(raw: string) {
+  type SuimyakuFlags = {
     enabled: boolean; version: number; codecs: string[]; simulcast: boolean;
     e2e: boolean; spatial: boolean; mixer: boolean; max: number; raw: string;
   };
-  const flags: LadonFlags = {
+  const flags: SuimyakuFlags = {
     enabled: !!raw, version: 0, codecs: [], simulcast: false,
     e2e: false, spatial: false, mixer: false, max: 0, raw,
   };
@@ -32,16 +32,16 @@ function parseLadonCap(raw: string) {
   return flags;
 }
 
-describe('parseLadonCap', () => {
+describe('parseSuimyakuCap', () => {
   it('returns disabled flags for empty string', () => {
-    const f = parseLadonCap('');
+    const f = parseSuimyakuCap('');
     expect(f.enabled).toBe(false);
     expect(f.version).toBe(0);
     expect(f.codecs).toEqual([]);
   });
 
   it('parses full capabilities string', () => {
-    const f = parseLadonCap('v=2,codecs=opus/vp8,simulcast,e2e,spatial,mixer,max=16');
+    const f = parseSuimyakuCap('v=2,codecs=opus/vp8,simulcast,e2e,spatial,mixer,max=16');
     expect(f.enabled).toBe(true);
     expect(f.version).toBe(2);
     expect(f.codecs).toEqual(['opus', 'vp8']);
@@ -53,7 +53,7 @@ describe('parseLadonCap', () => {
   });
 
   it('parses voice-only subset', () => {
-    const f = parseLadonCap('v=1,codecs=opus,max=32');
+    const f = parseSuimyakuCap('v=1,codecs=opus,max=32');
     expect(f.version).toBe(1);
     expect(f.codecs).toEqual(['opus']);
     expect(f.max).toBe(32);
@@ -62,19 +62,19 @@ describe('parseLadonCap', () => {
   });
 
   it('handles extra spaces around comma-separated tokens', () => {
-    const f = parseLadonCap('v=1, simulcast, e2e');
+    const f = parseSuimyakuCap('v=1, simulcast, e2e');
     expect(f.simulcast).toBe(true);
     expect(f.e2e).toBe(true);
   });
 
   it('ignores unknown tokens', () => {
-    const f = parseLadonCap('v=1,unknown_flag,codecs=opus');
+    const f = parseSuimyakuCap('v=1,unknown_flag,codecs=opus');
     expect(f.version).toBe(1);
     expect(f.codecs).toEqual(['opus']);
   });
 
   it('handles non-numeric version gracefully', () => {
-    const f = parseLadonCap('v=bad');
+    const f = parseSuimyakuCap('v=bad');
     expect(f.version).toBe(0);
   });
 
@@ -82,44 +82,44 @@ describe('parseLadonCap', () => {
 
   it('stores the raw string on the flags object', () => {
     const raw = 'v=3,codecs=opus';
-    const f = parseLadonCap(raw);
+    const f = parseSuimyakuCap(raw);
     expect(f.raw).toBe(raw);
   });
 
   it('returns enabled=true for any non-empty string', () => {
-    expect(parseLadonCap('v=1').enabled).toBe(true);
-    expect(parseLadonCap('simulcast').enabled).toBe(true);
+    expect(parseSuimyakuCap('v=1').enabled).toBe(true);
+    expect(parseSuimyakuCap('simulcast').enabled).toBe(true);
   });
 
   it('treats max=0 as a valid (zero) value', () => {
-    const f = parseLadonCap('max=0');
+    const f = parseSuimyakuCap('max=0');
     expect(f.max).toBe(0);
     expect(f.enabled).toBe(true);
   });
 
   it('parses large max value', () => {
-    const f = parseLadonCap('max=1024');
+    const f = parseSuimyakuCap('max=1024');
     expect(f.max).toBe(1024);
   });
 
   it('handles non-numeric max gracefully (leaves max at 0)', () => {
     // parseInt('xyz', 10) => NaN; isFinite(NaN) is false → max stays 0
-    const f = parseLadonCap('max=xyz');
+    const f = parseSuimyakuCap('max=xyz');
     expect(f.max).toBe(0);
   });
 
   it('parses a single codec without slash delimiter', () => {
-    const f = parseLadonCap('codecs=vp9');
+    const f = parseSuimyakuCap('codecs=vp9');
     expect(f.codecs).toEqual(['vp9']);
   });
 
   it('parses three codecs separated by slash', () => {
-    const f = parseLadonCap('codecs=opus/vp8/h264');
+    const f = parseSuimyakuCap('codecs=opus/vp8/h264');
     expect(f.codecs).toEqual(['opus', 'vp8', 'h264']);
   });
 
   it('flags default to false when only version is present', () => {
-    const f = parseLadonCap('v=1');
+    const f = parseSuimyakuCap('v=1');
     expect(f.simulcast).toBe(false);
     expect(f.e2e).toBe(false);
     expect(f.spatial).toBe(false);
@@ -128,7 +128,7 @@ describe('parseLadonCap', () => {
 
   it('handles token that looks like an unknown key=value pair', () => {
     // 'foo=bar' — unknown key, should not throw and should not affect known flags
-    const f = parseLadonCap('v=2,foo=bar,simulcast');
+    const f = parseSuimyakuCap('v=2,foo=bar,simulcast');
     expect(f.version).toBe(2);
     expect(f.simulcast).toBe(true);
   });
@@ -136,7 +136,7 @@ describe('parseLadonCap', () => {
   it('handles whitespace-only string as disabled', () => {
     // '   '.trim() => '', filter(Boolean) removes it — enabled is !!raw which
     // is truthy for whitespace, but all flags remain at defaults
-    const f = parseLadonCap('   ');
+    const f = parseSuimyakuCap('   ');
     // !!raw is true for '   ' (non-empty string)
     expect(f.enabled).toBe(true);
     // No valid tokens are parsed
@@ -147,7 +147,7 @@ describe('parseLadonCap', () => {
 
   it('handles repeated comma separators (empty tokens filtered)', () => {
     // Double comma — filter(Boolean) drops empty strings
-    const f = parseLadonCap('v=1,,simulcast');
+    const f = parseSuimyakuCap('v=1,,simulcast');
     expect(f.version).toBe(1);
     expect(f.simulcast).toBe(true);
   });

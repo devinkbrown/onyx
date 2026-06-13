@@ -116,7 +116,7 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
   const nsfwChannels         = useOnyxStore(s => s.nsfwChannels);
 
   const channelList   = [...channels.values()];
-  // IRC +V mode = LADON voice channel; also channels with '+' prefix (IRCX voice)
+  // IRC +V mode = SUIMYAKU voice channel; also channels with '+' prefix (IRCX voice)
   const ircVoiceChannels = channelList.filter(c =>
     c.modes.includes('V') ||
     c.name.startsWith('+') ||
@@ -374,8 +374,8 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
           </div>
         ))}
 
-        {/* IRC +V / IRCX + prefix / LADON voice channels in their own section */}
-        {(ircVoiceChannels.length > 0 || client?.isupport.LADONMEDIA) && (
+        {/* IRC +V / IRCX + prefix / SUIMYAKU voice channels in their own section */}
+        {(ircVoiceChannels.length > 0 || client?.isupport.SUIMYAKUMEDIA) && (
           <Section
             label="Voice Channels"
             expanded={!collapsed.has('__voice__')}

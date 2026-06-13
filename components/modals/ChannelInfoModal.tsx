@@ -57,13 +57,13 @@ const MODE_LABELS: Record<string, string> = {
   k: '+k Key protected (password required)',
   l: '+l User limit',
   q: '+q Quiet mask',
-  // Ophion core (chm_builtin.c)
+  // Orochi core (chm_builtin.c)
   c: '+c Strip colour and formatting codes',
   C: '+C Block CTCP (ACTION exempt)',
   S: '+S TLS-only — SSL/TLS clients only',
   A: '+A Admin-only — IRC admins only',
   O: '+O Oper-only — IRC operators only',
-  // Ophion IRCX (m_ircx_modes.c)
+  // Orochi IRCX (m_ircx_modes.c)
   r: '+r Registered — channel persists when empty',
   a: '+a Auth-only — authenticated users only',
   u: '+u KNOCK notifications enabled',
@@ -75,9 +75,9 @@ const MODE_LABELS: Record<string, string> = {
   x: '+x Auditorium — non-ops hidden from each other',
   w: '+w No whisper — disables WHISPER',
   Y: '+Y No comic data',
-  // LADON media modes
-  N: '+N LADON voice — group voice transport enabled',
-  V: '+V LADON media — camera and screen sharing enabled',
+  // SUIMYAKU media modes
+  N: '+N SUIMYAKU voice — group voice transport enabled',
+  V: '+V SUIMYAKU media — camera and screen sharing enabled',
   // Other extensions
   T: '+T No notices — blocks NOTICE to channel',
   U: '+U Allow non-TLS clients',
@@ -689,19 +689,19 @@ function SettingsTab({ channelName, modeStr, client }: SettingsTabProps) {
         </div>
       </section>
 
-      {/* LADON Voice/Video Modes */}
+      {/* SUIMYAKU Voice/Video Modes */}
       <section className="ci-section">
-        <h3 className="ci-section-title">LADON Media</h3>
+        <h3 className="ci-section-title">SUIMYAKU Media</h3>
         <div className="ci-toggle-list">
           <ModeToggle
             label="Voice Channel (+N)"
-            description="Enable group voice transport via LADON"
+            description="Enable group voice transport via SUIMYAKU"
             active={has('N')}
             onToggle={() => sendMode('N', !has('N'))}
           />
           <ModeToggle
             label="Video Channel (+V)"
-            description="Enable camera and screenshare via LADON"
+            description="Enable camera and screenshare via SUIMYAKU"
             active={has('V')}
             onToggle={() => sendMode('V', !has('V'))}
           />

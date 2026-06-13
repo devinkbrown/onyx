@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
-import { getMountedLadonMediaEngine as _e2eGetEngine } from '@/lib/ladon-media/MediaEngine';
+import { getMountedSuimyakuMediaEngine as _e2eGetEngine } from '@/lib/suimyaku-media/MediaEngine';
 import { useSwipe } from '@/hooks/useSwipe';
 import ImageLightbox from '@/components/ui/ImageLightbox';
 import MobileBottomNav from './MobileBottomNav';
@@ -70,7 +70,7 @@ import { BreakoutSidebar } from './BreakoutSidebar';
 import IncomingCallOverlay from '../voice/IncomingCallOverlay';
 import OutgoingCallOverlay from '../voice/OutgoingCallOverlay';
 import dynamic from 'next/dynamic';
-import { useLadonMedia } from '@/hooks/useLadonMedia';
+import { useSuimyakuMedia } from '@/hooks/useSuimyakuMedia';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useAppearance } from '@/hooks/useAppearance';
@@ -294,8 +294,8 @@ export default function AppShell({ children }: Props) {
     }
   }, [mobilePanel, openSettings, setMobilePanel]);
 
-  // Wire LADON media engine
-  useLadonMedia();
+  // Wire SUIMYAKU media engine
+  useSuimyakuMedia();
   // Global keyboard shortcuts
   useKeyboardShortcuts();
   // Document title + browser notifications

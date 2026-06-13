@@ -1,15 +1,15 @@
 'use client';
 
 /*
- * VeilSession.ts — Browser-side VEIL encrypted media session.
+ * TsumugiSession.ts — Browser-side TSUMUGI encrypted media session.
  *
- * Implements the VEIL_HANDSHAKE / VEIL_RATCHET / VEIL_DATA protocol
+ * Implements the TSUMUGI_HANDSHAKE / TSUMUGI_RATCHET / TSUMUGI_DATA protocol
  * using Web Crypto (P-256 ECDH + HKDF + AES-256-GCM).
  *
  * Usage:
- *   const v = await VeilSession.create();
- *   const offer = v.exportPublicKey();  // send to peer via VEIL_HANDSHAKE
- *   await v.ingestPeerKey(peerPublicKeyBytes); // on receiving VEIL_HANDSHAKE
+ *   const v = await TsumugiSession.create();
+ *   const offer = v.exportPublicKey();  // send to peer via TSUMUGI_HANDSHAKE
+ *   await v.ingestPeerKey(peerPublicKeyBytes); // on receiving TSUMUGI_HANDSHAKE
  *   const ct = await v.encrypt(plaintext);
  *   const pt = await v.decrypt(ct);
  */
@@ -22,7 +22,7 @@ const IV_LEN   = 12;
 
 type AesGcmKey = CryptoKey & { _gcm: true };
 
-export class VeilSession {
+export class TsumugiSession {
   private readonly keyPair: CryptoKeyPair;
   private sessionKey: AesGcmKey | null = null;
   private ratchetEpoch = 0;
@@ -31,17 +31,17 @@ export class VeilSession {
     this.keyPair = kp;
   }
 
-  static async create(): Promise<VeilSession> {
+  static async create(): Promise<TsumugiSession> {
     const kp = await crypto.subtle.generateKey(
       { name: 'ECDH', namedCurve: CURVE },
       true,
       ['deriveKey', 'deriveBits'],
     );
-    return new VeilSession(kp);
+    return new TsumugiSession(kp);
   }
 
-  static fromKeyPair(kp: CryptoKeyPair): VeilSession {
-    return new VeilSession(kp);
+  static fromKeyPair(kp: CryptoKeyPair): TsumugiSession {
+    return new TsumugiSession(kp);
   }
 
   /** Return raw uncompressed public key bytes (65 bytes, 0x04 prefix). */
@@ -51,10 +51,10 @@ export class VeilSession {
   }
 
   /**
-   * Ingest peer's raw public key (from VEIL_HANDSHAKE frame) and derive
+   * Ingest peer's raw public key (from TSUMUGI_HANDSHAKE frame) and derive
    * the shared AES-256-GCM session key via ECDH + HKDF.
    */
-  async ingestPeerKey(peerRawKey: Uint8Array, info = 'veil-v1'): Promise<void> {
+  async ingestPeerKey(peerRawKey: Uint8Array, info = 'tsumugi-v1'): Promise<void> {
     const peerKey = await crypto.subtle.importKey(
       'raw', new Uint8Array(peerRawKey).buffer as ArrayBuffer,
       { name: 'ECDH', namedCurve: CURVE },
@@ -87,14 +87,14 @@ export class VeilSession {
   }
 
   /**
-   * Ratchet the session key forward (called on VEIL_RATCHET frame).
+   * Ratchet the session key forward (called on TSUMUGI_RATCHET frame).
    * Derives a new key by HKDF-expanding the current key with the new epoch.
    */
   async ratchet(): Promise<void> {
-    if (!this.sessionKey) throw new Error('VeilSession: not yet established');
+    if (!this.sessionKey) throw new Error('TsumugiSession: not yet established');
     this.ratchetEpoch++;
     const exportable = await crypto.subtle.exportKey('raw', this.sessionKey)
-      .catch(() => { throw new Error('VeilSession: ratchet requires extractable key'); });
+      .catch(() => { throw new Error('TsumugiSession: ratchet requires extractable key'); });
     const hkdfKey = await crypto.subtle.importKey(
       'raw', exportable, HKDF_ALG, false, ['deriveKey'],
     );
@@ -104,7 +104,7 @@ export class VeilSession {
         name: HKDF_ALG,
         hash: 'SHA-256',
         salt:  new Uint8Array(32),
-        info:  new TextEncoder().encode(`veil-ratchet-${this.ratchetEpoch}`),
+        info:  new TextEncoder().encode(`tsumugi-ratchet-${this.ratchetEpoch}`),
       },
       hkdfKey,
       { name: GCM_ALG, length: GCM_LEN },
@@ -116,7 +116,7 @@ export class VeilSession {
 
   /** Encrypt plaintext with current session key. Returns iv || ciphertext. */
   async encrypt(plaintext: Uint8Array): Promise<Uint8Array> {
-    if (!this.sessionKey) throw new Error('VeilSession: not yet established');
+    if (!this.sessionKey) throw new Error('TsumugiSession: not yet established');
     const iv = crypto.getRandomValues(new Uint8Array(IV_LEN));
     const ct = await crypto.subtle.encrypt(
       { name: GCM_ALG, iv },
@@ -131,8 +131,8 @@ export class VeilSession {
 
   /** Decrypt iv || ciphertext with current session key. */
   async decrypt(frame: Uint8Array): Promise<Uint8Array> {
-    if (!this.sessionKey) throw new Error('VeilSession: not yet established');
-    if (frame.length < IV_LEN + 16) throw new Error('VeilSession: frame too short');
+    if (!this.sessionKey) throw new Error('TsumugiSession: not yet established');
+    if (frame.length < IV_LEN + 16) throw new Error('TsumugiSession: frame too short');
     const iv = frame.slice(0, IV_LEN);
     const ct = frame.slice(IV_LEN);
     const pt = await crypto.subtle.decrypt({ name: GCM_ALG, iv }, this.sessionKey,
@@ -150,12 +150,12 @@ export class VeilSession {
   async getFingerprint(): Promise<string> {
     const raw   = await crypto.subtle.exportKey('raw', this.keyPair.publicKey);
     const hash  = await crypto.subtle.digest('SHA-256', raw);
-    return veilBase58(new Uint8Array(hash)).slice(0, 12).padStart(12, '1');
+    return tsumugiBase58(new Uint8Array(hash)).slice(0, 12).padStart(12, '1');
   }
 }
 
 /** Base58 encode bytes without BigInt (compatible with ES2017 target). */
-function veilBase58(bytes: Uint8Array): string {
+function tsumugiBase58(bytes: Uint8Array): string {
   const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
   const digits = [0];
   for (const byte of bytes) {

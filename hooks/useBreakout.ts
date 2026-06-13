@@ -5,10 +5,10 @@
  *
  * Owns breakout-room state for a single parent channel. Subscribes to
  * incoming IRC NOTICE traffic via the IRC client and parses
- * ophion's m_ladon_breakout NOTICE protocol into a stable React-friendly
+ * orochi's m_suimyaku_breakout NOTICE protocol into a stable React-friendly
  * room list.
  *
- * Server-emitted NOTICE shapes (see modules/m_ladon_breakout.c):
+ * Server-emitted NOTICE shapes (see modules/m_suimyaku_breakout.c):
  *   - Channel: "Breakout room '<name>' created (ID=<id>)"
  *   - Channel: "Breakout '<name>' (ID=<id>) now <n> member(s)"
  *   - Channel: "Breakout room (ID=<id>) renamed to '<name>'"

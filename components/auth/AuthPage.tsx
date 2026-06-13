@@ -27,7 +27,7 @@ export default function AuthPage() {
             <p className="auth-kicker">eshmaki.me</p>
             <h1 className="auth-wordmark">Ocean</h1>
             <p className="auth-brand-copy">
-              Lacquered chat for Ophion communities, LADON media, and session-safe identity.
+              Lacquered chat for Orochi communities, SUIMYAKU media, and session-safe identity.
             </p>
             <div className="auth-brand-meter">
               <span />
@@ -77,7 +77,7 @@ export default function AuthPage() {
 
           <div className="auth-footer">
             <span className="auth-status-dot" aria-hidden="true" />
-            <span>Ophion gateway</span>
+            <span>Orochi gateway</span>
           </div>
         </section>
       </section>

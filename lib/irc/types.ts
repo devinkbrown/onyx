@@ -109,8 +109,8 @@ export interface ISupport {
   IRCX: boolean;
   MAXDATA: number;
   COMICCHAT: string;   // e.g. 'DATA' — method used for comic chat signalling
-  /** Deprecated compatibility field. Orochi media is gated by caps/NOTE MEDIA, not LADONMEDIA. */
-  LADONMEDIA: string;
+  /** Deprecated compatibility field. Orochi media is gated by caps/NOTE MEDIA, not SUIMYAKUMEDIA. */
+  SUIMYAKUMEDIA: string;
   MAXMEDIA: number;
   MEDIAUMODES: string;
   MEDIAMUTE: string;

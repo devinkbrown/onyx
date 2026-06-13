@@ -2,21 +2,21 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useOnyxStore } from '@/lib/store';
-import { LadonMediaEngine, setMountedLadonMediaEngine } from '@/lib/ladon-media/MediaEngine';
-import type { LadonMediaCallbacks } from '@/lib/ladon-media/types';
+import { SuimyakuMediaEngine, setMountedSuimyakuMediaEngine } from '@/lib/suimyaku-media/MediaEngine';
+import type { SuimyakuMediaCallbacks } from '@/lib/suimyaku-media/types';
 import type { IRCMessage } from '@/lib/irc/types';
 
 /**
- * useLadonMedia
+ * useSuimyakuMedia
  *
- * Creates and wires the LADON MediaEngine to the Ocean store.
+ * Creates and wires the SUIMYAKU MediaEngine to the Ocean store.
  * Mount once at AppShell level.
  *
  * Orochi media signaling arrives as NOTE MEDIA events:
  *   NOTE MEDIA <#channel> <verb> <nick> [detail...]
  * Local controls are sent with MEDIA <verb> <#channel> ...
  */
-export function useLadonMedia() {
+export function useSuimyakuMedia() {
   const client          = useOnyxStore(s => s.client);
   const setVoiceState   = useOnyxStore(s => s.setVoiceCallState);
   const addNotification = useOnyxStore(s => s.addNotification);
@@ -26,7 +26,7 @@ export function useLadonMedia() {
   const outputVolume    = useOnyxStore(s => s.voice.outputVolume);
   const activeView      = useOnyxStore(s => s.activeView);
 
-  const engineRef         = useRef<LadonMediaEngine | null>(null);
+  const engineRef         = useRef<SuimyakuMediaEngine | null>(null);
   const prevShareRef      = useRef<boolean>(false);
   // Cache canvas-captured streams per nick so onPeerState (which fires on
   // every speaking/mute change) reuses the existing MediaStream instead of
@@ -37,7 +37,7 @@ export function useLadonMedia() {
 
   // ── Boot the engine once ──────────────────────────────────────────────────
   useEffect(() => {
-    const callbacks: LadonMediaCallbacks = {
+    const callbacks: SuimyakuMediaCallbacks = {
       onCallState(state, nick, ch) {
         setVoiceState({ callState: state, callWith: nick, callChannel: ch });
       },
@@ -128,8 +128,8 @@ export function useLadonMedia() {
     };
 
     if (!engineRef.current) {
-      engineRef.current = new LadonMediaEngine(callbacks, { kind: 'voice' });
-      setMountedLadonMediaEngine(engineRef.current);
+      engineRef.current = new SuimyakuMediaEngine(callbacks, { kind: 'voice' });
+      setMountedSuimyakuMediaEngine(engineRef.current);
     }
 
     engineRef.current.setClient(client);
@@ -225,9 +225,9 @@ export function useLadonMedia() {
   return { engineRef, announceJoin, announceLeave };
 }
 
-// ── LADON capability flags ────────────────────────────────────────────────────
+// ── SUIMYAKU capability flags ────────────────────────────────────────────────────
 
-export interface LadonFlags {
+export interface SuimyakuFlags {
   enabled: boolean;
   version: number;
   codecs: string[];
@@ -239,13 +239,13 @@ export interface LadonFlags {
   raw: string;
 }
 
-const EMPTY_FLAGS: LadonFlags = {
+const EMPTY_FLAGS: SuimyakuFlags = {
   enabled: false, version: 0, codecs: [], simulcast: false,
   e2e: false, spatial: false, mixer: false, max: 0, raw: '',
 };
 
-function parseLadonCap(raw: string): LadonFlags {
-  const flags: LadonFlags = { ...EMPTY_FLAGS, enabled: !!raw, raw };
+function parseSuimyakuCap(raw: string): SuimyakuFlags {
+  const flags: SuimyakuFlags = { ...EMPTY_FLAGS, enabled: !!raw, raw };
   for (const token of raw.split(',').map(t => t.trim()).filter(Boolean)) {
     const eq = token.indexOf('=');
     if (eq === -1) {
@@ -265,23 +265,23 @@ function parseLadonCap(raw: string): LadonFlags {
 }
 
 /**
- * useLadonFlags
+ * useSuimyakuFlags
  *
- * Reads the `ophion/ladon-media` CAP value negotiated with the server and
+ * Reads the `orochi/suimyaku-media` CAP value negotiated with the server and
  * returns a structured flags object.  Updates reactively when the client
  * changes (e.g. reconnect).
  */
-export function useLadonFlags(): LadonFlags {
+export function useSuimyakuFlags(): SuimyakuFlags {
   const client = useOnyxStore(s => s.client);
-  const [flags, setFlags] = useState<LadonFlags>(EMPTY_FLAGS);
+  const [flags, setFlags] = useState<SuimyakuFlags>(EMPTY_FLAGS);
 
   useEffect(() => {
     if (!client) {
       setFlags(EMPTY_FLAGS);
       return;
     }
-    const raw = client.capValues.get('ophion/ladon-media') ?? '';
-    setFlags(raw ? parseLadonCap(raw) : EMPTY_FLAGS);
+    const raw = client.capValues.get('orochi/suimyaku-media') ?? '';
+    setFlags(raw ? parseSuimyakuCap(raw) : EMPTY_FLAGS);
   }, [client]);
 
   return flags;

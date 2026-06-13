@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { ChunkAssembler } from '@/lib/ladon-media/ChunkAssembler';
+import { ChunkAssembler } from '@/lib/suimyaku-media/ChunkAssembler';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ChunkAssembler

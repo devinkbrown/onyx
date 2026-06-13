@@ -39,7 +39,7 @@ function usePrefersReducedMotion(): boolean {
 }
 
 /**
- * SpatialPad — polar radar UI for LADON listener-centric spatial audio.
+ * SpatialPad — polar radar UI for SUIMYAKU listener-centric spatial audio.
  *
  * Self sits at the visual centre. Drag anywhere on the pad to move your
  * listener position; MEDIA SPATIAL frames are broadcast to peers over IRC.

@@ -127,7 +127,7 @@ describe('Package A design-token foundation', () => {
     const pearl = themeBlock('pearl');
     expect(pearl, 'pearl is a light theme').toContain('color-scheme: light');
     expect(pearl, 'pearl antique gold lux').toContain('--lux:           #8f6a14');
-    expect(pearl, 'pearl celadon accent').toContain('--accent:        #5d8a72');
+    expect(pearl, 'pearl cesuimyaku accent').toContain('--accent:        #5d8a72');
     expect(pearl, 'pearl ink text').toContain('--text-primary:   #211f1a');
   });
 

@@ -166,7 +166,7 @@ export function saveCredentials(opts: {
 }
 
 /**
- * Store a session token received from Ophion.
+ * Store a session token received from Orochi.
  * expiresAt is a Unix timestamp (seconds).
  * canonicalNick — if provided, overwrites the stored nick with the account
  *   name so future auto-connects use the real nick, not a '_'-suffixed alias.

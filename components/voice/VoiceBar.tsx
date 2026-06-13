@@ -6,7 +6,7 @@ import Tooltip from '@/components/ui/Tooltip';
 import SpeakingBars from './SpeakingBars';
 import VoiceParticipantCard from './VoiceParticipantCard';
 import CaptionsOverlay from './CaptionsOverlay';
-import { OpcodecWasm } from '@/lib/ladon-media/OpcodecWasm';
+import { OpcodecWasm } from '@/lib/suimyaku-media/OpcodecWasm';
 
 // ── Video participant tile ─────────────────────────────────────────────────────
 interface VoiceVideoTileProps {

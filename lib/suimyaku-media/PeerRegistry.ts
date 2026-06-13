@@ -7,14 +7,14 @@ import {
   OPVOX_FRAME_48K,
   type OpvoxQuality,
 } from './OpcodecWasm';
-import type { LadonPeerState, MediaKind } from './types';
+import type { SuimyakuPeerState, MediaKind } from './types';
 
 // -------------------------------------------------------------------
 // Per-peer decoder state
 // -------------------------------------------------------------------
 
 export interface PeerMedia {
-  state:          LadonPeerState;
+  state:          SuimyakuPeerState;
   audDec:         OpvoxDecoder | null;
   vidDec:         OpvisDecoder | null;
   screenVidDec:   OpvisDecoder | null;
@@ -68,7 +68,7 @@ export class PeerRegistry {
   readonly peerLevels    = new Map<string, number>();
   readonly decodeErrors  = new Map<string, number>();
 
-  onPeerStateChanged?: (state: LadonPeerState) => void;
+  onPeerStateChanged?: (state: SuimyakuPeerState) => void;
   onPeerLeft?:         (nick: string) => void;
   onPeerSpeaking?:     (nick: string, speaking: boolean) => void;
 

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 // Two real users (fake media) join voice in a FRESH EMPTY channel on the live
-// server. Verifies the voice CODE PATH end-to-end: both connect, the LADON
+// server. Verifies the voice CODE PATH end-to-end: both connect, the SUIMYAKU
 // engine is reachable from the store (the globalThis singleton fix), and
 // joinVoiceChannel drives the engine. Full media exchange additionally requires
 // the OPUS WASM codec, which chrome-headless-shell lacks — so when the codec is
@@ -34,7 +34,7 @@ test('two users drive the voice engine in an empty channel', async ({ browser })
   // cross-module singleton bug that made joinVoiceChannel a no-op).
   for (const U of [A, B]) {
     const reachable = await U.page.evaluate(() => !!(window as any).__getEngine?.());
-    expect(reachable, `${U.nick}: LADON engine reachable`).toBe(true);
+    expect(reachable, `${U.nick}: SUIMYAKU engine reachable`).toBe(true);
   }
 
   for (const U of [A, B]) await U.page.evaluate(async (c) => { await (window as any).__ocean.getState().joinVoiceChannel(c); }, chan);

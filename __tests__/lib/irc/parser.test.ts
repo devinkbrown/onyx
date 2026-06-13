@@ -144,7 +144,7 @@ describe('formatIRCLine', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('parsePREFIX', () => {
-  it('parses standard Ophion PREFIX', () => {
+  it('parses standard Orochi PREFIX', () => {
     const { modeToPrefix, prefixToMode } = parsePREFIX('(qaohv)~&@%+');
     expect(modeToPrefix['q']).toBe('~');
     expect(modeToPrefix['o']).toBe('@');

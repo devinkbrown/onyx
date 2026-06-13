@@ -63,7 +63,7 @@ export function StreamLayout({ channel }: Props) {
   return (
     <>
       <div className="sl-root">
-        {/* Black background with LADON media */}
+        {/* Black background with SUIMYAKU media */}
         <div className="sl-video-area">
           {mediaStream ? (
             <video
@@ -76,7 +76,7 @@ export function StreamLayout({ channel }: Props) {
           ) : (
             <div className="sl-video-placeholder" aria-hidden="true">
               <VideoPlaceholderIcon />
-              <span>Video stream via LADON</span>
+              <span>Video stream via SUIMYAKU</span>
             </div>
           )}
 

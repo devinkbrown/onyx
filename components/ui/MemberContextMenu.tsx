@@ -38,7 +38,7 @@ export default function MemberContextMenu({
   const [quietMask, setQuietMask]     = useState(`${nick}!*@*`);
 
   // Derive whether *we* have op in this channel
-  // Ophion PREFIX=(qov).@+  — only q (owner) and o (op) exist; no 'a'.
+  // Orochi PREFIX=(qov).@+  — only q (owner) and o (op) exist; no 'a'.
   const chanKey = channel.toLowerCase();
   const channelData = channels.get(chanKey);
   const ourUser = channelData?.users.get(ourNick.toLowerCase());

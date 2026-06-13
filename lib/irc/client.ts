@@ -105,7 +105,7 @@ export class IRCClient {
     IRCX: false,
     MAXDATA: 512,
     COMICCHAT: '',
-    LADONMEDIA: '',
+    SUIMYAKUMEDIA: '',
     MAXMEDIA: 2048,
     MEDIAUMODES: '',
     MEDIAMUTE: '',
@@ -252,12 +252,12 @@ export class IRCClient {
   }
 
   /**
-   * True when the server ACKed `ophion/session-sync`. When active, the server
+   * True when the server ACKed `orochi/session-sync`. When active, the server
    * drives session reclaim (auto JOIN + NAMES/topic + CHATHISTORY replay) on
    * (re)connect, so the client must suppress its own blind autojoin storm.
    */
   get sessionSyncActive(): boolean {
-    return this.negotiatedCaps.has('ophion/session-sync');
+    return this.negotiatedCaps.has('orochi/session-sync');
   }
 
   // ── Internals ───────────────────────────────────────────────────────────
@@ -597,7 +597,7 @@ export class IRCClient {
       // bot: Ocean is a human client, not a bot.
       if (cap === 'bot') return false;
 
-      // ophion/session-sync: server-driven session reclaim. When ACKed, the
+      // orochi/session-sync: server-driven session reclaim. When ACKed, the
       // server auto-pushes JOIN + NAMES/topic + CHATHISTORY replay for every
       // channel the account's session is live in, so the client must NOT run
       // its own blind autojoin storm. Always request it when offered; the

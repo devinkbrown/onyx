@@ -51,8 +51,8 @@ export default function LandingPage() {
             </h1>
 
             <p className="land-lead">
-              Open-protocol community chat with LADON media and VEIL encryption
-              carried through Ophion. Start in <span className="land-inline-channel">#root</span>.
+              Open-protocol community chat with SUIMYAKU media and TSUMUGI encryption
+              carried through Orochi. Start in <span className="land-inline-channel">#root</span>.
             </p>
 
             <div className="land-hero-actions">
@@ -98,11 +98,11 @@ export default function LandingPage() {
               <div className="land-card-eyebrow land-eyebrow-voice">
                 <span className="land-eyebrow-pip" />
                 <VoiceIcon />
-                <span>LADON</span>
+                <span>SUIMYAKU</span>
               </div>
               <h3 className="land-card-h3">Voice without borders</h3>
               <p className="land-card-p">
-                Spatial audio and encrypted voice over Ophion IRC. Native
+                Spatial audio and encrypted voice over Orochi IRC. Native
                 protocol transport — no relay servers, no third-party
                 infrastructure. Your voice travels the same path as your
                 messages.
@@ -140,16 +140,16 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Row 2 — VEIL (wide) */}
+        {/* Row 2 — TSUMUGI (wide) */}
         <div className="land-bento-row land-bento-row-2">
-          <div className="land-card land-card-veil">
-            <div className="land-card-glow land-card-glow-veil" />
+          <div className="land-card land-card-tsumugi">
+            <div className="land-card-glow land-card-glow-tsumugi" />
             <div className="land-card-inner land-card-inner-split">
               <div className="land-card-text">
-                <div className="land-card-eyebrow land-eyebrow-veil">
-                  <span className="land-eyebrow-pip land-eyebrow-pip-veil" />
-                  <VeilIcon />
-                  <span>VEIL</span>
+                <div className="land-card-eyebrow land-eyebrow-tsumugi">
+                  <span className="land-eyebrow-pip land-eyebrow-pip-tsumugi" />
+                  <TsumugiIcon />
+                  <span>TSUMUGI</span>
                 </div>
                 <h3 className="land-card-h3">End-to-end, always</h3>
                 <p className="land-card-p">
@@ -157,14 +157,14 @@ export default function LandingPage() {
                   voice and video session. Forward secrecy built into the protocol
                   — not bolted on.
                 </p>
-                <div className="land-veil-badges" aria-hidden>
-                  <span className="land-veil-badge">P-256 ECDH</span>
-                  <span className="land-veil-badge">AES-256-GCM</span>
-                  <span className="land-veil-badge">Forward Secrecy</span>
+                <div className="land-tsumugi-badges" aria-hidden>
+                  <span className="land-tsumugi-badge">P-256 ECDH</span>
+                  <span className="land-tsumugi-badge">AES-256-GCM</span>
+                  <span className="land-tsumugi-badge">Forward Secrecy</span>
                 </div>
               </div>
-              <div className="land-veil-diagram" aria-hidden>
-                <VeilKeyVis />
+              <div className="land-tsumugi-diagram" aria-hidden>
+                <TsumugiKeyVis />
               </div>
             </div>
           </div>
@@ -280,9 +280,9 @@ export default function LandingPage() {
               <div className="land-preview-avatar land-preview-avatar-gold">o</div>
               <div>
                 <div className="land-preview-name">ocean <span>live</span></div>
-                <p>LADON voice is encrypted, linked to the channel, and ready.</p>
+                <p>SUIMYAKU voice is encrypted, linked to the channel, and ready.</p>
                 <div className="land-preview-pill-row">
-                  <span>VEIL active</span>
+                  <span>TSUMUGI active</span>
                   <span>2 clients</span>
                   <span>IRCv3</span>
                 </div>
@@ -317,7 +317,7 @@ export default function LandingPage() {
         <div className="land-cap-grid">
           {([
             ['Chat', ['Threaded replies', 'Reactions and edits', 'Pins, search, history', 'Embeds and media cards']],
-            ['Voice and media', ['LADON channel voice', 'Encrypted sessions', 'Media gallery', 'Whiteboard collaboration']],
+            ['Voice and media', ['SUIMYAKU channel voice', 'Encrypted sessions', 'Media gallery', 'Whiteboard collaboration']],
             ['Identity', ['SASL login', 'Session reclaim', 'Multi-client nick support', 'Token-based resume']],
             ['Operations', ['Services awareness', 'Moderation tools', 'Channel browser', 'Network status views']],
           ] as Array<[string, string[]]>).map(([title, items]) => (
@@ -380,7 +380,7 @@ export default function LandingPage() {
           {([
             ['Do I need Ocean?', 'No. Ocean is the polished web client, but the network speaks IRCv3 so native clients can connect too.'],
             ['Can I stay connected from multiple devices?', 'Yes. Session reclaim is designed for multiple clients on the same nick without kicking out the others.'],
-            ['Is voice part of IRC?', 'Voice uses LADON over Ophion so channel voice belongs to the same open network instead of a separate relay stack.'],
+            ['Is voice part of IRC?', 'Voice uses SUIMYAKU over Orochi so channel voice belongs to the same open network instead of a separate relay stack.'],
             ['Where should I start?', 'Open Ocean, sign in, and join #root. The app exposes channels, members, voice, search, and settings in the main workspace.'],
           ] as Array<[string, string]>).map(([question, answer]) => (
             <article key={question} className="land-faq-item">
@@ -452,18 +452,18 @@ export default function LandingPage() {
             <OceanLogo size={20} />
             <span>Ocean</span>
           </div>
-          <p className="land-footer-tagline">Built on Ophion IRC · eshmaki.me</p>
+          <p className="land-footer-tagline">Built on Orochi IRC · eshmaki.me</p>
         </div>
         <nav className="land-footer-links" aria-label="Footer navigation">
           <Link href="/about" className="land-footer-link">About</Link>
           <Link href="/login" className="land-footer-link">Sign In</Link>
           <a
-            href="https://github.com/devinkbrown/ophion"
+            href="https://github.com/devinkbrown/orochi"
             target="_blank"
             rel="noopener noreferrer"
             className="land-footer-link"
           >
-            Ophion ↗
+            Orochi ↗
           </a>
         </nav>
         <p className="land-footer-copy">© 2026 eshmaki.me</p>
@@ -820,7 +820,7 @@ export default function LandingPage() {
         .land-card:hover .land-card-glow { opacity: 1; }
         .land-card-glow-voice  { background: radial-gradient(circle at 25% 50%, var(--accent-subtle) 0%, transparent 65%); }
         .land-card-glow-session { background: radial-gradient(circle at 80% 20%, var(--gold-subtle) 0%, transparent 60%); }
-        .land-card-glow-veil   { background: radial-gradient(circle at 50% 100%, rgba(14,165,233,0.08) 0%, transparent 60%); }
+        .land-card-glow-tsumugi   { background: radial-gradient(circle at 50% 100%, rgba(14,165,233,0.08) 0%, transparent 60%); }
         .land-card-glow-irc    { background: radial-gradient(circle at 30% 30%, var(--accent-subtle) 0%, transparent 70%); }
         .land-card-glow-wb     { background: radial-gradient(circle at 70% 70%, var(--gold-subtle) 0%, transparent 70%); }
         .land-card-glow-msg    { background: radial-gradient(circle at 50% 20%, var(--accent-subtle) 0%, transparent 70%); }
@@ -868,7 +868,7 @@ export default function LandingPage() {
           background: var(--gold-subtle);
           border: 1px solid rgba(103,232,249,0.25);
         }
-        .land-eyebrow-veil {
+        .land-eyebrow-tsumugi {
           color: #0ea5e9;
           background: rgba(14,165,233,0.1);
           border: 1px solid rgba(14,165,233,0.25);
@@ -887,7 +887,7 @@ export default function LandingPage() {
           background: currentColor; opacity: 0.8;
         }
         .land-eyebrow-pip-gold { background: var(--gold); }
-        .land-eyebrow-pip-veil { background: #0ea5e9; }
+        .land-eyebrow-pip-tsumugi { background: #0ea5e9; }
         .land-eyebrow-pip-dim  { background: var(--text-muted); }
 
         .land-card-h3 {
@@ -928,11 +928,11 @@ export default function LandingPage() {
           animation: dot-pulse 2s ease-in-out infinite;
         }
 
-        /* VEIL badges */
-        .land-veil-badges {
+        /* TSUMUGI badges */
+        .land-tsumugi-badges {
           display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px;
         }
-        .land-veil-badge {
+        .land-tsumugi-badge {
           font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
           text-transform: uppercase;
           padding: 3px 8px; border-radius: 4px;
@@ -940,8 +940,8 @@ export default function LandingPage() {
           border: 1px solid rgba(14,165,233,0.25);
         }
 
-        /* VEIL diagram area */
-        .land-veil-diagram { flex-shrink: 0; align-self: flex-start; }
+        /* TSUMUGI diagram area */
+        .land-tsumugi-diagram { flex-shrink: 0; align-self: flex-start; }
 
         /* IRC server tag */
         .land-irc-tag {
@@ -1556,7 +1556,7 @@ export default function LandingPage() {
 
           .land-card-inner { padding: 22px 18px; gap: 10px; }
           .land-card-inner-split { flex-direction: column; gap: 20px; }
-          .land-veil-diagram { align-self: center; }
+          .land-tsumugi-diagram { align-self: center; }
           .land-card-h3 { font-size: 1.05rem; }
           .land-card-p { font-size: 0.85rem; }
 
@@ -1678,7 +1678,7 @@ function TokenIcon() {
   );
 }
 
-function VeilIcon() {
+function TsumugiIcon() {
   return (
     <svg width="12" height="12" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5">
       <path d="M7.5 1L2 4v5c0 3.5 2.5 6.5 5.5 7.5C10.5 15.5 13 12.5 13 9V4L7.5 1z" strokeLinejoin="round" />
@@ -1939,13 +1939,13 @@ function WaveformVis() {
   );
 }
 
-// ── VEIL key exchange visualization ───────────────────────────────────────
+// ── TSUMUGI key exchange visualization ───────────────────────────────────────
 
-function VeilKeyVis() {
+function TsumugiKeyVis() {
   return (
-    <svg width="220" height="170" viewBox="0 0 220 170" fill="none" role="img" aria-label="VEIL key exchange diagram">
+    <svg width="220" height="170" viewBox="0 0 220 170" fill="none" role="img" aria-label="TSUMUGI key exchange diagram">
       <defs>
-        <radialGradient id="veil-glow" cx="50%" cy="50%" r="50%">
+        <radialGradient id="tsumugi-glow" cx="50%" cy="50%" r="50%">
           <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.35" />
           <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0" />
         </radialGradient>
@@ -1953,7 +1953,7 @@ function VeilKeyVis() {
           <stop offset="0%" stopColor="#67e8f9" stopOpacity="0.4" />
           <stop offset="100%" stopColor="#67e8f9" stopOpacity="0" />
         </radialGradient>
-        <filter id="veil-blur">
+        <filter id="tsumugi-blur">
           <feGaussianBlur stdDeviation="5" result="blur" />
           <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
         </filter>
@@ -1961,7 +1961,7 @@ function VeilKeyVis() {
 
       {/* Left node — client A */}
       <circle cx="42" cy="85" r="30" fill="rgba(14,165,233,0.12)" stroke="rgba(14,165,233,0.45)" strokeWidth="1.5" />
-      <circle cx="42" cy="85" r="30" fill="url(#veil-glow)" filter="url(#veil-blur)" opacity="0.5" />
+      <circle cx="42" cy="85" r="30" fill="url(#tsumugi-glow)" filter="url(#tsumugi-blur)" opacity="0.5" />
       {/* Key icon */}
       <g transform="translate(28, 71)">
         <circle cx="9" cy="9" r="7" stroke="rgba(14,165,233,0.9)" strokeWidth="1.4" fill="none" />
@@ -1972,7 +1972,7 @@ function VeilKeyVis() {
 
       {/* Right node — client B */}
       <circle cx="178" cy="85" r="30" fill="rgba(14,165,233,0.12)" stroke="rgba(14,165,233,0.45)" strokeWidth="1.5" />
-      <circle cx="178" cy="85" r="30" fill="none" stroke="rgba(14,165,233,0.15)" strokeWidth="8" filter="url(#veil-blur)" />
+      <circle cx="178" cy="85" r="30" fill="none" stroke="rgba(14,165,233,0.15)" strokeWidth="8" filter="url(#tsumugi-blur)" />
       {/* Lock icon */}
       <g transform="translate(163, 71)">
         <rect x="1" y="8" width="13" height="11" rx="2" stroke="rgba(14,165,233,0.9)" strokeWidth="1.4" fill="rgba(14,165,233,0.1)" />

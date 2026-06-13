@@ -3,7 +3,7 @@
 /**
  * useWhiteboard — collaborative whiteboard state + wire IO for a single channel.
  *
- * Wire format (text-IRC bridge over LADON):
+ * Wire format (text-IRC bridge over SUIMYAKU):
  *
  *   Outbound:
  *     WHITEBOARD DRAW    <channel> <stroke_json>

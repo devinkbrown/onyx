@@ -61,7 +61,7 @@ export default function ChanstatsPreview() {
     <section id="activity" className="cs-root" aria-label="Community activity">
       <div className="cs-heading">
         <span className="cs-kicker">Live archive</span>
-        <h2>Community activity, exported by Ophion.</h2>
+        <h2>Community activity, exported by Orochi.</h2>
         <p>
           Channel statistics are generated directly inside the server and served
           as static JSON and HTML. No stats bot needs to join, part, or reconnect.

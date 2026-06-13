@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-// Real end-to-end against the LIVE deployment (the Ophion WS only accepts its
+// Real end-to-end against the LIVE deployment (the Orochi WS only accepts its
 // own origin, so this cannot run from localhost). Verifies auth + WebSocket
 // connect + auto-join of the default channel actually work — i.e. the fixes did
 // not break the core connection flow. Does not send messages.

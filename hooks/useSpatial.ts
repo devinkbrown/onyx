@@ -40,7 +40,7 @@ function clamp(n: number, lo: number, hi: number): number {
  * useSpatial — exposes spatial-pad state for one channel and gives the
  * caller a throttled move-self function that emits MEDIA SPATIAL wire frames.
  *
- * Server-side rate-limit lives in m_ladon_spatial.c; this hook adds a
+ * Server-side rate-limit lives in m_suimyaku_spatial.c; this hook adds a
  * client-side coalescer (~30 Hz) so we don't flood while dragging.
  */
 export function useSpatial(channel: string): UseSpatialResult {
@@ -140,7 +140,7 @@ export function useSpatial(channel: string): UseSpatialResult {
     if (flushTimer.current) clearTimeout(flushTimer.current);
   }, []);
 
-  // ── Mirror remote positions into LADON media peer panning ──────────────────
+  // ── Mirror remote positions into SUIMYAKU media peer panning ──────────────────
   // Ocean uses voice.peers for per-peer audio state; spatial panning is
   // informational — callers can use peer.x to drive audio pan themselves.
 

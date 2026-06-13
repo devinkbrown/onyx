@@ -154,7 +154,7 @@ export default function HomeView() {
   if (negCaps?.has('sasl'))                                             featureBadges.push('SASL');
   if (negCaps?.has('server-time'))                                      featureBadges.push('SERVER-TIME');
   if (negCaps?.has('message-tags'))                                     featureBadges.push('MSG-TAGS');
-  if (client?.isupport?.LADONMEDIA)                                     featureBadges.push('LADON');
+  if (client?.isupport?.SUIMYAKUMEDIA)                                     featureBadges.push('SUIMYAKU');
 
   const handleCopyInvite = () => {
     navigator.clipboard?.writeText('/invite #channel-name').catch(() => undefined);
@@ -1879,7 +1879,7 @@ function formatTimeAgo(date: Date): string {
 
 // ── Sub-components ───────────────────────────────────────────────────────────────
 
-function OceanWaveIllustration() {
+function OceanWatsumugilustration() {
   return (
     <svg width="80" height="48" viewBox="0 0 80 48" fill="none" aria-hidden>
       <ellipse cx="40" cy="40" rx="36" ry="6" fill="var(--accent-subtle)" />

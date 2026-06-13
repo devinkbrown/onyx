@@ -1,6 +1,6 @@
 # Ocean — IRC Webchat
 
-Modern IRC client backed by the Orochi IRC engine (pure-Zig successor to Ophion; source at /home/kain/orochi). Dark luxury design.
+Modern IRC client backed by the Orochi IRC engine (pure-Zig successor to Orochi; source at /home/kain/orochi). Dark luxury design.
 
 ## Stack
 - **Next.js 16** (App Router, static export)
@@ -10,10 +10,10 @@ Modern IRC client backed by the Orochi IRC engine (pure-Zig successor to Ophion;
 
 ## Key libs (do NOT rewrite these from scratch)
 - `lib/irc/` — IRC WebSocket client with SASL PLAIN/SCRAM, CAP, IRCv3, IRCX
-- `lib/ladon-media/` — Orochi voice+video engine (NOT WebRTC); signaling = MEDIA subcommands + NOTE MEDIA events
-  - VeilSession.ts — P-256 ECDH + AES-256-GCM encryption
+- `lib/suimyaku-media/` — Orochi voice+video engine (NOT WebRTC); signaling = MEDIA subcommands + NOTE MEDIA events
+  - TsumugiSession.ts — P-256 ECDH + AES-256-GCM encryption
   - MediaEngine.ts — voice/video send+recv, adaptive bitrate
-  - VeilGroup.ts — group session key derivation
+  - TsumugiGroup.ts — group session key derivation
   - ChunkAssembler.ts — MCHUNK reassembly
   - PeerRegistry.ts — per-peer audio/video decode
 
@@ -64,7 +64,7 @@ All design tokens live in `app/globals.css` under `:root`.
 - **SCRAM-SHA-256** — preferred when advertised (Orochi: sasl=PLAIN,EXTERNAL,SCRAM-SHA-256)
 - **CERTFP** — future: cert-based auth
 - **IDENTIFY** — automatic on connect when password provided
-- **ACCOUNT GHOST** — kill a stale session using Ophion's built-in services (no NickServ)
+- **ACCOUNT GHOST** — kill a stale session using Orochi's built-in services (no NickServ)
 - **ACCOUNT** tag — account name auto-populates from server
 
 ## Services (Orochi built-in — NO NickServ bot)

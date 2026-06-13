@@ -102,7 +102,7 @@ export default function OnboardingModal() {
             <h2 className="onb-title">Welcome to Ocean</h2>
             <p className="onb-subtitle">Connected to <strong>{serverUrl}</strong></p>
             <p className="onb-body">
-              Ocean is a modern chat client powered by the Ophion IRC engine.
+              Ocean is a modern chat client powered by the Orochi IRC engine.
               Let&apos;s get you set up.
             </p>
             <button className="onb-btn-primary" onClick={nextOnboardingStep}>

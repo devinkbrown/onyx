@@ -8,7 +8,7 @@ import DMSearchBar from './DMSearchBar';
 import DateJumpPicker from './DateJumpPicker';
 import UserStatusBadge from '@/components/ui/UserStatusBadge';
 import ActivityHeatmap from './ActivityHeatmap';
-import LadonStatusBadge from '@/components/ui/LadonStatusBadge';
+import SuimyakuStatusBadge from '@/components/ui/SuimyakuStatusBadge';
 
 interface Props {
   title: string;
@@ -20,7 +20,7 @@ interface Props {
 const TOPIC_MAX = 512;
 const TOPIC_TRUNCATE = 100;
 
-const MODE_LABELS: Record<string, { label: string; title: string; variant?: 'ladon' }> = {
+const MODE_LABELS: Record<string, { label: string; title: string; variant?: 'suimyaku' }> = {
   // Standard IRC modes
   'n': { label: 'No External', title: 'No messages from outside the channel' },
   't': { label: 'Topic Lock',  title: 'Only ops can change the topic' },
@@ -34,12 +34,12 @@ const MODE_LABELS: Record<string, { label: string; title: string; variant?: 'lad
   'S': { label: 'Secure',      title: 'TLS/secure connections only' },
   'c': { label: 'No Color',    title: 'Color codes stripped' },
   'C': { label: 'No CTCP',     title: 'CTCP messages blocked' },
-  // LADON media modes
-  'B': { label: 'Bitrate Cap', title: 'LADON: media bitrate cap is active', variant: 'ladon' },
-  'G': { label: 'Media Mod',   title: 'LADON: only approved speakers may send voice/video', variant: 'ladon' },
-  'R': { label: 'Record',      title: 'LADON: recording-consent mode — participants must acknowledge', variant: 'ladon' },
-  'V': { label: 'Voice Slots', title: 'LADON: voice slot limit is active', variant: 'ladon' },
-  'W': { label: 'Video Slots', title: 'LADON: video slot limit is active', variant: 'ladon' },
+  // SUIMYAKU media modes
+  'B': { label: 'Bitrate Cap', title: 'SUIMYAKU: media bitrate cap is active', variant: 'suimyaku' },
+  'G': { label: 'Media Mod',   title: 'SUIMYAKU: only approved speakers may send voice/video', variant: 'suimyaku' },
+  'R': { label: 'Record',      title: 'SUIMYAKU: recording-consent mode — participants must acknowledge', variant: 'suimyaku' },
+  'V': { label: 'Voice Slots', title: 'SUIMYAKU: voice slot limit is active', variant: 'suimyaku' },
+  'W': { label: 'Video Slots', title: 'SUIMYAKU: video slot limit is active', variant: 'suimyaku' },
 };
 
 const MODE_BADGE_MAX = 4;
@@ -439,7 +439,7 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
 
         {isChannel && (
           <>
-            <LadonStatusBadge />
+            <SuimyakuStatusBadge />
             <div className="ch-head-divider" />
             {topicEditing ? (
               <div className="ch-head-topic-edit-wrap">
@@ -548,7 +548,7 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           <div className="ch-mode-badges">
             {visible.map(m => (
               <span
-                className={`ch-mode-badge${MODE_LABELS[m].variant === 'ladon' ? ' ch-mode-badge--ladon' : ''}`}
+                className={`ch-mode-badge${MODE_LABELS[m].variant === 'suimyaku' ? ' ch-mode-badge--suimyaku' : ''}`}
                 title={MODE_LABELS[m].title}
                 key={m}
               >
@@ -1874,7 +1874,7 @@ export default function ChatHeader({ title, topic, isChannel, onSearchResults }:
           color: var(--text-faint, var(--text-muted));
           opacity: 0.7;
         }
-        .ch-mode-badge--ladon {
+        .ch-mode-badge--suimyaku {
           color: var(--accent);
           border-color: var(--accent-border, rgba(14,165,233,0.3));
           background: rgba(14,165,233,0.08);

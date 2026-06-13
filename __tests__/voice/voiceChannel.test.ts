@@ -1,7 +1,7 @@
 /**
  * Voice channel integration tests.
  *
- * Tests the end-to-end flow for voice channel join/leave, LADON media
+ * Tests the end-to-end flow for voice channel join/leave, SUIMYAKU media
  * message routing, peer state management, and VoiceBar controls — using
  * mocked IRC client and media engine.
  */
@@ -70,10 +70,10 @@ describe('Voice channel MEDIA signaling', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LADON media message routing
+// SUIMYAKU media message routing
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('LADON media message handler routing', () => {
+describe('SUIMYAKU media message handler routing', () => {
   it('routes NOTE MEDIA command to handler', () => {
     const client = new MockIRCClient();
     const handler = vi.fn();
@@ -92,7 +92,7 @@ describe('LADON media message handler routing', () => {
   it('handler correctly filters non-MEDIA commands', () => {
     const client = new MockIRCClient();
 
-    // Simulate the filtering logic in useLadonMedia
+    // Simulate the filtering logic in useSuimyakuMedia
     const received: string[] = [];
 
     client.extraMessageHandlers.add((msg) => {
@@ -143,7 +143,7 @@ describe('Voice peer state management', () => {
   it('adds and removes peers correctly', () => {
     const peers = new Map<string, { nick: string; speaking: boolean; muted: boolean }>();
 
-    // onPeerState callback (from useLadonMedia)
+    // onPeerState callback (from useSuimyakuMedia)
     const onPeerState = (peer: { nick: string; speaking: boolean; muted: boolean }) => {
       const updated = new Map(peers);
       updated.set(peer.nick, peer);

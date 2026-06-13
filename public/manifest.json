@@ -1,7 +1,7 @@
 {
   "name": "Ocean",
   "short_name": "Ocean",
-  "description": "A better way to talk. Powered by Ophion.",
+  "description": "A better way to talk. Powered by Orochi.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "any",

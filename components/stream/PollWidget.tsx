@@ -15,7 +15,7 @@ export function PollWidget({ channel }: PollWidgetProps) {
   const poll = streamPolls.get(channel.toLowerCase());
 
   // Auto-expire the poll client-side if endsAt passes and the server hasn't
-  // sent LADON_POLL END yet (e.g. brief disconnect during the poll window).
+  // sent SUIMYAKU_POLL END yet (e.g. brief disconnect during the poll window).
   // expiredEndsAt stores the endsAt value of the poll we last expired, so
   // a new poll with a different endsAt is not suppressed.
   const [expiredEndsAt, setExpiredEndsAt] = useState<number | null>(null);
