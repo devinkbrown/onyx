@@ -52,12 +52,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     var legacy = localStorage.getItem('ocean-theme');
     var active = localStorage.getItem('ocean-active-theme');
     var display = localStorage.getItem('ocean-display-theme');
-    var activeValid = ['ocean','abyss','midnight','bathyal','coral','kelp','brine','onyx','amoled','arctic','ash','light','system'];
-    var displayValid = ['midnight','onyx','ash','amoled','light','system'];
+    var activeValid = ['ocean','abyss','midnight','bathyal','coral','kelp','brine','onyx','amoled','arctic','ash','light','lacquer','pearl','system'];
+    var displayValid = ['lacquer','midnight','onyx','ash','amoled','light','system'];
+    // Normalize a missing/invalid active theme. Default is now 'lacquer'.
     if (activeValid.indexOf(active) === -1) {
-      active = activeValid.indexOf(legacy) !== -1 ? legacy : 'ocean';
+      active = activeValid.indexOf(legacy) !== -1 ? legacy : 'lacquer';
       localStorage.setItem('ocean-active-theme', active);
     }
+    // v2 migration: legacy 'onyx' default -> 'midnight'.
     if (display === 'onyx' && !localStorage.getItem('ocean-theme-v2')) {
       display = 'midnight';
       localStorage.setItem('ocean-display-theme', 'midnight');
@@ -65,21 +67,33 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     }
     if (displayValid.indexOf(display) === -1) {
       display = displayValid.indexOf(legacy) !== -1 ? legacy : 'midnight';
-      if (display === 'onyx' && !localStorage.getItem('ocean-theme-v2')) {
-        display = 'midnight';
-        localStorage.setItem('ocean-theme-v2', '1');
-      }
       localStorage.setItem('ocean-display-theme', display);
     }
+    // v3 migration: 'lacquer' is the new flagship default. Move users still on
+    // the old auto-default (active 'ocean' and/or display 'midnight'/none) to
+    // 'lacquer'. Any explicit non-ocean/non-system named active theme is kept.
+    if (localStorage.getItem('ocean-theme-v3') !== '1') {
+      var explicit = active && active !== 'ocean' && active !== 'system' && active !== 'lacquer';
+      var autoDisplay = (display == null || display === 'midnight');
+      if (!explicit && active === 'ocean') {
+        active = 'lacquer';
+        localStorage.setItem('ocean-active-theme', 'lacquer');
+      }
+      if (!explicit && autoDisplay) {
+        display = 'lacquer';
+        localStorage.setItem('ocean-display-theme', 'lacquer');
+      }
+      localStorage.setItem('ocean-theme-v3', '1');
+    }
     if (active === 'system' || display === 'system') {
-      document.documentElement.setAttribute('data-theme', window.matchMedia('(prefers-color-scheme: dark)').matches ? 'midnight' : 'light');
+      document.documentElement.setAttribute('data-theme', window.matchMedia('(prefers-color-scheme: dark)').matches ? 'lacquer' : 'light');
     } else if (active && active !== 'ocean') {
       document.documentElement.setAttribute('data-theme', active);
     } else {
       document.documentElement.removeAttribute('data-theme');
     }
   } catch(e) {
-    document.documentElement.removeAttribute('data-theme');
+    document.documentElement.setAttribute('data-theme', 'lacquer');
   }
 })();` }} />
       </head>

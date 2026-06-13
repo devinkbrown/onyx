@@ -59,12 +59,19 @@ export default function ChanstatsPreview() {
 
   return (
     <section id="activity" className="cs-root" aria-label="Community activity">
+      <div className="cs-mark" aria-hidden>
+        <span className="cs-mark-index">05</span>
+        <span className="cs-mark-rule" />
+        <span className="cs-mark-label">Activity</span>
+        <span className="cs-mark-rule" />
+      </div>
       <div className="cs-heading">
         <span className="cs-kicker">Live archive</span>
-        <h2>Community activity, exported by Orochi.</h2>
+        <h2>Community activity, exported by the engine.</h2>
         <p>
-          Channel statistics are generated directly inside the server and served
-          as static JSON and HTML. No stats bot needs to join, part, or reconnect.
+          Channel statistics are generated directly inside Orochi and served as
+          static JSON and HTML. No stats bot needs to join, part, or reconnect —
+          the numbers come straight from the server.
         </p>
       </div>
 
@@ -103,39 +110,66 @@ export default function ChanstatsPreview() {
         .cs-root {
           position: relative;
           z-index: 1;
-          max-width: 1240px;
+          max-width: 1200px;
           margin: 0 auto;
-          padding: 0 clamp(20px, 5vw, 80px) 90px;
+          padding: 0 clamp(20px, 5vw, 80px) 80px;
         }
+        .cs-mark {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          margin: 70px 0 24px;
+        }
+        .cs-mark-index {
+          font-family: var(--font-mono);
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.1em;
+          color: var(--lux);
+        }
+        .cs-mark-label {
+          font-family: var(--font-mono);
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          color: var(--text-muted);
+          white-space: nowrap;
+        }
+        .cs-mark-rule { flex: 1; height: 1px; background: linear-gradient(90deg, var(--border-normal), transparent); }
+        .cs-mark-rule:last-child { background: linear-gradient(90deg, transparent, var(--border-subtle)); }
         .cs-heading {
-          max-width: 740px;
-          margin: 0 auto 28px;
+          max-width: 760px;
+          margin: 0 auto 32px;
           text-align: center;
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 12px;
+          gap: 14px;
         }
         .cs-kicker {
           display: inline-flex;
           width: fit-content;
-          padding: 5px 10px;
-          border-radius: 999px;
-          border: 1px solid var(--accent-border);
-          background: var(--accent-subtle);
-          color: var(--accent);
+          padding: 5px 11px;
+          border-radius: var(--r-full);
+          border: 1px solid var(--border-normal);
+          background: var(--lux-subtle);
+          color: var(--lux);
+          font-family: var(--font-mono);
           font-size: 10px;
-          font-weight: 800;
-          letter-spacing: 0.12em;
+          font-weight: 600;
+          letter-spacing: 0.14em;
           text-transform: uppercase;
         }
         .cs-heading h2 {
           margin: 0;
           color: var(--text-primary);
-          font-size: clamp(2rem, 4vw, 3rem);
-          font-weight: 850;
+          font-family: var(--font-display);
+          font-size: clamp(1.9rem, 1.2rem + 2.6vw, 3rem);
+          font-weight: 600;
           line-height: 1.08;
-          letter-spacing: -0.03em;
+          letter-spacing: -0.02em;
+          text-wrap: balance;
         }
         .cs-heading p {
           margin: 0;
@@ -158,37 +192,41 @@ export default function ChanstatsPreview() {
           justify-content: flex-end;
           gap: 8px;
           padding: 22px;
-          border-radius: 18px;
+          border-radius: var(--r-xl);
           border: 1px solid var(--border-subtle);
-          background: color-mix(in srgb, var(--bg-base) 88%, transparent);
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+          background: color-mix(in srgb, var(--bg-base) 84%, transparent);
+          box-shadow: var(--elev-highlight);
+          transition: border-color 200ms var(--ease-out), transform 200ms var(--ease-out);
         }
+        .cs-metric:hover { border-color: var(--border-normal); transform: translateY(-2px); }
         .cs-main-card {
           text-decoration: none;
           background:
-            radial-gradient(circle at 20% 20%, var(--accent-subtle), transparent 58%),
-            color-mix(in srgb, var(--bg-elevated) 88%, transparent);
-          border-color: var(--accent-border);
-          transition: border-color 160ms var(--ease-out), transform 160ms var(--ease-out);
+            radial-gradient(circle at 20% 10%, var(--lux-subtle), transparent 60%),
+            color-mix(in srgb, var(--bg-elevated) 86%, transparent);
+          border-color: color-mix(in srgb, var(--lux) 26%, transparent);
         }
         .cs-main-card:hover {
           transform: translateY(-2px);
-          border-color: var(--accent);
+          border-color: var(--lux);
           text-decoration: none;
         }
         .cs-label,
         .cs-metric span {
           color: var(--text-muted);
+          font-family: var(--font-mono);
           font-size: 10px;
-          font-weight: 800;
-          letter-spacing: 0.1em;
+          font-weight: 600;
+          letter-spacing: 0.12em;
           text-transform: uppercase;
         }
         .cs-main-card strong {
           color: var(--text-primary);
+          font-family: var(--font-display);
           font-size: clamp(1.5rem, 2.4vw, 2rem);
+          font-weight: 600;
           line-height: 1.05;
-          letter-spacing: -0.025em;
+          letter-spacing: -0.02em;
         }
         .cs-main-card > span:last-child {
           color: var(--text-secondary);
@@ -196,10 +234,12 @@ export default function ChanstatsPreview() {
           line-height: 1.45;
         }
         .cs-metric strong {
-          color: var(--accent);
+          color: var(--lux);
+          font-family: var(--font-display);
           font-size: clamp(1.45rem, 2.6vw, 2.15rem);
+          font-weight: 600;
           font-variant-numeric: tabular-nums;
-          letter-spacing: -0.035em;
+          letter-spacing: -0.03em;
           line-height: 1;
         }
         @media (max-width: 980px) {
@@ -208,29 +248,26 @@ export default function ChanstatsPreview() {
         }
         @media (max-width: 640px) {
           .cs-root {
-            padding-left: 12px;
-            padding-right: 12px;
-            padding-bottom: 64px;
+            padding-left: 16px;
+            padding-right: 16px;
+            padding-bottom: 56px;
           }
+          .cs-mark { margin-top: 48px; }
           .cs-heading {
             align-items: flex-start;
             text-align: left;
-            margin-bottom: 20px;
+            margin-bottom: 24px;
           }
-          .cs-heading h2 { font-size: clamp(1.75rem, 8vw, 2.25rem); }
+          .cs-heading h2 { font-size: clamp(1.7rem, 7vw, 2.2rem); }
           .cs-grid { gap: 10px; }
           .cs-main-card,
           .cs-metric {
             min-height: 126px;
             padding: 18px;
-            border-radius: 14px;
+            border-radius: var(--r-lg);
           }
         }
         @media (max-width: 375px) {
-          .cs-root {
-            padding-left: 8px;
-            padding-right: 8px;
-          }
           .cs-grid { grid-template-columns: 1fr; }
         }
       `}</style>

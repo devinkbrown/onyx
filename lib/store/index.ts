@@ -5,7 +5,7 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { IRCClient } from '@/lib/irc/client';
 import type { IRCMessage, Channel, ChatMessage, ConnectionStatus, MessageReaction } from '@/lib/irc/types';
 import { loadCredentials } from '@/lib/credentials';
-import { parseCHANLIMIT, parseMonitorNumeric, parsePREFIX, parseSessionTokenNote, parseStandardReply } from '@/lib/irc/parser';
+import { parseCHANLIMIT, parseMonitorNumeric, parsePREFIX, parseSessionMeshTokenNote, parseSessionTokenNote, parseStandardReply } from '@/lib/irc/parser';
 import type { SuimyakuPeerState, SuimyakuRoomStats, CallState } from '@/lib/suimyaku-media/types';
 import { getMountedSuimyakuMediaEngine } from '@/lib/suimyaku-media/MediaEngine';
 import { parseActivity } from '@/lib/activity';
@@ -364,6 +364,31 @@ export interface OnyxState {
   registerAccount(account: string, email: string | undefined, password: string): void;
   verifyAccount(account: string, code: string): void;
 
+  // ── Nick reclaim / CERTFP services (Orochi built-in, no NickServ bot) ──
+  /**
+   * `GHOST <nick> <password>` — disconnect a stale session occupying a nick
+   * that belongs to the caller's account (password-verified server-side).
+   * server.zig handleGhost: success replies as a NOTICE, failure as numerics
+   * (ERR_PASSWDMISMATCH / ERR_NEEDMOREPARAMS). The password is required.
+   */
+  ghost(nick: string, password: string): void;
+  /**
+   * GHOST the stale session holding `nick`, then re-NICK to it. Used by the
+   * "Reclaim" affordance when we landed on a temporary alias after a 433.
+   * Resolves to true when the GHOST line was sent (a client is connected).
+   */
+  reclaimNick(nick: string, password: string): boolean;
+  /**
+   * `CERTADD` — bind the TLS client-cert fingerprint presented on this
+   * connection to the logged-in account (server.zig handleCertAdd). Enables
+   * future password-less SASL EXTERNAL logins.
+   */
+  certAdd(): void;
+  /** `CERTLIST` — list bound certificate fingerprints (server.zig handleCertList). */
+  certList(): void;
+  /** `CERTDEL <fingerprint>` — unbind a fingerprint (server.zig handleCertDel). */
+  certDel(fingerprint: string): void;
+
   // ── MONITOR ─────────────────────────────────────────────────────────
   /** Tracks which nicks we've added to the MONITOR list */
   monitoredNicks: Set<string>;
@@ -514,6 +539,13 @@ export interface OnyxState {
     nick: string;
     password?: string;
     realname?: string;
+    /**
+     * Signals that this connection presents a TLS client certificate, so SASL
+     * EXTERNAL (CERTFP) may be selected when the server offers it. Forwarded to
+     * the IRC client; selectSaslMechanism picks EXTERNAL when no password is set
+     * but a cert is present.
+     */
+    hasClientCert?: boolean;
   }): void;
 
   /** Disconnect cleanly */
@@ -756,8 +788,8 @@ export interface OnyxState {
   closeThemeModal(): void;
 
   // ── Theme & display ───────────────────────────────────────────────────
-  /** New theme system: 'midnight' | 'onyx' | 'ash' | 'amoled' | 'light' | 'system' */
-  theme: 'midnight' | 'onyx' | 'ash' | 'amoled' | 'light' | 'system';
+  /** New theme system: 'lacquer' | 'midnight' | 'onyx' | 'ash' | 'amoled' | 'light' | 'system' */
+  theme: 'lacquer' | 'midnight' | 'onyx' | 'ash' | 'amoled' | 'light' | 'system';
   /** UI base font size in px (12 | 14 | 16 | 18 | 20) */
   fontSize: number;
   /** Set UI theme and persist to localStorage 'ocean-display-theme' */
@@ -1795,7 +1827,7 @@ export const useOnyxStore = create<OnyxState>()(
       }
     },
 
-    connect({ url, nick, password, realname }) {
+    connect({ url, nick, password, realname, hasClientCert }) {
       const prev = get().client;
       if (prev) prev.destroy();
       // Clear any in-progress reconnect countdown
@@ -1822,6 +1854,11 @@ export const useOnyxStore = create<OnyxState>()(
         username: nick,
         password,
         sessionToken: savedCreds?.sessionToken,
+        meshToken: savedCreds?.meshToken,
+        // EXTERNAL/CERTFP intent: only meaningful when the transport actually
+        // presents a client cert. selectSaslMechanism picks EXTERNAL when a cert
+        // is present and no password drives PLAIN/SCRAM.
+        hasClientCert,
         onConnected() {
           _clearReconnectCountdown();
           _reconnectAttempts = 0;
@@ -2025,6 +2062,50 @@ export const useOnyxStore = create<OnyxState>()(
       set({ registerPending: true, registerError: null });
       client.sendRaw('VERIFY', account, code);
       // OCEAN-UI: verification UI should call verifyAccount(account, code).
+    },
+
+    // ── Nick reclaim / CERTFP services ───────────────────────────────────
+    ghost(nick, password) {
+      const { client } = get();
+      if (!client) return;
+      // Orochi: `GHOST <nick> <password>` (password-verified). Replies arrive
+      // as a server NOTICE on success or numerics on failure — both surface in
+      // serviceNotices / notifications through the normal message path.
+      client.sendRaw('GHOST', nick, password);
+    },
+
+    reclaimNick(nick, password) {
+      const { client } = get();
+      if (!client) return false;
+      const target = nick.trim();
+      if (!target) return false;
+      // Evict the stale session, then take the nick back. The periodic reclaim
+      // timer (started on 001 when on an alias) also keeps retrying NICK until
+      // the zombie dies, so a single follow-up NICK here is sufficient.
+      client.sendRaw('GHOST', target, password);
+      client.sendRaw('NICK', target);
+      return true;
+    },
+
+    certAdd() {
+      const { client } = get();
+      // `CERTADD` takes no params — it binds the cert presented on THIS
+      // connection. Server fails (FAIL CERTADD NO_CLIENT_CERT) if none.
+      client?.sendRaw('CERTADD');
+    },
+
+    certList() {
+      const { client } = get();
+      // Replies: `:server NOTICE <nick> :CERTLIST <fp>` per fingerprint (or a
+      // single "no fingerprints bound" notice). Surfaced via serviceNotices.
+      client?.sendRaw('CERTLIST');
+    },
+
+    certDel(fingerprint) {
+      const { client } = get();
+      const fp = fingerprint.trim();
+      if (!client || !fp) return;
+      client.sendRaw('CERTDEL', fp);
     },
 
     // ── requestHistory ───────────────────────────────────────────────────
@@ -3041,6 +3122,18 @@ export const useOnyxStore = create<OnyxState>()(
           }
           return;
         }
+        if (standard.kind === 'NOTE' && standard.command === 'SESSION' && standard.code === 'MTOKEN') {
+          // Mesh-sealed reclaim token: persist it so a reconnect that lands on a
+          // different mesh node can still resume via SESSION RESUME <mtoken>
+          // (server.zig handleSession TOKEN → handleMeshReclaim).
+          const mtoken = parseSessionMeshTokenNote(msg);
+          if (mtoken) {
+            import('@/lib/credentials').then(({ storeMeshToken }) => {
+              storeMeshToken(mtoken);
+            }).catch(() => {});
+          }
+          return;
+        }
         if (standard.kind === 'FAIL' && standard.command === 'SESSION') {
           import('@/lib/credentials').then(({ clearSessionToken }) => {
             clearSessionToken(get().server?.url, _connectNick || get().ourNick);
@@ -3587,7 +3680,7 @@ export const useOnyxStore = create<OnyxState>()(
               (text.match(/^\[?(Account|Channel|Memo|VHost|NickServ|ChanServ|HostServ|MemoServ)\]?:?\s+/i)?.[1]) ??
               (/\b(MEMO|MEMOS)\b/.test(textUpper) ? 'Memo' : undefined) ??
               (/\bVHOST\b/.test(textUpper) ? 'VHost' : undefined) ??
-              (/\b(ACCESS LIST|HOST MASK|CERTIFICATE)\b/.test(textUpper) ? 'Account' : undefined) ??
+              (/\b(ACCESS LIST|HOST MASK|CERTIFICATE|CERTLIST|CERTADD|CERTDEL|FINGERPRINT)\b/.test(textUpper) ? 'Account' : undefined) ??
               (/\b(ACCOUNT|IDENTIFIED|REGISTERED|PASSWORD|EMAIL|GHOST|RECOVER|GROUPED|UNGROUP)\b/.test(textUpper) ? 'Account' : undefined);
 
             if (serviceSource) {
@@ -5006,6 +5099,13 @@ export const useOnyxStore = create<OnyxState>()(
         case '461': { // ERR_NEEDMOREPARAMS
           const cmd461 = params[1] ?? '';
           get().addNotification({ type: 'error', text: `Missing parameters for ${cmd461}` });
+          break;
+        }
+
+        case '464': { // ERR_PASSWDMISMATCH — wrong password (GHOST/IDENTIFY/etc.)
+          const text464 = params[params.length - 1] || 'Invalid account or password';
+          get().addNotification({ type: 'error', text: text464 });
+          get().addServiceNotice('Account', text464);
           break;
         }
 
@@ -7253,7 +7353,7 @@ function _loadTimeFormat(): '12h' | '24h' | 'hidden' {
 // ── Theme persistence ─────────────────────────────────────────────────────────
 
 function _loadActiveTheme(): string {
-  if (typeof window === 'undefined') return 'ocean';
+  if (typeof window === 'undefined') return 'lacquer';
   try {
     const validThemes = [
       'ocean',
@@ -7273,10 +7373,28 @@ function _loadActiveTheme(): string {
       'system',
     ];
     const stored = localStorage.getItem('ocean-active-theme');
-    if (stored && validThemes.includes(stored)) return stored;
     const legacy = localStorage.getItem('ocean-theme');
-    return legacy && validThemes.includes(legacy) ? legacy : 'ocean';
-  } catch { return 'ocean'; }
+    // v3 migration: 'lacquer' is the new flagship default. Move users who are
+    // still on the old auto-default ('ocean', the value that REMOVED data-theme
+    // and fell back to the plain :root base) — or who have no stored preference
+    // at all — onto 'lacquer'. Any explicit non-ocean choice is preserved.
+    const v3done = localStorage.getItem('ocean-theme-v3') === '1';
+    if (!v3done) {
+      const effective = (stored && validThemes.includes(stored))
+        ? stored
+        : (legacy && validThemes.includes(legacy) ? legacy : null);
+      localStorage.setItem('ocean-theme-v3', '1');
+      if (effective === null || effective === 'ocean') {
+        localStorage.setItem('ocean-active-theme', 'lacquer');
+        return 'lacquer';
+      }
+      // Explicit choice — persist it forward and keep it.
+      localStorage.setItem('ocean-active-theme', effective);
+      return effective;
+    }
+    if (stored && validThemes.includes(stored)) return stored;
+    return legacy && validThemes.includes(legacy) ? legacy : 'lacquer';
+  } catch { return 'lacquer'; }
 }
 
 // ── Font size persistence ──────────────────────────────────────────────────────
@@ -7496,19 +7614,37 @@ function _loadBoolPref(key: string): boolean {
 
 // ── Display theme persistence ─────────────────────────────────────────────────
 function _loadDisplayTheme(): OnyxState['theme'] {
-  if (typeof window === 'undefined') return 'midnight';
+  if (typeof window === 'undefined') return 'lacquer';
   const stored = localStorage.getItem('ocean-display-theme') ?? localStorage.getItem('ocean-theme');
+  const valid = (t: string | null): t is OnyxState['theme'] =>
+    t === 'lacquer' || t === 'midnight' || t === 'onyx' || t === 'ash' ||
+    t === 'amoled' || t === 'light' || t === 'system';
   // v2 migration: 'onyx' was the old default — migrate to 'midnight' unless
   // the user explicitly re-selected it after the migration flag was written.
   if (stored === 'onyx' && !localStorage.getItem('ocean-theme-v2')) {
     localStorage.setItem('ocean-display-theme', 'midnight');
     localStorage.setItem('ocean-theme-v2', '1');
-    return 'midnight';
   }
-  if (stored === 'midnight' || stored === 'onyx' || stored === 'ash' || stored === 'amoled' || stored === 'light' || stored === 'system') {
-    return stored;
+  // v3 migration: 'lacquer' is the new flagship default. Mirror the active-theme
+  // migration so the two loaders agree even though either may run first and set
+  // the shared 'ocean-theme-v3' flag. Users still on the old auto-default display
+  // theme ('midnight', the value v2 wrote) — or with no stored preference — move
+  // to 'lacquer'. An explicit choice is identified by ocean-active-theme being a
+  // non-ocean named theme; we never overwrite that. This is idempotent: once the
+  // display value is 'lacquer' or any explicit theme, it stays put.
+  const active = localStorage.getItem('ocean-active-theme');
+  const cur = localStorage.getItem('ocean-display-theme') ?? stored;
+  const explicit = active != null && active !== 'ocean' && active !== 'system' && active !== 'lacquer';
+  const isAutoDefault = cur == null || cur === 'midnight';
+  if (!explicit && isAutoDefault) {
+    localStorage.setItem('ocean-display-theme', 'lacquer');
+    localStorage.setItem('ocean-theme-v3', '1');
+    return 'lacquer';
   }
-  return 'midnight';
+  localStorage.setItem('ocean-theme-v3', '1');
+  const final = localStorage.getItem('ocean-display-theme') ?? stored;
+  if (valid(final)) return final;
+  return 'lacquer';
 }
 
 // ── Display font size persistence ─────────────────────────────────────────────

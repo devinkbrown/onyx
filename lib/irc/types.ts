@@ -118,15 +118,11 @@ export interface ISupport {
   NICKLEN: number;
   TOPICLEN: number;
   IRCX: boolean;
-  MAXDATA: number;
-  COMICCHAT: string;   // e.g. 'DATA' — method used for comic chat signalling
-  /** Deprecated compatibility field. Orochi media is gated by caps/NOTE MEDIA, not SUIMYAKUMEDIA. */
-  SUIMYAKUMEDIA: string;
-  MAXMEDIA: number;
-  MEDIAUMODES: string;
-  MEDIAMUTE: string;
-  /** Deprecated compatibility field. Orochi does not use IRC MEDIAFRAME. */
-  MEDIAFRAME: string;
-  MEDIACHUNK: number;  // max base64 chars per MCHUNK chunk (0 = not supported)
+  /**
+   * Deprecated compatibility field — Orochi advertises NO media ISUPPORT token.
+   * Voice/video availability is gated by the store's `mediaAvailable` selector
+   * (set on 001 / NOTE MEDIA), not a 005 token. Retained only because a
+   * non-media feature badge in HomeView still reads it; never set from 005.
+   */
   SILENCE: number;     // max silence list entries (0 = not supported)
 }

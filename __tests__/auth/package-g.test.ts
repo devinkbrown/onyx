@@ -32,8 +32,8 @@ describe('Package G auth and onboarding overhaul', () => {
     const landing = read('app/page.tsx');
     const onboarding = read('components/modals/OnboardingModal.tsx');
 
-    expect(landing).toContain('font-size: var(--text-hero)');
-    expect(landing).toContain('land-app-preview elev-2');
+    expect(landing).toContain('land-h1');
+    expect(landing).toContain('land-app-preview');
     expect(landing).not.toMatch(/Discord|WebRTC/i);
     expect(onboarding).toContain('OCEAN-INTEGRATION:');
     expect(onboarding).toContain('ocean:metadata-set');

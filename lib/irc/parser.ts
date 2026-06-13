@@ -224,6 +224,17 @@ export function parseSessionTokenNote(msg: IRCMessage): string | null {
   return reply.description || null;
 }
 
+/**
+ * Parse `:server NOTE SESSION MTOKEN :<token>` — Orochi's mesh-sealed reclaim
+ * token, emitted alongside the local TOKEN on mesh deployments. Usable to
+ * reclaim/redirect the session from any node via `SESSION RESUME <mtoken>`.
+ */
+export function parseSessionMeshTokenNote(msg: IRCMessage): string | null {
+  const reply = parseStandardReply(msg);
+  if (!reply || reply.kind !== 'NOTE' || reply.command !== 'SESSION' || reply.code !== 'MTOKEN') return null;
+  return reply.description || null;
+}
+
 export function buildSessionResumeLine(token: string): string {
   return formatIRCLine('SESSION', 'RESUME', token);
 }

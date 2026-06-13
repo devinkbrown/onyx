@@ -42,8 +42,20 @@ export default function ServicesPanel() {
   const ourNick          = useOnyxStore(s => s.ourNick);
   const serviceNotices   = useOnyxStore(s => s.serviceNotices);
   const clearServiceNotices = useOnyxStore(s => s.clearServiceNotices);
+  const ghost            = useOnyxStore(s => s.ghost);
+  const certAdd          = useOnyxStore(s => s.certAdd);
+  const certList         = useOnyxStore(s => s.certList);
+  const certDel          = useOnyxStore(s => s.certDel);
 
   const account = server?.account ?? null;
+
+  // SASL mechanisms advertised by the server (from the sasl cap value, e.g.
+  // "PLAIN,EXTERNAL,SCRAM-SHA-256"). EXTERNAL ⇒ CERTFP login is possible.
+  const saslMechs = (client?.capValues.get('sasl') ?? '')
+    .split(',')
+    .map(m => m.trim().toUpperCase())
+    .filter(Boolean);
+  const externalAvailable = saslMechs.includes('EXTERNAL');
 
   const svcNoticeRef   = useRef<HTMLDivElement>(null);
 
@@ -142,7 +154,16 @@ export default function ServicesPanel() {
         {/* Body */}
         <div className="svc-body">
           {servicesTab === 'account' && (
-            <AccountTab account={account} ourNick={ourNick} sendAccount={sendAccount} />
+            <AccountTab
+              account={account}
+              ourNick={ourNick}
+              sendAccount={sendAccount}
+              ghost={ghost}
+              certAdd={certAdd}
+              certList={certList}
+              certDel={certDel}
+              externalAvailable={externalAvailable}
+            />
           )}
           {servicesTab === 'channel' && (
             <ChannelTab channels={channels} ourNick={ourNick} send={send} />
@@ -656,6 +677,11 @@ interface AccountTabProps {
   account: string | null;
   ourNick: string;
   sendAccount: SendAccount;
+  ghost: (nick: string, password: string) => void;
+  certAdd: () => void;
+  certList: () => void;
+  certDel: (fingerprint: string) => void;
+  externalAvailable: boolean;
 }
 
 type AccountFlag =
@@ -683,7 +709,7 @@ const ACCOUNT_FLAGS: FlagDef[] = [
   { flag: 'SASLONLY',    label: 'SASL Only',      desc: 'IDENTIFY rejected; SASL PLAIN only' },
 ];
 
-function AccountTab({ account, ourNick, sendAccount }: AccountTabProps) {
+function AccountTab({ account, ourNick, sendAccount, ghost, certAdd, certList, certDel, externalAvailable }: AccountTabProps) {
   const [identifyPw, setIdentifyPw]     = useState('');
   const [identifyAcc, setIdentifyAcc]   = useState('');
   const [regPw, setRegPw]               = useState('');
@@ -691,10 +717,12 @@ function AccountTab({ account, ourNick, sendAccount }: AccountTabProps) {
   const [newPw, setNewPw]               = useState('');
   const [email, setEmail]               = useState('');
   const [ghostNick, setGhostNick]       = useState('');
+  const [ghostPw, setGhostPw]           = useState('');
   const [recoverNick, setRecoverNick]   = useState('');
   const [recoverPw, setRecoverPw]       = useState('');
   const [ungroupNick, setUngroupNick]   = useState('');
   const [accessMask, setAccessMask]     = useState('');
+  const [certDelFp, setCertDelFp]       = useState('');
   const [flags, setFlags]               = useState<Set<AccountFlag>>(new Set());
   const [showDrop, setShowDrop]         = useState(false);
   const [dropPw, setDropPw]             = useState('');
@@ -818,7 +846,9 @@ function AccountTab({ account, ourNick, sendAccount }: AccountTabProps) {
       <div className="svc-section">
         <div className="svc-section-label">Nick Recovery</div>
         <div className="svc-form-row">
-          <label className="svc-form-label">Ghost — disconnect a session using your nick</label>
+          <label className="svc-form-label">
+            Ghost — disconnect a stale session holding your nick (password-verified)
+          </label>
           <div className="svc-form-inline">
             <input
               className="svc-input"
@@ -826,10 +856,24 @@ function AccountTab({ account, ourNick, sendAccount }: AccountTabProps) {
               value={ghostNick}
               onChange={e => setGhostNick(e.target.value)}
             />
+            <input
+              className="svc-input"
+              type="password"
+              placeholder="Password"
+              style={{ maxWidth: 110 }}
+              value={ghostPw}
+              onChange={e => setGhostPw(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && ghostNick && ghostPw) {
+                  ghost(ghostNick, ghostPw);
+                  setGhostNick(''); setGhostPw('');
+                }
+              }}
+            />
             <button
               className="svc-btn"
-              disabled={!ghostNick}
-              onClick={() => { sendAccount('GHOST', ghostNick); setGhostNick(''); }}
+              disabled={!ghostNick || !ghostPw}
+              onClick={() => { ghost(ghostNick, ghostPw); setGhostNick(''); setGhostPw(''); }}
             >Ghost</button>
           </div>
         </div>
@@ -986,13 +1030,59 @@ function AccountTab({ account, ourNick, sendAccount }: AccountTabProps) {
               <button className="svc-btn svc-btn--sm" onClick={() => sendAccount('ACCESS', 'LIST')}>
                 List Masks ↗
               </button>
+            </div>
+          </div>
+
+          {/* CERTFP — TLS client-certificate fingerprint binding */}
+          <div className="svc-section">
+            <div className="svc-section-label">Certificate Fingerprints (CERTFP)</div>
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0, lineHeight: 1.45 }}>
+              Bind the TLS client certificate presented on this connection to your
+              account for password-less SASL EXTERNAL logins.{' '}
+              {externalAvailable
+                ? 'This server offers SASL EXTERNAL.'
+                : 'This server does not advertise SASL EXTERNAL.'}
+            </p>
+            <div className="svc-status-row">
+              <span className={`svc-status-badge ${externalAvailable ? 'svc-badge--ok' : 'svc-badge--none'}`}>
+                {externalAvailable ? '✓' : '—'}
+              </span>
+              <span className="svc-status-text">
+                SASL EXTERNAL {externalAvailable ? 'available' : 'not offered'}
+              </span>
+            </div>
+            <div className="svc-form-inline">
+              <button
+                className="svc-btn"
+                onClick={() => certAdd()}
+                title="Bind the cert presented on this connection"
+              >Bind This Cert</button>
               <button
                 className="svc-btn svc-btn--sm"
-                onClick={() => sendAccount('CERT', 'LIST')}
-                title="TLS certificate fingerprints"
-              >
-                List Certs ↗
-              </button>
+                onClick={() => certList()}
+              >List Certs ↗</button>
+            </div>
+            <div className="svc-form-row">
+              <label className="svc-form-label">Remove a bound fingerprint</label>
+              <div className="svc-form-inline">
+                <input
+                  className="svc-input"
+                  placeholder="sha256 fingerprint"
+                  value={certDelFp}
+                  onChange={e => setCertDelFp(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && certDelFp.trim()) {
+                      certDel(certDelFp.trim());
+                      setCertDelFp('');
+                    }
+                  }}
+                />
+                <button
+                  className="svc-btn svc-btn--danger"
+                  disabled={!certDelFp.trim()}
+                  onClick={() => { certDel(certDelFp.trim()); setCertDelFp(''); }}
+                >Delete</button>
+              </div>
             </div>
           </div>
 

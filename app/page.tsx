@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import ChanstatsPreview from '@/components/site/ChanstatsPreview';
 
 export default function LandingPage() {
@@ -9,12 +9,11 @@ export default function LandingPage() {
       {/* ── Skip link ── */}
       <a href="#land-main" className="land-skip-link">Skip to main content</a>
 
-      {/* ── Depth layers ─────────────────────────────────────────────── */}
-      <div className="land-depth" aria-hidden>
-        <div className="land-depth-ray land-depth-ray-1" />
-        <div className="land-depth-ray land-depth-ray-2" />
-        <div className="land-depth-ray land-depth-ray-3" />
-        <div className="land-depth-particles" />
+      {/* ── Atmosphere ──────────────────────────────────────────────── */}
+      <div className="land-atmos" aria-hidden>
+        <div className="land-atmos-halo" />
+        <div className="land-atmos-grain" />
+        <div className="land-atmos-grid" />
       </div>
 
       {/* ── Nav ─────────────────────────────────────────────────────── */}
@@ -22,15 +21,17 @@ export default function LandingPage() {
         <div className="land-nav-logo">
           <OceanLogo />
           <span className="land-nav-wordmark">Ocean</span>
+          <span className="land-nav-sep" aria-hidden>/</span>
+          <span className="land-nav-engine">Orochi</span>
         </div>
         <div className="land-nav-links">
-          <a href="#features" className="land-nav-link">Features</a>
-          <a href="#preview" className="land-nav-link">Preview</a>
+          <a href="#features" className="land-nav-link">Client</a>
+          <a href="#engine" className="land-nav-link">Engine</a>
+          <a href="#security" className="land-nav-link">Security</a>
           <a href="#activity" className="land-nav-link">Activity</a>
-          <a href="#connect" className="land-nav-link">Connect</a>
           <Link href="/about" className="land-nav-link">About</Link>
           <Link href="/login" className="land-nav-cta">
-            Dive in <ArrowRight size={13} />
+            Launch Ocean <ArrowRight size={13} />
           </Link>
         </div>
       </nav>
@@ -40,189 +41,299 @@ export default function LandingPage() {
         <div className="land-hero-body">
           <div className="land-hero-copy">
             <div className="land-badge">
-              <span className="land-badge-sonar" />
               <span className="land-badge-dot" />
-              eshmaki.me · live
+              <span className="land-badge-text">eshmaki.me · running on Orochi</span>
             </div>
 
             <h1 className="land-h1">
-              Ocean for<br />
-              eshmaki.me
+              Chat that
+              <span className="land-h1-accent"> answers to no one</span>
+              <span className="land-h1-tail"> but you.</span>
             </h1>
 
             <p className="land-lead">
-              Open-protocol community chat on Orochi — a pure-Zig IRC engine with a
-              SUIMYAKU CRDT mesh and post-quantum TSUMUGI links. Native voice, native
-              video. Start in <span className="land-inline-channel">#root</span>.
+              Ocean is a modern browser client — servers, channels, DMs, voice,
+              video, threads, rich messages — built on{' '}
+              <strong className="land-lead-strong">Orochi</strong>, a clean-room
+              pure-Zig engine. Real accounts, post-quantum links, and voice that
+              never touches a relay you don&rsquo;t control.
             </p>
 
             <div className="land-hero-actions">
               <Link href="/login" className="land-btn-primary">
-                Enter Ocean
+                Launch Ocean
                 <ArrowRight size={14} />
               </Link>
-              <Link href="/about" className="land-btn-ghost">What is this?</Link>
+              <Link href="/about" className="land-btn-ghost">
+                How it works
+              </Link>
             </div>
 
-            {/* Depth meter — desktop only */}
-            <div className="land-depth-meter" aria-hidden>
-              <div className="land-dm-track">
-                <div className="land-dm-fill" />
+            <dl className="land-hero-stats" aria-label="Engine highlights">
+              <div className="land-hs">
+                <dt>Mesh</dt>
+                <dd>SUIMYAKU CRDT</dd>
               </div>
-              <div className="land-dm-labels">
-                <span>surface</span>
-                <span className="land-dm-depth">4 000 m</span>
+              <span className="land-hs-rule" aria-hidden />
+              <div className="land-hs">
+                <dt>Links</dt>
+                <dd>X25519 + ML-KEM-768</dd>
               </div>
-            </div>
+              <span className="land-hs-rule" aria-hidden />
+              <div className="land-hs">
+                <dt>Runtime</dt>
+                <dd>Pure Zig · 64-bit</dd>
+              </div>
+            </dl>
           </div>
 
           <div className="land-hero-visual" aria-hidden>
-            <OceanDepthVis />
+            <MeshVis />
           </div>
         </div>
       </section>
 
-      {/* ── Depth lines (section separator) ─────────────────────────── */}
-      <div className="land-sonar-line" aria-hidden>
-        <div className="land-sonar-ping" />
-        <div className="land-sonar-text">depth: 2 500 m · features ahead</div>
-      </div>
+      {/* ── Credential rail ─────────────────────────────────────────── */}
+      <section className="land-rail" aria-label="What the engine provides">
+        <div className="land-rail-inner">
+          {([
+            ['Auth', 'SASL · SCRAM-SHA-256'],
+            ['Sessions', 'Persistent SESSION RESUME'],
+            ['Services', 'REGISTER · IDENTIFY · GHOST'],
+            ['Protocol', 'IRCv3 + IRCX surface'],
+            ['Upgrades', 'Helix hot-reload, zero drops'],
+          ] as Array<[string, string]>).map(([k, v]) => (
+            <div key={k} className="land-rail-item">
+              <span className="land-rail-k">{k}</span>
+              <span className="land-rail-v">{v}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Section divider ─────────────────────────────────────────── */}
+      <SectionMark label="The client" index="01" />
 
       {/* ── Features bento ──────────────────────────────────────────── */}
       <section id="features" className="land-features">
+        <div className="land-section-heading">
+          <span className="land-section-kicker">Ocean, the client</span>
+          <h2 className="land-section-title">
+            A familiar workspace, with nothing bolted on after the fact.
+          </h2>
+          <p className="land-section-copy">
+            Servers, channels, DMs, members, voice, and search sit exactly where
+            you expect them. Underneath, every feature is a first-class part of
+            the protocol — not a plugin pretending to be one.
+          </p>
+        </div>
 
         {/* Row 1 — Voice + Sessions */}
         <div className="land-bento-row land-bento-row-1">
-          <div className="land-card land-card-voice">
-            <div className="land-card-glow land-card-glow-voice" />
+          <article className="land-card land-card-voice">
+            <div className="land-card-glow land-card-glow-accent" />
             <div className="land-card-inner">
-              <div className="land-card-eyebrow land-eyebrow-voice">
+              <div className="land-card-eyebrow land-eyebrow-accent">
                 <span className="land-eyebrow-pip" />
                 <VoiceIcon />
-                <span>SUIMYAKU</span>
+                <span>Voice &amp; video</span>
               </div>
-              <h3 className="land-card-h3">Native voice and video</h3>
+              <h3 className="land-card-h3">Native media, no relay servers</h3>
               <p className="land-card-p">
-                SUIMYAKU carries voice and video over the Orochi mesh itself.
-                No STUN, no TURN, no relay servers. Your media
-                travels the same encrypted path as your messages.
+                Voice and video are carried over the Orochi mesh itself — the same
+                encrypted path as your messages. No external relay sits between
+                you and the people you&rsquo;re talking to.
               </p>
               <div className="land-voice-vis" aria-hidden>
                 <WaveformVis />
               </div>
             </div>
-          </div>
+          </article>
 
-          <div className="land-card land-card-session">
-            <div className="land-card-glow land-card-glow-session" />
+          <article className="land-card land-card-session">
+            <div className="land-card-glow land-card-glow-lux" />
             <div className="land-card-inner">
-              <div className="land-card-eyebrow land-eyebrow-gold">
-                <span className="land-eyebrow-pip land-eyebrow-pip-gold" />
+              <div className="land-card-eyebrow land-eyebrow-lux">
+                <span className="land-eyebrow-pip land-eyebrow-pip-lux" />
                 <TokenIcon />
-                <span>SESSION</span>
+                <span>Session resume</span>
               </div>
-              <h3 className="land-card-h3">Stay signed in</h3>
+              <h3 className="land-card-h3">Sign in once. Stay in.</h3>
               <p className="land-card-p">
-                Cryptographic session tokens keep you authenticated across
-                reconnects. No password stored. No re-entry.
+                After authentication, the engine issues a session token. Reconnect
+                and your identity, channels, and history return — across tabs and
+                devices — without re-entering a password.
               </p>
               <div className="land-token-display" aria-hidden>
                 <div className="land-token-row">
-                  <span className="land-token-prefix">sst_</span>
+                  <span className="land-token-prefix">SESSION&nbsp;RESUME&nbsp;</span>
                   <span className="land-token-body">4f8a2e…c1b9</span>
                 </div>
                 <div className="land-token-status">
                   <span className="land-token-dot" />
-                  valid · 29 days remaining
+                  resumed · 3 clients on this account
                 </div>
               </div>
             </div>
-          </div>
+          </article>
         </div>
 
         {/* Row 2 — TSUMUGI (wide) */}
         <div className="land-bento-row land-bento-row-2">
-          <div className="land-card land-card-tsumugi">
-            <div className="land-card-glow land-card-glow-tsumugi" />
+          <article className="land-card land-card-tsumugi">
+            <div className="land-card-glow land-card-glow-accent" />
             <div className="land-card-inner land-card-inner-split">
               <div className="land-card-text">
-                <div className="land-card-eyebrow land-eyebrow-tsumugi">
-                  <span className="land-eyebrow-pip land-eyebrow-pip-tsumugi" />
+                <div className="land-card-eyebrow land-eyebrow-accent">
+                  <span className="land-eyebrow-pip" />
                   <TsumugiIcon />
-                  <span>TSUMUGI</span>
+                  <span>TSUMUGI links</span>
                 </div>
-                <h3 className="land-card-h3">Post-quantum, end-to-end</h3>
+                <h3 className="land-card-h3">Post-quantum from the first byte</h3>
                 <p className="land-card-p">
-                  TSUMUGI secures every server link and media session with an
-                  X25519 + ML-KEM-768 hybrid handshake and a forward-secret
-                  ratchet. Encryption is built into the protocol — not bolted on.
+                  Every server link and media session is secured by a hybrid
+                  handshake — classical X25519 combined with ML-KEM-768 — and a
+                  forward-secret ratchet. Encryption is part of the protocol, so
+                  there is no &ldquo;encrypted mode&rdquo; to forget to turn on.
                 </p>
-                <div className="land-tsumugi-badges" aria-hidden>
-                  <span className="land-tsumugi-badge">X25519 + ML-KEM-768</span>
-                  <span className="land-tsumugi-badge">Forward Secrecy</span>
-                  <span className="land-tsumugi-badge">PQ-hybrid</span>
+                <div className="land-chip-row" aria-hidden>
+                  <span className="land-chip">X25519</span>
+                  <span className="land-chip land-chip-lux">ML-KEM-768</span>
+                  <span className="land-chip">Forward secrecy</span>
+                  <span className="land-chip">Hybrid ratchet</span>
                 </div>
               </div>
               <div className="land-tsumugi-diagram" aria-hidden>
                 <TsumugiKeyVis />
               </div>
             </div>
-          </div>
+          </article>
         </div>
 
         {/* Row 3 — small cards */}
         <div className="land-bento-row land-bento-row-3">
-          <div className="land-card land-card-sm land-card-irc">
-            <div className="land-card-glow land-card-glow-irc" />
+          <article className="land-card land-card-sm">
+            <div className="land-card-glow land-card-glow-accent" />
+            <div className="land-card-inner">
+              <div className="land-card-eyebrow land-eyebrow-dim">
+                <span className="land-eyebrow-pip land-eyebrow-pip-dim" />
+                <MsgIcon />
+                <span>Messaging</span>
+              </div>
+              <h3 className="land-card-h3">Rich messages &amp; threads</h3>
+              <p className="land-card-p">
+                Reactions, edits, replies, threads, embeds, and media cards —
+                carried over standard IRCv3 message extensions.
+              </p>
+            </div>
+          </article>
+
+          <article className="land-card land-card-sm">
+            <div className="land-card-glow land-card-glow-accent" />
+            <div className="land-card-inner">
+              <div className="land-card-eyebrow land-eyebrow-dim">
+                <span className="land-eyebrow-pip land-eyebrow-pip-dim" />
+                <IdIcon />
+                <span>Identity</span>
+              </div>
+              <h3 className="land-card-h3">Real accounts, no bots</h3>
+              <p className="land-card-p">
+                REGISTER, VERIFY, IDENTIFY, GHOST, and CERTFP are server commands,
+                not a NickServ pseudo-user. Your account is part of the engine.
+              </p>
+            </div>
+          </article>
+
+          <article className="land-card land-card-sm">
+            <div className="land-card-glow land-card-glow-accent" />
             <div className="land-card-inner">
               <div className="land-card-eyebrow land-eyebrow-dim">
                 <span className="land-eyebrow-pip land-eyebrow-pip-dim" />
                 <IrcIcon />
-                <span>PROTOCOL</span>
+                <span>Open surface</span>
               </div>
-              <h3 className="land-card-h3">Open IRC</h3>
+              <h3 className="land-card-h3">IRCv3 &amp; IRCX</h3>
               <p className="land-card-p">
-                Standard IRCv3. Connect with any client. Ocean is just the
-                surface.
+                Ocean is the polished surface, but the network speaks open
+                protocol. Bring any modern IRCv3 client over TLS and SASL.
               </p>
               <div className="land-irc-tag" aria-hidden>
                 <span className="land-irc-tag-text">eshmaki.me:6697</span>
               </div>
             </div>
-          </div>
-
-          <div className="land-card land-card-sm land-card-wb">
-            <div className="land-card-glow land-card-glow-wb" />
-            <div className="land-card-inner">
-              <div className="land-card-eyebrow land-eyebrow-dim">
-                <span className="land-eyebrow-pip land-eyebrow-pip-dim" />
-                <WbIcon />
-                <span>COLLABORATE</span>
-              </div>
-              <h3 className="land-card-h3">Whiteboard</h3>
-              <p className="land-card-p">
-                Shared drawing surfaces built into every channel. No extra app.
-              </p>
-            </div>
-          </div>
-
-          <div className="land-card land-card-sm land-card-msg">
-            <div className="land-card-glow land-card-glow-msg" />
-            <div className="land-card-inner">
-              <div className="land-card-eyebrow land-eyebrow-dim">
-                <span className="land-eyebrow-pip land-eyebrow-pip-dim" />
-                <MsgIcon />
-                <span>MESSAGING</span>
-              </div>
-              <h3 className="land-card-h3">Rich messages</h3>
-              <p className="land-card-p">
-                Reactions, edits, threads, embeds — over standard IRC
-                extensions.
-              </p>
-            </div>
-          </div>
+          </article>
         </div>
       </section>
+
+      {/* ── Section divider ─────────────────────────────────────────── */}
+      <SectionMark label="The engine" index="02" />
+
+      {/* ── Engine / architecture ───────────────────────────────────── */}
+      <section id="engine" className="land-engine">
+        <div className="land-section-heading">
+          <span className="land-section-kicker">Orochi engine</span>
+          <h2 className="land-section-title">
+            Not a fork. A clean-room engine, written in Zig.
+          </h2>
+          <p className="land-section-copy">
+            Orochi was built from nothing — its own mesh, its own crypto, its own
+            runtime. Four layers cooperate so a chat network can survive bad
+            networks, hostile clients, and live upgrades without losing a session.
+          </p>
+        </div>
+
+        <div className="land-arch">
+          {([
+            {
+              n: '01',
+              kicker: 'State',
+              title: 'SUIMYAKU mesh',
+              body: 'A multi-master CRDT mesh. Nodes gossip changes and reconcile with Merkle and rateless anti-entropy, so divergent servers always converge. A partition is a delay, not data loss — there are no netsplits that throw history away.',
+              tags: ['CRDT', 'Gossip', 'Merkle anti-entropy', 'Multi-master'],
+            },
+            {
+              n: '02',
+              kicker: 'Transport',
+              title: 'TSUMUGI links',
+              body: 'Server-to-server and media sessions ride a post-quantum hybrid handshake — X25519 + ML-KEM-768 — with a forward-secret ratchet. The mesh also carries native voice and video, so media needs no STUN, no TURN, and no relay.',
+              tags: ['Hybrid KEM', 'Forward secrecy', 'Native media'],
+            },
+            {
+              n: '03',
+              kicker: 'Runtime',
+              title: 'Sharded reactors',
+              body: 'A multithreaded core spreads connections across sharded reactors and a worker pool, instead of pinning everything to a single event loop. Throughput scales with cores on modern 64-bit hardware.',
+              tags: ['Multithreaded', 'Worker pool', '64-bit'],
+            },
+            {
+              n: '04',
+              kicker: 'Operations',
+              title: 'Helix hot-upgrade',
+              body: 'The server can swap to a new build in place. Live sessions are migrated across the upgrade, so a deploy does not kick everyone offline. Ship fixes without a reconnect storm.',
+              tags: ['Zero dropped sessions', 'In-place swap', 'Live migration'],
+            },
+          ] as Array<{ n: string; kicker: string; title: string; body: string; tags: string[] }>).map((row, i) => (
+            <article key={row.n} className="land-arch-row" style={{ '--arch-i': i } as ArchCSSProps}>
+              <div className="land-arch-index">
+                <span className="land-arch-n">{row.n}</span>
+                <span className="land-arch-kicker">{row.kicker}</span>
+              </div>
+              <div className="land-arch-body">
+                <h3 className="land-arch-title">{row.title}</h3>
+                <p className="land-arch-p">{row.body}</p>
+                <div className="land-chip-row">
+                  {row.tags.map((t) => (
+                    <span key={t} className="land-chip">{t}</span>
+                  ))}
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Section divider ─────────────────────────────────────────── */}
+      <SectionMark label="Inside the app" index="03" />
 
       {/* ── Product preview ────────────────────────────────────────── */}
       <section id="preview" className="land-preview">
@@ -230,13 +341,13 @@ export default function LandingPage() {
           <span className="land-section-kicker">Ocean app</span>
           <h2 className="land-section-title">Everything has a predictable place.</h2>
           <p className="land-section-copy">
-            Ocean keeps the familiar server, channel, chat, and member layout,
-            then layers in IRC-native identity, voice, session handoff, media,
-            and moderation tools where people already expect them.
+            The server rail, channel list, conversation, and member list stay
+            where muscle memory expects them — then identity, voice, session
+            handoff, and moderation tools live exactly where you reach for them.
           </p>
         </div>
 
-        <div className="land-app-preview elev-2" aria-label="Ocean app interface preview">
+        <div className="land-app-preview" aria-label="Ocean app interface preview">
           <div className="land-preview-rail" aria-hidden>
             <div className="land-preview-orb land-preview-orb-active">O</div>
             <div className="land-preview-orb">#</div>
@@ -273,17 +384,17 @@ export default function LandingPage() {
               <div className="land-preview-avatar">k</div>
               <div>
                 <div className="land-preview-name">kain <span>today</span></div>
-                <p>Session reclaimed cleanly. Phone and desktop are both attached.</p>
+                <p>Session resumed cleanly. Phone and desktop are both attached to the account.</p>
               </div>
             </div>
             <div className="land-preview-message">
-              <div className="land-preview-avatar land-preview-avatar-gold">o</div>
+              <div className="land-preview-avatar land-preview-avatar-lux">o</div>
               <div>
                 <div className="land-preview-name">ocean <span>live</span></div>
-                <p>SUIMYAKU voice is encrypted, linked to the channel, and ready.</p>
+                <p>Voice is up over TSUMUGI, linked to the channel, no relay in the path.</p>
                 <div className="land-preview-pill-row">
                   <span>TSUMUGI active</span>
-                  <span>2 clients</span>
+                  <span>3 clients</span>
                   <span>IRCv3</span>
                 </div>
               </div>
@@ -300,7 +411,7 @@ export default function LandingPage() {
             ))}
             <div className="land-preview-status">
               <strong>Network health</strong>
-              <span>Synced links, active sessions, no relay dependency.</span>
+              <span>Links synced, sessions active, no relay dependency.</span>
             </div>
           </div>
         </div>
@@ -308,7 +419,61 @@ export default function LandingPage() {
 
       <ChanstatsPreview />
 
-      {/* ── Capabilities ───────────────────────────────────────────── */}
+      {/* ── Section divider ─────────────────────────────────────────── */}
+      <SectionMark label="Security" index="04" />
+
+      {/* ── Security deep-dive ──────────────────────────────────────── */}
+      <section id="security" className="land-security">
+        <div className="land-section-heading">
+          <span className="land-section-kicker">Security model</span>
+          <h2 className="land-section-title">
+            Designed so the hard parts are on by default.
+          </h2>
+          <p className="land-section-copy">
+            Authentication, transport, and operations were chosen together. The
+            secure path is the only path — there is no plaintext fallback to drift
+            into.
+          </p>
+        </div>
+
+        <div className="land-sec-grid">
+          {([
+            {
+              icon: <ShieldIcon />,
+              title: 'Authentication',
+              body: 'SASL with PLAIN, SCRAM-SHA-256, and EXTERNAL. SCRAM keeps your password off the wire; EXTERNAL binds a client certificate (CERTFP). The engine, not a bot, owns your account.',
+              note: 'SCRAM-SHA-256 · CERTFP',
+            },
+            {
+              icon: <LockIcon />,
+              title: 'Transport',
+              body: 'Custom clean-room TLS terminates client connections. Between servers and media peers, TSUMUGI layers a post-quantum hybrid handshake with a forward-secret ratchet on top.',
+              note: 'Clean-room TLS · PQ links',
+            },
+            {
+              icon: <MeshGlyph />,
+              title: 'Resilience',
+              body: 'The CRDT mesh keeps every node honest about shared state. A partitioned server rejoins and reconciles instead of dropping messages, and there is no single relay to take the network down.',
+              note: 'Multi-master · No relay',
+            },
+            {
+              icon: <KeyIcon />,
+              title: 'Sessions',
+              body: 'Cryptographic session tokens replace stored passwords for resume. GHOST reclaims a stale session on your nick, and multiple clients can share one account without fighting over it.',
+              note: 'Token resume · GHOST',
+            },
+          ] as Array<{ icon: ReactNode; title: string; body: string; note: string }>).map((c) => (
+            <article key={c.title} className="land-sec-card">
+              <div className="land-sec-icon">{c.icon}</div>
+              <h3 className="land-sec-title">{c.title}</h3>
+              <p className="land-sec-body">{c.body}</p>
+              <div className="land-sec-note">{c.note}</div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Capability matrix ───────────────────────────────────────── */}
       <section className="land-capabilities" aria-label="Ocean capabilities">
         <div className="land-section-heading land-section-heading-compact">
           <span className="land-section-kicker">Feature map</span>
@@ -316,10 +481,10 @@ export default function LandingPage() {
         </div>
         <div className="land-cap-grid">
           {([
-            ['Chat', ['Threaded replies', 'Reactions and edits', 'Pins, search, history', 'Embeds and media cards']],
-            ['Voice and media', ['SUIMYAKU channel voice', 'Encrypted sessions', 'Media gallery', 'Whiteboard collaboration']],
-            ['Identity', ['SASL login', 'Session reclaim', 'Multi-client nick support', 'Token-based resume']],
-            ['Operations', ['Services awareness', 'Moderation tools', 'Channel browser', 'Network status views']],
+            ['Conversation', ['Threaded replies', 'Reactions and edits', 'Pins, search, history', 'Embeds and media cards']],
+            ['Voice and media', ['Channel voice and video', 'Carried over the mesh', 'Media gallery', 'Whiteboard collaboration']],
+            ['Identity', ['SASL / SCRAM-SHA-256', 'Session resume tokens', 'Multi-client accounts', 'GHOST and CERTFP']],
+            ['Operations', ['Built-in services', 'Moderation tooling', 'Channel browser', 'Live network status']],
           ] as Array<[string, string[]]>).map(([title, items]) => (
             <div key={title} className="land-cap-card">
               <h3>{title}</h3>
@@ -336,29 +501,66 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── Built different ─────────────────────────────────────────── */}
+      <section className="land-different">
+        <div className="land-different-inner">
+          <div className="land-different-copy">
+            <span className="land-section-kicker">Engineering</span>
+            <h2 className="land-different-h2">
+              Most chat is rented infrastructure.
+              <span className="land-different-em"> This one isn&rsquo;t.</span>
+            </h2>
+            <p className="land-different-p">
+              Ocean and Orochi were written together, on purpose. The mesh, the
+              crypto, the runtime, and the client share one design instead of
+              gluing a UI onto someone else&rsquo;s stack. That&rsquo;s why voice
+              has no relay, deploys keep your session, and the network has no
+              third party to answer to.
+            </p>
+            <Link href="/about" className="land-btn-ghost land-btn-ghost-lg">
+              Read the story
+              <ArrowRight size={13} />
+            </Link>
+          </div>
+          <ul className="land-different-list">
+            {([
+              ['Clean-room', 'No upstream fork. The engine, mesh, and crypto are original work.'],
+              ['Pure Zig', 'A single 64-bit native binary with no garbage-collected runtime.'],
+              ['No relays', 'Voice and video ride the mesh — there is no rented media path.'],
+              ['Hot upgrades', 'Helix swaps the running server and carries live sessions across.'],
+            ] as Array<[string, string]>).map(([k, v], i) => (
+              <li key={k} className="land-different-item" style={{ '--di-i': i } as DiCSSProps}>
+                <span className="land-different-k">{k}</span>
+                <span className="land-different-v">{v}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
       {/* ── Connect ───────────────────────────────────────────────── */}
       <section id="connect" className="land-connect">
         <div className="land-section-heading">
           <span className="land-section-kicker">Connect</span>
-          <h2 className="land-section-title">Use the web app or bring your own IRC client.</h2>
+          <h2 className="land-section-title">Use the web app, or bring your own client.</h2>
           <p className="land-section-copy">
-            The website is the front door, Ocean is the rich client, and the
-            network remains open enough for standard IRC tooling.
+            The website is the front door, Ocean is the full client, and the
+            network stays open enough for standard IRC tooling.
           </p>
         </div>
         <div className="land-connect-grid">
           <div className="land-connect-card land-connect-card-primary">
             <span className="land-connect-label">Recommended</span>
             <h3>Ocean web app</h3>
-            <p>Full chat, voice, media, settings, session resume, and community tooling in the browser.</p>
+            <p>Full chat, voice, media, session resume, settings, and community tooling — right in the browser.</p>
             <Link href="/login" className="land-connect-action">
-              Open Ocean <ArrowRight size={13} />
+              Launch Ocean <ArrowRight size={13} />
             </Link>
           </div>
           <div className="land-connect-card">
             <span className="land-connect-label">IRC</span>
-            <h3>TLS client access</h3>
-            <p>Use any IRCv3 client with TLS and SASL for a direct protocol connection.</p>
+            <h3>Direct TLS access</h3>
+            <p>Any IRCv3 client with TLS and SASL can connect to the same network.</p>
             <code>eshmaki.me:6697</code>
           </div>
           <div className="land-connect-card">
@@ -378,10 +580,12 @@ export default function LandingPage() {
         </div>
         <div className="land-faq-grid">
           {([
-            ['Do I need Ocean?', 'No. Ocean is the polished web client, but the network speaks IRCv3 so native clients can connect too.'],
-            ['Can I stay connected from multiple devices?', 'Yes. Session reclaim is designed for multiple clients on the same nick without kicking out the others.'],
-            ['Is voice part of IRC?', 'Voice uses SUIMYAKU over Orochi so channel voice belongs to the same open network instead of a separate relay stack.'],
-            ['Where should I start?', 'Open Ocean, sign in, and join #root. The app exposes channels, members, voice, search, and settings in the main workspace.'],
+            ['Do I need the Ocean app?', 'No. Ocean is the polished web client, but the network speaks IRCv3, so any modern client with TLS and SASL can connect too.'],
+            ['Where does my voice actually go?', 'Voice and video are carried over the Orochi mesh itself. There is no STUN, TURN, or external relay sitting between the people in a call.'],
+            ['Can I stay signed in across devices?', 'Yes. The engine issues a session token after authentication, so reconnects resume your identity and history — and several clients can share one account at once.'],
+            ['Is this a fork of an existing server?', 'No. Orochi is a clean-room, pure-Zig engine with its own CRDT mesh, post-quantum links, and runtime. It speaks open protocol but shares no upstream code.'],
+            ['What happens during an upgrade?', 'Helix swaps the running server in place and migrates live sessions across, so a deploy does not disconnect everyone or wipe history.'],
+            ['Where should I start?', 'Launch Ocean, sign in, and join #root. Channels, members, voice, search, and settings all live in the main workspace.'],
           ] as Array<[string, string]>).map(([question, answer]) => (
             <article key={question} className="land-faq-item">
               <h3>{question}</h3>
@@ -391,10 +595,10 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Community ───────────────────────────────────────────────── */}
+      {/* ── CTA ──────────────────────────────────────────────────────── */}
       <section className="land-community">
         <div className="land-community-bg" aria-hidden>
-          <NetworkVis />
+          <MeshVis muted />
         </div>
         <div className="land-community-inner">
           <div className="land-community-label">
@@ -402,13 +606,13 @@ export default function LandingPage() {
             eshmaki.me
           </div>
           <h2 className="land-community-h2">
-            One network.<br />Many depths.
+            One network.<br />Open all the way down.
           </h2>
           <p className="land-community-p">
-            Start at the surface in{' '}
-            <span className="land-channel-pill">#root</span> — the main
-            gathering place. Descend into voice channels, project rooms, and
-            late-night conversations.
+            Start in{' '}
+            <span className="land-channel-pill">#root</span> — the main gathering
+            place — then branch into voice channels, project rooms, and late-night
+            conversations. No bots, no relays, no landlord.
           </p>
           <div className="land-channels" aria-hidden>
             <div className="land-ch land-ch-active">
@@ -416,26 +620,26 @@ export default function LandingPage() {
               <span>root</span>
               <span className="land-ch-live">LIVE</span>
             </div>
-            <div className="land-ch land-ch-enter" style={{'--ch-delay':'80ms'} as ChDelayCSSProps}>
+            <div className="land-ch land-ch-enter" style={{ '--ch-delay': '80ms' } as ChDelayCSSProps}>
               <span className="land-ch-hash">#</span>
               <span>dev</span>
             </div>
-            <div className="land-ch land-ch-enter" style={{'--ch-delay':'160ms'} as ChDelayCSSProps}>
+            <div className="land-ch land-ch-enter" style={{ '--ch-delay': '160ms' } as ChDelayCSSProps}>
               <span className="land-ch-hash">#</span>
               <span>art</span>
             </div>
-            <div className="land-ch land-ch-enter" style={{'--ch-delay':'240ms'} as ChDelayCSSProps}>
+            <div className="land-ch land-ch-enter" style={{ '--ch-delay': '240ms' } as ChDelayCSSProps}>
               <span className="land-ch-hash">#</span>
               <span>lounge</span>
             </div>
-            <div className="land-ch land-ch-voice land-ch-enter" style={{'--ch-delay':'320ms'} as ChDelayCSSProps}>
+            <div className="land-ch land-ch-voice land-ch-enter" style={{ '--ch-delay': '320ms' } as ChDelayCSSProps}>
               <VoiceSmIcon />
               <span>voice-1</span>
             </div>
           </div>
           <div className="land-community-cta-group">
             <Link href="/login" className="land-btn-primary land-btn-lg">
-              Join the community
+              Launch Ocean
               <ArrowRight size={14} />
             </Link>
             <Link href="/about" className="land-btn-ghost land-btn-ghost-lg">
@@ -452,1207 +656,53 @@ export default function LandingPage() {
             <OceanLogo size={20} />
             <span>Ocean</span>
           </div>
-          <p className="land-footer-tagline">Built on Orochi IRC · eshmaki.me</p>
+          <p className="land-footer-tagline">Ocean client · Orochi engine · eshmaki.me</p>
         </div>
         <nav className="land-footer-links" aria-label="Footer navigation">
           <Link href="/about" className="land-footer-link">About</Link>
-          <Link href="/login" className="land-footer-link">Sign In</Link>
-          <a
-            href="https://github.com/devinkbrown/orochi"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="land-footer-link"
-          >
-            Orochi ↗
-          </a>
+          <Link href="/login" className="land-footer-link">Sign in</Link>
+          <Link href="/app" className="land-footer-link">Launch ↗</Link>
         </nav>
         <p className="land-footer-copy">© 2026 eshmaki.me</p>
       </footer>
 
-      <style>{`
-        /* ════════════════════════════════════════════════════════════
-           OCEAN LANDING — DEPTH AESTHETIC
-           ════════════════════════════════════════════════════════════ */
-
-        /* Override the app shell's global overflow: hidden so this page scrolls */
-        html, body { overflow: auto; overflow-x: hidden; }
-
-        /* ── Skip link ── */
-        .land-skip-link {
-          position: absolute;
-          top: -40px;
-          left: 0;
-          background: var(--accent);
-          color: #fff;
-          padding: 8px 16px;
-          text-decoration: none;
-          z-index: 9999;
-          border-radius: 0 0 6px 0;
-          transition: top 150ms;
-          font-size: 14px;
-          font-weight: 600;
-        }
-        .land-skip-link:focus { top: 0; }
-
-        .land-root {
-          background: var(--bg-void);
-          color: var(--text-primary);
-          min-height: 100dvh;
-          /* clip instead of hidden — doesn't create a spurious scroll container */
-          overflow-x: clip;
-          font-family: 'Inter', system-ui, sans-serif;
-        }
-
-        /* ── Depth atmospheric rays ── */
-        .land-depth {
-          position: fixed; inset: 0; pointer-events: none; z-index: 0;
-          overflow: hidden;
-        }
-        .land-depth-ray {
-          position: absolute;
-          width: 1px;
-          top: 0; bottom: 0;
-          opacity: 0.06;
-          background: linear-gradient(to bottom,
-            transparent 0%,
-            color-mix(in srgb, var(--accent) 80%, transparent) 20%,
-            color-mix(in srgb, var(--accent) 30%, transparent) 60%,
-            transparent 100%
-          );
-          transform-origin: top center;
-        }
-        .land-depth-ray-1 { left: 25%; transform: rotate(-4deg) scaleX(80); animation: ray-drift 12s ease-in-out infinite; }
-        .land-depth-ray-2 { left: 50%; transform: rotate(0deg)  scaleX(60); animation: ray-drift 15s ease-in-out infinite reverse; }
-        .land-depth-ray-3 { left: 75%; transform: rotate(3deg)  scaleX(90); animation: ray-drift 18s ease-in-out infinite; }
-        @keyframes ray-drift {
-          0%, 100% { opacity: 0.04; transform: rotate(-4deg) scaleX(80) translateX(0); }
-          50%       { opacity: 0.08; transform: rotate(-2deg) scaleX(80) translateX(20px); }
-        }
-        .land-depth-particles {
-          position: absolute; inset: 0;
-          background-image:
-            radial-gradient(1px 1px at 20% 30%, var(--accent-subtle) 0%, transparent 100%),
-            radial-gradient(1px 1px at 40% 70%, var(--gold-subtle) 0%, transparent 100%),
-            radial-gradient(1px 1px at 60% 20%, var(--accent-subtle) 0%, transparent 100%),
-            radial-gradient(1px 1px at 80% 55%, var(--gold-subtle) 0%, transparent 100%),
-            radial-gradient(1px 1px at 15% 60%, var(--accent-subtle) 0%, transparent 100%),
-            radial-gradient(1px 1px at 90% 40%, var(--gold-subtle) 0%, transparent 100%);
-          animation: particles-drift 30s linear infinite;
-        }
-        @keyframes particles-drift {
-          0%   { transform: translateY(0); }
-          100% { transform: translateY(-40px); }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .land-depth-ray, .land-depth-particles,
-          .land-badge-sonar, .land-badge-dot,
-          .land-h1-underwave, .land-dm-fill,
-          .land-sonar-ping, .land-token-dot,
-          .land-ch-enter { animation: none !important; }
-          *, *::before, *::after {
-            animation-duration: 0.001ms !important;
-            animation-iteration-count: 1 !important;
-            transition-duration: 0.001ms !important;
-            scroll-behavior: auto !important;
-          }
-        }
-
-        /* ── Nav ── */
-        .land-nav {
-          position: fixed; top: 0; left: 0; right: 0; z-index: 200;
-          display: flex; align-items: center; justify-content: space-between;
-          padding: env(safe-area-inset-top, 0px) clamp(20px, 5vw, 80px) 0;
-          height: calc(60px + env(safe-area-inset-top, 0px));
-          background: color-mix(in srgb, var(--bg-void) 72%, transparent);
-          backdrop-filter: blur(24px) saturate(1.5);
-          border-bottom: 1px solid var(--border-subtle);
-        }
-        .land-nav-logo {
-          display: flex; align-items: center; gap: 9px;
-          text-decoration: none;
-        }
-        .land-nav-wordmark {
-          font-size: 16px; font-weight: 700; letter-spacing: -0.3px;
-          color: var(--text-primary);
-        }
-        .land-nav-links { display: flex; align-items: center; gap: 20px; }
-        .land-nav-link {
-          font-size: 14px; font-weight: 500;
-          color: var(--text-secondary); text-decoration: none;
-          transition: color 0.2s;
-        }
-        .land-nav-link:hover { color: var(--text-primary); text-decoration: none; }
-        .land-nav-cta {
-          display: flex; align-items: center; gap: 6px;
-          font-size: 13px; font-weight: 600; color: var(--bg-void);
-          background: linear-gradient(135deg, var(--accent), var(--accent-hover));
-          text-decoration: none;
-          padding: 7px 16px; border-radius: 20px;
-          transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
-          box-shadow: 0 0 16px var(--accent-glow);
-        }
-        .land-nav-cta:hover { opacity: 0.92; transform: translateY(-1px); text-decoration: none; }
-
-        /* ── Hero ── */
-        .land-hero {
-          position: relative; z-index: 1;
-          padding: calc(160px + env(safe-area-inset-top, 0px)) clamp(20px,5vw,80px) 100px;
-          min-height: 100dvh;
-          display: flex; align-items: center;
-        }
-        .land-hero-body {
-          width: 100%; max-width: 1240px; margin: 0 auto;
-          display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 80px;
-          align-items: center;
-        }
-        @media (max-width: 768px) {
-          .land-hero-body { grid-template-columns: 1fr; }
-          .land-hero-visual { display: none; }
-        }
-
-        .land-hero-copy { display: flex; flex-direction: column; gap: 32px; }
-
-        /* Badge */
-        .land-badge {
-          display: inline-flex; align-items: center; gap: 8px;
-          font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
-          text-transform: uppercase; color: var(--accent);
-          padding: 5px 12px; border-radius: 20px;
-          background: var(--accent-subtle);
-          border: 1px solid var(--accent-border);
-          width: fit-content;
-          position: relative; overflow: hidden;
-        }
-        .land-badge-sonar {
-          position: absolute; inset: 0; border-radius: 20px;
-          background: var(--accent-subtle);
-          animation: sonar-pulse 3s ease-out infinite;
-        }
-        .land-badge-dot {
-          width: 6px; height: 6px; border-radius: 50%;
-          background: var(--accent);
-          box-shadow: 0 0 6px var(--accent-glow);
-          flex-shrink: 0;
-          animation: dot-pulse 2s ease-in-out infinite;
-        }
-        @keyframes sonar-pulse {
-          0% { transform: scale(0.9); opacity: 0.5; }
-          70% { transform: scale(1.4); opacity: 0; }
-          100% { transform: scale(1.4); opacity: 0; }
-        }
-        @keyframes dot-pulse {
-          0%, 100% { box-shadow: 0 0 4px var(--accent-glow); }
-          50%       { box-shadow: 0 0 10px var(--accent); }
-        }
-
-        /* Heading */
-        .land-h1 {
-          font-family: var(--font-display);
-          font-size: var(--text-hero);
-          font-weight: 800;
-          letter-spacing: 0;
-          line-height: 1.0;
-          color: var(--text-primary);
-          margin: 0;
-        }
-        .land-h1-deep {
-          position: relative; display: inline-block;
-          color: var(--accent);
-        }
-        .land-h1-word { position: relative; z-index: 1; }
-        .land-h1-underwave {
-          position: absolute; bottom: -4px; left: 0; right: 0; height: 4px;
-          background: linear-gradient(90deg, var(--accent), var(--gold), var(--accent));
-          border-radius: 2px;
-          animation: wave-shimmer 2s ease-in-out infinite;
-        }
-        @keyframes wave-shimmer {
-          0%, 100% { opacity: 0.7; transform: scaleX(1); }
-          50%       { opacity: 1;   transform: scaleX(1.02); }
-        }
-
-        /* Lead */
-        .land-lead {
-          font-size: clamp(1.05rem, 1.6vw, 1.2rem);
-          line-height: 1.7; color: var(--text-secondary); margin: 0;
-        }
-        .land-inline-channel {
-          font-family: var(--font-mono); font-size: 0.9em;
-          color: var(--accent); background: var(--accent-subtle);
-          padding: 1px 6px; border-radius: 4px;
-          border: 1px solid var(--accent-border);
-        }
-
-        /* CTA buttons */
-        .land-hero-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-        .land-btn-primary {
-          display: inline-flex; align-items: center; gap: 7px;
-          padding: 13px 26px; border-radius: var(--r-md);
-          font-size: 14px; font-weight: 700; color: var(--bg-void);
-          background: color-mix(in srgb, var(--accent) 88%, black 12%);
-          text-decoration: none;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 16px 28px rgba(0,0,0,.28);
-          transition: transform 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
-          letter-spacing: 0.01em;
-        }
-        .land-btn-primary:hover {
-          transform: translateY(-2px);
-          filter: brightness(1.06);
-          text-decoration: none; color: var(--bg-void);
-        }
-        .land-btn-ghost {
-          display: inline-flex; align-items: center; gap: 6px;
-          padding: 13px 22px; border-radius: var(--r-md);
-          font-size: 14px; font-weight: 500;
-          color: var(--text-secondary); text-decoration: none;
-          border: 1px solid var(--border-normal);
-          background: var(--accent-subtle);
-          transition: color 0.2s, background 0.2s, border-color 0.2s, transform 0.2s var(--ease-out);
-        }
-        .land-btn-ghost:hover {
-          color: var(--text-primary); background: color-mix(in srgb, var(--accent-subtle) 200%, transparent);
-          border-color: var(--accent-border); text-decoration: none;
-          transform: translateY(-1px);
-        }
-        .land-btn-lg { padding: 15px 32px; font-size: 15px; }
-        .land-btn-ghost-lg { padding: 14px 26px; font-size: 15px; }
-
-        /* Depth meter — desktop */
-        .land-depth-meter {
-          display: flex; flex-direction: column; gap: 6px;
-          padding-top: 4px;
-        }
-        .land-dm-track {
-          height: 2px; background: var(--border-subtle);
-          border-radius: 2px; overflow: hidden; position: relative;
-        }
-        .land-dm-fill {
-          position: absolute; top: 0; left: 0; bottom: 0;
-          width: 68%;
-          background: linear-gradient(90deg, var(--accent), var(--gold));
-          border-radius: 2px;
-          animation: fill-pulse 4s ease-in-out infinite;
-        }
-        @keyframes fill-pulse {
-          0%, 100% { width: 65%; opacity: 0.8; }
-          50%       { width: 72%; opacity: 1; }
-        }
-        .land-dm-labels {
-          display: flex; justify-content: space-between;
-          font-size: 11px; letter-spacing: 0.05em;
-          color: var(--text-muted); font-variant-numeric: tabular-nums;
-        }
-        .land-dm-depth { color: var(--accent); }
-
-        /* ── Hero visual ── */
-        .land-hero-visual {
-          display: flex; align-items: center; justify-content: center;
-        }
-
-        /* ── Sonar separator ── */
-        .land-sonar-line {
-          position: relative; z-index: 1;
-          display: flex; align-items: center; gap: 16px;
-          padding: 0 clamp(20px, 5vw, 80px);
-          margin: 0 0 70px;
-        }
-        .land-sonar-line::after {
-          content: '';
-          flex: 1;
-          height: 1px;
-          background: linear-gradient(90deg, var(--border-subtle), transparent);
-        }
-        .land-sonar-ping {
-          width: 8px; height: 8px; border-radius: 50%;
-          background: var(--accent); flex-shrink: 0;
-          box-shadow: 0 0 8px var(--accent-glow);
-          animation: ping 2s ease-in-out infinite;
-        }
-        @keyframes ping {
-          0%, 100% { box-shadow: 0 0 4px var(--accent-glow); }
-          50%       { box-shadow: 0 0 14px var(--accent), 0 0 28px var(--accent-subtle); }
-        }
-        .land-sonar-text {
-          font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
-          color: var(--text-muted); font-variant-numeric: tabular-nums;
-        }
-
-        /* ── Features ── */
-        .land-features {
-          position: relative; z-index: 1;
-          padding: 0 clamp(20px, 5vw, 80px) 100px;
-          max-width: 1240px; margin: 0 auto;
-          display: flex; flex-direction: column; gap: 14px;
-        }
-
-        /* ── Bento rows ── */
-        .land-bento-row { display: grid; gap: 14px; }
-        .land-bento-row-1 { grid-template-columns: 1fr 1fr; }
-        .land-bento-row-2 { grid-template-columns: 1fr; }
-        .land-bento-row-3 { grid-template-columns: repeat(3, 1fr); }
-        @media (max-width: 768px) {
-          .land-bento-row-1 { grid-template-columns: 1fr; }
-          .land-bento-row-3 { grid-template-columns: 1fr 1fr; }
-        }
-        @media (max-width: 480px) {
-          .land-bento-row-3 { grid-template-columns: 1fr; }
-        }
-
-        /* ── Cards ── */
-        .land-card {
-          position: relative; overflow: hidden;
-          background: color-mix(in srgb, var(--bg-base) 85%, transparent);
-          border: 1px solid var(--border-subtle);
-          border-radius: 16px;
-          backdrop-filter: blur(12px);
-          transition: border-color 0.3s var(--ease-out), transform 0.25s var(--ease-out), box-shadow 0.3s var(--ease-out);
-        }
-        .land-card:hover {
-          border-color: var(--accent-border);
-          transform: translateY(-3px);
-          box-shadow: 0 16px 48px rgba(0,0,0,0.55), 0 0 0 1px var(--border-normal), 0 0 32px var(--accent-glow);
-        }
-        .land-card-glow {
-          position: absolute; inset: 0; pointer-events: none;
-          border-radius: 16px; opacity: 0;
-          transition: opacity 0.4s var(--ease-out);
-        }
-        .land-card:hover .land-card-glow { opacity: 1; }
-        .land-card-glow-voice  { background: radial-gradient(circle at 25% 50%, var(--accent-subtle) 0%, transparent 65%); }
-        .land-card-glow-session { background: radial-gradient(circle at 80% 20%, var(--gold-subtle) 0%, transparent 60%); }
-        .land-card-glow-tsumugi   { background: radial-gradient(circle at 50% 100%, rgba(14,165,233,0.08) 0%, transparent 60%); }
-        .land-card-glow-irc    { background: radial-gradient(circle at 30% 30%, var(--accent-subtle) 0%, transparent 70%); }
-        .land-card-glow-wb     { background: radial-gradient(circle at 70% 70%, var(--gold-subtle) 0%, transparent 70%); }
-        .land-card-glow-msg    { background: radial-gradient(circle at 50% 20%, var(--accent-subtle) 0%, transparent 70%); }
-
-        /* Top inner shimmer */
-        .land-card::before {
-          content: '';
-          position: absolute;
-          top: 0; left: 20px; right: 20px;
-          height: 1px;
-          background: linear-gradient(90deg, transparent, var(--accent-border), transparent);
-          border-radius: 0 0 99px 99px;
-          opacity: 0.6;
-          transition: opacity 0.3s;
-        }
-        .land-card:hover::before { opacity: 1; }
-
-        .land-card-inner {
-          padding: 32px 28px; display: flex; flex-direction: column; gap: 14px;
-        }
-        .land-card-inner-split {
-          flex-direction: row; gap: 48px; align-items: center;
-        }
-        @media (max-width: 768px) {
-          .land-card-inner-split { flex-direction: column; }
-        }
-        .land-card-text { flex: 1; display: flex; flex-direction: column; gap: 14px; }
-
-        /* Eyebrows — more visually distinct */
-        .land-card-eyebrow {
-          display: inline-flex; align-items: center; gap: 7px;
-          font-size: 10px; font-weight: 800; letter-spacing: 0.12em;
-          text-transform: uppercase;
-          padding: 4px 10px 4px 8px;
-          border-radius: 6px;
-          width: fit-content;
-        }
-        .land-eyebrow-voice {
-          color: var(--accent);
-          background: var(--accent-subtle);
-          border: 1px solid var(--accent-border);
-        }
-        .land-eyebrow-gold {
-          color: var(--gold);
-          background: var(--gold-subtle);
-          border: 1px solid rgba(103,232,249,0.25);
-        }
-        .land-eyebrow-tsumugi {
-          color: #0ea5e9;
-          background: rgba(14,165,233,0.1);
-          border: 1px solid rgba(14,165,233,0.25);
-        }
-        .land-eyebrow-dim {
-          color: var(--text-muted);
-          background: color-mix(in srgb, var(--bg-base) 80%, transparent);
-          border: 1px solid var(--border-subtle);
-        }
-        .land-eyebrow-dim:hover { color: var(--accent); }
-        .land-card-eyebrow svg { opacity: 0.9; flex-shrink: 0; }
-
-        /* Eyebrow status pip */
-        .land-eyebrow-pip {
-          width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0;
-          background: currentColor; opacity: 0.8;
-        }
-        .land-eyebrow-pip-gold { background: var(--gold); }
-        .land-eyebrow-pip-tsumugi { background: #0ea5e9; }
-        .land-eyebrow-pip-dim  { background: var(--text-muted); }
-
-        .land-card-h3 {
-          font-size: 1.2rem; font-weight: 700; letter-spacing: -0.02em;
-          color: var(--text-primary); margin: 0; line-height: 1.3;
-        }
-        .land-card-p {
-          font-size: 0.875rem; line-height: 1.65;
-          color: var(--text-secondary); margin: 0;
-        }
-
-        /* Voice waveform */
-        .land-voice-vis {
-          margin-top: 8px; height: 60px;
-          display: flex; align-items: center;
-        }
-
-        /* Token display */
-        .land-token-display {
-          margin-top: 8px; display: flex; flex-direction: column; gap: 6px;
-        }
-        .land-token-row {
-          font-family: var(--font-mono); font-size: 13px;
-          padding: 8px 12px; border-radius: 8px;
-          background: rgba(0,0,0,0.4); border: 1px solid var(--border-normal);
-          display: flex; align-items: center; gap: 2px;
-        }
-        .land-token-prefix { color: var(--text-muted); }
-        .land-token-body   { color: var(--gold); }
-        .land-token-status {
-          display: flex; align-items: center; gap: 7px;
-          font-size: 12px; color: var(--status-online);
-        }
-        .land-token-dot {
-          width: 6px; height: 6px; border-radius: 50%;
-          background: var(--status-online); flex-shrink: 0;
-          box-shadow: 0 0 6px rgba(52,211,153,0.7);
-          animation: dot-pulse 2s ease-in-out infinite;
-        }
-
-        /* TSUMUGI badges */
-        .land-tsumugi-badges {
-          display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px;
-        }
-        .land-tsumugi-badge {
-          font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
-          text-transform: uppercase;
-          padding: 3px 8px; border-radius: 4px;
-          color: #0ea5e9; background: rgba(14,165,233,0.1);
-          border: 1px solid rgba(14,165,233,0.25);
-        }
-
-        /* TSUMUGI diagram area */
-        .land-tsumugi-diagram { flex-shrink: 0; align-self: flex-start; }
-
-        /* IRC server tag */
-        .land-irc-tag {
-          margin-top: 8px; display: inline-flex;
-        }
-        .land-irc-tag-text {
-          font-family: var(--font-mono); font-size: 11px;
-          color: var(--accent); background: var(--accent-subtle);
-          border: 1px solid var(--accent-border);
-          padding: 4px 10px; border-radius: 6px;
-          letter-spacing: 0.02em;
-        }
-
-        /* ── Shared section headings ── */
-        .land-section-heading {
-          position: relative; z-index: 1;
-          max-width: 740px;
-          margin: 0 auto 28px;
-          text-align: center;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 12px;
-        }
-        .land-section-heading-compact { margin-bottom: 22px; }
-        .land-section-kicker {
-          display: inline-flex;
-          align-items: center;
-          width: fit-content;
-          padding: 5px 10px;
-          border-radius: 999px;
-          border: 1px solid var(--accent-border);
-          background: var(--accent-subtle);
-          color: var(--accent);
-          font-size: 10px;
-          font-weight: 800;
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-        }
-        .land-section-title {
-          margin: 0;
-          color: var(--text-primary);
-          font-size: clamp(2rem, 4vw, 3rem);
-          font-weight: 850;
-          line-height: 1.08;
-          letter-spacing: -0.03em;
-        }
-        .land-section-copy {
-          margin: 0;
-          color: var(--text-secondary);
-          font-size: clamp(0.98rem, 1.4vw, 1.08rem);
-          line-height: 1.65;
-        }
-
-        /* ── Product preview ── */
-        .land-preview {
-          position: relative; z-index: 1;
-          padding: 10px clamp(20px, 5vw, 80px) 90px;
-          max-width: 1240px;
-          margin: 0 auto;
-        }
-        .land-app-preview {
-          display: grid;
-          grid-template-columns: 72px 220px minmax(0, 1fr) 190px;
-          min-height: 430px;
-          overflow: hidden;
-          border-radius: var(--r-2xl, 20px) var(--r-md, 8px) var(--r-lg, 12px) var(--r-sm, 6px);
-          border: 0;
-          background:
-            linear-gradient(180deg, rgba(14,165,233,0.07), transparent 34%),
-            color-mix(in srgb, var(--bg-base) 92%, transparent);
-        }
-        .land-preview-rail,
-        .land-preview-sidebar,
-        .land-preview-chat,
-        .land-preview-members {
-          min-width: 0;
-          border-right: 1px solid var(--border-subtle);
-        }
-        .land-preview-rail {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 12px;
-          padding: 18px 0;
-          background: rgba(0,0,0,0.28);
-        }
-        .land-preview-orb {
-          width: 42px; height: 42px;
-          border-radius: 14px;
-          display: grid; place-items: center;
-          color: var(--text-muted);
-          background: var(--bg-elevated);
-          border: 1px solid var(--border-subtle);
-          font-size: 13px;
-          font-weight: 800;
-        }
-        .land-preview-orb-active {
-          color: var(--bg-void);
-          background: linear-gradient(135deg, var(--accent), var(--gold));
-          box-shadow: 0 0 24px var(--accent-glow);
-        }
-        .land-preview-sidebar {
-          padding: 18px 14px;
-          background: rgba(0,0,0,0.16);
-        }
-        .land-preview-server {
-          color: var(--text-primary);
-          font-size: 14px;
-          font-weight: 800;
-          margin-bottom: 18px;
-        }
-        .land-preview-group {
-          color: var(--text-muted);
-          font-size: 10px;
-          font-weight: 800;
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-          margin: 16px 0 8px;
-        }
-        .land-preview-channel,
-        .land-preview-member {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          height: 34px;
-          padding: 0 10px;
-          border-radius: 8px;
-          color: var(--text-secondary);
-          font-size: 13px;
-          font-weight: 600;
-        }
-        .land-preview-channel span {
-          color: var(--text-muted);
-          font-family: var(--font-mono);
-        }
-        .land-preview-channel-active {
-          color: var(--accent);
-          background: var(--accent-subtle);
-          border: 1px solid var(--accent-border);
-        }
-        .land-preview-voice {
-          color: var(--status-online);
-          background: rgba(52,211,153,0.08);
-          border: 1px solid rgba(52,211,153,0.18);
-        }
-        .land-preview-voice svg { width: 12px; height: 12px; }
-        .land-preview-chat {
-          display: flex;
-          flex-direction: column;
-          background: rgba(2,6,23,0.22);
-        }
-        .land-preview-chat-head {
-          min-height: 58px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 16px;
-          padding: 0 20px;
-          border-bottom: 1px solid var(--border-subtle);
-          color: var(--text-primary);
-          font-size: 15px;
-          font-weight: 800;
-        }
-        .land-preview-chat-head span { color: var(--text-muted); margin-right: 4px; }
-        .land-preview-tools {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          flex-wrap: wrap;
-          justify-content: flex-end;
-        }
-        .land-preview-tools span,
-        .land-preview-pill-row span {
-          margin: 0;
-          padding: 4px 8px;
-          border-radius: 999px;
-          color: var(--text-secondary);
-          background: var(--bg-elevated);
-          border: 1px solid var(--border-subtle);
-          font-size: 11px;
-          font-weight: 700;
-        }
-        .land-preview-message {
-          display: grid;
-          grid-template-columns: 38px minmax(0, 1fr);
-          gap: 12px;
-          padding: 20px;
-          border-bottom: 1px solid var(--border-subtle);
-        }
-        .land-preview-avatar {
-          width: 38px; height: 38px;
-          border-radius: 12px;
-          display: grid; place-items: center;
-          color: var(--bg-void);
-          background: var(--accent);
-          font-size: 14px;
-          font-weight: 900;
-        }
-        .land-preview-avatar-gold { background: var(--gold); }
-        .land-preview-name {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          color: var(--text-primary);
-          font-size: 13px;
-          font-weight: 800;
-          margin-bottom: 4px;
-        }
-        .land-preview-name span {
-          color: var(--text-muted);
-          font-size: 11px;
-          font-weight: 600;
-        }
-        .land-preview-message p {
-          margin: 0;
-          color: var(--text-secondary);
-          font-size: 13px;
-          line-height: 1.55;
-        }
-        .land-preview-pill-row {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 6px;
-          margin-top: 10px;
-        }
-        .land-preview-composer {
-          margin: auto 20px 20px;
-          min-height: 44px;
-          display: flex;
-          align-items: center;
-          padding: 0 14px;
-          border-radius: 12px;
-          color: var(--text-muted);
-          background: var(--bg-elevated);
-          border: 1px solid var(--border-subtle);
-          font-size: 13px;
-        }
-        .land-preview-members {
-          border-right: 0;
-          padding: 18px 14px;
-          background: rgba(0,0,0,0.12);
-        }
-        .land-preview-presence {
-          width: 7px; height: 7px;
-          border-radius: 50%;
-          background: var(--status-online);
-          box-shadow: 0 0 8px rgba(52,211,153,0.55);
-        }
-        .land-preview-status {
-          margin-top: 22px;
-          padding: 14px;
-          border-radius: 12px;
-          background: var(--accent-subtle);
-          border: 1px solid var(--accent-border);
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-        .land-preview-status strong {
-          color: var(--accent);
-          font-size: 12px;
-        }
-        .land-preview-status span {
-          color: var(--text-secondary);
-          font-size: 12px;
-          line-height: 1.45;
-        }
-
-        /* ── Capabilities ── */
-        .land-capabilities {
-          position: relative; z-index: 1;
-          max-width: 1240px;
-          margin: 0 auto;
-          padding: 0 clamp(20px, 5vw, 80px) 90px;
-        }
-        .land-cap-grid {
-          display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
-          gap: 14px;
-        }
-        .land-cap-card {
-          border: 1px solid var(--border-subtle);
-          border-radius: 16px;
-          padding: 22px;
-          background: color-mix(in srgb, var(--bg-base) 86%, transparent);
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
-        }
-        .land-cap-card h3 {
-          margin: 0 0 14px;
-          color: var(--text-primary);
-          font-size: 1rem;
-          letter-spacing: -0.01em;
-        }
-        .land-cap-card ul {
-          list-style: none;
-          margin: 0;
-          padding: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 11px;
-        }
-        .land-cap-card li {
-          display: flex;
-          align-items: center;
-          gap: 9px;
-          color: var(--text-secondary);
-          font-size: 13px;
-          line-height: 1.35;
-        }
-        .land-cap-check {
-          width: 7px; height: 7px;
-          border-radius: 50%;
-          background: var(--accent);
-          box-shadow: 0 0 8px var(--accent-glow);
-          flex-shrink: 0;
-        }
-
-        /* ── Connect ── */
-        .land-connect {
-          position: relative; z-index: 1;
-          max-width: 1240px;
-          margin: 0 auto;
-          padding: 0 clamp(20px, 5vw, 80px) 90px;
-        }
-        .land-connect-grid {
-          display: grid;
-          grid-template-columns: 1.2fr 1fr 1fr;
-          gap: 14px;
-        }
-        .land-connect-card {
-          min-height: 230px;
-          display: flex;
-          flex-direction: column;
-          align-items: flex-start;
-          gap: 12px;
-          padding: 26px;
-          border-radius: 18px;
-          border: 1px solid var(--border-subtle);
-          background: color-mix(in srgb, var(--bg-base) 88%, transparent);
-        }
-        .land-connect-card-primary {
-          background:
-            radial-gradient(circle at 20% 20%, var(--accent-subtle), transparent 58%),
-            color-mix(in srgb, var(--bg-elevated) 88%, transparent);
-          border-color: var(--accent-border);
-        }
-        .land-connect-label {
-          color: var(--accent);
-          background: var(--accent-subtle);
-          border: 1px solid var(--accent-border);
-          border-radius: 999px;
-          padding: 4px 9px;
-          font-size: 10px;
-          font-weight: 800;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-        }
-        .land-connect-card h3 {
-          margin: 0;
-          color: var(--text-primary);
-          font-size: 1.15rem;
-          letter-spacing: -0.02em;
-        }
-        .land-connect-card p {
-          margin: 0;
-          color: var(--text-secondary);
-          font-size: 0.9rem;
-          line-height: 1.6;
-        }
-        .land-connect-card code {
-          margin-top: auto;
-          color: var(--gold);
-          background: rgba(0,0,0,0.36);
-          border: 1px solid var(--border-normal);
-          border-radius: 8px;
-          padding: 8px 10px;
-          font-family: var(--font-mono);
-          font-size: 12px;
-        }
-        .land-connect-action {
-          margin-top: auto;
-          display: inline-flex;
-          align-items: center;
-          gap: 7px;
-          color: var(--bg-void);
-          background: linear-gradient(135deg, var(--accent), var(--accent-hover));
-          border-radius: 10px;
-          padding: 10px 14px;
-          font-size: 13px;
-          font-weight: 800;
-          text-decoration: none;
-        }
-        .land-connect-action:hover { text-decoration: none; color: var(--bg-void); }
-        @media (max-width: 980px) {
-          .land-connect-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        }
-
-        /* ── FAQ ── */
-        .land-faq {
-          position: relative; z-index: 1;
-          max-width: 1120px;
-          margin: 0 auto;
-          padding: 0 clamp(20px, 5vw, 80px) 80px;
-        }
-        .land-faq-grid {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 14px;
-        }
-        .land-faq-item {
-          border: 1px solid var(--border-subtle);
-          border-radius: 16px;
-          background: color-mix(in srgb, var(--bg-base) 84%, transparent);
-          padding: 22px;
-        }
-        .land-faq-item h3 {
-          margin: 0 0 8px;
-          color: var(--text-primary);
-          font-size: 0.98rem;
-          letter-spacing: -0.01em;
-        }
-        .land-faq-item p {
-          margin: 0;
-          color: var(--text-secondary);
-          font-size: 0.88rem;
-          line-height: 1.6;
-        }
-
-        /* ── Community ── */
-        .land-community {
-          position: relative; z-index: 1;
-          overflow: hidden;
-          margin: 20px clamp(20px, 5vw, 80px);
-          border-radius: 28px;
-          background: linear-gradient(
-            155deg,
-            color-mix(in srgb, var(--bg-elevated) 80%, transparent) 0%,
-            color-mix(in srgb, var(--bg-deep) 90%, transparent) 100%
-          );
-          border: 1px solid var(--border-normal);
-          padding: clamp(70px, 9vw, 110px) clamp(32px, 5vw, 80px);
-          text-align: center;
-          box-shadow: inset 0 1px 0 var(--accent-border), 0 32px 80px rgba(0,0,0,0.4);
-        }
-        .land-community::before {
-          content: '';
-          position: absolute;
-          top: 0; left: 10%; right: 10%;
-          height: 1px;
-          background: linear-gradient(90deg, transparent, var(--accent-border), transparent);
-        }
-        /* Subtle bottom glow */
-        .land-community::after {
-          content: '';
-          position: absolute;
-          bottom: -60px; left: 20%; right: 20%;
-          height: 120px;
-          background: radial-gradient(ellipse, var(--accent-glow) 0%, transparent 70%);
-          pointer-events: none;
-        }
-        .land-community-bg {
-          position: absolute; inset: 0; pointer-events: none; opacity: 0.15;
-          display: flex; align-items: center; justify-content: center;
-        }
-        .land-community-inner {
-          position: relative; z-index: 1;
-          display: flex; flex-direction: column;
-          align-items: center; gap: 28px;
-          max-width: 680px; margin: 0 auto;
-        }
-        .land-community-label {
-          display: inline-flex; align-items: center; gap: 8px;
-          font-size: 11px; font-weight: 800; letter-spacing: 0.1em;
-          text-transform: uppercase; color: var(--text-muted);
-        }
-        .land-community-label-dot {
-          width: 6px; height: 6px; border-radius: 50%;
-          background: var(--status-online);
-          box-shadow: 0 0 8px rgba(52,211,153,0.6);
-          flex-shrink: 0;
-          animation: dot-pulse 2s ease-in-out infinite;
-        }
-        .land-community-h2 {
-          font-size: clamp(2.2rem, 4.5vw, 3.5rem); font-weight: 800;
-          letter-spacing: -0.03em; line-height: 1.1; color: var(--text-primary); margin: 0;
-        }
-        .land-community-p {
-          font-size: clamp(1rem, 1.4vw, 1.1rem); line-height: 1.7;
-          color: var(--text-secondary); margin: 0;
-        }
-        .land-channel-pill {
-          font-family: var(--font-mono); font-size: 0.92em;
-          color: var(--accent); background: var(--accent-subtle);
-          padding: 1px 6px; border-radius: 4px;
-          border: 1px solid var(--accent-border);
-        }
-
-        /* Channel list preview */
-        .land-channels {
-          display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-          justify-content: center;
-          padding: 16px 20px;
-          background: var(--bg-void);
-          border: 1px solid var(--border-subtle);
-          border-radius: 14px;
-          width: 100%;
-          max-width: 480px;
-          box-shadow: inset 0 1px 0 var(--border-subtle);
-        }
-        /* Channel staggered entrance */
-        .land-ch-enter {
-          animation: ch-slide-in 0.5s var(--ease-out) both;
-          animation-delay: var(--ch-delay, 0ms);
-        }
-        @keyframes ch-slide-in {
-          from { opacity: 0; transform: translateY(6px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        .land-ch {
-          display: flex; align-items: center; gap: 5px;
-          font-size: 13px; font-family: var(--font-mono);
-          padding: 6px 14px; border-radius: 20px;
-          background: var(--bg-elevated);
-          border: 1px solid var(--border-subtle);
-          color: var(--text-secondary);
-          transition: border-color 0.25s, color 0.25s, background 0.25s, transform 0.2s var(--ease-out);
-          cursor: default;
-        }
-        .land-ch:hover {
-          border-color: var(--border-normal);
-          color: var(--text-primary);
-          transform: translateY(-1px);
-        }
-        .land-ch-hash { color: var(--text-muted); font-size: 12px; }
-        .land-ch-active {
-          background: var(--accent-subtle);
-          border-color: var(--accent-border);
-          color: var(--accent);
-          box-shadow: 0 0 12px var(--accent-subtle);
-        }
-        .land-ch-live {
-          font-size: 9px; font-weight: 800; letter-spacing: 0.06em;
-          color: var(--bg-void); background: var(--accent);
-          padding: 2px 6px; border-radius: 4px; margin-left: 2px;
-        }
-        .land-ch-voice {
-          border-color: rgba(52,211,153,0.25);
-          color: var(--status-online);
-        }
-        .land-ch-voice:hover { border-color: rgba(52,211,153,0.45); }
-        .land-ch-voice svg { width: 11px; height: 11px; opacity: 0.9; }
-
-        /* Community CTA group */
-        .land-community-cta-group {
-          display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-          justify-content: center;
-        }
-
-        /* ── Footer ── */
-        .land-footer {
-          position: relative; z-index: 1;
-          display: grid;
-          grid-template-columns: 1fr auto auto;
-          align-items: center;
-          gap: 24px 40px;
-          padding: 40px clamp(20px, 5vw, 80px) max(40px, env(safe-area-inset-bottom, 0px));
-          border-top: 1px solid var(--border-subtle);
-          margin-top: 20px;
-        }
-        .land-footer-left { display: flex; flex-direction: column; gap: 5px; }
-        .land-footer-logo {
-          display: flex; align-items: center; gap: 8px;
-          font-size: 15px; font-weight: 700; color: var(--text-primary);
-        }
-        .land-footer-tagline { font-size: 12px; color: var(--text-muted); }
-        .land-footer-links { display: flex; align-items: center; gap: 20px; }
-        .land-footer-link {
-          font-size: 13px; color: var(--text-muted); text-decoration: none;
-          transition: color 0.2s;
-        }
-        .land-footer-link:hover { color: var(--text-secondary); text-decoration: none; }
-        .land-footer-copy { font-size: 12px; color: var(--text-muted); margin: 0; white-space: nowrap; }
-
-        /* ── Mobile — 640px and below ── */
-        @media (max-width: 640px) {
-          .land-nav {
-            height: calc(52px + env(safe-area-inset-top, 0px));
-            padding: env(safe-area-inset-top, 0px) 16px 0;
-          }
-          .land-nav-link { display: none; }
-          .land-nav-wordmark { font-size: 15px; }
-          .land-nav-cta { font-size: 12px; padding: 6px 14px; }
-
-          .land-hero { padding: calc(80px + env(safe-area-inset-top, 0px)) 16px 64px; min-height: auto; }
-          .land-hero-body { gap: 32px; }
-          .land-hero-copy { gap: 20px; }
-          .land-h1 { font-size: clamp(2.6rem, 9vw, 3.4rem); letter-spacing: -0.03em; }
-          .land-lead { font-size: 0.97rem; line-height: 1.65; }
-
-          .land-hero-actions { flex-direction: column; align-items: stretch; gap: 10px; }
-          .land-btn-primary, .land-btn-ghost { justify-content: center; padding: 15px 20px; font-size: 15px; text-align: center; }
-
-          .land-depth-meter { display: none; }
-
-          .land-sonar-line { margin-bottom: 40px; padding: 0 16px; }
-          .land-sonar-text { font-size: 12px; letter-spacing: 0.05em; }
-
-          .land-features { padding: 0 12px 64px; }
-          .land-bento-row { gap: 10px; }
-          .land-bento-row-1, .land-bento-row-2, .land-bento-row-3 { grid-template-columns: 1fr; }
-
-          .land-card-inner { padding: 22px 18px; gap: 10px; }
-          .land-card-inner-split { flex-direction: column; gap: 20px; }
-          .land-tsumugi-diagram { align-self: center; }
-          .land-card-h3 { font-size: 1.05rem; }
-          .land-card-p { font-size: 0.85rem; }
-
-          .land-section-heading { margin-bottom: 20px; align-items: flex-start; text-align: left; }
-          .land-section-title { font-size: clamp(1.75rem, 8vw, 2.25rem); }
-          .land-preview, .land-capabilities, .land-connect, .land-faq {
-            padding-left: 12px;
-            padding-right: 12px;
-            padding-bottom: 64px;
-          }
-          .land-app-preview {
-            grid-template-columns: 56px minmax(0, 1fr);
-            min-height: auto;
-            border-radius: 18px;
-          }
-          .land-preview-rail { grid-row: 1 / span 3; }
-          .land-preview-sidebar { border-right: 0; }
-          .land-preview-chat {
-            grid-column: 2;
-            border-top: 1px solid var(--border-subtle);
-            border-right: 0;
-          }
-          .land-preview-chat-head { align-items: flex-start; flex-direction: column; padding: 14px; gap: 10px; }
-          .land-preview-tools { justify-content: flex-start; }
-          .land-preview-message { padding: 16px 14px; }
-          .land-preview-composer { margin: 10px 14px 14px; }
-          .land-preview-members {
-            grid-column: 2;
-            border-top: 1px solid var(--border-subtle);
-            padding: 14px;
-          }
-          .land-cap-grid,
-          .land-connect-grid,
-          .land-faq-grid { grid-template-columns: 1fr; }
-          .land-connect-card { min-height: 0; padding: 22px; }
-
-          .land-community { margin: 10px 12px; padding: 44px 20px; border-radius: 20px; }
-          .land-community-h2 { font-size: clamp(1.8rem, 8vw, 2.4rem); }
-          .land-community-p { font-size: 0.95rem; }
-          .land-channels { padding: 14px 14px; gap: 7px; }
-          .land-ch { font-size: 12px; padding: 5px 11px; }
-          .land-community-cta-group { flex-direction: column; align-items: stretch; gap: 10px; }
-          .land-btn-lg, .land-btn-ghost-lg { text-align: center; justify-content: center; }
-
-          .land-footer {
-            grid-template-columns: 1fr;
-            text-align: center;
-            padding: 28px 16px max(28px, env(safe-area-inset-bottom, 0px));
-            gap: 16px;
-          }
-          .land-footer-links { flex-wrap: wrap; justify-content: center; gap: 14px; }
-          .land-footer-left { align-items: center; }
-          .land-footer-copy { order: 3; }
-        }
-
-        /* ── Mobile — 375px and below ── */
-        @media (max-width: 375px) {
-          .land-h1 { font-size: 2.4rem; }
-          .land-card-inner { padding: 18px 14px; }
-          .land-community { margin: 10px 8px; padding: 36px 16px; }
-          .land-features { padding: 0 8px 56px; }
-          .land-preview, .land-capabilities, .land-connect, .land-faq {
-            padding-left: 8px;
-            padding-right: 8px;
-          }
-          .land-preview-message {
-            grid-template-columns: 32px minmax(0, 1fr);
-            gap: 10px;
-          }
-          .land-preview-avatar { width: 32px; height: 32px; border-radius: 10px; }
-          .land-hero { padding: calc(72px + env(safe-area-inset-top, 0px)) 12px 56px; }
-          .land-nav { padding: env(safe-area-inset-top, 0px) 12px 0; }
-        }
-      `}</style>
+      <style>{LANDING_CSS}</style>
     </main>
   );
 }
 
-// ── Custom CSS property type ──────────────────────────────────────────────
-type ChDelayCSSProps = CSSProperties & { '--ch-delay'?: string };
+/* ── Section mark (editorial divider) ───────────────────────────────── */
+function SectionMark({ label, index }: { label: string; index: string }) {
+  return (
+    <div className="land-mark" aria-hidden>
+      <span className="land-mark-index">{index}</span>
+      <span className="land-mark-rule" />
+      <span className="land-mark-label">{label}</span>
+      <span className="land-mark-rule" />
+    </div>
+  );
+}
 
-// ── SVG Components ─────────────────────────────────────────────────────────────
+// ── Custom CSS property types ───────────────────────────────────────────────
+type ChDelayCSSProps = CSSProperties & { '--ch-delay'?: string };
+type ArchCSSProps = CSSProperties & { '--arch-i'?: number };
+type DiCSSProps = CSSProperties & { '--di-i'?: number };
+
+// ── SVG components ─────────────────────────────────────────────────────────
 
 function OceanLogo({ size = 28 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 28 28" fill="none">
-      <circle cx="14" cy="14" r="12" stroke="var(--accent)" strokeWidth="1.5" fill="var(--accent-subtle)" />
-      <path d="M4 14c3-4 6-4 6 0s3 4 6 0 3-4 6 0" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-      <path d="M4 17c3-3 6-3 6 0s3 3 6 0 3-3 6 0" stroke="var(--gold)" strokeWidth="1" strokeLinecap="round" fill="none" opacity="0.5" />
+    <svg width={size} height={size} viewBox="0 0 28 28" fill="none" aria-hidden>
+      <circle cx="14" cy="14" r="12" stroke="var(--lux)" strokeWidth="1.4" fill="var(--lux-subtle)" />
+      <path d="M4 14c3-4 6-4 6 0s3 4 6 0 3-4 6 0" stroke="var(--lux)" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+      <path d="M4 17c3-3 6-3 6 0s3 3 6 0 3-3 6 0" stroke="var(--accent)" strokeWidth="1" strokeLinecap="round" fill="none" opacity="0.6" />
     </svg>
   );
 }
 
 function ArrowRight({ size = 14 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M2.5 7h9M8 3.5L11.5 7 8 10.5" />
     </svg>
   );
@@ -1660,7 +710,7 @@ function ArrowRight({ size = 14 }: { size?: number }) {
 
 function VoiceIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <svg width="12" height="12" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
       <path d="M7.5 1a2 2 0 0 0-2 2v4.5a2 2 0 0 0 4 0V3a2 2 0 0 0-2-2z" />
       <path d="M3.5 6.5a4 4 0 0 0 8 0" strokeLinecap="round" />
       <path d="M7.5 10.5v3" strokeLinecap="round" />
@@ -1670,7 +720,7 @@ function VoiceIcon() {
 
 function TokenIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <svg width="12" height="12" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
       <rect x="2" y="4" width="11" height="7.5" rx="1.5" />
       <path d="M5 7.5h5M5 9.5h3" strokeLinecap="round" />
       <circle cx="11" cy="4" r="2" fill="currentColor" stroke="none" />
@@ -1680,7 +730,7 @@ function TokenIcon() {
 
 function TsumugiIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <svg width="12" height="12" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
       <path d="M7.5 1L2 4v5c0 3.5 2.5 6.5 5.5 7.5C10.5 15.5 13 12.5 13 9V4L7.5 1z" strokeLinejoin="round" />
       <path d="M5.5 7.5l1.5 1.5 3-3" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
@@ -1689,209 +739,174 @@ function TsumugiIcon() {
 
 function IrcIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <svg width="12" height="12" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
       <path d="M2 3a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H5l-3 2V3z" strokeLinejoin="round" />
       <path d="M5 6h5M5 8.5h3" strokeLinecap="round" />
     </svg>
   );
 }
 
-function WbIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <rect x="1.5" y="1.5" width="12" height="10" rx="1.5" />
-      <path d="M4 9l2-2 1.5 1.5L10 6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M4 12.5h7" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 function MsgIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <svg width="12" height="12" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
       <path d="M13 1.5H2A1.5 1.5 0 0 0 .5 3v7A1.5 1.5 0 0 0 2 11.5h2.5L7.5 14l3-2.5H13a1.5 1.5 0 0 0 1.5-1.5V3A1.5 1.5 0 0 0 13 1.5z" />
       <path d="M4.5 5.5h6M4.5 8h4" strokeLinecap="round" />
     </svg>
   );
 }
 
+function IdIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+      <rect x="1.5" y="3" width="12" height="9" rx="1.5" />
+      <circle cx="5" cy="7" r="1.6" />
+      <path d="M3 10.5c.4-1.2 1.1-1.6 2-1.6s1.6.4 2 1.6M9 6h3M9 8.5h2.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function VoiceSmIcon() {
   return (
-    <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4">
+    <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden>
       <path d="M6 1a1.5 1.5 0 0 0-1.5 1.5v3a1.5 1.5 0 0 0 3 0V2.5A1.5 1.5 0 0 0 6 1z" />
       <path d="M2.5 5a3.5 3.5 0 0 0 7 0M6 8.5V11" strokeLinecap="round" />
     </svg>
   );
 }
 
-// ── Ocean depth visualization (right side hero) ────────────────────────────
-
-function OceanDepthVis() {
+function ShieldIcon() {
   return (
-    <svg width="420" height="500" viewBox="0 0 420 500" fill="none" role="img" aria-label="Ocean depth visualization showing connected community channels">
-      <defs>
-        <linearGradient id="ocean-depth" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.15" />
-          <stop offset="40%" stopColor="#0284c7" stopOpacity="0.08" />
-          <stop offset="100%" stopColor="#020b18" stopOpacity="0.9" />
-        </linearGradient>
-        <linearGradient id="glow-line" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0" />
-          <stop offset="50%" stopColor="#0ea5e9" stopOpacity="0.8" />
-          <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0" />
-        </linearGradient>
-        <filter id="blur-glow">
-          <feGaussianBlur stdDeviation="3" result="blur" />
-          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-        <filter id="node-glow">
-          <feGaussianBlur stdDeviation="6" result="blur" />
-          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-        <radialGradient id="bio-glow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#67e8f9" stopOpacity="0.6" />
-          <stop offset="100%" stopColor="#67e8f9" stopOpacity="0" />
-        </radialGradient>
-        {/* Animated wave path */}
-        <linearGradient id="wave-grad-1" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.05" />
-          <stop offset="50%" stopColor="#0ea5e9" stopOpacity="0.2" />
-          <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0.05" />
-        </linearGradient>
-      </defs>
-
-      {/* Ocean water fill */}
-      <rect width="420" height="500" fill="url(#ocean-depth)" rx="20" />
-
-      {/* Wave layers at top — animated */}
-      <g opacity="0.6">
-        <path d="M0 60 Q52 45 105 60 Q157 75 210 60 Q262 45 315 60 Q367 75 420 60 L420 80 Q367 95 315 80 Q262 65 210 80 Q157 95 105 80 Q52 65 0 80Z"
-          fill="url(#wave-grad-1)">
-          <animateTransform attributeName="transform" type="translate" values="0,0;-105,0;0,0" dur="8s" repeatCount="indefinite" calcMode="spline" keySplines="0.45 0 0.55 1;0.45 0 0.55 1" />
-        </path>
-        <path d="M0 80 Q70 65 140 80 Q210 95 280 80 Q350 65 420 80 L420 95 Q350 110 280 95 Q210 80 140 95 Q70 110 0 95Z"
-          fill="url(#wave-grad-1)" opacity="0.5">
-          <animateTransform attributeName="transform" type="translate" values="0,0;105,0;0,0" dur="11s" repeatCount="indefinite" calcMode="spline" keySplines="0.45 0 0.55 1;0.45 0 0.55 1" />
-        </path>
-      </g>
-
-      {/* Depth level lines */}
-      {[120, 200, 280, 360, 440].map((y, i) => (
-        <g key={y}>
-          <line x1="20" y1={y} x2="400" y2={y} stroke="rgba(14,165,233,0.06)" strokeWidth="1" />
-          <text x="24" y={y - 5} fill="rgba(14,165,233,0.25)" fontSize="8.5" fontFamily="monospace">
-            {`${[200,500,1000,2000,4000][i]}m`}
-          </text>
-        </g>
-      ))}
-
-      {/* Sunlight rays from top */}
-      {[80, 160, 240, 330].map((x, i) => (
-        <line
-          key={x}
-          x1={x} y1={0}
-          x2={x + (i % 2 === 0 ? -24 : 24)} y2={260}
-          stroke="url(#glow-line)"
-          strokeWidth={i === 1 ? 2 : 1}
-          opacity={0.45 - i * 0.08}
-        />
-      ))}
-
-      {/* Connecting lines between nodes */}
-      {[
-        [120, 100, 300, 80],
-        [120, 100, 200, 200],
-        [300, 80,  200, 200],
-        [200, 200, 80,  265],
-        [200, 200, 340, 305],
-        [80,  265, 340, 305],
-      ].map(([x1,y1,x2,y2], i) => (
-        <line key={i} x1={x1} y1={y1} x2={x2} y2={y2}
-          stroke="rgba(14,165,233,0.1)" strokeWidth="1"
-          strokeDasharray={i > 3 ? "4 4" : "none"}
-        />
-      ))}
-
-      {/* Animated chat-bubble/message nodes */}
-      {[
-        { cx: 120, cy: 100, r: 32, label: '#root', active: true, voice: false },
-        { cx: 300, cy: 80,  r: 23, label: '#dev',  active: false, voice: false },
-        { cx: 200, cy: 200, r: 28, label: 'voice', active: false, voice: true },
-        { cx: 80,  cy: 265, r: 19, label: '#art',  active: false, voice: false },
-        { cx: 340, cy: 305, r: 21, label: '#lounge', active: false, voice: false },
-      ].map(({ cx, cy, r, label, active, voice }) => (
-        <g key={label} filter={active ? "url(#node-glow)" : "url(#blur-glow)"}>
-          <circle
-            cx={cx} cy={cy} r={r}
-            fill={active ? 'rgba(14,165,233,0.22)' : voice ? 'rgba(52,211,153,0.14)' : 'rgba(14,165,233,0.08)'}
-            stroke={active ? 'rgba(14,165,233,0.8)' : voice ? 'rgba(52,211,153,0.45)' : 'rgba(14,165,233,0.22)'}
-            strokeWidth={active ? 1.5 : 1}
-          />
-          {active && (
-            <>
-              <circle cx={cx} cy={cy} r={r + 7} fill="none"
-                stroke="rgba(14,165,233,0.18)" strokeWidth="1"
-                strokeDasharray="3 3">
-                <animateTransform attributeName="transform" type="rotate" from={`0 ${cx} ${cy}`} to={`360 ${cx} ${cy}`} dur="20s" repeatCount="indefinite" />
-              </circle>
-              <circle cx={cx} cy={cy} r={r + 14} fill="none"
-                stroke="rgba(14,165,233,0.07)" strokeWidth="1">
-                <animate attributeName="r" values={`${r+12};${r+18};${r+12}`} dur="3s" repeatCount="indefinite" />
-                <animate attributeName="opacity" values="0.4;0;0.4" dur="3s" repeatCount="indefinite" />
-              </circle>
-            </>
-          )}
-          <text x={cx} y={cy + 4} textAnchor="middle"
-            fill={active ? '#0ea5e9' : voice ? '#34d399' : 'rgba(14,165,233,0.55)'}
-            fontSize={label.length > 6 ? 7.5 : 8.5}
-            fontFamily="monospace" fontWeight={active ? '700' : '400'}
-          >
-            {voice ? '♪' : '#'}{label.replace('#', '')}
-          </text>
-        </g>
-      ))}
-
-      {/* Bioluminescent particles — deep zone */}
-      {[
-        [160, 355, 0.55], [250, 385, 0.4], [90, 425, 0.5], [320, 415, 0.35],
-        [185, 465, 0.6],  [280, 445, 0.4], [60,  345, 0.3], [375, 365, 0.45],
-        [130, 410, 0.35], [305, 475, 0.5],
-      ].map(([cx, cy, op], i) => (
-        <circle key={i} cx={cx} cy={cy} r={1.5}
-          fill="#67e8f9"
-          opacity={op}>
-          <animate attributeName="opacity" values={`${op};${(op as number) * 0.3};${op}`} dur={`${3 + (i % 4)}s`} repeatCount="indefinite" begin={`${i * 0.4}s`} />
-        </circle>
-      ))}
-
-      {/* Depth vessel (Ocean app icon) near bottom */}
-      <g transform="translate(183, 425)">
-        <ellipse cx="27" cy="16" rx="24" ry="13"
-          fill="rgba(14,165,233,0.12)"
-          stroke="rgba(14,165,233,0.55)"
-          strokeWidth="1.5"
-        />
-        {/* Vessel glow */}
-        <ellipse cx="27" cy="16" rx="24" ry="13"
-          fill="none"
-          stroke="rgba(14,165,233,0.2)"
-          strokeWidth="6"
-          filter="url(#blur-glow)"
-        />
-        <text x="27" y="20" textAnchor="middle"
-          fill="#0ea5e9" fontSize="9.5" fontFamily="monospace" fontWeight="600"
-        >
-          Ocean
-        </text>
-        <circle cx="13" cy="16" r="3.5" fill="rgba(14,165,233,0.15)" stroke="rgba(14,165,233,0.4)" strokeWidth="1" />
-        <circle cx="27" cy="16" r="3.5" fill="rgba(14,165,233,0.15)" stroke="rgba(14,165,233,0.4)" strokeWidth="1" />
-        <circle cx="41" cy="16" r="3.5" fill="rgba(14,165,233,0.15)" stroke="rgba(14,165,233,0.4)" strokeWidth="1" />
-      </g>
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden>
+      <path d="M10 1.5L3 4v5c0 4.5 3.2 8.3 7 9.5 3.8-1.2 7-5 7-9.5V4l-7-2.5z" strokeLinejoin="round" />
+      <path d="M7 10l2 2 4-4.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
 
-// ── Waveform visualization ──────────────────────────────────────────────────
+function LockIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden>
+      <rect x="3.5" y="8.5" width="13" height="9" rx="2" />
+      <path d="M6 8.5V6a4 4 0 0 1 8 0v2.5" strokeLinecap="round" />
+      <circle cx="10" cy="13" r="1.4" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function KeyIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden>
+      <circle cx="6.5" cy="7" r="3.5" />
+      <path d="M9 9.5l6 6M13 13.5l1.6-1.6M14.8 15.3l1.6-1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function MeshGlyph() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden>
+      <circle cx="10" cy="3.5" r="1.8" />
+      <circle cx="4" cy="14" r="1.8" />
+      <circle cx="16" cy="14" r="1.8" />
+      <path d="M10 5.3L5 12.4M10 5.3l5 7.1M5.5 14h9" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// ── Mesh visualization (hero + CTA backdrop) ───────────────────────────────
+
+function MeshVis({ muted = false }: { muted?: boolean }) {
+  const nodes: Array<[number, number, number]> = [
+    [210, 110, 1], // primary
+    [110, 60, 0],
+    [320, 70, 0],
+    [70, 190, 0],
+    [350, 200, 0],
+    [200, 250, 0],
+    [150, 160, 0],
+    [270, 165, 0],
+  ];
+  const edges: Array<[number, number]> = [
+    [0, 1], [0, 2], [0, 6], [0, 7], [1, 6], [2, 7],
+    [6, 3], [7, 4], [6, 5], [7, 5], [3, 5], [4, 5], [1, 2],
+  ];
+  return (
+    <svg
+      width="420"
+      height="320"
+      viewBox="0 0 420 320"
+      fill="none"
+      role="img"
+      aria-label="Orochi mesh: a primary node gossiping with peer servers"
+      className={muted ? 'land-meshvis land-meshvis-muted' : 'land-meshvis'}
+    >
+      <defs>
+        <radialGradient id="mesh-core" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="var(--lux)" stopOpacity="0.55" />
+          <stop offset="100%" stopColor="var(--lux)" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id="mesh-bg" cx="50%" cy="42%" r="62%">
+          <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.10" />
+          <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+
+      <rect width="420" height="320" fill="url(#mesh-bg)" />
+
+      {/* edges */}
+      {edges.map(([a, b], i) => (
+        <line
+          key={i}
+          x1={nodes[a][0]} y1={nodes[a][1]}
+          x2={nodes[b][0]} y2={nodes[b][1]}
+          stroke="var(--accent)"
+          strokeOpacity={a === 0 || b === 0 ? 0.45 : 0.22}
+          strokeWidth={a === 0 || b === 0 ? 1.2 : 1}
+        />
+      ))}
+
+      {/* gossip pulses along primary edges */}
+      {!muted && edges.filter(([a, b]) => a === 0 || b === 0).map(([a, b], i) => {
+        const [x1, y1] = nodes[a];
+        const [x2, y2] = nodes[b];
+        return (
+          <circle key={`p${i}`} r="2.4" fill="var(--lux)">
+            <animate attributeName="cx" values={`${x1};${x2};${x1}`} dur={`${3.4 + i * 0.5}s`} repeatCount="indefinite" calcMode="spline" keySplines="0.45 0 0.55 1;0.45 0 0.55 1" />
+            <animate attributeName="cy" values={`${y1};${y2};${y1}`} dur={`${3.4 + i * 0.5}s`} repeatCount="indefinite" calcMode="spline" keySplines="0.45 0 0.55 1;0.45 0 0.55 1" />
+            <animate attributeName="opacity" values="0;0.9;0" dur={`${3.4 + i * 0.5}s`} repeatCount="indefinite" />
+          </circle>
+        );
+      })}
+
+      {/* nodes */}
+      {nodes.map(([cx, cy, primary], i) => (
+        <g key={i}>
+          {primary === 1 && (
+            <>
+              <circle cx={cx} cy={cy} r="46" fill="url(#mesh-core)" />
+              {!muted && (
+                <circle cx={cx} cy={cy} r="22" fill="none" stroke="var(--lux)" strokeOpacity="0.35" strokeWidth="1">
+                  <animate attributeName="r" values="22;40;22" dur="3.6s" repeatCount="indefinite" />
+                  <animate attributeName="stroke-opacity" values="0.4;0;0.4" dur="3.6s" repeatCount="indefinite" />
+                </circle>
+              )}
+            </>
+          )}
+          <circle
+            cx={cx} cy={cy}
+            r={primary === 1 ? 9 : 5}
+            fill={primary === 1 ? 'var(--lux)' : 'var(--bg-overlay)'}
+            stroke={primary === 1 ? 'var(--lux)' : 'var(--accent)'}
+            strokeOpacity={primary === 1 ? 1 : 0.7}
+            strokeWidth="1.4"
+          />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+// ── Waveform visualization ─────────────────────────────────────────────────
 
 function WaveformVis() {
   const bars = [0.3, 0.5, 0.8, 1.0, 0.7, 0.9, 0.6, 0.4, 0.8, 0.7, 0.5, 0.9, 1.0, 0.6, 0.3, 0.7, 0.9, 0.5, 0.4, 0.8];
@@ -1899,8 +914,8 @@ function WaveformVis() {
     <svg width="100%" height="60" viewBox="0 0 200 60" preserveAspectRatio="none" role="img" aria-label="Audio waveform">
       <defs>
         <linearGradient id="waveform-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#0ea5e9" />
-          <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.3" />
+          <stop offset="0%" stopColor="var(--accent)" />
+          <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.25" />
         </linearGradient>
       </defs>
       {bars.map((h, i) => {
@@ -1913,7 +928,7 @@ function WaveformVis() {
             x={x} y={(60 - barH) / 2}
             width={barW} height={barH}
             rx="2" fill="url(#waveform-grad)"
-            opacity={0.55 + h * 0.45}>
+            opacity={0.5 + h * 0.4}>
             <animate
               attributeName="height"
               values={`${barH};${peakH};${barH}`}
@@ -1939,105 +954,929 @@ function WaveformVis() {
   );
 }
 
-// ── TSUMUGI key exchange visualization ───────────────────────────────────────
+// ── TSUMUGI key exchange visualization ──────────────────────────────────────
 
 function TsumugiKeyVis() {
   return (
-    <svg width="220" height="170" viewBox="0 0 220 170" fill="none" role="img" aria-label="TSUMUGI key exchange diagram">
+    <svg width="220" height="170" viewBox="0 0 220 170" fill="none" role="img" aria-label="TSUMUGI hybrid key exchange: X25519 and ML-KEM-768 combine into a shared secret">
       <defs>
         <radialGradient id="tsumugi-glow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0" />
+          <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.30" />
+          <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
         </radialGradient>
         <radialGradient id="shared-glow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#67e8f9" stopOpacity="0.4" />
-          <stop offset="100%" stopColor="#67e8f9" stopOpacity="0" />
+          <stop offset="0%" stopColor="var(--lux)" stopOpacity="0.45" />
+          <stop offset="100%" stopColor="var(--lux)" stopOpacity="0" />
         </radialGradient>
-        <filter id="tsumugi-blur">
-          <feGaussianBlur stdDeviation="5" result="blur" />
-          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
       </defs>
 
-      {/* Left node — client A */}
-      <circle cx="42" cy="85" r="30" fill="rgba(14,165,233,0.12)" stroke="rgba(14,165,233,0.45)" strokeWidth="1.5" />
-      <circle cx="42" cy="85" r="30" fill="url(#tsumugi-glow)" filter="url(#tsumugi-blur)" opacity="0.5" />
-      {/* Key icon */}
-      <g transform="translate(28, 71)">
-        <circle cx="9" cy="9" r="7" stroke="rgba(14,165,233,0.9)" strokeWidth="1.4" fill="none" />
-        <rect x="14" y="7" width="10" height="4" rx="1" stroke="rgba(14,165,233,0.9)" strokeWidth="1.2" fill="none" />
-        <rect x="21" y="11" width="3" height="3" rx="0.5" fill="rgba(14,165,233,0.9)" />
+      {/* Left node */}
+      <circle cx="42" cy="85" r="30" fill="url(#tsumugi-glow)" />
+      <circle cx="42" cy="85" r="30" fill="var(--accent-subtle)" stroke="var(--accent)" strokeOpacity="0.5" strokeWidth="1.4" />
+      <g transform="translate(28, 71)" stroke="var(--accent)" strokeWidth="1.3" fill="none">
+        <circle cx="9" cy="9" r="7" />
+        <rect x="14" y="7" width="10" height="4" rx="1" />
+        <rect x="21" y="11" width="3" height="3" rx="0.5" fill="var(--accent)" stroke="none" />
       </g>
-      <text x="42" y="126" textAnchor="middle" fill="rgba(14,165,233,0.7)" fontSize="8.5" fontFamily="monospace" fontWeight="600">P-256</text>
+      <text x="42" y="128" textAnchor="middle" fill="var(--accent)" fillOpacity="0.85" fontSize="8" fontFamily="var(--font-mono)" fontWeight="600">X25519</text>
 
-      {/* Right node — client B */}
-      <circle cx="178" cy="85" r="30" fill="rgba(14,165,233,0.12)" stroke="rgba(14,165,233,0.45)" strokeWidth="1.5" />
-      <circle cx="178" cy="85" r="30" fill="none" stroke="rgba(14,165,233,0.15)" strokeWidth="8" filter="url(#tsumugi-blur)" />
-      {/* Lock icon */}
-      <g transform="translate(163, 71)">
-        <rect x="1" y="8" width="13" height="11" rx="2" stroke="rgba(14,165,233,0.9)" strokeWidth="1.4" fill="rgba(14,165,233,0.1)" />
-        <path d="M4 8V5.5a3.5 3.5 0 0 1 7 0V8" stroke="rgba(14,165,233,0.9)" strokeWidth="1.4" fill="none" />
-        <circle cx="7.5" cy="13" r="1.5" fill="rgba(14,165,233,0.9)" />
+      {/* Right node */}
+      <circle cx="178" cy="85" r="30" fill="var(--accent-subtle)" stroke="var(--accent)" strokeOpacity="0.5" strokeWidth="1.4" />
+      <g transform="translate(163, 71)" stroke="var(--accent)" strokeWidth="1.3" fill="none">
+        <rect x="1" y="8" width="13" height="11" rx="2" fill="var(--accent-subtle)" />
+        <path d="M4 8V5.5a3.5 3.5 0 0 1 7 0V8" />
+        <circle cx="7.5" cy="13" r="1.5" fill="var(--accent)" stroke="none" />
       </g>
-      <text x="178" y="126" textAnchor="middle" fill="rgba(14,165,233,0.7)" fontSize="8.5" fontFamily="monospace" fontWeight="600">ECDH</text>
+      <text x="178" y="128" textAnchor="middle" fill="var(--accent)" fillOpacity="0.85" fontSize="7.5" fontFamily="var(--font-mono)" fontWeight="600">ML-KEM-768</text>
 
       {/* Center shared secret */}
-      <circle cx="110" cy="85" r="22" fill="url(#shared-glow)" />
-      <circle cx="110" cy="85" r="22" fill="rgba(103,232,249,0.1)" stroke="rgba(103,232,249,0.55)" strokeWidth="1.5">
-        <animate attributeName="stroke-opacity" values="0.55;0.85;0.55" dur="2.5s" repeatCount="indefinite" />
+      <circle cx="110" cy="85" r="24" fill="url(#shared-glow)" />
+      <circle cx="110" cy="85" r="22" fill="var(--lux-subtle)" stroke="var(--lux)" strokeOpacity="0.6" strokeWidth="1.5">
+        <animate attributeName="stroke-opacity" values="0.5;0.9;0.5" dur="2.6s" repeatCount="indefinite" />
       </circle>
-      {/* Check mark */}
-      <path d="M100 85l7 7 13-13" stroke="#67e8f9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <text x="110" y="118" textAnchor="middle" fill="rgba(103,232,249,0.75)" fontSize="8.5" fontFamily="monospace" fontWeight="600">AES-GCM</text>
+      <path d="M100 85l7 7 13-13" stroke="var(--lux)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <text x="110" y="122" textAnchor="middle" fill="var(--lux)" fillOpacity="0.85" fontSize="8" fontFamily="var(--font-mono)" fontWeight="600">SHARED KEY</text>
 
-      {/* Exchange arc — top (A→B) */}
-      <path d="M70 72 Q110 42 150 72" stroke="rgba(14,165,233,0.5)" strokeWidth="1.5" fill="none" strokeDasharray="5 4">
-        <animate attributeName="stroke-dashoffset" values="0;-18" dur="1.5s" repeatCount="indefinite" />
+      {/* Exchange arcs */}
+      <path d="M70 72 Q110 42 150 72" stroke="var(--accent)" strokeOpacity="0.5" strokeWidth="1.5" fill="none" strokeDasharray="5 4">
+        <animate attributeName="stroke-dashoffset" values="0;-18" dur="1.6s" repeatCount="indefinite" />
       </path>
-      {/* Arrow tip */}
-      <polygon points="148,70 155,73 147,76" fill="rgba(14,165,233,0.6)" />
-
-      {/* Exchange arc — bottom (B→A) */}
-      <path d="M150 98 Q110 128 70 98" stroke="rgba(14,165,233,0.5)" strokeWidth="1.5" fill="none" strokeDasharray="5 4">
-        <animate attributeName="stroke-dashoffset" values="0;-18" dur="1.5s" repeatCount="indefinite" />
+      <polygon points="148,70 155,73 147,76" fill="var(--accent)" fillOpacity="0.7" />
+      <path d="M150 98 Q110 128 70 98" stroke="var(--accent)" strokeOpacity="0.5" strokeWidth="1.5" fill="none" strokeDasharray="5 4">
+        <animate attributeName="stroke-dashoffset" values="0;-18" dur="1.6s" repeatCount="indefinite" />
       </path>
-      <polygon points="72,96 65,99 73,102" fill="rgba(14,165,233,0.6)" />
+      <polygon points="72,96 65,99 73,102" fill="var(--accent)" fillOpacity="0.7" />
     </svg>
   );
 }
 
-// ── Network visualization ──────────────────────────────────────────────────
+// ── Styles ─────────────────────────────────────────────────────────────────
+const LANDING_CSS = `
+  /* ════════════════════════════════════════════════════════════
+     OCEAN LANDING — DARK LACQUER / EDITORIAL
+     ════════════════════════════════════════════════════════════ */
 
-function NetworkVis() {
-  const nodes = [
-    [50, 50], [150, 30], [250, 60], [340, 40], [420, 70],
-    [80,  150], [200, 130], [300, 160], [380, 140],
-    [60,  230], [170, 200], [270, 220], [360, 200], [440, 230],
-    [100, 300], [230, 280], [320, 300], [410, 280],
-  ];
-  const edges = [
-    [0,1],[1,2],[2,3],[3,4],[0,5],[1,6],[2,6],[3,7],[4,8],
-    [5,6],[6,7],[7,8],[5,9],[6,10],[7,11],[8,12],[9,10],
-    [10,11],[11,12],[9,13],[10,14],[11,15],[12,16],
-  ];
-  return (
-    <svg width="480" height="340" viewBox="0 0 480 340" fill="none" aria-hidden>
-      {edges.map(([a, b], i) => (
-        <line key={i}
-          x1={nodes[a][0]} y1={nodes[a][1]}
-          x2={nodes[b][0]} y2={nodes[b][1]}
-          stroke="var(--accent-border)" strokeWidth="1"
-        />
-      ))}
-      {nodes.map(([cx, cy], i) => (
-        <circle key={i}
-          cx={cx} cy={cy} r={i < 4 ? 5 : 3}
-          fill={i < 4 ? 'var(--accent-subtle)' : 'var(--gold-subtle)'}
-          stroke={i < 4 ? 'var(--accent)' : 'var(--gold)'}
-          strokeWidth="1"
-          opacity={i < 4 ? 0.8 : 0.5}
-        />
-      ))}
-    </svg>
-  );
-}
+  /* Override the app shell's global overflow so this page scrolls */
+  html, body { overflow: auto; overflow-x: hidden; }
+
+  /* ── Skip link ── */
+  .land-skip-link {
+    position: absolute; top: -48px; left: 0;
+    background: var(--lux); color: var(--bg-void);
+    padding: 8px 16px; text-decoration: none; z-index: 9999;
+    border-radius: 0 0 8px 0; transition: top 150ms var(--ease-out);
+    font-size: 14px; font-weight: 700;
+  }
+  .land-skip-link:focus { top: 0; }
+
+  .land-root {
+    background: var(--bg-void);
+    color: var(--text-primary);
+    min-height: 100dvh;
+    overflow-x: clip;
+    font-family: var(--font-ui);
+    --land-gutter: clamp(20px, 5vw, 80px);
+    --land-max: 1200px;
+  }
+
+  /* ── Atmosphere ── */
+  .land-atmos { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+  .land-atmos-halo {
+    position: absolute; top: -22vh; left: 50%; transform: translateX(-50%);
+    width: min(1100px, 120vw); height: 70vh; border-radius: 50%;
+    background: radial-gradient(ellipse at center,
+      color-mix(in srgb, var(--lux) 9%, transparent) 0%,
+      transparent 62%);
+    opacity: 0.9;
+  }
+  .land-atmos-grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(var(--border-subtle) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+    background-size: 64px 64px;
+    -webkit-mask-image: radial-gradient(ellipse 80% 50% at 50% 0%, black, transparent 75%);
+    mask-image: radial-gradient(ellipse 80% 50% at 50% 0%, black, transparent 75%);
+    opacity: 0.5;
+  }
+  .land-atmos-grain {
+    position: absolute; inset: 0; opacity: 0.04; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .land-badge-dot, .land-token-dot, .land-community-label-dot, .land-ch-enter,
+    .land-meshvis * { animation: none !important; }
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* ── Nav ── */
+  .land-nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: env(safe-area-inset-top, 0px) var(--land-gutter) 0;
+    height: calc(62px + env(safe-area-inset-top, 0px));
+    background: color-mix(in srgb, var(--bg-void) 74%, transparent);
+    backdrop-filter: blur(24px) saturate(1.4);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .land-nav-logo { display: flex; align-items: center; gap: 9px; }
+  .land-nav-wordmark {
+    font-family: var(--font-display);
+    font-size: 18px; font-weight: 600; letter-spacing: -0.01em;
+    color: var(--text-primary);
+  }
+  .land-nav-sep { color: var(--border-normal); font-weight: 300; }
+  .land-nav-engine {
+    font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--lux);
+  }
+  .land-nav-links { display: flex; align-items: center; gap: 22px; }
+  .land-nav-link {
+    font-size: 13.5px; font-weight: 500; color: var(--text-secondary);
+    text-decoration: none; transition: color 0.2s var(--ease-out);
+    position: relative;
+  }
+  .land-nav-link::after {
+    content: ''; position: absolute; left: 0; right: 100%; bottom: -6px;
+    height: 1px; background: var(--lux); transition: right 0.25s var(--ease-out);
+  }
+  .land-nav-link:hover { color: var(--text-primary); text-decoration: none; }
+  .land-nav-link:hover::after { right: 0; }
+  .land-nav-cta {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13px; font-weight: 700; color: var(--bg-void);
+    background: var(--lux); text-decoration: none;
+    padding: 8px 16px; border-radius: var(--r-full);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--lux) 40%, transparent), 0 8px 22px rgba(0,0,0,0.4);
+    transition: transform 0.18s var(--ease-out), filter 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+  }
+  .land-nav-cta:hover {
+    transform: translateY(-1px); filter: brightness(1.06);
+    text-decoration: none; color: var(--bg-void);
+    box-shadow: 0 0 0 1px var(--lux), var(--glow), 0 10px 26px rgba(0,0,0,0.5);
+  }
+
+  /* ── Hero ── */
+  .land-hero {
+    position: relative; z-index: 1;
+    padding: calc(160px + env(safe-area-inset-top, 0px)) var(--land-gutter) 90px;
+    min-height: 100dvh; display: flex; align-items: center;
+  }
+  .land-hero-body {
+    width: 100%; max-width: var(--land-max); margin: 0 auto;
+    display: grid; grid-template-columns: 1.08fr 0.92fr; gap: 72px; align-items: center;
+  }
+  @media (max-width: 860px) {
+    .land-hero-body { grid-template-columns: 1fr; gap: 40px; }
+    .land-hero-visual { order: -1; max-width: 420px; }
+  }
+
+  .land-hero-copy { display: flex; flex-direction: column; gap: 30px; }
+
+  .land-badge {
+    display: inline-flex; align-items: center; gap: 9px;
+    font-family: var(--font-mono);
+    font-size: 11px; font-weight: 600; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--text-secondary);
+    padding: 6px 13px; border-radius: var(--r-full);
+    background: color-mix(in srgb, var(--bg-elevated) 70%, transparent);
+    border: 1px solid var(--border-normal);
+    width: fit-content;
+  }
+  .land-badge-dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+    background: var(--lux); box-shadow: 0 0 8px var(--lux);
+    animation: dot-pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes dot-pulse {
+    0%, 100% { box-shadow: 0 0 4px color-mix(in srgb, var(--lux) 60%, transparent); }
+    50%       { box-shadow: 0 0 12px var(--lux); }
+  }
+
+  .land-h1 {
+    font-family: var(--font-display);
+    font-size: clamp(2.7rem, 1.4rem + 5.6vw, 5.4rem);
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    line-height: 1.02;
+    color: var(--text-primary);
+    margin: 0;
+    text-wrap: balance;
+  }
+  .land-h1-accent {
+    color: var(--lux);
+    font-style: italic;
+    font-weight: 500;
+  }
+  .land-h1-tail { color: var(--text-primary); }
+
+  .land-lead {
+    font-size: clamp(1.02rem, 0.9rem + 0.5vw, 1.18rem);
+    line-height: 1.72; color: var(--text-secondary); margin: 0; max-width: 36em;
+  }
+  .land-lead-strong { color: var(--text-primary); font-weight: 600; }
+
+  .land-hero-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+
+  .land-btn-primary {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 14px 28px; border-radius: var(--r-md);
+    font-size: 14px; font-weight: 700; color: var(--bg-void);
+    background: var(--lux);
+    text-decoration: none; letter-spacing: 0.01em;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.2), 0 14px 30px rgba(0,0,0,0.4);
+    transition: transform 0.2s var(--ease-out), filter 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+  }
+  .land-btn-primary:hover {
+    transform: translateY(-2px); filter: brightness(1.07);
+    color: var(--bg-void); text-decoration: none;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.2), var(--glow), 0 18px 38px rgba(0,0,0,0.5);
+  }
+  .land-btn-primary:active { transform: translateY(0); }
+  .land-btn-primary:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 3px; }
+
+  .land-btn-ghost {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 14px 24px; border-radius: var(--r-md);
+    font-size: 14px; font-weight: 600;
+    color: var(--text-secondary); text-decoration: none;
+    border: 1px solid var(--border-normal);
+    background: color-mix(in srgb, var(--bg-elevated) 50%, transparent);
+    transition: color 0.2s, border-color 0.2s, background 0.2s, transform 0.2s var(--ease-out);
+  }
+  .land-btn-ghost:hover {
+    color: var(--text-primary); border-color: var(--lux);
+    background: color-mix(in srgb, var(--bg-elevated) 80%, transparent);
+    text-decoration: none; transform: translateY(-1px);
+  }
+  .land-btn-ghost:focus-visible { outline: 2px solid var(--lux); outline-offset: 3px; }
+  .land-btn-lg { padding: 16px 34px; font-size: 15px; }
+  .land-btn-ghost-lg { padding: 14px 26px; font-size: 15px; }
+
+  /* Hero stats */
+  .land-hero-stats {
+    display: flex; align-items: center; gap: 22px; flex-wrap: wrap; margin: 4px 0 0;
+  }
+  .land-hs { display: flex; flex-direction: column; gap: 4px; }
+  .land-hs dt {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted);
+  }
+  .land-hs dd {
+    margin: 0; font-size: 14px; font-weight: 600; color: var(--text-primary);
+    letter-spacing: -0.01em;
+  }
+  .land-hs-rule { width: 1px; height: 30px; background: var(--border-normal); flex-shrink: 0; }
+
+  /* Hero visual */
+  .land-hero-visual { display: flex; align-items: center; justify-content: center; }
+  .land-meshvis { width: 100%; height: auto; max-width: 460px; }
+
+  /* ── Credential rail ── */
+  .land-rail {
+    position: relative; z-index: 1;
+    padding: 0 var(--land-gutter) 18px;
+  }
+  .land-rail-inner {
+    max-width: var(--land-max); margin: 0 auto;
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--r-lg);
+    background: color-mix(in srgb, var(--bg-base) 60%, transparent);
+    overflow: hidden;
+  }
+  .land-rail-item {
+    display: flex; flex-direction: column; gap: 5px;
+    padding: 18px 20px;
+    border-right: 1px solid var(--border-subtle);
+  }
+  .land-rail-item:last-child { border-right: 0; }
+  .land-rail-k {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    letter-spacing: 0.16em; text-transform: uppercase; color: var(--lux);
+  }
+  .land-rail-v { font-size: 13px; font-weight: 600; color: var(--text-secondary); line-height: 1.3; }
+  @media (max-width: 860px) {
+    .land-rail-inner { grid-template-columns: repeat(2, 1fr); }
+    .land-rail-item:nth-child(2n) { border-right: 0; }
+    .land-rail-item { border-bottom: 1px solid var(--border-subtle); }
+    .land-rail-item:nth-last-child(-n+1) { border-bottom: 0; }
+  }
+  @media (max-width: 480px) { .land-rail-inner { grid-template-columns: 1fr; } }
+
+  /* ── Section mark ── */
+  .land-mark {
+    position: relative; z-index: 1;
+    max-width: var(--land-max); margin: 70px auto 6px; padding: 0 var(--land-gutter);
+    display: flex; align-items: center; gap: 16px;
+  }
+  .land-mark-index {
+    font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+    letter-spacing: 0.1em; color: var(--lux);
+  }
+  .land-mark-label {
+    font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .land-mark-rule { flex: 1; height: 1px; background: linear-gradient(90deg, var(--border-normal), transparent); }
+  .land-mark-rule:last-child { background: linear-gradient(90deg, transparent, var(--border-subtle)); }
+
+  /* ── Shared section headings ── */
+  .land-section-heading {
+    position: relative; z-index: 1; max-width: 760px; margin: 0 auto 36px;
+    text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px;
+  }
+  .land-section-heading-compact { margin-bottom: 26px; }
+  .land-section-kicker {
+    display: inline-flex; align-items: center; width: fit-content;
+    padding: 5px 11px; border-radius: var(--r-full);
+    border: 1px solid var(--border-normal);
+    background: var(--lux-subtle);
+    color: var(--lux);
+    font-family: var(--font-mono);
+    font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+  }
+  .land-section-title {
+    margin: 0; color: var(--text-primary);
+    font-family: var(--font-display);
+    font-size: clamp(1.9rem, 1.2rem + 2.6vw, 3rem);
+    font-weight: 600; line-height: 1.08; letter-spacing: -0.02em; text-wrap: balance;
+  }
+  .land-section-copy {
+    margin: 0; color: var(--text-secondary);
+    font-size: clamp(0.98rem, 0.94rem + 0.3vw, 1.1rem); line-height: 1.68; max-width: 60ch;
+  }
+
+  /* ── Features ── */
+  .land-features {
+    position: relative; z-index: 1;
+    padding: 0 var(--land-gutter) 30px; max-width: var(--land-max); margin: 0 auto;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .land-features .land-section-heading { margin-bottom: 20px; }
+
+  .land-bento-row { display: grid; gap: 14px; }
+  .land-bento-row-1 { grid-template-columns: 1fr 1fr; }
+  .land-bento-row-2 { grid-template-columns: 1fr; }
+  .land-bento-row-3 { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 768px) {
+    .land-bento-row-1 { grid-template-columns: 1fr; }
+    .land-bento-row-3 { grid-template-columns: 1fr; }
+  }
+
+  /* Cards */
+  .land-card {
+    position: relative; overflow: hidden;
+    background: color-mix(in srgb, var(--bg-base) 82%, transparent);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--r-xl);
+    transition: border-color 0.3s var(--ease-out), transform 0.25s var(--ease-out), box-shadow 0.3s var(--ease-out);
+  }
+  .land-card:hover {
+    border-color: var(--border-normal);
+    transform: translateY(-3px);
+    box-shadow: var(--elev-shadow-2), 0 0 28px rgba(0,0,0,0.4);
+  }
+  .land-card-glow {
+    position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+    opacity: 0; transition: opacity 0.4s var(--ease-out);
+  }
+  .land-card:hover .land-card-glow { opacity: 1; }
+  .land-card-glow-accent { background: radial-gradient(circle at 25% 0%, var(--accent-subtle) 0%, transparent 62%); }
+  .land-card-glow-lux { background: radial-gradient(circle at 80% 0%, var(--lux-subtle) 0%, transparent 60%); }
+
+  .land-card::before {
+    content: ''; position: absolute; top: 0; left: 22px; right: 22px; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--lux), transparent);
+    opacity: 0.25; transition: opacity 0.3s;
+  }
+  .land-card:hover::before { opacity: 0.7; }
+
+  .land-card-inner { padding: 30px 28px; display: flex; flex-direction: column; gap: 14px; }
+  .land-card-inner-split { flex-direction: row; gap: 48px; align-items: center; }
+  @media (max-width: 768px) { .land-card-inner-split { flex-direction: column; gap: 26px; } }
+  .land-card-text { flex: 1; display: flex; flex-direction: column; gap: 14px; }
+
+  .land-card-eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 5px 11px 5px 9px; border-radius: var(--r-sm); width: fit-content;
+  }
+  .land-eyebrow-accent { color: var(--accent); background: var(--accent-subtle); border: 1px solid var(--accent-border); }
+  .land-eyebrow-lux { color: var(--lux); background: var(--lux-subtle); border: 1px solid color-mix(in srgb, var(--lux) 30%, transparent); }
+  .land-eyebrow-dim { color: var(--text-muted); background: color-mix(in srgb, var(--bg-elevated) 60%, transparent); border: 1px solid var(--border-subtle); }
+  .land-card-eyebrow svg { flex-shrink: 0; }
+  .land-eyebrow-pip { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; background: currentColor; }
+  .land-eyebrow-pip-lux { background: var(--lux); }
+  .land-eyebrow-pip-dim { background: var(--text-muted); }
+
+  .land-card-h3 {
+    font-family: var(--font-display);
+    font-size: 1.32rem; font-weight: 600; letter-spacing: -0.015em;
+    color: var(--text-primary); margin: 0; line-height: 1.22;
+  }
+  .land-card-p { font-size: 0.9rem; line-height: 1.66; color: var(--text-secondary); margin: 0; }
+
+  .land-voice-vis { margin-top: 10px; height: 60px; display: flex; align-items: center; }
+
+  .land-token-display { margin-top: 10px; display: flex; flex-direction: column; gap: 7px; }
+  .land-token-row {
+    font-family: var(--font-mono); font-size: 12px;
+    padding: 9px 12px; border-radius: var(--r-md);
+    background: color-mix(in srgb, var(--bg-void) 70%, transparent);
+    border: 1px solid var(--border-normal);
+    display: flex; align-items: center; flex-wrap: wrap;
+  }
+  .land-token-prefix { color: var(--text-muted); }
+  .land-token-body { color: var(--lux); }
+  .land-token-status { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--status-online); }
+  .land-token-dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+    background: var(--status-online); box-shadow: 0 0 6px color-mix(in srgb, var(--status-online) 60%, transparent);
+    animation: dot-pulse 2.4s ease-in-out infinite;
+  }
+
+  /* Chips */
+  .land-chip-row { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 4px; }
+  .land-chip {
+    font-family: var(--font-mono);
+    font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
+    padding: 4px 9px; border-radius: var(--r-sm);
+    color: var(--text-secondary);
+    background: color-mix(in srgb, var(--bg-elevated) 60%, transparent);
+    border: 1px solid var(--border-normal);
+  }
+  .land-chip-lux { color: var(--lux); background: var(--lux-subtle); border-color: color-mix(in srgb, var(--lux) 30%, transparent); }
+
+  .land-tsumugi-diagram { flex-shrink: 0; align-self: center; }
+  @media (max-width: 768px) { .land-tsumugi-diagram { align-self: center; } }
+
+  .land-irc-tag { margin-top: 8px; display: inline-flex; }
+  .land-irc-tag-text {
+    font-family: var(--font-mono); font-size: 11px;
+    color: var(--lux); background: var(--lux-subtle);
+    border: 1px solid color-mix(in srgb, var(--lux) 28%, transparent);
+    padding: 5px 11px; border-radius: var(--r-sm); letter-spacing: 0.02em;
+  }
+
+  /* ── Engine / architecture ── */
+  .land-engine {
+    position: relative; z-index: 1;
+    max-width: var(--land-max); margin: 0 auto; padding: 0 var(--land-gutter) 30px;
+  }
+  .land-arch { display: flex; flex-direction: column; gap: 12px; }
+  .land-arch-row {
+    display: grid; grid-template-columns: 180px 1fr; gap: 36px;
+    padding: 30px 32px;
+    border: 1px solid var(--border-subtle); border-radius: var(--r-xl);
+    background: color-mix(in srgb, var(--bg-base) 76%, transparent);
+    position: relative; overflow: hidden;
+    transition: border-color 0.3s var(--ease-out), transform 0.25s var(--ease-out), box-shadow 0.3s var(--ease-out);
+  }
+  .land-arch-row::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+    background: linear-gradient(180deg, var(--lux), transparent);
+    opacity: 0.4; transition: opacity 0.3s;
+  }
+  .land-arch-row:hover {
+    border-color: var(--border-normal); transform: translateX(4px);
+    box-shadow: var(--elev-shadow-1);
+  }
+  .land-arch-row:hover::before { opacity: 1; }
+  .land-arch-index { display: flex; flex-direction: column; gap: 8px; }
+  .land-arch-n {
+    font-family: var(--font-display); font-size: 2.4rem; font-weight: 500;
+    line-height: 1; color: var(--lux); letter-spacing: -0.02em;
+  }
+  .land-arch-kicker {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted);
+  }
+  .land-arch-body { display: flex; flex-direction: column; gap: 12px; }
+  .land-arch-title {
+    font-family: var(--font-display);
+    font-size: 1.35rem; font-weight: 600; letter-spacing: -0.015em;
+    color: var(--text-primary); margin: 0;
+  }
+  .land-arch-p { margin: 0; font-size: 0.94rem; line-height: 1.7; color: var(--text-secondary); max-width: 62ch; }
+  @media (max-width: 768px) {
+    .land-arch-row { grid-template-columns: 1fr; gap: 16px; padding: 24px 20px; }
+    .land-arch-index { flex-direction: row; align-items: baseline; gap: 14px; }
+    .land-arch-row:hover { transform: translateY(-2px); }
+  }
+
+  /* ── Product preview ── */
+  .land-preview {
+    position: relative; z-index: 1;
+    padding: 0 var(--land-gutter) 80px; max-width: var(--land-max); margin: 0 auto;
+  }
+  .land-app-preview {
+    display: grid; grid-template-columns: 72px 220px minmax(0, 1fr) 200px;
+    min-height: 440px; overflow: hidden;
+    border-radius: var(--r-2xl);
+    border: 1px solid var(--border-normal);
+    background:
+      linear-gradient(180deg, var(--lux-subtle), transparent 30%),
+      color-mix(in srgb, var(--bg-base) 92%, transparent);
+    box-shadow: var(--elev-shadow-3);
+  }
+  .land-preview-rail, .land-preview-sidebar, .land-preview-chat, .land-preview-members {
+    min-width: 0; border-right: 1px solid var(--border-subtle);
+  }
+  .land-preview-rail {
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+    padding: 18px 0; background: color-mix(in srgb, var(--bg-void) 50%, transparent);
+  }
+  .land-preview-orb {
+    width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center;
+    color: var(--text-muted); background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle); font-size: 13px; font-weight: 800;
+  }
+  .land-preview-orb-active {
+    color: var(--bg-void); background: var(--lux);
+    border-color: var(--lux); box-shadow: var(--glow);
+  }
+  .land-preview-sidebar { padding: 18px 14px; background: color-mix(in srgb, var(--bg-void) 28%, transparent); }
+  .land-preview-server { color: var(--text-primary); font-size: 14px; font-weight: 800; margin-bottom: 18px; font-family: var(--font-display); }
+  .land-preview-group {
+    color: var(--text-muted); font-size: 10px; font-weight: 800; font-family: var(--font-mono);
+    letter-spacing: 0.12em; text-transform: uppercase; margin: 16px 0 8px;
+  }
+  .land-preview-channel, .land-preview-member {
+    display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px;
+    border-radius: var(--r-md); color: var(--text-secondary); font-size: 13px; font-weight: 600;
+  }
+  .land-preview-channel span { color: var(--text-muted); font-family: var(--font-mono); }
+  .land-preview-channel-active {
+    color: var(--lux); background: var(--lux-subtle);
+    border: 1px solid color-mix(in srgb, var(--lux) 28%, transparent);
+  }
+  .land-preview-channel-active span { color: var(--lux); }
+  .land-preview-voice {
+    color: var(--status-online); background: color-mix(in srgb, var(--status-online) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--status-online) 22%, transparent);
+  }
+  .land-preview-voice svg { width: 12px; height: 12px; }
+  .land-preview-chat { display: flex; flex-direction: column; background: color-mix(in srgb, var(--bg-void) 22%, transparent); }
+  .land-preview-chat-head {
+    min-height: 58px; display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; padding: 0 20px; border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-primary); font-size: 15px; font-weight: 800; font-family: var(--font-display);
+  }
+  .land-preview-chat-head span { color: var(--text-muted); margin-right: 4px; }
+  .land-preview-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .land-preview-tools span, .land-preview-pill-row span {
+    margin: 0; padding: 4px 9px; border-radius: var(--r-full);
+    color: var(--text-secondary); background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle); font-size: 11px; font-weight: 600; font-family: var(--font-mono);
+  }
+  .land-preview-message {
+    display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 12px;
+    padding: 20px; border-bottom: 1px solid var(--border-subtle);
+  }
+  .land-preview-avatar {
+    width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center;
+    color: var(--bg-void); background: var(--accent); font-size: 14px; font-weight: 900;
+  }
+  .land-preview-avatar-lux { background: var(--lux); }
+  .land-preview-name {
+    display: flex; align-items: center; gap: 8px; color: var(--text-primary);
+    font-size: 13px; font-weight: 800; margin-bottom: 4px;
+  }
+  .land-preview-name span { color: var(--text-muted); font-size: 11px; font-weight: 600; }
+  .land-preview-message p { margin: 0; color: var(--text-secondary); font-size: 13px; line-height: 1.55; }
+  .land-preview-pill-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .land-preview-composer {
+    margin: auto 20px 20px; min-height: 44px; display: flex; align-items: center;
+    padding: 0 14px; border-radius: var(--r-lg); color: var(--text-muted);
+    background: var(--bg-elevated); border: 1px solid var(--border-subtle); font-size: 13px;
+  }
+  .land-preview-members { border-right: 0; padding: 18px 14px; background: color-mix(in srgb, var(--bg-void) 18%, transparent); }
+  .land-preview-presence {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--status-online);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--status-online) 50%, transparent);
+  }
+  .land-preview-status {
+    margin-top: 22px; padding: 14px; border-radius: var(--r-lg);
+    background: var(--lux-subtle); border: 1px solid color-mix(in srgb, var(--lux) 26%, transparent);
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .land-preview-status strong { color: var(--lux); font-size: 12px; }
+  .land-preview-status span { color: var(--text-secondary); font-size: 12px; line-height: 1.45; }
+
+  /* ── Security ── */
+  .land-security {
+    position: relative; z-index: 1; max-width: var(--land-max); margin: 0 auto;
+    padding: 0 var(--land-gutter) 80px;
+  }
+  .land-sec-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+  @media (max-width: 980px) { .land-sec-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 560px) { .land-sec-grid { grid-template-columns: 1fr; } }
+  .land-sec-card {
+    display: flex; flex-direction: column; gap: 12px; padding: 26px 24px;
+    border: 1px solid var(--border-subtle); border-radius: var(--r-xl);
+    background: color-mix(in srgb, var(--bg-base) 80%, transparent);
+    transition: border-color 0.3s var(--ease-out), transform 0.25s var(--ease-out), box-shadow 0.3s var(--ease-out);
+  }
+  .land-sec-card:hover {
+    border-color: var(--border-normal); transform: translateY(-3px);
+    box-shadow: var(--elev-shadow-2);
+  }
+  .land-sec-icon {
+    width: 42px; height: 42px; border-radius: var(--r-lg);
+    display: grid; place-items: center; color: var(--lux);
+    background: var(--lux-subtle); border: 1px solid color-mix(in srgb, var(--lux) 24%, transparent);
+  }
+  .land-sec-title {
+    font-family: var(--font-display); font-size: 1.12rem; font-weight: 600;
+    color: var(--text-primary); margin: 0; letter-spacing: -0.01em;
+  }
+  .land-sec-body { margin: 0; font-size: 0.86rem; line-height: 1.62; color: var(--text-secondary); flex: 1; }
+  .land-sec-note {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    letter-spacing: 0.06em; color: var(--lux); padding-top: 8px;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  /* ── Capabilities ── */
+  .land-capabilities {
+    position: relative; z-index: 1; max-width: var(--land-max); margin: 0 auto;
+    padding: 0 var(--land-gutter) 80px;
+  }
+  .land-cap-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+  .land-cap-card {
+    border: 1px solid var(--border-subtle); border-radius: var(--r-xl); padding: 24px;
+    background: color-mix(in srgb, var(--bg-base) 82%, transparent);
+    box-shadow: var(--elev-highlight);
+    transition: border-color 0.3s var(--ease-out), transform 0.25s var(--ease-out);
+  }
+  .land-cap-card:hover { border-color: var(--border-normal); transform: translateY(-2px); }
+  .land-cap-card h3 {
+    margin: 0 0 16px; color: var(--text-primary); font-family: var(--font-display);
+    font-size: 1.02rem; font-weight: 600; letter-spacing: -0.01em;
+  }
+  .land-cap-card ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 11px; }
+  .land-cap-card li { display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; line-height: 1.35; }
+  .land-cap-check {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--lux);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--lux) 50%, transparent); flex-shrink: 0;
+  }
+  @media (max-width: 980px) { .land-cap-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 520px) { .land-cap-grid { grid-template-columns: 1fr; } }
+
+  /* ── Built different ── */
+  .land-different {
+    position: relative; z-index: 1; max-width: var(--land-max); margin: 0 auto;
+    padding: 0 var(--land-gutter) 80px;
+  }
+  .land-different-inner {
+    display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 48px; align-items: center;
+    padding: clamp(34px, 5vw, 60px);
+    border: 1px solid var(--border-normal); border-radius: var(--r-2xl);
+    background:
+      radial-gradient(circle at 0% 0%, var(--lux-subtle), transparent 52%),
+      color-mix(in srgb, var(--bg-base) 86%, transparent);
+    box-shadow: var(--elev-shadow-2);
+  }
+  @media (max-width: 860px) { .land-different-inner { grid-template-columns: 1fr; gap: 32px; } }
+  .land-different-copy { display: flex; flex-direction: column; align-items: flex-start; gap: 20px; }
+  .land-different-h2 {
+    margin: 0; font-family: var(--font-display);
+    font-size: clamp(1.7rem, 1.2rem + 1.8vw, 2.5rem); font-weight: 600;
+    line-height: 1.12; letter-spacing: -0.02em; color: var(--text-primary);
+  }
+  .land-different-em { color: var(--lux); font-style: italic; }
+  .land-different-p { margin: 0; font-size: 1rem; line-height: 1.72; color: var(--text-secondary); }
+  .land-different-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0; }
+  .land-different-item {
+    display: flex; flex-direction: column; gap: 5px; padding: 18px 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .land-different-item:first-child { padding-top: 0; }
+  .land-different-item:last-child { border-bottom: 0; padding-bottom: 0; }
+  .land-different-k {
+    font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--lux);
+  }
+  .land-different-v { font-size: 14px; line-height: 1.5; color: var(--text-secondary); }
+
+  /* ── Connect ── */
+  .land-connect {
+    position: relative; z-index: 1; max-width: var(--land-max); margin: 0 auto;
+    padding: 0 var(--land-gutter) 80px;
+  }
+  .land-connect-grid { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 14px; }
+  .land-connect-card {
+    min-height: 230px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px;
+    padding: 28px; border-radius: var(--r-xl);
+    border: 1px solid var(--border-subtle); background: color-mix(in srgb, var(--bg-base) 84%, transparent);
+    transition: border-color 0.3s var(--ease-out), transform 0.25s var(--ease-out);
+  }
+  .land-connect-card:hover { border-color: var(--border-normal); transform: translateY(-2px); }
+  .land-connect-card-primary {
+    background:
+      radial-gradient(circle at 20% 10%, var(--lux-subtle), transparent 60%),
+      color-mix(in srgb, var(--bg-elevated) 86%, transparent);
+    border-color: color-mix(in srgb, var(--lux) 26%, transparent);
+  }
+  .land-connect-label {
+    font-family: var(--font-mono); color: var(--lux);
+    background: var(--lux-subtle); border: 1px solid color-mix(in srgb, var(--lux) 26%, transparent);
+    border-radius: var(--r-full); padding: 4px 10px;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .land-connect-card h3 {
+    margin: 0; color: var(--text-primary); font-family: var(--font-display);
+    font-size: 1.2rem; font-weight: 600; letter-spacing: -0.015em;
+  }
+  .land-connect-card p { margin: 0; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6; }
+  .land-connect-card code {
+    margin-top: auto; color: var(--lux);
+    background: color-mix(in srgb, var(--bg-void) 60%, transparent);
+    border: 1px solid var(--border-normal); border-radius: var(--r-md);
+    padding: 9px 11px; font-family: var(--font-mono); font-size: 12px;
+  }
+  .land-connect-action {
+    margin-top: auto; display: inline-flex; align-items: center; gap: 7px;
+    color: var(--bg-void); background: var(--lux); border-radius: var(--r-md);
+    padding: 11px 16px; font-size: 13px; font-weight: 700; text-decoration: none;
+    transition: filter 0.2s var(--ease-out), transform 0.2s var(--ease-out);
+  }
+  .land-connect-action:hover { text-decoration: none; color: var(--bg-void); filter: brightness(1.07); transform: translateY(-1px); }
+  @media (max-width: 980px) { .land-connect-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+  /* ── FAQ ── */
+  .land-faq {
+    position: relative; z-index: 1; max-width: 1080px; margin: 0 auto;
+    padding: 0 var(--land-gutter) 70px;
+  }
+  .land-faq-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .land-faq-item {
+    border: 1px solid var(--border-subtle); border-radius: var(--r-xl);
+    background: color-mix(in srgb, var(--bg-base) 80%, transparent); padding: 24px;
+    transition: border-color 0.3s var(--ease-out);
+  }
+  .land-faq-item:hover { border-color: var(--border-normal); }
+  .land-faq-item h3 {
+    margin: 0 0 10px; color: var(--text-primary); font-family: var(--font-display);
+    font-size: 1.02rem; font-weight: 600; letter-spacing: -0.01em;
+  }
+  .land-faq-item p { margin: 0; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.62; }
+  @media (max-width: 720px) { .land-faq-grid { grid-template-columns: 1fr; } }
+
+  /* ── Community / CTA ── */
+  .land-community {
+    position: relative; z-index: 1; overflow: hidden;
+    margin: 20px var(--land-gutter); border-radius: var(--r-2xl);
+    background:
+      radial-gradient(ellipse at 50% -10%, var(--lux-subtle), transparent 55%),
+      linear-gradient(160deg, color-mix(in srgb, var(--bg-elevated) 84%, transparent), color-mix(in srgb, var(--bg-deep) 92%, transparent));
+    border: 1px solid var(--border-normal);
+    padding: clamp(60px, 9vw, 110px) clamp(28px, 5vw, 80px); text-align: center;
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--lux) 18%, transparent), var(--elev-shadow-3);
+  }
+  .land-community::before {
+    content: ''; position: absolute; top: 0; left: 12%; right: 12%; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--lux), transparent); opacity: 0.4;
+  }
+  .land-community-bg {
+    position: absolute; inset: 0; pointer-events: none; opacity: 0.22;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .land-community-bg .land-meshvis { max-width: 620px; }
+  .land-community-inner {
+    position: relative; z-index: 1; display: flex; flex-direction: column;
+    align-items: center; gap: 26px; max-width: 680px; margin: 0 auto;
+  }
+  .land-community-label {
+    display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono);
+    font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted);
+  }
+  .land-community-label-dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+    background: var(--lux); box-shadow: 0 0 8px var(--lux);
+    animation: dot-pulse 2.4s ease-in-out infinite;
+  }
+  .land-community-h2 {
+    font-family: var(--font-display);
+    font-size: clamp(2.1rem, 1.4rem + 3vw, 3.4rem); font-weight: 600;
+    letter-spacing: -0.025em; line-height: 1.08; color: var(--text-primary); margin: 0;
+  }
+  .land-community-p { font-size: clamp(1rem, 0.95rem + 0.3vw, 1.1rem); line-height: 1.7; color: var(--text-secondary); margin: 0; }
+  .land-channel-pill {
+    font-family: var(--font-mono); font-size: 0.9em;
+    color: var(--lux); background: var(--lux-subtle);
+    padding: 1px 7px; border-radius: var(--r-xs);
+    border: 1px solid color-mix(in srgb, var(--lux) 26%, transparent);
+  }
+  .land-channels {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center;
+    padding: 16px 20px; background: color-mix(in srgb, var(--bg-void) 50%, transparent);
+    border: 1px solid var(--border-subtle); border-radius: var(--r-lg);
+    width: 100%; max-width: 480px;
+  }
+  .land-ch-enter { animation: ch-slide-in 0.5s var(--ease-out) both; animation-delay: var(--ch-delay, 0ms); }
+  @keyframes ch-slide-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .land-ch {
+    display: flex; align-items: center; gap: 5px; font-size: 13px; font-family: var(--font-mono);
+    padding: 6px 14px; border-radius: var(--r-full);
+    background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: var(--text-secondary);
+    transition: border-color 0.25s, color 0.25s, transform 0.2s var(--ease-out); cursor: default;
+  }
+  .land-ch:hover { border-color: var(--border-normal); color: var(--text-primary); transform: translateY(-1px); }
+  .land-ch-hash { color: var(--text-muted); font-size: 12px; }
+  .land-ch-active {
+    background: var(--lux-subtle); border-color: color-mix(in srgb, var(--lux) 28%, transparent);
+    color: var(--lux);
+  }
+  .land-ch-active .land-ch-hash { color: var(--lux); }
+  .land-ch-live {
+    font-size: 9px; font-weight: 800; letter-spacing: 0.06em;
+    color: var(--bg-void); background: var(--lux); padding: 2px 6px; border-radius: var(--r-xs); margin-left: 2px;
+  }
+  .land-ch-voice { border-color: color-mix(in srgb, var(--status-online) 24%, transparent); color: var(--status-online); }
+  .land-ch-voice:hover { border-color: color-mix(in srgb, var(--status-online) 42%, transparent); }
+  .land-ch-voice svg { width: 11px; height: 11px; }
+  .land-community-cta-group { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: center; }
+
+  /* ── Footer ── */
+  .land-footer {
+    position: relative; z-index: 1; display: grid; grid-template-columns: 1fr auto auto;
+    align-items: center; gap: 24px 40px;
+    padding: 44px var(--land-gutter) max(40px, env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--border-subtle); margin-top: 30px;
+  }
+  .land-footer-left { display: flex; flex-direction: column; gap: 6px; }
+  .land-footer-logo {
+    display: flex; align-items: center; gap: 8px; font-family: var(--font-display);
+    font-size: 16px; font-weight: 600; color: var(--text-primary);
+  }
+  .land-footer-tagline { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); letter-spacing: 0.02em; }
+  .land-footer-links { display: flex; align-items: center; gap: 22px; }
+  .land-footer-link { font-size: 13px; color: var(--text-muted); text-decoration: none; transition: color 0.2s; }
+  .land-footer-link:hover { color: var(--text-primary); text-decoration: none; }
+  .land-footer-copy { font-size: 12px; color: var(--text-muted); margin: 0; white-space: nowrap; }
+
+  /* ── Mobile — 640px ── */
+  @media (max-width: 640px) {
+    .land-nav { height: calc(54px + env(safe-area-inset-top, 0px)); padding: env(safe-area-inset-top, 0px) 16px 0; }
+    .land-nav-link, .land-nav-sep, .land-nav-engine { display: none; }
+    .land-nav-cta { font-size: 12px; padding: 7px 14px; }
+
+    .land-hero { padding: calc(96px + env(safe-area-inset-top, 0px)) 16px 60px; min-height: auto; }
+    .land-hero-copy { gap: 22px; }
+    .land-hero-actions { flex-direction: column; align-items: stretch; gap: 10px; }
+    .land-btn-primary, .land-btn-ghost { justify-content: center; padding: 15px 20px; font-size: 15px; }
+    .land-hero-stats { gap: 14px; }
+    .land-hs-rule { display: none; }
+
+    .land-mark { margin-top: 48px; padding: 0 16px; }
+    .land-features, .land-engine, .land-preview, .land-security,
+    .land-capabilities, .land-different, .land-connect, .land-faq {
+      padding-left: 16px; padding-right: 16px; padding-bottom: 56px;
+    }
+    .land-section-heading { text-align: left; align-items: flex-start; margin-bottom: 24px; }
+    .land-section-title { font-size: clamp(1.7rem, 7vw, 2.2rem); }
+    .land-card-inner { padding: 24px 20px; }
+    .land-card-h3 { font-size: 1.18rem; }
+
+    .land-app-preview { grid-template-columns: 56px minmax(0, 1fr); min-height: auto; }
+    .land-preview-rail { grid-row: 1 / span 3; }
+    .land-preview-sidebar { border-right: 0; }
+    .land-preview-chat { grid-column: 2; border-top: 1px solid var(--border-subtle); border-right: 0; }
+    .land-preview-chat-head { align-items: flex-start; flex-direction: column; padding: 14px; gap: 10px; }
+    .land-preview-tools { justify-content: flex-start; }
+    .land-preview-message { padding: 16px 14px; }
+    .land-preview-composer { margin: 10px 14px 14px; }
+    .land-preview-members { grid-column: 2; border-top: 1px solid var(--border-subtle); padding: 14px; }
+
+    .land-different-inner { padding: 28px 22px; }
+
+    .land-community { margin: 10px 12px; padding: 48px 22px; }
+    .land-community-cta-group { flex-direction: column; align-items: stretch; }
+    .land-btn-lg, .land-btn-ghost-lg { justify-content: center; text-align: center; }
+
+    .land-footer { grid-template-columns: 1fr; text-align: center; gap: 16px; padding: 30px 16px max(30px, env(safe-area-inset-bottom, 0px)); }
+    .land-footer-left { align-items: center; }
+    .land-footer-links { flex-wrap: wrap; justify-content: center; gap: 16px; }
+    .land-footer-copy { order: 3; }
+  }
+
+  /* ── Mobile — 375px ── */
+  @media (max-width: 375px) {
+    .land-h1 { font-size: 2.5rem; }
+    .land-card-inner { padding: 20px 16px; }
+    .land-arch-row { padding: 20px 16px; }
+    .land-community { margin: 10px 8px; padding: 40px 18px; }
+    .land-preview-message { grid-template-columns: 32px minmax(0, 1fr); gap: 10px; }
+    .land-preview-avatar { width: 32px; height: 32px; border-radius: 10px; }
+  }
+`;

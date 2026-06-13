@@ -46,6 +46,8 @@ export default function LoginForm({ onSwitch }: Props) {
   const status = useOnyxStore(s => s.status);
   const notifications = useOnyxStore(s => s.notifications);
   const currentNickIsAlias = useOnyxStore(s => s.currentNickIsAlias);
+  const reclaimNick = useOnyxStore(s => s.reclaimNick);
+  const ourNick = useOnyxStore(s => s.ourNick);
 
   const [nick, setNick] = useState('');
   const [password, setPassword] = useState('');
@@ -57,6 +59,8 @@ export default function LoginForm({ onSwitch }: Props) {
   const [connectAttempted, setConnectAttempted] = useState(false);
   const [savedCreds, setSavedCreds] = useState<SavedCredentials | null>(null);
   const [autoMode, setAutoMode] = useState(false);
+  const [reclaimPassword, setReclaimPassword] = useState('');
+  const [reclaimSent, setReclaimSent] = useState(false);
 
   const nickRef = useRef<HTMLInputElement>(null);
 
@@ -139,6 +143,25 @@ export default function LoginForm({ onSwitch }: Props) {
       password: getAuthSecret(savedCreds),
     });
   }, [connect, savedCreds]);
+
+  // ── Nick reclaim (GHOST + re-NICK) ──────────────────────────────────────
+  // The nick we want back is whatever the user typed (or the saved nick); the
+  // server landed us on an alias (e.g. "kain_") because a stale session held it.
+  const desiredReclaimNick = (nick.trim() || savedCreds?.nick || '').trim();
+  // Reuse a password already in hand so the user need not retype it; GHOST is
+  // password-verified server-side (server.zig handleGhost → ERR_PASSWDMISMATCH).
+  const effectiveReclaimPassword = reclaimPassword || password || savedCreds?.password || '';
+  // A successful reclaim flips currentNickIsAlias false once the NICK lands.
+  const reclaimSucceeded = reclaimSent && !currentNickIsAlias;
+
+  const handleReclaim = () => {
+    if (!desiredReclaimNick || !effectiveReclaimPassword) return;
+    const sent = reclaimNick(desiredReclaimNick, effectiveReclaimPassword);
+    if (sent) {
+      setReclaimSent(true);
+      setReclaimPassword('');
+    }
+  };
 
   const handleForget = () => {
     clearCredentials();
@@ -311,9 +334,42 @@ export default function LoginForm({ onSwitch }: Props) {
       {currentNickIsAlias && !loading && (
         <div className="nick-alias-hint" role="status" data-testid="login-alias-hint">
           <span className="nick-alias-icon" aria-hidden="true"><GhostIcon /></span>
-          <div>
+          <div className="nick-alias-body">
             <strong>That nick is already in use.</strong>
-            <span>You are connected under a temporary alias. Reclaim it with <code>/GHOST {nick || 'yournick'}</code> once you are in, or sign in with the account that owns it.</span>
+            <span>
+              You are connected as <code>{ourNick}</code> — a temporary alias. Reclaim{' '}
+              <code>{desiredReclaimNick || 'your nick'}</code> by ghosting the stale session.
+            </span>
+
+            {reclaimSucceeded ? (
+              <span className="nick-alias-ok" data-testid="login-reclaim-ok">
+                Reclaimed <code>{desiredReclaimNick}</code> — the stale session was ghosted.
+              </span>
+            ) : (
+              <div className="nick-alias-actions">
+                {!effectiveReclaimPassword && (
+                  <input
+                    className="nick-alias-input"
+                    type="password"
+                    placeholder="Account password"
+                    value={reclaimPassword}
+                    onChange={e => setReclaimPassword(e.target.value)}
+                    autoComplete="current-password"
+                    data-testid="login-reclaim-password"
+                    aria-label={`Account password to reclaim ${desiredReclaimNick}`}
+                  />
+                )}
+                <button
+                  type="button"
+                  className="nick-alias-btn"
+                  onClick={handleReclaim}
+                  disabled={!desiredReclaimNick || !effectiveReclaimPassword}
+                  data-testid="login-reclaim-button"
+                >
+                  Reclaim {desiredReclaimNick}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -594,6 +650,71 @@ function LoginStyles() {
         background: color-mix(in srgb, var(--lux) 12%, transparent);
         padding: 0 4px;
         border-radius: 4px;
+      }
+
+      .nick-alias-body {
+        gap: var(--sp-2, 8px);
+      }
+
+      .nick-alias-actions {
+        display: flex;
+        gap: var(--sp-2, 8px);
+        align-items: center;
+        margin-top: 2px;
+      }
+
+      .nick-alias-input {
+        flex: 1;
+        min-width: 0;
+        height: 36px;
+        border: 0;
+        border-radius: var(--r-sm, 6px);
+        background: color-mix(in srgb, var(--bg-base) 92%, var(--warning) 8%);
+        color: var(--text-primary);
+        font: inherit;
+        font-size: var(--text-sm, .8125rem);
+        padding: 0 10px;
+        outline: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
+        outline-offset: -1px;
+      }
+
+      .nick-alias-input:focus {
+        outline-color: var(--warning, #fbbf24);
+      }
+
+      .nick-alias-btn {
+        flex-shrink: 0;
+        height: 36px;
+        padding: 0 14px;
+        border: 0;
+        border-radius: var(--r-sm, 6px);
+        background: var(--warning, #fbbf24);
+        color: var(--bg-void);
+        cursor: pointer;
+        font: inherit;
+        font-size: var(--text-xs, .75rem);
+        font-weight: 850;
+        letter-spacing: .03em;
+        white-space: nowrap;
+        transition: filter var(--t-control, 150ms) var(--ease-out), transform var(--t-control, 150ms) var(--ease-out);
+      }
+
+      .nick-alias-btn:hover:not(:disabled),
+      .nick-alias-btn:focus-visible {
+        filter: brightness(1.06);
+        outline: none;
+        transform: translateY(-1px);
+      }
+
+      .nick-alias-btn:disabled {
+        opacity: .5;
+        cursor: not-allowed;
+      }
+
+      .nick-alias-ok {
+        color: var(--status-online, #34d399) !important;
+        font-weight: 700;
+        margin-top: 2px;
       }
 
       .saved-auth-chip {

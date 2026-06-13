@@ -54,7 +54,6 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
   const joinVoiceChannel   = useOnyxStore(s => s.joinVoiceChannel);
   const leaveVoiceChannel  = useOnyxStore(s => s.leaveVoiceChannel);
   const voiceChannelParticipants = useOnyxStore(s => s.voiceChannelParticipants);
-  const client             = useOnyxStore(s => s.client);
   const networkName          = useOnyxStore(s => s.networkName);
   const ourNick              = useOnyxStore(s => s.ourNick);
   const currentNickIsAlias   = useOnyxStore(s => s.currentNickIsAlias);
@@ -114,6 +113,7 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
   const channelOrder         = useOnyxStore(s => s.channelOrder);
   const setChannelOrder      = useOnyxStore(s => s.setChannelOrder);
   const nsfwChannels         = useOnyxStore(s => s.nsfwChannels);
+  const mediaAvailable       = useOnyxStore(s => s.mediaAvailable);
 
   const channelList   = [...channels.values()];
   // IRC +V mode = SUIMYAKU voice channel; also channels with '+' prefix (IRCX voice)
@@ -382,8 +382,10 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
           </div>
         ))}
 
-        {/* IRC +V / IRCX + prefix / SUIMYAKU voice channels in their own section */}
-        {(ircVoiceChannels.length > 0 || client?.isupport.SUIMYAKUMEDIA) && (
+        {/* IRC +V / IRCX + prefix / Suimyaku voice channels in their own section.
+            Gated by the store's mediaAvailable selector (set on 001 / NOTE
+            MEDIA) — Orochi has no media ISUPPORT token. */}
+        {(ircVoiceChannels.length > 0 || mediaAvailable) && (
           <Section
             label="Voice Channels"
             expanded={!collapsed.has('__voice__')}

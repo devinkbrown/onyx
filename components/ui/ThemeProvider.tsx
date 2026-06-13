@@ -7,7 +7,7 @@ import { _applyAccentColor } from '@/lib/store';
 // Reads from / writes to the Zustand store so it works anywhere in the tree
 // without requiring a provider wrapper.
 
-export type ThemeOption = 'midnight' | 'onyx' | 'ash' | 'amoled' | 'light' | 'system';
+export type ThemeOption = 'lacquer' | 'midnight' | 'onyx' | 'ash' | 'amoled' | 'light' | 'system';
 
 export interface ThemeContextValue {
   theme: ThemeOption;
@@ -51,9 +51,9 @@ export default function ThemeProvider() {
   const [resolvedTheme, setResolvedTheme] = useState<string>(() => {
     if (storeTheme === 'system') {
       if (typeof window !== 'undefined') {
-        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'midnight' : 'light';
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'lacquer' : 'light';
       }
-      return 'midnight';
+      return 'lacquer';
     }
     return storeTheme;
   });
@@ -64,7 +64,7 @@ export default function ThemeProvider() {
       return;
     }
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const apply = (dark: boolean) => setResolvedTheme(dark ? 'midnight' : 'light');
+    const apply = (dark: boolean) => setResolvedTheme(dark ? 'lacquer' : 'light');
     apply(mq.matches);
     const handler = (e: MediaQueryListEvent) => apply(e.matches);
     mq.addEventListener('change', handler);

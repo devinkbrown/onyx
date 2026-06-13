@@ -2135,12 +2135,15 @@ function AdvancedTab() {
   const ignoredUsers    = useOnyxStore(s => s.ignoredUsers);
   const ignoreUser      = useOnyxStore(s => s.ignoreUser);
   const unignoreUser    = useOnyxStore(s => s.unignoreUser);
+  const mediaAvailable  = useOnyxStore(s => s.mediaAvailable);
 
   const [addIgnoreInput, setAddIgnoreInput] = useState('');
 
   const hasHistory  = client?.negotiatedCaps?.has('draft/chathistory') || client?.negotiatedCaps?.has('chathistory');
   const hasExtended = client?.isupport.IRCX;
-  const hasVoice    = !!client?.isupport.SUIMYAKUMEDIA;
+  // Orochi has no media ISUPPORT token — voice/video is gated by the store's
+  // mediaAvailable selector (set on 001 / NOTE MEDIA), not a phantom 005 token.
+  const hasVoice    = mediaAvailable;
 
   return (
     <div className="tab-body">

@@ -12,6 +12,13 @@
  * Saved tokens are reused with SESSION RESUME after SASL succeeds. They are
  * not SASL mechanisms and must not replace the account password.
  *
+ * On mesh deployments Orochi additionally emits:
+ *   NOTE SESSION MTOKEN :<token>
+ * a mesh-sealed reclaim token usable to resume the session from ANY node in the
+ * mesh (server.zig handleSession TOKEN). It is longer than the 32-hex local
+ * token; `SESSION RESUME <mtoken>` routes through handleMeshReclaim, which either
+ * reclaims a detached session held locally or redirects to the owning node.
+ *
  * When no token is present (first login or expired) the password is used
  * for SASL PLAIN / SCRAM.  The password is stored in plain text — same as
  * every desktop IRC client config file.
@@ -24,8 +31,10 @@ export interface SavedCredentials {
   server: string;
   /** NickServ / SASL password — only set when user opted in AND no valid token */
   password?: string;
-  /** Orochi-issued session resume token */
+  /** Orochi-issued session resume token (local node only) */
   sessionToken?: string;
+  /** Orochi-issued mesh-sealed reclaim token (resumes from any mesh node) */
+  meshToken?: string;
   /** Token validity deadline — ISO string */
   tokenExpiry?: string;
   /** When these credentials were last written */
@@ -105,10 +114,11 @@ function writeStore(store: CredentialsStore): void {
 function purgeExpiredTokens(store: CredentialsStore): boolean {
   let changed = false;
   for (const [key, creds] of Object.entries(store.entries)) {
-    if (creds.sessionToken && creds.tokenExpiry && Date.now() > new Date(creds.tokenExpiry).getTime()) {
+    if ((creds.sessionToken || creds.meshToken) && creds.tokenExpiry && Date.now() > new Date(creds.tokenExpiry).getTime()) {
       store.entries[key] = {
         ...creds,
         sessionToken: undefined,
+        meshToken: undefined,
         tokenExpiry: undefined,
       };
       changed = true;
@@ -154,6 +164,7 @@ export function saveCredentials(opts: {
       server:       opts.server,
       password:     opts.password,
       sessionToken: preserveToken ? existing.sessionToken : undefined,
+      meshToken:    preserveToken ? existing.meshToken : undefined,
       tokenExpiry:  preserveToken ? existing.tokenExpiry : undefined,
       savedAt:      new Date().toISOString(),
     };
@@ -207,7 +218,29 @@ export function clearSessionToken(server?: string, nick?: string): void {
     if (!store) return;
     const key = server && nick ? credentialKey(server, nick) : store.activeKey;
     if (!key || !store.entries[key]) return;
-    store.entries[key] = { ...store.entries[key], sessionToken: undefined, tokenExpiry: undefined };
+    store.entries[key] = { ...store.entries[key], sessionToken: undefined, meshToken: undefined, tokenExpiry: undefined };
+    writeStore(store);
+  } catch { /* quota */ }
+}
+
+/**
+ * Store a mesh-sealed reclaim token received from Orochi via
+ * `NOTE SESSION MTOKEN`. Unlike the local session token, this one is usable to
+ * reclaim/redirect the session from ANY node in the mesh, so it survives a
+ * reconnect that lands on a different node. Persisted against the active
+ * credential entry; a no-op when no base credentials exist (guest sessions).
+ */
+export function storeMeshToken(token: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const store = readStore();
+    if (!store) return; // Only store tokens when we have base credentials
+    purgeExpiredTokens(store);
+    const activeKey = store.activeKey ?? Object.keys(store.entries)[0];
+    if (!activeKey) return;
+    const existing = store.entries[activeKey];
+    if (!existing) return;
+    store.entries[activeKey] = { ...existing, meshToken: token };
     writeStore(store);
   } catch { /* quota */ }
 }

@@ -28,6 +28,7 @@ export default function HomeView() {
   const channels           = useOnyxStore(s => s.channels);
   const dms                = useOnyxStore(s => s.dms);
   const navigate           = useOnyxStore(s => s.navigate);
+  const mediaAvailable     = useOnyxStore(s => s.mediaAvailable);
   const joinChannel        = useOnyxStore(s => s.joinChannel);
   const client             = useOnyxStore(s => s.client);
   const networkName        = useOnyxStore(s => s.networkName);
@@ -154,7 +155,7 @@ export default function HomeView() {
   if (negCaps?.has('sasl'))                                             featureBadges.push('SASL');
   if (negCaps?.has('server-time'))                                      featureBadges.push('SERVER-TIME');
   if (negCaps?.has('message-tags'))                                     featureBadges.push('MSG-TAGS');
-  if (client?.isupport?.SUIMYAKUMEDIA)                                     featureBadges.push('SUIMYAKU');
+  if (mediaAvailable)                                                  featureBadges.push('SUIMYAKU');
 
   const handleCopyInvite = () => {
     navigator.clipboard?.writeText('/invite #channel-name').catch(() => undefined);

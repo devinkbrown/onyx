@@ -20,7 +20,8 @@ export interface IRCClientOptions {
   realname?: string;
   username?: string;
   password?: string;     // SASL PLAIN password
-  sessionToken?: string; // Orochi SESSION RESUME token
+  sessionToken?: string; // Orochi SESSION RESUME token (local node)
+  meshToken?: string;    // Orochi mesh-sealed reclaim token (any node)
   hasClientCert?: boolean;
   /** called for every parsed message */
   onMessage: IRCEventHandler;
@@ -111,14 +112,6 @@ export class IRCClient {
     NICKLEN: 64,
     TOPICLEN: 390,
     IRCX: false,
-    MAXDATA: 512,
-    COMICCHAT: '',
-    SUIMYAKUMEDIA: '',
-    MAXMEDIA: 2048,
-    MEDIAUMODES: '',
-    MEDIAMUTE: '',
-    MEDIAFRAME: '',
-    MEDIACHUNK: 0,       // MEDIACHUNK=160 — max base64 chars per MCHUNK chunk
     SILENCE: 0,          // SILENCE=20 — max entries in server-side silence list
   };
 
@@ -520,10 +513,17 @@ export class IRCClient {
         // Now that the connection is registered, the post-registration SESSION
         // command is valid. Reclaim a prior detached session if we hold a token,
         // then request a fresh token for this session (arrives as
-        // NOTE SESSION TOKEN). Both are no-ops server-side unless logged in.
+        // NOTE SESSION TOKEN, plus NOTE SESSION MTOKEN on mesh deployments).
+        // Both are no-ops server-side unless logged in.
+        //
+        // Prefer the mesh-sealed token for RESUME: a reconnect may land on a
+        // different mesh node, where the local 16-byte token is meaningless but
+        // the mesh token still reclaims/redirects (server.zig handleMeshReclaim).
+        // Fall back to the local token when no mesh token is held.
         if (this._loggedIn) {
-          if (this.opts.sessionToken) {
-            this.send(buildSessionResumeLine(this.opts.sessionToken));
+          const resumeToken = this.opts.meshToken || this.opts.sessionToken;
+          if (resumeToken) {
+            this.send(buildSessionResumeLine(resumeToken));
           }
           this.sendRaw('SESSION', 'TOKEN');
         }
@@ -765,24 +765,6 @@ export class IRCClient {
           break;
         case 'IRCX':
           this.isupport.IRCX = true;
-          break;
-        case 'MAXDATA':
-          this.isupport.MAXDATA = parseInt(val, 10) || 512;
-          break;
-        case 'COMICCHAT':
-          this.isupport.COMICCHAT = val;
-          break;
-        case 'MAXMEDIA':
-          this.isupport.MAXMEDIA = parseInt(val, 10) || 2048;
-          break;
-        case 'MEDIAUMODES':
-          this.isupport.MEDIAUMODES = val;
-          break;
-        case 'MEDIAMUTE':
-          this.isupport.MEDIAMUTE = val;
-          break;
-        case 'MEDIACHUNK':
-          this.isupport.MEDIACHUNK = parseInt(val, 10) || 160;
           break;
         case 'SILENCE':
           this.isupport.SILENCE = parseInt(val, 10) || 20;

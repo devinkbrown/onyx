@@ -163,13 +163,14 @@ export default function ThemeModal() {
   const [appliedFlash, setAppliedFlash] = useState<string | null>(null);
 
   const useSystemTheme = activeTheme === 'system' || displayTheme === 'system';
-  const activeThemeDef = useSystemTheme ? SYSTEM_THEME : (THEMES.find(t => t.id === activeTheme) ?? THEMES[0]);
+  const defaultThemeDef = THEMES.find(t => t.id === 'lacquer') ?? THEMES[0];
+  const activeThemeDef = useSystemTheme ? SYSTEM_THEME : (THEMES.find(t => t.id === activeTheme) ?? defaultThemeDef);
 
   const handleSetTheme = useCallback((id: string) => {
     setTheme(id);
-    // Also drive the new theme system for midnight/onyx/ash/amoled/light/system options
-    if (id === 'midnight' || id === 'onyx' || id === 'ash' || id === 'amoled' || id === 'light' || id === 'system') {
-      setUiTheme(id as 'midnight' | 'onyx' | 'ash' | 'amoled' | 'light' | 'system');
+    // Also drive the new theme system for the themes it understands
+    if (id === 'lacquer' || id === 'midnight' || id === 'onyx' || id === 'amoled' || id === 'ash' || id === 'light' || id === 'system') {
+      setUiTheme(id as 'lacquer' | 'midnight' | 'onyx' | 'ash' | 'amoled' | 'light' | 'system');
     }
     setAppliedFlash(id);
     const timer = setTimeout(() => setAppliedFlash(null), 1000);
@@ -240,7 +241,7 @@ export default function ThemeModal() {
         {/* ── System Theme ── */}
         <button
           className={`motion-toggle${useSystemTheme ? ' motion-toggle--active' : ''}`}
-          onClick={() => handleSetTheme(useSystemTheme ? 'ocean' : 'system')}
+          onClick={() => handleSetTheme(useSystemTheme ? 'lacquer' : 'system')}
           role="switch"
           aria-checked={useSystemTheme}
           style={{ marginTop: 14 }}
@@ -248,7 +249,7 @@ export default function ThemeModal() {
           <span className="motion-toggle-icon">🖥</span>
           <div className="motion-toggle-info">
             <span className="motion-toggle-label">Follow system theme</span>
-            <span className="motion-toggle-desc">Dark → Midnight · Light → Light</span>
+            <span className="motion-toggle-desc">Dark → Lacquer · Light → Light</span>
           </div>
           <div className={`toggle-track${useSystemTheme ? ' toggle-track--on' : ''}`}>
             <div className="toggle-thumb" />
