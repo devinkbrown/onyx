@@ -45,7 +45,7 @@ pnpm dev            # development server
 
 ## Deploy
 ```bash
-bash deploy/deploy.sh       # copies out/ to nginx webroot
+./deploy.sh    # build + auto-stamp SW cache version (nginx serves out/ at eshmaki.me)
 ```
 
 Configure `NEXT_PUBLIC_IRC_WS` in `.env.local` to point to your Orochi WebSocket endpoint; `NEXT_PUBLIC_MEDIA_URL` points at the nexus-upload proxy (`/upload` POST, files under `/uploads`).
