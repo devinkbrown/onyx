@@ -283,13 +283,25 @@ export class IRCClient {
 
   private _onMessage(ev: MessageEvent) {
     const data = typeof ev.data === 'string' ? ev.data : '';
-    // Some servers may batch lines
-    this._buffer += data;
-    const lines = this._buffer.split('\n');
-    this._buffer = lines.pop() ?? '';
+    if (!data) return;
 
-    for (const rawLine of lines) {
-      const line = rawLine.replace(/\r$/, '');
+    // Orochi follows the IRCv3 WebSocket sub-protocol: each frame carries a
+    // complete IRC message and the trailing CRLF is OPTIONAL — Orochi omits it
+    // entirely (e.g. ":eshmaki.me CAP * LS :..." with no newline). The browser
+    // reassembles continuation frames, so every onmessage delivers whole
+    // message(s), never a partial line. We split on optional CR/LF and process
+    // every non-empty segment.
+    //
+    // We must NOT retain a trailing remainder across frames: the previous
+    // `split('\n')` + `buffer = lines.pop()` stashed the CRLF-less final line
+    // forever, so CAP LS was never handled and registration hung — surfacing
+    // as a "WebSocket error" that made the client appear unable to connect.
+    // A single frame may still legitimately batch several CRLF-separated lines.
+    this._buffer += data;
+    const lines = this._buffer.split(/\r?\n/);
+    this._buffer = '';
+
+    for (const line of lines) {
       if (!line) continue;
       this.opts.onRaw?.(line, 'in');
       try {
