@@ -246,9 +246,11 @@ export default function RegisterForm({ onSwitch }: Props) {
               />
             </FloatingField>
             <p className="field-note">
-              Registration uses Orochi&rsquo;s built-in <code>REGISTER</code> command
-              (draft/account-registration). No NickServ bot — results come back as
-              standard server replies.
+              <span>
+                Registration uses Orochi&rsquo;s built-in <code>REGISTER</code> command
+                (draft/account-registration). No NickServ bot — results come back as
+                standard server replies.
+              </span>
             </p>
           </section>
         )}
@@ -285,9 +287,11 @@ export default function RegisterForm({ onSwitch }: Props) {
             <p className="strength-copy">{strengthText}</p>
             <p className="field-note">
               <ShieldIcon />
-              This becomes your SASL secret. Ocean signs in with
-              {' '}<strong>SCRAM-SHA-256</strong> when the server offers it, so your
-              password is never sent in the clear.
+              <span>
+                This becomes your SASL secret. Ocean signs in with{' '}
+                <strong>SCRAM-SHA-256</strong> when the server offers it, so your
+                password is never sent in the clear.
+              </span>
             </p>
           </section>
         )}
@@ -346,8 +350,10 @@ export default function RegisterForm({ onSwitch }: Props) {
                   />
                 </FloatingField>
                 <p className="field-note">
-                  Didn&rsquo;t get it? Once you&rsquo;re connected, run{' '}
-                  <code>/VERIFY {cleanNick} &lt;code&gt;</code> or re-register to resend.
+                  <span>
+                    Didn&rsquo;t get it? Once you&rsquo;re connected, run{' '}
+                    <code>/VERIFY {cleanNick} &lt;code&gt;</code> or re-register to resend.
+                  </span>
                 </p>
               </>
             )}

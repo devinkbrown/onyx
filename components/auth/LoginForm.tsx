@@ -313,9 +313,11 @@ export default function LoginForm({ onSwitch }: Props) {
 
       <p className="sasl-hint" data-mode={password ? 'sasl' : 'guest'}>
         <ShieldIcon />
-        {password
-          ? <>Authenticates with <strong>SCRAM-SHA-256</strong>, falling back to PLAIN. Your password never crosses the wire in the clear.</>
-          : <>No password? You join as a <strong>guest</strong>. Register an account to claim your nick and unlock sessions.</>}
+        <span>
+          {password
+            ? <>Authenticates with <strong>SCRAM-SHA-256</strong>, falling back to PLAIN. Your password never crosses the wire in the clear.</>
+            : <>No password? You join as a <strong>guest</strong>. Register an account to claim your nick and unlock sessions.</>}
+        </span>
       </p>
 
       <label className="remember-row">
@@ -491,15 +493,17 @@ function LoginStyles() {
         transform: translateY(-11px) scale(.78);
       }
 
+      /* Sits left of the password reveal button so the two never collide. */
       .float-aside {
         position: absolute;
-        right: 15px;
+        right: 50px;
         top: 50%;
         color: var(--text-muted);
         font-size: var(--text-2xs, .6875rem);
         font-weight: 850;
         letter-spacing: .08em;
         text-transform: uppercase;
+        pointer-events: none;
         transform: translateY(-50%);
       }
 
