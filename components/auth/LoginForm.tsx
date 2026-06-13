@@ -239,13 +239,16 @@ export default function LoginForm({ onSwitch }: Props) {
           </p>
         )}
 
-        <button className="lux-button" type="button" disabled={loading} onClick={handleAutoConnect} data-testid="login-saved-connect">
+        <button className="lux-button" type="button" disabled={loading} aria-busy={loading} onClick={handleAutoConnect} data-testid="login-saved-connect">
           {loading
-            ? CONNECTION_STEPS[connStep]
+            ? <span key={connStep} className="conn-step-label">{CONNECTION_STEPS[connStep]}</span>
             : visibleLastError
             ? 'Retry connection'
             : hasResumeToken ? 'Resume session' : 'Connect'}
         </button>
+        <span className="sr-only" role="status" aria-live="polite">
+          {loading ? `Connecting: ${CONNECTION_STEPS[connStep]}` : ''}
+        </span>
         <button
           type="button"
           className="text-button"
@@ -382,9 +385,14 @@ export default function LoginForm({ onSwitch }: Props) {
         </p>
       )}
 
-      <button className="lux-button" type="submit" disabled={loading} data-testid="login-submit">
-        {loading ? CONNECTION_STEPS[connStep] : 'Sign in'}
+      <button className="lux-button" type="submit" disabled={loading} aria-busy={loading} data-testid="login-submit">
+        {loading
+          ? <span key={connStep} className="conn-step-label">{CONNECTION_STEPS[connStep]}</span>
+          : 'Sign in'}
       </button>
+      <span className="sr-only" role="status" aria-live="polite">
+        {loading ? `Connecting: ${CONNECTION_STEPS[connStep]}` : ''}
+      </span>
 
       <p className="switch-line">
         New here? <button type="button" onClick={onSwitch}>Create an account</button>
@@ -412,7 +420,7 @@ function FloatingField({
     <label className="float-field" data-active={active} data-error={Boolean(error)}>
       <span className="float-label">{label}</span>
       {children}
-      {aside && <span className="float-aside">{aside}</span>}
+      {aside && <span className="float-aside" aria-hidden="true">{aside}</span>}
     </label>
   );
 }
@@ -423,7 +431,7 @@ function LoginStyles() {
       .auth-form {
         display: flex;
         flex-direction: column;
-        gap: var(--sp-4, 16px);
+        gap: var(--sp-3, 12px);
       }
 
       .auth-form--auto {
@@ -468,6 +476,10 @@ function LoginStyles() {
       .float-field input:focus {
         outline-color: var(--lux);
         background: color-mix(in srgb, var(--bg-elevated) 92%, var(--lux) 8%);
+        box-shadow:
+          inset 0 1px 0 rgba(255,255,255,.055),
+          0 1px 0 rgba(0,0,0,.26),
+          0 0 0 3px color-mix(in srgb, var(--lux) 16%, transparent);
       }
 
       .float-field[data-error="true"] input {
@@ -523,11 +535,25 @@ function LoginStyles() {
         transform: translateY(-50%);
       }
 
-      .field-icon-button:hover,
+      .field-icon-button {
+        transition: color var(--t-control, 150ms) var(--ease-out), background var(--t-control, 150ms) var(--ease-out), transform var(--t-control, 150ms) var(--ease-out);
+      }
+
+      .field-icon-button:hover {
+        color: var(--text-primary);
+        background: color-mix(in srgb, var(--lux) 10%, transparent);
+      }
+
       .field-icon-button:focus-visible {
         color: var(--text-primary);
         background: color-mix(in srgb, var(--lux) 10%, transparent);
-        outline: none;
+        outline: var(--focus-ring-width, 2px) solid var(--focus-ring, var(--accent));
+        outline-offset: -2px;
+      }
+
+      .field-icon-button:active {
+        transform: translateY(-50%) scale(.88);
+        background: color-mix(in srgb, var(--lux) 18%, transparent);
       }
 
       .field-error,
@@ -618,6 +644,12 @@ function LoginStyles() {
         border-radius: var(--r-lg, 12px) var(--r-sm, 6px) var(--r-md, 8px) var(--r-lg, 12px);
         background: color-mix(in srgb, var(--warning) 10%, transparent);
         box-shadow: inset 2px 0 0 var(--warning, #fbbf24);
+        animation: alias-hint-enter var(--t-surface, 220ms) var(--ease-out) both;
+      }
+
+      @keyframes alias-hint-enter {
+        from { opacity: 0; transform: translateY(-6px); }
+        to { opacity: 1; transform: translateY(0); }
       }
 
       .nick-alias-icon {
@@ -662,6 +694,7 @@ function LoginStyles() {
 
       .nick-alias-actions {
         display: flex;
+        flex-wrap: wrap;
         gap: var(--sp-2, 8px);
         align-items: center;
         margin-top: 2px;
@@ -669,7 +702,7 @@ function LoginStyles() {
 
       .nick-alias-input {
         flex: 1;
-        min-width: 0;
+        min-width: 120px;
         height: 36px;
         border: 0;
         border-radius: var(--r-sm, 6px);
@@ -770,34 +803,58 @@ function LoginStyles() {
 
       .lux-button {
         height: 48px;
+        margin-top: var(--sp-2, 8px);
         border: 0;
         border-radius: var(--r-md, 8px) var(--r-lg, 12px) var(--r-sm, 6px) var(--r-md, 8px);
-        background: color-mix(in srgb, var(--accent) 88%, black 12%);
-        color: white;
+        /* Deepened blue so white text clears WCAG AA (≈4.8:1); inset highlight
+           keeps the lacquered sheen and the hover glow adds life. */
+        background: linear-gradient(180deg,
+          color-mix(in srgb, var(--accent) 70%, #000 30%),
+          color-mix(in srgb, var(--accent) 56%, #000 44%));
+        color: var(--on-accent, #fff);
         cursor: pointer;
         font: inherit;
         font-size: var(--text-sm, .8125rem);
         font-weight: 850;
         letter-spacing: .05em;
         text-transform: uppercase;
-        box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 16px 28px rgba(0,0,0,.28);
-        transition: transform var(--t-control, 150ms) var(--ease-out), filter var(--t-control, 150ms) var(--ease-out);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 6px 18px rgba(0,0,0,.30);
+        transition: transform var(--t-control, 150ms) var(--ease-out), filter var(--t-control, 150ms) var(--ease-out), box-shadow var(--t-control, 150ms) var(--ease-out);
       }
 
-      .lux-button:hover:not(:disabled),
-      .lux-button:focus-visible {
-        filter: brightness(1.06);
-        outline: none;
+      .lux-button:hover:not(:disabled) {
+        filter: brightness(1.08);
         transform: translateY(-1px);
+        box-shadow:
+          inset 0 1px 0 rgba(255,255,255,.16),
+          0 10px 26px rgba(0,0,0,.34),
+          0 0 26px color-mix(in srgb, var(--accent) 30%, transparent);
+      }
+
+      .lux-button:focus-visible {
+        outline: var(--focus-ring-width, 2px) solid var(--focus-ring, var(--accent));
+        outline-offset: 2px;
       }
 
       .lux-button:active:not(:disabled) {
-        transform: translateY(0);
+        transform: translateY(1px) scale(.985);
+        filter: brightness(.95);
       }
 
       .lux-button:disabled {
         cursor: wait;
         opacity: .62;
+      }
+
+      /* Each handshake step label eases in instead of flicking. */
+      .conn-step-label {
+        display: inline-block;
+        animation: conn-step-in var(--t-surface, 220ms) var(--ease-out) both;
+      }
+
+      @keyframes conn-step-in {
+        from { opacity: 0; transform: translateY(4px); }
+        to { opacity: 1; transform: translateY(0); }
       }
 
       .switch-line {
@@ -815,16 +872,34 @@ function LoginStyles() {
         cursor: pointer;
         font: inherit;
         font-weight: 760;
+        min-height: 24px;
+        padding: 2px 6px;
+        border-radius: var(--r-xs, 4px);
+        transition: color var(--t-control, 150ms) var(--ease-out), opacity var(--t-control, 150ms) var(--ease-out);
+      }
+
+      .switch-line button:hover { color: color-mix(in srgb, var(--lux) 72%, white); }
+      .switch-line button:active,
+      .text-button:active { opacity: .7; }
+
+      .switch-line button:focus-visible,
+      .text-button:focus-visible {
+        outline: var(--focus-ring-width, 2px) solid var(--focus-ring, var(--accent));
+        outline-offset: 1px;
       }
 
       .text-button {
         color: var(--text-secondary);
       }
 
+      .text-button:hover { color: var(--text-primary); }
+
       .text-button--muted {
         color: var(--text-muted);
         font-size: var(--text-xs, .75rem);
       }
+
+      .text-button--muted:hover { color: var(--text-secondary); }
 
       .saved-card {
         display: grid;
@@ -845,9 +920,15 @@ function LoginStyles() {
         display: grid;
         place-items: center;
         border-radius: var(--r-lg, 12px) var(--r-sm, 6px) var(--r-md, 8px) var(--r-lg, 12px);
-        background: var(--lux);
+        /* Lacquered, light-catching badge rather than a flat fill. */
+        background: linear-gradient(145deg,
+          color-mix(in srgb, var(--lux) 100%, white 18%) 0%,
+          var(--lux) 58%,
+          color-mix(in srgb, var(--lux) 82%, black 18%) 100%);
         color: var(--bg-void);
+        font-size: var(--text-xl, 1.25rem);
         font-weight: 900;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 4px 12px color-mix(in srgb, var(--lux) 26%, transparent);
       }
 
       .saved-copy {
@@ -871,12 +952,19 @@ function LoginStyles() {
         font-size: var(--text-sm, .8125rem);
       }
 
-      @media (prefers-reduced-motion: reduce) {
-        .auth-form--shake {
-          animation: none;
+      /* Keep auth inputs at 16px on phones so iOS Safari doesn't zoom on focus. */
+      @media (max-width: 768px) {
+        .float-field input,
+        .nick-alias-input {
+          font-size: 16px;
         }
+      }
 
-        .resume-dot {
+      @media (prefers-reduced-motion: reduce) {
+        .auth-form--shake,
+        .resume-dot,
+        .nick-alias-hint,
+        .conn-step-label {
           animation: none;
         }
 

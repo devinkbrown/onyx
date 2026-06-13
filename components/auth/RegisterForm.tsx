@@ -378,8 +378,10 @@ export default function RegisterForm({ onSwitch }: Props) {
             Continue
           </button>
         ) : (
-          <button type="submit" className="lux-button" disabled={registerPending} data-testid="register-submit">
-            {registerPending ? 'Creating' : verifyRequired ? 'Verify' : 'Create account'}
+          <button type="submit" className="lux-button" disabled={registerPending} aria-busy={registerPending} data-testid="register-submit">
+            {registerPending
+              ? <><span className="btn-spinner" aria-hidden="true" />Creating</>
+              : verifyRequired ? 'Verify' : 'Create account'}
           </button>
         )}
       </div>
@@ -410,7 +412,7 @@ function FloatingField({
     <label className="float-field" data-active={active} data-error={Boolean(error)}>
       <span className="float-label">{label}</span>
       {children}
-      {aside && <span className="float-aside">{aside}</span>}
+      {aside && <span className="float-aside" aria-hidden="true">{aside}</span>}
     </label>
   );
 }
@@ -444,6 +446,20 @@ function RegisterStyles() {
         font-size: var(--text-xs, .75rem);
         font-weight: 800;
         padding: var(--sp-2, 8px);
+        min-height: 24px;
+        transition: background var(--t-control, 150ms) var(--ease-out), color var(--t-control, 150ms) var(--ease-out), transform var(--t-control, 150ms) var(--ease-out);
+      }
+
+      .step-dot:hover:not(:disabled):not([data-active="true"]) {
+        background: color-mix(in srgb, var(--bg-base) 80%, var(--lux) 20%);
+        color: var(--text-secondary);
+      }
+
+      .step-dot:active:not(:disabled) { transform: scale(.96); }
+
+      .step-dot:focus-visible {
+        outline: var(--focus-ring-width, 2px) solid var(--focus-ring, var(--accent));
+        outline-offset: 2px;
       }
 
       .step-dot span {
@@ -454,6 +470,7 @@ function RegisterStyles() {
         border-radius: var(--r-xs, 4px);
         background: color-mix(in srgb, var(--text-muted) 14%, transparent);
         color: var(--text-secondary);
+        transition: background var(--t-control, 150ms) var(--ease-out), color var(--t-control, 150ms) var(--ease-out);
       }
 
       .step-dot[data-active="true"] {
@@ -465,6 +482,21 @@ function RegisterStyles() {
       .step-dot[data-done="true"] span {
         background: var(--lux);
         color: var(--bg-void);
+      }
+
+      /* Completed steps read as a check, not a number. */
+      .step-dot[data-done="true"] span {
+        font-size: 0;
+        position: relative;
+      }
+      .step-dot[data-done="true"] span::after {
+        content: '';
+        position: absolute;
+        width: 8px;
+        height: 5px;
+        border-left: 2px solid var(--bg-void);
+        border-bottom: 2px solid var(--bg-void);
+        transform: rotate(-45deg) translate(0, -1px);
       }
 
       .step-dot:disabled {
@@ -553,6 +585,10 @@ function RegisterStyles() {
       .float-field input:focus {
         outline-color: var(--lux);
         background: color-mix(in srgb, var(--bg-elevated) 92%, var(--lux) 8%);
+        box-shadow:
+          inset 0 1px 0 rgba(255,255,255,.055),
+          0 1px 0 rgba(0,0,0,.26),
+          0 0 0 3px color-mix(in srgb, var(--lux) 16%, transparent);
       }
 
       .float-label {
@@ -600,6 +636,23 @@ function RegisterStyles() {
         color: var(--text-muted);
         cursor: pointer;
         transform: translateY(-50%);
+        transition: color var(--t-control, 150ms) var(--ease-out), background var(--t-control, 150ms) var(--ease-out), transform var(--t-control, 150ms) var(--ease-out);
+      }
+
+      .field-icon-button:hover {
+        color: var(--text-primary);
+        background: color-mix(in srgb, var(--lux) 10%, transparent);
+      }
+
+      .field-icon-button:focus-visible {
+        color: var(--text-primary);
+        outline: var(--focus-ring-width, 2px) solid var(--focus-ring, var(--accent));
+        outline-offset: -2px;
+      }
+
+      .field-icon-button:active {
+        transform: translateY(-50%) scale(.88);
+        background: color-mix(in srgb, var(--lux) 18%, transparent);
       }
 
       .availability {
@@ -609,6 +662,7 @@ function RegisterStyles() {
         color: var(--text-muted);
         font-size: var(--text-sm, .8125rem);
         font-weight: 700;
+        transition: color var(--t-control, 150ms) var(--ease-out);
       }
 
       .availability span {
@@ -616,6 +670,7 @@ function RegisterStyles() {
         height: 7px;
         border-radius: 50%;
         background: var(--warning, #f59e0b);
+        transition: background var(--t-control, 150ms) var(--ease-out);
       }
 
       .availability[data-state="available"] {
@@ -636,6 +691,7 @@ function RegisterStyles() {
         height: 7px;
         border-radius: var(--r-xs, 4px);
         background: color-mix(in srgb, var(--text-muted) 18%, transparent);
+        transition: background var(--t-control, 150ms) var(--ease-out);
       }
 
       .strength span[data-lit="true"][data-level="1"] { background: var(--danger); }
@@ -748,11 +804,14 @@ function RegisterStyles() {
       }
 
       .lux-button {
-        background: color-mix(in srgb, var(--accent) 88%, black 12%);
-        color: white;
+        background: linear-gradient(180deg,
+          color-mix(in srgb, var(--accent) 70%, #000 30%),
+          color-mix(in srgb, var(--accent) 56%, #000 44%));
+        color: var(--on-accent, #fff);
         letter-spacing: .05em;
         text-transform: uppercase;
-        box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 16px 28px rgba(0,0,0,.28);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 6px 18px rgba(0,0,0,.30);
+        transition: transform var(--t-control, 150ms) var(--ease-out), filter var(--t-control, 150ms) var(--ease-out), box-shadow var(--t-control, 150ms) var(--ease-out);
       }
 
       .quiet-button {
@@ -760,15 +819,28 @@ function RegisterStyles() {
         padding: 0 var(--sp-4, 16px);
         background: color-mix(in srgb, var(--bg-base) 88%, var(--lux) 12%);
         color: var(--text-secondary);
+        transition: transform var(--t-control, 150ms) var(--ease-out), filter var(--t-control, 150ms) var(--ease-out);
       }
 
-      .lux-button:hover:not(:disabled),
-      .lux-button:focus-visible,
-      .quiet-button:hover,
-      .quiet-button:focus-visible {
-        filter: brightness(1.06);
-        outline: none;
+      .lux-button:hover:not(:disabled) {
+        filter: brightness(1.08);
+        transform: translateY(-1px);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 10px 26px rgba(0,0,0,.34), 0 0 26px color-mix(in srgb, var(--accent) 30%, transparent);
       }
+
+      .quiet-button:hover {
+        filter: brightness(1.06);
+        transform: translateY(-1px);
+      }
+
+      .lux-button:focus-visible,
+      .quiet-button:focus-visible {
+        outline: var(--focus-ring-width, 2px) solid var(--focus-ring, var(--accent));
+        outline-offset: 2px;
+      }
+
+      .lux-button:active:not(:disabled) { transform: translateY(1px) scale(.985); filter: brightness(.95); }
+      .quiet-button:active { transform: translateY(0) scale(.97); filter: brightness(.95); }
 
       .lux-button:disabled {
         cursor: wait;
@@ -810,6 +882,25 @@ function RegisterStyles() {
         height: 34px;
       }
 
+      .btn-spinner {
+        display: inline-block;
+        width: 13px;
+        height: 13px;
+        margin-right: 7px;
+        vertical-align: -1px;
+        border: 2px solid rgba(255,255,255,.32);
+        border-top-color: var(--on-accent, #fff);
+        border-radius: 50%;
+        animation: ocean-spin .7s linear infinite;
+      }
+
+      /* Keep auth inputs at 16px on phones so iOS Safari doesn't zoom on focus. */
+      @media (max-width: 768px) {
+        .float-field input {
+          font-size: 16px;
+        }
+      }
+
       @media (max-width: 380px) {
         .step-dot {
           flex-direction: column;
@@ -824,6 +915,7 @@ function RegisterStyles() {
 
       @media (prefers-reduced-motion: reduce) {
         .step-panel,
+        .btn-spinner,
         .float-field[data-error="true"] input,
         .float-field input,
         .float-label {

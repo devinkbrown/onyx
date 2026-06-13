@@ -54,16 +54,16 @@ export default function AuthPage() {
         </aside>
 
         <section className="auth-panel elev-1">
+          <h1 className="sr-only">Ocean — sign in to the Orochi gateway</h1>
           <div className="auth-panel-head">
             <div>
               <p className="auth-panel-kicker label-caps">Account</p>
               <h2 className="auth-panel-title">{tab === 'login' ? 'Welcome back' : 'Create access'}</h2>
             </div>
-            <div className="auth-tabs" role="tablist" aria-label="Authentication mode">
+            <div className="auth-tabs" role="group" aria-label="Authentication mode">
               <button
                 type="button"
-                role="tab"
-                aria-selected={tab === 'login'}
+                aria-pressed={tab === 'login'}
                 className="auth-tab"
                 data-active={tab === 'login'}
                 data-testid="auth-tab-login"
@@ -73,8 +73,7 @@ export default function AuthPage() {
               </button>
               <button
                 type="button"
-                role="tab"
-                aria-selected={tab === 'register'}
+                aria-pressed={tab === 'register'}
                 className="auth-tab"
                 data-active={tab === 'register'}
                 data-testid="auth-tab-register"
@@ -105,8 +104,13 @@ export default function AuthPage() {
           display: grid;
           place-items: center;
           padding: var(--sp-8, 32px);
+          /* Atmospheric depth: accent light rising from the lower-left (as if off
+             the ocean floor) and a champagne glow descending from upper-right —
+             both well under 10% so the card reads as placed in a space, not on a
+             flat canvas. */
           background:
-            linear-gradient(180deg, color-mix(in srgb, var(--bg-void) 94%, var(--lux) 6%), var(--bg-void)),
+            radial-gradient(ellipse 80% 60% at 18% 112%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 62%),
+            radial-gradient(ellipse 64% 44% at 84% -8%, color-mix(in srgb, var(--lux) 7%, transparent), transparent 56%),
             var(--bg-void);
           color: var(--text-primary);
           overflow: hidden;
@@ -162,8 +166,11 @@ export default function AuthPage() {
           height: 100%;
           display: flex;
           flex-direction: column;
-          justify-content: flex-end;
-          padding: var(--sp-16, 64px);
+          /* Poster structure: logo anchors the top, the wordmark/copy/stack the
+             bottom — instead of everything crowded against the lower edge. The
+             kicker absorbs the free space so the lower group stays together. */
+          justify-content: flex-start;
+          padding: var(--sp-12, 48px) var(--sp-16, 64px);
         }
 
         .auth-logo {
@@ -174,7 +181,7 @@ export default function AuthPage() {
         }
 
         .auth-kicker {
-          margin: 0 0 var(--sp-2, 8px);
+          margin: auto 0 var(--sp-2, 8px);
           color: var(--lux);
           font-size: var(--text-xs, .75rem);
           font-weight: 800;
@@ -188,7 +195,16 @@ export default function AuthPage() {
           font-size: clamp(4rem, 9vw, 7.8rem);
           font-weight: 800;
           line-height: .82;
-          letter-spacing: 0;
+          letter-spacing: -.03em;
+          /* Luminous brand mark — primary fading into champagne — rather than
+             flat title text on the dark panel. */
+          background: linear-gradient(148deg,
+            var(--text-primary) 0%,
+            color-mix(in srgb, var(--text-primary) 68%, var(--lux)) 56%,
+            var(--lux) 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
           color: var(--text-primary);
         }
 
@@ -206,16 +222,24 @@ export default function AuthPage() {
           padding: 0;
           display: flex;
           flex-direction: column;
-          gap: var(--sp-3, 12px);
+          gap: var(--sp-4, 16px);
           max-width: 380px;
         }
 
         .auth-brand-stack li {
           display: flex;
           flex-direction: column;
-          gap: 3px;
+          gap: var(--sp-1, 4px);
           padding-left: var(--sp-4, 16px);
-          border-left: 2px solid color-mix(in srgb, var(--lux) 42%, transparent);
+          border-left: 2px solid color-mix(in srgb, var(--lux) 36%, transparent);
+        }
+
+        /* Lead with the strongest claim; let the rest graduate down. */
+        .auth-brand-stack li:first-child {
+          border-left-color: color-mix(in srgb, var(--lux) 72%, transparent);
+        }
+        .auth-brand-stack li:first-child .auth-stack-mech {
+          color: color-mix(in srgb, var(--lux) 100%, white 12%);
         }
 
         .auth-stack-mech {
@@ -246,10 +270,14 @@ export default function AuthPage() {
         }
 
         .auth-brand-meter span {
-          width: 40px;
-          height: 2px;
+          width: 28px;
+          height: 3px;
+          /* The two extra bars are drawn with box-shadow (no layout box), so
+             reserve their horizontal extent (~102px) before the label. */
+          margin-right: 82px;
+          border-radius: 2px;
           background: var(--lux);
-          box-shadow: 42px 0 0 color-mix(in srgb, var(--lux) 44%, transparent), 84px 0 0 color-mix(in srgb, var(--lux) 18%, transparent);
+          box-shadow: 36px 0 0 2px color-mix(in srgb, var(--lux) 48%, transparent), 72px 0 0 2px color-mix(in srgb, var(--lux) 20%, transparent);
         }
 
         .auth-panel {
@@ -279,9 +307,9 @@ export default function AuthPage() {
         .auth-panel-title {
           margin-top: var(--sp-1, 4px);
           font-family: var(--font-display);
-          font-size: var(--text-3xl, 2rem);
+          font-size: var(--text-2xl, 1.5rem);
           line-height: 1.05;
-          letter-spacing: 0;
+          letter-spacing: -.01em;
           color: var(--text-primary);
         }
 
@@ -299,7 +327,7 @@ export default function AuthPage() {
           border: 0;
           border-radius: var(--r-md, 8px) var(--r-xs, 4px) var(--r-md, 8px) var(--r-sm, 6px);
           background: transparent;
-          color: var(--text-muted);
+          color: var(--text-secondary);
           cursor: pointer;
           font: inherit;
           font-size: var(--text-sm, .8125rem);
@@ -308,20 +336,40 @@ export default function AuthPage() {
           transition: background var(--t-control, 150ms) var(--ease-out), color var(--t-control, 150ms) var(--ease-out), transform var(--t-control, 150ms) var(--ease-out);
         }
 
-        .auth-tab:hover,
-        .auth-tab:focus-visible {
+        .auth-tab:hover:not([data-active="true"]) {
           color: var(--text-primary);
-          outline: none;
+          background: color-mix(in srgb, var(--lux) 6%, transparent);
         }
 
+        .auth-tab:focus-visible {
+          outline: var(--focus-ring-width, 2px) solid var(--focus-ring, var(--accent));
+          outline-offset: 2px;
+          color: var(--text-primary);
+        }
+
+        .auth-tab:active { transform: scale(.96); }
+
         .auth-tab[data-active="true"] {
-          background: color-mix(in srgb, var(--lux) 14%, var(--bg-elevated));
+          background: color-mix(in srgb, var(--lux) 12%, var(--bg-elevated));
           color: var(--lux);
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 8px 18px rgba(0,0,0,.22);
+          box-shadow:
+            inset 0 1px 0 rgba(255,255,255,.08),
+            0 4px 12px rgba(0,0,0,.26),
+            0 0 0 1px color-mix(in srgb, var(--lux) 24%, transparent);
         }
 
         .auth-form-area {
           min-height: 470px;
+        }
+
+        /* Each mounted form (and the tab-switch swap) eases in. */
+        .auth-form-area > * {
+          animation: form-enter var(--t-surface, 220ms) var(--ease-out) both;
+        }
+
+        @keyframes form-enter {
+          from { opacity: 0; transform: translateY(6px); }
+          to { opacity: 1; transform: translateY(0); }
         }
 
         .auth-footer {
@@ -339,6 +387,12 @@ export default function AuthPage() {
           height: 7px;
           border-radius: 50%;
           background: var(--status-online, #3ba55d);
+          animation: auth-dot-idle 3.6s ease-in-out infinite;
+        }
+
+        @keyframes auth-dot-idle {
+          0%, 100% { opacity: .7; box-shadow: 0 0 0 0 color-mix(in srgb, var(--status-online) 0%, transparent); }
+          50% { opacity: 1; box-shadow: 0 0 8px color-mix(in srgb, var(--status-online) 55%, transparent); }
         }
 
         @keyframes depth-drift {
@@ -353,7 +407,11 @@ export default function AuthPage() {
         @media (max-width: 760px) {
           .auth-root {
             padding: 0;
+            padding-top: env(safe-area-inset-top, 0px);
             align-items: stretch;
+            /* Single-column flow must scroll; only the desktop card clips. */
+            overflow-y: auto;
+            overflow-x: hidden;
           }
 
           .auth-stage {
@@ -361,6 +419,9 @@ export default function AuthPage() {
             grid-template-columns: 1fr;
             border-radius: 0;
           }
+
+          /* The desktop floor would force scroll/clip on short phones. */
+          .auth-form-area { min-height: 0; }
 
           .auth-brand {
             min-height: 220px;
@@ -389,6 +450,7 @@ export default function AuthPage() {
           .auth-panel {
             justify-content: flex-start;
             padding: var(--sp-8, 32px) var(--sp-5, 20px);
+            padding-bottom: max(var(--sp-8, 32px), env(safe-area-inset-bottom, 0px));
           }
 
           .auth-panel-head {
@@ -401,20 +463,23 @@ export default function AuthPage() {
           }
         }
 
-        @media (max-width: 360px) {
+        @media (max-width: 400px) {
           .auth-panel {
             padding-inline: var(--sp-4, 16px);
           }
 
+          /* "Welcome back" at 2rem wraps in the narrow panel ~375px. */
           .auth-panel-title {
-            font-size: var(--text-2xl, 1.5rem);
+            font-size: var(--text-xl, 1.25rem);
           }
         }
 
         @media (prefers-reduced-motion: reduce) {
           .auth-brand,
           .auth-brand-grain,
-          .auth-tab {
+          .auth-tab,
+          .auth-status-dot,
+          .auth-form-area > * {
             animation: none;
             transition-duration: .001ms;
           }
