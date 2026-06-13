@@ -112,14 +112,16 @@ export default function RoleBadge({ mode, modes, prefix, compact = false }: Role
           padding: 0;
         }
         .role-badge--owner {
-          color: var(--lux, #d8b96a);
-          background: color-mix(in srgb, var(--elev-tint-2, var(--bg-float)) 88%, var(--lux, #d8b96a) 12%);
+          color: var(--role-owner, var(--lux, #d8b96a));
+          background: color-mix(in srgb, var(--elev-tint-2, var(--bg-float)) 88%, var(--role-owner, var(--lux, #d8b96a)) 12%);
         }
         .role-badge--op {
-          color: var(--accent, #6aa8ff);
+          color: var(--role-op, var(--accent, #6aa8ff));
+          background: color-mix(in srgb, var(--elev-tint-2, var(--bg-float)) 90%, var(--role-op, var(--accent)) 10%);
         }
         .role-badge--voice {
-          color: var(--success, #35d07f);
+          color: var(--role-voice, var(--success, #35d07f));
+          background: color-mix(in srgb, var(--elev-tint-2, var(--bg-float)) 90%, var(--role-voice, var(--success)) 10%);
         }
         .role-badge-glyph {
           font-family: var(--font-display), Georgia, serif;

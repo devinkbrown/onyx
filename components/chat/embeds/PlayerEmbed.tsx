@@ -43,7 +43,7 @@ export default function PlayerEmbed({ embed }: { embed: Embed }) {
       data-testid="embed-player-poster"
     >
       {embed.thumbnailUrl && !thumbBroken ? (
-        // eslint-disable-next-line @next/next/no-img-element
+         
         <img
           src={embed.thumbnailUrl}
           alt=""

@@ -1,9 +1,12 @@
 // Deterministic nick color from username hash
 export function getNickColor(nick: string): string {
+  // Normalize case so the same user always maps to the same color. Orochi uses
+  // ascii CASEMAPPING, so a plain lowercase fold matches the server's identity.
+  const key = nick.toLowerCase();
   // Hash the nick to pick from a palette of 12 readable colors
   let hash = 0;
-  for (let i = 0; i < nick.length; i++) {
-    hash = nick.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < key.length; i++) {
+    hash = key.charCodeAt(i) + ((hash << 5) - hash);
   }
   const NICK_COLORS = [
     '#60a5fa', // blue

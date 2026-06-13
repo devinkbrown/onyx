@@ -13,6 +13,7 @@ import { stickerToMessage } from '@/lib/stickers';
 import FloodWarningBar from '@/components/chat/FloodWarningBar';
 import AttachmentPreview, { PendingAttachment, AttachmentUploadState, getAttachmentType, formatBytes } from '@/components/chat/AttachmentPreview';
 import { useFileUpload } from '@/hooks/useFileUpload';
+import { getNickColor } from '@/lib/nick-color';
 
 const FLOOD_WINDOW_MS = 2000;
 const MAX_ATTACHMENTS = 10;
@@ -1511,9 +1512,19 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
       {/* Reply context bar */}
       {replyingTo && (
         <div className="reply-preview animate-fade-in">
+          <span className="reply-preview__icon" aria-hidden>
+            <svg width="13" height="13" viewBox="0 0 15 15" fill="currentColor">
+              <path d="M6.5 2L1 6.5 6.5 11V8C10 8 12.5 9.5 14 13c0-7-7.5-7-7.5-7V2z"/>
+            </svg>
+          </span>
           <div className="reply-preview__content">
             <span className="reply-preview__label">Replying to</span>
-            <span className="reply-preview__nick">{replyingTo.from}</span>
+            <span
+              className="reply-preview__nick"
+              style={{ color: getNickColor(replyingTo.from) }}
+            >
+              {replyingTo.from}
+            </span>
             <span
               className="reply-preview__text"
               role="button"
@@ -2174,6 +2185,15 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           from { opacity: 0; transform: translateY(4px); }
           to   { opacity: 1; transform: translateY(0); }
         }
+        .reply-preview__icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--accent);
+          flex-shrink: 0;
+          opacity: 0.9;
+          transform: scaleX(-1);
+        }
         .reply-preview__content {
           flex: 1;
           min-width: 0;
@@ -2190,7 +2210,7 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
         }
         .reply-preview__nick {
           font-size: 12px;
-          font-weight: 700;
+          font-weight: 750;
           color: var(--accent);
           white-space: nowrap;
           flex-shrink: 0;
@@ -2210,6 +2230,11 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           color: var(--text-primary);
           background: var(--bg-float);
         }
+        .reply-preview__text:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 1px;
+          color: var(--text-primary);
+        }
         .reply-preview__cancel {
           background: none;
           border: none;
@@ -2224,7 +2249,8 @@ export default function MessageInput({ target, placeholder, droppedFile, onDropp
           border-radius: var(--r-xs);
           flex-shrink: 0;
         }
-        .reply-preview__cancel:hover { color: var(--text-primary); background: var(--bg-float); }
+        .reply-preview__cancel:hover { color: var(--danger, #f87171); background: var(--danger-subtle, rgba(248,113,113,0.12)); }
+        .reply-preview__cancel:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
         .msg-input-wrap .attachment-strip {
           border-radius: var(--r-xl, 18px) var(--r-lg, 14px) 0 0;

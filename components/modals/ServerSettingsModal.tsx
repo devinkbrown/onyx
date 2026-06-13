@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import type { AuditEntry } from '@/lib/store';
 import Avatar from '@/components/ui/Avatar';
@@ -824,7 +824,7 @@ function InvitesTab() {
   const [invites,  setInvites]  = useState<InviteEntry[]>([]);
   const [copied,   setCopied]   = useState<string | null>(null);
 
-  const channelList = [...channels.keys()];
+  const channelList = useMemo(() => [...channels.keys()], [channels]);
 
   // Default to first channel if not set
   useEffect(() => {

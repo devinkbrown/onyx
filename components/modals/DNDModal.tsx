@@ -2,6 +2,7 @@
 
 import { useOnyxStore } from '@/lib/store';
 import ModalShell from './ModalShell';
+import Button from '@/components/ui/Button';
 
 function formatHour(h: number): string {
   if (h === 0) return '12:00 AM';
@@ -53,9 +54,9 @@ export default function DNDModal() {
       closeLabel="Close Do Not Disturb settings"
       flushBody
       footer={
-        <button className="dnd-btn dnd-btn--primary" onClick={closeDndModal}>
+        <Button variant="primary" onClick={closeDndModal}>
           Done
-        </button>
+        </Button>
       }
     >
       <div className="dnd-content">
@@ -239,6 +240,10 @@ export default function DNDModal() {
           padding: 0;
         }
         .dnd-toggle--on { background: var(--accent, #0ea5e9); }
+        .dnd-toggle:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
+        }
         .dnd-toggle-thumb {
           position: absolute;
           top: 3px;
@@ -328,6 +333,10 @@ export default function DNDModal() {
           border-color: var(--accent-border, rgba(14,165,233,0.4));
           color: var(--text-primary);
         }
+        .dnd-preset-btn:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
+        }
         .dnd-preset-btn--active {
           background: var(--accent-subtle, rgba(14,165,233,0.15));
           border-color: var(--accent, #0ea5e9);
@@ -344,22 +353,10 @@ export default function DNDModal() {
           border-color: var(--danger, #ef4444);
           color: var(--danger, #ef4444);
         }
-
-        .dnd-btn {
-          padding: 8px 20px;
-          border-radius: var(--r-sm, 6px);
-          border: none;
-          font-size: var(--text-sm, 13px);
-          font-weight: 600;
-          cursor: pointer;
-          font-family: inherit;
-          transition: background var(--t-control, 150ms), opacity var(--t-control, 150ms);
+        .dnd-preset-btn--clear:focus-visible {
+          outline: 2px solid var(--danger);
+          outline-offset: 2px;
         }
-        .dnd-btn--primary {
-          background: var(--accent, #0ea5e9);
-          color: #fff;
-        }
-        .dnd-btn--primary:hover { opacity: 0.88; }
       `}</style>
     </ModalShell>
   );

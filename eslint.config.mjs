@@ -25,6 +25,11 @@ const eslintConfig = defineConfig([
       "react-hooks/refs": "off",
       "react-hooks/set-state-in-effect": "off",
       "react-hooks/use-memo": "off",
+      // Ocean renders arbitrary remote + data-URL media (avatars, stickers,
+      // GIFs, link-preview thumbnails, custom emoji) under a static export.
+      // next/image can't optimize arbitrary external hosts without a loader and
+      // is the wrong fit here, so plain <img> is intentional.
+      "@next/next/no-img-element": "off",
     },
   },
 ]);

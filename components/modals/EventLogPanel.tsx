@@ -34,7 +34,10 @@ export default function EventLogPanel() {
   const closeEventLog    = useOnyxStore(s => s.closeEventLog);
 
   const channel = activeView.kind === 'channel' ? activeView.channel : null;
-  const rawEvents = channel ? (channelEvents[channel.toLowerCase()] ?? []) : [];
+  const rawEvents = useMemo(
+    () => channel ? (channelEvents[channel.toLowerCase()] ?? []) : [],
+    [channel, channelEvents],
+  );
 
   const events = useMemo(() => {
     return [...rawEvents]
@@ -91,8 +94,19 @@ export default function EventLogPanel() {
       <div className="elp-list" role="log" aria-live="polite" aria-relevant="additions">
         {events.length === 0 ? (
           <div className="elp-empty">
-            <span className="elp-empty-icon" aria-hidden>📋</span>
-            <p className="elp-empty-text">No events yet</p>
+            <span className="elp-empty-figure" aria-hidden>
+              <span className="elp-empty-ring" />
+              <span className="elp-empty-ring elp-empty-ring--inner" />
+              <span className="elp-empty-dot" />
+            </span>
+            <p className="elp-empty-text">
+              {rawEvents.length === 0 ? 'No events yet' : 'No events match these filters'}
+            </p>
+            <p className="elp-empty-sub">
+              {rawEvents.length === 0
+                ? 'Joins, parts, mode changes, and nick changes will appear here.'
+                : 'Enable more event types above to see activity.'}
+            </p>
           </div>
         ) : (
           events.map((event, idx) => {
@@ -174,6 +188,11 @@ export default function EventLogPanel() {
         }
         .elp-clear-btn:hover { background: var(--danger-subtle, rgba(240,71,71,0.1)); color: var(--danger, #f04747); }
         .elp-close-btn:hover { background: var(--ch-hover-bg); color: var(--text-primary); }
+        .elp-clear-btn:focus-visible,
+        .elp-close-btn:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
+        }
 
         /* Filter bar */
         .elp-filters {
@@ -204,6 +223,10 @@ export default function EventLogPanel() {
         .elp-filter-btn:hover {
           background: var(--ch-hover-bg);
           color: var(--text-secondary);
+        }
+        .elp-filter-btn:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
         }
         .elp-filter-btn--active {
           background: color-mix(in srgb, var(--filter-color, var(--accent)) 14%, transparent);
@@ -240,15 +263,45 @@ export default function EventLogPanel() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 8px;
-          padding: 40px 20px;
+          gap: var(--sp-2, 8px);
+          padding: 44px 24px;
           text-align: center;
         }
-        .elp-empty-icon { font-size: 28px; opacity: 0.4; }
+        .elp-empty-figure {
+          position: relative;
+          width: 64px;
+          height: 64px;
+          display: grid;
+          place-items: center;
+          margin-bottom: var(--sp-2, 8px);
+        }
+        .elp-empty-ring {
+          position: absolute;
+          inset: 0;
+          border-radius: 50%;
+          border: 1px solid color-mix(in srgb, var(--text-muted) 30%, transparent);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.035);
+        }
+        .elp-empty-ring--inner { inset: 26%; opacity: 0.6; }
+        .elp-empty-dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          background: color-mix(in srgb, var(--lux) 70%, var(--bg-deep));
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-1, 0 8px 18px rgba(0,0,0,.28));
+        }
         .elp-empty-text {
-          font-size: 13px;
-          color: var(--text-muted);
+          font-size: var(--text-sm, 13px);
+          font-weight: 600;
+          color: var(--text-secondary);
           margin: 0;
+        }
+        .elp-empty-sub {
+          font-size: var(--text-xs, 12px);
+          color: var(--text-muted);
+          line-height: 1.5;
+          margin: 0;
+          max-width: 220px;
         }
 
         .elp-row {
@@ -292,6 +345,10 @@ export default function EventLogPanel() {
 
         @media (max-width: 768px) {
           .elp-panel { width: 260px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .elp-panel { animation: none; }
         }
       `}</style>
     </aside>

@@ -16,7 +16,13 @@ interface Props {
 
 const DEFAULT_SERVER = process.env.NEXT_PUBLIC_IRC_WS ?? 'wss://eshmaki.me:8080';
 const NICK_INVALID_RE = /[^a-zA-Z0-9\-_\[\]{}\\|`^]/;
-const CONNECTION_STEPS = ['Opening link', 'Checking SASL', 'Loading channels'];
+const CONNECTION_STEPS = [
+  'Opening link',
+  'Negotiating CAP',
+  'SASL handshake',
+  'Reclaiming session',
+  'Loading channels',
+] as const;
 
 function validWsUrl(url: string): string | null {
   try {
@@ -39,6 +45,7 @@ export default function LoginForm({ onSwitch }: Props) {
   const connect = useOnyxStore(s => s.connect);
   const status = useOnyxStore(s => s.status);
   const notifications = useOnyxStore(s => s.notifications);
+  const currentNickIsAlias = useOnyxStore(s => s.currentNickIsAlias);
 
   const [nick, setNick] = useState('');
   const [password, setPassword] = useState('');
@@ -71,14 +78,27 @@ export default function LoginForm({ onSwitch }: Props) {
     }
 
     const interval = setInterval(() => {
-      setConnStep(step => (step + 1) % CONNECTION_STEPS.length);
-    }, 1200);
+      // Advance through the handshake without looping past the last step.
+      setConnStep(step => Math.min(step + 1, CONNECTION_STEPS.length - 1));
+    }, 900);
     return () => clearInterval(interval);
   }, [status]);
 
   const loading = status === 'connecting';
   const lastError = notifications.filter(n => n.type === 'error').at(-1);
   const visibleLastError = connectAttempted && !loading ? lastError : undefined;
+
+  // Which SASL path the handshake will take, mirroring selectSaslMechanism():
+  // SCRAM-SHA-256 is preferred when a password is present; without one we
+  // connect as a guest (no SASL). EXTERNAL/CERTFP is a future cert-bound path.
+  const saslHint = password
+    ? 'SCRAM-SHA-256'
+    : (savedCreds?.password ? 'SCRAM-SHA-256' : 'Guest');
+  // A live session-resume token means we skip the password round-trip entirely.
+  const hasResumeToken = Boolean(
+    savedCreds?.sessionToken
+    && (!savedCreds.tokenExpiry || Date.now() < new Date(savedCreds.tokenExpiry).getTime()),
+  );
 
   const nickInvalid = nick.length > 0 && NICK_INVALID_RE.test(nick);
   const nickError = nick.includes(' ')
@@ -172,7 +192,23 @@ export default function LoginForm({ onSwitch }: Props) {
             <h3>{savedCreds.nick}</h3>
             <span>{serverLabel(savedCreds.server)}</span>
           </div>
+          <span
+            className="saved-auth-chip"
+            data-mode={hasResumeToken ? 'resume' : 'sasl'}
+            title={hasResumeToken
+              ? 'A live SESSION RESUME token will reconnect you without re-sending your password'
+              : 'You will re-authenticate with SASL on connect'}
+          >
+            {hasResumeToken ? 'SESSION RESUME' : saslHint === 'Guest' ? 'GUEST' : 'SASL'}
+          </span>
         </div>
+
+        {hasResumeToken && (
+          <p className="resume-line">
+            <span className="resume-dot" aria-hidden="true" />
+            Persistent session active — reconnect skips the password round-trip.
+          </p>
+        )}
 
         {hasError && (
           <p className="form-error" role="alert" data-testid="login-error">
@@ -180,8 +216,12 @@ export default function LoginForm({ onSwitch }: Props) {
           </p>
         )}
 
-        <button className="lux-button" type="button" disabled={loading} onClick={handleAutoConnect}>
-          {loading ? CONNECTION_STEPS[connStep] : visibleLastError ? 'Retry' : 'Connect'}
+        <button className="lux-button" type="button" disabled={loading} onClick={handleAutoConnect} data-testid="login-saved-connect">
+          {loading
+            ? CONNECTION_STEPS[connStep]
+            : visibleLastError
+            ? 'Retry connection'
+            : hasResumeToken ? 'Resume session' : 'Connect'}
         </button>
         <button
           type="button"
@@ -225,7 +265,7 @@ export default function LoginForm({ onSwitch }: Props) {
       </FloatingField>
       {nickError && <p id="login-nick-error" className="field-error" role="alert">{nickError}</p>}
 
-      <FloatingField label="Password" active={Boolean(password)} aside={password ? 'SASL' : 'Guest ok'}>
+      <FloatingField label="Password" active={Boolean(password)} aside={password ? 'SCRAM' : 'Guest ok'}>
         <input
           id="login-password"
           data-testid="login-password"
@@ -248,6 +288,13 @@ export default function LoginForm({ onSwitch }: Props) {
         </button>
       </FloatingField>
 
+      <p className="sasl-hint" data-mode={password ? 'sasl' : 'guest'}>
+        <ShieldIcon />
+        {password
+          ? <>Authenticates with <strong>SCRAM-SHA-256</strong>, falling back to PLAIN. Your password never crosses the wire in the clear.</>
+          : <>No password? You join as a <strong>guest</strong>. Register an account to claim your nick and unlock sessions.</>}
+      </p>
+
       <label className="remember-row">
         <input
           type="checkbox"
@@ -255,8 +302,21 @@ export default function LoginForm({ onSwitch }: Props) {
           onChange={event => setRememberMe(event.target.checked)}
           disabled={loading}
         />
-        <span>Remember this identity</span>
+        <span>
+          Stay signed in
+          <em>Keeps a SESSION RESUME token so reconnects skip the password.</em>
+        </span>
       </label>
+
+      {currentNickIsAlias && !loading && (
+        <div className="nick-alias-hint" role="status" data-testid="login-alias-hint">
+          <span className="nick-alias-icon" aria-hidden="true"><GhostIcon /></span>
+          <div>
+            <strong>That nick is already in use.</strong>
+            <span>You are connected under a temporary alias. Reclaim it with <code>/GHOST {nick || 'yournick'}</code> once you are in, or sign in with the account that owns it.</span>
+          </div>
+        </div>
+      )}
 
       {hasError && (
         <p className="form-error" role="alert" data-testid="login-error">
@@ -426,20 +486,161 @@ function LoginStyles() {
         box-shadow: inset 2px 0 0 var(--danger);
       }
 
-      .remember-row {
-        width: fit-content;
+      .sasl-hint {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         gap: var(--sp-2, 8px);
+        margin: calc(var(--sp-1, 4px) * -1) 0 0;
+        padding: var(--sp-2, 8px) var(--sp-3, 12px);
+        border-radius: var(--r-md, 8px) var(--r-xs, 4px) var(--r-md, 8px) var(--r-sm, 6px);
+        background: color-mix(in srgb, var(--accent) 7%, transparent);
+        box-shadow: inset 2px 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
+        color: var(--text-muted);
+        font-size: var(--text-xs, .75rem);
+        line-height: 1.5;
+      }
+
+      .sasl-hint[data-mode="guest"] {
+        background: color-mix(in srgb, var(--lux) 7%, transparent);
+        box-shadow: inset 2px 0 0 color-mix(in srgb, var(--lux) 50%, transparent);
+      }
+
+      .sasl-hint strong { color: var(--text-secondary); font-weight: 800; }
+
+      .sasl-hint svg {
+        flex-shrink: 0;
+        margin-top: 1px;
+        width: 14px;
+        height: 14px;
+        color: var(--accent);
+      }
+
+      .sasl-hint[data-mode="guest"] svg { color: var(--lux); }
+
+      .remember-row {
+        width: 100%;
+        display: flex;
+        align-items: flex-start;
+        gap: var(--sp-3, 12px);
         color: var(--text-secondary);
         cursor: pointer;
         font-size: var(--text-sm, .8125rem);
+        font-weight: 700;
       }
 
       .remember-row input {
-        width: 17px;
-        height: 17px;
+        width: 18px;
+        height: 18px;
+        margin-top: 1px;
         accent-color: var(--lux);
+        flex-shrink: 0;
+      }
+
+      .remember-row span {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        line-height: 1.3;
+      }
+
+      .remember-row em {
+        color: var(--text-muted);
+        font-style: normal;
+        font-size: var(--text-xs, .75rem);
+        font-weight: 500;
+      }
+
+      .nick-alias-hint {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--sp-3, 12px);
+        padding: var(--sp-3, 12px) var(--sp-4, 16px);
+        border-radius: var(--r-lg, 12px) var(--r-sm, 6px) var(--r-md, 8px) var(--r-lg, 12px);
+        background: color-mix(in srgb, var(--warning) 10%, transparent);
+        box-shadow: inset 2px 0 0 var(--warning, #fbbf24);
+      }
+
+      .nick-alias-icon {
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+        width: 30px;
+        height: 30px;
+        border-radius: var(--r-md, 8px);
+        background: color-mix(in srgb, var(--warning) 18%, transparent);
+        color: var(--warning, #fbbf24);
+      }
+
+      .nick-alias-icon svg { width: 17px; height: 17px; }
+
+      .nick-alias-hint div { display: flex; flex-direction: column; gap: 3px; }
+
+      .nick-alias-hint strong {
+        color: var(--text-primary);
+        font-size: var(--text-sm, .8125rem);
+        font-weight: 800;
+      }
+
+      .nick-alias-hint span {
+        color: var(--text-secondary);
+        font-size: var(--text-xs, .75rem);
+        line-height: 1.5;
+      }
+
+      .nick-alias-hint code {
+        font-family: var(--font-mono);
+        font-size: .9em;
+        color: var(--lux);
+        background: color-mix(in srgb, var(--lux) 12%, transparent);
+        padding: 0 4px;
+        border-radius: 4px;
+      }
+
+      .saved-auth-chip {
+        align-self: center;
+        padding: 4px 9px;
+        border-radius: 999px;
+        font-size: var(--text-2xs, .6875rem);
+        font-weight: 850;
+        letter-spacing: .07em;
+        white-space: nowrap;
+      }
+
+      .saved-auth-chip[data-mode="resume"] {
+        color: var(--status-online, #34d399);
+        background: color-mix(in srgb, var(--status-online) 14%, transparent);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--status-online) 32%, transparent);
+      }
+
+      .saved-auth-chip[data-mode="sasl"] {
+        color: var(--accent);
+        background: var(--accent-subtle);
+        box-shadow: inset 0 0 0 1px var(--accent-border);
+      }
+
+      .resume-line {
+        display: flex;
+        align-items: center;
+        gap: var(--sp-2, 8px);
+        margin: calc(var(--sp-2, 8px) * -1) 0 0;
+        color: var(--text-muted);
+        font-size: var(--text-xs, .75rem);
+        line-height: 1.4;
+      }
+
+      .resume-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        background: var(--status-online, #34d399);
+        box-shadow: 0 0 8px color-mix(in srgb, var(--status-online) 70%, transparent);
+        animation: resume-pulse 2.4s ease-in-out infinite;
+      }
+
+      @keyframes resume-pulse {
+        0%, 100% { box-shadow: 0 0 4px color-mix(in srgb, var(--status-online) 50%, transparent); }
+        50% { box-shadow: 0 0 12px color-mix(in srgb, var(--status-online) 85%, transparent); }
       }
 
       .lux-button {
@@ -502,12 +703,15 @@ function LoginStyles() {
 
       .saved-card {
         display: grid;
-        grid-template-columns: auto minmax(0, 1fr);
+        grid-template-columns: auto minmax(0, 1fr) auto;
         gap: var(--sp-4, 16px);
         align-items: center;
         padding: var(--sp-5, 20px);
         border-radius: var(--r-2xl, 20px) var(--r-md, 8px) var(--r-lg, 12px) var(--r-sm, 6px);
-        background: var(--bg-elevated);
+        background:
+          radial-gradient(120% 100% at 100% 0%, color-mix(in srgb, var(--lux) 8%, transparent), transparent 60%),
+          var(--bg-elevated);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
       }
 
       .saved-avatar {
@@ -547,6 +751,10 @@ function LoginStyles() {
           animation: none;
         }
 
+        .resume-dot {
+          animation: none;
+        }
+
         .float-field input,
         .float-label,
         .lux-button {
@@ -554,6 +762,25 @@ function LoginStyles() {
         }
       }
     `}</style>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <svg viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
+      <path d="M7.5 1 2 3.2v4c0 3.4 2.4 6.2 5.5 7.3C10.6 13.4 13 10.6 13 7.2v-4L7.5 1Z" strokeLinejoin="round" />
+      <path d="M5.4 7.4 7 9l2.8-2.9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function GhostIcon() {
+  return (
+    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+      <path d="M3.5 15V7a5.5 5.5 0 0 1 11 0v8l-1.8-1.3-1.8 1.3-1.9-1.3-1.9 1.3-1.9-1.3L3.5 15Z" strokeLinejoin="round" />
+      <circle cx="6.8" cy="7.3" r="1" fill="currentColor" stroke="none" />
+      <circle cx="11.2" cy="7.3" r="1" fill="currentColor" stroke="none" />
+    </svg>
   );
 }
 

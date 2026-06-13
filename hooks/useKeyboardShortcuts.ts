@@ -56,7 +56,7 @@ export function useKeyboardShortcuts() {
     historyStack.current = historyStack.current.slice(0, historyIndex.current + 1);
     historyStack.current.push(activeView);
     historyIndex.current = historyStack.current.length - 1;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [activeView]);
 
   useEffect(() => {

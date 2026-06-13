@@ -1,5 +1,5 @@
 'use client';
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import { useTheme } from '@/components/ui/ThemeProvider';
 import type { TimeFormat } from '@/lib/format-time';

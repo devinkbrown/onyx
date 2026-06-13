@@ -1,5 +1,41 @@
 import { test, expect } from '@playwright/test';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Typed view of the Ocean test globals exposed on `window` when ?e2e=1 is set
+// (see AppShell: window.__ocean = useOnyxStore, window.__getEngine = …).
+// Only the surface this test drives is modelled — enough to drop every `any`
+// without coupling the spec to the full store type.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface OceanNotification {
+  text?: string;
+}
+
+interface OceanVoiceState {
+  callChannel: string | null;
+  localStream: MediaStream | null;
+}
+
+interface OceanStoreState {
+  status: string;
+  voice: OceanVoiceState;
+  voiceChannelParticipants: Map<string, Iterable<string>>;
+  notifications?: OceanNotification[];
+  connect(opts: { url: string; nick: string }): void;
+  joinChannel(channel: string): void;
+  navigate(target: { kind: string; channel: string }): void;
+  joinVoiceChannel(channel: string): Promise<void>;
+}
+
+interface OceanStore {
+  getState(): OceanStoreState;
+}
+
+interface OceanTestWindow extends Window {
+  __ocean?: OceanStore;
+  __getEngine?: () => unknown;
+}
+
 // Two real users (fake media) join voice in a FRESH EMPTY channel on the live
 // server. Verifies the voice CODE PATH end-to-end: both connect, the SUIMYAKU
 // engine is reachable from the store (the globalThis singleton fix), and
@@ -15,9 +51,9 @@ test('two users drive the voice engine in an empty channel', async ({ browser })
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
     await page.goto('https://eshmaki.me/app/?e2e=1');
-    await page.waitForFunction(() => (window as any).__ocean !== undefined, { timeout: 30_000 });
-    await page.evaluate(({ WS, nick }) => (window as any).__ocean.getState().connect({ url: WS, nick }), { WS, nick });
-    await page.waitForFunction(() => (window as any).__ocean.getState().status === 'connected', { timeout: 40_000 });
+    await page.waitForFunction(() => (window as unknown as OceanTestWindow).__ocean !== undefined, { timeout: 30_000 });
+    await page.evaluate(({ WS, nick }) => (window as unknown as OceanTestWindow).__ocean!.getState().connect({ url: WS, nick }), { WS, nick });
+    await page.waitForFunction(() => (window as unknown as OceanTestWindow).__ocean!.getState().status === 'connected', { timeout: 40_000 });
     return { ctx, page, nick };
   }
 
@@ -25,24 +61,24 @@ test('two users drive the voice engine in an empty channel', async ({ browser })
   const B = await makeUser('qaB' + Math.floor(Math.random() * 1e4));
 
   for (const U of [A, B]) {
-    await U.page.evaluate((c) => (window as any).__ocean.getState().joinChannel(c), chan);
-    await U.page.evaluate((c) => (window as any).__ocean.getState().navigate({ kind: 'channel', channel: c }), chan);
+    await U.page.evaluate((c) => (window as unknown as OceanTestWindow).__ocean!.getState().joinChannel(c), chan);
+    await U.page.evaluate((c) => (window as unknown as OceanTestWindow).__ocean!.getState().navigate({ kind: 'channel', channel: c }), chan);
   }
   await A.page.waitForTimeout(4000);
 
   // Engine must be reachable from the store (regression guard for the
   // cross-module singleton bug that made joinVoiceChannel a no-op).
   for (const U of [A, B]) {
-    const reachable = await U.page.evaluate(() => !!(window as any).__getEngine?.());
+    const reachable = await U.page.evaluate(() => !!(window as unknown as OceanTestWindow).__getEngine?.());
     expect(reachable, `${U.nick}: SUIMYAKU engine reachable`).toBe(true);
   }
 
-  for (const U of [A, B]) await U.page.evaluate(async (c) => { await (window as any).__ocean.getState().joinVoiceChannel(c); }, chan);
+  for (const U of [A, B]) await U.page.evaluate(async (c) => { await (window as unknown as OceanTestWindow).__ocean!.getState().joinVoiceChannel(c); }, chan);
   await A.page.waitForTimeout(8000);
 
   const snap = async (U: typeof A) => U.page.evaluate((c) => {
-    const s = (window as any).__ocean.getState();
-    const codecGone = (s.notifications || []).some((n: any) => /codec unavailable/i.test(n.text || ''));
+    const s = (window as unknown as OceanTestWindow).__ocean!.getState();
+    const codecGone = (s.notifications || []).some((n: OceanNotification) => /codec unavailable/i.test(n.text || ''));
     return {
       callChannel: s.voice.callChannel,
       audioTracks: s.voice.localStream ? s.voice.localStream.getAudioTracks().length : 0,

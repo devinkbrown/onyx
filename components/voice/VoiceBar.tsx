@@ -6,7 +6,13 @@ import Tooltip from '@/components/ui/Tooltip';
 import SpeakingBars from './SpeakingBars';
 import VoiceParticipantCard from './VoiceParticipantCard';
 import CaptionsOverlay from './CaptionsOverlay';
+import ConnectionQuality from './ConnectionQuality';
+import ReactionsOverlay from './ReactionsOverlay';
 import { OpcodecWasm } from '@/lib/suimyaku-media/OpcodecWasm';
+import { getMountedSuimyakuMediaEngine } from '@/lib/suimyaku-media/MediaEngine';
+
+// ── Quick reactions ────────────────────────────────────────────────────────────
+const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '😮', '👏', '🔥', '👋'] as const;
 
 // ── Video participant tile ─────────────────────────────────────────────────────
 interface VoiceVideoTileProps {
@@ -238,6 +244,7 @@ export default function VoiceBar() {
   const { callState, callChannel, peers, muted, deafened, screenshareActive, cameraDeviceId, localStream, videoParticipants, cameraOn, cameraStream } = voice;
   const isInCall = callState === 'in_call';
   const [captionsEnabled, setCaptionsEnabled] = useState(false);
+  const [reactionsOpen, setReactionsOpen] = useState(false);
 
   const duration  = useCallDuration(isInCall);
   const micLevel  = useLocalMicLevel(isInCall, localStream);
@@ -250,6 +257,16 @@ export default function VoiceBar() {
       setSpeakingNick(nick, peer.speaking);
     }
   }, [peers, setSpeakingNick]);
+
+  // ── Close the reaction popover on Escape ──────────────────────────────────
+  useEffect(() => {
+    if (!reactionsOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setReactionsOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [reactionsOpen]);
 
   // ── Camera ─────────────────────────────────────────────────────────────────
   const [hasVideoInput, setHasVideoInput] = useState(true);
@@ -285,6 +302,14 @@ export default function VoiceBar() {
     if (stageHandRaised) lowerHand();
     else raiseHand();
   };
+  const sendReaction = (emoji: string) => {
+    getMountedSuimyakuMediaEngine()?.sendReaction(emoji);
+    // Optimistic local echo so you see your own reaction float immediately.
+    window.dispatchEvent(
+      new CustomEvent('ocean:voice-reaction', { detail: { nick: ourNick, emoji } }),
+    );
+    setReactionsOpen(false);
+  };
 
   if (!isInCall) return null;
 
@@ -311,6 +336,9 @@ export default function VoiceBar() {
   return (
     <div className="voice-bar elev-2 animate-fade-in" data-testid="voice-bar">
 
+      {/* ── Floating reactions ── */}
+      <ReactionsOverlay />
+
       {/* ── Channel header ── */}
       <div className="vb-header">
         <span className="vb-waveform" aria-hidden="true">
@@ -320,6 +348,7 @@ export default function VoiceBar() {
           <span className="vb-waveform-bar" />
         </span>
         <span className="vb-channel-name">{channelLabel}</span>
+        <ConnectionQuality />
         <span className="vb-duration">{duration}</span>
         {codecUnavailable && (
           <Tooltip text="Voice codec unavailable (opcodec_wasm.js not found) — audio disabled" side="top">
@@ -452,6 +481,43 @@ export default function VoiceBar() {
             <MonitorIcon />
           </button>
         </Tooltip>
+
+        <div className="vb-react-wrap">
+          <Tooltip text="React" side="top">
+            <button
+              className={`vb-btn ${reactionsOpen ? 'vb-btn--active-lux' : ''}`}
+              onClick={() => setReactionsOpen(o => !o)}
+              aria-label="Send a reaction"
+              aria-haspopup="true"
+              aria-expanded={reactionsOpen}
+              data-testid="voice-react-toggle"
+            >
+              <ReactIcon />
+            </button>
+          </Tooltip>
+          {reactionsOpen && (
+            <>
+              <div
+                className="vb-react-scrim"
+                onClick={() => setReactionsOpen(false)}
+                aria-hidden="true"
+              />
+              <div className="vb-react-pop elev-3" role="menu" aria-label="Quick reactions">
+                {QUICK_REACTIONS.map(emoji => (
+                  <button
+                    key={emoji}
+                    className="vb-react-emoji"
+                    role="menuitem"
+                    onClick={() => sendReaction(emoji)}
+                    aria-label={`React with ${emoji}`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
 
         <Tooltip text={captionsEnabled ? 'Hide captions' : 'Show captions'} side="top">
           <button
@@ -943,6 +1009,62 @@ export default function VoiceBar() {
           background: color-mix(in srgb, var(--lux, #d8b96a) 24%, #050505 76%);
         }
 
+        /* ── Reaction launcher ── */
+        .vb-react-wrap {
+          position: relative;
+          display: flex;
+          flex-shrink: 0;
+        }
+        .vb-react-scrim {
+          position: fixed;
+          inset: 0;
+          z-index: 1;
+        }
+        .vb-react-pop {
+          position: absolute;
+          bottom: calc(100% + 10px);
+          left: 50%;
+          transform: translateX(-50%);
+          z-index: 2;
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 2px;
+          padding: var(--sp-2, 8px);
+          width: max-content;
+          border-radius: var(--r-lg, 14px) var(--r-md, 8px) var(--r-xl, 16px) var(--r-sm, 6px);
+          background: color-mix(in srgb, #050505 72%, var(--accent, #0ea5e9) 8%);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-3, 0 24px 60px rgba(0,0,0,.52));
+          animation: vb-react-pop-in 160ms var(--ease-spring, cubic-bezier(.34,1.4,.4,1)) both;
+        }
+        @keyframes vb-react-pop-in {
+          from { opacity: 0; transform: translateX(-50%) translateY(6px) scale(0.9); }
+          to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+        }
+        .vb-react-emoji {
+          width: 34px;
+          height: 34px;
+          border: 0;
+          border-radius: var(--r-sm, 6px) var(--r-md, 8px) var(--r-sm, 6px) var(--r-lg, 10px);
+          background: transparent;
+          cursor: pointer;
+          font-size: 18px;
+          line-height: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: transform var(--t-fast, 150ms) var(--ease-spring, cubic-bezier(.34,1.4,.4,1)),
+                      background var(--t-fast, 150ms) var(--ease-out, cubic-bezier(.16,1,.3,1));
+        }
+        .vb-react-emoji:hover {
+          background: color-mix(in srgb, white 8%, transparent);
+          transform: scale(1.22);
+        }
+        .vb-react-emoji:focus-visible {
+          outline: 2px solid var(--accent, #0ea5e9);
+          outline-offset: 1px;
+        }
+        .vb-react-emoji:active { transform: scale(1.05); }
+
         /* Leave: red, prominent pill — stands out clearly */
         .vb-btn--leave {
           background: color-mix(in srgb, var(--danger, #f87171) 28%, #050505 72%);
@@ -1100,8 +1222,16 @@ export default function VoiceBar() {
           .voice-bar,
           .vb-waveform-bar,
           .vb-tile-avatar--speaking::before,
-          .voice-video-tile--speaking {
+          .voice-video-tile--speaking,
+          .vb-react-pop {
             animation: none;
+          }
+          .vb-react-emoji {
+            transition: none;
+          }
+          .vb-react-emoji:hover,
+          .vb-react-emoji:active {
+            transform: none;
           }
           .voice-bar,
           .vb-tile,
@@ -1175,6 +1305,14 @@ const CaptionsIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round">
     <rect x="2" y="3" width="12" height="10" rx="2" />
     <path d="M5 7h2.2M5 10h1.4M9 7h2M8.5 10H11" />
+  </svg>
+);
+
+const ReactIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="8" cy="8" r="6.4" />
+    <path d="M5.5 9.4a3 3 0 0 0 5 0" />
+    <path d="M5.6 6.2h.01M10.4 6.2h.01" />
   </svg>
 );
 

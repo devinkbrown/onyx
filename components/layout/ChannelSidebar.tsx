@@ -242,14 +242,22 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
                 aria-label={`Connection: ${connectionStatus}`}
               />
             </div>
-            {ourNick && (
+            {connectionStatus !== 'connected' ? (
+              <div className="ch-header-nick">
+                <span className={`ch-header-status ch-header-status--${connectionStatus}`}>
+                  {connectionStatus === 'connecting' ? 'Connecting…'
+                    : connectionStatus === 'reconnecting' ? 'Reconnecting…'
+                    : 'Disconnected'}
+                </span>
+              </div>
+            ) : ourNick ? (
               <div className="ch-header-nick">
                 <span className="ch-header-nick-text">{ourNick}</span>
                 {currentNickIsAlias && (
                   <span className="ch-header-alias-badge" title="Using a fallback nick">alias</span>
                 )}
               </div>
-            )}
+            ) : null}
           </div>
         )}
         {!compactSidebar && <ServerMenuIcon />}
@@ -406,6 +414,19 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
               );
             })}
           </Section>
+        )}
+
+        {/* No channels joined yet — nudge toward browsing */}
+        {!compactSidebar && textLikeChannels.length === 0 && ircVoiceChannels.length === 0 && starredChannels.size === 0 && (
+          <div className="ch-no-channels">
+            <span className="ch-no-channels-icon" aria-hidden>#</span>
+            <span className="ch-no-channels-title">No channels yet</span>
+            <span className="ch-no-channels-desc">Join a channel to start chatting.</span>
+            <button className="ch-no-channels-btn" onClick={openChannelBrowser}>
+              <BrowseIcon />
+              Browse channels
+            </button>
+          </div>
         )}
 
         </>)}
@@ -627,6 +648,17 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
           border: 1px solid rgba(250,166,26,0.35);
           flex-shrink: 0;
         }
+        .ch-header-status {
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.01em;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .ch-header-status--connecting,
+        .ch-header-status--reconnecting { color: var(--warning, #faa61a); }
+        .ch-header-status--disconnected { color: var(--danger, #ed4245); }
 
         .ch-scroll {
           flex: 1;
@@ -687,6 +719,66 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
           transition: opacity var(--t-fast);
         }
         .ch-dm-empty-start:hover { opacity: 0.75; }
+
+        /* ── No channels joined empty state ── */
+        .ch-no-channels {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+          gap: 4px;
+          margin: 10px 8px 14px;
+          padding: 20px 16px;
+          border: 1px dashed var(--border-subtle);
+          border-radius: var(--r-lg);
+          background: color-mix(in srgb, var(--bg-deep) 50%, transparent);
+        }
+        .ch-no-channels-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 38px;
+          height: 38px;
+          margin-bottom: 4px;
+          border-radius: var(--r-md);
+          background: var(--elev-tint-1, color-mix(in srgb, var(--bg-elevated) 90%, var(--accent) 4%));
+          color: var(--text-muted);
+          font-size: 20px;
+          font-weight: 600;
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
+        }
+        .ch-no-channels-title {
+          font-size: 13px;
+          font-weight: 700;
+          color: var(--text-secondary);
+        }
+        .ch-no-channels-desc {
+          font-size: 11px;
+          color: var(--text-muted);
+          line-height: 1.4;
+          max-width: 180px;
+        }
+        .ch-no-channels-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          margin-top: 8px;
+          padding: 6px 12px;
+          border: 1px solid var(--accent-border);
+          border-radius: var(--r-full);
+          background: var(--accent-subtle);
+          color: var(--accent);
+          font-size: 12px;
+          font-weight: 600;
+          font-family: inherit;
+          cursor: pointer;
+          transition: background var(--t-control, 150ms) var(--ease-out), transform var(--t-control, 150ms) var(--ease-out);
+        }
+        .ch-no-channels-btn:hover {
+          background: color-mix(in srgb, var(--accent) 18%, transparent);
+          transform: translateY(-1px);
+        }
+        .ch-no-channels-btn svg { opacity: 0.9; }
 
         .ch-browse-btn {
           display: flex;
@@ -1487,6 +1579,13 @@ export default function ChannelSidebar({ onNavigate, onMobileClose }: SidebarPro
         .dm-status--unknown { background: var(--status-offline); }
         .dm-row--muted .dm-nick { opacity: 0.55; }
         .dm-muted-icon { font-size: 12px; opacity: 0.6; flex-shrink: 0; }
+        .dm-unread-dot {
+          width: 7px; height: 7px;
+          border-radius: 50%;
+          background: var(--unread, var(--lux, #d8b96a));
+          flex-shrink: 0;
+          margin-right: 2px;
+        }
         .dm-ctx-backdrop { position: fixed; inset: 0; z-index: 299; }
         .dm-ctx-menu {
           position: fixed; z-index: 300;
@@ -1905,7 +2004,11 @@ function DMRow({ dm, active, muted, onClick, onContextMenu }: {
       </span>
       <span className={`dm-nick ${!muted && dm.unread > 0 ? 'dm-nick--unread' : ''}`}>{dm.nick}</span>
       {muted && <span className="dm-muted-icon" aria-label="Muted" title="Notifications muted">🔕</span>}
-      {!muted && dm.highlights > 0 && <span className="unread-badge">{dm.highlights > 99 ? '99+' : dm.highlights}</span>}
+      {!muted && dm.highlights > 0 ? (
+        <span className="unread-badge" aria-label={`${dm.highlights} mentions`}>{dm.highlights > 99 ? '99+' : dm.highlights}</span>
+      ) : !muted && dm.unread > 0 ? (
+        <span className="dm-unread-dot" aria-label="Unread messages" />
+      ) : null}
     </button>
   );
 }

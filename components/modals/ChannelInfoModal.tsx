@@ -111,7 +111,7 @@ export default function ChannelInfoModal() {
   // Re-request props each time modal opens
   useEffect(() => {
     if (channelName && isIRCX) requestChannelProps(channelName);
-  }, [channelName, isIRCX]);
+  }, [channelName, isIRCX, requestChannelProps]);
 
   // Reset tab when channel changes
   useEffect(() => {
@@ -206,7 +206,7 @@ export default function ChannelInfoModal() {
   }, [client, channelName, topicDraft]);
 
   // Channel stats (computed from message history)
-  const messages = channel?.messages ?? [];
+  const messages = useMemo(() => channel?.messages ?? [], [channel?.messages]);
   const stats = useMemo(() => computeChannelStats(messages), [messages]);
 
   const tabs: Tab[] = ['overview', 'members', 'pins', 'stats'];

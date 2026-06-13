@@ -1328,5 +1328,33 @@ const styles = `
     from { opacity: 0; transform: translateY(3px); }
     to   { opacity: 1; transform: translateY(0); }
   }
-  .animate-lp { animation: lp-fade-in 0.18s ease-out; }
+  .animate-lp { animation: lp-fade-in 0.18s var(--ease-out, ease-out); }
+
+  /* Focus-visible affordances for keyboard users */
+  .lp-title--link:focus-visible,
+  .lp-domain:focus-visible,
+  .lp-cta:focus-visible {
+    outline: 2px solid var(--accent, #0ea5e9);
+    outline-offset: 2px;
+    border-radius: var(--r-xs, 3px);
+  }
+  .lp-thumb-anchor:focus-visible,
+  .lp-yt-hero:focus-visible {
+    outline: 2px solid var(--accent, #0ea5e9);
+    outline-offset: 2px;
+  }
+  .lp-dismiss:focus-visible {
+    opacity: 1;
+    outline: 2px solid var(--accent, #0ea5e9);
+    outline-offset: 1px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-lp { animation: none; }
+    .lp-sp-bar { animation: none; opacity: 0.6; transform: none; }
+    .sk-line, .lp-thumb-skeleton { animation: none; opacity: 0.7; }
+    .lp-yt-hero:hover .lp-yt-hero-img { filter: none; }
+    .lp-yt-hero:hover .lp-yt-play-overlay svg,
+    .lp-yt-play-overlay svg { transform: none; transition: none; }
+  }
 `;

@@ -51,7 +51,7 @@ export default function ImageEmbed({ embed }: { embed: Embed }) {
         data-testid="embed-image-frame"
       >
         {state === 'loading' && <span className="embed-shimmer" aria-hidden="true" />}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
+        { }
         <img
           src={embed.url}
           alt={embed.fileName ?? 'image'}

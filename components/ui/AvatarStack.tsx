@@ -56,13 +56,13 @@ export default function AvatarStack({ nicks, max = 5 }: Props) {
           font-size: 10px;
           font-weight: 700;
           color: rgba(255,255,255,0.92);
-          border: 0;
+          border: 2px solid var(--bg-deep, #06101d);
           position: relative;
           flex-shrink: 0;
           user-select: none;
           letter-spacing: 0.01em;
           box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-1, 0 8px 18px rgba(0,0,0,.24));
-          transition: transform 120ms var(--ease-out, ease), z-index 0s;
+          transition: transform var(--t-micro, 120ms) var(--ease-out, ease), z-index 0s;
         }
         .avatar-stack-item:hover {
           transform: translateY(-2px) scale(1.08);
@@ -80,12 +80,16 @@ export default function AvatarStack({ nicks, max = 5 }: Props) {
           font-weight: 700;
           color: var(--text-secondary);
           background: var(--elev-tint-1, var(--bg-elevated));
-          border: 0;
+          border: 2px solid var(--bg-deep, #06101d);
           box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-1, 0 8px 18px rgba(0,0,0,.24));
           margin-left: -8px;
           flex-shrink: 0;
           user-select: none;
           letter-spacing: -0.02em;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .avatar-stack-item { transition-duration: 1ms; }
+          .avatar-stack-item:hover { transform: none; }
         }
       `}</style>
     </span>

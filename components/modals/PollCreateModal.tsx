@@ -59,7 +59,7 @@ export default function PollCreateModal() {
     ];
     sendMessage(target, `[POLL: ${pollParts.join('|')}]`);
     closePollCreate();
-  }, [canSubmit, activeView, question, options, durationIdx, multiVote, sendMessage, closePollCreate]);
+  }, [canSubmit, activeView, question, options, sendMessage, closePollCreate]);
 
   return (
     <ModalShell

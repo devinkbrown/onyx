@@ -113,7 +113,7 @@ describe('SUIMYAKU media message handler routing', () => {
     const handled: unknown[] = [];
 
     client.extraMessageHandlers.add((msg) => {
-      const { command, params, nick } = msg as { command: string; params: string[]; nick: string };
+      const { command, params } = msg as { command: string; params: string[] };
       if (command !== 'NOTE' || params[0] !== 'MEDIA') return;
       const target  = params[1];
       const subtype = params[2];

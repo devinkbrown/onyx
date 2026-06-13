@@ -1,6 +1,6 @@
 # Ocean — IRC Webchat
 
-Modern IRC client backed by the Orochi IRC engine (pure-Zig successor to Orochi; source at /home/kain/orochi). Dark luxury design.
+Modern IRC client backed by the Orochi IRC engine (pure-Zig, clean-room; source at /home/kain/orochi). Dark luxury design.
 
 ## Stack
 - **Next.js 16** (App Router, static export)

@@ -161,7 +161,10 @@ export default function ForumView() {
   const newTagInputRef                      = useRef<HTMLInputElement>(null);
 
   const channelName = activeView.kind === 'channel' ? activeView.channel : '';
-  const rawPosts    = forumPosts[channelName.toLowerCase()] ?? [];
+  const rawPosts    = useMemo(
+    () => forumPosts[channelName.toLowerCase()] ?? [],
+    [forumPosts, channelName],
+  );
   const forumLoading = (connectionStatus === 'connecting' || connectionStatus === 'reconnecting') && rawPosts.length === 0;
   const forumError = status === 'error';
 

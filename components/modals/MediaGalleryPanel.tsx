@@ -278,7 +278,7 @@ function MediaCell({ item, onClick, onJump }: MediaCellProps) {
       }}
     >
       {item.type === 'image' ? (
-        /* eslint-disable-next-line @next/next/no-img-element */
+         
         <img src={item.url} alt={`Shared by ${item.nick}`} loading="lazy" decoding="async" />
       ) : (
         <div className="mgp-video-thumb">

@@ -57,7 +57,7 @@ export default function TypingIndicator({ channel }: Props) {
       return (
         <>
           <strong>{typing[0]}</strong>
-          {' is typing...'}
+          {' is typing'}
         </>
       );
     }
@@ -67,11 +67,33 @@ export default function TypingIndicator({ channel }: Props) {
           <strong>{typing[0]}</strong>
           {' and '}
           <strong>{typing[1]}</strong>
-          {' are typing...'}
+          {' are typing'}
         </>
       );
     }
-    return <>{'Several people are typing...'}</>;
+    if (typing.length === 3) {
+      return (
+        <>
+          <strong>{typing[0]}</strong>
+          {', '}
+          <strong>{typing[1]}</strong>
+          {' and '}
+          <strong>{typing[2]}</strong>
+          {' are typing'}
+        </>
+      );
+    }
+    // 4+ — name the first two, summarize the rest so we never drop everyone
+    return (
+      <>
+        <strong>{typing[0]}</strong>
+        {', '}
+        <strong>{typing[1]}</strong>
+        {' and '}
+        <strong>{typing.length - 2}</strong>
+        {' others are typing'}
+      </>
+    );
   };
 
   return (

@@ -27,14 +27,15 @@ export default function CaptionsOverlay() {
   const timersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
+    const timers = timersRef.current;
     const clearLineLater = (id: number) => {
-      const existing = timersRef.current.get(id);
+      const existing = timers.get(id);
       if (existing) clearTimeout(existing);
       const timer = setTimeout(() => {
-        timersRef.current.delete(id);
+        timers.delete(id);
         setLines(prev => prev.filter(line => line.id !== id));
       }, 8000);
-      timersRef.current.set(id, timer);
+      timers.set(id, timer);
     };
 
     const onCaption = (event: Event) => {
@@ -62,8 +63,8 @@ export default function CaptionsOverlay() {
     window.addEventListener('ocean:caption', onCaption);
     return () => {
       window.removeEventListener('ocean:caption', onCaption);
-      for (const timer of timersRef.current.values()) clearTimeout(timer);
-      timersRef.current.clear();
+      for (const timer of timers.values()) clearTimeout(timer);
+      timers.clear();
     };
   }, []);
 

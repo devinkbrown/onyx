@@ -260,7 +260,7 @@ function DMMediaCell({ item, onClick, onJump }: DMMediaCellProps) {
       }}
     >
       {item.type === 'image' ? (
-        /* eslint-disable-next-line @next/next/no-img-element */
+         
         <img
           src={item.url}
           alt={`Shared by ${item.nick}`}

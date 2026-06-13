@@ -178,7 +178,11 @@ export default function RegisterForm({ onSwitch }: Props) {
         </div>
         <p className="step-kicker label-caps">Registered</p>
         <h3>Access created</h3>
-        <p><strong>{cleanNick}</strong> is ready for Ocean. Sign in with the same password to enter.</p>
+        <p>
+          <strong>{cleanNick}</strong> is registered on Orochi. Sign in with the
+          same password — tick <em>Stay signed in</em> and Ocean keeps a session
+          token so you skip it next time.
+        </p>
         <button type="button" className="lux-button" onClick={onSwitch}>Sign in</button>
         <RegisterStyles />
       </div>
@@ -241,6 +245,11 @@ export default function RegisterForm({ onSwitch }: Props) {
                 autoComplete="email"
               />
             </FloatingField>
+            <p className="field-note">
+              Registration uses Orochi&rsquo;s built-in <code>REGISTER</code> command
+              (draft/account-registration). No NickServ bot — results come back as
+              standard server replies.
+            </p>
           </section>
         )}
 
@@ -274,6 +283,12 @@ export default function RegisterForm({ onSwitch }: Props) {
               ))}
             </div>
             <p className="strength-copy">{strengthText}</p>
+            <p className="field-note">
+              <ShieldIcon />
+              This becomes your SASL secret. Ocean signs in with
+              {' '}<strong>SCRAM-SHA-256</strong> when the server offers it, so your
+              password is never sent in the clear.
+            </p>
           </section>
         )}
 
@@ -312,7 +327,11 @@ export default function RegisterForm({ onSwitch }: Props) {
             ) : (
               <>
                 <p className="verify-copy">
-                  The server requested a verification code before activating <strong>{cleanNick}</strong>.
+                  Orochi requested a verification code before activating{' '}
+                  <strong>{cleanNick}</strong>.{' '}
+                  {email.trim()
+                    ? <>Check <strong>{email.trim()}</strong> for the code.</>
+                    : <>The code was sent through the server.</>}
                 </p>
                 <FloatingField label="Verification code" active={Boolean(verifyCode)} error={shakeField === 'verify'}>
                   <input
@@ -322,9 +341,14 @@ export default function RegisterForm({ onSwitch }: Props) {
                       setVerifyCode(event.target.value);
                       setLocalError('');
                     }}
+                    inputMode="numeric"
                     autoComplete="one-time-code"
                   />
                 </FloatingField>
+                <p className="field-note">
+                  Didn&rsquo;t get it? Once you&rsquo;re connected, run{' '}
+                  <code>/VERIFY {cleanNick} &lt;code&gt;</code> or re-register to resend.
+                </p>
               </>
             )}
           </section>
@@ -443,7 +467,7 @@ function RegisterStyles() {
       }
 
       .slide-lock {
-        min-height: 274px;
+        min-height: 330px;
         overflow: hidden;
         position: relative;
       }
@@ -624,6 +648,46 @@ function RegisterStyles() {
         line-height: 1.5;
       }
 
+      .register-complete em {
+        color: var(--text-secondary);
+        font-style: normal;
+        font-weight: 800;
+      }
+
+      .field-note {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--sp-2, 8px);
+        margin: calc(var(--sp-1, 4px) * -1) 0 0;
+        padding: var(--sp-2, 8px) var(--sp-3, 12px);
+        border-radius: var(--r-md, 8px) var(--r-xs, 4px) var(--r-md, 8px) var(--r-sm, 6px);
+        background: color-mix(in srgb, var(--accent) 6%, transparent);
+        box-shadow: inset 2px 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
+        color: var(--text-muted);
+        font-size: var(--text-xs, .75rem);
+        line-height: 1.5;
+      }
+
+      .field-note strong { color: var(--text-secondary); font-weight: 800; }
+
+      .field-note svg {
+        flex-shrink: 0;
+        margin-top: 1px;
+        width: 14px;
+        height: 14px;
+        color: var(--accent);
+      }
+
+      .field-note code {
+        font-family: var(--font-mono);
+        font-size: .92em;
+        color: var(--lux);
+        background: color-mix(in srgb, var(--lux) 11%, transparent);
+        padding: 0 4px;
+        border-radius: 4px;
+        word-break: break-word;
+      }
+
       .form-error {
         color: var(--danger);
         padding: var(--sp-3, 12px);
@@ -748,7 +812,7 @@ function RegisterStyles() {
         }
 
         .slide-lock {
-          min-height: 300px;
+          min-height: 356px;
         }
       }
 
@@ -769,6 +833,15 @@ function CheckIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M5 12.5 9.2 17 19 7" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <svg viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
+      <path d="M7.5 1 2 3.2v4c0 3.4 2.4 6.2 5.5 7.3C10.6 13.4 13 10.6 13 7.2v-4L7.5 1Z" strokeLinejoin="round" />
+      <path d="M5.4 7.4 7 9l2.8-2.9" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

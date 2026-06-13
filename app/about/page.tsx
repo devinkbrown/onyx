@@ -53,8 +53,8 @@ export default function AboutPage() {
             </div>
             <div className="about-stat-divider" />
             <div className="about-stat">
-              <span className="about-stat-val">P-256</span>
-              <span className="about-stat-label">TSUMUGI encryption</span>
+              <span className="about-stat-val">ML-KEM</span>
+              <span className="about-stat-label">post-quantum links</span>
             </div>
           </div>
         </div>
@@ -98,30 +98,30 @@ export default function AboutPage() {
               name="Orochi"
               tag="IRC Server"
               accentColor="#0ea5e9"
-              desc="A custom IRC server built for performance and modern protocol extensions. Supports IRCv3, IRCX, CHATHISTORY, and full SASL auth including session tokens."
+              desc="A pure-Zig IRC engine built for performance and modern protocol extensions. Speaks IRCv3, IRCX, and CHATHISTORY, with SASL SCRAM-SHA-256, EXTERNAL, and PLAIN plus persistent session tokens — and built-in services, no NickServ bot."
               href="https://github.com/devinkbrown/orochi"
               detail="eshmaki.me:6697"
             />
             <TechCard
               name="SUIMYAKU"
-              tag="Media Protocol"
+              tag="Mesh & Media"
               accentColor="#67e8f9"
-              desc="Proprietary voice and video protocol built over IRC messaging. Native transport — no relay servers, no third-party infrastructure. Spatial audio and video delivered through the Orochi network."
-              detail="Native transport · No relay"
+              desc="A CRDT state mesh with Sazanami gossip and Merkle anti-entropy — and the transport for native voice and video. Not WebRTC: no STUN, no TURN, no relay. Media rides the same network as your messages."
+              detail="CRDT mesh · Native media"
             />
             <TechCard
               name="TSUMUGI"
               tag="Encryption"
               accentColor="#0ea5e9"
-              desc="P-256 ECDH key exchange with AES-256-GCM encryption for every SUIMYAKU session. Group session keys derived with forward secrecy — no plaintext voice leaves your device."
-              detail="P-256 ECDH · AES-256-GCM"
+              desc="Forward-secret server links and media sessions over an X25519 + ML-KEM-768 post-quantum hybrid handshake and ratchet. No plaintext crosses the wire — encryption is part of the protocol, not an add-on."
+              detail="X25519 + ML-KEM-768"
             />
             <TechCard
               name="Ocean"
               tag="Web Client"
               accentColor="#38bdf8"
-              desc="Next.js static export with Zustand state management. Dark luxury design system, bento layouts, and a full-featured IRC client under the hood."
-              detail="open source"
+              desc="Next.js static export with Zustand state management. Dark luxury design system, bento layouts, and a full-featured IRCv3 client under the hood."
+              detail="eshmaki.me web app"
             />
           </div>
         </section>
@@ -148,12 +148,12 @@ export default function AboutPage() {
               {
                 n: '03',
                 title: 'Privacy by design',
-                body: 'Session tokens replace stored passwords. TSUMUGI encrypts voice before it leaves your device. No analytics, no tracking.',
+                body: 'SCRAM keeps your password off the wire and session tokens replace stored secrets. TSUMUGI encrypts links and media with post-quantum keys. No analytics, no tracking.',
               },
               {
                 n: '04',
                 title: 'Actually good software',
-                body: 'Not "good for IRC". Just good. Spatial audio, live reactions, collaborative whiteboard, rich embeds — done right.',
+                body: 'Not "good for IRC". Just good. Native voice and video, live reactions, collaborative whiteboard, rich embeds — done right.',
               },
             ].map(p => (
               <div key={p.n} className="about-principle">

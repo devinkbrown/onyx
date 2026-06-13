@@ -5,6 +5,7 @@ import type { CSSProperties } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import Avatar from '@/components/ui/Avatar';
 import { useDialogFocus } from './useDialogFocus';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 import ProfileMetadataEditor, { type ProfileMetadataDraft } from '@/components/ui/ProfileMetadataEditor';
 import RoleBadge, { highestRoleMode } from '@/components/ui/RoleBadge';
 
@@ -151,48 +152,48 @@ function NoteEditor({ nick }: { nick: string }) {
 
 // ── Block confirmation ────────────────────────────────────────────────────────
 
-function useBlockedNicks() {
-  const STORAGE_KEY = 'ocean-blocked';
+const BLOCKED_STORAGE_KEY = 'ocean-blocked';
 
-  const isBlocked = (nick: string): boolean => {
+function useBlockedNicks() {
+  const isBlocked = useCallback((nick: string): boolean => {
     if (typeof window === 'undefined') return false;
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(BLOCKED_STORAGE_KEY);
       if (!raw) return false;
       const list: string[] = JSON.parse(raw);
       return list.includes(nick.toLowerCase());
     } catch {
       return false;
     }
-  };
+  }, []);
 
-  const block = (nick: string): void => {
+  const block = useCallback((nick: string): void => {
     if (typeof window === 'undefined') return;
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(BLOCKED_STORAGE_KEY);
       const list: string[] = raw ? JSON.parse(raw) : [];
       const key = nick.toLowerCase();
       if (!list.includes(key)) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify([...list, key]));
+        localStorage.setItem(BLOCKED_STORAGE_KEY, JSON.stringify([...list, key]));
       }
     } catch {
       // ignore
     }
-  };
+  }, []);
 
-  const unblock = (nick: string): void => {
+  const unblock = useCallback((nick: string): void => {
     if (typeof window === 'undefined') return;
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(BLOCKED_STORAGE_KEY);
       const list: string[] = raw ? JSON.parse(raw) : [];
       localStorage.setItem(
-        STORAGE_KEY,
+        BLOCKED_STORAGE_KEY,
         JSON.stringify(list.filter(n => n !== nick.toLowerCase()))
       );
     } catch {
       // ignore
     }
-  };
+  }, []);
 
   return { isBlocked, block, unblock };
 }
@@ -333,6 +334,7 @@ export default function UserProfileModal() {
   const cardRef    = useRef<HTMLDivElement>(null);
   const { isBlocked, block, unblock } = useBlockedNicks();
   useDialogFocus(cardRef);
+  useFocusTrap(cardRef, true);
 
   const isSelf = nick.toLowerCase() === ourNick.toLowerCase();
   const isIgnored = ignoredUsers.has(nick.toLowerCase());
@@ -350,12 +352,12 @@ export default function UserProfileModal() {
   // Check initial block state
   useEffect(() => {
     setBlocked(isBlocked(nick));
-  }, [nick]);
+  }, [nick, isBlocked]);
 
   // Request IRCX props
   useEffect(() => {
     if (isIRCX && nick) requestUserProps(nick);
-  }, [nick, isIRCX]);
+  }, [nick, isIRCX, requestUserProps]);
 
   // WHOIS — populate richProfile via store setUserProfile
   useEffect(() => {
@@ -377,7 +379,7 @@ export default function UserProfileModal() {
     return () => {
       handler.delete(fn);
     };
-  }, [nick, client]);
+  }, [nick, client, setUserProfile]);
 
   // Close on overlay click
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -387,7 +389,10 @@ export default function UserProfileModal() {
   // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeUserProfile();
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        closeUserProfile();
+      }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
@@ -762,6 +767,9 @@ export default function UserProfileModal() {
           to   { opacity: 1; transform: scale(1); }
         }
         .animate-scale-in { animation: scale-in var(--t-overlay-in, 320ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both; }
+        @media (prefers-reduced-motion: reduce) {
+          .animate-scale-in { animation: none; }
+        }
 
         /* ── Close button ── */
         .upm-close {
@@ -786,6 +794,15 @@ export default function UserProfileModal() {
           background: var(--bg-float);
           color: var(--text-primary);
           transform: scale(1.04);
+        }
+        .upm-close:active { transform: scale(0.96); }
+        .upm-close:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .upm-close:hover,
+          .upm-close:active { transform: none; }
         }
 
         /* ── Two-column layout ── */
@@ -1057,6 +1074,11 @@ export default function UserProfileModal() {
         .upm-tab:hover:not(.active) {
           color: var(--text-secondary, var(--text-muted));
         }
+        .upm-tab:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: -2px;
+          border-radius: var(--r-sm, 6px);
+        }
 
         .upm-tab-count {
           font-size: 11px;
@@ -1195,6 +1217,10 @@ export default function UserProfileModal() {
           box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), inset 0 0 0 1px var(--accent-border);
           color: var(--text-normal, var(--text-primary));
         }
+        .upm-note-textarea:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
+        }
 
         /* ── Actions ── */
         .upm-actions {
@@ -1330,6 +1356,10 @@ export default function UserProfileModal() {
         .upm-edit-input:focus {
           box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), inset 0 0 0 1px var(--accent-border), 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
         }
+        .upm-edit-input:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
+        }
         .upm-edit-input::placeholder { color: var(--text-muted); }
 
         .upm-edit-textarea {
@@ -1351,6 +1381,10 @@ export default function UserProfileModal() {
         }
         .upm-edit-textarea:focus {
           box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), inset 0 0 0 1px var(--accent-border), 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+        }
+        .upm-edit-textarea:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
         }
         .upm-edit-textarea::placeholder { color: var(--text-muted); }
 
@@ -1387,6 +1421,10 @@ export default function UserProfileModal() {
 
         .upm-toggle-on {
           background: var(--accent);
+        }
+        .upm-toggle:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
         }
 
         .upm-toggle-thumb {

@@ -50,6 +50,18 @@ export default function ServerBar() {
   const unreadAnnouncements = announcements.filter(a => !a.read).length;
   const firstChannel = channels.values().next().value;
 
+  // DM-only aggregates for the Home button badge
+  const dmMentions = (() => {
+    let n = 0;
+    for (const dm of dms.values()) n += dm.highlights;
+    return n;
+  })();
+  const dmUnread = (() => {
+    let n = 0;
+    for (const dm of dms.values()) n += dm.unread;
+    return n;
+  })();
+
   const onlineFriendCount = (() => {
     let n = 0;
     for (const f of friends.values()) if (f.online) n++;
@@ -59,14 +71,23 @@ export default function ServerBar() {
   return (
     <div className="server-bar">
       {/* Home / DMs button */}
-      <Tooltip text="Direct Messages" side="right">
-        <button
-          className={`server-btn server-btn--home ${activeView.kind === 'home' ? 'server-btn--active' : ''}`}
-          onClick={() => navigate({ kind: 'home' })}
-          aria-label="Direct Messages"
-        >
-          <HomeIcon />
-        </button>
+      <Tooltip text={dmMentions > 0 ? `Direct Messages — ${dmMentions} mention${dmMentions === 1 ? '' : 's'}` : 'Direct Messages'} side="right">
+        <div className="server-btn-wrap">
+          <button
+            className={`server-btn server-btn--home ${activeView.kind === 'home' || activeView.kind === 'dm' ? 'server-btn--active' : ''}`}
+            onClick={() => navigate({ kind: 'home' })}
+            aria-label={`Direct Messages${dmMentions > 0 ? ` (${dmMentions} mentions)` : dmUnread > 0 ? ' (unread)' : ''}`}
+          >
+            <HomeIcon />
+          </button>
+          {dmMentions > 0 ? (
+            <span className="server-badge server-badge--ping" aria-hidden>
+              {dmMentions > 99 ? '99+' : dmMentions}
+            </span>
+          ) : dmUnread > 0 ? (
+            <span className="server-badge server-badge--dot" aria-hidden />
+          ) : null}
+        </div>
       </Tooltip>
 
       <div className="server-separator" />
@@ -226,6 +247,9 @@ export default function ServerBar() {
           box-shadow: inset -1px 0 0 color-mix(in srgb, var(--text-primary) 3%, transparent);
           min-height: 0;
           scrollbar-width: none;
+          /* Fade the top/bottom edges so a long, scrollable rail reads as layered */
+          -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+          mask-image: linear-gradient(to bottom, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
         }
         .server-bar::-webkit-scrollbar { display: none; }
 

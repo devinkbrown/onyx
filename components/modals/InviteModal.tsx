@@ -308,6 +308,10 @@ const styles = `
     background: var(--bg-float, rgba(255,255,255,0.08));
     color: var(--text-primary);
   }
+  .inv-copy-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
   .inv-copy-btn--copied {
     color: var(--status-online, #3dd68c);
     background: rgba(52, 211, 153, 0.08);
@@ -406,6 +410,10 @@ const styles = `
     transition: background var(--t-control, 150ms), color var(--t-control, 150ms);
   }
   .inv-regen-btn:hover { background: var(--bg-float); color: var(--text-primary); }
+  .inv-regen-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 
   .inv-gen-row {
     display: flex;
@@ -430,6 +438,10 @@ const styles = `
     transition: background var(--t-control, 150ms), border-color var(--t-control, 150ms), color var(--t-control, 150ms);
   }
   .inv-expiry-btn:hover { border-color: var(--accent-border); color: var(--text-secondary); background: var(--bg-float); }
+  .inv-expiry-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
   .inv-expiry-btn--active {
     border-color: var(--accent);
     background: var(--accent-subtle);
@@ -438,16 +450,34 @@ const styles = `
   .inv-gen-btn {
     align-self: flex-start;
     padding: 8px 18px;
-    border-radius: var(--r-md);
-    border: none;
+    border-radius: var(--r-md, 8px) var(--r-lg, 12px) var(--r-md, 8px) var(--r-sm, 6px);
+    border: 1px solid color-mix(in srgb, var(--accent) 82%, #fff 18%);
     background: var(--accent);
     color: #fff;
     font-size: var(--text-sm, 13px);
     font-weight: 700;
     cursor: pointer;
     font-family: inherit;
-    transition: background var(--t-control, 150ms);
+    transition: background var(--t-control, 150ms) var(--ease-out, cubic-bezier(.16,1,.3,1)),
+                transform var(--t-micro, 90ms) var(--ease-out, cubic-bezier(.16,1,.3,1)),
+                box-shadow var(--t-control, 150ms) var(--ease-out, cubic-bezier(.16,1,.3,1));
     letter-spacing: 0.01em;
+    box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-1, 0 8px 24px rgba(0,0,0,.28));
   }
-  .inv-gen-btn:hover { background: var(--accent-hover); }
+  .inv-gen-btn:hover {
+    background: color-mix(in srgb, var(--accent) 94%, #000 6%);
+    transform: translateY(-1px);
+    box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--elev-shadow-2, 0 18px 48px rgba(0,0,0,.38));
+  }
+  .inv-gen-btn:active { transform: translateY(0.5px); }
+  .inv-gen-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .inv-gen-btn { transition-duration: 1ms; }
+    .inv-gen-btn:hover,
+    .inv-gen-btn:active { transform: none; }
+  }
 `;

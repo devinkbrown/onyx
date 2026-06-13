@@ -65,11 +65,22 @@ export interface ChatMessage {
   redacted?: boolean;
 }
 
-export type UserMode = 'q' | 'o' | 'v' | '';
+/**
+ * Channel member status mode letters, per Orochi's
+ * `ISUPPORT PREFIX=(YQqov)*!.@+`:
+ *   Y → '*' network-operator (server-derived, render-only; never set via MODE)
+ *   Q → '!' founder   (channel creator; ops/owners cannot strip)
+ *   q → '.' owner
+ *   o → '@' op
+ *   v → '+' voice
+ * Empty string represents no status. The wire prefix map is server-driven
+ * (parsed from 005 PREFIX); these letters are the authoritative defaults.
+ */
+export type UserMode = 'Y' | 'Q' | 'q' | 'o' | 'v' | '';
 
 export interface ChannelUser {
   nick: string;
-  /** highest mode: q > o > v */
+  /** status modes held (e.g. {'Q'}, {'o','v'}); highest: Y > Q > q > o > v */
   modes: Set<string>;
   away?: boolean;
   account?: string;

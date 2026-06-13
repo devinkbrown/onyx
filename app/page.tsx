@@ -51,8 +51,9 @@ export default function LandingPage() {
             </h1>
 
             <p className="land-lead">
-              Open-protocol community chat with SUIMYAKU media and TSUMUGI encryption
-              carried through Orochi. Start in <span className="land-inline-channel">#root</span>.
+              Open-protocol community chat on Orochi — a pure-Zig IRC engine with a
+              SUIMYAKU CRDT mesh and post-quantum TSUMUGI links. Native voice, native
+              video. Start in <span className="land-inline-channel">#root</span>.
             </p>
 
             <div className="land-hero-actions">
@@ -100,12 +101,11 @@ export default function LandingPage() {
                 <VoiceIcon />
                 <span>SUIMYAKU</span>
               </div>
-              <h3 className="land-card-h3">Voice without borders</h3>
+              <h3 className="land-card-h3">Native voice and video</h3>
               <p className="land-card-p">
-                Spatial audio and encrypted voice over Orochi IRC. Native
-                protocol transport — no relay servers, no third-party
-                infrastructure. Your voice travels the same path as your
-                messages.
+                SUIMYAKU carries voice and video over the Orochi mesh itself.
+                No STUN, no TURN, no relay servers. Your media
+                travels the same encrypted path as your messages.
               </p>
               <div className="land-voice-vis" aria-hidden>
                 <WaveformVis />
@@ -151,16 +151,16 @@ export default function LandingPage() {
                   <TsumugiIcon />
                   <span>TSUMUGI</span>
                 </div>
-                <h3 className="land-card-h3">End-to-end, always</h3>
+                <h3 className="land-card-h3">Post-quantum, end-to-end</h3>
                 <p className="land-card-p">
-                  P-256 ECDH key exchange and AES-256-GCM encryption for every
-                  voice and video session. Forward secrecy built into the protocol
-                  — not bolted on.
+                  TSUMUGI secures every server link and media session with an
+                  X25519 + ML-KEM-768 hybrid handshake and a forward-secret
+                  ratchet. Encryption is built into the protocol — not bolted on.
                 </p>
                 <div className="land-tsumugi-badges" aria-hidden>
-                  <span className="land-tsumugi-badge">P-256 ECDH</span>
-                  <span className="land-tsumugi-badge">AES-256-GCM</span>
+                  <span className="land-tsumugi-badge">X25519 + ML-KEM-768</span>
                   <span className="land-tsumugi-badge">Forward Secrecy</span>
+                  <span className="land-tsumugi-badge">PQ-hybrid</span>
                 </div>
               </div>
               <div className="land-tsumugi-diagram" aria-hidden>

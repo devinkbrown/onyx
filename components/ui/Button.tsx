@@ -33,11 +33,11 @@ export default function Button({
         className={`${base} ${variantClass} ${sizeClass} ${widthClass} ${className}`}
         disabled={disabled || loading}
         type={type}
+        aria-busy={loading || undefined}
         {...rest}
       >
-        {loading && !children ? <span className="btn-spinner" aria-hidden /> : null}
-        {!loading && icon ? <span className="btn-icon">{icon}</span> : null}
-        {children && <span>{children}</span>}
+        {loading ? <span className="btn-spinner" aria-hidden /> : icon ? <span className="btn-icon">{icon}</span> : null}
+        {children && <span className="btn-label">{children}</span>}
       </button>
 
       <style>{`
@@ -69,10 +69,12 @@ export default function Button({
         .btn:hover:not(:disabled) { transform: translateY(-1px); }
         .btn:active:not(:disabled) { transform: translateY(0.5px); }
         .btn:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+        .btn[aria-busy="true"] { cursor: progress; }
         .btn:focus-visible {
-          outline: 2px solid var(--accent, #0ea5e9);
-          outline-offset: 2px;
+          outline: var(--focus-ring-width, 2px) solid var(--focus-ring, var(--accent, #0ea5e9));
+          outline-offset: var(--focus-ring-offset, 2px);
         }
+        .btn-label { display: inline-flex; align-items: center; }
 
         /* Sizes */
         .btn--sm  { height: 28px; padding: 0 var(--sp-2, 8px); font-size: var(--text-xs, 0.75rem); }
@@ -81,7 +83,7 @@ export default function Button({
 
         .btn--primary {
           background-color: var(--accent, #0ea5e9);
-          color: #fff;
+          color: var(--on-accent, #fff);
           border-color: color-mix(in srgb, var(--accent, #0ea5e9) 82%, #fff 18%);
           border-radius: var(--r-md, 8px) var(--r-lg, 12px) var(--r-md, 8px) var(--r-sm, 6px);
           box-shadow:
@@ -135,7 +137,7 @@ export default function Button({
 
         .btn--danger {
           background: var(--danger, #f87171);
-          color: #fff;
+          color: var(--danger-contrast, #fff);
           border-color: color-mix(in srgb, var(--danger, #f87171) 80%, #fff 20%);
           border-radius: var(--r-md, 8px) var(--r-sm, 6px) var(--r-lg, 12px) var(--r-md, 8px);
           box-shadow:

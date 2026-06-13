@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import { saveCredentials } from '@/lib/credentials';
 import ModalShell from './ModalShell';
+import Button from '@/components/ui/Button';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -201,20 +202,19 @@ export default function ConnectionProfilesModal() {
       flushBody
       footer={
         <>
-          <button className="conn-btn-secondary" onClick={closeConnectionProfiles}>
+          <Button variant="ghost" onClick={closeConnectionProfiles}>
             Cancel
-          </button>
-          <button className="conn-btn-secondary" onClick={handleSave}>
+          </Button>
+          <Button variant="secondary" onClick={handleSave}>
             Save
-          </button>
-          <button
-            className="conn-btn-primary"
+          </Button>
+          <Button
+            variant="primary"
             onClick={handleConnect}
             disabled={!draft?.host || !draft?.nick}
-            style={{ opacity: (!draft?.host || !draft?.nick) ? 0.5 : 1 }}
           >
             {connectionStatus === 'connected' ? 'Reconnect' : 'Connect'}
-          </button>
+          </Button>
         </>
       }
     >
@@ -371,13 +371,11 @@ export default function ConnectionProfilesModal() {
         .conn-input { background: var(--bg-elevated); border: 1px solid var(--border-normal); border-radius: var(--r-sm); padding: 8px 12px; color: var(--text-primary); font-size: var(--text-sm, 13px); font-family: inherit; outline: none; transition: border-color var(--t-control, 150ms), background var(--t-control, 150ms); }
         .conn-input:focus { border-color: var(--accent-border); background: var(--bg-float); }
         .conn-input::placeholder { color: var(--text-muted); }
-        .conn-btn-primary { padding: 8px 20px; border-radius: var(--r-sm); border: none; background: var(--accent); color: white; cursor: pointer; font-size: var(--text-sm, 13px); font-weight: 600; font-family: inherit; transition: background var(--t-control, 150ms), opacity var(--t-control, 150ms); }
-        .conn-btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
-        .conn-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
-        .conn-btn-secondary { padding: 8px 16px; border-radius: var(--r-sm); border: 1px solid var(--border-normal); background: none; color: var(--text-secondary); cursor: pointer; font-size: var(--text-sm, 13px); font-family: inherit; transition: background var(--t-control, 150ms), color var(--t-control, 150ms); }
-        .conn-btn-secondary:hover { background: var(--bg-overlay); color: var(--text-primary); }
         .conn-new-btn { padding: 8px 10px; border-radius: var(--r-sm); border: 1px dashed var(--border-normal); background: none; color: var(--text-muted); cursor: pointer; font-size: var(--text-xs, 12px); font-family: inherit; display: flex; align-items: center; gap: 6px; margin-top: auto; transition: border-color var(--t-control, 150ms), color var(--t-control, 150ms), background var(--t-control, 150ms); }
         .conn-new-btn:hover { border-color: var(--accent-border); color: var(--accent); background: var(--accent-subtle); }
+        .conn-new-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        .conn-profile-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+        .conn-profile-del:focus-visible { outline: 2px solid var(--danger); outline-offset: 2px; }
         .conn-toggle { position: relative; width: 36px; height: 20px; border-radius: 10px; border: none; background: var(--border-normal); cursor: pointer; transition: background var(--t-control, 150ms); padding: 0; flex-shrink: 0; }
         .conn-toggle--on { background: var(--accent); }
         .conn-toggle-thumb { position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: white; transition: transform var(--t-control, 150ms); display: block; }

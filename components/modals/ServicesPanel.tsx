@@ -383,6 +383,13 @@ export default function ServicesPanel() {
         .svc-btn:active {
           transform: translateY(1px);
         }
+        .svc-btn:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
+        }
+        .svc-btn--danger:focus-visible {
+          outline-color: var(--danger);
+        }
         .svc-btn--accent {
           background: var(--accent);
           border-color: var(--accent);

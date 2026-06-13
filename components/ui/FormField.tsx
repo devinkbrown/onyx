@@ -17,7 +17,7 @@ export default function FormField({ label, hint, error, required, children }: Pr
       </label>
       {children}
       {hint && !error && <p className="form-hint">{hint}</p>}
-      {error && <p className="form-error">{error}</p>}
+      {error && <p className="form-error" role="alert">{error}</p>}
 
       <style>{`
         .form-field {
@@ -93,8 +93,8 @@ export default function FormField({ label, hint, error, required, children }: Pr
         .form-field > textarea:focus-visible,
         .form-field > .form-control:focus-visible {
           border-color: var(--accent);
-          outline: 2px solid var(--accent);
-          outline-offset: 2px;
+          outline: var(--focus-ring-width, 2px) solid var(--focus-ring, var(--accent));
+          outline-offset: var(--focus-ring-offset, 2px);
         }
 
         .form-field.form-field--error > input,
@@ -102,6 +102,12 @@ export default function FormField({ label, hint, error, required, children }: Pr
         .form-field.form-field--error > textarea,
         .form-field.form-field--error > .form-control {
           border-color: var(--danger);
+        }
+        .form-field.form-field--error > input:focus-visible,
+        .form-field.form-field--error > select:focus-visible,
+        .form-field.form-field--error > textarea:focus-visible,
+        .form-field.form-field--error > .form-control:focus-visible {
+          outline-color: var(--danger);
         }
 
         /* 12px muted helper text */

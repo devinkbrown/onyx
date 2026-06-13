@@ -128,9 +128,19 @@ export default function ChannelBrowserModal() {
         {/* Empty state */}
         {!channelListLoading && filtered.length === 0 && (
           <div className="cbrowser-empty">
-            {search
-              ? `No channels matching "${search}"`
-              : 'No channels available'}
+            <span className="cbrowser-empty-figure" aria-hidden>
+              <span className="cbrowser-empty-ring" />
+              <span className="cbrowser-empty-ring cbrowser-empty-ring--inner" />
+              <span className="cbrowser-empty-dot" />
+            </span>
+            <span className="cbrowser-empty-title">
+              {search ? 'No channels found' : 'No channels listed'}
+            </span>
+            <span className="cbrowser-empty-sub">
+              {search
+                ? `Nothing matches "${search}". Try a different name, or create it with /join.`
+                : 'This network has not advertised any channels yet.'}
+            </span>
           </div>
         )}
 
@@ -486,11 +496,47 @@ export default function ChannelBrowserModal() {
 
         /* Empty state */
         .cbrowser-empty {
-          padding: 48px 20px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 6px;
+          padding: 48px 24px;
           text-align: center;
           color: var(--text-muted);
-          font-size: var(--text-base, 14px);
-          line-height: 1.6;
+        }
+        .cbrowser-empty-figure {
+          position: relative;
+          width: 60px;
+          height: 60px;
+          display: grid;
+          place-items: center;
+          margin-bottom: var(--sp-2, 8px);
+        }
+        .cbrowser-empty-ring {
+          position: absolute;
+          inset: 0;
+          border-radius: 50%;
+          border: 1px solid color-mix(in srgb, var(--text-muted) 30%, transparent);
+        }
+        .cbrowser-empty-ring--inner { inset: 26%; opacity: 0.6; }
+        .cbrowser-empty-dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          background: color-mix(in srgb, var(--lux) 70%, var(--bg-deep));
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
+        }
+        .cbrowser-empty-title {
+          font-size: var(--text-md, 15px);
+          font-weight: 650;
+          font-family: var(--font-display), Georgia, serif;
+          color: var(--text-secondary);
+        }
+        .cbrowser-empty-sub {
+          font-size: var(--text-sm, 13px);
+          color: var(--text-muted);
+          line-height: 1.55;
+          max-width: 320px;
         }
 
         /* Responsive */

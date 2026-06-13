@@ -5,6 +5,7 @@ import { useOnyxStore } from '@/lib/store';
 import SkeletonMember from '@/components/chat/SkeletonMember';
 import type { ChannelUser } from '@/lib/irc/types';
 import Avatar from '@/components/ui/Avatar';
+import Tooltip from '@/components/ui/Tooltip';
 import UserPopover from '@/components/ui/UserPopover';
 import MemberContextMenu from '@/components/ui/MemberContextMenu';
 import { getNickColor } from '@/lib/nick-color';
@@ -56,6 +57,7 @@ export default function MemberList() {
   const modeToPrefix      = useOnyxStore(s => s.isupportModeToPrefix);
   const [search, setSearch] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [ctxMenu, setCtxMenu] = useState<CtxMenuState | null>(null);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
@@ -166,10 +168,42 @@ export default function MemberList() {
   const total = channel.users.size;
   const shown = isFiltering ? filteredMembers.size : total;
 
+  // Presence breakdown for the footer summary
+  const awayCount = allMembers.reduce((n, m) => n + (m.away ? 1 : 0), 0);
+  const onlineCount = total - awayCount;
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Escape') {
       setSearch('');
       inputRef.current?.blur();
+    }
+    // From the search box, ArrowDown jumps into the first member row
+    if (e.key === 'ArrowDown') {
+      const first = scrollRef.current?.querySelector<HTMLElement>('[data-testid="member-row"]');
+      if (first) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  };
+
+  // Roving focus: Up/Down move between member rows within the list
+  const handleListKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    const target = e.target as HTMLElement;
+    if (target.getAttribute('data-testid') !== 'member-row') return;
+    const rows = Array.from(
+      scrollRef.current?.querySelectorAll<HTMLElement>('[data-testid="member-row"]') ?? [],
+    );
+    const idx = rows.indexOf(target);
+    if (idx === -1) return;
+    e.preventDefault();
+    const dir = e.key === 'ArrowDown' ? 1 : -1;
+    const next = rows[idx + dir];
+    if (next) {
+      next.focus();
+    } else if (dir === -1) {
+      inputRef.current?.focus();
     }
   };
 
@@ -231,7 +265,7 @@ export default function MemberList() {
         </div>
       )}
 
-      <div className="ml-scroll" role="list" aria-label="Channel members">
+      <div className="ml-scroll" role="list" aria-label="Channel members" ref={scrollRef} onKeyDown={handleListKeyDown}>
         {connectionStatus === 'connecting' ? (
           <SkeletonMember count={12} />
         ) : groups.length === 0 && isFiltering ? (
@@ -281,6 +315,21 @@ export default function MemberList() {
           })
         )}
       </div>
+
+      {connectionStatus !== 'connecting' && total > 0 && (
+        <div className="ml-footer" aria-hidden>
+          <span className="ml-footer-stat">
+            <span className="ml-footer-dot ml-footer-dot--online" />
+            {onlineCount} online
+          </span>
+          {awayCount > 0 && (
+            <span className="ml-footer-stat ml-footer-stat--away">
+              <span className="ml-footer-dot ml-footer-dot--away" />
+              {awayCount} away
+            </span>
+          )}
+        </div>
+      )}
 
       {ctxMenu && (
         <MemberContextMenu
@@ -520,6 +569,42 @@ export default function MemberList() {
           }
         }
 
+        /* ── Presence summary footer ── */
+        .ml-footer {
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          gap: var(--sp-3, 12px);
+          padding: 7px var(--sp-3, 12px);
+          border-top: 1px solid color-mix(in srgb, var(--border-subtle) 80%, transparent);
+          background: color-mix(in srgb, var(--bg-deep) 60%, transparent);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
+          font-size: var(--text-2xs, 10px);
+          font-weight: 600;
+          letter-spacing: 0.02em;
+          color: var(--text-muted);
+          font-variant-numeric: tabular-nums;
+        }
+        .ml-footer-stat {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+        }
+        .ml-footer-stat--away { color: color-mix(in srgb, var(--text-muted) 86%, transparent); }
+        .ml-footer-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          flex-shrink: 0;
+        }
+        .ml-footer-dot--online {
+          background: var(--status-online, #23a55a);
+          box-shadow: 0 0 6px color-mix(in srgb, var(--status-online, #23a55a) 50%, transparent);
+        }
+        .ml-footer-dot--away {
+          background: var(--status-idle, #f0b232);
+        }
+
         .ml-no-results {
           display: flex;
           flex-direction: column;
@@ -638,6 +723,16 @@ function MemberRow({
             <span style={{ color: getNickColor(user.nick) }} className={user.away ? 'mr-nick-away' : ''}>
               {displayName}
             </span>
+            {user.account && (
+              <Tooltip text={`Logged in as ${user.account}`} side="left">
+                <span className="mr-verified" aria-label={`Authenticated as ${user.account}`}>
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden>
+                    <path d="M6 1l1.3 1 1.6-.2.5 1.5 1.4.8-.7 1.5.7 1.5-1.4.8-.5 1.5-1.6-.2L6 11l-1.3-1-1.6.2-.5-1.5L1.2 8l.7-1.5L1.2 5l1.4-.8.5-1.5 1.6.2L6 1z" fill="currentColor" opacity="0.9"/>
+                    <path d="M4.3 6.1l1.2 1.2 2.3-2.5" stroke="var(--bg-deep)" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </span>
+              </Tooltip>
+            )}
             {user.away && <span className="mr-away-icon" aria-hidden>💤</span>}
           </span>
           {hasDisplayName && (
@@ -755,6 +850,18 @@ function MemberRow({
             margin-left: 3px;
             font-style: normal;
           }
+
+          .mr-verified {
+            display: inline-flex;
+            align-items: center;
+            margin-left: 3px;
+            color: var(--lux, #d8b96a);
+            flex-shrink: 0;
+            line-height: 0;
+            opacity: 0.85;
+            transition: opacity var(--t-control, 150ms) var(--ease-out);
+          }
+          .mr-row:hover .mr-verified { opacity: 1; }
 
           .mr-account {
             font-size: 11px;

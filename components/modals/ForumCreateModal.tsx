@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import type { ForumPost } from '@/lib/store';
 import ModalShell from './ModalShell';
+import Button from '@/components/ui/Button';
 
 const MAX_TITLE   = 100;
 const MAX_TAGS    = 5;
@@ -147,18 +148,17 @@ export default function ForumCreateModal() {
       size="md"
       footer={
         <>
-          <button className="fcm-btn-cancel" onClick={closeForumCreate} type="button">
+          <Button variant="ghost" onClick={closeForumCreate}>
             Cancel
-          </button>
-          <button
-            className="fcm-btn-post"
+          </Button>
+          <Button
+            variant="primary"
             onClick={handleSubmit}
-            type="button"
             disabled={!canSubmit}
-            aria-disabled={!canSubmit}
+            loading={submitting}
           >
             {submitting ? 'Posting…' : 'Post'}
-          </button>
+          </Button>
         </>
       }
     >
@@ -233,7 +233,7 @@ export default function ForumCreateModal() {
                 {suggestions.length > 0 && (
                   <ul className="fcm-tag-suggestions" role="listbox">
                     {suggestions.slice(0, 5).map(s => (
-                      <li key={s} role="option">
+                      <li key={s} role="option" aria-selected={false}>
                         <button
                           type="button"
                           className="fcm-tag-suggestion-item"
@@ -476,47 +476,6 @@ export default function ForumCreateModal() {
           box-shadow: 0 0 0 3px var(--accent-subtle);
         }
         .fcm-textarea::placeholder { color: var(--text-muted); }
-
-        .fcm-btn-cancel {
-          padding: 7px 16px;
-          background: none;
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-sm);
-          font-size: var(--text-sm, 13px);
-          font-weight: 600;
-          font-family: inherit;
-          color: var(--text-secondary);
-          cursor: pointer;
-          transition: background var(--t-control, 150ms), color var(--t-control, 150ms), border-color var(--t-control, 150ms);
-        }
-        .fcm-btn-cancel:hover {
-          background: var(--bg-overlay);
-          color: var(--text-primary);
-          border-color: var(--border-normal);
-        }
-
-        .fcm-btn-post {
-          padding: 8px 22px;
-          background: var(--accent);
-          border: none;
-          border-radius: var(--r-sm);
-          font-size: var(--text-sm, 13px);
-          font-weight: 700;
-          font-family: inherit;
-          color: #fff;
-          cursor: pointer;
-          transition: opacity var(--t-control, 150ms), transform var(--t-micro, 90ms);
-        }
-        .fcm-btn-post:hover:not([disabled]) {
-          opacity: 0.90;
-        }
-        .fcm-btn-post:active:not([disabled]) {
-          transform: scale(0.98);
-        }
-        .fcm-btn-post[disabled] {
-          opacity: 0.38;
-          cursor: not-allowed;
-        }
       `}</style>
     </ModalShell>
   );

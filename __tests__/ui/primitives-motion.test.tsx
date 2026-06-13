@@ -20,7 +20,7 @@ describe('Package H primitive motion contract', () => {
     expect(styleText).not.toContain('linear-gradient');
     expect(styleText).not.toContain('accent-glow');
     expect(styleText).toContain('color-mix(in srgb, var(--accent, #0ea5e9) 94%, #000 6%)');
-    expect(styleText).toContain('outline-offset: 2px');
+    expect(styleText).toContain('outline-offset: var(--focus-ring-offset');
     expect(styleText).toContain('translateY(0.5px)');
   });
 

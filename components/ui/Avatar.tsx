@@ -40,11 +40,13 @@ export interface AvatarProps {
 
 /* ── Constants ─────────────────────────────────────────────────── */
 
+/* Presence colors resolve to canonical design tokens (--status-*-solid) so
+   every dot in the app reads identically regardless of theme tint. */
 const STATUS_COLORS: Record<string, string> = {
-  online:  '#23a55a',
-  idle:    '#f0b232',
-  dnd:     '#f04747',
-  offline: '#80848e',
+  online:  'var(--status-online-solid, #23a55a)',
+  idle:    'var(--status-idle-solid, #f0b232)',
+  dnd:     'var(--status-dnd-solid, #f04747)',
+  offline: 'var(--status-offline-solid, #80848e)',
 };
 
 /* ── Avatar ────────────────────────────────────────────────────── */
@@ -196,14 +198,14 @@ export default function Avatar({
           0%, 100% {
             box-shadow:
               0 0 0 2px var(--bg-deep, #06101d),
-              0 0 0 4px var(--accent, #0ea5e9),
-              0 0 0 6px rgba(14, 165, 233, 0.25);
+              0 0 0 4px var(--status-online-solid, #23a55a),
+              0 0 0 6px color-mix(in srgb, var(--status-online-solid, #23a55a) 28%, transparent);
           }
           50% {
             box-shadow:
               0 0 0 2px var(--bg-deep, #06101d),
-              0 0 0 5px var(--accent, #0ea5e9),
-              0 0 0 10px rgba(14, 165, 233, 0.4);
+              0 0 0 5px var(--status-online-solid, #23a55a),
+              0 0 0 10px color-mix(in srgb, var(--status-online-solid, #23a55a) 42%, transparent);
           }
         }
 
@@ -261,7 +263,7 @@ export default function Avatar({
           top: -2px;
           right: -2px;
           font-size: 8px;
-          background: var(--gold, #67e8f9);
+          background: var(--gold, #d8b96a);
           color: #000;
           border-radius: 3px;
           padding: 1px 3px;
@@ -304,9 +306,9 @@ export default function Avatar({
           color: var(--text-primary, #dff0ff);
           pointer-events: none;
           opacity: 0;
-          transition: opacity 120ms ease;
-          z-index: 50;
-          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+          transition: opacity var(--t-micro, 120ms) var(--ease-out, ease);
+          z-index: var(--z-popover, 50);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05)), var(--shadow-md, 0 4px 16px rgba(0, 0, 0, 0.5));
         }
 
         .av-wrap:hover .av-tooltip {

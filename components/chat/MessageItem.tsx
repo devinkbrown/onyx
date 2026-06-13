@@ -445,7 +445,7 @@ function InlineImage({ url, fullWidth = false }: InlineImageProps) {
       style={{ cursor: 'pointer' }}
     >
       {!loaded && <div className="msg-img-placeholder" aria-hidden />}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
+      { }
       <img
         src={url}
         alt=""
@@ -504,7 +504,7 @@ function parseCustomEmoji(
     const ce = customEmoji.find(e => e.name === m![1]);
     if (!ce) continue;
     if (m.index > last) parts.push(text.slice(last, m.index));
-    /* eslint-disable @next/next/no-img-element */
+     
     parts.push(
       <img
         key={`ce-${m.index}`}
@@ -514,7 +514,7 @@ function parseCustomEmoji(
         style={{ height: '20px', verticalAlign: 'middle', borderRadius: '2px', display: 'inline' }}
       />
     );
-    /* eslint-enable @next/next/no-img-element */
+     
     last = m.index + m[0].length;
   }
   if (last < text.length) parts.push(text.slice(last));
@@ -2102,13 +2102,22 @@ const msgStyles = `
     box-shadow: inset 0 -1px 0 rgba(0,0,0,0.32);
   }
   .msg-mention {
-    color: var(--text-primary);
+    color: var(--accent-hover, var(--accent));
     background: var(--accent-subtle);
     padding: 0 5px;
     border-radius: var(--r-xs);
     border: 1px solid var(--accent-border);
     font-weight: 700;
     cursor: pointer;
+    transition: background var(--t-control, 150ms) var(--ease-out, ease), border-color var(--t-control, 150ms) var(--ease-out, ease), color var(--t-control, 150ms) var(--ease-out, ease);
+  }
+  .msg-mention:hover {
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 52%, transparent);
+    color: var(--text-primary);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .msg-mention { transition: none; }
   }
   .highlight-word {
     background: var(--gold-subtle);
@@ -2137,6 +2146,13 @@ const msgStyles = `
   }
   .msg-link--masked { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
   .msg-link--masked:hover { color: var(--gold); }
+  .msg-link:focus-visible,
+  .msg-link--masked:focus-visible {
+    outline: 2px solid var(--accent, #0ea5e9);
+    outline-offset: 2px;
+    border-radius: var(--r-xs, 3px);
+    text-decoration: none;
+  }
 
   .msg-blockquote {
     border-left: 3px solid var(--accent-border);
@@ -2301,15 +2317,8 @@ const msgStyles = `
   /* Emoji picker */
   .picker-anchor { position: relative; }
 
-  /* Jump-to-message highlight */
-  .msg-jump-highlight {
-    animation: jump-flash 1.5s ease;
-  }
-  @keyframes jump-flash {
-    0%, 100% { filter: brightness(1); }
-    15% { filter: brightness(1.35); }
-    85% { filter: brightness(1.16); }
-  }
+  /* Jump-to-message highlight is defined in MessageList styles (gold flash) so
+     there is a single source of truth for the animation. */
 `;
 
 const eventStyles = `

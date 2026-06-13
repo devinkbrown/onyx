@@ -1879,32 +1879,6 @@ function formatTimeAgo(date: Date): string {
 
 // ── Sub-components ───────────────────────────────────────────────────────────────
 
-function OceanWatsumugilustration() {
-  return (
-    <svg width="80" height="48" viewBox="0 0 80 48" fill="none" aria-hidden>
-      <ellipse cx="40" cy="40" rx="36" ry="6" fill="var(--accent-subtle)" />
-      <path
-        d="M4 28 Q14 18 24 28 Q34 38 44 28 Q54 18 64 28 Q74 38 84 28"
-        stroke="var(--accent)"
-        strokeWidth="2"
-        strokeLinecap="round"
-        fill="none"
-        opacity="0.5"
-      />
-      <path
-        d="M4 36 Q14 26 24 36 Q34 46 44 36 Q54 26 64 36 Q74 46 84 36"
-        stroke="var(--gold)"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        fill="none"
-        opacity="0.35"
-      />
-      <circle cx="40" cy="16" r="6" fill="var(--accent-subtle)" stroke="var(--accent-border)" strokeWidth="1.5" />
-      <path d="M37 16h6M40 13v6" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 function OceanLogo({ size = 36 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 36 36" fill="none" aria-label="Ocean">

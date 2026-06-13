@@ -79,7 +79,7 @@ export default function MessageList({ messages, target, searchActive, searchMatc
       scrollToBottomRef.current = () => scrollToBottom('smooth');
       return () => { scrollToBottomRef.current = null; };
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [scrollToBottomRef]);
 
   // Handle Ctrl+L (ocean:scroll-bottom custom event)
@@ -382,15 +382,19 @@ export default function MessageList({ messages, target, searchActive, searchMatc
       {/* Jump to Present button */}
       {!isAtBottom && (
         <button
-          className="ml-jump-btn animate-ml-fadein"
-          aria-label="Jump to present"
+          className={`ml-jump-btn animate-ml-fadein${unreadCount > 0 ? ' ml-jump-btn--unread' : ''}`}
+          aria-label={unreadCount > 0 ? `Jump to ${unreadCount} new ${unreadCount === 1 ? 'message' : 'messages'}` : 'Jump to present'}
           onClick={() => {
             setIsAtBottom(true);
             scrollToBottom('smooth');
             if (unreadMsgId) clearFirstUnread(target);
           }}
         >
-          {unreadCount > 0 ? `↓ ${unreadCount} new` : '↓ Jump to Present'}
+          {unreadCount > 0 && <span className="ml-jump-pip" aria-hidden />}
+          <svg className="ml-jump-arrow" width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M5.5 1.5v8M2.5 6.5l3 3 3-3" />
+          </svg>
+          <span>{unreadCount > 0 ? `${unreadCount} new ${unreadCount === 1 ? 'message' : 'messages'}` : 'Jump to Present'}</span>
         </button>
       )}
 
@@ -641,6 +645,42 @@ export default function MessageList({ messages, target, searchActive, searchMatc
           border-color: color-mix(in srgb, var(--lux, #d8b96a) 52%, transparent);
           transform: translateX(-50%) translateY(-1px);
         }
+        .ml-jump-btn:focus-visible {
+          outline: 2px solid var(--accent, #0ea5e9);
+          outline-offset: 2px;
+        }
+        .ml-jump-btn:hover .ml-jump-arrow { transform: translateY(1px); }
+        .ml-jump-arrow { transition: transform var(--t-micro, 90ms) var(--ease-out, ease); }
+
+        /* Unread variant — accent-tinted to draw the eye to new messages */
+        .ml-jump-btn--unread {
+          color: var(--accent, #0ea5e9);
+          background: color-mix(in srgb, var(--bg-elevated, #132131) 80%, var(--accent, #0ea5e9) 14%);
+          border-color: color-mix(in srgb, var(--accent, #0ea5e9) 46%, transparent);
+        }
+        .ml-jump-btn--unread:hover {
+          background: color-mix(in srgb, var(--bg-elevated, #132131) 70%, var(--accent, #0ea5e9) 20%);
+          border-color: var(--accent, #0ea5e9);
+        }
+        .ml-jump-pip {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: var(--accent, #0ea5e9);
+          box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent, #0ea5e9) 60%, transparent);
+          animation: ml-jump-pip-pulse 1.8s var(--ease-out, ease-out) infinite;
+          flex-shrink: 0;
+        }
+        @keyframes ml-jump-pip-pulse {
+          0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent, #0ea5e9) 55%, transparent); }
+          70%  { box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent, #0ea5e9) 0%, transparent); }
+          100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent, #0ea5e9) 0%, transparent); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .ml-jump-pip { animation: none; }
+          .ml-jump-arrow { transition: none; }
+          .ml-jump-btn:hover .ml-jump-arrow { transform: none; }
+        }
 
         @keyframes ml-fadein {
           from { opacity: 0; transform: translateX(-50%) translateY(10px); }
@@ -676,12 +716,16 @@ export default function MessageList({ messages, target, searchActive, searchMatc
 
         /* ── Jump-to-message highlight ── */
         .msg-jump-highlight {
-          animation: msg-jump-flash 2s ease-out forwards;
+          animation: msg-jump-flash 2s var(--ease-out, ease-out) forwards;
+          border-radius: var(--r-sm, 6px);
         }
         @keyframes msg-jump-flash {
-          0%   { background: rgba(124, 90, 245, 0.3); }
-          50%  { background: rgba(124, 90, 245, 0.15); }
-          100% { background: transparent; }
+          0%   { background: color-mix(in srgb, var(--lux, #d8b96a) 26%, transparent); box-shadow: inset 3px 0 0 var(--lux, #d8b96a); }
+          50%  { background: color-mix(in srgb, var(--lux, #d8b96a) 12%, transparent); box-shadow: inset 3px 0 0 color-mix(in srgb, var(--lux, #d8b96a) 50%, transparent); }
+          100% { background: transparent; box-shadow: inset 3px 0 0 transparent; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .msg-jump-highlight { animation-duration: 1.2s; }
         }
 
         /* ── Search highlight / dim ── */
@@ -694,11 +738,10 @@ export default function MessageList({ messages, target, searchActive, searchMatc
           transition: opacity var(--t-fast);
         }
         .msg--focused {
-          background: rgba(14, 165, 233, 0.08);
-          border-left: 2px solid var(--accent);
-          padding-left: 6px;
-          border-radius: var(--r-xs);
-          margin-left: -8px;
+          background: var(--accent-subtle, color-mix(in srgb, var(--accent) 8%, transparent));
+          box-shadow: inset 2px 0 0 var(--accent);
+          border-radius: var(--r-xs, 4px);
+          transition: background var(--t-control, 150ms) var(--ease-out, ease), box-shadow var(--t-control, 150ms) var(--ease-out, ease);
         }
 
       `}</style>

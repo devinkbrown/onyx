@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import ModalShell from './ModalShell';
 
@@ -586,7 +586,11 @@ export default function IRCOperatorPanel() {
           box-sizing: border-box;
         }
         .op-input::placeholder { color: #2d5070; }
-        .op-input:focus { border-color: rgba(248, 185, 56, 0.45); }
+        .op-input:focus-visible {
+          border-color: var(--accent, #0ea5e9);
+          outline: 2px solid var(--accent, #0ea5e9);
+          outline-offset: 2px;
+        }
         .op-input--sm { flex: 1; }
 
         /* ── Buttons ── */
@@ -607,6 +611,14 @@ export default function IRCOperatorPanel() {
         }
         .op-btn:not(:disabled):hover { filter: brightness(1.12); }
         .op-btn:not(:disabled):active { filter: brightness(0.92); }
+        .op-btn:focus-visible {
+          outline: 2px solid var(--accent, #0ea5e9);
+          outline-offset: 2px;
+        }
+        .op-btn--die:focus-visible,
+        .op-btn--danger:focus-visible {
+          outline-color: var(--danger, #f87171);
+        }
 
         .op-btn--primary {
           background: #0ea5e9;

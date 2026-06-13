@@ -48,20 +48,20 @@ export function StatusDot({
         }
 
         .sdot--online {
-          background: #23a55a;
-          transition: background 300ms ease;
+          background: var(--status-online-solid, #23a55a);
+          transition: background var(--t-surface, 300ms) var(--ease-out, ease);
         }
 
         /* idle — solid amber, no animation */
         .sdot--idle {
-          background: #f0b232;
-          transition: background 300ms ease;
+          background: var(--status-idle-solid, #f0b232);
+          transition: background var(--t-surface, 300ms) var(--ease-out, ease);
         }
 
         /* dnd — red with horizontal bar */
         .sdot--dnd {
-          background: #f04747;
-          transition: background 300ms ease;
+          background: var(--status-dnd-solid, #f04747);
+          transition: background var(--t-surface, 300ms) var(--ease-out, ease);
         }
 
         .sdot-dnd-bar {
@@ -74,8 +74,8 @@ export function StatusDot({
 
         /* offline — gray, muted */
         .sdot--offline {
-          background: rgba(128,128,128,0.5);
-          transition: background 300ms ease;
+          background: var(--status-offline-solid, #80848e);
+          transition: background var(--t-surface, 300ms) var(--ease-out, ease);
         }
       `}</style>
     </span>
@@ -98,7 +98,9 @@ export default function UserStatusBadge() {
   return (
     <button
       className="usb-root"
+      type="button"
       onClick={openAwayModal}
+      aria-haspopup="dialog"
       aria-label={`Status: ${statusText}. Click to change.`}
     >
       <span className="usb-dot-wrap">
@@ -139,26 +141,26 @@ export default function UserStatusBadge() {
 
         /* online */
         .usb-dot--online {
-          background: #23a55a;
-          transition: background 300ms ease;
+          background: var(--status-online-solid, #23a55a);
+          transition: background var(--t-surface, 300ms) var(--ease-out, ease);
         }
 
         /* idle/away */
         .usb-dot--idle {
-          background: #f0b232;
-          transition: background 300ms ease;
+          background: var(--status-idle-solid, #f0b232);
+          transition: background var(--t-surface, 300ms) var(--ease-out, ease);
         }
 
         /* dnd */
         .usb-dot--dnd {
-          background: #f04747;
-          transition: background 300ms ease;
+          background: var(--status-dnd-solid, #f04747);
+          transition: background var(--t-surface, 300ms) var(--ease-out, ease);
         }
 
         /* offline */
         .usb-dot--offline {
-          background: rgba(128,128,128,0.5);
-          transition: background 300ms ease;
+          background: var(--status-offline-solid, #80848e);
+          transition: background var(--t-surface, 300ms) var(--ease-out, ease);
         }
 
         .usb-text {

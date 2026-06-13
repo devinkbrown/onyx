@@ -58,6 +58,8 @@ export class IRCClient {
   private pongTimeout: ReturnType<typeof setTimeout> | null = null;
   private _destroyed = false;
   private _registered = false;
+  /** True once SASL has succeeded (903). Gates the post-001 SESSION commands. */
+  private _loggedIn = false;
   private _saslPending = false;
   private _capNegotiating = true;
   private _capReqPending = 0;
@@ -91,17 +93,23 @@ export class IRCClient {
   public extraMessageHandlers: Set<IRCEventHandler> = new Set();
 
   isupport: ISupport = {
-    PREFIX: { q: '.', o: '@', v: '+' },
-    PREFIX_MODES: { '.': 'q', '@': 'o', '+': 'v' },
-    CHANMODES: [],
+    // Defaults mirror Orochi's ISUPPORT PREFIX=(YQqov)*!.@+ (founder Q/'!',
+    // owner q/'.', op o/'@', voice v/'+', plus the render-only oper Y/'*').
+    // Overwritten verbatim from 005 PREFIX on connect.
+    PREFIX: { Y: '*', Q: '!', q: '.', o: '@', v: '+' },
+    PREFIX_MODES: { '*': 'Y', '!': 'Q', '.': 'q', '@': 'o', '+': 'v' },
+    // Orochi defaults (overwritten from 005 on connect):
+    //   CHANMODES=beIZ,k,lfj,imnstCTNMSgWOA, CHANTYPES=#&, CASEMAPPING=ascii,
+    //   NICKLEN=64, TOPICLEN=390, CHANLIMIT=#&:50, MONITOR=128, SILENCE=32.
+    CHANMODES: ['beIZ', 'k', 'lfj', 'imnstCTNMSgWOA'],
     CHANTYPES: '#&',
     CHANLIMITS: {},
     NETWORK: 'IRCXNet',
-    CASEMAPPING: 'rfc1459',
+    CASEMAPPING: 'ascii',
     MODES: 4,
-    MAXCHANNELS: 20,
-    NICKLEN: 30,
-    TOPICLEN: 307,
+    MAXCHANNELS: 50,
+    NICKLEN: 64,
+    TOPICLEN: 390,
     IRCX: false,
     MAXDATA: 512,
     COMICCHAT: '',
@@ -114,10 +122,10 @@ export class IRCClient {
     SILENCE: 0,          // SILENCE=20 — max entries in server-side silence list
   };
 
-  /** Map prefix char → mode letter, e.g. '@' → 'o' */
-  prefixToMode: Record<string, string> = { '~': 'q', '.': 'q', '@': 'o', '+': 'v' };
-  /** Map mode letter → prefix char (used for display) */
-  modeToPrefix: Record<string, string> = { q: '.', o: '@', v: '+' };
+  /** Map prefix char → mode letter, e.g. '@' → 'o'. Orochi: (YQqov)*!.@+ */
+  prefixToMode: Record<string, string> = { '*': 'Y', '!': 'Q', '.': 'q', '@': 'o', '+': 'v' };
+  /** Map mode letter → prefix char (used for display). Orochi: (YQqov)*!.@+ */
+  modeToPrefix: Record<string, string> = { Y: '*', Q: '!', q: '.', o: '@', v: '+' };
 
   constructor(opts: IRCClientOptions) {
     this.opts = opts;
@@ -144,6 +152,7 @@ export class IRCClient {
     // reclaim the real nick.
     this.opts.nick = this._authNick;
     this._registered = false;
+    this._loggedIn = false;
     this._saslPending = false;
     this._capNegotiating = true;
     this._capReqPending = 0;
@@ -459,27 +468,37 @@ export class IRCClient {
         break;
       }
 
-      case '903': // SASL success
-        if (this._saslTimer) { clearTimeout(this._saslTimer); this._saslTimer = null; }
-        this._saslPending = false;
-        this._saslMech = null;
-        this._scramState = null;
-        if (this.opts.sessionToken) {
-          this.send(buildSessionResumeLine(this.opts.sessionToken));
+      // NOTE: 903/904/905 are reused by Orochi's IRCX layer post-registration
+      // (903=ERR_BADLEVEL, 904=ERR_BADTAG, 905=ERR_BADPROPERTY). Only treat them
+      // as the SASL result numerics while a SASL exchange is actually in flight
+      // (pre-registration). Otherwise they must pass through to the store as
+      // ordinary IRCX errors.
+      case '903': // RPL_SASLSUCCESS (during SASL only)
+        if (this._saslPending || this._saslMech) {
+          if (this._saslTimer) { clearTimeout(this._saslTimer); this._saslTimer = null; }
+          this._saslPending = false;
+          this._loggedIn = true;
+          this._saslMech = null;
+          this._scramState = null;
+          // NOTE: SESSION RESUME / SESSION TOKEN are deliberately NOT sent here.
+          // Orochi's SESSION command requires a registered connection (it checks
+          // session.account() and lives in the post-registration command path),
+          // so it is issued after 001 (see the '001' case below). Sending it
+          // during CAP/SASL would be rejected as a pre-registration command.
+          this._finishCapIfReady();
         }
-        this.sendRaw('SESSION', 'TOKEN');
-        this._finishCapIfReady();
         break;
 
-      case '904': // SASL fail
-      case '905': {
-        if (this._saslTimer) { clearTimeout(this._saslTimer); this._saslTimer = null; }
-        this._saslPending = false;
-        this._saslMech = null;
-        this._scramState = null;
-        this._finishCapIfReady();
+      case '904': // ERR_SASLFAIL (during SASL only)
+      case '905':
+        if (this._saslPending || this._saslMech) {
+          if (this._saslTimer) { clearTimeout(this._saslTimer); this._saslTimer = null; }
+          this._saslPending = false;
+          this._saslMech = null;
+          this._scramState = null;
+          this._finishCapIfReady();
+        }
         break;
-      }
 
       case '433': // Nickname in use
       case '432': // Erroneous nickname
@@ -498,6 +517,16 @@ export class IRCClient {
         this._registered = true;
         // Send IRCX before notifying the store (which will trigger JOIN)
         this.sendRaw('IRCX');
+        // Now that the connection is registered, the post-registration SESSION
+        // command is valid. Reclaim a prior detached session if we hold a token,
+        // then request a fresh token for this session (arrives as
+        // NOTE SESSION TOKEN). Both are no-ops server-side unless logged in.
+        if (this._loggedIn) {
+          if (this.opts.sessionToken) {
+            this.send(buildSessionResumeLine(this.opts.sessionToken));
+          }
+          this.sendRaw('SESSION', 'TOKEN');
+        }
         this.opts.onConnected?.();
         break;
 
@@ -573,6 +602,10 @@ export class IRCClient {
       // ── Always-off caps ──────────────────────────────────────────────────
       // STARTTLS upgrade: Ocean already uses WSS; requesting this is wrong.
       if (cap === 'tls') return false;
+      // sts (Strict Transport Security): an informational cap whose value is the
+      // transport policy. It is advertised, not negotiated — Orochi NAKs a REQ
+      // for it. The TLS upgrade is already implicit in the wss:// endpoint.
+      if (cap === 'sts') return false;
       // SASL: only request when we have credentials to send.
       if (cap === 'sasl') return Boolean(this.opts.password || this.opts.hasClientCert);
       // no-implicit-names: Ocean relies on the automatic 353 NAMREPLY on

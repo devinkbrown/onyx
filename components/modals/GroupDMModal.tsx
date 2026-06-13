@@ -2,6 +2,7 @@
 import { useState, useMemo } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import ModalShell from './ModalShell';
+import Button from '@/components/ui/Button';
 
 export default function GroupDMModal() {
   const closeGroupDM    = useOnyxStore(s => s.closeGroupDM);
@@ -64,14 +65,19 @@ export default function GroupDMModal() {
       flushBody
       footer={
         <>
-          <button className="gdm-cancel" onClick={closeGroupDM}>Cancel</button>
-          <button
-            className="gdm-start"
+          <span className="gdm-footer-hint" aria-live="polite">
+            {selected.length < 2
+              ? `Add at least ${2 - selected.length} more ${2 - selected.length === 1 ? 'person' : 'people'}`
+              : `${selected.length} selected`}
+          </span>
+          <Button variant="ghost" onClick={closeGroupDM}>Cancel</Button>
+          <Button
+            variant="primary"
             disabled={selected.length < 2 || !client}
             onClick={startGroup}
           >
-            Start Group
-          </button>
+            Start group
+          </Button>
         </>
       }
     >
@@ -110,7 +116,16 @@ export default function GroupDMModal() {
         <ul className="gdm-list" role="listbox" aria-label="User results">
           {candidates.length === 0 && (
             <li className="gdm-empty">
-              {query ? 'No users found' : 'No users available'}
+              <span className="gdm-empty-figure" aria-hidden>
+                <span className="gdm-empty-ring" />
+                <span className="gdm-empty-dot" />
+              </span>
+              <span className="gdm-empty-title">{query ? 'No matches' : 'No one to add'}</span>
+              <span className="gdm-empty-sub">
+                {query
+                  ? `Nobody matches "${query.trim()}".`
+                  : 'Add friends or join a channel to find people.'}
+              </span>
             </li>
           )}
           {candidates.map(nick => (
@@ -183,6 +198,12 @@ export default function GroupDMModal() {
           transition: opacity var(--t-control, 150ms);
         }
         .gdm-chip-remove:hover { opacity: 1; }
+        .gdm-chip-remove:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
+          border-radius: var(--r-xs, 3px);
+          opacity: 1;
+        }
 
         /* Search */
         .gdm-search-wrap {
@@ -204,10 +225,14 @@ export default function GroupDMModal() {
           font-family: inherit;
         }
         .gdm-search::placeholder { color: var(--text-muted); }
-        .gdm-search:focus {
-          border-color: var(--accent-border);
+        .gdm-search:hover {
+          border-color: var(--border-normal);
+        }
+        .gdm-search:focus-visible {
+          border-color: var(--accent);
           background: var(--bg-float);
-          box-shadow: 0 0 0 2px var(--accent-glow);
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
         }
 
         /* List */
@@ -222,10 +247,45 @@ export default function GroupDMModal() {
         }
 
         .gdm-empty {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 6px;
           text-align: center;
           color: var(--text-muted);
+          padding: var(--sp-8, 32px) var(--sp-6, 24px);
+        }
+        .gdm-empty-figure {
+          position: relative;
+          width: 52px;
+          height: 52px;
+          display: grid;
+          place-items: center;
+          margin-bottom: var(--sp-1, 4px);
+        }
+        .gdm-empty-ring {
+          position: absolute;
+          inset: 0;
+          border-radius: 50%;
+          border: 1px solid color-mix(in srgb, var(--text-muted) 30%, transparent);
+        }
+        .gdm-empty-dot {
+          width: 9px;
+          height: 9px;
+          border-radius: 50%;
+          background: color-mix(in srgb, var(--lux) 70%, var(--bg-deep));
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
+        }
+        .gdm-empty-title {
           font-size: var(--text-sm, 13px);
-          padding: var(--sp-6, 24px);
+          font-weight: 600;
+          color: var(--text-secondary);
+        }
+        .gdm-empty-sub {
+          font-size: var(--text-xs, 12px);
+          color: var(--text-muted);
+          line-height: 1.5;
+          max-width: 240px;
         }
 
         .gdm-item {
@@ -243,6 +303,10 @@ export default function GroupDMModal() {
           font-family: inherit;
         }
         .gdm-item:hover { background: var(--ch-hover-bg); }
+        .gdm-item:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: -2px;
+        }
 
         .gdm-item-avatar {
           width: 32px;
@@ -276,34 +340,12 @@ export default function GroupDMModal() {
         }
         .gdm-item:hover .gdm-item-add { opacity: 0.8; }
 
-        .gdm-cancel {
-          background: none;
-          border: 1px solid var(--border-normal);
-          color: var(--text-secondary);
-          font-size: var(--text-sm, 13px);
-          font-weight: 600;
-          padding: 8px 18px;
-          border-radius: var(--r-sm);
-          cursor: pointer;
-          font-family: inherit;
-          transition: background var(--t-control, 150ms), color var(--t-control, 150ms);
+        .gdm-footer-hint {
+          margin-right: auto;
+          font-size: var(--text-xs, 12px);
+          color: var(--text-muted);
+          font-variant-numeric: tabular-nums;
         }
-        .gdm-cancel:hover { background: var(--bg-overlay); color: var(--text-primary); }
-
-        .gdm-start {
-          background: var(--accent);
-          border: none;
-          color: #fff;
-          font-size: var(--text-sm, 13px);
-          font-weight: 700;
-          padding: 8px 20px;
-          border-radius: var(--r-sm);
-          cursor: pointer;
-          font-family: inherit;
-          transition: background var(--t-control, 150ms), opacity var(--t-control, 150ms);
-        }
-        .gdm-start:hover:not(:disabled) { background: var(--accent-hover); }
-        .gdm-start:disabled { opacity: 0.35; cursor: not-allowed; }
       `}</style>
     </ModalShell>
   );

@@ -38,18 +38,57 @@
     --text-link:      var(--accent-hover);                                  /* follows each theme's accent */
     --text-link-hover: color-mix(in srgb, var(--accent-hover) 62%, white);
 
-    /* ── Status ── */
+    /* ── Status ── (theme-tinted glow/text values) */
     --status-online:  #34d399;
     --status-idle:    #fbbf24;
     --status-dnd:     #f87171;
     --status-offline: #2d4a5c;
 
+    /* ── Status — canonical SOLID dots (theme-invariant presence colors).
+       Use these for presence indicators so every dot reads identically
+       across the app, regardless of the active palette tint above. ── */
+    --status-online-solid:  #23a55a;   /* presence green */
+    --status-idle-solid:    #f0b232;   /* presence amber */
+    --status-dnd-solid:     #f04747;   /* presence red */
+    --status-offline-solid: #80848e;   /* presence grey */
+    --status-bot:           var(--accent);   /* bot/integration marker */
+    --bot:                  var(--accent);
+
+    /* ── Role tiers — Orochi prefix mapping (per-theme overridable) ── */
+    --role-founder: var(--lux);     /* ! — brightest gold */
+    --role-owner:   var(--lux);     /* ~ . q/Q — gold */
+    --role-op:      var(--accent);  /* @ o — accent */
+    --role-voice:   var(--success); /* + v — green */
+    --role-member:  var(--text-secondary);
+
     /* ── Semantic ── */
     --danger:        #f87171;
     --danger-hover:  #ef4444;
     --danger-subtle: rgba(248, 113, 113, 0.12);
-    --success:       #34d399;
-    --warning:       #fbbf24;
+    --danger-border: rgba(248, 113, 113, 0.30);
+    --success:        #34d399;
+    --success-hover:  #4ade80;
+    --success-subtle: rgba(52, 211, 153, 0.12);
+    --warning:        #fbbf24;
+    --warning-hover:  #fcd34d;
+    --warning-subtle: rgba(251, 191, 36, 0.12);
+    --info:           #38bdf8;
+    --info-hover:     #7dd3fc;
+    --info-subtle:    rgba(56, 189, 248, 0.12);
+
+    /* ── On-color text (text that sits ON a filled accent/danger/etc.).
+       Defaults to white for dark themes; light themes override below. ── */
+    --accent-contrast:  #ffffff;
+    --danger-contrast:  #ffffff;
+    --success-contrast: #04140d;
+    --on-accent:        var(--accent-contrast);
+
+    /* ── Focus ring — single source of truth for keyboard focus ── */
+    --focus-ring:        var(--accent);
+    --focus-ring-width:  2px;
+    --focus-ring-offset: 2px;
+    --ring: 0 0 0 var(--focus-ring-offset) var(--bg-base),
+            0 0 0 calc(var(--focus-ring-offset) + var(--focus-ring-width)) var(--focus-ring);
 
     /* ── Channel list (bound to theme tokens so every palette stays coherent) ── */
     --ch-active-bg:  color-mix(in srgb, var(--accent) 14%, transparent);
@@ -594,6 +633,7 @@
     --border-normal:  rgba(33,31,26,0.14);
     --border-subtle:  rgba(33,31,26,0.08);
     --status-offline: #99948a;
+    --accent-contrast: #ffffff;   /* muted cesuimyaku is dark enough for white text */
     --shadow-sm:  0 1px 3px rgba(58,48,30,0.12);
     --shadow-md:  0 4px 12px rgba(58,48,30,0.15);
     --shadow-lg:  0 8px 30px rgba(58,48,30,0.18);
@@ -652,8 +692,25 @@ body {
 /* ── Selection, placeholder & focus ── */
 ::selection { background: color-mix(in srgb, var(--lux) 28%, transparent); color: var(--text-primary); }
 ::placeholder { color: var(--text-muted); opacity: 1; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-xs); }
+:focus-visible {
+  outline: var(--focus-ring-width, 2px) solid var(--focus-ring, var(--accent));
+  outline-offset: var(--focus-ring-offset, 2px);
+  border-radius: var(--r-xs);
+}
 :focus:not(:focus-visible) { outline: none; }
+
+/* Shared focus helper — apply `.focus-ring` to any element whose default
+   outline you suppress, so keyboard focus stays consistent and visible. */
+.focus-ring:focus-visible {
+  outline: var(--focus-ring-width, 2px) solid var(--focus-ring, var(--accent));
+  outline-offset: var(--focus-ring-offset, 2px);
+}
+/* Inset glow variant for tight surfaces (rails, list rows) where an outline
+   would clip. Pairs the ring with the surface for a clean halo. */
+.focus-ring-soft:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
 
 /* ── Typography ── */
 code, kbd {
@@ -675,6 +732,22 @@ pre {
 }
 pre code { background: none; border: none; padding: 0; }
 
+/* Keyboard hint — physical-key look, distinct from inline code */
+kbd {
+  display: inline-flex;
+  align-items: center;
+  min-width: 1.4em;
+  height: 1.5em;
+  justify-content: center;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--elev-tint-2, var(--bg-float));
+  border: 1px solid var(--border-normal);
+  border-bottom-width: 2px;
+  border-radius: var(--r-sm);
+  box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
+}
+
 a { color: var(--text-link); text-decoration: none; }
 a:hover { color: var(--text-link-hover); text-decoration: underline; }
 
@@ -687,7 +760,7 @@ a:hover { color: var(--text-link-hover); text-decoration: underline; }
   border-radius: var(--r-full);
   font-size: 11px;
   font-weight: 700;
-  color: #fff;
+  color: var(--on-accent, #fff);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -783,11 +856,43 @@ a:hover { color: var(--text-link-hover); text-decoration: underline; }
 .label-caps {
   font-size: var(--text-2xs);
   font-weight: 700;
-  letter-spacing: 0;
+  letter-spacing: 0.04em;
   line-height: 1;
   text-transform: uppercase;
   color: var(--text-muted);
 }
+
+/* Unstyled button base — strip UA chrome while keeping a11y semantics.
+   Compose with `.focus-ring` for keyboard focus. */
+.btn-reset {
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: inherit;
+  line-height: inherit;
+}
+.btn-reset:disabled { cursor: not-allowed; opacity: 0.45; }
+
+/* Presence dot — canonical, theme-invariant. Add a modifier for state. */
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--r-full);
+  flex-shrink: 0;
+  border: 2px solid var(--bg-void);
+  background: var(--status-offline-solid);
+}
+.status-dot--online  { background: var(--status-online-solid); }
+.status-dot--idle    { background: var(--status-idle-solid); }
+.status-dot--dnd     { background: var(--status-dnd-solid); }
+.status-dot--offline { background: var(--status-offline-solid); }
+.status-dot--bot     { background: var(--status-bot); }
 
 /* Gradient text utility */
 .text-gradient {
@@ -1066,6 +1171,9 @@ body.bubble-mode .chat-msg-wrap {
   --border-normal: rgba(255,255,255,0.3);
   --border: rgba(255,255,255,0.4);
   --border-strong: rgba(255,255,255,0.7);
+  --focus-ring: #ffffff;
+  --focus-ring-width: 3px;
+  --accent-contrast: #000000;
   --lux: #ffe08a;
   --lux-subtle: color-mix(in srgb, var(--lux) 16%, transparent);
   --gold: var(--lux);

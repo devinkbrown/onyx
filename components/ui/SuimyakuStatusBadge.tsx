@@ -30,16 +30,16 @@ export default function SuimyakuStatusBadge() {
       <style>{`
         .suimyaku-badge {
           display: inline-flex; align-items: center; gap: 4px;
-          padding: 2px 7px; border-radius: 999px; font-size: 11px;
+          padding: 2px 7px; border-radius: var(--r-full, 999px); font-size: var(--text-2xs, 11px);
           font-weight: 600; letter-spacing: 0.04em; user-select: none;
-          background: rgba(255,255,255,0.06);
-          border: 1px solid rgba(255,255,255,0.12);
+          background: var(--elev-tint-1, rgba(255,255,255,0.06));
+          border: 1px solid var(--border-subtle, rgba(255,255,255,0.12));
           color: var(--text-muted);
           white-space: nowrap;
         }
         .suimyaku-badge--e2e {
-          background: rgba(14,165,233,0.15);
-          border-color: rgba(14,165,233,0.35);
+          background: var(--accent-subtle, rgba(14,165,233,0.15));
+          border-color: var(--accent-border, rgba(14,165,233,0.35));
           color: var(--accent);
         }
         .suimyaku-badge-dot {

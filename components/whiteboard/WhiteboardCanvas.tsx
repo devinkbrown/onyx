@@ -3,197 +3,57 @@
 /**
  * WhiteboardCanvas — collaborative drawing surface for a single channel.
  *
- * Wraps useWhiteboard() and a <canvas> to provide pen/eraser/shape
- * tools with pointer (mouse/touch/pen) input. Strokes are emitted on
- * pointer-up and replayed locally for every inbound DRAW frame.
+ * Architecture:
+ *   • Committed strokes paint onto a base <canvas>; that canvas is only
+ *     repainted when the stroke list or view (pan/zoom) changes.
+ *   • The in-progress draft + interaction feedback paint onto an overlay
+ *     <canvas> driven by requestAnimationFrame, so dragging never forces
+ *     React re-renders or full-list repaints (avoids re-render churn).
+ *   • Pan/zoom is a single view transform applied at paint time; strokes
+ *     stay normalised on the wire, so zoom is purely a local concern.
+ *   • Presence + cursors derive from channel membership and the hook's
+ *     remoteCursors — no separate sync backend is invented.
  */
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
+import { useWhiteboard, type WhiteboardTool } from '@/hooks/useWhiteboard';
+import { WhiteboardToolbar, type WhiteboardPeer } from './WhiteboardToolbar';
+import { RemoteCursors } from './RemoteCursors';
 import {
-  useWhiteboard,
-  type WhiteboardStroke,
-  type WhiteboardTool,
-} from '@/hooks/useWhiteboard';
-import { WhiteboardToolbar } from './WhiteboardToolbar';
+  type DraftStroke, type View, IDENTITY_VIEW, clampZoom,
+  screenToWorld, repaintAll, paintStroke, decimate, nickColor,
+} from './paint';
 
 interface WhiteboardCanvasProps {
   channel: string;
-  /** Called when the user clicks the close button. */
   onClose: () => void;
 }
 
+const DPR_CAP = 2;
+const ZOOM_STEP = 1.2;
+const TOOL_HOTKEYS: Record<string, WhiteboardTool> = {
+  p: 'pen', l: 'line', r: 'rect', o: 'circle', t: 'text', e: 'eraser',
+};
 
-/** Internal in-progress stroke (before pointer-up). Coords are CSS pixels. */
-interface DraftStroke {
-  tool: WhiteboardTool;
-  color: string;
-  width: number;
-  pointsPx: Array<readonly [number, number]>;
-  pointerId: number;
-}
-
-/**
- * Smooth quadratic-bezier path through a point list.
- * For pen/eraser tools, this produces a much more natural line than
- * straight lineTo segments between every raw pointer sample.
- */
-function paintSmoothPath(
-  ctx: CanvasRenderingContext2D,
-  resolved: Array<[number, number]>,
-): void {
-  if (resolved.length === 0) return;
-  ctx.beginPath();
-  ctx.moveTo(resolved[0][0], resolved[0][1]);
-  if (resolved.length === 1) {
-    // Single point: draw a dot.
-    ctx.arc(resolved[0][0], resolved[0][1], ctx.lineWidth / 2, 0, Math.PI * 2);
-    ctx.fill();
-    return;
-  }
-  if (resolved.length === 2) {
-    ctx.lineTo(resolved[1][0], resolved[1][1]);
-    ctx.stroke();
-    return;
-  }
-  // Quadratic bezier through midpoints.
-  // Start at the midpoint of [0]→[1] so the first segment curves naturally,
-  // then use each sample as a control point and the next midpoint as the
-  // anchor — the curve passes through all midpoints.
-  const mid0x = (resolved[0][0] + resolved[1][0]) / 2;
-  const mid0y = (resolved[0][1] + resolved[1][1]) / 2;
-  ctx.lineTo(mid0x, mid0y);
-  for (let i = 1; i < resolved.length - 1; i++) {
-    const midX = (resolved[i][0] + resolved[i + 1][0]) / 2;
-    const midY = (resolved[i][1] + resolved[i + 1][1]) / 2;
-    ctx.quadraticCurveTo(resolved[i][0], resolved[i][1], midX, midY);
-  }
-  const last = resolved[resolved.length - 1];
-  ctx.lineTo(last[0], last[1]);
-  ctx.stroke();
-}
-
-/**
- * Render a single stroke onto the given 2D context. Coordinates in the
- * stroke are normalised (0..1); we scale to the canvas backing-store size.
- */
-function paintStroke(
-  ctx: CanvasRenderingContext2D,
-  stroke: WhiteboardStroke | DraftStroke,
-  width: number,
-  height: number,
-): void {
-  const points = 'points' in stroke ? stroke.points : stroke.pointsPx;
-  if (points.length === 0) return;
-
-  ctx.save();
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.lineWidth = stroke.width;
-
-  if (stroke.tool === 'eraser') {
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.strokeStyle = 'rgba(0,0,0,1)';
-  } else {
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.strokeStyle = stroke.color;
-    ctx.fillStyle = stroke.color;
-  }
-
-  // Whether to fill shapes (rect/circle) — from wire stroke or draft.
-  const shouldFill = 'fill' in stroke ? !!(stroke as WhiteboardStroke).fill : false;
-
-  // Resolve points to pixel space depending on stroke flavor.
-  const resolved: Array<[number, number]> = 'points' in stroke
-    ? (stroke.points as ReadonlyArray<readonly [number, number]>).map(
-        ([nx, ny]) => [nx * width, ny * height] as [number, number],
-      )
-    : (stroke.pointsPx as ReadonlyArray<readonly [number, number]>).map(
-        ([x, y]) => [x, y] as [number, number],
-      );
-
-  switch (stroke.tool) {
-    case 'pen':
-    case 'eraser': {
-      paintSmoothPath(ctx, resolved);
-      break;
-    }
-    case 'line': {
-      if (resolved.length < 2) break;
-      const [la, lb] = [resolved[0], resolved[resolved.length - 1]];
-      ctx.beginPath();
-      ctx.moveTo(la[0], la[1]);
-      ctx.lineTo(lb[0], lb[1]);
-      ctx.stroke();
-      break;
-    }
-    case 'rect': {
-      if (resolved.length < 2) break;
-      const [ra, rb] = [resolved[0], resolved[resolved.length - 1]];
-      const rx = Math.min(ra[0], rb[0]);
-      const ry = Math.min(ra[1], rb[1]);
-      const rw = Math.abs(rb[0] - ra[0]);
-      const rh = Math.abs(rb[1] - ra[1]);
-      if (shouldFill) {
-        ctx.fillRect(rx, ry, rw, rh);
-      } else {
-        ctx.strokeRect(rx, ry, rw, rh);
-      }
-      break;
-    }
-    case 'circle': {
-      if (resolved.length < 2) break;
-      const [ca, cb] = [resolved[0], resolved[resolved.length - 1]];
-      const cx = (ca[0] + cb[0]) / 2;
-      const cy = (ca[1] + cb[1]) / 2;
-      const crx = Math.abs(cb[0] - ca[0]) / 2;
-      const cry = Math.abs(cb[1] - ca[1]) / 2;
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, crx, cry, 0, 0, Math.PI * 2);
-      if (shouldFill) { ctx.fill(); } else { ctx.stroke(); }
-      break;
-    }
-    case 'text': {
-      if (!('text' in stroke) || !stroke.text || resolved.length === 0) break;
-      ctx.font = `${Math.max(12, stroke.width * 4)}px ui-sans-serif, system-ui, sans-serif`;
-      ctx.fillText(stroke.text, resolved[0][0], resolved[0][1]);
-      break;
-    }
-  }
-  ctx.restore();
-}
-
-/**
- * Downsample a noisy pointer trail to a manageable shape — keep the
- * endpoints, drop intermediate samples that are closer than `epsilon`
- * pixels from the previous kept point.
- */
-function decimate(points: ReadonlyArray<readonly [number, number]>, epsilon = 1.5): Array<readonly [number, number]> {
-  if (points.length <= 2) return [...points];
-  const out: Array<readonly [number, number]> = [points[0]];
-  let last = points[0];
-  for (let i = 1; i < points.length - 1; i++) {
-    const p = points[i];
-    const dx = p[0] - last[0];
-    const dy = p[1] - last[1];
-    if (dx * dx + dy * dy >= epsilon * epsilon) {
-      out.push(p);
-      last = p;
-    }
-  }
-  out.push(points[points.length - 1]);
-  return out;
+function dpr(): number {
+  return Math.min(window.devicePixelRatio || 1, DPR_CAP);
 }
 
 export function WhiteboardCanvas({ channel, onClose }: WhiteboardCanvasProps) {
   const ourNick  = useOnyxStore(s => s.ourNick);
   const channels = useOnyxStore(s => s.channels);
+  const connectionStatus = useOnyxStore(s => s.connectionStatus);
+  // Only treat hard drops as "disconnected"; a transient connecting/reconnecting
+  // state should not flash the blocking overlay over an active board.
+  const isDisconnected = connectionStatus === 'disconnected';
 
-  // Derive oper/admin modes from the channel member list.
-  const myModes = useMemo(() => {
-    const ch = channels.get(channel.toLowerCase());
-    return ch?.users.get(ourNick.toLowerCase())?.modes ?? new Set<string>();
-  }, [channels, channel, ourNick]);
+  // Channel membership → presence + permission gating.
+  const channelEntry = channels.get(channel.toLowerCase());
+  const myModes = useMemo(
+    () => channelEntry?.users.get(ourNick.toLowerCase())?.modes ?? new Set<string>(),
+    [channelEntry, ourNick],
+  );
 
   const {
     strokes, notice, rateLimited,
@@ -203,44 +63,72 @@ export function WhiteboardCanvas({ channel, onClose }: WhiteboardCanvasProps) {
   } = useWhiteboard(channel);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const canvasRef    = useRef<HTMLCanvasElement>(null);
+  const baseRef      = useRef<HTMLCanvasElement>(null);
+  const overlayRef   = useRef<HTMLCanvasElement>(null);
+  const inputRef     = useRef<HTMLCanvasElement>(null);
   const draftRef     = useRef<DraftStroke | null>(null);
-  const textInputRef = useRef<HTMLTextAreaElement>(null);
-  const [, forceRepaint] = useState(0);
-  // Tracked in state so cursor overlay can use canvas dimensions without a ref read during render.
+  const rafRef       = useRef<number>(0);
+  const panRef       = useRef<{ pointerId: number; startX: number; startY: number; origin: View } | null>(null);
+
   const [canvasSize, setCanvasSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+  const [view, setView] = useState<View>(IDENTITY_VIEW);
+  const viewRef = useRef<View>(IDENTITY_VIEW);
+  viewRef.current = view;
 
   const [tool,       setTool]       = useState<WhiteboardTool>('pen');
   const [color,      setColor]      = useState<string>('#5eccff');
   const [width,      setWidth]      = useState<number>(3);
   const [fillShapes, setFillShapes] = useState<boolean>(false);
-  // Tracks whether a draft stroke is in progress — mirrors draftRef for render use.
-  const [isDrawing, setIsDrawing] = useState(false);
+  const [isDrawing,  setIsDrawing]  = useState(false);
+  const [spaceHeld,  setSpaceHeld]  = useState(false);
+  const [snapshotPending, setSnapshotPending] = useState(true);
 
-  // Text tool popup state.
-  const [textInput, setTextInput] = useState<{ x: number; y: number; px: number; py: number } | null>(null);
+  const [textInput, setTextInput] = useState<{ wx: number; wy: number } | null>(null);
   const [textValue, setTextValue] = useState('');
 
-  // Oper-or-creator gate for Clear. Server enforces it; we just hint.
-  const canClear = useMemo(() => myModes.has('o') || myModes.has('O') || myModes.has('a') || myModes.has('q'), [myModes]);
+  const canClear = useMemo(
+    () => myModes.has('o') || myModes.has('O') || myModes.has('a') || myModes.has('q'),
+    [myModes],
+  );
 
-  // ── Sizing ──────────────────────────────────────────────────────────
+  // ── Presence: live collaborators from channel membership ─────────────
+  const peers = useMemo<WhiteboardPeer[]>(() => {
+    if (!channelEntry) return [];
+    const activeNicks = new Set(remoteCursors.map(c => c.nick.toLowerCase()));
+    const out: WhiteboardPeer[] = [];
+    for (const [, u] of channelEntry.users) {
+      if (u.nick.toLowerCase() === ourNick.toLowerCase()) continue;
+      const role = u.modes.has('q') ? 'q' : u.modes.has('o') ? 'o' : u.modes.has('v') ? 'v' : '';
+      out.push({
+        nick: u.nick,
+        color: nickColor(u.nick),
+        role,
+        active: activeNicks.has(u.nick.toLowerCase()),
+      });
+    }
+    // Active collaborators first, then by name.
+    out.sort((a, b) => (Number(b.active) - Number(a.active)) || a.nick.localeCompare(b.nick));
+    return out;
+  }, [channelEntry, ourNick, remoteCursors]);
+
+  // ── Sizing ───────────────────────────────────────────────────────────
   const resizeCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
     const container = containerRef.current;
-    if (!canvas || !container) return;
+    if (!container) return;
     const rect = container.getBoundingClientRect();
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const ratio = dpr();
     const cssW = Math.max(320, Math.floor(rect.width));
     const cssH = Math.max(240, Math.floor(rect.height));
-    canvas.width  = Math.floor(cssW * dpr);
-    canvas.height = Math.floor(cssH * dpr);
-    canvas.style.width  = `${cssW}px`;
-    canvas.style.height = `${cssH}px`;
-    const ctx = canvas.getContext('2d');
-    if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    for (const canvas of [baseRef.current, overlayRef.current]) {
+      if (!canvas) continue;
+      canvas.width  = Math.floor(cssW * ratio);
+      canvas.height = Math.floor(cssH * ratio);
+      canvas.style.width  = `${cssW}px`;
+      canvas.style.height = `${cssH}px`;
+      const ctx = canvas.getContext('2d');
+      if (ctx) ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    }
     setCanvasSize({ w: cssW, h: cssH });
-    forceRepaint(n => n + 1);
   }, []);
 
   useEffect(() => {
@@ -250,174 +138,265 @@ export function WhiteboardCanvas({ channel, onClose }: WhiteboardCanvasProps) {
     return () => obs.disconnect();
   }, [resizeCanvas]);
 
-  // ── Repaint on stroke change ────────────────────────────────────────
+  // ── Base layer repaint (committed strokes only) ──────────────────────
   useEffect(() => {
-    const canvas = canvasRef.current;
+    const canvas = baseRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    const ratio = dpr();
+    repaintAll(
+      ctx, canvas.width, canvas.height,
+      canvas.width / ratio, canvas.height / ratio,
+      view, strokes, null,
+    );
+  }, [strokes, view, canvasSize]);
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const cssW = canvas.width / dpr;
-    const cssH = canvas.height / dpr;
-
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.restore();
-
-    for (const s of strokes) paintStroke(ctx, s, cssW, cssH);
-    if (draftRef.current) paintStroke(ctx, draftRef.current, cssW, cssH);
-  }, [strokes]);
-
-  // ── Late-joiner snapshot request ────────────────────────────────────
-  useEffect(() => {
-    if (!channel) return;
-    // Defer one tick so subscription is in place before the request.
-    const t = setTimeout(() => requestSnapshot(), 0);
-    return () => clearTimeout(t);
-  }, [channel, requestSnapshot]);
-
-  // ── Keyboard shortcuts: Ctrl+Z undo, Ctrl+Shift+Z / Ctrl+Y redo ─────
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      // Skip when a text input/textarea has focus (let native undo work there).
-      const active = document.activeElement;
-      if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
-      // Only act when focus is inside the canvas container or on the body.
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(active) &&
-        active !== document.body
-      ) return;
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
-        e.preventDefault();
-        if (e.shiftKey) { redo(); } else { undo(); }
+  // ── Overlay layer: draft + interaction feedback via rAF ──────────────
+  const scheduleOverlay = useCallback(() => {
+    if (rafRef.current) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = 0;
+      const canvas = overlayRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      const ratio = dpr();
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+      const draft = draftRef.current;
+      if (!draft) return;
+      if (draft.tool === 'eraser') {
+        // The real erase happens on the committed base layer; on the
+        // transparent overlay a destination-out stroke would be invisible,
+        // so show a soft neutral "ghost" trail to preview the erase path.
+        paintStroke(
+          ctx,
+          { ...draft, tool: 'pen', color: 'rgba(223,240,255,0.35)' },
+          canvas.width / ratio, canvas.height / ratio, viewRef.current,
+        );
+      } else {
+        paintStroke(ctx, draft, canvas.width / ratio, canvas.height / ratio, viewRef.current);
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
-        e.preventDefault();
-        redo();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [undo, redo]);
-
-  // ── Pointer handlers ────────────────────────────────────────────────
-  const localPoint = useCallback((e: React.PointerEvent<HTMLCanvasElement>): [number, number] => {
-    const canvas = canvasRef.current;
-    if (!canvas) return [0, 0];
-    const rect = canvas.getBoundingClientRect();
-    return [
-      Math.max(0, Math.min(rect.width,  e.clientX - rect.left)),
-      Math.max(0, Math.min(rect.height, e.clientY - rect.top)),
-    ];
+    });
   }, []);
 
-  const paintDraft = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const cssW = canvas.width / dpr;
-    const cssH = canvas.height / dpr;
+  useEffect(() => () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); }, []);
 
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.restore();
+  // ── Late-joiner snapshot request ─────────────────────────────────────
+  useEffect(() => {
+    if (!channel) return;
+    setSnapshotPending(true);
+    const t = setTimeout(() => requestSnapshot(), 0);
+    // Snapshot considered settled either on first stroke or a short grace window.
+    const grace = setTimeout(() => setSnapshotPending(false), 1500);
+    return () => { clearTimeout(t); clearTimeout(grace); };
+  }, [channel, requestSnapshot]);
 
-    for (const s of strokes) paintStroke(ctx, s, cssW, cssH);
-    if (draftRef.current) paintStroke(ctx, draftRef.current, cssW, cssH);
-  }, [strokes]);
+  useEffect(() => {
+    if (strokes.length > 0) setSnapshotPending(false);
+  }, [strokes.length]);
 
+  // ── Zoom helpers ─────────────────────────────────────────────────────
+  const zoomAt = useCallback((factor: number, anchorX: number, anchorY: number) => {
+    setView(v => {
+      const next = clampZoom(v.scale * factor);
+      const k = next / v.scale;
+      // Keep the anchor point stationary under the cursor.
+      return {
+        scale: next,
+        tx: anchorX - (anchorX - v.tx) * k,
+        ty: anchorY - (anchorY - v.ty) * k,
+      };
+    });
+  }, []);
+
+  const zoomCenter = useCallback((factor: number) => {
+    zoomAt(factor, canvasSize.w / 2, canvasSize.h / 2);
+  }, [zoomAt, canvasSize]);
+
+  const resetView = useCallback(() => setView(IDENTITY_VIEW), []);
+
+  // Native non-passive wheel listener so we can preventDefault for ctrl/cmd+wheel zoom.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return; // plain scroll left to the page
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const factor = e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+      zoomAt(factor, e.clientX - rect.left, e.clientY - rect.top);
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [zoomAt]);
+
+  // ── Keyboard: tool hotkeys, undo/redo, zoom, pan ─────────────────────
+  useEffect(() => {
+    const isEditable = (el: Element | null) =>
+      el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
+
+    const onKey = (e: KeyboardEvent) => {
+      const active = document.activeElement;
+      if (isEditable(active)) return;
+      const inScope =
+        containerRef.current &&
+        (containerRef.current.contains(active) || active === document.body);
+      if (!inScope) return;
+
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        if (e.shiftKey) redo(); else undo();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); return; }
+      if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+')) { e.preventDefault(); zoomCenter(ZOOM_STEP); return; }
+      if ((e.ctrlKey || e.metaKey) && e.key === '-') { e.preventDefault(); zoomCenter(1 / ZOOM_STEP); return; }
+      if ((e.ctrlKey || e.metaKey) && e.key === '0') { e.preventDefault(); resetView(); return; }
+      if (e.shiftKey && e.key === '!') { e.preventDefault(); resetView(); return; }
+
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      if (e.key === ' ') { setSpaceHeld(true); return; }
+      if (e.key === 'Escape') { setTextInput(null); return; }
+
+      const mapped = TOOL_HOTKEYS[e.key.toLowerCase()];
+      if (mapped) { setTool(mapped); }
+    };
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === ' ') setSpaceHeld(false);
+    };
+
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, [undo, redo, zoomCenter, resetView]);
+
+  // ── Pointer geometry ─────────────────────────────────────────────────
+  const localPoint = useCallback((e: React.PointerEvent): [number, number] => {
+    const canvas = overlayRef.current;
+    if (!canvas) return [0, 0];
+    const rect = canvas.getBoundingClientRect();
+    return [e.clientX - rect.left, e.clientY - rect.top];
+  }, []);
+
+  // Pan when space is held (cursor turns to grab) or the middle mouse button is used.
+  const wantsPan = (e: React.PointerEvent) => spaceHeld || e.button === 1;
+
+  // ── Pointer handlers ─────────────────────────────────────────────────
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!ourNick) return;
 
-    // Text tool: show inline text input popup, do not start a draft.
+    // Pan (space-drag / middle button).
+    if (wantsPan(e)) {
+      e.currentTarget.setPointerCapture(e.pointerId);
+      panRef.current = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, origin: viewRef.current };
+      return;
+    }
+
     if (tool === 'text') {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const p = localPoint(e);
-      setTextInput({
-        x: p[0] / rect.width,
-        y: p[1] / rect.height,
-        px: p[0],
-        py: p[1],
-      });
+      const [px, py] = localPoint(e);
+      const [wx, wy] = screenToWorld(px, py, canvasSize.w, canvasSize.h, viewRef.current);
+      setTextInput({ wx, wy });
       setTextValue('');
       return;
     }
 
     e.currentTarget.setPointerCapture(e.pointerId);
     const p = localPoint(e);
+    const isShape = tool === 'rect' || tool === 'circle';
     draftRef.current = {
       tool, color, width,
       pointsPx: [p],
       pointerId: e.pointerId,
+      ...(isShape && fillShapes ? { fill: true } : {}),
     };
     setIsDrawing(true);
+    scheduleOverlay();
   };
 
   const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    // Broadcast cursor position to peers regardless of drawing state.
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const rect = canvas.getBoundingClientRect();
-      sendCursor(
-        Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)),
-        Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height)),
-      );
+    // Pan in progress.
+    const pan = panRef.current;
+    if (pan && pan.pointerId === e.pointerId) {
+      setView({
+        scale: pan.origin.scale,
+        tx: pan.origin.tx + (e.clientX - pan.startX),
+        ty: pan.origin.ty + (e.clientY - pan.startY),
+      });
+      return;
     }
+
+    // Broadcast cursor (world coords) regardless of drawing state.
+    const [px, py] = localPoint(e);
+    const [wx, wy] = screenToWorld(px, py, canvasSize.w, canvasSize.h, viewRef.current);
+    sendCursor(Math.max(0, Math.min(1, wx)), Math.max(0, Math.min(1, wy)));
 
     const draft = draftRef.current;
     if (!draft || draft.pointerId !== e.pointerId) return;
-    const p = localPoint(e);
-    // For shapes we only need start+end; for pen/eraser, accumulate.
     if (draft.tool === 'pen' || draft.tool === 'eraser') {
-      draft.pointsPx.push(p);
+      draft.pointsPx.push([px, py]);
     } else {
-      draft.pointsPx = [draft.pointsPx[0], p];
+      draft.pointsPx = [draft.pointsPx[0], [px, py]];
     }
-    paintDraft();
+    scheduleOverlay();
   };
 
+  const clearOverlay = useCallback(() => {
+    const canvas = overlayRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  }, []);
+
   const finishStroke = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    // End pan.
+    if (panRef.current && panRef.current.pointerId === e.pointerId) {
+      try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+      panRef.current = null;
+      return;
+    }
+
     const draft = draftRef.current;
     if (!draft || draft.pointerId !== e.pointerId) return;
     try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
     draftRef.current = null;
     setIsDrawing(false);
+    clearOverlay();
 
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return;
-
+    if (canvasSize.w <= 0 || canvasSize.h <= 0) return;
+    const v = viewRef.current;
     const decimated = decimate(draft.pointsPx, 1.5);
-    const normalised = decimated.map(
-      ([x, y]) => [
-        Math.max(0, Math.min(1, x / rect.width)),
-        Math.max(0, Math.min(1, y / rect.height)),
-      ] as readonly [number, number],
-    );
-
+    const normalised = decimated.map(([x, y]) => {
+      const [wx, wy] = screenToWorld(x, y, canvasSize.w, canvasSize.h, v);
+      return [
+        Math.max(0, Math.min(1, wx)),
+        Math.max(0, Math.min(1, wy)),
+      ] as readonly [number, number];
+    });
     if (normalised.length === 0) return;
 
-    const isShape = draft.tool === 'rect' || draft.tool === 'circle';
     drawStroke({
       tool: draft.tool,
       color: draft.color,
       width: draft.width,
       points: normalised,
-      ...(isShape && fillShapes ? { fill: true } : {}),
+      ...(draft.fill ? { fill: true } : {}),
     });
   };
 
   const onExport = useCallback(() => {
-    const url = exportPNG(canvasRef.current);
+    const url = exportPNG(baseRef.current);
     if (!url) return;
     const a = document.createElement('a');
     a.href = url;
@@ -427,30 +406,132 @@ export function WhiteboardCanvas({ channel, onClose }: WhiteboardCanvasProps) {
     a.remove();
   }, [channel, exportPNG]);
 
-  // ── Render ──────────────────────────────────────────────────────────
+  const cursorStyle =
+    spaceHeld ? (panRef.current ? 'grabbing' : 'grab')
+    : tool === 'eraser' ? 'cell'
+    : tool === 'text' ? 'text'
+    : 'crosshair';
+
+  const isEmpty = strokes.length === 0 && !isDrawing && !snapshotPending;
+
+  // ── Render ───────────────────────────────────────────────────────────
   return (
-    <>
-    <style>{`
-      @keyframes wb-cursor-pulse {
-        0%, 100% { opacity: 1; transform: scale(1); }
-        50% { opacity: 0.55; transform: scale(1.35); }
-      }
-      .wb-cursor-dot {
-        animation: wb-cursor-pulse 1.6s ease-in-out infinite;
-      }
-    `}</style>
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        width: '100%',
-        background: 'var(--bg-base)',
-        color: 'var(--text-primary)',
-        borderLeft: '1px solid var(--border-subtle)',
-      }}
-      aria-label={`Whiteboard for ${channel}`}
-    >
+    <div className="wb-root" aria-label={`Whiteboard for ${channel}`}>
+      <style>{`
+        .wb-root {
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+          width: 100%;
+          background: var(--bg-base);
+          color: var(--text-primary);
+          border-left: 1px solid var(--border-normal);
+        }
+        .wb-notice {
+          display: flex; align-items: center; gap: 8px;
+          padding: 7px 14px;
+          font-size: var(--text-xs);
+          border-bottom: 1px solid var(--border-subtle);
+          flex-shrink: 0;
+        }
+        .wb-notice-info { color: var(--text-secondary); }
+        .wb-notice-error {
+          color: #ffb6c6;
+          background: color-mix(in srgb, #ff5577 12%, transparent);
+        }
+        .wb-stage {
+          flex: 1; min-height: 0; position: relative; overflow: hidden;
+          background:
+            radial-gradient(120% 90% at 50% -10%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 60%),
+            var(--bg-void);
+        }
+        .wb-grid {
+          position: absolute; inset: 0;
+          pointer-events: none;
+          background-image:
+            repeating-linear-gradient(0deg, color-mix(in srgb, var(--border-normal) 55%, transparent) 0 1px, transparent 1px var(--wb-grid)),
+            repeating-linear-gradient(90deg, color-mix(in srgb, var(--border-normal) 55%, transparent) 0 1px, transparent 1px var(--wb-grid));
+          background-position: var(--wb-gx) var(--wb-gy);
+          mask-image: radial-gradient(130% 130% at 50% 50%, #000 60%, transparent 100%);
+        }
+        .wb-canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; }
+        .wb-canvas-overlay { pointer-events: none; }
+        .wb-empty {
+          position: absolute; inset: 0; z-index: 4;
+          display: flex; flex-direction: column;
+          align-items: center; justify-content: center;
+          gap: 14px; pointer-events: none; text-align: center; padding: 24px;
+        }
+        .wb-empty-glyph {
+          width: 64px; height: 64px;
+          display: grid; place-items: center;
+          border-radius: var(--r-xl);
+          background: color-mix(in srgb, var(--accent) 9%, transparent);
+          border: 1px solid var(--border-normal);
+          box-shadow: var(--shadow-md), inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
+        }
+        .wb-empty-title {
+          font-family: var(--font-display);
+          font-size: var(--text-lg);
+          font-weight: 600;
+          color: var(--text-primary);
+          letter-spacing: 0.01em;
+        }
+        .wb-empty-sub { font-size: var(--text-xs); color: var(--text-muted); max-width: 240px; line-height: 1.5; }
+        .wb-empty-keys { display: inline-flex; gap: 6px; margin-top: 2px; }
+        .wb-empty-key {
+          font-size: 9px; font-weight: 700;
+          padding: 2px 6px;
+          border-radius: var(--r-sm);
+          background: var(--bg-elevated);
+          border: 1px solid var(--border-normal);
+          color: var(--text-secondary);
+        }
+        .wb-loading {
+          position: absolute; inset: 0; z-index: 4;
+          display: flex; flex-direction: column;
+          align-items: center; justify-content: center;
+          gap: 12px; pointer-events: none;
+        }
+        .wb-spinner {
+          width: 30px; height: 30px;
+          border-radius: 50%;
+          border: 2.5px solid color-mix(in srgb, var(--accent) 22%, transparent);
+          border-top-color: var(--accent);
+          animation: wb-spin 0.7s linear infinite;
+        }
+        .wb-loading-text { font-size: var(--text-xs); color: var(--text-muted); letter-spacing: 0.03em; }
+        @keyframes wb-spin { to { transform: rotate(360deg); } }
+        .wb-disconnected {
+          position: absolute; inset: 0; z-index: 6;
+          display: flex; flex-direction: column;
+          align-items: center; justify-content: center;
+          gap: 10px; text-align: center; padding: 24px;
+          background: color-mix(in srgb, var(--bg-void) 70%, transparent);
+          backdrop-filter: blur(2px);
+        }
+        .wb-disconnected-title { font-size: var(--text-sm); font-weight: 600; color: #ffb6c6; }
+        .wb-disconnected-sub { font-size: var(--text-xs); color: var(--text-muted); }
+        .wb-text-pop { position: absolute; z-index: 10; }
+        .wb-text-input {
+          background: color-mix(in srgb, var(--bg-void) 82%, transparent);
+          border: 1px solid var(--accent-border);
+          border-radius: var(--r-sm);
+          font-family: var(--font-ui);
+          padding: 6px 8px;
+          min-width: 130px;
+          resize: both;
+          backdrop-filter: blur(8px);
+          outline: none;
+          box-shadow: var(--shadow-md);
+        }
+        .wb-text-input:focus { border-color: var(--accent); box-shadow: var(--shadow-md), 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
+        .wb-text-hint { font-size: 9px; color: var(--text-muted); margin-top: 3px; }
+        @media (prefers-reduced-motion: reduce) {
+          .wb-spinner { animation-duration: 1.6s; }
+        }
+      `}</style>
+
       <WhiteboardToolbar
         tool={tool}
         color={color}
@@ -460,6 +541,8 @@ export function WhiteboardCanvas({ channel, onClose }: WhiteboardCanvasProps) {
         fillShapes={fillShapes}
         canUndo={canUndo}
         canRedo={canRedo}
+        zoom={view.scale}
+        peers={peers}
         onToolChange={setTool}
         onColorChange={setColor}
         onWidthChange={setWidth}
@@ -469,21 +552,15 @@ export function WhiteboardCanvas({ channel, onClose }: WhiteboardCanvasProps) {
         onClear={clear}
         onExport={onExport}
         onClose={onClose}
+        onZoomIn={() => zoomCenter(ZOOM_STEP)}
+        onZoomOut={() => zoomCenter(1 / ZOOM_STEP)}
+        onZoomReset={resetView}
       />
 
       {notice && (
         <div
           role={notice.level === 'error' ? 'alert' : 'status'}
-          style={{
-            padding: '6px 12px',
-            fontSize: 12,
-            color: notice.level === 'error' ? '#ffb6c6' : 'var(--text-secondary)',
-            background: notice.level === 'error'
-              ? 'color-mix(in srgb, #ff5577 12%, transparent)'
-              : 'transparent',
-            borderBottom: '1px solid var(--border-subtle)',
-            flexShrink: 0,
-          }}
+          className={`wb-notice ${notice.level === 'error' ? 'wb-notice-error' : 'wb-notice-info'}`}
         >
           {notice.message}
         </div>
@@ -491,166 +568,125 @@ export function WhiteboardCanvas({ channel, onClose }: WhiteboardCanvasProps) {
 
       <div
         ref={containerRef}
+        className="wb-stage"
         style={{
-          flex: 1,
-          minHeight: 0,
-          position: 'relative',
-          background:
-            'repeating-linear-gradient(0deg, color-mix(in srgb, var(--border-subtle) 40%, transparent) 0 1px, transparent 1px 32px),' +
-            'repeating-linear-gradient(90deg, color-mix(in srgb, var(--border-subtle) 40%, transparent) 0 1px, transparent 1px 32px),' +
-            'var(--bg-void)',
+          ['--wb-grid' as string]: `${32 * view.scale}px`,
+          ['--wb-gx' as string]: `${view.tx}px`,
+          ['--wb-gy' as string]: `${view.ty}px`,
         }}
       >
+        <div className="wb-grid" aria-hidden="true" />
+
+        <canvas ref={baseRef} className="wb-canvas" aria-label="Whiteboard drawing surface" role="img" />
         <canvas
-          ref={canvasRef}
+          ref={overlayRef}
+          className="wb-canvas wb-canvas-overlay"
+          aria-hidden="true"
+        />
+        {/* Transparent interaction surface on top so pointer events hit one node. */}
+        <canvas
+          ref={inputRef}
+          className="wb-canvas"
+          style={{ background: 'transparent', cursor: cursorStyle, zIndex: 3 }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={finishStroke}
           onPointerCancel={finishStroke}
           onPointerLeave={finishStroke}
-          style={{
-            display: 'block',
-            width: '100%',
-            height: '100%',
-            touchAction: 'none',
-            cursor: tool === 'eraser' ? 'cell' : tool === 'text' ? 'text' : 'crosshair',
-          }}
-          aria-label="Drawing canvas"
+          aria-label="Drawing input layer"
         />
 
-        {/* Empty state placeholder */}
-        {strokes.length === 0 && !isDrawing && tool !== 'text' && (
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            pointerEvents: 'none',
-            gap: 10,
-          }}>
-            <svg width="48" height="48" viewBox="0 0 48 48" fill="none" aria-hidden="true"
-              style={{ opacity: 0.18 }}>
-              <path d="M8 40L18 24l8 10 8-14 6 10" stroke="var(--text-primary)" strokeWidth="2.5"
-                strokeLinecap="round" strokeLinejoin="round"/>
-              <circle cx="8" cy="40" r="2" fill="var(--text-primary)"/>
-            </svg>
-            <span style={{
-              fontSize: 13,
-              color: 'var(--text-muted)',
-              letterSpacing: '0.04em',
-              userSelect: 'none',
-            }}>
-              Whiteboard is empty — start drawing
-            </span>
+        {snapshotPending && strokes.length === 0 && (
+          <div className="wb-loading">
+            <div className="wb-spinner" />
+            <span className="wb-loading-text">Loading board…</span>
           </div>
         )}
 
-        {/* Remote cursor overlay — pointer-events:none so it never intercepts drawing */}
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
-          {canvasSize.w > 0 && remoteCursors.map(cursor => {
-            const cx = cursor.x * canvasSize.w;
-            const cy = cursor.y * canvasSize.h;
-            return (
-              <div
-                key={cursor.nick}
-                style={{
-                  position: 'absolute',
-                  left: cx,
-                  top: cy,
-                  transform: 'translate(-5px, -5px)',
-                  pointerEvents: 'none',
-                  transition: 'left 0.1s linear, top 0.1s linear',
-                }}
-              >
-                {/* Pulsing dot cursor */}
-                <div className="wb-cursor-dot" style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: '50%',
-                  background: cursor.color,
-                  boxShadow: `0 0 6px ${cursor.color}`,
-                }} />
-                {/* Nick label */}
-                <div style={{
-                  position: 'absolute',
-                  left: 14,
-                  top: -1,
-                  fontSize: 10,
-                  fontWeight: 600,
-                  color: cursor.color,
-                  background: 'rgba(3, 8, 16, 0.82)',
-                  padding: '1px 5px',
-                  borderRadius: 3,
-                  whiteSpace: 'nowrap',
-                  backdropFilter: 'blur(4px)',
-                  border: `1px solid ${cursor.color}33`,
-                  lineHeight: '14px',
-                }}>
-                  {cursor.nick}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Text tool input popup */}
-        {textInput && (
-          <div
-            style={{
-              position: 'absolute',
-              left: textInput.px,
-              top: textInput.py,
-              zIndex: 10,
-              pointerEvents: 'auto',
-            }}
-            onPointerDown={e => e.stopPropagation()}
-          >
-            <textarea
-              ref={textInputRef}
-              value={textValue}
-              onChange={e => setTextValue(e.target.value)}
-              autoFocus
-              rows={2}
-              style={{
-                background: 'rgba(3, 8, 16, 0.85)',
-                border: '1px solid var(--accent-border)',
-                borderRadius: 6,
-                color,
-                fontSize: Math.max(12, width * 4),
-                fontFamily: 'ui-sans-serif, system-ui, sans-serif',
-                padding: '6px 8px',
-                minWidth: 120,
-                resize: 'both',
-                backdropFilter: 'blur(8px)',
-                outline: 'none',
-              }}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  if (textValue.trim()) {
-                    drawStroke({
-                      tool: 'text',
-                      color,
-                      width,
-                      points: [[textInput.x, textInput.y]],
-                      text: textValue.trim(),
-                    });
-                  }
-                  setTextInput(null);
-                }
-                if (e.key === 'Escape') setTextInput(null);
-              }}
-              placeholder="Type text, Enter to place..."
-            />
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-              Enter to place · Esc to cancel
+        {isEmpty && (
+          <div className="wb-empty">
+            <div className="wb-empty-glyph">
+              <svg width="30" height="30" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+                <path d="M8 40L18 24l8 10 8-14 6 10" stroke="var(--accent)" strokeWidth="2.5"
+                  strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="8" cy="40" r="2.4" fill="var(--accent)" />
+              </svg>
+            </div>
+            <div className="wb-empty-title">A blank canvas</div>
+            <div className="wb-empty-sub">
+              Sketch, diagram, and brainstorm together. Everything you draw syncs live to everyone in {channel}.
+            </div>
+            <div className="wb-empty-keys">
+              <span className="wb-empty-key">P pen</span>
+              <span className="wb-empty-key">R rect</span>
+              <span className="wb-empty-key">T text</span>
+              <span className="wb-empty-key">Space pan</span>
             </div>
           </div>
         )}
+
+        <RemoteCursors cursors={remoteCursors} cssW={canvasSize.w} cssH={canvasSize.h} view={view} />
+
+        {isDisconnected && (
+          <div className="wb-disconnected" role="alert">
+            <div className="wb-disconnected-title">Disconnected</div>
+            <div className="wb-disconnected-sub">Reconnecting to the server — your drawing won’t sync until the link is back.</div>
+          </div>
+        )}
+
+        {textInput && (
+          <TextPopup
+            wx={textInput.wx}
+            wy={textInput.wy}
+            cssW={canvasSize.w}
+            cssH={canvasSize.h}
+            view={view}
+            color={color}
+            width={width}
+            value={textValue}
+            onChange={setTextValue}
+            onCommit={(value) => {
+              if (value.trim()) {
+                drawStroke({ tool: 'text', color, width, points: [[textInput.wx, textInput.wy]], text: value.trim() });
+              }
+              setTextInput(null);
+            }}
+            onCancel={() => setTextInput(null)}
+          />
+        )}
       </div>
     </div>
-    </>
+  );
+}
+
+/** Inline text entry popup positioned in screen space via the view transform. */
+function TextPopup({
+  wx, wy, cssW, cssH, view, color, width, value, onChange, onCommit, onCancel,
+}: {
+  wx: number; wy: number; cssW: number; cssH: number; view: View;
+  color: string; width: number; value: string;
+  onChange: (v: string) => void;
+  onCommit: (v: string) => void;
+  onCancel: () => void;
+}) {
+  const px = wx * cssW * view.scale + view.tx;
+  const py = wy * cssH * view.scale + view.ty;
+  return (
+    <div className="wb-text-pop" style={{ left: px, top: py }} onPointerDown={e => e.stopPropagation()}>
+      <textarea
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        autoFocus
+        rows={2}
+        className="wb-text-input"
+        style={{ color, fontSize: Math.max(12, width * 4 * view.scale) }}
+        onKeyDown={e => {
+          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onCommit(value); }
+          if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+        }}
+        placeholder="Type, Enter to place…"
+      />
+      <div className="wb-text-hint">Enter to place · Shift+Enter for newline · Esc to cancel</div>
+    </div>
   );
 }

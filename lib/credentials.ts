@@ -222,8 +222,13 @@ export function clearCredentials(): void {
 }
 
 /**
- * Return the best available auth secret for a connect attempt.
- * Prefers session token; falls back to password; falls back to undefined.
+ * Return the SASL secret (password) for a connect attempt, or undefined for a
+ * guest/token-only session.
+ *
+ * The session token is intentionally NOT returned here: it is not a SASL
+ * secret. It is supplied separately to IRCClient as `sessionToken` and replayed
+ * via `SESSION RESUME` only after SASL has already succeeded (Orochi's SESSION
+ * command requires a registered, logged-in connection).
  */
 export function getAuthSecret(creds: SavedCredentials): string | undefined {
   return creds.password;

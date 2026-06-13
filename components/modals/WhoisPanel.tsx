@@ -4,6 +4,7 @@ import { useCallback } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import Avatar from '@/components/ui/Avatar';
 import ModalShell from './ModalShell';
+import Button from '@/components/ui/Button';
 
 // ── Time helpers ──────────────────────────────────────────────────────────────
 
@@ -233,12 +234,12 @@ export default function WhoisPanel() {
 
         {/* Actions */}
         <section className="whois-section whois-actions">
-          <button className="whois-btn whois-btn--primary" onClick={openDM}>
-            Send Message
-          </button>
-          <button className="whois-btn whois-btn--secondary" onClick={viewProfile}>
-            View Profile
-          </button>
+          <Button variant="primary" fullWidth onClick={openDM}>
+            Send message
+          </Button>
+          <Button variant="secondary" fullWidth onClick={viewProfile}>
+            View profile
+          </Button>
         </section>
       </div>
 
@@ -418,28 +419,6 @@ export default function WhoisPanel() {
           flex-direction: column;
           gap: var(--sp-2, 8px);
         }
-        .whois-btn {
-          width: 100%;
-          padding: 10px 16px;
-          border-radius: var(--r-md);
-          font-size: var(--text-base, 14px);
-          font-weight: 600;
-          cursor: pointer;
-          border: none;
-          font-family: inherit;
-          transition: background var(--t-control, 150ms), opacity var(--t-control, 150ms);
-        }
-        .whois-btn--primary {
-          background: var(--accent);
-          color: #fff;
-        }
-        .whois-btn--primary:hover { background: var(--accent-hover); }
-        .whois-btn--secondary {
-          background: var(--bg-elevated);
-          color: var(--text-secondary);
-          border: 1px solid var(--border-normal);
-        }
-        .whois-btn--secondary:hover { background: var(--bg-float); color: var(--text-primary); }
 
         /* Skeleton */
         .whois-skeleton {

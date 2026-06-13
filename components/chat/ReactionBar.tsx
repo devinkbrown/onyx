@@ -195,6 +195,12 @@ const styles = `
     background: color-mix(in srgb, var(--reaction-bg-active, transparent) 88%, var(--lux, #d8b96a) 8%);
     transform: translateY(-1px);
   }
+  .rb-pill:focus-visible,
+  .rb-add-btn:focus-visible {
+    outline: 2px solid var(--accent, #0ea5e9);
+    outline-offset: 2px;
+  }
+  .rb-pill:active { transform: translateY(0) scale(0.96); }
 
   @keyframes reaction-pop {
     0%   { transform: scale(1); }
@@ -205,7 +211,10 @@ const styles = `
 
   @media (prefers-reduced-motion: reduce) {
     .rb-emoji--pop { animation: none !important; }
-    .rb-pill:hover { transform: none; }
+    .rb-pill:hover,
+    .rb-pill:active,
+    .rb-pill--mine:hover,
+    .rb-add-btn:hover { transform: none; }
   }
 
   .rb-emoji { font-size: 14px; line-height: 1; display: inline-block; }

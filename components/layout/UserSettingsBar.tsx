@@ -859,7 +859,7 @@ const QuickSettingsPanel = forwardRef<HTMLDivElement, QuickSettingsPanelProps>(
     const accentColor     = useOnyxStore(s => s.accentColor);
     const setAccentColor  = useOnyxStore(s => s.setAccentColor);
 
-    const THEMES = ['ocean', 'midnight', 'kelp', 'coral', 'arctic'] as const;
+    const THEMES = ['lacquer', 'midnight', 'abyss', 'kelp', 'coral', 'arctic'] as const;
 
     // Close on Escape
     useEffect(() => {
@@ -1055,12 +1055,13 @@ const QuickSettingsPanel = forwardRef<HTMLDivElement, QuickSettingsPanelProps>(
             transition: border-color var(--t-fast), transform var(--t-fast);
           }
           .qs-theme-dot:hover { transform: scale(1.15); }
-          .qs-theme-dot--active { border-color: white; }
-          .qs-theme-ocean   { background: #0ea5e9; }
+          .qs-theme-dot--active { border-color: var(--text-primary); box-shadow: 0 0 0 1px var(--bg-float); }
+          .qs-theme-lacquer  { background: linear-gradient(135deg, #1d1815 40%, #d8b96a); }
           .qs-theme-midnight { background: #0ea5e9; }
-          .qs-theme-kelp    { background: #22c55e; }
-          .qs-theme-coral   { background: #fb923c; }
-          .qs-theme-arctic  { background: #58a6ff; }
+          .qs-theme-abyss    { background: #00d4ff; }
+          .qs-theme-kelp     { background: #22c55e; }
+          .qs-theme-coral    { background: #fb923c; }
+          .qs-theme-arctic   { background: #60a5fa; }
           .qs-color-dot {
             width: 20px; height: 20px;
             border-radius: 50%;

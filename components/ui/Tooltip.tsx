@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect, useId } from 'react';
 
 interface Props {
   text: string;
@@ -12,8 +12,10 @@ interface Props {
 export default function Tooltip({ text, side = 'right', delay = 300, children }: Props) {
   const [visible, setVisible] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tipId = useId();
 
   const show = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => setVisible(true), delay);
   }, [delay]);
 
@@ -22,10 +24,26 @@ export default function Tooltip({ text, side = 'right', delay = 300, children }:
     setVisible(false);
   }, []);
 
+  // Dismiss on Escape — standard for hover/focus tooltips.
+  const onKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') hide();
+  }, [hide]);
+
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+
   return (
-    <span className="tooltip-wrap" onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide}>
+    <span
+      className="tooltip-wrap"
+      onMouseEnter={show}
+      onMouseLeave={hide}
+      onFocus={show}
+      onBlur={hide}
+      onKeyDown={onKeyDown}
+      aria-describedby={visible ? tipId : undefined}
+    >
       {children}
       <span
+        id={tipId}
         className={`tooltip tooltip--${side}${visible ? ' tooltip--visible' : ''}`}
         role="tooltip"
         aria-hidden={!visible}

@@ -20,73 +20,75 @@ const DEFAULT_DURATION: Record<ToastVariant, number> = {
 // ── Accent colors ─────────────────────────────────────────────────────────────
 
 const ACCENT: Record<ToastVariant, string> = {
-  success: '#23a55a',
-  error:   '#f04747',
-  warning: '#f0b232',
-  info:    'var(--accent)',
-  mention: '#e8b84b',
+  success: 'var(--success, #23a55a)',
+  error:   'var(--danger, #f04747)',
+  warning: 'var(--warning, #f0b232)',
+  info:    'var(--info, var(--accent))',
+  mention: 'var(--lux, #e8b84b)',
   dm:      'var(--accent)',
-  join:    '#23a55a',
-  undo:    '#94a3b8',
+  join:    'var(--success, #23a55a)',
+  undo:    'var(--text-secondary, #94a3b8)',
 };
 
 // ── Icons (inline SVG) ────────────────────────────────────────────────────────
 
 function ToastIcon({ variant }: { variant: ToastVariant }) {
-  const color = ACCENT[variant];
+  // Strokes use currentColor so the semantic var() (set via style.color) resolves
+  // correctly — var() is not valid in raw SVG presentation attributes.
+  const style = { color: ACCENT[variant] };
   switch (variant) {
     case 'success':
       return (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden>
-          <circle cx="10" cy="10" r="9" stroke={color} strokeWidth="1.5" />
-          <path d="M6 10l3 3 5-5" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={style} aria-hidden>
+          <circle cx="10" cy="10" r="9" stroke="currentColor" strokeWidth="1.5" />
+          <path d="M6 10l3 3 5-5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
     case 'error':
       return (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden>
-          <circle cx="10" cy="10" r="9" stroke={color} strokeWidth="1.5" />
-          <path d="M10 6v5M10 14v.5" stroke={color} strokeWidth="1.75" strokeLinecap="round" />
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={style} aria-hidden>
+          <circle cx="10" cy="10" r="9" stroke="currentColor" strokeWidth="1.5" />
+          <path d="M10 6v5M10 14v.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
         </svg>
       );
     case 'warning':
       return (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden>
-          <path d="M10 3L18 17H2L10 3z" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
-          <path d="M10 8v4M10 14v.5" stroke={color} strokeWidth="1.75" strokeLinecap="round" />
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={style} aria-hidden>
+          <path d="M10 3L18 17H2L10 3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+          <path d="M10 8v4M10 14v.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
         </svg>
       );
     case 'info':
       return (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden>
-          <circle cx="10" cy="10" r="9" stroke={color} strokeWidth="1.5" />
-          <path d="M10 9v5M10 6v.5" stroke={color} strokeWidth="1.75" strokeLinecap="round" />
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={style} aria-hidden>
+          <circle cx="10" cy="10" r="9" stroke="currentColor" strokeWidth="1.5" />
+          <path d="M10 9v5M10 6v.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
         </svg>
       );
     case 'mention':
       return (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden>
-          <circle cx="10" cy="10" r="4" stroke={color} strokeWidth="1.5" />
-          <path d="M14 10a4 4 0 00-4-4 4 4 0 00-4 4 4 4 0 004 4h4" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={style} aria-hidden>
+          <circle cx="10" cy="10" r="4" stroke="currentColor" strokeWidth="1.5" />
+          <path d="M14 10a4 4 0 00-4-4 4 4 0 00-4 4 4 4 0 004 4h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
       );
     case 'dm':
       return (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden>
-          <path d="M4 4h12a1 1 0 011 1v8a1 1 0 01-1 1H6l-3 3V5a1 1 0 011-1z" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={style} aria-hidden>
+          <path d="M4 4h12a1 1 0 011 1v8a1 1 0 01-1 1H6l-3 3V5a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
         </svg>
       );
     case 'join':
       return (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden>
-          <path d="M10 4v12M4 10h12" stroke={color} strokeWidth="1.75" strokeLinecap="round" />
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={style} aria-hidden>
+          <path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
         </svg>
       );
     case 'undo':
       return (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden>
-          <path d="M6 9H4V5" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M4 9a7 7 0 107-7" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={style} aria-hidden>
+          <path d="M6 9H4V5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M4 9a7 7 0 107-7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
       );
   }

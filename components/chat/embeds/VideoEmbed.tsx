@@ -15,7 +15,7 @@ export default function VideoEmbed({ embed }: { embed: Embed }) {
 
   return (
     <span className="embed-video-frame">
-      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+      { }
       <video
         className="embed-video"
         src={embed.url}

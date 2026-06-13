@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
 import ModalShell from './ModalShell';
@@ -83,9 +83,12 @@ export default function ChatExportModal() {
   const activeView        = useOnyxStore(s => s.activeView);
   const channels          = useOnyxStore(s => s.channels);
 
-  const rawMessages = activeView.kind === 'channel'
-    ? (channels.get(activeView.channel.toLowerCase())?.messages ?? [])
-    : [];
+  const rawMessages = useMemo(
+    () => activeView.kind === 'channel'
+      ? (channels.get(activeView.channel.toLowerCase())?.messages ?? [])
+      : [],
+    [activeView, channels],
+  );
   const channelName = activeView.kind === 'channel' ? activeView.channel : 'export';
 
   const [format, setFormat]                   = useState<ExportFormat>('txt');

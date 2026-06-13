@@ -111,6 +111,31 @@ export function useSuimyakuMedia() {
       onDecodeError() {
         // Decode errors are non-fatal; engine handles recovery internally
       },
+      onReaction(nick, emoji) {
+        // Float a reaction in the call dock (ReactionsOverlay listens here).
+        if (typeof window === 'undefined') return;
+        window.dispatchEvent(
+          new CustomEvent('ocean:voice-reaction', { detail: { nick, emoji } }),
+        );
+      },
+      onRecordingAlert(nick, started) {
+        useOnyxStore.getState().addToast({
+          variant: started ? 'warning' : 'info',
+          title: started ? 'Recording started' : 'Recording stopped',
+          description: started
+            ? `${nick} is recording this call`
+            : `${nick} stopped recording`,
+          duration: 5000,
+        });
+      },
+      onNetworkQuality(tier, suggestedBps) {
+        // ConnectionQuality polls the engine directly; this event lets any
+        // other surface react to tier changes without polling.
+        if (typeof window === 'undefined') return;
+        window.dispatchEvent(
+          new CustomEvent('ocean:voice-network', { detail: { tier, suggestedBps } }),
+        );
+      },
       enableVideoCalls: () => true,
       enableVoiceCalls: () => true,
       getMediaSettings: () => {

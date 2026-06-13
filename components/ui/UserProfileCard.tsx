@@ -197,7 +197,7 @@ export default function UserProfileCard({ nick, anchor }: Props) {
     if (isStale) {
       client.sendRaw('WHOIS', nick, nick);
     }
-  }, [client, nick]);
+  }, [client, nick, getUserProfile]);
 
   // ── Shared channels ───────────────────────────────────────────────────────
 

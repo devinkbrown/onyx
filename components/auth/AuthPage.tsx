@@ -24,14 +24,31 @@ export default function AuthPage() {
           <div className="auth-brand-grain" />
           <div className="auth-brand-content">
             <OceanLogo />
-            <p className="auth-kicker">eshmaki.me</p>
+            <p className="auth-kicker">eshmaki.me · Orochi gateway</p>
             <h1 className="auth-wordmark">Ocean</h1>
             <p className="auth-brand-copy">
-              Lacquered chat for Orochi communities, SUIMYAKU media, and session-safe identity.
+              Lacquered chat for Orochi communities — pure-Zig mesh engine,
+              PQ-secured channels, and session-safe identity.
             </p>
+
+            <ul className="auth-brand-stack">
+              <li>
+                <span className="auth-stack-mech">SCRAM-SHA-256</span>
+                <span className="auth-stack-desc">Salted challenge auth — your password never crosses the wire</span>
+              </li>
+              <li>
+                <span className="auth-stack-mech">SESSION RESUME</span>
+                <span className="auth-stack-desc">Cryptographic tokens reconnect you without re-entry</span>
+              </li>
+              <li>
+                <span className="auth-stack-mech">TSUMUGI · ML-KEM</span>
+                <span className="auth-stack-desc">Post-quantum keys for native voice and video</span>
+              </li>
+            </ul>
+
             <div className="auth-brand-meter">
               <span />
-              <strong>Orochi ready</strong>
+              <strong>Built-in services · no bots</strong>
             </div>
           </div>
         </aside>
@@ -183,12 +200,44 @@ export default function AuthPage() {
           line-height: 1.55;
         }
 
+        .auth-brand-stack {
+          list-style: none;
+          margin: var(--sp-8, 32px) 0 0;
+          padding: 0;
+          display: flex;
+          flex-direction: column;
+          gap: var(--sp-3, 12px);
+          max-width: 380px;
+        }
+
+        .auth-brand-stack li {
+          display: flex;
+          flex-direction: column;
+          gap: 3px;
+          padding-left: var(--sp-4, 16px);
+          border-left: 2px solid color-mix(in srgb, var(--lux) 42%, transparent);
+        }
+
+        .auth-stack-mech {
+          font-family: var(--font-mono);
+          font-size: var(--text-sm, .8125rem);
+          font-weight: 700;
+          letter-spacing: .02em;
+          color: var(--lux);
+        }
+
+        .auth-stack-desc {
+          color: var(--text-secondary);
+          font-size: var(--text-xs, .75rem);
+          line-height: 1.45;
+        }
+
         .auth-brand-meter {
           width: min(300px, 100%);
           display: flex;
           align-items: center;
           gap: var(--sp-3, 12px);
-          margin-top: var(--sp-10, 40px);
+          margin-top: var(--sp-8, 32px);
           color: var(--text-secondary);
           font-size: var(--text-xs, .75rem);
           font-weight: 750;
@@ -332,6 +381,7 @@ export default function AuthPage() {
           }
 
           .auth-brand-copy,
+          .auth-brand-stack,
           .auth-brand-meter {
             display: none;
           }

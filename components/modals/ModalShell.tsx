@@ -318,6 +318,20 @@ export default function ModalShell({
         }
         .mshell-body-flush { padding: 0; }
 
+        /* Fleet-wide keyboard focus safety net.
+           Many modals only restyle :focus border-color on their native fields,
+           which leaves keyboard users without a clear focus ring. This gives
+           every native form control inside a modal body a visible lacquer ring
+           on keyboard focus. Components that paint their own ring (Button,
+           FormField, custom controls with .mshell-no-ring) keep their own. */
+        .mshell-body :is(input, select, textarea):focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
+        }
+        .mshell-body .mshell-no-ring:focus-visible {
+          outline: none;
+        }
+
         .mshell-footer {
           display: flex;
           align-items: center;

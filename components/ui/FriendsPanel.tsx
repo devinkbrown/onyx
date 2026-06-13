@@ -142,24 +142,6 @@ function BlockedRow({ nick, onUnblock }: BlockedRowProps) {
   );
 }
 
-// ── Empty state ───────────────────────────────────────────────────────────────
-
-interface EmptyStateProps {
-  icon: React.ReactNode;
-  title: string;
-  sub?: string;
-}
-
-function EmptyState({ icon, title, sub }: EmptyStateProps) {
-  return (
-    <div className="fp-empty">
-      <span className="fp-empty-icon">{icon}</span>
-      <span className="fp-empty-title">{title}</span>
-      {sub && <span className="fp-empty-sub">{sub}</span>}
-    </div>
-  );
-}
-
 // ── Add Friend tab ─────────────────────────────────────────────────────────────
 
 interface AddFriendTabProps {
@@ -865,40 +847,3 @@ function InfoIcon() {
   );
 }
 
-function PeopleIllustration() {
-  return (
-    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="10" r="4" />
-      <path d="M3 26c0-4.418 3.582-8 8-8s8 3.582 8 8" />
-      <circle cx="23" cy="10" r="3" />
-      <path d="M29 26c0-3.314-2.686-6-6-6" />
-    </svg>
-  );
-}
-
-function OnlineIllustration() {
-  return (
-    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="16" cy="16" r="13" />
-      <path d="M10 16l4 4 8-8" />
-    </svg>
-  );
-}
-
-function PendingIllustration() {
-  return (
-    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="16" cy="16" r="13" />
-      <path d="M16 9v8l4 4" />
-    </svg>
-  );
-}
-
-function BlockIllustration() {
-  return (
-    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="16" cy="16" r="13" />
-      <path d="M6.7 6.7l18.6 18.6" />
-    </svg>
-  );
-}

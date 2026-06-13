@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import ModalShell from './ModalShell';
+import Button from '@/components/ui/Button';
+import FormField from '@/components/ui/FormField';
 
 /**
  * ChannelJoinModal — shown when:
@@ -75,28 +77,27 @@ export default function ChannelJoinModal() {
       size="sm"
       footer={
         <>
-          <button className="cjm-btn cjm-btn--secondary" onClick={clearPrompt}>
+          <Button variant="ghost" onClick={clearPrompt}>
             Cancel
-          </button>
-          <button
-            className="cjm-btn cjm-btn--primary"
-            onClick={handleJoin}
-            disabled={!targetChannel}
-          >
-            Join
-          </button>
+          </Button>
+          <Button variant="primary" onClick={handleJoin} disabled={!targetChannel}>
+            Join channel
+          </Button>
         </>
       }
     >
       <div className="cjm-form">
-        {errorText && <div className="cjm-error">{errorText}</div>}
+        {errorText && (
+          <div className="cjm-error" role="alert">
+            <span className="cjm-error-mark" aria-hidden>!</span>
+            <span>{errorText}</span>
+          </div>
+        )}
 
         {!isRetry && (
-          <div className="cjm-row">
-            <div className="label-caps cjm-label">Channel name</div>
+          <FormField label="Channel name" hint="Joins as a public channel unless you prefix with &.">
             <input
               ref={channelRef}
-              className="cjm-input"
               type="text"
               placeholder="#channel"
               value={channelInput}
@@ -105,16 +106,15 @@ export default function ChannelJoinModal() {
               autoComplete="off"
               spellCheck={false}
             />
-          </div>
+          </FormField>
         )}
 
-        <div className="cjm-row">
-          <div className="label-caps cjm-label">
-            Password {!isRetry && <span style={{ fontWeight: 400, opacity: 0.6 }}>(optional)</span>}
-          </div>
+        <FormField
+          label={isRetry ? 'Channel password' : 'Password (optional)'}
+          hint={isRetry ? 'This channel is protected with a key (+k).' : undefined}
+        >
           <input
             ref={passwordRef}
-            className="cjm-input"
             type="password"
             placeholder="Channel password"
             value={password}
@@ -122,7 +122,7 @@ export default function ChannelJoinModal() {
             onKeyDown={handleKeyDown}
             autoComplete="new-password"
           />
-        </div>
+        </FormField>
       </div>
 
       <style>{`
@@ -132,63 +132,30 @@ export default function ChannelJoinModal() {
           gap: var(--sp-4, 16px);
         }
         .cjm-error {
+          display: flex;
+          align-items: center;
+          gap: var(--sp-2, 8px);
           font-size: var(--text-sm, 13px);
+          line-height: 1.45;
           color: var(--danger);
           background: var(--danger-subtle);
-          border: 1px solid rgba(248,113,113,0.2);
-          border-radius: var(--r-sm);
+          border: 1px solid color-mix(in srgb, var(--danger) 24%, transparent);
+          border-radius: var(--r-sm, 6px) var(--r-md, 8px) var(--r-sm, 6px) var(--r-md, 8px);
           padding: var(--sp-2, 8px) var(--sp-3, 12px);
+          box-shadow: var(--elev-highlight, inset 0 1px 0 rgba(255,255,255,.05));
         }
-        .cjm-label {
-          margin-bottom: var(--sp-2, 8px);
-        }
-        .cjm-input {
-          width: 100%;
-          height: 38px;
-          background: var(--bg-void);
-          border: 1px solid var(--border-normal);
-          border-radius: var(--r-md);
-          padding: 0 var(--sp-3, 12px);
-          color: var(--text-primary);
-          font-size: var(--text-base, 14px);
-          font-family: inherit;
-          box-sizing: border-box;
-          transition: border-color var(--t-control, 150ms), box-shadow var(--t-control, 150ms);
-        }
-        .cjm-input:focus {
-          outline: none;
-          border-color: var(--accent);
-          box-shadow: 0 0 0 2px var(--accent-glow);
-        }
-        .cjm-btn {
-          border: none;
-          border-radius: var(--r-md);
-          padding: 9px 18px;
-          font-size: var(--text-base, 14px);
-          font-weight: 600;
-          cursor: pointer;
-          font-family: inherit;
-          transition: background var(--t-control, 150ms), opacity var(--t-control, 150ms);
-        }
-        .cjm-btn--primary {
-          background: var(--accent);
-          color: #fff;
-        }
-        .cjm-btn--primary:hover:not(:disabled) {
-          background: var(--accent-hover);
-        }
-        .cjm-btn--primary:disabled {
-          opacity: 0.45;
-          cursor: not-allowed;
-        }
-        .cjm-btn--secondary {
-          background: var(--bg-float);
-          border: 1px solid var(--border-normal);
-          color: var(--text-secondary);
-        }
-        .cjm-btn--secondary:hover {
-          background: var(--bg-overlay);
-          color: var(--text-primary);
+        .cjm-error-mark {
+          flex-shrink: 0;
+          width: 18px;
+          height: 18px;
+          display: grid;
+          place-items: center;
+          border-radius: 50%;
+          font-size: var(--text-xs, 12px);
+          font-weight: 800;
+          line-height: 1;
+          color: var(--danger);
+          background: color-mix(in srgb, var(--danger) 18%, transparent);
         }
       `}</style>
     </ModalShell>

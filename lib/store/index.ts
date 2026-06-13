@@ -350,7 +350,12 @@ export interface OnyxState {
   chanLimits: Record<string, number>;
   caseMapping: string;
   mediaAvailable: boolean;
+  /** draft/message-editing negotiated — gate the "edit" affordance */
   canEditMessages: boolean;
+  /** draft/message-redaction negotiated — gate the "delete for everyone" affordance */
+  canRedactMessages: boolean;
+  /** draft/react negotiated — gate server-relayed reactions (else local-only) */
+  canReact: boolean;
 
   // ── Account registration protocol ────────────────────────────────────
   registerPending: boolean;
@@ -1401,6 +1406,18 @@ const _typingLastSent = new Map<string, number>();
 // ── CHATHISTORY batch collectors (module-level) ───────────────────────────────
 /** ref → { target, messages[] } — accumulates PRIVMSG during a BATCH */
 const _batchCollectors = new Map<string, { target: string; messages: ChatMessage[] }>();
+/**
+ * Lowercased target → batch ref for every currently-open `chathistory` BATCH.
+ * Orochi's CHATHISTORY replay does NOT stamp `@batch=<ref>` on the inner
+ * PRIVMSG lines (it writes `BATCH +1 chathistory #c` then bare
+ * `:nick PRIVMSG #c :…` then `BATCH -1`; see orochi src/proto/chathistory_cmd.zig
+ * writeMessage and the threaded test at src/daemon/server.zig:19476). Without a
+ * per-line batch tag we cannot correlate inner lines by tag, so we track the
+ * open batch by target and route inner PRIVMSGs into the collector while the
+ * batch is open. The `@batch` tag path is still honored when present (spec
+ * compliance / future-proofing against other servers).
+ */
+const _openChathistoryByTarget = new Map<string, string>();
 
 // ── MOTD buffer (module-level) ────────────────────────────────────────────────
 /** Accumulates MOTD lines between RPL_MOTDSTART (375) and RPL_ENDOFMOTD (376) */
@@ -1658,9 +1675,11 @@ export const useOnyxStore = create<OnyxState>()(
     isupportPrefixToMode: { '.': 'q', '@': 'o', '+': 'v' },
     isupportModeToPrefix: { q: '.', o: '@', v: '+' },
     chanLimits: {},
-    caseMapping: 'rfc1459',
+    caseMapping: 'ascii',
     mediaAvailable: false,
     canEditMessages: false,
+    canRedactMessages: false,
+    canReact: false,
     registerPending: false,
     registerError: null,
     verifyRequired: false,
@@ -1781,6 +1800,11 @@ export const useOnyxStore = create<OnyxState>()(
       if (prev) prev.destroy();
       // Clear any in-progress reconnect countdown
       _clearReconnectCountdown();
+      // Reset transient protocol buffers from any prior session so they cannot
+      // leak across a (re)connect.
+      _batchCollectors.clear();
+      _openChathistoryByTarget.clear();
+      _motdBuffer = '';
 
       // Remember the desired nick before the IRC client may append '_' on collision
       _stopNickReclaim();
@@ -1836,9 +1860,14 @@ export const useOnyxStore = create<OnyxState>()(
         },
       });
       client.onCapChange = () => {
+        // mediaAvailable is NOT a cap: Orochi exposes MEDIA as a plain channel
+        // command for any registered member (no advertised media cap), so it is
+        // set on registration (001) / first NOTE MEDIA, not here. Only mirror
+        // genuinely cap-gated UI affordances off the negotiated set.
         set({
           canEditMessages: client.negotiatedCaps.has('draft/message-editing'),
-          mediaAvailable: client.negotiatedCaps.has('standard-replies') || client.capValues.has('standard-replies'),
+          canRedactMessages: client.negotiatedCaps.has('draft/message-redaction'),
+          canReact: client.negotiatedCaps.has('draft/react'),
         });
       };
 
@@ -1882,6 +1911,11 @@ export const useOnyxStore = create<OnyxState>()(
       _reconnectAttempts = 0;
       _connectNick  = '';
       _saslAccount  = null;
+      // Drop any in-flight CHATHISTORY batch state so a stale open batch can't
+      // swallow live messages after a fresh connect.
+      _batchCollectors.clear();
+      _openChathistoryByTarget.clear();
+      _motdBuffer = '';
       get().client?.destroy();
       set({
         client: null,
@@ -3069,44 +3103,60 @@ export const useOnyxStore = create<OnyxState>()(
           return;
         }
         if (standard.command === 'MEDIA') {
+          // `NOTE MEDIA` is NOT a standard reply: it has the shape
+          //   :server NOTE MEDIA <#chan> <verb> [<nick>] [extra...]
+          // The standard-reply context/description split mis-attributes the
+          // actor when there is no trailing kind (e.g. LEAVE), so parse the raw
+          // params directly. params = ['MEDIA', '#chan', verb, nick?, ...extra].
+          const mediaParams = msg.params;
+          const mediaChannel = mediaParams[1] ?? '';
+          const mediaVerb = (mediaParams[2] ?? '').toUpperCase();
+          const mediaActor = mediaParams[3] ?? '';
+
           // ── Live captions / transcript replay ──────────────────────────
           // `:server NOTE MEDIA <#chan> CAPTION <nick> :<text>` (live fan-out)
           // `:server NOTE MEDIA <#chan> TRANSCRIPT <speaker> :<text>` (replay)
-          {
-            const capVerb = (standard.context[0] ?? '').toUpperCase();
-            if (capVerb === 'CAPTION' || capVerb === 'TRANSCRIPT') {
-              const capChannel = msg.params[1] ?? standard.code;
-              const capNick = standard.context[1] ?? '';
-              const capText = standard.description;
-              if (capChannel && capNick && capText) {
-                set(s => {
-                  const mediaTranscripts = new Map(s.mediaTranscripts);
-                  const tKey = capChannel.toLowerCase();
-                  const entries = [
-                    ...(mediaTranscripts.get(tKey) ?? []).slice(-199),
-                    { nick: capNick, text: capText, time: tags['time'] ? new Date(tags['time']) : new Date() },
-                  ];
-                  mediaTranscripts.set(tKey, entries);
-                  return { mediaTranscripts };
-                });
-                // Live captions feed the CaptionsOverlay. Orochi fans out
-                // complete utterances, so each caption line is final.
-                if (capVerb === 'CAPTION' && typeof window !== 'undefined') {
-                  window.dispatchEvent(new CustomEvent('ocean:caption', {
-                    detail: { channel: capChannel, nick: capNick, text: capText, final: true },
-                  }));
-                }
+          if (mediaVerb === 'CAPTION' || mediaVerb === 'TRANSCRIPT') {
+            const capChannel = mediaChannel;
+            const capNick = mediaActor;
+            const capText = mediaParams.slice(4).join(' ');
+            if (capChannel && capNick && capText) {
+              set(s => {
+                const mediaTranscripts = new Map(s.mediaTranscripts);
+                const tKey = capChannel.toLowerCase();
+                const entries = [
+                  ...(mediaTranscripts.get(tKey) ?? []).slice(-199),
+                  { nick: capNick, text: capText, time: tags['time'] ? new Date(tags['time']) : new Date() },
+                ];
+                mediaTranscripts.set(tKey, entries);
+                return { mediaTranscripts };
+              });
+              // Live captions feed the CaptionsOverlay. Orochi fans out
+              // complete utterances, so each caption line is final.
+              if (mediaVerb === 'CAPTION' && typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('ocean:caption', {
+                  detail: { channel: capChannel, nick: capNick, text: capText, final: true },
+                }));
               }
-              return;
             }
+            return;
           }
-          const channel = standard.code;
-          const verb = (standard.context[0] ?? '').toUpperCase();
-          const actor = standard.context[1] ?? nick ?? '';
-          const detail = standard.context.slice(2).join(' ') || standard.description;
-          if (channel && actor) {
+          const channel = mediaChannel;
+          const verb = mediaVerb;
+          // Presence verbs are `<verb> <nick> [kind]`; signaling verbs
+          // (TRANSPORT/NATIVE/PROFILE/LAYER…) have no nick. Only treat param[3]
+          // as an actor for presence; otherwise forward the whole tail.
+          const isPresenceVerb = verb === 'JOIN' || verb === 'LEAVE' || verb === 'ROSTER'
+            || verb === 'MUTE' || verb === 'UNMUTE' || verb === 'SPEAKING' || verb === 'HAND'
+            || verb === 'REACT';
+          const actor = isPresenceVerb ? (mediaActor || nick || '') : '';
+          // Pass the full param tail after the verb so the media engine can parse
+          // per-verb signaling payloads itself.
+          const detail = mediaParams.slice(3).join(' ');
+
+          if (channel) {
             const chKey = channel.toLowerCase();
-            if (verb === 'JOIN' || verb === 'ROSTER') {
+            if ((verb === 'JOIN' || verb === 'ROSTER') && actor) {
               set(s => {
                 const map = new Map(s.voiceChannelParticipants);
                 const pSet = new Set(map.get(chKey) ?? []);
@@ -3114,7 +3164,7 @@ export const useOnyxStore = create<OnyxState>()(
                 map.set(chKey, pSet);
                 return { voiceChannelParticipants: map, mediaAvailable: true };
               });
-            } else if (verb === 'LEAVE') {
+            } else if (verb === 'LEAVE' && actor) {
               set(s => {
                 const map = new Map(s.voiceChannelParticipants);
                 const pSet = new Set(map.get(chKey) ?? []);
@@ -3122,7 +3172,10 @@ export const useOnyxStore = create<OnyxState>()(
                 map.set(chKey, pSet);
                 return { voiceChannelParticipants: map, mediaAvailable: true };
               });
+            } else {
+              set({ mediaAvailable: true });
             }
+            // Forward every NOTE MEDIA (presence + signaling) to the engine.
             getMountedSuimyakuMediaEngine()?.handleMediaMessage(actor, channel, verb, detail);
           } else {
             set({ mediaAvailable: true });
@@ -3137,7 +3190,10 @@ export const useOnyxStore = create<OnyxState>()(
 
         // ── Registration ──────────────────────────────────────────────────
         case '001': { // RPL_WELCOME
-          set({ ourNick: params[0] });
+          // Orochi exposes voice/video via the MEDIA channel command for any
+          // registered member — there is no media cap to gate on, so mark it
+          // available on registration. NOTE MEDIA events keep it true.
+          set({ ourNick: params[0], mediaAvailable: true });
           // Show onboarding if this server hasn't been visited before
           const hostname = get().server?.url ?? 'unknown';
           const onboardKey = `ocean-onboarded-${hostname}`;
@@ -3729,6 +3785,37 @@ export const useOnyxStore = create<OnyxState>()(
             break;
           }
 
+          // ── IRCv3 draft/message-editing (native Orochi shape) ────────────
+          // Orochi emits an edit as a PRIVMSG carrying `+draft/edit=<msgid>`
+          // (and `+draft/revision`), NOT a top-level EDIT command
+          // (orochi src/daemon/server.zig:10788). Apply it in place against the
+          // referenced message instead of appending a duplicate.
+          const editRef = tags['+draft/edit'] ?? tags['draft/edit'];
+          if (editRef) {
+            const editTargetKey = (isChan(target) ? target : (isSelf ? target : sender)).toLowerCase();
+            const editedText = (text.startsWith('\x01ACTION ') && text.endsWith('\x01'))
+              ? text.slice(8, -1)
+              : text;
+            const applyTagEdit = (messages: ChatMessage[]): ChatMessage[] =>
+              messages.map(m => m.id === editRef ? { ...m, text: editedText, edited: true } : m);
+            set(s => {
+              const channels = new Map(s.channels);
+              const ch = channels.get(editTargetKey);
+              if (ch) {
+                channels.set(editTargetKey, { ...ch, messages: applyTagEdit(ch.messages) });
+                return { channels };
+              }
+              const dms = new Map(s.dms);
+              const dm = dms.get(editTargetKey);
+              if (dm) {
+                dms.set(editTargetKey, { ...dm, messages: applyTagEdit(dm.messages) });
+                return { dms };
+              }
+              return {};
+            });
+            break;
+          }
+
           const isChannel = isChan(target);
 
           // ── Parse reply reference ────────────────────────────────────────
@@ -3788,9 +3875,18 @@ export const useOnyxStore = create<OnyxState>()(
           };
 
           // ── If this PRIVMSG is part of a CHATHISTORY batch, collect it ────
+          // Two routing paths:
+          //  1. Spec-compliant servers stamp `@batch=<ref>` on each inner line.
+          //  2. Orochi omits that tag on CHATHISTORY replay, so fall back to the
+          //     open-batch-by-target map populated on `BATCH +ref chathistory`.
           const batchTag = tags['batch'];
           if (batchTag && _batchCollectors.has(batchTag)) {
             _batchCollectors.get(batchTag)!.messages.push(chatMsg);
+            break;
+          }
+          const openBatchRef = _openChathistoryByTarget.get(msgKey);
+          if (openBatchRef && _batchCollectors.has(openBatchRef)) {
+            _batchCollectors.get(openBatchRef)!.messages.push(chatMsg);
             break;
           }
 
@@ -3920,7 +4016,8 @@ export const useOnyxStore = create<OnyxState>()(
               if (!c) return {};
               const modeText = params.slice(1).join(' ');
               const users = new Map(c.users);
-              const prefixModes = new Set(Object.keys(get().client?.modeToPrefix ?? { q: '.', o: '@', v: '+' }));
+              const prefixModes = new Set(Object.keys(get().client?.modeToPrefix ?? { Q: '!', q: '.', o: '@', v: '+' }));
+              const chanmodes = get().client?.isupport.CHANMODES ?? [];
               let adding = true;
               let argIdx = 0;
               let changedUsers = false;
@@ -3928,7 +4025,7 @@ export const useOnyxStore = create<OnyxState>()(
               for (const ch of modeStr) {
                 if (ch === '+') { adding = true; continue; }
                 if (ch === '-') { adding = false; continue; }
-                const consumesArg = ch === 'b' || prefixModes.has(ch) || (ch === 'z' && adding);
+                const consumesArg = modeConsumesArg(ch, adding, chanmodes, prefixModes);
                 const modeArg = consumesArg ? modeArgs[argIdx++] : undefined;
                 if (!prefixModes.has(ch) || !modeArg) continue;
                 const userKey = modeArg.toLowerCase();
@@ -3947,7 +4044,8 @@ export const useOnyxStore = create<OnyxState>()(
             });
 
             // Emit audit entries for ban/unban/other mode changes
-            const prefixModes = new Set(Object.keys(get().client?.modeToPrefix ?? { q: '.', o: '@', v: '+' }));
+            const prefixModes = new Set(Object.keys(get().client?.modeToPrefix ?? { Q: '!', q: '.', o: '@', v: '+' }));
+            const chanmodes = get().client?.isupport.CHANMODES ?? [];
             let adding = true;
             let argIdx = 0;
             let sawBan = false;
@@ -3955,7 +4053,7 @@ export const useOnyxStore = create<OnyxState>()(
             for (const ch of modeStr) {
               if (ch === '+') { adding = true; continue; }
               if (ch === '-') { adding = false; continue; }
-              const consumesArg = ch === 'b' || prefixModes.has(ch) || (ch === 'z' && adding);
+              const consumesArg = modeConsumesArg(ch, adding, chanmodes, prefixModes);
               const modeArg = consumesArg ? modeArgs[argIdx++] : undefined;
               if (ch === 'b') {
                 sawBan = true;
@@ -4081,6 +4179,48 @@ export const useOnyxStore = create<OnyxState>()(
             }
             return { channels };
           });
+          break;
+        }
+
+        // ── INVITE (invite-notify cap) ────────────────────────────────────
+        // :inviter!u@h INVITE <target-nick> <#channel>
+        // We receive this either as the invitee (invited to a channel) or, with
+        // invite-notify, as a channel member observing someone else's invite.
+        case 'INVITE': {
+          const invitee = params[0] ?? '';
+          const inviteChannel = params[1] ?? '';
+          const inviter = nick ?? 'someone';
+          if (!inviteChannel) break;
+          const invitedMe = invitee.toLowerCase() === ourNick.toLowerCase();
+          if (invitedMe) {
+            get().addNotification({
+              type: 'system',
+              text: `${inviter} invited you to ${inviteChannel}`,
+              from: inviter,
+              channel: inviteChannel,
+            });
+          } else {
+            // invite-notify: surface as a channel system line for context.
+            get().addChannelEvent(inviteChannel, {
+              type: 'join',
+              nick: inviter,
+              text: `${inviter} invited ${invitee} to ${inviteChannel}`,
+              time: new Date(),
+            });
+          }
+          break;
+        }
+
+        // ── SETNAME (setname cap) ─────────────────────────────────────────
+        // :nick!u@h SETNAME :<new realname>. ChannelUser does not track realname,
+        // so update any cached WHOIS/profile realname if present; otherwise a
+        // safe no-op that keeps SETNAME from hitting the default branch.
+        case 'SETNAME': {
+          const setnameNick = nick ?? '';
+          const newRealname = params[0] ?? '';
+          if (setnameNick && newRealname) {
+            get().setUserProfile(setnameNick, { realname: newRealname });
+          }
           break;
         }
 
@@ -4506,6 +4646,7 @@ export const useOnyxStore = create<OnyxState>()(
               (batchType === 'draft/chathistory' || batchType === 'chathistory')
             ) {
               _batchCollectors.set(batchRef, { target: batchTarget, messages: [] });
+              _openChathistoryByTarget.set(batchTarget.toLowerCase(), batchRef);
             }
           } else if (batchParam.startsWith('-')) {
             // BATCH -ref — end of batch
@@ -4514,25 +4655,37 @@ export const useOnyxStore = create<OnyxState>()(
             if (collector) {
               _batchCollectors.delete(batchRef);
               const { target: batchTarget, messages: batchMsgs } = collector;
+              if (_openChathistoryByTarget.get(batchTarget.toLowerCase()) === batchRef) {
+                _openChathistoryByTarget.delete(batchTarget.toLowerCase());
+              }
               const batchKey = batchTarget.toLowerCase();
 
               if (batchMsgs.length > 0) {
                 set(s => {
+                  // Prepend historical messages (oldest first) before existing
+                  // live messages, deduped by server msgid. Without this, a
+                  // session-sync reconnect would replay CHATHISTORY into a
+                  // target that still holds the same messages (state survives
+                  // auto-reconnect), duplicating every message. CHATHISTORY
+                  // messages carry a server msgid as ChatMessage.id; locally
+                  // generated ids (uid()) never collide with those.
+                  const mergeHistory = (existing: ChatMessage[]): ChatMessage[] => {
+                    const existingIds = new Set(existing.map(m => m.id));
+                    const newHistory = batchMsgs.filter(m => !existingIds.has(m.id));
+                    return [...newHistory, ...existing];
+                  };
                   const channels = new Map(s.channels);
                   const c = channels.get(batchKey);
                   if (c) {
-                    // Prepend historical messages (oldest first) before existing
-                    // live messages, deduped by server msgid. Without this, a
-                    // session-sync reconnect would replay CHATHISTORY into a
-                    // channel that still holds the same messages (state survives
-                    // auto-reconnect), duplicating every message. CHATHISTORY
-                    // messages carry a server msgid as ChatMessage.id; locally
-                    // generated ids (uid()) never collide with those.
-                    const existingIds = new Set(c.messages.map(m => m.id));
-                    const newHistory = batchMsgs.filter(m => !existingIds.has(m.id));
-                    const merged = [...newHistory, ...c.messages];
-                    channels.set(batchKey, { ...c, messages: merged });
+                    channels.set(batchKey, { ...c, messages: mergeHistory(c.messages) });
                     return { channels };
+                  }
+                  // CHATHISTORY also covers DM targets (a nick, not a #channel).
+                  const dms = new Map(s.dms);
+                  const dm = dms.get(batchKey);
+                  if (dm) {
+                    dms.set(batchKey, { ...dm, messages: mergeHistory(dm.messages) });
+                    return { dms };
                   }
                   return {};
                 });
@@ -4710,10 +4863,16 @@ export const useOnyxStore = create<OnyxState>()(
         // ── 900 RPL_LOGGEDIN / 901 RPL_LOGGEDOUT ─────────────────────────
         case '900': {
           // :server 900 nick nick!u@h account :You are now logged in as account
-          const account900 = params[2] ?? null;
-          // Capture before server object exists (900 arrives during CAP/SASL, before 001)
-          _saslAccount = account900;
-          set(s => ({ server: s.server ? { ...s.server, account: account900 } : null }));
+          // 900 is also IRCX ERR_BADCOMMAND (`900 nick :Bad command`, 2 params).
+          // Only treat it as RPL_LOGGEDIN when the account param is present
+          // (RPL_LOGGEDIN carries [nick, nick!u@h, account, msg]); otherwise it
+          // is an IRCX error and must not clobber the logged-in account.
+          if (params.length >= 4 && params[2]) {
+            const account900 = params[2];
+            // Capture before server object exists (900 arrives during CAP/SASL, before 001)
+            _saslAccount = account900;
+            set(s => ({ server: s.server ? { ...s.server, account: account900 } : null }));
+          }
           break;
         }
 
@@ -6264,7 +6423,11 @@ export const useOnyxStore = create<OnyxState>()(
     },
 
     _applyMetadata(target, key, value) {
-      const nickKey = target.toLowerCase();
+      // Orochi echoes the literal target the client sent, so a self-SET
+      // (`METADATA * SET …`) comes back as target `*`. Normalize it to our nick
+      // so the metadata lands on our own profile, not a phantom `*` entry.
+      const resolvedTarget = target === '*' ? (get().ourNick || target) : target;
+      const nickKey = resolvedTarget.toLowerCase();
       set(s => {
         const userMetadata = new Map(s.userMetadata);
         const entry = { ...(userMetadata.get(nickKey) ?? {}) };
@@ -6293,7 +6456,7 @@ export const useOnyxStore = create<OnyxState>()(
                   : norm === 'banner' || norm === 'banner-url'
                     ? { bannerUrl: value || undefined }
                     : null;
-      if (profilePatch) get().setUserProfile(target, profilePatch);
+      if (profilePatch) get().setUserProfile(resolvedTarget, profilePatch);
     },
 
     clearTegami(target) {
@@ -6547,7 +6710,13 @@ export const useOnyxStore = create<OnyxState>()(
         startedAt: Math.floor(Date.now() / 1000), viewers: 0, mode, quality,
       };
       set(s => ({ streams: new Map(s.streams).set(channel.toLowerCase(), info) }));
-      client.sendRaw('JOIN', `%%${channel}`);
+      // MEDIA targets the real channel and requires membership (orochi
+      // src/daemon/server.zig:12473 isMember check). Join the actual channel if
+      // we are not already in it — never a `%%`-prefixed phantom (CHANTYPES=#&,
+      // and `%` is only a single UTF8-only modifier prefix, not `%%`).
+      if (!get().channels.has(channel.toLowerCase())) {
+        client.sendRaw('JOIN', channel);
+      }
       const t = encodeURIComponent(title);
       const c = encodeURIComponent(category);
       void t; void c; void key;
@@ -6563,7 +6732,9 @@ export const useOnyxStore = create<OnyxState>()(
     endStream: (channel) => {
       const { client } = get();
       if (!client) return;
-      client.sendRaw('PART', `%%${channel}`);
+      // Leave only the media call; the text channel membership is left intact
+      // (the user may still want to read/chat). MEDIA LEAVE is the inverse of
+      // MEDIA JOIN — no phantom `%%` channel to PART.
       client.sendRaw('MEDIA', 'LEAVE', channel);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('ocean:stream-stop', {
@@ -6679,6 +6850,32 @@ export const selectTegami = (target: string) => (s: OnyxState): { count: number;
   s.tegami.get(target.toLowerCase()) ?? null;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Decide whether a channel mode letter consumes an argument when applied,
+ * derived from the server-advertised CHANMODES groups and the PREFIX (status)
+ * modes — never a hardcoded guess.
+ *
+ * ISUPPORT CHANMODES = A,B,C,D (Orochi: `beIZ,k,lfj,imnstCTNMSgWOA`):
+ *   A (list modes)       → always take an arg (+b / -b)
+ *   B (always arg)       → take an arg when set AND unset
+ *   C (arg only when set)→ take an arg only when adding
+ *   D (flag, never arg)  → never
+ * Status/prefix modes (Q/q/o/v) always take a nick argument.
+ */
+function modeConsumesArg(
+  letter: string,
+  adding: boolean,
+  chanmodes: string[],
+  prefixModes: Set<string>,
+): boolean {
+  if (prefixModes.has(letter)) return true;
+  const [listModes = '', argModes = '', setOnlyModes = ''] = chanmodes;
+  if (listModes.includes(letter)) return true;   // group A
+  if (argModes.includes(letter)) return true;    // group B
+  if (setOnlyModes.includes(letter)) return adding; // group C
+  return false;                                  // group D (or unknown flag)
+}
 
 function parseNamePrefix(
   name: string,

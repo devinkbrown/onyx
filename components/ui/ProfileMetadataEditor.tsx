@@ -62,7 +62,6 @@ export default function ProfileMetadataEditor({
   }, [initialDisplayName, initialPronouns, initialBio, initialAccentColor, initialLinks]);
 
   const links = useMemo(() => normalizeLinks(linksText), [linksText]);
-  const draft: ProfileMetadataDraft = { displayName, pronouns, bio, accentColor, links };
 
   const handleSave = () => {
     dispatchMetadata('displayName', displayName.trim());

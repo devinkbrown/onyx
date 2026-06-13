@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import ModalShell from './ModalShell';
+import Button from '@/components/ui/Button';
 
 const PRESETS = [
   { emoji: '🍽️', label: 'Lunch',    message: 'Out for lunch' },
@@ -58,9 +59,11 @@ export default function AwayModal() {
           <div className="away-current">
             <p className="away-current-label">You are currently away</p>
             <p className="away-current-msg">{awayMessage || '(no message)'}</p>
-            <button className="away-btn-clear" onClick={unsetAway}>
-              Clear Away
-            </button>
+            <div className="away-actions">
+              <Button variant="secondary" onClick={unsetAway}>
+                Clear away
+              </Button>
+            </div>
           </div>
         ) : (
           // ── Set away ──────────────────────────────────────────────────────
@@ -91,13 +94,11 @@ export default function AwayModal() {
               <span className="away-counter">{draft.length}/{MAX_CHARS}</span>
             </div>
 
-            <button
-              className="away-btn-set"
-              onClick={handleSet}
-              disabled={!draft.trim()}
-            >
-              Set Away
-            </button>
+            <div className="away-actions">
+              <Button variant="primary" onClick={handleSet} disabled={!draft.trim()}>
+                Set away
+              </Button>
+            </div>
           </>
         )}
 
@@ -151,6 +152,17 @@ export default function AwayModal() {
           background: var(--accent-subtle);
           border-color: var(--accent-border);
           color: var(--text-primary);
+          transform: translateY(-1px);
+        }
+        .away-preset:active { transform: translateY(0.5px); }
+        .away-preset:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
+        }
+
+        .away-actions {
+          display: flex;
+          justify-content: flex-end;
         }
 
         .away-preset-emoji { font-size: 15px; }
@@ -176,9 +188,10 @@ export default function AwayModal() {
           box-sizing: border-box;
           transition: border-color var(--t-control, 150ms);
         }
-        .away-textarea:focus {
-          outline: none;
-          border-color: var(--accent-border, rgba(14,165,233,0.5));
+        .away-textarea:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
+          border-color: var(--accent);
         }
         .away-textarea::placeholder { color: var(--text-muted); }
 
@@ -186,25 +199,7 @@ export default function AwayModal() {
           font-size: var(--text-2xs, 11px);
           color: var(--text-muted);
           text-align: right;
-        }
-
-        .away-btn-set {
-          padding: 9px 20px;
-          background: var(--accent);
-          color: #fff;
-          border: none;
-          border-radius: var(--r-md);
-          font-size: var(--text-base, 14px);
-          font-weight: 600;
-          font-family: inherit;
-          cursor: pointer;
-          transition: background var(--t-control, 150ms), opacity var(--t-control, 150ms);
-          align-self: flex-end;
-        }
-        .away-btn-set:hover:not(:disabled) { background: var(--accent-hover); }
-        .away-btn-set:disabled {
-          opacity: 0.4;
-          cursor: not-allowed;
+          font-variant-numeric: tabular-nums;
         }
 
         .away-current {
@@ -229,25 +224,6 @@ export default function AwayModal() {
           padding: 10px 12px;
           margin: 0;
           word-break: break-word;
-        }
-
-        .away-btn-clear {
-          padding: 9px 18px;
-          background: none;
-          border: 1px solid var(--border-normal, rgba(255,255,255,0.1));
-          color: var(--text-secondary);
-          border-radius: var(--r-md, 8px);
-          font-size: var(--text-base, 14px);
-          font-weight: 600;
-          font-family: inherit;
-          cursor: pointer;
-          align-self: flex-end;
-          transition: background var(--t-control, 150ms), border-color var(--t-control, 150ms), color var(--t-control, 150ms);
-        }
-        .away-btn-clear:hover {
-          background: var(--ch-hover-bg);
-          border-color: var(--border-normal);
-          color: var(--text-primary);
         }
 
         .away-idle-section {
@@ -290,9 +266,19 @@ export default function AwayModal() {
           background-position: right 8px center;
           transition: border-color var(--t-control, 150ms);
         }
-        .away-idle-select:focus {
-          outline: none;
-          border-color: var(--accent-border, rgba(14,165,233,0.5));
+        .away-idle-select:hover {
+          border-color: var(--border-normal);
+        }
+        .away-idle-select:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
+          border-color: var(--accent);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .away-preset { transition-duration: 1ms; }
+          .away-preset:hover,
+          .away-preset:active { transform: none; }
         }
       `}</style>
     </ModalShell>

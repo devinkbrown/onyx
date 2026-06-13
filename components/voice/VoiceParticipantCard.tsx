@@ -1,8 +1,11 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useOnyxStore } from '@/lib/store';
 import Avatar from '@/components/ui/Avatar';
 import SpeakingBars from './SpeakingBars';
+import { getMountedSuimyakuMediaEngine } from '@/lib/suimyaku-media/MediaEngine';
+import type { NetworkQualityTier } from '@/lib/suimyaku-media/types';
 
 interface VoiceParticipantCardProps {
   nick: string;
@@ -26,6 +29,20 @@ export default function VoiceParticipantCard({
   const voice         = useOnyxStore(s => s.voice);
   const channels      = useOnyxStore(s => s.channels);
 
+  // Live session network tier (engine-authoritative); falls back to null until
+  // the engine reports. The card is only shown for in-call participants, so the
+  // session tier is the relevant signal for everyone on the same SFU room.
+  const [tier, setTier] = useState<NetworkQualityTier | null>(null);
+  useEffect(() => {
+    const read = () => {
+      const engine = getMountedSuimyakuMediaEngine();
+      setTier(engine ? engine.getNetworkStats().tier : null);
+    };
+    read();
+    const id = setInterval(read, 1500);
+    return () => clearInterval(id);
+  }, []);
+
   // Speaking: check speakingNicks store (updated by VAD), fall back to peer state
   const speaking = speakingNicks.has(nick.toLowerCase())
     || (!isYou && (voice.peers.get(nick)?.speaking ?? false));
@@ -41,19 +58,26 @@ export default function VoiceParticipantCard({
   const isOp    = userModes.has('o') || userModes.has('a');
   const isVoice = userModes.has('v') || userModes.has('h');
 
-  // Connection quality derived from roomStats (audio_kbps as a proxy)
-  const roomStats = voice.roomStats;
+  // Connection quality — prefer the engine's authoritative network tier; fall
+  // back to a roomStats audio-bitrate heuristic when the engine hasn't reported.
   let qualityLabel = 'Good';
   let qualityColor = 'var(--status-online, #34d399)';
 
-  for (const [, stat] of roomStats) {
-    if (!stat) continue;
-    if (stat.audio_kbps > 0 && stat.audio_kbps < 8) {
-      qualityLabel = 'Poor';
-      qualityColor = '#ef4444';
-    } else if (stat.audio_kbps > 0 && stat.audio_kbps < 16) {
-      qualityLabel = 'Fair';
-      qualityColor = '#f59e0b';
+  if (tier !== null) {
+    if (tier === 0)      { qualityLabel = 'Excellent'; qualityColor = 'var(--status-online, #34d399)'; }
+    else if (tier === 1) { qualityLabel = 'Good';      qualityColor = 'var(--status-online, #34d399)'; }
+    else if (tier === 2) { qualityLabel = 'Fair';      qualityColor = 'var(--warning, #fbbf24)'; }
+    else                 { qualityLabel = 'Poor';      qualityColor = 'var(--danger, #f87171)'; }
+  } else {
+    for (const [, stat] of voice.roomStats) {
+      if (!stat) continue;
+      if (stat.audio_kbps > 0 && stat.audio_kbps < 8) {
+        qualityLabel = 'Poor';
+        qualityColor = 'var(--danger, #f87171)';
+      } else if (stat.audio_kbps > 0 && stat.audio_kbps < 16) {
+        qualityLabel = 'Fair';
+        qualityColor = 'var(--warning, #fbbf24)';
+      }
     }
   }
 
