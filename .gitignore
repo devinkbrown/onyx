@@ -24,6 +24,10 @@
 .DS_Store
 *.pem
 
+# secrets / generated runtime keys (never commit)
+*.key
+orochi-node.key
+
 # debug
 npm-debug.log*
 yarn-debug.log*
