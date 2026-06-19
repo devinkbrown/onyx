@@ -34,6 +34,16 @@ import { ChannelSidebar } from './ChannelSidebar';
 import { PresenceRibbon } from './PresenceRibbon';
 import { MessageView } from './MessageView';
 import { Composer } from './Composer';
+import {
+  VoiceStage,
+  VoiceBar,
+  VoicePip,
+  IncomingCallOverlay,
+  OutgoingCallOverlay,
+  CaptionsOverlay,
+  ReactionsOverlay,
+} from './voice';
+import { mountMedia } from '@/media/useSuimyakuMedia';
 import { MemberList } from './MemberList';
 
 // ── AppShell props ───────────────────────────────────────────────────────────
@@ -105,6 +115,24 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const showMemberList = useStore((s) => s.showMemberList);
   const mobileSidebarOpen = useStore((s) => s.mobileSidebarOpen);
   const ourNick = useStore((s) => s.ourNick);
+
+  // ── voice/video ──
+  // Boot the SUIMYAKU media engine once and wire its callbacks into the store.
+  mountMedia();
+  const voice = useStore((s) => s.voice);
+  const inCall = createMemo(() => {
+    const cs = voice().callState;
+    return cs !== 'idle' && cs !== 'ringing_in' && cs !== 'ringing_out';
+  });
+  const viewingCall = createMemo(() => {
+    const v = activeView();
+    return inCall() && v.kind === 'channel' && v.channel === voice().callChannel;
+  });
+  const canJoinVoice = createMemo(() => activeView().kind === 'channel' && !inCall());
+  function joinVoice(withVideo: boolean): void {
+    const v = activeView();
+    if (v.kind === 'channel') void getState().joinVoiceChannel(v.channel, withVideo);
+  }
 
   // ── The rail is hidden when fewer than 3 servers are present.
   //    We only have one IRCXNet network for now, so the rail collapses.
@@ -195,7 +223,26 @@ export function AppShell(props: AppShellProps): JSX.Element {
             when={hasConversation()}
             fallback={<HomeView />}
           >
+            {/* In-call stage when viewing the voice channel you're in */}
+            <Show when={viewingCall()}>
+              <VoiceStage />
+            </Show>
+            {/* Join-voice affordance for a text channel you're not yet in a call on */}
+            <Show when={canJoinVoice()}>
+              <div class="shell-voice-join">
+                <button type="button" class="shell-voice-join-btn" onClick={() => joinVoice(false)}>
+                  [ join voice ]
+                </button>
+                <button type="button" class="shell-voice-join-btn" onClick={() => joinVoice(true)}>
+                  [ join video ]
+                </button>
+              </div>
+            </Show>
             <MessageView selfNick={displayNick()} />
+            {/* Persistent call controls while in a call */}
+            <Show when={inCall()}>
+              <VoiceBar />
+            </Show>
             <Composer />
           </Show>
         </div>
@@ -225,6 +272,13 @@ export function AppShell(props: AppShellProps): JSX.Element {
           ✕ disconnect
         </button>
       </nav>
+
+      {/* Voice/video overlays — each self-gates on store.voice */}
+      <VoicePip />
+      <IncomingCallOverlay />
+      <OutgoingCallOverlay />
+      <CaptionsOverlay />
+      <ReactionsOverlay />
     </>
   );
 }
