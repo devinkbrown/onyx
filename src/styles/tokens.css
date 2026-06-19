@@ -8,6 +8,13 @@
                     brutalist editorial type, [bracketed] controls
    Warm washi-paper text over cool ultramarine + a single vermilion (朱)
    accent — the deliberate opposite of purple-gradient AI slop.
+
+   The :root declaration is the canonical default (ruri flagship).
+   All other themes in src/theme/themes.ts override these values via
+   ThemeProvider, which writes CSS-custom-property overrides onto
+   document.documentElement and sets the data-theme attribute.
+   The [data-theme='ruri'] selector below restores these exact values
+   if a user switches back to ruri after another theme was active.
    ───────────────────────────────────────────────────────────── */
 
 :root,

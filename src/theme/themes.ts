@@ -1,0 +1,437 @@
+/**
+ * Ruri theming engine — curated theme definitions.
+ *
+ * Each theme is a typed map of CSS-custom-property overrides keyed to the
+ * token names defined in src/styles/tokens.css.  A theme only needs to
+ * declare the vars it wants to change; the flagship `ruri` theme declares
+ * every token so it can serve as an exhaustive reference.
+ *
+ * Identity constraints (ALL themes must honour):
+ *   - WCAG AA contrast on all text / surface pairs
+ *   - No purple / indigo in any palette position
+ *   - No backdrop-filter blur (glassmorphism) in token values
+ *   - No Inter, no neon glow, no AI-style gradient language
+ *   - Animate compositor-friendly properties only (transform, opacity, clip-path)
+ */
+
+export type TokenMap = Record<string, string>;
+
+export type ThemeMeta = {
+  /** Machine ID used in data-theme attribute and localStorage. */
+  id: ThemeId;
+  /** Human-readable display name. */
+  label: string;
+  /** Short flavour description. */
+  description: string;
+  /** Light or dark — written to the `color-scheme` property. */
+  scheme: 'light' | 'dark';
+  /** The CSS custom property overrides for this theme. */
+  tokens: TokenMap;
+};
+
+export type ThemeId =
+  | 'ruri'
+  | 'obsidian'
+  | 'pearl'
+  | 'sumi'
+  | 'shu'
+  | 'hisui'
+  | 'kohaku';
+
+// ---------------------------------------------------------------------------
+// Flagship: ruri — lapis × kintsugi × terminal (dark)
+// Formalises what lives in tokens.css as the default :root.
+// ---------------------------------------------------------------------------
+const ruriTokens: TokenMap = {
+  // Ground
+  '--ink':        '#07090f',
+  '--ink-2':      '#0a0d16',
+  '--stone':      '#0d1631',
+  '--stone-2':    '#122051',
+  '--stone-3':    '#18306e',
+  '--stone-line': '#20356f',
+
+  // Lapis
+  '--lapis':       '#2f5bf0',
+  '--lapis-bright':'#4f7bff',
+  '--lapis-deep':  '#1d3aa8',
+
+  // Gold — kintsugi seams
+  '--gold':       '#c9a24a',
+  '--gold-bright':'#ecc873',
+  '--gold-deep':  '#9a7a30',
+
+  // Vermilion — 朱 shu
+  '--shu':        '#e0452f',
+  '--shu-bright': '#ff5a40',
+
+  // Text — warm washi paper
+  '--washi':      '#ece4cf',
+  '--washi-dim':  '#ada590',
+  '--washi-mute': '#6d6f86',
+
+  // Status
+  '--ok':      '#5fb98a',
+  '--warn':    'var(--gold-bright)',
+  '--danger':  'var(--shu)',
+
+  // Seams + structure
+  '--seam':       'color-mix(in oklab, var(--gold) 42%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--gold) 16%, transparent)',
+  '--line':       'color-mix(in oklab, var(--lapis) 22%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--lapis) 10%, transparent)',
+
+  // Radius
+  '--r-0':    '0px',
+  '--r-sm':   '2px',
+  '--r-md':   '4px',
+  '--r-pill': '999px',
+
+  // Motion
+  '--ease': 'cubic-bezier(0.16, 1, 0.3, 1)',
+  '--dur':  '240ms',
+
+  // Typography
+  '--font-mono':    "'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace",
+  '--font-display': "'Anton', 'Arial Narrow', 'Helvetica Neue', sans-serif",
+  '--font-sans':    "'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  '--font-serif':   "'Fraunces Variable', 'Iowan Old Style', Georgia, 'Times New Roman', serif",
+};
+
+// ---------------------------------------------------------------------------
+// obsidian — deeper / AMOLED; pure volcanic black ground, cooler lapis
+// ---------------------------------------------------------------------------
+const obsidianTokens: TokenMap = {
+  '--ink':        '#000000',
+  '--ink-2':      '#030508',
+  '--stone':      '#080e1e',
+  '--stone-2':    '#0d1830',
+  '--stone-3':    '#122240',
+  '--stone-line': '#162848',
+
+  '--lapis':        '#2248d0',
+  '--lapis-bright': '#3d6bec',
+  '--lapis-deep':   '#152c8a',
+
+  '--gold':        '#b8902e',
+  '--gold-bright': '#dab85a',
+  '--gold-deep':   '#8a6520',
+
+  '--shu':        '#cc3a22',
+  '--shu-bright': '#f04828',
+
+  '--washi':      '#e8dfc8',
+  '--washi-dim':  '#9e9682',
+  '--washi-mute': '#5c5e74',
+
+  '--ok':   '#4ea87a',
+  '--warn': 'var(--gold-bright)',
+  '--danger': 'var(--shu)',
+
+  '--seam':       'color-mix(in oklab, var(--gold) 38%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--gold) 12%, transparent)',
+  '--line':       'color-mix(in oklab, var(--lapis) 20%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--lapis) 8%, transparent)',
+
+  '--r-0':    '0px',
+  '--r-sm':   '1px',
+  '--r-md':   '3px',
+  '--r-pill': '999px',
+
+  '--ease': 'cubic-bezier(0.16, 1, 0.3, 1)',
+  '--dur':  '220ms',
+};
+
+// ---------------------------------------------------------------------------
+// pearl — light; warm washi-paper ground, ink text, lapis + gold accents
+// color-scheme: light is set in ThemeProvider via the scheme field.
+// ---------------------------------------------------------------------------
+const pearlTokens: TokenMap = {
+  // Ground (reversed — light surfaces)
+  '--ink':        '#f7f2e8',
+  '--ink-2':      '#ede7d6',
+  '--stone':      '#e4dccc',
+  '--stone-2':    '#d8cebc',
+  '--stone-3':    '#ccc1ac',
+  '--stone-line': '#b8ae9c',
+
+  // Lapis — must stay readable on light ground (darkened for contrast)
+  '--lapis':        '#1a3db8',
+  '--lapis-bright': '#2a54d8',
+  '--lapis-deep':   '#0e267a',
+
+  // Gold — deepened for WCAG AA on paper
+  '--gold':        '#8a6418',
+  '--gold-bright': '#a87c20',
+  '--gold-deep':   '#6a4c10',
+
+  // Vermilion stays as-is; deepened slightly for contrast on paper
+  '--shu':        '#c83418',
+  '--shu-bright': '#e04028',
+
+  // Text — near-ink on paper
+  '--washi':      '#1a1610',
+  '--washi-dim':  '#3e3828',
+  '--washi-mute': '#6e6854',
+
+  '--ok':      '#2a7a4c',
+  '--warn':    'var(--gold)',
+  '--danger':  'var(--shu)',
+
+  '--seam':       'color-mix(in oklab, var(--gold) 55%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--gold) 24%, transparent)',
+  '--line':       'color-mix(in oklab, var(--lapis) 28%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--lapis) 12%, transparent)',
+
+  '--r-0':    '0px',
+  '--r-sm':   '2px',
+  '--r-md':   '4px',
+  '--r-pill': '999px',
+
+  '--ease': 'cubic-bezier(0.16, 1, 0.3, 1)',
+  '--dur':  '200ms',
+};
+
+// ---------------------------------------------------------------------------
+// sumi — high-contrast ink; near-white washi on deepest sumi-black
+// ---------------------------------------------------------------------------
+const sumiTokens: TokenMap = {
+  '--ink':        '#05060a',
+  '--ink-2':      '#060810',
+  '--stone':      '#090c18',
+  '--stone-2':    '#0c1020',
+  '--stone-3':    '#101528',
+  '--stone-line': '#141a2e',
+
+  '--lapis':        '#4a78ff',
+  '--lapis-bright': '#6a94ff',
+  '--lapis-deep':   '#2840c0',
+
+  '--gold':        '#d8b050',
+  '--gold-bright': '#f0cc70',
+  '--gold-deep':   '#a88030',
+
+  '--shu':        '#e84530',
+  '--shu-bright': '#ff5a40',
+
+  // High-contrast: near-pure washi
+  '--washi':      '#f4ede0',
+  '--washi-dim':  '#c8c0a8',
+  '--washi-mute': '#807a68',
+
+  '--ok':      '#68d098',
+  '--warn':    'var(--gold-bright)',
+  '--danger':  'var(--shu)',
+
+  '--seam':       'color-mix(in oklab, var(--gold) 50%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--gold) 20%, transparent)',
+  '--line':       'color-mix(in oklab, var(--lapis) 25%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--lapis) 10%, transparent)',
+
+  '--r-0':    '0px',
+  '--r-sm':   '0px',
+  '--r-md':   '2px',
+  '--r-pill': '999px',
+
+  '--ease': 'cubic-bezier(0.16, 1, 0.3, 1)',
+  '--dur':  '180ms',
+};
+
+// ---------------------------------------------------------------------------
+// shu — vermilion-forward dark; shu as the primary accent colour
+// ---------------------------------------------------------------------------
+const shuTokens: TokenMap = {
+  '--ink':        '#0e0806',
+  '--ink-2':      '#120a07',
+  '--stone':      '#1c0e0a',
+  '--stone-2':    '#281410',
+  '--stone-3':    '#341a14',
+  '--stone-line': '#3c2018',
+
+  // Lapis recedes — shu leads
+  '--lapis':        '#3a6adc',
+  '--lapis-bright': '#5a86f0',
+  '--lapis-deep':   '#1e3e9a',
+
+  // Gold as supporting seam (kintsugi still present)
+  '--gold':        '#c09838',
+  '--gold-bright': '#dcb84e',
+  '--gold-deep':   '#8e7020',
+
+  // Shu as the dominant accent
+  '--shu':        '#e84530',
+  '--shu-bright': '#ff5e44',
+
+  '--washi':      '#ede0cc',
+  '--washi-dim':  '#b0a08a',
+  '--washi-mute': '#6c5e52',
+
+  '--ok':      '#5aaa78',
+  '--warn':    'var(--gold-bright)',
+  '--danger':  'var(--shu)',
+
+  '--seam':       'color-mix(in oklab, var(--shu) 38%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--shu) 14%, transparent)',
+  '--line':       'color-mix(in oklab, var(--shu) 18%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--shu) 8%, transparent)',
+
+  '--r-0':    '0px',
+  '--r-sm':   '2px',
+  '--r-md':   '4px',
+  '--r-pill': '999px',
+
+  '--ease': 'cubic-bezier(0.16, 1, 0.3, 1)',
+  '--dur':  '240ms',
+};
+
+// ---------------------------------------------------------------------------
+// hisui — jade-green gem variant (翡翠); deep forest ground + jade accent
+// ---------------------------------------------------------------------------
+const hisuiTokens: TokenMap = {
+  '--ink':        '#060e09',
+  '--ink-2':      '#08120b',
+  '--stone':      '#0b1c10',
+  '--stone-2':    '#0e2414',
+  '--stone-3':    '#122c18',
+  '--stone-line': '#163420',
+
+  // Jade as primary accent (replaces lapis)
+  '--lapis':        '#1e9458',
+  '--lapis-bright': '#2db86e',
+  '--lapis-deep':   '#127040',
+
+  // Gold — still present as kintsugi seams
+  '--gold':        '#c0a030',
+  '--gold-bright': '#dcbc48',
+  '--gold-deep':   '#907820',
+
+  // Shu accent stays (contrast on green ground)
+  '--shu':        '#e04030',
+  '--shu-bright': '#f85840',
+
+  '--washi':      '#e8e0cc',
+  '--washi-dim':  '#a8a08a',
+  '--washi-mute': '#607054',
+
+  '--ok':      '#3cb87a',
+  '--warn':    'var(--gold-bright)',
+  '--danger':  'var(--shu)',
+
+  '--seam':       'color-mix(in oklab, var(--lapis) 40%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--lapis) 15%, transparent)',
+  '--line':       'color-mix(in oklab, var(--lapis) 22%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--lapis) 9%, transparent)',
+
+  '--r-0':    '0px',
+  '--r-sm':   '2px',
+  '--r-md':   '4px',
+  '--r-pill': '999px',
+
+  '--ease': 'cubic-bezier(0.16, 1, 0.3, 1)',
+  '--dur':  '240ms',
+};
+
+// ---------------------------------------------------------------------------
+// kohaku — amber gem variant (琥珀); warm amber ground + deep amber seams
+// ---------------------------------------------------------------------------
+const kohakuTokens: TokenMap = {
+  '--ink':        '#0e0a04',
+  '--ink-2':      '#140e06',
+  '--stone':      '#1e1408',
+  '--stone-2':    '#281a0a',
+  '--stone-3':    '#32200c',
+  '--stone-line': '#3a2610',
+
+  // Amber as primary accent (replaces lapis with deep amber)
+  '--lapis':        '#c07820',
+  '--lapis-bright': '#e09030',
+  '--lapis-deep':   '#8a5414',
+
+  // Gold leans warm amber-gold
+  '--gold':        '#d4960e',
+  '--gold-bright': '#f0b020',
+  '--gold-deep':   '#a07008',
+
+  '--shu':        '#dc3c28',
+  '--shu-bright': '#f85040',
+
+  '--washi':      '#f0e4cc',
+  '--washi-dim':  '#c0aa88',
+  '--washi-mute': '#806858',
+
+  '--ok':      '#5aac78',
+  '--warn':    'var(--gold-bright)',
+  '--danger':  'var(--shu)',
+
+  '--seam':       'color-mix(in oklab, var(--gold) 48%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--gold) 18%, transparent)',
+  '--line':       'color-mix(in oklab, var(--lapis) 28%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--lapis) 12%, transparent)',
+
+  '--r-0':    '0px',
+  '--r-sm':   '2px',
+  '--r-md':   '4px',
+  '--r-pill': '999px',
+
+  '--ease': 'cubic-bezier(0.16, 1, 0.3, 1)',
+  '--dur':  '240ms',
+};
+
+// ---------------------------------------------------------------------------
+// Registry
+// ---------------------------------------------------------------------------
+
+export const THEMES: Record<ThemeId, ThemeMeta> = {
+  ruri: {
+    id: 'ruri',
+    label: '瑠璃 — Ruri',
+    description: 'Flagship lapis × kintsugi × terminal dark.',
+    scheme: 'dark',
+    tokens: ruriTokens,
+  },
+  obsidian: {
+    id: 'obsidian',
+    label: '黒曜 — Obsidian',
+    description: 'Deeper AMOLED variant. Volcanic black ground.',
+    scheme: 'dark',
+    tokens: obsidianTokens,
+  },
+  pearl: {
+    id: 'pearl',
+    label: '真珠 — Pearl',
+    description: 'Warm washi-paper light theme. Ink text, lapis + gold accents.',
+    scheme: 'light',
+    tokens: pearlTokens,
+  },
+  sumi: {
+    id: 'sumi',
+    label: '墨 — Sumi',
+    description: 'High-contrast ink. Near-white washi on deepest sumi-black.',
+    scheme: 'dark',
+    tokens: sumiTokens,
+  },
+  shu: {
+    id: 'shu',
+    label: '朱 — Shu',
+    description: 'Vermilion-forward dark. 朱 leads; gold seams persist.',
+    scheme: 'dark',
+    tokens: shuTokens,
+  },
+  hisui: {
+    id: 'hisui',
+    label: '翡翠 — Hisui',
+    description: 'Jade-green gem variant. Deep forest ground, jade accent.',
+    scheme: 'dark',
+    tokens: hisuiTokens,
+  },
+  kohaku: {
+    id: 'kohaku',
+    label: '琥珀 — Kohaku',
+    description: 'Amber gem variant. Warm amber ground and seams.',
+    scheme: 'dark',
+    tokens: kohakuTokens,
+  },
+};
+
+export const THEME_IDS = Object.keys(THEMES) as ThemeId[];
+export const DEFAULT_THEME_ID: ThemeId = 'ruri';
