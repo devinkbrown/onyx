@@ -1,0 +1,204 @@
+.ruri-spotlight {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: start center;
+  padding: clamp(1rem, 7svh, 5rem) 1rem 1rem;
+  color: var(--washi);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--ink) 90%, transparent), color-mix(in oklab, var(--ink) 76%, transparent)),
+    repeating-linear-gradient(90deg, transparent 0 38px, var(--line-faint) 38px 39px);
+}
+
+.ruri-spotlight__panel {
+  position: relative;
+  width: min(45rem, 100%);
+  max-height: min(42rem, calc(100svh - 2rem));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 54%, var(--ink)), color-mix(in oklab, var(--stone) 34%, var(--ink))),
+    var(--ink);
+  border: 1px solid var(--seam);
+  border-radius: var(--r-md);
+  box-shadow: 0 34px 90px -54px #000;
+}
+
+.ruri-spotlight__panel::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--gold-deep), var(--gold-bright), var(--shu), var(--gold));
+  clip-path: polygon(0 0, 100% 0, 58% 18%, 100% 36%, 42% 54%, 100% 76%, 54% 100%, 0 100%);
+}
+
+.ruri-spotlight__panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-top: 1px solid color-mix(in oklab, var(--gold-bright) 58%, transparent);
+}
+
+.ruri-spotlight__search {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1rem 1rem 0.9rem 1.25rem;
+  border-bottom: 1px solid var(--seam-faint);
+}
+
+.ruri-spotlight__sigil {
+  color: var(--gold-bright);
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.ruri-spotlight__input {
+  width: 100%;
+  min-width: 0;
+  appearance: none;
+  border: 0;
+  outline: 0;
+  color: var(--washi);
+  background: transparent;
+  font: 500 1rem/1.4 var(--font-sans);
+}
+
+.ruri-spotlight__input::placeholder {
+  color: var(--washi-mute);
+}
+
+.ruri-spotlight__close {
+  width: 2rem;
+  height: 2rem;
+  display: inline-grid;
+  place-items: center;
+  appearance: none;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-0);
+  color: var(--washi-dim);
+  background: color-mix(in oklab, var(--stone) 30%, transparent);
+  cursor: pointer;
+  font: 700 1rem/1 var(--font-mono);
+}
+
+.ruri-spotlight__close:hover {
+  color: var(--gold-bright);
+  border-color: var(--gold);
+}
+
+.ruri-spotlight__results {
+  min-height: 13rem;
+  max-height: min(32rem, calc(100svh - 8rem));
+  overflow: auto;
+  padding: 0.45rem;
+}
+
+.ruri-spotlight__group + .ruri-spotlight__group {
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--line-faint);
+}
+
+.ruri-spotlight__section {
+  display: block;
+  padding: 0.55rem 0.7rem 0.35rem;
+  color: var(--gold);
+  font: 700 0.68rem/1 var(--font-mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.ruri-spotlight__option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  min-height: 3rem;
+  padding: 0.68rem 0.75rem;
+  border: 1px solid transparent;
+  color: var(--washi);
+  cursor: pointer;
+}
+
+.ruri-spotlight__option[aria-selected='true'] {
+  background:
+    linear-gradient(90deg, color-mix(in oklab, var(--gold) 18%, transparent), transparent 62%),
+    color-mix(in oklab, var(--stone-3) 36%, transparent);
+  border-color: var(--seam);
+}
+
+.ruri-spotlight__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 650 0.95rem/1.2 var(--font-sans);
+}
+
+.ruri-spotlight__title mark {
+  padding: 0;
+  color: var(--ink);
+  background: var(--gold-bright);
+}
+
+.ruri-spotlight__hint {
+  min-width: 0;
+  max-width: 18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--washi-mute);
+  font: 0.72rem/1.2 var(--font-mono);
+}
+
+.ruri-spotlight__empty {
+  display: grid;
+  min-height: 11rem;
+  place-items: center;
+  color: var(--washi-mute);
+  font: 0.86rem/1.4 var(--font-mono);
+}
+
+@media (max-width: 520px) {
+  .ruri-spotlight {
+    padding-top: 0.75rem;
+  }
+
+  .ruri-spotlight__panel {
+    max-height: calc(100svh - 1.5rem);
+  }
+
+  .ruri-spotlight__option {
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+  }
+
+  .ruri-spotlight__hint {
+    max-width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ruri-spotlight__panel {
+    animation: ruri-spotlight-in var(--dur) var(--ease);
+  }
+}
+
+@keyframes ruri-spotlight-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.55rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
