@@ -18,7 +18,10 @@
   overflow: hidden;
   font-family: var(--font-sans);
   color: var(--washi);
-  background: transparent;
+  /* Semi-opaque ink veil over the live Background canvas: keeps it as calm
+     ambiance behind the working surfaces so message text stays crisp.
+     (The background is shown full-strength on /appearance for picking.) */
+  background: color-mix(in oklab, var(--ink) 82%, transparent);
 }
 
 .shell--no-rail {

@@ -15,7 +15,7 @@ body,
 
 body {
   margin: 0;
-  background: var(--bg-void);
+  background: var(--ink);
   color: var(--text);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
