@@ -1,0 +1,70 @@
+import { createMemo, For, Show } from 'solid-js';
+
+import { useStore } from '@/lib/store';
+
+import './voice-overlays.css';
+
+type CaptionLine = {
+  nick: string;
+  text: string;
+  time: Date;
+};
+
+function nickColor(nick: string) {
+  let hash = 0;
+  for (let index = 0; index < nick.length; index += 1) {
+    hash = (hash * 31 + nick.charCodeAt(index)) >>> 0;
+  }
+  const swatches = [
+    'var(--gold-bright)',
+    'var(--lapis-bright)',
+    'var(--ok)',
+    'var(--shu-bright)',
+    'var(--washi)',
+  ];
+  return swatches[hash % swatches.length] ?? swatches[0];
+}
+
+export function CaptionsOverlay() {
+  const lines = useStore((state) => {
+    const voiceTarget = state.voice.callChannel;
+    const activeTarget = state.activeView.kind === 'channel' ? state.activeView.channel : null;
+    const target = voiceTarget ?? activeTarget;
+    if (!target || state.voice.callState === 'idle') return [] as CaptionLine[];
+    return state.mediaTranscripts.get(target.toLowerCase()) ?? [];
+  });
+
+  const visibleLines = createMemo(() => lines().slice(-3));
+
+  return (
+    <Show when={visibleLines().length > 0}>
+      <section
+        class="voice-captions"
+        role="log"
+        aria-live="polite"
+        aria-label="Live captions"
+        data-testid="captions-overlay"
+      >
+        <For each={visibleLines()}>
+          {(line, index) => {
+            const opacity = createMemo(() => 0.58 + ((index() + 1) / visibleLines().length) * 0.42);
+            return (
+              <p
+                class="voice-caption-line"
+                style={{
+                  '--voice-caption-color': nickColor(line.nick),
+                  '--voice-caption-opacity': String(opacity()),
+                }}
+              >
+                <span class="voice-caption-speaker">{line.nick}</span>
+                <span class="voice-caption-text">{line.text}</span>
+              </p>
+            );
+          }}
+        </For>
+      </section>
+    </Show>
+  );
+}
+
+export default CaptionsOverlay;

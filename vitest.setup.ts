@@ -52,6 +52,7 @@ Object.defineProperty(globalThis, 'AudioContext', {
 });
 Object.defineProperty(globalThis.navigator, 'mediaDevices', {
   writable: true,
+  configurable: true, // let individual tests redefine it with their own device fixtures
   value: {
     getUserMedia: () => Promise.reject(new Error('not available in test')),
     getDisplayMedia: () => Promise.reject(new Error('not available in test')),

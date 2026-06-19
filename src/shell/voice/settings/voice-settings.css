@@ -1,0 +1,163 @@
+.voice-settings {
+  display: grid;
+  gap: 1rem;
+  color: var(--washi);
+}
+
+.voice-settings__section {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--stone) 30%, transparent), color-mix(in oklab, var(--ink) 28%, transparent)),
+    repeating-linear-gradient(90deg, transparent 0 29px, var(--line-faint) 29px 30px);
+  border: 1px solid var(--seam-faint);
+  border-top-color: var(--seam);
+}
+
+.voice-settings__section-title {
+  margin: 0;
+  color: var(--washi);
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.voice-settings__section-copy {
+  margin: -0.25rem 0 0;
+  color: var(--washi-dim);
+  font-family: var(--font-serif);
+  font-size: 0.94rem;
+  line-height: 1.45;
+}
+
+.voice-settings__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.voice-settings__select {
+  width: 100%;
+  min-height: 2.7rem;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-0);
+  padding: 0.68rem 0.78rem;
+  color: var(--washi);
+  background: color-mix(in oklab, var(--ink) 68%, var(--stone));
+  font: inherit;
+  outline: none;
+}
+
+.voice-settings__select:focus {
+  border-color: var(--lapis);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--lapis) 34%, transparent);
+}
+
+.voice-settings__select option {
+  color: var(--washi);
+  background: var(--ink);
+}
+
+.voice-settings__toggle {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.75rem;
+  border: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--ink) 42%, transparent);
+}
+
+.voice-settings__toggle input {
+  appearance: none;
+  width: 2.35rem;
+  height: 1.25rem;
+  margin: 0.1rem 0 0;
+  border: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--ink) 78%, var(--stone));
+  cursor: pointer;
+  position: relative;
+}
+
+.voice-settings__toggle input::before {
+  content: '';
+  position: absolute;
+  top: 0.18rem;
+  left: 0.18rem;
+  width: 0.78rem;
+  height: 0.78rem;
+  background: var(--washi-mute);
+  transition: transform var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+
+.voice-settings__toggle input:checked {
+  border-color: var(--gold);
+  background: color-mix(in oklab, var(--gold) 24%, var(--ink));
+}
+
+.voice-settings__toggle input:checked::before {
+  background: var(--gold-bright);
+  transform: translateX(1.08rem);
+}
+
+.voice-settings__toggle input:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.voice-settings__toggle-text {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.voice-settings__toggle-label {
+  color: var(--washi);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.voice-settings__toggle-description {
+  color: var(--washi-dim);
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.voice-settings__key-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: end;
+}
+
+.voice-settings__key-display {
+  flex: 1 1 11rem;
+}
+
+.voice-settings__key-value {
+  display: flex;
+  align-items: center;
+  min-height: 2.7rem;
+  padding: 0.68rem 0.78rem;
+  color: var(--washi);
+  background: color-mix(in oklab, var(--ink) 68%, var(--stone));
+  border: 1px solid var(--seam-faint);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.voice-settings__capture {
+  color: var(--gold-bright);
+}
+
+@media (max-width: 720px) {
+  .voice-settings__grid {
+    grid-template-columns: 1fr;
+  }
+}
