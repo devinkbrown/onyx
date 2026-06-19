@@ -1,0 +1,1126 @@
+/* ── Ruri AppShell — Lapis × Kintsugi × Terminal ──────────────────────────────
+   Layout: CSS grid — [ ServerRail | ChannelSidebar | ConversationColumn | MemberList ]
+   PresenceRibbon spans the top of the conversation column.
+   Background canvas is fixed behind everything (z-index: -1).
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* ── Grid root ── */
+.shell {
+  position: relative;
+  display: grid;
+  grid-template-columns:
+    var(--shell-rail-w, 54px)
+    var(--shell-sidebar-w, 224px)
+    1fr
+    var(--shell-members-w, 220px);
+  grid-template-rows: 1fr;
+  height: 100svh;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  color: var(--washi);
+  background: transparent;
+}
+
+.shell--no-rail {
+  --shell-rail-w: 0px;
+  grid-template-columns:
+    0px
+    var(--shell-sidebar-w, 224px)
+    1fr
+    var(--shell-members-w, 220px);
+}
+
+.shell--members-hidden {
+  --shell-members-w: 0px;
+  grid-template-columns:
+    var(--shell-rail-w, 54px)
+    var(--shell-sidebar-w, 224px)
+    1fr
+    0px;
+}
+
+.shell--no-rail.shell--members-hidden {
+  grid-template-columns: 0px var(--shell-sidebar-w, 224px) 1fr 0px;
+}
+
+/* ── Server rail ── */
+.shell-rail {
+  grid-column: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 0 12px;
+  background: color-mix(in oklab, var(--ink) 84%, var(--stone));
+  border-right: 1px solid var(--seam-faint);
+  overflow: hidden;
+  width: var(--shell-rail-w, 54px);
+}
+
+.shell-rail--hidden {
+  display: none;
+}
+
+.shell-rail-sep {
+  width: 28px;
+  height: 1px;
+  margin: 4px auto;
+  background: var(--seam-faint);
+}
+
+.shell-rail-entry {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: var(--r-0);
+  cursor: pointer;
+  background: transparent;
+  color: var(--washi-dim);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition:
+    color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease);
+}
+
+.shell-rail-entry:hover {
+  color: var(--gold-bright);
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--stone) 24%, transparent);
+}
+
+.shell-rail-entry--active {
+  color: var(--gold-bright);
+  border-color: var(--gold);
+  background: color-mix(in oklab, var(--stone-2) 56%, transparent);
+}
+
+.shell-rail-entry--active::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 20%;
+  bottom: 20%;
+  width: 2px;
+  background: var(--gold);
+}
+
+.shell-rail-bottom {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── Channel sidebar ── */
+.shell-sidebar {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in oklab, var(--ink) 72%, var(--stone));
+  border-right: 1px solid var(--seam-faint);
+  overflow: hidden;
+}
+
+.shell-sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 12px 10px;
+  border-bottom: 1px solid var(--seam-faint);
+}
+
+.shell-sidebar-network {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.shell-sidebar-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ok);
+  flex: none;
+}
+
+.shell-sidebar-dot--connecting { background: var(--gold-bright); }
+.shell-sidebar-dot--disconnected { background: var(--washi-mute); }
+.shell-sidebar-dot--error { background: var(--shu); }
+
+.shell-sidebar-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--seam-faint) transparent;
+  padding-bottom: 8px;
+}
+
+.shell-sidebar-section {
+  padding: 10px 12px 2px;
+}
+
+.shell-sidebar-section-label {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--washi-mute);
+  padding: 0 0 4px;
+}
+
+.shell-channel-list,
+.shell-dm-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.shell-channel-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  border-radius: var(--r-0);
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 0.86rem;
+  color: var(--washi-dim);
+  transition:
+    color var(--dur) var(--ease),
+    background var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell-channel-item:hover {
+  color: var(--washi);
+  background: color-mix(in oklab, var(--stone) 22%, transparent);
+}
+
+.shell-channel-item--active {
+  color: var(--washi);
+  background: color-mix(in oklab, var(--stone-2) 44%, transparent);
+  border-color: var(--seam-faint);
+}
+
+.shell-channel-item--active .shell-channel-sigil {
+  color: var(--gold);
+}
+
+.shell-channel-item--unread {
+  color: var(--washi);
+  font-weight: 600;
+}
+
+.shell-channel-item--highlight .shell-channel-badge {
+  background: var(--shu);
+  color: var(--washi);
+}
+
+.shell-channel-sigil {
+  color: var(--washi-mute);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  flex: none;
+}
+
+.shell-channel-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell-channel-badge {
+  flex: none;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--gold) 20%, var(--stone));
+  color: var(--gold-bright);
+}
+
+/* join-channel input */
+.shell-join-form {
+  display: flex;
+  gap: 0;
+  margin: 8px 10px 4px;
+}
+
+.shell-join-input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--washi);
+  background: color-mix(in oklab, var(--ink) 72%, var(--stone));
+  border: 1px solid var(--seam-faint);
+  border-right: none;
+  outline: none;
+}
+
+.shell-join-input:focus {
+  border-color: var(--lapis);
+}
+
+.shell-join-input::placeholder {
+  color: var(--washi-mute);
+}
+
+.shell-join-btn {
+  flex: none;
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--gold-bright);
+  background: color-mix(in oklab, var(--stone-2) 48%, var(--ink));
+  border: 1px solid var(--seam-faint);
+  cursor: pointer;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+
+.shell-join-btn:hover {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+
+/* ── Conversation column ── */
+.shell-conversation {
+  grid-column: 3;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: color-mix(in oklab, var(--ink) 56%, var(--stone));
+  overflow: hidden;
+}
+
+/* ── Presence ribbon ── */
+.shell-ribbon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  height: 48px;
+  background: color-mix(in oklab, var(--ink) 70%, var(--stone));
+  border-bottom: 1px solid var(--seam-faint);
+  overflow: hidden;
+}
+
+.shell-ribbon-kintsugi {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--seam-faint) 12%,
+    var(--seam) 35%,
+    var(--gold) 50%,
+    var(--seam) 66%,
+    var(--seam-faint) 88%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+.shell-ribbon-channel {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--washi);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: none;
+  max-width: 22ch;
+}
+
+.shell-ribbon-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--seam-faint);
+  flex: none;
+}
+
+.shell-ribbon-topic {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-serif);
+  font-size: 0.86rem;
+  color: var(--washi-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-style: italic;
+}
+
+.shell-ribbon-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  margin-left: auto;
+}
+
+.shell-ribbon-identity {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  color: var(--washi-dim);
+  text-transform: uppercase;
+}
+
+.shell-ribbon-identity-nick {
+  color: var(--gold);
+}
+
+.shell-ribbon-conn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  color: var(--washi-mute);
+  text-transform: uppercase;
+}
+
+.shell-ribbon-conn-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--washi-mute);
+  flex: none;
+}
+
+.shell-ribbon-conn-dot--connected { background: var(--ok); }
+.shell-ribbon-conn-dot--connecting { background: var(--gold-bright); animation: shell-pulse 1.4s ease infinite; }
+.shell-ribbon-conn-dot--disconnected { background: var(--washi-mute); }
+.shell-ribbon-conn-dot--error { background: var(--shu); }
+
+@keyframes shell-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.38; }
+}
+
+.shell-ribbon-members {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--washi-dim);
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: color var(--dur) var(--ease);
+}
+
+.shell-ribbon-members:hover { color: var(--gold-bright); }
+
+/* ── Message view ── */
+.shell-messages {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.shell-feed {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  padding: 12px 0 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--seam-faint) transparent;
+}
+
+.shell-feed-empty {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--washi-mute);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Message group */
+.shell-msg-group {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 0 10px;
+  padding: 4px 16px;
+}
+
+.shell-msg-group:hover { background: color-mix(in oklab, var(--stone) 10%, transparent); }
+
+.shell-msg-group--system {
+  grid-template-columns: 1fr;
+  padding: 3px 16px 3px calc(42px + 10px + 16px);
+}
+
+.shell-msg-avatar {
+  grid-column: 1;
+  grid-row: 1;
+  padding-top: 2px;
+  justify-self: center;
+}
+
+.shell-msg-body {
+  grid-column: 2;
+  min-width: 0;
+}
+
+.shell-msg-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.shell-msg-author {
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--washi);
+  letter-spacing: 0.01em;
+}
+
+.shell-msg-ts {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  color: var(--washi-mute);
+  letter-spacing: 0.06em;
+  flex: none;
+}
+
+.shell-msg-text {
+  font-size: 0.91rem;
+  line-height: 1.52;
+  color: var(--washi);
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.shell-msg-text--deleted {
+  color: var(--washi-mute);
+  font-style: italic;
+  font-size: 0.84rem;
+}
+
+.shell-msg-text--action {
+  color: var(--washi-dim);
+  font-style: italic;
+}
+
+/* Consecutive message (no avatar repeat) */
+.shell-msg-cont {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 0 10px;
+  padding: 1px 16px;
+}
+
+.shell-msg-cont:hover { background: color-mix(in oklab, var(--stone) 10%, transparent); }
+
+.shell-msg-cont-ts {
+  grid-column: 1;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--washi-mute);
+  letter-spacing: 0.04em;
+  text-align: right;
+  padding-top: 2px;
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+}
+
+.shell-msg-cont:hover .shell-msg-cont-ts { opacity: 1; }
+
+.shell-msg-cont-body {
+  grid-column: 2;
+  min-width: 0;
+}
+
+/* System line */
+.shell-msg-system {
+  padding: 2px 16px 2px calc(42px + 10px + 16px);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--washi-mute);
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shell-msg-system::before {
+  content: '─';
+  color: var(--seam-faint);
+  font-size: 0.9rem;
+}
+
+/* Highlight */
+.shell-msg-group--highlight,
+.shell-msg-cont--highlight {
+  background: color-mix(in oklab, var(--shu) 6%, transparent) !important;
+  border-left: 2px solid var(--shu);
+}
+
+/* Reply indicator */
+.shell-msg-reply {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+  padding-left: 8px;
+  border-left: 2px solid var(--seam);
+  font-size: 0.78rem;
+  color: var(--washi-mute);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell-msg-reply-from {
+  color: var(--gold);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+/* Thread indicator */
+.shell-thread-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--seam-faint);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis-deep) 14%, transparent);
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+
+.shell-thread-indicator:hover {
+  color: var(--gold-bright);
+  border-color: var(--gold);
+  background: color-mix(in oklab, var(--gold-deep) 12%, transparent);
+}
+
+/* Reactions */
+.shell-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+
+.shell-reaction {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px 2px 5px;
+  border: 1px solid var(--seam-faint);
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--washi-dim);
+  background: color-mix(in oklab, var(--stone) 20%, transparent);
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+
+.shell-reaction:hover {
+  border-color: var(--gold);
+  background: color-mix(in oklab, var(--gold-deep) 14%, transparent);
+  color: var(--washi);
+}
+
+.shell-reaction-avatars {
+  display: flex;
+}
+
+.shell-reaction-avatars .ruri-avatar {
+  margin-left: -6px;
+  border: 1px solid var(--ink);
+}
+
+.shell-reaction-avatars .ruri-avatar:first-child { margin-left: 0; }
+
+.shell-reaction-emoji { font-size: 0.96rem; line-height: 1; }
+.shell-reaction-count {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 700;
+  color: var(--washi-mute);
+}
+
+/* Jump to latest */
+.shell-jump-latest {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 7px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold-bright);
+  background: color-mix(in oklab, var(--stone-2) 64%, var(--ink));
+  border: 1px solid var(--gold);
+  cursor: pointer;
+  box-shadow: 0 8px 28px -16px #000;
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+
+.shell-jump-latest:hover {
+  transform: translateX(-50%) translateY(-2px);
+  box-shadow: 0 12px 36px -18px #000;
+}
+
+/* ── Composer ── */
+.shell-composer {
+  flex: none;
+  padding: 10px 16px 14px;
+  background: color-mix(in oklab, var(--ink) 62%, var(--stone));
+  border-top: 1px solid var(--seam-faint);
+}
+
+.shell-composer-inner {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  background: color-mix(in oklab, var(--ink) 72%, var(--stone-2));
+  border: 1px solid var(--seam-faint);
+  transition: border-color var(--dur) var(--ease);
+}
+
+.shell-composer-inner:focus-within {
+  border-color: var(--lapis);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--lapis) 28%, transparent);
+}
+
+.shell-composer-textarea {
+  flex: 1;
+  min-height: 38px;
+  max-height: 200px;
+  padding: 9px 10px;
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: var(--font-sans);
+  font-size: 0.91rem;
+  line-height: 1.52;
+  color: var(--washi);
+  background: transparent;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--seam-faint) transparent;
+}
+
+.shell-composer-textarea::placeholder { color: var(--washi-mute); }
+
+.shell-composer-send {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  margin: 0 2px 1px 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  cursor: pointer;
+  color: var(--washi-mute);
+  background: transparent;
+  font-size: 1rem;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+
+.shell-composer-send:hover:not(:disabled) {
+  color: var(--gold-bright);
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--stone) 24%, transparent);
+}
+
+.shell-composer-send:disabled {
+  opacity: 0.36;
+  cursor: not-allowed;
+}
+
+.shell-composer-hint {
+  margin-top: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  color: var(--washi-mute);
+}
+
+.shell-composer--disabled .shell-composer-inner {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* ── Member list ── */
+.shell-members {
+  grid-column: 4;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in oklab, var(--ink) 78%, var(--stone));
+  border-left: 1px solid var(--seam-faint);
+  overflow: hidden;
+  width: var(--shell-members-w, 220px);
+  transition: width var(--dur) var(--ease);
+}
+
+.shell-members--hidden {
+  display: none;
+}
+
+.shell-members-head {
+  padding: 12px 12px 8px;
+  border-bottom: 1px solid var(--seam-faint);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.shell-members-count {
+  color: var(--washi-mute);
+  font-size: 0.62rem;
+}
+
+.shell-members-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--seam-faint) transparent;
+  padding: 6px 0 8px;
+}
+
+.shell-members-group-label {
+  padding: 8px 10px 4px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--washi-mute);
+}
+
+.shell-member-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  margin: 0 4px;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+
+.shell-member-row:hover {
+  background: color-mix(in oklab, var(--stone) 22%, transparent);
+  border-color: var(--seam-faint);
+}
+
+.shell-member-nick {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.84rem;
+  color: var(--washi-dim);
+  transition: color var(--dur) var(--ease);
+}
+
+.shell-member-row:hover .shell-member-nick { color: var(--washi); }
+
+.shell-member-nick--away { color: var(--washi-mute); font-style: italic; }
+
+/* Role badges */
+.shell-role-badge {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 16px;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border: 1px solid;
+  border-radius: var(--r-sm);
+}
+
+.shell-role-badge--owner {
+  color: var(--gold-bright);
+  border-color: var(--gold);
+  background: color-mix(in oklab, var(--gold-deep) 22%, transparent);
+}
+
+.shell-role-badge--founder {
+  color: var(--gold-bright);
+  border-color: var(--gold-bright);
+  background: color-mix(in oklab, var(--gold) 18%, transparent);
+}
+
+.shell-role-badge--op {
+  color: var(--shu-bright);
+  border-color: color-mix(in oklab, var(--shu) 60%, transparent);
+  background: color-mix(in oklab, var(--shu) 12%, transparent);
+}
+
+.shell-role-badge--voice {
+  color: var(--ok);
+  border-color: color-mix(in oklab, var(--ok) 50%, transparent);
+  background: color-mix(in oklab, var(--ok) 10%, transparent);
+}
+
+.shell-role-badge--netop {
+  color: var(--lapis-bright);
+  border-color: color-mix(in oklab, var(--lapis) 50%, transparent);
+  background: color-mix(in oklab, var(--lapis) 14%, transparent);
+}
+
+/* Member popover card */
+.shell-member-card {
+  display: grid;
+  gap: 10px;
+  min-width: 200px;
+}
+
+.shell-member-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.shell-member-card-nick {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--washi);
+  letter-spacing: 0.06em;
+}
+
+.shell-member-card-account {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--washi-mute);
+}
+
+.shell-member-card-badges {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.shell-member-card-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* ── Home / empty state ── */
+.shell-home {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  color: var(--washi-mute);
+  text-align: center;
+  padding: 2rem;
+}
+
+.shell-home-title {
+  font-family: var(--font-display);
+  font-size: 2.4rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--washi-dim);
+  margin: 0 0 0.6rem;
+  line-height: 1;
+}
+
+.shell-home-sub {
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  font-style: italic;
+  color: var(--washi-mute);
+  max-width: 36ch;
+  line-height: 1.55;
+}
+
+/* ── Thread panel (Sheet) ── */
+.shell-thread-msg {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--seam-faint);
+}
+
+.shell-thread-msg-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--washi-mute);
+}
+
+.shell-thread-msg-from { color: var(--gold); }
+
+.shell-thread-msg-text {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--washi);
+}
+
+/* ── Mobile layout ── */
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+
+  .shell-rail {
+    display: none;
+  }
+
+  .shell-sidebar {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    width: min(280px, 88vw);
+    transform: translateX(-100%);
+    transition: transform var(--dur) var(--ease);
+    grid-column: unset;
+  }
+
+  .shell-sidebar--mobile-open {
+    transform: translateX(0);
+  }
+
+  .shell-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 89;
+    background: color-mix(in oklab, var(--ink) 70%, transparent);
+  }
+
+  .shell-members {
+    display: none;
+  }
+
+  .shell-conversation {
+    grid-column: 1;
+  }
+
+  .shell-mobile-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    height: 50px;
+    background: color-mix(in oklab, var(--ink) 84%, var(--stone));
+    border-top: 1px solid var(--seam-faint);
+    grid-column: 1;
+  }
+
+  .shell-mobile-nav-btn {
+    display: grid;
+    place-items: center;
+    padding: 0 16px;
+    height: 100%;
+    color: var(--washi-mute);
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: color var(--dur) var(--ease);
+  }
+
+  .shell-mobile-nav-btn:hover,
+  .shell-mobile-nav-btn--active { color: var(--gold-bright); }
+}
+
+@media (min-width: 901px) {
+  .shell-mobile-nav { display: none; }
+  .shell-sidebar-backdrop { display: none; }
+}
+
+/* ── Disconnected banner ── */
+.shell-disconnected-banner {
+  background: color-mix(in oklab, var(--shu) 18%, var(--ink));
+  border-bottom: 1px solid var(--shu);
+  padding: 8px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  color: var(--shu-bright);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Kintsugi seam decoration — conversation column top */
+.shell-conversation::before {
+  content: '';
+  position: absolute;
+  top: 48px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--seam-faint) 15%,
+    var(--seam) 40%,
+    var(--seam-faint) 70%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}

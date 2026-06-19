@@ -63,6 +63,13 @@ Object.defineProperty(globalThis.navigator, 'mediaDevices', {
 globalThis.requestAnimationFrame = (cb: FrameRequestCallback) => setTimeout(() => cb(performance.now()), 16) as unknown as number;
 globalThis.cancelAnimationFrame = (id: number) => clearTimeout(id);
 
+// ── scroll APIs jsdom lacks (message-view autoscroll, etc.) ──────────────────
+if (typeof Element !== 'undefined') {
+  Element.prototype.scrollTo = Element.prototype.scrollTo || (() => {});
+  Element.prototype.scrollIntoView = Element.prototype.scrollIntoView || (() => {});
+  Element.prototype.scrollBy = Element.prototype.scrollBy || (() => {});
+}
+
 // ── Canvas 2D context stub (jsdom has none) — lets the background engine + any
 //    canvas component mount in tests. Every method is a no-op; gradients/text/
 //    imageData return minimal shapes; property sets are accepted. ──────────────
