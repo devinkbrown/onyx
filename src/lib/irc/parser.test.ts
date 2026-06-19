@@ -1,0 +1,155 @@
+import { describe, it, expect } from 'vitest';
+import {
+  parseIRCMessage,
+  formatIRCLine,
+  parseNamesPrefix,
+  parsePREFIX,
+  parseCHANLIMIT,
+  normalizeCase,
+  selectSaslMechanism,
+  parseStandardReply,
+  parseSessionTokenNote,
+  parseSessionMeshTokenNote,
+  buildSessionResumeLine,
+  parseMonitorNumeric,
+} from './parser';
+
+describe('parseIRCMessage', () => {
+  it('parses a bare command with a trailing param', () => {
+    const m = parseIRCMessage('PING :token123');
+    expect(m.command).toBe('PING');
+    expect(m.params).toEqual(['token123']);
+    expect(m.prefix).toBeNull();
+  });
+
+  it('extracts nick + host from a nick!user@host prefix', () => {
+    const m = parseIRCMessage(':alice!ally@host.example PRIVMSG #ruri :hello world');
+    expect(m.nick).toBe('alice');
+    expect(m.host).toBe('host.example');
+    expect(m.command).toBe('PRIVMSG');
+    expect(m.params).toEqual(['#ruri', 'hello world']);
+  });
+
+  it('keeps a server-name prefix as the prefix', () => {
+    const m = parseIRCMessage(':eshmaki.me 001 ruri :Welcome');
+    expect(m.prefix).toBe('eshmaki.me');
+    expect(m.command).toBe('001');
+    expect(m.params[0]).toBe('ruri');
+  });
+
+  it('parses IRCv3 message tags with escapes', () => {
+    const m = parseIRCMessage('@account=bob;msg=a\\sb :n!u@h PRIVMSG #c :hi');
+    expect(m.tags.account).toBe('bob');
+    expect(m.tags.msg).toBe('a b'); // \s unescapes to a space
+    expect(m.command).toBe('PRIVMSG');
+  });
+
+  it('strips a trailing CRLF and null bytes', () => {
+    const m = parseIRCMessage('NICK ruri\x00\r\n');
+    expect(m.command).toBe('NICK');
+    expect(m.params).toEqual(['ruri']);
+  });
+});
+
+describe('formatIRCLine', () => {
+  it('prefixes a trailing param containing a space with a colon and ends with CRLF', () => {
+    expect(formatIRCLine('PRIVMSG', '#c', 'hello world')).toBe('PRIVMSG #c :hello world\r\n');
+  });
+  it('leaves a single space-free param unprefixed', () => {
+    expect(formatIRCLine('NICK', 'ruri')).toBe('NICK ruri\r\n');
+  });
+  it('colon-prefixes an empty trailing param', () => {
+    expect(formatIRCLine('PART', '#c', '')).toBe('PART #c :\r\n');
+  });
+});
+
+describe('parseNamesPrefix', () => {
+  const map = { '~': 'q', '@': 'o', '+': 'v', '%': 'h', '&': 'a' };
+  it('collects leading mode prefixes and the nick', () => {
+    expect(parseNamesPrefix('@bob', map)).toEqual({ nick: 'bob', modes: new Set(['o']) });
+  });
+  it('handles stacked prefixes + userhost-in-names', () => {
+    const r = parseNamesPrefix('~@alice!u@h', map);
+    expect(r.nick).toBe('alice');
+    expect(r.modes).toEqual(new Set(['q', 'o']));
+  });
+});
+
+describe('parsePREFIX', () => {
+  it('maps modes <-> prefix chars from an ISUPPORT value', () => {
+    const r = parsePREFIX('(qaohv)~&@%+');
+    expect(r.modeToPrefix).toMatchObject({ q: '~', a: '&', o: '@', h: '%', v: '+' });
+    expect(r.prefixToMode).toMatchObject({ '~': 'q', '@': 'o', '+': 'v' });
+  });
+  it('returns empty maps for a malformed value', () => {
+    expect(parsePREFIX('garbage')).toEqual({ modeToPrefix: {}, prefixToMode: {} });
+  });
+});
+
+describe('parseCHANLIMIT', () => {
+  it('expands grouped channel-type limits', () => {
+    expect(parseCHANLIMIT('#&:25,!:10')).toEqual({ '#': 25, '&': 25, '!': 10 });
+  });
+});
+
+describe('normalizeCase', () => {
+  it('ascii lowercases only', () => {
+    expect(normalizeCase('Foo[]\\^', 'ascii')).toBe('foo[]\\^');
+  });
+  it('rfc1459 folds []\\^ to {}|~', () => {
+    expect(normalizeCase('Foo[]\\^', 'rfc1459')).toBe('foo{}|~');
+  });
+});
+
+describe('selectSaslMechanism', () => {
+  it('prefers SCRAM when a password is present', () => {
+    expect(selectSaslMechanism(['PLAIN', 'SCRAM-SHA-256'], { hasPassword: true })).toBe('SCRAM-SHA-256');
+  });
+  it('falls back to PLAIN', () => {
+    expect(selectSaslMechanism(['PLAIN'], { hasPassword: true })).toBe('PLAIN');
+  });
+  it('uses EXTERNAL with a cert and no password', () => {
+    expect(selectSaslMechanism(['EXTERNAL'], { hasPassword: false, hasClientCert: true })).toBe('EXTERNAL');
+  });
+  it('returns null when nothing is usable', () => {
+    expect(selectSaslMechanism(['PLAIN'], { hasPassword: false })).toBeNull();
+  });
+});
+
+describe('standard replies + SESSION notes', () => {
+  it('parses a NOTE standard reply', () => {
+    const r = parseStandardReply(parseIRCMessage(':srv NOTE REGISTER SUCCESS :done'));
+    expect(r).toMatchObject({ kind: 'NOTE', command: 'REGISTER', code: 'SUCCESS', description: 'done' });
+  });
+  it('ignores non standard-reply commands', () => {
+    expect(parseStandardReply(parseIRCMessage(':srv PRIVMSG #c :hi'))).toBeNull();
+  });
+  it('extracts a SESSION TOKEN', () => {
+    expect(parseSessionTokenNote(parseIRCMessage(':srv NOTE SESSION TOKEN :abc123'))).toBe('abc123');
+  });
+  it('extracts a SESSION MTOKEN (mesh)', () => {
+    expect(parseSessionMeshTokenNote(parseIRCMessage(':srv NOTE SESSION MTOKEN :m3sh'))).toBe('m3sh');
+  });
+  it('does not confuse TOKEN and MTOKEN', () => {
+    expect(parseSessionMeshTokenNote(parseIRCMessage(':srv NOTE SESSION TOKEN :abc'))).toBeNull();
+  });
+  it('builds a resume line', () => {
+    expect(buildSessionResumeLine('tok')).toBe('SESSION RESUME tok\r\n');
+  });
+});
+
+describe('parseMonitorNumeric', () => {
+  it('730 -> online targets', () => {
+    expect(parseMonitorNumeric(parseIRCMessage(':srv 730 ruri :bob,carol'))).toMatchObject({
+      kind: 'online', targets: ['bob', 'carol'],
+    });
+  });
+  it('731 -> offline targets', () => {
+    expect(parseMonitorNumeric(parseIRCMessage(':srv 731 ruri :dave'))).toMatchObject({
+      kind: 'offline', targets: ['dave'],
+    });
+  });
+  it('non-monitor numerics return null', () => {
+    expect(parseMonitorNumeric(parseIRCMessage(':srv 001 ruri :hi'))).toBeNull();
+  });
+});
