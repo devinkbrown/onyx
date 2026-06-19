@@ -1,0 +1,76 @@
+/* ─────────────────────────────────────────────────────────────
+   Ruri — design tokens.  Flagship theme: "ruri" (瑠璃 / lapis lazuli).
+
+   Identity = Lapis × Kintsugi × Terminal:
+   · lapis lazuli — deep ultramarine ground veined with real gold (pyrite)
+   · kintsugi     — the mesh drawn as golden seams mending the dark
+   · terminal     — BBS/ANSI/demoscene heritage; mono labels, box-drawing,
+                    brutalist editorial type, [bracketed] controls
+   Warm washi-paper text over cool ultramarine + a single vermilion (朱)
+   accent — the deliberate opposite of purple-gradient AI slop.
+   ───────────────────────────────────────────────────────────── */
+
+:root,
+[data-theme='ruri'] {
+  color-scheme: dark;
+
+  /* Ground — sumi ink → lapis shadow */
+  --ink: #07090f;
+  --ink-2: #0a0d16;
+  --stone: #0d1631; /* deep lapis surface */
+  --stone-2: #122051; /* lapis body */
+  --stone-3: #18306e; /* raised lapis */
+  --stone-line: #20356f;
+
+  /* Lapis — true ultramarine (never sky, never purple) */
+  --lapis: #2f5bf0;
+  --lapis-bright: #4f7bff;
+  --lapis-deep: #1d3aa8;
+
+  /* Gold — kin / pyrite / kintsugi seams (warm, real, not champagne pastel) */
+  --gold: #c9a24a;
+  --gold-bright: #ecc873;
+  --gold-deep: #9a7a30;
+
+  /* Vermilion — 朱 shu, the single hot accent (use sparingly) */
+  --shu: #e0452f;
+  --shu-bright: #ff5a40;
+
+  /* Text — warm washi paper, NOT cool gray/white */
+  --washi: #ece4cf;
+  --washi-dim: #ada590;
+  --washi-mute: #6d6f86; /* cool slate, least important */
+
+  /* Functional status (kept muted, in-palette where possible) */
+  --ok: #5fb98a;
+  --warn: var(--gold-bright);
+  --danger: var(--shu);
+
+  /* Seams + structure */
+  --seam: color-mix(in oklab, var(--gold) 42%, transparent);
+  --seam-faint: color-mix(in oklab, var(--gold) 16%, transparent);
+  --line: color-mix(in oklab, var(--lapis) 22%, transparent);
+  --line-faint: color-mix(in oklab, var(--lapis) 10%, transparent);
+
+  /* Radius — brutalist: sharp by default, one soft step for chips */
+  --r-0: 0px;
+  --r-sm: 2px;
+  --r-md: 4px;
+  --r-pill: 999px;
+
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur: 240ms;
+
+  /* Type — mono-led (terminal soul) + brutalist display.
+     Real self-hosted pairing (grotesque display + humanist mono) lands Phase 1. */
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo,
+    Consolas, monospace;
+  --font-display: 'Anton', 'Arial Narrow', 'Helvetica Neue', sans-serif;
+  --font-sans: 'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system,
+    'Segoe UI', Roboto, sans-serif;
+  --font-serif: 'Fraunces Variable', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur: 0ms; }
+}

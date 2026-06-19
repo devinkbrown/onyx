@@ -1,38 +1,42 @@
 {
-  "name": "ocean",
+  "name": "ruri",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build --webpack",
-    "start": "next start",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
     "lint": "eslint",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "announce": "python3 tools/announce_bot.py"
   },
   "dependencies": {
-    "next": "16.2.6",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
+    "@fontsource-variable/fraunces": "^5.2.9",
+    "@fontsource-variable/instrument-sans": "^5.2.8",
+    "@fontsource-variable/jetbrains-mono": "^5.2.8",
+    "@fontsource/anton": "^5.2.7",
+    "@solidjs/router": "^0.15.3",
+    "solid-js": "^1.9.5",
     "zustand": "^5.0.13"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
-    "@tailwindcss/postcss": "^4",
+    "@solidjs/testing-library": "^0.8.10",
+    "@tailwindcss/vite": "^4.1.7",
     "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
     "@vitest/coverage-v8": "^4.1.7",
     "eslint": "^9",
-    "eslint-config-next": "16.2.6",
     "jsdom": "^29.1.1",
-    "tailwindcss": "^4",
+    "tailwindcss": "^4.1.7",
     "typescript": "^5",
+    "vite": "^7.1.0",
+    "vite-plugin-solid": "^2.11.6",
     "vitest": "^4.1.7"
   }
 }
