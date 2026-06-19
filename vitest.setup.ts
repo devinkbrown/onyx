@@ -1,54 +1,64 @@
 import '@testing-library/jest-dom';
-import React from 'react';
+import { cleanup } from '@solidjs/testing-library';
+import { afterEach } from 'vitest';
 
-// ── localStorage polyfill for jsdom ──────────────────────────────────────────
-const store: Record<string, string> = {};
-const localStorageMock: Storage = {
-  get length() { return Object.keys(store).length; },
-  key(index: number) { return Object.keys(store)[index] ?? null; },
-  getItem(k: string) { return store[k] ?? null; },
-  setItem(k: string, v: string) { store[k] = v; },
-  removeItem(k: string) { delete store[k]; },
-  clear() { for (const k of Object.keys(store)) delete store[k]; },
-};
-Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock, writable: true });
-// ─────────────────────────────────────────────────────────────────────────────
+// Unmount Solid trees between tests.
+afterEach(() => cleanup());
 
-// Stub next/navigation for components that import it
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
-  usePathname: () => '/',
-}));
+// ── localStorage / sessionStorage polyfill for jsdom ─────────────────────────
+function makeStorage(): Storage {
+  const store: Record<string, string> = {};
+  return {
+    get length() { return Object.keys(store).length; },
+    key(i: number) { return Object.keys(store)[i] ?? null; },
+    getItem(k: string) { return store[k] ?? null; },
+    setItem(k: string, v: string) { store[k] = String(v); },
+    removeItem(k: string) { delete store[k]; },
+    clear() { for (const k of Object.keys(store)) delete store[k]; },
+  } as Storage;
+}
+Object.defineProperty(globalThis, 'localStorage', { value: makeStorage(), writable: true });
+Object.defineProperty(globalThis, 'sessionStorage', { value: makeStorage(), writable: true });
 
-// Stub next/link
-vi.mock('next/link', () => ({
-  default: ({ children, href, ...rest }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string; children?: React.ReactNode }) => {
-    return React.createElement('a', { href, ...rest }, children);
-  },
-}));
+// ── matchMedia (reduced-motion, theme queries) ───────────────────────────────
+Object.defineProperty(globalThis, 'matchMedia', {
+  writable: true,
+  value: (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  }),
+});
 
-// Stub AudioContext / WebAudio APIs not available in jsdom
+// ── Observers not in jsdom ───────────────────────────────────────────────────
+class MockObserver { observe() {} unobserve() {} disconnect() {} takeRecords() { return []; } }
+globalThis.ResizeObserver ??= MockObserver as unknown as typeof ResizeObserver;
+globalThis.IntersectionObserver ??= MockObserver as unknown as typeof IntersectionObserver;
+
+// ── WebAudio + media (the suimyaku media engine touches these) ────────────────
 Object.defineProperty(globalThis, 'AudioContext', {
   writable: true,
   value: class MockAudioContext {
-    createAnalyser() {
-      return { fftSize: 0, frequencyBinCount: 0, getByteFrequencyData: () => {}, connect: () => {} };
-    }
+    createAnalyser() { return { fftSize: 0, frequencyBinCount: 0, getByteFrequencyData: () => {}, connect: () => {} }; }
     createMediaStreamSource() { return { connect: () => {} }; }
+    createGain() { return { gain: { value: 1 }, connect: () => {} }; }
     close() { return Promise.resolve(); }
   },
 });
-
-// Stub MediaDevices
 Object.defineProperty(globalThis.navigator, 'mediaDevices', {
   writable: true,
   value: {
-    getUserMedia: vi.fn().mockRejectedValue(new Error('not available in test')),
-    getDisplayMedia: vi.fn().mockRejectedValue(new Error('not available in test')),
-    enumerateDevices: vi.fn().mockResolvedValue([]),
+    getUserMedia: () => Promise.reject(new Error('not available in test')),
+    getDisplayMedia: () => Promise.reject(new Error('not available in test')),
+    enumerateDevices: () => Promise.resolve([]),
   },
 });
 
-// Stub requestAnimationFrame
-globalThis.requestAnimationFrame = (cb: FrameRequestCallback) => setTimeout(cb, 16) as unknown as number;
+// ── rAF ──────────────────────────────────────────────────────────────────────
+globalThis.requestAnimationFrame = (cb: FrameRequestCallback) => setTimeout(() => cb(performance.now()), 16) as unknown as number;
 globalThis.cancelAnimationFrame = (id: number) => clearTimeout(id);

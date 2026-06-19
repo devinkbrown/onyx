@@ -12,7 +12,7 @@ export default defineConfig({
   retries: 0,
   reporter: [['list']],
   use: {
-    baseURL: 'http://localhost:3100',
+    baseURL: 'http://localhost:4173',
     headless: true,
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
@@ -26,11 +26,13 @@ export default defineConfig({
     },
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  // Test the real production build via Vite preview (instant serve — avoids dev
+  // cold-start). Reuses an already-running preview on :4173 when present.
   webServer: {
-    command: 'pnpm dev --port 3100',
-    url: 'http://localhost:3100',
+    command: 'pnpm preview --port 4173 --host',
+    url: 'http://localhost:4173',
     reuseExistingServer: true,
-    timeout: 180_000,
+    timeout: 120_000,
     stdout: 'ignore',
     stderr: 'pipe',
   },

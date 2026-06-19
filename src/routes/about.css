@@ -1,0 +1,938 @@
+/* Ruri /about — continuous with landing.css; same Lapis × Kintsugi × Terminal identity.
+   Banished: purple, glassmorphism/backdrop-blur cards, neon glow, AI gradient text, Inter.
+   Present: mineral depth, editorial hierarchy, warm kintsugi seams, human voice. */
+
+/* ───────── Inherit atmosphere from landing ───────── */
+/* .r-ground, .r-flecks, .r-veins, .r-grain, .r-divider, .r-status, .r-footer
+   are all already defined in landing.css — imported below so /about shares them. */
+
+/* ───────── About hero ───────── */
+.ab-hero {
+  padding-block: clamp(64px, 11vw, 140px) clamp(48px, 8vw, 96px);
+}
+
+.ab-hero .r-kicker {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.ab-hero .r-kicker::before {
+  content: '// ';
+  color: var(--washi-mute);
+}
+
+.ab-hero h1 {
+  margin: 26px 0 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(3rem, 0.4rem + 13vw, 10.5rem);
+  line-height: 0.86;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  color: var(--washi);
+  text-wrap: balance;
+}
+
+.ab-hero h1 .gold {
+  background: linear-gradient(
+    98deg,
+    var(--gold-deep) 0%,
+    var(--gold) 22%,
+    var(--gold-bright) 44%,
+    #fff4d2 52%,
+    var(--gold-bright) 60%,
+    var(--gold) 82%,
+    var(--gold-deep) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 0 color-mix(in oklab, var(--gold-deep) 60%, transparent));
+}
+
+.ab-hero .serif-pull {
+  margin: 30px 0 0;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 360;
+  font-size: clamp(1.3rem, 1rem + 1.3vw, 2.2rem);
+  line-height: 1.35;
+  color: var(--washi);
+  max-width: 28ch;
+}
+
+.ab-hero .serif-pull em {
+  color: var(--gold-bright);
+  font-style: italic;
+}
+
+.ab-hero p.sub {
+  margin: 22px 0 0;
+  max-width: 58ch;
+  font-family: var(--font-sans);
+  font-size: clamp(1rem, 0.9rem + 0.5vw, 1.28rem);
+  line-height: 1.65;
+  color: var(--washi-dim);
+  text-wrap: pretty;
+}
+
+/* ───────── Section headers ───────── */
+.ab-section {
+  position: relative;
+  padding-block: clamp(56px, 8vw, 120px);
+}
+
+/* ───────── Protocol deep-dive ───────── */
+.ab-proto-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(14px, 2vw, 24px);
+  margin-top: 46px;
+}
+
+@media (max-width: 860px) {
+  .ab-proto-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ab-proto-item {
+  position: relative;
+  padding: clamp(26px, 3vw, 40px);
+  background: linear-gradient(
+    160deg,
+    color-mix(in oklab, var(--stone-2) 48%, var(--ink)),
+    color-mix(in oklab, var(--stone) 28%, var(--ink))
+  );
+  border: 1px solid var(--seam-faint);
+  border-top: 2px solid var(--seam);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: border-top-color var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+
+.ab-proto-item:hover {
+  transform: translateY(-3px);
+  border-top-color: var(--gold-bright);
+}
+
+.ab-proto-item .label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.ab-proto-item h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(1.3rem, 1rem + 1vw, 1.85rem);
+  text-transform: uppercase;
+  color: var(--washi);
+  line-height: 0.97;
+}
+
+.ab-proto-item p {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 0.97rem;
+  line-height: 1.63;
+  color: var(--washi-dim);
+  text-wrap: pretty;
+}
+
+.ab-proto-item p b {
+  color: var(--washi);
+  font-weight: 600;
+}
+
+.ab-proto-item .tag {
+  margin-top: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--washi-mute);
+}
+
+.ab-proto-item .tag.e2ee {
+  color: var(--shu-bright);
+}
+
+/* CAP block — inline mono listing */
+.ab-cap-list {
+  margin-top: 36px;
+  border: 1px solid var(--seam-faint);
+  border-left: 3px solid var(--seam);
+  background: color-mix(in oklab, var(--ink) 70%, var(--stone));
+  font-family: var(--font-mono);
+  font-size: clamp(0.82rem, 0.7rem + 0.4vw, 0.98rem);
+  line-height: 1.9;
+  padding: clamp(18px, 2.4vw, 28px) clamp(20px, 3vw, 34px);
+}
+
+.ab-cap-list .bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--seam-faint);
+  color: var(--washi-mute);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+}
+
+.ab-cap-list .lights {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.ab-cap-list .lights i {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+}
+
+.ab-cap-row {
+  display: flex;
+  gap: clamp(12px, 2vw, 28px);
+  flex-wrap: wrap;
+}
+
+.ab-cap-row .key {
+  color: var(--gold-bright);
+  min-width: 18ch;
+}
+
+.ab-cap-row .val {
+  color: var(--washi-dim);
+}
+
+.ab-cap-row .val b {
+  color: var(--ok);
+  font-weight: 400;
+}
+
+/* ───────── Media section ───────── */
+.ab-media-header {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: clamp(32px, 5vw, 80px);
+  align-items: start;
+  margin-top: 40px;
+}
+
+@media (max-width: 860px) {
+  .ab-media-header {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ab-media-diagram {
+  width: 100%;
+  height: auto;
+  display: block;
+  border: 1px solid var(--seam-faint);
+  border-top: 1px solid var(--seam);
+  background: radial-gradient(
+    130% 130% at 50% -10%,
+    color-mix(in oklab, var(--stone-2) 55%, var(--ink)),
+    var(--ink)
+  );
+}
+
+.ab-media-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.ab-media-body p {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-weight: 380;
+  font-size: clamp(1.02rem, 0.92rem + 0.5vw, 1.26rem);
+  line-height: 1.6;
+  color: var(--washi-dim);
+  text-wrap: pretty;
+}
+
+.ab-media-body p b {
+  color: var(--washi);
+  font-weight: 600;
+}
+
+/* Transport mode cards */
+.ab-transport-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(10px, 1.4vw, 16px);
+  margin-top: 40px;
+}
+
+@media (max-width: 720px) {
+  .ab-transport-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ab-transport {
+  padding: clamp(20px, 2.2vw, 30px);
+  border: 1px solid var(--seam-faint);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: color-mix(in oklab, var(--stone) 20%, transparent);
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+
+.ab-transport:hover {
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--stone-2) 32%, transparent);
+}
+
+.ab-transport.primary {
+  border-top: 2px solid var(--gold);
+}
+
+.ab-transport.secondary {
+  border-top: 2px solid var(--lapis-bright);
+}
+
+.ab-transport.fallback {
+  border-top: 2px solid var(--washi-mute);
+}
+
+.ab-transport .t-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--washi-mute);
+}
+
+.ab-transport.primary .t-label {
+  color: var(--gold);
+}
+
+.ab-transport.secondary .t-label {
+  color: var(--lapis-bright);
+}
+
+.ab-transport h4 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(1.15rem, 1rem + 0.7vw, 1.6rem);
+  text-transform: uppercase;
+  color: var(--washi);
+  line-height: 0.97;
+}
+
+.ab-transport p {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 0.91rem;
+  line-height: 1.58;
+  color: var(--washi-dim);
+}
+
+/* ───────── E2EE — Tsumugi ───────── */
+.ab-e2ee-split {
+  display: grid;
+  grid-template-columns: 0.9fr 1.1fr;
+  gap: clamp(32px, 5vw, 80px);
+  align-items: center;
+  margin-top: 44px;
+}
+
+@media (max-width: 860px) {
+  .ab-e2ee-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ab-e2ee-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ab-e2ee-body p {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 0.99rem;
+  line-height: 1.65;
+  color: var(--washi-dim);
+  text-wrap: pretty;
+}
+
+.ab-e2ee-body p b {
+  color: var(--washi);
+  font-weight: 600;
+}
+
+.ab-prop-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.ab-prop {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--seam-faint);
+  border-left: 3px solid var(--seam);
+  background: color-mix(in oklab, var(--stone) 16%, transparent);
+}
+
+.ab-prop .pk {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold);
+  flex: none;
+  min-width: 8ch;
+  padding-top: 2px;
+}
+
+.ab-prop .pv {
+  font-family: var(--font-sans);
+  font-size: 0.93rem;
+  line-height: 1.55;
+  color: var(--washi-dim);
+}
+
+.ab-e2ee-visual {
+  width: 100%;
+  height: auto;
+  display: block;
+  border: 1px solid var(--seam-faint);
+  border-top: 1px solid var(--seam);
+  background: radial-gradient(
+    100% 100% at 50% 0%,
+    color-mix(in oklab, var(--stone-2) 50%, var(--ink)),
+    var(--ink)
+  );
+}
+
+/* ───────── Suimyaku mesh section ───────── */
+.ab-mesh-body {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: clamp(28px, 4vw, 68px);
+  align-items: center;
+  margin-top: 40px;
+}
+
+@media (max-width: 860px) {
+  .ab-mesh-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ab-mesh-vis {
+  width: 100%;
+  height: auto;
+  display: block;
+  border: 1px solid var(--seam-faint);
+  border-top: 1px solid var(--seam);
+  background: radial-gradient(
+    120% 120% at 50% 0%,
+    color-mix(in oklab, var(--stone-2) 50%, var(--ink)),
+    var(--ink)
+  );
+}
+
+.ab-mesh-text {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.ab-mesh-text p {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 0.99rem;
+  line-height: 1.65;
+  color: var(--washi-dim);
+  text-wrap: pretty;
+}
+
+.ab-mesh-text p b {
+  color: var(--washi);
+  font-weight: 600;
+}
+
+.ab-node-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.ab-node {
+  border: 1px solid var(--seam-faint);
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: color-mix(in oklab, var(--stone) 22%, transparent);
+  transition: border-color var(--dur) var(--ease);
+}
+
+.ab-node:hover {
+  border-color: var(--seam);
+}
+
+.ab-node .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex: none;
+}
+
+.ab-node.esh .dot {
+  background: var(--shu);
+  box-shadow: 0 0 12px var(--shu);
+}
+
+.ab-node.ircx .dot {
+  background: var(--lapis-bright);
+  box-shadow: 0 0 12px var(--lapis);
+}
+
+.ab-node .meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ab-node .host {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  color: var(--washi);
+  letter-spacing: 0.04em;
+}
+
+.ab-node .role {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.9rem;
+  color: var(--washi-dim);
+}
+
+/* Mesh tech list */
+.ab-crdt-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: clamp(10px, 1.4vw, 16px);
+  margin-top: 32px;
+}
+
+.ab-crdt-item {
+  padding: 18px 20px;
+  border: 1px solid var(--seam-faint);
+  border-top: 2px solid color-mix(in oklab, var(--lapis) 60%, var(--gold));
+  background: color-mix(in oklab, var(--stone) 16%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ab-crdt-item .k {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--lapis-bright);
+}
+
+.ab-crdt-item .v {
+  font-family: var(--font-sans);
+  font-size: 0.91rem;
+  line-height: 1.55;
+  color: var(--washi-dim);
+}
+
+/* ───────── Services section ───────── */
+.ab-svc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: clamp(12px, 1.6vw, 20px);
+  margin-top: 44px;
+}
+
+.ab-svc {
+  padding: clamp(22px, 2.4vw, 34px);
+  border: 1px solid var(--seam-faint);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: linear-gradient(
+    160deg,
+    color-mix(in oklab, var(--stone-2) 40%, var(--ink)),
+    color-mix(in oklab, var(--stone) 22%, var(--ink))
+  );
+  position: relative;
+  overflow: hidden;
+  transition: transform var(--dur) var(--ease);
+}
+
+.ab-svc::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-top: 1px solid var(--seam);
+  pointer-events: none;
+}
+
+.ab-svc:hover {
+  transform: translateY(-3px);
+}
+
+.ab-svc .cmd {
+  font-family: var(--font-mono);
+  font-size: clamp(1.1rem, 1rem + 0.7vw, 1.55rem);
+  color: var(--gold-bright);
+  letter-spacing: 0.04em;
+}
+
+.ab-svc h3 {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--washi);
+  line-height: 1.2;
+}
+
+.ab-svc p {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--washi-dim);
+  text-wrap: pretty;
+}
+
+.ab-svc .note {
+  margin-top: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--washi-mute);
+}
+
+.ab-svc .note.live {
+  color: var(--ok);
+}
+
+/* No-bot manifesto pull-quote */
+.ab-nobot {
+  margin: 44px 0 0;
+  padding: clamp(24px, 3vw, 38px) clamp(28px, 4vw, 52px);
+  border-left: 3px solid var(--shu);
+  background: color-mix(in oklab, var(--stone) 20%, transparent);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 380;
+  font-size: clamp(1.1rem, 1rem + 0.8vw, 1.5rem);
+  line-height: 1.5;
+  color: var(--washi);
+  text-wrap: pretty;
+}
+
+.ab-nobot b {
+  color: var(--shu-bright);
+  font-style: normal;
+  font-weight: 600;
+}
+
+/* ───────── Mythos deep-dive ───────── */
+.ab-mythos-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(16px, 2vw, 28px);
+  margin-top: 46px;
+}
+
+@media (max-width: 860px) {
+  .ab-mythos-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ab-myth {
+  position: relative;
+  padding: clamp(28px, 3.2vw, 44px) clamp(24px, 3vw, 38px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border: 1px solid var(--seam-faint);
+  border-top: 1px solid var(--seam);
+  transition: transform var(--dur) var(--ease), border-top-color var(--dur) var(--ease);
+}
+
+.ab-myth:hover {
+  transform: translateY(-4px);
+}
+
+.ab-myth.serpent {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--lapis-deep) 20%, var(--ink)),
+    var(--ink)
+  );
+}
+
+.ab-myth.serpent:hover {
+  border-top-color: var(--lapis-bright);
+}
+
+.ab-myth.devil {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--shu) 12%, var(--ink)),
+    var(--ink)
+  );
+}
+
+.ab-myth.devil:hover {
+  border-top-color: var(--shu-bright);
+}
+
+.ab-myth.jewel {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--gold-deep) 16%, var(--ink)),
+    var(--ink)
+  );
+}
+
+.ab-myth.jewel:hover {
+  border-top-color: var(--gold-bright);
+}
+
+.ab-myth .ideograph {
+  font-family: var(--font-sans);
+  font-size: clamp(3rem, 1rem + 6vw, 5rem);
+  line-height: 1;
+  display: block;
+}
+
+.ab-myth.serpent .ideograph {
+  color: var(--lapis-bright);
+}
+
+.ab-myth.devil .ideograph {
+  color: var(--shu-bright);
+}
+
+.ab-myth.jewel .ideograph {
+  color: var(--gold-bright);
+}
+
+.ab-myth .name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--washi);
+}
+
+.ab-myth p {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-weight: 380;
+  font-size: 1.02rem;
+  line-height: 1.6;
+  color: var(--washi-dim);
+  text-wrap: pretty;
+}
+
+.ab-myth p b {
+  color: var(--washi);
+  font-weight: 600;
+}
+
+.ab-myth .etym {
+  margin-top: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--washi-mute);
+  line-height: 1.7;
+}
+
+/* ───────── Developer section ───────── */
+.ab-dev-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(16px, 2.5vw, 36px);
+  margin-top: 46px;
+}
+
+@media (max-width: 720px) {
+  .ab-dev-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ab-dev-card {
+  padding: clamp(26px, 3vw, 42px);
+  border: 1px solid var(--seam-faint);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: color-mix(in oklab, var(--stone-2) 22%, var(--ink));
+  position: relative;
+  overflow: hidden;
+}
+
+.ab-dev-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+}
+
+.ab-dev-card:hover::before {
+  opacity: 1;
+}
+
+.ab-dev-card .idx {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.ab-dev-card h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(1.5rem, 1rem + 1.8vw, 2.4rem);
+  text-transform: uppercase;
+  color: var(--washi);
+  line-height: 0.94;
+}
+
+.ab-dev-card p {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 0.98rem;
+  line-height: 1.65;
+  color: var(--washi-dim);
+  text-wrap: pretty;
+}
+
+.ab-dev-card p b {
+  color: var(--washi);
+  font-weight: 600;
+}
+
+.ab-dev-card .code-snip {
+  font-family: var(--font-mono);
+  font-size: clamp(0.78rem, 0.68rem + 0.4vw, 0.9rem);
+  line-height: 1.85;
+  color: var(--washi-dim);
+  background: color-mix(in oklab, var(--ink) 60%, var(--stone));
+  border: 1px solid var(--seam-faint);
+  border-left: 2px solid var(--gold);
+  padding: 14px 18px;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.ab-dev-card .code-snip .c {
+  color: var(--ok);
+}
+
+.ab-dev-card .code-snip .p {
+  color: var(--gold-bright);
+}
+
+.ab-dev-card .code-snip .o {
+  color: var(--washi-mute);
+}
+
+.ab-dev-card .code-snip .h {
+  color: var(--lapis-bright);
+}
+
+.ab-dev-card a.more {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--gold-bright);
+  margin-top: 4px;
+  transition: color var(--dur) var(--ease);
+}
+
+.ab-dev-card a.more:hover {
+  color: var(--gold);
+}
+
+/* Animated SVG vein for mesh vis */
+.ab-vein {
+  stroke-dasharray: 4 7;
+  animation: ab-flow 5s linear infinite;
+}
+
+@keyframes ab-flow {
+  to {
+    stroke-dashoffset: -44;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ab-vein {
+    animation: none;
+  }
+}
+
+/* ───────── Inline seam ───────── */
+.ab-seam {
+  height: 2px;
+  width: min(600px, 80vw);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--gold) 8%,
+    var(--gold-bright) 50%,
+    var(--gold) 92%,
+    transparent
+  );
+  clip-path: polygon(
+    0 40%,
+    12% 0,
+    24% 70%,
+    40% 10%,
+    56% 80%,
+    72% 18%,
+    86% 62%,
+    100% 28%,
+    100% 100%,
+    0 100%
+  );
+  opacity: 0.8;
+  margin-top: 24px;
+}

@@ -6,7 +6,7 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable", "WebWorker"],
     "jsx": "preserve",
     "jsxImportSource": "solid-js",
-    "types": ["vite/client"],
+    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
     "strict": true,
     "noEmit": true,
     "allowJs": false,
