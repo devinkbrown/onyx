@@ -1,0 +1,115 @@
+/* /appearance — customization surface (sits over the live Background canvas). */
+.ap {
+  position: relative;
+  min-height: 100svh;
+  font-family: var(--font-sans);
+  color: var(--text, var(--washi));
+}
+
+.ap-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px clamp(16px, 5vw, 48px);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--washi-dim);
+  background: color-mix(in oklab, var(--ink) 64%, transparent);
+  border-bottom: 1px solid var(--seam-faint);
+  backdrop-filter: blur(10px);
+}
+.ap-bar a:hover { color: var(--washi); }
+.ap-bar .ap-tag { color: var(--gold-bright); }
+
+.ap-wrap {
+  width: 100%;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: clamp(36px, 7vw, 88px) clamp(16px, 5vw, 48px) 14vh;
+}
+
+.ap-kicker {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.ap-kicker::before { content: '// '; color: var(--washi-mute); }
+
+.ap-h1 {
+  margin: 14px 0 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  text-transform: uppercase;
+  font-size: clamp(2.6rem, 1rem + 6vw, 5.5rem);
+  line-height: 0.9;
+  color: var(--washi);
+}
+.ap-h1 .gold {
+  background: linear-gradient(98deg, var(--gold-deep), var(--gold) 30%, var(--gold-bright) 52%, var(--gold) 78%, var(--gold-deep));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.ap-lede {
+  margin: 18px 0 0;
+  max-width: 60ch;
+  font-family: var(--font-serif);
+  font-weight: 380;
+  font-size: clamp(1.05rem, 1rem + 0.5vw, 1.32rem);
+  line-height: 1.5;
+  color: var(--washi-dim);
+}
+
+.ap-group { margin-top: clamp(28px, 4vw, 48px); }
+.ap-glabel {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 14px;
+}
+.ap-chips { display: flex; gap: 10px; flex-wrap: wrap; }
+.ap-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 16px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: var(--washi-dim);
+  background: color-mix(in oklab, var(--stone) 32%, transparent);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-0, 0);
+  cursor: pointer;
+  transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease),
+    background var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.ap-chip:hover { color: var(--washi); border-color: var(--seam); transform: translateY(-1px); }
+.ap-chip.on {
+  color: var(--ink);
+  background: var(--gold-bright);
+  border-color: var(--gold-bright);
+  font-weight: 700;
+}
+.ap-chip .ap-kind {
+  font-style: normal;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.ap-studio { margin-top: clamp(34px, 5vw, 64px); }

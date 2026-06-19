@@ -62,3 +62,29 @@ Object.defineProperty(globalThis.navigator, 'mediaDevices', {
 // ── rAF ──────────────────────────────────────────────────────────────────────
 globalThis.requestAnimationFrame = (cb: FrameRequestCallback) => setTimeout(() => cb(performance.now()), 16) as unknown as number;
 globalThis.cancelAnimationFrame = (id: number) => clearTimeout(id);
+
+// ── Canvas 2D context stub (jsdom has none) — lets the background engine + any
+//    canvas component mount in tests. Every method is a no-op; gradients/text/
+//    imageData return minimal shapes; property sets are accepted. ──────────────
+if (typeof HTMLCanvasElement !== 'undefined') {
+  HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, type: string) {
+    if (type !== '2d') return null;
+    const noop = () => {};
+    return new Proxy(
+      { canvas: this } as Record<string, unknown>,
+      {
+        get(target, prop: string) {
+          if (prop in target) return target[prop];
+          if (prop === 'measureText') return () => ({ width: 0 });
+          if (prop === 'getImageData') return () => ({ data: new Uint8ClampedArray(4) });
+          if (prop === 'createLinearGradient' || prop === 'createRadialGradient' || prop === 'createPattern')
+            return () => ({ addColorStop: noop });
+          return noop;
+        },
+        set() {
+          return true;
+        },
+      },
+    );
+  } as unknown as typeof HTMLCanvasElement.prototype.getContext;
+}
