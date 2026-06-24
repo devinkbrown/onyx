@@ -62,8 +62,10 @@
 .r-status .brand { color: var(--washi); font-weight: 700; letter-spacing: 0.05em; }
 .r-status .brand b { color: var(--gold-bright); margin-right: 9px; font-weight: 400; font-size: 15px; }
 .r-status nav { display: flex; gap: clamp(12px, 2vw, 28px); align-items: center; }
-.r-status nav a { color: var(--washi-mute); transition: color var(--dur) var(--ease); }
+.r-status nav a { color: var(--washi-mute); transition: color var(--dur) var(--ease); position: relative; }
 .r-status nav a:hover { color: var(--washi); }
+.r-status nav a:not(.enter)::after { content: ''; position: absolute; left: 0; right: 100%; bottom: -4px; height: 1px; background: var(--gold); transition: right var(--dur) var(--ease); }
+.r-status nav a:not(.enter):hover::after { right: 0; }
 .r-status .enter { color: var(--gold-bright); border: 1px solid var(--seam); padding: 7px 14px; transition: all var(--dur) var(--ease); }
 .r-status .enter:hover { background: color-mix(in oklab, var(--gold) 16%, transparent); border-color: var(--gold); }
 .r-status .live { color: var(--ok); display: inline-flex; align-items: center; gap: 8px; }
@@ -77,10 +79,15 @@
 .r-kicker::before { content: '// '; color: var(--washi-mute); }
 .r-hero h1 { margin: 26px 0 0; font-family: var(--font-display); font-weight: 400; font-size: clamp(3.4rem, 0.4rem + 14.5vw, 12.5rem); line-height: 0.82; letter-spacing: -0.012em; text-transform: uppercase; color: var(--washi); text-wrap: balance; }
 .r-hero h1 .gold {
-  background: linear-gradient(98deg, var(--gold-deep) 0%, var(--gold) 22%, var(--gold-bright) 44%, #fff4d2 52%, var(--gold-bright) 60%, var(--gold) 82%, var(--gold-deep) 100%);
+  background: linear-gradient(98deg, var(--gold-deep) 0%, var(--gold) 20%, var(--gold-bright) 40%, #fff4d2 50%, var(--gold-bright) 60%, var(--gold) 80%, var(--gold-deep) 100%);
+  background-size: 200% auto;
   -webkit-background-clip: text; background-clip: text; color: transparent;
   filter: drop-shadow(0 1px 0 color-mix(in oklab, var(--gold-deep) 60%, transparent));
+  /* slow metallic sheen sweeping the gold leaf */
+  animation: r-foil-sheen 6.5s linear infinite;
 }
+@keyframes r-foil-sheen { to { background-position: -200% center; } }
+@media (prefers-reduced-motion: reduce) { .r-hero h1 .gold { animation: none; } }
 .r-hero .serif-sub { margin: 24px 0 0; font-family: var(--font-serif); font-style: italic; font-weight: 360; font-size: clamp(1.3rem, 1rem + 1.2vw, 2.1rem); line-height: 1.3; color: var(--washi); max-width: 24ch; }
 .r-hero .serif-sub em { color: var(--gold-bright); font-style: italic; }
 .r-seam-inline { margin-top: 22px; height: 2px; width: min(680px, 82vw); background: linear-gradient(90deg, transparent, var(--gold) 8%, var(--gold-bright) 50%, var(--gold) 92%, transparent); clip-path: polygon(0 40%, 12% 0, 24% 70%, 40% 10%, 56% 80%, 72% 18%, 86% 62%, 100% 28%, 100% 100%, 0 100%); opacity: 0.85; }

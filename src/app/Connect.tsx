@@ -63,6 +63,9 @@ export function Connect(props: ConnectProps): JSX.Element {
   const [password, setPassword] = createSignal('');
   const [staySignedIn, setStaySignedIn] = createSignal(true);
   const [nickError, setNickError] = createSignal<string | undefined>(undefined);
+  // True only once the user has actually submitted a connect — so the form
+  // never flashes an "error" merely because a nick was typed while disconnected.
+  const [attempted, setAttempted] = createSignal(false);
 
   // ── Store reads ───────────────────────────────────────────────────────────
   const connectionStatus = useStore((s) => s.connectionStatus);
@@ -74,10 +77,9 @@ export function Connect(props: ConnectProps): JSX.Element {
     const s = connectionStatus();
     if (s === 'connecting' || s === 'reconnecting') return 'connecting';
     if (s === 'disconnected') {
-      // After a connection attempt: if ourNick is set but we are now disconnected,
-      // treat as error (server closed the connection during login).
-      // If we never attempted, stay idle.
-      return nick().trim() ? 'error' : 'idle';
+      // Only an "error" once a connect has actually been attempted — typing a
+      // nick before submitting must not surface an error state.
+      return attempted() ? 'error' : 'idle';
     }
     return 'idle';
   });
@@ -88,14 +90,19 @@ export function Connect(props: ConnectProps): JSX.Element {
     error:      'error',
   };
 
-  const PHASE_MSG: Record<'idle' | 'connecting' | 'error', string> = {
-    idle:       'Pick a node and enter your nick to connect.',
-    connecting: `Opening door to ${selectedNode().host}...`,
-    error:      'Connection closed. Check your nick / password and retry.',
-  };
-
   const phaseLabel = createMemo(() => PHASE_LABEL[formPhase()]);
-  const statusMsg  = createMemo(() => PHASE_MSG[formPhase()]);
+  // Reactive status copy — reflects the *currently selected* node (not the one
+  // chosen at mount) and never blames the nick for a server-side failure.
+  const statusMsg = createMemo(() => {
+    switch (formPhase()) {
+      case 'connecting':
+        return `Opening the door to ${selectedNode().host}…`;
+      case 'error':
+        return `Couldn't reach ${selectedNode().host}. The node may be unavailable — try the other door, or check your nick.`;
+      default:
+        return 'Pick a node and enter your nick to connect.';
+    }
+  });
 
   const isFormReady = createMemo(() => {
     const s = connectionStatus();
@@ -125,6 +132,7 @@ export function Connect(props: ConnectProps): JSX.Element {
     setNickError(err);
     if (err) return;
 
+    setAttempted(true);
     const node = selectedNode();
     const pass = password().trim() || undefined;
 
@@ -145,6 +153,7 @@ export function Connect(props: ConnectProps): JSX.Element {
   // ── Disconnect ────────────────────────────────────────────────────────────
 
   function handleDisconnect(): void {
+    setAttempted(false);
     getState().disconnect();
   }
 
