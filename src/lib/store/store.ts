@@ -3323,7 +3323,13 @@ export const store = createStore<OnyxState>()(
           // behavior on servers that don't ACK the cap (backward compatible).
           {
             const sessionSync = get().client?.sessionSyncActive ?? false;
-            if (!sessionSync) {
+            // Session-sync reclaims an ACCOUNT's live sessions, so the server
+            // pushes their JOINs and the client shouldn't guess. But a GUEST
+            // (no SASL account) has no live sessions to reclaim — skipping the
+            // autojoin would strand them on the empty home view with no #root.
+            // So guests still autojoin #root even when session-sync is active.
+            const loggedIn = _saslAccount !== null;
+            if (!sessionSync || !loggedIn) {
               const { autoJoinChannels } = get();
               const serverUrl = get().server?.url ?? '';
               // Both eshmaki.me and ircx.us are the same IRCXNet mesh — and the

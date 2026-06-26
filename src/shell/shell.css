@@ -1551,6 +1551,44 @@
   color: var(--washi-mute);
   max-width: 36ch;
   line-height: 1.55;
+  margin: 0 auto;
+}
+
+.shell-home-actions {
+  margin-top: 1.6rem;
+  display: flex;
+  justify-content: center;
+  gap: 0.7rem;
+}
+
+.shell-home-cta {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--lapis-bright), var(--lapis));
+  border: 1px solid var(--lapis-bright);
+  border-radius: var(--r-md);
+  padding: 0.7rem 1.3rem;
+  cursor: pointer;
+  font-weight: 600;
+  box-shadow: 0 6px 22px -10px color-mix(in oklab, var(--lapis) 70%, transparent);
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease),
+    filter var(--dur) var(--ease);
+}
+.shell-home-cta:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.06);
+  box-shadow: 0 10px 30px -10px color-mix(in oklab, var(--lapis-bright) 80%, transparent);
+}
+.shell-home-cta:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .shell-home-cta { transition: none; }
+  .shell-home-cta:hover { transform: none; }
 }
 
 /* ── Thread panel (Sheet) ── */

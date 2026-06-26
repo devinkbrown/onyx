@@ -61,9 +61,19 @@ function HomeView(): JSX.Element {
       <div>
         <h2 class="shell-home-title">You're in the current</h2>
         <p class="shell-home-sub">
-          Pick a channel from the rail to dive in, or join a new room below.
-          Press <b>/</b> to jump to any room, person, or command.
+          Jump straight into the main hall, or pick a channel from the rail.
+          Once you're in a room you can start voice or video from its header.
+          Press <b>/</b> to search rooms, people, and commands.
         </p>
+        <div class="shell-home-actions">
+          <button
+            type="button"
+            class="shell-home-cta"
+            onClick={() => void getState().joinChannel('#root')}
+          >
+            Join #root →
+          </button>
+        </div>
       </div>
     </div>
   );
