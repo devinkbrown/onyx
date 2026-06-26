@@ -12,11 +12,28 @@ import { TsumugiGroup } from './TsumugiGroup';
 import { TsumugiIdentity } from './TsumugiIdentity';
 import { ChunkAssembler } from './ChunkAssembler';
 import { PeerRegistry } from './PeerRegistry';
+import { KaguraCodec, type KaguraCodecTag, decodeKaguraFrame, encodeKaguraFrame } from './kaguraFrame';
+import { appendMediaMac, importMediaMacKey } from './mediaMac';
+import { MediaStreamRouter, mediaStreamId } from './mediaStream';
+import type { IRCMessage } from '../irc/types';
 import type {
   CallState, VoiceCallState, MediaKind,
   SuimyakuPeerState, SuimyakuRoomStats, NetworkQualityTier,
   SuimyakuMediaCallbacks, SuimyakuChannelInfo,
 } from './types';
+
+// WS media-plane Kagura band ids: media bands are >= 64. band_id discriminates
+// how a relayed datagram's payload is handled (the codec tag is informational).
+const WS_BAND_AUDIO = 64;          // opvox audio, plaintext
+const WS_BAND_VIDEO = 65;          // opvis video
+const WS_BAND_TSUMUGI_AUDIO = 66;  // opvox audio, TSUMUGI group-encrypted ciphertext
+
+function base64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
 
 export type { CallState, VoiceCallState, MediaKind, SuimyakuPeerState, SuimyakuRoomStats, NetworkQualityTier, SuimyakuMediaCallbacks, SuimyakuChannelInfo };
 
@@ -173,6 +190,22 @@ export class SuimyakuMediaEngine {
   private readonly cb: SuimyakuMediaCallbacks;
   private readonly defaultKind: MediaKind;
 
+  // --- WS media plane (browser media over binary WebSocket frames) ----------
+  /** Server-issued per-stream MAC key for the active call. Null until a
+   *  `NOTE MEDIA <#chan> MACKEY <b64>` arrives — i.e. the server opted in
+   *  (`[media].ws_media_relay`). While null, sendFrame stays a no-op. */
+  private wsMediaKey: CryptoKey | null = null;
+  private wsMyNick = '';
+  private wsAudSeq = 0;
+  private wsVidSeq = 0;
+  private readonly streamRouter = new MediaStreamRouter();
+  /** Client this engine's media handlers are currently registered on. */
+  private boundMediaClient: IRCClient | null = null;
+  // Stable references so they can be added to / removed from the client's
+  // subscriber sets across setClient transitions.
+  private readonly onMediaServerMessageBound = (msg: IRCMessage) => this.handleMediaServerMessage(msg);
+  private readonly onMediaDatagramBound = (data: Uint8Array) => this.handleMediaDatagram(data);
+
   private wasm:      OpcodecWasm | null = null;
   private wasmReady  = false;
 
@@ -258,6 +291,18 @@ export class SuimyakuMediaEngine {
   setClient(client: IRCClient | null) {
     const prev = this.client;
     this.client = client;
+    // Move the media-plane subscriptions to the new client (binary datagrams +
+    // NOTE MEDIA MACKEY/JOIN/ROSTER), tolerating repeat calls with the same client.
+    if (this.boundMediaClient && this.boundMediaClient !== client) {
+      this.boundMediaClient.binaryHandlers.delete(this.onMediaDatagramBound);
+      this.boundMediaClient.extraMessageHandlers.delete(this.onMediaServerMessageBound);
+      this.boundMediaClient = null;
+    }
+    if (client && this.boundMediaClient !== client) {
+      client.binaryHandlers.add(this.onMediaDatagramBound);
+      client.extraMessageHandlers.add(this.onMediaServerMessageBound);
+      this.boundMediaClient = client;
+    }
     if (!client && this.callState !== 'idle') { this.setIdle(); return; }
     if (client && !prev && this.callState === 'in_call' && this.activeRoom) {
       const room = this.activeRoom;
@@ -829,14 +874,101 @@ export class SuimyakuMediaEngine {
     return btoa(s);
   }
 
+  /**
+   * Transmit one encoded media frame over the WS media plane: wrap it in a
+   * Kagura datagram, append the per-stream MAC, and send a binary WebSocket
+   * frame. No-op until the server has issued a MAC key (ws_media_relay on), so
+   * on servers without the WS media plane this stays the historical no-op.
+   */
   private sendFrame(channel: string, ftype: string, data: Uint8Array) {
-    if (!this.client) return;
-    void channel; void ftype; void data;
-    // Orochi does not carry media frames as IRC commands. MEDIA OFFER returns
-    // NOTE MEDIA TRANSPORT/NATIVE details for the media plane; until the native
-    // transport is mounted in this client, keep the codec internals alive without
-    // emitting obsolete IRC media payloads.
-    return;
+    const client = this.client;
+    if (!client || !this.wsMediaKey || channel !== this.activeRoom || !this.wsMyNick) return;
+    if (!data.length) return;
+
+    let bandId: number;
+    let codec: KaguraCodecTag;
+    let keyframe = false;
+    let kind: 'audio' | 'video';
+    switch (ftype) {
+      case 'AUDIO':        bandId = WS_BAND_AUDIO;         codec = KaguraCodec.opvoxAudio; kind = 'audio'; break;
+      case 'TSUMUGI_DATA': bandId = WS_BAND_TSUMUGI_AUDIO; codec = KaguraCodec.opvoxAudio; kind = 'audio'; break;
+      case 'KEYFRAME':     bandId = WS_BAND_VIDEO;         codec = KaguraCodec.opvisVideo; keyframe = true; kind = 'video'; break;
+      case 'FRAME':        bandId = WS_BAND_VIDEO;         codec = KaguraCodec.opvisVideo; kind = 'video'; break;
+      default: return;
+    }
+
+    // Sequence is assigned synchronously (before the async MAC) so per-stream
+    // ordering is stable even if two sends race.
+    const sequence = (kind === 'audio' ? this.wsAudSeq++ : this.wsVidSeq++) >>> 0;
+    const frame = encodeKaguraFrame({
+      bandId,
+      streamId: mediaStreamId(channel, this.wsMyNick, kind),
+      sequence,
+      timestamp: Date.now(),
+      keyframe,
+      codec,
+      payload: data,
+    });
+
+    const key = this.wsMediaKey;
+    appendMediaMac(key, frame)
+      .then((datagram) => { if (this.client === client) client.sendBinary(datagram); })
+      .catch(() => { /* a MAC failure drops one media frame; loss-tolerant */ });
+  }
+
+  /** Observe NOTE MEDIA control events to drive the WS media plane. */
+  private handleMediaServerMessage(msg: IRCMessage) {
+    if (msg.command !== 'NOTE' || msg.params[0] !== 'MEDIA') return;
+    const channel = msg.params[1];
+    const verb = msg.params[2];
+    if (!channel || !verb || channel !== this.activeRoom) return;
+
+    if (verb === 'MACKEY') {
+      const b64 = msg.params[3];
+      if (!b64) return;
+      this.wsMyNick = this.client?.currentNick ?? this.wsMyNick;
+      this.wsAudSeq = 0;
+      this.wsVidSeq = 0;
+      this.streamRouter.setRoster(channel, this.wsMyNick ? [this.wsMyNick] : []);
+      try {
+        importMediaMacKey(base64ToBytes(b64))
+          .then((k) => { this.wsMediaKey = k; })
+          .catch(() => {});
+      } catch { /* malformed key — stay a no-op */ }
+    } else if (verb === 'JOIN' || verb === 'ROSTER') {
+      const nick = msg.params[3];
+      if (nick) this.streamRouter.addParticipant(nick);
+    }
+  }
+
+  /** Decode one inbound media datagram and route it to the sending peer. */
+  private handleMediaDatagram(data: Uint8Array) {
+    const room = this.activeRoom;
+    if (!room) return;
+    const frame = decodeKaguraFrame(data);
+    if (!frame) return;
+    const src = this.streamRouter.resolve(frame.streamId);
+    if (!src) return; // unknown stream (not a current roster participant)
+
+    if (frame.bandId === WS_BAND_TSUMUGI_AUDIO) {
+      const groupKey = this.tsumugiGroupKey;
+      if (!groupKey) return; // can't decrypt without the group key
+      const payload = frame.payload;
+      groupKey.decrypt(payload)
+        .then((pcm) => {
+          const pm = this.registry.getOrCreate(src.nick, room, 'voice');
+          void this.registry.decodeAudio(pm, pcm);
+        })
+        .catch(() => {});
+      return;
+    }
+    if (src.kind === 'audio') {
+      const pm = this.registry.getOrCreate(src.nick, room, 'voice');
+      void this.registry.decodeAudio(pm, frame.payload);
+    } else {
+      const pm = this.registry.getOrCreate(src.nick, room, 'video');
+      void this.registry.decodeVideo(pm, frame.payload, frame.keyframe ? 'KEYFRAME' : 'FRAME');
+    }
   }
 
   private mediaframeCmd(channel: string, subtype: string, payload = '') {
@@ -1505,6 +1637,11 @@ export class SuimyakuMediaEngine {
   private setActiveRoom(channel: string) {
     this.activeRoom = channel;
     this.setCallState('in_call', '', channel);
+    // Drop any prior call's MAC key/stream map; the new call's MACKEY repopulates.
+    this.wsMediaKey = null;
+    this.wsAudSeq = 0;
+    this.wsVidSeq = 0;
+    this.streamRouter.clear();
     if (!this.audioLevelTimer) {
       this.audioLevelTimer = setInterval(() => {
         for (const [nick, level] of this.registry.peerLevels)
@@ -1564,6 +1701,12 @@ export class SuimyakuMediaEngine {
     this.tsumugiSessions.clear();
     this.tsumugiGroupKey = null;
     this.tsumugiGroupKeyPromise = null;
+    // WS media plane teardown.
+    this.wsMediaKey = null;
+    this.wsMyNick = '';
+    this.wsAudSeq = 0;
+    this.wsVidSeq = 0;
+    this.streamRouter.clear();
     if (this.gcTimer) { clearInterval(this.gcTimer); this.gcTimer = null; }
     this.suggestedBps = 0; this.networkTier = 0; this.videoSkipCount = 0;
     this.audioQuality = AUDIO_QUALITY; this.nearCapacityFired = false;
