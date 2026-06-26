@@ -57,7 +57,8 @@ describe('voice overlays', () => {
       ],
     ]);
     store.setState({ mediaTranscripts });
-    store.getState().setVoiceCallState({ callState: 'in_call', callChannel: '#voice' });
+    // Captions are now opt-in (VoiceBar toggle) — enable them for this render.
+    store.getState().setVoiceCallState({ callState: 'in_call', callChannel: '#voice', captionsEnabled: true });
 
     render(() => <CaptionsOverlay />);
 
