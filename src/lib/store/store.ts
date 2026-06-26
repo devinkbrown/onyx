@@ -5,7 +5,7 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { IRCClient } from '@/lib/irc/client';
 import type { IRCMessage, Channel, ChatMessage, ConnectionStatus, MessageReaction } from '@/lib/irc/types';
 import { loadCredentials } from '@/lib/credentials';
-import { parseCHANLIMIT, parseMonitorNumeric, parsePREFIX, parseSessionMeshTokenNote, parseSessionTokenNote, parseStandardReply } from '@/lib/irc/parser';
+import { parseAccountInfo, parseCHANLIMIT, parseMonitorNumeric, parsePREFIX, parseSessionMeshTokenNote, parseSessionTokenNote, parseStandardReply } from '@/lib/irc/parser';
 import type { SuimyakuPeerState, SuimyakuRoomStats, CallState } from '@/lib/suimyaku-media/types';
 import { getMountedSuimyakuMediaEngine } from '@/lib/suimyaku-media/MediaEngine';
 import { parseActivity } from '@/lib/activity';
@@ -206,6 +206,40 @@ export interface Notification {
   at: Date;
 }
 
+/**
+ * Fields `ACCOUNTSET` accepts (server.zig handleAccountSet).
+ * `email | secure | enforce | flags` are the documented fields; `password` is
+ * accepted on deployments that support an in-band password change (the server
+ * answers `FAIL ACCOUNTSET INVALID_FIELD` when it doesn't, surfaced to the UI).
+ */
+export type AccountSetField = 'email' | 'secure' | 'enforce' | 'flags' | 'password';
+
+/**
+ * Structured account details parsed from the `ACCOUNTINFO` reply.
+ *
+ * Orochi's `ACCOUNTINFO` answers with `account=<name> flags=<n>` (server.zig
+ * handleAccountInfo). Some deployments also surface `email=`, `secure=`,
+ * `enforce=`, and a registration timestamp/`registered=` — all optional. We
+ * parse whatever key=value pairs are present and leave the rest undefined,
+ * never inventing values the server did not send.
+ */
+export interface AccountInfo {
+  /** Canonical account name the info pertains to. */
+  account: string;
+  /** Raw numeric flag bits, when the server reports `flags=`. */
+  flags?: number;
+  /** Contact email, when the server reports `email=`. */
+  email?: string;
+  /** `secure on|off` — recognised only via IDENTIFY, never access-list match. */
+  secure?: boolean;
+  /** `enforce on|off` — nick protection on the registered nick. */
+  enforce?: boolean;
+  /** Registration detail (timestamp or human string), when reported. */
+  registered?: string;
+  /** When this snapshot was fetched (for staleness display). */
+  fetchedAt: Date;
+}
+
 // ── Toast system ──────────────────────────────────────────────────────────────
 
 export type ToastVariant = 'success' | 'error' | 'warning' | 'info' | 'mention' | 'dm' | 'join' | 'undo';
@@ -301,6 +335,11 @@ export interface OnyxState {
   showSettings: boolean;
   /** Which settings tab is active */
   settingsTab: string;
+  /** Whether the account management panel is open */
+  showAccount: boolean;
+  /** Open / close the account management panel */
+  openAccount(): void;
+  closeAccount(): void;
 
   // ── Data ────────────────────────────────────────────────────────────
   channels: Map<string, Channel>;
@@ -363,6 +402,55 @@ export interface OnyxState {
   verifyRequired: boolean;
   registerAccount(account: string, email: string | undefined, password: string): void;
   verifyAccount(account: string, code: string): void;
+
+  // ── Account identity / management (Orochi built-in, no NickServ bot) ──
+  /**
+   * Latest structured details from `ACCOUNTINFO`, populated when the reply
+   * arrives (NOTICE `account=<name> flags=<n>`). Null until first fetched or
+   * after LOGOUT. The Account panel renders this.
+   */
+  accountInfo: AccountInfo | null;
+  /** True while an ACCOUNTINFO round-trip is in flight (for spinners). */
+  accountInfoPending: boolean;
+  /**
+   * Last failed account-management command surfaced from a `FAIL <cmd> <code>`
+   * reply (ACCOUNTSET / RECOVER / IDENTIFY / DROP / ACCOUNTINFO / LOGOUT).
+   * Cleared when a new action is dispatched or on success.
+   */
+  accountActionError: { command: string; code: string; description: string } | null;
+  /**
+   * `IDENTIFY <account> <password>` — log in to an account on the existing
+   * connection. Success arrives as 900 RPL_LOGGEDIN (sets server.account);
+   * failure as 464 / `FAIL IDENTIFY`.
+   */
+  identify(account: string, password: string): void;
+  /**
+   * `LOGOUT` — log out of the current account. On the confirming reply the
+   * store clears server.account and accountInfo.
+   */
+  logout(): void;
+  /**
+   * `ACCOUNTINFO [account]` — request account details. With no argument the
+   * server reports the caller's own account. The reply populates accountInfo.
+   */
+  accountInfo_fetch(account?: string): void;
+  /**
+   * `ACCOUNTSET <account> <password> <field> <value>` — update a setting after
+   * password verification. `field` ∈ email | secure | enforce | flags.
+   * Optimistically updates accountInfo on the confirming reply.
+   */
+  accountSet(field: AccountSetField, value: string, password: string): void;
+  /**
+   * `RECOVER <nick> [password]` — force an unauthenticated holder off your
+   * registered nick. Caller must be identified to the owning account.
+   */
+  recover(nick: string, password?: string): void;
+  /**
+   * `DROP <account> <password>` — permanently delete the account (dangerous).
+   * Guard behind a confirmation in the UI. On success the server logs the
+   * session out; the store clears account state.
+   */
+  dropAccount(account: string, password: string): void;
 
   // ── Nick reclaim / CERTFP services (Orochi built-in, no NickServ bot) ──
   /**
@@ -1527,6 +1615,46 @@ function _clearReconnectCountdown() {
 type SetFn = (partial: Partial<OnyxState> | ((s: OnyxState) => Partial<OnyxState>)) => void;
 type GetFn = () => OnyxState;
 
+// ── Account-management standard-reply commands ───────────────────────────────
+/** Commands whose FAIL/WARN/NOTE replies the account layer routes to state. */
+const ACCOUNT_COMMANDS = new Set([
+  'ACCOUNTINFO',
+  'ACCOUNTSET',
+  'IDENTIFY',
+  'LOGOUT',
+  'RECOVER',
+  'DROP',
+]);
+
+/**
+ * Merge parsed ACCOUNTINFO fields into the structured `accountInfo` state.
+ * No-op when parsing found nothing. Always clears `accountInfoPending`. The
+ * account name falls back to the logged-in server account when the reply omits
+ * `account=` (the bare-arg ACCOUNTINFO case reports your own account).
+ */
+function _applyAccountInfo(
+  set: SetFn,
+  get: GetFn,
+  fields: ReturnType<typeof parseAccountInfo>,
+): void {
+  if (!fields) {
+    set({ accountInfoPending: false });
+    return;
+  }
+  const ownAccount = get().server?.account ?? null;
+  const name = fields.account ?? get().accountInfo?.account ?? ownAccount ?? '';
+  const next: AccountInfo = {
+    account: name,
+    ...(fields.flags !== undefined ? { flags: fields.flags } : {}),
+    ...(fields.email !== undefined ? { email: fields.email } : {}),
+    ...(fields.secure !== undefined ? { secure: fields.secure } : {}),
+    ...(fields.enforce !== undefined ? { enforce: fields.enforce } : {}),
+    ...(fields.registered !== undefined ? { registered: fields.registered } : {}),
+    fetchedAt: new Date(),
+  };
+  set({ accountInfo: next, accountInfoPending: false, accountActionError: null });
+}
+
 function _startReconnectCountdown(get: GetFn, set: SetFn) {
   _clearReconnectCountdown();
 
@@ -1677,6 +1805,7 @@ export const store = createStore<OnyxState>()(
     showMemberList: true,
     showSettings: false,
     settingsTab: 'account',
+    showAccount: false,
     channels: new Map(),
     dms: new Map(),
     ourNick: '',
@@ -1723,6 +1852,9 @@ export const store = createStore<OnyxState>()(
     registerPending: false,
     registerError: null,
     verifyRequired: false,
+    accountInfo: null,
+    accountInfoPending: false,
+    accountActionError: null,
     notifications: [],
     readNotificationIds: new Set(),
     showNotificationCenter: false,
@@ -1973,6 +2105,9 @@ export const store = createStore<OnyxState>()(
         server: null,
         activeView: { kind: 'home' },
         serverRules: [],
+        accountInfo: null,
+        accountInfoPending: false,
+        accountActionError: null,
       });
     },
 
@@ -2072,6 +2207,73 @@ export const store = createStore<OnyxState>()(
       // OCEAN-UI: verification UI should call verifyAccount(account, code).
     },
 
+    // ── Account identity / management ────────────────────────────────────
+    // All of these are real server commands whose replies arrive through the
+    // standard-reply / NOTICE path in _handleMessage. The actions only send the
+    // raw line and clear the prior error; state mutations live in the handler so
+    // there is a single source of truth for the server's verdict.
+    identify(account, password) {
+      const { client } = get();
+      const acct = account.trim();
+      if (!client || !acct || !password) return;
+      set({ accountActionError: null });
+      // Login success returns as 900 RPL_LOGGEDIN (sets server.account);
+      // failure as 464 ERR_PASSWDMISMATCH or `FAIL IDENTIFY`.
+      client.sendRaw('IDENTIFY', acct, password);
+    },
+
+    logout() {
+      const { client } = get();
+      if (!client) return;
+      set({ accountActionError: null });
+      // Orochi LOGOUT replies with an optional `MODE <nick> :-o` then a
+      // confirming NOTICE. The 901 RPL_LOGGEDOUT (if sent) clears server.account;
+      // we also clear it defensively when the confirming notice lands.
+      client.sendRaw('LOGOUT');
+    },
+
+    accountInfo_fetch(account) {
+      const { client } = get();
+      if (!client) return;
+      const acct = account?.trim();
+      set({ accountInfoPending: true, accountActionError: null });
+      // `ACCOUNTINFO [account]` — no arg = own account. Reply is parsed from the
+      // `account=… flags=…` NOTICE in the message handler.
+      if (acct) client.sendRaw('ACCOUNTINFO', acct);
+      else client.sendRaw('ACCOUNTINFO');
+    },
+
+    accountSet(field, value, password) {
+      const { client, server } = get();
+      const acct = server?.account ?? null;
+      if (!client || !acct || !password) return;
+      set({ accountActionError: null });
+      // `ACCOUNTSET <account> <password> <field> <value>` — owner-only, password
+      // verified. The confirming NOTICE optimistically updates accountInfo.
+      client.sendRaw('ACCOUNTSET', acct, password, field, value);
+    },
+
+    recover(nick, password) {
+      const { client } = get();
+      const target = nick.trim();
+      if (!client || !target) return;
+      set({ accountActionError: null });
+      // `RECOVER <nick> [password]` — caller must be identified to the owning
+      // account. Force-renames the holder to a Guest… nick on success.
+      if (password && password.trim()) client.sendRaw('RECOVER', target, password.trim());
+      else client.sendRaw('RECOVER', target);
+    },
+
+    dropAccount(account, password) {
+      const { client } = get();
+      const acct = account.trim();
+      if (!client || !acct || !password) return;
+      set({ accountActionError: null });
+      // `DROP <account> <password>` — irreversible. The server logs the session
+      // out on success; the confirming NOTICE clears account state.
+      client.sendRaw('DROP', acct, password);
+    },
+
     // ── Nick reclaim / CERTFP services ───────────────────────────────────
     ghost(nick, password) {
       const { client } = get();
@@ -2141,6 +2343,14 @@ export const store = createStore<OnyxState>()(
     },
     closeSettings() {
       set({ showSettings: false });
+    },
+
+    // ── openAccount / closeAccount ───────────────────────────────────────
+    openAccount() {
+      set({ showAccount: true });
+    },
+    closeAccount() {
+      set({ showAccount: false });
     },
 
     // ── markRead ─────────────────────────────────────────────────────────
@@ -3155,6 +3365,49 @@ export const store = createStore<OnyxState>()(
           }
           return;
         }
+        // ── Account management standard replies ──────────────────────────
+        // ACCOUNTINFO / ACCOUNTSET / IDENTIFY / LOGOUT / RECOVER / DROP.
+        // Errors arrive as `FAIL <cmd> <code>`; success for ACCOUNTINFO may
+        // arrive either as a NOTICE (handled below) or, on some deployments,
+        // as a `NOTE ACCOUNTINFO :account=… flags=…`.
+        if (ACCOUNT_COMMANDS.has(standard.command)) {
+          if (standard.kind === 'FAIL' || standard.kind === 'WARN') {
+            set({
+              accountInfoPending: false,
+              accountActionError: {
+                command: standard.command,
+                code: standard.code,
+                description: standard.description || standard.code,
+              },
+            });
+            get().addNotification({
+              type: 'error',
+              text: standard.description || `${standard.command} failed (${standard.code})`,
+            });
+            return;
+          }
+          if (standard.kind === 'NOTE') {
+            // ACCOUNTINFO payload can land in any trailing param depending on
+            // how the server framed it (`NOTE ACCOUNTINFO :account=… flags=…`
+            // puts it in the code slot; a contextual form spreads it). Join the
+            // raw params after the command name and let the parser find the
+            // key=value pairs wherever they sit. params = ['ACCOUNTINFO', …].
+            const infoBody = msg.params.slice(1).join(' ');
+            const parsed = parseAccountInfo(infoBody);
+            if (parsed) {
+              _applyAccountInfo(set, get, parsed);
+            } else {
+              // A confirmation NOTE with no key=value payload (e.g. a successful
+              // ACCOUNTSET). Clear any prior error and, when the change touched a
+              // displayed setting, re-fetch ACCOUNTINFO so the panel reflects it.
+              set({ accountActionError: null });
+              if (standard.command === 'ACCOUNTSET' && get().server?.account) {
+                get().accountInfo_fetch();
+              }
+            }
+            return;
+          }
+        }
         if (standard.kind === 'FAIL' && standard.command === 'RENAME') {
           get().addNotification({
             type: 'error',
@@ -3686,6 +3939,56 @@ export const store = createStore<OnyxState>()(
               type: 'global-notice',
             });
             break;
+          }
+
+          // ── Account management notices (server-sourced replies) ──────────
+          // Orochi answers ACCOUNTINFO / LOGOUT / DROP with server NOTICEs.
+          // Capture the structured ACCOUNTINFO payload and the logout/drop
+          // confirmations into account state before the generic service-notice
+          // routing folds them into the flat serviceNotices list. Only trust a
+          // notice with no user-nick prefix (a server source), so a peer's PM
+          // mentioning "logged out" can never clear our session.
+          // A pure server prefix (`:server.name NOTICE …`) parses to an empty
+          // sender (msg.nick === null). Account replies always come from the
+          // server, so requiring an empty sender keeps peer PMs out.
+          if (
+            command === 'NOTICE' &&
+            !text.startsWith('\x01') &&
+            !isChan(target) &&
+            !sender
+          ) {
+            const info = parseAccountInfo(text);
+            if (info) {
+              _applyAccountInfo(set, get, info);
+              get().addServiceNotice('Account', text);
+              break;
+            }
+            // Logout / drop confirmation — clear the logged-in account and any
+            // cached info so the UI flips back to the guest state.
+            if (/\b(logged out|logout|signed out)\b/i.test(text) || /\b(account (?:dropped|deleted)|drop(?:ped)?)\b/i.test(text)) {
+              set(s => ({
+                server: s.server ? { ...s.server, account: null } : s.server,
+                accountInfo: null,
+                accountActionError: null,
+              }));
+              _saslAccount = null;
+              get().addServiceNotice('Account', text);
+              break;
+            }
+            // ACCOUNTSET confirmation — a settings-change notice that names a
+            // field and an applied verb. Re-fetch ACCOUNTINFO so the panel
+            // reflects the new email / secure / enforce / flags value, since
+            // the confirmation itself carries no structured payload.
+            if (
+              get().server?.account &&
+              /\b(email|secure|enforce|flag|flags|password)\b/i.test(text) &&
+              /\b(updated|set|changed|enabled|disabled|saved|on|off)\b/i.test(text)
+            ) {
+              set({ accountActionError: null });
+              get().accountInfo_fetch();
+              get().addServiceNotice('Account', text);
+              break;
+            }
           }
 
           if (command === 'NOTICE' && !text.startsWith('\x01') && !isChan(target)) {
@@ -6927,6 +7230,9 @@ export const selectUnreadCount = (target: string) => (s: OnyxState): number => {
   const key = target.toLowerCase();
   return s.channels.get(key)?.unread ?? s.dms.get(key)?.unread ?? 0;
 };
+
+/** The account we're logged into (server.account), or null when a guest. */
+export const selectAccount = (s: OnyxState): string | null => s.server?.account ?? null;
 
 /** First unread message id for the UnreadDivider / jump-pill, or null. */
 export const selectFirstUnreadId = (target: string) => (s: OnyxState): string | null =>

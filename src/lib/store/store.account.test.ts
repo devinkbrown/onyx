@@ -1,0 +1,219 @@
+/**
+ * store.account.test.ts
+ *
+ * Account identity / management actions (Orochi built-in services, no NickServ
+ * bot). Each action sends a raw server command through the IRC client; the
+ * server's reply (a standard FAIL/WARN/NOTE, a NOTICE, or a numeric) is folded
+ * back into state by _handleMessage. We mock the client to capture the exact
+ * raw line, and feed parsed replies through _handleMessage to assert state.
+ */
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { store, type Server } from './store';
+import { parseIRCMessage } from '@/lib/irc/parser';
+
+const initialState = store.getInitialState();
+
+/** Minimal IRCClient stand-in — we only assert on sendRaw calls here. The
+ *  message handler reads client.isupport.CHANTYPES, so provide a stub. */
+function makeClient() {
+  return {
+    sendRaw: vi.fn(),
+    isupport: { CHANTYPES: '#&' },
+    negotiatedCaps: new Set<string>(),
+  };
+}
+
+/** Seed a logged-in server identity so owner-gated actions can run. */
+function seedServer(account: string | null): Server {
+  return {
+    id: 'ircxnet',
+    name: 'eshmaki.me',
+    network: 'IRCXNet',
+    url: 'wss://eshmaki.me',
+    icon: '#000',
+    nick: account ?? 'guest',
+    account,
+    connected: true,
+  };
+}
+
+/** Feed a raw IRC line through the store's message handler. */
+function feed(line: string): void {
+  store.getState()._handleMessage(parseIRCMessage(line));
+}
+
+beforeEach(() => {
+  store.setState(initialState, true);
+});
+
+describe('account actions — raw command dispatch', () => {
+  it('identify() sends IDENTIFY <account> <password> and clears prior error', () => {
+    const client = makeClient();
+    store.setState({ client: client as never, accountActionError: { command: 'DROP', code: 'X', description: 'x' } });
+
+    store.getState().identify('alice', 'hunter2');
+
+    expect(client.sendRaw).toHaveBeenCalledWith('IDENTIFY', 'alice', 'hunter2');
+    expect(store.getState().accountActionError).toBeNull();
+  });
+
+  it('identify() is a no-op without a client, account, or password', () => {
+    const client = makeClient();
+    store.setState({ client: client as never });
+    store.getState().identify('', 'pw');
+    store.getState().identify('alice', '');
+    expect(client.sendRaw).not.toHaveBeenCalled();
+  });
+
+  it('logout() sends LOGOUT', () => {
+    const client = makeClient();
+    store.setState({ client: client as never });
+    store.getState().logout();
+    expect(client.sendRaw).toHaveBeenCalledWith('LOGOUT');
+  });
+
+  it('accountInfo_fetch() sends ACCOUNTINFO with no arg for own account', () => {
+    const client = makeClient();
+    store.setState({ client: client as never });
+    store.getState().accountInfo_fetch();
+    expect(client.sendRaw).toHaveBeenCalledWith('ACCOUNTINFO');
+    expect(store.getState().accountInfoPending).toBe(true);
+  });
+
+  it('accountInfo_fetch(account) sends ACCOUNTINFO <account>', () => {
+    const client = makeClient();
+    store.setState({ client: client as never });
+    store.getState().accountInfo_fetch('bob');
+    expect(client.sendRaw).toHaveBeenCalledWith('ACCOUNTINFO', 'bob');
+  });
+
+  it('accountSet() sends ACCOUNTSET <account> <password> <field> <value>', () => {
+    const client = makeClient();
+    store.setState({ client: client as never, server: seedServer('alice') });
+    store.getState().accountSet('email', 'alice@example.net', 'hunter2');
+    expect(client.sendRaw).toHaveBeenCalledWith(
+      'ACCOUNTSET', 'alice', 'hunter2', 'email', 'alice@example.net',
+    );
+  });
+
+  it('accountSet() is a no-op when not logged in', () => {
+    const client = makeClient();
+    store.setState({ client: client as never, server: seedServer(null) });
+    store.getState().accountSet('secure', 'on', 'pw');
+    expect(client.sendRaw).not.toHaveBeenCalled();
+  });
+
+  it('recover() sends RECOVER <nick> with and without a password', () => {
+    const client = makeClient();
+    store.setState({ client: client as never });
+    store.getState().recover('alice');
+    expect(client.sendRaw).toHaveBeenCalledWith('RECOVER', 'alice');
+    store.getState().recover('alice', 'pw');
+    expect(client.sendRaw).toHaveBeenCalledWith('RECOVER', 'alice', 'pw');
+  });
+
+  it('dropAccount() sends DROP <account> <password>', () => {
+    const client = makeClient();
+    store.setState({ client: client as never });
+    store.getState().dropAccount('alice', 'hunter2');
+    expect(client.sendRaw).toHaveBeenCalledWith('DROP', 'alice', 'hunter2');
+  });
+});
+
+describe('account replies — state from the message handler', () => {
+  it('ACCOUNTINFO NOTICE populates structured accountInfo', () => {
+    store.setState({ accountInfoPending: true, server: seedServer('alice') });
+    feed(':eshmaki.me NOTICE alice :account=alice flags=8 email=alice@example.net secure=on enforce=off');
+
+    const info = store.getState().accountInfo;
+    expect(info).toMatchObject({
+      account: 'alice',
+      flags: 8,
+      email: 'alice@example.net',
+      secure: true,
+      enforce: false,
+    });
+    expect(store.getState().accountInfoPending).toBe(false);
+  });
+
+  it('a NOTE ACCOUNTINFO standard reply also populates accountInfo', () => {
+    store.setState({ accountInfoPending: true, server: seedServer('bob') });
+    feed(':eshmaki.me NOTE ACCOUNTINFO :account=bob flags=2');
+    expect(store.getState().accountInfo).toMatchObject({ account: 'bob', flags: 2 });
+    expect(store.getState().accountInfoPending).toBe(false);
+  });
+
+  it('FAIL ACCOUNTSET surfaces accountActionError and a notification', () => {
+    store.setState({ server: seedServer('alice') });
+    feed(':eshmaki.me FAIL ACCOUNTSET INVALID_VALUE :Bad value for secure');
+
+    expect(store.getState().accountActionError).toMatchObject({
+      command: 'ACCOUNTSET',
+      code: 'INVALID_VALUE',
+    });
+    const notes = store.getState().notifications;
+    expect(notes[notes.length - 1]).toMatchObject({ type: 'error' });
+  });
+
+  it('FAIL IDENTIFY surfaces accountActionError', () => {
+    feed(':eshmaki.me FAIL IDENTIFY TEMPORARILY_UNAVAILABLE :try later');
+    expect(store.getState().accountActionError).toMatchObject({
+      command: 'IDENTIFY',
+      code: 'TEMPORARILY_UNAVAILABLE',
+    });
+  });
+
+  it('a logout confirmation NOTICE clears account + accountInfo', () => {
+    store.setState({
+      server: seedServer('alice'),
+      accountInfo: { account: 'alice', fetchedAt: new Date() },
+    });
+    feed(':eshmaki.me NOTICE alice :You are now logged out.');
+
+    expect(store.getState().server?.account).toBeNull();
+    expect(store.getState().accountInfo).toBeNull();
+  });
+
+  it('901 RPL_LOGGEDOUT clears the server account', () => {
+    store.setState({ server: seedServer('alice') });
+    feed(':eshmaki.me 901 alice alice!u@h :You are now logged out');
+    expect(store.getState().server?.account).toBeNull();
+  });
+
+  it('does NOT clear the account from a peer PM mentioning "logged out"', () => {
+    store.setState({ server: seedServer('alice') });
+    feed(':mallory!m@evil NOTICE alice :hey you got logged out lol');
+    expect(store.getState().server?.account).toBe('alice');
+  });
+
+  it('900 RPL_LOGGEDIN sets the server account (IDENTIFY success path)', () => {
+    store.setState({ server: seedServer(null) });
+    feed(':eshmaki.me 900 alice alice!u@h alice :You are now logged in as alice');
+    expect(store.getState().server?.account).toBe('alice');
+  });
+
+  it('an ACCOUNTSET confirmation NOTICE re-fetches ACCOUNTINFO', () => {
+    const client = makeClient();
+    store.setState({ client: client as never, server: seedServer('alice') });
+    feed(':eshmaki.me NOTICE alice :Secure mode enabled.');
+    // The confirmation has no structured payload, so the store asks the server
+    // for fresh details to reflect the new value in the panel.
+    expect(client.sendRaw).toHaveBeenCalledWith('ACCOUNTINFO');
+    expect(store.getState().accountActionError).toBeNull();
+  });
+
+  it('a NOTE ACCOUNTSET confirmation (no payload) re-fetches ACCOUNTINFO', () => {
+    const client = makeClient();
+    store.setState({ client: client as never, server: seedServer('alice') });
+    feed(':eshmaki.me NOTE ACCOUNTSET :email updated');
+    expect(client.sendRaw).toHaveBeenCalledWith('ACCOUNTINFO');
+  });
+
+  it('a DROP confirmation NOTICE clears the account', () => {
+    store.setState({ server: seedServer('alice'), accountInfo: { account: 'alice', fetchedAt: new Date() } });
+    feed(':eshmaki.me NOTICE alice :Account dropped.');
+    expect(store.getState().server?.account).toBeNull();
+    expect(store.getState().accountInfo).toBeNull();
+  });
+});

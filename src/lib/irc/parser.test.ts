@@ -12,6 +12,7 @@ import {
   parseSessionMeshTokenNote,
   buildSessionResumeLine,
   parseMonitorNumeric,
+  parseAccountInfo,
 } from './parser';
 
 describe('parseIRCMessage', () => {
@@ -151,5 +152,54 @@ describe('parseMonitorNumeric', () => {
   });
   it('non-monitor numerics return null', () => {
     expect(parseMonitorNumeric(parseIRCMessage(':srv 001 ruri :hi'))).toBeNull();
+  });
+});
+
+describe('parseAccountInfo', () => {
+  it('parses the canonical account + flags reply', () => {
+    expect(parseAccountInfo('account=alice flags=0')).toEqual({
+      account: 'alice',
+      flags: 0,
+    });
+  });
+
+  it('parses extended fields (email/secure/enforce/registered)', () => {
+    const r = parseAccountInfo(
+      'account=bob flags=8 email=bob@example.net secure=on enforce=off registered=2026-01-02',
+    );
+    expect(r).toEqual({
+      account: 'bob',
+      flags: 8,
+      email: 'bob@example.net',
+      secure: true,
+      enforce: false,
+      registered: '2026-01-02',
+    });
+  });
+
+  it('tolerates reordering and extra whitespace', () => {
+    expect(parseAccountInfo('  flags=2   account=carol  ')).toEqual({
+      account: 'carol',
+      flags: 2,
+    });
+  });
+
+  it('coerces on/off/true/false/1/0 to booleans', () => {
+    expect(parseAccountInfo('secure=true enforce=0')).toEqual({
+      secure: true,
+      enforce: false,
+    });
+  });
+
+  it('returns null when no recognised key=value pair is present', () => {
+    expect(parseAccountInfo('You are now identified.')).toBeNull();
+    expect(parseAccountInfo('')).toBeNull();
+  });
+
+  it('ignores unrecognised keys but keeps known ones', () => {
+    expect(parseAccountInfo('account=dave nonsense=x flags=5')).toEqual({
+      account: 'dave',
+      flags: 5,
+    });
   });
 });

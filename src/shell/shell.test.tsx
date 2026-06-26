@@ -12,7 +12,7 @@
  * AAA pattern throughout. Descriptive test names.
  */
 
-import { cleanup, fireEvent, render } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { store } from '@/lib/store/store';
 import type { Channel } from '@/lib/irc/types';
@@ -306,6 +306,48 @@ describe('AppShell', () => {
       // Assert
       const ribbon = getByRole('banner', { name: 'Channel information' });
       expect(ribbon.textContent).toContain('testuser');
+    });
+
+    it('shows a "Guest" account chip that opens the account panel', () => {
+      // Arrange — connected guest (no logged-in account).
+      seedStore('#general');
+
+      // Act
+      const { getByTestId } = render(() => <AppShell />);
+      const chip = getByTestId('ribbon-account-chip');
+
+      // Assert — guest chip, panel closed.
+      expect(chip).toHaveAttribute('data-guest', 'true');
+      expect(chip.textContent).toContain('Guest');
+      expect(store.getState().showAccount).toBe(false);
+
+      // Act — click opens the panel via the store.
+      fireEvent.click(chip);
+
+      // Assert — store flag flips and the panel mounts (portaled to body, so
+      // query the whole document via screen, not the render container).
+      expect(store.getState().showAccount).toBe(true);
+      expect(screen.getByTestId('account-panel')).toBeInTheDocument();
+    });
+
+    it('shows the account name on the chip when signed in', () => {
+      // Arrange — connected with a logged-in account.
+      seedStore('#general');
+      store.setState({
+        server: {
+          id: 'ircxnet', name: 'eshmaki.me', network: 'IRCXNet',
+          url: 'wss://eshmaki.me', icon: '#000', nick: 'alice',
+          account: 'alice', connected: true,
+        },
+      });
+
+      // Act
+      const { getByTestId } = render(() => <AppShell />);
+      const chip = getByTestId('ribbon-account-chip');
+
+      // Assert
+      expect(chip).toHaveAttribute('data-guest', 'false');
+      expect(chip.textContent).toContain('alice');
     });
   });
 

@@ -8,7 +8,7 @@
  */
 
 import { createMemo, Show, splitProps, type JSX } from 'solid-js';
-import { useStore, getState } from '@/lib/store';
+import { useStore, getState, selectAccount } from '@/lib/store';
 
 export type PresenceRibbonProps = {
   selfNick?: string;
@@ -23,6 +23,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   const channels = useStore((s) => s.channels);
   const dms = useStore((s) => s.dms);
   const ourNick = useStore((s) => s.ourNick);
+  const account = useStore(selectAccount);
 
   // ── derived ──
   const activeChannel = createMemo(() => {
@@ -132,12 +133,33 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
           </button>
         </Show>
 
-        {/* Identity */}
-        <Show when={displayNick()}>
-          <span class="shell-ribbon-identity" aria-label={`Connected as ${displayNick()}`}>
-            <span class="shell-ribbon-identity-nick">{displayNick()}</span>
+        {/* Identity / account chip — opens the account panel. Shows the
+            logged-in account, or "Guest" when browsing anonymously. */}
+        <button
+          type="button"
+          class="shell-ribbon-account"
+          data-guest={account() ? 'false' : 'true'}
+          aria-label={
+            account()
+              ? `Account: ${account()} — open account panel`
+              : 'Guest — open account panel'
+          }
+          aria-haspopup="dialog"
+          onClick={() => getState().openAccount()}
+          data-testid="ribbon-account-chip"
+        >
+          <span class="shell-ribbon-account-glyph" aria-hidden="true">
+            {account() ? '◆' : '◌'}
           </span>
-        </Show>
+          <span class="shell-ribbon-account-text">
+            <Show when={account()} fallback={<span class="shell-ribbon-account-name">Guest</span>}>
+              {(acct) => <span class="shell-ribbon-account-name">{acct()}</span>}
+            </Show>
+            <Show when={displayNick() && displayNick() !== account()}>
+              <span class="shell-ribbon-account-nick">{displayNick()}</span>
+            </Show>
+          </span>
+        </button>
 
         {/* Connection status */}
         <span class="shell-ribbon-conn" aria-live="polite" aria-atomic="true">

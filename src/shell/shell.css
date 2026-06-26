@@ -666,6 +666,77 @@
   color: var(--lapis-bright);
 }
 
+/* ── Account chip (opens the account panel) ───────────────────────────────── */
+.shell-ribbon-account {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 14rem;
+  padding: 4px 10px 4px 8px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--stone) 32%, transparent);
+  cursor: pointer;
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+
+.shell-ribbon-account:hover {
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--stone-2) 40%, transparent);
+}
+
+.shell-ribbon-account:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.shell-ribbon-account-glyph {
+  font-size: 0.66rem;
+  line-height: 1;
+  color: var(--lapis-bright);
+}
+
+.shell-ribbon-account[data-guest='true'] .shell-ribbon-account-glyph {
+  color: var(--washi-mute);
+}
+
+.shell-ribbon-account-text {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.shell-ribbon-account-name {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: var(--lapis-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell-ribbon-account[data-guest='true'] .shell-ribbon-account-name {
+  color: var(--washi-dim);
+}
+
+.shell-ribbon-account-nick {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.06em;
+  color: var(--washi-mute);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-ribbon-account { transition: none; }
+}
+
 .shell-ribbon-conn {
   display: flex;
   align-items: center;

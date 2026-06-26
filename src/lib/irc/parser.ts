@@ -218,6 +218,92 @@ export function parseStandardReply(msg: IRCMessage): StandardReply | null {
   };
 }
 
+/**
+ * Parsed key=value fields from an `ACCOUNTINFO` reply.
+ *
+ * Orochi answers `ACCOUNTINFO` with a server NOTICE in the shape
+ * `account=<name> flags=<n>` (server.zig handleAccountInfo); some deployments
+ * append `email=`, `secure=on|off`, `enforce=on|off`, and `registered=`.
+ * We extract only the keys the server actually sent — absent keys stay
+ * undefined so the UI never displays invented values.
+ */
+export interface AccountInfoFields {
+  account?: string;
+  flags?: number;
+  email?: string;
+  secure?: boolean;
+  enforce?: boolean;
+  registered?: string;
+}
+
+function parseBoolToken(value: string): boolean | undefined {
+  const v = value.trim().toLowerCase();
+  if (v === 'on' || v === 'true' || v === 'yes' || v === '1') return true;
+  if (v === 'off' || v === 'false' || v === 'no' || v === '0') return false;
+  return undefined;
+}
+
+/**
+ * Parse the body of an ACCOUNTINFO reply (the NOTICE/NOTE trailing text) into
+ * structured fields. Returns null when no recognised `key=value` pair is found,
+ * so callers can distinguish "this was an ACCOUNTINFO reply" from unrelated
+ * account-channel notices. Tolerant of ordering and extra whitespace.
+ */
+export function parseAccountInfo(text: string): AccountInfoFields | null {
+  if (!text) return null;
+  const fields: AccountInfoFields = {};
+  let matched = false;
+  // Match key=value where value runs to the next whitespace (values here are
+  // tokens: a name, a number, on/off). Email is also a single token.
+  const re = /(\w+)=([^\s]+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const key = m[1]!.toLowerCase();
+    const value = m[2]!;
+    switch (key) {
+      case 'account':
+        fields.account = value;
+        matched = true;
+        break;
+      case 'flags': {
+        const n = Number.parseInt(value, 10);
+        if (Number.isFinite(n)) {
+          fields.flags = n;
+          matched = true;
+        }
+        break;
+      }
+      case 'email':
+        fields.email = value;
+        matched = true;
+        break;
+      case 'secure': {
+        const b = parseBoolToken(value);
+        if (b !== undefined) {
+          fields.secure = b;
+          matched = true;
+        }
+        break;
+      }
+      case 'enforce': {
+        const b = parseBoolToken(value);
+        if (b !== undefined) {
+          fields.enforce = b;
+          matched = true;
+        }
+        break;
+      }
+      case 'registered':
+        fields.registered = value;
+        matched = true;
+        break;
+      default:
+        break;
+    }
+  }
+  return matched ? fields : null;
+}
+
 export function parseSessionTokenNote(msg: IRCMessage): string | null {
   const reply = parseStandardReply(msg);
   if (!reply || reply.kind !== 'NOTE' || reply.command !== 'SESSION' || reply.code !== 'TOKEN') return null;

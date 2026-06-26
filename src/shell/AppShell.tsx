@@ -45,6 +45,7 @@ import {
 } from './voice';
 import { mountMedia } from '@/media/useSuimyakuMedia';
 import { MemberList } from './MemberList';
+import { AccountPanel } from '@/app/Account';
 
 // ── AppShell props ───────────────────────────────────────────────────────────
 
@@ -126,6 +127,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const showMemberList = useStore((s) => s.showMemberList);
   const mobileSidebarOpen = useStore((s) => s.mobileSidebarOpen);
   const ourNick = useStore((s) => s.ourNick);
+  const showAccount = useStore((s) => s.showAccount);
 
   // ── voice/video ──
   // Boot the SUIMYAKU media engine once and wire its callbacks into the store.
@@ -336,6 +338,12 @@ export function AppShell(props: AppShellProps): JSX.Element {
           <b aria-hidden="true">✕</b>leave
         </button>
       </nav>
+
+      {/* Account management panel — portal modal, gated on store.showAccount */}
+      <AccountPanel
+        open={showAccount()}
+        onOpenChange={(open) => (open ? getState().openAccount() : getState().closeAccount())}
+      />
 
       {/* Voice/video overlays — each self-gates on store.voice */}
       <VoicePip />
