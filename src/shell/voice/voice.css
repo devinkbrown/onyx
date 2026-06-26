@@ -100,11 +100,16 @@
   grid-template-columns: repeat(4, 1fr);
 }
 
-/* Screenshare layout: primary large tile + filmstrip */
+/* Screenshare + spotlight layouts: primary large tile + filmstrip */
 .voice-stage--screenshare .voice-stage__grid {
   display: flex;
   flex-direction: column;
   gap: clamp(8px, 1vw, 12px);
+}
+
+.voice-stage--spotlight {
+  display: flex;
+  flex-direction: column;
 }
 
 .voice-stage__primary {
@@ -351,8 +356,13 @@
 
 @media (prefers-reduced-motion: reduce) {
   .voice-stage::before,
-  .voice-tile__speaking-bars--active span {
+  .voice-tile__speaking-bars--active span,
+  .voice-tile__hand-badge {
     animation: none !important;
+  }
+  .voice-tile__pin {
+    transition: opacity var(--dur) var(--ease);
+    transform: none;
   }
 }
 
@@ -372,6 +382,143 @@
   border-radius: var(--r-pill);
   box-shadow: 0 0 14px color-mix(in oklab, var(--lapis-bright) 20%, transparent);
 }
+
+/* Camera-off hint under the avatar fallback */
+.voice-tile__camera-off {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--washi-mute);
+  opacity: 0.8;
+}
+
+/* ── Tile top bar (hand · quality · pin) ─────────────────────────────────────── */
+.voice-tile__topbar {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Raised-hand badge */
+.voice-tile__hand-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
+  line-height: 1;
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--gold) 26%, var(--ink));
+  border: 1px solid color-mix(in oklab, var(--gold-bright) 56%, transparent);
+  box-shadow: 0 0 14px color-mix(in oklab, var(--gold-bright) 30%, transparent);
+  animation: vtile-hand 1.8s var(--ease) infinite;
+}
+
+@keyframes vtile-hand {
+  0%, 100% { transform: rotate(-7deg); }
+  50%       { transform: rotate(7deg); }
+}
+
+.voice-tile--hand {
+  border-color: color-mix(in oklab, var(--gold-bright) 60%, var(--seam));
+}
+
+/* Connection-quality pips (3 bars) */
+.voice-tile__quality {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 13px;
+  padding: 3px 4px;
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--ink) 56%, transparent);
+  border: 1px solid var(--seam-faint);
+}
+
+.voice-tile__quality span {
+  display: block;
+  width: 3px;
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--stone-3) 70%, transparent);
+}
+
+.voice-tile__quality span:nth-child(1) { height: 40%; }
+.voice-tile__quality span:nth-child(2) { height: 70%; }
+.voice-tile__quality span:nth-child(3) { height: 100%; }
+
+.voice-tile__quality span.on { background: var(--q-color, var(--ok)); }
+.voice-tile__quality--t0 { --q-color: var(--ok); }
+.voice-tile__quality--t1 { --q-color: var(--ok); }
+.voice-tile__quality--t2 { --q-color: var(--gold-bright); }
+.voice-tile__quality--t3 { --q-color: var(--shu); }
+
+/* Pin / spotlight affordance — reveals on hover/focus, stays for pinned tiles */
+.voice-tile__pin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--washi-dim);
+  background: color-mix(in oklab, var(--ink) 60%, transparent);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-pill);
+  opacity: 0;
+  transform: translateY(-2px);
+  transition:
+    opacity var(--dur) var(--ease),
+    transform var(--dur) var(--ease),
+    color var(--dur) var(--ease),
+    background var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+}
+
+.voice-tile:hover .voice-tile__pin,
+.voice-tile:focus-within .voice-tile__pin,
+.voice-tile__pin:focus-visible,
+.voice-tile__pin[aria-pressed="true"] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.voice-tile__pin:hover {
+  color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis) 16%, var(--stone));
+  border-color: var(--seam);
+}
+
+.voice-tile__pin:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.voice-tile__pin[aria-pressed="true"] {
+  color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis-deep) 32%, var(--ink));
+  border-color: color-mix(in oklab, var(--lapis-bright) 60%, var(--seam));
+  box-shadow: 0 0 12px color-mix(in oklab, var(--lapis-bright) 26%, transparent);
+}
+
+/* Pinned tile — persistent azure frame so it reads as the focus */
+.voice-tile--pinned {
+  border-color: color-mix(in oklab, var(--lapis-bright) 60%, var(--seam));
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--lapis-bright) 40%, transparent),
+    0 0 22px color-mix(in oklab, var(--lapis-bright) 18%, transparent);
+}
+
+/* Camera-off badge in the bottom bar */
+.voice-tile__badge--cam { color: var(--washi-mute); }
 
 /* ── VoiceBar ────────────────────────────────────────────────────────────────── */
 
@@ -422,11 +569,25 @@
   max-width: 120px;
 }
 
-.voice-bar__timer {
+.voice-bar__meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.voice-bar__dot {
+  color: var(--washi-mute);
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.voice-bar__count {
   font-size: 10px;
   color: var(--washi-mute);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* Divider between identity and controls */
@@ -445,6 +606,115 @@
   gap: 6px;
   flex: 1;
   justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* Logical groups of controls */
+.voice-bar__group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Reactions popover trigger — match the icon-button chrome around it */
+.voice-bar__group .ruri-popover__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  min-height: 34px;
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--washi-dim);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--seam-faint);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 42%, transparent), color-mix(in oklab, var(--ink) 70%, transparent));
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--washi) 7%, transparent);
+  cursor: pointer;
+  transition:
+    color var(--dur) var(--ease),
+    background var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+
+.voice-bar__group .ruri-popover__trigger:hover {
+  color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis) 12%, var(--stone));
+  border-color: var(--seam);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--washi) 12%, transparent),
+    0 0 18px color-mix(in oklab, var(--lapis-bright) 18%, transparent);
+  transform: translateY(-1px);
+}
+
+.voice-bar__group .ruri-popover__trigger:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 3px;
+}
+
+.voice-bar__group .ruri-popover__trigger[aria-expanded="true"] {
+  color: var(--washi);
+  border-color: color-mix(in oklab, var(--lapis-bright) 72%, var(--seam));
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--lapis) 30%, var(--stone)), color-mix(in oklab, var(--lapis-deep) 32%, var(--ink)));
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--lapis-bright) 24%, transparent),
+    0 0 22px color-mix(in oklab, var(--lapis-bright) 22%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-bar__group .ruri-popover__trigger { transition: color var(--dur) var(--ease); }
+  .voice-bar__group .ruri-popover__trigger:hover { transform: none; }
+}
+
+/* Reactions popover panel */
+.voice-bar__reactions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  padding: 6px;
+  min-width: 168px;
+}
+
+.voice-bar__reaction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  transition:
+    background var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+
+.voice-bar__reaction:hover {
+  background: color-mix(in oklab, var(--lapis) 14%, var(--stone));
+  border-color: var(--seam);
+  transform: translateY(-1px) scale(1.08);
+}
+
+.voice-bar__reaction:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-bar__reaction {
+    transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+  }
+  .voice-bar__reaction:hover { transform: none; }
 }
 
 /* Right slot: connection quality */

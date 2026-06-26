@@ -479,4 +479,341 @@ describe('VoiceBar', () => {
     const toolbar = getByRole('toolbar', { name: 'Voice call controls' });
     expect(toolbar).toBeDefined();
   });
+
+  it('raise-hand button calls toggleRaiseHand and reflects pressed state', () => {
+    // Arrange
+    seedVoiceStore([]);
+    const spy = vi.spyOn(store.getState(), 'toggleRaiseHand').mockImplementation(() => {
+      store.setState(s => ({ voice: { ...s.voice, handRaised: !s.voice.handRaised } }));
+    });
+
+    // Act
+    const { getByTestId } = render(() => <VoiceBar />);
+    const btn = getByTestId('raise-hand-button');
+    expect(btn).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(btn);
+
+    // Assert
+    expect(spy).toHaveBeenCalledOnce();
+    expect(btn).toHaveAttribute('aria-pressed', 'true');
+    spy.mockRestore();
+  });
+
+  it('captions button calls toggleCaptions and reflects pressed state', () => {
+    // Arrange
+    seedVoiceStore([]);
+    const spy = vi.spyOn(store.getState(), 'toggleCaptions').mockImplementation(() => {
+      store.setState(s => ({ voice: { ...s.voice, captionsEnabled: !s.voice.captionsEnabled } }));
+    });
+
+    // Act
+    const { getByTestId } = render(() => <VoiceBar />);
+    const btn = getByTestId('captions-button');
+    expect(btn).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(btn);
+
+    // Assert
+    expect(spy).toHaveBeenCalledOnce();
+    expect(btn).toHaveAttribute('aria-pressed', 'true');
+    spy.mockRestore();
+  });
+
+  it('layout button toggles between grid and spotlight', () => {
+    // Arrange
+    seedVoiceStore([]);
+    const spy = vi.spyOn(store.getState(), 'setCallLayout').mockImplementation((l) => {
+      store.setState(s => ({ voice: { ...s.voice, callLayout: l } }));
+    });
+
+    // Act
+    const { getByTestId } = render(() => <VoiceBar />);
+    const btn = getByTestId('layout-button');
+    expect(btn).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(btn);
+
+    // Assert
+    expect(spy).toHaveBeenCalledWith('spotlight');
+    expect(btn).toHaveAttribute('aria-pressed', 'true');
+    spy.mockRestore();
+  });
+
+  it('settings button calls openVoiceSettings', () => {
+    // Arrange
+    seedVoiceStore([]);
+    const spy = vi.spyOn(store.getState(), 'openVoiceSettings').mockImplementation(() => {});
+
+    // Act
+    const { getByTestId } = render(() => <VoiceBar />);
+    fireEvent.click(getByTestId('settings-button'));
+
+    // Assert
+    expect(spy).toHaveBeenCalledOnce();
+    spy.mockRestore();
+  });
+
+  it('shows the live duration timer with an accessible label', () => {
+    // Arrange
+    seedVoiceStore([], [], { callStartedAt: Date.now() });
+
+    // Act
+    const { getByRole } = render(() => <VoiceBar />);
+
+    // Assert
+    const timer = getByRole('timer');
+    expect(timer.getAttribute('aria-label')).toMatch(/Call duration:/);
+  });
+
+  it('shows the participant count (self + peers)', () => {
+    // Arrange — self + 2 peers = 3
+    seedVoiceStore([makePeer('alice'), makePeer('bob')]);
+
+    // Act
+    const { getByTestId } = render(() => <VoiceBar />);
+    const count = getByTestId('participant-count');
+
+    // Assert
+    expect(count).toHaveAttribute('aria-label', '3 in call');
+    expect(count.textContent).toContain('3');
+  });
+
+  it('reaction picker sends an emoji via sendCallReaction', () => {
+    // Arrange
+    seedVoiceStore([]);
+    const spy = vi.spyOn(store.getState(), 'sendCallReaction').mockImplementation(() => {});
+
+    // Act — open the popover, then click a reaction
+    const { getByTestId } = render(() => <VoiceBar />);
+    fireEvent.click(getByTestId('reactions-button'));
+    fireEvent.click(getByTestId('reaction-🎉'));
+
+    // Assert
+    expect(spy).toHaveBeenCalledWith('🎉');
+    spy.mockRestore();
+  });
+});
+
+// ── Store voice slice ───────────────────────────────────────────────────────
+
+describe('store voice slice — in-call actions', () => {
+  beforeEach(() => {
+    store.setState(initialState, true);
+  });
+
+  it('setCallLayout updates the layout', () => {
+    // Act
+    store.getState().setCallLayout('spotlight');
+
+    // Assert
+    expect(store.getState().voice.callLayout).toBe('spotlight');
+  });
+
+  it('pinParticipant pins a nick and switches to spotlight', () => {
+    // Act
+    store.getState().pinParticipant('alice');
+
+    // Assert
+    expect(store.getState().voice.pinnedParticipant).toBe('alice');
+    expect(store.getState().voice.callLayout).toBe('spotlight');
+  });
+
+  it('pinParticipant toggles off when the same nick is pinned again', () => {
+    // Arrange
+    store.getState().pinParticipant('alice');
+
+    // Act
+    store.getState().pinParticipant('alice');
+
+    // Assert
+    expect(store.getState().voice.pinnedParticipant).toBeNull();
+  });
+
+  it('toggleCaptions flips captionsEnabled', () => {
+    // Arrange
+    expect(store.getState().voice.captionsEnabled).toBe(false);
+
+    // Act
+    store.getState().toggleCaptions();
+
+    // Assert
+    expect(store.getState().voice.captionsEnabled).toBe(true);
+  });
+
+  it('toggleRaiseHand flips the self handRaised flag', () => {
+    // Act
+    store.getState().toggleRaiseHand();
+
+    // Assert
+    expect(store.getState().voice.handRaised).toBe(true);
+
+    // Act again
+    store.getState().toggleRaiseHand();
+    expect(store.getState().voice.handRaised).toBe(false);
+  });
+
+  it('setPeerHandRaised tracks per-peer raised hands immutably', () => {
+    // Act
+    store.getState().setPeerHandRaised('alice', true);
+
+    // Assert
+    expect(store.getState().voice.raisedHands.has('alice')).toBe(true);
+
+    // Act — lower
+    store.getState().setPeerHandRaised('alice', false);
+    expect(store.getState().voice.raisedHands.has('alice')).toBe(false);
+  });
+
+  it('openVoiceSettings / closeVoiceSettings toggle the settings flag', () => {
+    // Act
+    store.getState().openVoiceSettings();
+    expect(store.getState().showVoiceSettings).toBe(true);
+
+    store.getState().closeVoiceSettings();
+    expect(store.getState().showVoiceSettings).toBe(false);
+  });
+});
+
+// ── VoiceStage — spotlight layout ─────────────────────────────────────────────
+
+describe('VoiceStage spotlight layout', () => {
+  beforeEach(() => {
+    store.setState(initialState, true);
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('renders the spotlight primary slot when callLayout is spotlight', () => {
+    // Arrange
+    seedVoiceStore([makePeer('alice'), makePeer('bob')], [], { callLayout: 'spotlight' });
+
+    // Act
+    const { getByTestId } = render(() => <VoiceStage />);
+
+    // Assert
+    expect(getByTestId('spotlight-primary')).toBeDefined();
+    expect(getByTestId('voice-stage')).toHaveAttribute('data-layout', 'spotlight');
+  });
+
+  it('promotes the pinned participant into the spotlight', () => {
+    // Arrange — pin bob; the primary tile should be bob
+    seedVoiceStore(
+      [makePeer('alice'), makePeer('bob')],
+      [],
+      { callLayout: 'spotlight', pinnedParticipant: 'bob' },
+    );
+
+    // Act
+    const { getByTestId } = render(() => <VoiceStage />);
+
+    // Assert — primary contains the bob tile
+    const primary = getByTestId('spotlight-primary');
+    expect(primary.querySelector('[data-nick="bob"]')).not.toBeNull();
+  });
+
+  it('auto-promotes the active speaker when nobody is pinned', () => {
+    // Arrange — alice is speaking
+    seedVoiceStore(
+      [makePeer('alice', { speaking: true }), makePeer('bob')],
+      [],
+      { callLayout: 'spotlight' },
+    );
+
+    // Act
+    const { getByTestId } = render(() => <VoiceStage />);
+
+    // Assert — speaking peer is in the primary slot
+    const primary = getByTestId('spotlight-primary');
+    expect(primary.querySelector('[data-nick="alice"]')).not.toBeNull();
+  });
+
+  it('still renders the grid when callLayout is grid', () => {
+    // Arrange
+    seedVoiceStore([makePeer('alice')], [], { callLayout: 'grid' });
+
+    // Act
+    const { queryByTestId } = render(() => <VoiceStage />);
+
+    // Assert — no spotlight primary
+    expect(queryByTestId('spotlight-primary')).toBeNull();
+  });
+});
+
+// ── ParticipantTile — richer tiles ────────────────────────────────────────────
+
+describe('ParticipantTile enhancements', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('shows the raised-hand badge when handRaised', () => {
+    // Act
+    const { getByTestId } = render(() => (
+      <ParticipantTile nick="alice" peer={makePeer('alice')} stream={null} handRaised channelUser={undefined} />
+    ));
+
+    // Assert
+    expect(getByTestId('hand-badge')).toBeDefined();
+    expect(getByTestId('participant-tile')).toHaveAttribute('data-hand-raised', 'true');
+  });
+
+  it('does not show the raised-hand badge by default', () => {
+    // Act
+    const { queryByTestId } = render(() => (
+      <ParticipantTile nick="alice" peer={makePeer('alice')} stream={null} channelUser={undefined} />
+    ));
+
+    // Assert
+    expect(queryByTestId('hand-badge')).toBeNull();
+  });
+
+  it('renders a pin button when onPin is provided and fires it', () => {
+    // Arrange
+    const onPin = vi.fn();
+
+    // Act
+    const { getByTestId } = render(() => (
+      <ParticipantTile nick="alice" peer={makePeer('alice')} stream={null} onPin={onPin} channelUser={undefined} />
+    ));
+    fireEvent.click(getByTestId('pin-button'));
+
+    // Assert
+    expect(onPin).toHaveBeenCalledWith('alice');
+  });
+
+  it('marks the pin button pressed and the tile pinned when pinned', () => {
+    // Act
+    const { getByTestId } = render(() => (
+      <ParticipantTile nick="alice" peer={makePeer('alice')} stream={null} onPin={() => {}} pinned channelUser={undefined} />
+    ));
+
+    // Assert
+    expect(getByTestId('pin-button')).toHaveAttribute('aria-pressed', 'true');
+    expect(getByTestId('participant-tile').className).toContain('voice-tile--pinned');
+  });
+
+  it('renders the connection-quality indicator only when quality is supplied', () => {
+    // Act — with quality
+    const withQuality = render(() => (
+      <ParticipantTile nick="alice" peer={makePeer('alice')} stream={null} quality={2} channelUser={undefined} />
+    ));
+    expect(withQuality.getByTestId('tile-quality')).toBeDefined();
+    cleanup();
+
+    // Act — without quality
+    const withoutQuality = render(() => (
+      <ParticipantTile nick="bob" peer={makePeer('bob')} stream={null} channelUser={undefined} />
+    ));
+    expect(withoutQuality.queryByTestId('tile-quality')).toBeNull();
+  });
+
+  it('shows the camera-off badge for a peer that declared video but has no stream', () => {
+    // Act
+    const { getByTitle } = render(() => (
+      <ParticipantTile nick="alice" peer={makePeer('alice', { hasVideo: true })} stream={null} channelUser={undefined} />
+    ));
+
+    // Assert
+    expect(getByTitle('Camera off')).toBeDefined();
+  });
 });

@@ -137,7 +137,27 @@ export interface VoiceState {
   // Local camera state
   cameraOn: boolean;
   cameraStream: MediaStream | null;
+
+  // ── In-call layout & overlays ──────────────────────────────────────────────
+  /** Stage layout — even grid vs. one large active-speaker tile + filmstrip. */
+  callLayout: CallLayout;
+  /** Nick pinned to the spotlight slot, or null to auto-follow active speaker. */
+  pinnedParticipant: string | null;
+  /** Live-captions overlay visibility toggle. */
+  captionsEnabled: boolean;
+  /** True when we have a hand raised in the current call. */
+  handRaised: boolean;
+  /** Nicks (peers) currently signalling a raised hand. */
+  raisedHands: Set<string>;
+  /**
+   * Epoch ms the active call started, or null when idle. Drives the live
+   * duration timer so it survives component remounts (unlike a local signal).
+   */
+  callStartedAt: number | null;
 }
+
+/** Voice-stage layout mode. */
+export type CallLayout = 'grid' | 'spotlight';
 
 type StoredVoiceSettings = Pick<
   VoiceState,
@@ -154,6 +174,16 @@ type StoredVoiceSettings = Pick<
 >;
 
 const VOICE_SETTINGS_KEY = 'ocean-voice-settings';
+
+/**
+ * Fire a window CustomEvent (SSR-safe). The voice overlays (reactions, etc.)
+ * listen on `window` rather than store subscriptions, so local actions echo
+ * through the same channel inbound media events use.
+ */
+function _dispatchVoiceEvent(name: string, detail: unknown): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(name, { detail }));
+}
 
 function _loadVoiceSettings(): StoredVoiceSettings {
   const defaults: StoredVoiceSettings = {
@@ -1264,6 +1294,27 @@ export interface OnyxState {
   toggleMute(): void;
   toggleDeafen(): void;
 
+  // In-call experience actions
+  /** Toggle local camera on/off (alias of toggleCamera for the VoiceBar cluster). */
+  toggleVideo(): Promise<void>;
+  /** Set the stage layout (grid ↔ spotlight). */
+  setCallLayout(layout: CallLayout): void;
+  /** Pin a participant to the spotlight, or null to auto-follow the speaker. */
+  pinParticipant(nick: string | null): void;
+  /** Toggle the live-captions overlay. */
+  toggleCaptions(): void;
+  /** Toggle our own raised-hand state in the call (also emits a reaction signal). */
+  toggleRaiseHand(): void;
+  /** Mark a peer's raised-hand state (driven by inbound reaction signals). */
+  setPeerHandRaised(nick: string, raised: boolean): void;
+  /** Send a quick emoji reaction to the call (and echo it locally). */
+  sendCallReaction(emoji: string): void;
+  /** Open/close the in-call settings sheet. */
+  openVoiceSettings(): void;
+  closeVoiceSettings(): void;
+  /** Whether the in-call settings sheet is open. */
+  showVoiceSettings: boolean;
+
   // DM calling
   startDmCall(nick: string, withVideo?: boolean): void;
   acceptDmCall(): void;
@@ -1946,6 +1997,12 @@ export const store = createStore<OnyxState>()(
       videoParticipants: new Map(),
       cameraOn: false,
       cameraStream: null,
+      callLayout: 'grid',
+      pinnedParticipant: null,
+      captionsEnabled: false,
+      handRaised: false,
+      raisedHands: new Set<string>(),
+      callStartedAt: null,
       async startScreenshare() {
         const { activeView } = get();
         const target = activeView.kind === 'channel' ? activeView.channel :
@@ -7044,6 +7101,7 @@ export const store = createStore<OnyxState>()(
 
     // ── Voice / Video Channel Actions ─────────────────────────────────────────
     voiceChannelParticipants: new Map(),
+    showVoiceSettings: false,
 
     async joinVoiceChannel(channel, withVideo = false) {
       const { client } = get();
@@ -7068,6 +7126,11 @@ export const store = createStore<OnyxState>()(
         localStream: stream,
         cameraOn: withVideo,
         cameraStream: withVideo ? stream : null,
+        callStartedAt: Date.now(),
+        // Fresh call — reset transient layout/overlay state.
+        pinnedParticipant: null,
+        handRaised: false,
+        raisedHands: new Set<string>(),
       });
 
       const { ourNick } = get();
@@ -7099,6 +7162,10 @@ export const store = createStore<OnyxState>()(
         cameraOn: false,
         cameraStream: null,
         peers: new Map(),
+        callStartedAt: null,
+        pinnedParticipant: null,
+        handRaised: false,
+        raisedHands: new Set<string>(),
       });
 
       const { ourNick } = get();
@@ -7149,6 +7216,68 @@ export const store = createStore<OnyxState>()(
       get().setVoiceCallState({ deafened });
     },
 
+    // ── In-call experience ──────────────────────────────────────────────────────
+    async toggleVideo() {
+      await get().toggleCamera();
+    },
+
+    setCallLayout(layout) {
+      get().setVoiceCallState({ callLayout: layout });
+    },
+
+    pinParticipant(nick) {
+      const current = get().voice.pinnedParticipant;
+      // Clicking the already-pinned participant un-pins (toggle affordance).
+      const next = nick !== null && current === nick ? null : nick;
+      get().setVoiceCallState({
+        pinnedParticipant: next,
+        // Pinning implies the spotlight layout; un-pinning leaves layout as-is.
+        ...(next ? { callLayout: 'spotlight' as CallLayout } : {}),
+      });
+    },
+
+    toggleCaptions() {
+      get().setVoiceCallState({ captionsEnabled: !get().voice.captionsEnabled });
+    },
+
+    toggleRaiseHand() {
+      const { voice, ourNick } = get();
+      const raised = !voice.handRaised;
+      get().setVoiceCallState({ handRaised: raised });
+      // Surface a raised-hand reaction so the rest of the call sees it, and echo
+      // it locally for the reactions overlay.
+      const engine = getMountedSuimyakuMediaEngine();
+      if (raised) {
+        engine?.sendReaction('✋');
+        _dispatchVoiceEvent('ocean:voice-reaction', { nick: ourNick || 'you', emoji: '✋' });
+      }
+    },
+
+    setPeerHandRaised(nick, raised) {
+      set(prev => {
+        const next = new Set(prev.voice.raisedHands);
+        if (raised) next.add(nick);
+        else next.delete(nick);
+        return { voice: { ...prev.voice, raisedHands: next } };
+      });
+    },
+
+    sendCallReaction(emoji) {
+      const trimmed = emoji.trim();
+      if (!trimmed) return;
+      const { ourNick } = get();
+      getMountedSuimyakuMediaEngine()?.sendReaction(trimmed);
+      // Echo locally so the sender sees their own reaction float up immediately.
+      _dispatchVoiceEvent('ocean:voice-reaction', { nick: ourNick || 'you', emoji: trimmed });
+    },
+
+    openVoiceSettings() {
+      set({ showVoiceSettings: true });
+    },
+    closeVoiceSettings() {
+      set({ showVoiceSettings: false });
+    },
+
     // ── DM Calling ────────────────────────────────────────────────────────────────
     startDmCall(nick, withVideo = false) {
       const { client } = get();
@@ -7173,13 +7302,14 @@ export const store = createStore<OnyxState>()(
 
       void client;
       void getMountedSuimyakuMediaEngine()?.acceptIncomingCall();
+      get().setVoiceCallState({ callStartedAt: Date.now() });
     },
 
     rejectDmCall() {
       const { client, voice } = get();
       void client;
       if (voice.callWith) getMountedSuimyakuMediaEngine()?.rejectCall(voice.callWith);
-      get().setVoiceCallState({ callState: 'idle', callWith: '', callChannel: null });
+      get().setVoiceCallState({ callState: 'idle', callWith: '', callChannel: null, callStartedAt: null });
     },
 
     endDmCall() {
@@ -7198,6 +7328,10 @@ export const store = createStore<OnyxState>()(
         cameraOn: false,
         cameraStream: null,
         peers: new Map(),
+        callStartedAt: null,
+        pinnedParticipant: null,
+        handRaised: false,
+        raisedHands: new Set<string>(),
       });
     },
 

@@ -12,6 +12,9 @@ import type {
   SuimyakuPeerState,
 } from '@/lib/suimyaku-media/types';
 
+/** Per-peer auto-lower timers for raised hands signalled via the ✋ reaction. */
+const _handTimers = new Map<string, number>();
+
 type CanvasStreamCacheEntry = {
   canvas: HTMLCanvasElement;
   stream: MediaStream;
@@ -212,6 +215,21 @@ export function mountMedia(): void {
 
     onReaction(nick, emoji) {
       dispatchWindowEvent('ocean:voice-reaction', { nick, emoji });
+      // A ✋ reaction is the raise-hand signal (toggleRaiseHand emits it on raise;
+      // there is no explicit lower signal), so surface the peer's raised hand and
+      // auto-clear it after a window so a stale hand doesn't linger forever.
+      if (emoji === '✋') {
+        getState().setPeerHandRaised(nick, true);
+        const prev = _handTimers.get(nick);
+        if (prev) clearTimeout(prev);
+        _handTimers.set(
+          nick,
+          setTimeout(() => {
+            getState().setPeerHandRaised(nick, false);
+            _handTimers.delete(nick);
+          }, 15000) as unknown as number,
+        );
+      }
     },
 
     onRecordingAlert(nick, started) {

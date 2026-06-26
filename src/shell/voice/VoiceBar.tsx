@@ -1,24 +1,24 @@
 /**
  * VoiceBar — persistent control bar shown whenever callState is active.
  *
- * Controls:
- *   [M] Mic toggle     — muted:    coral when active, aria-pressed
- *   [D] Deafen toggle  — deafened: azure tint when active, aria-pressed
- *   [C] Camera toggle  — cameraOn: azure tint when active, aria-pressed
- *   [S] Screenshare    — screenshareActive: azure tint, aria-pressed
- *   [LEAVE]            — coral, calls leaveVoiceChannel()
+ * Control cluster (grouped left → right):
+ *   Identity:  self Avatar + channel name + live duration timer + participant count
+ *   Media:     [M] Mic · [D] Deafen · [CAM] Camera · [SCR] Screenshare
+ *   Engage:    [✋] Raise hand · [☺] Reactions · [CC] Captions
+ *   View:      [layout] Grid ↔ Spotlight · [⚙] Settings
+ *   Exit:      [LEAVE]
+ *   Right:     connection-quality pip
  *
- * Identity zone (left): self Avatar + channel name + call timer
- * Connection quality pip (right): 4-bar indicator from getNetworkStats()
- *
- * All buttons have aria-label, aria-pressed, and keyboard focus styles.
- * Tooltip wraps each control via the Tooltip primitive.
+ * Toggle buttons expose aria-pressed; every control has an aria-label and a
+ * Tooltip. The duration timer is announced politely via aria-live. The whole
+ * bar is a role="toolbar". Reduced-motion is handled in voice.css.
  */
 
 import { createEffect, createMemo, createSignal, onCleanup, Show } from 'solid-js';
-import { useStore, getState } from '@/lib/store';
+import { getState, useStore } from '@/lib/store';
 import { getMountedSuimyakuMediaEngine } from '@/lib/suimyaku-media/MediaEngine';
-import { Avatar, Tooltip } from '@/primitives';
+import { Avatar, Popover, Tooltip } from '@/primitives';
+import { VoiceSettings } from './settings/VoiceSettings';
 import type { NetworkQualityTier } from '@/lib/suimyaku-media/types';
 import './voice.css';
 
@@ -30,6 +30,9 @@ const TIER_META: Record<NetworkQualityTier, { label: string; color: string; bars
   2: { label: 'Fair',      color: 'var(--gold-bright)', bars: 2 },
   3: { label: 'Poor',      color: 'var(--shu)',         bars: 1 },
 };
+
+/** Quick-reaction emoji set surfaced in the reactions popover. */
+const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '👏', '🔥', '😮', '✋'] as const;
 
 function formatBitrate(bps: number): string {
   if (bps <= 0) return '';
@@ -111,7 +114,20 @@ function ConnectionQualityPip() {
 
 // ── Call duration ─────────────────────────────────────────────────────────────
 
-function CallTimer(props: { active: boolean }) {
+function formatElapsed(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+}
+
+/**
+ * Live duration readout. Anchored to the store's callStartedAt epoch so it is
+ * accurate even if the bar remounts mid-call (a local start signal would reset
+ * to 0:00). Falls back to ticking from mount when no timestamp is recorded.
+ */
+function CallTimer(props: { active: boolean; startedAt: number | null }) {
   const [elapsed, setElapsed] = createSignal(0);
 
   createEffect(() => {
@@ -119,25 +135,23 @@ function CallTimer(props: { active: boolean }) {
       setElapsed(0);
       return;
     }
-    const start = Date.now();
-    const id = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - start) / 1000));
-    }, 1000);
+    const start = props.startedAt ?? Date.now();
+    const tick = () => setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+    tick();
+    const id = setInterval(tick, 1000);
     onCleanup(() => clearInterval(id));
   });
 
-  const formatted = createMemo(() => {
-    const t = elapsed();
-    const h = Math.floor(t / 3600);
-    const m = Math.floor((t % 3600) / 60);
-    const s = t % 60;
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
-  });
+  const formatted = createMemo(() => formatElapsed(elapsed()));
 
   return (
     <Show when={props.active}>
-      <span class="voice-bar__timer" aria-live="off" aria-label={`Call duration: ${formatted()}`}>
+      <span
+        class="voice-bar__timer"
+        role="timer"
+        aria-live="polite"
+        aria-label={`Call duration: ${formatted()}`}
+      >
         {formatted()}
       </span>
     </Show>
@@ -149,6 +163,9 @@ function CallTimer(props: { active: boolean }) {
 export function VoiceBar() {
   const voice = useStore(s => s.voice);
   const ourNick = useStore(s => s.ourNick);
+  const showSettings = useStore(s => s.showVoiceSettings);
+
+  const [reactionsOpen, setReactionsOpen] = createSignal(false);
 
   const isActive = createMemo(() =>
     voice().callState === 'in_call' || voice().callState === 'ringing_out' || voice().callState === 'ringing_in'
@@ -156,18 +173,16 @@ export function VoiceBar() {
 
   const channelLabel = createMemo(() => voice().callChannel ?? voice().callWith ?? '');
   const selfNick = createMemo(() => ourNick() ?? '');
+  const participantCount = createMemo(() => voice().peers.size + 1);
+  const isSpotlight = createMemo(() => voice().callLayout === 'spotlight');
 
-  const handleToggleMute = () => {
-    getState().toggleMute();
-  };
-
-  const handleToggleDeafen = () => {
-    getState().toggleDeafen();
-  };
-
-  const handleToggleCamera = () => {
-    void getState().toggleCamera();
-  };
+  const handleToggleMute = () => getState().toggleMute();
+  const handleToggleDeafen = () => getState().toggleDeafen();
+  const handleToggleCamera = () => void getState().toggleVideo();
+  const handleToggleHand = () => getState().toggleRaiseHand();
+  const handleToggleCaptions = () => getState().toggleCaptions();
+  const handleToggleLayout = () => getState().setCallLayout(isSpotlight() ? 'grid' : 'spotlight');
+  const handleOpenSettings = () => getState().openVoiceSettings();
 
   const handleToggleScreenshare = () => {
     if (voice().screenshareActive) {
@@ -177,8 +192,11 @@ export function VoiceBar() {
     }
   };
 
-  const handleLeave = () => {
-    getState().leaveVoiceChannel();
+  const handleLeave = () => getState().leaveVoiceChannel();
+
+  const sendReaction = (emoji: string) => {
+    getState().sendCallReaction(emoji);
+    setReactionsOpen(false);
   };
 
   return (
@@ -189,14 +207,24 @@ export function VoiceBar() {
         aria-label="Voice call controls"
         data-testid="voice-bar"
       >
-        {/* Left: identity */}
+        {/* Left: identity + call info */}
         <div class="voice-bar__identity">
           <Avatar name={selfNick()} size="sm" />
           <div class="voice-bar__channel">
             <span class="voice-bar__channel-name" title={channelLabel()}>
               {channelLabel()}
             </span>
-            <CallTimer active={isActive()} />
+            <span class="voice-bar__meta">
+              <CallTimer active={isActive()} startedAt={voice().callStartedAt} />
+              <span class="voice-bar__dot" aria-hidden="true">·</span>
+              <span
+                class="voice-bar__count"
+                data-testid="participant-count"
+                aria-label={`${participantCount()} in call`}
+              >
+                <span aria-hidden="true">◇ {participantCount()}</span>
+              </span>
+            </span>
           </div>
         </div>
 
@@ -204,69 +232,153 @@ export function VoiceBar() {
 
         {/* Center: controls */}
         <div class="voice-bar__controls">
-          {/* Mic */}
-          <Tooltip content={voice().muted ? 'Unmute microphone' : 'Mute microphone'} placement="top">
-            <button
-              type="button"
-              class={`ruri-icon-button ruri-icon-button--ghost ruri-icon-button--md${voice().muted ? ' ruri-icon-button--muted' : ''}`}
-              aria-label={voice().muted ? 'Unmute microphone' : 'Mute microphone'}
-              aria-pressed={voice().muted}
-              onClick={handleToggleMute}
-              data-testid="mute-button"
-            >
-              <span class="ruri-icon-button__glyph" aria-hidden="true">
-                {voice().muted ? '[M✗]' : '[M]'}
-              </span>
-            </button>
-          </Tooltip>
+          {/* ── Media group ── */}
+          <div class="voice-bar__group" role="group" aria-label="Media controls">
+            <Tooltip content={voice().muted ? 'Unmute microphone' : 'Mute microphone'} placement="top">
+              <button
+                type="button"
+                class={`ruri-icon-button ruri-icon-button--ghost ruri-icon-button--md${voice().muted ? ' ruri-icon-button--muted' : ''}`}
+                aria-label={voice().muted ? 'Unmute microphone' : 'Mute microphone'}
+                aria-pressed={voice().muted}
+                onClick={handleToggleMute}
+                data-testid="mute-button"
+              >
+                <span class="ruri-icon-button__glyph" aria-hidden="true">{voice().muted ? '[M✗]' : '[M]'}</span>
+              </button>
+            </Tooltip>
 
-          {/* Deafen */}
-          <Tooltip content={voice().deafened ? 'Undeafen' : 'Deafen'} placement="top">
-            <button
-              type="button"
-              class="ruri-icon-button ruri-icon-button--ghost ruri-icon-button--md"
-              aria-label={voice().deafened ? 'Undeafen' : 'Deafen'}
-              aria-pressed={voice().deafened}
-              onClick={handleToggleDeafen}
-              data-testid="deafen-button"
-            >
-              <span class="ruri-icon-button__glyph" aria-hidden="true">
-                {voice().deafened ? '[D✗]' : '[D]'}
-              </span>
-            </button>
-          </Tooltip>
+            <Tooltip content={voice().deafened ? 'Undeafen' : 'Deafen'} placement="top">
+              <button
+                type="button"
+                class="ruri-icon-button ruri-icon-button--ghost ruri-icon-button--md"
+                aria-label={voice().deafened ? 'Undeafen' : 'Deafen'}
+                aria-pressed={voice().deafened}
+                onClick={handleToggleDeafen}
+                data-testid="deafen-button"
+              >
+                <span class="ruri-icon-button__glyph" aria-hidden="true">{voice().deafened ? '[D✗]' : '[D]'}</span>
+              </button>
+            </Tooltip>
 
-          {/* Camera */}
-          <Tooltip content={voice().cameraOn ? 'Turn off camera' : 'Turn on camera'} placement="top">
-            <button
-              type="button"
-              class="ruri-icon-button ruri-icon-button--ghost ruri-icon-button--md"
-              aria-label={voice().cameraOn ? 'Turn off camera' : 'Turn on camera'}
-              aria-pressed={voice().cameraOn}
-              onClick={handleToggleCamera}
-              data-testid="camera-button"
-            >
-              <span class="ruri-icon-button__glyph" aria-hidden="true">
-                {voice().cameraOn ? '[CAM]' : '[cam]'}
-              </span>
-            </button>
-          </Tooltip>
+            <Tooltip content={voice().cameraOn ? 'Turn off camera' : 'Turn on camera'} placement="top">
+              <button
+                type="button"
+                class="ruri-icon-button ruri-icon-button--ghost ruri-icon-button--md"
+                aria-label={voice().cameraOn ? 'Turn off camera' : 'Turn on camera'}
+                aria-pressed={voice().cameraOn}
+                onClick={handleToggleCamera}
+                data-testid="camera-button"
+              >
+                <span class="ruri-icon-button__glyph" aria-hidden="true">{voice().cameraOn ? '[CAM]' : '[cam]'}</span>
+              </button>
+            </Tooltip>
 
-          {/* Screenshare */}
-          <Tooltip content={voice().screenshareActive ? 'Stop sharing screen' : 'Share screen'} placement="top">
-            <button
-              type="button"
-              class="ruri-icon-button ruri-icon-button--ghost ruri-icon-button--md"
-              aria-label={voice().screenshareActive ? 'Stop sharing screen' : 'Share screen'}
-              aria-pressed={voice().screenshareActive}
-              onClick={handleToggleScreenshare}
-              data-testid="screenshare-button"
+            <Tooltip content={voice().screenshareActive ? 'Stop sharing screen' : 'Share screen'} placement="top">
+              <button
+                type="button"
+                class="ruri-icon-button ruri-icon-button--ghost ruri-icon-button--md"
+                aria-label={voice().screenshareActive ? 'Stop sharing screen' : 'Share screen'}
+                aria-pressed={voice().screenshareActive}
+                onClick={handleToggleScreenshare}
+                data-testid="screenshare-button"
+              >
+                <span class="ruri-icon-button__glyph" aria-hidden="true">{voice().screenshareActive ? '[SCR✗]' : '[SCR]'}</span>
+              </button>
+            </Tooltip>
+          </div>
+
+          <div class="voice-bar__sep" aria-hidden="true" />
+
+          {/* ── Engagement group ── */}
+          <div class="voice-bar__group" role="group" aria-label="Engagement controls">
+            <Tooltip content={voice().handRaised ? 'Lower hand' : 'Raise hand'} placement="top">
+              <button
+                type="button"
+                class="ruri-icon-button ruri-icon-button--ghost ruri-icon-button--md"
+                aria-label={voice().handRaised ? 'Lower hand' : 'Raise hand'}
+                aria-pressed={voice().handRaised}
+                onClick={handleToggleHand}
+                data-testid="raise-hand-button"
+              >
+                <span class="ruri-icon-button__glyph" aria-hidden="true">✋</span>
+              </button>
+            </Tooltip>
+
+            <Popover
+              placement="top"
+              open={reactionsOpen()}
+              onOpenChange={setReactionsOpen}
+              trigger={
+                <span
+                  class="ruri-icon-button__glyph"
+                  aria-hidden="true"
+                  data-testid="reactions-button"
+                  title="Send a reaction"
+                >
+                  ☺
+                </span>
+              }
             >
-              <span class="ruri-icon-button__glyph" aria-hidden="true">
-                {voice().screenshareActive ? '[SCR✗]' : '[SCR]'}
-              </span>
-            </button>
-          </Tooltip>
+              <div class="voice-bar__reactions" role="menu" aria-label="Send a reaction">
+                {QUICK_REACTIONS.map((emoji) => (
+                  <button
+                    type="button"
+                    class="voice-bar__reaction"
+                    role="menuitem"
+                    aria-label={`React with ${emoji}`}
+                    data-testid={`reaction-${emoji}`}
+                    onClick={() => sendReaction(emoji)}
+                  >
+                    <span aria-hidden="true">{emoji}</span>
+                  </button>
+                ))}
+              </div>
+            </Popover>
+
+            <Tooltip content={voice().captionsEnabled ? 'Hide captions' : 'Show captions'} placement="top">
+              <button
+                type="button"
+                class="ruri-icon-button ruri-icon-button--ghost ruri-icon-button--md"
+                aria-label={voice().captionsEnabled ? 'Hide live captions' : 'Show live captions'}
+                aria-pressed={voice().captionsEnabled}
+                onClick={handleToggleCaptions}
+                data-testid="captions-button"
+              >
+                <span class="ruri-icon-button__glyph" aria-hidden="true">[CC]</span>
+              </button>
+            </Tooltip>
+          </div>
+
+          <div class="voice-bar__sep" aria-hidden="true" />
+
+          {/* ── View group ── */}
+          <div class="voice-bar__group" role="group" aria-label="View controls">
+            <Tooltip content={isSpotlight() ? 'Switch to grid' : 'Switch to spotlight'} placement="top">
+              <button
+                type="button"
+                class="ruri-icon-button ruri-icon-button--ghost ruri-icon-button--md"
+                aria-label={isSpotlight() ? 'Switch to grid layout' : 'Switch to spotlight layout'}
+                aria-pressed={isSpotlight()}
+                onClick={handleToggleLayout}
+                data-testid="layout-button"
+              >
+                <span class="ruri-icon-button__glyph" aria-hidden="true">{isSpotlight() ? '▣' : '⊞'}</span>
+              </button>
+            </Tooltip>
+
+            <Tooltip content="Voice settings" placement="top">
+              <button
+                type="button"
+                class="ruri-icon-button ruri-icon-button--ghost ruri-icon-button--md"
+                aria-label="Open voice settings"
+                aria-pressed={showSettings()}
+                onClick={handleOpenSettings}
+                data-testid="settings-button"
+              >
+                <span class="ruri-icon-button__glyph" aria-hidden="true">⚙</span>
+              </button>
+            </Tooltip>
+          </div>
 
           <div class="voice-bar__sep" aria-hidden="true" />
 
@@ -289,6 +401,12 @@ export function VoiceBar() {
           <ConnectionQualityPip />
         </div>
       </div>
+
+      {/* In-call settings sheet (portal modal) */}
+      <VoiceSettings
+        open={showSettings()}
+        onOpenChange={(open) => (open ? getState().openVoiceSettings() : getState().closeVoiceSettings())}
+      />
     </Show>
   );
 }

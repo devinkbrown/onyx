@@ -27,6 +27,9 @@ function nickColor(nick: string) {
 
 export function CaptionsOverlay() {
   const lines = useStore((state) => {
+    // Captions are opt-in: the VoiceBar toggle drives state.voice.captionsEnabled
+    // (default off). Honour it so toggling actually shows/hides the overlay.
+    if (!state.voice.captionsEnabled) return [] as CaptionLine[];
     const voiceTarget = state.voice.callChannel;
     const activeTarget = state.activeView.kind === 'channel' ? state.activeView.channel : null;
     const target = voiceTarget ?? activeTarget;

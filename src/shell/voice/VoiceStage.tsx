@@ -1,16 +1,22 @@
 /**
- * VoiceStage — responsive grid of ParticipantTiles.
+ * VoiceStage — the in-call participant surface.
  *
- * Layout rules:
- *   1 participant  → full-width single tile
- *   2              → 2-column side by side
- *   3-4            → 2×2 grid
- *   5-6            → 3 columns
- *   7-9            → 3 columns
- *   10+            → 4 columns (data-count="large")
+ * Three layout modes:
  *
- * Screenshare override: the screenshare stream gets a full primary tile;
- * all other participants shrink to a horizontal filmstrip below it.
+ *   1. Screenshare (highest priority): the active screenshare gets a full
+ *      primary tile; everyone else shrinks to a horizontal filmstrip below it.
+ *
+ *   2. Grid (callLayout === 'grid'): a responsive grid that adapts to the
+ *      participant count.
+ *        1 participant  → full-width single tile
+ *        2              → 2-column side by side
+ *        3-4            → 2×2 grid
+ *        5-9            → 3 columns
+ *        10+            → 4 columns (data-count="large")
+ *
+ *   3. Spotlight (callLayout === 'spotlight'): one large tile — the pinned
+ *      participant, else the active speaker, else self — with a filmstrip of
+ *      the rest. Auto-promotes the active speaker when nobody is pinned.
  *
  * Self tile: sourced from store.voice.localStream / cameraStream.
  * Peer tiles: iterated from store.voice.peers Map.
@@ -22,10 +28,21 @@
  */
 
 import { createMemo, For, Show } from 'solid-js';
-import { useStore } from '@/lib/store';
+import { getState, useStore } from '@/lib/store';
 import type { SuimyakuPeerState } from '@/lib/suimyaku-media/types';
 import { ParticipantTile } from './ParticipantTile';
 import './voice.css';
+
+/** A normalized participant — self or a remote peer — for layout passes. */
+type Slot = {
+  key: string;
+  nick: string;
+  peer: SuimyakuPeerState | null;
+  isSelf: boolean;
+  stream: MediaStream | null;
+  speaking: boolean;
+  handRaised: boolean;
+};
 
 export function VoiceStage() {
   const voice = useStore(s => s.voice);
@@ -38,6 +55,8 @@ export function VoiceStage() {
     return channels().get(ch.toLowerCase())?.users;
   });
 
+  const userFor = (nick: string) => channelUsers()?.get(nick.toLowerCase());
+
   // All peers as an array (stable iteration order)
   const peers = createMemo<SuimyakuPeerState[]>(() => [...voice().peers.values()]);
 
@@ -46,6 +65,8 @@ export function VoiceStage() {
 
   // Screenshare is active: self screenshare takes the primary slot
   const screenshareActive = createMemo(() => voice().screenshareActive && !!voice().screenshareStream);
+
+  const isSpotlight = createMemo(() => voice().callLayout === 'spotlight' && !screenshareActive());
 
   const countAttr = createMemo(() => {
     const n = totalCount();
@@ -67,44 +88,137 @@ export function VoiceStage() {
 
   const selfNick = createMemo(() => ourNick() ?? 'you');
 
+  const selfSlot = createMemo<Slot>(() => ({
+    key: '__self__',
+    nick: selfNick(),
+    peer: null,
+    isSelf: true,
+    stream: selfVideoStream(),
+    speaking: false,
+    handRaised: voice().handRaised,
+  }));
+
+  const peerSlots = createMemo<Slot[]>(() =>
+    peers().map(p => ({
+      key: p.nick,
+      nick: p.nick,
+      peer: p,
+      isSelf: false,
+      stream: peerStream(p.nick),
+      speaking: p.speaking,
+      handRaised: voice().raisedHands.has(p.nick),
+    }))
+  );
+
+  const allSlots = createMemo<Slot[]>(() => [selfSlot(), ...peerSlots()]);
+
+  // Spotlight subject: pinned participant → active speaker → self.
+  const spotlightSlot = createMemo<Slot>(() => {
+    const slots = allSlots();
+    const pinned = voice().pinnedParticipant;
+    if (pinned) {
+      const found = slots.find(s => s.nick === pinned);
+      if (found) return found;
+    }
+    const speaker = peerSlots().find(s => s.speaking);
+    if (speaker) return speaker;
+    return selfSlot();
+  });
+
+  const filmstripSlots = createMemo<Slot[]>(() =>
+    allSlots().filter(s => s.key !== spotlightSlot().key)
+  );
+
+  const handlePin = (nick: string) => getState().pinParticipant(nick);
+
+  const stageClass = createMemo(() => {
+    const cls = ['voice-stage'];
+    if (screenshareActive()) cls.push('voice-stage--screenshare');
+    else if (isSpotlight()) cls.push('voice-stage--spotlight');
+    return cls.join(' ');
+  });
+
   return (
     <div
-      class={`voice-stage${screenshareActive() ? ' voice-stage--screenshare' : ''}`}
+      class={stageClass()}
       aria-label="Voice call participants"
       role="region"
       data-testid="voice-stage"
+      data-layout={screenshareActive() ? 'screenshare' : voice().callLayout}
     >
       <Show
         when={screenshareActive()}
         fallback={
-          /* Normal grid layout */
-          <div class="voice-stage__grid" data-count={countAttr()}>
-            {/* Self tile */}
-            <ParticipantTile
-              nick={selfNick()}
-              peer={null}
-              stream={selfVideoStream()}
-              isSelf
-              muted={voice().muted}
-              deafened={voice().deafened}
-              channelUser={channelUsers()?.get(selfNick().toLowerCase())}
-            />
+          <Show
+            when={isSpotlight()}
+            fallback={
+              /* ── Grid layout ── */
+              <div class="voice-stage__grid" data-count={countAttr()}>
+                <For each={allSlots()}>
+                  {(slot) => (
+                    <ParticipantTile
+                      nick={slot.nick}
+                      peer={slot.peer}
+                      stream={slot.stream}
+                      isSelf={slot.isSelf}
+                      muted={slot.isSelf ? voice().muted : undefined}
+                      deafened={slot.isSelf ? voice().deafened : undefined}
+                      handRaised={slot.handRaised}
+                      pinned={voice().pinnedParticipant === slot.nick}
+                      onPin={handlePin}
+                      channelUser={userFor(slot.nick)}
+                    />
+                  )}
+                </For>
+              </div>
+            }
+          >
+            {/* ── Spotlight / active-speaker layout ── */}
+            <div class="voice-stage__primary" data-testid="spotlight-primary">
+              {(() => {
+                const slot = spotlightSlot();
+                return (
+                  <ParticipantTile
+                    nick={slot.nick}
+                    peer={slot.peer}
+                    stream={slot.stream}
+                    isSelf={slot.isSelf}
+                    muted={slot.isSelf ? voice().muted : undefined}
+                    deafened={slot.isSelf ? voice().deafened : undefined}
+                    handRaised={slot.handRaised}
+                    pinned={voice().pinnedParticipant === slot.nick}
+                    onPin={handlePin}
+                    channelUser={userFor(slot.nick)}
+                  />
+                );
+              })()}
+            </div>
 
-            {/* Peer tiles */}
-            <For each={peers()}>
-              {(peer) => (
-                <ParticipantTile
-                  nick={peer.nick}
-                  peer={peer}
-                  stream={peerStream(peer.nick)}
-                  channelUser={channelUsers()?.get(peer.nick.toLowerCase())}
-                />
-              )}
-            </For>
-          </div>
+            <Show when={filmstripSlots().length > 0}>
+              <div class="voice-stage__filmstrip" role="list" aria-label="Other participants">
+                <For each={filmstripSlots()}>
+                  {(slot) => (
+                    <ParticipantTile
+                      nick={slot.nick}
+                      peer={slot.peer}
+                      stream={slot.stream}
+                      isSelf={slot.isSelf}
+                      muted={slot.isSelf ? voice().muted : undefined}
+                      deafened={slot.isSelf ? voice().deafened : undefined}
+                      handRaised={slot.handRaised}
+                      pinned={voice().pinnedParticipant === slot.nick}
+                      onPin={handlePin}
+                      channelUser={userFor(slot.nick)}
+                      class="voice-stage__filmstrip-tile"
+                    />
+                  )}
+                </For>
+              </div>
+            </Show>
+          </Show>
         }
       >
-        {/* Screenshare layout: large primary + filmstrip */}
+        {/* ── Screenshare layout: large primary + filmstrip ── */}
         <div class="voice-stage__primary">
           <ParticipantTile
             nick={selfNick()}
@@ -114,7 +228,7 @@ export function VoiceStage() {
             isScreenshare
             muted={voice().muted}
             deafened={voice().deafened}
-            channelUser={channelUsers()?.get(selfNick().toLowerCase())}
+            channelUser={userFor(selfNick())}
           />
         </div>
 
@@ -128,7 +242,8 @@ export function VoiceStage() {
               isSelf
               muted={voice().muted}
               deafened={voice().deafened}
-              channelUser={channelUsers()?.get(selfNick().toLowerCase())}
+              handRaised={voice().handRaised}
+              channelUser={userFor(selfNick())}
               class="voice-stage__filmstrip-tile"
             />
           </Show>
@@ -139,7 +254,10 @@ export function VoiceStage() {
                 nick={peer.nick}
                 peer={peer}
                 stream={peerStream(peer.nick)}
-                channelUser={channelUsers()?.get(peer.nick.toLowerCase())}
+                handRaised={voice().raisedHands.has(peer.nick)}
+                pinned={voice().pinnedParticipant === peer.nick}
+                onPin={handlePin}
+                channelUser={userFor(peer.nick)}
                 class="voice-stage__filmstrip-tile"
               />
             )}
