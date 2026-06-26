@@ -30,6 +30,13 @@ const SECTION_ORDER: SpotlightSection[] = ['Channels', 'DMs', 'Actions'];
 const LISTBOX_ID = 'ruri-spotlight-listbox';
 const INPUT_ID = 'ruri-spotlight-input';
 
+// Token-tinted leading glyphs, one per section (CSS tints them per data-section).
+const SECTION_ICON: Record<SpotlightSection, string> = {
+  Channels: '#',
+  DMs: '@',
+  Actions: '→',
+};
+
 function optionId(index: number): string {
   return `ruri-spotlight-option-${index}`;
 }
@@ -238,7 +245,20 @@ export function Spotlight(props: SpotlightProps) {
           tabIndex={-1}
         >
           <div class="ruri-spotlight__search">
-            <span class="ruri-spotlight__sigil" aria-hidden="true">▚</span>
+            <svg
+              class="ruri-spotlight__sigil"
+              viewBox="0 0 16 16"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
+              <circle cx="7" cy="7" r="4.25" />
+              <line x1="10.4" y1="10.4" x2="13.5" y2="13.5" />
+            </svg>
             <input
               ref={inputRef}
               id={INPUT_ID}
@@ -263,18 +283,41 @@ export function Spotlight(props: SpotlightProps) {
               aria-label="Close spotlight"
               onClick={() => closeSpotlight()}
             >
-              ×
+              <svg
+                viewBox="0 0 14 14"
+                width="14"
+                height="14"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                aria-hidden="true"
+              >
+                <line x1="3.5" y1="3.5" x2="10.5" y2="10.5" />
+                <line x1="10.5" y1="3.5" x2="3.5" y2="10.5" />
+              </svg>
             </button>
           </div>
 
           <div id={LISTBOX_ID} class="ruri-spotlight__results" role="listbox" aria-label="Commands">
             <Show
               when={groups().length > 0}
-              fallback={<div class="ruri-spotlight__empty">No command found</div>}
+              fallback={
+                <div class="ruri-spotlight__empty">
+                  <span class="ruri-spotlight__empty-mark" aria-hidden="true">⌕</span>
+                  <span class="ruri-spotlight__empty-text">Nothing surfaces yet</span>
+                  <span class="ruri-spotlight__empty-sub">Try a channel, a name, or an action</span>
+                </div>
+              }
             >
               <For each={groups()}>
                 {(group) => (
-                  <div class="ruri-spotlight__group" role="group" aria-label={group.section}>
+                  <div
+                    class="ruri-spotlight__group"
+                    role="group"
+                    aria-label={group.section}
+                    data-section={group.section}
+                  >
                     <span class="ruri-spotlight__section" aria-hidden="true">{group.section}</span>
                     <For each={group.items}>
                       {(item) => (
@@ -290,6 +333,9 @@ export function Spotlight(props: SpotlightProps) {
                             runActive();
                           }}
                         >
+                          <span class="ruri-spotlight__icon" aria-hidden="true">
+                            {SECTION_ICON[group.section]}
+                          </span>
                           <HighlightedTitle title={item.command.title} ranges={item.ranges} />
                           <Show when={item.command.hint}>
                             {(hint) => <span class="ruri-spotlight__hint">{hint()}</span>}

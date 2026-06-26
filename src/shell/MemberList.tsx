@@ -142,7 +142,7 @@ function MemberCard(props: MemberCardProps): JSX.Element {
           onClick={handleDm}
           aria-label={`Send DM to ${local.user.nick}`}
         >
-          [DM]
+          Message
         </Button>
         <Button
           variant="ghost"
@@ -150,7 +150,7 @@ function MemberCard(props: MemberCardProps): JSX.Element {
           onClick={handleWhois}
           aria-label={`View profile of ${local.user.nick}`}
         >
-          [info]
+          Profile
         </Button>
       </div>
     </div>
@@ -237,8 +237,8 @@ export function MemberList(props: MemberListProps): JSX.Element {
         <Show
           when={groups().length > 0}
           fallback={
-            <p style={{ padding: '10px', color: 'var(--washi-mute)', 'font-family': 'var(--font-mono)', 'font-size': '0.72rem' }}>
-              // no members
+            <p style={{ padding: '10px 12px', color: 'var(--washi-mute)', 'font-family': 'var(--font-mono)', 'font-size': '0.72rem' }}>
+              No one here yet
             </p>
           }
         >
@@ -256,12 +256,18 @@ export function MemberList(props: MemberListProps): JSX.Element {
                           class={`shell-member-row${user.away ? ' shell-member-row--away' : ''}`}
                           role="listitem"
                         >
-                          <Avatar
-                            name={user.nick}
-                            size="sm"
-                            owner={role.key === 'owner' || role.key === 'founder'}
-                            aria-hidden="true"
-                          />
+                          <span class="shell-member-avatar">
+                            <Avatar
+                              name={user.nick}
+                              size="sm"
+                              owner={role.key === 'owner' || role.key === 'founder'}
+                              aria-hidden="true"
+                            />
+                            <span
+                              class={`shell-member-presence${user.away ? ' shell-member-presence--away' : ''}`}
+                              aria-hidden="true"
+                            />
+                          </span>
                           <span
                             class={`shell-member-nick${user.away ? ' shell-member-nick--away' : ''}`}
                           >

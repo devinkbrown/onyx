@@ -1,18 +1,37 @@
 .voice-settings {
   display: grid;
-  gap: 1rem;
+  gap: 1.05rem;
   color: var(--washi);
 }
 
 .voice-settings__section {
+  position: relative;
   display: grid;
   gap: 0.85rem;
   padding: 1rem;
+  overflow: hidden;
   background:
-    linear-gradient(180deg, color-mix(in oklab, var(--stone) 30%, transparent), color-mix(in oklab, var(--ink) 28%, transparent)),
-    repeating-linear-gradient(90deg, transparent 0 29px, var(--line-faint) 29px 30px);
+    radial-gradient(circle at 12% 0%, color-mix(in oklab, var(--lapis) 13%, transparent), transparent 38%),
+    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 44%, transparent), color-mix(in oklab, var(--ink) 46%, transparent));
   border: 1px solid var(--seam-faint);
   border-top-color: var(--seam);
+  border-radius: var(--r-md);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--washi) 8%, transparent),
+    0 18px 48px -40px color-mix(in oklab, var(--ink) 96%, transparent);
+}
+
+.voice-settings__section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg, transparent 0 62%, color-mix(in oklab, var(--lapis-bright) 10%, transparent) 68%, transparent 76%);
+  opacity: 0.4;
+}
+
+.voice-settings__section > * {
+  position: relative;
 }
 
 .voice-settings__section-title {
@@ -44,17 +63,35 @@
   width: 100%;
   min-height: 2.7rem;
   border: 1px solid var(--seam-faint);
-  border-radius: var(--r-0);
+  border-radius: var(--r-sm);
   padding: 0.68rem 0.78rem;
   color: var(--washi);
-  background: color-mix(in oklab, var(--ink) 68%, var(--stone));
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--stone) 42%, transparent), color-mix(in oklab, var(--ink) 72%, var(--stone)));
   font: inherit;
   outline: none;
+  transition:
+    border-color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease),
+    background var(--dur) var(--ease);
 }
 
-.voice-settings__select:focus {
-  border-color: var(--lapis);
-  box-shadow: 0 0 0 2px color-mix(in oklab, var(--lapis) 34%, transparent);
+.voice-settings__select:hover:not(:disabled) {
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--stone-2) 46%, var(--ink));
+}
+
+.voice-settings__select:focus-visible {
+  border-color: var(--lapis-bright);
+  box-shadow:
+    0 0 0 2px color-mix(in oklab, var(--lapis-bright) 26%, transparent),
+    0 0 22px color-mix(in oklab, var(--lapis-bright) 12%, transparent);
+}
+
+.voice-settings__select:disabled {
+  color: var(--washi-mute);
+  cursor: not-allowed;
+  opacity: 0.58;
 }
 
 .voice-settings__select option {
@@ -69,18 +106,36 @@
   align-items: start;
   padding: 0.75rem;
   border: 1px solid var(--seam-faint);
-  background: color-mix(in oklab, var(--ink) 42%, transparent);
+  border-radius: var(--r-md);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--stone) 26%, transparent), color-mix(in oklab, var(--ink) 48%, transparent));
+  cursor: pointer;
+  transition:
+    border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+
+.voice-settings__toggle:hover {
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--stone-2) 28%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--washi) 7%, transparent);
 }
 
 .voice-settings__toggle input {
   appearance: none;
-  width: 2.35rem;
-  height: 1.25rem;
+  width: 2.55rem;
+  height: 1.35rem;
   margin: 0.1rem 0 0;
   border: 1px solid var(--seam-faint);
+  border-radius: var(--r-pill);
   background: color-mix(in oklab, var(--ink) 78%, var(--stone));
   cursor: pointer;
   position: relative;
+  transition:
+    border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
 }
 
 .voice-settings__toggle input::before {
@@ -90,18 +145,20 @@
   left: 0.18rem;
   width: 0.78rem;
   height: 0.78rem;
+  border-radius: var(--r-pill);
   background: var(--washi-mute);
   transition: transform var(--dur) var(--ease), background var(--dur) var(--ease);
 }
 
 .voice-settings__toggle input:checked {
-  border-color: var(--gold);
-  background: color-mix(in oklab, var(--gold) 24%, var(--ink));
+  border-color: color-mix(in oklab, var(--lapis-bright) 62%, var(--seam));
+  background: color-mix(in oklab, var(--lapis) 34%, var(--ink));
+  box-shadow: 0 0 16px color-mix(in oklab, var(--lapis-bright) 16%, transparent);
 }
 
 .voice-settings__toggle input:checked::before {
-  background: var(--gold-bright);
-  transform: translateX(1.08rem);
+  background: var(--lapis-bright);
+  transform: translateX(1.18rem);
 }
 
 .voice-settings__toggle input:focus-visible {
@@ -146,14 +203,65 @@
   min-height: 2.7rem;
   padding: 0.68rem 0.78rem;
   color: var(--washi);
-  background: color-mix(in oklab, var(--ink) 68%, var(--stone));
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--stone) 42%, transparent), color-mix(in oklab, var(--ink) 72%, var(--stone)));
   border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
   font-family: var(--font-mono);
   overflow-wrap: anywhere;
 }
 
 .voice-settings__capture {
-  color: var(--gold-bright);
+  color: var(--lapis-bright);
+}
+
+.voice-settings .ruri-button {
+  border-radius: var(--r-pill);
+  box-shadow: none;
+}
+
+.voice-settings .ruri-button--ghost {
+  color: var(--washi);
+  background: color-mix(in oklab, var(--stone-2) 38%, transparent);
+  border-color: var(--seam-faint);
+}
+
+.voice-settings .ruri-button--danger {
+  color: var(--washi);
+  background: linear-gradient(180deg, color-mix(in oklab, var(--shu) 70%, var(--stone)), color-mix(in oklab, var(--shu) 54%, var(--ink)));
+  border-color: color-mix(in oklab, var(--shu) 58%, var(--washi));
+}
+
+.voice-settings .ruri-button:hover:not(:disabled):not([aria-disabled='true']) {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 38px -30px color-mix(in oklab, var(--lapis-bright) 70%, transparent);
+}
+
+.voice-settings .ruri-button--danger:hover:not(:disabled):not([aria-disabled='true']) {
+  box-shadow: 0 16px 38px -30px color-mix(in oklab, var(--shu) 82%, transparent);
+}
+
+.voice-settings .ruri-button:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 3px;
+}
+
+.voice-settings .ruri-field__label {
+  color: var(--washi);
+}
+
+.voice-settings .ruri-field__description {
+  color: var(--washi-dim);
+}
+
+.voice-settings .ruri-field__input[type='range'] {
+  accent-color: var(--lapis-bright);
+  cursor: pointer;
+}
+
+.voice-settings .ruri-field__input[type='range']:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 4px;
 }
 
 @media (max-width: 720px) {

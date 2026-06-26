@@ -1,22 +1,62 @@
 /* ─────────────────────────────────────────────────────────────────────────────
-   voice.css — Onyx in-call voice/video stage.
-   Identity: Lapis × Kintsugi × Terminal.
-   Ground: sumi ink / lapis. Seams: kintsugi gold. Accent: vermilion (--shu).
-   Type: Anton display, JetBrains Mono labels. NO purple/glassmorphism/neon.
+   voice.css — Ocean in-call voice/video stage.
+   Deep-water surfaces, bioluminescent active states, sea-foam labels.
    ─────────────────────────────────────────────────────────────────────────── */
 
 /* ── VoiceStage ─────────────────────────────────────────────────────────────── */
 
 .voice-stage {
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   width: 100%;
   height: 100%;
   min-height: 0;
-  background: transparent;
-  padding: 12px;
-  gap: 8px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% -12%, color-mix(in oklab, var(--lapis-deep) 26%, transparent), transparent 42%),
+    radial-gradient(circle at 12% 18%, color-mix(in oklab, var(--lapis) 12%, transparent), transparent 30%),
+    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 72%, var(--ink)), var(--stone) 42%, var(--ink));
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--washi) 8%, transparent),
+    inset 0 -28px 80px color-mix(in oklab, var(--ink) 72%, transparent);
+  padding: clamp(10px, 1.3vw, 16px);
+  gap: clamp(8px, 1vw, 12px);
   box-sizing: border-box;
+}
+
+.voice-stage::before,
+.voice-stage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.voice-stage::before {
+  background:
+    linear-gradient(115deg, transparent 8%, color-mix(in oklab, var(--lapis-bright) 12%, transparent) 12%, transparent 18%),
+    linear-gradient(102deg, transparent 58%, color-mix(in oklab, var(--lapis) 10%, transparent) 63%, transparent 70%);
+  opacity: 0.42;
+  transform: translateX(-8%);
+  animation: voice-current-drift 18s var(--ease) infinite alternate;
+}
+
+.voice-stage::after {
+  background:
+    radial-gradient(circle at 78% 22%, color-mix(in oklab, var(--lapis-bright) 12%, transparent) 0 1px, transparent 2px),
+    radial-gradient(circle at 30% 68%, color-mix(in oklab, var(--gold-bright) 10%, transparent) 0 1px, transparent 2px);
+  background-size: 7.5rem 7.5rem, 10rem 10rem;
+  opacity: 0.38;
+}
+
+.voice-stage > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* Grid layout adapts to participant count */
@@ -24,8 +64,9 @@
   display: grid;
   flex: 1;
   min-height: 0;
-  gap: 8px;
-  align-content: start;
+  gap: clamp(8px, 1vw, 12px);
+  align-content: stretch;
+  grid-auto-rows: minmax(0, 1fr);
 }
 
 .voice-stage__grid[data-count="0"],
@@ -63,26 +104,33 @@
 .voice-stage--screenshare .voice-stage__grid {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: clamp(8px, 1vw, 12px);
 }
 
 .voice-stage__primary {
   flex: 1;
   min-height: 0;
+  display: grid;
+}
+
+.voice-stage__primary .voice-tile {
+  height: 100%;
+  min-height: min(28rem, 54vh);
+  aspect-ratio: auto;
 }
 
 .voice-stage__filmstrip {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   overflow-x: auto;
-  padding-bottom: 2px;
+  padding: 2px 2px 6px;
   scrollbar-width: thin;
   scrollbar-color: var(--seam) transparent;
 }
 
 .voice-stage__filmstrip::-webkit-scrollbar { height: 4px; }
 .voice-stage__filmstrip::-webkit-scrollbar-track { background: transparent; }
-.voice-stage__filmstrip::-webkit-scrollbar-thumb { background: var(--seam); border-radius: var(--r-sm); }
+.voice-stage__filmstrip::-webkit-scrollbar-thumb { background: var(--seam); border-radius: var(--r-pill); }
 
 .voice-stage__filmstrip .voice-tile {
   width: 160px;
@@ -97,28 +145,64 @@
   aspect-ratio: 16 / 9;
   border-radius: var(--r-md);
   overflow: hidden;
-  background: var(--stone);
-  border: 1px solid var(--line-faint);
+  background:
+    radial-gradient(circle at 50% 0%, color-mix(in oklab, var(--lapis-deep) 20%, transparent), transparent 48%),
+    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 64%, transparent), color-mix(in oklab, var(--stone) 86%, var(--ink)));
+  border: 1px solid var(--seam-faint);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--washi) 8%, transparent),
+    0 18px 48px -34px color-mix(in oklab, var(--ink) 92%, transparent);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  transition: border-color var(--dur) var(--ease);
+  backdrop-filter: blur(18px);
+  transition:
+    border-color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
 }
 
-/* Speaking ring — gold kintsugi seam glow */
+.voice-tile::before,
+.voice-tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.voice-tile::before {
+  background:
+    linear-gradient(125deg, transparent 0 42%, color-mix(in oklab, var(--lapis-bright) 12%, transparent) 48%, transparent 56%),
+    radial-gradient(circle at 20% 14%, color-mix(in oklab, var(--washi) 8%, transparent), transparent 24%);
+  opacity: 0.28;
+}
+
+.voice-tile::after {
+  border: 1px solid color-mix(in oklab, var(--washi) 8%, transparent);
+  border-radius: inherit;
+}
+
+/* Active speaker — bioluminescent azure current glow */
 .voice-tile--speaking {
-  border-color: var(--gold);
-  box-shadow: 0 0 0 2px var(--gold), 0 0 12px 2px color-mix(in oklab, var(--gold) 30%, transparent);
+  border-color: color-mix(in oklab, var(--lapis-bright) 86%, var(--washi));
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--lapis-bright) 86%, transparent),
+    0 0 28px color-mix(in oklab, var(--lapis-bright) 34%, transparent),
+    inset 0 1px 0 color-mix(in oklab, var(--washi) 12%, transparent);
+  transform: translateY(-1px);
 }
 
 .voice-tile--self {
-  border-color: var(--stone-3);
+  border-color: color-mix(in oklab, var(--stone-line) 72%, var(--seam-faint));
 }
 
 .voice-tile--self.voice-tile--speaking {
-  border-color: var(--gold);
-  box-shadow: 0 0 0 2px var(--gold), 0 0 12px 2px color-mix(in oklab, var(--gold) 30%, transparent);
+  border-color: color-mix(in oklab, var(--lapis-bright) 86%, var(--washi));
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--lapis-bright) 86%, transparent),
+    0 0 28px color-mix(in oklab, var(--lapis-bright) 34%, transparent),
+    inset 0 1px 0 color-mix(in oklab, var(--washi) 12%, transparent);
 }
 
 /* Video feed */
@@ -143,6 +227,9 @@
   height: 100%;
   padding: 8px;
   box-sizing: border-box;
+  background:
+    radial-gradient(circle at 50% 42%, color-mix(in oklab, var(--lapis) 16%, transparent), transparent 36%),
+    linear-gradient(180deg, color-mix(in oklab, var(--stone) 36%, transparent), transparent);
 }
 
 /* Oversize the avatar in a tile */
@@ -151,6 +238,9 @@
   height: 52px;
   font-size: 1.25rem;
   flex-shrink: 0;
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--lapis-bright) 18%, transparent),
+    0 16px 34px -24px color-mix(in oklab, var(--lapis) 80%, transparent);
 }
 
 /* Bottom bar: nick + badges */
@@ -161,13 +251,16 @@
   right: 0;
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 8px 6px;
-  background: linear-gradient(to top, color-mix(in oklab, var(--ink) 85%, transparent), transparent);
+  gap: 6px;
+  padding: 4px 9px 7px;
+  background:
+    linear-gradient(to top, color-mix(in oklab, var(--ink) 88%, transparent), color-mix(in oklab, var(--stone) 26%, transparent) 68%, transparent);
+  border-top: 1px solid var(--seam-faint);
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--washi);
   letter-spacing: 0.04em;
+  backdrop-filter: blur(14px);
 }
 
 .voice-tile__nick {
@@ -181,7 +274,7 @@
 
 .voice-tile__you-tag {
   font-size: 9px;
-  color: var(--washi-mute);
+  color: var(--washi-dim);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   margin-left: 2px;
@@ -214,6 +307,10 @@
   opacity: 0.85;
   font-family: var(--font-mono);
   color: var(--washi-dim);
+  padding: 1px 3px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--ink) 58%, transparent);
 }
 
 .voice-tile__badge--muted  { color: var(--shu); }
@@ -231,8 +328,9 @@
 .voice-tile__speaking-bars span {
   display: block;
   width: 2px;
-  border-radius: 1px;
-  background: var(--gold-bright);
+  border-radius: var(--r-pill);
+  background: var(--lapis-bright);
+  box-shadow: 0 0 8px color-mix(in oklab, var(--lapis-bright) 52%, transparent);
   transform-origin: bottom;
   transition: height 80ms ease;
 }
@@ -240,7 +338,11 @@
 .voice-tile__speaking-bars--active span:nth-child(1) { height: 40%; animation: vtile-bar 0.9s ease-in-out infinite; }
 .voice-tile__speaking-bars--active span:nth-child(2) { height: 80%; animation: vtile-bar 0.9s ease-in-out infinite 0.15s; }
 .voice-tile__speaking-bars--active span:nth-child(3) { height: 55%; animation: vtile-bar 0.9s ease-in-out infinite 0.3s; }
-.voice-tile__speaking-bars span:not(.voice-tile__speaking-bars--active span) { height: 25%; background: var(--washi-mute); }
+.voice-tile__speaking-bars:not(.voice-tile__speaking-bars--active) span {
+  height: 25%;
+  background: var(--washi-mute);
+  box-shadow: none;
+}
 
 @keyframes vtile-bar {
   0%, 100% { height: 30%; }
@@ -248,7 +350,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .voice-tile__speaking-bars--active span { animation: none !important; }
+  .voice-stage::before,
+  .voice-tile__speaking-bars--active span {
+    animation: none !important;
+  }
 }
 
 /* Screenshare label overlay */
@@ -260,11 +365,12 @@
   font-size: 10px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--gold);
-  background: color-mix(in oklab, var(--ink) 72%, transparent);
-  padding: 2px 6px;
-  border: 1px solid var(--seam-faint);
-  border-radius: var(--r-sm);
+  color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--ink) 76%, transparent);
+  padding: 3px 7px;
+  border: 1px solid var(--seam);
+  border-radius: var(--r-pill);
+  box-shadow: 0 0 14px color-mix(in oklab, var(--lapis-bright) 20%, transparent);
 }
 
 /* ── VoiceBar ────────────────────────────────────────────────────────────────── */
@@ -273,11 +379,16 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
-  height: 52px;
-  padding: 0 12px;
-  background: var(--ink-2);
+  gap: 8px;
+  min-height: 56px;
+  padding: 6px 12px;
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--stone) 74%, transparent), color-mix(in oklab, var(--ink) 94%, var(--stone))),
+    linear-gradient(90deg, transparent, color-mix(in oklab, var(--lapis) 9%, transparent) 48%, transparent);
   border-top: 1px solid var(--seam-faint);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--washi) 8%, transparent),
+    0 -18px 48px -34px color-mix(in oklab, var(--lapis-deep) 70%, transparent);
   font-family: var(--font-mono);
   flex-shrink: 0;
   z-index: 10;
@@ -302,7 +413,7 @@
 
 .voice-bar__channel-name {
   font-size: 11px;
-  color: var(--washi-dim);
+  color: var(--washi);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -322,7 +433,7 @@
 .voice-bar__sep {
   width: 1px;
   height: 22px;
-  background: var(--line-faint);
+  background: var(--seam-faint);
   flex-shrink: 0;
   margin: 0 4px;
 }
@@ -331,7 +442,7 @@
 .voice-bar__controls {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   flex: 1;
   justify-content: center;
 }
@@ -347,37 +458,68 @@
 
 /* Override IconButton for voice context */
 .voice-bar .ruri-icon-button {
-  border-radius: var(--r-sm);
+  border-radius: var(--r-pill);
+  color: var(--washi-dim);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 42%, transparent), color-mix(in oklab, var(--ink) 70%, transparent));
+  border-color: var(--seam-faint);
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--washi) 7%, transparent);
 }
 
-/* Pressed / active state — gold tint */
-.voice-bar .ruri-icon-button[aria-pressed="true"] {
-  background: color-mix(in oklab, var(--gold) 14%, transparent);
-  color: var(--gold-bright);
+.voice-bar .ruri-icon-button:hover:not(:disabled) {
+  color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis) 12%, var(--stone));
   border-color: var(--seam);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--washi) 12%, transparent),
+    0 0 18px color-mix(in oklab, var(--lapis-bright) 18%, transparent);
+  transform: translateY(-1px);
 }
 
-/* Muted microphone — vermilion */
+.voice-bar .ruri-icon-button:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 3px;
+  box-shadow:
+    0 0 0 4px color-mix(in oklab, var(--lapis-bright) 16%, transparent),
+    inset 0 1px 0 color-mix(in oklab, var(--washi) 12%, transparent);
+}
+
+/* Pressed / active state — azure bioluminescent tint */
+.voice-bar .ruri-icon-button[aria-pressed="true"] {
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--lapis) 30%, var(--stone)), color-mix(in oklab, var(--lapis-deep) 32%, var(--ink)));
+  color: var(--washi);
+  border-color: color-mix(in oklab, var(--lapis-bright) 72%, var(--seam));
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--lapis-bright) 24%, transparent),
+    0 0 22px color-mix(in oklab, var(--lapis-bright) 22%, transparent),
+    inset 0 1px 0 color-mix(in oklab, var(--washi) 16%, transparent);
+}
+
+/* Muted microphone — coral danger accent */
 .voice-bar .ruri-icon-button--muted {
-  background: color-mix(in oklab, var(--shu) 16%, transparent);
-  color: var(--shu-bright);
+  background: color-mix(in oklab, var(--shu) 16%, var(--ink));
+  color: var(--washi);
   border: 1px solid color-mix(in oklab, var(--shu) 36%, transparent);
 }
 
-/* Leave button — hard vermilion, brutalist */
+/* Leave button — coral, restrained */
 .voice-bar__leave.ruri-icon-button {
-  background: var(--shu);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--shu) 74%, var(--stone)), color-mix(in oklab, var(--shu) 58%, var(--ink)));
   color: var(--washi);
-  border: 1px solid var(--shu-bright);
+  border: 1px solid color-mix(in oklab, var(--shu) 64%, var(--washi));
   font-weight: 700;
-  border-radius: var(--r-sm);
+  border-radius: var(--r-pill);
   min-width: 44px;
+  box-shadow: 0 10px 28px -22px color-mix(in oklab, var(--shu) 88%, transparent);
 }
 
 .voice-bar__leave.ruri-icon-button:hover,
 .voice-bar__leave.ruri-icon-button:focus-visible {
-  background: var(--shu-bright);
-  border-color: var(--washi);
+  background: color-mix(in oklab, var(--shu) 82%, var(--stone));
+  border-color: color-mix(in oklab, var(--shu) 72%, var(--washi));
+  color: var(--washi);
 }
 
 /* ── ConnectionQuality pip ──────────────────────────────────────────────────── */
@@ -385,12 +527,13 @@
 .voice-cq {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   cursor: default;
   outline: none;
-  border: none;
-  background: none;
-  padding: 0;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--ink) 52%, transparent);
+  padding: 5px 8px;
 }
 
 .voice-cq__bars {
@@ -403,7 +546,7 @@
 .voice-cq__bar {
   display: block;
   width: 3px;
-  border-radius: 1px;
+  border-radius: var(--r-pill);
   transition: background var(--dur) var(--ease), height var(--dur) var(--ease);
 }
 
@@ -413,7 +556,7 @@
 .voice-cq__bar:nth-child(4) { height: 100%; }
 
 .voice-cq__bar--on  { background: var(--cq-color, var(--ok)); }
-.voice-cq__bar--off { background: var(--stone-3); }
+.voice-cq__bar--off { background: color-mix(in oklab, var(--stone-3) 68%, transparent); }
 
 .voice-cq__rate {
   font-family: var(--font-mono);
@@ -436,4 +579,9 @@
 @media (max-width: 480px) {
   .voice-bar__channel-name { max-width: 70px; }
   .voice-cq__rate { display: none; }
+}
+
+@keyframes voice-current-drift {
+  from { transform: translateX(-8%); }
+  to { transform: translateX(8%); }
 }

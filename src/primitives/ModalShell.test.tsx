@@ -8,7 +8,7 @@ const tick = () => new Promise((resolve) => window.setTimeout(resolve, 0));
 afterEach(cleanup);
 
 describe('ModalShell', () => {
-  it('renders an accessible modal dialog with sharp Onyx structure', () => {
+  it('renders an accessible modal dialog with layered Ocean structure', () => {
     render(() => (
       <ModalShell open title="Confirm disconnect" description="Leave the current room" onOpenChange={() => undefined}>
         <button type="button">Stay connected</button>

@@ -48,9 +48,9 @@ export function Composer(props: ComposerProps): JSX.Element {
   const placeholder = createMemo(() => {
     const t = target();
     const cs = connectionStatus();
-    if (cs !== 'connected') return '// not connected';
-    if (!t) return '// pick a room or DM to start';
-    return `message ${t}`;
+    if (cs !== 'connected') return 'Reconnecting to the current…';
+    if (!t) return 'Pick a room or a person to begin';
+    return `Message ${t}`;
   });
 
   // ── auto-resize ──

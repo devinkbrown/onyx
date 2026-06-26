@@ -124,7 +124,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
               when={sortedChannels().length > 0}
               fallback={
                 <li style={{ padding: '4px 10px', color: 'var(--washi-mute)', 'font-family': 'var(--font-mono)', 'font-size': '0.72rem' }}>
-                  no channels
+                  No rooms yet
                 </li>
               }
             >
@@ -248,7 +248,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
           disabled={!joinInput().trim()}
           aria-label="Join channel"
         >
-          [+]
+          <span aria-hidden="true">+</span>
         </button>
       </form>
     </aside>

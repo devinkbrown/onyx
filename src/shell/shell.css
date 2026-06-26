@@ -317,15 +317,19 @@
 }
 
 .shell-channel-item {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 5px 10px;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
   border-radius: var(--r-md);
   border: 1px solid transparent;
   cursor: pointer;
   font-size: 0.86rem;
+  text-align: left;
   color: var(--washi-dim);
+  background: transparent;
   transition:
     color var(--dur) var(--ease),
     background var(--dur) var(--ease),
@@ -346,24 +350,55 @@
   background:
     linear-gradient(
       90deg,
-      color-mix(in oklab, var(--lapis-deep) 24%, transparent) 0%,
-      color-mix(in oklab, var(--stone-2) 40%, transparent) 100%
+      color-mix(in oklab, var(--lapis-deep) 26%, transparent) 0%,
+      color-mix(in oklab, var(--stone-2) 38%, transparent) 100%
     );
   border-color: var(--seam);
+}
+
+/* Active room: a bioluminescent current runs down its leading edge. */
+.shell-channel-item--active::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 999px;
+  background: var(--lapis-bright);
+  box-shadow: 0 0 10px color-mix(in oklab, var(--lapis-bright) 64%, transparent);
 }
 
 .shell-channel-item--active .shell-channel-sigil {
   color: var(--lapis-bright);
 }
 
+/* Unread but not active: the name brightens and a small azure pip marks it. */
 .shell-channel-item--unread {
   color: var(--washi);
   font-weight: 600;
 }
 
+.shell-channel-item--unread:not(.shell-channel-item--active) .shell-channel-sigil {
+  color: var(--lapis);
+}
+
+/* A mention/highlight badge glows bioluminescent azure — it is a call to you,
+   not a danger. Coral is reserved for genuine alerts. */
 .shell-channel-item--highlight .shell-channel-badge {
-  background: var(--shu);
-  color: var(--washi);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--lapis-bright) 64%, transparent) 0%,
+    var(--lapis) 100%
+  );
+  color: var(--ink);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--lapis-bright) 40%, transparent),
+    0 0 12px color-mix(in oklab, var(--lapis-bright) 44%, transparent);
+}
+
+.shell-channel-item--highlight:not(.shell-channel-item--active) {
+  box-shadow: inset 2px 0 0 var(--lapis-bright);
 }
 
 .shell-channel-sigil {
@@ -390,9 +425,10 @@
   font-family: var(--font-mono);
   font-size: 0.62rem;
   font-weight: 700;
-  border-radius: var(--r-sm);
-  background: color-mix(in oklab, var(--lapis-deep) 30%, var(--stone));
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--lapis-deep) 36%, var(--stone));
   color: var(--lapis-bright);
+  box-shadow: inset 0 0 0 1px var(--seam-faint);
 }
 
 /* join-channel input */
@@ -417,8 +453,8 @@
 }
 
 .shell-join-input:focus {
-  border-color: var(--lapis-bright);
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 26%, transparent);
+  border-color: var(--lapis);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 30%, transparent);
 }
 
 .shell-join-input::placeholder {
@@ -427,21 +463,42 @@
 
 .shell-join-btn {
   flex: none;
+  display: grid;
+  place-items: center;
+  min-width: 34px;
   padding: 6px 10px;
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: 0.9rem;
+  line-height: 1;
   color: var(--lapis-bright);
   background: color-mix(in oklab, var(--stone-2) 48%, var(--ink));
   border: 1px solid var(--seam-faint);
+  border-left: none;
   border-radius: 0 var(--r-md) var(--r-md) 0;
   cursor: pointer;
-  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+  transition:
+    color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
 }
 
-.shell-join-btn:hover {
-  color: var(--washi);
-  border-color: var(--lapis-bright);
-  box-shadow: 0 0 18px color-mix(in oklab, var(--lapis) 18%, transparent);
+.shell-join-btn:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--lapis-bright) 0%, var(--lapis) 100%);
+  box-shadow: 0 0 16px -3px color-mix(in oklab, var(--lapis-bright) 56%, transparent);
+}
+
+/* When the input has focus, the join control adopts the same azure edge so the
+   form reads as one connected affordance. */
+.shell-join-form:focus-within .shell-join-btn {
+  border-color: color-mix(in oklab, var(--lapis) 60%, transparent);
+}
+
+.shell-join-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* ── Conversation column ── */
@@ -461,9 +518,49 @@
 }
 
 /* ── Join-voice affordance ── */
-.shell-voice-join { display: flex; gap: 10px; padding: 10px clamp(12px, 2vw, 20px); border-bottom: 1px solid var(--seam-faint); }
-.shell-voice-join-btn { font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.04em; color: var(--washi-dim); background: color-mix(in oklab, var(--stone) 40%, transparent); border: 1px solid var(--seam-faint); border-radius: var(--r-md); padding: 7px 14px; cursor: pointer; transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
-.shell-voice-join-btn:hover { color: var(--lapis-bright); border-color: var(--seam); box-shadow: inset 0 0 18px color-mix(in oklab, var(--lapis) 12%, transparent); }
+.shell-voice-join {
+  display: flex;
+  gap: 10px;
+  padding: 10px clamp(12px, 2vw, 20px);
+  border-bottom: 1px solid var(--seam-faint);
+}
+
+.shell-voice-join-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-sans);
+  font-size: 0.84rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--washi-dim);
+  background: color-mix(in oklab, var(--stone) 40%, transparent);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  padding: 7px 15px;
+  cursor: pointer;
+  transition:
+    color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+
+.shell-voice-join-btn:hover {
+  color: var(--lapis-bright);
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--lapis-deep) 16%, transparent);
+  box-shadow: inset 0 0 20px -6px color-mix(in oklab, var(--lapis) 28%, transparent);
+}
+
+.shell-voice-join-icon {
+  font-size: 0.9rem;
+  line-height: 1;
+  color: var(--lapis);
+  transition: color var(--dur) var(--ease);
+}
+
+.shell-voice-join-btn:hover .shell-voice-join-icon { color: var(--lapis-bright); }
 
 /* ── Presence ribbon ── */
 .shell-ribbon {
@@ -519,8 +616,15 @@
   max-width: 22ch;
 }
 
-.shell-ribbon-channel [style*='--gold'] {
-  color: var(--lapis-bright) !important;
+/* The channel sigil reads in bioluminescent azure — never gold. */
+.shell-ribbon-sigil {
+  color: var(--lapis-bright);
+  font-family: var(--font-mono);
+  margin-right: 1px;
+}
+
+.shell-ribbon-sigil--dm {
+  color: var(--washi-mute);
 }
 
 .shell-ribbon-sep {
@@ -592,15 +696,38 @@
 }
 
 .shell-ribbon-members {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
   font-family: var(--font-mono);
   font-size: 0.68rem;
   color: var(--washi-dim);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
   cursor: pointer;
-  transition: color var(--dur) var(--ease);
+  transition:
+    color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease);
 }
 
-.shell-ribbon-members:hover { color: var(--lapis-bright); }
+.shell-ribbon-members::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ok);
+  box-shadow: 0 0 6px color-mix(in oklab, var(--ok) 50%, transparent);
+}
+
+.shell-ribbon-members:hover {
+  color: var(--lapis-bright);
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--lapis-deep) 14%, transparent);
+}
 
 /* ── Message view ── */
 .shell-messages {
@@ -633,22 +760,37 @@
   display: grid;
   place-items: center;
   height: 100%;
+  padding: 2rem;
   color: var(--washi-mute);
-  font-family: var(--font-mono);
-  font-size: 0.82rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.96rem;
+  letter-spacing: 0.01em;
+  text-align: center;
+  line-height: 1.5;
 }
 
-/* Message group */
+/* Message group — a fresh author surfaces from the depth: a touch more breathing
+   room above so distinct speakers read as distinct, with a hover wash that lifts
+   the line toward the light. */
 .shell-msg-group {
+  position: relative;
   display: grid;
   grid-template-columns: 42px 1fr;
-  gap: 0 10px;
-  padding: 4px 16px;
+  gap: 0 12px;
+  padding: 7px 18px 4px;
+  margin-top: 2px;
+  transition: background var(--dur) var(--ease);
 }
 
-.shell-msg-group:hover { background: color-mix(in oklab, var(--lapis-deep) 8%, transparent); }
+.shell-msg-group:hover,
+.shell-msg-cont:hover {
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--lapis-deep) 11%, transparent) 0%,
+    color-mix(in oklab, var(--lapis-deep) 5%, transparent) 100%
+  );
+}
 
 .shell-msg-group--system {
   grid-template-columns: 1fr;
@@ -676,26 +818,76 @@
 
 .shell-msg-author {
   font-family: var(--font-sans);
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   font-weight: 600;
   color: var(--washi);
   letter-spacing: 0.01em;
+  cursor: default;
+  transition: color var(--dur) var(--ease);
+}
+
+.shell-msg-group:hover .shell-msg-author {
+  color: var(--lapis-bright);
 }
 
 .shell-msg-ts {
   font-family: var(--font-mono);
-  font-size: 0.64rem;
+  font-size: 0.62rem;
   color: var(--washi-mute);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   flex: none;
+  opacity: 0.78;
 }
 
 .shell-msg-text {
   font-size: 0.91rem;
-  line-height: 1.52;
+  line-height: 1.56;
   color: var(--washi);
   word-break: break-word;
   overflow-wrap: break-word;
+}
+
+/* Links surface as bioluminescent crest — the brightest blue, clearly tappable,
+   with an underline that only kindles on hover/focus. */
+.shell-msg-text a,
+.shell-thread-msg-text a {
+  color: var(--lapis-bright);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in oklab, var(--lapis-bright) 32%, transparent);
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+
+.shell-msg-text a:hover,
+.shell-msg-text a:focus-visible,
+.shell-thread-msg-text a:hover {
+  color: var(--washi);
+  border-bottom-color: var(--lapis-bright);
+}
+
+/* A mention of a user reads in azure on a faint azure wash — calm, not loud. */
+.shell-msg-mention {
+  color: var(--lapis-bright);
+  font-weight: 600;
+  padding: 0 3px;
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--lapis) 16%, transparent);
+}
+
+/* A mention of you specifically gets a slightly warmer azure pill. */
+.shell-msg-mention--self {
+  background: color-mix(in oklab, var(--lapis) 26%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 30%, transparent);
+}
+
+/* Inline monospace fragments and code. */
+.shell-msg-text code {
+  font-family: var(--font-mono);
+  font-size: 0.84em;
+  padding: 0.06em 0.36em;
+  border-radius: var(--r-sm);
+  color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--ink) 60%, var(--stone-2));
+  border: 1px solid var(--seam-faint);
 }
 
 .shell-msg-text--deleted {
@@ -713,101 +905,129 @@
 .shell-msg-cont {
   display: grid;
   grid-template-columns: 42px 1fr;
-  gap: 0 10px;
-  padding: 1px 16px;
+  gap: 0 12px;
+  padding: 1px 18px;
+  transition: background var(--dur) var(--ease);
 }
-
-.shell-msg-cont:hover { background: color-mix(in oklab, var(--lapis-deep) 8%, transparent); }
 
 .shell-msg-cont-ts {
   grid-column: 1;
+  align-self: center;
   font-family: var(--font-mono);
-  font-size: 0.6rem;
+  font-size: 0.58rem;
   color: var(--washi-mute);
   letter-spacing: 0.04em;
   text-align: right;
-  padding-top: 2px;
+  padding-right: 2px;
   opacity: 0;
   transition: opacity var(--dur) var(--ease);
 }
 
-.shell-msg-cont:hover .shell-msg-cont-ts { opacity: 1; }
+.shell-msg-cont:hover .shell-msg-cont-ts { opacity: 0.85; }
 
 .shell-msg-cont-body {
   grid-column: 2;
   min-width: 0;
 }
 
-/* System line */
+/* System line — joins, parts, mode changes. A quiet ripple in the current:
+   small, dim, and prefixed with a soft azure tide-mark. */
 .shell-msg-system {
-  padding: 2px 16px 2px calc(42px + 10px + 16px);
+  padding: 3px 18px 3px calc(42px + 12px + 18px);
   font-family: var(--font-mono);
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   color: var(--washi-mute);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
+  transition: color var(--dur) var(--ease);
 }
+
+.shell-msg-system:hover { color: var(--washi-dim); }
 
 .shell-msg-system::before {
-  content: '─';
-  color: var(--seam-faint);
-  font-size: 0.9rem;
+  content: '';
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--lapis) 40%, transparent);
+  box-shadow: 0 0 6px color-mix(in oklab, var(--lapis) 30%, transparent);
 }
 
-/* Highlight */
+/* Highlight — a message that names you. Bioluminescent azure crest, never
+   alarm-coral: it should feel like being gently called to, not warned. */
 .shell-msg-group--highlight,
 .shell-msg-cont--highlight {
-  background: color-mix(in oklab, var(--shu) 6%, transparent) !important;
-  border-left: 2px solid var(--shu);
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--lapis) 14%, transparent) 0%,
+      color-mix(in oklab, var(--lapis-deep) 6%, transparent) 42%,
+      transparent 100%
+    ) !important;
+  box-shadow: inset 2px 0 0 var(--lapis-bright);
 }
 
-/* Reply indicator */
+/* Reply indicator — a faint azure thread back to the quoted message. */
 .shell-msg-reply {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 3px;
-  padding-left: 8px;
+  gap: 7px;
+  margin-bottom: 4px;
+  padding: 2px 0 2px 9px;
   border-left: 2px solid var(--seam);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
   font-size: 0.78rem;
   color: var(--washi-mute);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: pointer;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+
+.shell-msg-reply:hover {
+  color: var(--washi-dim);
+  border-left-color: var(--lapis-bright);
 }
 
 .shell-msg-reply-from {
   color: var(--lapis-bright);
   font-family: var(--font-mono);
   font-size: 0.72rem;
+  flex: none;
 }
 
 /* Thread indicator */
 .shell-thread-indicator {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  margin-top: 4px;
-  padding: 3px 8px;
+  gap: 6px;
+  margin-top: 5px;
+  padding: 3px 10px 3px 8px;
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-pill);
   cursor: pointer;
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--lapis-bright);
+  color: var(--lapis);
   background: color-mix(in oklab, var(--lapis-deep) 14%, transparent);
-  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+  transition:
+    color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
 }
 
 .shell-thread-indicator:hover {
-  color: var(--washi);
-  border-color: var(--lapis-bright);
-  background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
-  box-shadow: 0 0 18px color-mix(in oklab, var(--lapis) 16%, transparent);
+  color: var(--lapis-bright);
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--lapis-deep) 22%, transparent);
+  box-shadow: 0 0 18px -4px color-mix(in oklab, var(--lapis) 30%, transparent);
 }
 
 /* Reactions */
@@ -821,22 +1041,41 @@
 .shell-reaction {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 7px 2px 5px;
+  gap: 5px;
+  padding: 2px 8px 2px 6px;
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-pill);
   cursor: pointer;
   font-size: 0.82rem;
   color: var(--washi-dim);
-  background: color-mix(in oklab, var(--stone) 20%, transparent);
-  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+  background: color-mix(in oklab, var(--stone-2) 34%, transparent);
+  transition:
+    border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease),
+    color var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
 }
 
 .shell-reaction:hover {
-  border-color: var(--lapis-bright);
-  background: color-mix(in oklab, var(--lapis-deep) 16%, transparent);
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--lapis-deep) 20%, transparent);
   color: var(--washi);
+  transform: translateY(-1px);
 }
+
+.shell-reaction:active {
+  transform: translateY(0);
+}
+
+/* A reaction you've already given glows azure — your mark on the message. */
+.shell-reaction--mine {
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--lapis) 18%, transparent);
+  color: var(--washi);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 24%, transparent);
+}
+
+.shell-reaction--mine .shell-reaction-count { color: var(--lapis-bright); }
 
 .shell-reaction-avatars {
   display: flex;
@@ -860,21 +1099,25 @@
 /* Jump to latest */
 .shell-jump-latest {
   position: absolute;
-  bottom: 12px;
+  bottom: 14px;
   left: 50%;
   transform: translateX(-50%);
   padding: 7px 16px;
   font-family: var(--font-mono);
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--lapis-bright);
-  background: color-mix(in oklab, var(--stone-2) 64%, var(--ink));
+  background: color-mix(in oklab, var(--stone-2) 72%, var(--ink));
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   border: 1px solid var(--seam);
   border-radius: var(--r-pill);
   cursor: pointer;
-  box-shadow: 0 8px 28px -16px color-mix(in oklab, var(--ink) 96%, transparent);
-  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+  box-shadow:
+    0 8px 28px -16px color-mix(in oklab, var(--ink) 96%, transparent),
+    0 0 0 1px color-mix(in oklab, var(--lapis) 12%, transparent);
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 
 .shell-jump-latest:hover {
@@ -901,17 +1144,28 @@
   display: flex;
   gap: 8px;
   align-items: flex-end;
-  background: color-mix(in oklab, var(--ink) 72%, var(--stone-2));
+  background: color-mix(in oklab, var(--ink) 70%, var(--stone-2));
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-md);
-  transition: border-color var(--dur) var(--ease);
+  transition:
+    border-color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease),
+    background var(--dur) var(--ease);
 }
 
+.shell-composer-inner:hover {
+  border-color: var(--seam);
+}
+
+/* Focus brings the surface toward the light and lifts an azure glow around the
+   input — the single most inviting affordance in the app. */
 .shell-composer-inner:focus-within {
-  border-color: var(--lapis-bright);
+  border-color: var(--lapis);
+  background: color-mix(in oklab, var(--ink) 62%, var(--stone-2));
   box-shadow:
-    0 0 0 2px color-mix(in oklab, var(--lapis) 24%, transparent),
-    0 0 24px color-mix(in oklab, var(--lapis-bright) 12%, transparent);
+    0 0 0 1px color-mix(in oklab, var(--lapis) 40%, transparent),
+    0 0 0 4px color-mix(in oklab, var(--lapis) 14%, transparent),
+    0 0 28px -4px color-mix(in oklab, var(--lapis-bright) 22%, transparent);
 }
 
 .shell-composer-textarea {
@@ -938,35 +1192,66 @@
   flex: none;
   width: 36px;
   height: 36px;
-  margin: 0 2px 1px 0;
+  margin: 0 3px 2px 0;
   display: grid;
   place-items: center;
-  border: 1px solid transparent;
+  border: 1px solid var(--seam-faint);
   border-radius: var(--r-md);
   cursor: pointer;
-  color: var(--washi-mute);
-  background: transparent;
+  color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis-deep) 22%, transparent);
   font-size: 1rem;
-  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+  transition:
+    color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+
+/* Armed: there is text to send. Fills with current, glows, invites the tap. */
+.shell-composer-send:not(:disabled) {
+  color: var(--ink);
+  border-color: transparent;
+  background: linear-gradient(
+    180deg,
+    var(--lapis-bright) 0%,
+    var(--lapis) 100%
+  );
+  box-shadow: 0 0 16px -4px color-mix(in oklab, var(--lapis-bright) 60%, transparent);
 }
 
 .shell-composer-send:hover:not(:disabled) {
-  color: var(--lapis-bright);
-  border-color: var(--seam);
-  background: color-mix(in oklab, var(--lapis-deep) 16%, transparent);
+  transform: translateY(-1px);
+  box-shadow: 0 0 22px -3px color-mix(in oklab, var(--lapis-bright) 72%, transparent);
+}
+
+.shell-composer-send:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .shell-composer-send:disabled {
-  opacity: 0.36;
+  color: var(--washi-mute);
+  border-color: var(--seam-faint);
+  background: transparent;
   cursor: not-allowed;
 }
 
 .shell-composer-hint {
-  margin-top: 5px;
+  margin-top: 6px;
+  padding-left: 2px;
   font-family: var(--font-mono);
   font-size: 0.62rem;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.07em;
   color: var(--washi-mute);
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+}
+
+/* The keyboard hint fades in only when the composer is engaged — calm by
+   default, helpful when you're typing. */
+.shell-composer-inner:focus-within ~ .shell-composer-hint {
+  opacity: 0.85;
 }
 
 .shell-composer--disabled .shell-composer-inner {
@@ -1024,18 +1309,33 @@
 }
 
 .shell-members-group-label {
-  padding: 8px 10px 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 5px;
   font-family: var(--font-mono);
-  font-size: 0.62rem;
+  font-size: 0.6rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--washi-mute);
 }
 
+/* A faint current line trails each group heading into the list. */
+.shell-members-group-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    var(--seam-faint) 0%,
+    transparent 100%
+  );
+}
+
 .shell-member-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   padding: 4px 10px;
   cursor: pointer;
   border: 1px solid transparent;
@@ -1045,8 +1345,39 @@
 }
 
 .shell-member-row:hover {
-  background: color-mix(in oklab, var(--lapis-deep) 12%, transparent);
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--lapis-deep) 16%, transparent) 0%,
+    color-mix(in oklab, var(--lapis-deep) 7%, transparent) 100%
+  );
   border-color: var(--seam);
+}
+
+/* Avatar carries a tiny presence dot at its corner — a soft bioluminescent
+   glow when present, dimmed when away. */
+.shell-member-avatar {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+
+.shell-member-presence {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--ok);
+  box-shadow:
+    0 0 0 2px color-mix(in oklab, var(--stone-2) 80%, var(--ink)),
+    0 0 6px color-mix(in oklab, var(--ok) 50%, transparent);
+}
+
+.shell-member-presence--away {
+  background: var(--washi-mute);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--stone-2) 80%, var(--ink));
 }
 
 /* Each member is wrapped in a Popover — an inline <span> + inline <button> by
@@ -1084,9 +1415,14 @@
 
 .shell-member-row:hover .shell-member-nick { color: var(--washi); }
 
+.shell-member-row--away { opacity: 0.66; }
+.shell-member-row--away:hover { opacity: 1; }
 .shell-member-nick--away { color: var(--washi-mute); font-style: italic; }
 
-/* Role badges */
+/* Role badges — each tier a distinct stratum of the reef, tinted only from
+   theme tokens. Champagne gold marks the stewards (founder/owner); azure marks
+   operators and network staff; sea-green marks voice. Coral stays out of the
+   routine nicklist entirely. */
 .shell-role-badge {
   flex: none;
   display: grid;
@@ -1099,49 +1435,60 @@
   letter-spacing: 0.04em;
   border: 1px solid;
   border-radius: var(--r-sm);
+  transition: box-shadow var(--dur) var(--ease);
 }
 
-.shell-role-badge--owner {
-  color: var(--gold-bright);
-  border-color: var(--gold);
-  background: color-mix(in oklab, var(--gold-deep) 22%, transparent);
-}
+.shell-member-row:hover .shell-role-badge { box-shadow: 0 0 10px -2px currentColor; }
 
+/* Founder — brightest champagne, the steward of the room. */
 .shell-role-badge--founder {
   color: var(--gold-bright);
   border-color: var(--gold-bright);
-  background: color-mix(in oklab, var(--gold) 18%, transparent);
+  background: color-mix(in oklab, var(--gold) 20%, transparent);
 }
 
+/* Owner — warm champagne, a half-step below founder. */
+.shell-role-badge--owner {
+  color: var(--gold-bright);
+  border-color: var(--gold);
+  background: color-mix(in oklab, var(--gold-deep) 24%, transparent);
+}
+
+/* Op — deep-current azure, distinct from the brighter netop crest. */
 .shell-role-badge--op {
-  color: var(--shu-bright);
-  border-color: color-mix(in oklab, var(--shu) 60%, transparent);
-  background: color-mix(in oklab, var(--shu) 12%, transparent);
+  color: var(--lapis-bright);
+  border-color: color-mix(in oklab, var(--lapis-deep) 78%, var(--lapis));
+  background: color-mix(in oklab, var(--lapis-deep) 30%, transparent);
 }
 
+/* Voice — sea-green, the gift of being heard. */
 .shell-role-badge--voice {
   color: var(--ok);
-  border-color: color-mix(in oklab, var(--ok) 50%, transparent);
-  background: color-mix(in oklab, var(--ok) 10%, transparent);
+  border-color: color-mix(in oklab, var(--ok) 52%, transparent);
+  background: color-mix(in oklab, var(--ok) 12%, transparent);
 }
 
+/* Network operator — the bioluminescent crest, brightest azure. */
 .shell-role-badge--netop {
   color: var(--lapis-bright);
-  border-color: color-mix(in oklab, var(--lapis) 50%, transparent);
-  background: color-mix(in oklab, var(--lapis) 14%, transparent);
+  border-color: var(--lapis);
+  background: color-mix(in oklab, var(--lapis) 18%, transparent);
+  box-shadow: 0 0 10px -3px color-mix(in oklab, var(--lapis-bright) 60%, transparent);
 }
 
 /* Member popover card */
 .shell-member-card {
   display: grid;
-  gap: 10px;
-  min-width: 200px;
+  gap: 12px;
+  min-width: 210px;
 }
 
 .shell-member-card-head {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 11px;
+  padding-bottom: 11px;
+  border-bottom: 1px solid var(--seam-faint);
 }
 
 .shell-member-card-nick {

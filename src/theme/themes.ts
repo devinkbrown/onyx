@@ -31,6 +31,9 @@ export type ThemeMeta = {
 
 export type ThemeId =
   | 'ocean'
+  | 'tide'
+  | 'abyss'
+  | 'reef'
   | 'ruri'
   | 'obsidian'
   | 'pearl'
@@ -81,6 +84,189 @@ const oceanTokens: TokenMap = {
   '--seam-faint': 'color-mix(in oklab, var(--lapis) 16%, transparent)',
   '--line':       'color-mix(in oklab, var(--washi) 14%, transparent)',
   '--line-faint': 'color-mix(in oklab, var(--washi) 7%, transparent)',
+
+  // Radius — fluid, elegant
+  '--r-0':    '0px',
+  '--r-sm':   '5px',
+  '--r-md':   '11px',
+  '--r-pill': '999px',
+
+  // Motion
+  '--ease': 'cubic-bezier(0.16, 1, 0.3, 1)',
+  '--dur':  '260ms',
+
+  // Typography
+  '--font-mono':    "'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace",
+  '--font-display': "'Anton', 'Arial Narrow', 'Helvetica Neue', sans-serif",
+  '--font-sans':    "'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  '--font-serif':   "'Fraunces Variable', 'Iowan Old Style', Georgia, 'Times New Roman', serif",
+};
+
+// ---------------------------------------------------------------------------
+// tide — Ocean sub-variant: brighter, shallower water. Sunlit azure surfaces
+// lift toward the surface; more luminous crest, the gold reads as bright sand.
+// Same azure-primary identity as the flagship, turned up toward daylight.
+// ---------------------------------------------------------------------------
+const tideTokens: TokenMap = {
+  // Ground — shallows: lifted, lighter blue-grey water (still dark-scheme)
+  '--ink':        '#04101e',
+  '--ink-2':      '#06162a',
+  '--stone':      '#0d2742',
+  '--stone-2':    '#163a5e',
+  '--stone-3':    '#1f4d77',
+  '--stone-line': '#2e6499',
+
+  // Azure — brighter electric current; crest pushed toward sky-white
+  '--lapis':       '#46c8ff',
+  '--lapis-bright':'#a6ecff',
+  '--lapis-deep':  '#1684cc',
+
+  // Champagne — bright shallow-water sand
+  '--gold':       '#e4c97e',
+  '--gold-bright':'#f6e6ae',
+  '--gold-deep':  '#a98c46',
+
+  // Coral — the single hot accent (danger / badges)
+  '--shu':        '#ff7a6c',
+  '--shu-bright': '#ffa193',
+
+  // Text — luminous sea-foam over sunlit water
+  '--washi':      '#f0faff',
+  '--washi-dim':  '#b7d8ee',
+  '--washi-mute': '#7aa0bc',
+
+  // Status
+  '--ok':      '#3ee0a8',
+  '--warn':    'var(--gold-bright)',
+  '--danger':  'var(--shu)',
+
+  // Seams (brighter current lines) + bands (pale tide)
+  '--seam':       'color-mix(in oklab, var(--lapis) 50%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--lapis) 20%, transparent)',
+  '--line':       'color-mix(in oklab, var(--washi) 16%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--washi) 8%, transparent)',
+
+  // Radius — fluid, elegant
+  '--r-0':    '0px',
+  '--r-sm':   '6px',
+  '--r-md':   '12px',
+  '--r-pill': '999px',
+
+  // Motion
+  '--ease': 'cubic-bezier(0.16, 1, 0.3, 1)',
+  '--dur':  '260ms',
+
+  // Typography
+  '--font-mono':    "'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace",
+  '--font-display': "'Anton', 'Arial Narrow', 'Helvetica Neue', sans-serif",
+  '--font-sans':    "'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  '--font-serif':   "'Fraunces Variable', 'Iowan Old Style', Georgia, 'Times New Roman', serif",
+};
+
+// ---------------------------------------------------------------------------
+// abyss — Ocean sub-variant: near-AMOLED deep trench. Almost pure black water,
+// restrained azure that glows rather than floods, high text contrast. The
+// flagship's identity at maximum depth and darkness.
+// ---------------------------------------------------------------------------
+const abyssTokens: TokenMap = {
+  // Ground — the bottom of the trench: near-pure black, faint blue undertone
+  '--ink':        '#000206',
+  '--ink-2':      '#01040a',
+  '--stone':      '#040a14',
+  '--stone-2':    '#08121f',
+  '--stone-3':    '#0c1a2b',
+  '--stone-line': '#142a40',
+
+  // Azure — restrained, deep; a glow in the dark, not a flood
+  '--lapis':       '#2196d6',
+  '--lapis-bright':'#6fd4ff',
+  '--lapis-deep':  '#0a4f80',
+
+  // Champagne — dimmed treasure glint
+  '--gold':       '#c4a558',
+  '--gold-bright':'#e6cd8e',
+  '--gold-deep':  '#86692c',
+
+  // Coral — the single hot accent (danger / badges)
+  '--shu':        '#f0594b',
+  '--shu-bright': '#ff7c6e',
+
+  // Text — high-contrast sea-foam ivory over the trench
+  '--washi':      '#eef7ff',
+  '--washi-dim':  '#a8cae2',
+  '--washi-mute': '#5a7d96',
+
+  // Status
+  '--ok':      '#2fcf93',
+  '--warn':    'var(--gold-bright)',
+  '--danger':  'var(--shu)',
+
+  // Seams (restrained current lines) + bands (faint tide)
+  '--seam':       'color-mix(in oklab, var(--lapis) 36%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--lapis) 13%, transparent)',
+  '--line':       'color-mix(in oklab, var(--washi) 11%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--washi) 5%, transparent)',
+
+  // Radius — taut, deep
+  '--r-0':    '0px',
+  '--r-sm':   '3px',
+  '--r-md':   '8px',
+  '--r-pill': '999px',
+
+  // Motion
+  '--ease': 'cubic-bezier(0.16, 1, 0.3, 1)',
+  '--dur':  '240ms',
+
+  // Typography
+  '--font-mono':    "'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace",
+  '--font-display': "'Anton', 'Arial Narrow', 'Helvetica Neue', sans-serif",
+  '--font-sans':    "'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  '--font-serif':   "'Fraunces Variable', 'Iowan Old Style', Georgia, 'Times New Roman', serif",
+};
+
+// ---------------------------------------------------------------------------
+// reef — Ocean sub-variant: the base deep water with a warm coral + gold lean.
+// Azure stays the primary current, but the second accent shifts from champagne
+// toward living coral and warm reef-gold — a touch more colour, still elegant.
+// ---------------------------------------------------------------------------
+const reefTokens: TokenMap = {
+  // Ground — deep water with the faintest warm coral undertone in the strata
+  '--ink':        '#03070e',
+  '--ink-2':      '#060b12',
+  '--stone':      '#0a1a2a',
+  '--stone-2':    '#122c3f',
+  '--stone-3':    '#1b3c50',
+  '--stone-line': '#2a5470',
+
+  // Azure — still the primary current (kept close to the flagship)
+  '--lapis':       '#2bb4f0',
+  '--lapis-bright':'#83e4ff',
+  '--lapis-deep':  '#0e6aa8',
+
+  // Reef-gold — warmer, more saturated treasure than the flagship champagne
+  '--gold':       '#e8a94e',
+  '--gold-bright':'#ffcf86',
+  '--gold-deep':  '#a8702a',
+
+  // Coral — promoted from rare danger accent to a visible warm secondary
+  '--shu':        '#ff6f5e',
+  '--shu-bright': '#ff9a86',
+
+  // Text — sea-foam ivory, faintly warmed
+  '--washi':      '#eef6ff',
+  '--washi-dim':  '#a7cbe2',
+  '--washi-mute': '#6890a8',
+
+  // Status
+  '--ok':      '#34d399',
+  '--warn':    'var(--gold-bright)',
+  '--danger':  'var(--shu)',
+
+  // Seams — azure current with a warm coral wash in the faint band
+  '--seam':       'color-mix(in oklab, var(--lapis) 40%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--shu) 16%, transparent)',
+  '--line':       'color-mix(in oklab, var(--washi) 14%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--gold) 12%, transparent)',
 
   // Radius — fluid, elegant
   '--r-0':    '0px',
@@ -449,6 +635,27 @@ export const THEMES: Record<ThemeId, ThemeMeta> = {
     description: 'The flagship — deep water, electric azure current, bioluminescent crests, champagne gold.',
     scheme: 'dark',
     tokens: oceanTokens,
+  },
+  tide: {
+    id: 'tide',
+    label: 'Ocean · Tide',
+    description: 'Shallow sunlit water — lifted azure surfaces, a more luminous crest, bright sand gold.',
+    scheme: 'dark',
+    tokens: tideTokens,
+  },
+  abyss: {
+    id: 'abyss',
+    label: 'Ocean · Abyss',
+    description: 'The deep trench — near-black water, restrained azure that glows, high-contrast sea-foam.',
+    scheme: 'dark',
+    tokens: abyssTokens,
+  },
+  reef: {
+    id: 'reef',
+    label: 'Ocean · Reef',
+    description: 'Living reef — azure current with a warm coral and reef-gold lean. A touch more colour.',
+    scheme: 'dark',
+    tokens: reefTokens,
   },
   ruri: {
     id: 'ruri',

@@ -265,10 +265,12 @@ export function AppShell(props: AppShellProps): JSX.Element {
             <Show when={canJoinVoice()}>
               <div class="shell-voice-join">
                 <button type="button" class="shell-voice-join-btn" onClick={() => joinVoice(false)}>
-                  [ join voice ]
+                  <span class="shell-voice-join-icon" aria-hidden="true">◍</span>
+                  Join voice
                 </button>
                 <button type="button" class="shell-voice-join-btn" onClick={() => joinVoice(true)}>
-                  [ join video ]
+                  <span class="shell-voice-join-icon" aria-hidden="true">▤</span>
+                  Join video
                 </button>
               </div>
             </Show>

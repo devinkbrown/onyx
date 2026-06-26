@@ -6,14 +6,16 @@
 .ruri-toast button,
 .ruri-tabs__trigger {
   appearance: none;
-  border-radius: var(--r-0);
+  border-radius: clamp(var(--r-sm), 0.65rem, var(--r-md));
   font-family: var(--font-mono);
   letter-spacing: 0.05em;
+  outline: none;
   transition:
     transform var(--dur) var(--ease),
     background var(--dur) var(--ease),
     border-color var(--dur) var(--ease),
     color var(--dur) var(--ease),
+    opacity var(--dur) var(--ease),
     box-shadow var(--dur) var(--ease);
 }
 
@@ -32,40 +34,96 @@
 .ruri-button--md { min-height: 2.75rem; padding: 0.72rem 1rem; font-size: 0.86rem; }
 
 .ruri-button--primary {
-  border-color: var(--gold-bright);
+  border-color: color-mix(in oklab, var(--lapis-bright) 72%, var(--seam));
   color: var(--ink);
-  background: linear-gradient(105deg, var(--gold-deep), var(--gold), var(--gold-bright), #fff4d2, var(--gold-bright), var(--gold));
-  box-shadow: 4px 4px 0 var(--shu);
+  background:
+    linear-gradient(135deg, var(--lapis-deep), var(--lapis) 48%, var(--lapis-bright));
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--washi) 18%, transparent) inset,
+    0 14px 30px -20px var(--lapis-bright);
   font-weight: 800;
 }
 
 .ruri-button--primary:hover:not(:disabled):not([aria-disabled='true']) {
-  transform: translate(-2px, -2px);
-  box-shadow: 7px 7px 0 var(--shu);
+  transform: translateY(-1px);
+  border-color: var(--lapis-bright);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--washi) 26%, transparent) inset,
+    0 18px 38px -20px var(--lapis-bright),
+    0 0 28px -18px var(--lapis-bright);
+}
+
+.ruri-button--primary:active:not(:disabled):not([aria-disabled='true']) {
+  transform: translateY(0);
+  background:
+    linear-gradient(135deg, var(--lapis-deep), var(--lapis) 62%, var(--lapis-bright));
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--washi) 18%, transparent) inset,
+    0 0 24px -14px var(--lapis-bright);
 }
 
 .ruri-button--ghost {
   color: var(--washi);
-  background: color-mix(in oklab, var(--stone) 18%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 24%, transparent), color-mix(in oklab, var(--stone) 32%, transparent));
   border-color: var(--seam-faint);
+  box-shadow: 0 1px 0 color-mix(in oklab, var(--washi) 8%, transparent) inset;
 }
 
 .ruri-button--ghost:hover:not(:disabled):not([aria-disabled='true']) {
-  color: var(--gold-bright);
-  border-color: var(--gold);
-  transform: translateY(-2px);
+  color: var(--lapis-bright);
+  border-color: var(--seam);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--stone-3) 34%, transparent), color-mix(in oklab, var(--stone-2) 32%, transparent));
+  transform: translateY(-1px);
+  box-shadow:
+    0 1px 0 color-mix(in oklab, var(--washi) 10%, transparent) inset,
+    0 12px 28px -24px var(--lapis-bright);
+}
+
+.ruri-button--ghost:active:not(:disabled):not([aria-disabled='true']) {
+  transform: translateY(0);
+  color: var(--washi);
+  background: color-mix(in oklab, var(--lapis-deep) 18%, var(--stone));
+  box-shadow: 0 0 20px -16px var(--lapis-bright) inset;
 }
 
 .ruri-button--danger {
   color: var(--washi);
-  background: linear-gradient(180deg, var(--shu-bright), var(--shu));
-  border-color: color-mix(in oklab, var(--shu-bright) 72%, var(--gold));
-  box-shadow: 4px 4px 0 var(--gold-deep);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--shu-bright) 34%, var(--stone-3)), color-mix(in oklab, var(--shu) 44%, var(--stone)));
+  border-color: color-mix(in oklab, var(--shu-bright) 76%, var(--seam));
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--washi) 10%, transparent) inset,
+    0 14px 30px -22px var(--shu);
 }
 
 .ruri-button--danger:hover:not(:disabled):not([aria-disabled='true']) {
-  transform: translate(-2px, -2px);
-  box-shadow: 7px 7px 0 var(--gold-deep);
+  transform: translateY(-1px);
+  border-color: var(--shu-bright);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--washi) 14%, transparent) inset,
+    0 18px 38px -22px var(--shu);
+}
+
+.ruri-button--danger:active:not(:disabled):not([aria-disabled='true']) {
+  transform: translateY(0);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--shu) 48%, var(--stone-3)), color-mix(in oklab, var(--shu) 38%, var(--ink)));
+}
+
+.ruri-button:focus-visible,
+.ruri-icon-button:focus-visible,
+.ruri-popover__trigger:focus-visible,
+.ruri-sheet__close:focus-visible,
+.ruri-modal__close:focus-visible,
+.ruri-toast button:focus-visible,
+.ruri-tabs__trigger:focus-visible {
+  border-color: var(--lapis-bright);
+  box-shadow:
+    0 0 0 1px var(--ink),
+    0 0 0 3px color-mix(in oklab, var(--lapis-bright) 68%, transparent),
+    0 0 30px -16px var(--lapis-bright);
 }
 
 .ruri-button:disabled,
@@ -83,15 +141,54 @@
   place-items: center;
   border: 1px solid var(--seam-faint);
   color: var(--washi);
-  background: color-mix(in oklab, var(--stone) 36%, var(--ink));
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 30%, var(--ink)), color-mix(in oklab, var(--stone) 48%, var(--ink)));
   cursor: pointer;
+  box-shadow: 0 1px 0 color-mix(in oklab, var(--washi) 8%, transparent) inset;
 }
 
 .ruri-icon-button--sm { width: 2rem; height: 2rem; }
 .ruri-icon-button--md { width: 2.5rem; height: 2.5rem; }
-.ruri-icon-button--primary { color: var(--ink); border-color: var(--gold-bright); background: var(--gold-bright); box-shadow: 3px 3px 0 var(--shu); }
-.ruri-icon-button--danger { color: var(--washi); border-color: var(--shu-bright); background: var(--shu); }
-.ruri-icon-button:hover:not(:disabled) { color: var(--gold-bright); border-color: var(--gold); transform: translateY(-2px); }
+.ruri-icon-button--primary {
+  color: var(--ink);
+  border-color: var(--lapis-bright);
+  background: linear-gradient(135deg, var(--lapis-deep), var(--lapis-bright));
+  box-shadow: 0 12px 28px -20px var(--lapis-bright);
+}
+.ruri-icon-button--danger {
+  color: var(--washi);
+  border-color: var(--shu-bright);
+  background: linear-gradient(180deg, color-mix(in oklab, var(--shu-bright) 32%, var(--stone-3)), color-mix(in oklab, var(--shu) 42%, var(--stone)));
+}
+.ruri-icon-button:hover:not(:disabled) {
+  color: var(--lapis-bright);
+  border-color: var(--seam);
+  transform: translateY(-1px);
+  box-shadow:
+    0 1px 0 color-mix(in oklab, var(--washi) 10%, transparent) inset,
+    0 12px 26px -22px var(--lapis-bright);
+}
+.ruri-icon-button:active:not(:disabled) {
+  transform: translateY(0);
+  background: color-mix(in oklab, var(--lapis-deep) 18%, var(--stone));
+}
+.ruri-icon-button--primary:active:not(:disabled) {
+  color: var(--ink);
+  background: linear-gradient(135deg, var(--lapis-deep), var(--lapis) 64%, var(--lapis-bright));
+}
+.ruri-icon-button--danger:active:not(:disabled) {
+  color: var(--washi);
+  background: linear-gradient(180deg, color-mix(in oklab, var(--shu) 48%, var(--stone-3)), color-mix(in oklab, var(--shu) 38%, var(--ink)));
+}
+.ruri-icon-button--primary:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--lapis-bright);
+}
+.ruri-icon-button--danger:hover:not(:disabled) {
+  color: var(--washi);
+  border-color: var(--shu-bright);
+  box-shadow: 0 14px 30px -22px var(--shu);
+}
 .ruri-icon-button__glyph { display: inline-grid; place-items: center; line-height: 1; }
 
 .ruri-tooltip,
@@ -114,11 +211,15 @@
   transform: translateX(-50%);
   width: max-content;
   max-width: min(20rem, calc(100vw - 2rem));
-  padding: 0.42rem 0.6rem;
+  padding: 0.45rem 0.65rem;
   color: var(--washi);
-  background: color-mix(in oklab, var(--ink) 82%, var(--stone));
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 52%, var(--ink)), color-mix(in oklab, var(--ink) 86%, var(--stone)));
   border: 1px solid var(--seam);
-  box-shadow: 0 14px 36px -24px #000;
+  border-radius: var(--r-sm);
+  box-shadow:
+    0 18px 42px -26px color-mix(in oklab, var(--ink) 92%, transparent),
+    0 0 24px -18px var(--lapis-bright);
   font-family: var(--font-mono);
   font-size: 0.72rem;
   line-height: 1.35;
@@ -157,13 +258,21 @@
   padding: 0.48rem 0.72rem;
   border: 1px solid var(--seam-faint);
   color: var(--washi);
-  background: color-mix(in oklab, var(--stone) 24%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 26%, transparent), color-mix(in oklab, var(--stone) 34%, transparent));
   cursor: pointer;
 }
 
 .ruri-popover__trigger:hover {
-  color: var(--gold-bright);
-  border-color: var(--gold);
+  color: var(--lapis-bright);
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--lapis-deep) 14%, var(--stone));
+}
+
+.ruri-popover__trigger[aria-expanded='true'] {
+  color: var(--lapis-bright);
+  border-color: var(--lapis);
+  box-shadow: 0 0 22px -16px var(--lapis-bright);
 }
 
 .ruri-popover__panel {
@@ -173,11 +282,16 @@
   left: 0;
   min-width: 16rem;
   max-width: min(24rem, calc(100vw - 2rem));
-  padding: 0.9rem;
+  padding: 0.95rem;
   color: var(--washi);
-  background: linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 46%, var(--ink)), color-mix(in oklab, var(--stone) 38%, var(--ink)));
+  background:
+    radial-gradient(circle at 24% 0%, color-mix(in oklab, var(--lapis-deep) 24%, transparent), transparent 68%),
+    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 58%, var(--ink)), color-mix(in oklab, var(--stone) 34%, var(--ink)));
   border: 1px solid var(--seam);
-  box-shadow: 0 24px 70px -42px #000;
+  border-radius: var(--r-md);
+  box-shadow:
+    0 28px 72px -42px color-mix(in oklab, var(--ink) 94%, transparent),
+    0 0 34px -24px var(--lapis-bright);
   font-family: var(--font-sans);
 }
 
@@ -210,7 +324,8 @@
   border: 0;
   padding: 0;
   background:
-    linear-gradient(90deg, color-mix(in oklab, var(--ink) 48%, transparent), color-mix(in oklab, var(--ink) 78%, transparent)),
+    radial-gradient(circle at 50% 12%, color-mix(in oklab, var(--lapis-deep) 18%, transparent), transparent 34rem),
+    linear-gradient(180deg, color-mix(in oklab, var(--stone) 28%, transparent), color-mix(in oklab, var(--ink) 84%, transparent)),
     repeating-linear-gradient(90deg, transparent 0 31px, var(--line-faint) 31px 32px);
   cursor: default;
 }
@@ -224,10 +339,16 @@
   display: flex;
   flex-direction: column;
   color: var(--washi);
-  background: linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 50%, var(--ink)), var(--ink));
+  background:
+    radial-gradient(circle at 28% 0%, color-mix(in oklab, var(--lapis-deep) 20%, transparent), transparent 34rem),
+    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 64%, var(--ink)), var(--ink));
   border-left: 1px solid var(--seam);
-  box-shadow: -34px 0 90px -58px #000;
+  border-radius: var(--r-md) 0 0 var(--r-md);
+  box-shadow:
+    -34px 0 90px -58px color-mix(in oklab, var(--ink) 96%, transparent),
+    -6px 0 28px -24px var(--lapis-bright);
   animation: ruri-sheet-in var(--dur) var(--ease);
+  overflow: hidden;
 }
 
 @keyframes ruri-sheet-in {
@@ -243,15 +364,28 @@
   display: flex;
   flex-direction: column;
   color: var(--washi);
-  background: linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 46%, var(--ink)), var(--ink));
+  background:
+    radial-gradient(circle at 18% 0%, color-mix(in oklab, var(--lapis-deep) 20%, transparent), transparent 30rem),
+    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 58%, var(--ink)), var(--ink));
   border: 1px solid var(--seam);
-  box-shadow: 0 32px 90px -54px #000;
+  border-radius: var(--r-md);
+  box-shadow:
+    0 34px 92px -54px color-mix(in oklab, var(--ink) 96%, transparent),
+    0 0 34px -26px var(--lapis-bright);
   animation: ruri-modal-in var(--dur) var(--ease);
+  overflow: hidden;
 }
 
 @keyframes ruri-modal-in {
   from { opacity: 0; transform: translateY(0.8rem); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+.ruri-sheet__panel:focus-visible,
+.ruri-modal__dialog:focus-visible,
+.ruri-tabs__content:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--lapis-bright) 74%, transparent);
+  outline-offset: 3px;
 }
 
 .ruri-sheet__header,
@@ -260,13 +394,15 @@
   justify-content: space-between;
   gap: 1rem;
   padding: 1rem;
+  background:
+    linear-gradient(90deg, color-mix(in oklab, var(--lapis-deep) 11%, transparent), transparent);
   border-bottom: 1px solid var(--seam-faint);
 }
 
 .ruri-sheet__kicker,
 .ruri-modal__kicker {
   margin: 0 0 0.35rem;
-  color: var(--gold);
+  color: var(--lapis-bright);
   font-family: var(--font-mono);
   font-size: 0.68rem;
   letter-spacing: 0.18em;
@@ -301,7 +437,8 @@
   flex: none;
   border: 1px solid var(--seam-faint);
   color: var(--washi);
-  background: transparent;
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 22%, transparent), color-mix(in oklab, var(--stone) 28%, transparent));
   cursor: pointer;
   font-size: 1.2rem;
   line-height: 1;
@@ -310,8 +447,16 @@
 .ruri-sheet__close:hover,
 .ruri-modal__close:hover,
 .ruri-toast button:hover {
-  color: var(--gold-bright);
-  border-color: var(--gold);
+  color: var(--lapis-bright);
+  border-color: var(--seam);
+  box-shadow: 0 0 20px -14px var(--lapis-bright);
+}
+
+.ruri-sheet__close:active,
+.ruri-modal__close:active,
+.ruri-toast button:active {
+  color: var(--washi);
+  background: color-mix(in oklab, var(--lapis-deep) 18%, var(--stone));
 }
 
 .ruri-sheet__body,
@@ -330,7 +475,10 @@
   color: var(--ruri-avatar-fg);
   background: var(--ruri-avatar-bg);
   border: 1px solid var(--seam-faint);
-  border-radius: var(--r-0);
+  border-radius: var(--r-pill);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--ink) 64%, transparent) inset,
+    0 8px 18px -16px var(--lapis-bright);
   font-family: var(--font-mono);
   font-weight: 800;
   letter-spacing: 0.04em;
@@ -339,7 +487,12 @@
 
 .ruri-avatar--sm { width: 2rem; height: 2rem; font-size: 0.72rem; }
 .ruri-avatar--md { width: 2.65rem; height: 2.65rem; font-size: 0.86rem; }
-.ruri-avatar--owner { border-color: var(--gold); box-shadow: 0 0 0 2px var(--seam); }
+.ruri-avatar--owner {
+  border-color: var(--gold);
+  box-shadow:
+    0 0 0 2px color-mix(in oklab, var(--gold-bright) 40%, transparent),
+    0 0 24px -16px var(--lapis-bright);
+}
 
 .ruri-toaster {
   position: fixed;
@@ -361,14 +514,19 @@
   gap: 1rem;
   padding: 0.85rem;
   color: var(--washi);
-  background: linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 48%, var(--ink)), color-mix(in oklab, var(--stone) 36%, var(--ink)));
+  background:
+    radial-gradient(circle at 16% 0%, color-mix(in oklab, var(--lapis-deep) 16%, transparent), transparent 18rem),
+    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 56%, var(--ink)), color-mix(in oklab, var(--stone) 42%, var(--ink)));
   border: 1px solid var(--seam-faint);
-  border-left: 3px solid var(--gold);
-  box-shadow: 0 24px 70px -52px #000;
+  border-left: 3px solid var(--lapis);
+  border-radius: var(--r-md);
+  box-shadow:
+    0 24px 70px -52px color-mix(in oklab, var(--ink) 96%, transparent),
+    0 0 28px -24px var(--lapis-bright);
 }
 
 .ruri-toast--success { border-left-color: var(--ok); }
-.ruri-toast--warning { border-left-color: var(--warn); }
+.ruri-toast--warning { border-left-color: var(--gold); }
 .ruri-toast--danger { border-left-color: var(--danger); }
 .ruri-toast__body { display: grid; gap: 0.25rem; }
 .ruri-toast strong { font-family: var(--font-mono); font-size: 0.82rem; letter-spacing: 0.05em; text-transform: uppercase; }
@@ -380,7 +538,7 @@
 }
 
 .ruri-field__label {
-  color: var(--gold);
+  color: var(--lapis-bright);
   font-family: var(--font-mono);
   font-size: 0.72rem;
   letter-spacing: 0.16em;
@@ -401,22 +559,47 @@
   width: 100%;
   min-height: 2.7rem;
   border: 1px solid var(--seam-faint);
-  border-radius: var(--r-0);
+  border-radius: var(--r-md);
   padding: 0.68rem 0.78rem;
   color: var(--washi);
-  background: color-mix(in oklab, var(--ink) 68%, var(--stone));
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--stone) 34%, var(--ink)), color-mix(in oklab, var(--ink) 72%, var(--stone)));
   font: inherit;
   outline: none;
-  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), background var(--dur) var(--ease);
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), background var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+
+.ruri-field__input::placeholder {
+  color: var(--washi-mute);
+}
+
+.ruri-field__input:hover:not(:disabled):not([readonly]) {
+  border-color: var(--seam);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 32%, var(--ink)), color-mix(in oklab, var(--ink) 68%, var(--stone)));
 }
 
 .ruri-field__input:focus {
   border-color: var(--lapis);
-  box-shadow: 0 0 0 2px color-mix(in oklab, var(--lapis) 34%, transparent);
+  box-shadow:
+    0 0 0 1px var(--ink),
+    0 0 0 3px color-mix(in oklab, var(--lapis-bright) 46%, transparent),
+    0 0 30px -18px var(--lapis-bright);
 }
 
 .ruri-field__input[aria-invalid='true'] {
   border-color: var(--shu);
+}
+
+.ruri-field__input[aria-invalid='true']:focus {
+  box-shadow:
+    0 0 0 1px var(--ink),
+    0 0 0 3px color-mix(in oklab, var(--shu-bright) 42%, transparent);
+}
+
+.ruri-field__input:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
 }
 
 .ruri-tabs {
@@ -427,17 +610,20 @@
 .ruri-tabs__list {
   display: inline-flex;
   align-items: center;
-  gap: 0;
+  flex-wrap: wrap;
+  gap: 0.18rem;
   width: fit-content;
+  padding: 0.18rem;
   border: 1px solid var(--seam-faint);
-  background: color-mix(in oklab, var(--stone) 20%, transparent);
+  border-radius: var(--r-md);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 24%, transparent), color-mix(in oklab, var(--stone) 28%, transparent));
 }
 
 .ruri-tabs__trigger {
   min-height: 2.35rem;
   padding: 0.52rem 0.82rem;
-  border: 0;
-  border-right: 1px solid var(--seam-faint);
+  border: 1px solid transparent;
   color: var(--washi-dim);
   background: transparent;
   cursor: pointer;
@@ -445,23 +631,36 @@
   text-transform: uppercase;
 }
 
-.ruri-tabs__trigger:last-child { border-right: 0; }
-.ruri-tabs__trigger[aria-selected='true'] { color: var(--ink); background: var(--gold-bright); }
-.ruri-tabs__trigger:hover:not(:disabled) { color: var(--gold-bright); }
+.ruri-tabs__trigger[aria-selected='true'] {
+  color: var(--ink);
+  background: linear-gradient(135deg, var(--lapis), var(--lapis-bright));
+  border-color: color-mix(in oklab, var(--lapis-bright) 72%, var(--seam));
+  box-shadow:
+    0 1px 0 color-mix(in oklab, var(--washi) 24%, transparent) inset,
+    0 10px 24px -20px var(--lapis-bright);
+}
+.ruri-tabs__trigger:hover:not(:disabled) {
+  color: var(--lapis-bright);
+  border-color: var(--seam-faint);
+  background: color-mix(in oklab, var(--lapis-deep) 12%, transparent);
+}
 .ruri-tabs__trigger[aria-selected='true']:hover { color: var(--ink); }
 
 .ruri-tabs__content {
   padding: 1rem;
   color: var(--washi-dim);
-  background: color-mix(in oklab, var(--stone) 20%, transparent);
+  background:
+    radial-gradient(circle at 18% 0%, color-mix(in oklab, var(--lapis-deep) 12%, transparent), transparent 22rem),
+    color-mix(in oklab, var(--stone) 22%, transparent);
   border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
 }
 
 .ruri-spinner {
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
-  color: var(--gold-bright);
+  color: var(--lapis-bright);
   font-family: var(--font-mono);
   font-size: 0.75rem;
   letter-spacing: 0.12em;
@@ -474,9 +673,10 @@
 .ruri-spinner__ring {
   display: inline-block;
   border: 2px solid var(--seam-faint);
-  border-top-color: var(--gold-bright);
-  border-right-color: var(--gold);
+  border-top-color: var(--lapis-bright);
+  border-right-color: var(--lapis);
   border-radius: var(--r-pill);
+  filter: drop-shadow(0 0 0.65rem color-mix(in oklab, var(--lapis-bright) 54%, transparent));
   animation: ruri-spin 760ms linear infinite;
 }
 
@@ -485,6 +685,24 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .ruri-button,
+  .ruri-icon-button,
+  .ruri-popover__trigger,
+  .ruri-sheet__close,
+  .ruri-modal__close,
+  .ruri-toast button,
+  .ruri-tabs__trigger,
+  .ruri-field__input {
+    transition-duration: 0ms;
+  }
+
+  .ruri-button:hover,
+  .ruri-button:active,
+  .ruri-icon-button:hover,
+  .ruri-icon-button:active {
+    transform: none;
+  }
+
   .ruri-sheet__panel,
   .ruri-modal__dialog,
   .ruri-spinner__ring {

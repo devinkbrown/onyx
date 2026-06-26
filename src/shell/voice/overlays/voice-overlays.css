@@ -1,6 +1,6 @@
 .voice-call-body {
   display: grid;
-  gap: 1rem;
+  gap: 1.05rem;
   justify-items: center;
   text-align: center;
 }
@@ -12,7 +12,7 @@
   width: 5.7rem;
   height: 5.7rem;
   margin-block: 0.25rem;
-  color: var(--gold-bright);
+  color: var(--lapis-bright);
 }
 
 .voice-call-token::before,
@@ -21,6 +21,7 @@
   position: absolute;
   inset: 0.35rem;
   border: 1px solid var(--seam);
+  border-radius: var(--r-pill);
   opacity: 0.8;
   animation: voice-call-ring 1800ms var(--ease) infinite;
 }
@@ -33,7 +34,7 @@
 
 .voice-call-token--outgoing::before,
 .voice-call-token--outgoing::after {
-  border-color: var(--line);
+  border-color: color-mix(in oklab, var(--lapis) 28%, transparent);
 }
 
 .voice-call-token .ruri-avatar {
@@ -42,7 +43,10 @@
   width: 3.6rem;
   height: 3.6rem;
   font-size: 1rem;
-  box-shadow: 0 0 0 1px var(--ink), 0 18px 44px -28px #000;
+  box-shadow:
+    0 0 0 1px var(--ink),
+    0 0 0 4px color-mix(in oklab, var(--lapis-bright) 10%, transparent),
+    0 18px 44px -28px color-mix(in oklab, var(--ink) 96%, transparent);
 }
 
 .voice-call-meta {
@@ -52,7 +56,7 @@
 
 .voice-call-kicker {
   margin: 0;
-  color: var(--gold);
+  color: var(--lapis-bright);
   font-family: var(--font-mono);
   font-size: 0.72rem;
   letter-spacing: 0.18em;
@@ -88,6 +92,52 @@
   width: 100%;
 }
 
+.voice-call-actions .ruri-button,
+.voice-pip__actions .ruri-button {
+  border-radius: var(--r-pill);
+  box-shadow: none;
+}
+
+.voice-call-actions .ruri-button--primary,
+.voice-pip__actions .ruri-button--primary {
+  color: var(--ink);
+  background: linear-gradient(110deg, var(--lapis), var(--lapis-bright));
+  border-color: color-mix(in oklab, var(--lapis-bright) 72%, var(--washi));
+  box-shadow: 0 14px 34px -24px color-mix(in oklab, var(--lapis-bright) 80%, transparent);
+}
+
+.voice-call-actions .ruri-button--ghost,
+.voice-pip__actions .ruri-button--ghost {
+  color: var(--washi);
+  background: color-mix(in oklab, var(--stone-2) 38%, transparent);
+  border-color: var(--seam-faint);
+}
+
+.voice-call-actions .ruri-button--danger,
+.voice-pip__actions .ruri-button--danger {
+  color: var(--washi);
+  background: linear-gradient(180deg, color-mix(in oklab, var(--shu) 72%, var(--stone)), color-mix(in oklab, var(--shu) 58%, var(--ink)));
+  border-color: color-mix(in oklab, var(--shu) 64%, var(--washi));
+  box-shadow: 0 14px 34px -24px color-mix(in oklab, var(--shu) 80%, transparent);
+}
+
+.voice-call-actions .ruri-button:hover:not(:disabled):not([aria-disabled='true']),
+.voice-pip__actions .ruri-button:hover:not(:disabled):not([aria-disabled='true']) {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 42px -28px color-mix(in oklab, var(--lapis-bright) 72%, transparent);
+}
+
+.voice-call-actions .ruri-button--danger:hover:not(:disabled):not([aria-disabled='true']),
+.voice-pip__actions .ruri-button--danger:hover:not(:disabled):not([aria-disabled='true']) {
+  box-shadow: 0 18px 42px -28px color-mix(in oklab, var(--shu) 82%, transparent);
+}
+
+.voice-call-actions .ruri-button:focus-visible,
+.voice-pip__actions .ruri-button:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 3px;
+}
+
 .voice-call-icon {
   display: inline-grid;
   place-items: center;
@@ -107,12 +157,16 @@
   pointer-events: none;
   color: var(--washi);
   background:
-    linear-gradient(90deg, color-mix(in oklab, var(--ink) 84%, transparent), color-mix(in oklab, var(--stone) 54%, transparent)),
-    repeating-linear-gradient(90deg, transparent 0 23px, var(--line-faint) 23px 24px);
+    radial-gradient(circle at 18% 0%, color-mix(in oklab, var(--lapis) 14%, transparent), transparent 48%),
+    linear-gradient(90deg, color-mix(in oklab, var(--ink) 86%, transparent), color-mix(in oklab, var(--stone) 62%, transparent));
   border: 1px solid var(--seam-faint);
-  border-left-color: var(--gold);
-  box-shadow: 0 24px 70px -52px #000;
+  border-left-color: var(--lapis-bright);
+  border-radius: var(--r-md);
+  box-shadow:
+    0 24px 70px -52px color-mix(in oklab, var(--ink) 96%, transparent),
+    inset 0 1px 0 color-mix(in oklab, var(--washi) 8%, transparent);
   transform: translateX(-50%);
+  backdrop-filter: blur(18px);
 }
 
 .voice-caption-line {
@@ -127,7 +181,7 @@
 
 .voice-caption-speaker {
   min-width: 0;
-  color: var(--voice-caption-color, var(--gold-bright));
+  color: var(--voice-caption-color, var(--lapis-bright));
   font-family: var(--font-mono);
   font-size: 0.74rem;
   letter-spacing: 0.08em;
@@ -170,15 +224,16 @@
 .voice-reaction__emoji {
   font-size: 1.75rem;
   line-height: 1;
-  filter: drop-shadow(0 8px 16px rgb(0 0 0 / 0.55));
+  filter: drop-shadow(0 8px 16px color-mix(in oklab, var(--ink) 88%, transparent));
 }
 
 .voice-reaction__nick {
   max-width: 7rem;
-  padding: 0.1rem 0.4rem;
+  padding: 0.12rem 0.48rem;
   color: var(--washi);
   background: color-mix(in oklab, var(--ink) 82%, transparent);
   border: 1px solid var(--seam-faint);
+  border-radius: var(--r-pill);
   font-family: var(--font-mono);
   font-size: 0.64rem;
   overflow: hidden;
@@ -194,16 +249,20 @@
   width: min(20rem, calc(100vw - 1rem));
   color: var(--washi);
   background:
-    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 48%, var(--ink)), color-mix(in oklab, var(--ink) 94%, var(--stone))),
-    repeating-linear-gradient(90deg, transparent 0 27px, var(--line-faint) 27px 28px);
+    radial-gradient(circle at 26% 0%, color-mix(in oklab, var(--lapis) 18%, transparent), transparent 44%),
+    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 56%, var(--ink)), color-mix(in oklab, var(--ink) 94%, var(--stone)));
   border: 1px solid var(--seam);
-  box-shadow: 0 24px 80px -48px #000;
+  border-radius: var(--r-md);
+  box-shadow:
+    0 24px 80px -48px color-mix(in oklab, var(--ink) 96%, transparent),
+    inset 0 1px 0 color-mix(in oklab, var(--washi) 8%, transparent);
   transform: translate3d(var(--voice-pip-x, 1rem), var(--voice-pip-y, 1rem), 0);
   touch-action: none;
+  backdrop-filter: blur(18px);
 }
 
 .voice-pip:focus-visible {
-  outline: 2px solid var(--gold-bright);
+  outline: 2px solid var(--lapis-bright);
   outline-offset: 3px;
 }
 
@@ -214,6 +273,7 @@
   gap: 0.75rem;
   padding: 0.65rem 0.75rem 0.55rem;
   border-bottom: 1px solid var(--seam-faint);
+  background: linear-gradient(90deg, color-mix(in oklab, var(--lapis) 8%, transparent), transparent 62%);
   cursor: grab;
   user-select: none;
 }
@@ -229,7 +289,7 @@
 }
 
 .voice-pip__kicker {
-  color: var(--gold);
+  color: var(--lapis-bright);
   font-family: var(--font-mono);
   font-size: 0.62rem;
   letter-spacing: 0.16em;
@@ -265,8 +325,9 @@
   content: '';
   width: 0.45rem;
   height: 0.45rem;
-  background: var(--ok);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ok) 18%, transparent);
+  background: var(--lapis-bright);
+  border-radius: var(--r-pill);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--lapis-bright) 18%, transparent);
 }
 
 .voice-pip__body {
@@ -295,8 +356,11 @@
 }
 
 .voice-pip__participant[data-speaking='true'] .ruri-avatar {
-  border-color: var(--gold-bright);
-  box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px var(--seam);
+  border-color: var(--lapis-bright);
+  box-shadow:
+    0 0 0 2px var(--ink),
+    0 0 0 4px color-mix(in oklab, var(--lapis-bright) 30%, transparent),
+    0 0 18px color-mix(in oklab, var(--lapis-bright) 28%, transparent);
 }
 
 .voice-pip__participant[data-muted='true'] {
@@ -310,7 +374,9 @@
   height: 2rem;
   margin-left: 0.35rem;
   color: var(--washi-dim);
+  background: color-mix(in oklab, var(--ink) 46%, transparent);
   border: 1px solid var(--seam-faint);
+  border-radius: var(--r-pill);
   font-family: var(--font-mono);
   font-size: 0.72rem;
 }

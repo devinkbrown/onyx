@@ -28,7 +28,7 @@ describe('Avatar', () => {
     expect(avatars[0]?.classList.contains('ruri-avatar--sm')).toBe(true);
   });
 
-  it('adds owner status to the accessible name and gold ring class', () => {
+  it('adds owner status to the accessible name and owner ring class', () => {
     render(() => <Avatar name="Root User" owner />);
 
     const avatar = screen.getByRole('img', { name: 'Root User, owner' });

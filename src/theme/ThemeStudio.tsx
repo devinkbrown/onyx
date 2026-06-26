@@ -94,13 +94,13 @@ function StudioPreview() {
       <div class="ts-preview__body">
         <div class="ts-preview__msg">
           <span class="ts-preview__nick" style="color: var(--lapis-bright)">aoi</span>
-          <span class="ts-preview__text">connected from the jade coast</span>
+          <span class="ts-preview__text">surfaced from the deep current</span>
         </div>
         <div class="ts-preview__msg">
           <span class="ts-preview__nick" style="color: var(--gold-bright)">kain</span>
           <span class="ts-preview__text">
-            the seams hold —{' '}
-            <span style="color: var(--shu-bright)">vermilion</span> mending the dark
+            the tide is calm —{' '}
+            <span style="color: var(--shu-bright)">a coral light</span> drifting through the dark water
           </span>
         </div>
         <div class="ts-preview__msg">
@@ -632,13 +632,13 @@ const STUDIO_CSS = `
     background var(--dur) var(--ease);
 }
 .ts-theme-chip:hover {
-  border-color: var(--gold);
+  border-color: var(--lapis);
   color: var(--washi);
 }
 .ts-theme-chip[data-active='true'] {
-  border-color: var(--gold-bright);
-  background: color-mix(in oklab, var(--gold-deep) 20%, var(--stone));
-  color: var(--gold-bright);
+  border-color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis-deep) 22%, var(--stone));
+  color: var(--lapis-bright);
 }
 .ts-theme-chip__scheme {
   font-size: 0.6rem;

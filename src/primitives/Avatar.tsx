@@ -7,11 +7,11 @@ export type AvatarProps = JSX.HTMLAttributes<HTMLDivElement> & {
 };
 
 const swatches = [
-  ['var(--lapis-deep)', 'var(--washi)'],
-  ['var(--stone-3)', 'var(--gold-bright)'],
-  ['var(--gold-deep)', 'var(--ink)'],
-  ['var(--shu)', 'var(--washi)'],
-  ['var(--stone-2)', 'var(--washi)'],
+  ['linear-gradient(135deg, var(--lapis-deep), var(--stone-3))', 'var(--washi)'],
+  ['linear-gradient(135deg, var(--stone-3), var(--stone-2))', 'var(--lapis-bright)'],
+  ['linear-gradient(135deg, var(--stone-2), var(--lapis-deep))', 'var(--washi)'],
+  ['linear-gradient(135deg, var(--ink), var(--stone-3))', 'var(--washi-dim)'],
+  ['linear-gradient(135deg, var(--stone), var(--stone-2))', 'var(--washi)'],
 ];
 
 function hashName(name: string) {

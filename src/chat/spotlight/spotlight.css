@@ -1,14 +1,30 @@
+/* Spotlight — deep-water command palette.
+   Ocean theme: an abyssal glass surface lit by a soft azure glow, with a
+   bioluminescent search field and an azure-highlighted active row.
+   All color comes from theme tokens so it re-skins with the active theme. */
+
 .ruri-spotlight {
   position: fixed;
   inset: 0;
   z-index: 120;
   display: grid;
   place-items: start center;
-  padding: clamp(1rem, 7svh, 5rem) 1rem 1rem;
+  padding: clamp(1rem, 9svh, 6rem) 1rem 1rem;
   color: var(--washi);
+  /* Light filtering down through deep water onto a darkened scrim. */
   background:
-    linear-gradient(180deg, color-mix(in oklab, var(--ink) 90%, transparent), color-mix(in oklab, var(--ink) 76%, transparent)),
-    repeating-linear-gradient(90deg, transparent 0 38px, var(--line-faint) 38px 39px);
+    radial-gradient(
+      120% 80% at 50% -10%,
+      color-mix(in oklab, var(--lapis-deep) 24%, transparent),
+      transparent 60%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--ink) 86%, transparent),
+      color-mix(in oklab, var(--ink) 72%, transparent)
+    );
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
 }
 
 .ruri-spotlight__panel {
@@ -18,29 +34,57 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
+  isolation: isolate;
+  /* Glass cut from deep water: near-surface strata at the top, fading to the
+     trench at the bottom, over a translucent ink base. */
   background:
-    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 54%, var(--ink)), color-mix(in oklab, var(--stone) 34%, var(--ink))),
-    var(--ink);
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--stone-3) 64%, transparent),
+      color-mix(in oklab, var(--stone) 46%, transparent) 55%,
+      color-mix(in oklab, var(--ink) 64%, transparent)
+    ),
+    color-mix(in oklab, var(--ink) 82%, transparent);
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
   border: 1px solid var(--seam);
   border-radius: var(--r-md);
-  box-shadow: 0 34px 90px -54px #000;
+  /* Lifted off the depths + a soft azure halo bleeding from the crest. */
+  box-shadow:
+    0 40px 100px -48px var(--ink),
+    0 0 64px -28px color-mix(in oklab, var(--lapis) 60%, transparent),
+    inset 0 1px 0 color-mix(in oklab, var(--lapis-bright) 30%, transparent);
 }
 
+/* Bioluminescent crest — a thin azure light skimming the top edge. */
 .ruri-spotlight__panel::before {
   content: '';
   position: absolute;
-  inset: 0 auto 0 0;
-  width: 4px;
-  background: linear-gradient(180deg, var(--gold-deep), var(--gold-bright), var(--shu), var(--gold));
-  clip-path: polygon(0 0, 100% 0, 58% 18%, 100% 36%, 42% 54%, 100% 76%, 54% 100%, 0 100%);
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--lapis-bright) 22%,
+    var(--lapis) 50%,
+    var(--lapis-bright) 78%,
+    transparent
+  );
+  opacity: 0.85;
 }
 
+/* Faint caustic wash near the surface, fading into the dark. */
 .ruri-spotlight__panel::after {
   content: '';
   position: absolute;
   inset: 0;
+  z-index: -1;
   pointer-events: none;
-  border-top: 1px solid color-mix(in oklab, var(--gold-bright) 58%, transparent);
+  background: radial-gradient(
+    140% 60% at 50% 0%,
+    color-mix(in oklab, var(--lapis) 14%, transparent),
+    transparent 58%
+  );
 }
 
 .ruri-spotlight__search {
@@ -49,15 +93,33 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.85rem;
-  padding: 1rem 1rem 0.9rem 1.25rem;
+  padding: 1.1rem 1.1rem 1rem 1.3rem;
   border-bottom: 1px solid var(--seam-faint);
+  transition: border-color var(--dur) var(--ease);
+}
+
+/* Bioluminescent focus — the seam below the field lights up as you type. */
+.ruri-spotlight__search:focus-within {
+  border-bottom-color: color-mix(in oklab, var(--lapis) 60%, transparent);
 }
 
 .ruri-spotlight__sigil {
-  color: var(--gold-bright);
+  display: inline-grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--lapis-bright);
   font-family: var(--font-mono);
   font-size: 1rem;
   line-height: 1;
+  /* A soft glow on the search glyph — the lantern leading the search. */
+  filter: drop-shadow(0 0 8px color-mix(in oklab, var(--lapis) 55%, transparent));
+  transition: color var(--dur) var(--ease), filter var(--dur) var(--ease);
+}
+
+.ruri-spotlight__search:focus-within .ruri-spotlight__sigil {
+  color: var(--lapis-bright);
+  filter: drop-shadow(0 0 12px color-mix(in oklab, var(--lapis-bright) 65%, transparent));
 }
 
 .ruri-spotlight__input {
@@ -68,7 +130,8 @@
   outline: 0;
   color: var(--washi);
   background: transparent;
-  font: 500 1rem/1.4 var(--font-sans);
+  font: 500 1.05rem/1.4 var(--font-sans);
+  caret-color: var(--lapis-bright);
 }
 
 .ruri-spotlight__input::placeholder {
@@ -82,57 +145,143 @@
   place-items: center;
   appearance: none;
   border: 1px solid var(--seam-faint);
-  border-radius: var(--r-0);
+  border-radius: var(--r-sm);
   color: var(--washi-dim);
-  background: color-mix(in oklab, var(--stone) 30%, transparent);
+  background: color-mix(in oklab, var(--stone-2) 40%, transparent);
   cursor: pointer;
-  font: 700 1rem/1 var(--font-mono);
+  font: 400 1.1rem/1 var(--font-mono);
+  transition:
+    color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    background-color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
 }
 
 .ruri-spotlight__close:hover {
-  color: var(--gold-bright);
-  border-color: var(--gold);
+  color: var(--lapis-bright);
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--lapis) 14%, transparent);
+}
+
+.ruri-spotlight__close:focus-visible {
+  outline: none;
+  border-color: var(--lapis);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--lapis) 28%, transparent);
 }
 
 .ruri-spotlight__results {
   min-height: 13rem;
   max-height: min(32rem, calc(100svh - 8rem));
   overflow: auto;
-  padding: 0.45rem;
+  overscroll-behavior: contain;
+  padding: 0.5rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--seam) transparent;
+}
+
+.ruri-spotlight__results::-webkit-scrollbar {
+  width: 10px;
+}
+
+.ruri-spotlight__results::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: var(--r-pill);
+  background-clip: padding-box;
+  background-color: var(--seam);
 }
 
 .ruri-spotlight__group + .ruri-spotlight__group {
-  margin-top: 0.35rem;
-  padding-top: 0.35rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
   border-top: 1px solid var(--line-faint);
 }
 
 .ruri-spotlight__section {
   display: block;
-  padding: 0.55rem 0.7rem 0.35rem;
-  color: var(--gold);
-  font: 700 0.68rem/1 var(--font-mono);
-  letter-spacing: 0.16em;
+  padding: 0.6rem 0.75rem 0.4rem;
+  color: var(--washi-mute);
+  font: 700 0.66rem/1 var(--font-mono);
+  letter-spacing: 0.2em;
   text-transform: uppercase;
 }
 
 .ruri-spotlight__option {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 1rem;
-  min-height: 3rem;
-  padding: 0.68rem 0.75rem;
+  gap: 0.85rem;
+  min-height: 3.1rem;
+  padding: 0.6rem 0.7rem;
   border: 1px solid transparent;
+  border-radius: var(--r-sm);
   color: var(--washi);
   cursor: pointer;
+  transition:
+    background-color 120ms var(--ease),
+    border-color 120ms var(--ease);
 }
 
+/* Token-tinted leading icon — a small bioluminescent marker per row. */
+.ruri-spotlight__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: var(--r-sm);
+  color: var(--lapis);
+  background: color-mix(in oklab, var(--lapis) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--lapis) 22%, transparent);
+  font: 600 0.82rem/1 var(--font-mono);
+  transition:
+    color 120ms var(--ease),
+    background-color 120ms var(--ease),
+    border-color 120ms var(--ease),
+    box-shadow 120ms var(--ease);
+}
+
+/* DMs tinted sea-foam, Actions tinted champagne gold (sparingly). */
+.ruri-spotlight__group[data-section='DMs'] .ruri-spotlight__icon {
+  color: var(--washi-dim);
+  background: color-mix(in oklab, var(--washi) 9%, transparent);
+  border-color: color-mix(in oklab, var(--washi) 16%, transparent);
+}
+
+.ruri-spotlight__group[data-section='Actions'] .ruri-spotlight__icon {
+  color: var(--gold);
+  background: color-mix(in oklab, var(--gold) 11%, transparent);
+  border-color: color-mix(in oklab, var(--gold) 22%, transparent);
+}
+
+.ruri-spotlight__option:hover {
+  background: color-mix(in oklab, var(--stone-3) 30%, transparent);
+}
+
+/* Active row — azure highlight with a luminous left edge and a soft glow. */
 .ruri-spotlight__option[aria-selected='true'] {
   background:
-    linear-gradient(90deg, color-mix(in oklab, var(--gold) 18%, transparent), transparent 62%),
-    color-mix(in oklab, var(--stone-3) 36%, transparent);
+    linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--lapis) 22%, transparent),
+      color-mix(in oklab, var(--lapis) 6%, transparent) 70%
+    ),
+    color-mix(in oklab, var(--stone-3) 34%, transparent);
   border-color: var(--seam);
+  box-shadow:
+    inset 3px 0 0 var(--lapis-bright),
+    0 0 28px -16px color-mix(in oklab, var(--lapis) 70%, transparent);
+}
+
+.ruri-spotlight__option[aria-selected='true'] .ruri-spotlight__icon {
+  color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis) 24%, transparent);
+  border-color: color-mix(in oklab, var(--lapis) 50%, transparent);
+  box-shadow: 0 0 12px -3px color-mix(in oklab, var(--lapis-bright) 60%, transparent);
+}
+
+.ruri-spotlight__group[data-section='Actions'] .ruri-spotlight__option[aria-selected='true'] .ruri-spotlight__icon {
+  color: var(--gold-bright);
+  background: color-mix(in oklab, var(--gold) 24%, transparent);
+  border-color: color-mix(in oklab, var(--gold) 48%, transparent);
 }
 
 .ruri-spotlight__title {
@@ -140,13 +289,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font: 650 0.95rem/1.2 var(--font-sans);
+  font: 550 0.96rem/1.25 var(--font-sans);
 }
 
+/* Matched fuzzy ranges glow azure rather than highlight-marker yellow. */
 .ruri-spotlight__title mark {
   padding: 0;
-  color: var(--ink);
-  background: var(--gold-bright);
+  color: var(--lapis-bright);
+  background: transparent;
+  font-weight: 700;
+  text-shadow: 0 0 10px color-mix(in oklab, var(--lapis) 45%, transparent);
 }
 
 .ruri-spotlight__hint {
@@ -163,8 +315,27 @@
   display: grid;
   min-height: 11rem;
   place-items: center;
+  gap: 0.6rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.ruri-spotlight__empty-mark {
+  font-size: 1.6rem;
+  line-height: 1;
+  color: var(--lapis);
+  opacity: 0.7;
+  filter: drop-shadow(0 0 10px color-mix(in oklab, var(--lapis) 40%, transparent));
+}
+
+.ruri-spotlight__empty-text {
+  color: var(--washi-dim);
+  font: 500 0.92rem/1.4 var(--font-sans);
+}
+
+.ruri-spotlight__empty-sub {
   color: var(--washi-mute);
-  font: 0.86rem/1.4 var(--font-mono);
+  font: 0.74rem/1.4 var(--font-mono);
 }
 
 @media (max-width: 520px) {
@@ -177,28 +348,53 @@
   }
 
   .ruri-spotlight__option {
-    grid-template-columns: 1fr;
-    gap: 0.35rem;
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      'icon title'
+      'icon hint';
+    row-gap: 0.2rem;
+  }
+
+  .ruri-spotlight__icon {
+    grid-area: icon;
+  }
+
+  .ruri-spotlight__title {
+    grid-area: title;
   }
 
   .ruri-spotlight__hint {
+    grid-area: hint;
     max-width: 100%;
   }
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  .ruri-spotlight {
+    animation: ruri-spotlight-scrim var(--dur) var(--ease);
+  }
+
   .ruri-spotlight__panel {
     animation: ruri-spotlight-in var(--dur) var(--ease);
+  }
+}
+
+@keyframes ruri-spotlight-scrim {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 
 @keyframes ruri-spotlight-in {
   from {
     opacity: 0;
-    transform: translateY(0.55rem);
+    transform: translateY(0.65rem) scale(0.985);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }

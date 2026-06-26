@@ -10,8 +10,8 @@
  * Fallback: Avatar (from @/primitives) when no video stream is present.
  *
  * Overlays:
- *   - Speaking ring: gold border + box-shadow when speaking === true
- *   - Role badge: owner (~·q = gold), op (@·o = lapis), voice (+·v = green)
+ *   - Speaking ring: bioluminescent azure border + glow when speaking === true
+ *   - Role badge: owner (~·q = champagne), op (@·o = azure), voice (+·v = green)
  *     resolved from the channel's ChannelUser.modes Set
  *   - Mute / deafen icons
  *   - Nick label + animated speaking bars

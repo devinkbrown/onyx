@@ -68,6 +68,7 @@ function ReactionPill(props: ReactionProps): JSX.Element {
   const [local] = splitProps(props, ['reaction', 'target', 'messageId', 'selfNick']);
 
   const topUsers = createMemo(() => local.reaction.users.slice(0, 4));
+  const mine = createMemo(() => !!local.selfNick && local.reaction.users.includes(local.selfNick));
 
   function handleClick(): void {
     const emoji = local.reaction.emoji;
@@ -83,8 +84,9 @@ function ReactionPill(props: ReactionProps): JSX.Element {
   return (
     <button
       type="button"
-      class="shell-reaction"
+      class={`shell-reaction${mine() ? ' shell-reaction--mine' : ''}`}
       aria-label={`${local.reaction.emoji} — ${local.reaction.users.join(', ')} reacted`}
+      aria-pressed={mine()}
       onClick={handleClick}
     >
       <span class="shell-reaction-emoji" aria-hidden="true">{local.reaction.emoji}</span>
@@ -287,7 +289,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
           fallback={
             <div class="shell-feed-empty">
               <Show when={activeView().kind !== 'home'}>
-                <span>// quiet in here — say the first thing</span>
+                <span>Still waters here — say the first thing.</span>
               </Show>
             </div>
           }

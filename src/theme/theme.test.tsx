@@ -347,6 +347,62 @@ describe('Token catalogue', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 7. Ocean family — flagship + sub-variants
+// ---------------------------------------------------------------------------
+
+describe('Ocean family', () => {
+  const OCEAN_FAMILY: ThemeId[] = ['ocean', 'tide', 'abyss', 'reef'];
+
+  it('ocean is the default theme', () => {
+    expect(DEFAULT_THEME_ID).toBe('ocean');
+  });
+
+  it('registers the flagship and all three sub-variants', () => {
+    for (const id of OCEAN_FAMILY) {
+      expect(THEME_IDS).toContain(id);
+      expect(THEMES[id]).toBeDefined();
+    }
+  });
+
+  it('lists the Ocean family first, with ocean leading', () => {
+    expect(THEME_IDS.slice(0, OCEAN_FAMILY.length)).toEqual(OCEAN_FAMILY);
+  });
+
+  it('every Ocean-family theme is dark and labelled in the Ocean family', () => {
+    expect(THEMES.ocean.label).toBe('Ocean');
+    for (const id of OCEAN_FAMILY) {
+      const theme = THEMES[id];
+      expect(theme.scheme).toBe('dark');
+      // Flagship is exactly "Ocean"; sub-variants are namespaced "Ocean · …".
+      expect(theme.label.startsWith('Ocean')).toBe(true);
+    }
+  });
+
+  it('each sub-variant defines the same token slots as the flagship', () => {
+    const oceanKeys = Object.keys(THEMES.ocean.tokens).sort();
+    for (const id of ['tide', 'abyss', 'reef'] as ThemeId[]) {
+      const variantKeys = Object.keys(THEMES[id].tokens).sort();
+      expect(variantKeys).toEqual(oceanKeys);
+    }
+  });
+
+  it('sub-variants change values rather than copy the flagship verbatim', () => {
+    for (const id of ['tide', 'abyss', 'reef'] as ThemeId[]) {
+      expect(THEMES[id].tokens['--ink']).not.toBe(THEMES.ocean.tokens['--ink']);
+    }
+  });
+
+  it('every Ocean-family theme keeps an azure-primary lapis token', () => {
+    for (const id of OCEAN_FAMILY) {
+      // All Ocean variants stay azure-primary: --lapis is a real colour value.
+      expect(THEMES[id].tokens['--lapis']).toBeTruthy();
+      expect(THEMES[id].tokens['--lapis-bright']).toBeTruthy();
+      expect(THEMES[id].tokens['--lapis-deep']).toBeTruthy();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 6. useTheme throws outside provider
 // ---------------------------------------------------------------------------
 

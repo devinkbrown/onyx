@@ -2,11 +2,11 @@
  * VoiceBar — persistent control bar shown whenever callState is active.
  *
  * Controls:
- *   [M] Mic toggle     — muted:    vermilion when active, aria-pressed
- *   [D] Deafen toggle  — deafened: gold tint when active, aria-pressed
- *   [C] Camera toggle  — cameraOn: gold tint when active, aria-pressed
- *   [S] Screenshare    — screenshareActive: gold tint, aria-pressed
- *   [LEAVE]            — vermilion, calls leaveVoiceChannel()
+ *   [M] Mic toggle     — muted:    coral when active, aria-pressed
+ *   [D] Deafen toggle  — deafened: azure tint when active, aria-pressed
+ *   [C] Camera toggle  — cameraOn: azure tint when active, aria-pressed
+ *   [S] Screenshare    — screenshareActive: azure tint, aria-pressed
+ *   [LEAVE]            — coral, calls leaveVoiceChannel()
  *
  * Identity zone (left): self Avatar + channel name + call timer
  * Connection quality pip (right): 4-bar indicator from getNetworkStats()

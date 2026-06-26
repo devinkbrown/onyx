@@ -94,10 +94,10 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
             aria-label={activeView().kind === 'channel' ? `Channel: ${name()}` : `Direct message: ${name()}`}
           >
             <Show when={activeView().kind === 'channel'}>
-              <span aria-hidden="true" style={{ color: 'var(--gold)', 'font-family': 'var(--font-mono)' }}>#</span>
+              <span class="shell-ribbon-sigil" aria-hidden="true">#</span>
             </Show>
             <Show when={activeView().kind === 'dm'}>
-              <span aria-hidden="true" style={{ color: 'var(--washi-mute)', 'font-family': 'var(--font-mono)' }}>@</span>
+              <span class="shell-ribbon-sigil shell-ribbon-sigil--dm" aria-hidden="true">@</span>
             </Show>
             {activeView().kind === 'channel'
               ? name().replace(/^#/, '')
