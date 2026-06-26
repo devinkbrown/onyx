@@ -6,9 +6,13 @@
  * Main → Worker:
  *   { type: 'init', wasmUrl: string, encWidth: number, encHeight: number,
  *     encQuality: number, encProfile: 'camera'|'screen', encFps: number,
- *     track: MediaStreamTrack }
- *     — Start the capture/encode loop. `track` is transferred in the same
- *       postMessage call via the transfer list.
+ *     track?: MediaStreamTrack, readable?: ReadableStream<VideoFrame> }
+ *     — Start the capture/encode loop. Exactly one frame source is provided:
+ *       `track` (a transferable MediaStreamTrack — the worker wraps it in a
+ *       MediaStreamTrackProcessor) OR `readable` (a ReadableStream of
+ *       VideoFrames already derived from a MediaStreamTrackProcessor on the
+ *       main thread, used when MediaStreamTrack is not transferable in this
+ *       Chromium). Whichever is present is transferred via the transfer list.
  *
  *   { type: 'tier', tier: 0|1|2|3 }
  *     — Update the adaptive-resolution tier. The worker scales its draw
@@ -65,7 +69,7 @@ const TIER_RESOLUTIONS: Record<NetworkQualityTier, TierResolution> = {
   3: { width:  854,     height:  480 },
 };
 
-function tierDimensions(
+export function tierDimensions(
   tier: NetworkQualityTier,
   profileWidth: number,
   profileHeight: number,
@@ -107,7 +111,37 @@ let state: WorkerState | null = null;
 // Encoder initialisation (also called on tier change)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildEncoder(
+/**
+ * Resolutions the opvis WASM encoder is known to accept, largest first. Used as
+ * a fallback ladder: the codec rejects some sizes (notably ≥1600 wide and a few
+ * small/odd ones), returning a null handle that makes OpvisEncoder throw. When
+ * the requested size is rejected we step down to the next known-good size so the
+ * worker still produces frames instead of silently disabling video. The capture
+ * loop always draws into `enc.width × enc.height`, so the canvas follows.
+ */
+const ENCODER_FALLBACK_SIZES: ReadonlyArray<{ width: number; height: number }> = [
+  { width: 1280, height: 720 },
+  { width: 1024, height: 576 },
+  { width:  640, height: 360 },
+  { width:  320, height: 240 },
+];
+
+function tryCreateEncoder(
+  wasm: OpcodecWasm,
+  width: number,
+  height: number,
+  quality: number,
+  encProfile: OpvisProfile,
+  fps: number,
+): OpvisEncoder | null {
+  try {
+    return wasm.videoEncoder(width, height, quality, encProfile, fps);
+  } catch {
+    return null;
+  }
+}
+
+export function buildEncoder(
   wasm: OpcodecWasm,
   tier: NetworkQualityTier,
   profileWidth: number,
@@ -117,7 +151,22 @@ function buildEncoder(
   profileFps: number,
 ): OpvisEncoder {
   const { width, height } = tierDimensions(tier, profileWidth, profileHeight);
-  return wasm.videoEncoder(width, height, profileQuality, encProfile, profileFps);
+  const direct = tryCreateEncoder(wasm, width, height, profileQuality, encProfile, profileFps);
+  if (direct) return direct;
+
+  /* Requested size rejected by the codec — walk the known-good ladder, keeping
+   * even dimensions and never upscaling past the requested width. */
+  for (const size of ENCODER_FALLBACK_SIZES) {
+    if (size.width > width) continue;
+    const fb = tryCreateEncoder(wasm, size.width, size.height, profileQuality, encProfile, profileFps);
+    if (fb) return fb;
+  }
+  /* Last attempt: smallest ladder entry regardless of requested width, so a
+   * tiny requested size that itself was rejected still yields a usable encoder.
+   * If even this throws, the error propagates to the caller (reported, not a
+   * crash). */
+  const smallest = ENCODER_FALLBACK_SIZES[ENCODER_FALLBACK_SIZES.length - 1]!;
+  return wasm.videoEncoder(smallest.width, smallest.height, profileQuality, encProfile, profileFps);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -131,6 +180,12 @@ async function captureLoop(s: WorkerState): Promise<void> {
   let drawH = s.enc.height;
   let canvas = new OffscreenCanvas(drawW, drawH);
   let ctx    = canvas.getContext('2d') as OffscreenCanvasRenderingContext2D | null;
+  /* Remember the tier-target size the current encoder was built FOR. The
+   * encoder's own dimensions may differ (codec fallback), so we must compare
+   * the new tier target against the last requested target — not against
+   * s.enc.width — or a fallback would trigger an endless per-frame rebuild. */
+  let builtForW = tierDimensions(s.tier, s.profileWidth, s.profileHeight).width;
+  let builtForH = tierDimensions(s.tier, s.profileWidth, s.profileHeight).height;
 
   while (true) {
     if (s.stopped) break;
@@ -146,22 +201,28 @@ async function captureLoop(s: WorkerState): Promise<void> {
 
     const frame = result.value;
 
-    /* Rebuild canvas + encoder if tier changed (draw dimensions differ). */
-    const { width: newW, height: newH } = tierDimensions(
+    /* Rebuild canvas + encoder if the tier's target size differs from what the
+     * encoder is currently using. We compare against the encoder's ACTUAL
+     * dimensions (s.enc.width/height) rather than the tier target, because the
+     * codec may have fallen back to a different size than tierDimensions asked
+     * for. After (re)building, draw dimensions are taken from the encoder so the
+     * YUV planes always match exactly what the WASM encoder expects. */
+    const { width: targetW, height: targetH } = tierDimensions(
       s.tier, s.profileWidth, s.profileHeight,
     );
-    if (newW !== drawW || newH !== drawH) {
-      drawW = newW;
-      drawH = newH;
-      canvas = new OffscreenCanvas(drawW, drawH);
-      ctx    = canvas.getContext('2d') as OffscreenCanvasRenderingContext2D | null;
-      /* Rebuild encoder at new dimensions. */
+    if (targetW !== builtForW || targetH !== builtForH) {
+      builtForW = targetW;
+      builtForH = targetH;
       s.enc.destroy();
       s.enc = buildEncoder(
         s.wasm, s.tier,
         s.profileWidth, s.profileHeight,
         s.profileQuality, s.encProfile, s.profileFps,
       );
+      drawW = s.enc.width;
+      drawH = s.enc.height;
+      canvas = new OffscreenCanvas(drawW, drawH);
+      ctx    = canvas.getContext('2d') as OffscreenCanvasRenderingContext2D | null;
     }
 
     if (!ctx) { frame.close(); continue; }
@@ -222,6 +283,7 @@ self.onmessage = async (event: MessageEvent) => {
     encProfile?: OpvisProfile;
     encFps?: number;
     track?: MediaStreamTrack;
+    readable?: ReadableStream<VideoFrame>;
     tier?: NetworkQualityTier;
   };
 
@@ -240,10 +302,11 @@ self.onmessage = async (event: MessageEvent) => {
         encProfile = 'camera' as OpvisProfile,
         encFps    = 60,
         track,
+        readable,
       } = msg;
 
-      if (!track) {
-        self.postMessage({ type: 'error', msg: 'No track provided to worker' });
+      if (!track && !readable) {
+        self.postMessage({ type: 'error', msg: 'No track or readable provided to worker' });
         return;
       }
 
@@ -266,10 +329,17 @@ self.onmessage = async (event: MessageEvent) => {
         return;
       }
 
-      /* Pull VideoFrames from the track via MediaStreamTrackProcessor. */
-      const processor = new (globalThis as any).MediaStreamTrackProcessor({ track });
-      const reader: ReadableStreamDefaultReader<VideoFrame> =
-        (processor.readable as ReadableStream<VideoFrame>).getReader();
+      /* Obtain a VideoFrame stream. Either the main thread transferred a raw
+       * MediaStreamTrack (wrap it in a MediaStreamTrackProcessor here) or it
+       * already transferred a ReadableStream<VideoFrame> derived from one. */
+      let frameStream: ReadableStream<VideoFrame>;
+      if (readable) {
+        frameStream = readable;
+      } else {
+        const processor = new (globalThis as any).MediaStreamTrackProcessor({ track });
+        frameStream = processor.readable as ReadableStream<VideoFrame>;
+      }
+      const reader: ReadableStreamDefaultReader<VideoFrame> = frameStream.getReader();
 
       state = {
         wasm,

@@ -50,6 +50,7 @@ const MAX_PEERS = 64;
 
 export class PeerRegistry {
   private peers = new Map<string, PeerMedia>();
+  private detachedPeers = new WeakSet<PeerMedia>();
 
   /** Accumulated inter-arrival jitter (EMA) */
   lastJitterMs = 0;
@@ -88,6 +89,40 @@ export class PeerRegistry {
 
   setWasm(wasm: OpcodecWasm) { this.wasm = wasm; }
 
+  private createPeerMedia(nick: string, channel: string | null, kind: MediaKind): PeerMedia {
+    return {
+      state: { nick, channel, kind, speaking: false, muted: false, hasVideo: false, canvas: null },
+      audDec: null, vidDec: null, audCtx: null,
+      screenVidDec: null, vidCanvas: null, screenCanvas: null, screenStream: null,
+      panner: null, outputGain: null, lastKeyW: 0, lastKeyH: 0, lastScreenKeyW: 0, lastScreenKeyH: 0,
+      videoW: this.videoW, videoH: this.videoH, screenW: this.videoW, screenH: this.videoH,
+      videoFps: 60, screenFps: 60,
+      vidImageData: null, screenImageData: null,
+    };
+  }
+
+  private isDetached(pm: PeerMedia): boolean {
+    return this.detachedPeers.has(pm);
+  }
+
+  private safeDestroy(decoder: { destroy: () => void } | null): void {
+    try { decoder?.destroy(); } catch { /* teardown best-effort */ }
+  }
+
+  private safeDisconnect(node: { disconnect: () => void } | null): void {
+    try { node?.disconnect(); } catch { /* teardown best-effort */ }
+  }
+
+  private safeClose(ctx: AudioContext | null): void {
+    try { ctx?.close().catch(() => {}); } catch { /* teardown best-effort */ }
+  }
+
+  private safeStopStream(stream: MediaStream | null): void {
+    for (const track of stream?.getTracks() ?? []) {
+      try { track.stop(); } catch { /* teardown best-effort */ }
+    }
+  }
+
   get(nick: string): PeerMedia | undefined {
     return this.peers.get(nick.toLowerCase());
   }
@@ -101,26 +136,12 @@ export class PeerRegistry {
     if (this.peers.size >= MAX_PEERS) {
       // Return a transient, detached PeerMedia so callers never get null,
       // but do not register it so it doesn't consume tracked state.
-      return {
-        state: { nick, channel, kind, speaking: false, muted: false, hasVideo: false, canvas: null },
-        audDec: null, vidDec: null, audCtx: null,
-        screenVidDec: null, vidCanvas: null, screenCanvas: null, screenStream: null,
-        panner: null, outputGain: null, lastKeyW: 0, lastKeyH: 0, lastScreenKeyW: 0, lastScreenKeyH: 0,
-        videoW: this.videoW, videoH: this.videoH, screenW: this.videoW, screenH: this.videoH,
-        videoFps: 60, screenFps: 60,
-        vidImageData: null, screenImageData: null,
-      };
+      const detached = this.createPeerMedia(nick, channel, kind);
+      this.detachedPeers.add(detached);
+      return detached;
     }
 
-    pm = {
-      state: { nick, channel, kind, speaking: false, muted: false, hasVideo: false, canvas: null },
-      audDec: null, vidDec: null, audCtx: null,
-      screenVidDec: null, vidCanvas: null, screenCanvas: null, screenStream: null,
-      panner: null, outputGain: null, lastKeyW: 0, lastKeyH: 0, lastScreenKeyW: 0, lastScreenKeyH: 0,
-      videoW: this.videoW, videoH: this.videoH, screenW: this.videoW, screenH: this.videoH,
-      videoFps: 60, screenFps: 60,
-      vidImageData: null, screenImageData: null,
-    };
+    pm = this.createPeerMedia(nick, channel, kind);
     this.peers.set(key, pm);
     this.updateSpatialAudio();
     this.onPeerStateChanged?.(pm.state);
@@ -131,30 +152,31 @@ export class PeerRegistry {
     const key = nick.toLowerCase();
     const pm  = this.peers.get(key);
     if (!pm) return;
-    pm.audDec?.destroy();
-    pm.vidDec?.destroy();
-    pm.screenVidDec?.destroy();
-    pm.audCtx?.close().catch(() => {});
-    pm.panner?.disconnect();
-    pm.outputGain?.disconnect();
-    pm.screenStream?.getTracks().forEach(t => t.stop());
+    const stateNick = pm.state.nick;
+    this.safeDestroy(pm.audDec);
+    this.safeDestroy(pm.vidDec);
+    this.safeDestroy(pm.screenVidDec);
+    this.safeClose(pm.audCtx);
+    this.safeDisconnect(pm.panner);
+    this.safeDisconnect(pm.outputGain);
+    this.safeStopStream(pm.screenStream);
     this.peers.delete(key);
     this.peerLevels.delete(key);
     this.decodeErrors.delete(key);
     this.updateSpatialAudio();
-    this.onPeerLeft?.(nick);
+    this.onPeerLeft?.(stateNick);
   }
 
   reset(nick: string) {
     const pm = this.peers.get(nick.toLowerCase());
     if (!pm) return;
-    pm.audDec?.destroy();       pm.audDec       = null;
-    pm.vidDec?.destroy();       pm.vidDec       = null;
-    pm.screenVidDec?.destroy(); pm.screenVidDec = null;
-    pm.audCtx?.close().catch(() => {}); pm.audCtx  = null;
-    pm.panner?.disconnect();    pm.panner       = null;
-    pm.outputGain?.disconnect(); pm.outputGain  = null;
-    pm.screenStream?.getTracks().forEach(t => t.stop());
+    this.safeDestroy(pm.audDec);       pm.audDec       = null;
+    this.safeDestroy(pm.vidDec);       pm.vidDec       = null;
+    this.safeDestroy(pm.screenVidDec); pm.screenVidDec = null;
+    this.safeClose(pm.audCtx);         pm.audCtx       = null;
+    this.safeDisconnect(pm.panner);    pm.panner       = null;
+    this.safeDisconnect(pm.outputGain); pm.outputGain  = null;
+    this.safeStopStream(pm.screenStream);
     pm.screenStream  = null;
     pm.screenCanvas  = null;
     pm.vidCanvas     = null;
@@ -202,13 +224,14 @@ export class PeerRegistry {
 
   setVideoParams(nick: string, width: number, height: number, kind: MediaKind, fps = 60): void {
     const pm = this.getOrCreate(nick, null, kind);
+    if (this.isDetached(pm)) return;
     if (kind === 'screen') {
       if (pm.screenW !== width || pm.screenH !== height) {
-        pm.screenVidDec?.destroy();
+        this.safeDestroy(pm.screenVidDec);
         pm.screenVidDec  = null;
         pm.screenCanvas  = null;
         pm.screenImageData = null;
-        pm.screenStream?.getTracks().forEach(t => t.stop());
+        this.safeStopStream(pm.screenStream);
         pm.screenStream  = null;
       }
       pm.screenW   = width;
@@ -216,7 +239,7 @@ export class PeerRegistry {
       pm.screenFps = fps;
     } else {
       if (pm.videoW !== width || pm.videoH !== height) {
-        pm.vidDec?.destroy();
+        this.safeDestroy(pm.vidDec);
         pm.vidDec       = null;
         pm.vidCanvas    = null;
         pm.vidImageData  = null;
@@ -242,7 +265,7 @@ export class PeerRegistry {
   // ----------------------------------------------------------------
 
   async decodeAudio(pm: PeerMedia, frame: Uint8Array): Promise<void> {
-    if (!this.wasm) return;
+    if (!this.wasm || this.isDetached(pm)) return;
     if (!pm.audDec) pm.audDec = this.wasm.audioDecoder(this.sampleRate, this.audioQuality());
     if (!pm.audCtx) pm.audCtx = new AudioContext({ sampleRate: this.sampleRate });
 
@@ -312,7 +335,7 @@ export class PeerRegistry {
   }
 
   async decodeVideo(pm: PeerMedia, frame: Uint8Array, ftype: string): Promise<void> {
-    if (!this.wasm) return;
+    if (!this.wasm || this.isDetached(pm)) return;
     const isKey = ftype === 'KEYFRAME';
     const W = pm.videoW || this.videoW, H = pm.videoH || this.videoH;
 
@@ -321,7 +344,7 @@ export class PeerRegistry {
     if (!pm.vidDec && !isKey) return;
 
     if (!pm.vidDec || (isKey && (pm.lastKeyW !== W || pm.lastKeyH !== H))) {
-      pm.vidDec?.destroy();
+      this.safeDestroy(pm.vidDec);
       pm.vidDec       = this.wasm.videoDecoder(W, H);
       pm.lastKeyW     = W;
       pm.lastKeyH     = H;
@@ -334,7 +357,7 @@ export class PeerRegistry {
     } catch {
       const key = pm.state.nick.toLowerCase();
       this.decodeErrors.set(key, (this.decodeErrors.get(key) ?? 0) + 1);
-      pm.vidDec.destroy();
+      this.safeDestroy(pm.vidDec);
       pm.vidDec = null;   // force re-sync on next keyframe
       return;
     }
@@ -360,7 +383,7 @@ export class PeerRegistry {
   }
 
   async decodeScreenVideo(pm: PeerMedia, frame: Uint8Array, ftype: string): Promise<void> {
-    if (!this.wasm) return;
+    if (!this.wasm || this.isDetached(pm)) return;
     const isKey = ftype === 'KEYFRAME';
     const W = pm.screenW || this.videoW, H = pm.screenH || this.videoH;
 
@@ -368,7 +391,7 @@ export class PeerRegistry {
     if (!pm.screenVidDec && !isKey) return;
 
     if (!pm.screenVidDec || (isKey && (pm.lastScreenKeyW !== W || pm.lastScreenKeyH !== H))) {
-      pm.screenVidDec?.destroy();
+      this.safeDestroy(pm.screenVidDec);
       pm.screenVidDec   = this.wasm.videoDecoder(W, H);
       pm.lastScreenKeyW = W;
       pm.lastScreenKeyH = H;
@@ -381,7 +404,7 @@ export class PeerRegistry {
     } catch {
       const key = pm.state.nick.toLowerCase();
       this.decodeErrors.set(key, (this.decodeErrors.get(key) ?? 0) + 1);
-      pm.screenVidDec.destroy();
+      this.safeDestroy(pm.screenVidDec);
       pm.screenVidDec = null;   // force re-sync on next keyframe
       return;
     }

@@ -60,15 +60,18 @@ export class TsumugiIdentity {
 
   /** Delete the persisted identity key (forces regeneration on next load). */
   static async clear(): Promise<void> {
+    let db: IDBDatabase | null = null;
     try {
-      const db = await TsumugiIdentity.openDb();
+      db = await TsumugiIdentity.openDb();
+      const openDb = db;
       await new Promise<void>((res, rej) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const tx = openDb.transaction(STORE_NAME, 'readwrite');
         tx.objectStore(STORE_NAME).delete(KEY_ID);
         tx.oncomplete = () => res();
         tx.onerror    = () => rej(tx.error);
       });
     } catch { /* non-fatal */ }
+    finally { db?.close(); }
   }
 
   // -------------------------------------------------------------------
@@ -90,24 +93,55 @@ export class TsumugiIdentity {
 
   private static async dbGet(): Promise<CryptoKeyPair | null> {
     const db = await TsumugiIdentity.openDb();
-    return new Promise((res, rej) => {
-      const tx  = db.transaction(STORE_NAME, 'readonly');
-      const req = tx.objectStore(STORE_NAME).get(KEY_ID);
-      req.onsuccess = () => res(req.result as CryptoKeyPair | null ?? null);
-      req.onerror   = () => rej(req.error);
-    });
+    try {
+      return await new Promise((res, rej) => {
+        const tx  = db.transaction(STORE_NAME, 'readonly');
+        const req = tx.objectStore(STORE_NAME).get(KEY_ID);
+        req.onsuccess = () => {
+          const result = req.result;
+          res(isTsumugiKeyPair(result) ? result : null);
+        };
+        req.onerror   = () => rej(req.error);
+      });
+    } finally {
+      db.close();
+    }
   }
 
   private static async dbPut(kp: CryptoKeyPair): Promise<void> {
+    if (!isTsumugiKeyPair(kp)) throw new Error('TsumugiIdentity: invalid key pair');
     const db = await TsumugiIdentity.openDb();
-    return new Promise((res, rej) => {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      tx.objectStore(STORE_NAME).put(kp, KEY_ID);
-      tx.oncomplete = () => res();
-      tx.onerror    = () => rej(tx.error);
-    });
+    try {
+      return await new Promise((res, rej) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).put(kp, KEY_ID);
+        tx.oncomplete = () => res();
+        tx.onerror    = () => rej(tx.error);
+      });
+    } finally {
+      db.close();
+    }
   }
 }
+
+function isTsumugiKeyPair(value: unknown): value is CryptoKeyPair {
+  if (!value || typeof value !== 'object') return false;
+  const pair = value as Partial<CryptoKeyPair>;
+  const publicKey = pair.publicKey;
+  const privateKey = pair.privateKey;
+  return isP256Key(publicKey, 'public')
+    && isP256Key(privateKey, 'private')
+    && privateKey.usages.includes('deriveBits');
+}
+
+function isP256Key(key: unknown, type: KeyType): key is CryptoKey {
+  if (!key || typeof key !== 'object') return false;
+  const candidate = key as Partial<CryptoKey>;
+  const alg = candidate.algorithm as EcKeyAlgorithm | undefined;
+  return candidate.type === type && alg?.name === 'ECDH' && alg.namedCurve === CURVE;
+}
+
+type EcKeyAlgorithm = KeyAlgorithm & { namedCurve?: string };
 
 /** Base58 encode bytes without BigInt (ES2017 compatible). */
 function tsumugiIdentityBase58(bytes: Uint8Array): string {

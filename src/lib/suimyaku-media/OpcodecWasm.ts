@@ -34,6 +34,48 @@ interface EmModule {
   HEAPF32: Float32Array;
 }
 
+// The raw Emscripten module may expose only `cwrap` (this opcodec build does
+// not export `ccall`). `cwrap` exposes the same C functions, so we can derive
+// an equivalent `ccall` from it.
+export interface RawEmModule {
+  ccall?(name: string, ret: string | null, argtypes: string[], args: unknown[]): unknown;
+  cwrap?(name: string, ret: string | null, argtypes: string[]): (...args: unknown[]) => unknown;
+  HEAPU8:  Uint8Array;
+  HEAP16:  Int16Array;
+  HEAPF32: Float32Array;
+}
+
+/**
+ * Ensure the loaded module exposes a working `ccall`.
+ *
+ * Some opcodec WASM builds export `cwrap` but not `ccall`. Calling
+ * `m.ccall(...)` on such a module throws "m.ccall is not a function", which the
+ * engine surfaces as "Codec unavailable". When `ccall` is missing we synthesize
+ * it from `cwrap` (memoizing each wrapped function), giving the rest of this
+ * module a single, stable `EmModule.ccall` contract regardless of build flags.
+ */
+export function normalizeModule(raw: RawEmModule): EmModule {
+  if (typeof raw.ccall === 'function') return raw as EmModule;
+  if (typeof raw.cwrap !== 'function') {
+    throw new Error('opcodec module exposes neither ccall nor cwrap');
+  }
+  const cwrap = raw.cwrap.bind(raw);
+  const cache = new Map<string, (...args: unknown[]) => unknown>();
+  const ccall = (name: string, ret: string | null, argtypes: string[], args: unknown[]): unknown => {
+    // Key on name + arg signature so a function called with different arg
+    // shapes still gets a correctly-typed wrapper.
+    const key = `${name}|${ret ?? 'void'}|${argtypes.join(',')}`;
+    let fn = cache.get(key);
+    if (!fn) {
+      fn = cwrap(name, ret, argtypes);
+      cache.set(key, fn);
+    }
+    return fn(...args);
+  };
+  (raw as RawEmModule & { ccall: typeof ccall }).ccall = ccall;
+  return raw as unknown as EmModule;
+}
+
 // -------------------------------------------------------------------
 // Singleton loader
 // -------------------------------------------------------------------
@@ -62,9 +104,9 @@ async function loadModule(url: string): Promise<EmModule> {
         script.onload  = () => res();
         script.onerror = () => rej(new Error(`Failed to load ${url} (attempt ${attempt + 1})`));
       });
-      const factory = (window as any).createOpcodec as (() => Promise<EmModule>) | undefined;
+      const factory = (window as any).createOpcodec as  ((arg?: Record<string, unknown>) => Promise<RawEmModule>) | undefined;
       if (!factory) throw new Error('createOpcodec not found after script load');
-      return factory();
+      return normalizeModule(await factory());
     } catch (err) {
       lastErr = err;
       if (attempt < MAX_ATTEMPTS - 1) {
@@ -80,16 +122,39 @@ async function loadModule(url: string): Promise<EmModule> {
 }
 
 /**
- * Worker-safe WASM loader.
+ * Evaluate the Emscripten bundle text in the worker's GLOBAL scope.
  *
- * Web Workers have no `document`, so the main-thread script-tag approach
- * cannot be used.  Instead we use `importScripts` (synchronous) which is
- * available in dedicated workers, falling back to a dynamic `import()` of the
- * URL when `importScripts` is absent (e.g. module workers).
+ * `public/opcodec_wasm.js` declares `var createOpcodec = …` at top level. To
+ * attach that `var` to the worker global (so `self.createOpcodec` resolves), the
+ * script must run in global scope. Indirect `eval` — `(0, eval)(text)` — does
+ * exactly that: unlike a direct `eval(text)` call (function/module scope) or a
+ * blob `import()` (module scope, where top-level `var` stays module-local and
+ * never reaches `self`), indirect eval runs its argument as a global script.
+ */
+function evalInWorkerGlobalScope(scriptText: string): void {
+  // The `(0, eval)` form forces the indirect (global-scope) eval semantics.
+  const indirectEval = eval;
+  (indirectEval as (s: string) => unknown)(scriptText);
+}
+
+/**
+ * Load + evaluate the opcodec bundle into the worker global.
  *
- * After the script is evaluated, `self.createOpcodec` should be defined by
- * the Emscripten-generated bundle, mirroring what `window.createOpcodec` is
- * on the main thread.
+ * This worker is spawned as a MODULE worker (`new Worker(url, { type: 'module' })`)
+ * because `videoEncodeWorker.ts` uses ES `import`. Two consequences:
+ *
+ *   - `importScripts` is present on the global but THROWS when called
+ *     ("Module scripts don't support importScripts()"), so a
+ *     `typeof importScripts === 'function'` guard is not enough — we must guard
+ *     the call itself.
+ *   - A blob `import()` would run the bundle in MODULE scope, where its
+ *     top-level `var createOpcodec` stays module-local and never reaches `self`.
+ *
+ * So the primary path fetches the bundle text and evaluates it in GLOBAL scope
+ * via indirect `eval` (see `evalInWorkerGlobalScope`), which makes the
+ * top-level `var createOpcodec` a property of the worker global. `importScripts`
+ * is kept only as a best-effort fallback for classic workers and is ignored if
+ * it throws.
  */
 async function loadModuleInWorker(url: string): Promise<EmModule> {
   const MAX_ATTEMPTS = 3;
@@ -100,26 +165,47 @@ async function loadModuleInWorker(url: string): Promise<EmModule> {
     if (attempt > 0) await new Promise(r => setTimeout(r, retryDelays[attempt - 1]));
     try {
       const scriptUrl = url + (attempt > 0 ? `?r=${attempt}` : '');
-      if (typeof (self as any).importScripts === 'function') {
-        (self as any).importScripts(scriptUrl);
-      } else {
-        // Module worker — fetch + eval via dynamic import is not straightforward;
-        // use a Blob-URL shim so the script runs in the worker's scope.
-        const text = await fetch(scriptUrl).then(r => {
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          return r.text();
-        });
-        const blob = new Blob([text], { type: 'application/javascript' });
-        const blobUrl = URL.createObjectURL(blob);
+      // Primary path (works in both module and classic workers): fetch the
+      // bundle and evaluate it in GLOBAL scope so its top-level
+      // `var createOpcodec` attaches to the worker global.
+      const text = await fetch(scriptUrl).then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.text();
+      });
+      evalInWorkerGlobalScope(text);
+
+      let factory = (self as any).createOpcodec as  ((arg?: Record<string, unknown>) => Promise<RawEmModule>) | undefined;
+      // Classic-worker fallback: if global eval somehow did not define the
+      // factory, try importScripts, swallowing its throw in module workers.
+      if (typeof factory !== 'function' && typeof (self as any).importScripts === 'function') {
         try {
-          await import(/* webpackIgnore: true */ blobUrl);
-        } finally {
-          URL.revokeObjectURL(blobUrl);
-        }
+          (self as any).importScripts(scriptUrl);
+          factory = (self as any).createOpcodec as  ((arg?: Record<string, unknown>) => Promise<RawEmModule>) | undefined;
+        } catch { /* module worker: importScripts unsupported — ignore */ }
       }
-      const factory = (self as any).createOpcodec as (() => Promise<EmModule>) | undefined;
-      if (!factory) throw new Error('createOpcodec not defined after worker script load');
-      return factory();
+      if (typeof factory !== 'function') {
+        throw new Error('createOpcodec not defined after worker script load');
+      }
+
+      // Inside a (module) worker the Emscripten bundle derives its
+      // `scriptDirectory` from `self.location.href` — the worker chunk's URL,
+      // NOT the site root. So its default `locateFile("opcodec_wasm.wasm")`
+      // resolves to the wrong path and the dev server returns index.html (an
+      // HTML body whose first bytes `3c 21 64 6f` = "<!do" fail the wasm magic
+      // check). We sidestep that entirely by fetching the .wasm ourselves,
+      // relative to the known JS URL, and handing it to the factory as
+      // `wasmBinary` so it never has to locate the file.
+      const wasmBinary = await fetchWasmBinary(url);
+      // Resolve the bundle URL against the worker origin so a root-relative
+      // `url` (e.g. "/opcodec_wasm.js") becomes a valid absolute base for any
+      // residual locateFile lookups (the wasmBinary override usually wins).
+      const base = new URL(url, (self as any).location?.href ?? 'http://localhost/');
+      const moduleArg: Record<string, unknown> = {
+        locateFile: (path: string) => new URL(path, base).toString(),
+      };
+      if (wasmBinary) moduleArg.wasmBinary = wasmBinary;
+
+      return normalizeModule(await factory.call(self, moduleArg));
     } catch (err) {
       lastErr = err;
       if (attempt < MAX_ATTEMPTS - 1) {
@@ -128,6 +214,27 @@ async function loadModuleInWorker(url: string): Promise<EmModule> {
     }
   }
   throw new Error(`Voice codec unavailable in worker: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`);
+}
+
+/**
+ * Fetch the opcodec `.wasm` binary that sits next to the given JS bundle URL.
+ * Returns the bytes, or `null` if the fetch fails (callers then fall back to
+ * the module's own locateFile-based loading).
+ */
+async function fetchWasmBinary(jsUrl: string): Promise<ArrayBuffer | null> {
+  // `/path/opcodec_wasm.js` → `/path/opcodec_wasm.wasm`. Strip any query first.
+  const noQuery = jsUrl.split('?')[0] ?? jsUrl;
+  const wasmUrl = noQuery.replace(/\.js$/, '.wasm');
+  try {
+    const resp = await fetch(wasmUrl);
+    if (!resp.ok) return null;
+    const type = resp.headers.get('content-type') ?? '';
+    // Guard against an HTML fallback masquerading as the binary.
+    if (type.includes('text/html')) return null;
+    return await resp.arrayBuffer();
+  } catch {
+    return null;
+  }
 }
 
 // -------------------------------------------------------------------

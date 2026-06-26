@@ -585,9 +585,11 @@ export class SuimyakuMediaEngine {
       return;
     }
 
-    /* Spawn the encode worker. Next.js (Webpack/Turbopack) resolves the URL
-     * at bundle time; the worker module is code-split automatically. */
-    const worker = new Worker(new URL('./videoEncodeWorker.ts', import.meta.url));
+    /* Spawn the encode worker. Vite resolves the URL at bundle time and code-
+     * splits the worker module. It MUST be a module worker (`type: 'module'`):
+     * videoEncodeWorker.ts uses ES `import`, which a classic worker rejects with
+     * "Cannot use import statement outside a module" (breaks video encoding). */
+    const worker = new Worker(new URL('./videoEncodeWorker.ts', import.meta.url), { type: 'module' });
     this.vidWorker   = worker;
     this.workerReady = false;
 
@@ -622,20 +624,69 @@ export class SuimyakuMediaEngine {
      * MediaStreamTrackProcessor without interfering with the original stream. */
     const clonedTrack = videoTrack.clone();
 
-    /* Transfer the cloned track to the worker (moves ownership). */
-    worker.postMessage(
-      {
-        type:       'init',
-        wasmUrl:    WASM_URL,
-        encWidth:   profile.width,
-        encHeight:  profile.height,
-        encQuality: profile.quality,
-        encProfile: profile.profile,
-        encFps:     profile.fps,
-        track:      clonedTrack,
-      },
-      [clonedTrack] as unknown as Transferable[],
-    );
+    const initBase = {
+      type:       'init' as const,
+      wasmUrl:    WASM_URL,
+      encWidth:   profile.width,
+      encHeight:  profile.height,
+      encQuality: profile.quality,
+      encProfile: profile.profile,
+      encFps:     profile.fps,
+    };
+
+    /* A MediaStreamTrack is NOT transferable in every Chromium. Prefer
+     * transferring the raw track when the platform supports it; otherwise
+     * create the MediaStreamTrackProcessor here and transfer its `.readable`
+     * (a ReadableStream IS transferable). If neither works, fall back to the
+     * main-thread capture path so the join never crashes. */
+    if (SuimyakuMediaEngine.supportsTransferableMediaStreamTrack()) {
+      try {
+        worker.postMessage(
+          { ...initBase, track: clonedTrack },
+          [clonedTrack] as unknown as Transferable[],
+        );
+        return;
+      } catch {
+        /* Track transfer rejected at runtime — fall through to readable path. */
+      }
+    }
+
+    const ProcessorCtor = (globalThis as Record<string, unknown>).MediaStreamTrackProcessor as
+      | (new (opts: { track: MediaStreamTrack }) => { readable: ReadableStream })
+      | undefined;
+    if (ProcessorCtor) {
+      try {
+        const processor = new ProcessorCtor({ track: clonedTrack });
+        const readable = processor.readable;
+        worker.postMessage(
+          { ...initBase, readable },
+          [readable] as unknown as Transferable[],
+        );
+        return;
+      } catch {
+        /* readable transfer failed too — fall through to main-thread path. */
+      }
+    }
+
+    /* Last resort: tear down the worker and use the main-thread encode loop. */
+    clonedTrack.stop();
+    worker.postMessage({ type: 'stop' });
+    worker.terminate();
+    this.vidWorker   = null;
+    this.workerReady = false;
+    await this.startVideoCaptureFallback(stream, profile);
+  }
+
+  /** True when a MediaStreamTrack can be structured-cloned/transferred to a worker. */
+  private static supportsTransferableMediaStreamTrack(): boolean {
+    const Ctor = (globalThis as Record<string, unknown>).MediaStreamTrack as
+      | { prototype?: { transfer?: unknown } }
+      | undefined;
+    // Chromium exposes `MediaStreamTrack.prototype.transfer` (the
+    // transferable-streams / serializable-track API) only when tracks may be
+    // moved across realms. Absence means postMessage transfer will throw
+    // DataCloneError, so we must use the readable-stream path instead.
+    return typeof Ctor?.prototype?.transfer === 'function';
   }
 
   // ── Fallback path (main thread — Safari / Firefox) ────────────────
