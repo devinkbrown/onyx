@@ -16,6 +16,18 @@ NODE_OPTIONS="--disable-warning=DEP0205" pnpm build
 test -f out/index.html || { echo "FAIL: out/index.html missing — build broken, NOT deploying"; exit 1; }
 test -f out/sw.js      || { echo "FAIL: out/sw.js missing"; exit 1; }
 
+# SPA route entrypoints. The app is client-routed (solid-router) but the build
+# emits only out/index.html, so a HARD load / refresh / direct link to a route
+# (e.g. /app, the 'Open Onyx' target) 404s under nginx's
+# `try_files $uri $uri/ $uri/index.html =404`. Materialise each client route as
+# its own index.html copy so the `$uri/index.html` branch serves it — no nginx
+# change, clean URLs. Keep this list in sync with the <Route> table in index.tsx.
+echo "==> materialising SPA route entrypoints (app, about, appearance)"
+for route in app about appearance; do
+  mkdir -p "out/${route}"
+  cp out/index.html "out/${route}/index.html"
+done
+
 echo "==> stamping service-worker cache: ocean-shell-${VERSION}"
 sed -i "s/ocean-shell-__BUILD_VERSION__/ocean-shell-${VERSION}/" out/sw.js
 grep -q "ocean-shell-${VERSION}" out/sw.js \
