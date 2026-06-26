@@ -3,7 +3,7 @@
 import { chromium } from '@playwright/test';
 
 const APP = 'http://localhost:5174/app';
-const WS = 'wss://127.0.0.1:7080';
+const WS = process.env.WS || 'wss://eshmaki.me:8080';
 const CHAN = '#root';
 const args = ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required'];
 const b = await chromium.launch({ args });
