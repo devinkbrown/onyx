@@ -39,3 +39,56 @@ describe('IRCClient WebSocket frame handling', () => {
     expect(commands).toEqual(['NOTICE', 'NOTICE']);
   });
 });
+
+describe('IRCClient binary media plane', () => {
+  function feedBinary(client: IRCClient, bytes: Uint8Array): void {
+    (client as unknown as { _onMessage(ev: { data: ArrayBuffer }): void })._onMessage({
+      data: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+    });
+  }
+
+  it('routes a binary frame to onBinary and binaryHandlers, never to onMessage', () => {
+    const commands: string[] = [];
+    const viaOption: Uint8Array[] = [];
+    const viaHandler: Uint8Array[] = [];
+    const client = new IRCClient({
+      url: 'wss://ircx.us:8080/',
+      nick: 'ruri',
+      onMessage: (m: IRCMessage) => commands.push(m.command),
+      onBinary: (b) => viaOption.push(b),
+    });
+    client.binaryHandlers.add((b) => viaHandler.push(b));
+
+    feedBinary(client, new Uint8Array([1, 2, 3, 4]));
+
+    expect(commands).toEqual([]); // binary never reaches the IRC line parser
+    expect(viaOption).toHaveLength(1);
+    expect(Array.from(viaOption[0]!)).toEqual([1, 2, 3, 4]);
+    expect(viaHandler).toHaveLength(1);
+    expect(Array.from(viaHandler[0]!)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('ignores an empty binary frame', () => {
+    const viaOption: Uint8Array[] = [];
+    const client = new IRCClient({
+      url: 'wss://ircx.us:8080/',
+      nick: 'ruri',
+      onMessage: () => {},
+      onBinary: (b) => viaOption.push(b),
+    });
+    feedBinary(client, new Uint8Array(0));
+    expect(viaOption).toEqual([]);
+  });
+
+  it('still parses text frames after a binary frame (no state bleed)', () => {
+    const commands: string[] = [];
+    const client = new IRCClient({
+      url: 'wss://ircx.us:8080/',
+      nick: 'ruri',
+      onMessage: (m: IRCMessage) => commands.push(m.command),
+    });
+    feedBinary(client, new Uint8Array([9, 9]));
+    (client as unknown as { _onMessage(ev: { data: string }): void })._onMessage({ data: ':s NOTICE * :hi' });
+    expect(commands).toEqual(['NOTICE']);
+  });
+});

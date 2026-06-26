@@ -25,6 +25,8 @@ export interface IRCClientOptions {
   hasClientCert?: boolean;
   /** called for every parsed message */
   onMessage: IRCEventHandler;
+  /** called for every inbound binary WebSocket frame (browser media datagrams) */
+  onBinary?: (data: Uint8Array) => void;
   onRaw?: RawHandler;
   onConnected?: () => void;
   onDisconnected?: (reason: string) => void;
@@ -92,6 +94,12 @@ export class IRCClient {
    * primary store handler.
    */
   public extraMessageHandlers: Set<IRCEventHandler> = new Set();
+  /**
+   * Auxiliary binary-frame subscribers, fired in addition to `opts.onBinary`.
+   * The media engine registers here to receive browser media datagrams without
+   * owning the primary `onBinary` option.
+   */
+  public binaryHandlers: Set<(data: Uint8Array) => void> = new Set();
 
   isupport: ISupport = {
     // Defaults mirror Orochi's ISUPPORT PREFIX=(YQqov)*!.@+ (founder Q/'!',
@@ -165,6 +173,9 @@ export class IRCClient {
 
     try {
       this.ws = new WebSocket(this.opts.url);
+      // Browser media datagrams ride binary frames on this same socket; deliver
+      // them as ArrayBuffers (not Blobs) so onBinary gets bytes synchronously.
+      this.ws.binaryType = 'arraybuffer';
       this.ws.onopen = this._onOpen.bind(this);
       this.ws.onmessage = this._onMessage.bind(this);
       this.ws.onclose = this._onClose.bind(this);
@@ -200,6 +211,23 @@ export class IRCClient {
 
   sendRaw(command: string, ...params: string[]) {
     this.send(formatIRCLine(command, ...params));
+  }
+
+  /** The effective current nick (registration nick, or the post-433 alias). */
+  get currentNick(): string {
+    return this.opts.nick;
+  }
+
+  /** Send a media datagram as a binary WebSocket frame (browser media plane). */
+  sendBinary(bytes: Uint8Array) {
+    if (this.ws?.readyState !== WebSocket.OPEN) return;
+    try {
+      // Copy into a fresh ArrayBuffer-backed view so a pooled/odd-offset source
+      // buffer isn't sent with stale trailing bytes.
+      this.ws.send(bytes.slice());
+    } catch {
+      // WebSocket state raced — let _onClose handle the disconnect.
+    }
   }
 
   // ── Public IRC command helpers ──────────────────────────────────────────
@@ -282,6 +310,17 @@ export class IRCClient {
   }
 
   private _onMessage(ev: MessageEvent) {
+    // Binary frames carry browser media datagrams, not IRC lines.
+    if (ev.data instanceof ArrayBuffer) {
+      if (ev.data.byteLength) {
+        const bytes = new Uint8Array(ev.data);
+        this.opts.onBinary?.(bytes);
+        for (const h of this.binaryHandlers) {
+          try { h(bytes); } catch { /* a subscriber must not break the socket */ }
+        }
+      }
+      return;
+    }
     const data = typeof ev.data === 'string' ? ev.data : '';
     if (!data) return;
 
