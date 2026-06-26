@@ -1,81 +1,121 @@
 /* ─────────────────────────────────────────────────────────────
-   Ruri — design tokens.  Flagship theme: "ruri" (瑠璃 / lapis lazuli).
+   Onyx — design tokens.  Flagship theme: "ocean" (deep-water dark luxury).
 
-   Identity = Lapis × Kintsugi × Terminal:
-   · lapis lazuli — deep ultramarine ground veined with real gold (pyrite)
-   · kintsugi     — the mesh drawn as golden seams mending the dark
-   · terminal     — BBS/ANSI/demoscene heritage; mono labels, box-drawing,
-                    brutalist editorial type, [bracketed] controls
-   Warm washi-paper text over cool ultramarine + a single vermilion (朱)
-   accent — the deliberate opposite of purple-gradient AI slop.
+   Identity = Ocean × Bioluminescence × Champagne:
+   · deep water    — abyssal trench → mid-depth strata → near-surface crests,
+                     a true vertical depth gradient with real layering
+   · azure current — electric sky-blue, the living primary; bioluminescent
+                     crest highlights that glow on the dark water
+   · champagne     — warm gold treasure inlay, the second accent (sparingly)
+   · sea-foam text — aqua-tinted ivory over deep water, calm and legible
+   Soft, fluid radii and unhurried motion — elegant, not brutalist.
 
-   The :root declaration is the canonical default (ruri flagship).
-   All other themes in src/theme/themes.ts override these values via
-   ThemeProvider, which writes CSS-custom-property overrides onto
-   document.documentElement and sets the data-theme attribute.
-   The [data-theme='ruri'] selector below restores these exact values
-   if a user switches back to ruri after another theme was active.
+   The :root declaration is the canonical default (Ocean flagship).
+   All themes in src/theme/themes.ts override these values via ThemeProvider,
+   which writes CSS-custom-property overrides onto document.documentElement and
+   sets the data-theme attribute.  [data-theme='ruri'] restores the older Onyx
+   "black stone × gold inlay" cut for users who switch to it.
    ───────────────────────────────────────────────────────────── */
 
 :root,
-[data-theme='ruri'] {
+[data-theme='ocean'] {
   color-scheme: dark;
 
-  /* Ground — sumi ink → lapis shadow */
-  --ink: #07090f;
-  --ink-2: #0a0d16;
-  --stone: #0d1631; /* deep lapis surface */
-  --stone-2: #122051; /* lapis body */
-  --stone-3: #18306e; /* raised lapis */
-  --stone-line: #20356f;
+  /* Ground — abyssal trench → mid depth → near-surface crests */
+  --ink: #02060d;        /* the trench, beneath everything */
+  --ink-2: #04090f;
+  --stone: #08182a;      /* deep water body */
+  --stone-2: #0f2740;    /* mid depth, raised surface */
+  --stone-3: #173550;    /* upper layer, near the light */
+  --stone-line: #21466a; /* current banding line */
 
-  /* Lapis — true ultramarine (never sky, never purple) */
-  --lapis: #2f5bf0;
-  --lapis-bright: #4f7bff;
-  --lapis-deep: #1d3aa8;
+  /* Azure — electric sky-blue current + bioluminescent crest (primary) */
+  --lapis: #2bb4f0;
+  --lapis-bright: #7fe2ff;
+  --lapis-deep: #0e6aa8;
 
-  /* Gold — kin / pyrite / kintsugi seams (warm, real, not champagne pastel) */
-  --gold: #c9a24a;
-  --gold-bright: #ecc873;
-  --gold-deep: #9a7a30;
+  /* Champagne — warm gold treasure inlay (the second accent) */
+  --gold: #d8b96a;
+  --gold-bright: #f2dca0;
+  --gold-deep: #9a7c38;
 
-  /* Vermilion — 朱 shu, the single hot accent (use sparingly) */
-  --shu: #e0452f;
-  --shu-bright: #ff5a40;
+  /* Coral — the single hot accent (danger / badges; ocean coral, sparingly) */
+  --shu: #ff6f61;
+  --shu-bright: #ff9484;
 
-  /* Text — warm washi paper, NOT cool gray/white */
-  --washi: #ece4cf;
-  --washi-dim: #ada590;
-  --washi-mute: #6d6f86; /* cool slate, least important */
+  /* Text — sea-foam ivory over deep water */
+  --washi: #e6f4ff;
+  --washi-dim: #9fc6e0;
+  --washi-mute: #5f87a2; /* deep-tide graphite, least important */
 
-  /* Functional status (kept muted, in-palette where possible) */
-  --ok: #5fb98a;
+  /* Functional status (kept in-palette where possible) */
+  --ok: #34d399;
   --warn: var(--gold-bright);
   --danger: var(--shu);
 
-  /* Seams + structure */
-  --seam: color-mix(in oklab, var(--gold) 42%, transparent);
-  --seam-faint: color-mix(in oklab, var(--gold) 16%, transparent);
-  --line: color-mix(in oklab, var(--lapis) 22%, transparent);
-  --line-faint: color-mix(in oklab, var(--lapis) 10%, transparent);
+  /* Seams (bioluminescent current lines) + bands (pale tide) */
+  --seam: color-mix(in oklab, var(--lapis) 42%, transparent);
+  --seam-faint: color-mix(in oklab, var(--lapis) 16%, transparent);
+  --line: color-mix(in oklab, var(--washi) 14%, transparent);
+  --line-faint: color-mix(in oklab, var(--washi) 7%, transparent);
 
-  /* Radius — brutalist: sharp by default, one soft step for chips */
+  /* Radius — fluid, elegant (Ocean is softer than the brutalist Onyx cut) */
   --r-0: 0px;
-  --r-sm: 2px;
-  --r-md: 4px;
+  --r-sm: 5px;
+  --r-md: 11px;
   --r-pill: 999px;
 
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --dur: 240ms;
+  --dur: 260ms;
 
-  /* Type — mono-led (terminal soul) + brutalist display.
-     Real self-hosted pairing (grotesque display + humanist mono) lands Phase 1. */
+  /* Type — mono-led labels + display + humanist sans + serif soul. */
   --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo,
     Consolas, monospace;
   --font-display: 'Anton', 'Arial Narrow', 'Helvetica Neue', sans-serif;
   --font-sans: 'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system,
     'Segoe UI', Roboto, sans-serif;
   --font-serif: 'Fraunces Variable', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+}
+
+/* Onyx — the older "black banded stone × gold inlay × terminal" cut. */
+[data-theme='ruri'] {
+  color-scheme: dark;
+
+  --ink: #050507;
+  --ink-2: #08080c;
+  --stone: #0f0f15;
+  --stone-2: #16161e;
+  --stone-3: #20202a;
+  --stone-line: #2c2c39;
+
+  --lapis: #5a7fb8;
+  --lapis-bright: #a8c8ee;
+  --lapis-deep: #34507e;
+
+  --gold: #c9a24a;
+  --gold-bright: #f1d489;
+  --gold-deep: #8c6c2c;
+
+  --shu: #d8412c;
+  --shu-bright: #ff5d44;
+
+  --washi: #ece8e0;
+  --washi-dim: #a6a299;
+  --washi-mute: #6a6b78;
+
+  --ok: #57b98a;
+  --warn: var(--gold-bright);
+  --danger: var(--shu);
+
+  --seam: color-mix(in oklab, var(--gold) 40%, transparent);
+  --seam-faint: color-mix(in oklab, var(--gold) 15%, transparent);
+  --line: color-mix(in oklab, var(--washi) 13%, transparent);
+  --line-faint: color-mix(in oklab, var(--washi) 6%, transparent);
+
+  --r-0: 0px;
+  --r-sm: 2px;
+  --r-md: 4px;
+  --r-pill: 999px;
 }
 
 @media (prefers-reduced-motion: reduce) {

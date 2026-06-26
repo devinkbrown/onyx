@@ -1,5 +1,5 @@
 /**
- * Ruri theming engine — curated theme definitions.
+ * Onyx theming engine — curated theme definitions.
  *
  * Each theme is a typed map of CSS-custom-property overrides keyed to the
  * token names defined in src/styles/tokens.css.  A theme only needs to
@@ -30,6 +30,7 @@ export type ThemeMeta = {
 };
 
 export type ThemeId =
+  | 'ocean'
   | 'ruri'
   | 'obsidian'
   | 'pearl'
@@ -39,47 +40,107 @@ export type ThemeId =
   | 'kohaku';
 
 // ---------------------------------------------------------------------------
-// Flagship: ruri — lapis × kintsugi × terminal (dark)
-// Formalises what lives in tokens.css as the default :root.
+// Flagship: ocean — deep-water dark luxury (electric azure × bioluminescence ×
+// champagne gold). Formalises what lives in tokens.css as the default :root.
 // ---------------------------------------------------------------------------
-const ruriTokens: TokenMap = {
-  // Ground
-  '--ink':        '#07090f',
-  '--ink-2':      '#0a0d16',
-  '--stone':      '#0d1631',
-  '--stone-2':    '#122051',
-  '--stone-3':    '#18306e',
-  '--stone-line': '#20356f',
+const oceanTokens: TokenMap = {
+  // Ground — abyssal trench → mid depth → near-surface crests
+  '--ink':        '#02060d',
+  '--ink-2':      '#04090f',
+  '--stone':      '#08182a',
+  '--stone-2':    '#0f2740',
+  '--stone-3':    '#173550',
+  '--stone-line': '#21466a',
 
-  // Lapis
-  '--lapis':       '#2f5bf0',
-  '--lapis-bright':'#4f7bff',
-  '--lapis-deep':  '#1d3aa8',
+  // Azure — electric sky-blue current + bioluminescent crest (primary)
+  '--lapis':       '#2bb4f0',
+  '--lapis-bright':'#7fe2ff',
+  '--lapis-deep':  '#0e6aa8',
 
-  // Gold — kintsugi seams
-  '--gold':       '#c9a24a',
-  '--gold-bright':'#ecc873',
-  '--gold-deep':  '#9a7a30',
+  // Champagne — warm gold treasure inlay (second accent)
+  '--gold':       '#d8b96a',
+  '--gold-bright':'#f2dca0',
+  '--gold-deep':  '#9a7c38',
 
-  // Vermilion — 朱 shu
-  '--shu':        '#e0452f',
-  '--shu-bright': '#ff5a40',
+  // Coral — the single hot accent (danger / badges)
+  '--shu':        '#ff6f61',
+  '--shu-bright': '#ff9484',
 
-  // Text — warm washi paper
-  '--washi':      '#ece4cf',
-  '--washi-dim':  '#ada590',
-  '--washi-mute': '#6d6f86',
+  // Text — sea-foam ivory over deep water
+  '--washi':      '#e6f4ff',
+  '--washi-dim':  '#9fc6e0',
+  '--washi-mute': '#5f87a2',
 
   // Status
-  '--ok':      '#5fb98a',
+  '--ok':      '#34d399',
   '--warn':    'var(--gold-bright)',
   '--danger':  'var(--shu)',
 
-  // Seams + structure
-  '--seam':       'color-mix(in oklab, var(--gold) 42%, transparent)',
-  '--seam-faint': 'color-mix(in oklab, var(--gold) 16%, transparent)',
-  '--line':       'color-mix(in oklab, var(--lapis) 22%, transparent)',
-  '--line-faint': 'color-mix(in oklab, var(--lapis) 10%, transparent)',
+  // Seams (bioluminescent current lines) + bands (pale tide)
+  '--seam':       'color-mix(in oklab, var(--lapis) 42%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--lapis) 16%, transparent)',
+  '--line':       'color-mix(in oklab, var(--washi) 14%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--washi) 7%, transparent)',
+
+  // Radius — fluid, elegant
+  '--r-0':    '0px',
+  '--r-sm':   '5px',
+  '--r-md':   '11px',
+  '--r-pill': '999px',
+
+  // Motion
+  '--ease': 'cubic-bezier(0.16, 1, 0.3, 1)',
+  '--dur':  '260ms',
+
+  // Typography
+  '--font-mono':    "'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace",
+  '--font-display': "'Anton', 'Arial Narrow', 'Helvetica Neue', sans-serif",
+  '--font-sans':    "'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  '--font-serif':   "'Fraunces Variable', 'Iowan Old Style', Georgia, 'Times New Roman', serif",
+};
+
+// ---------------------------------------------------------------------------
+// ruri — Onyx: black banded stone × gold inlay × terminal (dark)
+// The older flagship cut, kept selectable.
+// ---------------------------------------------------------------------------
+const ruriTokens: TokenMap = {
+  // Ground — onyx black → graphite strata
+  '--ink':        '#050507',
+  '--ink-2':      '#08080c',
+  '--stone':      '#0f0f15',
+  '--stone-2':    '#16161e',
+  '--stone-3':    '#20202a',
+  '--stone-line': '#2c2c39',
+
+  // Moonstone — cold silver-blue sheen
+  '--lapis':       '#5a7fb8',
+  '--lapis-bright':'#a8c8ee',
+  '--lapis-deep':  '#34507e',
+
+  // Gold — champagne brass inlay
+  '--gold':       '#c9a24a',
+  '--gold-bright':'#f1d489',
+  '--gold-deep':  '#8c6c2c',
+
+  // Garnet accent (theme token: --shu)
+  '--shu':        '#d8412c',
+  '--shu-bright': '#ff5d44',
+
+  // Text — bone / ivory over black
+  '--washi':      '#ece8e0',
+  '--washi-dim':  '#a6a299',
+  '--washi-mute': '#6a6b78',
+
+  // Status
+  '--ok':      '#57b98a',
+  '--warn':    'var(--gold-bright)',
+  '--danger':  'var(--shu)',
+
+  // Seams (gold inlay) + bands (pale strata)
+  '--seam':       'color-mix(in oklab, var(--gold) 40%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--gold) 15%, transparent)',
+  '--line':       'color-mix(in oklab, var(--washi) 13%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--washi) 6%, transparent)',
 
   // Radius
   '--r-0':    '0px',
@@ -99,19 +160,19 @@ const ruriTokens: TokenMap = {
 };
 
 // ---------------------------------------------------------------------------
-// obsidian — deeper / AMOLED; pure volcanic black ground, cooler lapis
+// obsidian — deeper / AMOLED; pure volcanic black ground, dimmed moonstone
 // ---------------------------------------------------------------------------
 const obsidianTokens: TokenMap = {
   '--ink':        '#000000',
-  '--ink-2':      '#030508',
-  '--stone':      '#080e1e',
-  '--stone-2':    '#0d1830',
-  '--stone-3':    '#122240',
-  '--stone-line': '#162848',
+  '--ink-2':      '#040406',
+  '--stone':      '#0a0a0e',
+  '--stone-2':    '#101016',
+  '--stone-3':    '#17171f',
+  '--stone-line': '#212129',
 
-  '--lapis':        '#2248d0',
-  '--lapis-bright': '#3d6bec',
-  '--lapis-deep':   '#152c8a',
+  '--lapis':        '#52719e',
+  '--lapis-bright': '#9bbce4',
+  '--lapis-deep':   '#2e466c',
 
   '--gold':        '#b8902e',
   '--gold-bright': '#dab85a',
@@ -120,9 +181,9 @@ const obsidianTokens: TokenMap = {
   '--shu':        '#cc3a22',
   '--shu-bright': '#f04828',
 
-  '--washi':      '#e8dfc8',
-  '--washi-dim':  '#9e9682',
-  '--washi-mute': '#5c5e74',
+  '--washi':      '#e8e3da',
+  '--washi-dim':  '#9e9a90',
+  '--washi-mute': '#5c5d68',
 
   '--ok':   '#4ea87a',
   '--warn': 'var(--gold-bright)',
@@ -130,8 +191,8 @@ const obsidianTokens: TokenMap = {
 
   '--seam':       'color-mix(in oklab, var(--gold) 38%, transparent)',
   '--seam-faint': 'color-mix(in oklab, var(--gold) 12%, transparent)',
-  '--line':       'color-mix(in oklab, var(--lapis) 20%, transparent)',
-  '--line-faint': 'color-mix(in oklab, var(--lapis) 8%, transparent)',
+  '--line':       'color-mix(in oklab, var(--washi) 12%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--washi) 5%, transparent)',
 
   '--r-0':    '0px',
   '--r-sm':   '1px',
@@ -285,7 +346,7 @@ const shuTokens: TokenMap = {
 };
 
 // ---------------------------------------------------------------------------
-// hisui — jade-green gem variant (翡翠); deep forest ground + jade accent
+// hisui — jade-green variant; deep forest ground + jade accent
 // ---------------------------------------------------------------------------
 const hisuiTokens: TokenMap = {
   '--ink':        '#060e09',
@@ -332,7 +393,7 @@ const hisuiTokens: TokenMap = {
 };
 
 // ---------------------------------------------------------------------------
-// kohaku — amber gem variant (琥珀); warm amber ground + deep amber seams
+// kohaku — amber variant; warm amber ground + deep amber seams
 // ---------------------------------------------------------------------------
 const kohakuTokens: TokenMap = {
   '--ink':        '#0e0a04',
@@ -382,56 +443,63 @@ const kohakuTokens: TokenMap = {
 // ---------------------------------------------------------------------------
 
 export const THEMES: Record<ThemeId, ThemeMeta> = {
+  ocean: {
+    id: 'ocean',
+    label: 'Ocean',
+    description: 'The flagship — deep water, electric azure current, bioluminescent crests, champagne gold.',
+    scheme: 'dark',
+    tokens: oceanTokens,
+  },
   ruri: {
     id: 'ruri',
-    label: '瑠璃 — Ruri',
-    description: 'Flagship lapis × kintsugi × terminal dark.',
+    label: 'Onyx',
+    description: 'Black banded stone, gold inlay, moonstone sheen — the older cut.',
     scheme: 'dark',
     tokens: ruriTokens,
   },
   obsidian: {
     id: 'obsidian',
-    label: '黒曜 — Obsidian',
-    description: 'Deeper AMOLED variant. Volcanic black ground.',
+    label: 'Obsidian',
+    description: 'Pure AMOLED black. The deepest cut of the stone.',
     scheme: 'dark',
     tokens: obsidianTokens,
   },
   pearl: {
     id: 'pearl',
-    label: '真珠 — Pearl',
-    description: 'Warm washi-paper light theme. Ink text, lapis + gold accents.',
+    label: 'Pearl',
+    description: 'The light cut — warm paper, ink text, gold inlay.',
     scheme: 'light',
     tokens: pearlTokens,
   },
   sumi: {
     id: 'sumi',
-    label: '墨 — Sumi',
-    description: 'High-contrast ink. Near-white washi on deepest sumi-black.',
+    label: 'Ink',
+    description: 'High-contrast. Bone-white on the deepest black.',
     scheme: 'dark',
     tokens: sumiTokens,
   },
   shu: {
     id: 'shu',
-    label: '朱 — Shu',
-    description: 'Vermilion-forward dark. 朱 leads; gold seams persist.',
+    label: 'Garnet',
+    description: 'Garnet-forward dark — deep red ground, gold seams.',
     scheme: 'dark',
     tokens: shuTokens,
   },
   hisui: {
     id: 'hisui',
-    label: '翡翠 — Hisui',
-    description: 'Jade-green gem variant. Deep forest ground, jade accent.',
+    label: 'Jade',
+    description: 'Jade green. Deep forest ground, mineral accent.',
     scheme: 'dark',
     tokens: hisuiTokens,
   },
   kohaku: {
     id: 'kohaku',
-    label: '琥珀 — Kohaku',
-    description: 'Amber gem variant. Warm amber ground and seams.',
+    label: 'Amber',
+    description: 'Amber. Warm resin ground and seams.',
     scheme: 'dark',
     tokens: kohakuTokens,
   },
 };
 
 export const THEME_IDS = Object.keys(THEMES) as ThemeId[];
-export const DEFAULT_THEME_ID: ThemeId = 'ruri';
+export const DEFAULT_THEME_ID: ThemeId = 'ocean';
