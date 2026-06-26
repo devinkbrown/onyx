@@ -7,8 +7,9 @@
  * SOLID IDIOMS: never destructure props; splitProps; createMemo.
  */
 
-import { createMemo, Show, splitProps, type JSX } from 'solid-js';
+import { createMemo, createSignal, Show, splitProps, type JSX } from 'solid-js';
 import { useStore, getState, selectAccount } from '@/lib/store';
+import { ChannelSettings } from './ChannelSettings';
 
 export type PresenceRibbonProps = {
   selfNick?: string;
@@ -57,6 +58,10 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   });
 
   const displayNick = createMemo(() => local.selfNick ?? ourNick() ?? '');
+
+  // Active channel name for the settings panel (display-cased, e.g. "#general").
+  const settingsChannel = createMemo(() => activeChannel()?.name ?? null);
+  const [settingsOpen, setSettingsOpen] = createSignal(false);
 
   const connMod = createMemo(() => {
     const s = connectionStatus();
@@ -121,6 +126,20 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
 
       {/* Right side: identity, conn status, member count */}
       <div class="shell-ribbon-right" role="group" aria-label="Connection status">
+        {/* Channel settings — only in a channel. Opens topic + modes panel. */}
+        <Show when={activeView().kind === 'channel' && settingsChannel()}>
+          <button
+            type="button"
+            class="shell-ribbon-settings"
+            aria-label={`Channel settings for ${settingsChannel()}`}
+            aria-haspopup="dialog"
+            onClick={() => setSettingsOpen(true)}
+            data-testid="ribbon-settings-gear"
+          >
+            <span class="shell-ribbon-settings-glyph" aria-hidden="true">⚙</span>
+          </button>
+        </Show>
+
         {/* Member count — only show in channel */}
         <Show when={activeView().kind === 'channel' && memberCount() > 0}>
           <button
@@ -170,6 +189,17 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
           <span class="sr-only">{connLabel()}</span>
         </span>
       </div>
+
+      {/* Channel settings panel (topic + modes) — portaled Sheet. */}
+      <Show when={settingsChannel()}>
+        {(name) => (
+          <ChannelSettings
+            channel={name()}
+            open={settingsOpen()}
+            onOpenChange={setSettingsOpen}
+          />
+        )}
+      </Show>
     </header>
   );
 }

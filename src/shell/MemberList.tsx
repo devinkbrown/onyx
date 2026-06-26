@@ -23,7 +23,7 @@ import {
   splitProps,
   type JSX,
 } from 'solid-js';
-import { useStore, getState } from '@/lib/store';
+import { useStore, getState, selectIsChannelOp } from '@/lib/store';
 import type { ChannelUser } from '@/lib/irc/types';
 import { Avatar, Popover, Button } from '@/primitives/index';
 
@@ -104,17 +104,44 @@ function RoleBadge(props: RoleBadgeProps): JSX.Element {
 type MemberCardProps = {
   user: ChannelUser;
   role: ResolvedRole;
+  /** Active channel the member belongs to (for moderation commands). */
+  channel: string;
 };
 
 function MemberCard(props: MemberCardProps): JSX.Element {
-  const [local] = splitProps(props, ['user', 'role']);
+  const [local] = splitProps(props, ['user', 'role', 'channel']);
+
+  // Reactive op-gate: moderation controls only render for op (or higher).
+  const canModerate = useStore((s) => selectIsChannelOp(local.channel)(s));
+  const ourNick = useStore((s) => s.ourNick);
+
+  // Whether the target currently holds the named status mode.
+  const hasMode = (m: string): boolean => local.user.modes.has(m);
+  const isSelf = (): boolean => local.user.nick.toLowerCase() === ourNick().toLowerCase();
 
   function handleDm(): void {
     getState().navigate({ kind: 'dm', nick: local.user.nick });
   }
 
   function handleWhois(): void {
-    getState().openWhois(local.user.nick);
+    getState().whois(local.user.nick);
+  }
+
+  function handleOp(): void {
+    getState().opMember(local.channel, local.user.nick, !hasMode('o'));
+  }
+
+  function handleVoice(): void {
+    getState().voiceMember(local.channel, local.user.nick, !hasMode('v'));
+  }
+
+  function handleKick(): void {
+    getState().kickMember(local.channel, local.user.nick);
+  }
+
+  function handleBan(): void {
+    // Ban by nick mask — a conservative, readable default.
+    getState().banMask(local.channel, `${local.user.nick}!*@*`);
   }
 
   return (
@@ -123,6 +150,7 @@ function MemberCard(props: MemberCardProps): JSX.Element {
         <Avatar name={local.user.nick} size="md" owner={local.role.key === 'owner' || local.role.key === 'founder'} />
         <div>
           <p class="shell-member-card-nick">{local.user.nick}</p>
+          <p class="shell-member-card-role">{local.role.label}</p>
           <Show when={local.user.account}>
             {(acct) => (
               <p class="shell-member-card-account">~{acct()}</p>
@@ -153,6 +181,48 @@ function MemberCard(props: MemberCardProps): JSX.Element {
           Profile
         </Button>
       </div>
+
+      {/* Moderation — op (or higher) only, and never against yourself. */}
+      <Show when={canModerate() && !isSelf()}>
+        <div
+          class="shell-member-card-mod"
+          role="group"
+          aria-label={`Moderate ${local.user.nick}`}
+        >
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleOp}
+            aria-label={hasMode('o') ? `Remove op from ${local.user.nick}` : `Give op to ${local.user.nick}`}
+          >
+            {hasMode('o') ? 'Deop' : 'Op'}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleVoice}
+            aria-label={hasMode('v') ? `Remove voice from ${local.user.nick}` : `Give voice to ${local.user.nick}`}
+          >
+            {hasMode('v') ? 'Devoice' : 'Voice'}
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={handleKick}
+            aria-label={`Kick ${local.user.nick} from ${local.channel}`}
+          >
+            Kick
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={handleBan}
+            aria-label={`Ban ${local.user.nick} from ${local.channel}`}
+          >
+            Ban
+          </Button>
+        </div>
+      </Show>
     </div>
   );
 }
@@ -279,7 +349,7 @@ export function MemberList(props: MemberListProps): JSX.Element {
                         </div>
                       }
                     >
-                      <MemberCard user={user} role={role} />
+                      <MemberCard user={user} role={role} channel={activeChannel()?.name ?? ''} />
                     </Popover>
                   )}
                 </For>

@@ -645,6 +645,30 @@ export interface OnyxState {
   /** Leave a channel */
   partChannel(channel: string): void;
 
+  // ── Channel management & member moderation ─────────────────────────────
+  // Each action sends the matching raw IRC command through the client. They
+  // are intentionally thin: server replies (MODE / KICK / TOPIC echoes,
+  // numerics, FAIL/WARN) are folded back into state by _handleMessage.
+
+  /** Set (or clear) a channel topic — `TOPIC <#chan> :<text>`. */
+  setTopic(channel: string, text: string): void;
+  /** Apply channel modes — `MODE <#chan> <modes> [args…]` (e.g. '+m', '+k', key). */
+  setChannelMode(channel: string, modes: string, ...args: string[]): void;
+  /** Kick a member — `KICK <#chan> <nick> [:reason]`. */
+  kickMember(channel: string, nick: string, reason?: string): void;
+  /** Ban a mask — `MODE <#chan> +b <mask>`. */
+  banMask(channel: string, mask: string): void;
+  /** Lift a ban — `MODE <#chan> -b <mask>`. */
+  unbanMask(channel: string, mask: string): void;
+  /** Invite a user — `INVITE <nick> <#chan>`. */
+  inviteUser(channel: string, nick: string): void;
+  /** Grant / revoke op — `MODE <#chan> +o|-o <nick>`. */
+  opMember(channel: string, nick: string, on: boolean): void;
+  /** Grant / revoke voice — `MODE <#chan> +v|-v <nick>`. */
+  voiceMember(channel: string, nick: string, on: boolean): void;
+  /** Request a WHOIS — `WHOIS <nick>`. */
+  whois(nick: string): void;
+
   /** Navigate to a channel or DM */
   navigate(view: ActiveView): void;
 
@@ -2119,6 +2143,57 @@ export const store = createStore<OnyxState>()(
     // ── partChannel ──────────────────────────────────────────────────────
     partChannel(channel) {
       get().client?.sendRaw('PART', channel, 'Goodbye');
+    },
+
+    // ── Channel management & member moderation ───────────────────────────
+    // Thin raw-command dispatchers. They never optimistically mutate channel
+    // state — the server's MODE / KICK / TOPIC echo (or FAIL/WARN) is the
+    // source of truth, applied in _handleMessage.
+
+    setTopic(channel, text) {
+      get().client?.sendRaw('TOPIC', channel, text);
+    },
+
+    setChannelMode(channel, modes, ...args) {
+      if (!modes) return;
+      get().client?.sendRaw('MODE', channel, modes, ...args);
+    },
+
+    kickMember(channel, nick, reason) {
+      const trimmed = reason?.trim();
+      if (trimmed) {
+        get().client?.sendRaw('KICK', channel, nick, trimmed);
+      } else {
+        get().client?.sendRaw('KICK', channel, nick);
+      }
+    },
+
+    banMask(channel, mask) {
+      if (!mask.trim()) return;
+      get().client?.sendRaw('MODE', channel, '+b', mask);
+    },
+
+    unbanMask(channel, mask) {
+      if (!mask.trim()) return;
+      get().client?.sendRaw('MODE', channel, '-b', mask);
+    },
+
+    inviteUser(channel, nick) {
+      if (!nick.trim()) return;
+      // RFC order: INVITE <nick> <channel>
+      get().client?.sendRaw('INVITE', nick, channel);
+    },
+
+    opMember(channel, nick, on) {
+      get().client?.sendRaw('MODE', channel, on ? '+o' : '-o', nick);
+    },
+
+    voiceMember(channel, nick, on) {
+      get().client?.sendRaw('MODE', channel, on ? '+v' : '-v', nick);
+    },
+
+    whois(nick) {
+      get().openWhois(nick);
     },
 
     // ── navigate ─────────────────────────────────────────────────────────
@@ -3923,6 +3998,30 @@ export const store = createStore<OnyxState>()(
           break;
         }
 
+        // ── RPL_CHANNELMODEIS (324): authoritative current channel modes ──
+        // `:server 324 <me> <#chan> <+modes> [args…]` — seeds Channel.modes so
+        // the settings panel reflects live flags/key/limit on join or refresh.
+        case '324': {
+          const ch = params[1];
+          if (ch && isChan(ch)) {
+            const key = ch.toLowerCase();
+            const modeStr = params[2] ?? '';
+            const modeArgs = params.slice(3);
+            const prefixModes = new Set(Object.keys(get().client?.modeToPrefix ?? { Q: '!', q: '.', o: '@', v: '+' }));
+            const chanmodes = get().client?.isupport.CHANMODES ?? [];
+            set(s => {
+              const channels = new Map(s.channels);
+              const c = channels.get(key);
+              if (!c) return {};
+              // Rebuild from empty so 324 is fully authoritative.
+              const modes = applyChannelModeDelta('', modeStr, modeArgs, chanmodes, prefixModes);
+              channels.set(key, { ...c, modes });
+              return { channels };
+            });
+          }
+          break;
+        }
+
         // ── Messages ──────────────────────────────────────────────────────
         case 'PRIVMSG':
         case 'NOTICE': {
@@ -4452,9 +4551,13 @@ export const store = createStore<OnyxState>()(
                 changedUsers = true;
               }
 
+              // Track plain channel-mode flags (+m/+i/+t/+k/+l …) on the
+              // channel itself so the settings panel reflects live state.
+              const nextModes = applyChannelModeDelta(c.modes ?? '', modeStr, modeArgs, chanmodes, prefixModes);
+
               const sysm = sysMsg(`${nick ?? 'server'} set mode ${modeText}`, target);
               const msgs = [...(c.messages ?? []), sysm];
-              return { channels: new Map(channels).set(key, { ...c, users: changedUsers ? users : c.users, messages: msgs } as Channel) };
+              return { channels: new Map(channels).set(key, { ...c, modes: nextModes, users: changedUsers ? users : c.users, messages: msgs } as Channel) };
             });
 
             // Emit audit entries for ban/unban/other mode changes
@@ -7234,6 +7337,100 @@ export const selectUnreadCount = (target: string) => (s: OnyxState): number => {
 /** The account we're logged into (server.account), or null when a guest. */
 export const selectAccount = (s: OnyxState): string | null => s.server?.account ?? null;
 
+// ── Channel role / mode selectors ────────────────────────────────────────────
+
+/**
+ * Status-mode rank ladder for a channel member. Higher wins:
+ *   Y network-oper > Q founder > q owner > o op > v voice > '' member.
+ * Used to gate moderation affordances. Mirrors MemberList's resolveRole order.
+ */
+const STATUS_RANK: Record<string, number> = { Y: 5, Q: 4, q: 3, o: 2, v: 1 };
+
+function rankOfModes(modes: Set<string> | undefined): number {
+  if (!modes) return 0;
+  let best = 0;
+  for (const m of modes) {
+    const r = STATUS_RANK[m] ?? 0;
+    if (r > best) best = r;
+  }
+  return best;
+}
+
+/** Our highest status mode in `channel` ('Y'|'Q'|'q'|'o'|'v'|''), or '' if none. */
+export const selectOwnPrefix = (channel: string) => (s: OnyxState): string => {
+  const ch = s.channels.get(channel.toLowerCase());
+  if (!ch) return '';
+  const me = ch.users.get(s.ourNick.toLowerCase());
+  if (!me) return '';
+  let best = '';
+  let bestRank = 0;
+  for (const m of me.modes) {
+    const r = STATUS_RANK[m] ?? 0;
+    if (r > bestRank) { bestRank = r; best = m; }
+  }
+  return best;
+};
+
+/**
+ * True when the current user can moderate `channel` — i.e. holds op (o) or
+ * higher (owner q, founder Q, network-oper Y). Network opers (Y) are always
+ * treated as privileged. Used to gate Op/Kick/Ban/Mode controls in the UI.
+ */
+export const selectIsChannelOp = (channel: string) => (s: OnyxState): boolean => {
+  if (s.isOper) return true;
+  const ch = s.channels.get(channel.toLowerCase());
+  if (!ch) return false;
+  const me = ch.users.get(s.ourNick.toLowerCase());
+  return rankOfModes(me?.modes) >= STATUS_RANK.o!;
+};
+
+/** Parsed channel-mode state (flags + key/limit) for the settings UI. */
+export interface ChannelModeState {
+  /** Set of simple flag letters currently set (m, i, t, n, s, p, …). */
+  flags: Set<string>;
+  /** +k key, if any. */
+  key: string | null;
+  /** +l user limit, if any. */
+  limit: number | null;
+}
+
+/**
+ * Derive the channel's current modes from `Channel.modes` (maintained from
+ * MODE echoes + RPL_CHANNELMODEIS). Flag letters are split from any +k/+l
+ * arguments so the settings panel can reflect live state.
+ */
+export const selectChannelModeState = (channel: string) => (s: OnyxState): ChannelModeState => {
+  const ch = s.channels.get(channel.toLowerCase());
+  return parseChannelModeString(ch?.modes ?? '');
+};
+
+/**
+ * Parse a stored mode string like "+mntk secret" or "imt 50" into flags +
+ * key/limit. Tolerant of a leading '+', missing args, and stray whitespace.
+ */
+export function parseChannelModeString(modeStr: string): ChannelModeState {
+  const flags = new Set<string>();
+  let key: string | null = null;
+  let limit: number | null = null;
+  if (!modeStr) return { flags, key, limit };
+
+  const parts = modeStr.trim().split(/\s+/);
+  const letters = (parts[0] ?? '').replace(/^\+/, '');
+  const args = parts.slice(1);
+  let argIdx = 0;
+  for (const ch of letters) {
+    if (ch === '+' || ch === '-') continue;
+    flags.add(ch);
+    if (ch === 'k') {
+      key = args[argIdx++] ?? null;
+    } else if (ch === 'l') {
+      const n = Number.parseInt(args[argIdx++] ?? '', 10);
+      limit = Number.isFinite(n) ? n : null;
+    }
+  }
+  return { flags, key, limit };
+}
+
 /** First unread message id for the UnreadDivider / jump-pill, or null. */
 export const selectFirstUnreadId = (target: string) => (s: OnyxState): string | null =>
   s.firstUnreadId.get(target.toLowerCase()) ?? null;
@@ -7287,6 +7484,61 @@ export const selectTegami = (target: string) => (s: OnyxState): { count: number;
  *   D (flag, never arg)  → never
  * Status/prefix modes (Q/q/o/v) always take a nick argument.
  */
+/**
+ * Apply a MODE delta (e.g. "+mk-l" with args ["secret"]) to a channel's stored
+ * mode string, returning the new canonical "+<flags> <key> <limit>" form.
+ *
+ * Only plain (non-status, non-list) channel modes are tracked here — status
+ * modes (Q/q/o/v) live on each ChannelUser, and list modes (b/e/I) have their
+ * own state. This keeps `Channel.modes` an accurate reflection of the simple
+ * flags the settings panel toggles, without double-counting per-user grants.
+ */
+function applyChannelModeDelta(
+  current: string,
+  modeStr: string,
+  modeArgs: string[],
+  chanmodes: string[],
+  prefixModes: Set<string>,
+): string {
+  const state = parseChannelModeString(current);
+  const flags = new Set(state.flags);
+  let key = state.key;
+  let limit = state.limit;
+  const [listModes = ''] = chanmodes;
+
+  let adding = true;
+  let argIdx = 0;
+  for (const ch of modeStr) {
+    if (ch === '+') { adding = true; continue; }
+    if (ch === '-') { adding = false; continue; }
+    const consumesArg = modeConsumesArg(ch, adding, chanmodes, prefixModes);
+    const arg = consumesArg ? modeArgs[argIdx++] : undefined;
+    // Skip status (per-user) and list modes — tracked elsewhere.
+    if (prefixModes.has(ch) || listModes.includes(ch)) continue;
+    if (ch === 'k') {
+      if (adding) { flags.add('k'); key = arg ?? key; }
+      else { flags.delete('k'); key = null; }
+    } else if (ch === 'l') {
+      if (adding) {
+        flags.add('l');
+        const n = Number.parseInt(arg ?? '', 10);
+        if (Number.isFinite(n)) limit = n;
+      } else { flags.delete('l'); limit = null; }
+    } else if (adding) {
+      flags.add(ch);
+    } else {
+      flags.delete(ch);
+    }
+  }
+
+  const letters = [...flags].sort().join('');
+  if (!letters) return '';
+  let out = `+${letters}`;
+  if (flags.has('k') && key) out += ` ${key}`;
+  if (flags.has('l') && limit != null) out += ` ${limit}`;
+  return out;
+}
+
 function modeConsumesArg(
   letter: string,
   adding: boolean,
