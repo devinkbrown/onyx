@@ -1,15 +1,27 @@
 /**
  * Connect.tsx — Onyx connect screen (Ocean dark-luxury).
  *
- * Renders the nick/password form, session-token toggle, live connection-state
- * feedback, and (when connected) the real AppShell.
+ * The front door to the Orochi mesh. A segmented mode switch routes between
+ * three auth surfaces, all on the same Ocean atmosphere:
+ *
+ *   • Guest    — nick only; drifts in anonymously (or with a saved SESSION).
+ *   • Sign in  — nick + account password → SASL login.
+ *   • Register — desired account + optional email + password (+ confirm), with
+ *                live validation and a strength meter. Flows form → verify → done.
+ *
+ * Two contextual recovery paths layer on top:
+ *   • GHOST reclaim — when a nick is in use, offer to evict the stale session.
+ *   • Session resume — a one-tap "welcome back" when a remembered identity exists.
  *
  * The network is a single mesh, so the client does NOT expose a server picker:
  * it measures latency to each node and attaches to the fastest (nearest) one
  * automatically. Which node is used is never surfaced in the UI.
  *
- * The global store is the single source of truth for the connection. On submit,
- * we call getState().connect(...) and gate the view on connectionStatus.
+ * The global store is the single source of truth. We call getState() actions and
+ * gate the view on connectionStatus; registration reacts to registerPending /
+ * registerError / verifyRequired. Nick-in-use is detected from the store's
+ * currentNickIsAlias flag (or the latest error notification) — we never mutate
+ * the store to learn it.
  *
  * SOLID IDIOMS: components run once. Never destructure props. Use splitProps,
  * createSignal/createMemo/createEffect/onCleanup, For/Show, and clean up the
@@ -20,6 +32,7 @@ import './connect.css';
 import {
   createSignal,
   createMemo,
+  createEffect,
   For,
   onMount,
   Show,
@@ -31,6 +44,7 @@ import { Button } from '@/primitives/index';
 import { FormField } from '@/primitives/index';
 import { Spinner } from '@/primitives/index';
 import { Mascot } from '@/components/brand/Mascot';
+import { loadCredentials, type SavedCredentials } from '@/lib/credentials';
 import { initialNode, selectBestNode, type IrcNode } from './nodes';
 
 // ── Ocean atmosphere — deep-water depth, azure currents, bioluminescence ─────
@@ -91,6 +105,126 @@ function Atmosphere(): JSX.Element {
   );
 }
 
+// ── Constants ────────────────────────────────────────────────────────────────
+
+type Mode = 'guest' | 'signin' | 'register';
+
+const MODES: ReadonlyArray<{ id: Mode; label: string }> = [
+  { id: 'guest',    label: 'Guest' },
+  { id: 'signin',   label: 'Sign in' },
+  { id: 'register', label: 'Register' },
+];
+
+/** Account passwords must be at least this long to register. */
+const MIN_PASSWORD_LEN = 8;
+
+// ── Validation helpers (pure) ────────────────────────────────────────────────
+
+/** IRC nick rules — start with a letter / special char, no leading digit. */
+export function validateNick(value: string): string | undefined {
+  const v = value.trim();
+  if (!v) return 'Nick is required.';
+  if (v.length > 64) return 'Nick must be 64 characters or fewer.';
+  if (!/^[A-Za-z\[\]\\`_^{|}][A-Za-z0-9\[\]\\`_^{|}\-]*$/.test(v)) {
+    return 'Nick must start with a letter or IRC special char and contain only letters, numbers, or -[]\\`_^{|}.';
+  }
+  return undefined;
+}
+
+/** A light, forgiving email shape check (optional field — empty is valid). */
+export function validateEmail(value: string): string | undefined {
+  const v = value.trim();
+  if (!v) return undefined; // optional
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return 'Enter a valid email address.';
+  return undefined;
+}
+
+export function validatePassword(value: string): string | undefined {
+  if (!value) return 'Password is required.';
+  if (value.length < MIN_PASSWORD_LEN) return `Use at least ${MIN_PASSWORD_LEN} characters.`;
+  return undefined;
+}
+
+export function validateConfirm(password: string, confirm: string): string | undefined {
+  if (!confirm) return 'Confirm your password.';
+  if (password !== confirm) return 'Passwords do not match.';
+  return undefined;
+}
+
+/** 0–4 strength score from length + character-class variety. */
+export function passwordStrength(value: string): { score: number; label: string } {
+  if (!value) return { score: 0, label: 'empty' };
+  let score = 0;
+  if (value.length >= MIN_PASSWORD_LEN) score++;
+  if (value.length >= 12) score++;
+  if (/[a-z]/.test(value) && /[A-Z]/.test(value)) score++;
+  if (/\d/.test(value)) score++;
+  if (/[^A-Za-z0-9]/.test(value)) score++;
+  const clamped = Math.max(0, Math.min(4, score)) as 0 | 1 | 2 | 3 | 4;
+  const LABELS = ['weak', 'weak', 'fair', 'good', 'strong'] as const;
+  return { score: clamped, label: LABELS[clamped] };
+}
+
+// ── Password input with show / hide toggle ───────────────────────────────────
+
+interface PasswordInputProps {
+  id: string;
+  label: string;
+  placeholder?: string;
+  autocomplete?: string;
+  value: string;
+  error?: string;
+  description?: string;
+  disabled?: boolean;
+  required?: boolean;
+  onInput: (value: string) => void;
+}
+
+function PasswordInput(props: PasswordInputProps): JSX.Element {
+  const [shown, setShown] = createSignal(false);
+  const descriptionId = () => (props.description ? `${props.id}-description` : undefined);
+  const errorId = () => (props.error ? `${props.id}-error` : undefined);
+  const describedBy = () =>
+    [descriptionId(), errorId()].filter(Boolean).join(' ') || undefined;
+
+  return (
+    <div class="ruri-field conn-password">
+      <label class="ruri-field__label" for={props.id}>{props.label}</label>
+      <Show when={props.description}>
+        <p class="ruri-field__description" id={descriptionId()}>{props.description}</p>
+      </Show>
+      <div class="conn-password-row">
+        <input
+          id={props.id}
+          class="ruri-field__input"
+          type={shown() ? 'text' : 'password'}
+          placeholder={props.placeholder}
+          autocomplete={props.autocomplete}
+          value={props.value}
+          required={props.required}
+          disabled={props.disabled}
+          aria-invalid={props.error ? 'true' : undefined}
+          aria-describedby={describedBy()}
+          onInput={(e) => props.onInput(e.currentTarget.value)}
+        />
+        <button
+          type="button"
+          class="conn-password-toggle"
+          aria-pressed={shown() ? 'true' : 'false'}
+          aria-label={shown() ? 'Hide password' : 'Show password'}
+          disabled={props.disabled}
+          onClick={() => setShown((v) => !v)}
+        >
+          {shown() ? 'Hide' : 'Show'}
+        </button>
+      </div>
+      <Show when={props.error}>
+        <p class="ruri-field__error" id={errorId()}>{props.error}</p>
+      </Show>
+    </div>
+  );
+}
+
 // ── Connect form ─────────────────────────────────────────────────────────────
 
 export interface ConnectProps {
@@ -99,19 +233,51 @@ export interface ConnectProps {
 }
 
 export function Connect(props: ConnectProps): JSX.Element {
-  // ── Form state ────────────────────────────────────────────────────────────
+  void props;
+
+  // ── Mode ──────────────────────────────────────────────────────────────────
+  const [mode, setMode] = createSignal<Mode>('guest');
+
+  // ── Shared form state ──────────────────────────────────────────────────────
   const [nick, setNick] = createSignal('');
   const [password, setPassword] = createSignal('');
   const [staySignedIn, setStaySignedIn] = createSignal(true);
+
+  // Register-only fields
+  const [email, setEmail] = createSignal('');
+  const [confirm, setConfirm] = createSignal('');
+  const [verifyCode, setVerifyCode] = createSignal('');
+
+  // Per-field errors (only shown after a submit attempt for that field)
   const [nickError, setNickError] = createSignal<string | undefined>(undefined);
-  // True only once the user has actually submitted a connect — so the form
-  // never flashes an "error" merely because a nick was typed while disconnected.
+  const [passwordError, setPasswordError] = createSignal<string | undefined>(undefined);
+  const [emailError, setEmailError] = createSignal<string | undefined>(undefined);
+  const [confirmError, setConfirmError] = createSignal<string | undefined>(undefined);
+  const [verifyError, setVerifyError] = createSignal<string | undefined>(undefined);
+
+  // True only once a connect has actually been submitted — so the form never
+  // flashes "error" merely because a nick was typed while disconnected.
   const [attempted, setAttempted] = createSignal(false);
 
-  // ── Automatic node selection (no server picker) ───────────────────────────
-  // Start with a synchronous best-guess so connect always has a target, then
-  // refine to the lowest-latency (nearest) reachable node once probing resolves.
-  // The chosen node is never shown in the UI.
+  // Registration is a small state machine, tracked explicitly so the multi-step
+  // gating never depends on signal-update ordering:
+  //   idle       → not registering
+  //   submitting → REGISTER sent; awaiting the server's verdict
+  //   verifying  → server asked for a code; the verify form is showing
+  //   completing → code accepted; chaining into a real authed connect
+  type RegisterPhase = 'idle' | 'submitting' | 'verifying' | 'completing';
+  const [registerPhase, setRegisterPhase] = createSignal<RegisterPhase>('idle');
+  const registerSubmitted = createMemo(() => registerPhase() !== 'idle');
+
+  // ── GHOST reclaim ──────────────────────────────────────────────────────────
+  const [reclaimOpen, setReclaimOpen] = createSignal(false);
+  const [reclaimPassword, setReclaimPassword] = createSignal('');
+
+  // ── Remembered identity (one-tap resume) ───────────────────────────────────
+  const [saved, setSaved] = createSignal<SavedCredentials | null>(null);
+  const [resumeDismissed, setResumeDismissed] = createSignal(false);
+
+  // ── Automatic node selection (no server picker) ────────────────────────────
   const [chosenNode, setChosenNode] = createSignal<IrcNode>(initialNode());
   const [routing, setRouting] = createSignal(true);
 
@@ -120,20 +286,44 @@ export function Connect(props: ConnectProps): JSX.Element {
       setChosenNode(node);
       setRouting(false);
     });
+    // Surface a remembered identity if one exists. Pre-fill the nick so guest /
+    // sign-in start from a familiar place.
+    const creds = loadCredentials();
+    if (creds) {
+      setSaved(creds);
+      if (!nick()) setNick(creds.nick);
+    }
   });
 
-  // ── Store reads ───────────────────────────────────────────────────────────
+  // ── Store reads ─────────────────────────────────────────────────────────────
   const connectionStatus = useStore((s) => s.connectionStatus);
   const ourNick = useStore((s) => s.ourNick);
+  const registerPending = useStore((s) => s.registerPending);
+  const registerError = useStore((s) => s.registerError);
+  const verifyRequired = useStore((s) => s.verifyRequired);
+  const currentNickIsAlias = useStore((s) => s.currentNickIsAlias);
+  const notifications = useStore((s) => s.notifications);
 
-  // ── Derived phase label for the form status bar ───────────────────────────
-  // Maps store connectionStatus to a display phase for the connect form.
+  // Latest error notification text — used to distinguish failure types and to
+  // detect a nick-in-use without modifying the store.
+  const lastErrorText = createMemo<string>(() => {
+    const list = notifications();
+    for (let i = list.length - 1; i >= 0; i--) {
+      if (list[i]!.type === 'error') return list[i]!.text;
+    }
+    return '';
+  });
+
+  const nickInUse = createMemo<boolean>(() => {
+    if (currentNickIsAlias()) return true;
+    return /nick(?:name)?\s+in\s+use/i.test(lastErrorText());
+  });
+
+  // ── Derived phase for the form status bar ───────────────────────────────────
   const formPhase = createMemo<'idle' | 'connecting' | 'error'>(() => {
     const s = connectionStatus();
     if (s === 'connecting' || s === 'reconnecting') return 'connecting';
     if (s === 'disconnected') {
-      // Only an "error" once a connect has actually been attempted — typing a
-      // nick before submitting must not surface an error state.
       return attempted() ? 'error' : 'idle';
     }
     return 'idle';
@@ -144,88 +334,286 @@ export function Connect(props: ConnectProps): JSX.Element {
     connecting: 'connecting',
     error:      'error',
   };
-
   const phaseLabel = createMemo(() => PHASE_LABEL[formPhase()]);
-  // Reactive status copy — never names a server (the client auto-routes) and
+
+  // Reactive status copy — distinguishes failure types, never names a server,
   // never blames the nick for a server-side failure.
   const statusMsg = createMemo(() => {
+    if (registerPending()) return 'Registering your account…';
+    if (registerError()) return registerError() ?? 'Registration failed — please try again.';
+    if (verifyRequired() && registerSubmitted()) {
+      return 'Almost there — enter the verification code we sent you.';
+    }
     switch (formPhase()) {
       case 'connecting':
         return 'Opening an encrypted channel…';
       case 'error':
+        if (nickInUse()) {
+          return 'That name is already in the water — reclaim it, or pick another.';
+        }
+        if (/password|auth|login|incorrect|credential|464/i.test(lastErrorText())) {
+          return 'That password was not accepted. Check it and sign in again.';
+        }
         return "The network didn't answer — it may be busy. Try again in a moment.";
       default:
         return routing()
           ? 'Finding the nearest node…'
-          : 'Pick a name and slip into the water — Onyx finds the nearest node for you.';
+          : modeHint(mode());
     }
+  });
+
+  function modeHint(m: Mode): string {
+    switch (m) {
+      case 'signin':
+        return 'Sign in to your account — Onyx finds the nearest node for you.';
+      case 'register':
+        return 'Claim a name that is yours — registration takes a moment.';
+      default:
+        return 'Pick a name and slip into the water — Onyx finds the nearest node for you.';
+    }
+  }
+
+  // The status phase reflects registration first, then connection.
+  const statusPhase = createMemo<'idle' | 'connecting' | 'error'>(() => {
+    if (registerError()) return 'error';
+    if (registerPending()) return 'connecting';
+    return formPhase();
   });
 
   const isFormReady = createMemo(() => {
     const s = connectionStatus();
-    return s !== 'connecting' && s !== 'connected' && s !== 'reconnecting';
+    if (s === 'connecting' || s === 'connected' || s === 'reconnecting') return false;
+    return !registerPending();
   });
 
-  // ── Validation ────────────────────────────────────────────────────────────
+  // ── Live validity (drives submit-button enablement, no error text yet) ──────
   const nickTrimmed = createMemo(() => nick().trim());
 
-  function validateNick(value: string): string | undefined {
-    const v = value.trim();
-    if (!v) return 'Nick is required.';
-    if (v.length > 64) return 'Nick must be 64 characters or fewer.';
-    if (!/^[A-Za-z\[\]\\`_^{|}][A-Za-z0-9\[\]\\`_^{|}\-]*$/.test(v)) {
-      return 'Nick must start with a letter or IRC special char and contain only letters, numbers, or -[]\\`_^{|}.';
+  const canSubmit = createMemo<boolean>(() => {
+    if (!isFormReady()) return false;
+    const m = mode();
+    if (m === 'guest') return !!nickTrimmed();
+    if (m === 'signin') return !!nickTrimmed() && !!password();
+    // register
+    return (
+      !validateNick(nick()) &&
+      !validateEmail(email()) &&
+      !validatePassword(password()) &&
+      !validateConfirm(password(), confirm())
+    );
+  });
+
+  // ── Registration phase transitions (deterministic, store-reactive) ──────────
+  // REGISTER / VERIFY are dispatched only after the round-trip is observed, so a
+  // dedicated flag marks "a request is in flight" — transitions then key off the
+  // server's verdict (registerPending falling edge), never on signal ordering.
+  const [registerInFlight, setRegisterInFlight] = createSignal(false);
+
+  // submitting → verifying: the server asked for a verification code.
+  createEffect(() => {
+    if (registerPhase() === 'submitting' && verifyRequired()) {
+      setRegisterInFlight(false);
+      setRegisterPhase('verifying');
     }
-    return undefined;
+  });
+
+  // Resolution of a REGISTER / VERIFY round-trip is signalled by registerPending
+  // falling to false. The server reports VERIFICATION_REQUIRED and SUCCESS as
+  // separate store writes whose individual keys may surface to our selectors in
+  // any order, so we defer the success decision to a microtask: by then every
+  // key in the batch has settled and a pending verifyRequired wins cleanly.
+  createEffect(() => {
+    const phase = registerPhase();
+    const inFlight = registerInFlight();
+    const pending = registerPending();
+    if ((phase === 'submitting' || phase === 'verifying') && inFlight && !pending) {
+      queueMicrotask(() => {
+        if (!registerInFlight()) return;
+        if (registerError()) {
+          setRegisterInFlight(false);
+          return; // surfaced inline; user can retry
+        }
+        if (registerPhase() === 'submitting' && verifyRequired()) {
+          return; // the verifying transition handles this
+        }
+        if (!verifyRequired()) {
+          setRegisterInFlight(false);
+          finishRegistration();
+        }
+      });
+    }
+  });
+
+  // When the verify step appears, focus the code field.
+  let verifyInputRef: HTMLInputElement | undefined;
+  createEffect(() => {
+    if (registerPhase() === 'verifying' && verifyInputRef) {
+      verifyInputRef.focus();
+    }
+  });
+
+  function finishRegistration(): void {
+    setRegisterPhase('completing');
+    if (connectionStatus() === 'connected') {
+      // Drop the anonymous connection used to run REGISTER so the next connect
+      // re-runs SASL and logs the new account in.
+      getState().disconnect();
+    }
+    doConnect(nickTrimmed(), password());
+    setRegisterPhase('idle');
   }
 
-  // ── Connect action ────────────────────────────────────────────────────────
+  // ── Mode switching ──────────────────────────────────────────────────────────
+  function switchMode(next: Mode): void {
+    if (next === mode()) return;
+    setMode(next);
+    // Clear transient errors so a stale message from another mode never lingers.
+    setNickError(undefined);
+    setPasswordError(undefined);
+    setEmailError(undefined);
+    setConfirmError(undefined);
+    setVerifyError(undefined);
+  }
 
-  function handleConnect(event: SubmitEvent): void {
+  // ── Connect action (shared by guest / sign-in / post-register) ──────────────
+  function doConnect(n: string, pass: string): void {
+    setAttempted(true);
+    setReclaimOpen(false);
+    const node = chosenNode();
+    getState().connect({
+      url:  node.wss,
+      nick: n,
+      password: pass.trim() || undefined,
+      realname: `${n} (Onyx)`,
+    });
+    // staySignedIn: the store persists session tokens via saveCredentials /
+    // loadCredentials internally. The toggle communicates intent in the UI.
+    void staySignedIn;
+  }
+
+  function handleSubmit(event: SubmitEvent): void {
     event.preventDefault();
+    const m = mode();
 
+    if (m === 'register') {
+      handleRegisterSubmit();
+      return;
+    }
+
+    // guest / sign-in share nick validation.
     const n = nickTrimmed();
     const err = validateNick(n);
     setNickError(err);
     if (err) return;
 
-    setAttempted(true);
-    const node = chosenNode();
-    const pass = password().trim() || undefined;
-
-    getState().connect({
-      url:  node.wss,
-      nick: n,
-      password: pass,
-      realname: `${n} (Onyx)`,
-    });
-
-    // staySignedIn: the store already saves/loads session tokens via
-    // loadCredentials / saveCredentials internally. The toggle is surfaced
-    // here for UX intent; future work can wire it to the store's credential
-    // persistence layer.
-    void staySignedIn;
+    if (m === 'signin') {
+      const pErr = password() ? undefined : 'Password is required to sign in.';
+      setPasswordError(pErr);
+      if (pErr) return;
+      doConnect(n, password());
+    } else {
+      doConnect(n, '');
+    }
   }
 
-  // ── Disconnect ────────────────────────────────────────────────────────────
+  function handleRegisterSubmit(): void {
+    const nErr = validateNick(nick());
+    const eErr = validateEmail(email());
+    const pErr = validatePassword(password());
+    const cErr = validateConfirm(password(), confirm());
+    setNickError(nErr);
+    setEmailError(eErr);
+    setPasswordError(pErr);
+    setConfirmError(cErr);
+    if (nErr || eErr || pErr || cErr) return;
 
+    const n = nickTrimmed();
+    setRegisterPhase('submitting');
+    setAttempted(true);
+
+    // REGISTER is a post-connection server command, so the connection must exist
+    // first. Connect under the desired nick (anonymously); the store reacts and
+    // the verify step / success drives the rest. registerInFlight flips true the
+    // moment REGISTER is actually dispatched (here or via the pending effect).
+    if (connectionStatus() === 'disconnected') {
+      // Stage the deferred REGISTER *before* connecting: the connect may flip
+      // status to 'connected' synchronously, firing the pending effect, so the
+      // payload must already be in place.
+      _pendingRegister = { account: n, email: email().trim() || undefined, password: password() };
+      doConnect(n, '');
+    } else {
+      setRegisterInFlight(true);
+      getState().registerAccount(n, email().trim() || undefined, password());
+    }
+  }
+
+  // When a Register submit had to connect first, fire REGISTER once connected.
+  let _pendingRegister: { account: string; email: string | undefined; password: string } | null = null;
+  createEffect(() => {
+    if (connectionStatus() === 'connected' && _pendingRegister && registerPhase() === 'submitting') {
+      const reg = _pendingRegister;
+      _pendingRegister = null;
+      setRegisterInFlight(true);
+      getState().registerAccount(reg.account, reg.email, reg.password);
+    }
+  });
+
+  function handleVerifySubmit(event: SubmitEvent): void {
+    event.preventDefault();
+    const code = verifyCode().trim();
+    if (!code) {
+      setVerifyError('Enter the verification code.');
+      return;
+    }
+    setVerifyError(undefined);
+    setRegisterInFlight(true);
+    getState().verifyAccount(nickTrimmed(), code);
+  }
+
+  // ── GHOST reclaim ───────────────────────────────────────────────────────────
+  function handleReclaim(event: SubmitEvent): void {
+    event.preventDefault();
+    const pass = reclaimPassword().trim();
+    if (!pass) return;
+    // Evict the stale session, then retry the connection under the desired nick.
+    getState().ghost(nickTrimmed(), pass);
+    setReclaimOpen(false);
+    setReclaimPassword('');
+    doConnect(nickTrimmed(), password());
+  }
+
+  // ── Session resume (one-tap) ────────────────────────────────────────────────
+  function handleResume(): void {
+    const creds = saved();
+    if (!creds) return;
+    setNick(creds.nick);
+    doConnect(creds.nick, creds.password ?? '');
+  }
+
+  // ── Disconnect ──────────────────────────────────────────────────────────────
   function handleDisconnect(): void {
     setAttempted(false);
+    setRegisterPhase('idle');
+    setRegisterInFlight(false);
+    _pendingRegister = null;
     getState().disconnect();
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  const showResume = createMemo(() =>
+    !resumeDismissed() && !!saved() && !attempted() && mode() !== 'register'
+  );
+  const showReclaim = createMemo(() => formPhase() === 'error' && nickInUse());
+  const inVerifyStep = createMemo(() => registerPhase() === 'verifying');
 
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <Show
-      when={connectionStatus() === 'connected'}
+      when={connectionStatus() === 'connected' && registerPhase() === 'idle'}
       fallback={
-        // ── Connect form ────────────────────────────────────────────────────
-        <div class="conn" data-testid="connect-screen">
+        <div class="conn" data-testid="connect-screen" data-mode={mode()}>
           <Atmosphere />
 
           <div class="conn-card" role="main">
-            {/* Bioluminescent crest hairline runs across the top of the card */}
             <div class="conn-crest" aria-hidden="true" />
 
             <div class="conn-body">
@@ -237,109 +625,118 @@ export function Connect(props: ConnectProps): JSX.Element {
                 <span class="conn-eyebrow">IRCXNet</span>
                 <h1 class="conn-title">Connect</h1>
                 <p class="conn-sub">
-                  Choose a name and slip into the water. Onyx finds the nearest
-                  node by latency and runs the handshake — no server to choose,
-                  nothing to configure.
+                  Choose how you arrive. Onyx finds the nearest node by latency
+                  and runs the handshake — no server to choose, nothing to
+                  configure.
                 </p>
               </header>
 
+              {/* Session resume — one-tap welcome back */}
+              <Show when={showResume()}>
+                <div class="conn-resume" role="region" aria-label="Resume session">
+                  <div class="conn-resume-body">
+                    <span class="conn-resume-eyebrow">Welcome back</span>
+                    <span class="conn-resume-nick">
+                      Resume as <b>{saved()!.nick}</b>
+                    </span>
+                  </div>
+                  <div class="conn-resume-actions">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      disabled={!isFormReady()}
+                      onClick={handleResume}
+                      data-testid="conn-resume"
+                    >
+                      Resume
+                    </Button>
+                    <button
+                      type="button"
+                      class="conn-resume-dismiss"
+                      aria-label="Dismiss resume"
+                      onClick={() => setResumeDismissed(true)}
+                    >
+                      Not now
+                    </button>
+                  </div>
+                </div>
+              </Show>
+
+              {/* Mode switch */}
+              <div
+                class="conn-modes"
+                role="tablist"
+                aria-label="Connection mode"
+                data-testid="conn-modes"
+              >
+                <For each={MODES}>
+                  {(m) => (
+                    <button
+                      type="button"
+                      role="tab"
+                      class="conn-mode"
+                      data-active={mode() === m.id ? 'true' : 'false'}
+                      aria-selected={mode() === m.id ? 'true' : 'false'}
+                      disabled={!isFormReady()}
+                      onClick={() => switchMode(m.id)}
+                    >
+                      {m.label}
+                    </button>
+                  )}
+                </For>
+              </div>
+
               <div class="conn-seam" aria-hidden="true" />
 
-              <form onSubmit={handleConnect} noValidate aria-label="IRC connection form">
-                {/* Auto-routing indicator — never reveals which server is used */}
-                <p class="conn-route" data-routing={routing() ? 'true' : 'false'}>
-                  <span class="conn-route-dot" aria-hidden="true" />
-                  <Show when={routing()} fallback="Routed to the nearest node">
-                    Locating the nearest node…
-                  </Show>
-                </p>
+              {/* Auto-routing indicator — never reveals which server is used */}
+              <p class="conn-route" data-routing={routing() ? 'true' : 'false'}>
+                <span class="conn-route-dot" aria-hidden="true" />
+                <Show when={routing()} fallback="Routed to the nearest node">
+                  Locating the nearest node…
+                </Show>
+              </p>
 
-                <div class="conn-seam" style={{ margin: '20px 0' }} aria-hidden="true" />
-
-                <div class="conn-fields">
-                  <FormField
-                    id="conn-nick"
-                    label="Nick"
-                    type="text"
-                    placeholder="your-nick"
-                    autocomplete="username"
-                    maxlength={64}
-                    required
-                    disabled={!isFormReady()}
-                    value={nick()}
-                    onInput={(e) => {
-                      setNick(e.currentTarget.value);
-                      setNickError(undefined);
-                    }}
-                    error={nickError()}
-                    aria-required="true"
-                  />
-
-                  <FormField
-                    id="conn-password"
-                    label="Password — optional, SASL PLAIN / SCRAM"
-                    type="password"
-                    placeholder="leave blank to drift in anonymously"
-                    autocomplete="current-password"
-                    disabled={!isFormReady()}
-                    value={password()}
-                    onInput={(e) => setPassword(e.currentTarget.value)}
-                  />
-                </div>
-
-                <div class="conn-seam" style={{ margin: '20px 0' }} aria-hidden="true" />
-
-                {/* Stay signed in toggle */}
-                <div class="conn-toggle">
-                  <div class="conn-toggle-body">
-                    <label class="conn-toggle-label" for="conn-stay-signed-in">
-                      Stay signed in
-                    </label>
-                    <p class="conn-toggle-description" id="conn-session-desc">
-                      Mints a SESSION token so you reconnect instantly — no re-login
-                    </p>
-                  </div>
-                  <label class="conn-toggle-switch">
-                    <input
-                      id="conn-stay-signed-in"
-                      type="checkbox"
-                      role="switch"
-                      aria-checked={staySignedIn() ? 'true' : 'false'}
-                      aria-describedby="conn-session-desc"
-                      checked={staySignedIn()}
-                      disabled={!isFormReady()}
-                      onChange={(e) => setStaySignedIn(e.currentTarget.checked)}
-                    />
-                    <span class="conn-toggle-track" />
-                    <span class="conn-toggle-thumb" aria-hidden="true" />
-                  </label>
-                </div>
-
-                <div class="conn-seam" style={{ margin: '20px 0' }} aria-hidden="true" />
-
-                {/* Status feedback */}
-                <div
-                  class="conn-status"
-                  data-phase={formPhase()}
-                  role="status"
-                  aria-live="polite"
-                  aria-atomic="true"
-                  data-testid="conn-status"
+              {/* ── Verify step (register only) ── */}
+              <Show when={inVerifyStep()}>
+                <form
+                  class="conn-verify"
+                  onSubmit={handleVerifySubmit}
+                  noValidate
+                  aria-label="Account verification form"
+                  data-testid="conn-verify-form"
                 >
-                  <span class="conn-status-dot" aria-hidden="true" />
-                  <div class="conn-status-body">
-                    <span class="conn-status-phase">{phaseLabel()}</span>
-                    <span class="conn-status-msg">{statusMsg()}</span>
+                  <div class="conn-step" aria-hidden="true">
+                    <span class="conn-step-dot" data-done="true" />
+                    <span class="conn-step-line" />
+                    <span class="conn-step-dot" data-active="true" />
+                    <span class="conn-step-line" />
+                    <span class="conn-step-dot" />
                   </div>
-                </div>
-
-                {/* Actions */}
-                <div class="conn-actions" style={{ 'margin-top': '20px' }}>
+                  <p class="conn-verify-lead">
+                    We sent a verification code for <b>{nickTrimmed()}</b>. Enter it
+                    to finish creating your account.
+                  </p>
+                  <FormField
+                    id="conn-verify-code"
+                    label="Verification code"
+                    type="text"
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                    placeholder="000000"
+                    disabled={registerPending()}
+                    value={verifyCode()}
+                    error={verifyError()}
+                    ref={(el: HTMLInputElement) => (verifyInputRef = el)}
+                    onInput={(e) => {
+                      setVerifyCode(e.currentTarget.value);
+                      setVerifyError(undefined);
+                    }}
+                  />
                   <Show
-                    when={formPhase() !== 'connecting'}
+                    when={!registerPending()}
                     fallback={
                       <div class="conn-submit" style={{ display: 'flex', 'align-items': 'center', gap: '10px' }}>
-                        <Spinner size="sm" label={phaseLabel()} />
+                        <Spinner size="sm" label="Verifying" />
                       </div>
                     }
                   >
@@ -347,15 +744,240 @@ export function Connect(props: ConnectProps): JSX.Element {
                       class="conn-submit"
                       type="submit"
                       variant="primary"
-                      disabled={!isFormReady() || !nickTrimmed()}
-                      aria-label="Connect to IRCXNet"
-                      data-testid="conn-submit"
+                      disabled={!verifyCode().trim()}
+                      data-testid="conn-verify-submit"
                     >
-                      {formPhase() === 'error' ? 'Try again' : 'Dive in'}
+                      Verify &amp; enter
                     </Button>
                   </Show>
-                </div>
-              </form>
+                </form>
+              </Show>
+
+              {/* ── Main auth form (hidden during the verify step) ── */}
+              <Show when={!inVerifyStep()}>
+                <form
+                  onSubmit={handleSubmit}
+                  noValidate
+                  aria-label="IRC connection form"
+                >
+                  <div class="conn-fields">
+                    <FormField
+                      id="conn-nick"
+                      label={mode() === 'register' ? 'Desired account / nick' : 'Nick'}
+                      type="text"
+                      placeholder="your-nick"
+                      autocomplete="username"
+                      maxlength={64}
+                      required
+                      disabled={!isFormReady()}
+                      value={nick()}
+                      onInput={(e) => {
+                        setNick(e.currentTarget.value);
+                        setNickError(undefined);
+                      }}
+                      error={nickError()}
+                      aria-required="true"
+                    />
+
+                    {/* Email — register only, optional */}
+                    <Show when={mode() === 'register'}>
+                      <FormField
+                        id="conn-email"
+                        label="Email"
+                        description="Optional — for account recovery"
+                        type="email"
+                        placeholder="you@example.com"
+                        autocomplete="email"
+                        disabled={!isFormReady()}
+                        value={email()}
+                        onInput={(e) => {
+                          setEmail(e.currentTarget.value);
+                          setEmailError(undefined);
+                        }}
+                        error={emailError()}
+                      />
+                    </Show>
+
+                    {/* Password — guest hides it; sign-in & register show it */}
+                    <Show when={mode() !== 'guest'}>
+                      <PasswordInput
+                        id="conn-password"
+                        label={mode() === 'register' ? 'Password' : 'Account password'}
+                        placeholder={mode() === 'register' ? 'at least 8 characters' : 'your account password'}
+                        autocomplete={mode() === 'register' ? 'new-password' : 'current-password'}
+                        required
+                        disabled={!isFormReady()}
+                        value={password()}
+                        error={passwordError()}
+                        onInput={(value) => {
+                          setPassword(value);
+                          setPasswordError(undefined);
+                        }}
+                      />
+                    </Show>
+
+                    {/* Strength meter + confirm — register only */}
+                    <Show when={mode() === 'register'}>
+                      <div
+                        class="conn-strength"
+                        data-score={passwordStrength(password()).score}
+                        aria-hidden={password() ? undefined : 'true'}
+                      >
+                        <div class="conn-strength-track">
+                          <For each={[0, 1, 2, 3]}>
+                            {(i) => (
+                              <span
+                                class="conn-strength-seg"
+                                data-on={passwordStrength(password()).score > i ? 'true' : 'false'}
+                              />
+                            )}
+                          </For>
+                        </div>
+                        <span class="conn-strength-label">
+                          {password() ? passwordStrength(password()).label : ''}
+                        </span>
+                      </div>
+
+                      <PasswordInput
+                        id="conn-confirm"
+                        label="Confirm password"
+                        placeholder="re-enter your password"
+                        autocomplete="new-password"
+                        required
+                        disabled={!isFormReady()}
+                        value={confirm()}
+                        error={confirmError()}
+                        onInput={(value) => {
+                          setConfirm(value);
+                          setConfirmError(undefined);
+                        }}
+                      />
+                    </Show>
+                  </div>
+
+                  {/* Stay signed in — guest & sign-in only (register chains in) */}
+                  <Show when={mode() !== 'register'}>
+                    <div class="conn-seam" style={{ margin: '20px 0' }} aria-hidden="true" />
+                    <div class="conn-toggle">
+                      <div class="conn-toggle-body">
+                        <label class="conn-toggle-label" for="conn-stay-signed-in">
+                          Stay signed in
+                        </label>
+                        <p class="conn-toggle-description" id="conn-session-desc">
+                          Mints a SESSION token so you reconnect instantly — no re-login
+                        </p>
+                      </div>
+                      <label class="conn-toggle-switch">
+                        <input
+                          id="conn-stay-signed-in"
+                          type="checkbox"
+                          role="switch"
+                          aria-checked={staySignedIn() ? 'true' : 'false'}
+                          aria-describedby="conn-session-desc"
+                          checked={staySignedIn()}
+                          disabled={!isFormReady()}
+                          onChange={(e) => setStaySignedIn(e.currentTarget.checked)}
+                        />
+                        <span class="conn-toggle-track" />
+                        <span class="conn-toggle-thumb" aria-hidden="true" />
+                      </label>
+                    </div>
+                  </Show>
+
+                  <div class="conn-seam" style={{ margin: '20px 0' }} aria-hidden="true" />
+
+                  {/* Status feedback */}
+                  <div
+                    class="conn-status"
+                    data-phase={statusPhase()}
+                    role="status"
+                    aria-live="polite"
+                    aria-atomic="true"
+                    data-testid="conn-status"
+                  >
+                    <span class="conn-status-dot" aria-hidden="true" />
+                    <div class="conn-status-body">
+                      <span class="conn-status-phase">{phaseLabel()}</span>
+                      <span class="conn-status-msg">{statusMsg()}</span>
+                    </div>
+                  </div>
+
+                  {/* GHOST reclaim — appears when the nick is in use */}
+                  <Show when={showReclaim()}>
+                    <div class="conn-reclaim" data-testid="conn-reclaim">
+                      <Show
+                        when={reclaimOpen()}
+                        fallback={
+                          <button
+                            type="button"
+                            class="conn-reclaim-open"
+                            data-testid="conn-reclaim-open"
+                            onClick={() => setReclaimOpen(true)}
+                          >
+                            That name is taken — reclaim it?
+                          </button>
+                        }
+                      >
+                        <div class="conn-reclaim-form">
+                          <p class="conn-reclaim-lead">
+                            Enter the account password for <b>{nickTrimmed()}</b> to
+                            evict the stale session.
+                          </p>
+                          <PasswordInput
+                            id="conn-reclaim-password"
+                            label="Account password"
+                            placeholder="account password"
+                            autocomplete="current-password"
+                            value={reclaimPassword()}
+                            onInput={(value) => setReclaimPassword(value)}
+                          />
+                          <div class="conn-reclaim-actions">
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              disabled={!reclaimPassword().trim()}
+                              onClick={(e: MouseEvent) => handleReclaim(e as unknown as SubmitEvent)}
+                              data-testid="conn-reclaim-submit"
+                            >
+                              Reclaim &amp; connect
+                            </Button>
+                            <button
+                              type="button"
+                              class="conn-reclaim-cancel"
+                              onClick={() => setReclaimOpen(false)}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      </Show>
+                    </div>
+                  </Show>
+
+                  {/* Submit */}
+                  <div class="conn-actions" style={{ 'margin-top': '20px' }}>
+                    <Show
+                      when={statusPhase() !== 'connecting'}
+                      fallback={
+                        <div class="conn-submit" style={{ display: 'flex', 'align-items': 'center', gap: '10px' }}>
+                          <Spinner size="sm" label={registerPending() ? 'Registering' : phaseLabel()} />
+                        </div>
+                      }
+                    >
+                      <Button
+                        class="conn-submit"
+                        type="submit"
+                        variant="primary"
+                        disabled={!canSubmit()}
+                        aria-label={SUBMIT_ARIA[mode()]}
+                        data-testid="conn-submit"
+                      >
+                        {submitLabel(mode(), formPhase())}
+                      </Button>
+                    </Show>
+                  </div>
+                </form>
+              </Show>
             </div>
 
             {/* Footer */}
@@ -373,4 +995,21 @@ export function Connect(props: ConnectProps): JSX.Element {
       />
     </Show>
   );
+}
+
+// ── Submit copy ───────────────────────────────────────────────────────────────
+
+const SUBMIT_ARIA: Record<Mode, string> = {
+  guest:    'Connect to IRCXNet as a guest',
+  signin:   'Sign in to IRCXNet',
+  register: 'Register a new account',
+};
+
+function submitLabel(mode: Mode, phase: 'idle' | 'connecting' | 'error'): string {
+  if (phase === 'error') return 'Try again';
+  switch (mode) {
+    case 'signin':   return 'Sign in';
+    case 'register': return 'Create account';
+    default:         return 'Dive in';
+  }
 }
