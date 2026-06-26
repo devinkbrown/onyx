@@ -1,12 +1,15 @@
 /**
- * Connect.tsx — Ruri IRC connect screen.
+ * Connect.tsx — Onyx connect screen (Ocean dark-luxury).
  *
- * Renders the node picker, nick/password form, session-token toggle, live
- * connection-state feedback, and (when connected) the real AppShell.
+ * Renders the nick/password form, session-token toggle, live connection-state
+ * feedback, and (when connected) the real AppShell.
  *
- * The global store is the single source of truth for the connection.
- * On submit, we call getState().connect(...) and gate the view on
- * connectionStatus from the store.
+ * The network is a single mesh, so the client does NOT expose a server picker:
+ * it measures latency to each node and attaches to the fastest (nearest) one
+ * automatically. Which node is used is never surfaced in the UI.
+ *
+ * The global store is the single source of truth for the connection. On submit,
+ * we call getState().connect(...) and gate the view on connectionStatus.
  *
  * SOLID IDIOMS: components run once. Never destructure props. Use splitProps,
  * createSignal/createMemo/createEffect/onCleanup, For/Show, and clean up the
@@ -18,6 +21,7 @@ import {
   createSignal,
   createMemo,
   For,
+  onMount,
   Show,
   type JSX,
 } from 'solid-js';
@@ -26,25 +30,63 @@ import { AppShell } from '@/shell';
 import { Button } from '@/primitives/index';
 import { FormField } from '@/primitives/index';
 import { Spinner } from '@/primitives/index';
-import { NODES, DEFAULT_NODE, type IrcNode } from './nodes';
+import { Mascot } from '@/components/brand/Mascot';
+import { initialNode, selectBestNode, type IrcNode } from './nodes';
 
-// ── Atmosphere background (shared with landing) ─────────────────────────────
+// ── Ocean atmosphere — deep-water depth, azure currents, bioluminescence ─────
+// Self-contained to the connect screen (namespaced .conn-sea-*) so it carries
+// its own ocean motifs rather than borrowing the landing layer. Every moving
+// part is paused under prefers-reduced-motion (see connect.css).
+
+/** Sparse drifting bioluminescent motes — deterministic layout, no randomness. */
+const MOTES: ReadonlyArray<{ x: number; y: number; s: number; d: number; t: 'cyan' | 'gold' }> = [
+  { x: 12, y: 22, s: 2.4, d: 0,    t: 'cyan' },
+  { x: 28, y: 64, s: 1.6, d: 1400, t: 'cyan' },
+  { x: 44, y: 14, s: 1.9, d: 600,  t: 'gold' },
+  { x: 61, y: 48, s: 2.6, d: 2200, t: 'cyan' },
+  { x: 73, y: 78, s: 1.5, d: 900,  t: 'cyan' },
+  { x: 84, y: 30, s: 2.0, d: 1800, t: 'gold' },
+  { x: 91, y: 60, s: 1.7, d: 300,  t: 'cyan' },
+  { x: 18, y: 86, s: 1.4, d: 2600, t: 'cyan' },
+];
 
 function Atmosphere(): JSX.Element {
   return (
     <>
-      <div class="r-ground" aria-hidden="true" />
-      <div class="r-flecks" aria-hidden="true" />
-      {/* Kintsugi veins — three paths, one animated dash */}
-      <svg class="r-veins" aria-hidden="true" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
-        <path d="M0,340 Q240,180 480,320 T960,280 T1440,320" opacity="0.4" />
-        <path class="flow" d="M0,500 Q360,380 720,460 T1440,440" opacity="0.28" />
-        <path d="M200,0 Q380,240 320,480 T400,900" opacity="0.22" />
-        <circle class="node" cx="480" cy="320" r="2.2" />
-        <circle class="node" cx="960" cy="280" r="2.2" />
-        <circle class="node" cx="320" cy="480" r="2.2" />
+      {/* Depth gradient — abyss (bottom) → light filtering down (top) */}
+      <div class="conn-sea-depth" aria-hidden="true" />
+      {/* Caustics — faint light bands drifting near the surface */}
+      <div class="conn-sea-caustics" aria-hidden="true" />
+      {/* Currents — flowing azure paths, one with a slow dash drift */}
+      <svg
+        class="conn-sea-currents"
+        aria-hidden="true"
+        viewBox="0 0 1440 900"
+        preserveAspectRatio="xMidYMid slice"
+      >
+        <path d="M0,300 Q300,200 600,300 T1200,280 T1440,320" />
+        <path class="drift" d="M0,520 Q360,400 720,490 T1440,470" />
+        <path d="M-40,720 Q380,620 760,700 T1480,680" />
       </svg>
-      <div class="r-grain" aria-hidden="true" />
+      {/* Bioluminescence — sparse pulsing motes */}
+      <div class="conn-sea-motes" aria-hidden="true">
+        <For each={MOTES}>
+          {(m) => (
+            <span
+              class="conn-sea-mote"
+              data-tone={m.t}
+              style={{
+                left: `${m.x}%`,
+                top: `${m.y}%`,
+                '--mote-size': `${m.s}px`,
+                '--mote-delay': `${m.d}ms`,
+              }}
+            />
+          )}
+        </For>
+      </div>
+      {/* Film grain — faint texture over the water */}
+      <div class="conn-sea-grain" aria-hidden="true" />
     </>
   );
 }
@@ -58,7 +100,6 @@ export interface ConnectProps {
 
 export function Connect(props: ConnectProps): JSX.Element {
   // ── Form state ────────────────────────────────────────────────────────────
-  const [selectedNode, setSelectedNode] = createSignal<IrcNode>(DEFAULT_NODE);
   const [nick, setNick] = createSignal('');
   const [password, setPassword] = createSignal('');
   const [staySignedIn, setStaySignedIn] = createSignal(true);
@@ -66,6 +107,20 @@ export function Connect(props: ConnectProps): JSX.Element {
   // True only once the user has actually submitted a connect — so the form
   // never flashes an "error" merely because a nick was typed while disconnected.
   const [attempted, setAttempted] = createSignal(false);
+
+  // ── Automatic node selection (no server picker) ───────────────────────────
+  // Start with a synchronous best-guess so connect always has a target, then
+  // refine to the lowest-latency (nearest) reachable node once probing resolves.
+  // The chosen node is never shown in the UI.
+  const [chosenNode, setChosenNode] = createSignal<IrcNode>(initialNode());
+  const [routing, setRouting] = createSignal(true);
+
+  onMount(() => {
+    void selectBestNode().then((node) => {
+      setChosenNode(node);
+      setRouting(false);
+    });
+  });
 
   // ── Store reads ───────────────────────────────────────────────────────────
   const connectionStatus = useStore((s) => s.connectionStatus);
@@ -91,16 +146,18 @@ export function Connect(props: ConnectProps): JSX.Element {
   };
 
   const phaseLabel = createMemo(() => PHASE_LABEL[formPhase()]);
-  // Reactive status copy — reflects the *currently selected* node (not the one
-  // chosen at mount) and never blames the nick for a server-side failure.
+  // Reactive status copy — never names a server (the client auto-routes) and
+  // never blames the nick for a server-side failure.
   const statusMsg = createMemo(() => {
     switch (formPhase()) {
       case 'connecting':
-        return `Opening the door to ${selectedNode().host}…`;
+        return 'Opening an encrypted channel…';
       case 'error':
-        return `Couldn't reach ${selectedNode().host}. The node may be unavailable — try the other door, or check your nick.`;
+        return "The network didn't answer — it may be busy. Try again in a moment.";
       default:
-        return 'Pick a node and enter your nick to connect.';
+        return routing()
+          ? 'Finding the nearest node…'
+          : 'Pick a name and slip into the water — Onyx finds the nearest node for you.';
     }
   });
 
@@ -133,14 +190,14 @@ export function Connect(props: ConnectProps): JSX.Element {
     if (err) return;
 
     setAttempted(true);
-    const node = selectedNode();
+    const node = chosenNode();
     const pass = password().trim() || undefined;
 
     getState().connect({
       url:  node.wss,
       nick: n,
       password: pass,
-      realname: `${n} (Ruri / Ocean)`,
+      realname: `${n} (Onyx)`,
     });
 
     // staySignedIn: the store already saves/loads session tokens via
@@ -168,66 +225,34 @@ export function Connect(props: ConnectProps): JSX.Element {
           <Atmosphere />
 
           <div class="conn-card" role="main">
-            {/* Window chrome */}
-            <div class="conn-bar" aria-hidden="true">
-              <span class="conn-bar-lights">
-                <i style={{ background: 'var(--shu-bright)' }} />
-                <i style={{ background: 'var(--gold-bright)' }} />
-                <i style={{ background: 'var(--ok)' }} />
-              </span>
-              <span class="conn-bar-title">ruri — orochi mesh connection</span>
-            </div>
+            {/* Bioluminescent crest hairline runs across the top of the card */}
+            <div class="conn-crest" aria-hidden="true" />
 
             <div class="conn-body">
               {/* Header */}
               <header class="conn-header">
+                <span class="conn-brand" aria-hidden="true">
+                  <Mascot variant="mark" class="conn-brand-mark" />
+                </span>
                 <span class="conn-eyebrow">IRCXNet</span>
                 <h1 class="conn-title">Connect</h1>
                 <p class="conn-sub">
-                  Choose a door into the mesh. The Suimyaku grid binds all nodes —
-                  either entrance reaches the whole network.
+                  Choose a name and slip into the water. Onyx finds the nearest
+                  node by latency and runs the handshake — no server to choose,
+                  nothing to configure.
                 </p>
               </header>
 
               <div class="conn-seam" aria-hidden="true" />
 
-              {/* Node picker */}
               <form onSubmit={handleConnect} noValidate aria-label="IRC connection form">
-                <div class="conn-nodes" role="group" aria-labelledby="conn-nodes-lbl">
-                  <p id="conn-nodes-lbl" class="conn-nodes-label">Select node</p>
-                  <For each={NODES as IrcNode[]}>
-                    {(node) => {
-                      const isSelected = createMemo(() => selectedNode().id === node.id);
-                      return (
-                        <button
-                          class="conn-node-btn"
-                          type="button"
-                          role="button"
-                          aria-pressed={isSelected() ? 'true' : 'false'}
-                          aria-label={`Select ${node.host}`}
-                          data-node-id={node.id}
-                          disabled={!isFormReady()}
-                          onClick={() => setSelectedNode(node)}
-                        >
-                          <span
-                            class={`conn-node-dot conn-node-dot--${node.id}`}
-                            aria-hidden="true"
-                          />
-                          <span class="conn-node-body">
-                            <span class="conn-node-host">{node.host}</span>
-                            <span class="conn-node-label">{node.label}</span>
-                          </span>
-                          <Show when={isSelected()}>
-                            <span class="conn-node-check" aria-hidden="true">[selected]</span>
-                          </Show>
-                        </button>
-                      );
-                    }}
-                  </For>
-                  <p class="conn-mesh-note">
-                    // Suimyaku mesh: connecting to either node reaches the full IRCXNet network
-                  </p>
-                </div>
+                {/* Auto-routing indicator — never reveals which server is used */}
+                <p class="conn-route" data-routing={routing() ? 'true' : 'false'}>
+                  <span class="conn-route-dot" aria-hidden="true" />
+                  <Show when={routing()} fallback="Routed to the nearest node">
+                    Locating the nearest node…
+                  </Show>
+                </p>
 
                 <div class="conn-seam" style={{ margin: '20px 0' }} aria-hidden="true" />
 
@@ -252,9 +277,9 @@ export function Connect(props: ConnectProps): JSX.Element {
 
                   <FormField
                     id="conn-password"
-                    label="Password (optional — SASL PLAIN / SCRAM)"
+                    label="Password — optional, SASL PLAIN / SCRAM"
                     type="password"
-                    placeholder="leave blank to connect anonymously"
+                    placeholder="leave blank to drift in anonymously"
                     autocomplete="current-password"
                     disabled={!isFormReady()}
                     value={password()}
@@ -271,7 +296,7 @@ export function Connect(props: ConnectProps): JSX.Element {
                       Stay signed in
                     </label>
                     <p class="conn-toggle-description" id="conn-session-desc">
-                      Requests a SESSION TOKEN for instant reconnect reclaim
+                      Mints a SESSION token so you reconnect instantly — no re-login
                     </p>
                   </div>
                   <label class="conn-toggle-switch">
@@ -323,10 +348,10 @@ export function Connect(props: ConnectProps): JSX.Element {
                       type="submit"
                       variant="primary"
                       disabled={!isFormReady() || !nickTrimmed()}
-                      aria-label={`Connect to ${selectedNode().host}`}
+                      aria-label="Connect to IRCXNet"
                       data-testid="conn-submit"
                     >
-                      {formPhase() === 'error' ? '[retry]' : '[connect]'}
+                      {formPhase() === 'error' ? 'Try again' : 'Dive in'}
                     </Button>
                   </Show>
                 </div>
@@ -335,7 +360,7 @@ export function Connect(props: ConnectProps): JSX.Element {
 
             {/* Footer */}
             <footer class="conn-foot">
-              <b>IRCXNet</b> · Orochi Mesh · <b>{selectedNode().host}</b> · wss :8080
+              <b>IRCXNet</b> · encrypted · auto-routed
             </footer>
           </div>
         </div>

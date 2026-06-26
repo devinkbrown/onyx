@@ -1,13 +1,14 @@
 import './landing.css';
+import { Mascot } from '@/components/brand/Mascot';
 
-/** Ruri launch site — Lapis × Kintsugi × Terminal, warmed.
- *  Capability-led, mythos-rich, living kintsugi atmosphere. Claims are grounded
- *  in the Orochi implementation (docs/planning/20-media-interop.md,
- *  architecture/03-media.md). WebGPU vein-field + scroll story arrive in Phase 2. */
+/** Onyx launch site — Ocean: deep-water dark luxury, community-first.
+ *  Leads with people and place: a real IRC network you join, not a product you buy.
+ *  Atmosphere is ocean depth + flowing azure currents + drifting bioluminescence,
+ *  all reduced-motion safe. The friendly water-dragon Mascot is the brand face. */
 export default function Landing() {
   return (
     <main class="r">
-      {/* ── living atmosphere ── */}
+      {/* ── living atmosphere: depth · currents · bioluminescence · grain ── */}
       <div class="r-ground" aria-hidden="true" />
       <div class="r-flecks" aria-hidden="true" />
       <svg class="r-veins" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
@@ -21,122 +22,160 @@ export default function Landing() {
       <div class="r-grain" aria-hidden="true" />
 
       {/* ── top bar ── */}
-      <header class="r-status">
-        <span class="brand"><b>瑠璃</b>RURI</span>
-        <nav>
-          <a class="hideable" href="#difference">Difference</a>
-          <a class="hideable" href="#network">Network</a>
-          <a class="hideable" href="#commons">Commons</a>
-          <span class="live hideable"><i />mesh online</span>
-          <a class="enter" href="/app">Open Ruri</a>
+      <header class="r-status" role="banner">
+        <a class="brand" href="/" aria-label="Onyx home">
+          <Mascot variant="mark" />ONYX
+        </a>
+        <nav aria-label="Primary">
+          <a class="hideable" href="#community">Who's here</a>
+          <a class="hideable" href="#rooms">Rooms</a>
+          <a class="hideable" href="#join">Join</a>
+          <span class="live hideable"><i aria-hidden="true" />network online</span>
+          <a class="enter" href="/app">Open Onyx</a>
         </nav>
       </header>
 
       {/* ── hero ── */}
-      <section class="r-wrap r-hero">
-        <p class="r-kicker">a mesh-native client for the Orochi network</p>
-        <h1>Talk on a<br /><span class="gold">living mesh</span></h1>
-        <p class="serif-sub">Named for <em>瑠璃</em> — the azure stone the serpent guards.</p>
-        <p class="sub">
-          Open IRCv3/IRCX over a server mesh that heals itself. End-to-end-encrypted
-          voice, video and screen the server never sees — your codec on every device,
-          your choice of transport. Real services, not bots. A home you actually own.
-        </p>
-        <div class="r-cta">
-          <a class="r-btn primary" href="/app">[ enter the network → ]</a>
-          <a class="r-btn ghost" href="#difference">what makes it different</a>
-        </div>
-        <div class="r-ticker">
-          <span><b>solid + vite</b> · signal-fast</span>
-          <span><b>suimyaku</b> mesh · <b>tsumugi</b> e2ee media</span>
-          <span><b>theme studio</b> · living backgrounds</span>
-        </div>
-      </section>
-
-      <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
-
-      {/* ── mythos ── */}
-      <section class="r-wrap r-section r-mythos">
-        <span class="r-eyebrow">the mythos</span>
-        <h2 class="r-title">Three names,<br />one network</h2>
-        <p class="r-lede">Every part of this thing is named for something old and a little dangerous. The lore isn't decoration — it's the architecture.</p>
-        <div class="r-glyphs">
-          <article class="r-glyph serpent">
-            <span class="mark">大蛇</span>
-            <span class="name">Orochi · the serpent</span>
-            <p class="gloss">The daemon that <b>is</b> the network. Clean-room, modern, sovereign — a many-headed server that refuses to be a single point of failure.</p>
-          </article>
-          <article class="r-glyph devil">
-            <span class="mark">ეშმაკი</span>
-            <span class="name">eshmaki · the gate</span>
-            <p class="gloss">Georgian for <b>devil</b>, from Aēšma — the ancient word for wrath. <b>eshmaki.me</b> is one of two doors into the mesh.</p>
-          </article>
-          <article class="r-glyph jewel">
-            <span class="mark">瑠璃</span>
-            <span class="name">Ruri · the jewel</span>
-            <p class="gloss">Lapis lazuli — deep ultramarine veined in gold. This client: the azure stone the serpent keeps, and what you hold.</p>
-          </article>
+      <section class="r-wrap r-hero" aria-labelledby="hero-heading">
+        <div class="r-hero-grid">
+          <div class="r-hero-copy">
+            <p class="r-kicker">a home on the open IRC ocean</p>
+            <h1 id="hero-heading">Come live<br /><span class="gold">on the water</span></h1>
+            <p class="serif-sub">A real network of real people — rooms that stay open, names that are yours, and a place no one can quietly take away.</p>
+            <p class="sub">
+              Onyx is the warm front door to the Orochi network: drop into a channel,
+              find your people, talk in text or hop into encrypted voice and video.
+              It's open, it's yours, and there's no account to rent and no ads to dodge.
+            </p>
+            <div class="r-cta">
+              <a class="r-btn primary" href="/app">Open Onyx &rarr;</a>
+              <a class="r-btn ghost" href="#community">See who's around</a>
+            </div>
+            <div class="r-ticker">
+              <span><b>open protocol</b> · IRCv3 + IRCX</span>
+              <span><b>encrypted media</b> · voice, video, screen</span>
+              <span><b>yours to keep</b> · no ads, no rental</span>
+            </div>
+          </div>
+          <div class="r-hero-art" aria-hidden="true">
+            <Mascot variant="hero" />
+          </div>
         </div>
       </section>
 
       <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
 
-      {/* ── offerings / the difference ── */}
-      <section id="difference" class="r-wrap r-section">
-        <span class="r-eyebrow">what sets it apart</span>
-        <h2 class="r-title">Difference you can feel</h2>
-        <p class="r-lede">Not another chat skin. The platform underneath does things the walled gardens simply can't.</p>
-        <div class="r-offerings">
-          <article class="r-offer">
-            <div class="head"><span class="idx">01</span><h3>Your codec, every device</h3></div>
-            <p>OPVOX audio and OPVIS video — <b>our</b> codec — run natively on desktop and in WASM on browser and mobile. Identical media everywhere, no per-platform divergence.</p>
-            <span class="tag">opvox · opvis · wasm</span>
+      {/* ── who's here / community ── */}
+      <section id="community" class="r-wrap r-section r-community" aria-labelledby="community-heading">
+        <span class="r-eyebrow">who's here</span>
+        <h2 class="r-title" id="community-heading">People, not<br />a product</h2>
+        <p class="r-lede">IRC was always a place — a town square that belonged to the people in it. The Orochi network keeps it that way. You're not a user in someone's database; you're a regular in a room.</p>
+        <div class="r-stats">
+          <div class="r-stat"><span class="n">#root</span><span class="l">the build channel — say hello, we're around</span></div>
+          <div class="r-stat"><span class="n">always-on</span><span class="l">rooms stay open between visits, history and all</span></div>
+          <div class="r-stat"><span class="n">your name</span><span class="l">register once, it's yours across every door</span></div>
+        </div>
+      </section>
+
+      <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
+
+      {/* ── channels & rooms to explore ── */}
+      <section id="rooms" class="r-wrap r-section r-rooms" aria-labelledby="rooms-heading">
+        <span class="r-eyebrow">channels &amp; rooms</span>
+        <h2 class="r-title" id="rooms-heading">Rooms to<br />wander into</h2>
+        <p class="r-lede">Browse the directory and watch presence light up as people arrive. Text rooms, voice stages, screen-shares, quiet DMs — pick a current and drift in.</p>
+        <div class="r-board">
+          <article class="r-card">
+            <span class="k">text</span>
+            <h4>#root</h4>
+            <p>Where the network lives day to day — questions, builds, late-night tangents. Open Onyx and you're in the conversation in seconds.</p>
+            <a class="more" href="/app">Drop in &rarr;</a>
           </article>
-          <article class="r-offer">
-            <div class="head"><span class="idx">02</span><h3>The server never sees you</h3></div>
-            <p>A pure selective-forwarding unit: it relays <b>opaque end-to-end-encrypted</b> frames and never encodes, decodes or transcodes. Keys are yours; plaintext never touches the wire.</p>
-            <span class="tag hot">e2ee · sfu · zero-transcode</span>
+          <article class="r-card">
+            <span class="k">voice</span>
+            <h4>Voice stages</h4>
+            <p>Hop into a room and just talk — spatial audio, screen-share, raise-hand. Encrypted end to end; the server only forwards, it never listens.</p>
+            <a class="more" href="/app">Join a stage &rarr;</a>
           </article>
-          <article class="r-offer">
-            <div class="head"><span class="idx">03</span><h3>You choose the transport</h3></div>
-            <p>WebTransport over QUIC by default. A <b>WebRTC</b> data channel carries the same frames where QUIC can't reach — and you can opt into standard WebRTC codecs on mobile when you want to.</p>
-            <span class="tag">webtransport · quic · webrtc opt-in</span>
+          <article class="r-card">
+            <span class="k">browse</span>
+            <h4>Room directory</h4>
+            <p>The whole network in one list. Sort by what's busy, peek at topics, and follow the lights to wherever your people happen to be tonight.</p>
+            <a class="more" href="/app">Browse rooms &rarr;</a>
           </article>
-          <article class="r-offer">
-            <div class="head"><span class="idx">04</span><h3>A network that heals</h3></div>
-            <p>The <b>Suimyaku</b> CRDT mesh keeps two nodes today — eshmaki.me and ircx.us — in sync. Either door reaches the whole graph; lose one and the mesh routes around it.</p>
-            <span class="tag">suimyaku · crdt mesh</span>
-          </article>
-          <article class="r-offer">
-            <div class="head"><span class="idx">05</span><h3>Open to the bone</h3></div>
-            <p>IRCv3 + IRCX over WebSocket — SASL, session-resume, CHATHISTORY, roles and permissions as real state. Bring any client. Your account, your identity, no cage.</p>
-            <span class="tag">ircv3 · ircx · wss</span>
-          </article>
-          <article class="r-offer">
-            <div class="head"><span class="idx">06</span><h3>Services, not bots</h3></div>
-            <p>REGISTER, CHANNEL, GHOST, TEGAMI are <b>real server commands</b> — not ChanServ puppets sitting in your DMs pretending to be people.</p>
-            <span class="tag">services · no pseudo-users</span>
-          </article>
-          <article class="r-offer">
-            <div class="head"><span class="idx">07</span><h3>Conferencing, loaded</h3></div>
-            <p>Voice, video and screen with spatial audio, breakout rooms, live captions and transcripts, raise-hand and reactions — encrypted, and built into the protocol.</p>
-            <span class="tag">rooms · spatial · captions</span>
-          </article>
-          <article class="r-offer">
-            <div class="head"><span class="idx">08</span><h3>Yours to the bone</h3></div>
-            <p>A live <b>Theme Studio</b>, per-server accents, and a background engine that runs animated or solid — all synced to your account across the mesh, on every device.</p>
-            <span class="tag">theme studio · backgrounds</span>
+          <article class="r-card">
+            <span class="k">dm</span>
+            <h4>Quiet corners</h4>
+            <p>Private messages and small groups for the side conversations. Same network, same name, no separate app — just a calmer current.</p>
+            <a class="more" href="/app">Say hi &rarr;</a>
           </article>
         </div>
       </section>
 
-      {/* ── the mesh ── */}
-      <section id="network" class="r-wrap r-section r-mesh">
-        <span class="r-eyebrow">the network</span>
-        <h2 class="r-title">One mesh, two doors</h2>
+      <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
+
+      {/* ── join in seconds ── */}
+      <section id="join" class="r-wrap r-section r-join" aria-labelledby="join-heading">
+        <span class="r-eyebrow">join in seconds</span>
+        <h2 class="r-title" id="join-heading">You're three<br />steps from hello</h2>
         <div class="grid2">
-          <svg class="r-meshvis" viewBox="0 0 600 360" role="img" aria-label="The Orochi mesh: two nodes joined by golden veins">
-            <g fill="none" stroke="var(--gold)" stroke-width="1.3">
+          <ol class="r-steps">
+            <li><span class="idx">01</span><div><b>Open Onyx.</b> Nothing to install — it runs right here in your browser.</div></li>
+            <li><span class="idx">02</span><div><b>Pick a name.</b> Claim a handle now, or register it so it's yours for good.</div></li>
+            <li><span class="idx">03</span><div><b>Say hi in #root.</b> You're on the wire, in the room, part of the network.</div></li>
+          </ol>
+          <div class="term" aria-hidden="true">
+            <div class="bar"><span class="lights"><i /><i /><i /></span><span>onyx — first connection</span></div>
+            <div class="body">
+              <div><span class="o">welcome aboard —</span> <span class="c">finding the nearest shore …</span></div>
+              <div><span class="o">you joined</span> <span class="h">#root</span></div>
+              <div><span class="o">&lt;you&gt;</span> <span class="c">hello :)</span></div>
+              <div><span class="o">&lt;orochi&gt;</span> <span class="p">good to have you here.</span> <span class="cursor">▍</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="r-cta"><a class="r-btn primary" href="/app">Open Onyx &rarr;</a><a class="r-btn ghost" href="/about">Read more</a></div>
+      </section>
+
+      <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
+
+      {/* ── the culture ── */}
+      <section class="r-wrap r-section r-culture" aria-labelledby="culture-heading">
+        <span class="r-eyebrow">the culture</span>
+        <h2 class="r-title" id="culture-heading">Open. Yours.<br />No catch.</h2>
+        <p class="r-lede">A network should feel like somewhere you live, not a service that tolerates you. Here's what that means in practice.</p>
+        <div class="r-board three">
+          <article class="r-card">
+            <span class="k">open</span>
+            <h4>Open to the bone</h4>
+            <p>Plain IRCv3 + IRCX over WebSocket. Onyx is one way in — bring any client you like, or write your own straight from the spec.</p>
+          </article>
+          <article class="r-card">
+            <span class="k">yours</span>
+            <h4>Your name, your data</h4>
+            <p>Register once and your identity follows you across every node. No silent shutdowns, no account you're only renting from a landlord.</p>
+          </article>
+          <article class="r-card">
+            <span class="k">clean</span>
+            <h4>No ads, no mining</h4>
+            <p>Nobody's selling your attention. No trackers in the timeline, no engagement traps — just the room and the people in it.</p>
+          </article>
+        </div>
+      </section>
+
+      <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
+
+      {/* ── run your own ── */}
+      <section class="r-wrap r-section r-sovereign" aria-labelledby="sovereign-heading">
+        <div class="grid2 align">
+          <div>
+            <span class="r-eyebrow">run your own</span>
+            <h2 class="r-title" id="sovereign-heading">Or raise<br />your own shore</h2>
+            <p class="r-lede">Sovereignty is the whole point. Stand up your own Orochi node, peer it into the network, and own a slice of the ocean outright — your rooms, your rules, still part of the wider tide.</p>
+            <div class="r-cta"><a class="r-btn ghost" href="/about">How to run a node &rarr;</a></div>
+          </div>
+          <svg class="r-meshvis" viewBox="0 0 600 360" role="img" aria-label="Several nodes joined by azure currents into one connected network">
+            <g fill="none" stroke="var(--lapis)" stroke-width="1.3">
               <path class="r-vein" d="M150 180 C 250 90, 350 270, 450 180" />
               <path class="r-vein" d="M150 180 C 260 200, 340 160, 450 180" opacity="0.6" />
               <path d="M150 180 C 230 300, 370 60, 450 180" opacity="0.35" />
@@ -147,64 +186,41 @@ export default function Landing() {
             </g>
             <circle cx="70" cy="90" r="3" fill="var(--washi-mute)" /><circle cx="60" cy="270" r="3" fill="var(--washi-mute)" />
             <circle cx="540" cy="90" r="3" fill="var(--washi-mute)" /><circle cx="535" cy="270" r="3" fill="var(--washi-mute)" />
-            <circle cx="150" cy="180" r="13" fill="var(--ink)" stroke="var(--shu)" stroke-width="2" />
-            <circle cx="150" cy="180" r="5" fill="var(--shu)" />
+            <circle cx="150" cy="180" r="13" fill="var(--ink)" stroke="var(--gold-bright)" stroke-width="2" />
+            <circle cx="150" cy="180" r="5" fill="var(--gold-bright)" />
             <circle cx="450" cy="180" r="13" fill="var(--ink)" stroke="var(--lapis-bright)" stroke-width="2" />
             <circle cx="450" cy="180" r="5" fill="var(--lapis-bright)" />
           </svg>
-          <div class="r-nodecard">
-            <p class="r-lede" style={{ margin: '0 0 6px' }}>Connect to either node. The Suimyaku mesh keeps them convergent, so the whole network is one room with two entrances.</p>
-            <div class="r-node eshmaki"><span class="dot" /><span class="meta"><span class="host">eshmaki.me : 8080</span><span class="role">the devil's gate — wrath, from Aēšma</span></span></div>
-            <div class="r-node ircx"><span class="dot" /><span class="meta"><span class="host">ircx.us : 8080</span><span class="role">the far door — the open shore</span></span></div>
-          </div>
         </div>
       </section>
 
       <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
 
-      {/* ── community ── */}
-      <section id="commons" class="r-wrap r-section r-community">
-        <span class="r-eyebrow">the commons</span>
-        <h2 class="r-title">Come live<br />on the wire</h2>
-        <p class="r-lede">IRC was always a place, not a product. Ruri keeps it that way — a network you join, not an account you rent.</p>
-        <div class="r-board">
-          <article class="r-card"><span class="k">join</span><h4>Drop into #root</h4><p>The build channel lives on IRCXNet right now. Open Ruri, pick a name, and you're on the wire in seconds.</p><a class="more" href="/app">open a session →</a></article>
-          <article class="r-card"><span class="k">explore</span><h4>Channel directory</h4><p>Browse rooms across the mesh — text, voice, stages and threads — and watch live presence as people arrive.</p><a class="more" href="/app">browse channels →</a></article>
-          <article class="r-card"><span class="k">build</span><h4>Write a client</h4><p>The protocol is open IRCv3/IRCX. Ruri is one client; build your own, port a bot, or wire up the announce bot.</p><a class="more" href="/about">read the spec →</a></article>
-          <article class="r-card"><span class="k">run</span><h4>Stand up a node</h4><p>Sovereignty is the point. Run your own Orochi node, peer it into the Suimyaku mesh, and own your slice of the network.</p><a class="more" href="/about">node guide →</a></article>
+      {/* ── built right (concise tech strip) ── */}
+      <section class="r-wrap r-section r-built" aria-labelledby="built-heading">
+        <span class="r-eyebrow">built right</span>
+        <h2 class="r-title" id="built-heading">Quietly serious<br />underneath</h2>
+        <p class="r-lede">You never have to think about any of this — but it's the reason the network heals, the calls stay private, and the lights stay on.</p>
+        <div class="r-strip">
+          <div class="r-spec"><span class="t">self-healing network</span><p>The client finds the nearest node by latency; when one drops, the rest close over the gap. You never pick a server.</p></div>
+          <div class="r-spec"><span class="t">media the server can't read</span><p>Voice and video are end-to-end encrypted. The server forwards opaque frames and never decodes them — the keys are yours.</p></div>
+          <div class="r-spec"><span class="t">real services, not bots</span><p>Register, ghost a stale session, manage a room — all real server commands, not a puppet sitting in your DMs.</p></div>
+          <div class="r-spec"><span class="t">a client you can theme</span><p>A live Theme Studio and ocean-deep backgrounds, synced to your account across every device you sign in from.</p></div>
         </div>
-      </section>
-
-      <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
-
-      {/* ── connect ── */}
-      <section class="r-wrap r-section r-connect">
-        <span class="r-eyebrow">open a session</span>
-        <h2 class="r-title">Two lines to the mesh</h2>
-        <div class="term">
-          <div class="bar"><span class="lights"><i style={{ background: 'var(--shu)' }} /><i style={{ background: 'var(--gold)' }} /><i style={{ background: 'var(--ok)' }} /></span><span>ruri — connection</span></div>
-          <div class="body">
-            <div><span class="o">$</span> <span class="c">ruri connect</span> <span class="h">wss://ircx.us:8080</span></div>
-            <div><span class="o">→ negotiating</span> <span class="p">CAP · SASL · SESSION</span> <span class="o">…</span></div>
-            <div><span class="o">→ joined</span> <span class="h">#root</span> <span class="o">· mesh convergent · e2ee media ready</span></div>
-            <div><span class="c">welcome to IRCXNet.</span> <span class="cursor">▍</span></div>
-          </div>
-        </div>
-        <div class="r-cta"><a class="r-btn primary" href="/app">[ open ruri → ]</a><a class="r-btn ghost" href="/about">read the spec</a></div>
       </section>
 
       {/* ── footer ── */}
       <footer class="r-wrap r-footer">
         <div class="cols">
           <div class="sig">
-            <div class="logo"><b>瑠璃</b>RURI</div>
-            <p>The azure jewel the serpent guards — a mesh-native client for the Orochi network. Built in the open with Claude + Codex.</p>
+            <div class="logo"><Mascot variant="mark" />ONYX</div>
+            <p>A warm, open home on the Orochi network — real rooms, real people, encrypted media, and a name that's yours to keep. Built in the open.</p>
           </div>
-          <div class="col"><h5>Platform</h5><a href="#difference">The difference</a><a href="/app">Open Ruri</a><a href="/about">Media &amp; codec</a><a href="/about">Theme Studio</a></div>
-          <div class="col"><h5>Network</h5><a href="#network">The mesh</a><a href="/app">eshmaki.me</a><a href="/app">ircx.us</a><a href="/about">Protocol spec</a></div>
-          <div class="col"><h5>Commons</h5><a href="#commons">Join #root</a><a href="/about">Build a client</a><a href="/about">Run a node</a><a href="/about">About</a></div>
+          <div class="col"><h5>Community</h5><a href="#community">Who's here</a><a href="#rooms">Rooms</a><a href="#join">Join</a><a href="/app">Open Onyx</a></div>
+          <div class="col"><h5>Network</h5><a href="/about">The network</a><a href="/about">Run a node</a><a href="/about">Protocol spec</a><a href="/about">About</a></div>
+          <div class="col"><h5>Get in</h5><a href="/app">Drop into #root</a><a href="/app">Browse rooms</a><a href="/about">Build a client</a><a href="/about">Read more</a></div>
         </div>
-        <div class="base"><span><b>瑠璃</b> Ruri — IRCXNet</span><span>大蛇 Orochi · ეშმაკი eshmaki · 2026</span></div>
+        <div class="base"><span><Mascot variant="mark" /> Onyx — on the Orochi network</span><span>Open IRC · made for people · 2026</span></div>
       </footer>
     </main>
   );

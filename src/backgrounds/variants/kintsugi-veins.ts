@@ -10,7 +10,7 @@ import {
 
 export const kintsugiVeins = {
   id: 'kintsugi-veins',
-  label: 'Kintsugi Veins',
+  label: 'Gold Veins',
   kind: 'animated',
   init(ctx) {
     this.frame(ctx, 0);

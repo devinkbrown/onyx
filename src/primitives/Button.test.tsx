@@ -15,9 +15,9 @@ describe('Button', () => {
   });
 
   it('renders a polymorphic anchor when href is provided', () => {
-    render(() => <Button href="/app" variant="ghost" size="sm">Open Ruri</Button>);
+    render(() => <Button href="/app" variant="ghost" size="sm">Open Onyx</Button>);
 
-    const link = screen.getByRole('link', { name: 'Open Ruri' });
+    const link = screen.getByRole('link', { name: 'Open Onyx' });
 
     expect(link.getAttribute('href')).toBe('/app');
     expect(link.classList.contains('ruri-button--ghost')).toBe(true);

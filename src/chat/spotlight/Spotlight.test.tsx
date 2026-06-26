@@ -126,7 +126,8 @@ describe('Spotlight', () => {
 
     fireEvent.keyDown(window, { key: 'k', metaKey: true });
     const input = screen.getByRole('combobox', { name: 'Command search' });
-    fireEvent.input(input, { target: { value: 'theme shu' } });
+    // Search by the theme's visible name (the 'shu' theme is labelled "Garnet").
+    fireEvent.input(input, { target: { value: 'garnet' } });
     fireEvent.keyDown(input, { key: 'Enter' });
 
     expect(document.documentElement.getAttribute('data-theme')).toBe('shu');

@@ -21,6 +21,10 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overflow-x: hidden;
+  /* Stop the rubber-band/body-bounce behind fixed mobile surfaces, and kill the
+     grey tap-flash on touch. */
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 a {

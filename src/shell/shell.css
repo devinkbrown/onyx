@@ -1,4 +1,4 @@
-/* ── Ruri AppShell — Lapis × Kintsugi × Terminal ──────────────────────────────
+/* ── Onyx AppShell — Ocean × Bioluminescence × Terminal ───────────────────────
    Layout: CSS grid — [ ServerRail | ChannelSidebar | ConversationColumn | MemberList ]
    PresenceRibbon spans the top of the conversation column.
    Background canvas is fixed behind everything (z-index: -1).
@@ -7,6 +7,7 @@
 /* ── Grid root ── */
 .shell {
   position: relative;
+  isolation: isolate;
   display: grid;
   grid-template-columns:
     var(--shell-rail-w, 54px)
@@ -18,10 +19,111 @@
   overflow: hidden;
   font-family: var(--font-sans);
   color: var(--washi);
-  /* Semi-opaque ink veil over the live Background canvas: keeps it as calm
-     ambiance behind the working surfaces so message text stays crisp.
-     (The background is shown full-strength on /appearance for picking.) */
-  background: color-mix(in oklab, var(--ink) 82%, transparent);
+  /* Semi-opaque depth veil over the live Background canvas: keeps it as calm
+     ambiance behind the working surfaces so message text stays crisp. */
+  background:
+    radial-gradient(
+      ellipse at 50% 0%,
+      color-mix(in oklab, var(--lapis-deep) 22%, transparent) 0%,
+      transparent 46%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--stone-2) 28%, var(--ink)) 0%,
+      color-mix(in oklab, var(--stone) 18%, var(--ink)) 38%,
+      color-mix(in oklab, var(--ink) 94%, transparent) 100%
+    );
+}
+
+.shell::before,
+.shell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.shell::before {
+  background:
+    linear-gradient(
+      112deg,
+      transparent 0%,
+      transparent 31%,
+      color-mix(in oklab, var(--lapis) 10%, transparent) 43%,
+      transparent 57%,
+      transparent 100%
+    ),
+    linear-gradient(
+      72deg,
+      transparent 0%,
+      color-mix(in oklab, var(--lapis-bright) 6%, transparent) 49%,
+      transparent 68%
+    );
+  opacity: 0.72;
+  animation: shell-current-drift 24s var(--ease) infinite alternate;
+}
+
+.shell::after {
+  background-image:
+    radial-gradient(
+      circle at 12% 18%,
+      color-mix(in oklab, var(--lapis-bright) 80%, transparent) 0,
+      color-mix(in oklab, var(--lapis-bright) 80%, transparent) 1px,
+      transparent 2px
+    ),
+    radial-gradient(
+      circle at 74% 14%,
+      color-mix(in oklab, var(--lapis) 64%, transparent) 0,
+      color-mix(in oklab, var(--lapis) 64%, transparent) 1px,
+      transparent 2px
+    ),
+    radial-gradient(
+      circle at 92% 58%,
+      color-mix(in oklab, var(--gold-bright) 48%, transparent) 0,
+      color-mix(in oklab, var(--gold-bright) 48%, transparent) 1px,
+      transparent 2px
+    ),
+    radial-gradient(
+      circle at 36% 72%,
+      color-mix(in oklab, var(--lapis-bright) 56%, transparent) 0,
+      color-mix(in oklab, var(--lapis-bright) 56%, transparent) 1px,
+      transparent 2px
+    );
+  opacity: 0.42;
+  filter: drop-shadow(0 0 6px color-mix(in oklab, var(--lapis-bright) 42%, transparent));
+  animation: shell-biolume-drift 18s var(--ease) infinite alternate;
+}
+
+.shell > * {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes shell-current-drift {
+  from { transform: translate3d(-2.5%, -1%, 0); }
+  to { transform: translate3d(2.5%, 1%, 0); }
+}
+
+@keyframes shell-biolume-drift {
+  from {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.34;
+  }
+  to {
+    transform: translate3d(0, -1.8%, 0);
+    opacity: 0.54;
+  }
+}
+
+.shell button:focus-visible,
+.shell [role='button']:focus-visible,
+.shell input:focus-visible,
+.shell textarea:focus-visible,
+.shell-mobile-nav-btn:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--lapis) 18%, transparent);
 }
 
 .shell--no-rail {
@@ -54,7 +156,12 @@
   align-items: center;
   gap: 6px;
   padding: 10px 0 12px;
-  background: color-mix(in oklab, var(--ink) 84%, var(--stone));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--stone) 34%, var(--ink)) 0%,
+      color-mix(in oklab, var(--ink) 88%, var(--stone)) 100%
+    );
   border-right: 1px solid var(--seam-faint);
   overflow: hidden;
   width: var(--shell-rail-w, 54px);
@@ -78,7 +185,7 @@
   width: 34px;
   height: 34px;
   border: 1px solid transparent;
-  border-radius: var(--r-0);
+  border-radius: var(--r-md);
   cursor: pointer;
   background: transparent;
   color: var(--washi-dim);
@@ -93,15 +200,22 @@
 }
 
 .shell-rail-entry:hover {
-  color: var(--gold-bright);
+  color: var(--lapis-bright);
   border-color: var(--seam);
-  background: color-mix(in oklab, var(--stone) 24%, transparent);
+  background: color-mix(in oklab, var(--lapis-deep) 16%, transparent);
+  box-shadow: inset 0 0 18px color-mix(in oklab, var(--lapis) 14%, transparent);
 }
 
 .shell-rail-entry--active {
-  color: var(--gold-bright);
-  border-color: var(--gold);
-  background: color-mix(in oklab, var(--stone-2) 56%, transparent);
+  color: var(--lapis-bright);
+  border-color: var(--seam);
+  background:
+    radial-gradient(
+      circle at 50% 20%,
+      color-mix(in oklab, var(--lapis-bright) 18%, transparent) 0%,
+      transparent 58%
+    ),
+    color-mix(in oklab, var(--stone-2) 56%, transparent);
 }
 
 .shell-rail-entry--active::before {
@@ -111,7 +225,8 @@
   top: 20%;
   bottom: 20%;
   width: 2px;
-  background: var(--gold);
+  background: var(--lapis-bright);
+  box-shadow: 0 0 12px color-mix(in oklab, var(--lapis-bright) 72%, transparent);
 }
 
 .shell-rail-bottom {
@@ -127,7 +242,12 @@
   grid-column: 2;
   display: flex;
   flex-direction: column;
-  background: color-mix(in oklab, var(--ink) 72%, var(--stone));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--stone-2) 20%, var(--ink)) 0%,
+      color-mix(in oklab, var(--ink) 78%, var(--stone)) 100%
+    );
   border-right: 1px solid var(--seam-faint);
   overflow: hidden;
 }
@@ -149,7 +269,7 @@
   font-size: 0.72rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--gold);
+  color: var(--lapis-bright);
 }
 
 .shell-sidebar-dot {
@@ -160,7 +280,7 @@
   flex: none;
 }
 
-.shell-sidebar-dot--connecting { background: var(--gold-bright); }
+.shell-sidebar-dot--connecting { background: var(--lapis-bright); }
 .shell-sidebar-dot--disconnected { background: var(--washi-mute); }
 .shell-sidebar-dot--error { background: var(--shu); }
 
@@ -201,7 +321,7 @@
   align-items: center;
   gap: 7px;
   padding: 5px 10px;
-  border-radius: var(--r-0);
+  border-radius: var(--r-md);
   border: 1px solid transparent;
   cursor: pointer;
   font-size: 0.86rem;
@@ -217,17 +337,23 @@
 
 .shell-channel-item:hover {
   color: var(--washi);
-  background: color-mix(in oklab, var(--stone) 22%, transparent);
+  background: color-mix(in oklab, var(--lapis-deep) 12%, transparent);
+  border-color: var(--seam-faint);
 }
 
 .shell-channel-item--active {
   color: var(--washi);
-  background: color-mix(in oklab, var(--stone-2) 44%, transparent);
-  border-color: var(--seam-faint);
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--lapis-deep) 24%, transparent) 0%,
+      color-mix(in oklab, var(--stone-2) 40%, transparent) 100%
+    );
+  border-color: var(--seam);
 }
 
 .shell-channel-item--active .shell-channel-sigil {
-  color: var(--gold);
+  color: var(--lapis-bright);
 }
 
 .shell-channel-item--unread {
@@ -265,8 +391,8 @@
   font-size: 0.62rem;
   font-weight: 700;
   border-radius: var(--r-sm);
-  background: color-mix(in oklab, var(--gold) 20%, var(--stone));
-  color: var(--gold-bright);
+  background: color-mix(in oklab, var(--lapis-deep) 30%, var(--stone));
+  color: var(--lapis-bright);
 }
 
 /* join-channel input */
@@ -286,11 +412,13 @@
   background: color-mix(in oklab, var(--ink) 72%, var(--stone));
   border: 1px solid var(--seam-faint);
   border-right: none;
+  border-radius: var(--r-md) 0 0 var(--r-md);
   outline: none;
 }
 
 .shell-join-input:focus {
-  border-color: var(--lapis);
+  border-color: var(--lapis-bright);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 26%, transparent);
 }
 
 .shell-join-input::placeholder {
@@ -302,62 +430,79 @@
   padding: 6px 10px;
   font-family: var(--font-mono);
   font-size: 0.78rem;
-  color: var(--gold-bright);
+  color: var(--lapis-bright);
   background: color-mix(in oklab, var(--stone-2) 48%, var(--ink));
   border: 1px solid var(--seam-faint);
+  border-radius: 0 var(--r-md) var(--r-md) 0;
   cursor: pointer;
   transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
 
 .shell-join-btn:hover {
-  color: var(--gold);
-  border-color: var(--gold);
+  color: var(--washi);
+  border-color: var(--lapis-bright);
+  box-shadow: 0 0 18px color-mix(in oklab, var(--lapis) 18%, transparent);
 }
 
 /* ── Conversation column ── */
 .shell-conversation {
   grid-column: 3;
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background: color-mix(in oklab, var(--ink) 56%, var(--stone));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--stone-2) 16%, var(--ink)) 0%,
+      color-mix(in oklab, var(--ink) 88%, var(--stone)) 100%
+    );
   overflow: hidden;
 }
 
 /* ── Join-voice affordance ── */
 .shell-voice-join { display: flex; gap: 10px; padding: 10px clamp(12px, 2vw, 20px); border-bottom: 1px solid var(--seam-faint); }
-.shell-voice-join-btn { font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.04em; color: var(--washi-dim); background: color-mix(in oklab, var(--stone) 40%, transparent); border: 1px solid var(--seam-faint); padding: 7px 14px; cursor: pointer; transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease); }
-.shell-voice-join-btn:hover { color: var(--gold-bright); border-color: var(--gold); }
+.shell-voice-join-btn { font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.04em; color: var(--washi-dim); background: color-mix(in oklab, var(--stone) 40%, transparent); border: 1px solid var(--seam-faint); border-radius: var(--r-md); padding: 7px 14px; cursor: pointer; transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
+.shell-voice-join-btn:hover { color: var(--lapis-bright); border-color: var(--seam); box-shadow: inset 0 0 18px color-mix(in oklab, var(--lapis) 12%, transparent); }
 
 /* ── Presence ribbon ── */
 .shell-ribbon {
+  position: relative;
   flex: none;
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 0 16px;
   height: 48px;
-  background: color-mix(in oklab, var(--ink) 70%, var(--stone));
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--stone-2) 22%, var(--ink)) 0%,
+      color-mix(in oklab, var(--ink) 78%, var(--stone)) 70%,
+      color-mix(in oklab, var(--lapis-deep) 12%, var(--ink)) 100%
+    );
   border-bottom: 1px solid var(--seam-faint);
   overflow: hidden;
 }
 
-.shell-ribbon-kintsugi {
+.shell-ribbon::after {
+  content: '';
   position: absolute;
-  top: 48px;
+  bottom: 0;
   left: 0;
   right: 0;
-  height: 2px;
+  height: 1px;
   background: linear-gradient(
     90deg,
     transparent 0%,
-    var(--seam-faint) 12%,
-    var(--seam) 35%,
-    var(--gold) 50%,
-    var(--seam) 66%,
-    var(--seam-faint) 88%,
+    color-mix(in oklab, var(--lapis) 18%, transparent) 14%,
+    var(--seam) 34%,
+    var(--lapis-bright) 52%,
+    var(--seam) 70%,
+    color-mix(in oklab, var(--lapis) 16%, transparent) 88%,
     transparent 100%
   );
+  opacity: 0.7;
   pointer-events: none;
 }
 
@@ -372,6 +517,10 @@
   text-overflow: ellipsis;
   flex: none;
   max-width: 22ch;
+}
+
+.shell-ribbon-channel [style*='--gold'] {
+  color: var(--lapis-bright) !important;
 }
 
 .shell-ribbon-sep {
@@ -410,7 +559,7 @@
 }
 
 .shell-ribbon-identity-nick {
-  color: var(--gold);
+  color: var(--lapis-bright);
 }
 
 .shell-ribbon-conn {
@@ -433,7 +582,7 @@
 }
 
 .shell-ribbon-conn-dot--connected { background: var(--ok); }
-.shell-ribbon-conn-dot--connecting { background: var(--gold-bright); animation: shell-pulse 1.4s ease infinite; }
+.shell-ribbon-conn-dot--connecting { background: var(--lapis-bright); animation: shell-pulse 1.4s ease infinite; }
 .shell-ribbon-conn-dot--disconnected { background: var(--washi-mute); }
 .shell-ribbon-conn-dot--error { background: var(--shu); }
 
@@ -451,7 +600,7 @@
   transition: color var(--dur) var(--ease);
 }
 
-.shell-ribbon-members:hover { color: var(--gold-bright); }
+.shell-ribbon-members:hover { color: var(--lapis-bright); }
 
 /* ── Message view ── */
 .shell-messages {
@@ -461,6 +610,13 @@
   flex-direction: column;
   overflow: hidden;
   position: relative;
+  background:
+    radial-gradient(
+      ellipse at 50% 0%,
+      color-mix(in oklab, var(--lapis-deep) 8%, transparent) 0%,
+      transparent 42%
+    ),
+    color-mix(in oklab, var(--ink) 76%, var(--stone));
 }
 
 .shell-feed {
@@ -492,7 +648,7 @@
   padding: 4px 16px;
 }
 
-.shell-msg-group:hover { background: color-mix(in oklab, var(--stone) 10%, transparent); }
+.shell-msg-group:hover { background: color-mix(in oklab, var(--lapis-deep) 8%, transparent); }
 
 .shell-msg-group--system {
   grid-template-columns: 1fr;
@@ -561,7 +717,7 @@
   padding: 1px 16px;
 }
 
-.shell-msg-cont:hover { background: color-mix(in oklab, var(--stone) 10%, transparent); }
+.shell-msg-cont:hover { background: color-mix(in oklab, var(--lapis-deep) 8%, transparent); }
 
 .shell-msg-cont-ts {
   grid-column: 1;
@@ -623,7 +779,7 @@
 }
 
 .shell-msg-reply-from {
-  color: var(--gold);
+  color: var(--lapis-bright);
   font-family: var(--font-mono);
   font-size: 0.72rem;
 }
@@ -636,6 +792,7 @@
   margin-top: 4px;
   padding: 3px 8px;
   border: 1px solid var(--seam-faint);
+  border-radius: var(--r-pill);
   cursor: pointer;
   font-family: var(--font-mono);
   font-size: 0.68rem;
@@ -647,9 +804,10 @@
 }
 
 .shell-thread-indicator:hover {
-  color: var(--gold-bright);
-  border-color: var(--gold);
-  background: color-mix(in oklab, var(--gold-deep) 12%, transparent);
+  color: var(--washi);
+  border-color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
+  box-shadow: 0 0 18px color-mix(in oklab, var(--lapis) 16%, transparent);
 }
 
 /* Reactions */
@@ -666,6 +824,7 @@
   gap: 4px;
   padding: 2px 7px 2px 5px;
   border: 1px solid var(--seam-faint);
+  border-radius: var(--r-pill);
   cursor: pointer;
   font-size: 0.82rem;
   color: var(--washi-dim);
@@ -674,8 +833,8 @@
 }
 
 .shell-reaction:hover {
-  border-color: var(--gold);
-  background: color-mix(in oklab, var(--gold-deep) 14%, transparent);
+  border-color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis-deep) 16%, transparent);
   color: var(--washi);
 }
 
@@ -709,24 +868,32 @@
   font-size: 0.74rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--gold-bright);
+  color: var(--lapis-bright);
   background: color-mix(in oklab, var(--stone-2) 64%, var(--ink));
-  border: 1px solid var(--gold);
+  border: 1px solid var(--seam);
+  border-radius: var(--r-pill);
   cursor: pointer;
-  box-shadow: 0 8px 28px -16px #000;
+  box-shadow: 0 8px 28px -16px color-mix(in oklab, var(--ink) 96%, transparent);
   transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
 
 .shell-jump-latest:hover {
   transform: translateX(-50%) translateY(-2px);
-  box-shadow: 0 12px 36px -18px #000;
+  box-shadow:
+    0 12px 36px -18px color-mix(in oklab, var(--ink) 96%, transparent),
+    0 0 22px color-mix(in oklab, var(--lapis) 18%, transparent);
 }
 
 /* ── Composer ── */
 .shell-composer {
   flex: none;
   padding: 10px 16px 14px;
-  background: color-mix(in oklab, var(--ink) 62%, var(--stone));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--stone) 16%, var(--ink)) 0%,
+      color-mix(in oklab, var(--ink) 82%, var(--stone)) 100%
+    );
   border-top: 1px solid var(--seam-faint);
 }
 
@@ -736,12 +903,15 @@
   align-items: flex-end;
   background: color-mix(in oklab, var(--ink) 72%, var(--stone-2));
   border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
   transition: border-color var(--dur) var(--ease);
 }
 
 .shell-composer-inner:focus-within {
-  border-color: var(--lapis);
-  box-shadow: 0 0 0 2px color-mix(in oklab, var(--lapis) 28%, transparent);
+  border-color: var(--lapis-bright);
+  box-shadow:
+    0 0 0 2px color-mix(in oklab, var(--lapis) 24%, transparent),
+    0 0 24px color-mix(in oklab, var(--lapis-bright) 12%, transparent);
 }
 
 .shell-composer-textarea {
@@ -772,6 +942,7 @@
   display: grid;
   place-items: center;
   border: 1px solid transparent;
+  border-radius: var(--r-md);
   cursor: pointer;
   color: var(--washi-mute);
   background: transparent;
@@ -780,9 +951,9 @@
 }
 
 .shell-composer-send:hover:not(:disabled) {
-  color: var(--gold-bright);
+  color: var(--lapis-bright);
   border-color: var(--seam);
-  background: color-mix(in oklab, var(--stone) 24%, transparent);
+  background: color-mix(in oklab, var(--lapis-deep) 16%, transparent);
 }
 
 .shell-composer-send:disabled {
@@ -808,7 +979,12 @@
   grid-column: 4;
   display: flex;
   flex-direction: column;
-  background: color-mix(in oklab, var(--ink) 78%, var(--stone));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--stone-2) 16%, var(--ink)) 0%,
+      color-mix(in oklab, var(--ink) 82%, var(--stone)) 100%
+    );
   border-left: 1px solid var(--seam-faint);
   overflow: hidden;
   width: var(--shell-members-w, 220px);
@@ -826,7 +1002,7 @@
   font-size: 0.68rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--gold);
+  color: var(--lapis-bright);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -863,13 +1039,36 @@
   padding: 4px 10px;
   cursor: pointer;
   border: 1px solid transparent;
+  border-radius: var(--r-md);
   margin: 0 4px;
   transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
 
 .shell-member-row:hover {
-  background: color-mix(in oklab, var(--stone) 22%, transparent);
-  border-color: var(--seam-faint);
+  background: color-mix(in oklab, var(--lapis-deep) 12%, transparent);
+  border-color: var(--seam);
+}
+
+/* Each member is wrapped in a Popover — an inline <span> + inline <button> by
+   default — which made the nicklist flow horizontally and wrap into ragged
+   columns. Force the wrappers to stack as clean, full-width vertical rows. */
+.shell-members-scroll .ruri-popover { display: block; }
+.shell-members-scroll .ruri-popover__trigger {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--r-sm);
+}
+.shell-members-scroll .ruri-popover__trigger:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: -2px;
 }
 
 .shell-member-nick {
@@ -978,6 +1177,12 @@
   color: var(--washi-mute);
   text-align: center;
   padding: 2rem;
+  background:
+    radial-gradient(
+      ellipse at 50% 42%,
+      color-mix(in oklab, var(--lapis-deep) 12%, transparent) 0%,
+      transparent 56%
+    );
 }
 
 .shell-home-title {
@@ -986,9 +1191,10 @@
   font-weight: 400;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--washi-dim);
+  color: var(--lapis-bright);
   margin: 0 0 0.6rem;
   line-height: 1;
+  text-shadow: 0 0 28px color-mix(in oklab, var(--lapis-bright) 22%, transparent);
 }
 
 .shell-home-sub {
@@ -1016,7 +1222,7 @@
   color: var(--washi-mute);
 }
 
-.shell-thread-msg-from { color: var(--gold); }
+.shell-thread-msg-from { color: var(--lapis-bright); }
 
 .shell-thread-msg-text {
   font-size: 0.88rem;
@@ -1027,76 +1233,149 @@
 /* ── Mobile layout ── */
 @media (max-width: 900px) {
   .shell {
+    --mnav-h: 54px;
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr auto;
+    grid-template-rows: 1fr;
+    /* Sit above the fixed bottom tab bar; clear the notch up top. */
+    height: calc(100svh - var(--mnav-h) - env(safe-area-inset-bottom, 0px));
+    padding-top: env(safe-area-inset-top, 0px);
   }
 
-  .shell-rail {
-    display: none;
-  }
+  .shell-rail { display: none; }
 
+  /* Channel drawer — slides in from the left, stops above the tab bar */
   .shell-sidebar {
     position: fixed;
-    inset: 0;
+    top: 0;
+    bottom: calc(54px + env(safe-area-inset-bottom, 0px));
+    left: 0;
     z-index: 90;
-    width: min(280px, 88vw);
+    width: min(300px, 86vw);
+    padding-top: env(safe-area-inset-top, 0px);
     transform: translateX(-100%);
     transition: transform var(--dur) var(--ease);
     grid-column: unset;
+    box-shadow: 24px 0 60px -30px color-mix(in oklab, var(--ink) 92%, transparent);
   }
+  /* The open class lives on the wrapper; flip the fixed child's transform.
+     (A transform on the wrapper itself would make the fixed child a containing
+     block and break the slide — so only the child is transformed.) */
+  .shell-sidebar--mobile-open .shell-sidebar { transform: translateX(0); }
 
-  .shell-sidebar--mobile-open {
-    transform: translateX(0);
-  }
-
-  .shell-sidebar-backdrop {
+  .shell-sidebar-backdrop,
+  .shell-members-backdrop {
     position: fixed;
     inset: 0;
     z-index: 89;
-    background: color-mix(in oklab, var(--ink) 70%, transparent);
+    background: color-mix(in oklab, var(--ink) 64%, transparent);
+    backdrop-filter: blur(2px);
   }
 
+  /* Member list — a right-hand drawer instead of a column */
   .shell-members {
-    display: none;
+    position: fixed;
+    top: 0;
+    bottom: calc(54px + env(safe-area-inset-bottom, 0px));
+    right: 0;
+    z-index: 90;
+    width: min(290px, 84vw);
+    padding-top: env(safe-area-inset-top, 0px);
+    transform: translateX(100%);
+    transition: transform var(--dur) var(--ease);
+    grid-column: unset;
+    box-shadow: -24px 0 60px -30px color-mix(in oklab, var(--ink) 92%, transparent);
+  }
+  /* Override desktop display:none so the drawer can animate off-screen instead */
+  .shell-members--hidden {
+    display: flex;
+    transform: translateX(100%);
+    pointer-events: none;
+  }
+  .shell-members:not(.shell-members--hidden) { transform: translateX(0); }
+
+  .shell-conversation { grid-column: 1; min-width: 0; }
+
+  /* Bigger tap target for the member toggle in the ribbon */
+  .shell-ribbon-members {
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 6px;
   }
 
-  .shell-conversation {
-    grid-column: 1;
-  }
+  /* Composer: 16px kills iOS zoom-on-focus; larger send target; drop the hint */
+  .shell-composer-textarea { font-size: 16px; min-height: 42px; }
+  .shell-composer-send { width: 42px; height: 42px; }
+  .shell-composer-hint { display: none; }
 
+  /* Bottom tab bar — fixed, safe-area aware, real touch targets */
   .shell-mobile-nav {
     display: flex;
-    align-items: center;
+    align-items: stretch;
     justify-content: space-around;
-    height: 50px;
-    background: color-mix(in oklab, var(--ink) 84%, var(--stone));
-    border-top: 1px solid var(--seam-faint);
-    grid-column: 1;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 95;
+    height: calc(var(--mnav-h, 54px) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: color-mix(in oklab, var(--ink) 90%, var(--stone));
+    border-top: 1px solid var(--seam);
+    box-shadow: 0 -20px 50px -34px color-mix(in oklab, var(--ink) 92%, transparent);
   }
 
   .shell-mobile-nav-btn {
-    display: grid;
-    place-items: center;
-    padding: 0 16px;
-    height: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-height: 44px;
+    padding: 0 6px;
     color: var(--washi-mute);
     font-family: var(--font-mono);
-    font-size: 0.68rem;
+    font-size: 0.58rem;
     letter-spacing: 0.1em;
     text-transform: uppercase;
     background: transparent;
     border: none;
     cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
     transition: color var(--dur) var(--ease);
   }
-
+  .shell-mobile-nav-btn b { font-size: 1.05rem; line-height: 1; font-weight: 400; }
+  .shell-mobile-nav-btn:active { color: var(--lapis-bright); }
   .shell-mobile-nav-btn:hover,
-  .shell-mobile-nav-btn--active { color: var(--gold-bright); }
+  .shell-mobile-nav-btn--active { color: var(--lapis-bright); }
+
+  /* Join voice/video — full-width, taller tap targets */
+  .shell-voice-join-btn { flex: 1; padding: 11px 12px; text-align: center; }
 }
 
 @media (min-width: 901px) {
   .shell-mobile-nav { display: none; }
-  .shell-sidebar-backdrop { display: none; }
+  .shell-sidebar-backdrop,
+  .shell-members-backdrop { display: none; }
+}
+
+/* Phone-specific tightening */
+@media (max-width: 480px) {
+  .shell-ribbon { gap: 8px; padding: 0 12px; }
+  .shell-ribbon-channel { font-size: 1rem; max-width: 10ch; }
+  .shell-ribbon-topic { display: none; }
+  .shell-ribbon-identity { display: none; }
+  .shell-composer { padding: 8px 12px; }
+  .shell-voice-join { padding: 8px 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell::before,
+  .shell::after,
+  .shell-ribbon-conn-dot--connecting {
+    animation: none;
+  }
 }
 
 /* ── Disconnected banner ── */
@@ -1113,7 +1392,7 @@
   gap: 10px;
 }
 
-/* Kintsugi seam decoration — conversation column top */
+/* Azure current decoration — conversation column top */
 .shell-conversation::before {
   content: '';
   position: absolute;

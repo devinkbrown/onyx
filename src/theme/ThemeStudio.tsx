@@ -99,8 +99,8 @@ function StudioPreview() {
         <div class="ts-preview__msg">
           <span class="ts-preview__nick" style="color: var(--gold-bright)">kain</span>
           <span class="ts-preview__text">
-            the kintsugi holds —{' '}
-            <span style="color: var(--shu-bright)">朱 vermilion</span> seams mending the dark
+            the seams hold —{' '}
+            <span style="color: var(--shu-bright)">vermilion</span> mending the dark
           </span>
         </div>
         <div class="ts-preview__msg">
@@ -356,7 +356,7 @@ export function ThemeStudio(props: ThemeStudioProps) {
 
   const handleImport = (): void => {
     const raw = window.prompt(
-      'Paste a Ruri theme JSON blob to import:',
+      'Paste an Onyx theme JSON blob to import:',
       '',
     );
     if (!raw) return;
@@ -370,7 +370,7 @@ export function ThemeStudio(props: ThemeStudioProps) {
     }
 
     if (!isExportBlob(parsed)) {
-      setImportError('Not a valid Ruri theme export.');
+      setImportError('Not a valid Onyx theme export.');
       return;
     }
 

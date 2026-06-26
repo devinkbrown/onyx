@@ -1,9 +1,11 @@
 import './landing.css';
 import './about.css';
+import { Mascot } from '@/components/brand/Mascot';
 
 /**
- * Ruri /about — full editorial deep-dive.
- * "Lapis × Kintsugi × Terminal" identity; continuous with landing.
+ * Onyx /about — full editorial deep-dive.
+ * Ocean dark-luxury identity; deep-water depth, azure currents,
+ * bioluminescent crests. Continuous with landing.
  *
  * Technical claims grounded in:
  *   docs/planning/20-media-interop.md
@@ -14,8 +16,8 @@ import './about.css';
  */
 export default function About() {
   return (
-    <main class="r">
-      {/* ── Living atmosphere (shared with landing) ── */}
+    <main class="r ab-ocean">
+      {/* ── Living atmosphere (shared with landing, ocean-tinted here) ── */}
       <div class="r-ground" aria-hidden="true" />
       <div class="r-flecks" aria-hidden="true" />
       <svg
@@ -35,8 +37,8 @@ export default function About() {
 
       {/* ── Top status bar ── */}
       <header class="r-status" role="banner">
-        <a class="brand" href="/" aria-label="Ruri home">
-          <b>瑠璃</b>RURI
+        <a class="brand" href="/" aria-label="Onyx home">
+          <Mascot variant="mark" aria-label="Onyx" />ONYX
         </a>
         <nav aria-label="Site navigation">
           <a class="hideable" href="/">Home</a>
@@ -44,13 +46,13 @@ export default function About() {
           <a class="hideable" href="#media">Media</a>
           <a class="hideable" href="#mesh">Mesh</a>
           <span class="live hideable"><i aria-hidden="true" />mesh online</span>
-          <a class="enter" href="/app">Open Ruri</a>
+          <a class="enter" href="/app">Open Onyx</a>
         </nav>
       </header>
 
       {/* ── Hero ── */}
       <section class="r-wrap ab-hero" aria-labelledby="about-hero-heading">
-        <p class="r-kicker">how ruri works</p>
+        <p class="r-kicker">how onyx works</p>
         <h1 id="about-hero-heading">
           Open wire,<br />
           <span class="gold">no ceilings</span>
@@ -62,11 +64,10 @@ export default function About() {
         </p>
         <div class="ab-seam" aria-hidden="true" />
         <p class="sub">
-          Ruri is the window into the Orochi network. The window matters, but it isn't
-          the point — the point is everything underneath. This page is about that
-          underneath: the protocol, the media model, the cryptography, the mesh, and
-          what it all means for the people who use it and the developers who build on
-          it.
+          Onyx is the window. The window matters — but the point is everything behind
+          it. This page is the underneath: the protocol, the media model, the
+          cryptography, the mesh, and what each one means for the people who live here
+          and the developers who build on it.
         </p>
       </section>
 
@@ -186,46 +187,46 @@ export default function About() {
           >
             {/* SFU center */}
             <rect x="230" y="120" width="120" height="80" fill="none" stroke="var(--seam)" stroke-width="1.5" />
-            <text x="290" y="152" font-family="'JetBrains Mono Variable', monospace" font-size="10" fill="var(--gold)" text-anchor="middle" letter-spacing="1">SFU</text>
+            <text x="290" y="152" font-family="'JetBrains Mono Variable', monospace" font-size="10" fill="var(--lapis-bright)" text-anchor="middle" letter-spacing="1">SFU</text>
             <text x="290" y="168" font-family="'JetBrains Mono Variable', monospace" font-size="8.5" fill="var(--washi-mute)" text-anchor="middle">forward only</text>
             <text x="290" y="182" font-family="'JetBrains Mono Variable', monospace" font-size="8.5" fill="var(--washi-mute)" text-anchor="middle">no encode/decode</text>
 
             {/* Desktop client left */}
-            <rect x="30" y="60" width="100" height="50" fill="none" stroke="var(--lapis-bright)" stroke-width="1" rx="1" />
+            <rect x="30" y="60" width="100" height="50" fill="none" stroke="var(--lapis-bright)" stroke-width="1" rx="2" />
             <text x="80" y="82" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--lapis-bright)" text-anchor="middle">Desktop</text>
             <text x="80" y="96" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">OPVOX/OPVIS</text>
             <text x="80" y="108" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">native</text>
 
             {/* Browser client left-lower */}
-            <rect x="30" y="200" width="100" height="50" fill="none" stroke="var(--ok)" stroke-width="1" rx="1" />
+            <rect x="30" y="200" width="100" height="50" fill="none" stroke="var(--ok)" stroke-width="1" rx="2" />
             <text x="80" y="222" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--ok)" text-anchor="middle">Browser</text>
             <text x="80" y="236" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">OPVOX/OPVIS</text>
             <text x="80" y="248" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">WASM</text>
 
             {/* Mobile right-upper */}
-            <rect x="450" y="60" width="100" height="50" fill="none" stroke="var(--ok)" stroke-width="1" rx="1" />
+            <rect x="450" y="60" width="100" height="50" fill="none" stroke="var(--ok)" stroke-width="1" rx="2" />
             <text x="500" y="82" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--ok)" text-anchor="middle">Mobile</text>
             <text x="500" y="96" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">OPVOX/OPVIS</text>
             <text x="500" y="108" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">WASM</text>
 
             {/* Desktop right-lower */}
-            <rect x="450" y="200" width="100" height="50" fill="none" stroke="var(--lapis-bright)" stroke-width="1" rx="1" />
+            <rect x="450" y="200" width="100" height="50" fill="none" stroke="var(--lapis-bright)" stroke-width="1" rx="2" />
             <text x="500" y="222" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--lapis-bright)" text-anchor="middle">Desktop</text>
             <text x="500" y="236" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">OPVOX/OPVIS</text>
             <text x="500" y="248" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">native</text>
 
             {/* Arrows from left clients to SFU */}
-            <path d="M130 85 L228 148" fill="none" stroke="var(--gold)" stroke-width="1.2" stroke-dasharray="3 5" />
-            <path d="M130 225 L228 172" fill="none" stroke="var(--gold)" stroke-width="1.2" stroke-dasharray="3 5" />
+            <path d="M130 85 L228 148" fill="none" stroke="var(--lapis)" stroke-width="1.2" stroke-dasharray="3 5" />
+            <path d="M130 225 L228 172" fill="none" stroke="var(--lapis)" stroke-width="1.2" stroke-dasharray="3 5" />
 
             {/* Arrows from SFU to right clients */}
-            <path d="M352 148 L448 85" fill="none" stroke="var(--gold)" stroke-width="1.2" stroke-dasharray="3 5" />
-            <path d="M352 172 L448 225" fill="none" stroke="var(--gold)" stroke-width="1.2" stroke-dasharray="3 5" />
+            <path d="M352 148 L448 85" fill="none" stroke="var(--lapis)" stroke-width="1.2" stroke-dasharray="3 5" />
+            <path d="M352 172 L448 225" fill="none" stroke="var(--lapis)" stroke-width="1.2" stroke-dasharray="3 5" />
 
             {/* Frame label */}
-            <text x="175" y="122" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--gold-bright)" text-anchor="middle">kagura frame</text>
+            <text x="175" y="122" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--lapis-bright)" text-anchor="middle">kagura frame</text>
             <text x="175" y="133" font-family="'JetBrains Mono Variable', monospace" font-size="7.5" fill="var(--washi-mute)" text-anchor="middle">(opaque, e2ee)</text>
-            <text x="405" y="122" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--gold-bright)" text-anchor="middle">kagura frame</text>
+            <text x="405" y="122" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--lapis-bright)" text-anchor="middle">kagura frame</text>
             <text x="405" y="133" font-family="'JetBrains Mono Variable', monospace" font-size="7.5" fill="var(--washi-mute)" text-anchor="middle">(identical bytes)</text>
           </svg>
 
@@ -340,7 +341,7 @@ export default function About() {
             aria-label="Tsumugi secure channel: TreeKEM tree on left, clients hold leaf keys, root key encrypts media, server relays opaque ciphertext on right"
           >
             {/* Tree structure */}
-            <text x="220" y="28" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--gold)" text-anchor="middle" letter-spacing="1.5">TSUMUGI SECURE CHANNEL</text>
+            <text x="220" y="28" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--lapis-bright)" text-anchor="middle" letter-spacing="1.5">TSUMUGI SECURE CHANNEL</text>
 
             {/* Root */}
             <circle cx="220" cy="65" r="12" fill="none" stroke="var(--shu)" stroke-width="1.5" />
@@ -349,8 +350,8 @@ export default function About() {
             {/* Mid nodes */}
             <line x1="220" y1="77" x2="140" y2="118" stroke="var(--seam)" stroke-width="1" />
             <line x1="220" y1="77" x2="300" y2="118" stroke="var(--seam)" stroke-width="1" />
-            <circle cx="140" cy="130" r="10" fill="none" stroke="var(--gold)" stroke-width="1" />
-            <circle cx="300" cy="130" r="10" fill="none" stroke="var(--gold)" stroke-width="1" />
+            <circle cx="140" cy="130" r="10" fill="none" stroke="var(--lapis)" stroke-width="1" />
+            <circle cx="300" cy="130" r="10" fill="none" stroke="var(--lapis)" stroke-width="1" />
 
             {/* Leaf nodes */}
             <line x1="140" y1="140" x2="90" y2="178" stroke="var(--seam-faint)" stroke-width="1" />
@@ -375,8 +376,8 @@ export default function About() {
             <text x="350" y="215" font-family="'JetBrains Mono Variable', monospace" font-size="7" fill="var(--washi-mute)" text-anchor="middle">leaf key</text>
 
             {/* Encrypted frame flow */}
-            <rect x="60" y="248" width="320" height="40" fill="none" stroke="var(--seam-faint)" rx="1" />
-            <text x="220" y="263" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--gold-bright)" text-anchor="middle">HPKE-encrypted kagura frame</text>
+            <rect x="60" y="248" width="320" height="40" fill="none" stroke="var(--seam-faint)" rx="2" />
+            <text x="220" y="263" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--lapis-bright)" text-anchor="middle">HPKE-encrypted kagura frame</text>
             <text x="220" y="279" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">opaque payload — server cannot read</text>
 
             {/* Arrow to server */}
@@ -388,13 +389,13 @@ export default function About() {
 
       <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
 
-      {/* ── 4. Suimyaku mesh ── */}
+      {/* ── 4. The mesh ── */}
       <section id="mesh" class="r-wrap ab-section" aria-labelledby="mesh-heading">
-        <span class="r-eyebrow">04 — the suimyaku mesh</span>
+        <span class="r-eyebrow">04 — the mesh</span>
         <h2 id="mesh-heading" class="r-title">A network that<br />heals itself</h2>
         <p class="r-lede">
-          Suimyaku (水脈) — "vein of water." The server mesh that keeps the network
-          convergent across however many nodes, with no single point of failure.
+          A self-healing server mesh that keeps the network convergent across however
+          many nodes, with no single point of failure.
         </p>
 
         <div class="ab-mesh-body">
@@ -403,10 +404,10 @@ export default function About() {
             class="ab-mesh-vis"
             viewBox="0 0 600 360"
             role="img"
-            aria-label="Suimyaku mesh: eshmaki.me and ircx.us joined by golden kintsugi veins; either node reaches the whole network"
+            aria-label="Mesh diagram: eshmaki.me and ircx.us joined by azure current links; either node reaches the whole network"
           >
-            {/* Veins */}
-            <g fill="none" stroke="var(--gold)" stroke-width="1.3">
+            {/* Currents */}
+            <g fill="none" stroke="var(--lapis)" stroke-width="1.3">
               <path class="ab-vein" d="M150 180 C 250 90, 350 270, 450 180" />
               <path class="ab-vein" d="M150 180 C 260 200, 340 160, 450 180" opacity="0.6" />
               <path d="M150 180 C 230 300, 370 60, 450 180" opacity="0.35" />
@@ -424,9 +425,9 @@ export default function About() {
             <circle cx="537" cy="272" r="3" fill="var(--washi-mute)" />
 
             {/* eshmaki node */}
-            <circle cx="150" cy="180" r="14" fill="var(--ink)" stroke="var(--shu)" stroke-width="2" />
-            <circle cx="150" cy="180" r="5" fill="var(--shu)" />
-            <text x="150" y="212" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--shu)" text-anchor="middle">eshmaki.me</text>
+            <circle cx="150" cy="180" r="14" fill="var(--ink)" stroke="var(--lapis)" stroke-width="2" />
+            <circle cx="150" cy="180" r="5" fill="var(--lapis)" />
+            <text x="150" y="212" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--lapis)" text-anchor="middle">eshmaki.me</text>
             <text x="150" y="225" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">:8080 wss</text>
 
             {/* ircx node */}
@@ -436,16 +437,16 @@ export default function About() {
             <text x="450" y="225" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">:8080 wss</text>
 
             {/* Convergence label */}
-            <text x="300" y="155" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--gold)" text-anchor="middle" letter-spacing="1">CRDT convergent</text>
+            <text x="300" y="155" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--lapis-bright)" text-anchor="middle" letter-spacing="1">CRDT convergent</text>
             <text x="300" y="170" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">delta-state sync</text>
           </svg>
 
           <div class="ab-mesh-text">
             <p>
-              Connect to <b>eshmaki.me:8080</b> or <b>ircx.us:8080</b> — both doors open
-              to the same network. Suimyaku keeps them in continuous sync using
-              delta-state CRDTs, so state change on one node reaches the other without
-              full-state floods.
+              The client auto-routes to the nearest node — <b>eshmaki.me:8080</b> and
+              <b> ircx.us:8080</b> are two entrances to the same network. The mesh keeps
+              them in continuous sync using delta-state CRDTs, so a state change on one
+              node reaches the other without full-state floods.
             </p>
             <p>
               Lose a node and the mesh heals: HyParView partial views maintain an active
@@ -464,14 +465,14 @@ export default function About() {
                 <span class="dot" aria-hidden="true" />
                 <span class="meta">
                   <span class="host">eshmaki.me : 8080</span>
-                  <span class="role">the devil's gate — wrath, from Aēšma · Georgian ეშმაკი</span>
+                  <span class="role">the near harbor — where the client lands first</span>
                 </span>
               </div>
               <div class="ab-node ircx">
                 <span class="dot" aria-hidden="true" />
                 <span class="meta">
                   <span class="host">ircx.us : 8080</span>
-                  <span class="role">the far door — the open shore</span>
+                  <span class="role">the far shore — the same waters, another door</span>
                 </span>
               </div>
             </div>
@@ -546,7 +547,7 @@ export default function About() {
             <span class="cmd">IDENTIFY</span>
             <h3>Authenticate</h3>
             <p>
-              Log in to your account. Ruri handles this automatically on connect
+              Log in to your account. Onyx handles this automatically on connect
               when you've saved credentials — no /msg NickServ.
             </p>
             <span class="note live">auto on connect</span>
@@ -577,10 +578,10 @@ export default function About() {
             <span class="cmd">TEGAMI</span>
             <h3>Offline messages</h3>
             <p>
-              Leave a message for someone who isn't online. Delivered when they
-              next connect. Tegami (手紙) means "letter" in Japanese.
+              Leave a message for someone who isn't online — it's delivered the
+              moment they next connect. No third-party inbox, no bot in your DMs.
             </p>
-            <span class="note">手紙 · async</span>
+            <span class="note">async delivery</span>
           </article>
 
           <article class="ab-svc">
@@ -597,69 +598,68 @@ export default function About() {
 
       <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
 
-      {/* ── 6. Mythos ── */}
+      {/* ── 6. The stack ── */}
       <section id="mythos" class="r-wrap ab-section" aria-labelledby="mythos-heading">
-        <span class="r-eyebrow">06 — the names</span>
-        <h2 id="mythos-heading" class="r-title">Three names,<br />one serpent</h2>
+        <span class="r-eyebrow">06 — the stack</span>
+        <h2 id="mythos-heading" class="r-title">Three layers,<br />one network</h2>
         <p class="r-lede">
-          Every layer of this thing is named for something old and a little dangerous.
-          The lore isn't decoration — it's the shape of the architecture.
+          The client, the gate and the engine — what you hold, where you enter,
+          and what carries it. Each layer is built to refuse a single point of failure.
         </p>
 
         <div class="ab-mythos-grid">
           <article class="ab-myth serpent">
-            <span class="ideograph" aria-label="大蛇 — Yamata no Orochi">大蛇</span>
-            <span class="name">Orochi · 大蛇 · the serpent</span>
+            <span class="ideograph" aria-hidden="true"><Mascot variant="hero" /></span>
+            <span class="name">Orochi · the engine</span>
             <p>
-              In the Kojiki, Yamata no Orochi is an eight-headed serpent — immense,
-              plural, sovereign. The daemon is named for it deliberately: <b>no single head
-              to cut off</b>, no single point of failure. The serpent is the network.
-              Not a node. Not a service. The network itself.
+              The daemon that <b>is</b> the network — many-noded and self-healing, with
+              <b> no single head to cut off</b>, no single point of failure. Not a node,
+              not a service: the network itself.
             </p>
             <p>
-              Written in Zig from scratch. Clean-room. Modern. No legacy IRC server
-              code, no shared ancestry with anything that existed before it.
+              Named for the water-dragon Orochi, written in Zig from scratch. Clean-room.
+              Modern. No legacy IRC server code, no shared ancestry with anything that
+              existed before it.
             </p>
             <span class="etym">
-              大蛇 · yamata no orochi<br />
-              kojiki, 712 CE · eight-headed serpent
+              orochi · the engine<br />
+              clean-room zig daemon · no single point of failure
             </span>
           </article>
 
-          <article class="ab-myth devil">
-            <span class="ideograph" aria-label="ეშმაკი — eshmaki, Georgian for devil">ეშმაკი</span>
-            <span class="name">eshmaki · ეშმაკი · the gate</span>
+          <article class="ab-myth tide">
+            <span class="ideograph" aria-hidden="true">≈</span>
+            <span class="name">the gate · where you enter</span>
             <p>
-              Georgian for <b>devil</b>, from the Zoroastrian Aēšma — the daeva of
-              wrath, of fury, of the sword. In the Avesta, Aēšma is one of the most
-              feared adversaries, a spirit of disorder that tests what is ordered.
+              The network has more than one door, and any door opens onto the whole of
+              it. <b>eshmaki.me</b> and <b>ircx.us</b> are entrances, not destinations —
+              the client picks the nearest one and the mesh does the rest.
             </p>
             <p>
-              <b>eshmaki.me</b> is one of two doors into the Orochi mesh. The name
-              is a provocation: you have to want to be here. The gate isn't gentle.
+              Run your own node and you add another gate to the same waters. There is no
+              front door and no back door, only the open shore — the network belongs to
+              everyone who keeps a light on.
             </p>
             <span class="etym">
-              ეშმაკი · eshmaki<br />
-              from aēšma, avestan · wrath
+              the gate · where you enter<br />
+              many doors · one open network
             </span>
           </article>
 
           <article class="ab-myth jewel">
-            <span class="ideograph" aria-label="瑠璃 — Ruri, lapis lazuli">瑠璃</span>
-            <span class="name">Ruri · 瑠璃 · the jewel</span>
+            <span class="ideograph" aria-hidden="true">◆</span>
+            <span class="name">Onyx · the client</span>
             <p>
-              Lapis lazuli. The stone that ancient Egypt ground for ultramarine,
-              that Vermeer used in the Girl with a Pearl Earring's headscarf,
-              that Byzantine icon painters reserved for the Virgin's robe.
+              Onyx — black banded chalcedony, cut and worn as a seal stone since
+              antiquity, prized for its depth and its hard, clean edges.
             </p>
             <p>
-              Deep ultramarine veined with <b>pyrite — real gold</b>. Not a metaphor
-              for this client: this client is literally that. Mineral blue ground,
-              gold seams, film grain. The azure jewel the serpent keeps.
+              That's this client: deep-water ground, azure currents, bioluminescent
+              crests — the window you hold onto the network. Calm, deliberate, yours.
             </p>
             <span class="etym">
-              瑠璃 · ruri<br />
-              lapis lazuli · ultramarine veined in gold
+              onyx · the client<br />
+              dark gemstone · the window you hold
             </span>
           </article>
         </div>
@@ -683,7 +683,7 @@ export default function About() {
             <h3>Any client,<br />any language</h3>
             <p>
               IRCv3 + IRCX over WebSocket. The protocol is public and interoperable.
-              You don't need Ruri. Connect with <b>irssi, WeeChat, Thunderbird</b>, a
+              You don't need Onyx. Connect with <b>irssi, WeeChat, Thunderbird</b>, a
               custom bot, or a new client you build from scratch.
             </p>
             <p>
@@ -703,7 +703,7 @@ export default function About() {
               <div><span class="c">SESSION TOKEN</span></div>
               <div><span class="o">← NOTE SESSION TOKEN </span><span class="h">:&lt;token&gt;</span></div>
             </div>
-            <a class="more" href="/app">open a session in Ruri →</a>
+            <a class="more" href="/app">open a session in Onyx →</a>
           </article>
 
           <article class="ab-dev-card">
@@ -712,7 +712,7 @@ export default function About() {
             <p>
               Orochi is a pure-Zig daemon. It runs on Linux x86_64 and aarch64.
               Stand it up on your own hardware, configure it, and link it into the
-              Suimyaku mesh — your node becomes another door into the whole network.
+              mesh — your node becomes another door into the whole network.
             </p>
             <p>
               Node identity is your <b>Ed25519 signing key</b>. The NodeId is
@@ -741,10 +741,10 @@ export default function About() {
       <footer class="r-wrap r-footer">
         <div class="cols">
           <div class="sig">
-            <div class="logo"><b>瑠璃</b>RURI</div>
+            <div class="logo"><Mascot variant="mark" aria-label="Onyx" />ONYX</div>
             <p>
-              The azure jewel the serpent guards — a mesh-native client for the
-              Orochi network. Built in the open with Claude and Codex.
+              A mesh-native client for the open Orochi network — end-to-end-encrypted
+              media, real services, and a home you own. Built in the open with Claude and Codex.
             </p>
           </div>
           <div class="col">
@@ -759,21 +759,21 @@ export default function About() {
           </div>
           <div class="col">
             <h5>Network</h5>
-            <a href="/app">eshmaki.me</a>
-            <a href="/app">ircx.us</a>
+            <a href="#mesh">The mesh</a>
+            <a href="/app">Auto-routing</a>
             <a href="/">Landing</a>
           </div>
           <div class="col">
             <h5>Commons</h5>
-            <a href="/app">Open Ruri</a>
+            <a href="/app">Open Onyx</a>
             <a href="/app">Join #root</a>
             <a href="#developer">Build a client</a>
             <a href="#developer">Run a node</a>
           </div>
         </div>
         <div class="base">
-          <span><b>瑠璃</b> Ruri — IRCXNet</span>
-          <span>大蛇 Orochi · ეშმაკი eshmaki · 2026</span>
+          <span><Mascot variant="mark" aria-label="Onyx" /> Onyx — IRCXNet</span>
+          <span>Orochi · the open mesh · 2026</span>
         </div>
       </footer>
     </main>

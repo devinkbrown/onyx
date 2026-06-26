@@ -49,7 +49,7 @@ export function Composer(props: ComposerProps): JSX.Element {
     const t = target();
     const cs = connectionStatus();
     if (cs !== 'connected') return '// not connected';
-    if (!t) return '// select a channel or DM';
+    if (!t) return '// pick a room or DM to start';
     return `message ${t}`;
   });
 

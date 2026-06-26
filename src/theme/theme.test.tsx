@@ -1,5 +1,5 @@
 /**
- * Tests for the Ruri theming engine.
+ * Tests for the Onyx theming engine.
  *
  * Coverage areas:
  *   1. applyThemeToDom — writes expected CSS vars to documentElement.

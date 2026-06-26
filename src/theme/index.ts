@@ -1,5 +1,5 @@
 /**
- * Ruri Theme Engine — barrel export.
+ * Onyx Theme Engine — barrel export.
  *
  * Public surface:
  *   - ThemeProvider + useTheme + applyThemeToDom

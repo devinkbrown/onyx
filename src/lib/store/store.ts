@@ -3326,10 +3326,13 @@ export const store = createStore<OnyxState>()(
             if (!sessionSync) {
               const { autoJoinChannels } = get();
               const serverUrl = get().server?.url ?? '';
-              const isDefault = serverUrl.includes('eshmaki.me');
+              // Both eshmaki.me and ircx.us are the same IRCXNet mesh — and the
+              // client now auto-routes to whichever node is nearest, so the
+              // #root fallback must fire for either entrance (not just eshmaki).
+              const isIrcxNet = serverUrl.includes('eshmaki.me') || serverUrl.includes('ircx.us');
               const channels = autoJoinChannels.length > 0
                 ? autoJoinChannels
-                : (isDefault ? ['#root'] : []);
+                : (isIrcxNet ? ['#root'] : []);
               if (channels.length > 0) {
                 setTimeout(() => {
                   for (const ch of channels) {

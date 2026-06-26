@@ -1,5 +1,5 @@
 /**
- * AppShell.tsx — the layout spine for Ruri's connected state.
+ * AppShell.tsx — the layout spine for Onyx's connected state.
  *
  * CSS Grid: [ ServerRail | ChannelSidebar | ConversationColumn | MemberList ]
  * PresenceRibbon spans the top of the conversation column.
@@ -26,7 +26,7 @@
 
 import './shell.css';
 
-import { createMemo, Show, splitProps, type JSX } from 'solid-js';
+import { createMemo, createSignal, onCleanup, onMount, Show, splitProps, type JSX } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
 import { Background } from '@/backgrounds/index';
 import { ServerRail } from './ServerRail';
@@ -59,9 +59,10 @@ function HomeView(): JSX.Element {
   return (
     <div class="shell-home" role="main" aria-label="Welcome screen">
       <div>
-        <h2 class="shell-home-title">IRCXNet</h2>
+        <h2 class="shell-home-title">You're in the current</h2>
         <p class="shell-home-sub">
-          Select a channel from the sidebar to begin, or join one below.
+          Pick a channel from the rail to dive in, or join a new room below.
+          Press <b>/</b> to jump to any room, person, or command.
         </p>
       </div>
     </div>
@@ -143,9 +144,9 @@ export function AppShell(props: AppShellProps): JSX.Element {
   // ── active background from localStorage ──
   const bgId = createMemo(() => {
     try {
-      return localStorage.getItem('ruri:bg') ?? 'kintsugi-veins';
+      return localStorage.getItem('ruri:bg') ?? 'deep-current';
     } catch {
-      return 'kintsugi-veins';
+      return 'deep-current';
     }
   });
 
@@ -158,8 +159,28 @@ export function AppShell(props: AppShellProps): JSX.Element {
     return view.kind === 'channel' || view.kind === 'dm';
   });
 
+  // ── mobile viewport tracking ──
+  // The member list is a column on desktop (driven by showMemberList) but a
+  // right-hand drawer on mobile that must default CLOSED and open only on tap —
+  // so on narrow viewports it gets its own open state.
+  const [isMobile, setIsMobile] = createSignal(false);
+  const [mobileMembersOpen, setMobileMembersOpen] = createSignal(false);
+
+  onMount(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(max-width: 900px)');
+    setIsMobile(mq.matches);
+    const onChange = (e: MediaQueryListEvent): void => {
+      setIsMobile(e.matches);
+      if (!e.matches) setMobileMembersOpen(false);
+    };
+    mq.addEventListener('change', onChange);
+    onCleanup(() => mq.removeEventListener('change', onChange));
+  });
+
   // ── mobile sidebar handlers ──
   function openMobileSidebar(): void {
+    setMobileMembersOpen(false); // never both drawers at once
     getState().openMobileSidebar();
   }
 
@@ -168,8 +189,21 @@ export function AppShell(props: AppShellProps): JSX.Element {
   }
 
   function handleToggleMembers(): void {
-    getState().toggleMemberList();
+    if (isMobile()) {
+      setMobileMembersOpen((v) => !v);
+    } else {
+      getState().toggleMemberList();
+    }
   }
+
+  function closeMobileMembers(): void {
+    setMobileMembersOpen(false);
+  }
+
+  // ── is the member surface visible (column on desktop, drawer on mobile)? ──
+  const membersVisible = createMemo(() =>
+    hasConversation() && (isMobile() ? mobileMembersOpen() : showMemberList()),
+  );
 
   function handleDisconnect(): void {
     local.onDisconnect?.();
@@ -247,21 +281,39 @@ export function AppShell(props: AppShellProps): JSX.Element {
           </Show>
         </div>
 
-        {/* ── Member List ── */}
-        <MemberList hidden={!showMemberList() || !hasConversation()} />
+        {/* ── Member List (right drawer on mobile) ── */}
+        <Show when={isMobile() && membersVisible()}>
+          <div
+            class="shell-members-backdrop"
+            aria-hidden="true"
+            onClick={closeMobileMembers}
+          />
+        </Show>
+        <MemberList hidden={!membersVisible()} />
       </div>
 
-      {/* Mobile bottom nav */}
+      {/* Mobile bottom tab bar */}
       <nav class="shell-mobile-nav" aria-label="Mobile navigation">
         <button
           type="button"
           class={`shell-mobile-nav-btn${mobileSidebarOpen() ? ' shell-mobile-nav-btn--active' : ''}`}
           aria-label="Toggle channel list"
           aria-expanded={mobileSidebarOpen()}
-          onClick={() => mobileSidebarOpen() ? closeMobileSidebar() : openMobileSidebar()}
+          onClick={() => (mobileSidebarOpen() ? closeMobileSidebar() : openMobileSidebar())}
         >
-          ≡ channels
+          <b aria-hidden="true">≡</b>rooms
         </button>
+        <Show when={hasConversation()}>
+          <button
+            type="button"
+            class={`shell-mobile-nav-btn${mobileMembersOpen() ? ' shell-mobile-nav-btn--active' : ''}`}
+            aria-label="Toggle member list"
+            aria-expanded={mobileMembersOpen()}
+            onClick={handleToggleMembers}
+          >
+            <b aria-hidden="true">◇</b>members
+          </button>
+        </Show>
         <button
           type="button"
           class="shell-mobile-nav-btn"
@@ -269,7 +321,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
           onClick={handleDisconnect}
           style={{ color: 'var(--shu)' }}
         >
-          ✕ disconnect
+          <b aria-hidden="true">✕</b>leave
         </button>
       </nav>
 

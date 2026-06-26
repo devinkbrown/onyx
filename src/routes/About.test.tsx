@@ -1,5 +1,5 @@
 /**
- * Tests for /about — Ruri's editorial deep-dive page.
+ * Tests for /about — Onyx's editorial deep-dive page.
  *
  * Strategy: static source + runtime DOM assertions.
  *
@@ -83,8 +83,10 @@ describe('About page — source structure', () => {
     expect(srcContains("import './about.css'")).toBe(true);
   });
 
-  it('has a <main class="r"> root element', () => {
-    expect(srcContains('class="r"')).toBe(true);
+  it('has a <main> root carrying the shared "r" atmosphere class', () => {
+    // Root is <main class="r ab-ocean"> — "r" wires the shared atmosphere,
+    // "ab-ocean" scopes the Ocean re-tint.
+    expect(/<main class="r(\s|")/.test(src)).toBe(true);
   });
 
   it('has a <header class="r-status"> top bar', () => {
@@ -208,28 +210,39 @@ describe('About page — source structure', () => {
     expect(/NickServ|ChanServ|bot|fake/i.test(src)).toBe(true);
   });
 
-  it('mentions Orochi and 大蛇 in the mythos', () => {
-    expect(srcContains('Orochi')).toBe(true);
-    expect(srcContains('大蛇')).toBe(true);
+  it('frames Orochi as the engine in the stack section (no kanji lore)', () => {
+    expect(srcContains('Orochi · the engine')).toBe(true);
+    expect(srcContains('大蛇')).toBe(false);
   });
 
-  it('mentions Aēšma etymology for eshmaki', () => {
-    expect(srcContains('Aēšma')).toBe(true);
+  it('frames the gate as the open network entrance — no devil/Aēšma lore', () => {
+    // Ocean reframe: the middle stack card is "the gate · where you enter".
+    expect(srcContains('the gate · where you enter')).toBe(true);
+    // Devil/Zoroastrian lore must be fully removed.
+    expect(srcContains('Aēšma')).toBe(false);
+    expect(srcContains('ეშმაკი')).toBe(false);
+    expect(/\bdevil\b/i.test(src)).toBe(false);
+    expect(/\bwrath\b/i.test(src)).toBe(false);
+    expect(/\bAvesta\b|Zoroastrian|daeva/i.test(src)).toBe(false);
   });
 
-  it('mentions Georgian and eshmaki in the mythos', () => {
-    expect(srcContains('Georgian')).toBe(true);
-    expect(srcContains('ეშმაკი')).toBe(true);
+  it('keeps eshmaki.me only as a plain node/domain name (no demonic framing)', () => {
+    // The node address is still a real entrance to the mesh.
+    expect(srcContains('eshmaki.me')).toBe(true);
+    // The old "eshmaki · the gate" devil glyph card label is gone.
+    expect(srcContains('eshmaki · the gate')).toBe(false);
   });
 
-  it('mentions lapis lazuli for the Ruri jewel', () => {
-    expect(/lapis/i.test(src)).toBe(true);
+  it('frames Onyx as the client (no Japanese jewel lore)', () => {
+    expect(srcContains('Onyx · the client')).toBe(true);
+    expect(srcContains('瑠璃')).toBe(false);
   });
 
-  it('has three myth article classes: serpent, devil, jewel', () => {
+  it('has three stack article classes: serpent, tide, jewel (no devil class)', () => {
     expect(srcContains('ab-myth serpent')).toBe(true);
-    expect(srcContains('ab-myth devil')).toBe(true);
+    expect(srcContains('ab-myth tide')).toBe(true);
     expect(srcContains('ab-myth jewel')).toBe(true);
+    expect(srcContains('ab-myth devil')).toBe(false);
   });
 
   it('has three transport card classes: primary, secondary, fallback', () => {
@@ -254,7 +267,7 @@ describe('About page — source structure', () => {
     expect(srcContains('href="/"')).toBe(true);
   });
 
-  it('Open Ruri link points to /app', () => {
+  it('Open Onyx link points to /app', () => {
     expect(srcContains('href="/app"')).toBe(true);
   });
 
@@ -273,9 +286,10 @@ describe('About page — source structure', () => {
     expect(srcContains('aria-label=')).toBe(true);
   });
 
-  it('footer has brand glyph 瑠璃 and year 2026', () => {
-    expect(srcContains('瑠璃')).toBe(true);
+  it('footer has the Onyx brand and year 2026, no kanji', () => {
+    expect(srcContains('Onyx — IRCXNet')).toBe(true);
     expect(srcContains('2026')).toBe(true);
+    expect(srcContains('瑠璃')).toBe(false);
   });
 
   it('CAP listing contains sasl, ircx, session, chathistory entries', () => {
@@ -283,6 +297,22 @@ describe('About page — source structure', () => {
     expect(srcContains('ircx')).toBe(true);
     expect(srcContains('session')).toBe(true);
     expect(srcContains('chathistory')).toBe(true);
+  });
+
+  it('contains zero devil/demonic references anywhere on the page', () => {
+    expect(/\bdevil\b/i.test(src)).toBe(false);
+    expect(srcContains('Aēšma')).toBe(false);
+    expect(srcContains('ეშმაკი')).toBe(false);
+    expect(/Zoroastrian|Avesta|daeva|\bwrath\b/i.test(src)).toBe(false);
+  });
+
+  it('imports the Ocean brand Mascot and uses it', () => {
+    expect(srcContains("import { Mascot } from '@/components/brand/Mascot'")).toBe(true);
+    expect(/<Mascot\b/.test(src)).toBe(true);
+  });
+
+  it('roots the page in the Ocean aesthetic (ab-ocean root class)', () => {
+    expect(srcContains('class="r ab-ocean"')).toBe(true);
   });
 });
 
@@ -360,6 +390,20 @@ describe('About page — CSS source', () => {
   it('defines responsive breakpoints via @media (max-width)', () => {
     expect(css.includes('@media (max-width')).toBe(true);
   });
+
+  it('re-tints the shared atmosphere to ocean bioluminescence (.ab-ocean scope)', () => {
+    expect(css.includes('.ab-ocean')).toBe(true);
+    expect(css.includes('.ab-ocean .r-veins path')).toBe(true);
+  });
+
+  it('renames the devil mythos card to a neutral .ab-myth.tide', () => {
+    expect(css.includes('.ab-myth.tide')).toBe(true);
+    expect(css.includes('.ab-myth.devil')).toBe(false);
+  });
+
+  it('uses fluid radii tokens (var(--r-md) / var(--r-sm)) for the ocean cut', () => {
+    expect(css.includes('var(--r-md)') || css.includes('var(--r-sm)')).toBe(true);
+  });
 });
 
 // ── DOM rendering tests (run only if the SolidJS client renderer is available) ─
@@ -407,7 +451,7 @@ describe('About page — DOM rendering', () => {
   it.skipIf(!renderAvailable)('three myth articles render in the DOM', () => {
     const { cleanup } = renderAbout!();
     expect(document.querySelector('.ab-myth.serpent')).not.toBeNull();
-    expect(document.querySelector('.ab-myth.devil')).not.toBeNull();
+    expect(document.querySelector('.ab-myth.tide')).not.toBeNull();
     expect(document.querySelector('.ab-myth.jewel')).not.toBeNull();
     cleanup();
   });
@@ -422,7 +466,7 @@ describe('About page — DOM rendering', () => {
     const { cleanup } = renderAbout!();
     const footer = document.querySelector('footer.r-footer');
     const t = footer?.textContent ?? '';
-    expect(t).toContain('Ruri');
+    expect(t).toContain('Onyx');
     expect(t).toContain('Orochi');
     expect(t).toContain('2026');
     cleanup();

@@ -21,8 +21,8 @@ describe('Appearance', () => {
     const labels = getAllByRole('button').map((b) => b.textContent ?? '');
     // at least one chip per theme + per background (studio adds more)
     expect(getAllByRole('button').length).toBeGreaterThanOrEqual(THEME_IDS.length + backgroundOptions.length);
-    expect(labels.join(' ')).toMatch(/ruri/i);
-    expect(labels.join(' ')).toMatch(/kintsugi/i);
+    expect(labels.join(' ')).toMatch(/onyx/i);
+    expect(labels.join(' ')).toMatch(/gold veins/i);
   });
 
   it('marks the active theme chip as pressed', () => {

@@ -17,12 +17,12 @@ describe('Avatar', () => {
   it('uses deterministic color variables for repeated names', () => {
     render(() => (
       <>
-        <Avatar name="Ruri Operator" size="sm" />
-        <Avatar name="Ruri Operator" size="sm" />
+        <Avatar name="Onyx Operator" size="sm" />
+        <Avatar name="Onyx Operator" size="sm" />
       </>
     ));
 
-    const avatars = screen.getAllByRole('img', { name: 'Ruri Operator' });
+    const avatars = screen.getAllByRole('img', { name: 'Onyx Operator' });
 
     expect(avatars[0]?.style.getPropertyValue('--ruri-avatar-bg')).toBe(avatars[1]?.style.getPropertyValue('--ruri-avatar-bg'));
     expect(avatars[0]?.classList.contains('ruri-avatar--sm')).toBe(true);

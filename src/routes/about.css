@@ -1,10 +1,40 @@
-/* Ruri /about — continuous with landing.css; same Lapis × Kintsugi × Terminal identity.
+/* Onyx /about — Ocean dark-luxury: deep-water depth, azure currents, bioluminescence.
    Banished: purple, glassmorphism/backdrop-blur cards, neon glow, AI gradient text, Inter.
-   Present: mineral depth, editorial hierarchy, warm kintsugi seams, human voice. */
+   Present: abyssal depth gradients, flowing azure current seams, sea-foam text,
+   champagne gold as a sparing second accent, fluid radii, calm human voice. */
 
 /* ───────── Inherit atmosphere from landing ───────── */
 /* .r-ground, .r-flecks, .r-veins, .r-grain, .r-divider, .r-status, .r-footer
-   are all already defined in landing.css — imported below so /about shares them. */
+   are all already defined in landing.css — imported there so /about shares them.
+   The .ab-ocean overrides below re-tint that shared atmosphere from gold-leaf
+   into bioluminescent azure currents without touching landing.css. */
+
+/* Re-tint the shared gold atmosphere to ocean bioluminescence (scoped to /about) */
+.ab-ocean .r-veins path { stroke: var(--lapis); }
+.ab-ocean .r-veins .node { fill: var(--lapis-bright); }
+.ab-ocean .r-flecks {
+  background-image:
+    radial-gradient(1.4px 1.4px at 12% 22%, var(--lapis-bright) 50%, transparent 52%),
+    radial-gradient(1px 1px at 78% 16%, var(--lapis) 50%, transparent 52%),
+    radial-gradient(1.5px 1.5px at 64% 60%, var(--lapis-bright) 50%, transparent 52%),
+    radial-gradient(1px 1px at 30% 78%, var(--lapis) 50%, transparent 52%),
+    radial-gradient(1px 1px at 88% 72%, var(--gold-bright) 50%, transparent 52%),
+    radial-gradient(1.4px 1.4px at 44% 34%, var(--lapis) 50%, transparent 52%),
+    radial-gradient(1px 1px at 22% 52%, var(--lapis-bright) 50%, transparent 52%),
+    radial-gradient(1px 1px at 56% 88%, var(--lapis) 50%, transparent 52%);
+}
+
+/* Brand mark (Mascot) sits inline with the ONYX wordmark in nav + footer */
+.ab-ocean .r-status .brand,
+.ab-ocean .r-footer .sig .logo,
+.ab-ocean .r-footer .base span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+.ab-ocean .r-status .brand :global(svg) { width: 1.05em; height: 1.05em; color: var(--lapis-bright); }
+.ab-ocean .r-footer .sig .logo :global(svg) { width: 1em; height: 1em; color: var(--lapis-bright); }
+.ab-ocean .r-footer .base span :global(svg) { width: 1.1em; height: 1.1em; color: var(--lapis); }
 
 /* ───────── About hero ───────── */
 .ab-hero {
@@ -16,7 +46,7 @@
   font-size: 13px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--gold);
+  color: var(--lapis);
 }
 
 .ab-hero .r-kicker::before {
@@ -36,21 +66,22 @@
   text-wrap: balance;
 }
 
+/* Hero accent — bioluminescent azure crest cresting over deep water */
 .ab-hero h1 .gold {
   background: linear-gradient(
     98deg,
-    var(--gold-deep) 0%,
-    var(--gold) 22%,
-    var(--gold-bright) 44%,
-    #fff4d2 52%,
-    var(--gold-bright) 60%,
-    var(--gold) 82%,
-    var(--gold-deep) 100%
+    var(--lapis-deep) 0%,
+    var(--lapis) 24%,
+    var(--lapis-bright) 46%,
+    #e8fbff 52%,
+    var(--lapis-bright) 60%,
+    var(--lapis) 80%,
+    var(--lapis-deep) 100%
   );
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 1px 0 color-mix(in oklab, var(--gold-deep) 60%, transparent));
+  filter: drop-shadow(0 0 18px color-mix(in oklab, var(--lapis) 40%, transparent));
 }
 
 .ab-hero .serif-pull {
@@ -65,7 +96,7 @@
 }
 
 .ab-hero .serif-pull em {
-  color: var(--gold-bright);
+  color: var(--lapis-bright);
   font-style: italic;
 }
 
@@ -102,6 +133,7 @@
 .ab-proto-item {
   position: relative;
   padding: clamp(26px, 3vw, 40px);
+  border-radius: var(--r-md);
   background: linear-gradient(
     160deg,
     color-mix(in oklab, var(--stone-2) 48%, var(--ink)),
@@ -112,12 +144,14 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  transition: border-top-color var(--dur) var(--ease), transform var(--dur) var(--ease);
+  transition: border-top-color var(--dur) var(--ease), transform var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
 }
 
 .ab-proto-item:hover {
   transform: translateY(-3px);
-  border-top-color: var(--gold-bright);
+  border-top-color: var(--lapis-bright);
+  box-shadow: 0 18px 40px -28px color-mix(in oklab, var(--lapis) 60%, transparent);
 }
 
 .ab-proto-item .label {
@@ -125,7 +159,7 @@
   font-size: 11px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--gold);
+  color: var(--lapis);
 }
 
 .ab-proto-item h3 {
@@ -170,6 +204,7 @@
   margin-top: 36px;
   border: 1px solid var(--seam-faint);
   border-left: 3px solid var(--seam);
+  border-radius: var(--r-md);
   background: color-mix(in oklab, var(--ink) 70%, var(--stone));
   font-family: var(--font-mono);
   font-size: clamp(0.82rem, 0.7rem + 0.4vw, 0.98rem);
@@ -207,7 +242,7 @@
 }
 
 .ab-cap-row .key {
-  color: var(--gold-bright);
+  color: var(--lapis-bright);
   min-width: 18ch;
 }
 
@@ -241,9 +276,11 @@
   display: block;
   border: 1px solid var(--seam-faint);
   border-top: 1px solid var(--seam);
+  border-radius: var(--r-md);
   background: radial-gradient(
     130% 130% at 50% -10%,
-    color-mix(in oklab, var(--stone-2) 55%, var(--ink)),
+    color-mix(in oklab, var(--lapis-deep) 22%, var(--ink)),
+    color-mix(in oklab, var(--stone-2) 40%, var(--ink)) 40%,
     var(--ink)
   );
 }
@@ -286,20 +323,24 @@
 .ab-transport {
   padding: clamp(20px, 2.2vw, 30px);
   border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
   display: flex;
   flex-direction: column;
   gap: 10px;
   background: color-mix(in oklab, var(--stone) 20%, transparent);
-  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
 }
 
 .ab-transport:hover {
   border-color: var(--seam);
   background: color-mix(in oklab, var(--stone-2) 32%, transparent);
+  transform: translateY(-2px);
 }
 
+/* Primary = the preferred path, the live azure current */
 .ab-transport.primary {
-  border-top: 2px solid var(--gold);
+  border-top: 2px solid var(--lapis);
 }
 
 .ab-transport.secondary {
@@ -319,7 +360,7 @@
 }
 
 .ab-transport.primary .t-label {
-  color: var(--gold);
+  color: var(--lapis);
 }
 
 .ab-transport.secondary .t-label {
@@ -393,6 +434,7 @@
   padding: 14px 16px;
   border: 1px solid var(--seam-faint);
   border-left: 3px solid var(--seam);
+  border-radius: var(--r-sm);
   background: color-mix(in oklab, var(--stone) 16%, transparent);
 }
 
@@ -401,7 +443,7 @@
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--gold);
+  color: var(--lapis);
   flex: none;
   min-width: 8ch;
   padding-top: 2px;
@@ -420,9 +462,11 @@
   display: block;
   border: 1px solid var(--seam-faint);
   border-top: 1px solid var(--seam);
+  border-radius: var(--r-md);
   background: radial-gradient(
     100% 100% at 50% 0%,
-    color-mix(in oklab, var(--stone-2) 50%, var(--ink)),
+    color-mix(in oklab, var(--lapis-deep) 20%, var(--ink)),
+    color-mix(in oklab, var(--stone-2) 42%, var(--ink)) 42%,
     var(--ink)
   );
 }
@@ -448,9 +492,11 @@
   display: block;
   border: 1px solid var(--seam-faint);
   border-top: 1px solid var(--seam);
+  border-radius: var(--r-md);
   background: radial-gradient(
     120% 120% at 50% 0%,
-    color-mix(in oklab, var(--stone-2) 50%, var(--ink)),
+    color-mix(in oklab, var(--lapis-deep) 22%, var(--ink)),
+    color-mix(in oklab, var(--stone-2) 40%, var(--ink)) 42%,
     var(--ink)
   );
 }
@@ -484,6 +530,7 @@
 
 .ab-node {
   border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
   padding: 16px 18px;
   display: flex;
   align-items: center;
@@ -504,13 +551,13 @@
 }
 
 .ab-node.esh .dot {
-  background: var(--shu);
-  box-shadow: 0 0 12px var(--shu);
+  background: var(--lapis);
+  box-shadow: 0 0 12px var(--lapis);
 }
 
 .ab-node.ircx .dot {
   background: var(--lapis-bright);
-  box-shadow: 0 0 12px var(--lapis);
+  box-shadow: 0 0 12px var(--lapis-bright);
 }
 
 .ab-node .meta {
@@ -544,7 +591,8 @@
 .ab-crdt-item {
   padding: 18px 20px;
   border: 1px solid var(--seam-faint);
-  border-top: 2px solid color-mix(in oklab, var(--lapis) 60%, var(--gold));
+  border-top: 2px solid color-mix(in oklab, var(--lapis) 72%, var(--lapis-bright));
+  border-radius: var(--r-md);
   background: color-mix(in oklab, var(--stone) 16%, transparent);
   display: flex;
   flex-direction: column;
@@ -577,6 +625,7 @@
 .ab-svc {
   padding: clamp(22px, 2.4vw, 34px);
   border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -587,7 +636,7 @@
   );
   position: relative;
   overflow: hidden;
-  transition: transform var(--dur) var(--ease);
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
 
 .ab-svc::after {
@@ -600,12 +649,13 @@
 
 .ab-svc:hover {
   transform: translateY(-3px);
+  box-shadow: 0 18px 40px -30px color-mix(in oklab, var(--lapis) 55%, transparent);
 }
 
 .ab-svc .cmd {
   font-family: var(--font-mono);
   font-size: clamp(1.1rem, 1rem + 0.7vw, 1.55rem);
-  color: var(--gold-bright);
+  color: var(--lapis-bright);
   letter-spacing: 0.04em;
 }
 
@@ -645,6 +695,7 @@
   margin: 44px 0 0;
   padding: clamp(24px, 3vw, 38px) clamp(28px, 4vw, 52px);
   border-left: 3px solid var(--shu);
+  border-radius: var(--r-md);
   background: color-mix(in oklab, var(--stone) 20%, transparent);
   font-family: var(--font-serif);
   font-style: italic;
@@ -683,6 +734,7 @@
   gap: 16px;
   border: 1px solid var(--seam-faint);
   border-top: 1px solid var(--seam);
+  border-radius: var(--r-md);
   transition: transform var(--dur) var(--ease), border-top-color var(--dur) var(--ease);
 }
 
@@ -690,10 +742,11 @@
   transform: translateY(-4px);
 }
 
+/* serpent = Orochi engine — the living azure current */
 .ab-myth.serpent {
   background: linear-gradient(
     180deg,
-    color-mix(in oklab, var(--lapis-deep) 20%, var(--ink)),
+    color-mix(in oklab, var(--lapis-deep) 26%, var(--ink)),
     var(--ink)
   );
 }
@@ -702,18 +755,20 @@
   border-top-color: var(--lapis-bright);
 }
 
-.ab-myth.devil {
+/* tide = the gate — the open water you pass through */
+.ab-myth.tide {
   background: linear-gradient(
     180deg,
-    color-mix(in oklab, var(--shu) 12%, var(--ink)),
+    color-mix(in oklab, var(--lapis) 14%, var(--ink)),
     var(--ink)
   );
 }
 
-.ab-myth.devil:hover {
-  border-top-color: var(--shu-bright);
+.ab-myth.tide:hover {
+  border-top-color: var(--lapis);
 }
 
+/* jewel = Onyx client — champagne gold, the sparing second accent */
 .ab-myth.jewel {
   background: linear-gradient(
     180deg,
@@ -733,12 +788,18 @@
   display: block;
 }
 
+.ab-myth .ideograph :global(svg) {
+  width: 1em;
+  height: 1em;
+  color: var(--lapis-bright);
+}
+
 .ab-myth.serpent .ideograph {
   color: var(--lapis-bright);
 }
 
-.ab-myth.devil .ideograph {
-  color: var(--shu-bright);
+.ab-myth.tide .ideograph {
+  color: var(--lapis);
 }
 
 .ab-myth.jewel .ideograph {
@@ -751,6 +812,11 @@
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--washi);
+}
+
+/* the Onyx client card carries the sparing champagne second accent */
+.ab-myth.jewel .name {
+  color: var(--gold);
 }
 
 .ab-myth p {
@@ -794,6 +860,7 @@
 .ab-dev-card {
   padding: clamp(26px, 3vw, 42px);
   border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -809,7 +876,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  background: linear-gradient(90deg, transparent, var(--lapis-bright), transparent);
   opacity: 0;
   transition: opacity var(--dur) var(--ease);
 }
@@ -823,7 +890,7 @@
   font-size: 11px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--gold);
+  color: var(--lapis);
 }
 
 .ab-dev-card h3 {
@@ -857,7 +924,8 @@
   color: var(--washi-dim);
   background: color-mix(in oklab, var(--ink) 60%, var(--stone));
   border: 1px solid var(--seam-faint);
-  border-left: 2px solid var(--gold);
+  border-left: 2px solid var(--lapis);
+  border-radius: var(--r-sm);
   padding: 14px 18px;
   overflow-x: auto;
   white-space: pre;
@@ -868,7 +936,7 @@
 }
 
 .ab-dev-card .code-snip .p {
-  color: var(--gold-bright);
+  color: var(--lapis-bright);
 }
 
 .ab-dev-card .code-snip .o {
@@ -882,13 +950,13 @@
 .ab-dev-card a.more {
   font-family: var(--font-mono);
   font-size: 12px;
-  color: var(--gold-bright);
+  color: var(--lapis-bright);
   margin-top: 4px;
   transition: color var(--dur) var(--ease);
 }
 
 .ab-dev-card a.more:hover {
-  color: var(--gold);
+  color: var(--lapis);
 }
 
 /* Animated SVG vein for mesh vis */
@@ -909,30 +977,32 @@
   }
 }
 
-/* ───────── Inline seam ───────── */
+/* ───────── Inline seam — an azure current line cresting through the dark ───────── */
 .ab-seam {
   height: 2px;
   width: min(600px, 80vw);
   background: linear-gradient(
     90deg,
     transparent,
-    var(--gold) 8%,
-    var(--gold-bright) 50%,
-    var(--gold) 92%,
+    var(--lapis) 8%,
+    var(--lapis-bright) 50%,
+    var(--lapis) 92%,
     transparent
   );
+  /* a gentle wave crest rather than a jagged kintsugi fracture */
   clip-path: polygon(
-    0 40%,
-    12% 0,
-    24% 70%,
-    40% 10%,
-    56% 80%,
-    72% 18%,
-    86% 62%,
-    100% 28%,
+    0 50%,
+    14% 30%,
+    28% 64%,
+    42% 24%,
+    56% 70%,
+    70% 30%,
+    84% 60%,
+    100% 40%,
     100% 100%,
     0 100%
   );
-  opacity: 0.8;
+  opacity: 0.85;
   margin-top: 24px;
+  filter: drop-shadow(0 0 8px color-mix(in oklab, var(--lapis) 50%, transparent));
 }

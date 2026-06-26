@@ -8,10 +8,10 @@ import { pyriteField } from './variants/pyrite-field';
 import { washi } from './variants/washi';
 
 export const backgroundRegistry = [
-  kintsugiVeins,
+  deepCurrent,
   aurora,
   pyriteField,
-  deepCurrent,
+  kintsugiVeins,
   obsidian,
   lapisGradient,
   washi,

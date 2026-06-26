@@ -1,20 +1,37 @@
 /**
  * Connect.test.tsx
  *
- * Tests for the Ruri IRC connect screen (store-driven).
+ * Tests for the Onyx connect screen (store-driven).
  *
  * The store is the single source of truth. We spy on getState().connect to
  * assert correct invocation, and we seed connectionStatus directly to verify
  * that the form / AppShell gate works correctly.
  *
- * No live WebSocket or IRCClient is needed here — those are integration concerns
- * tested in store.test.ts and shell.test.tsx.
+ * There is no server picker: the client auto-routes to the fastest reachable
+ * mesh node. We therefore assert the connect URL is *one of* the known nodes,
+ * never a specific one. No live WebSocket is needed (probing falls back to a
+ * random node when WebSocket is unavailable in jsdom).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { cleanup, render, screen, fireEvent, waitFor } from '@solidjs/testing-library';
 import { Connect } from './Connect';
-import { NODES, DEFAULT_NODE } from './nodes';
+import { NODES } from './nodes';
 import { store, getState } from '@/lib/store';
+
+// The connect screen probes node latency by opening real WebSockets on mount.
+// In jsdom that would hit the live servers, so stub the probe + selector here —
+// real latency routing is exercised in the browser / e2e, not in unit tests.
+vi.mock('./nodes', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./nodes')>();
+  return {
+    ...actual,
+    pingNode: vi.fn(async () => Number.POSITIVE_INFINITY),
+    selectBestNode: vi.fn(async () => actual.NODES[0]),
+  };
+});
+
+/** Set of every valid mesh endpoint the auto-router may pick. */
+const NODE_URLS = new Set(NODES.map((n) => n.wss));
 
 // ── Store reset ────────────────────────────────────────────────────────────────
 
@@ -36,23 +53,18 @@ describe('Connect screen rendering', () => {
     expect(screen.getByRole('heading', { name: /connect/i })).toBeInTheDocument();
   });
 
-  it('renders both IRC nodes', () => {
+  it('does not expose a server picker or any node hostnames', () => {
     render(() => <Connect />);
-    for (const node of NODES) {
-      const matches = screen.getAllByText(node.host);
-      expect(matches.length).toBeGreaterThan(0);
-    }
+    // Auto-routing: no node-selection buttons, and no server is ever named.
+    expect(screen.queryByRole('button', { name: /select ircx\.us/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/ircx\.us/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/eshmaki\.me/i)).not.toBeInTheDocument();
   });
 
-  it('renders ircx.us as the default selected node', () => {
+  it('shows the auto-routing indicator', () => {
     render(() => <Connect />);
-    const ircxBtn = screen.getByRole('button', { name: /select ircx\.us/i });
-    expect(ircxBtn).toHaveAttribute('aria-pressed', 'true');
-  });
-
-  it('renders eshmaki.me node with its label', () => {
-    render(() => <Connect />);
-    expect(screen.getByText("eshmaki.me — the devil's gate (Aēšma, wrath)")).toBeInTheDocument();
+    // "nearest node" appears in both the route badge and the status copy.
+    expect(screen.getAllByText(/nearest node/i).length).toBeGreaterThan(0);
   });
 
   it('renders the nick field', () => {
@@ -84,30 +96,6 @@ describe('Connect screen rendering', () => {
     store.setState({ ...initialState, connectionStatus: 'disconnected' }, true);
     render(() => <Connect />);
     expect(screen.getByTestId('connect-screen')).toBeInTheDocument();
-  });
-});
-
-describe('Node selection', () => {
-  it('selects eshmaki.me when clicked', async () => {
-    render(() => <Connect />);
-    const eshmakiBtn = screen.getByRole('button', { name: /select eshmaki\.me/i });
-    fireEvent.click(eshmakiBtn);
-    await waitFor(() => expect(eshmakiBtn).toHaveAttribute('aria-pressed', 'true'));
-  });
-
-  it('deselects ircx.us when eshmaki is picked', async () => {
-    render(() => <Connect />);
-    const ircxBtn = screen.getByRole('button', { name: /select ircx\.us/i });
-    const eshmakiBtn = screen.getByRole('button', { name: /select eshmaki\.me/i });
-    fireEvent.click(eshmakiBtn);
-    await waitFor(() => expect(ircxBtn).toHaveAttribute('aria-pressed', 'false'));
-  });
-
-  it('shows [selected] marker on the active node', async () => {
-    render(() => <Connect />);
-    const eshmakiBtn = screen.getByRole('button', { name: /select eshmaki\.me/i });
-    fireEvent.click(eshmakiBtn);
-    await waitFor(() => expect(eshmakiBtn.textContent).toContain('[selected]'));
   });
 });
 
@@ -144,7 +132,7 @@ describe('Nick validation', () => {
 });
 
 describe('Store-driven connect action', () => {
-  it('calls getState().connect with the default node url and nick on submit', async () => {
+  it('calls getState().connect with an auto-selected mesh node url and nick on submit', async () => {
     const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
 
     render(() => <Connect />);
@@ -155,29 +143,9 @@ describe('Store-driven connect action', () => {
     await waitFor(() => expect(connectSpy).toHaveBeenCalledOnce());
 
     const call = connectSpy.mock.calls[0]![0];
-    expect(call.url).toBe(DEFAULT_NODE.wss);
+    // The router picks a node for us — assert it is one of the known endpoints.
+    expect(NODE_URLS.has(call.url)).toBe(true);
     expect(call.nick).toBe('kain');
-
-    connectSpy.mockRestore();
-  });
-
-  it('calls getState().connect with the selected node url', async () => {
-    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
-
-    render(() => <Connect />);
-
-    // Switch to eshmaki.me
-    const eshmakiNode = NODES.find((n) => n.host === 'eshmaki.me')!;
-    fireEvent.click(screen.getByRole('button', { name: /select eshmaki\.me/i }));
-
-    fireEvent.input(screen.getByLabelText(/^nick$/i), { target: { value: 'alice' } });
-    fireEvent.submit(document.querySelector('form')!);
-
-    await waitFor(() => expect(connectSpy).toHaveBeenCalledOnce());
-
-    const call = connectSpy.mock.calls[0]![0];
-    expect(call.url).toBe(eshmakiNode.wss);
-    expect(call.nick).toBe('alice');
 
     connectSpy.mockRestore();
   });
@@ -327,9 +295,9 @@ describe('View gating on connectionStatus', () => {
       expect(screen.getByTestId('conn-status')).toHaveAttribute('data-phase', 'error')
     );
 
-    // Should show retry button
+    // Should show the retry-affordance button ("Try again")
     await waitFor(() =>
-      expect(screen.getByTestId('conn-submit')).toHaveTextContent(/retry/i)
+      expect(screen.getByTestId('conn-submit')).toHaveTextContent(/try again/i)
     );
 
     connectSpy.mockRestore();

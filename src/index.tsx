@@ -16,7 +16,14 @@ const AppShell = lazy(() => import('./routes/AppRoute'));
 const Appearance = lazy(() => import('./app/Appearance'));
 
 const root = document.getElementById('root');
-if (!root) throw new Error('Ruri: #root not found');
+if (!root) throw new Error('Onyx: #root not found');
+
+// Dev-only store handle for headless screenshot/QA harnesses (never ships to prod).
+if (import.meta.env.DEV) {
+  void import('@/lib/store/store').then((m) => {
+    (window as unknown as { __onyx?: unknown }).__onyx = m;
+  });
+}
 
 render(
   () => (

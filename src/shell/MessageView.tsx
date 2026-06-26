@@ -287,7 +287,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
           fallback={
             <div class="shell-feed-empty">
               <Show when={activeView().kind !== 'home'}>
-                <span>// no messages yet</span>
+                <span>// quiet in here — say the first thing</span>
               </Show>
             </div>
           }

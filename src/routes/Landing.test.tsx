@@ -3,29 +3,48 @@ import { render } from '@solidjs/testing-library';
 import Landing from './Landing';
 
 describe('Landing', () => {
-  it('renders the brutalist hero headline', () => {
+  it('renders the community-first hero headline', () => {
     const { getByText } = render(() => <Landing />);
-    expect(getByText(/living mesh/i)).toBeInTheDocument();
+    expect(getByText(/come live/i)).toBeInTheDocument();
+    expect(getByText(/on the water/i)).toBeInTheDocument();
   });
 
-  it('renders the mythos: Orochi, eshmaki and Ruri', () => {
+  it('leads with people and place, not jargon', () => {
     const { getByText } = render(() => <Landing />);
-    expect(getByText(/Orochi · the serpent/i)).toBeInTheDocument();
-    expect(getByText(/eshmaki · the gate/i)).toBeInTheDocument();
-    expect(getByText(/Ruri · the jewel/i)).toBeInTheDocument();
+    expect(getByText(/People, not\s*a product/i)).toBeInTheDocument();
+    expect(getByText(/Rooms to\s*wander into/i)).toBeInTheDocument();
   });
 
-  it('leads on capability differentiators', () => {
-    const { getByText } = render(() => <Landing />);
-    expect(getByText(/Difference you can feel/i)).toBeInTheDocument();
-    expect(getByText(/The server never sees you/i)).toBeInTheDocument();
-    expect(getByText(/You choose the transport/i)).toBeInTheDocument();
+  it('invites the visitor to join in seconds', () => {
+    const { getByText, getAllByText } = render(() => <Landing />);
+    expect(getByText(/You're three\s*steps from hello/i)).toBeInTheDocument();
+    expect(getAllByText(/Open Onyx/i).length).toBeGreaterThan(0);
   });
 
-  it('surfaces both mesh nodes (eshmaki.me + ircx.us)', () => {
+  it('states the culture: open, yours, no ads', () => {
     const { getByText } = render(() => <Landing />);
-    expect(getByText(/eshmaki\.me : 8080/i)).toBeInTheDocument();
-    expect(getByText(/ircx\.us : 8080/i)).toBeInTheDocument();
+    expect(getByText(/Open to the bone/i)).toBeInTheDocument();
+    expect(getByText(/No ads, no mining/i)).toBeInTheDocument();
+  });
+
+  it('offers to run your own node', () => {
+    const { getByText } = render(() => <Landing />);
+    expect(getByText(/raise\s*your own shore/i)).toBeInTheDocument();
+  });
+
+  it('carries no devil / gate lore', () => {
+    const { queryByText } = render(() => <Landing />);
+    expect(queryByText(/devil/i)).not.toBeInTheDocument();
+    expect(queryByText(/the gate/i)).not.toBeInTheDocument();
+    expect(queryByText(/wrath/i)).not.toBeInTheDocument();
+  });
+
+  it('renders the brand mascot accessibly', () => {
+    const { getAllByRole } = render(() => <Landing />);
+    const dragons = getAllByRole('img').filter((el) =>
+      (el.getAttribute('aria-label') ?? '').toLowerCase().includes('water-dragon'),
+    );
+    expect(dragons.length).toBeGreaterThan(0);
   });
 
   it('exposes a primary entry point into the app', () => {

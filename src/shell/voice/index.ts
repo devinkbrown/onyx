@@ -1,4 +1,4 @@
-/** Ruri voice/video surfaces — barrel. */
+/** Onyx voice/video surfaces — barrel. */
 export { VoiceStage } from './VoiceStage';
 export { VoiceBar } from './VoiceBar';
 export { VoicePip } from './VoicePip';

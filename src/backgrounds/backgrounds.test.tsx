@@ -32,10 +32,10 @@ describe('background registry', () => {
   it('classifies animated and solid variants correctly', () => {
     // Arrange
     const expectedKinds: Record<BackgroundId, BackgroundVariant['kind']> = {
-      'kintsugi-veins': 'animated',
+      'deep-current': 'animated',
       aurora: 'animated',
       'pyrite-field': 'animated',
-      'deep-current': 'animated',
+      'kintsugi-veins': 'animated',
       obsidian: 'solid',
       'lapis-gradient': 'solid',
       washi: 'solid',
@@ -48,15 +48,24 @@ describe('background registry', () => {
     expect(actualKinds).toEqual(expectedKinds);
   });
 
+  it('uses deep current as the registry default', () => {
+    // Act
+    const defaultVariant = backgroundRegistry[0];
+
+    // Assert
+    expect(defaultVariant?.id).toBe('deep-current');
+    expect(defaultVariant?.label).toBe('Deep Current');
+  });
+
   it('finds registered variants by id', () => {
     // Arrange
-    const id = 'kintsugi-veins';
+    const id = 'deep-current';
 
     // Act
     const variant = getBackground(id);
 
     // Assert
-    expect(variant?.label).toBe('Kintsugi Veins');
+    expect(variant?.label).toBe('Deep Current');
   });
 });
 
@@ -113,11 +122,11 @@ describe('Background reduced-motion selection', () => {
     ) as unknown as typeof HTMLCanvasElement.prototype.getContext;
 
     // Act
-    const { container } = render(() => <Background id="kintsugi-veins" quality="high" />);
+    const { container } = render(() => <Background id="deep-current" quality="high" />);
     const canvas = container.querySelector('canvas');
 
     // Assert
-    expect(selectBackgroundId('kintsugi-veins', true)).toBe('lapis-gradient');
+    expect(selectBackgroundId('deep-current', true)).toBe('lapis-gradient');
     expect(canvas?.getAttribute('data-background-id')).toBe('lapis-gradient');
     expect(canvas?.getAttribute('data-background-kind')).toBe('solid');
   });

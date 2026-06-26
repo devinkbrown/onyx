@@ -3,7 +3,7 @@ import { clearCanvas, readBackgroundTheme, rgba, seeded } from './utils';
 
 export const washi = {
   id: 'washi',
-  label: 'Washi Paper',
+  label: 'Paper Grain',
   kind: 'solid',
   init(ctx) {
     this.frame(ctx, 0);

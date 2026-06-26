@@ -126,7 +126,7 @@ const accentGroup: StudioGroup = {
     },
     {
       property: '--shu',
-      label: '朱 Shu (vermilion)',
+      label: 'Vermilion',
       hint: 'Single hot accent — use very sparingly (danger, badges).',
       type: 'color',
     },
