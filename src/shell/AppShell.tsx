@@ -26,7 +26,7 @@
 
 import './shell.css';
 
-import { createMemo, createSignal, onCleanup, onMount, Show, splitProps, type JSX } from 'solid-js';
+import { createMemo, createSignal, For, onCleanup, onMount, Show, splitProps, type JSX } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
 import { Background } from '@/backgrounds/index';
 import { NotificationRuntime } from '@/lib/notifications';
@@ -65,15 +65,26 @@ export type AppShellProps = {
 // ── Home view placeholder ────────────────────────────────────────────────────
 
 function HomeView(): JSX.Element {
+  const joinHistory = useStore((s) => s.joinHistory);
+  const channels = useStore((s) => s.channels);
+  const networkName = useStore((s) => s.networkName);
+
+  // Recently-visited rooms the user has since left — one tap to rejoin.
+  const recentRooms = createMemo(() =>
+    joinHistory().filter((c) => !channels().has(c.toLowerCase())).slice(0, 6),
+  );
+
   return (
     <div class="shell-home" role="main" aria-label="Welcome screen">
-      <div>
+      <div class="shell-home-inner">
+        <p class="shell-home-kicker">{networkName() || 'IRCXNet'}</p>
         <h2 class="shell-home-title">You're in the current</h2>
         <p class="shell-home-sub">
-          Jump straight into the main hall, or pick a channel from the rail.
-          Once you're in a room you can start voice or video from its header.
-          Press <b>/</b> to search rooms, people, and commands.
+          Pick a room from the rail, jump back into a recent one, or start fresh.
+          Press <b>/</b> to search rooms, people and commands — <b>⌘K</b> opens the
+          command palette, <b>?</b> shows every shortcut.
         </p>
+
         <div class="shell-home-actions">
           <button
             type="button"
@@ -82,7 +93,32 @@ function HomeView(): JSX.Element {
           >
             Join #root →
           </button>
+          <button type="button" class="shell-home-action" onClick={() => getState().openAppearance()}>
+            Appearance
+          </button>
+          <button type="button" class="shell-home-action" onClick={() => getState().openKeyboardShortcuts()}>
+            Shortcuts
+          </button>
         </div>
+
+        <Show when={recentRooms().length > 0}>
+          <div class="shell-home-recent">
+            <span class="shell-home-recent-label">Recent rooms</span>
+            <div class="shell-home-recent-chips">
+              <For each={recentRooms()}>
+                {(room) => (
+                  <button
+                    type="button"
+                    class="shell-home-recent-chip"
+                    onClick={() => void getState().joinChannel(room)}
+                  >
+                    {room}
+                  </button>
+                )}
+              </For>
+            </div>
+          </div>
+        </Show>
       </div>
     </div>
   );

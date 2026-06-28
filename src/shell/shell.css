@@ -2636,6 +2636,88 @@
   .shell-home-cta:hover { transform: none; }
 }
 
+.shell-home-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 44ch;
+}
+
+.shell-home-kicker {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.shell-home-action {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--washi-dim);
+  background: color-mix(in oklab, var(--stone-2) 26%, transparent);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  padding: 0.7rem 1.1rem;
+  cursor: pointer;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease);
+}
+.shell-home-action:hover {
+  color: var(--lapis-bright);
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--lapis-deep) 14%, transparent);
+}
+.shell-home-action:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.shell-home-recent {
+  margin-top: var(--space-7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+}
+.shell-home-recent-label {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--washi-mute);
+}
+.shell-home-recent-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+}
+.shell-home-recent-chip {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--washi-dim);
+  background: color-mix(in oklab, var(--stone-2) 20%, transparent);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-pill);
+  padding: 0.32rem 0.8rem;
+  cursor: pointer;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease);
+}
+.shell-home-recent-chip:hover {
+  color: var(--lapis-bright);
+  border-color: var(--lapis);
+  background: color-mix(in oklab, var(--lapis-deep) 16%, transparent);
+}
+.shell-home-recent-chip:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
 /* ── Thread panel (Sheet) ── */
 .shell-thread-msg {
   padding: var(--space-2) 0;
