@@ -29,6 +29,7 @@ import type { ChatMessage, MessageReaction } from '@/lib/irc/types';
 import { Avatar } from '@/primitives/index';
 import { Sheet } from '@/primitives/index';
 import { MessageText } from '@/shell/message/MessageText';
+import { activeMessageSearchResultId } from './search/useMessageSearch';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -385,7 +386,11 @@ export function MessageView(props: MessageViewProps): JSX.Element {
               if (isSystemMsg(msg)) {
                 return (
                   <div
-                    class="shell-msg-system"
+                    class={[
+                      'shell-msg-system',
+                      activeMessageSearchResultId() === msg.id ? 'shell-msg-search-current' : '',
+                    ].filter(Boolean).join(' ')}
+                    data-message-search-id={msg.id}
                     role="status"
                     aria-label={msg.text}
                   >
@@ -408,7 +413,9 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                     class={[
                       'shell-msg-cont',
                       isHighlight() ? 'shell-msg-cont--highlight' : '',
+                      activeMessageSearchResultId() === msg.id ? 'shell-msg-search-current' : '',
                     ].filter(Boolean).join(' ')}
+                    data-message-search-id={msg.id}
                   >
                     <span class="shell-msg-cont-ts" aria-hidden="true">
                       {fmtTime(msg.time)}
@@ -457,7 +464,9 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                   class={[
                     'shell-msg-group',
                     isHighlight() ? 'shell-msg-group--highlight' : '',
+                    activeMessageSearchResultId() === msg.id ? 'shell-msg-search-current' : '',
                   ].filter(Boolean).join(' ')}
+                  data-message-search-id={msg.id}
                   aria-label={`${msg.from} at ${fmtTime(msg.time)}`}
                 >
                   <div class="shell-msg-avatar">

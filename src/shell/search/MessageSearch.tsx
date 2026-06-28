@@ -1,0 +1,225 @@
+import {
+  createEffect,
+  createMemo,
+  onCleanup,
+  Show,
+  splitProps,
+  type JSX,
+} from 'solid-js';
+import {
+  closeMessageSearch,
+  useMessageSearch,
+} from './useMessageSearch';
+import './message-search.css';
+
+export type MessageSearchProps = JSX.HTMLAttributes<HTMLDivElement>;
+
+const INPUT_ID = 'ruri-message-search-input';
+
+function cssEscape(value: string): string {
+  if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+    return CSS.escape(value);
+  }
+  return value.replace(/["\\]/g, '\\$&');
+}
+
+function prefersReducedMotion(): boolean {
+  return typeof window !== 'undefined'
+    && typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function scrollToMessage(messageId: string): number | undefined {
+  const selector = `[data-message-search-id="${cssEscape(messageId)}"]`;
+  const node = document.querySelector<HTMLElement>(selector);
+  if (!node) return undefined;
+
+  node.scrollIntoView({
+    block: 'center',
+    behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+  });
+
+  node.classList.remove('shell-msg-search-pulse');
+  void node.offsetWidth;
+  node.classList.add('shell-msg-search-pulse');
+
+  return window.setTimeout(() => {
+    node.classList.remove('shell-msg-search-pulse');
+  }, 950);
+}
+
+export function MessageSearch(props: MessageSearchProps): JSX.Element {
+  const [local, rest] = splitProps(props, ['class']);
+  const search = useMessageSearch();
+  let inputRef: HTMLInputElement | undefined;
+  let pulseTimer: number | undefined;
+
+  const countLabel = createMemo(() => (
+    search.resultCount() > 0
+      ? `${search.activePosition()} of ${search.resultCount()}`
+      : '0 of 0'
+  ));
+
+  const statusLabel = createMemo(() => {
+    if (!search.query().trim()) return `Search ${search.targetLabel()}`;
+    if (search.resultCount() === 0) return `No matches in ${search.targetLabel()}`;
+    return `${countLabel()} in ${search.targetLabel()}`;
+  });
+
+  createEffect(() => {
+    if (!search.isOpen()) return;
+    queueMicrotask(() => inputRef?.focus());
+  });
+
+  createEffect(() => {
+    const result = search.activeResult();
+    if (!search.isOpen() || !result) return;
+
+    queueMicrotask(() => {
+      if (pulseTimer !== undefined) window.clearTimeout(pulseTimer);
+      pulseTimer = scrollToMessage(result.id);
+    });
+  });
+
+  onCleanup(() => {
+    if (pulseTimer !== undefined) window.clearTimeout(pulseTimer);
+  });
+
+  const handleInput: JSX.EventHandlerUnion<HTMLInputElement, InputEvent> = (event) => {
+    search.setQuery((event.currentTarget as HTMLInputElement).value);
+  };
+
+  const handleKeyDown: JSX.EventHandlerUnion<HTMLInputElement, KeyboardEvent> = (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeMessageSearch();
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      if (event.shiftKey) {
+        search.previous();
+      } else {
+        search.next();
+      }
+    }
+  };
+
+  return (
+    <Show when={search.isOpen()}>
+      <div
+        {...rest}
+        class={['ruri-message-search', local.class].filter(Boolean).join(' ')}
+        role="search"
+        aria-label="Message search"
+      >
+        <div class="ruri-message-search__surface">
+          <label class="sr-only" for={INPUT_ID}>Search messages</label>
+          <svg
+            class="ruri-message-search__sigil"
+            viewBox="0 0 16 16"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            aria-hidden="true"
+          >
+            <circle cx="7" cy="7" r="4.25" />
+            <line x1="10.4" y1="10.4" x2="13.5" y2="13.5" />
+          </svg>
+          <input
+            ref={inputRef}
+            id={INPUT_ID}
+            class="ruri-message-search__input"
+            type="search"
+            value={search.query()}
+            autocomplete="off"
+            spellcheck={false}
+            aria-label="Search messages"
+            placeholder="Find in conversation"
+            onInput={handleInput}
+            onKeyDown={handleKeyDown}
+          />
+          <output class="ruri-message-search__count" aria-live="polite">
+            {countLabel()}
+          </output>
+          <div class="ruri-message-search__controls" role="group" aria-label="Search result navigation">
+            <button
+              type="button"
+              class="ruri-message-search__button"
+              aria-label="Previous match"
+              title="Previous match"
+              disabled={search.resultCount() === 0}
+              onClick={() => search.previous()}
+            >
+              <svg
+                viewBox="0 0 16 16"
+                width="14"
+                height="14"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M8 13V3" />
+                <path d="M4.5 6.5 8 3l3.5 3.5" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="ruri-message-search__button"
+              aria-label="Next match"
+              title="Next match"
+              disabled={search.resultCount() === 0}
+              onClick={() => search.next()}
+            >
+              <svg
+                viewBox="0 0 16 16"
+                width="14"
+                height="14"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M8 3v10" />
+                <path d="M4.5 9.5 8 13l3.5-3.5" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="ruri-message-search__button ruri-message-search__button--close"
+              aria-label="Close search"
+              title="Close search"
+              onClick={() => closeMessageSearch()}
+            >
+              <svg
+                viewBox="0 0 16 16"
+                width="14"
+                height="14"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                aria-hidden="true"
+              >
+                <line x1="4" y1="4" x2="12" y2="12" />
+                <line x1="12" y1="4" x2="4" y2="12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <span class="sr-only" aria-live="polite">{statusLabel()}</span>
+      </div>
+    </Show>
+  );
+}
+
+export default MessageSearch;
