@@ -121,9 +121,17 @@ function baseActionCommands(state: CommandState): SpotlightCommand[] {
     {
       id: 'action:appearance',
       section: 'Actions',
-      title: 'Open Appearance',
+      title: 'Appearance — theme & background',
+      hint: 'panel',
+      keywords: ['theme', 'background', 'customize', 'appearance', 'color', 'dark', 'light'],
+      run: () => getState().openAppearance(),
+    },
+    {
+      id: 'action:theme-studio',
+      section: 'Actions',
+      title: 'Open Theme Studio',
       hint: '/appearance',
-      keywords: ['theme', 'background', 'customize', 'appearance'],
+      keywords: ['theme', 'studio', 'custom', 'tokens', 'editor', 'create theme'],
       run: () => navigateTo('/appearance'),
     },
     {
