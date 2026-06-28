@@ -1,5 +1,7 @@
 import type { BackgroundKind, BackgroundVariant } from './engine';
 import { aurora } from './variants/aurora';
+import { bioluminescence } from './variants/bioluminescence';
+import { caustics } from './variants/caustics';
 import { deepCurrent } from './variants/deep-current';
 import { kintsugiVeins } from './variants/kintsugi-veins';
 import { lapisGradient } from './variants/lapis-gradient';
@@ -9,6 +11,8 @@ import { washi } from './variants/washi';
 
 export const backgroundRegistry = [
   deepCurrent,
+  bioluminescence,
+  caustics,
   aurora,
   pyriteField,
   kintsugiVeins,
