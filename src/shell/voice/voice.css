@@ -312,10 +312,18 @@
   opacity: 0.85;
   font-family: var(--font-mono);
   color: var(--washi-dim);
-  padding: 1px 3px;
+  padding: 2px;
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-sm);
   background: color-mix(in oklab, var(--ink) 58%, transparent);
+  display: inline-grid;
+  place-items: center;
+}
+
+.voice-tile__badge-icon {
+  display: block;
+  width: 0.82rem;
+  height: 0.82rem;
 }
 
 .voice-tile__badge--muted  { color: var(--shu); }

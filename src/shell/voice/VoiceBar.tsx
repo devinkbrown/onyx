@@ -3,11 +3,14 @@
  *
  * Control cluster (grouped left → right):
  *   Identity:  self Avatar + channel name + live duration timer + participant count
- *   Media:     [M] Mic · [D] Deafen · [CAM] Camera · [SCR] Screenshare
- *   Engage:    [✋] Raise hand · [☺] Reactions · [CC] Captions
- *   View:      [layout] Grid ↔ Spotlight · [⚙] Settings
- *   Exit:      [LEAVE]
+ *   Media:     Mic · Deafen · Camera · Screenshare
+ *   Engage:    Raise hand · Reactions · Captions
+ *   View:      Grid ↔ Spotlight · Settings
+ *   Exit:      Hang up
  *   Right:     connection-quality pip
+ *
+ * All controls use the shared inline-SVG icon set (./icons) so the bar reads as
+ * one system; each button keeps its aria-label and Tooltip.
  *
  * Toggle buttons expose aria-pressed; every control has an aria-label and a
  * Tooltip. The duration timer is announced politely via aria-live. The whole
@@ -19,6 +22,11 @@ import { getState, useStore } from '@/lib/store';
 import { getMountedSuimyakuMediaEngine } from '@/lib/suimyaku-media/MediaEngine';
 import { Avatar, Popover, Tooltip } from '@/primitives';
 import { VoiceSettings } from './settings/VoiceSettings';
+import {
+  MicIcon, MicOffIcon, DeafenIcon, DeafenOffIcon, CameraIcon, CameraOffIcon,
+  ScreenShareIcon, ScreenShareStopIcon, CaptionsIcon, HandIcon, ReactionIcon,
+  GridIcon, SpotlightIcon, SettingsIcon, HangupIcon,
+} from './icons';
 import type { NetworkQualityTier } from '@/lib/suimyaku-media/types';
 import './voice.css';
 
@@ -243,7 +251,9 @@ export function VoiceBar() {
                 onClick={handleToggleMute}
                 data-testid="mute-button"
               >
-                <span class="ruri-icon-button__glyph" aria-hidden="true">{voice().muted ? '[M✗]' : '[M]'}</span>
+                <span class="ruri-icon-button__glyph" aria-hidden="true">
+                  <Show when={voice().muted} fallback={<MicIcon />}><MicOffIcon /></Show>
+                </span>
               </button>
             </Tooltip>
 
@@ -256,7 +266,9 @@ export function VoiceBar() {
                 onClick={handleToggleDeafen}
                 data-testid="deafen-button"
               >
-                <span class="ruri-icon-button__glyph" aria-hidden="true">{voice().deafened ? '[D✗]' : '[D]'}</span>
+                <span class="ruri-icon-button__glyph" aria-hidden="true">
+                  <Show when={voice().deafened} fallback={<DeafenIcon />}><DeafenOffIcon /></Show>
+                </span>
               </button>
             </Tooltip>
 
@@ -269,7 +281,9 @@ export function VoiceBar() {
                 onClick={handleToggleCamera}
                 data-testid="camera-button"
               >
-                <span class="ruri-icon-button__glyph" aria-hidden="true">{voice().cameraOn ? '[CAM]' : '[cam]'}</span>
+                <span class="ruri-icon-button__glyph" aria-hidden="true">
+                  <Show when={voice().cameraOn} fallback={<CameraOffIcon />}><CameraIcon /></Show>
+                </span>
               </button>
             </Tooltip>
 
@@ -282,7 +296,9 @@ export function VoiceBar() {
                 onClick={handleToggleScreenshare}
                 data-testid="screenshare-button"
               >
-                <span class="ruri-icon-button__glyph" aria-hidden="true">{voice().screenshareActive ? '[SCR✗]' : '[SCR]'}</span>
+                <span class="ruri-icon-button__glyph" aria-hidden="true">
+                  <Show when={voice().screenshareActive} fallback={<ScreenShareIcon />}><ScreenShareStopIcon /></Show>
+                </span>
               </button>
             </Tooltip>
           </div>
@@ -300,7 +316,7 @@ export function VoiceBar() {
                 onClick={handleToggleHand}
                 data-testid="raise-hand-button"
               >
-                <span class="ruri-icon-button__glyph" aria-hidden="true">✋</span>
+                <span class="ruri-icon-button__glyph" aria-hidden="true"><HandIcon /></span>
               </button>
             </Tooltip>
 
@@ -310,12 +326,14 @@ export function VoiceBar() {
               onOpenChange={setReactionsOpen}
               trigger={
                 <span
-                  class="ruri-icon-button__glyph"
-                  aria-hidden="true"
+                  class="ruri-icon-button ruri-icon-button--ghost ruri-icon-button--md"
+                  role="button"
+                  tabindex="0"
+                  aria-label="Send a reaction"
                   data-testid="reactions-button"
                   title="Send a reaction"
                 >
-                  ☺
+                  <span class="ruri-icon-button__glyph" aria-hidden="true"><ReactionIcon /></span>
                 </span>
               }
             >
@@ -344,7 +362,7 @@ export function VoiceBar() {
                 onClick={handleToggleCaptions}
                 data-testid="captions-button"
               >
-                <span class="ruri-icon-button__glyph" aria-hidden="true">[CC]</span>
+                <span class="ruri-icon-button__glyph" aria-hidden="true"><CaptionsIcon /></span>
               </button>
             </Tooltip>
           </div>
@@ -362,7 +380,9 @@ export function VoiceBar() {
                 onClick={handleToggleLayout}
                 data-testid="layout-button"
               >
-                <span class="ruri-icon-button__glyph" aria-hidden="true">{isSpotlight() ? '▣' : '⊞'}</span>
+                <span class="ruri-icon-button__glyph" aria-hidden="true">
+                  <Show when={isSpotlight()} fallback={<GridIcon />}><SpotlightIcon /></Show>
+                </span>
               </button>
             </Tooltip>
 
@@ -375,7 +395,7 @@ export function VoiceBar() {
                 onClick={handleOpenSettings}
                 data-testid="settings-button"
               >
-                <span class="ruri-icon-button__glyph" aria-hidden="true">⚙</span>
+                <span class="ruri-icon-button__glyph" aria-hidden="true"><SettingsIcon /></span>
               </button>
             </Tooltip>
           </div>
@@ -391,7 +411,7 @@ export function VoiceBar() {
               onClick={handleLeave}
               data-testid="leave-button"
             >
-              <span class="ruri-icon-button__glyph" aria-hidden="true">[LEAVE]</span>
+              <span class="ruri-icon-button__glyph" aria-hidden="true"><HangupIcon /></span>
             </button>
           </Tooltip>
         </div>

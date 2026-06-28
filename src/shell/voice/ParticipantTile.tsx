@@ -22,6 +22,7 @@
 
 import { createEffect, createMemo, onCleanup, Show, splitProps, type JSX } from 'solid-js';
 import { Avatar } from '@/primitives';
+import { CameraOffIcon, MicOffIcon, DeafenIcon } from './icons';
 import type { NetworkQualityTier, SuimyakuPeerState } from '@/lib/suimyaku-media/types';
 import type { ChannelUser } from '@/lib/irc/types';
 
@@ -255,13 +256,19 @@ export function ParticipantTile(props: ParticipantTileProps): JSX.Element {
         {/* Mute / deafen / camera badges */}
         <span class="voice-tile__badges">
           <Show when={cameraOff()}>
-            <span class="voice-tile__badge voice-tile__badge--cam" title="Camera off">[cam]</span>
+            <span class="voice-tile__badge voice-tile__badge--cam" title="Camera off" aria-label="Camera off">
+              <CameraOffIcon class="voice-tile__badge-icon" />
+            </span>
           </Show>
           <Show when={isMuted()}>
-            <span class="voice-tile__badge voice-tile__badge--muted" title="Muted">[M]</span>
+            <span class="voice-tile__badge voice-tile__badge--muted" title="Muted" aria-label="Muted">
+              <MicOffIcon class="voice-tile__badge-icon" />
+            </span>
           </Show>
           <Show when={isDeafened()}>
-            <span class="voice-tile__badge voice-tile__badge--deaf" title="Deafened">[D]</span>
+            <span class="voice-tile__badge voice-tile__badge--deaf" title="Deafened" aria-label="Deafened">
+              <DeafenIcon class="voice-tile__badge-icon" />
+            </span>
           </Show>
         </span>
 
