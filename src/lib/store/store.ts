@@ -3,7 +3,7 @@
 import { createStore } from 'zustand/vanilla';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { IRCClient } from '@/lib/irc/client';
-import type { IRCMessage, Channel, ChatMessage, ConnectionStatus, MessageReaction } from '@/lib/irc/types';
+import type { IRCMessage, Channel, ChannelUser, ChatMessage, ConnectionStatus, MessageReaction } from '@/lib/irc/types';
 import { loadCredentials } from '@/lib/credentials';
 import { parseAccountInfo, parseCHANLIMIT, parseMonitorNumeric, parsePREFIX, parseSessionMeshTokenNote, parseSessionTokenNote, parseStandardReply } from '@/lib/irc/parser';
 import type { SuimyakuPeerState, SuimyakuRoomStats, CallState } from '@/lib/suimyaku-media/types';
@@ -1672,6 +1672,17 @@ const _batchCollectors = new Map<string, { target: string; messages: ChatMessage
  */
 const _openChathistoryByTarget = new Map<string, string>();
 
+// ── NAMES accumulation (module-level) ─────────────────────────────────────────
+/**
+ * Lowercased channel keys with a NAMES reply in progress. A channel's roster
+ * arrives across one or more RPL_NAMREPLY (353) lines terminated by
+ * RPL_ENDOFNAMES (366). The FIRST 353 for a channel replaces the roster (NAMES
+ * is authoritative — it must drop members who have since left); later 353s for
+ * the same burst append; 366 closes the burst. Without this, NAMES only ever
+ * added members, so stale nicks lingered after a rejoin/reconnect.
+ */
+const _namesInProgress = new Set<string>();
+
 // ── MOTD buffer (module-level) ────────────────────────────────────────────────
 /** Accumulates MOTD lines between RPL_MOTDSTART (375) and RPL_ENDOFMOTD (376) */
 let _motdBuffer = '';
@@ -2123,6 +2134,7 @@ export const store = createStore<OnyxState>()(
       // leak across a (re)connect.
       _batchCollectors.clear();
       _openChathistoryByTarget.clear();
+      _namesInProgress.clear();
       _motdBuffer = '';
 
       // Remember the desired nick before the IRC client may append '_' on collision
@@ -2130,7 +2142,21 @@ export const store = createStore<OnyxState>()(
       _connectNick = nick;
       _saslAccount = null;
 
-      set({ status: 'connecting', connectionStatus: 'connecting', ourNick: nick, autoReconnect: false });
+      // Start every explicit connect from a clean roster. Only disconnect() used
+      // to clear these, so reconnecting from the form (e.g. after changing nick)
+      // left the previous channels/members in place — and NAMES merges rather
+      // than replaces, so the old nicks "stuck around". Auto-reconnect uses a
+      // different path (reconnectNow → client.connect) and is unaffected.
+      set({
+        status: 'connecting',
+        connectionStatus: 'connecting',
+        ourNick: nick,
+        autoReconnect: false,
+        channels: new Map(),
+        dms: new Map(),
+        activeView: { kind: 'home' },
+        firstUnreadId: new Map(),
+      });
       _nickAliasTryIdx = 0;
       const savedCreds = loadCredentials(url, nick);
 
@@ -4153,6 +4179,8 @@ export const store = createStore<OnyxState>()(
         case '366': { // RPL_ENDOFNAMES
           const ch366 = params[1];
           if (!ch366) break;
+          // Close the NAMES burst so the next 353 starts a fresh authoritative roster.
+          _namesInProgress.delete(ch366.toLowerCase());
           // Fetch channel PROP data if IRCX
           if (get().isIRCX) {
             get().requestChannelProps(ch366);
@@ -4217,10 +4245,14 @@ export const store = createStore<OnyxState>()(
           const key = ch.toLowerCase();
           const { client } = get();
           const names = (namesStr ?? '').split(' ').filter(Boolean);
+          // First 353 of a burst replaces the roster (NAMES is authoritative);
+          // subsequent 353s for the same channel append until 366.
+          const freshNames = !_namesInProgress.has(key);
+          if (freshNames) _namesInProgress.add(key);
           set(s => {
             const channels = new Map(s.channels);
             const c = channels.get(key) ?? emptyChannel(ch);
-            const users = new Map(c.users);
+            const users = freshNames ? new Map<string, ChannelUser>() : new Map(c.users);
             for (const name of names) {
               const { nick: n, modes } = parseNamePrefix(name, client?.prefixToMode ?? {});
               if (n) users.set(n.toLowerCase(), { nick: n, modes: new Set(modes), away: false });
@@ -8612,4 +8644,24 @@ function _saveNsfwChannels(channels: Set<string>): void {
   } catch {
     // ignore quota errors
   }
+}
+
+// ── Clean leave on deliberate page unload ─────────────────────────────────────
+// A page refresh/close fires `pagehide`; an accidental network drop does NOT.
+// Sending QUIT here tells the server to remove our nick from channels right away
+// instead of letting the session linger (resume window / ping timeout) as a
+// ghost that reappears under the old nick when you reconnect. Best-effort: the
+// synchronous WS frame usually flushes during unload. This module only loads on
+// the /app route, so the listener never affects the landing page.
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', () => {
+    try {
+      const s = store.getState();
+      if (s.connectionStatus === 'connected') {
+        s.client?.quit('client closed');
+      }
+    } catch {
+      // best-effort; never block unload
+    }
+  });
 }

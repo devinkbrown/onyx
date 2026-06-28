@@ -255,3 +255,44 @@ describe('channel mode tracking via _handleMessage', () => {
     expect(store.getState().channels.get('#general')?.users.get('bob')?.modes.has('o')).toBe(true);
   });
 });
+
+// ── NAMES is authoritative (353/366) ────────────────────────────────────────
+
+describe('NAMES (353/366) replaces the roster', () => {
+  function seedEmpty(name: string, ourNick = 'me') {
+    const client = makeClient();
+    store.setState({
+      ...initialState,
+      client: client as never,
+      ourNick,
+      channels: new Map(),
+      activeView: { kind: 'channel', channel: name.toLowerCase() },
+    }, true);
+    return client;
+  }
+
+  function roster(name: string): string[] {
+    const c = store.getState().channels.get(name.toLowerCase());
+    return c ? [...c.users.keys()].sort() : [];
+  }
+
+  it('drops departed members when a fresh NAMES burst arrives', () => {
+    seedEmpty('#room');
+    feed(':irc 353 me = #room :me alice bob');
+    feed(':irc 366 me #room :End of /NAMES list.');
+    expect(roster('#room')).toEqual(['alice', 'bob', 'me']);
+
+    // Rejoin/reconnect: NAMES no longer lists alice/bob — they must not linger.
+    feed(':irc 353 me = #room :me charlie');
+    feed(':irc 366 me #room :End of /NAMES list.');
+    expect(roster('#room')).toEqual(['charlie', 'me']);
+  });
+
+  it('accumulates multiple 353 lines within a single burst', () => {
+    seedEmpty('#room');
+    feed(':irc 353 me = #room :me alice');
+    feed(':irc 353 me = #room :bob carol');
+    feed(':irc 366 me #room :End of /NAMES list.');
+    expect(roster('#room')).toEqual(['alice', 'bob', 'carol', 'me']);
+  });
+});
