@@ -2160,6 +2160,10 @@ export const store = createStore<OnyxState>()(
       _nickAliasTryIdx = 0;
       const savedCreds = loadCredentials(url, nick);
 
+      // Per-client flag: true once this client has registered at least once, so
+      // onConnected can tell a fresh connect from a reconnect/session-resume.
+      let hasRegistered = false;
+
       const client = new IRCClient({
         url,
         nick,
@@ -2176,6 +2180,24 @@ export const store = createStore<OnyxState>()(
           _clearReconnectCountdown();
           _reconnectAttempts = 0;
           set({ status: 'connected', connectionStatus: 'connected', reconnectIn: 0, autoReconnect: true, connectedAt: new Date() });
+          // On a RECONNECT / session-resume, reattach does not necessarily replay
+          // NAMES, so members who joined or left during the gap leave the roster
+          // stale (missing or ghost nicks). Re-request NAMES for every joined
+          // channel to resync — our NAMES handling is authoritative, so each
+          // reply rebuilds that channel's roster exactly. Skipped on the first
+          // connect (its JOINs already pull fresh NAMES).
+          if (hasRegistered) {
+            setTimeout(() => {
+              const st = get();
+              if (st.connectionStatus !== 'connected') return;
+              const c = st.client;
+              if (!c) return;
+              for (const ch of st.channels.values()) {
+                c.sendRaw('NAMES', ch.name);
+              }
+            }, 600);
+          }
+          hasRegistered = true;
         },
         onDisconnected(reason) {
           set(s => ({
