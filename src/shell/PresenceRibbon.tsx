@@ -88,6 +88,10 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
 
   return (
     <header class="shell-ribbon" role="banner" aria-label="Channel information">
+      {/* Inner row shares the conversation reading measure so the title and
+          controls stay aligned with the message column on ultra-wide displays;
+          the ribbon's background + underline remain full-bleed chrome. */}
+      <div class="shell-ribbon-inner">
       {/* Channel / DM name */}
       <Show when={channelName()} fallback={
         <span class="shell-ribbon-channel" aria-label="No active channel">
@@ -188,6 +192,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
           />
           <span class="sr-only">{connLabel()}</span>
         </span>
+      </div>
       </div>
 
       {/* Channel settings panel (topic + modes) — portaled Sheet. */}

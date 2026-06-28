@@ -124,7 +124,7 @@ export function Composer(props: ComposerProps): JSX.Element {
     const t = target();
     const cs = connectionStatus();
     if (activeEditing()) return 'Edit message';
-    if (cs !== 'connected') return 'Reconnecting to the current...';
+    if (cs !== 'connected') return 'Reconnecting…';
     if (!t) return 'Pick a room or a person to begin';
     return `Message ${t}`;
   });
@@ -473,6 +473,7 @@ export function Composer(props: ComposerProps): JSX.Element {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      <div class="shell-composer-measure">
       <Show when={replyingTo()}>
         {(reply) => (
           <div class="shell-composer-context" role="status" aria-live="polite">
@@ -681,6 +682,7 @@ export function Composer(props: ComposerProps): JSX.Element {
       <p class="shell-composer-hint" aria-hidden="true">
         Enter to send · Shift+Enter for newline · Paste or drop files to attach
       </p>
+      </div>
     </section>
   );
 }

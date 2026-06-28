@@ -277,6 +277,13 @@
 }
 
 /* ── Channel sidebar ── */
+/* The sidebar is wrapped in a slot div (for the mobile-drawer class toggle).
+   display:contents dissolves that wrapper so .shell-sidebar itself is the grid
+   item and its grid-column:2 lands in the correct track. */
+.shell-sidebar-slot {
+  display: contents;
+}
+
 .shell-sidebar {
   grid-column: 2;
   display: flex;
@@ -693,6 +700,18 @@
   );
   opacity: 0.7;
   pointer-events: none;
+}
+
+/* Inner row carries the reading measure; the ribbon itself stays full-bleed
+   chrome (background + underline). On narrow columns this just fills width. */
+.shell-ribbon-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: var(--shell-measure);
+  margin-inline: auto;
+  min-width: 0;
 }
 
 .shell-ribbon-channel {
@@ -1183,6 +1202,8 @@
   gap: 0 12px;
   padding: 7px 18px 4px;
   margin-top: 2px;
+  max-width: var(--shell-measure);
+  margin-inline: auto;
   transition: background var(--dur) var(--ease);
 }
 
@@ -1310,6 +1331,8 @@
   grid-template-columns: 42px 1fr;
   gap: 0 12px;
   padding: 1px 18px;
+  max-width: var(--shell-measure);
+  margin-inline: auto;
   transition: background var(--dur) var(--ease);
 }
 
@@ -1337,6 +1360,8 @@
    small, dim, and prefixed with a soft azure tide-mark. */
 .shell-msg-system {
   padding: 3px 18px 3px calc(42px + 12px + 18px);
+  max-width: var(--shell-measure);
+  margin-inline: auto;
   font-family: var(--font-mono);
   font-size: 0.72rem;
   color: var(--washi-mute);
@@ -1617,6 +1642,13 @@
       color-mix(in oklab, var(--ink) 82%, var(--stone)) 100%
     );
   border-top: 1px solid var(--seam-faint);
+}
+
+/* Content column shares the conversation reading measure so the input lines up
+   with the messages on ultra-wide displays; the bar stays full-bleed. */
+.shell-composer-measure {
+  max-width: var(--shell-measure);
+  margin-inline: auto;
 }
 
 .shell-composer--drag {

@@ -68,6 +68,11 @@
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --dur: 260ms;
 
+  /* Layout — conversation reading measure. Caps line length so messages,
+     ribbon and composer stay readable and aligned on ultra-wide displays;
+     narrower columns simply fill their width. */
+  --shell-measure: 1180px;
+
   /* Type — mono-led labels + display + humanist sans + serif soul. */
   --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo,
     Consolas, monospace;

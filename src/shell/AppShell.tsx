@@ -264,12 +264,14 @@ export function AppShell(props: AppShellProps): JSX.Element {
             onClick={closeMobileSidebar}
           />
         </Show>
-        <div class={mobileSidebarOpen() ? 'shell-sidebar--mobile-open' : ''}>
+        <div class={`shell-sidebar-slot${mobileSidebarOpen() ? ' shell-sidebar--mobile-open' : ''}`}>
           <ChannelSidebar onMobileClose={closeMobileSidebar} />
         </div>
 
         {/* ── Conversation Column ── */}
-        <div class="shell-conversation" style={{ 'grid-column': showRail() ? '3' : '2 / span 1' }}>
+        {/* Always grid-column 3 (CSS). The rail track stays in the grid at 0px
+            when hidden, so the conversation keeps the 1fr track either way. */}
+        <div class="shell-conversation">
           {/* Disconnected banner */}
           <DisconnectedBanner />
 
