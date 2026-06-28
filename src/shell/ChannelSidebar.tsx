@@ -45,6 +45,39 @@ function unreadLabel(unread: number, highlights: number): string {
   return parts.length > 0 ? `, ${parts.join(', ')}` : '';
 }
 
+/**
+ * Roving keyboard navigation across the combined channel + DM lists.
+ *
+ * Up/Down move focus between sibling rows, Home/End jump to the first/last
+ * row, and Enter/Space activate (delegated to the button's native click).
+ * All rows carry `data-sidebar-item`; one tab stop is kept by giving the
+ * active (or first) row `tabindex=0` and the rest `tabindex=-1`.
+ */
+function moveSidebarFocus(
+  container: HTMLElement,
+  current: HTMLElement,
+  delta: number | 'home' | 'end',
+): void {
+  const items = Array.from(
+    container.querySelectorAll<HTMLButtonElement>('[data-sidebar-item]'),
+  );
+  if (items.length === 0) return;
+
+  let nextIndex: number;
+  if (delta === 'home') {
+    nextIndex = 0;
+  } else if (delta === 'end') {
+    nextIndex = items.length - 1;
+  } else {
+    const index = items.indexOf(current as HTMLButtonElement);
+    const base = index === -1 ? 0 : index;
+    nextIndex = Math.min(items.length - 1, Math.max(0, base + delta));
+  }
+
+  const next = items[nextIndex];
+  if (next) next.focus();
+}
+
 export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
   const [local] = splitProps(props, ['onMobileClose']);
 
@@ -72,6 +105,67 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
     return entries.sort((a, b) => a.nick.localeCompare(b.nick));
   });
 
+  // ── roving tab stop ──
+  // One item in the combined list owns the single tab stop (tabindex=0): the
+  // active conversation if present, otherwise the first channel (or first DM
+  // when there are no channels). Everything else is tabindex=-1 and reachable
+  // only via the arrow keys, keeping the list a single Tab landing point.
+  const rovingKey = createMemo((): string | null => {
+    const view = activeView();
+    if (view.kind === 'channel') {
+      const match = sortedChannels().find(
+        (ch) => ch.name.toLowerCase() === view.channel.toLowerCase(),
+      );
+      if (match) return `ch:${match.name.toLowerCase()}`;
+    }
+    if (view.kind === 'dm') {
+      const match = sortedDms().find(
+        (dm) => dm.nick.toLowerCase() === view.nick.toLowerCase(),
+      );
+      if (match) return `dm:${match.nick.toLowerCase()}`;
+    }
+    const firstChannel = sortedChannels()[0];
+    if (firstChannel) return `ch:${firstChannel.name.toLowerCase()}`;
+    const firstDm = sortedDms()[0];
+    if (firstDm) return `dm:${firstDm.nick.toLowerCase()}`;
+    return null;
+  });
+
+  function channelKey(ch: Channel): string {
+    return `ch:${ch.name.toLowerCase()}`;
+  }
+
+  function dmKey(dm: DMConversation): string {
+    return `dm:${dm.nick.toLowerCase()}`;
+  }
+
+  function handleListKeyDown(e: KeyboardEvent): void {
+    const target = e.target as HTMLElement | null;
+    if (!target || !target.matches('[data-sidebar-item]')) return;
+    const container = e.currentTarget as HTMLElement;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        moveSidebarFocus(container, target, 1);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        moveSidebarFocus(container, target, -1);
+        break;
+      case 'Home':
+        e.preventDefault();
+        moveSidebarFocus(container, target, 'home');
+        break;
+      case 'End':
+        e.preventDefault();
+        moveSidebarFocus(container, target, 'end');
+        break;
+      default:
+        break;
+    }
+  }
+
   // ── status dot modifier ──
   const statusMod = createMemo(() => {
     const s = connectionStatus();
@@ -79,6 +173,14 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
     if (s === 'connecting' || s === 'reconnecting') return '--connecting';
     if (s === 'disconnected') return '--disconnected';
     return '--disconnected';
+  });
+
+  const statusLabel = createMemo(() => {
+    const s = connectionStatus();
+    if (s === 'connected') return 'connected';
+    if (s === 'reconnecting') return 'reconnecting';
+    if (s === 'connecting') return 'connecting';
+    return 'disconnected';
   });
 
   function handleJoin(e: SubmitEvent): void {
@@ -113,12 +215,20 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
             aria-hidden="true"
           />
           {networkName() || 'IRCXNet'}
+          <span class="sr-only" aria-live="polite" aria-atomic="true">
+            {`Connection ${statusLabel()}`}
+          </span>
         </span>
         <NotificationControls />
       </div>
 
       {/* Scrollable list */}
-      <div class="shell-sidebar-scroll" role="region" aria-label="Channels and direct messages">
+      <div
+        class="shell-sidebar-scroll"
+        role="region"
+        aria-label="Channels and direct messages"
+        onKeyDown={handleListKeyDown}
+      >
         {/* Channels section */}
         <div class="shell-sidebar-section">
           <p class="shell-sidebar-section-label" id="sidebar-channels-label">
@@ -147,6 +257,8 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
                     <li>
                       <button
                         type="button"
+                        data-sidebar-item
+                        tabindex={rovingKey() === channelKey(ch) ? 0 : -1}
                         class={[
                           'shell-channel-item',
                           active() ? 'shell-channel-item--active' : '',
@@ -199,6 +311,8 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
                     <li>
                       <button
                         type="button"
+                        data-sidebar-item
+                        tabindex={rovingKey() === dmKey(dm) ? 0 : -1}
                         class={[
                           'shell-channel-item',
                           active() ? 'shell-channel-item--active' : '',

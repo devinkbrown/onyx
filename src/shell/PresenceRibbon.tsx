@@ -129,7 +129,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
       </Show>
 
       {/* Right side: identity, conn status, member count */}
-      <div class="shell-ribbon-right" role="group" aria-label="Connection status">
+      <div class="shell-ribbon-right" role="group" aria-label="Channel actions and status">
         {/* Channel settings — only in a channel. Opens topic + modes panel. */}
         <Show when={activeView().kind === 'channel' && settingsChannel()}>
           <button

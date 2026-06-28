@@ -300,7 +300,14 @@ export function MemberList(props: MemberListProps): JSX.Element {
     >
       <div class="shell-members-head">
         <span>members</span>
-        <span class="shell-members-count">{totalCount()}</span>
+        <span
+          class="shell-members-count"
+          aria-live="polite"
+          aria-atomic="true"
+          aria-label={`${totalCount()} member${totalCount() === 1 ? '' : 's'}`}
+        >
+          {totalCount()}
+        </span>
       </div>
 
       <div class="shell-members-scroll" role="region" aria-label="Channel members">
@@ -313,48 +320,60 @@ export function MemberList(props: MemberListProps): JSX.Element {
           }
         >
           <For each={groups()}>
-            {(group) => (
-              <>
-                <p class="shell-members-group-label" role="heading" aria-level={3}>
-                  {group.label} — {group.members.length}
-                </p>
-                <For each={group.members}>
-                  {({ user, role }) => (
-                    <Popover
-                      trigger={
-                        <div
-                          class={`shell-member-row${user.away ? ' shell-member-row--away' : ''}`}
-                          role="listitem"
-                        >
-                          <span class="shell-member-avatar">
-                            <Avatar
-                              name={user.nick}
-                              size="sm"
-                              owner={role.key === 'owner' || role.key === 'founder'}
-                              aria-hidden="true"
-                            />
-                            <span
-                              class={`shell-member-presence${user.away ? ' shell-member-presence--away' : ''}`}
-                              aria-hidden="true"
-                            />
-                          </span>
-                          <span
-                            class={`shell-member-nick${user.away ? ' shell-member-nick--away' : ''}`}
+            {(group) => {
+              const groupLabelId = `members-group-${group.key}`;
+              return (
+                <section aria-labelledby={groupLabelId}>
+                  <p
+                    class="shell-members-group-label"
+                    id={groupLabelId}
+                    role="heading"
+                    aria-level={3}
+                  >
+                    {group.label} — {group.members.length}
+                  </p>
+                  <ul class="shell-members-group-list" role="list" aria-labelledby={groupLabelId}>
+                    <For each={group.members}>
+                      {({ user, role }) => (
+                        <li class="shell-members-group-item">
+                          <Popover
+                            trigger={
+                              <div
+                                class={`shell-member-row${user.away ? ' shell-member-row--away' : ''}`}
+                                aria-label={`${user.nick}, ${role.label}${user.away ? ', away' : ''}`}
+                              >
+                                <span class="shell-member-avatar">
+                                  <Avatar
+                                    name={user.nick}
+                                    size="sm"
+                                    owner={role.key === 'owner' || role.key === 'founder'}
+                                    aria-hidden="true"
+                                  />
+                                  <span
+                                    class={`shell-member-presence${user.away ? ' shell-member-presence--away' : ''}`}
+                                    aria-hidden="true"
+                                  />
+                                </span>
+                                <span
+                                  class={`shell-member-nick${user.away ? ' shell-member-nick--away' : ''}`}
+                                >
+                                  {user.nick}
+                                </span>
+                                <Show when={role.key !== 'member'}>
+                                  <RoleBadge role={role} />
+                                </Show>
+                              </div>
+                            }
                           >
-                            {user.nick}
-                          </span>
-                          <Show when={role.key !== 'member'}>
-                            <RoleBadge role={role} />
-                          </Show>
-                        </div>
-                      }
-                    >
-                      <MemberCard user={user} role={role} channel={activeChannel()?.name ?? ''} />
-                    </Popover>
-                  )}
-                </For>
-              </>
-            )}
+                            <MemberCard user={user} role={role} channel={activeChannel()?.name ?? ''} />
+                          </Popover>
+                        </li>
+                      )}
+                    </For>
+                  </ul>
+                </section>
+              );
+            }}
           </For>
         </Show>
       </div>
