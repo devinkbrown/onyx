@@ -33,6 +33,8 @@ describe('background registry', () => {
     // Arrange
     const expectedKinds: Record<BackgroundId, BackgroundVariant['kind']> = {
       'deep-current': 'animated',
+      bioluminescence: 'animated',
+      caustics: 'animated',
       aurora: 'animated',
       'pyrite-field': 'animated',
       'kintsugi-veins': 'animated',
