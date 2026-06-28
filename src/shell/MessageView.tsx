@@ -297,6 +297,27 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     }
   });
 
+  // On opening a conversation that has an unread boundary, land on it (where you
+  // left off) instead of the bottom. Runs once per switch; an rAF lets the
+  // divider boundary (captured just after navigate) and its DOM node settle, and
+  // runs after the autoscroll effect's microtask so this scroll wins.
+  let scrolledTarget: string | null = null;
+  createEffect(() => {
+    const target = activeTarget();
+    unreadDividerId(); // re-track so the boundary settling re-runs the effect
+    if (!target || target === scrolledTarget) return;
+    scrolledTarget = target;
+    requestAnimationFrame(() => {
+      const el = feedEl?.querySelector<HTMLElement>('.shell-unread-divider');
+      if (el) {
+        el.scrollIntoView({ block: 'center' });
+        setAtBottom(false);
+      } else {
+        scrollToBottom(false);
+      }
+    });
+  });
+
   // ── thread panel ──
   const [threadOpen, setThreadOpen] = createSignal(false);
   const [threadParentId, setThreadParentId] = createSignal<string | null>(null);
