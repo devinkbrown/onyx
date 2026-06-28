@@ -291,6 +291,12 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   // Declared here so the conversation-switch effect below can clear it.
   const [revealedId, setRevealedId] = createSignal<string | null>(null);
 
+  // Count of messages that arrived while scrolled away from the bottom, so the
+  // jump-to-latest pill can say "N new" instead of a bare arrow. lastSeenCount is
+  // the message count as of the last time we were pinned to the bottom.
+  const [unreadBelow, setUnreadBelow] = createSignal(0);
+  let lastSeenCount = 0;
+
   function checkScroll(): void {
     const el = feedEl;
     if (!el) return;
@@ -314,6 +320,19 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     }
   });
 
+  // Track how many messages have arrived since we were last at the bottom. While
+  // pinned to the bottom the baseline tracks the live count (nothing unread); once
+  // scrolled up, anything beyond the baseline is "new below".
+  createEffect(() => {
+    const count = messages().length;
+    if (atBottom()) {
+      lastSeenCount = count;
+      setUnreadBelow(0);
+    } else {
+      setUnreadBelow(Math.max(0, count - lastSeenCount));
+    }
+  });
+
   // On opening a conversation that has an unread boundary, land on it (where you
   // left off) instead of the bottom. Runs once per switch; an rAF lets the
   // divider boundary (captured just after navigate) and its DOM node settle, and
@@ -325,6 +344,9 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     if (!target || target === scrolledTarget) return;
     scrolledTarget = target;
     setRevealedId(null);
+    // Reset the "new below" baseline for the channel we just opened.
+    lastSeenCount = messages().length;
+    setUnreadBelow(0);
     requestAnimationFrame(() => {
       const el = feedEl?.querySelector<HTMLElement>('.shell-unread-divider');
       if (el) {
@@ -607,15 +629,24 @@ export function MessageView(props: MessageViewProps): JSX.Element {
         </Show>
       </div>
 
-      {/* Jump to latest button */}
+      {/* Jump to latest button — shows the new-message count when scrolled up. */}
       <Show when={!atBottom()}>
         <button
           type="button"
           class="shell-jump-latest"
+          classList={{ 'shell-jump-latest--unread': unreadBelow() > 0 }}
           onClick={() => scrollToBottom(true)}
-          aria-label="Jump to latest messages"
+          aria-label={
+            unreadBelow() > 0
+              ? `${unreadBelow()} new message${unreadBelow() === 1 ? '' : 's'} below — jump to latest`
+              : 'Jump to latest messages'
+          }
         >
-          ↓ latest
+          <Show when={unreadBelow() > 0} fallback={<span>↓ latest</span>}>
+            <span class="shell-jump-latest-count">{unreadBelow()}</span>
+            <span>new</span>
+            <span aria-hidden="true">↓</span>
+          </Show>
         </button>
       </Show>
 
