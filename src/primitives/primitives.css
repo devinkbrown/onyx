@@ -282,7 +282,7 @@
   left: 0;
   min-width: 16rem;
   max-width: min(24rem, calc(100vw - 2rem));
-  padding: 0.95rem;
+  padding: var(--space-4);
   color: var(--washi);
   background:
     radial-gradient(circle at 24% 0%, color-mix(in oklab, var(--lapis-deep) 24%, transparent), transparent 68%),
@@ -392,8 +392,8 @@
 .ruri-modal__header {
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 1rem;
+  gap: var(--space-4);
+  padding: var(--pad-panel-lg);
   background:
     linear-gradient(90deg, color-mix(in oklab, var(--lapis-deep) 11%, transparent), transparent);
   border-bottom: 1px solid var(--seam-faint);
@@ -401,7 +401,7 @@
 
 .ruri-sheet__kicker,
 .ruri-modal__kicker {
-  margin: 0 0 0.35rem;
+  margin: 0 0 var(--space-1);
   color: var(--lapis-bright);
   font-family: var(--font-mono);
   font-size: 0.68rem;
@@ -423,7 +423,7 @@
 
 .ruri-sheet__header p:last-child,
 .ruri-modal__header p:last-child {
-  margin: 0.45rem 0 0;
+  margin: var(--space-2) 0 0;
   color: var(--washi-dim);
   font-family: var(--font-serif);
   line-height: 1.45;
@@ -463,7 +463,7 @@
 .ruri-modal__body {
   min-height: 0;
   overflow: auto;
-  padding: 1rem;
+  padding: var(--pad-panel-lg);
   color: var(--washi-dim);
   line-height: 1.6;
 }
@@ -647,7 +647,7 @@
 .ruri-tabs__trigger[aria-selected='true']:hover { color: var(--ink); }
 
 .ruri-tabs__content {
-  padding: 1rem;
+  padding: var(--pad-panel);
   color: var(--washi-dim);
   background:
     radial-gradient(circle at 18% 0%, color-mix(in oklab, var(--lapis-deep) 12%, transparent), transparent 22rem),

@@ -65,6 +65,29 @@
   --r-md: 11px;
   --r-pill: 999px;
 
+  /* ── Spacing scale ──────────────────────────────────────────────────────────
+     A single 4px-based rhythm shared by the shell and every dialog. Use these
+     instead of ad-hoc px/rem so vertical rhythm and padding stay consistent and
+     re-tune from one place. The scale is theme-independent (it lives only here;
+     themes override colour + radius, never spacing). */
+  --space-0: 0;
+  --space-1: 0.25rem; /*  4px — hairline gaps, icon insets */
+  --space-2: 0.5rem;  /*  8px — tight gaps inside a row */
+  --space-3: 0.75rem; /* 12px — default control padding, list-row gaps */
+  --space-4: 1rem;    /* 16px — panel padding, section gaps */
+  --space-5: 1.25rem; /* 20px — generous panel padding */
+  --space-6: 1.5rem;  /* 24px — section-to-section rhythm */
+  --space-7: 2rem;    /* 32px — major divisions, empty-state padding */
+  --space-8: 2.5rem;  /* 40px — hero / page-level breathing room */
+
+  /* Semantic spacing — name the intent, map to the scale. */
+  --gap-tight: var(--space-2);    /* between closely-related inline items */
+  --gap-row: var(--space-3);      /* between rows in a list */
+  --gap-section: var(--space-6);  /* between sections in a panel/dialog */
+  --pad-control: var(--space-3);  /* inner padding of inputs, toggles, chips */
+  --pad-panel: var(--space-4);    /* inner padding of a dialog/panel body */
+  --pad-panel-lg: var(--space-5); /* roomier panel padding on wide surfaces */
+
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --dur: 260ms;
 

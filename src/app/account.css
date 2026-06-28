@@ -11,7 +11,7 @@
 .acct {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: var(--gap-section);
 }
 
 /* ── Guest state ─────────────────────────────────────────────────────────── */
@@ -21,8 +21,8 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 12px;
-  padding: 28px 18px;
+  gap: var(--space-3);
+  padding: var(--space-7) var(--space-5);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-md);
   background:
@@ -57,8 +57,8 @@
 .acct-identity {
   display: flex;
   align-items: flex-start;
-  gap: 16px;
-  padding: 18px;
+  gap: var(--space-4);
+  padding: var(--space-4);
   border: 1px solid var(--seam);
   border-radius: var(--r-md);
   background:
@@ -84,7 +84,7 @@
 .acct-identity-meta {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
   min-width: 0;
 }
 
@@ -111,14 +111,14 @@
 .acct-facts {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 14px;
-  margin: 6px 0 0;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-2) 0 0;
 }
 
 .acct-fact {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .acct-fact dt {
@@ -142,8 +142,8 @@
 .acct-error {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 11px 14px;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border: 1px solid color-mix(in oklab, var(--shu) 50%, transparent);
   border-radius: var(--r-sm);
   background: color-mix(in oklab, var(--shu) 12%, transparent);
@@ -158,15 +158,15 @@
 .acct-section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding-top: 20px;
+  gap: var(--space-3);
+  padding-top: var(--space-5);
   border-top: 1px solid var(--seam-faint);
 }
 
 .acct-section-head {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--space-1);
 }
 
 .acct-section-title {
@@ -188,13 +188,13 @@
 .acct-section-body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .acct-section-body form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
   align-items: flex-start;
 }
 
@@ -207,7 +207,7 @@
 .acct-password-row {
   display: flex;
   align-items: stretch;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .acct-password-row .ruri-field__input {
@@ -218,7 +218,7 @@
 .acct-password-toggle {
   appearance: none;
   flex: none;
-  padding: 0 14px;
+  padding: 0 var(--space-4);
   border-radius: var(--r-sm);
   border: 1px solid var(--seam-faint);
   background: color-mix(in oklab, var(--stone) 32%, transparent);
@@ -251,8 +251,8 @@
 .acct-toggle-row {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 12px 14px;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-sm);
   background: color-mix(in oklab, var(--stone) 30%, transparent);
@@ -261,7 +261,7 @@
 .acct-toggle-body {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-1);
   min-width: 0;
 }
 
@@ -346,11 +346,11 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .acct-cert-item {
-  padding: 8px 11px;
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-sm);
   background: color-mix(in oklab, var(--stone) 28%, transparent);
@@ -372,7 +372,7 @@
 
 .acct-danger-actions {
   display: flex;
-  gap: 10px;
+  gap: var(--space-3);
   flex-wrap: wrap;
 }
 

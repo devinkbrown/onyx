@@ -1,14 +1,14 @@
 .voice-settings {
   display: grid;
-  gap: 1.05rem;
+  gap: var(--space-4);
   color: var(--washi);
 }
 
 .voice-settings__section {
   position: relative;
   display: grid;
-  gap: 0.85rem;
-  padding: 1rem;
+  gap: var(--space-3);
+  padding: var(--space-4);
   overflow: hidden;
   background:
     radial-gradient(circle at 12% 0%, color-mix(in oklab, var(--lapis) 13%, transparent), transparent 38%),
@@ -56,7 +56,7 @@
 .voice-settings__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.85rem;
+  gap: var(--space-3);
 }
 
 .voice-settings__select {
@@ -102,9 +102,9 @@
 .voice-settings__toggle {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 0.75rem;
+  gap: var(--space-3);
   align-items: start;
-  padding: 0.75rem;
+  padding: var(--space-3);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-md);
   background:
@@ -168,7 +168,7 @@
 
 .voice-settings__toggle-text {
   display: grid;
-  gap: 0.2rem;
+  gap: var(--space-1);
   min-width: 0;
 }
 
@@ -189,7 +189,7 @@
 .voice-settings__key-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.65rem;
+  gap: var(--space-2);
   align-items: end;
 }
 

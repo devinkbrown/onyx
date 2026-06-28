@@ -138,9 +138,12 @@ export function KeyboardHelpOverlay(): JSX.Element {
         >
           {/* Header */}
           <div class="kbd-help__header">
-            <h2 id="kbd-help-title" class="kbd-help__title">
-              Keyboard shortcuts
-            </h2>
+            <div class="kbd-help__heading">
+              <p class="kbd-help__kicker" aria-hidden="true">reference</p>
+              <h2 id="kbd-help-title" class="kbd-help__title">
+                Keyboard shortcuts
+              </h2>
+            </div>
             <button
               ref={closeButtonRef}
               type="button"
