@@ -52,6 +52,8 @@ import { Spotlight } from '@/chat/spotlight';
 import { useSpotlightHotkeys } from '@/chat/spotlight/useSpotlight';
 import { KeyboardHelpOverlay } from './KeyboardHelpOverlay';
 import { useKeyboardShortcuts } from '@/lib/keyboard/useKeyboardShortcuts';
+import { MessageSearch } from './search/MessageSearch';
+import { hasMessageSearchableConversation, openMessageSearch } from './search/useMessageSearch';
 
 // ── AppShell props ───────────────────────────────────────────────────────────
 
@@ -123,6 +125,17 @@ function DisconnectedBanner(): JSX.Element {
   );
 }
 
+function handleMessageSearchHotkey(event: KeyboardEvent): void {
+  if (event.defaultPrevented) return;
+
+  const key = event.key.toLowerCase();
+  const isFindCombo = key === 'f' && (event.metaKey || event.ctrlKey) && !event.altKey;
+  if (!isFindCombo || !hasMessageSearchableConversation()) return;
+
+  event.preventDefault();
+  openMessageSearch();
+}
+
 // ── AppShell ─────────────────────────────────────────────────────────────────
 
 export function AppShell(props: AppShellProps): JSX.Element {
@@ -142,6 +155,11 @@ export function AppShell(props: AppShellProps): JSX.Element {
   // Both register/clean-up their window listeners via onMount/onCleanup.
   useSpotlightHotkeys();
   useKeyboardShortcuts();
+
+  onMount(() => {
+    window.addEventListener('keydown', handleMessageSearchHotkey);
+    onCleanup(() => window.removeEventListener('keydown', handleMessageSearchHotkey));
+  });
 
   // ── voice/video ──
   // Boot the SUIMYAKU media engine once and wire its callbacks into the store.
@@ -299,6 +317,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
               </div>
             </Show>
             <MessageView selfNick={displayNick()} />
+            <MessageSearch />
             {/* Persistent call controls while in a call */}
             <Show when={inCall()}>
               <VoiceBar />
