@@ -31,7 +31,10 @@ import { Tooltip } from '../primitives/Tooltip';
 
 import { useTheme } from './ThemeProvider';
 import { THEMES, THEME_IDS, type ThemeId, type TokenMap } from './themes';
+import { getCustomTheme, isCustomThemeId } from './customThemes';
 import { STUDIO_GROUPS, type StudioGroup, type StudioToken } from './tokens';
+import { useStore, getState } from '@/lib/store';
+import { backgroundOptions } from '@/backgrounds';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -281,7 +284,8 @@ export type ThemeStudioProps = {
 
 export function ThemeStudio(props: ThemeStudioProps) {
   const [local] = splitProps(props, ['class']);
-  const { themeId, setTheme } = useTheme();
+  const { themeId, setTheme, customThemes, saveCustom, deleteCustom } = useTheme();
+  const backgroundId = useStore((s) => s.backgroundId);
 
   // The current per-session overrides the user has made on top of the base theme.
   const [overrides, setOverrides] = createSignal<TokenMap>({});
@@ -391,9 +395,39 @@ export function ThemeStudio(props: ThemeStudioProps) {
     });
   };
 
-  const activeThemeMeta = createMemo(() => THEMES[themeId()]);
+  const activeThemeMeta = createMemo(() => {
+    const id = themeId();
+    if (isCustomThemeId(id)) {
+      const c = getCustomTheme(id);
+      const base = c ? THEMES[c.base] : undefined;
+      return {
+        label: c?.name ?? 'Custom',
+        description: base ? `Your custom theme, based on ${base.label}.` : 'Your custom theme.',
+        scheme: base?.scheme ?? 'dark',
+      };
+    }
+    return THEMES[id as ThemeId];
+  });
 
   const hasOverrides = createMemo(() => Object.keys(overrides()).length > 0);
+
+  // Save the current base + edits as a named, selectable theme. Editing an
+  // existing custom theme folds its overrides into the new one.
+  const handleSaveCustom = (): void => {
+    const id = themeId();
+    const suggested = isCustomThemeId(id) ? (getCustomTheme(id)?.name ?? 'My theme') : `${THEMES[id as ThemeId]?.label ?? 'My'} custom`;
+    const name = window.prompt('Name your theme:', suggested);
+    if (!name) return;
+    const base: ThemeId = isCustomThemeId(id) ? (getCustomTheme(id)?.base ?? THEME_IDS[0]!) : (id as ThemeId);
+    const baseOverrides = isCustomThemeId(id) ? (getCustomTheme(id)?.overrides ?? {}) : {};
+    const merged: TokenMap = { ...baseOverrides, ...overrides() };
+    const newId = saveCustom(name, base, merged);
+    setTheme(newId); // select it; the base-change effect clears the session overrides
+  };
+
+  const chooseBackground = (id: string): void => {
+    getState().setBackground(id);
+  };
 
   return (
     <div
@@ -432,6 +466,62 @@ export function ThemeStudio(props: ThemeStudioProps) {
                 >
                   <span class="ts-theme-chip__label">{meta.label}</span>
                   <span class="ts-theme-chip__scheme">{meta.scheme}</span>
+                </button>
+              );
+            }}
+          </For>
+
+          {/* User-saved custom themes — selectable + deletable. */}
+          <For each={customThemes()}>
+            {(ct) => {
+              const isActive = () => themeId() === ct.id;
+              return (
+                <span class="ts-theme-chip-wrap">
+                  <button
+                    type="button"
+                    class="ts-theme-chip ts-theme-chip--custom"
+                    aria-pressed={isActive()}
+                    data-active={isActive() ? 'true' : undefined}
+                    data-testid={`ts-theme-chip-${ct.id}`}
+                    onClick={() => setTheme(ct.id)}
+                  >
+                    <span class="ts-theme-chip__label">{ct.name}</span>
+                    <span class="ts-theme-chip__scheme">custom · {ct.base}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="ts-theme-chip-del"
+                    aria-label={`Delete theme ${ct.name}`}
+                    title={`Delete ${ct.name}`}
+                    onClick={() => deleteCustom(ct.id)}
+                  >
+                    ×
+                  </button>
+                </span>
+              );
+            }}
+          </For>
+        </div>
+      </section>
+
+      {/* ── Background selector ── */}
+      <section class="ts-section" aria-labelledby="ts-bg-label">
+        <h2 class="ts-section__heading" id="ts-bg-label">Background</h2>
+        <div class="ts-theme-grid" role="radiogroup" aria-label="Select background">
+          <For each={backgroundOptions}>
+            {(opt) => {
+              const isActive = () => backgroundId() === opt.id;
+              return (
+                <button
+                  type="button"
+                  class="ts-theme-chip"
+                  aria-pressed={isActive()}
+                  data-active={isActive() ? 'true' : undefined}
+                  data-testid={`ts-bg-chip-${opt.id}`}
+                  onClick={() => chooseBackground(opt.id)}
+                >
+                  <span class="ts-theme-chip__label">{opt.label}</span>
+                  <span class="ts-theme-chip__scheme">{opt.kind}</span>
                 </button>
               );
             }}
@@ -487,6 +577,16 @@ export function ThemeStudio(props: ThemeStudioProps) {
               data-testid="ts-reset-btn"
             >
               [reset]
+            </Button>
+          </Tooltip>
+          <Tooltip content="Save the current base + edits as a named theme you can select anywhere." placement="top">
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleSaveCustom}
+              data-testid="ts-save-btn"
+            >
+              [save theme]
             </Button>
           </Tooltip>
         </div>
@@ -643,6 +743,47 @@ const STUDIO_CSS = `
 .ts-theme-chip__scheme {
   font-size: 0.6rem;
   opacity: 0.6;
+}
+
+/* Custom (user-saved) theme chip + its delete affordance. */
+.ts-theme-chip-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.ts-theme-chip--custom {
+  padding-right: 1.6rem;
+  border-style: dashed;
+}
+.ts-theme-chip--custom[data-active='true'] {
+  border-style: solid;
+}
+.ts-theme-chip-del {
+  position: absolute;
+  top: 50%;
+  right: 0.3rem;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.05rem;
+  height: 1.05rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--washi-mute);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.ts-theme-chip-del:hover {
+  color: var(--shu-bright);
+  background: color-mix(in oklab, var(--shu) 18%, transparent);
+}
+.ts-theme-chip-del:focus-visible {
+  outline: 2px solid var(--lapis);
+  outline-offset: 1px;
 }
 
 /* ── Body: editor + preview side-by-side ── */

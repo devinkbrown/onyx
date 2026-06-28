@@ -23,7 +23,17 @@ import {
   useContext,
   type ParentProps,
 } from 'solid-js';
-import { DEFAULT_THEME_ID, THEMES, type ThemeId } from './themes';
+import { DEFAULT_THEME_ID, THEMES, type ThemeId, type TokenMap } from './themes';
+import {
+  addCustomTheme,
+  customThemeScheme,
+  customThemeTokens,
+  getCustomTheme,
+  isCustomThemeId,
+  loadCustomThemes,
+  removeCustomTheme,
+  type CustomTheme,
+} from './customThemes';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -36,10 +46,16 @@ const STORAGE_KEY = 'ruri:theme';
 // ---------------------------------------------------------------------------
 
 type ThemeContextValue = {
-  /** The currently active theme ID. */
-  themeId: () => ThemeId;
-  /** Switch to a different theme. */
-  setTheme: (id: ThemeId) => void;
+  /** The currently active theme ID (a built-in ThemeId or a `custom:` id). */
+  themeId: () => string;
+  /** Switch to a different theme (built-in or custom). */
+  setTheme: (id: string) => void;
+  /** Reactive list of the user's saved custom themes. */
+  customThemes: () => CustomTheme[];
+  /** Persist the current base + overrides as a named custom theme; returns its id. */
+  saveCustom: (name: string, base: ThemeId, overrides: TokenMap) => string;
+  /** Delete a custom theme; falls back to its base if it was active. */
+  deleteCustom: (id: string) => void;
 };
 
 const ThemeContext = createContext<ThemeContextValue>();
@@ -66,13 +82,25 @@ let _fallbackTheme: ThemeContextValue | undefined;
 function fallbackThemeController(): ThemeContextValue {
   if (_fallbackTheme) return _fallbackTheme;
   _fallbackTheme = createRoot(() => {
-    const [id, setId] = createSignal<ThemeId>(readStoredTheme());
-    const setTheme = (next: ThemeId): void => {
+    const [id, setId] = createSignal<string>(readStoredTheme());
+    const [custom, setCustom] = createSignal<CustomTheme[]>(loadCustomThemes());
+    const setTheme = (next: string): void => {
       setId(next);
       persistTheme(next);
       if (typeof document !== 'undefined') applyThemeToDom(next);
     };
-    return { themeId: id, setTheme };
+    const saveCustom = (name: string, base: ThemeId, overrides: TokenMap): string => {
+      const created = addCustomTheme(name, base, overrides);
+      setCustom(loadCustomThemes());
+      return created.id;
+    };
+    const deleteCustom = (delId: string): void => {
+      const fallback = getCustomTheme(delId)?.base ?? DEFAULT_THEME_ID;
+      removeCustomTheme(delId);
+      setCustom(loadCustomThemes());
+      if (id() === delId) setTheme(fallback);
+    };
+    return { themeId: id, setTheme, customThemes: custom, saveCustom, deleteCustom };
   });
   return _fallbackTheme;
 }
@@ -85,17 +113,19 @@ export function useThemeOptional(): ThemeContextValue {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function readStoredTheme(): ThemeId {
+function readStoredTheme(): string {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored && stored in THEMES) return stored as ThemeId;
+    if (stored && (stored in THEMES || (isCustomThemeId(stored) && getCustomTheme(stored)))) {
+      return stored;
+    }
   } catch {
     // localStorage may be unavailable in some environments.
   }
   return DEFAULT_THEME_ID;
 }
 
-function persistTheme(id: ThemeId): void {
+function persistTheme(id: string): void {
   try {
     localStorage.setItem(STORAGE_KEY, id);
   } catch {
@@ -107,12 +137,26 @@ function persistTheme(id: ThemeId): void {
  * Writes all token overrides for `id` onto `document.documentElement` and
  * updates `data-theme` + `color-scheme`.  This is intentionally side-effectful
  * and kept outside of reactive primitives so it can also be called from tests.
+ * Accepts both built-in ThemeIds and `custom:` ids (base tokens + overrides).
  */
-export function applyThemeToDom(id: ThemeId): void {
-  const theme = THEMES[id];
-  if (!theme) return;
-
+export function applyThemeToDom(id: string): void {
   const root = document.documentElement;
+
+  // Custom theme: apply its base's tokens overlaid with the saved overrides,
+  // inheriting the base's colour scheme. Inline vars win over any [data-theme] CSS.
+  if (isCustomThemeId(id)) {
+    const custom = getCustomTheme(id);
+    if (!custom) return;
+    for (const [prop, value] of Object.entries(customThemeTokens(custom))) {
+      root.style.setProperty(prop, value);
+    }
+    root.setAttribute('data-theme', custom.base);
+    root.style.setProperty('color-scheme', customThemeScheme(custom));
+    return;
+  }
+
+  const theme = THEMES[id as ThemeId];
+  if (!theme) return;
 
   // Write every token override.
   for (const [prop, value] of Object.entries(theme.tokens)) {
@@ -138,17 +182,32 @@ export type ThemeProviderProps = ParentProps<{
 }>;
 
 export function ThemeProvider(props: ThemeProviderProps) {
-  const [innerThemeId, setInnerThemeId] = createSignal<ThemeId>(readStoredTheme());
+  const [innerThemeId, setInnerThemeId] = createSignal<string>(readStoredTheme());
+  const [customThemes, setCustomThemes] = createSignal<CustomTheme[]>(loadCustomThemes());
 
-  const themeId = (): ThemeId => props.value ?? innerThemeId();
+  const themeId = (): string => props.value ?? innerThemeId();
 
-  const setTheme = (id: ThemeId): void => {
+  const setTheme = (id: string): void => {
     setInnerThemeId(id);
     persistTheme(id);
   };
 
-  // Apply CSS variables whenever the active theme changes.
+  const saveCustom = (name: string, base: ThemeId, overrides: TokenMap): string => {
+    const created = addCustomTheme(name, base, overrides);
+    setCustomThemes(loadCustomThemes());
+    return created.id;
+  };
+
+  const deleteCustom = (id: string): void => {
+    const fallback = getCustomTheme(id)?.base ?? DEFAULT_THEME_ID;
+    removeCustomTheme(id);
+    setCustomThemes(loadCustomThemes());
+    if (themeId() === id) setTheme(fallback);
+  };
+
+  // Apply CSS variables whenever the active theme (or its custom overrides) change.
   createEffect(() => {
+    customThemes(); // re-apply if the active custom theme was edited
     applyThemeToDom(themeId());
   });
 
@@ -157,7 +216,7 @@ export function ThemeProvider(props: ThemeProviderProps) {
     document.documentElement.removeAttribute('data-theme');
   });
 
-  const context: ThemeContextValue = { themeId, setTheme };
+  const context: ThemeContextValue = { themeId, setTheme, customThemes, saveCustom, deleteCustom };
 
   return (
     <ThemeContext.Provider value={context}>

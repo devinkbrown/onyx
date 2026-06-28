@@ -23,6 +23,14 @@ export {
 export type { ThemeId, ThemeMeta, TokenMap } from './themes';
 
 export {
+  isCustomThemeId,
+  loadCustomThemes,
+  getCustomTheme,
+  customThemeTokens,
+} from './customThemes';
+export type { CustomTheme } from './customThemes';
+
+export {
   STUDIO_GROUPS,
   ALL_STUDIO_TOKENS,
   EDITABLE_PROPERTIES,

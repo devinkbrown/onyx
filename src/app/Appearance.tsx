@@ -1,37 +1,28 @@
-import { createSignal, For } from 'solid-js';
+import { createMemo, For } from 'solid-js';
 import { Background, backgroundOptions, type BackgroundId } from '@/backgrounds';
-
-const DEFAULT_BG = (backgroundOptions[0]?.id ?? 'kintsugi-veins') as BackgroundId;
 import { useTheme, THEMES, THEME_IDS, ThemeStudio } from '@/theme';
+import { useStore, getState } from '@/lib/store';
 import './appearance.css';
 
-const BG_KEY = 'ruri:bg';
+type ThemeChip = { id: string; label: string; custom: boolean };
 
 /** /appearance — the customization surface: live theme + background pickers over
  *  an animated backdrop, plus the full Theme Studio. Headline feature. */
 export default function Appearance() {
   const theme = useTheme();
+  // Background lives in the reactive store so the choice persists and applies
+  // live across the whole app (shell + this page) without a reload.
+  const backgroundId = useStore((s) => s.backgroundId);
+  const chooseBg = (id: BackgroundId) => getState().setBackground(id);
 
-  const stored = (() => {
-    try {
-      return localStorage.getItem(BG_KEY) as BackgroundId | null;
-    } catch {
-      return null;
-    }
-  })();
-  const [bg, setBg] = createSignal<BackgroundId>(stored ?? DEFAULT_BG);
-  const chooseBg = (id: BackgroundId) => {
-    setBg(id);
-    try {
-      localStorage.setItem(BG_KEY, id);
-    } catch {
-      /* storage unavailable */
-    }
-  };
+  const themeChips = createMemo<ThemeChip[]>(() => [
+    ...THEME_IDS.map((id) => ({ id, label: THEMES[id].label, custom: false })),
+    ...theme.customThemes().map((ct) => ({ id: ct.id, label: ct.name, custom: true })),
+  ]);
 
   return (
     <main class="ap">
-      <Background id={bg()} />
+      <Background id={backgroundId()} />
 
       <header class="ap-bar">
         <a class="ap-back" href="/app">← back to app</a>
@@ -50,16 +41,16 @@ export default function Appearance() {
         <div class="ap-group">
           <span class="ap-glabel">Theme</span>
           <div class="ap-chips">
-            <For each={THEME_IDS}>
-              {(id) => (
+            <For each={themeChips()}>
+              {(chip) => (
                 <button
                   type="button"
                   class="ap-chip"
-                  classList={{ on: theme.themeId() === id }}
-                  aria-pressed={theme.themeId() === id}
-                  onClick={() => theme.setTheme(id)}
+                  classList={{ on: theme.themeId() === chip.id, 'ap-chip--custom': chip.custom }}
+                  aria-pressed={theme.themeId() === chip.id}
+                  onClick={() => theme.setTheme(chip.id)}
                 >
-                  {THEMES[id].label}
+                  {chip.label}
                 </button>
               )}
             </For>
@@ -74,8 +65,8 @@ export default function Appearance() {
                 <button
                   type="button"
                   class="ap-chip"
-                  classList={{ on: bg() === opt.id }}
-                  aria-pressed={bg() === opt.id}
+                  classList={{ on: backgroundId() === opt.id }}
+                  aria-pressed={backgroundId() === opt.id}
                   onClick={() => chooseBg(opt.id as BackgroundId)}
                 >
                   {opt.label}

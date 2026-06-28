@@ -1043,6 +1043,14 @@
   box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis) 30%, transparent);
 }
 
+/* Custom (user-saved) themes read as dashed until selected. */
+.ap-theme-chip--custom {
+  border-style: dashed;
+}
+.ap-theme-chip--custom.ap-theme-chip--on {
+  border-style: solid;
+}
+
 .ap-theme-swatch {
   display: inline-flex;
   flex: none;

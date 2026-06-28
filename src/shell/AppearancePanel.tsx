@@ -9,19 +9,20 @@
  * SOLID IDIOMS: never destructure props; For/Show; createMemo; useStore accessor.
  */
 
-import { For, type JSX } from 'solid-js';
+import { createMemo, For, type JSX } from 'solid-js';
 import { Sheet } from '@/primitives';
 import { useStore, getState } from '@/lib/store';
-import { useThemeOptional, THEMES, THEME_IDS } from '@/theme';
+import { useThemeOptional, THEMES, THEME_IDS, customThemeTokens } from '@/theme';
 import { backgroundOptions } from '@/backgrounds';
 
-/** Pull a few representative swatch colours out of a theme's token set. */
-function themeSwatch(id: (typeof THEME_IDS)[number]): string[] {
-  const t = THEMES[id].tokens as Record<string, string>;
+type ThemeEntry = { id: string; label: string; title: string; swatch: string[]; custom: boolean };
+
+/** Three representative swatch colours from a token set. */
+function swatchFrom(tokens: Record<string, string>): string[] {
   return [
-    t['--lapis'] ?? t['--accent'] ?? '#2bb4f0',
-    t['--gold'] ?? '#d8b96a',
-    t['--stone-2'] ?? t['--bg-raised'] ?? '#0f2740',
+    tokens['--lapis'] ?? tokens['--accent'] ?? '#2bb4f0',
+    tokens['--gold'] ?? '#d8b96a',
+    tokens['--stone-2'] ?? tokens['--bg-raised'] ?? '#0f2740',
   ];
 }
 
@@ -29,6 +30,25 @@ export function AppearancePanel(): JSX.Element {
   const theme = useThemeOptional();
   const open = useStore((s) => s.showAppearance);
   const backgroundId = useStore((s) => s.backgroundId);
+
+  // Built-in themes followed by the user's saved custom themes.
+  const themeEntries = createMemo<ThemeEntry[]>(() => {
+    const builtin: ThemeEntry[] = THEME_IDS.map((id) => ({
+      id,
+      label: THEMES[id].label,
+      title: THEMES[id].description,
+      swatch: swatchFrom(THEMES[id].tokens as Record<string, string>),
+      custom: false,
+    }));
+    const custom: ThemeEntry[] = theme.customThemes().map((ct) => ({
+      id: ct.id,
+      label: ct.name,
+      title: `Custom theme based on ${THEMES[ct.base]?.label ?? ct.base}`,
+      swatch: swatchFrom(customThemeTokens(ct)),
+      custom: true,
+    }));
+    return [...builtin, ...custom];
+  });
 
   return (
     <Sheet
@@ -43,25 +63,24 @@ export function AppearancePanel(): JSX.Element {
         <section class="ap-panel-group">
           <h3 class="ap-panel-label">Theme</h3>
           <div class="ap-panel-themes" role="radiogroup" aria-label="Theme">
-            <For each={THEME_IDS}>
-              {(id) => {
-                const active = () => theme.themeId() === id;
-                const sw = themeSwatch(id);
+            <For each={themeEntries()}>
+              {(entry) => {
+                const active = () => theme.themeId() === entry.id;
                 return (
                   <button
                     type="button"
                     class="ap-theme-chip"
-                    classList={{ 'ap-theme-chip--on': active() }}
+                    classList={{ 'ap-theme-chip--on': active(), 'ap-theme-chip--custom': entry.custom }}
                     role="radio"
                     aria-checked={active()}
-                    aria-label={`${THEMES[id].label} theme`}
-                    title={THEMES[id].description}
-                    onClick={() => theme.setTheme(id)}
+                    aria-label={`${entry.label} theme`}
+                    title={entry.title}
+                    onClick={() => theme.setTheme(entry.id)}
                   >
                     <span class="ap-theme-swatch" aria-hidden="true">
-                      <For each={sw}>{(c) => <span style={{ background: c }} />}</For>
+                      <For each={entry.swatch}>{(c) => <span style={{ background: c }} />}</For>
                     </span>
-                    <span class="ap-theme-name">{THEMES[id].label}</span>
+                    <span class="ap-theme-name">{entry.label}</span>
                   </button>
                 );
               }}
