@@ -288,14 +288,19 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   // ── active messages ──
   const messages = createMemo((): ChatMessage[] => {
     const view = activeView();
+    let list: ChatMessage[] = [];
     if (view.kind === 'channel') {
-      return channels().get(view.channel)?.messages ?? [];
-    }
-    if (view.kind === 'dm') {
-      return dms().get(view.nick.toLowerCase())?.messages ??
+      list = channels().get(view.channel)?.messages ?? [];
+    } else if (view.kind === 'dm') {
+      list = dms().get(view.nick.toLowerCase())?.messages ??
              dms().get(view.nick)?.messages ?? [];
     }
-    return [];
+    // Render chronologically. Live lines append in arrival order, but replayed
+    // CHATHISTORY / event-playback lines (joins, parts, topics) can land after
+    // the live tail — a stable sort by server time puts every event where it
+    // actually happened. Array.sort is stable, so equal timestamps keep their
+    // insertion order (preserving author grouping).
+    return [...list].sort((a, b) => a.time.getTime() - b.time.getTime());
   });
 
   // ── active target for reactions/sends ──

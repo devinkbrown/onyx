@@ -1618,8 +1618,23 @@ function mentionsMe(text: string, nick: string): boolean {
   return new RegExp(`\\b${escaped}\\b`, 'i').test(text);
 }
 
-function sysMsg(text: string, target: string): ChatMessage {
-  return { id: uid(), time: new Date(), from: '', text, type: 'system', target };
+function sysMsg(text: string, target: string, time?: Date): ChatMessage {
+  return { id: uid(), time: time ?? new Date(), from: '', text, type: 'system', target };
+}
+
+/**
+ * Resolve the timestamp for a system event from its IRCv3 `@time` tag. Live
+ * events stamp ~now; CHATHISTORY / draft/event-playback replays carry the real
+ * (past) time, so using the tag keeps joins/parts in chronological order
+ * instead of clustering at the bottom with a "now" timestamp.
+ */
+function eventTime(tags: Record<string, string>): Date {
+  const t = tags['time'];
+  if (t) {
+    const d = new Date(t);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  return new Date();
 }
 
 function serverIcon(network: string): string {
@@ -3999,7 +4014,7 @@ export const store = createStore<OnyxState>()(
                   away: false,
                   ...(joinAccount ? { account: joinAccount } : {}),
                 });
-                const msgs = [...(c.messages ?? []), sysMsg(`${joiner} joined`, ch)];
+                const msgs = [...(c.messages ?? []), sysMsg(`${joiner} joined`, ch, eventTime(tags))];
                 channels.set(key, { ...c, users, messages: msgs } as Channel);
               }
               return { channels };
@@ -4039,7 +4054,7 @@ export const store = createStore<OnyxState>()(
                 const users = new Map(c.users);
                 users.delete(parter.toLowerCase());
                 const reasonSuffix = partReason ? ` (${partReason})` : '';
-                const msgs = [...(c.messages ?? []), sysMsg(`${parter} left${reasonSuffix}`, ch)];
+                const msgs = [...(c.messages ?? []), sysMsg(`${parter} left${reasonSuffix}`, ch, eventTime(tags))];
                 channels.set(key, { ...c, users, messages: msgs } as Channel);
               }
               return { channels };
@@ -4060,7 +4075,7 @@ export const store = createStore<OnyxState>()(
               if (ch.users.has(quitter.toLowerCase())) {
                 const users = new Map(ch.users);
                 users.delete(quitter.toLowerCase());
-                const msgs = [...(ch.messages ?? []), sysMsg(`${quitter} quit: ${quitReason}`, ch.name)];
+                const msgs = [...(ch.messages ?? []), sysMsg(`${quitter} quit: ${quitReason}`, ch.name, eventTime(tags))];
                 channels.set(chanKey, { ...ch, users, messages: msgs } as Channel);
                 quitChannels.push(ch.name);
               }
@@ -4087,7 +4102,7 @@ export const store = createStore<OnyxState>()(
               if (c) {
                 const users = new Map(c.users);
                 users.delete(target.toLowerCase());
-                const kickMsg = sysMsg(`${nick} kicked ${target}: ${reason ?? ''}`, ch);
+                const kickMsg = sysMsg(`${nick} kicked ${target}: ${reason ?? ''}`, ch, eventTime(tags));
                 const msgs = [...(c.messages ?? []), kickMsg];
                 channels.set(key, { ...c, users, messages: msgs } as Channel);
               }
@@ -4713,7 +4728,7 @@ export const store = createStore<OnyxState>()(
                 const u = users.get(oldKey)!;
                 users.delete(oldKey);
                 users.set(newNick.toLowerCase(), { ...u, nick: newNick });
-                const nm = sysMsg(`${oldNick} → ${newNick}`, ch.name);
+                const nm = sysMsg(`${oldNick} → ${newNick}`, ch.name, eventTime(tags));
                 const msgs = [...(ch.messages ?? []), nm];
                 channels.set(key, { ...ch, users, messages: msgs } as Channel);
               }
@@ -4778,7 +4793,7 @@ export const store = createStore<OnyxState>()(
               // channel itself so the settings panel reflects live state.
               const nextModes = applyChannelModeDelta(c.modes ?? '', modeStr, modeArgs, chanmodes, prefixModes);
 
-              const sysm = sysMsg(`${nick ?? 'server'} set mode ${modeText}`, target);
+              const sysm = sysMsg(`${nick ?? 'server'} set mode ${modeText}`, target, eventTime(tags));
               const msgs = [...(c.messages ?? []), sysm];
               return { channels: new Map(channels).set(key, { ...c, modes: nextModes, users: changedUsers ? users : c.users, messages: msgs } as Channel) };
             });
