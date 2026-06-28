@@ -40,7 +40,10 @@ export type ThemeId =
   | 'sumi'
   | 'shu'
   | 'hisui'
-  | 'kohaku';
+  | 'kohaku'
+  | 'teal'
+  | 'slate'
+  | 'frost';
 
 // ---------------------------------------------------------------------------
 // Flagship: ocean — deep-water dark luxury (electric azure × bioluminescence ×
@@ -625,6 +628,183 @@ const kohakuTokens: TokenMap = {
 };
 
 // ---------------------------------------------------------------------------
+// teal — deep teal cut; cyan-green ground, mint crest, brass inlay
+// ---------------------------------------------------------------------------
+const tealTokens: TokenMap = {
+  // Ground — deep cyan-green waterstone strata
+  '--ink':        '#021412',
+  '--ink-2':      '#061c19',
+  '--stone':      '#0b2a24',
+  '--stone-2':    '#123b33',
+  '--stone-3':    '#194c42',
+  '--stone-line': '#236457',
+
+  // Mint — clear seafoam current as the primary accent
+  '--lapis':       '#4bcda9',
+  '--lapis-bright':'#a6f0dc',
+  '--lapis-deep':  '#14765e',
+
+  // Brass — warm inlay against the cool ground
+  '--gold':       '#c5a15a',
+  '--gold-bright':'#ead086',
+  '--gold-deep':  '#8b6830',
+
+  // Coral — restrained hot accent for danger
+  '--shu':        '#dc654f',
+  '--shu-bright': '#ff8f79',
+
+  // Text — pale seafoam over deep teal
+  '--washi':      '#eafff8',
+  '--washi-dim':  '#a8d7c9',
+  '--washi-mute': '#6f9e91',
+
+  // Status
+  '--ok':      '#42d69a',
+  '--warn':    'var(--gold-bright)',
+  '--danger':  'var(--shu)',
+
+  // Seams (mint current) + bands (brass wash)
+  '--seam':       'color-mix(in oklab, var(--lapis) 42%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--lapis) 16%, transparent)',
+  '--line':       'color-mix(in oklab, var(--washi) 14%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--gold) 11%, transparent)',
+
+  // Radius — fluid, elegant
+  '--r-0':    '0px',
+  '--r-sm':   '6px',
+  '--r-md':   '13px',
+  '--r-pill': '999px',
+
+  // Motion
+  '--ease': 'cubic-bezier(0.16, 1, 0.3, 1)',
+  '--dur':  '260ms',
+
+  // Typography
+  '--font-mono':    "'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace",
+  '--font-display': "'Anton', 'Arial Narrow', 'Helvetica Neue', sans-serif",
+  '--font-sans':    "'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  '--font-serif':   "'Fraunces Variable', 'Iowan Old Style', Georgia, 'Times New Roman', serif",
+};
+
+// ---------------------------------------------------------------------------
+// slate — warm neutral graphite; no blue cast, bronze inlay
+// ---------------------------------------------------------------------------
+const slateTokens: TokenMap = {
+  // Ground — warm graphite and charcoal strata
+  '--ink':        '#090807',
+  '--ink-2':      '#100f0d',
+  '--stone':      '#1a1815',
+  '--stone-2':    '#24211d',
+  '--stone-3':    '#302c26',
+  '--stone-line': '#423b32',
+
+  // Stone-sage — muted mineral accent without a blue cast
+  '--lapis':       '#9aa28f',
+  '--lapis-bright':'#c6cdb8',
+  '--lapis-deep':  '#626b57',
+
+  // Bronze — primary seam and command accent
+  '--gold':       '#c28a45',
+  '--gold-bright':'#e1b66f',
+  '--gold-deep':  '#855a2a',
+
+  // Fired clay — danger accent
+  '--shu':        '#c95a3e',
+  '--shu-bright': '#e77a58',
+
+  // Text — chalk ivory over warm graphite
+  '--washi':      '#f0ede4',
+  '--washi-dim':  '#b7b0a4',
+  '--washi-mute': '#7d756b',
+
+  // Status
+  '--ok':      '#70b77b',
+  '--warn':    'var(--gold-bright)',
+  '--danger':  'var(--shu)',
+
+  // Seams (bronze inlay) + bands (chalk strata)
+  '--seam':       'color-mix(in oklab, var(--gold) 43%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--gold) 16%, transparent)',
+  '--line':       'color-mix(in oklab, var(--washi) 13%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--lapis) 10%, transparent)',
+
+  // Radius — fluid, restrained
+  '--r-0':    '0px',
+  '--r-sm':   '4px',
+  '--r-md':   '9px',
+  '--r-pill': '999px',
+
+  // Motion
+  '--ease': 'cubic-bezier(0.16, 1, 0.3, 1)',
+  '--dur':  '240ms',
+
+  // Typography
+  '--font-mono':    "'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace",
+  '--font-display': "'Anton', 'Arial Narrow', 'Helvetica Neue', sans-serif",
+  '--font-sans':    "'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  '--font-serif':   "'Fraunces Variable', 'Iowan Old Style', Georgia, 'Times New Roman', serif",
+};
+
+// ---------------------------------------------------------------------------
+// frost — light; cool frost paper, deep slate ink, steel-blue accent
+// ---------------------------------------------------------------------------
+const frostTokens: TokenMap = {
+  // Ground (reversed — cool light surfaces)
+  '--ink':        '#f4f8f8',
+  '--ink-2':      '#e8f0f0',
+  '--stone':      '#dce7e8',
+  '--stone-2':    '#cedbdd',
+  '--stone-3':    '#bdcccf',
+  '--stone-line': '#a9bcc1',
+
+  // Steel-blue — cool accent, dark enough for light paper
+  '--lapis':       '#2f6f8f',
+  '--lapis-bright':'#3f88ac',
+  '--lapis-deep':  '#1d4e68',
+
+  // Pale brass — a warmer counterpoint to the frost
+  '--gold':       '#8c6b2e',
+  '--gold-bright':'#a7813a',
+  '--gold-deep':  '#654d20',
+
+  // Brick red — danger accent with AA contrast on paper
+  '--shu':        '#b94432',
+  '--shu-bright': '#d75843',
+
+  // Text — deep slate ink on frost paper
+  '--washi':      '#172126',
+  '--washi-dim':  '#33444b',
+  '--washi-mute': '#62737b',
+
+  // Status
+  '--ok':      '#2e7d5b',
+  '--warn':    'var(--gold)',
+  '--danger':  'var(--shu)',
+
+  // Seams (steel-blue linework) + bands (pale brass)
+  '--seam':       'color-mix(in oklab, var(--lapis) 44%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--lapis) 18%, transparent)',
+  '--line':       'color-mix(in oklab, var(--washi) 18%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--gold) 14%, transparent)',
+
+  // Radius — fluid, precise
+  '--r-0':    '0px',
+  '--r-sm':   '5px',
+  '--r-md':   '10px',
+  '--r-pill': '999px',
+
+  // Motion
+  '--ease': 'cubic-bezier(0.16, 1, 0.3, 1)',
+  '--dur':  '220ms',
+
+  // Typography
+  '--font-mono':    "'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace",
+  '--font-display': "'Anton', 'Arial Narrow', 'Helvetica Neue', sans-serif",
+  '--font-sans':    "'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  '--font-serif':   "'Fraunces Variable', 'Iowan Old Style', Georgia, 'Times New Roman', serif",
+};
+
+// ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 
@@ -705,6 +885,27 @@ export const THEMES: Record<ThemeId, ThemeMeta> = {
     description: 'Amber. Warm resin ground and seams.',
     scheme: 'dark',
     tokens: kohakuTokens,
+  },
+  teal: {
+    id: 'teal',
+    label: 'Teal',
+    description: 'Deep teal ground, seafoam text, mint current, and brass seams.',
+    scheme: 'dark',
+    tokens: tealTokens,
+  },
+  slate: {
+    id: 'slate',
+    label: 'Slate',
+    description: 'Warm graphite, chalk text, quiet mineral accents, and bronze seams.',
+    scheme: 'dark',
+    tokens: slateTokens,
+  },
+  frost: {
+    id: 'frost',
+    label: 'Frost',
+    description: 'Cool frost paper, deep slate ink, steel-blue current, and pale brass linework.',
+    scheme: 'light',
+    tokens: frostTokens,
   },
 };
 
