@@ -31,7 +31,7 @@ import { Tooltip } from '../primitives/Tooltip';
 
 import { useTheme } from './ThemeProvider';
 import { THEMES, THEME_IDS, type ThemeId, type TokenMap } from './themes';
-import { getCustomTheme, isCustomThemeId } from './customThemes';
+import { customThemeTokens, getCustomTheme, isCustomThemeId } from './customThemes';
 import { STUDIO_GROUPS, type StudioGroup, type StudioToken } from './tokens';
 import { useStore, getState } from '@/lib/store';
 import { backgroundOptions } from '@/backgrounds';
@@ -291,7 +291,11 @@ export function ThemeStudio(props: ThemeStudioProps) {
   const [overrides, setOverrides] = createSignal<TokenMap>({});
   const [importError, setImportError] = createSignal<string | null>(null);
   const [exportCopied, setExportCopied] = createSignal(false);
+  // Inline "save theme" naming (replaces a browser prompt).
+  const [saving, setSaving] = createSignal(false);
+  const [saveName, setSaveName] = createSignal('');
   let copyTimer: ReturnType<typeof setTimeout> | undefined;
+  let saveInputRef: HTMLInputElement | undefined;
 
   // When the base theme changes, clear per-session overrides so the new
   // theme's values render cleanly.  The ThemeProvider already writes the new
@@ -331,20 +335,24 @@ export function ThemeStudio(props: ThemeStudioProps) {
     }
     setOverrides({});
     setImportError(null);
-    // Re-apply the base theme.
-    const theme = THEMES[themeId()];
-    if (theme) {
-      for (const [prop, val] of Object.entries(theme.tokens)) {
-        applyVar(prop, val);
-      }
+    // Re-apply the active theme's tokens (built-in or custom: base + overrides).
+    const id = themeId();
+    const tokens = isCustomThemeId(id)
+      ? (getCustomTheme(id) ? customThemeTokens(getCustomTheme(id)!) : {})
+      : (THEMES[id as ThemeId]?.tokens ?? {});
+    for (const [prop, val] of Object.entries(tokens)) {
+      applyVar(prop, val);
     }
   };
 
   const handleExport = (): void => {
+    const id = themeId();
+    const base: ThemeId = isCustomThemeId(id) ? (getCustomTheme(id)?.base ?? THEME_IDS[0]!) : (id as ThemeId);
+    const baseOverrides = isCustomThemeId(id) ? (getCustomTheme(id)?.overrides ?? {}) : {};
     const blob: ExportBlob = {
       __ruri_theme_export__: true,
-      base: themeId(),
-      overrides: overrides(),
+      base,
+      overrides: { ...baseOverrides, ...overrides() },
       exported: new Date().toISOString(),
     };
     const json = JSON.stringify(blob, null, 2);
@@ -411,17 +419,31 @@ export function ThemeStudio(props: ThemeStudioProps) {
 
   const hasOverrides = createMemo(() => Object.keys(overrides()).length > 0);
 
-  // Save the current base + edits as a named, selectable theme. Editing an
-  // existing custom theme folds its overrides into the new one.
-  const handleSaveCustom = (): void => {
+  // Open the inline name field, pre-filled with a sensible suggestion.
+  const beginSave = (): void => {
     const id = themeId();
-    const suggested = isCustomThemeId(id) ? (getCustomTheme(id)?.name ?? 'My theme') : `${THEMES[id as ThemeId]?.label ?? 'My'} custom`;
-    const name = window.prompt('Name your theme:', suggested);
+    const suggested = isCustomThemeId(id)
+      ? (getCustomTheme(id)?.name ?? 'My theme')
+      : `${THEMES[id as ThemeId]?.label ?? 'My'} custom`;
+    setSaveName(suggested);
+    setSaving(true);
+    queueMicrotask(() => {
+      saveInputRef?.focus();
+      saveInputRef?.select();
+    });
+  };
+
+  // Commit the current base + edits as a named, selectable theme. Editing an
+  // existing custom theme folds its overrides into the new one.
+  const confirmSave = (): void => {
+    const name = saveName().trim();
     if (!name) return;
+    const id = themeId();
     const base: ThemeId = isCustomThemeId(id) ? (getCustomTheme(id)?.base ?? THEME_IDS[0]!) : (id as ThemeId);
     const baseOverrides = isCustomThemeId(id) ? (getCustomTheme(id)?.overrides ?? {}) : {};
     const merged: TokenMap = { ...baseOverrides, ...overrides() };
     const newId = saveCustom(name, base, merged);
+    setSaving(false);
     setTheme(newId); // select it; the base-change effect clears the session overrides
   };
 
@@ -579,16 +601,43 @@ export function ThemeStudio(props: ThemeStudioProps) {
               [reset]
             </Button>
           </Tooltip>
-          <Tooltip content="Save the current base + edits as a named theme you can select anywhere." placement="top">
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleSaveCustom}
-              data-testid="ts-save-btn"
-            >
-              [save theme]
-            </Button>
-          </Tooltip>
+          <Show
+            when={saving()}
+            fallback={
+              <Tooltip content="Save the current base + edits as a named theme you can select anywhere." placement="top">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={beginSave}
+                  data-testid="ts-save-btn"
+                >
+                  [save theme]
+                </Button>
+              </Tooltip>
+            }
+          >
+            <div class="ts-save-row" role="group" aria-label="Name your theme">
+              <input
+                ref={saveInputRef}
+                class="ts-save-input"
+                value={saveName()}
+                placeholder="Theme name"
+                aria-label="Theme name"
+                spellcheck={false}
+                onInput={(e) => setSaveName((e.currentTarget as HTMLInputElement).value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); confirmSave(); }
+                  else if (e.key === 'Escape') { e.preventDefault(); setSaving(false); }
+                }}
+              />
+              <Button variant="primary" size="sm" onClick={confirmSave} data-testid="ts-save-confirm">
+                save
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setSaving(false)}>
+                cancel
+              </Button>
+            </div>
+          </Show>
         </div>
 
         <div class="ts-footer__right">
@@ -989,6 +1038,30 @@ const STUDIO_CSS = `
   letter-spacing: 0.06em;
   color: var(--shu-bright);
 }
+
+/* ── Inline save-theme name field ── */
+.ts-save-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.ts-save-input {
+  width: 11rem;
+  padding: 0.32rem 0.55rem;
+  border: 1px solid var(--seam);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--ink) 60%, transparent);
+  color: var(--washi);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+}
+.ts-save-input:focus-visible {
+  outline: 2px solid var(--lapis);
+  outline-offset: 1px;
+  border-color: var(--lapis);
+}
+.ts-save-input::placeholder { color: var(--washi-mute); }
 `;
 
 // Inject the studio styles once at module evaluation time.
