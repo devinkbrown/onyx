@@ -4,6 +4,7 @@ import { getState, useStore } from '@/lib/store';
 import type { State } from '@/lib/store/store';
 import { applyThemeToDom, THEME_IDS, THEMES, type ThemeId } from '@/theme';
 import { saveRecent } from '@/lib/commands/registry';
+import { openPreferences } from '@/lib/prefs/preferences';
 
 export type SpotlightSection = 'Channels' | 'DMs' | 'People' | 'Actions';
 
@@ -125,6 +126,14 @@ function baseActionCommands(state: CommandState): SpotlightCommand[] {
       hint: 'panel',
       keywords: ['theme', 'background', 'customize', 'appearance', 'color', 'dark', 'light'],
       run: () => getState().openAppearance(),
+    },
+    {
+      id: 'action:preferences',
+      section: 'Actions',
+      title: 'Preferences — display & behaviour',
+      hint: 'panel',
+      keywords: ['preferences', 'settings', 'density', 'font', 'size', 'width', 'motion', 'events', 'display', 'behaviour', 'behavior'],
+      run: () => openPreferences(),
     },
     {
       id: 'action:theme-studio',
