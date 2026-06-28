@@ -204,6 +204,9 @@ describe('AppShell', () => {
       const textarea = container.querySelector('.shell-composer-textarea') as HTMLTextAreaElement;
       fireEvent.input(textarea, { target: { value: 'test message' } });
       fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
+      // sendMessage is now async (it awaits attachment upload before sending);
+      // flush microtasks so the store call lands before asserting.
+      await new Promise((r) => setTimeout(r, 0));
 
       // Assert
       expect(sendMessageSpy).toHaveBeenCalledWith(

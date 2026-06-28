@@ -160,6 +160,60 @@ function MsgBody(props: MsgBodyProps): JSX.Element {
   );
 }
 
+// ── Message actions ─────────────────────────────────────────────────────────
+
+type MessageActionsProps = {
+  msg: ChatMessage;
+  target: string;
+  selfNick: string;
+  canEdit: boolean;
+};
+
+function MessageActions(props: MessageActionsProps): JSX.Element {
+  const [local] = splitProps(props, ['msg', 'target', 'selfNick', 'canEdit']);
+
+  const isOwnMessage = createMemo(() =>
+    !!local.selfNick && local.msg.from.toLowerCase() === local.selfNick.toLowerCase()
+  );
+  const canReply = createMemo(() => !local.msg.deleted && !local.msg.redacted);
+  const canEditMessage = createMemo(() =>
+    canReply() && local.canEdit && isOwnMessage() && local.msg.type === 'msg'
+  );
+
+  function startReply(): void {
+    if (!canReply()) return;
+    getState().setReplyingTo(local.msg);
+  }
+
+  function startEdit(): void {
+    if (!canEditMessage()) return;
+    getState().setComposerEditingMessage(local.msg);
+  }
+
+  return (
+    <div class="shell-msg-actions" role="group" aria-label="Message actions">
+      <button
+        type="button"
+        class="shell-msg-action"
+        aria-label={`Reply to ${local.msg.from}`}
+        onClick={startReply}
+      >
+        reply
+      </button>
+      <Show when={canEditMessage()}>
+        <button
+          type="button"
+          class="shell-msg-action"
+          aria-label="Edit message"
+          onClick={startEdit}
+        >
+          edit
+        </button>
+      </Show>
+    </div>
+  );
+}
+
 // ── Thread panel content ─────────────────────────────────────────────────────
 
 type ThreadPanelProps = {
@@ -227,6 +281,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   const channels = useStore((s) => s.channels);
   const dms = useStore((s) => s.dms);
   const ourNick = useStore((s) => s.ourNick);
+  const canEditMessages = useStore((s) => s.canEditMessages);
 
   const selfNick = createMemo(() => local.selfNick ?? ourNick() ?? '');
 
@@ -363,6 +418,12 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                         )}
                       </Show>
                       <MsgBody msg={msg} selfNick={selfNick()} onChannelClick={(name) => getState().navigate({ kind: 'channel', channel: name })} />
+                      <MessageActions
+                        msg={msg}
+                        target={activeTarget()}
+                        selfNick={selfNick()}
+                        canEdit={canEditMessages()}
+                      />
                       <Show when={hasReactions()}>
                         <div class="shell-reactions" role="group" aria-label="Reactions">
                           <For each={msg.reactions ?? []}>
@@ -426,6 +487,12 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                       )}
                     </Show>
                     <MsgBody msg={msg} selfNick={selfNick()} onChannelClick={(name) => getState().navigate({ kind: 'channel', channel: name })} />
+                    <MessageActions
+                      msg={msg}
+                      target={activeTarget()}
+                      selfNick={selfNick()}
+                      canEdit={canEditMessages()}
+                    />
                     <Show when={hasReactions()}>
                       <div class="shell-reactions" role="group" aria-label="Reactions">
                         <For each={msg.reactions ?? []}>
