@@ -17,6 +17,7 @@ import {
   setComposerDraft as updateComposerDraft,
   type ComposerDrafts,
 } from '@/lib/composer/drafts';
+import { markViewedRead, normalizeTargetKey, totalMentions } from '@/lib/notifications/readState';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -1434,6 +1435,17 @@ export interface OnyxState {
   channelMentions: Record<string, number>;
   /** Computed: sum of all channelMentions values */
   totalUnreadMentions: number;
+
+  // ── notifications/presence ──
+  /** target.toLowerCase() → epoch ms when that target was last marked viewed */
+  lastReadAt: Map<string, number>;
+  /** target.toLowerCase() → message id where the current "new messages" divider renders */
+  viewUnreadDividerId: Map<string, string>;
+  /** Preserve the unread boundary for rendering, then clear counts separately. */
+  captureUnreadDivider: (target: string) => void;
+  /** Clear the rendered unread boundary for a target. */
+  clearViewUnreadDivider: (target: string) => void;
+
   /** Zero out unread + mentions for a channel */
   markChannelRead: (channel: string) => void;
   /** Increment unread (and optionally mention) count for a channel */
@@ -1975,6 +1987,9 @@ export const store = createStore<OnyxState>()(
     showSearchOverlay: false,
     showKeyboardShortcuts: false,
     firstUnreadId: new Map(),
+    // ── notifications/presence ──
+    lastReadAt: new Map(),
+    viewUnreadDividerId: new Map(),
     showChannelBrowser: false,
     channelList: [],
     channelListLoading: false,
@@ -2284,12 +2299,14 @@ export const store = createStore<OnyxState>()(
     navigate(view) {
       set({ activeView: view });
       if (view.kind === 'channel') {
+        get().captureUnreadDivider(view.channel);
         get().markRead(view.channel);
         get().markChannelRead(view.channel);
         // Clear the unread separator when switching to a channel
         get().clearFirstUnread(view.channel);
       }
       if (view.kind === 'dm') {
+        get().captureUnreadDivider(view.nick);
         get().markRead(view.nick);
         // Clear the unread separator when switching to a DM
         get().clearFirstUnread(view.nick);
@@ -2514,7 +2531,7 @@ export const store = createStore<OnyxState>()(
 
     // ── markRead ─────────────────────────────────────────────────────────
     markRead(target) {
-      const key = target.toLowerCase();
+      const key = normalizeTargetKey(target);
       set(s => {
         const channels = new Map(s.channels);
         const ch = channels.get(key);
@@ -2523,6 +2540,15 @@ export const store = createStore<OnyxState>()(
         const dm = dms.get(key);
         if (dm) dms.set(key, { ...dm, unread: 0, highlights: 0 });
         return { channels, dms };
+      });
+      const viewedAt = Date.now();
+      const localMarker = new Date(viewedAt).toISOString();
+      set(s => {
+        const lastReadAt = new Map(s.lastReadAt);
+        const readMarkers = new Map(s.readMarkers);
+        lastReadAt.set(key, viewedAt);
+        readMarkers.set(key, localMarker);
+        return { lastReadAt, readMarkers };
       });
       // IRCv3 draft/read-marker: sync read position with server so other sessions know
       const { client } = get();
@@ -3194,6 +3220,32 @@ export const store = createStore<OnyxState>()(
     },
 
     // ── unread separator ──────────────────────────────────────────────────
+    // ── notifications/presence ──
+    captureUnreadDivider(target) {
+      const key = normalizeTargetKey(target);
+      set(s => {
+        const viewed = markViewedRead({
+          unread: s.channels.get(key)?.unread ?? s.dms.get(key)?.unread ?? 0,
+          mentions: s.channels.get(key)?.highlights ?? s.dms.get(key)?.highlights ?? 0,
+          firstUnreadId: s.firstUnreadId.get(key) ?? null,
+        }, Date.now());
+        const lastReadAt = new Map(s.lastReadAt);
+        const viewUnreadDividerId = new Map(s.viewUnreadDividerId);
+        lastReadAt.set(key, viewed.lastReadAtMs);
+        if (viewed.dividerId) viewUnreadDividerId.set(key, viewed.dividerId);
+        else viewUnreadDividerId.delete(key);
+        return { lastReadAt, viewUnreadDividerId };
+      });
+    },
+    clearViewUnreadDivider(target) {
+      const key = normalizeTargetKey(target);
+      set(s => {
+        if (!s.viewUnreadDividerId.has(key)) return {};
+        const viewUnreadDividerId = new Map(s.viewUnreadDividerId);
+        viewUnreadDividerId.delete(key);
+        return { viewUnreadDividerId };
+      });
+    },
     markFirstUnread(target, messageId) {
       const key = target.toLowerCase();
       set(s => {
@@ -7063,19 +7115,19 @@ export const store = createStore<OnyxState>()(
     channelMentions: {},
     totalUnreadMentions: 0,
     markChannelRead: (channel) => set(state => {
-      const key = channel.toLowerCase();
+      const key = normalizeTargetKey(channel);
       const newUnread = { ...state.channelUnread, [key]: 0 };
       const newMentions = { ...state.channelMentions, [key]: 0 };
-      const totalUnreadMentions = Object.values(newMentions).reduce((a, b) => a + b, 0);
+      const totalUnreadMentions = totalMentions(newMentions);
       return { channelUnread: newUnread, channelMentions: newMentions, totalUnreadMentions };
     }),
     incrementUnread: (channel, isMention) => set(state => {
-      const key = channel.toLowerCase();
+      const key = normalizeTargetKey(channel);
       const newUnread = { ...state.channelUnread, [key]: (state.channelUnread[key] || 0) + 1 };
       const newMentions = isMention
         ? { ...state.channelMentions, [key]: (state.channelMentions[key] || 0) + 1 }
         : state.channelMentions;
-      const totalUnreadMentions = Object.values(newMentions).reduce((a, b) => a + b, 0);
+      const totalUnreadMentions = totalMentions(newMentions);
       return { channelUnread: newUnread, channelMentions: newMentions, totalUnreadMentions };
     }),
 
