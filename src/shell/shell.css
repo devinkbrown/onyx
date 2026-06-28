@@ -2744,6 +2744,15 @@
 
 /* ── Mobile layout ── */
 @media (max-width: 900px) {
+  /* Force a single column even for the --no-rail / --members-hidden modifier
+     combinations, whose two-class selectors otherwise outrank a bare `.shell`
+     and leave the conversation in a 0px track (blank home view on mobile). */
+  .shell,
+  .shell--no-rail,
+  .shell--members-hidden,
+  .shell--no-rail.shell--members-hidden {
+    grid-template-columns: 1fr;
+  }
   .shell {
     --mnav-h: 54px;
     grid-template-columns: 1fr;
