@@ -46,6 +46,10 @@ import {
 import { mountMedia } from '@/media/useSuimyakuMedia';
 import { MemberList } from './MemberList';
 import { AccountPanel } from '@/app/Account';
+import { Spotlight } from '@/chat/spotlight';
+import { useSpotlightHotkeys } from '@/chat/spotlight/useSpotlight';
+import { KeyboardHelpOverlay } from './KeyboardHelpOverlay';
+import { useKeyboardShortcuts } from '@/lib/keyboard/useKeyboardShortcuts';
 
 // ── AppShell props ───────────────────────────────────────────────────────────
 
@@ -128,6 +132,14 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const mobileSidebarOpen = useStore((s) => s.mobileSidebarOpen);
   const ourNick = useStore((s) => s.ourNick);
   const showAccount = useStore((s) => s.showAccount);
+
+  // ── Global keyboard shortcuts (palette, nav, member list, composer, help) ──
+  // useSpotlightHotkeys wires Cmd/Ctrl+K and "/" → open spotlight.
+  // useKeyboardShortcuts adds: Esc (close overlays), Alt+↑/↓ (channel nav),
+  // Alt+M (member list), Alt+Enter (focus composer), ? (keyboard help).
+  // Both register/clean-up their window listeners via onMount/onCleanup.
+  useSpotlightHotkeys();
+  useKeyboardShortcuts();
 
   // ── voice/video ──
   // Boot the SUIMYAKU media engine once and wire its callbacks into the store.
@@ -351,6 +363,12 @@ export function AppShell(props: AppShellProps): JSX.Element {
       <OutgoingCallOverlay />
       <CaptionsOverlay />
       <ReactionsOverlay />
+
+      {/* Command palette — self-gates on spotlight.isOpen() */}
+      <Spotlight />
+
+      {/* Keyboard shortcuts help overlay — self-gates on store.showKeyboardShortcuts */}
+      <KeyboardHelpOverlay />
     </>
   );
 }

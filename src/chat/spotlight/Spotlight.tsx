@@ -26,7 +26,7 @@ type CommandGroup = {
 
 export type SpotlightProps = JSX.HTMLAttributes<HTMLDivElement>;
 
-const SECTION_ORDER: SpotlightSection[] = ['Channels', 'DMs', 'Actions'];
+const SECTION_ORDER: SpotlightSection[] = ['Channels', 'DMs', 'People', 'Actions'];
 const LISTBOX_ID = 'ruri-spotlight-listbox';
 const INPUT_ID = 'ruri-spotlight-input';
 
@@ -34,6 +34,7 @@ const INPUT_ID = 'ruri-spotlight-input';
 const SECTION_ICON: Record<SpotlightSection, string> = {
   Channels: '#',
   DMs: '@',
+  People: '◇',
   Actions: '→',
 };
 

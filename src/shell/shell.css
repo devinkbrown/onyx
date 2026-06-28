@@ -2105,6 +2105,204 @@
   gap: 10px;
 }
 
+/* ── Rich messaging — new token styles ─────────────────────────────────────────
+   These extend .shell-msg-text without duplicating any existing rules.
+   All colors reference design tokens; no hardcoded values.
+   Animations respect prefers-reduced-motion.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Code block — fenced ``` ... ``` */
+.shell-msg-codeblock {
+  position: relative;
+  display: block;
+  margin: 6px 0;
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--ink) 60%, var(--stone-2));
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  line-height: 1.55;
+  color: var(--washi);
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--seam-faint) transparent;
+  white-space: pre;
+  max-height: 320px;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+.shell-msg-codeblock code {
+  /* Reset: the outer pre inherits from .shell-msg-text code */
+  font-family: inherit;
+  font-size: inherit;
+  padding: 0;
+  background: none;
+  border-radius: 0;
+  color: inherit;
+  border: none;
+}
+
+.shell-msg-codeblock-lang {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.64em;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--washi-mute);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Blockquote — > ... */
+.shell-msg-blockquote {
+  margin: 4px 0;
+  padding: 3px 10px;
+  border-left: 3px solid var(--lapis);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  background: color-mix(in oklab, var(--lapis-deep) 10%, transparent);
+  font-style: italic;
+  color: var(--washi-dim);
+}
+
+/* Spoiler — ||...|| */
+.shell-msg-spoiler {
+  display: inline-block;
+  padding: 0 4px;
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--stone-2) 60%, transparent);
+  color: transparent;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+  /* Ensure keyboard focusability is visible */
+}
+
+.shell-msg-spoiler:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.shell-msg-spoiler-label {
+  color: var(--washi-mute);
+  font-family: var(--font-mono);
+  font-size: 0.72em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.shell-msg-spoiler--revealed {
+  background: color-mix(in oklab, var(--lapis-deep) 16%, transparent);
+  color: var(--washi);
+}
+
+/* Explicit link class (separate from .shell-msg-text a for specificity) */
+.shell-msg-link {
+  color: var(--lapis-bright);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in oklab, var(--lapis-bright) 32%, transparent);
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+
+.shell-msg-link:hover,
+.shell-msg-link:focus-visible {
+  color: var(--washi);
+  border-bottom-color: var(--lapis-bright);
+}
+
+/* #channel link button — looks like inline text, not a button */
+.shell-msg-channel-link {
+  display: inline;
+  padding: 0 2px;
+  background: none;
+  border: none;
+  border-radius: var(--r-sm);
+  color: var(--lapis-bright);
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+
+.shell-msg-channel-link:hover {
+  background: color-mix(in oklab, var(--lapis) 14%, transparent);
+}
+
+.shell-msg-channel-link:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+/* Emoji rendered from shortcode */
+.shell-msg-emoji {
+  font-style: normal;
+  /* Emoji are naturally inline; no extra sizing needed */
+}
+
+/* ── Inline media unfurl ──────────────────────────────────────────────────────
+   Previews are constrained, lazy-loaded, and never block the layout.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.shell-msg-media {
+  display: block;
+  margin-top: 6px;
+}
+
+.shell-msg-media-link {
+  display: inline-block;
+  border: none;
+}
+
+.shell-msg-media-img {
+  display: block;
+  max-width: min(480px, 100%);
+  max-height: 320px;
+  width: auto;
+  height: auto;
+  border-radius: var(--r-md);
+  border: 1px solid var(--seam-faint);
+  object-fit: contain;
+  background: color-mix(in oklab, var(--ink) 50%, var(--stone-2));
+  cursor: pointer;
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+
+.shell-msg-media-img:hover {
+  opacity: 0.9;
+  transform: scale(1.01);
+}
+
+.shell-msg-media-video,
+.shell-msg-media-audio {
+  display: block;
+  max-width: min(480px, 100%);
+  border-radius: var(--r-md);
+  border: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--ink) 50%, var(--stone-2));
+}
+
+.shell-msg-media-video {
+  max-height: 320px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-msg-spoiler,
+  .shell-msg-link,
+  .shell-msg-channel-link,
+  .shell-msg-media-img {
+    transition: none;
+  }
+  .shell-msg-media-img:hover {
+    transform: none;
+  }
+}
+
 /* Azure current decoration — conversation column top */
 .shell-conversation::before {
   content: '';

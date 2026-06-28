@@ -3,8 +3,9 @@ import { backgroundOptions, type BackgroundId } from '@/backgrounds';
 import { getState, useStore } from '@/lib/store';
 import type { State } from '@/lib/store/store';
 import { applyThemeToDom, THEME_IDS, THEMES, type ThemeId } from '@/theme';
+import { saveRecent } from '@/lib/commands/registry';
 
-export type SpotlightSection = 'Channels' | 'DMs' | 'Actions';
+export type SpotlightSection = 'Channels' | 'DMs' | 'People' | 'Actions';
 
 export type SpotlightCommand = {
   id: string;
@@ -15,7 +16,7 @@ export type SpotlightCommand = {
   run: () => void | Promise<void>;
 };
 
-type CommandState = Pick<State, 'channels' | 'dms' | 'server' | 'networkName'>;
+type CommandState = Pick<State, 'channels' | 'dms' | 'server' | 'networkName' | 'activeView' | 'showMemberList' | 'voice'>;
 
 const THEME_STORAGE_KEY = 'ruri:theme';
 const BACKGROUND_STORAGE_KEY = 'ruri:bg';
@@ -97,6 +98,8 @@ function dmHint(dm: CommandState['dms'] extends Map<string, infer D> ? D : never
 
 function baseActionCommands(state: CommandState): SpotlightCommand[] {
   const nodeAddress = state.server?.url ?? '';
+  const inVoice = state.voice.callState !== 'idle';
+  const activeChannel = state.activeView.kind === 'channel' ? state.activeView.channel : null;
 
   return [
     {
@@ -124,6 +127,59 @@ function baseActionCommands(state: CommandState): SpotlightCommand[] {
       run: () => navigateTo('/appearance'),
     },
     {
+      id: 'action:toggle-member-list',
+      section: 'Actions',
+      title: state.showMemberList ? 'Hide member list' : 'Show member list',
+      hint: 'Alt+M',
+      keywords: ['members', 'sidebar', 'panel', 'people', 'list'],
+      run: () => getState().toggleMemberList(),
+    },
+    {
+      id: 'action:focus-composer',
+      section: 'Actions',
+      title: 'Focus composer',
+      hint: 'Alt+Enter',
+      keywords: ['compose', 'type', 'message', 'input', 'chat'],
+      run: () => {
+        const el = typeof document !== 'undefined'
+          ? document.querySelector<HTMLElement>('[data-composer-input]')
+          : null;
+        el?.focus();
+      },
+    },
+    ...(!inVoice && activeChannel
+      ? [
+          {
+            id: 'action:start-voice',
+            section: 'Actions' as SpotlightSection,
+            title: 'Start voice in current channel',
+            hint: activeChannel,
+            keywords: ['voice', 'audio', 'call', 'join'],
+            run: () => {
+              const current = getState();
+              const view = current.activeView;
+              if (view.kind === 'channel') {
+                void current.joinVoiceChannel(view.channel, false);
+              }
+            },
+          },
+          {
+            id: 'action:start-video',
+            section: 'Actions' as SpotlightSection,
+            title: 'Start video in current channel',
+            hint: activeChannel,
+            keywords: ['video', 'camera', 'call', 'join'],
+            run: () => {
+              const current = getState();
+              const view = current.activeView;
+              if (view.kind === 'channel') {
+                void current.joinVoiceChannel(view.channel, true);
+              }
+            },
+          },
+        ]
+      : []),
+    {
       id: 'action:disconnect',
       section: 'Actions',
       title: 'Disconnect',
@@ -140,6 +196,35 @@ function baseActionCommands(state: CommandState): SpotlightCommand[] {
       run: () => copyText(getState().server?.url ?? ''),
     },
   ];
+}
+
+/**
+ * Build "People" commands — members of the active channel who aren't already
+ * in the DMs list. Provides a fast way to jump to a DM with anyone you can see.
+ */
+function peopleCommands(state: CommandState): SpotlightCommand[] {
+  const view = state.activeView;
+  if (view.kind !== 'channel') return [];
+
+  const channel = state.channels.get(view.channel);
+  if (!channel) return [];
+
+  const dmNicks = new Set(Array.from(state.dms.keys()).map((n) => n.toLowerCase()));
+
+  return Array.from(channel.users.values())
+    .filter((user) => !dmNicks.has(user.nick.toLowerCase()))
+    .sort((a, b) => a.nick.localeCompare(b.nick))
+    .map<SpotlightCommand>((user) => ({
+      id: `people:${user.nick.toLowerCase()}`,
+      section: 'People',
+      title: `Message ${user.nick}`,
+      hint: user.account ? `@${user.account}` : undefined,
+      keywords: [user.nick, user.account ?? '', 'dm', 'message', 'people'],
+      run: () => {
+        saveRecent({ id: `people:${user.nick.toLowerCase()}`, label: `Message ${user.nick}`, section: 'People' });
+        getState().navigate({ kind: 'dm', nick: user.nick });
+      },
+    }));
 }
 
 export function buildCommands(state: CommandState = getState()): SpotlightCommand[] {
@@ -160,6 +245,7 @@ export function buildCommands(state: CommandState = getState()): SpotlightComman
       keywords: [channel.name, channel.name.replace(/^#/, ''), channel.topic],
       run: () => {
         const current = getState();
+        saveRecent({ id: `channel:${channel.name.toLowerCase()}`, label: `Go to ${channel.name}`, section: 'Channels' });
         current.joinChannel(channel.name);
         current.navigate({ kind: 'channel', channel: channel.name });
       },
@@ -173,7 +259,10 @@ export function buildCommands(state: CommandState = getState()): SpotlightComman
       title: `Open DM with ${dm.nick}`,
       hint: dmHint(dm),
       keywords: [dm.nick, dm.account ?? '', 'direct message', 'dm'],
-      run: () => getState().navigate({ kind: 'dm', nick: dm.nick }),
+      run: () => {
+        saveRecent({ id: `dm:${dm.nick.toLowerCase()}`, label: `Open DM with ${dm.nick}`, section: 'DMs' });
+        getState().navigate({ kind: 'dm', nick: dm.nick });
+      },
     }));
 
   const themeCommands = THEME_IDS.map<SpotlightCommand>((id) => ({
@@ -197,6 +286,7 @@ export function buildCommands(state: CommandState = getState()): SpotlightComman
   return [
     ...channels,
     ...dms,
+    ...peopleCommands(state),
     ...baseActionCommands(state),
     ...themeCommands,
     ...backgroundCommands,
@@ -210,12 +300,18 @@ export function useCommands(): Accessor<SpotlightCommand[]> {
       dms: store.dms,
       server: store.server,
       networkName: store.networkName,
+      activeView: store.activeView,
+      showMemberList: store.showMemberList,
+      voice: store.voice,
     }),
     (a, b) => (
       a.channels === b.channels &&
       a.dms === b.dms &&
       a.server === b.server &&
-      a.networkName === b.networkName
+      a.networkName === b.networkName &&
+      a.activeView === b.activeView &&
+      a.showMemberList === b.showMemberList &&
+      a.voice === b.voice
     ),
   );
 

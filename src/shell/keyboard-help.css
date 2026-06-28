@@ -1,0 +1,207 @@
+/**
+ * keyboard-help.css — Keyboard shortcuts help overlay
+ *
+ * Mirrors the visual language of spotlight.css (same tokens, glass surface,
+ * entrance animation) but uses a wider, multi-column layout suited to a
+ * reference sheet.
+ */
+
+/* ── Root overlay ──────────────────────────────────────────────────────────── */
+
+.kbd-help {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+}
+
+/* ── Scrim ─────────────────────────────────────────────────────────────────── */
+
+.kbd-help__scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 30%, oklch(30% 0.08 250 / 0.55), oklch(8% 0.02 250 / 0.72));
+  backdrop-filter: blur(4px);
+}
+
+/* ── Panel ─────────────────────────────────────────────────────────────────── */
+
+.kbd-help__panel {
+  position: relative;
+  z-index: 1;
+  width: min(52rem, calc(100vw - 2rem));
+  max-height: min(44rem, calc(100svh - 2rem));
+  overflow-y: auto;
+  border-radius: var(--r-md, 10px);
+  background: oklch(13% 0.04 250 / 0.96);
+  border: 1px solid oklch(100% 0 0 / 0.08);
+  box-shadow:
+    0 0 0 1px oklch(100% 0 0 / 0.04) inset,
+    0 4px 6px -1px oklch(0% 0 0 / 0.5),
+    0 24px 48px -8px oklch(0% 0 0 / 0.7),
+    0 0 80px -8px oklch(60% 0.15 250 / 0.12);
+  backdrop-filter: blur(20px) saturate(1.3);
+  outline: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .kbd-help__panel {
+    animation: kbd-help-in 200ms var(--ease, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  }
+
+  @keyframes kbd-help-in {
+    from {
+      opacity: 0;
+      transform: translateY(-8px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+/* ── Header ────────────────────────────────────────────────────────────────── */
+
+.kbd-help__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem 0.75rem;
+  border-bottom: 1px solid oklch(100% 0 0 / 0.06);
+}
+
+.kbd-help__title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  color: var(--washi, oklch(92% 0.01 250));
+  letter-spacing: 0.01em;
+}
+
+.kbd-help__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: none;
+  border-radius: var(--r-sm, 4px);
+  background: transparent;
+  color: var(--washi-dim, oklch(65% 0.01 250));
+  cursor: pointer;
+  transition: background var(--dur, 150ms), color var(--dur, 150ms);
+}
+
+.kbd-help__close:hover,
+.kbd-help__close:focus-visible {
+  background: oklch(100% 0 0 / 0.06);
+  color: var(--washi, oklch(92% 0.01 250));
+}
+
+.kbd-help__close:focus-visible {
+  outline: 2px solid var(--lapis-bright, oklch(68% 0.2 250));
+  outline-offset: 1px;
+}
+
+/* ── Body ──────────────────────────────────────────────────────────────────── */
+
+.kbd-help__body {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: 0;
+  padding: 0.5rem 0;
+}
+
+/* ── Group ─────────────────────────────────────────────────────────────────── */
+
+.kbd-help__group {
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid oklch(100% 0 0 / 0.04);
+}
+
+.kbd-help__group:last-child {
+  border-bottom: none;
+}
+
+.kbd-help__group-name {
+  margin: 0 0 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--lapis-bright, oklch(68% 0.2 250));
+}
+
+/* ── Shortcut list ─────────────────────────────────────────────────────────── */
+
+.kbd-help__list {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.3rem 1rem;
+  align-items: center;
+}
+
+.kbd-help__keys {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+.kbd-help__sep {
+  color: var(--washi-mute, oklch(45% 0.01 250));
+  font-size: 0.7rem;
+}
+
+.kbd-help__kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6rem;
+  padding: 0.1em 0.45em;
+  border-radius: var(--r-sm, 4px);
+  border: 1px solid oklch(100% 0 0 / 0.14);
+  background: oklch(100% 0 0 / 0.06);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--washi, oklch(92% 0.01 250));
+  box-shadow: 0 1px 0 oklch(0% 0 0 / 0.4);
+  white-space: nowrap;
+}
+
+.kbd-help__desc {
+  font-size: 0.8rem;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  color: var(--washi-dim, oklch(65% 0.01 250));
+  margin: 0;
+}
+
+/* ── Footer ────────────────────────────────────────────────────────────────── */
+
+.kbd-help__footer {
+  padding: 0.6rem 1.25rem;
+  border-top: 1px solid oklch(100% 0 0 / 0.06);
+  font-size: 0.72rem;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  color: var(--washi-mute, oklch(45% 0.01 250));
+  text-align: center;
+}
+
+/* ── Mobile ────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 520px) {
+  .kbd-help__body {
+    grid-template-columns: 1fr;
+  }
+
+  .kbd-help__panel {
+    width: calc(100vw - 1rem);
+  }
+}

@@ -28,6 +28,7 @@ import { useStore, getState } from '@/lib/store';
 import type { ChatMessage, MessageReaction } from '@/lib/irc/types';
 import { Avatar } from '@/primitives/index';
 import { Sheet } from '@/primitives/index';
+import { MessageText } from '@/shell/message/MessageText';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -124,12 +125,18 @@ function ThreadIndicator(props: ThreadIndicatorProps): JSX.Element {
 
 // ── Message text ─────────────────────────────────────────────────────────────
 
-type MessageTextProps = {
+type MsgBodyProps = {
   msg: ChatMessage;
+  selfNick: string;
+  onChannelClick?: (name: string) => void;
 };
 
-function MessageText(props: MessageTextProps): JSX.Element {
-  const [local] = splitProps(props, ['msg']);
+/**
+ * MsgBody — thin wrapper that handles deleted/action states then delegates
+ * to the rich MessageText renderer from @/shell/message/MessageText.
+ */
+function MsgBody(props: MsgBodyProps): JSX.Element {
+  const [local] = splitProps(props, ['msg', 'selfNick', 'onChannelClick']);
 
   const cls = createMemo(() => {
     if (local.msg.deleted || local.msg.redacted) return 'shell-msg-text shell-msg-text--deleted';
@@ -143,7 +150,14 @@ function MessageText(props: MessageTextProps): JSX.Element {
     return local.msg.text;
   });
 
-  return <p class={cls()}>{displayText()}</p>;
+  return (
+    <MessageText
+      text={displayText()}
+      selfNick={local.selfNick}
+      onChannelClick={local.onChannelClick}
+      class={cls()}
+    />
+  );
 }
 
 // ── Thread panel content ─────────────────────────────────────────────────────
@@ -348,7 +362,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                           </div>
                         )}
                       </Show>
-                      <MessageText msg={msg} />
+                      <MsgBody msg={msg} selfNick={selfNick()} onChannelClick={(name) => getState().navigate({ kind: 'channel', channel: name })} />
                       <Show when={hasReactions()}>
                         <div class="shell-reactions" role="group" aria-label="Reactions">
                           <For each={msg.reactions ?? []}>
@@ -411,7 +425,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                         </div>
                       )}
                     </Show>
-                    <MessageText msg={msg} />
+                    <MsgBody msg={msg} selfNick={selfNick()} onChannelClick={(name) => getState().navigate({ kind: 'channel', channel: name })} />
                     <Show when={hasReactions()}>
                       <div class="shell-reactions" role="group" aria-label="Reactions">
                         <For each={msg.reactions ?? []}>
