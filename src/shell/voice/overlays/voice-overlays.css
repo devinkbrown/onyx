@@ -1,6 +1,6 @@
 .voice-call-body {
   display: grid;
-  gap: 1.05rem;
+  gap: var(--space-4);
   justify-items: center;
   text-align: center;
 }
@@ -51,7 +51,7 @@
 
 .voice-call-meta {
   display: grid;
-  gap: 0.25rem;
+  gap: var(--space-1);
 }
 
 .voice-call-kicker {
@@ -88,7 +88,7 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 0.75rem;
+  gap: var(--space-3);
   width: 100%;
 }
 
@@ -270,8 +270,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.65rem 0.75rem 0.55rem;
+  gap: var(--space-3);
+  padding: 0.65rem var(--space-3) 0.55rem;
   border-bottom: 1px solid var(--seam-faint);
   background: linear-gradient(90deg, color-mix(in oklab, var(--lapis) 8%, transparent), transparent 62%);
   cursor: grab;

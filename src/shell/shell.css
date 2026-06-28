@@ -302,15 +302,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 12px 12px 10px;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-3);
   border-bottom: 1px solid var(--seam-faint);
 }
 
 .shell-sidebar-network {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--space-2);
   font-family: var(--font-mono);
   font-size: 0.72rem;
   letter-spacing: 0.12em;
@@ -333,7 +333,7 @@
 .shell-notify-controls {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   flex: none;
 }
 
@@ -390,11 +390,11 @@
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--seam-faint) transparent;
-  padding-bottom: 8px;
+  padding-bottom: var(--space-2);
 }
 
 .shell-sidebar-section {
-  padding: 10px 12px 2px;
+  padding: var(--space-3) var(--space-3) var(--space-1);
 }
 
 .shell-sidebar-section-label {
@@ -403,7 +403,7 @@
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--washi-mute);
-  padding: 0 0 4px;
+  padding: 0 0 var(--space-1);
 }
 
 .shell-channel-list,
@@ -419,9 +419,9 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   width: 100%;
-  padding: 6px 10px;
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--r-md);
   border: 1px solid transparent;
   cursor: pointer;
@@ -534,13 +534,13 @@
 .shell-join-form {
   display: flex;
   gap: 0;
-  margin: 8px 10px 4px;
+  margin: var(--space-2) var(--space-3) var(--space-1);
 }
 
 .shell-join-input {
   flex: 1;
   min-width: 0;
-  padding: 6px 8px;
+  padding: var(--space-2);
   font-family: var(--font-mono);
   font-size: 0.76rem;
   color: var(--washi);
@@ -565,7 +565,7 @@
   display: grid;
   place-items: center;
   min-width: 34px;
-  padding: 6px 10px;
+  padding: var(--space-2) var(--space-3);
   font-family: var(--font-mono);
   font-size: 0.9rem;
   line-height: 1;
@@ -619,15 +619,15 @@
 /* ── Join-voice affordance ── */
 .shell-voice-join {
   display: flex;
-  gap: 10px;
-  padding: 10px clamp(12px, 2vw, 20px);
+  gap: var(--space-3);
+  padding: var(--space-3) clamp(var(--space-3), 2vw, var(--space-5));
   border-bottom: 1px solid var(--seam-faint);
 }
 
 .shell-voice-join-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   font-family: var(--font-sans);
   font-size: 0.84rem;
   font-weight: 500;
@@ -636,7 +636,7 @@
   background: color-mix(in oklab, var(--stone) 40%, transparent);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-md);
-  padding: 7px 15px;
+  padding: var(--space-2) var(--space-4);
   cursor: pointer;
   transition:
     color var(--dur) var(--ease),
@@ -667,8 +667,8 @@
   flex: none;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 16px;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
   height: 48px;
   background:
     linear-gradient(
@@ -707,7 +707,7 @@
 .shell-ribbon-inner {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   width: 100%;
   max-width: var(--shell-measure);
   margin-inline: auto;
@@ -760,7 +760,7 @@
 .shell-ribbon-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
   flex: none;
   margin-left: auto;
 }
@@ -782,9 +782,9 @@
   appearance: none;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--space-2);
   max-width: 14rem;
-  padding: 4px 10px 4px 8px;
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-2);
   border-radius: var(--r-pill);
   border: 1px solid var(--seam-faint);
   background: color-mix(in oklab, var(--stone) 32%, transparent);
@@ -816,7 +816,7 @@
 .shell-ribbon-account-text {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: var(--space-2);
   min-width: 0;
 }
 
@@ -851,7 +851,7 @@
 .shell-ribbon-conn {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--space-1);
   font-family: var(--font-mono);
   font-size: 0.68rem;
   letter-spacing: 0.1em;
@@ -880,8 +880,8 @@
 .shell-ribbon-members {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 9px;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
   font-family: var(--font-mono);
   font-size: 0.68rem;
   color: var(--washi-dim);
@@ -1138,12 +1138,12 @@
 /* ── Channel settings panel ── */
 .shell-chset {
   display: grid;
-  gap: 26px;
+  gap: var(--gap-section);
 }
 
 .shell-chset-section {
   display: grid;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .shell-chset-heading {
@@ -1164,20 +1164,20 @@
 
 .shell-chset-topic-form {
   display: grid;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .shell-chset-textarea {
   width: 100%;
   resize: vertical;
-  min-height: 64px;
-  padding: 10px 12px;
+  min-height: 4rem;
+  padding: var(--space-3);
   font-family: var(--font-serif);
   font-size: 0.9rem;
   color: var(--washi);
-  background: var(--bg-inset, color-mix(in oklab, var(--ink) 18%, transparent));
+  background: color-mix(in oklab, var(--ink) 18%, transparent);
   border: 1px solid var(--seam);
-  border-radius: var(--r-md, 10px);
+  border-radius: var(--r-md);
   transition: border-color var(--dur) var(--ease);
 }
 
@@ -1200,10 +1200,10 @@
 
 .shell-chset-readonly {
   display: grid;
-  gap: 6px;
-  padding: 12px;
+  gap: var(--space-2);
+  padding: var(--space-3);
   border: 1px solid var(--seam-faint);
-  border-radius: var(--r-md, 10px);
+  border-radius: var(--r-md);
   background: color-mix(in oklab, var(--ink) 10%, transparent);
 }
 
@@ -1234,19 +1234,19 @@
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .shell-chset-toggle {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 9px 11px;
+  gap: var(--space-3);
+  padding: var(--space-3);
   text-align: left;
   background: color-mix(in oklab, var(--ink) 10%, transparent);
   border: 1px solid var(--seam-faint);
-  border-radius: var(--r-md, 10px);
+  border-radius: var(--r-md);
   cursor: pointer;
   transition:
     border-color var(--dur) var(--ease),
@@ -1298,7 +1298,7 @@
 
 .shell-chset-toggle-text {
   display: grid;
-  gap: 2px;
+  gap: var(--space-1);
 }
 
 .shell-chset-toggle-label {
@@ -1321,7 +1321,7 @@
 
 .shell-chset-param {
   display: grid;
-  gap: 8px;
+  gap: var(--space-2);
   justify-items: start;
 }
 
@@ -1356,7 +1356,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
-  padding: 12px 0 4px;
+  padding: var(--space-3) 0 var(--space-2);
   scrollbar-width: thin;
   scrollbar-color: var(--seam-faint) transparent;
 }
@@ -1365,7 +1365,7 @@
   display: grid;
   place-items: center;
   height: 100%;
-  padding: 2rem;
+  padding: var(--space-7);
   color: var(--washi-mute);
   font-family: var(--font-serif);
   font-style: italic;
@@ -1382,9 +1382,9 @@
   position: relative;
   display: grid;
   grid-template-columns: 42px 1fr;
-  gap: 0 12px;
-  padding: 7px 18px 4px;
-  margin-top: 2px;
+  gap: 0 var(--space-3);
+  padding: var(--space-2) var(--space-5) var(--space-1);
+  margin-top: var(--space-2);
   max-width: var(--shell-measure);
   margin-inline: auto;
   transition: background var(--dur) var(--ease);
@@ -1401,7 +1401,8 @@
 
 .shell-msg-group--system {
   grid-template-columns: 1fr;
-  padding: 3px 16px 3px calc(42px + 10px + 16px);
+  /* Align the system line under the message body: avatar + gap + left padding. */
+  padding: var(--space-1) var(--space-5) var(--space-1) calc(42px + var(--space-3) + var(--space-5));
 }
 
 .shell-msg-avatar {
@@ -1419,8 +1420,8 @@
 .shell-msg-meta {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  margin-bottom: 2px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
 }
 
 .shell-msg-author {
@@ -1512,8 +1513,8 @@
 .shell-msg-cont {
   display: grid;
   grid-template-columns: 42px 1fr;
-  gap: 0 12px;
-  padding: 1px 18px;
+  gap: 0 var(--space-3);
+  padding: 1px var(--space-5);
   max-width: var(--shell-measure);
   margin-inline: auto;
   transition: background var(--dur) var(--ease);
@@ -1542,7 +1543,8 @@
 /* System line — joins, parts, mode changes. A quiet ripple in the current:
    small, dim, and prefixed with a soft azure tide-mark. */
 .shell-msg-system {
-  padding: 3px 18px 3px calc(42px + 12px + 18px);
+  /* Align under the message body: avatar (42px) + column gap + left padding. */
+  padding: var(--space-1) var(--space-5) var(--space-1) calc(42px + var(--space-3) + var(--space-5));
   max-width: var(--shell-measure);
   margin-inline: auto;
   font-family: var(--font-mono);
@@ -1551,7 +1553,7 @@
   letter-spacing: 0.03em;
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: var(--space-2);
   transition: color var(--dur) var(--ease);
 }
 
@@ -1571,8 +1573,8 @@
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: 10px;
-  margin: 8px 18px;
+  gap: var(--space-3);
+  margin: var(--space-2) var(--space-5);
   color: var(--lapis-bright);
   font-family: var(--font-mono);
   font-size: 0.64rem;
@@ -1827,7 +1829,7 @@
 .shell-composer {
   position: relative;
   flex: none;
-  padding: 10px 16px 14px;
+  padding: var(--space-3) var(--space-4) var(--space-4);
   background:
     linear-gradient(
       180deg,
@@ -1858,9 +1860,9 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 7px;
-  padding: 6px 8px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  padding: var(--space-2);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-md);
   color: var(--washi-dim);
@@ -1915,17 +1917,17 @@
 .shell-composer-attachments {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
-  margin-bottom: 8px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
 }
 
 .shell-attachment {
   display: grid;
   grid-template-columns: 38px minmax(110px, 1fr) 24px;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   max-width: min(100%, 340px);
-  padding: 5px;
+  padding: var(--space-1);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-md);
   background: color-mix(in oklab, var(--stone-2) 38%, transparent);
@@ -1936,7 +1938,7 @@
 }
 
 .shell-attachment--error {
-  border-color: color-mix(in oklab, var(--crimson, #ef4444) 62%, var(--seam-faint));
+  border-color: color-mix(in oklab, var(--shu) 62%, var(--seam-faint));
 }
 
 .shell-attachment-thumb,
@@ -1965,7 +1967,7 @@
 .shell-attachment-meta {
   min-width: 0;
   display: grid;
-  gap: 2px;
+  gap: var(--space-1);
 }
 
 .shell-attachment-name {
@@ -1984,7 +1986,7 @@
 }
 
 .shell-attachment-error {
-  color: color-mix(in oklab, var(--crimson, #ef4444) 70%, var(--washi));
+  color: color-mix(in oklab, var(--shu) 70%, var(--washi));
 }
 
 .shell-attachment-progress {
@@ -2018,8 +2020,8 @@
 
 .shell-composer-popovers {
   display: grid;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
 }
 
 .shell-command-menu,
@@ -2035,16 +2037,16 @@
 
 .shell-command-menu {
   display: grid;
-  padding: 5px;
+  padding: var(--space-1);
 }
 
 .shell-command-item {
   display: grid;
   grid-template-columns: minmax(84px, auto) minmax(0, 1fr);
-  gap: 10px;
+  gap: var(--space-3);
   align-items: center;
   min-height: 34px;
-  padding: 6px 8px;
+  padding: var(--space-2);
   border: 1px solid transparent;
   border-radius: var(--r-sm);
   cursor: pointer;
@@ -2074,14 +2076,14 @@
 }
 
 .shell-emoji-picker {
-  padding: 8px;
+  padding: var(--space-2);
 }
 
 .shell-emoji-search {
   width: 100%;
   min-height: 34px;
-  margin-bottom: 8px;
-  padding: 0 9px;
+  margin-bottom: var(--space-2);
+  padding: 0 var(--space-2);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-sm);
   color: var(--washi);
@@ -2091,7 +2093,7 @@
 .shell-emoji-grid {
   display: grid;
   grid-template-columns: repeat(9, minmax(28px, 1fr));
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .shell-emoji-choice {
@@ -2112,7 +2114,7 @@
 }
 .shell-typing-indicator {
   min-height: 18px;
-  margin: 0 4px 6px;
+  margin: 0 var(--space-1) var(--space-2);
   color: var(--washi-mute);
   font-family: var(--font-mono);
   font-size: 0.66rem;
@@ -2121,7 +2123,7 @@
 
 .shell-composer-inner {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   align-items: flex-end;
   background: color-mix(in oklab, var(--ink) 70%, var(--stone-2));
   border: 1px solid var(--seam-faint);
@@ -2151,7 +2153,7 @@
   flex: 1;
   min-height: 38px;
   max-height: 200px;
-  padding: 9px 10px;
+  padding: var(--space-2) var(--space-3);
   border: none;
   outline: none;
   resize: none;
@@ -2248,14 +2250,14 @@
 }
 
 .shell-composer-error {
-  margin: 6px 0 0;
+  margin: var(--space-2) 0 0;
   font-family: var(--font-mono);
   font-size: 0.66rem;
-  color: color-mix(in oklab, var(--crimson, #ef4444) 72%, var(--washi));
+  color: color-mix(in oklab, var(--shu) 72%, var(--washi));
 }
 
 .shell-composer-hint {
-  margin-top: 6px;
+  margin-top: var(--space-2);
   padding-left: 2px;
   font-family: var(--font-mono);
   font-size: 0.62rem;
@@ -2298,7 +2300,7 @@
 }
 
 .shell-members-head {
-  padding: 12px 12px 8px;
+  padding: var(--space-3) var(--space-3) var(--space-2);
   border-bottom: 1px solid var(--seam-faint);
   font-family: var(--font-mono);
   font-size: 0.68rem;
@@ -2322,14 +2324,14 @@
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--seam-faint) transparent;
-  padding: 6px 0 8px;
+  padding: var(--space-2) 0;
 }
 
 .shell-members-group-label {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px 5px;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-1);
   font-family: var(--font-mono);
   font-size: 0.6rem;
   letter-spacing: 0.14em;
@@ -2352,12 +2354,12 @@
 .shell-member-row {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 4px 10px;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
   cursor: pointer;
   border: 1px solid transparent;
   border-radius: var(--r-md);
-  margin: 0 4px;
+  margin: 0 var(--space-1);
   transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
 
@@ -2496,15 +2498,15 @@
 /* Member popover card */
 .shell-member-card {
   display: grid;
-  gap: 12px;
+  gap: var(--space-3);
   min-width: 210px;
 }
 
 .shell-member-card-head {
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding-bottom: 11px;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
   border-bottom: 1px solid var(--seam-faint);
 }
 
@@ -2532,21 +2534,21 @@
 
 .shell-member-card-badges {
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
   flex-wrap: wrap;
 }
 
 .shell-member-card-actions {
   display: flex;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 /* Moderation cluster — op-gated row of grant/kick/ban controls. */
 .shell-member-card-mod {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  padding-top: 10px;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
   border-top: 1px solid var(--seam-faint);
 }
 
@@ -2557,7 +2559,7 @@
   place-items: center;
   color: var(--washi-mute);
   text-align: center;
-  padding: 2rem;
+  padding: var(--space-7);
   background:
     radial-gradient(
       ellipse at 50% 42%,
@@ -2589,10 +2591,10 @@
 }
 
 .shell-home-actions {
-  margin-top: 1.6rem;
+  margin-top: var(--space-6);
   display: flex;
   justify-content: center;
-  gap: 0.7rem;
+  gap: var(--space-3);
 }
 
 .shell-home-cta {
@@ -2627,15 +2629,15 @@
 
 /* ── Thread panel (Sheet) ── */
 .shell-thread-msg {
-  padding: 8px 0;
+  padding: var(--space-2) 0;
   border-bottom: 1px solid var(--seam-faint);
 }
 
 .shell-thread-msg-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
   font-family: var(--font-mono);
   font-size: 0.72rem;
   color: var(--washi-mute);

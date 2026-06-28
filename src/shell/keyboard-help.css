@@ -1,9 +1,11 @@
 /**
  * keyboard-help.css — Keyboard shortcuts help overlay
  *
- * Mirrors the visual language of spotlight.css (same tokens, glass surface,
- * entrance animation) but uses a wider, multi-column layout suited to a
- * reference sheet.
+ * Shares the visual language of the command palette (spotlight.css) and the
+ * shared ModalShell: a deep-water glass surface, a mono kicker + display title,
+ * and a multi-column reference grid. Every colour comes from a theme token so
+ * the sheet re-skins with the active theme (including the light "pearl" cut);
+ * every gap/pad comes from the spacing scale in tokens.css.
  */
 
 /* ── Root overlay ──────────────────────────────────────────────────────────── */
@@ -14,6 +16,7 @@
   z-index: 120;
   display: grid;
   place-items: center;
+  padding: var(--space-4);
 }
 
 /* ── Scrim ─────────────────────────────────────────────────────────────────── */
@@ -21,9 +24,20 @@
 .kbd-help__scrim {
   position: absolute;
   inset: 0;
+  /* Light filtering down through deep water onto a darkened scrim — all tokens. */
   background:
-    radial-gradient(ellipse at 50% 30%, oklch(30% 0.08 250 / 0.55), oklch(8% 0.02 250 / 0.72));
+    radial-gradient(
+      ellipse at 50% 30%,
+      color-mix(in oklab, var(--lapis-deep) 28%, transparent),
+      color-mix(in oklab, var(--ink) 80%, transparent) 70%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--ink) 78%, transparent),
+      color-mix(in oklab, var(--ink) 66%, transparent)
+    );
   backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 /* ── Panel ─────────────────────────────────────────────────────────────────── */
@@ -31,30 +45,57 @@
 .kbd-help__panel {
   position: relative;
   z-index: 1;
-  width: min(52rem, calc(100vw - 2rem));
-  max-height: min(44rem, calc(100svh - 2rem));
+  width: min(52rem, calc(100vw - var(--space-7)));
+  max-height: min(44rem, calc(100svh - var(--space-7)));
   overflow-y: auto;
-  border-radius: var(--r-md, 10px);
-  background: color-mix(in oklab, var(--stone-2) 92%, var(--ink));
-  border: 1px solid var(--line);
+  overscroll-behavior: contain;
+  border-radius: var(--r-md);
+  /* Glass cut from deep water, matching the spotlight panel. */
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--stone-3) 64%, transparent),
+      color-mix(in oklab, var(--stone) 46%, transparent) 55%,
+      color-mix(in oklab, var(--ink) 64%, transparent)
+    ),
+    color-mix(in oklab, var(--ink) 82%, transparent);
+  border: 1px solid var(--seam);
   box-shadow:
-    inset 0 0 0 1px color-mix(in oklab, var(--lapis) 8%, transparent),
-    0 4px 6px -1px oklch(0% 0 0 / 0.5),
-    0 24px 48px -8px oklch(0% 0 0 / 0.7),
-    0 0 80px -8px color-mix(in oklab, var(--lapis) 14%, transparent);
+    0 40px 100px -48px var(--ink),
+    0 0 64px -28px color-mix(in oklab, var(--lapis) 50%, transparent),
+    inset 0 1px 0 color-mix(in oklab, var(--lapis-bright) 26%, transparent);
   backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
   outline: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--seam) transparent;
+}
+
+.kbd-help__panel:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--lapis-bright) 74%, transparent);
+  outline-offset: 3px;
+}
+
+.kbd-help__panel::-webkit-scrollbar {
+  width: 10px;
+}
+
+.kbd-help__panel::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: var(--r-pill);
+  background-clip: padding-box;
+  background-color: var(--seam);
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .kbd-help__panel {
-    animation: kbd-help-in 200ms var(--ease, cubic-bezier(0.16, 1, 0.3, 1)) both;
+    animation: kbd-help-in var(--dur) var(--ease) both;
   }
 
   @keyframes kbd-help-in {
     from {
       opacity: 0;
-      transform: translateY(-8px) scale(0.97);
+      transform: translateY(0.65rem) scale(0.985);
     }
     to {
       opacity: 1;
@@ -67,44 +108,70 @@
 
 .kbd-help__header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: 1rem 1.25rem 0.75rem;
-  border-bottom: 1px solid oklch(100% 0 0 / 0.06);
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5) var(--space-3);
+  background:
+    linear-gradient(90deg, color-mix(in oklab, var(--lapis-deep) 11%, transparent), transparent);
+  border-bottom: 1px solid var(--seam-faint);
+}
+
+.kbd-help__heading {
+  min-width: 0;
+}
+
+.kbd-help__kicker {
+  margin: 0 0 var(--space-1);
+  color: var(--lapis-bright);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
 }
 
 .kbd-help__title {
   margin: 0;
-  font-size: 0.875rem;
-  font-weight: 600;
-  font-family: var(--font-sans, system-ui, sans-serif);
-  color: var(--washi, oklch(92% 0.01 250));
-  letter-spacing: 0.01em;
+  font-family: var(--font-display);
+  font-size: 1.55rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--washi);
 }
 
 .kbd-help__close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  border: none;
-  border-radius: var(--r-sm, 4px);
-  background: transparent;
-  color: var(--washi-dim, oklch(65% 0.01 250));
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  flex: none;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 22%, transparent), color-mix(in oklab, var(--stone) 28%, transparent));
+  color: var(--washi-dim);
   cursor: pointer;
-  transition: background var(--dur, 150ms), color var(--dur, 150ms);
+  transition:
+    background var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
 }
 
-.kbd-help__close:hover,
-.kbd-help__close:focus-visible {
-  background: color-mix(in oklab, var(--washi) 8%, transparent);
-  color: var(--washi, oklch(92% 0.01 250));
+.kbd-help__close:hover {
+  color: var(--lapis-bright);
+  border-color: var(--seam);
+  box-shadow: 0 0 20px -14px var(--lapis-bright);
 }
 
 .kbd-help__close:focus-visible {
-  outline: 2px solid var(--lapis-bright, oklch(68% 0.2 250));
-  outline-offset: 1px;
+  outline: none;
+  border-color: var(--lapis-bright);
+  box-shadow:
+    0 0 0 1px var(--ink),
+    0 0 0 3px color-mix(in oklab, var(--lapis-bright) 60%, transparent);
 }
 
 /* ── Body ──────────────────────────────────────────────────────────────────── */
@@ -113,13 +180,13 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
   gap: 0;
-  padding: 0.5rem 0;
+  padding: var(--space-2) 0;
 }
 
 /* ── Group ─────────────────────────────────────────────────────────────────── */
 
 .kbd-help__group {
-  padding: 0.75rem 1.25rem;
+  padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--line-faint);
 }
 
@@ -128,13 +195,13 @@
 }
 
 .kbd-help__group-name {
-  margin: 0 0 0.5rem;
-  font-size: 0.65rem;
-  font-weight: 600;
-  font-family: var(--font-sans, system-ui, sans-serif);
+  margin: 0 0 var(--space-3);
+  font-size: 0.66rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--lapis-bright, oklch(68% 0.2 250));
+  letter-spacing: 0.2em;
+  color: var(--lapis-bright);
 }
 
 /* ── Shortcut list ─────────────────────────────────────────────────────────── */
@@ -143,19 +210,19 @@
   margin: 0;
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 0.3rem 1rem;
+  gap: var(--space-2) var(--space-4);
   align-items: center;
 }
 
 .kbd-help__keys {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: var(--space-1);
   white-space: nowrap;
 }
 
 .kbd-help__sep {
-  color: var(--washi-mute, oklch(45% 0.01 250));
+  color: var(--washi-mute);
   font-size: 0.7rem;
 }
 
@@ -165,43 +232,61 @@
   justify-content: center;
   min-width: 1.6rem;
   padding: 0.1em 0.45em;
-  border-radius: var(--r-sm, 4px);
-  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--seam-faint);
   background: color-mix(in oklab, var(--washi) 7%, transparent);
-  font-family: var(--font-mono, ui-monospace, monospace);
+  font-family: var(--font-mono);
   font-size: 0.7rem;
   font-weight: 500;
-  color: var(--washi, oklch(92% 0.01 250));
+  color: var(--washi);
   box-shadow: 0 1px 0 color-mix(in oklab, var(--ink) 40%, transparent);
   white-space: nowrap;
 }
 
 .kbd-help__desc {
   font-size: 0.8rem;
-  font-family: var(--font-sans, system-ui, sans-serif);
-  color: var(--washi-dim, oklch(65% 0.01 250));
+  font-family: var(--font-sans);
+  color: var(--washi-dim);
   margin: 0;
 }
 
 /* ── Footer ────────────────────────────────────────────────────────────────── */
 
 .kbd-help__footer {
-  padding: 0.6rem 1.25rem;
+  padding: var(--space-3) var(--space-5);
   border-top: 1px solid var(--line-faint);
   font-size: 0.72rem;
-  font-family: var(--font-sans, system-ui, sans-serif);
-  color: var(--washi-mute, oklch(45% 0.01 250));
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  color: var(--washi-mute);
   text-align: center;
 }
 
 /* ── Mobile ────────────────────────────────────────────────────────────────── */
 
 @media (max-width: 520px) {
+  .kbd-help {
+    padding: var(--space-2);
+  }
+
   .kbd-help__body {
     grid-template-columns: 1fr;
   }
 
   .kbd-help__panel {
-    width: calc(100vw - 1rem);
+    width: calc(100vw - var(--space-4));
+    max-height: calc(100svh - var(--space-4));
+  }
+
+  .kbd-help__header {
+    padding: var(--space-3) var(--space-4) var(--space-3);
+  }
+
+  .kbd-help__group {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .kbd-help__title {
+    font-size: 1.3rem;
   }
 }
