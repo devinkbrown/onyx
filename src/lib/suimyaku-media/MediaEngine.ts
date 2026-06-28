@@ -916,15 +916,25 @@ export class SuimyakuMediaEngine {
       .catch(() => { /* a MAC failure drops one media frame; loss-tolerant */ });
   }
 
-  /** Observe NOTE MEDIA control events to drive the WS media plane. */
+  /** Observe MEDIA control events to drive the WS media plane. Accepts both the
+   * per-client NOTE MEDIA replies (MACKEY, ROSTER) and the live EVENT MEDIA
+   * presence feed (JOIN …) — presence moved off NOTE onto the IRCX EVENT plane,
+   * which orders fields `<verb> <#chan> <nick>` vs NOTE's `<#chan> <verb> <nick>`. */
   private handleMediaServerMessage(msg: IRCMessage) {
-    if (msg.command !== 'NOTE' || msg.params[0] !== 'MEDIA') return;
-    const channel = msg.params[1];
-    const verb = msg.params[2];
+    let channel: string | undefined;
+    let verb: string | undefined;
+    let arg: string | undefined;
+    if (msg.command === 'NOTE' && msg.params[0] === 'MEDIA') {
+      channel = msg.params[1]; verb = msg.params[2]; arg = msg.params[3];
+    } else if (msg.command === 'EVENT' && (msg.params[1] ?? '').toUpperCase() === 'MEDIA') {
+      verb = msg.params[2]; channel = msg.params[3]; arg = msg.params[4];
+    } else {
+      return;
+    }
     if (!channel || !verb || channel !== this.activeRoom) return;
 
     if (verb === 'MACKEY') {
-      const b64 = msg.params[3];
+      const b64 = arg;
       if (!b64) return;
       this.wsMyNick = this.client?.currentNick ?? this.wsMyNick;
       this.wsAudSeq = 0;
@@ -936,8 +946,7 @@ export class SuimyakuMediaEngine {
           .catch(() => {});
       } catch { /* malformed key — stay a no-op */ }
     } else if (verb === 'JOIN' || verb === 'ROSTER') {
-      const nick = msg.params[3];
-      if (nick) this.streamRouter.addParticipant(nick);
+      if (arg) this.streamRouter.addParticipant(arg);
     }
   }
 

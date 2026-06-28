@@ -3674,12 +3674,36 @@ export const store = createStore<OnyxState>()(
 
       switch (command) {
 
+        // ── IRCX MEDIA event plane ────────────────────────────────────────
+        case 'EVENT': {
+          // The server surfaces real-time voice/video presence on the IRCX EVENT
+          // plane: `:server EVENT <me> MEDIA <verb> <#chan> <nick> [detail]`.
+          // Re-shape it into the legacy NOTE MEDIA param order and re-dispatch so
+          // the single MEDIA handler processes it unchanged (presence moved off
+          // NOTE → EVENT server-side; per-client replies — MACKEY, ROSTER, STATS,
+          // TRANSPORT, PROFILE — still arrive as NOTE MEDIA).
+          if ((params[1] ?? '').toUpperCase() === 'MEDIA') {
+            get()._handleMessage({
+              ...msg,
+              command: 'NOTE',
+              params: ['MEDIA', params[3] ?? '', params[2] ?? '', params[4] ?? '', ...params.slice(5)],
+            });
+          }
+          return;
+        }
+
         // ── Registration ──────────────────────────────────────────────────
         case '001': { // RPL_WELCOME
           // Orochi exposes voice/video via the MEDIA channel command for any
           // registered member — there is no media cap to gate on, so mark it
-          // available on registration. NOTE MEDIA events keep it true.
+          // available on registration. MEDIA EVENTs keep it true.
           set({ ourNick: params[0], mediaAvailable: true });
+          // Subscribe to the IRCX MEDIA event plane so the server delivers live
+          // voice/video presence as `:server EVENT <me> MEDIA …`. The feed is
+          // membership-gated server-side, so the `*` mask only yields calls in
+          // channels we are in; a re-subscribe after reconnect is a harmless
+          // ERR_EVENTDUP we ignore.
+          get().client?.sendRaw('EVENT', 'ADD', 'MEDIA', '*');
           // Show onboarding if this server hasn't been visited before
           const hostname = get().server?.url ?? 'unknown';
           const onboardKey = `ocean-onboarded-${hostname}`;
