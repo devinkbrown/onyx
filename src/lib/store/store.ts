@@ -4131,6 +4131,14 @@ export const store = createStore<OnyxState>()(
             }
             // Fetch WHO data for away status
             get().client?.sendRaw('WHO', ch);
+            // Reconcile the member list from the authoritative server roster. A
+            // client-initiated JOIN already triggers an automatic NAMES burst,
+            // but a JOIN that arrives via session reclaim / sync replay (fresh
+            // page load of a logged-in account) does not reliably carry one — so
+            // the nicklist would be empty with nothing to refresh it. NAMES is
+            // authoritative + idempotent (throttled per channel), so requesting
+            // it here guarantees the roster however we ended up in the channel.
+            _refreshChannelRoster(get, ch);
           } else {
             // Someone else joined
             set(s => {

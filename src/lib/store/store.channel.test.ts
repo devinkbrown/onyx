@@ -344,4 +344,21 @@ describe('navigate() reconciles the focused channel roster', () => {
     const names = client.sendRaw.mock.calls.filter((c) => c[0] === 'NAMES');
     expect(names).toHaveLength(0);
   });
+
+  it('self-JOIN requests NAMES so a resume/replay JOIN still populates the roster', () => {
+    // Fresh page load of a logged-in account: channels arrive via replayed JOIN
+    // lines that may not carry a NAMES burst. The self-JOIN handler must request
+    // NAMES itself so the nicklist is never left empty.
+    const client = makeClient();
+    store.setState({
+      ...initialState,
+      client: client as never,
+      connectionStatus: 'connected',
+      ourNick: 'me',
+      channels: new Map(),
+      activeView: { kind: 'home' },
+    }, true);
+    feed(':me JOIN #resume1');
+    expect(client.sendRaw.mock.calls).toContainEqual(['NAMES', '#resume1']);
+  });
 });
