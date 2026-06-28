@@ -26,6 +26,9 @@
  *   - Max input length: capped at MAX_LENGTH chars before parsing
  */
 
+import { parseIrcRuns, isDefaultStyle, type IrcStyle } from './ircFormat';
+export type { IrcStyle } from './ircFormat';
+
 export type TokenType =
   | 'text'
   | 'bold'
@@ -38,7 +41,8 @@ export type TokenType =
   | 'link'
   | 'mention'
   | 'channel'
-  | 'emoji';
+  | 'emoji'
+  | 'styled';
 
 /** A leaf token with no children. */
 export interface TextToken      { type: 'text';       text: string }
@@ -55,6 +59,8 @@ export interface ItalicToken    { type: 'italic';     children: InlineToken[] }
 export interface StrikeToken    { type: 'strike';     children: InlineToken[] }
 export interface SpoilerToken   { type: 'spoiler';    children: InlineToken[] }
 export interface BlockquoteToken{ type: 'blockquote'; children: InlineToken[] }
+/** A run carrying resolved IRC/mIRC formatting (bold/colour/etc.). */
+export interface StyledToken    { type: 'styled';     style: IrcStyle; children: InlineToken[] }
 
 /** Union of all inline tokens (can appear inside containers). */
 export type InlineToken =
@@ -67,7 +73,8 @@ export type InlineToken =
   | BoldToken
   | ItalicToken
   | StrikeToken
-  | SpoilerToken;
+  | SpoilerToken
+  | StyledToken;
 
 /** Top-level tokens (includes blockquote which is block-level). */
 export type Token = InlineToken | CodeBlockToken | BlockquoteToken;
@@ -369,6 +376,38 @@ function parseInline(src: string, start: number, end: number): InlineToken[] {
   return tokens;
 }
 
+// ── IRC formatting layer ───────────────────────────────────────────────────────
+
+/**
+ * Parse one line as IRC-formatted text: split into styled runs (control bytes
+ * stripped), then markdown-parse the visible text of each run. Runs with no
+ * formatting pass straight through as plain inline tokens, so messages without
+ * any control codes behave exactly as before. Non-default runs are wrapped in a
+ * single `styled` token carrying the resolved colour/weight/etc.
+ *
+ * `inStyle` threads the active style in from the previous line; `out` carries it
+ * forward, so colours opened before a newline continue afterwards.
+ */
+function parseStyledInline(
+  line: string,
+  inStyle: IrcStyle,
+): { tokens: InlineToken[]; out: IrcStyle } {
+  const { runs, out } = parseIrcRuns(line, inStyle);
+  const tokens: InlineToken[] = [];
+
+  for (const run of runs) {
+    if (!run.text) continue;
+    const inline = parseInline(run.text, 0, run.text.length);
+    if (isDefaultStyle(run.style)) {
+      for (const t of inline) tokens.push(t);
+    } else {
+      tokens.push({ type: 'styled', style: run.style, children: inline });
+    }
+  }
+
+  return { tokens, out };
+}
+
 // ── Top-level parser ──────────────────────────────────────────────────────────
 
 /**
@@ -385,13 +424,18 @@ export function parseMessage(text: string): Token[] {
   // Split on newlines first so blockquotes work correctly
   const lines = src.split('\n');
 
+  // IRC formatting is stateful: thread the active style across lines so a colour
+  // opened before a newline keeps applying until reset.
+  let carry: IrcStyle = {};
+
   for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
     const line = lines[lineIdx]!;
 
     // ── Blockquote (> at start of line) ──────────────────────────────────────
     if (line.startsWith('> ') || line === '>') {
       const content = line.startsWith('> ') ? line.slice(2) : '';
-      const children = parseInline(content, 0, content.length);
+      const { tokens: children, out } = parseStyledInline(content, carry);
+      carry = out;
       tokens.push({ type: 'blockquote', children });
       if (lineIdx < lines.length - 1) {
         tokens.push({ type: 'text', text: '\n' });
@@ -415,10 +459,14 @@ export function parseMessage(text: string): Token[] {
         bodyLines.push(lines[j]!);
       }
 
+      // Code is literal — formatting does not bleed through a code block.
+      carry = {};
+
       if (!found) {
         // Unclosed: output ``` literally then parse the rest
         const rest = line.slice(0); // full line including ```
-        const inlineTokens = parseInline(rest, 0, rest.length);
+        const { tokens: inlineTokens, out } = parseStyledInline(rest, carry);
+        carry = out;
         for (const t of inlineTokens) tokens.push(t);
         if (lineIdx < lines.length - 1) tokens.push({ type: 'text', text: '\n' });
       } else if (lineIdx < lines.length - 1) {
@@ -428,7 +476,8 @@ export function parseMessage(text: string): Token[] {
     }
 
     // ── Normal inline line ────────────────────────────────────────────────────
-    const inlineTokens = parseInline(line, 0, line.length);
+    const { tokens: inlineTokens, out } = parseStyledInline(line, carry);
+    carry = out;
     for (const t of inlineTokens) tokens.push(t);
 
     if (lineIdx < lines.length - 1) {

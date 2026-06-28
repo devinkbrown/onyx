@@ -513,3 +513,41 @@ describe('complex real-world messages', () => {
     expect(tokens[0]).toMatchObject({ type: 'text' });
   });
 });
+
+// ── IRC / mIRC formatting ──────────────────────────────────────────────────────
+
+describe('IRC control codes', () => {
+  it('leaves plain messages free of styled tokens', () => {
+    const tokens = parseMessage('just plain text');
+    expect(only(tokens, 'styled')).toHaveLength(0);
+    expect(tokens[0]).toMatchObject({ type: 'text', text: 'just plain text' });
+  });
+
+  it('wraps a bold run in a styled token', () => {
+    const tokens = parseMessage('\x02bold\x02 normal');
+    const styled = only(tokens, 'styled');
+    expect(styled).toHaveLength(1);
+    expect(styled[0]).toMatchObject({ type: 'styled', style: { bold: true } });
+  });
+
+  it('carries the colour onto a styled run', () => {
+    const tokens = parseMessage('\x034alert');
+    const styled = only(tokens, 'styled') as Array<{ style: { fg?: string } }>;
+    expect(styled).toHaveLength(1);
+    expect(styled[0]!.style.fg).toBe('#ff0000');
+  });
+
+  it('strips control bytes from the rendered text', () => {
+    const tokens = parseMessage('\x034\x02red bold\x0f');
+    // No raw control bytes should survive in any text token.
+    const raw = JSON.stringify(tokens);
+    expect(raw).not.toMatch(/[\x02\x03\x04\x0f\x16\x1d\x1e\x1f]/);
+  });
+
+  it('still detects links inside a coloured run', () => {
+    const tokens = parseMessage('\x0312https://example.com\x03');
+    const styled = only(tokens, 'styled') as Array<{ children: Array<{ type: string }> }>;
+    expect(styled).toHaveLength(1);
+    expect(styled[0]!.children.some((c) => c.type === 'link')).toBe(true);
+  });
+});

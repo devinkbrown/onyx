@@ -35,6 +35,7 @@ import type {
   ItalicToken,
   StrikeToken,
   SpoilerToken,
+  StyledToken,
   BlockquoteToken,
   CodeBlockToken,
 } from '@/lib/format/parseMessage';
@@ -162,6 +163,62 @@ function Spoiler(props: SpoilerProps): JSX.Element {
   );
 }
 
+// ── IRC formatting run ─────────────────────────────────────────────────────────
+
+type StyledRunProps = {
+  token: StyledToken;
+  selfNick: string;
+  onChannelClick: ((name: string) => void) | undefined;
+};
+
+/**
+ * Render a run of IRC/mIRC-formatted text. Colours come from a fixed palette or
+ * a validated 6-hex value, so they are safe to place in an inline `color:` /
+ * `background-color:` — there is no string interpolation of user text here.
+ */
+function StyledRun(props: StyledRunProps): JSX.Element {
+  const [local] = splitProps(props, ['token', 'selfNick', 'onChannelClick']);
+
+  const css = createMemo<JSX.CSSProperties>(() => {
+    const s = local.token.style;
+    let fg = s.fg;
+    let bg = s.bg;
+    // Reverse video swaps fg/bg, falling back to the surface + text defaults.
+    if (s.reverse) {
+      const swapFg = bg ?? 'var(--ink)';
+      const swapBg = fg ?? 'var(--washi)';
+      fg = swapFg;
+      bg = swapBg;
+    }
+    const out: Record<string, string> = {};
+    if (fg) out['color'] = fg;
+    if (bg) {
+      out['background-color'] = bg;
+      out['border-radius'] = '2px';
+      out['padding'] = '0 2px';
+      out['box-decoration-break'] = 'clone';
+    }
+    if (s.bold) out['font-weight'] = '700';
+    if (s.italic) out['font-style'] = 'italic';
+    if (s.monospace) out['font-family'] = 'var(--font-mono)';
+    const deco: string[] = [];
+    if (s.underline) deco.push('underline');
+    if (s.strike) deco.push('line-through');
+    if (deco.length) out['text-decoration-line'] = deco.join(' ');
+    return out as JSX.CSSProperties;
+  });
+
+  return (
+    <span class="shell-msg-irc" style={css()}>
+      <RenderInlineTokens
+        tokens={local.token.children}
+        selfNick={local.selfNick}
+        onChannelClick={local.onChannelClick}
+      />
+    </span>
+  );
+}
+
 // ── Inline token renderer ─────────────────────────────────────────────────────
 
 type InlineProps = {
@@ -247,6 +304,14 @@ function RenderInlineToken(props: SingleInlineProps): JSX.Element {
       <Match when={local.token.type === 'spoiler'}>
         <Spoiler
           children={(local.token as SpoilerToken).children}
+          selfNick={local.selfNick}
+          onChannelClick={local.onChannelClick}
+        />
+      </Match>
+
+      <Match when={local.token.type === 'styled'}>
+        <StyledRun
+          token={local.token as StyledToken}
           selfNick={local.selfNick}
           onChannelClick={local.onChannelClick}
         />
