@@ -340,9 +340,9 @@ describe('Token catalogue', () => {
     }
   });
 
-  it('pearl is the only light-scheme theme', () => {
+  it('exposes the expected light-scheme themes', () => {
     const lightThemes = THEME_IDS.filter((id) => THEMES[id]?.scheme === 'light');
-    expect(lightThemes).toEqual(['pearl']);
+    expect(lightThemes.sort()).toEqual(['frost', 'pearl']);
   });
 });
 
