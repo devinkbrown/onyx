@@ -296,3 +296,52 @@ describe('NAMES (353/366) replaces the roster', () => {
     expect(roster('#room')).toEqual(['alice', 'bob', 'carol', 'me']);
   });
 });
+
+describe('navigate() reconciles the focused channel roster', () => {
+  // A mesh netsplit can leave the member list stale with no delta to fix it.
+  // Focusing a channel re-requests NAMES so the list reconciles to server truth.
+  function seedConnected(name: string) {
+    const client = makeClient();
+    const channels = new Map<string, Channel>();
+    channels.set(name.toLowerCase(), makeChannel(name, [makeUser('me')]));
+    store.setState({
+      ...initialState,
+      client: client as never,
+      connectionStatus: 'connected',
+      ourNick: 'me',
+      channels,
+      activeView: { kind: 'home' },
+    }, true);
+    return client;
+  }
+
+  it('sends NAMES when navigating to a joined channel', () => {
+    const client = seedConnected('#recon1');
+    store.getState().navigate({ kind: 'channel', channel: '#recon1' });
+    expect(client.sendRaw).toHaveBeenCalledWith('NAMES', '#recon1');
+  });
+
+  it('throttles repeated focus so it does not spam NAMES', () => {
+    const client = seedConnected('#recon2');
+    store.getState().navigate({ kind: 'channel', channel: '#recon2' });
+    store.getState().navigate({ kind: 'home' });
+    store.getState().navigate({ kind: 'channel', channel: '#recon2' });
+    const names = client.sendRaw.mock.calls.filter((c) => c[0] === 'NAMES');
+    expect(names).toHaveLength(1);
+  });
+
+  it('does not send NAMES for a channel we are not in', () => {
+    const client = seedConnected('#recon3');
+    store.getState().navigate({ kind: 'channel', channel: '#notjoined' });
+    const names = client.sendRaw.mock.calls.filter((c) => c[0] === 'NAMES');
+    expect(names).toHaveLength(0);
+  });
+
+  it('does not send NAMES while disconnected', () => {
+    const client = seedConnected('#recon4');
+    store.setState({ connectionStatus: 'disconnected' });
+    store.getState().navigate({ kind: 'channel', channel: '#recon4' });
+    const names = client.sendRaw.mock.calls.filter((c) => c[0] === 'NAMES');
+    expect(names).toHaveLength(0);
+  });
+});

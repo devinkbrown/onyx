@@ -1683,6 +1683,21 @@ const _openChathistoryByTarget = new Map<string, string>();
  */
 const _namesInProgress = new Set<string>();
 
+// ── Active-roster reconciliation (module-level) ───────────────────────────────
+// The member list can silently drift from the server's truth: a mesh peer flap
+// emits a netsplit QUIT batch (then a netjoin JOIN batch) that a briefly-dropped
+// or late-reconnecting client may only half-apply, leaving cross-node members
+// missing with NO delta left to restore them. NAMES is authoritative (the 353
+// handler rebuilds the roster) and idempotent, so we reconcile the *visible*
+// channel back to server truth on focus and on a slow timer. A per-channel
+// throttle keeps focus-thrash from spamming NAMES.
+const _ROSTER_REFRESH_MS = 8000;
+/** Active-channel poll interval — heals a stale roster without a manual switch. */
+const _ROSTER_POLL_MS = 45000;
+/** channel key → last NAMES refresh timestamp (_now()). */
+const _lastRosterRefresh = new Map<string, number>();
+let _rosterPollTimer: ReturnType<typeof setInterval> | null = null;
+
 // ── MOTD buffer (module-level) ────────────────────────────────────────────────
 /** Accumulates MOTD lines between RPL_MOTDSTART (375) and RPL_ENDOFMOTD (376) */
 let _motdBuffer = '';
@@ -1758,6 +1773,43 @@ function _clearReconnectCountdown() {
 
 type SetFn = (partial: Partial<OnyxState> | ((s: OnyxState) => Partial<OnyxState>)) => void;
 type GetFn = () => OnyxState;
+
+/**
+ * Re-request NAMES for a joined channel so its member list reconciles to the
+ * server's authoritative roster. Throttled per channel (_ROSTER_REFRESH_MS) so
+ * rapid focus switching can't spam the server. No-op when disconnected or not a
+ * member. Safe to call freely: NAMES rebuilds the roster and is idempotent.
+ */
+function _refreshChannelRoster(get: GetFn, channel: string): void {
+  const key = channel.toLowerCase();
+  const st = get();
+  if (st.connectionStatus !== 'connected' || !st.client) return;
+  const chan = st.channels.get(key);
+  if (!chan) return;
+  const now = _now();
+  // _now() is a relative clock (performance.now()), so an absent entry must mean
+  // "never refreshed" — not timestamp 0, which would wrongly throttle the first
+  // refresh during the first few seconds of a session.
+  const last = _lastRosterRefresh.get(key);
+  if (last !== undefined && now - last < _ROSTER_REFRESH_MS) return;
+  _lastRosterRefresh.set(key, now);
+  st.client.sendRaw('NAMES', chan.name);
+}
+
+/** Start the active-channel roster poll, replacing any prior timer. */
+function _startRosterPoll(get: GetFn): void {
+  if (_rosterPollTimer) clearInterval(_rosterPollTimer);
+  _rosterPollTimer = setInterval(() => {
+    const view = get().activeView;
+    if (view.kind === 'channel') _refreshChannelRoster(get, view.channel);
+  }, _ROSTER_POLL_MS);
+}
+
+/** Stop the active-channel roster poll and clear the throttle map. */
+function _stopRosterPoll(): void {
+  if (_rosterPollTimer) { clearInterval(_rosterPollTimer); _rosterPollTimer = null; }
+  _lastRosterRefresh.clear();
+}
 
 // ── Account-management standard-reply commands ───────────────────────────────
 /** Commands whose FAIL/WARN/NOTE replies the account layer routes to state. */
@@ -2135,7 +2187,12 @@ export const store = createStore<OnyxState>()(
       _batchCollectors.clear();
       _openChathistoryByTarget.clear();
       _namesInProgress.clear();
+      _lastRosterRefresh.clear();
       _motdBuffer = '';
+      // Poll the focused channel's roster so a stale member list self-heals even
+      // without a manual channel switch (e.g. while sitting in #root through a
+      // mesh flap). The throttle in _refreshChannelRoster keeps it cheap.
+      _startRosterPoll(get);
 
       // Remember the desired nick before the IRC client may append '_' on collision
       _stopNickReclaim();
@@ -2287,6 +2344,7 @@ export const store = createStore<OnyxState>()(
       // swallow live messages after a fresh connect.
       _batchCollectors.clear();
       _openChathistoryByTarget.clear();
+      _stopRosterPoll();
       _motdBuffer = '';
       get().client?.destroy();
       set({
@@ -2376,6 +2434,9 @@ export const store = createStore<OnyxState>()(
         get().markChannelRead(view.channel);
         // Clear the unread separator when switching to a channel
         get().clearFirstUnread(view.channel);
+        // Reconcile the member list to the server's authoritative roster on
+        // focus — heals a list left stale by a mesh netsplit or a missed delta.
+        _refreshChannelRoster(get, view.channel);
       }
       if (view.kind === 'dm') {
         get().captureUnreadDivider(view.nick);
