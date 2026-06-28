@@ -17,6 +17,7 @@
 import {
   createContext,
   createEffect,
+  createRoot,
   createSignal,
   onCleanup,
   useContext,
@@ -53,6 +54,31 @@ export function useTheme(): ThemeContextValue {
     throw new Error('useTheme() must be called inside <ThemeProvider>.');
   }
   return ctx;
+}
+
+/**
+ * Non-throwing variant for always-mounted UI (e.g. the in-shell Appearance
+ * panel) that may render in environments without a ThemeProvider — tests,
+ * Storybook, isolated component mounts. Returns the real context when present,
+ * otherwise a functional standalone theme controller backed by localStorage.
+ */
+let _fallbackTheme: ThemeContextValue | undefined;
+function fallbackThemeController(): ThemeContextValue {
+  if (_fallbackTheme) return _fallbackTheme;
+  _fallbackTheme = createRoot(() => {
+    const [id, setId] = createSignal<ThemeId>(readStoredTheme());
+    const setTheme = (next: ThemeId): void => {
+      setId(next);
+      persistTheme(next);
+      if (typeof document !== 'undefined') applyThemeToDom(next);
+    };
+    return { themeId: id, setTheme };
+  });
+  return _fallbackTheme;
+}
+
+export function useThemeOptional(): ThemeContextValue {
+  return useContext(ThemeContext) ?? fallbackThemeController();
 }
 
 // ---------------------------------------------------------------------------

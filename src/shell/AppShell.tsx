@@ -47,6 +47,7 @@ import {
 import { mountMedia } from '@/media/useSuimyakuMedia';
 import { MemberList } from './MemberList';
 import { AccountPanel } from '@/app/Account';
+import { AppearancePanel } from './AppearancePanel';
 import { Spotlight } from '@/chat/spotlight';
 import { useSpotlightHotkeys } from '@/chat/spotlight/useSpotlight';
 import { KeyboardHelpOverlay } from './KeyboardHelpOverlay';
@@ -166,14 +167,8 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const CONNECTED_SERVERS = 1;
   const showRail = createMemo(() => CONNECTED_SERVERS >= 3);
 
-  // ── active background from localStorage ──
-  const bgId = createMemo(() => {
-    try {
-      return localStorage.getItem('ruri:bg') ?? 'deep-current';
-    } catch {
-      return 'deep-current';
-    }
-  });
+  // ── active background (reactive: live-updates when changed in the panel) ──
+  const bgId = useStore((s) => s.backgroundId);
 
   // ── derived nick ──
   const displayNick = createMemo(() => local.selfNick ?? ourNick() ?? '');
@@ -361,6 +356,9 @@ export function AppShell(props: AppShellProps): JSX.Element {
         open={showAccount()}
         onOpenChange={(open) => (open ? getState().openAccount() : getState().closeAccount())}
       />
+
+      {/* Appearance panel — theme + background, gated on store.showAppearance */}
+      <AppearancePanel />
 
       {/* Voice/video overlays — each self-gates on store.voice */}
       <VoicePip />

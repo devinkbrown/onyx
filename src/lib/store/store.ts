@@ -379,6 +379,13 @@ export interface OnyxState {
   /** Open / close the account management panel */
   openAccount(): void;
   closeAccount(): void;
+  /** Whether the appearance (theme + background) panel is open */
+  showAppearance: boolean;
+  openAppearance(): void;
+  closeAppearance(): void;
+  /** Active animated/solid background id (reactive so the shell updates live) */
+  backgroundId: string;
+  setBackground(id: string): void;
 
   // ── Data ────────────────────────────────────────────────────────────
   channels: Map<string, Channel>;
@@ -1932,6 +1939,8 @@ export const store = createStore<OnyxState>()(
     showSettings: false,
     settingsTab: 'account',
     showAccount: false,
+    showAppearance: false,
+    backgroundId: _loadBackground(),
     channels: new Map(),
     dms: new Map(),
     ourNick: '',
@@ -2542,6 +2551,18 @@ export const store = createStore<OnyxState>()(
     },
     closeAccount() {
       set({ showAccount: false });
+    },
+
+    // ── Appearance panel + live background ───────────────────────────────
+    openAppearance() {
+      set({ showAppearance: true });
+    },
+    closeAppearance() {
+      set({ showAppearance: false });
+    },
+    setBackground(id) {
+      _saveBackground(id);
+      set({ backgroundId: id });
     },
 
     // ── markRead ─────────────────────────────────────────────────────────
@@ -8443,6 +8464,19 @@ function _loadNickAliases(): string[] {
 function _saveNickAliases(aliases: string[]): void {
   if (typeof window === 'undefined') return;
   try { localStorage.setItem('ocean-nick-aliases', JSON.stringify(aliases)); } catch {}
+}
+
+// ── Background persistence (shared with the Appearance route, key 'ruri:bg') ──
+// NB: literals are inlined (not module-level consts) because _loadBackground is
+// invoked while the store's initial state is built — earlier in module eval
+// than any const declared down here would be initialized (TDZ).
+function _loadBackground(): string {
+  if (typeof window === 'undefined') return 'deep-current';
+  try { return localStorage.getItem('ruri:bg') || 'deep-current'; } catch { return 'deep-current'; }
+}
+function _saveBackground(id: string): void {
+  if (typeof window === 'undefined') return;
+  try { localStorage.setItem('ruri:bg', id); } catch {}
 }
 
 // ── Watch list persistence ────────────────────────────────────────────────────

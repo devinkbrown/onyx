@@ -156,6 +156,25 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
           </button>
         </Show>
 
+        {/* Appearance — theme + background switcher. Always reachable here
+            (the rail entry is hidden when fewer than 3 servers). */}
+        <button
+          type="button"
+          class="shell-ribbon-appearance"
+          aria-label="Appearance — theme and background"
+          aria-haspopup="dialog"
+          onClick={() => getState().openAppearance()}
+          data-testid="ribbon-appearance"
+        >
+          <svg class="shell-ribbon-appearance-glyph" viewBox="0 0 24 24" aria-hidden="true"
+            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3a9 9 0 1 0 0 18c1 0 1.6-.8 1.6-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.1 0-.9.7-1.6 1.6-1.6H16a5 5 0 0 0 5-5c0-3.9-4-7.4-9-7.4Z" />
+            <circle cx="7.5" cy="11.5" r="1.1" fill="currentColor" stroke="none" />
+            <circle cx="11" cy="7.5" r="1.1" fill="currentColor" stroke="none" />
+            <circle cx="15.5" cy="8.5" r="1.1" fill="currentColor" stroke="none" />
+          </svg>
+        </button>
+
         {/* Identity / account chip — opens the account panel. Shows the
             logged-in account, or "Guest" when browsing anonymously. */}
         <button

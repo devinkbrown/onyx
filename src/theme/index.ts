@@ -9,7 +9,7 @@
  *   - Types (ThemeId, ThemeMeta, TokenMap, StudioToken, StudioGroup, StudioTokenType)
  */
 
-export { ThemeProvider, useTheme, applyThemeToDom } from './ThemeProvider';
+export { ThemeProvider, useTheme, useThemeOptional, applyThemeToDom } from './ThemeProvider';
 export type { ThemeProviderProps } from './ThemeProvider';
 
 export { ThemeStudio } from './ThemeStudio';
