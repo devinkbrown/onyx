@@ -1576,6 +1576,16 @@
   opacity: 1;
 }
 
+/* Pointer devices: hold the row actions out of sight until the message is
+   hovered or keyboard-focused. They stay in flow (opacity only) so revealing
+   them never reflows the feed. Touch devices keep the faint resting state
+   above, since there is no hover to surface them. */
+@media (hover: hover) and (pointer: fine) {
+  .shell-msg-actions {
+    opacity: 0;
+  }
+}
+
 .shell-msg-action {
   padding: 2px 7px;
   border: 1px solid var(--seam-faint);
