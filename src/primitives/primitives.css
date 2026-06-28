@@ -308,6 +308,30 @@
   }
 }
 
+/* Phones: an anchored popover next to a trigger near the screen edge (message
+   action bar, member card, voice reactions) easily overflows off-screen. Re-pin
+   every popover panel to a centered bottom sheet so it is always fully visible
+   and thumb-reachable. Overrides the anchor() positioning above (same specificity,
+   declared later) and the [data-placement='top'] variant. */
+@media (max-width: 560px) {
+  .ruri-popover__panel,
+  .ruri-popover[data-placement='top'] .ruri-popover__panel {
+    position: fixed;
+    inset: auto;
+    left: 50%;
+    right: auto;
+    top: auto;
+    bottom: max(0.75rem, env(safe-area-inset-bottom, 0.75rem));
+    transform: translateX(-50%);
+    translate: none;
+    width: min(92vw, 26rem);
+    min-width: 0;
+    max-width: 92vw;
+    max-height: 72svh;
+    overflow: auto;
+  }
+}
+
 .ruri-sheet,
 .ruri-modal {
   position: fixed;

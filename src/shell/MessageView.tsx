@@ -274,6 +274,10 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   let feedEl!: HTMLDivElement;
   const [atBottom, setAtBottom] = createSignal(true);
 
+  // Tap-to-reveal action bar (touch): id of the row whose action bar is showing.
+  // Declared here so the conversation-switch effect below can clear it.
+  const [revealedId, setRevealedId] = createSignal<string | null>(null);
+
   function checkScroll(): void {
     const el = feedEl;
     if (!el) return;
@@ -307,6 +311,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     unreadDividerId(); // re-track so the boundary settling re-runs the effect
     if (!target || target === scrolledTarget) return;
     scrolledTarget = target;
+    setRevealedId(null);
     requestAnimationFrame(() => {
       const el = feedEl?.querySelector<HTMLElement>('.shell-unread-divider');
       if (el) {
@@ -325,6 +330,22 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   function openThread(msgId: string): void {
     setThreadParentId(msgId);
     setThreadOpen(true);
+  }
+
+  // ── tap-to-reveal action bar (touch) ──
+  // On touch devices there is no hover, so the per-message action bar (react /
+  // reply / ⋯) stays hidden until the row is tapped — it would otherwise crowd
+  // every line. revealedId (declared above) holds the one revealed row. Taps that
+  // land on a link, button, or an active text selection are ignored so they keep
+  // their normal behaviour rather than toggling the bar.
+  function toggleReveal(msgId: string, event: MouseEvent): void {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('a, button, input, textarea, select, [role="button"], [contenteditable="true"]')) {
+      return;
+    }
+    const selection = typeof window !== 'undefined' ? window.getSelection?.() : null;
+    if (selection && !selection.isCollapsed) return;
+    setRevealedId((current) => (current === msgId ? null : msgId));
   }
 
   return (
@@ -414,10 +435,12 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                     class={[
                       'shell-msg-cont',
                       isHighlight() ? 'shell-msg-cont--highlight' : '',
+                      revealedId() === msg.id ? 'shell-msg-revealed' : '',
                       activeMessageSearchResultId() === msg.id ? 'shell-msg-search-current' : '',
                     ].filter(Boolean).join(' ')}
                     data-message-search-id={msg.id}
                     onContextMenu={openMenuFromRow}
+                    onClick={(e) => toggleReveal(msg.id, e)}
                   >
                     <span class="shell-msg-cont-ts" aria-hidden="true">
                       {fmtTime(msg.time)}
@@ -471,11 +494,13 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                   class={[
                     'shell-msg-group',
                     isHighlight() ? 'shell-msg-group--highlight' : '',
+                    revealedId() === msg.id ? 'shell-msg-revealed' : '',
                     activeMessageSearchResultId() === msg.id ? 'shell-msg-search-current' : '',
                   ].filter(Boolean).join(' ')}
                   data-message-search-id={msg.id}
                   aria-label={`${msg.from} at ${fmtTime(msg.time)}`}
                   onContextMenu={openMenuFromRow}
+                  onClick={(e) => toggleReveal(msg.id, e)}
                 >
                   <MessageMenu
                     msg={msg}

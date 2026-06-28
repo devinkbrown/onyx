@@ -51,11 +51,20 @@
   transform: translateY(0);
 }
 
-/* Touch / coarse pointers: keep the bar gently present (no hover to reveal it). */
+/* Touch / coarse pointers: there is no hover to reveal the bar, so it stays
+   hidden until the row is tapped. MessageView toggles .shell-msg-revealed on the
+   tapped row (one at a time), and the bar lifts in via focus when a button gets
+   keyboard focus. This keeps the feed uncluttered on phones. */
 @media (hover: none), (pointer: coarse) {
   .msg-menu-bar {
-    opacity: 0.7;
+    opacity: 0;
     transform: none;
+  }
+
+  .shell-msg-group.shell-msg-revealed .msg-menu-bar,
+  .shell-msg-cont.shell-msg-revealed .msg-menu-bar,
+  .msg-menu-bar:focus-within {
+    opacity: 1;
   }
 }
 
