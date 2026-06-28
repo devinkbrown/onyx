@@ -218,6 +218,18 @@ export function Composer(props: ComposerProps): JSX.Element {
     setComposerText(next);
     setComposerError(null);
     setSlashDismissed(false);
+    // Broadcast typing presence (the store rate-limits 'active' to once / 4s, and
+    // recipients auto-expire after a few seconds of silence). Empty input or a
+    // slash command isn't "composing a message", so signal a stop instead.
+    const t = target();
+    if (t) {
+      const trimmed = next.trim();
+      if (trimmed && !trimmed.startsWith('/')) {
+        getState().sendTypingStart(t);
+      } else {
+        getState().sendTypingStop(t);
+      }
+    }
   }
 
   function handleKeyDown(e: KeyboardEvent): void {
@@ -398,6 +410,7 @@ export function Composer(props: ComposerProps): JSX.Element {
   }
 
   function resetAfterSend(t: string): void {
+    getState().sendTypingStop(t); // we just sent — stop the typing signal
     setComposerText('', false);
     getState().clearComposerDraft(t);
     setAttachments((items) => {

@@ -34,6 +34,7 @@ import { ServerRail } from './ServerRail';
 import { ChannelSidebar } from './ChannelSidebar';
 import { PresenceRibbon } from './PresenceRibbon';
 import { MessageView } from './MessageView';
+import { TypingIndicator } from './TypingIndicator';
 import { Composer } from './Composer';
 import {
   VoiceStage,
@@ -363,6 +364,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
             <Show when={inCall()}>
               <VoiceBar />
             </Show>
+            <TypingIndicator />
             <Composer />
           </Show>
         </div>
