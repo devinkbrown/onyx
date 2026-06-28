@@ -99,3 +99,57 @@ describe('MEDIA presence via the IRCX EVENT plane', () => {
     expect(sub).toBeTruthy();
   });
 });
+
+describe('MEDIA live state (speaking / mute / hand / react) — drives the call UI for cross-node peers', () => {
+  it('SPEAKING / SILENT toggles speakingNicks', () => {
+    seedChannel('#root');
+    feed(':eshmaki.me EVENT me MEDIA JOIN #root alice voice');
+    feed(':eshmaki.me EVENT me MEDIA SPEAKING #root alice voice');
+    expect(store.getState().speakingNicks.has('alice')).toBe(true);
+    feed(':eshmaki.me EVENT me MEDIA SILENT #root alice voice');
+    expect(store.getState().speakingNicks.has('alice')).toBe(false);
+  });
+
+  it('MUTE / UNMUTE toggles mutedNicks (flat set works for peers with no media)', () => {
+    seedChannel('#root');
+    feed(':eshmaki.me EVENT me MEDIA JOIN #root alice voice');
+    feed(':eshmaki.me EVENT me MEDIA MUTE #root alice voice');
+    expect(store.getState().mutedNicks.has('alice')).toBe(true);
+    feed(':eshmaki.me EVENT me MEDIA UNMUTE #root alice voice');
+    expect(store.getState().mutedNicks.has('alice')).toBe(false);
+  });
+
+  it('HAND up / down toggles voice.raisedHands', () => {
+    seedChannel('#root');
+    feed(':eshmaki.me EVENT me MEDIA JOIN #root alice voice');
+    feed(':eshmaki.me EVENT me MEDIA HAND #root alice up');
+    expect(store.getState().voice.raisedHands.has('alice')).toBe(true);
+    feed(':eshmaki.me EVENT me MEDIA HAND #root alice down');
+    expect(store.getState().voice.raisedHands.has('alice')).toBe(false);
+  });
+
+  it('REACT dispatches an ocean:voice-reaction event', () => {
+    seedChannel('#root');
+    feed(':eshmaki.me EVENT me MEDIA JOIN #root alice voice');
+    const got: Array<{ emoji: string; nick: string }> = [];
+    const h = (e: Event) => got.push((e as CustomEvent).detail);
+    window.addEventListener('ocean:voice-reaction', h);
+    feed(':eshmaki.me EVENT me MEDIA REACT #root alice tada');
+    window.removeEventListener('ocean:voice-reaction', h);
+    expect(got).toEqual([{ emoji: 'tada', nick: 'alice' }]);
+  });
+
+  it('LEAVE clears the participant from speaking / muted / hand', () => {
+    seedChannel('#root');
+    feed(':eshmaki.me EVENT me MEDIA JOIN #root alice voice');
+    feed(':eshmaki.me EVENT me MEDIA SPEAKING #root alice voice');
+    feed(':eshmaki.me EVENT me MEDIA MUTE #root alice voice');
+    feed(':eshmaki.me EVENT me MEDIA HAND #root alice up');
+    feed(':eshmaki.me EVENT me MEDIA LEAVE #root alice');
+    const st = store.getState();
+    expect(st.speakingNicks.has('alice')).toBe(false);
+    expect(st.mutedNicks.has('alice')).toBe(false);
+    expect(st.voice.raisedHands.has('alice')).toBe(false);
+    expect(callRoster('#root')?.has('alice') ?? false).toBe(false);
+  });
+});

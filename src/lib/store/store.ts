@@ -1275,9 +1275,15 @@ export interface OnyxState {
   markWelcomeSeen: (channel: string) => void;
 
   // ── Voice / SUIMYAKU speaking + channel tracking ─────────────────────────────
-  /** Set of nicks currently speaking (updated from PeerRegistry VAD) */
+  /** Set of nicks currently speaking (local VAD + server MEDIA SPEAKING events) */
   speakingNicks: Set<string>;
   setSpeakingNick: (nick: string, speaking: boolean) => void;
+  /**
+   * Nicks reported muted by the server's MEDIA MUTE/UNMUTE events. A flat set
+   * (unlike `voice.peers[nick].muted`) so it reflects CROSS-NODE participants
+   * too — their media never reaches this client, so they have no peer entry.
+   */
+  mutedNicks: Set<string>;
   /** Channel names identified as SUIMYAKU voice channels (prefix + or mode V) */
   voiceChannels: string[];
   addVoiceChannel: (channel: string) => void;
@@ -3633,8 +3639,8 @@ export const store = createStore<OnyxState>()(
           // (TRANSPORT/NATIVE/PROFILE/LAYER…) have no nick. Only treat param[3]
           // as an actor for presence; otherwise forward the whole tail.
           const isPresenceVerb = verb === 'JOIN' || verb === 'LEAVE' || verb === 'ROSTER'
-            || verb === 'MUTE' || verb === 'UNMUTE' || verb === 'SPEAKING' || verb === 'HAND'
-            || verb === 'REACT';
+            || verb === 'MUTE' || verb === 'UNMUTE' || verb === 'SPEAKING' || verb === 'SILENT'
+            || verb === 'HAND' || verb === 'REACT';
           const actor = isPresenceVerb ? (mediaActor || nick || '') : '';
           // Pass the full param tail after the verb so the media engine can parse
           // per-verb signaling payloads itself.
@@ -3642,6 +3648,9 @@ export const store = createStore<OnyxState>()(
 
           if (channel) {
             const chKey = channel.toLowerCase();
+            // The token after the actor: kind (JOIN/SPEAKING), up|down (HAND),
+            // or the emoji (REACT).
+            const arg = mediaParams[4] ?? '';
             if ((verb === 'JOIN' || verb === 'ROSTER') && actor) {
               set(s => {
                 const map = new Map(s.voiceChannelParticipants);
@@ -3656,12 +3665,52 @@ export const store = createStore<OnyxState>()(
                 const pSet = new Set(map.get(chKey) ?? []);
                 pSet.delete(actor);
                 map.set(chKey, pSet);
-                return { voiceChannelParticipants: map, mediaAvailable: true };
+                // A departed participant carries no live speaking/mute/hand state.
+                const speakingNicks = new Set(s.speakingNicks); speakingNicks.delete(actor);
+                const mutedNicks = new Set(s.mutedNicks); mutedNicks.delete(actor);
+                const raisedHands = new Set(s.voice.raisedHands); raisedHands.delete(actor);
+                const peers = new Map(s.voice.peers); peers.delete(actor);
+                return {
+                  voiceChannelParticipants: map,
+                  speakingNicks,
+                  mutedNicks,
+                  voice: { ...s.voice, raisedHands, peers },
+                  mediaAvailable: true,
+                };
               });
+            } else if ((verb === 'SPEAKING' || verb === 'SILENT') && actor) {
+              // Authoritative speaking signal — the ONLY one for cross-node peers
+              // (their audio never reaches this client's local VAD).
+              const on = verb === 'SPEAKING';
+              get().setVoiceParticipantSpeaking(actor, on);
+              get().setSpeakingNick(actor, on);
+              set({ mediaAvailable: true });
+            } else if ((verb === 'MUTE' || verb === 'UNMUTE') && actor) {
+              const m = verb === 'MUTE';
+              get().setVoiceParticipantMuted(actor, m); // same-node peers w/ a peer entry
+              set(s => {
+                const mutedNicks = new Set(s.mutedNicks);
+                if (m) mutedNicks.add(actor); else mutedNicks.delete(actor);
+                return { mutedNicks, mediaAvailable: true };
+              });
+            } else if (verb === 'HAND' && actor) {
+              const up = arg.toLowerCase() === 'up';
+              set(s => {
+                const raisedHands = new Set(s.voice.raisedHands);
+                if (up) raisedHands.add(actor); else raisedHands.delete(actor);
+                return { voice: { ...s.voice, raisedHands }, mediaAvailable: true };
+              });
+            } else if (verb === 'REACT' && actor) {
+              if (arg && typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('ocean:voice-reaction', {
+                  detail: { emoji: arg, nick: actor },
+                }));
+              }
+              set({ mediaAvailable: true });
             } else {
               set({ mediaAvailable: true });
             }
-            // Forward every NOTE MEDIA (presence + signaling) to the engine.
+            // Forward every media event to the engine (frame/signaling paths).
             getMountedSuimyakuMediaEngine()?.handleMediaMessage(actor, channel, verb, detail);
           } else {
             set({ mediaAvailable: true });
@@ -6721,6 +6770,7 @@ export const store = createStore<OnyxState>()(
 
     // ── Voice / SUIMYAKU speaking + channel tracking ────────────────────────────
     speakingNicks: new Set<string>(),
+    mutedNicks: new Set<string>(),
     setSpeakingNick: (nick, speaking) => set(s => {
       const next = new Set(s.speakingNicks);
       if (speaking) {

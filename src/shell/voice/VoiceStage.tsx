@@ -42,12 +42,18 @@ type Slot = {
   stream: MediaStream | null;
   speaking: boolean;
   handRaised: boolean;
+  muted: boolean;
 };
 
 export function VoiceStage() {
   const voice = useStore(s => s.voice);
   const channels = useStore(s => s.channels);
   const ourNick = useStore(s => s.ourNick);
+  // Flat, peer-independent state from the server's MEDIA event plane — the ONLY
+  // source for cross-node participants (their media never reaches this client).
+  const speakingNicks = useStore(s => s.speakingNicks);
+  const mutedNicks = useStore(s => s.mutedNicks);
+  const voiceChannelParticipants = useStore(s => s.voiceChannelParticipants);
 
   const channelUsers = createMemo(() => {
     const ch = voice().callChannel;
@@ -60,19 +66,10 @@ export function VoiceStage() {
   // All peers as an array (stable iteration order)
   const peers = createMemo<SuimyakuPeerState[]>(() => [...voice().peers.values()]);
 
-  // Total participant count (self + peers)
-  const totalCount = createMemo(() => peers().length + 1);
-
   // Screenshare is active: self screenshare takes the primary slot
   const screenshareActive = createMemo(() => voice().screenshareActive && !!voice().screenshareStream);
 
   const isSpotlight = createMemo(() => voice().callLayout === 'spotlight' && !screenshareActive());
-
-  const countAttr = createMemo(() => {
-    const n = totalCount();
-    if (n >= 10) return 'large';
-    return String(n);
-  });
 
   // Resolve video stream for a peer
   const peerStream = (nick: string): MediaStream | null =>
@@ -94,8 +91,9 @@ export function VoiceStage() {
     peer: null,
     isSelf: true,
     stream: selfVideoStream(),
-    speaking: false,
+    speaking: speakingNicks().has(selfNick()),
     handRaised: voice().handRaised,
+    muted: voice().muted,
   }));
 
   const peerSlots = createMemo<Slot[]>(() =>
@@ -105,12 +103,50 @@ export function VoiceStage() {
       peer: p,
       isSelf: false,
       stream: peerStream(p.nick),
-      speaking: p.speaking,
+      speaking: p.speaking || speakingNicks().has(p.nick),
       handRaised: voice().raisedHands.has(p.nick),
+      muted: p.muted || mutedNicks().has(p.nick),
     }))
   );
 
-  const allSlots = createMemo<Slot[]>(() => [selfSlot(), ...peerSlots()]);
+  // Cross-node (and any not-yet-decoding) call members: present in the mesh-
+  // propagated roster but with no local media peer. Render them as audio-only
+  // tiles driven entirely by the server's MEDIA event-plane state, so a call
+  // spanning two servers actually shows everyone in it.
+  const rosterSlots = createMemo<Slot[]>(() => {
+    const ch = voice().callChannel;
+    if (!ch) return [];
+    const roster = voiceChannelParticipants().get(ch.toLowerCase());
+    if (!roster) return [];
+    const known = new Set<string>([selfNick().toLowerCase(), ...peers().map(p => p.nick.toLowerCase())]);
+    const out: Slot[] = [];
+    for (const nick of roster) {
+      if (known.has(nick.toLowerCase())) continue;
+      out.push({
+        key: nick,
+        nick,
+        peer: null,
+        isSelf: false,
+        stream: null,
+        speaking: speakingNicks().has(nick),
+        handRaised: voice().raisedHands.has(nick),
+        muted: mutedNicks().has(nick),
+      });
+    }
+    return out;
+  });
+
+  const remoteSlots = createMemo<Slot[]>(() => [...peerSlots(), ...rosterSlots()]);
+  const allSlots = createMemo<Slot[]>(() => [selfSlot(), ...remoteSlots()]);
+
+  // Total participant count (self + media peers + roster-only members).
+  const totalCount = createMemo(() => allSlots().length);
+
+  const countAttr = createMemo(() => {
+    const n = totalCount();
+    if (n >= 10) return 'large';
+    return String(n);
+  });
 
   // Spotlight subject: pinned participant → active speaker → self.
   const spotlightSlot = createMemo<Slot>(() => {
@@ -120,7 +156,7 @@ export function VoiceStage() {
       const found = slots.find(s => s.nick === pinned);
       if (found) return found;
     }
-    const speaker = peerSlots().find(s => s.speaking);
+    const speaker = remoteSlots().find(s => s.speaking);
     if (speaker) return speaker;
     return selfSlot();
   });
@@ -161,7 +197,7 @@ export function VoiceStage() {
                       peer={slot.peer}
                       stream={slot.stream}
                       isSelf={slot.isSelf}
-                      muted={slot.isSelf ? voice().muted : undefined}
+                      muted={slot.muted}
                       deafened={slot.isSelf ? voice().deafened : undefined}
                       handRaised={slot.handRaised}
                       pinned={voice().pinnedParticipant === slot.nick}
@@ -183,7 +219,7 @@ export function VoiceStage() {
                     peer={slot.peer}
                     stream={slot.stream}
                     isSelf={slot.isSelf}
-                    muted={slot.isSelf ? voice().muted : undefined}
+                    muted={slot.muted}
                     deafened={slot.isSelf ? voice().deafened : undefined}
                     handRaised={slot.handRaised}
                     pinned={voice().pinnedParticipant === slot.nick}
@@ -203,7 +239,7 @@ export function VoiceStage() {
                       peer={slot.peer}
                       stream={slot.stream}
                       isSelf={slot.isSelf}
-                      muted={slot.isSelf ? voice().muted : undefined}
+                      muted={slot.muted}
                       deafened={slot.isSelf ? voice().deafened : undefined}
                       handRaised={slot.handRaised}
                       pinned={voice().pinnedParticipant === slot.nick}
