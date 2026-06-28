@@ -126,6 +126,18 @@
   box-shadow: 0 0 0 4px color-mix(in oklab, var(--lapis) 18%, transparent);
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .shell--no-rail {
   --shell-rail-w: 0px;
   grid-template-columns:
@@ -1407,6 +1419,45 @@
   color: var(--washi-mute);
 }
 
+.shell-msg-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 5px;
+  opacity: 0.42;
+  transition: opacity var(--dur) var(--ease);
+}
+
+.shell-msg-group:hover .shell-msg-actions,
+.shell-msg-group:focus-within .shell-msg-actions,
+.shell-msg-cont:hover .shell-msg-actions,
+.shell-msg-cont:focus-within .shell-msg-actions {
+  opacity: 1;
+}
+
+.shell-msg-action {
+  padding: 2px 7px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--washi-mute);
+  background: color-mix(in oklab, var(--stone-2) 28%, transparent);
+  transition:
+    color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease);
+}
+
+.shell-msg-action:hover {
+  color: var(--lapis-bright);
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
+}
+
 /* Jump to latest */
 .shell-jump-latest {
   position: absolute;
@@ -1440,6 +1491,7 @@
 
 /* ── Composer ── */
 .shell-composer {
+  position: relative;
   flex: none;
   padding: 10px 16px 14px;
   background:
@@ -1449,6 +1501,273 @@
       color-mix(in oklab, var(--ink) 82%, var(--stone)) 100%
     );
   border-top: 1px solid var(--seam-faint);
+}
+
+.shell-composer--drag {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--lapis-deep) 22%, var(--ink)) 0%,
+      color-mix(in oklab, var(--ink) 78%, var(--stone)) 100%
+    );
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 38%, transparent);
+}
+
+.shell-composer-context {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+  padding: 6px 8px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  color: var(--washi-dim);
+  background: color-mix(in oklab, var(--stone-2) 38%, transparent);
+}
+
+.shell-composer-context--edit {
+  border-color: color-mix(in oklab, var(--gold) 42%, var(--seam-faint));
+  background: color-mix(in oklab, var(--gold) 10%, var(--stone-2));
+}
+
+.shell-composer-context-label {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lapis-bright);
+  white-space: nowrap;
+}
+
+.shell-composer-context--edit .shell-composer-context-label {
+  color: var(--gold-bright);
+}
+
+.shell-composer-context-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  color: var(--washi-dim);
+}
+
+.shell-composer-context-close {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  color: var(--washi-mute);
+  background: transparent;
+  line-height: 1;
+}
+
+.shell-composer-context-close:hover {
+  color: var(--washi);
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--stone-2) 48%, transparent);
+}
+
+.shell-composer-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 8px;
+}
+
+.shell-attachment {
+  display: grid;
+  grid-template-columns: 38px minmax(110px, 1fr) 24px;
+  align-items: center;
+  gap: 8px;
+  max-width: min(100%, 340px);
+  padding: 5px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--stone-2) 38%, transparent);
+}
+
+.shell-attachment--uploading {
+  border-color: color-mix(in oklab, var(--lapis) 48%, var(--seam-faint));
+}
+
+.shell-attachment--error {
+  border-color: color-mix(in oklab, var(--crimson, #ef4444) 62%, var(--seam-faint));
+}
+
+.shell-attachment-thumb,
+.shell-attachment-file {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--ink) 54%, var(--stone-2));
+}
+
+.shell-attachment-thumb {
+  object-fit: cover;
+}
+
+.shell-attachment-file {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--washi-mute);
+}
+
+.shell-attachment-meta {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.shell-attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  color: var(--washi);
+}
+
+.shell-attachment-size,
+.shell-attachment-error {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--washi-mute);
+}
+
+.shell-attachment-error {
+  color: color-mix(in oklab, var(--crimson, #ef4444) 70%, var(--washi));
+}
+
+.shell-attachment-progress {
+  width: 100%;
+  height: 4px;
+  accent-color: var(--lapis-bright);
+}
+
+.shell-attachment-remove {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  color: var(--washi-mute);
+  background: transparent;
+  line-height: 1;
+}
+
+.shell-attachment-remove:hover:not(:disabled) {
+  color: var(--washi);
+  border-color: var(--seam);
+}
+
+.shell-attachment-remove:disabled {
+  opacity: 0.45;
+  cursor: progress;
+}
+
+.shell-composer-popovers {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.shell-command-menu,
+.shell-emoji-picker {
+  width: min(460px, 100%);
+  border: 1px solid var(--seam);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--stone-2) 86%, var(--ink));
+  box-shadow:
+    0 16px 44px -24px color-mix(in oklab, var(--ink) 96%, transparent),
+    inset 0 0 0 1px color-mix(in oklab, var(--lapis) 10%, transparent);
+}
+
+.shell-command-menu {
+  display: grid;
+  padding: 5px;
+}
+
+.shell-command-item {
+  display: grid;
+  grid-template-columns: minmax(84px, auto) minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  text-align: left;
+  color: var(--washi-dim);
+  background: transparent;
+}
+
+.shell-command-item:hover,
+.shell-command-item--active {
+  color: var(--washi);
+  border-color: var(--seam-faint);
+  background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
+}
+
+.shell-command-usage {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--lapis-bright);
+}
+
+.shell-command-desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.74rem;
+}
+
+.shell-emoji-picker {
+  padding: 8px;
+}
+
+.shell-emoji-search {
+  width: 100%;
+  min-height: 34px;
+  margin-bottom: 8px;
+  padding: 0 9px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  color: var(--washi);
+  background: color-mix(in oklab, var(--ink) 64%, var(--stone-2));
+}
+
+.shell-emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(28px, 1fr));
+  gap: 4px;
+}
+
+.shell-emoji-choice {
+  min-width: 0;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  font-size: 1.1rem;
+  background: transparent;
+}
+
+.shell-emoji-choice:hover {
+  border-color: var(--seam-faint);
+  background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
 }
 
 .shell-composer-inner {
@@ -1499,6 +1818,37 @@
 
 .shell-composer-textarea::placeholder { color: var(--washi-mute); }
 
+.shell-composer-tool {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  margin-bottom: 3px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  color: var(--washi-dim);
+  background: transparent;
+  transition:
+    color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease);
+}
+
+.shell-composer-tool:hover:not(:disabled),
+.shell-composer-tool[aria-expanded='true'] {
+  color: var(--lapis-bright);
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
+}
+
+.shell-composer-tool:disabled {
+  color: var(--washi-mute);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .shell-composer-send {
   flex: none;
   width: 36px;
@@ -1546,6 +1896,13 @@
   border-color: var(--seam-faint);
   background: transparent;
   cursor: not-allowed;
+}
+
+.shell-composer-error {
+  margin: 6px 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: color-mix(in oklab, var(--crimson, #ef4444) 72%, var(--washi));
 }
 
 .shell-composer-hint {
@@ -2018,6 +2375,7 @@
 
   /* Composer: 16px kills iOS zoom-on-focus; larger send target; drop the hint */
   .shell-composer-textarea { font-size: 16px; min-height: 42px; }
+  .shell-composer-tool { width: 42px; height: 42px; }
   .shell-composer-send { width: 42px; height: 42px; }
   .shell-composer-hint { display: none; }
 
@@ -2080,6 +2438,10 @@
   .shell-ribbon-topic { display: none; }
   .shell-ribbon-identity { display: none; }
   .shell-composer { padding: 8px 12px; }
+  .shell-composer-inner { gap: 6px; }
+  .shell-command-item { grid-template-columns: 1fr; gap: 2px; }
+  .shell-emoji-grid { grid-template-columns: repeat(7, minmax(28px, 1fr)); }
+  .shell-attachment { grid-template-columns: 34px minmax(0, 1fr) 24px; max-width: 100%; }
   .shell-voice-join { padding: 8px 12px; }
 }
 

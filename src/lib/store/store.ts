@@ -9,6 +9,14 @@ import { parseAccountInfo, parseCHANLIMIT, parseMonitorNumeric, parsePREFIX, par
 import type { SuimyakuPeerState, SuimyakuRoomStats, CallState } from '@/lib/suimyaku-media/types';
 import { getMountedSuimyakuMediaEngine } from '@/lib/suimyaku-media/MediaEngine';
 import { parseActivity } from '@/lib/activity';
+import {
+  composerDraftKey,
+  getComposerDraft as readComposerDraft,
+  loadComposerDrafts,
+  saveComposerDrafts,
+  setComposerDraft as updateComposerDraft,
+  type ComposerDrafts,
+} from '@/lib/composer/drafts';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -571,6 +579,16 @@ export interface OnyxState {
   replyingTo: ChatMessage | null;
   /** Who is typing in each target: target.toLowerCase() → (nick → expiresAt ms timestamp) */
   typingUsers: Map<string, Map<string, number>>;
+
+  // ── composer/attachments ──
+  /** Persisted composer drafts by lowercased target. */
+  composerDrafts: ComposerDrafts;
+  /** Message currently being edited through the composer, if any. */
+  editingMessage: ChatMessage | null;
+  getComposerDraft(target: string): string;
+  setComposerDraft(target: string, text: string): void;
+  clearComposerDraft(target: string): void;
+  setComposerEditingMessage(msg: ChatMessage | null): void;
 
   // ── Thread Panel ──────────────────────────────────────────────────────
   showThreadPanel: boolean;
@@ -1940,6 +1958,9 @@ export const store = createStore<OnyxState>()(
     readNotificationIds: new Set(),
     showNotificationCenter: false,
     toasts: [],
+    // ── composer/attachments ──
+    composerDrafts: loadComposerDrafts(),
+    editingMessage: null,
     replyingTo: null,
     typingUsers: new Map(),
     showThreadPanel: false,
@@ -2606,6 +2627,26 @@ export const store = createStore<OnyxState>()(
     // ── messaging UX ──────────────────────────────────────────────────────
     setReplyingTo(msg) {
       set({ replyingTo: msg });
+    },
+
+    // ── composer/attachments ──
+    getComposerDraft(target) {
+      return readComposerDraft(get().composerDrafts, target);
+    },
+
+    setComposerDraft(target, text) {
+      if (!composerDraftKey(target)) return;
+      const next = updateComposerDraft(get().composerDrafts, target, text);
+      saveComposerDrafts(next);
+      set({ composerDrafts: next });
+    },
+
+    clearComposerDraft(target) {
+      get().setComposerDraft(target, '');
+    },
+
+    setComposerEditingMessage(msg) {
+      set({ editingMessage: msg });
     },
 
     addLocalReaction(target, messageId, emoji) {
