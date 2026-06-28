@@ -1391,6 +1391,111 @@
   line-height: 1.5;
 }
 
+/* Loading skeleton — shown while CHATHISTORY is in flight so the feed never
+   flashes the "say the first thing" empty state before history lands. Mirrors
+   the message-group rhythm (avatar + author + lines) with a calm lapis shimmer
+   that staggers in rather than pulsing in lockstep. */
+.shell-feed-loading {
+  --skel-base: color-mix(in oklab, var(--stone-2) 56%, var(--ink));
+  --skel-sheen: color-mix(in oklab, var(--lapis-deep) 26%, var(--skel-base));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-5);
+}
+
+.shell-skel-row {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+  opacity: 0;
+  animation: shell-skel-in var(--dur) var(--ease) forwards;
+  animation-delay: calc(var(--skel-i, 0) * 70ms);
+}
+
+.shell-skel-avatar {
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--r-pill);
+}
+
+.shell-skel-lines { display: grid; gap: 0.45rem; min-width: 0; padding-top: 0.1rem; }
+
+.shell-skel-line {
+  height: 0.62rem;
+  width: 78%;
+  border-radius: var(--r-pill);
+}
+
+.shell-skel-avatar,
+.shell-skel-line {
+  background: linear-gradient(90deg, var(--skel-base) 0%, var(--skel-sheen) 50%, var(--skel-base) 100%);
+  background-size: 220% 100%;
+  animation: shell-skel-shimmer 1.6s ease-in-out infinite;
+}
+
+.shell-skel-line--name { width: 7rem; height: 0.72rem; margin-bottom: 0.12rem; }
+.shell-skel-lines .shell-skel-line:nth-child(3) { width: 64%; }
+.shell-skel-line--short { width: 46%; }
+
+@keyframes shell-skel-shimmer {
+  0% { background-position: 220% 0; }
+  100% { background-position: -120% 0; }
+}
+
+@keyframes shell-skel-in {
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-skel-row { animation: none; opacity: 1; }
+  .shell-skel-avatar,
+  .shell-skel-line { animation: none; background-position: 0 0; }
+}
+
+/* Member-list skeleton — same shimmer language, scaled to roster rows. Shown
+   while NAMES is in flight so the panel doesn't flash "No one here yet". */
+.shell-members-skel {
+  --skel-base: color-mix(in oklab, var(--stone-2) 56%, var(--ink));
+  --skel-sheen: color-mix(in oklab, var(--lapis-deep) 26%, var(--skel-base));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3);
+}
+
+.shell-members-skel-row {
+  display: grid;
+  grid-template-columns: 1.65rem minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: center;
+  opacity: 0;
+  animation: shell-skel-in var(--dur) var(--ease) forwards;
+  animation-delay: calc(var(--skel-i, 0) * 70ms);
+}
+
+.shell-members-skel-avatar {
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: var(--r-pill);
+}
+
+.shell-members-skel-name { height: 0.6rem; border-radius: var(--r-pill); }
+
+.shell-members-skel-avatar,
+.shell-members-skel-name {
+  background: linear-gradient(90deg, var(--skel-base) 0%, var(--skel-sheen) 50%, var(--skel-base) 100%);
+  background-size: 220% 100%;
+  animation: shell-skel-shimmer 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-members-skel-row { animation: none; opacity: 1; }
+  .shell-members-skel-avatar,
+  .shell-members-skel-name { animation: none; background-position: 0 0; }
+}
+
 /* Message group — a fresh author surfaces from the depth: a touch more breathing
    room above so distinct speakers read as distinct, with a hover wash that lifts
    the line toward the light. */

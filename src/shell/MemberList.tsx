@@ -238,11 +238,20 @@ export function MemberList(props: MemberListProps): JSX.Element {
 
   const activeView = useStore((s) => s.activeView);
   const channels = useStore((s) => s.channels);
+  const connectionStatus = useStore((s) => s.connectionStatus);
 
   const activeChannel = createMemo(() => {
     const view = activeView();
     if (view.kind !== 'channel') return null;
     return channels().get(view.channel) ?? null;
+  });
+
+  // We're in the channel but the roster hasn't landed yet (NAMES in flight): a
+  // channel you're a member of always lists at least yourself, so an empty user
+  // map while connected means "loading", not "genuinely empty".
+  const isLoadingRoster = createMemo(() => {
+    const ch = activeChannel();
+    return !!ch && ch.users.size === 0 && connectionStatus() === 'connected';
   });
 
   // Build sorted, grouped member list
@@ -314,9 +323,26 @@ export function MemberList(props: MemberListProps): JSX.Element {
         <Show
           when={groups().length > 0}
           fallback={
-            <p style={{ padding: '10px 12px', color: 'var(--washi-mute)', 'font-family': 'var(--font-mono)', 'font-size': '0.72rem' }}>
-              No one here yet
-            </p>
+            <Show
+              when={isLoadingRoster()}
+              fallback={
+                <p style={{ padding: '10px 12px', color: 'var(--washi-mute)', 'font-family': 'var(--font-mono)', 'font-size': '0.72rem' }}>
+                  No one here yet
+                </p>
+              }
+            >
+              <div class="shell-members-skel" role="status" aria-label="Loading members">
+                <span class="sr-only">Loading members…</span>
+                <For each={[0, 1, 2, 3, 4]}>
+                  {(i) => (
+                    <div class="shell-members-skel-row" style={{ '--skel-i': i }} aria-hidden="true">
+                      <span class="shell-members-skel-avatar" />
+                      <span class="shell-members-skel-name" style={{ width: `${68 - i * 7}%` }} />
+                    </div>
+                  )}
+                </For>
+              </div>
+            </Show>
           }
         >
           <For each={groups()}>

@@ -41,6 +41,10 @@ export type MessageViewProps = {
 
 const SYSTEM_TYPES = new Set(['join', 'part', 'quit', 'kick', 'mode', 'topic', 'nick', 'system', 'error']);
 
+/** Body-line counts per skeleton row — varied so the loading state reads as
+ *  real message groups rather than a uniform grid. */
+const SKELETON_ROWS = [2, 1, 3, 2, 1] as const;
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtTime(date: Date): string {
@@ -230,6 +234,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   const dms = useStore((s) => s.dms);
   const ourNick = useStore((s) => s.ourNick);
   const canEditMessages = useStore((s) => s.canEditMessages);
+  const historyLoading = useStore((s) => s.historyLoading);
 
   const selfNick = createMemo(() => local.selfNick ?? ourNick() ?? '');
 
@@ -257,6 +262,14 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     if (view.kind === 'channel') return view.channel;
     if (view.kind === 'dm') return view.nick;
     return '';
+  });
+
+  // True while CHATHISTORY is in flight for the open target — lets the empty
+  // feed show a loading skeleton instead of the "say the first thing" prompt.
+  const isLoadingHistory = createMemo(() => {
+    const t = activeTarget();
+    if (!t) return false;
+    return historyLoading().get(t.toLowerCase()) ?? false;
   });
 
   // ── unread divider ──
@@ -362,11 +375,37 @@ export function MessageView(props: MessageViewProps): JSX.Element {
         <Show
           when={messages().length > 0}
           fallback={
-            <div class="shell-feed-empty">
-              <Show when={activeView().kind !== 'home'}>
-                <span>Still waters here — say the first thing.</span>
-              </Show>
-            </div>
+            <Show
+              when={isLoadingHistory()}
+              fallback={
+                <div class="shell-feed-empty">
+                  <Show when={activeView().kind !== 'home'}>
+                    <span>Still waters here — say the first thing.</span>
+                  </Show>
+                </div>
+              }
+            >
+              <div class="shell-feed-loading" role="status" aria-label="Loading messages">
+                <span class="sr-only">Loading messages…</span>
+                <For each={SKELETON_ROWS}>
+                  {(bodyLines, i) => (
+                    <div class="shell-skel-row" style={{ '--skel-i': i() }}>
+                      <div class="shell-skel-avatar" aria-hidden="true" />
+                      <div class="shell-skel-lines" aria-hidden="true">
+                        <div class="shell-skel-line shell-skel-line--name" />
+                        <For each={Array.from({ length: bodyLines })}>
+                          {(_, j) => (
+                            <div
+                              class={`shell-skel-line${j() === bodyLines - 1 ? ' shell-skel-line--short' : ''}`}
+                            />
+                          )}
+                        </For>
+                      </div>
+                    </div>
+                  )}
+                </For>
+              </div>
+            </Show>
           }
         >
           <For each={messages()}>
