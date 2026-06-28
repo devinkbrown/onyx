@@ -259,6 +259,17 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     return '';
   });
 
+  // ── unread divider ──
+  // The id of the message the "new messages" boundary sits above. Captured when
+  // the conversation was opened (store.captureUnreadDivider) so it stays put
+  // while you read, marking where you left off.
+  const viewUnreadDividerId = useStore((s) => s.viewUnreadDividerId);
+  const unreadDividerId = createMemo(() => {
+    const t = activeTarget();
+    if (!t) return null;
+    return viewUnreadDividerId().get(t.toLowerCase()) ?? null;
+  });
+
   // ── scroll state ──
   let feedEl!: HTMLDivElement;
   const [atBottom, setAtBottom] = createSignal(true);
@@ -329,20 +340,32 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                 return sameAuthorGroup(prev, msg);
               });
 
+              // "New messages" boundary, rendered above the captured divider message.
+              const dividerEl = (
+                <Show when={msg.id === unreadDividerId()}>
+                  <div class="shell-unread-divider" role="separator" aria-label="New messages">
+                    <span class="shell-unread-divider-label">new messages</span>
+                  </div>
+                </Show>
+              );
+
               // System message
               if (isSystemMsg(msg)) {
                 return (
-                  <div
-                    class={[
-                      'shell-msg-system',
-                      activeMessageSearchResultId() === msg.id ? 'shell-msg-search-current' : '',
-                    ].filter(Boolean).join(' ')}
-                    data-message-search-id={msg.id}
-                    role="status"
-                    aria-label={msg.text}
-                  >
-                    {msg.text}
-                  </div>
+                  <>
+                    {dividerEl}
+                    <div
+                      class={[
+                        'shell-msg-system',
+                        activeMessageSearchResultId() === msg.id ? 'shell-msg-search-current' : '',
+                      ].filter(Boolean).join(' ')}
+                      data-message-search-id={msg.id}
+                      role="status"
+                      aria-label={msg.text}
+                    >
+                      {msg.text}
+                    </div>
+                  </>
                 );
               }
 
@@ -364,6 +387,8 @@ export function MessageView(props: MessageViewProps): JSX.Element {
               // Continuation line (same author within 5 min)
               if (isContinuation()) {
                 return (
+                  <>
+                  {dividerEl}
                   <div
                     class={[
                       'shell-msg-cont',
@@ -413,11 +438,14 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                       </Show>
                     </div>
                   </div>
+                  </>
                 );
               }
 
               // Full group (avatar + meta)
               return (
+                <>
+                {dividerEl}
                 <div
                   class={[
                     'shell-msg-group',
@@ -487,6 +515,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                     </Show>
                   </div>
                 </div>
+                </>
               );
             }}
           </For>
