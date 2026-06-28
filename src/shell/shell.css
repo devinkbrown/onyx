@@ -1820,11 +1820,23 @@
   font-size: 0.82rem;
   color: var(--washi-dim);
   background: color-mix(in oklab, var(--stone-2) 34%, transparent);
+  /* Gentle scale-in when a pill appears — quick enough to feel like feedback
+     on react, calm enough not to be busy when a channel's reactions mount. */
+  animation: shell-reaction-pop 0.22s var(--ease-out-expo, var(--ease));
   transition:
     border-color var(--dur) var(--ease),
     background var(--dur) var(--ease),
     color var(--dur) var(--ease),
     transform var(--dur) var(--ease);
+}
+
+@keyframes shell-reaction-pop {
+  from { opacity: 0; transform: scale(0.86); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-reaction { animation: none; }
 }
 
 .shell-reaction:hover {
