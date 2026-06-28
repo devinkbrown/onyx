@@ -1519,6 +1519,7 @@
 
 /* Consecutive message (no avatar repeat) */
 .shell-msg-cont {
+  position: relative; /* anchor for the per-message action bar (.msg-menu) */
   display: grid;
   grid-template-columns: 42px 1fr;
   gap: 0 var(--space-3);

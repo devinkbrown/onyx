@@ -1,0 +1,263 @@
+/**
+ * message-menu.css — per-message hover action bar + overflow / react popovers.
+ *
+ * Theme tokens only (no hardcoded palette). The bar floats top-right of a
+ * message row; on pointer devices it stays out of sight until the row is
+ * hovered or keyboard-focused, then fades + lifts in (transform/opacity only).
+ * Touch devices keep a faint resting state since there is no hover.
+ *
+ * The action buttons wrap the shared Popover primitive, so a few rules reset
+ * the primitive's default chunky trigger/panel chrome down to an icon-sized
+ * surface — scoped under .msg-menu so nothing else is affected.
+ */
+
+.msg-menu {
+  position: absolute;
+  top: -10px;
+  right: 6px;
+  z-index: 6;
+}
+
+.msg-menu-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--stone-3) 78%, var(--ink)),
+      color-mix(in oklab, var(--stone-2) 70%, var(--ink))
+    );
+  box-shadow:
+    0 12px 30px -20px color-mix(in oklab, var(--ink) 94%, transparent),
+    inset 0 0 0 1px color-mix(in oklab, var(--lapis) 8%, transparent);
+  opacity: 0;
+  transform: translateY(3px);
+  transition:
+    opacity var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+
+/* Reveal on row hover/focus. The parent rows carry these classes. */
+.shell-msg-group:hover .msg-menu-bar,
+.shell-msg-group:focus-within .msg-menu-bar,
+.shell-msg-cont:hover .msg-menu-bar,
+.shell-msg-cont:focus-within .msg-menu-bar,
+.msg-menu-bar:focus-within {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Touch / coarse pointers: keep the bar gently present (no hover to reveal it). */
+@media (hover: none), (pointer: coarse) {
+  .msg-menu-bar {
+    opacity: 0.7;
+    transform: none;
+  }
+}
+
+/* The visible icon-button surface. */
+.msg-menu-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  color: var(--washi-mute);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease);
+}
+
+.msg-menu-btn:hover {
+  color: var(--lapis-bright);
+  border-color: var(--seam-faint);
+  background: color-mix(in oklab, var(--lapis-deep) 20%, transparent);
+}
+
+.msg-menu-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+/* ── Popover primitive resets (scoped) ──────────────────────────────────────
+   Strip the chunky default trigger so only the .msg-menu-btn surface shows,
+   and let the wrapping <button> drive the hover/active state of the icon. */
+.msg-menu .ruri-popover {
+  display: inline-flex;
+}
+
+.msg-menu .ruri-popover__trigger {
+  display: inline-flex;
+  min-height: 0;
+  padding: 0;
+  gap: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.msg-menu .ruri-popover__trigger:hover,
+.msg-menu .ruri-popover__trigger[aria-expanded='true'] {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.msg-menu .ruri-popover__trigger:hover .msg-menu-btn,
+.msg-menu .ruri-popover__trigger[aria-expanded='true'] .msg-menu-btn {
+  color: var(--lapis-bright);
+  border-color: var(--seam-faint);
+  background: color-mix(in oklab, var(--lapis-deep) 20%, transparent);
+}
+
+.msg-menu .ruri-popover__trigger[aria-expanded='true'] .msg-menu-btn {
+  border-color: var(--lapis);
+}
+
+/* Compact panels: the shared panel defaults to a wide form/dialog body. */
+.msg-menu .ruri-popover__panel {
+  min-width: 0;
+  padding: var(--space-1);
+  font-family: var(--font-sans);
+}
+
+/* ── Overflow menu list ──────────────────────────────────────────────────── */
+.msg-menu-list {
+  display: grid;
+  gap: 1px;
+  min-width: 9.5rem;
+}
+
+.msg-menu-item {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+  width: 100%;
+  min-height: 32px;
+  padding: var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.82rem;
+  color: var(--washi-dim);
+  background: transparent;
+  transition:
+    color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease);
+}
+
+.msg-menu-item:hover,
+.msg-menu-item:focus-visible {
+  color: var(--washi);
+  border-color: var(--seam-faint);
+  background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
+}
+
+.msg-menu-item--danger {
+  color: color-mix(in oklab, var(--shu) 80%, var(--washi-dim));
+}
+
+.msg-menu-item--danger:hover,
+.msg-menu-item--danger:focus-visible {
+  color: var(--shu-bright);
+  border-color: color-mix(in oklab, var(--shu) 40%, transparent);
+  background: color-mix(in oklab, var(--shu) 14%, transparent);
+}
+
+.msg-menu-item-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+/* ── React emoji picker ────────────────────────────────────────────────────── */
+.msg-menu-emoji {
+  width: min(280px, 78vw);
+}
+
+.msg-menu-emoji-search {
+  width: 100%;
+  min-height: 32px;
+  margin-bottom: var(--space-2);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  color: var(--washi);
+  font-size: 0.82rem;
+  background: color-mix(in oklab, var(--ink) 64%, var(--stone-2));
+}
+
+.msg-menu-emoji-search:focus-visible {
+  outline: none;
+  border-color: var(--lapis);
+}
+
+.msg-menu-emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(28px, 1fr));
+  gap: var(--space-1);
+  max-height: 168px;
+  overflow-y: auto;
+}
+
+.msg-menu-emoji-choice {
+  min-width: 0;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  font-size: 1.1rem;
+  background: transparent;
+  transition:
+    border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+
+.msg-menu-emoji-choice:hover,
+.msg-menu-emoji-choice:focus-visible {
+  border-color: var(--seam-faint);
+  background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
+  transform: scale(1.08);
+}
+
+.msg-menu-emoji-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: var(--space-2);
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--washi-mute);
+}
+
+/* Honour reduced-motion: drop the lift/scale, keep instant reveal. */
+@media (prefers-reduced-motion: reduce) {
+  .msg-menu-bar,
+  .msg-menu-emoji-choice {
+    transition: none;
+    transform: none;
+  }
+
+  .shell-msg-group:hover .msg-menu-bar,
+  .shell-msg-group:focus-within .msg-menu-bar,
+  .shell-msg-cont:hover .msg-menu-bar,
+  .shell-msg-cont:focus-within .msg-menu-bar,
+  .msg-menu-bar:focus-within {
+    transform: none;
+  }
+}

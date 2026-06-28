@@ -29,6 +29,7 @@ import type { ChatMessage, MessageReaction } from '@/lib/irc/types';
 import { Avatar } from '@/primitives/index';
 import { Sheet } from '@/primitives/index';
 import { MessageText } from '@/shell/message/MessageText';
+import { MessageMenu } from '@/shell/message/MessageMenu';
 import { activeMessageSearchResultId } from './search/useMessageSearch';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -158,60 +159,6 @@ function MsgBody(props: MsgBodyProps): JSX.Element {
       onChannelClick={local.onChannelClick}
       class={cls()}
     />
-  );
-}
-
-// ── Message actions ─────────────────────────────────────────────────────────
-
-type MessageActionsProps = {
-  msg: ChatMessage;
-  target: string;
-  selfNick: string;
-  canEdit: boolean;
-};
-
-function MessageActions(props: MessageActionsProps): JSX.Element {
-  const [local] = splitProps(props, ['msg', 'target', 'selfNick', 'canEdit']);
-
-  const isOwnMessage = createMemo(() =>
-    !!local.selfNick && local.msg.from.toLowerCase() === local.selfNick.toLowerCase()
-  );
-  const canReply = createMemo(() => !local.msg.deleted && !local.msg.redacted);
-  const canEditMessage = createMemo(() =>
-    canReply() && local.canEdit && isOwnMessage() && local.msg.type === 'msg'
-  );
-
-  function startReply(): void {
-    if (!canReply()) return;
-    getState().setReplyingTo(local.msg);
-  }
-
-  function startEdit(): void {
-    if (!canEditMessage()) return;
-    getState().setComposerEditingMessage(local.msg);
-  }
-
-  return (
-    <div class="shell-msg-actions" role="group" aria-label="Message actions">
-      <button
-        type="button"
-        class="shell-msg-action"
-        aria-label={`Reply to ${local.msg.from}`}
-        onClick={startReply}
-      >
-        reply
-      </button>
-      <Show when={canEditMessage()}>
-        <button
-          type="button"
-          class="shell-msg-action"
-          aria-label="Edit message"
-          onClick={startEdit}
-        >
-          edit
-        </button>
-      </Show>
-    </div>
   );
 }
 
@@ -406,6 +353,14 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                 return messages().some((m) => m.replyTo?.id === msg.id);
               });
 
+              // Per-row overflow-menu open state, so a right-click anywhere on
+              // the row opens the same ⋯ menu the action bar exposes.
+              const [menuOpen, setMenuOpen] = createSignal(false);
+              const openMenuFromRow = (e: MouseEvent): void => {
+                e.preventDefault();
+                setMenuOpen(true);
+              };
+
               // Continuation line (same author within 5 min)
               if (isContinuation()) {
                 return (
@@ -416,10 +371,19 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                       activeMessageSearchResultId() === msg.id ? 'shell-msg-search-current' : '',
                     ].filter(Boolean).join(' ')}
                     data-message-search-id={msg.id}
+                    onContextMenu={openMenuFromRow}
                   >
                     <span class="shell-msg-cont-ts" aria-hidden="true">
                       {fmtTime(msg.time)}
                     </span>
+                    <MessageMenu
+                      msg={msg}
+                      target={activeTarget()}
+                      selfNick={selfNick()}
+                      canEdit={canEditMessages()}
+                      menuOpen={menuOpen()}
+                      onMenuOpenChange={setMenuOpen}
+                    />
                     <div class="shell-msg-cont-body">
                       <Show when={msg.replyTo}>
                         {(rt) => (
@@ -430,12 +394,6 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                         )}
                       </Show>
                       <MsgBody msg={msg} selfNick={selfNick()} onChannelClick={(name) => getState().navigate({ kind: 'channel', channel: name })} />
-                      <MessageActions
-                        msg={msg}
-                        target={activeTarget()}
-                        selfNick={selfNick()}
-                        canEdit={canEditMessages()}
-                      />
                       <Show when={hasReactions()}>
                         <div class="shell-reactions" role="group" aria-label="Reactions">
                           <For each={msg.reactions ?? []}>
@@ -468,7 +426,16 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                   ].filter(Boolean).join(' ')}
                   data-message-search-id={msg.id}
                   aria-label={`${msg.from} at ${fmtTime(msg.time)}`}
+                  onContextMenu={openMenuFromRow}
                 >
+                  <MessageMenu
+                    msg={msg}
+                    target={activeTarget()}
+                    selfNick={selfNick()}
+                    canEdit={canEditMessages()}
+                    menuOpen={menuOpen()}
+                    onMenuOpenChange={setMenuOpen}
+                  />
                   <div class="shell-msg-avatar">
                     <Avatar
                       name={msg.from}
@@ -501,12 +468,6 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                       )}
                     </Show>
                     <MsgBody msg={msg} selfNick={selfNick()} onChannelClick={(name) => getState().navigate({ kind: 'channel', channel: name })} />
-                    <MessageActions
-                      msg={msg}
-                      target={activeTarget()}
-                      selfNick={selfNick()}
-                      canEdit={canEditMessages()}
-                    />
                     <Show when={hasReactions()}>
                       <div class="shell-reactions" role="group" aria-label="Reactions">
                         <For each={msg.reactions ?? []}>
