@@ -10,8 +10,10 @@
  */
 
 import {
+  createEffect,
   createMemo,
   createSignal,
+  onCleanup,
   Show,
   splitProps,
   type JSX,
@@ -28,9 +30,17 @@ export function Composer(props: ComposerProps): JSX.Element {
 
   const activeView = useStore((s) => s.activeView);
   const connectionStatus = useStore((s) => s.connectionStatus);
+  const typingUsers = useStore((s) => s.typingUsers);
+  const ourNick = useStore((s) => s.ourNick);
 
   const [text, setText] = createSignal('');
+  const [nowMs, setNowMs] = createSignal(Date.now());
   let textareaRef!: HTMLTextAreaElement;
+  let typingStopTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastTypingTarget: string | null = null;
+  const tick = typeof window !== 'undefined'
+    ? window.setInterval(() => setNowMs(Date.now()), 1000)
+    : null;
 
   // ── derived target ──
   const target = createMemo(() => {
@@ -43,6 +53,28 @@ export function Composer(props: ComposerProps): JSX.Element {
 
   const isEnabled = createMemo(() => {
     return !!target() && connectionStatus() === 'connected';
+  });
+
+  const activeTypingNicks = createMemo(() => {
+    const t = target();
+    if (!t) return [];
+    const key = t.toLowerCase();
+    const self = ourNick().toLowerCase();
+    const users = typingUsers().get(key);
+    if (!users) return [];
+    const now = nowMs();
+    return [...users.entries()]
+      .filter(([nick, expiresAt]) => expiresAt > now && nick.toLowerCase() !== self)
+      .map(([nick]) => nick)
+      .sort((a, b) => a.localeCompare(b));
+  });
+
+  const typingText = createMemo(() => {
+    const nicks = activeTypingNicks();
+    if (nicks.length === 0) return '';
+    if (nicks.length === 1) return `${nicks[0]} is typing...`;
+    if (nicks.length === 2) return `${nicks[0]} and ${nicks[1]} are typing...`;
+    return `${nicks[0]}, ${nicks[1]}, and ${nicks.length - 2} more are typing...`;
   });
 
   const placeholder = createMemo(() => {
@@ -61,8 +93,34 @@ export function Composer(props: ComposerProps): JSX.Element {
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
   }
 
+  function clearTypingTimer(): void {
+    if (typingStopTimer) {
+      clearTimeout(typingStopTimer);
+      typingStopTimer = null;
+    }
+  }
+
+  function sendTypingStopNow(t = target()): void {
+    clearTypingTimer();
+    if (t) getState().sendTypingStop(t);
+  }
+
+  function noteTypingActivity(hasText: boolean): void {
+    const t = target();
+    if (!t || !isEnabled()) return;
+    if (!hasText) {
+      sendTypingStopNow(t);
+      return;
+    }
+    getState().sendTypingStart(t);
+    clearTypingTimer();
+    typingStopTimer = setTimeout(() => getState().sendTypingStop(t), 5000);
+  }
+
   function handleInput(e: InputEvent): void {
-    setText((e.currentTarget as HTMLTextAreaElement).value);
+    const next = (e.currentTarget as HTMLTextAreaElement).value;
+    setText(next);
+    noteTypingActivity(next.trim().length > 0);
     autoResize();
   }
 
@@ -78,6 +136,7 @@ export function Composer(props: ComposerProps): JSX.Element {
     const content = text().trim();
     if (!t || !content || !isEnabled()) return;
     getState().sendMessage(t, content);
+    sendTypingStopNow(t);
     setText('');
     // Reset height after clearing
     queueMicrotask(() => {
@@ -87,11 +146,31 @@ export function Composer(props: ComposerProps): JSX.Element {
     });
   }
 
+  createEffect(() => {
+    const nextTarget = target();
+    if (lastTypingTarget && lastTypingTarget !== nextTarget) {
+      getState().sendTypingStop(lastTypingTarget);
+    }
+    lastTypingTarget = nextTarget;
+  });
+
+  onCleanup(() => {
+    if (tick !== null) window.clearInterval(tick);
+    sendTypingStopNow(lastTypingTarget);
+  });
+
   return (
     <section
       class={`shell-composer${!isEnabled() ? ' shell-composer--disabled' : ''}`}
       aria-label="Message composer"
     >
+      <Show when={typingText()}>
+        {(line) => (
+          <p class="shell-typing-indicator" aria-live="polite">
+            {line()}
+          </p>
+        )}
+      </Show>
       <div class="shell-composer-inner">
         <label for="shell-composer-input" class="sr-only">
           <Show when={target()} fallback="Message input (no active channel)">
@@ -108,6 +187,7 @@ export function Composer(props: ComposerProps): JSX.Element {
           value={text()}
           onInput={handleInput}
           onKeyDown={handleKeyDown}
+          onBlur={() => sendTypingStopNow()}
           aria-label={placeholder()}
           aria-disabled={!isEnabled()}
           aria-multiline="true"

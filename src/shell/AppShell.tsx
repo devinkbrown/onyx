@@ -29,6 +29,7 @@ import './shell.css';
 import { createMemo, createSignal, onCleanup, onMount, Show, splitProps, type JSX } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
 import { Background } from '@/backgrounds/index';
+import { NotificationRuntime } from '@/lib/notifications';
 import { ServerRail } from './ServerRail';
 import { ChannelSidebar } from './ChannelSidebar';
 import { PresenceRibbon } from './PresenceRibbon';
@@ -231,6 +232,8 @@ export function AppShell(props: AppShellProps): JSX.Element {
 
   return (
     <>
+      <NotificationRuntime />
+
       {/* Fixed background canvas behind everything */}
       <Background id={bgId()} quality="high" />
 

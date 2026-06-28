@@ -19,6 +19,7 @@ import {
 import { useStore, getState } from '@/lib/store';
 import type { Channel } from '@/lib/irc/types';
 import type { ActiveView, DMConversation } from '@/lib/store/store';
+import { NotificationControls } from './NotificationControls';
 
 export type ChannelSidebarProps = {
   /** Called when mobile close is triggered */
@@ -35,6 +36,13 @@ function isChannelActive(activeView: ActiveView, channel: Channel): boolean {
 function isDmActive(activeView: ActiveView, dm: DMConversation): boolean {
   return activeView.kind === 'dm' &&
     activeView.nick.toLowerCase() === dm.nick.toLowerCase();
+}
+
+function unreadLabel(unread: number, highlights: number): string {
+  const parts: string[] = [];
+  if (unread > 0) parts.push(`${unread} unread`);
+  if (highlights > 0) parts.push(`${highlights} mention${highlights === 1 ? '' : 's'}`);
+  return parts.length > 0 ? `, ${parts.join(', ')}` : '';
 }
 
 export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
@@ -106,6 +114,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
           />
           {networkName() || 'IRCXNet'}
         </span>
+        <NotificationControls />
       </div>
 
       {/* Scrollable list */}
@@ -145,7 +154,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
                           hasHighlight() ? 'shell-channel-item--highlight' : '',
                         ].filter(Boolean).join(' ')}
                         aria-current={active() ? 'page' : undefined}
-                        aria-label={`${ch.name}${ch.unread > 0 ? `, ${ch.unread} unread` : ''}`}
+                        aria-label={`${ch.name}${unreadLabel(ch.unread, ch.highlights)}`}
                         onClick={() => handleChannelClick(ch)}
                       >
                         <span class="shell-channel-sigil" aria-hidden="true">#</span>
@@ -197,7 +206,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
                           hasHighlight() ? 'shell-channel-item--highlight' : '',
                         ].filter(Boolean).join(' ')}
                         aria-current={active() ? 'page' : undefined}
-                        aria-label={`DM with ${dm.nick}${dm.unread > 0 ? `, ${dm.unread} unread` : ''}`}
+                        aria-label={`DM with ${dm.nick}${unreadLabel(dm.unread, dm.highlights)}`}
                         onClick={() => handleDmClick(dm)}
                       >
                         <span class="shell-channel-sigil" aria-hidden="true">@</span>

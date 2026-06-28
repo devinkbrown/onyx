@@ -213,6 +213,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   const channels = useStore((s) => s.channels);
   const dms = useStore((s) => s.dms);
   const ourNick = useStore((s) => s.ourNick);
+  const unreadDividers = useStore((s) => s.viewUnreadDividerId);
 
   const selfNick = createMemo(() => local.selfNick ?? ourNick() ?? '');
 
@@ -235,6 +236,12 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     if (view.kind === 'channel') return view.channel;
     if (view.kind === 'dm') return view.nick;
     return '';
+  });
+
+  const unreadDividerId = createMemo(() => {
+    const target = activeTarget();
+    if (!target) return null;
+    return unreadDividers().get(target.toLowerCase()) ?? null;
   });
 
   // ── scroll state ──
@@ -307,16 +314,28 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                 return sameAuthorGroup(prev, msg);
               });
 
+              const showUnreadDivider = createMemo(() => unreadDividerId() === msg.id);
+              const renderUnreadDivider = (): JSX.Element => (
+                <Show when={showUnreadDivider()}>
+                  <div class="shell-unread-divider" role="separator" aria-label="New messages">
+                    <span>New messages</span>
+                  </div>
+                </Show>
+              );
+
               // System message
               if (isSystemMsg(msg)) {
                 return (
-                  <div
-                    class="shell-msg-system"
-                    role="status"
-                    aria-label={msg.text}
-                  >
-                    {msg.text}
-                  </div>
+                  <>
+                    {renderUnreadDivider()}
+                    <div
+                      class="shell-msg-system"
+                      role="status"
+                      aria-label={msg.text}
+                    >
+                      {msg.text}
+                    </div>
+                  </>
                 );
               }
 
@@ -330,16 +349,84 @@ export function MessageView(props: MessageViewProps): JSX.Element {
               // Continuation line (same author within 5 min)
               if (isContinuation()) {
                 return (
+                  <>
+                    {renderUnreadDivider()}
+                    <div
+                      class={[
+                        'shell-msg-cont',
+                        isHighlight() ? 'shell-msg-cont--highlight' : '',
+                      ].filter(Boolean).join(' ')}
+                    >
+                      <span class="shell-msg-cont-ts" aria-hidden="true">
+                        {fmtTime(msg.time)}
+                      </span>
+                      <div class="shell-msg-cont-body">
+                        <Show when={msg.replyTo}>
+                          {(rt) => (
+                            <div class="shell-msg-reply" aria-label={`Replying to ${rt().from}`}>
+                              <span class="shell-msg-reply-from">{rt().from}</span>
+                              <span>{rt().text.slice(0, 80)}{rt().text.length > 80 ? '…' : ''}</span>
+                            </div>
+                          )}
+                        </Show>
+                        <MessageText msg={msg} />
+                        <Show when={hasReactions()}>
+                          <div class="shell-reactions" role="group" aria-label="Reactions">
+                            <For each={msg.reactions ?? []}>
+                              {(reaction) => (
+                                <ReactionPill
+                                  reaction={reaction}
+                                  target={activeTarget()}
+                                  messageId={msg.id}
+                                  selfNick={selfNick()}
+                                />
+                              )}
+                            </For>
+                          </div>
+                        </Show>
+                        <Show when={hasThread()}>
+                          <ThreadIndicator messageId={msg.id} onOpenThread={openThread} />
+                        </Show>
+                      </div>
+                    </div>
+                  </>
+                );
+              }
+
+              // Full group (avatar + meta)
+              return (
+                <>
+                  {renderUnreadDivider()}
                   <div
                     class={[
-                      'shell-msg-cont',
-                      isHighlight() ? 'shell-msg-cont--highlight' : '',
+                      'shell-msg-group',
+                      isHighlight() ? 'shell-msg-group--highlight' : '',
                     ].filter(Boolean).join(' ')}
+                    aria-label={`${msg.from} at ${fmtTime(msg.time)}`}
                   >
-                    <span class="shell-msg-cont-ts" aria-hidden="true">
-                      {fmtTime(msg.time)}
-                    </span>
-                    <div class="shell-msg-cont-body">
+                    <div class="shell-msg-avatar">
+                      <Avatar
+                        name={msg.from}
+                        size="sm"
+                        owner={msg.from === selfNick()}
+                      />
+                    </div>
+                    <div class="shell-msg-body">
+                      <div class="shell-msg-meta">
+                        <span class="shell-msg-author">{msg.from}</span>
+                        <time
+                          class="shell-msg-ts"
+                          dateTime={msg.time.toISOString()}
+                          aria-hidden="true"
+                        >
+                          {fmtTime(msg.time)}
+                        </time>
+                        <Show when={msg.edited}>
+                          <span style={{ color: 'var(--washi-mute)', 'font-family': 'var(--font-mono)', 'font-size': '0.62rem' }}>
+                            (edited)
+                          </span>
+                        </Show>
+                      </div>
                       <Show when={msg.replyTo}>
                         {(rt) => (
                           <div class="shell-msg-reply" aria-label={`Replying to ${rt().from}`}>
@@ -368,69 +455,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                       </Show>
                     </div>
                   </div>
-                );
-              }
-
-              // Full group (avatar + meta)
-              return (
-                <div
-                  class={[
-                    'shell-msg-group',
-                    isHighlight() ? 'shell-msg-group--highlight' : '',
-                  ].filter(Boolean).join(' ')}
-                  aria-label={`${msg.from} at ${fmtTime(msg.time)}`}
-                >
-                  <div class="shell-msg-avatar">
-                    <Avatar
-                      name={msg.from}
-                      size="sm"
-                      owner={msg.from === selfNick()}
-                    />
-                  </div>
-                  <div class="shell-msg-body">
-                    <div class="shell-msg-meta">
-                      <span class="shell-msg-author">{msg.from}</span>
-                      <time
-                        class="shell-msg-ts"
-                        dateTime={msg.time.toISOString()}
-                        aria-hidden="true"
-                      >
-                        {fmtTime(msg.time)}
-                      </time>
-                      <Show when={msg.edited}>
-                        <span style={{ color: 'var(--washi-mute)', 'font-family': 'var(--font-mono)', 'font-size': '0.62rem' }}>
-                          (edited)
-                        </span>
-                      </Show>
-                    </div>
-                    <Show when={msg.replyTo}>
-                      {(rt) => (
-                        <div class="shell-msg-reply" aria-label={`Replying to ${rt().from}`}>
-                          <span class="shell-msg-reply-from">{rt().from}</span>
-                          <span>{rt().text.slice(0, 80)}{rt().text.length > 80 ? '…' : ''}</span>
-                        </div>
-                      )}
-                    </Show>
-                    <MessageText msg={msg} />
-                    <Show when={hasReactions()}>
-                      <div class="shell-reactions" role="group" aria-label="Reactions">
-                        <For each={msg.reactions ?? []}>
-                          {(reaction) => (
-                            <ReactionPill
-                              reaction={reaction}
-                              target={activeTarget()}
-                              messageId={msg.id}
-                              selfNick={selfNick()}
-                            />
-                          )}
-                        </For>
-                      </div>
-                    </Show>
-                    <Show when={hasThread()}>
-                      <ThreadIndicator messageId={msg.id} onOpenThread={openThread} />
-                    </Show>
-                  </div>
-                </div>
+                </>
               );
             }}
           </For>
