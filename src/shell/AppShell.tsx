@@ -48,6 +48,8 @@ import { mountMedia } from '@/media/useSuimyakuMedia';
 import { MemberList } from './MemberList';
 import { AccountPanel } from '@/app/Account';
 import { AppearancePanel } from './AppearancePanel';
+import { PreferencesPanel } from './PreferencesPanel';
+import { applyPreferences } from '@/lib/prefs/preferences';
 import { Spotlight } from '@/chat/spotlight';
 import { useSpotlightHotkeys } from '@/chat/spotlight/useSpotlight';
 import { KeyboardHelpOverlay } from './KeyboardHelpOverlay';
@@ -196,6 +198,9 @@ export function AppShell(props: AppShellProps): JSX.Element {
     window.addEventListener('keydown', handleMessageSearchHotkey);
     onCleanup(() => window.removeEventListener('keydown', handleMessageSearchHotkey));
   });
+
+  // Reflect saved display/behaviour preferences onto <html> on first paint.
+  onMount(() => applyPreferences());
 
   // ── voice/video ──
   // Boot the SUIMYAKU media engine once and wire its callbacks into the store.
@@ -414,6 +419,9 @@ export function AppShell(props: AppShellProps): JSX.Element {
 
       {/* Appearance panel — theme + background, gated on store.showAppearance */}
       <AppearancePanel />
+
+      {/* Preferences panel — display & behaviour, gated on isPreferencesOpen() */}
+      <PreferencesPanel />
 
       {/* Voice/video overlays — each self-gates on store.voice */}
       <VoicePip />

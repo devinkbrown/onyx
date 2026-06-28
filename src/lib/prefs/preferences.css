@@ -1,0 +1,250 @@
+/**
+ * preferences.css — display & behaviour preferences, applied purely through the
+ * `data-*` attributes that `preferences.ts` writes onto <html>. These rules reach
+ * into the *existing* shell classes (.shell-msg-group / .shell-msg-cont /
+ * .shell-msg-system) and the --shell-measure token so the message components
+ * themselves never need to change.
+ *
+ * Imported by PreferencesPanel.tsx.
+ */
+
+/* ── Message density ─────────────────────────────────────────────────────────
+   Adjust the vertical rhythm of the feed without touching the grid. Cozy is the
+   shell default, so it carries no overrides. */
+
+:root[data-density='compact'] .shell-msg-group {
+  padding-block: var(--space-1) 0;
+  margin-top: var(--space-1);
+}
+:root[data-density='compact'] .shell-msg-cont {
+  padding-block: 0;
+}
+:root[data-density='compact'] .shell-msg-system {
+  padding-block: 0;
+}
+
+:root[data-density='roomy'] .shell-msg-group {
+  padding-block: var(--space-4) var(--space-2);
+  margin-top: var(--space-4);
+}
+:root[data-density='roomy'] .shell-msg-cont {
+  padding-block: var(--space-1);
+}
+:root[data-density='roomy'] .shell-msg-system {
+  padding-block: var(--space-2);
+}
+
+/* ── Font scale ──────────────────────────────────────────────────────────────
+   Scales the document base size; rem-based shell type follows. Medium = default. */
+
+:root[data-font-scale='sm'] {
+  font-size: 14px;
+}
+:root[data-font-scale='lg'] {
+  font-size: 17px;
+}
+
+/* ── Hide join/part/quit events ──────────────────────────────────────────────
+   Removes the quiet system tide-lines from the feed entirely. */
+
+:root[data-hide-events='true'] .shell-msg-system,
+:root[data-hide-events='true'] .shell-msg-group--system {
+  display: none;
+}
+
+/* ── Conversation width ──────────────────────────────────────────────────────
+   "measured" keeps the capped reading measure (default); "full" lets the feed
+   and chrome run edge-to-edge by removing the cap. */
+
+:root[data-width='full'] {
+  --shell-measure: none;
+}
+
+/* ── Reduce motion ───────────────────────────────────────────────────────────
+   Force-disables animation + transitions everywhere when the user opts in,
+   independent of the OS prefers-reduced-motion setting. */
+
+:root[data-reduce-motion='true'] *,
+:root[data-reduce-motion='true'] *::before,
+:root[data-reduce-motion='true'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* ── Panel styling ───────────────────────────────────────────────────────────
+   The Preferences sheet content. Theme-token colours only; designed focus +
+   selected states. */
+
+.pref-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-section);
+}
+
+.pref-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.pref-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.pref-label {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--washi-dim);
+}
+
+.pref-desc {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--washi-mute);
+}
+
+/* Segmented control — a row of mutually-exclusive options. */
+.pref-segments {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--ink) 45%, transparent);
+}
+
+.pref-segment {
+  flex: 1 1 0;
+  appearance: none;
+  cursor: pointer;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--washi-dim);
+  font: inherit;
+  font-size: 0.82rem;
+  letter-spacing: 0.01em;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+.pref-segment:hover {
+  color: var(--washi);
+  background: color-mix(in oklab, var(--lapis) 12%, transparent);
+}
+
+.pref-segment:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.pref-segment[aria-pressed='true'] {
+  color: var(--ink);
+  background: var(--lapis-bright);
+  font-weight: 700;
+}
+
+/* Toggle switch — a single on/off control. */
+.pref-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  appearance: none;
+  cursor: pointer;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--ink) 45%, transparent);
+  color: var(--washi);
+  font: inherit;
+  text-align: left;
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+
+.pref-toggle:hover {
+  border-color: var(--seam);
+}
+
+.pref-toggle:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.pref-toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.pref-toggle-title {
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.pref-switch {
+  flex: none;
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--washi) 18%, transparent);
+  transition: background var(--dur) var(--ease);
+}
+
+.pref-switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--r-pill);
+  background: var(--washi);
+  transition: transform var(--dur) var(--ease);
+}
+
+.pref-toggle[aria-pressed='true'] .pref-switch {
+  background: var(--lapis-bright);
+}
+
+.pref-toggle[aria-pressed='true'] .pref-switch::after {
+  transform: translateX(16px);
+  background: var(--ink);
+}
+
+.pref-reset {
+  align-self: flex-start;
+  appearance: none;
+  cursor: pointer;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--washi-dim);
+  font: inherit;
+  font-size: 0.8rem;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+
+.pref-reset:hover {
+  color: var(--washi);
+  border-color: var(--seam);
+}
+
+.pref-reset:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
