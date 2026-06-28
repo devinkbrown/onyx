@@ -573,7 +573,7 @@ export function Composer(props: ComposerProps): JSX.Element {
         </Show>
 
         <Show when={emojiOpen()}>
-          <div class="shell-emoji-picker" role="dialog" aria-label="Emoji picker">
+          <div id="shell-emoji-picker" class="shell-emoji-picker" role="dialog" aria-label="Emoji picker">
             <label class="sr-only" for="shell-emoji-search">Search emoji</label>
             <input
               id="shell-emoji-search"
@@ -632,7 +632,9 @@ export function Composer(props: ComposerProps): JSX.Element {
           class="shell-composer-tool"
           disabled={!isEnabled()}
           aria-label="Insert emoji"
+          aria-haspopup="dialog"
           aria-expanded={emojiOpen()}
+          aria-controls={emojiOpen() ? 'shell-emoji-picker' : undefined}
           onClick={() => setEmojiOpen((open) => !open)}
         >
           <span aria-hidden="true">☺</span>

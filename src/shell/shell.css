@@ -218,6 +218,14 @@
   box-shadow: inset 0 0 18px color-mix(in oklab, var(--lapis) 14%, transparent);
 }
 
+/* The Appearance link is an <a>, which the global .shell focus rule (button /
+   [role=button] / input / textarea) does not cover — give it a focus ring. */
+.shell-rail-entry:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--lapis) 18%, transparent);
+}
+
 .shell-rail-entry--active {
   color: var(--lapis-bright);
   border-color: var(--seam);
@@ -2346,6 +2354,19 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--washi-mute);
+}
+
+/* Member groups are real lists for assistive tech; strip the default list
+   chrome so the visual layout is unchanged. */
+.shell-members-group-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.shell-members-group-item {
+  margin: 0;
+  padding: 0;
 }
 
 /* A faint current line trails each group heading into the list. */

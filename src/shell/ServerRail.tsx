@@ -43,13 +43,13 @@ export function ServerRail(props: ServerRailProps): JSX.Element {
     <nav
       class="shell-rail"
       aria-label="Server list"
-      role="navigation"
     >
-      {/* IRCXNet server icon */}
+      {/* IRCXNet server icon — the active (and only) network. It is a status
+          indicator, not an action, so it is a labelled image rather than a
+          fake button: an interactive role with no handler misleads AT. */}
       <div
         class="shell-rail-entry shell-rail-entry--active"
-        role="button"
-        tabIndex={0}
+        role="img"
         aria-label={`IRCXNet — active server${unreadTotal() > 0 ? `, ${unreadTotal()} unread` : ''}${mentionTotal() > 0 ? `, ${mentionTotal()} mentions` : ''}`}
         aria-current="true"
       >
