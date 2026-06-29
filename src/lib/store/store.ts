@@ -2315,7 +2315,12 @@ export const store = createStore<OnyxState>()(
               url,
               icon: serverIcon(net),
               nick: client['opts']?.nick ?? nick,
-              account: null,
+              // 900 RPL_LOGGEDIN arrives during SASL (before this Server object
+              // exists) and stashes the account in _saslAccount. Seed it here so a
+              // logged-in user shows their account, not "Guest". Stays null for a
+              // genuine guest; a later IDENTIFY updates server.account via the 900
+              // handler.
+              account: _saslAccount,
               connected: true,
             };
             const caps = client.negotiatedCaps ? Array.from(client.negotiatedCaps) : [];
