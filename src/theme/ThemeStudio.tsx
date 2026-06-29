@@ -33,6 +33,7 @@ import { useTheme } from './ThemeProvider';
 import { THEMES, THEME_IDS, type ThemeId, type TokenMap } from './themes';
 import { customThemeTokens, getCustomTheme, isCustomThemeId } from './customThemes';
 import { STUDIO_GROUPS, type StudioGroup, type StudioToken } from './tokens';
+import { resolveCssColor, wcagRating } from './contrast';
 import { useStore, getState } from '@/lib/store';
 import { backgroundOptions } from '@/backgrounds';
 
@@ -130,6 +131,98 @@ function StudioPreview() {
 }
 
 // ---------------------------------------------------------------------------
+// Live contrast auditor — grades key foreground/background pairs against WCAG
+// so a theme can't silently become unreadable. Reacts to live token edits.
+// ---------------------------------------------------------------------------
+
+type ContrastPair = { label: string; fg: string; bg: string };
+
+const CONTRAST_PAIRS: ContrastPair[] = [
+  { label: 'Body text', fg: '--washi', bg: '--ink' },
+  { label: 'Secondary text', fg: '--washi-dim', bg: '--ink' },
+  { label: 'Metadata', fg: '--washi-mute', bg: '--ink' },
+  { label: 'Text on panel', fg: '--washi', bg: '--stone-2' },
+  { label: 'Links / accent', fg: '--lapis-bright', bg: '--ink' },
+  { label: 'Gold accent', fg: '--gold-bright', bg: '--ink' },
+  { label: 'Status OK', fg: '--ok', bg: '--ink' },
+  { label: 'Danger', fg: '--shu-bright', bg: '--ink' },
+];
+
+type ContrastAuditProps = {
+  /** Tracked so the audit re-runs on every live token edit. */
+  overrides: () => TokenMap;
+  /** Tracked so the audit re-runs when the base theme switches. */
+  themeId: () => string;
+};
+
+function ContrastAudit(props: ContrastAuditProps) {
+  const [local] = splitProps(props, ['overrides', 'themeId']);
+
+  const rows = createMemo(() => {
+    local.overrides(); // dependency: live edits
+    local.themeId(); // dependency: base theme switch
+    return CONTRAST_PAIRS.map((pair) => {
+      const fg = resolveCssColor(readLiveVar(pair.fg));
+      const bg = resolveCssColor(readLiveVar(pair.bg));
+      const rating = fg && bg ? wcagRating(fg, bg) : null;
+      return { ...pair, rating };
+    });
+  });
+
+  const failing = createMemo(
+    () => rows().filter((r) => r.rating && !r.rating.passesAA).length,
+  );
+
+  return (
+    <div class="ts-audit" aria-label="Contrast audit" data-testid="ts-contrast-audit">
+      <div class="ts-audit__head">
+        <span class="ts-eyebrow">// Contrast (WCAG AA)</span>
+        <Show
+          when={failing() > 0}
+          fallback={<span class="ts-audit__status ts-audit__status--ok" data-testid="ts-audit-status">all pass AA</span>}
+        >
+          <span class="ts-audit__status ts-audit__status--warn" data-testid="ts-audit-status">
+            {failing()} below AA
+          </span>
+        </Show>
+      </div>
+      <ul class="ts-audit__list">
+        <For each={rows()}>
+          {(row) => (
+            <li class="ts-audit__row">
+              <span
+                class="ts-audit__sample"
+                aria-hidden="true"
+                style={{ background: `var(${row.bg})`, color: `var(${row.fg})` }}
+              >
+                Aa
+              </span>
+              <span class="ts-audit__label">{row.label}</span>
+              <Show
+                when={row.rating}
+                fallback={<span class="ts-audit__badge ts-audit__badge--na">n/a</span>}
+              >
+                {(r) => (
+                  <>
+                    <span class="ts-audit__ratio" title={`${r().ratio}:1`}>{r().ratio.toFixed(2)}</span>
+                    <span
+                      class={`ts-audit__badge ts-audit__badge--${r().level.toLowerCase().replace(/\s+/g, '-')}`}
+                      aria-label={`${row.label}: contrast ${r().ratio} to one, ${r().level}`}
+                    >
+                      {r().level}
+                    </span>
+                  </>
+                )}
+              </Show>
+            </li>
+          )}
+        </For>
+      </ul>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Individual token controls
 // ---------------------------------------------------------------------------
 
@@ -137,10 +230,14 @@ type TokenControlProps = {
   token: StudioToken;
   currentValue: () => string;
   onInput: (value: string) => void;
+  /** Whether this token currently carries an override (vs the base value). */
+  modified: () => boolean;
+  /** Revert this token to the base theme's value. */
+  onReset: () => void;
 };
 
 function TokenControl(props: TokenControlProps) {
-  const [local] = splitProps(props, ['token', 'currentValue', 'onInput']);
+  const [local] = splitProps(props, ['token', 'currentValue', 'onInput', 'modified', 'onReset']);
   const id = `ts-control-${local.token.property.replace(/^--/, '').replace(/-/g, '_')}`;
 
   // Derive a usable current value for each control type.
@@ -233,6 +330,19 @@ function TokenControl(props: TokenControlProps) {
             spellcheck={false}
           />
         </Show>
+
+        <Show when={local.modified()}>
+          <button
+            type="button"
+            class="ts-token-revert"
+            onClick={local.onReset}
+            aria-label={`Revert ${local.token.label} to base`}
+            title="Revert to base value"
+            data-testid={`ts-revert-${local.token.property.replace(/^--/, '')}`}
+          >
+            ↺ revert
+          </button>
+        </Show>
       </div>
     </Tooltip>
   );
@@ -246,10 +356,11 @@ type GroupPanelProps = {
   group: StudioGroup;
   overrides: () => TokenMap;
   onTokenChange: (property: string, value: string) => void;
+  onTokenReset: (property: string) => void;
 };
 
 function GroupPanel(props: GroupPanelProps) {
-  const [local] = splitProps(props, ['group', 'overrides', 'onTokenChange']);
+  const [local] = splitProps(props, ['group', 'overrides', 'onTokenChange', 'onTokenReset']);
 
   return (
     <div class="ts-group" data-testid={`ts-group-${local.group.id}`}>
@@ -260,12 +371,15 @@ function GroupPanel(props: GroupPanelProps) {
             if (override !== undefined) return override;
             return readLiveVar(token.property);
           });
+          const modified = createMemo(() => local.overrides()[token.property] !== undefined);
 
           return (
             <TokenControl
               token={token}
               currentValue={currentValue}
+              modified={modified}
               onInput={(val) => local.onTokenChange(token.property, val)}
+              onReset={() => local.onTokenReset(token.property)}
             />
           );
         }}
@@ -326,6 +440,29 @@ export function ThemeStudio(props: ThemeStudioProps) {
   const handleTokenChange = (property: string, value: string): void => {
     setOverrides((prev) => ({ ...prev, [property]: value }));
     applyVar(property, value); // immediate live-preview
+  };
+
+  // Resolve the active theme's base token set (built-in tokens, or a custom
+  // theme's base + its saved overrides).
+  const baseTokens = (): TokenMap => {
+    const id = themeId();
+    if (isCustomThemeId(id)) {
+      const c = getCustomTheme(id);
+      return c ? customThemeTokens(c) : {};
+    }
+    return THEMES[id as ThemeId]?.tokens ?? {};
+  };
+
+  // Revert a single token to its base value, dropping just that override.
+  const handleTokenReset = (property: string): void => {
+    removeVar(property);
+    setOverrides((prev) => {
+      const next = { ...prev };
+      delete next[property];
+      return next;
+    });
+    const baseVal = baseTokens()[property];
+    if (baseVal !== undefined) applyVar(property, baseVal);
   };
 
   const handleReset = (): void => {
@@ -573,6 +710,7 @@ export function ThemeStudio(props: ThemeStudioProps) {
                     group={group}
                     overrides={overrides}
                     onTokenChange={handleTokenChange}
+                    onTokenReset={handleTokenReset}
                   />
                 </Tabs.Content>
               )}
@@ -584,6 +722,7 @@ export function ThemeStudio(props: ThemeStudioProps) {
         <aside class="ts-preview-pane" aria-label="Live preview">
           <span class="ts-eyebrow">// Preview</span>
           <StudioPreview />
+          <ContrastAudit overrides={overrides} themeId={themeId} />
         </aside>
       </div>
 
@@ -931,6 +1070,87 @@ const STUDIO_CSS = `
   gap: 0.75rem;
   padding: 1rem 1.2rem;
   overflow-y: auto;
+}
+
+/* ── Contrast auditor ── */
+.ts-audit {
+  border: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--ink) 80%, var(--stone));
+  padding: 0.7rem 0.8rem 0.8rem;
+}
+.ts-audit__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.55rem;
+}
+.ts-audit__status {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--r-sm);
+}
+.ts-audit__status--ok { color: var(--ok); border: 1px solid color-mix(in oklab, var(--ok) 40%, transparent); }
+.ts-audit__status--warn { color: var(--shu-bright); border: 1px solid color-mix(in oklab, var(--shu-bright) 50%, transparent); }
+.ts-audit__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
+.ts-audit__row {
+  display: grid;
+  grid-template-columns: 1.6rem minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+.ts-audit__sample {
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  font-family: var(--font-serif);
+  font-size: 0.78rem;
+  line-height: 1;
+}
+.ts-audit__label { font-size: 0.74rem; color: var(--washi-dim); min-width: 0; }
+.ts-audit__ratio { font-family: var(--font-mono); font-size: 0.7rem; color: var(--washi-mute); }
+.ts-audit__badge {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.08rem 0.34rem;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.ts-audit__badge--aaa { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 48%, transparent); }
+.ts-audit__badge--aa { color: var(--lapis-bright); border-color: color-mix(in oklab, var(--lapis-bright) 48%, transparent); }
+.ts-audit__badge--aa-large { color: var(--gold-bright); border-color: color-mix(in oklab, var(--gold-bright) 48%, transparent); }
+.ts-audit__badge--fail { color: var(--ink); background: var(--shu); border-color: var(--shu); }
+.ts-audit__badge--na { color: var(--washi-mute); border-color: var(--seam-faint); }
+
+/* ── Per-token revert ── */
+.ts-token-revert {
+  justify-self: start;
+  margin-top: 0.3rem;
+  padding: 0.12rem 0.45rem;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  color: var(--gold-bright);
+  background: transparent;
+  border: 1px solid color-mix(in oklab, var(--gold-bright) 36%, transparent);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.ts-token-revert:hover {
+  color: var(--ink);
+  background: var(--gold-bright);
+  border-color: var(--gold-bright);
 }
 
 /* ── Preview widget ── */
