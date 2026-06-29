@@ -20,8 +20,13 @@ export type CustomTheme = {
   overrides: TokenMap;
 };
 
-const STORAGE_KEY = 'ruri:custom-themes';
+const STORAGE_KEY = 'onyx:custom-themes';
+/** Legacy key from the previous brand name; read-only for one-time migration. */
+const LEGACY_STORAGE_KEY = 'ruri:custom-themes';
 const CUSTOM_PREFIX = 'custom:';
+/** Legacy built-in theme id that was renamed; migrate custom-theme `base` refs. */
+const LEGACY_BASE_ID = 'ruri';
+const MIGRATED_BASE_ID = 'onyx';
 
 /** True when `id` names a custom (user-created) theme rather than a built-in. */
 export function isCustomThemeId(id: string): boolean {
@@ -31,12 +36,27 @@ export function isCustomThemeId(id: string): boolean {
 export function loadCustomThemes(): CustomTheme[] {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]');
+    // Current key first, then fall back to the legacy key (read-old-write-new)
+    // so themes saved under the previous brand survive the rebrand.
+    const serialized = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
+    const raw = JSON.parse(serialized ?? '[]');
     if (!Array.isArray(raw)) return [];
-    return raw.filter(isValidCustomTheme);
+    // Migrate any custom theme whose base was the renamed legacy theme id, then
+    // validate (validation requires base to be a current THEMES key).
+    return raw.map(migrateCustomThemeBase).filter(isValidCustomTheme);
   } catch {
     return [];
   }
+}
+
+/** Rewrite a legacy `base: 'ruri'` reference to the current theme id. */
+function migrateCustomThemeBase(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null) return value;
+  const v = value as Record<string, unknown>;
+  if (v.base === LEGACY_BASE_ID) {
+    return { ...v, base: MIGRATED_BASE_ID };
+  }
+  return value;
 }
 
 function persist(list: CustomTheme[]): void {

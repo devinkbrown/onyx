@@ -245,13 +245,13 @@ export function VoiceBar() {
             <Tooltip content={voice().muted ? 'Unmute microphone' : 'Mute microphone'} placement="top">
               <button
                 type="button"
-                class={`ruri-icon-button ruri-icon-button--ghost ruri-icon-button--md${voice().muted ? ' ruri-icon-button--muted' : ''}`}
+                class={`onyx-icon-button onyx-icon-button--ghost onyx-icon-button--md${voice().muted ? ' onyx-icon-button--muted' : ''}`}
                 aria-label={voice().muted ? 'Unmute microphone' : 'Mute microphone'}
                 aria-pressed={voice().muted}
                 onClick={handleToggleMute}
                 data-testid="mute-button"
               >
-                <span class="ruri-icon-button__glyph" aria-hidden="true">
+                <span class="onyx-icon-button__glyph" aria-hidden="true">
                   <Show when={voice().muted} fallback={<MicIcon />}><MicOffIcon /></Show>
                 </span>
               </button>
@@ -260,13 +260,13 @@ export function VoiceBar() {
             <Tooltip content={voice().deafened ? 'Undeafen' : 'Deafen'} placement="top">
               <button
                 type="button"
-                class="ruri-icon-button ruri-icon-button--ghost ruri-icon-button--md"
+                class="onyx-icon-button onyx-icon-button--ghost onyx-icon-button--md"
                 aria-label={voice().deafened ? 'Undeafen' : 'Deafen'}
                 aria-pressed={voice().deafened}
                 onClick={handleToggleDeafen}
                 data-testid="deafen-button"
               >
-                <span class="ruri-icon-button__glyph" aria-hidden="true">
+                <span class="onyx-icon-button__glyph" aria-hidden="true">
                   <Show when={voice().deafened} fallback={<DeafenIcon />}><DeafenOffIcon /></Show>
                 </span>
               </button>
@@ -275,13 +275,13 @@ export function VoiceBar() {
             <Tooltip content={voice().cameraOn ? 'Turn off camera' : 'Turn on camera'} placement="top">
               <button
                 type="button"
-                class="ruri-icon-button ruri-icon-button--ghost ruri-icon-button--md"
+                class="onyx-icon-button onyx-icon-button--ghost onyx-icon-button--md"
                 aria-label={voice().cameraOn ? 'Turn off camera' : 'Turn on camera'}
                 aria-pressed={voice().cameraOn}
                 onClick={handleToggleCamera}
                 data-testid="camera-button"
               >
-                <span class="ruri-icon-button__glyph" aria-hidden="true">
+                <span class="onyx-icon-button__glyph" aria-hidden="true">
                   <Show when={voice().cameraOn} fallback={<CameraOffIcon />}><CameraIcon /></Show>
                 </span>
               </button>
@@ -290,13 +290,13 @@ export function VoiceBar() {
             <Tooltip content={voice().screenshareActive ? 'Stop sharing screen' : 'Share screen'} placement="top">
               <button
                 type="button"
-                class="ruri-icon-button ruri-icon-button--ghost ruri-icon-button--md"
+                class="onyx-icon-button onyx-icon-button--ghost onyx-icon-button--md"
                 aria-label={voice().screenshareActive ? 'Stop sharing screen' : 'Share screen'}
                 aria-pressed={voice().screenshareActive}
                 onClick={handleToggleScreenshare}
                 data-testid="screenshare-button"
               >
-                <span class="ruri-icon-button__glyph" aria-hidden="true">
+                <span class="onyx-icon-button__glyph" aria-hidden="true">
                   <Show when={voice().screenshareActive} fallback={<ScreenShareIcon />}><ScreenShareStopIcon /></Show>
                 </span>
               </button>
@@ -310,13 +310,13 @@ export function VoiceBar() {
             <Tooltip content={voice().handRaised ? 'Lower hand' : 'Raise hand'} placement="top">
               <button
                 type="button"
-                class="ruri-icon-button ruri-icon-button--ghost ruri-icon-button--md"
+                class="onyx-icon-button onyx-icon-button--ghost onyx-icon-button--md"
                 aria-label={voice().handRaised ? 'Lower hand' : 'Raise hand'}
                 aria-pressed={voice().handRaised}
                 onClick={handleToggleHand}
                 data-testid="raise-hand-button"
               >
-                <span class="ruri-icon-button__glyph" aria-hidden="true"><HandIcon /></span>
+                <span class="onyx-icon-button__glyph" aria-hidden="true"><HandIcon /></span>
               </button>
             </Tooltip>
 
@@ -326,14 +326,14 @@ export function VoiceBar() {
               onOpenChange={setReactionsOpen}
               trigger={
                 <span
-                  class="ruri-icon-button ruri-icon-button--ghost ruri-icon-button--md"
+                  class="onyx-icon-button onyx-icon-button--ghost onyx-icon-button--md"
                   role="button"
                   tabindex="0"
                   aria-label="Send a reaction"
                   data-testid="reactions-button"
                   title="Send a reaction"
                 >
-                  <span class="ruri-icon-button__glyph" aria-hidden="true"><ReactionIcon /></span>
+                  <span class="onyx-icon-button__glyph" aria-hidden="true"><ReactionIcon /></span>
                 </span>
               }
             >
@@ -356,13 +356,13 @@ export function VoiceBar() {
             <Tooltip content={voice().captionsEnabled ? 'Hide captions' : 'Show captions'} placement="top">
               <button
                 type="button"
-                class="ruri-icon-button ruri-icon-button--ghost ruri-icon-button--md"
+                class="onyx-icon-button onyx-icon-button--ghost onyx-icon-button--md"
                 aria-label={voice().captionsEnabled ? 'Hide live captions' : 'Show live captions'}
                 aria-pressed={voice().captionsEnabled}
                 onClick={handleToggleCaptions}
                 data-testid="captions-button"
               >
-                <span class="ruri-icon-button__glyph" aria-hidden="true"><CaptionsIcon /></span>
+                <span class="onyx-icon-button__glyph" aria-hidden="true"><CaptionsIcon /></span>
               </button>
             </Tooltip>
           </div>
@@ -374,13 +374,13 @@ export function VoiceBar() {
             <Tooltip content={isSpotlight() ? 'Switch to grid' : 'Switch to spotlight'} placement="top">
               <button
                 type="button"
-                class="ruri-icon-button ruri-icon-button--ghost ruri-icon-button--md"
+                class="onyx-icon-button onyx-icon-button--ghost onyx-icon-button--md"
                 aria-label={isSpotlight() ? 'Switch to grid layout' : 'Switch to spotlight layout'}
                 aria-pressed={isSpotlight()}
                 onClick={handleToggleLayout}
                 data-testid="layout-button"
               >
-                <span class="ruri-icon-button__glyph" aria-hidden="true">
+                <span class="onyx-icon-button__glyph" aria-hidden="true">
                   <Show when={isSpotlight()} fallback={<GridIcon />}><SpotlightIcon /></Show>
                 </span>
               </button>
@@ -389,13 +389,13 @@ export function VoiceBar() {
             <Tooltip content="Voice settings" placement="top">
               <button
                 type="button"
-                class="ruri-icon-button ruri-icon-button--ghost ruri-icon-button--md"
+                class="onyx-icon-button onyx-icon-button--ghost onyx-icon-button--md"
                 aria-label="Open voice settings"
                 aria-pressed={showSettings()}
                 onClick={handleOpenSettings}
                 data-testid="settings-button"
               >
-                <span class="ruri-icon-button__glyph" aria-hidden="true"><SettingsIcon /></span>
+                <span class="onyx-icon-button__glyph" aria-hidden="true"><SettingsIcon /></span>
               </button>
             </Tooltip>
           </div>
@@ -406,12 +406,12 @@ export function VoiceBar() {
           <Tooltip content="Leave call" placement="top">
             <button
               type="button"
-              class="ruri-icon-button voice-bar__leave"
+              class="onyx-icon-button voice-bar__leave"
               aria-label="Leave voice call"
               onClick={handleLeave}
               data-testid="leave-button"
             >
-              <span class="ruri-icon-button__glyph" aria-hidden="true"><HangupIcon /></span>
+              <span class="onyx-icon-button__glyph" aria-hidden="true"><HangupIcon /></span>
             </button>
           </Tooltip>
         </div>

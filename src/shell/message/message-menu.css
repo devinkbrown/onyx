@@ -100,11 +100,11 @@
 /* ── Popover primitive resets (scoped) ──────────────────────────────────────
    Strip the chunky default trigger so only the .msg-menu-btn surface shows,
    and let the wrapping <button> drive the hover/active state of the icon. */
-.msg-menu .ruri-popover {
+.msg-menu .onyx-popover {
   display: inline-flex;
 }
 
-.msg-menu .ruri-popover__trigger {
+.msg-menu .onyx-popover__trigger {
   display: inline-flex;
   min-height: 0;
   padding: 0;
@@ -114,26 +114,26 @@
   color: inherit;
 }
 
-.msg-menu .ruri-popover__trigger:hover,
-.msg-menu .ruri-popover__trigger[aria-expanded='true'] {
+.msg-menu .onyx-popover__trigger:hover,
+.msg-menu .onyx-popover__trigger[aria-expanded='true'] {
   background: transparent;
   border: 0;
   box-shadow: none;
 }
 
-.msg-menu .ruri-popover__trigger:hover .msg-menu-btn,
-.msg-menu .ruri-popover__trigger[aria-expanded='true'] .msg-menu-btn {
+.msg-menu .onyx-popover__trigger:hover .msg-menu-btn,
+.msg-menu .onyx-popover__trigger[aria-expanded='true'] .msg-menu-btn {
   color: var(--lapis-bright);
   border-color: var(--seam-faint);
   background: color-mix(in oklab, var(--lapis-deep) 20%, transparent);
 }
 
-.msg-menu .ruri-popover__trigger[aria-expanded='true'] .msg-menu-btn {
+.msg-menu .onyx-popover__trigger[aria-expanded='true'] .msg-menu-btn {
   border-color: var(--lapis);
 }
 
 /* Compact panels: the shared panel defaults to a wide form/dialog body. */
-.msg-menu .ruri-popover__panel {
+.msg-menu .onyx-popover__panel {
   min-width: 0;
   padding: var(--space-1);
   font-family: var(--font-sans);

@@ -11,7 +11,7 @@ describe('IconButton', () => {
     const button = screen.getByRole('button', { name: 'Mute channel' });
 
     expect(button.getAttribute('aria-label')).toBe('Mute channel');
-    expect(button.classList.contains('ruri-icon-button--ghost')).toBe(true);
+    expect(button.classList.contains('onyx-icon-button--ghost')).toBe(true);
   });
 
   it('applies variant and size classes and forwards click behavior', () => {
@@ -21,8 +21,8 @@ describe('IconButton', () => {
     const button = screen.getByRole('button', { name: 'Delete' });
     fireEvent.click(button);
 
-    expect(button.classList.contains('ruri-icon-button--danger')).toBe(true);
-    expect(button.classList.contains('ruri-icon-button--sm')).toBe(true);
+    expect(button.classList.contains('onyx-icon-button--danger')).toBe(true);
+    expect(button.classList.contains('onyx-icon-button--sm')).toBe(true);
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 

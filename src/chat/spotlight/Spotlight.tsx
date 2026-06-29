@@ -27,8 +27,8 @@ type CommandGroup = {
 export type SpotlightProps = JSX.HTMLAttributes<HTMLDivElement>;
 
 const SECTION_ORDER: SpotlightSection[] = ['Channels', 'DMs', 'People', 'Actions'];
-const LISTBOX_ID = 'ruri-spotlight-listbox';
-const INPUT_ID = 'ruri-spotlight-input';
+const LISTBOX_ID = 'onyx-spotlight-listbox';
+const INPUT_ID = 'onyx-spotlight-input';
 
 // Token-tinted leading glyphs, one per section (CSS tints them per data-section).
 const SECTION_ICON: Record<SpotlightSection, string> = {
@@ -39,7 +39,7 @@ const SECTION_ICON: Record<SpotlightSection, string> = {
 };
 
 function optionId(index: number): string {
-  return `ruri-spotlight-option-${index}`;
+  return `onyx-spotlight-option-${index}`;
 }
 
 function tabbables(root: HTMLElement): HTMLElement[] {
@@ -75,7 +75,7 @@ function HighlightedTitle(props: { title: string; ranges: HighlightRange[] }) {
   const segments = createMemo(() => titleSegments(local.title, local.ranges));
 
   return (
-    <span class="ruri-spotlight__title">
+    <span class="onyx-spotlight__title">
       <For each={segments()}>
         {(segment) => (
           <Dynamic component={segment.mark ? 'mark' : 'span'}>
@@ -233,21 +233,21 @@ export function Spotlight(props: SpotlightProps) {
     <Show when={spotlight.isOpen()}>
       <div
         {...rest}
-        class={['ruri-spotlight', local.class].filter(Boolean).join(' ')}
+        class={['onyx-spotlight', local.class].filter(Boolean).join(' ')}
         role="presentation"
         onKeyDown={handleRootKeyDown}
       >
         <div
           ref={panelRef}
-          class="ruri-spotlight__panel"
+          class="onyx-spotlight__panel"
           role="dialog"
           aria-modal="true"
           aria-label="Command palette"
           tabIndex={-1}
         >
-          <div class="ruri-spotlight__search">
+          <div class="onyx-spotlight__search">
             <svg
-              class="ruri-spotlight__sigil"
+              class="onyx-spotlight__sigil"
               viewBox="0 0 16 16"
               width="16"
               height="16"
@@ -263,7 +263,7 @@ export function Spotlight(props: SpotlightProps) {
             <input
               ref={inputRef}
               id={INPUT_ID}
-              class="ruri-spotlight__input"
+              class="onyx-spotlight__input"
               role="combobox"
               type="text"
               value={query()}
@@ -280,7 +280,7 @@ export function Spotlight(props: SpotlightProps) {
             />
             <button
               type="button"
-              class="ruri-spotlight__close"
+              class="onyx-spotlight__close"
               aria-label="Close spotlight"
               onClick={() => closeSpotlight()}
             >
@@ -300,31 +300,31 @@ export function Spotlight(props: SpotlightProps) {
             </button>
           </div>
 
-          <div id={LISTBOX_ID} class="ruri-spotlight__results" role="listbox" aria-label="Commands">
+          <div id={LISTBOX_ID} class="onyx-spotlight__results" role="listbox" aria-label="Commands">
             <Show
               when={groups().length > 0}
               fallback={
-                <div class="ruri-spotlight__empty">
-                  <span class="ruri-spotlight__empty-mark" aria-hidden="true">⌕</span>
-                  <span class="ruri-spotlight__empty-text">Nothing surfaces yet</span>
-                  <span class="ruri-spotlight__empty-sub">Try a channel, a name, or an action</span>
+                <div class="onyx-spotlight__empty">
+                  <span class="onyx-spotlight__empty-mark" aria-hidden="true">⌕</span>
+                  <span class="onyx-spotlight__empty-text">Nothing surfaces yet</span>
+                  <span class="onyx-spotlight__empty-sub">Try a channel, a name, or an action</span>
                 </div>
               }
             >
               <For each={groups()}>
                 {(group) => (
                   <div
-                    class="ruri-spotlight__group"
+                    class="onyx-spotlight__group"
                     role="group"
                     aria-label={group.section}
                     data-section={group.section}
                   >
-                    <span class="ruri-spotlight__section" aria-hidden="true">{group.section}</span>
+                    <span class="onyx-spotlight__section" aria-hidden="true">{group.section}</span>
                     <For each={group.items}>
                       {(item) => (
                         <div
                           id={optionId(item.index)}
-                          class="ruri-spotlight__option"
+                          class="onyx-spotlight__option"
                           role="option"
                           aria-selected={activeIndex() === item.index}
                           onMouseMove={() => setActiveIndex(item.index)}
@@ -334,12 +334,12 @@ export function Spotlight(props: SpotlightProps) {
                             runActive();
                           }}
                         >
-                          <span class="ruri-spotlight__icon" aria-hidden="true">
+                          <span class="onyx-spotlight__icon" aria-hidden="true">
                             {SECTION_ICON[group.section]}
                           </span>
                           <HighlightedTitle title={item.command.title} ranges={item.ranges} />
                           <Show when={item.command.hint}>
-                            {(hint) => <span class="ruri-spotlight__hint">{hint()}</span>}
+                            {(hint) => <span class="onyx-spotlight__hint">{hint()}</span>}
                           </Show>
                         </div>
                       )}

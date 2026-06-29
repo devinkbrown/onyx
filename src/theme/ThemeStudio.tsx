@@ -42,7 +42,7 @@ import { backgroundOptions } from '@/backgrounds';
 // ---------------------------------------------------------------------------
 
 type ExportBlob = {
-  __ruri_theme_export__: true;
+  __onyx_theme_export__: true;
   base: ThemeId;
   overrides: TokenMap;
   exported: string; // ISO timestamp
@@ -78,7 +78,7 @@ function isExportBlob(value: unknown): value is ExportBlob {
   return (
     typeof value === 'object' &&
     value !== null &&
-    (value as Record<string, unknown>).__ruri_theme_export__ === true
+    (value as Record<string, unknown>).__onyx_theme_export__ === true
   );
 }
 
@@ -117,10 +117,10 @@ function StudioPreview() {
             <span class="ts-preview__cursor" aria-hidden="true">█</span>
           </div>
           <div class="ts-preview__actions">
-            <button class="ruri-button ruri-button--primary ruri-button--sm" type="button" tabIndex={-1}>
+            <button class="onyx-button onyx-button--primary onyx-button--sm" type="button" tabIndex={-1}>
               send
             </button>
-            <button class="ruri-button ruri-button--ghost ruri-button--sm" type="button" tabIndex={-1}>
+            <button class="onyx-button onyx-button--ghost onyx-button--sm" type="button" tabIndex={-1}>
               attach
             </button>
           </div>
@@ -487,7 +487,7 @@ export function ThemeStudio(props: ThemeStudioProps) {
     const base: ThemeId = isCustomThemeId(id) ? (getCustomTheme(id)?.base ?? THEME_IDS[0]!) : (id as ThemeId);
     const baseOverrides = isCustomThemeId(id) ? (getCustomTheme(id)?.overrides ?? {}) : {};
     const blob: ExportBlob = {
-      __ruri_theme_export__: true,
+      __onyx_theme_export__: true,
       base,
       overrides: { ...baseOverrides, ...overrides() },
       exported: new Date().toISOString(),
@@ -1286,10 +1286,10 @@ const STUDIO_CSS = `
 
 // Inject the studio styles once at module evaluation time.
 if (typeof document !== 'undefined') {
-  const existing = document.getElementById('ruri-theme-studio-styles');
+  const existing = document.getElementById('onyx-theme-studio-styles');
   if (!existing) {
     const styleEl = document.createElement('style');
-    styleEl.id = 'ruri-theme-studio-styles';
+    styleEl.id = 'onyx-theme-studio-styles';
     styleEl.textContent = STUDIO_CSS;
     document.head.appendChild(styleEl);
   }

@@ -70,9 +70,9 @@ function DeviceSelect(props: DeviceSelectProps) {
   const descriptionId = () => `${local.id}-description`;
 
   return (
-    <div class="ruri-field">
-      <label class="ruri-field__label" for={local.id}>{local.label}</label>
-      <p class="ruri-field__description" id={descriptionId()}>{local.description}</p>
+    <div class="onyx-field">
+      <label class="onyx-field__label" for={local.id}>{local.label}</label>
+      <p class="onyx-field__description" id={descriptionId()}>{local.description}</p>
       <select
         id={local.id}
         class="voice-settings__select"
@@ -162,7 +162,7 @@ function VoiceSettingsContent() {
         <h3 class="voice-settings__section-title" id="voice-devices-title">Devices</h3>
         <p class="voice-settings__section-copy">Choose the capture, playback, and camera paths for this voice session.</p>
         <Show when={deviceError()}>
-          {(error) => <p class="ruri-field__error" role="alert">{error()}</p>}
+          {(error) => <p class="onyx-field__error" role="alert">{error()}</p>}
         </Show>
         <div class="voice-settings__grid">
           <DeviceSelect
@@ -217,9 +217,9 @@ function VoiceSettingsContent() {
             checked={voice().vadEnabled}
             onChecked={(checked) => updateVoice({ vadEnabled: checked })}
           />
-          <div class="ruri-field">
-            <label class="ruri-field__label" for="voice-vad-sensitivity">Sensitivity</label>
-            <p class="ruri-field__description" id="voice-vad-sensitivity-description">Threshold for opening the voice gate.</p>
+          <div class="onyx-field">
+            <label class="onyx-field__label" for="voice-vad-sensitivity">Sensitivity</label>
+            <p class="onyx-field__description" id="voice-vad-sensitivity-description">Threshold for opening the voice gate.</p>
             <select
               id="voice-vad-sensitivity"
               class="voice-settings__select"
@@ -264,8 +264,8 @@ function VoiceSettingsContent() {
           onChecked={(checked) => updateVoice({ pushToTalk: checked })}
         />
         <div class="voice-settings__key-row">
-          <div class="ruri-field voice-settings__key-display">
-            <span class="ruri-field__label" id="voice-ptt-key-label">Talk key</span>
+          <div class="onyx-field voice-settings__key-display">
+            <span class="onyx-field__label" id="voice-ptt-key-label">Talk key</span>
             <span
               class="voice-settings__key-value"
               aria-labelledby="voice-ptt-key-label"

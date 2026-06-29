@@ -68,7 +68,7 @@ describe('customThemeTokens', () => {
 
 describe('persistence', () => {
   it('rejects malformed entries on load', () => {
-    localStorage.setItem('ruri:custom-themes', JSON.stringify([{ id: 'nope', name: 'x' }, 42]));
+    localStorage.setItem('onyx:custom-themes', JSON.stringify([{ id: 'nope', name: 'x' }, 42]));
     expect(loadCustomThemes()).toHaveLength(0);
   });
 });

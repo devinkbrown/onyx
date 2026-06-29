@@ -9,7 +9,7 @@ function makeClient(): { client: IRCClient; commands: string[] } {
   const commands: string[] = [];
   const client = new IRCClient({
     url: 'wss://ircx.us:8080/',
-    nick: 'ruri',
+    nick: 'onyx',
     onMessage: (m: IRCMessage) => commands.push(m.command),
   });
   return { client, commands };
@@ -53,7 +53,7 @@ describe('IRCClient binary media plane', () => {
     const viaHandler: Uint8Array[] = [];
     const client = new IRCClient({
       url: 'wss://ircx.us:8080/',
-      nick: 'ruri',
+      nick: 'onyx',
       onMessage: (m: IRCMessage) => commands.push(m.command),
       onBinary: (b) => viaOption.push(b),
     });
@@ -72,7 +72,7 @@ describe('IRCClient binary media plane', () => {
     const viaOption: Uint8Array[] = [];
     const client = new IRCClient({
       url: 'wss://ircx.us:8080/',
-      nick: 'ruri',
+      nick: 'onyx',
       onMessage: () => {},
       onBinary: (b) => viaOption.push(b),
     });
@@ -84,7 +84,7 @@ describe('IRCClient binary media plane', () => {
     const commands: string[] = [];
     const client = new IRCClient({
       url: 'wss://ircx.us:8080/',
-      nick: 'ruri',
+      nick: 'onyx',
       onMessage: (m: IRCMessage) => commands.push(m.command),
     });
     feedBinary(client, new Uint8Array([9, 9]));

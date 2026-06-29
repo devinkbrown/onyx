@@ -14,8 +14,8 @@ export function Tooltip(props: TooltipProps) {
   const [local, rest] = splitProps(props, ['content', 'id', 'placement', 'openDelay', 'disabled', 'children']);
   const [open, setOpen] = createSignal(false);
   const instanceId = ++tooltipId;
-  const id = local.id ?? `ruri-tooltip-${instanceId}`;
-  const anchorName = `--ruri-tooltip-anchor-${instanceId}`;
+  const id = local.id ?? `onyx-tooltip-${instanceId}`;
+  const anchorName = `--onyx-tooltip-anchor-${instanceId}`;
   let triggerRef: HTMLSpanElement | undefined;
   let timer: number | undefined;
 
@@ -54,9 +54,9 @@ export function Tooltip(props: TooltipProps) {
   return (
     <span
       {...rest}
-      class="ruri-tooltip"
+      class="onyx-tooltip"
       data-placement={local.placement ?? 'top'}
-      style={{ '--ruri-anchor-name': anchorName }}
+      style={{ '--onyx-anchor-name': anchorName }}
       onPointerEnter={show}
       onPointerLeave={hide}
       onFocusIn={show}
@@ -65,9 +65,9 @@ export function Tooltip(props: TooltipProps) {
         if (event.key === 'Escape') hide();
       }}
     >
-      <span ref={triggerRef} class="ruri-tooltip__trigger">{local.children}</span>
+      <span ref={triggerRef} class="onyx-tooltip__trigger">{local.children}</span>
       <Show when={open()}>
-        <span id={id} role="tooltip" class="ruri-tooltip__content">{local.content}</span>
+        <span id={id} role="tooltip" class="onyx-tooltip__content">{local.content}</span>
       </Show>
     </span>
   );

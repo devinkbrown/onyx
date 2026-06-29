@@ -71,9 +71,9 @@ describe('voice overlays', () => {
   it('shows the PIP only while in voice and off the active channel', () => {
     store.setState({
       activeView: { kind: 'channel', channel: '#general' },
-      ourNick: 'ruri',
+      ourNick: 'onyx',
       speakingNicks: new Set(['Mina']),
-      voiceChannelParticipants: new Map([['#voice', new Set(['ruri', 'Mina'])]]),
+      voiceChannelParticipants: new Map([['#voice', new Set(['onyx', 'Mina'])]]),
     });
     store.getState().setVoiceCallState({
       callState: 'in_call',

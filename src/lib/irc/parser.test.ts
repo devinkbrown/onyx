@@ -24,18 +24,18 @@ describe('parseIRCMessage', () => {
   });
 
   it('extracts nick + host from a nick!user@host prefix', () => {
-    const m = parseIRCMessage(':alice!ally@host.example PRIVMSG #ruri :hello world');
+    const m = parseIRCMessage(':alice!ally@host.example PRIVMSG #onyx :hello world');
     expect(m.nick).toBe('alice');
     expect(m.host).toBe('host.example');
     expect(m.command).toBe('PRIVMSG');
-    expect(m.params).toEqual(['#ruri', 'hello world']);
+    expect(m.params).toEqual(['#onyx', 'hello world']);
   });
 
   it('keeps a server-name prefix as the prefix', () => {
-    const m = parseIRCMessage(':eshmaki.me 001 ruri :Welcome');
+    const m = parseIRCMessage(':eshmaki.me 001 onyx :Welcome');
     expect(m.prefix).toBe('eshmaki.me');
     expect(m.command).toBe('001');
-    expect(m.params[0]).toBe('ruri');
+    expect(m.params[0]).toBe('onyx');
   });
 
   it('parses IRCv3 message tags with escapes', () => {
@@ -46,9 +46,9 @@ describe('parseIRCMessage', () => {
   });
 
   it('strips a trailing CRLF and null bytes', () => {
-    const m = parseIRCMessage('NICK ruri\x00\r\n');
+    const m = parseIRCMessage('NICK onyx\x00\r\n');
     expect(m.command).toBe('NICK');
-    expect(m.params).toEqual(['ruri']);
+    expect(m.params).toEqual(['onyx']);
   });
 });
 
@@ -57,7 +57,7 @@ describe('formatIRCLine', () => {
     expect(formatIRCLine('PRIVMSG', '#c', 'hello world')).toBe('PRIVMSG #c :hello world\r\n');
   });
   it('leaves a single space-free param unprefixed', () => {
-    expect(formatIRCLine('NICK', 'ruri')).toBe('NICK ruri\r\n');
+    expect(formatIRCLine('NICK', 'onyx')).toBe('NICK onyx\r\n');
   });
   it('colon-prefixes an empty trailing param', () => {
     expect(formatIRCLine('PART', '#c', '')).toBe('PART #c :\r\n');
@@ -141,17 +141,17 @@ describe('standard replies + SESSION notes', () => {
 
 describe('parseMonitorNumeric', () => {
   it('730 -> online targets', () => {
-    expect(parseMonitorNumeric(parseIRCMessage(':srv 730 ruri :bob,carol'))).toMatchObject({
+    expect(parseMonitorNumeric(parseIRCMessage(':srv 730 onyx :bob,carol'))).toMatchObject({
       kind: 'online', targets: ['bob', 'carol'],
     });
   });
   it('731 -> offline targets', () => {
-    expect(parseMonitorNumeric(parseIRCMessage(':srv 731 ruri :dave'))).toMatchObject({
+    expect(parseMonitorNumeric(parseIRCMessage(':srv 731 onyx :dave'))).toMatchObject({
       kind: 'offline', targets: ['dave'],
     });
   });
   it('non-monitor numerics return null', () => {
-    expect(parseMonitorNumeric(parseIRCMessage(':srv 001 ruri :hi'))).toBeNull();
+    expect(parseMonitorNumeric(parseIRCMessage(':srv 001 onyx :hi'))).toBeNull();
   });
 });
 

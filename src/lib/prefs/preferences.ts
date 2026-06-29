@@ -46,7 +46,9 @@ export const DEFAULT_PREFERENCES: Readonly<Preferences> = {
 
 // ── persistence ─────────────────────────────────────────────────────────────
 
-const STORAGE_KEY = 'ruri:preferences';
+const STORAGE_KEY = 'onyx:preferences';
+/** Legacy key from the previous brand name; read-only for one-time migration. */
+const LEGACY_STORAGE_KEY = 'ruri:preferences';
 
 function hasStorage(): boolean {
   return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
@@ -62,7 +64,10 @@ export function loadPreferences(): Preferences {
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
+    // Current key first, then fall back to the legacy key (read-old-write-new)
+    // so prefs saved under the previous brand survive one load after the rebrand.
+    const serialized = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
+    parsed = JSON.parse(serialized ?? '{}');
   } catch {
     return { ...DEFAULT_PREFERENCES };
   }

@@ -215,51 +215,51 @@
   color: var(--lapis-bright);
 }
 
-.voice-settings .ruri-button {
+.voice-settings .onyx-button {
   border-radius: var(--r-pill);
   box-shadow: none;
 }
 
-.voice-settings .ruri-button--ghost {
+.voice-settings .onyx-button--ghost {
   color: var(--washi);
   background: color-mix(in oklab, var(--stone-2) 38%, transparent);
   border-color: var(--seam-faint);
 }
 
-.voice-settings .ruri-button--danger {
+.voice-settings .onyx-button--danger {
   color: var(--washi);
   background: linear-gradient(180deg, color-mix(in oklab, var(--shu) 70%, var(--stone)), color-mix(in oklab, var(--shu) 54%, var(--ink)));
   border-color: color-mix(in oklab, var(--shu) 58%, var(--washi));
 }
 
-.voice-settings .ruri-button:hover:not(:disabled):not([aria-disabled='true']) {
+.voice-settings .onyx-button:hover:not(:disabled):not([aria-disabled='true']) {
   transform: translateY(-1px);
   box-shadow: 0 16px 38px -30px color-mix(in oklab, var(--lapis-bright) 70%, transparent);
 }
 
-.voice-settings .ruri-button--danger:hover:not(:disabled):not([aria-disabled='true']) {
+.voice-settings .onyx-button--danger:hover:not(:disabled):not([aria-disabled='true']) {
   box-shadow: 0 16px 38px -30px color-mix(in oklab, var(--shu) 82%, transparent);
 }
 
-.voice-settings .ruri-button:focus-visible {
+.voice-settings .onyx-button:focus-visible {
   outline: 2px solid var(--lapis-bright);
   outline-offset: 3px;
 }
 
-.voice-settings .ruri-field__label {
+.voice-settings .onyx-field__label {
   color: var(--washi);
 }
 
-.voice-settings .ruri-field__description {
+.voice-settings .onyx-field__description {
   color: var(--washi-dim);
 }
 
-.voice-settings .ruri-field__input[type='range'] {
+.voice-settings .onyx-field__input[type='range'] {
   accent-color: var(--lapis-bright);
   cursor: pointer;
 }
 
-.voice-settings .ruri-field__input[type='range']:focus-visible {
+.voice-settings .onyx-field__input[type='range']:focus-visible {
   outline: 2px solid var(--lapis-bright);
   outline-offset: 4px;
 }

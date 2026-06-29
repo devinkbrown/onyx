@@ -13,7 +13,7 @@
    The :root declaration is the canonical default (Ocean flagship).
    All themes in src/theme/themes.ts override these values via ThemeProvider,
    which writes CSS-custom-property overrides onto document.documentElement and
-   sets the data-theme attribute.  [data-theme='ruri'] restores the older Onyx
+   sets the data-theme attribute.  [data-theme='onyx'] restores the older Onyx
    "black stone × gold inlay" cut for users who switch to it.
    ───────────────────────────────────────────────────────────── */
 
@@ -106,7 +106,7 @@
 }
 
 /* Onyx — the older "black banded stone × gold inlay × terminal" cut. */
-[data-theme='ruri'] {
+[data-theme='onyx'] {
   color-scheme: dark;
 
   --ink: #050507;

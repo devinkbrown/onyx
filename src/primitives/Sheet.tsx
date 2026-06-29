@@ -75,30 +75,30 @@ export function Sheet(props: SheetProps) {
   return (
     <Show when={local.open}>
       <Portal>
-        <div {...rest} class="ruri-sheet" role="presentation">
+        <div {...rest} class="onyx-sheet" role="presentation">
           {/* Decorative click-to-dismiss layer — keyboard users dismiss via Esc /
               the labelled close button, so the backdrop stays out of the a11y tree. */}
-          <div class="ruri-sheet__backdrop" aria-hidden="true" onClick={() => local.onOpenChange(false)} />
+          <div class="onyx-sheet__backdrop" aria-hidden="true" onClick={() => local.onOpenChange(false)} />
           <aside
             ref={panelRef}
-            class="ruri-sheet__panel"
+            class="onyx-sheet__panel"
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId()}
             aria-describedby={descriptionId()}
             tabindex="-1"
           >
-            <header class="ruri-sheet__header">
+            <header class="onyx-sheet__header">
               <div>
-                <p class="ruri-sheet__kicker">panel</p>
+                <p class="onyx-sheet__kicker">panel</p>
                 <h2 id={titleId()}>{local.title}</h2>
                 <Show when={local.description}>
                   <p id={descriptionId()}>{local.description}</p>
                 </Show>
               </div>
-              <button class="ruri-sheet__close" type="button" aria-label={local.closeLabel ?? 'Close panel'} onClick={() => local.onOpenChange(false)}>×</button>
+              <button class="onyx-sheet__close" type="button" aria-label={local.closeLabel ?? 'Close panel'} onClick={() => local.onOpenChange(false)}>×</button>
             </header>
-            <div class="ruri-sheet__body">{local.children}</div>
+            <div class="onyx-sheet__body">{local.children}</div>
           </aside>
         </div>
       </Portal>

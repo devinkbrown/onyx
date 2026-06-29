@@ -1,7 +1,7 @@
 /**
  * src/lib/keyboard/useKeyboardShortcuts.ts
  *
- * Global keyboard shortcut primitive for Ruri.
+ * Global keyboard shortcut primitive for Onyx.
  *
  * Usage (inside a SolidJS component or `createRoot`):
  *

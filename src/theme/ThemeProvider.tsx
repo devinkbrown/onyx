@@ -39,7 +39,17 @@ import {
 // Constants
 // ---------------------------------------------------------------------------
 
-const STORAGE_KEY = 'ruri:theme';
+const STORAGE_KEY = 'onyx:theme';
+/** Legacy key from the previous brand name; read-only for one-time migration. */
+const LEGACY_STORAGE_KEY = 'ruri:theme';
+/** Legacy built-in theme id that was renamed to its current brand-consistent id. */
+const LEGACY_THEME_ID = 'ruri';
+const MIGRATED_THEME_ID = 'onyx';
+
+/** Map a stored (possibly legacy) theme id to its current id. */
+function migrateThemeId(id: string): string {
+  return id === LEGACY_THEME_ID ? MIGRATED_THEME_ID : id;
+}
 
 // ---------------------------------------------------------------------------
 // Context shape
@@ -115,7 +125,10 @@ export function useThemeOptional(): ThemeContextValue {
 
 function readStoredTheme(): string {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    // Read the current key first; fall back to the legacy key (read-old-write-new)
+    // so existing users keep their saved theme through one load after the rebrand.
+    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
+    const stored = raw ? migrateThemeId(raw) : null;
     if (stored && (stored in THEMES || (isCustomThemeId(stored) && getCustomTheme(stored)))) {
       return stored;
     }

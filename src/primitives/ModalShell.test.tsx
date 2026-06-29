@@ -18,7 +18,7 @@ describe('ModalShell', () => {
     const dialog = screen.getByRole('dialog', { name: 'Confirm disconnect' });
 
     expect(dialog.getAttribute('aria-modal')).toBe('true');
-    expect(dialog.classList.contains('ruri-modal__dialog')).toBe(true);
+    expect(dialog.classList.contains('onyx-modal__dialog')).toBe(true);
     expect(dialog.textContent).toContain('Leave the current room');
   });
 

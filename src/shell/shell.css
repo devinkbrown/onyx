@@ -1868,12 +1868,12 @@
   display: flex;
 }
 
-.shell-reaction-avatars .ruri-avatar {
+.shell-reaction-avatars .onyx-avatar {
   margin-left: -6px;
   border: 1px solid var(--ink);
 }
 
-.shell-reaction-avatars .ruri-avatar:first-child { margin-left: 0; }
+.shell-reaction-avatars .onyx-avatar:first-child { margin-left: 0; }
 
 .shell-reaction-emoji { font-size: 0.96rem; line-height: 1; }
 .shell-reaction-count {
@@ -2609,8 +2609,8 @@
 /* Each member is wrapped in a Popover — an inline <span> + inline <button> by
    default — which made the nicklist flow horizontally and wrap into ragged
    columns. Force the wrappers to stack as clean, full-width vertical rows. */
-.shell-members-scroll .ruri-popover { display: block; }
-.shell-members-scroll .ruri-popover__trigger {
+.shell-members-scroll .onyx-popover { display: block; }
+.shell-members-scroll .onyx-popover__trigger {
   display: block;
   width: 100%;
   margin: 0;
@@ -2623,7 +2623,7 @@
   cursor: pointer;
   border-radius: var(--r-sm);
 }
-.shell-members-scroll .ruri-popover__trigger:focus-visible {
+.shell-members-scroll .onyx-popover__trigger:focus-visible {
   outline: 2px solid var(--lapis-bright);
   outline-offset: -2px;
 }

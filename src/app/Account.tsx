@@ -74,15 +74,15 @@ function PasswordField(props: PasswordFieldProps): JSX.Element {
   const describedBy = () => [descriptionId(), errorId()].filter(Boolean).join(' ') || undefined;
 
   return (
-    <div class="ruri-field acct-password">
-      <label class="ruri-field__label" for={local.id}>{local.label}</label>
+    <div class="onyx-field acct-password">
+      <label class="onyx-field__label" for={local.id}>{local.label}</label>
       <Show when={local.description}>
-        <p class="ruri-field__description" id={descriptionId()}>{local.description}</p>
+        <p class="onyx-field__description" id={descriptionId()}>{local.description}</p>
       </Show>
       <div class="acct-password-row">
         <input
           id={local.id}
-          class="ruri-field__input"
+          class="onyx-field__input"
           type={shown() ? 'text' : 'password'}
           placeholder={local.placeholder}
           autocomplete={local.autocomplete}
@@ -104,7 +104,7 @@ function PasswordField(props: PasswordFieldProps): JSX.Element {
         </button>
       </div>
       <Show when={local.error}>
-        <p class="ruri-field__error" id={errorId()}>{local.error}</p>
+        <p class="onyx-field__error" id={errorId()}>{local.error}</p>
       </Show>
     </div>
   );

@@ -3,7 +3,7 @@
    bioluminescent search field and an azure-highlighted active row.
    All color comes from theme tokens so it re-skins with the active theme. */
 
-.ruri-spotlight {
+.onyx-spotlight {
   position: fixed;
   inset: 0;
   z-index: 120;
@@ -27,7 +27,7 @@
   -webkit-backdrop-filter: blur(3px);
 }
 
-.ruri-spotlight__panel {
+.onyx-spotlight__panel {
   position: relative;
   width: min(45rem, 100%);
   max-height: min(42rem, calc(100svh - 2rem));
@@ -57,7 +57,7 @@
 }
 
 /* Bioluminescent crest — a thin azure light skimming the top edge. */
-.ruri-spotlight__panel::before {
+.onyx-spotlight__panel::before {
   content: '';
   position: absolute;
   inset: 0 0 auto 0;
@@ -74,7 +74,7 @@
 }
 
 /* Faint caustic wash near the surface, fading into the dark. */
-.ruri-spotlight__panel::after {
+.onyx-spotlight__panel::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -87,7 +87,7 @@
   );
 }
 
-.ruri-spotlight__search {
+.onyx-spotlight__search {
   position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -99,11 +99,11 @@
 }
 
 /* Bioluminescent focus — the seam below the field lights up as you type. */
-.ruri-spotlight__search:focus-within {
+.onyx-spotlight__search:focus-within {
   border-bottom-color: color-mix(in oklab, var(--lapis) 60%, transparent);
 }
 
-.ruri-spotlight__sigil {
+.onyx-spotlight__sigil {
   display: inline-grid;
   place-items: center;
   width: 1.5rem;
@@ -117,12 +117,12 @@
   transition: color var(--dur) var(--ease), filter var(--dur) var(--ease);
 }
 
-.ruri-spotlight__search:focus-within .ruri-spotlight__sigil {
+.onyx-spotlight__search:focus-within .onyx-spotlight__sigil {
   color: var(--lapis-bright);
   filter: drop-shadow(0 0 12px color-mix(in oklab, var(--lapis-bright) 65%, transparent));
 }
 
-.ruri-spotlight__input {
+.onyx-spotlight__input {
   width: 100%;
   min-width: 0;
   appearance: none;
@@ -134,11 +134,11 @@
   caret-color: var(--lapis-bright);
 }
 
-.ruri-spotlight__input::placeholder {
+.onyx-spotlight__input::placeholder {
   color: var(--washi-mute);
 }
 
-.ruri-spotlight__close {
+.onyx-spotlight__close {
   width: 2rem;
   height: 2rem;
   display: inline-grid;
@@ -157,19 +157,19 @@
     box-shadow var(--dur) var(--ease);
 }
 
-.ruri-spotlight__close:hover {
+.onyx-spotlight__close:hover {
   color: var(--lapis-bright);
   border-color: var(--seam);
   background: color-mix(in oklab, var(--lapis) 14%, transparent);
 }
 
-.ruri-spotlight__close:focus-visible {
+.onyx-spotlight__close:focus-visible {
   outline: none;
   border-color: var(--lapis);
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--lapis) 28%, transparent);
 }
 
-.ruri-spotlight__results {
+.onyx-spotlight__results {
   min-height: 13rem;
   max-height: min(32rem, calc(100svh - 8rem));
   overflow: auto;
@@ -179,24 +179,24 @@
   scrollbar-color: var(--seam) transparent;
 }
 
-.ruri-spotlight__results::-webkit-scrollbar {
+.onyx-spotlight__results::-webkit-scrollbar {
   width: 10px;
 }
 
-.ruri-spotlight__results::-webkit-scrollbar-thumb {
+.onyx-spotlight__results::-webkit-scrollbar-thumb {
   border: 3px solid transparent;
   border-radius: var(--r-pill);
   background-clip: padding-box;
   background-color: var(--seam);
 }
 
-.ruri-spotlight__group + .ruri-spotlight__group {
+.onyx-spotlight__group + .onyx-spotlight__group {
   margin-top: var(--space-2);
   padding-top: var(--space-2);
   border-top: 1px solid var(--line-faint);
 }
 
-.ruri-spotlight__section {
+.onyx-spotlight__section {
   display: block;
   padding: 0.6rem 0.75rem 0.4rem;
   color: var(--washi-mute);
@@ -205,7 +205,7 @@
   text-transform: uppercase;
 }
 
-.ruri-spotlight__option {
+.onyx-spotlight__option {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
@@ -222,7 +222,7 @@
 }
 
 /* Token-tinted leading icon — a small bioluminescent marker per row. */
-.ruri-spotlight__icon {
+.onyx-spotlight__icon {
   display: inline-grid;
   place-items: center;
   width: 1.85rem;
@@ -240,24 +240,24 @@
 }
 
 /* DMs tinted sea-foam, Actions tinted champagne gold (sparingly). */
-.ruri-spotlight__group[data-section='DMs'] .ruri-spotlight__icon {
+.onyx-spotlight__group[data-section='DMs'] .onyx-spotlight__icon {
   color: var(--washi-dim);
   background: color-mix(in oklab, var(--washi) 9%, transparent);
   border-color: color-mix(in oklab, var(--washi) 16%, transparent);
 }
 
-.ruri-spotlight__group[data-section='Actions'] .ruri-spotlight__icon {
+.onyx-spotlight__group[data-section='Actions'] .onyx-spotlight__icon {
   color: var(--gold);
   background: color-mix(in oklab, var(--gold) 11%, transparent);
   border-color: color-mix(in oklab, var(--gold) 22%, transparent);
 }
 
-.ruri-spotlight__option:hover {
+.onyx-spotlight__option:hover {
   background: color-mix(in oklab, var(--stone-3) 30%, transparent);
 }
 
 /* Active row — azure highlight with a luminous left edge and a soft glow. */
-.ruri-spotlight__option[aria-selected='true'] {
+.onyx-spotlight__option[aria-selected='true'] {
   background:
     linear-gradient(
       90deg,
@@ -271,20 +271,20 @@
     0 0 28px -16px color-mix(in oklab, var(--lapis) 70%, transparent);
 }
 
-.ruri-spotlight__option[aria-selected='true'] .ruri-spotlight__icon {
+.onyx-spotlight__option[aria-selected='true'] .onyx-spotlight__icon {
   color: var(--lapis-bright);
   background: color-mix(in oklab, var(--lapis) 24%, transparent);
   border-color: color-mix(in oklab, var(--lapis) 50%, transparent);
   box-shadow: 0 0 12px -3px color-mix(in oklab, var(--lapis-bright) 60%, transparent);
 }
 
-.ruri-spotlight__group[data-section='Actions'] .ruri-spotlight__option[aria-selected='true'] .ruri-spotlight__icon {
+.onyx-spotlight__group[data-section='Actions'] .onyx-spotlight__option[aria-selected='true'] .onyx-spotlight__icon {
   color: var(--gold-bright);
   background: color-mix(in oklab, var(--gold) 24%, transparent);
   border-color: color-mix(in oklab, var(--gold) 48%, transparent);
 }
 
-.ruri-spotlight__title {
+.onyx-spotlight__title {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -293,7 +293,7 @@
 }
 
 /* Matched fuzzy ranges glow azure rather than highlight-marker yellow. */
-.ruri-spotlight__title mark {
+.onyx-spotlight__title mark {
   padding: 0;
   color: var(--lapis-bright);
   background: transparent;
@@ -301,7 +301,7 @@
   text-shadow: 0 0 10px color-mix(in oklab, var(--lapis) 45%, transparent);
 }
 
-.ruri-spotlight__hint {
+.onyx-spotlight__hint {
   min-width: 0;
   max-width: 18rem;
   overflow: hidden;
@@ -311,7 +311,7 @@
   font: 0.72rem/1.2 var(--font-mono);
 }
 
-.ruri-spotlight__empty {
+.onyx-spotlight__empty {
   display: grid;
   min-height: 11rem;
   place-items: center;
@@ -320,7 +320,7 @@
   text-align: center;
 }
 
-.ruri-spotlight__empty-mark {
+.onyx-spotlight__empty-mark {
   font-size: 1.6rem;
   line-height: 1;
   color: var(--lapis);
@@ -328,26 +328,26 @@
   filter: drop-shadow(0 0 10px color-mix(in oklab, var(--lapis) 40%, transparent));
 }
 
-.ruri-spotlight__empty-text {
+.onyx-spotlight__empty-text {
   color: var(--washi-dim);
   font: 500 0.92rem/1.4 var(--font-sans);
 }
 
-.ruri-spotlight__empty-sub {
+.onyx-spotlight__empty-sub {
   color: var(--washi-mute);
   font: 0.74rem/1.4 var(--font-mono);
 }
 
 @media (max-width: 520px) {
-  .ruri-spotlight {
+  .onyx-spotlight {
     padding-top: 0.75rem;
   }
 
-  .ruri-spotlight__panel {
+  .onyx-spotlight__panel {
     max-height: calc(100svh - 1.5rem);
   }
 
-  .ruri-spotlight__option {
+  .onyx-spotlight__option {
     grid-template-columns: auto 1fr;
     grid-template-areas:
       'icon title'
@@ -355,31 +355,31 @@
     row-gap: 0.2rem;
   }
 
-  .ruri-spotlight__icon {
+  .onyx-spotlight__icon {
     grid-area: icon;
   }
 
-  .ruri-spotlight__title {
+  .onyx-spotlight__title {
     grid-area: title;
   }
 
-  .ruri-spotlight__hint {
+  .onyx-spotlight__hint {
     grid-area: hint;
     max-width: 100%;
   }
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .ruri-spotlight {
-    animation: ruri-spotlight-scrim var(--dur) var(--ease);
+  .onyx-spotlight {
+    animation: onyx-spotlight-scrim var(--dur) var(--ease);
   }
 
-  .ruri-spotlight__panel {
-    animation: ruri-spotlight-in var(--dur) var(--ease);
+  .onyx-spotlight__panel {
+    animation: onyx-spotlight-in var(--dur) var(--ease);
   }
 }
 
-@keyframes ruri-spotlight-scrim {
+@keyframes onyx-spotlight-scrim {
   from {
     opacity: 0;
   }
@@ -388,7 +388,7 @@
   }
 }
 
-@keyframes ruri-spotlight-in {
+@keyframes onyx-spotlight-in {
   from {
     opacity: 0;
     transform: translateY(0.65rem) scale(0.985);

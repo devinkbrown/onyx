@@ -14,7 +14,7 @@ import './message-search.css';
 
 export type MessageSearchProps = JSX.HTMLAttributes<HTMLDivElement>;
 
-const INPUT_ID = 'ruri-message-search-input';
+const INPUT_ID = 'onyx-message-search-input';
 
 function cssEscape(value: string): string {
   if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
@@ -110,14 +110,14 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
     <Show when={search.isOpen()}>
       <div
         {...rest}
-        class={['ruri-message-search', local.class].filter(Boolean).join(' ')}
+        class={['onyx-message-search', local.class].filter(Boolean).join(' ')}
         role="search"
         aria-label="Message search"
       >
-        <div class="ruri-message-search__surface">
+        <div class="onyx-message-search__surface">
           <label class="sr-only" for={INPUT_ID}>Search messages</label>
           <svg
-            class="ruri-message-search__sigil"
+            class="onyx-message-search__sigil"
             viewBox="0 0 16 16"
             width="16"
             height="16"
@@ -133,7 +133,7 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
           <input
             ref={inputRef}
             id={INPUT_ID}
-            class="ruri-message-search__input"
+            class="onyx-message-search__input"
             type="search"
             value={search.query()}
             autocomplete="off"
@@ -143,13 +143,13 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
             onInput={handleInput}
             onKeyDown={handleKeyDown}
           />
-          <output class="ruri-message-search__count" aria-live="polite">
+          <output class="onyx-message-search__count" aria-live="polite">
             {countLabel()}
           </output>
-          <div class="ruri-message-search__controls" role="group" aria-label="Search result navigation">
+          <div class="onyx-message-search__controls" role="group" aria-label="Search result navigation">
             <button
               type="button"
-              class="ruri-message-search__button"
+              class="onyx-message-search__button"
               aria-label="Previous match"
               title="Previous match"
               disabled={search.resultCount() === 0}
@@ -172,7 +172,7 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
             </button>
             <button
               type="button"
-              class="ruri-message-search__button"
+              class="onyx-message-search__button"
               aria-label="Next match"
               title="Next match"
               disabled={search.resultCount() === 0}
@@ -195,7 +195,7 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
             </button>
             <button
               type="button"
-              class="ruri-message-search__button ruri-message-search__button--close"
+              class="onyx-message-search__button onyx-message-search__button--close"
               aria-label="Close search"
               title="Close search"
               onClick={() => closeMessageSearch()}

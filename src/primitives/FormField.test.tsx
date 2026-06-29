@@ -7,12 +7,12 @@ afterEach(cleanup);
 describe('FormField', () => {
   it('binds the mono label to the input and forwards typing events', () => {
     const onInput = vi.fn();
-    render(() => <FormField id="nick" label="Nickname" placeholder="ruri" onInput={onInput} />);
+    render(() => <FormField id="nick" label="Nickname" placeholder="onyx" onInput={onInput} />);
 
     const input = screen.getByRole('textbox', { name: 'Nickname' }) as HTMLInputElement;
     fireEvent.input(input, { target: { value: 'kain' } });
 
-    expect(input.placeholder).toBe('ruri');
+    expect(input.placeholder).toBe('onyx');
     expect(onInput).toHaveBeenCalledTimes(1);
   });
 

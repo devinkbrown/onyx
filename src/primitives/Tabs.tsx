@@ -57,7 +57,7 @@ function TabsRoot(props: TabsProps) {
   const [local, rest] = splitProps(props, ['value', 'defaultValue', 'onValueChange', 'orientation', 'children']);
   const [innerValue, setInnerValue] = createSignal(local.defaultValue ?? '');
   const [triggers, setTriggers] = createSignal<HTMLButtonElement[]>([]);
-  const baseId = `ruri-tabs-${++tabsId}`;
+  const baseId = `onyx-tabs-${++tabsId}`;
   const selected = createMemo(() => local.value ?? innerValue());
 
   const setSelected = (value: string) => {
@@ -100,7 +100,7 @@ function TabsRoot(props: TabsProps) {
 
   return (
     <TabsContext.Provider value={context}>
-      <div {...rest} class="ruri-tabs">{local.children}</div>
+      <div {...rest} class="onyx-tabs">{local.children}</div>
     </TabsContext.Provider>
   );
 }
@@ -112,7 +112,7 @@ function TabsList(props: TabsListProps) {
   return (
     <div
       {...rest}
-      class={['ruri-tabs__list', local.class].filter(Boolean).join(' ')}
+      class={['onyx-tabs__list', local.class].filter(Boolean).join(' ')}
       role="tablist"
       aria-orientation={context.orientation()}
     >
@@ -173,7 +173,7 @@ function TabsTrigger(props: TabsTriggerProps) {
       {...rest}
       ref={assignRef}
       type={local.type ?? 'button'}
-      class={['ruri-tabs__trigger', local.class].filter(Boolean).join(' ')}
+      class={['onyx-tabs__trigger', local.class].filter(Boolean).join(' ')}
       role="tab"
       id={triggerId()}
       data-value={local.value}
@@ -199,7 +199,7 @@ function TabsContent(props: TabsContentProps) {
   return (
     <div
       {...rest}
-      class={['ruri-tabs__content', local.class].filter(Boolean).join(' ')}
+      class={['onyx-tabs__content', local.class].filter(Boolean).join(' ')}
       role="tabpanel"
       id={panelId()}
       aria-labelledby={triggerId()}

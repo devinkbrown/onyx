@@ -1,7 +1,7 @@
 /**
  * account.css — Onyx account panel (Ocean dark-luxury).
  *
- * Rendered inside the shared ModalShell (`.ruri-modal__*`), so this sheet only
+ * Rendered inside the shared ModalShell (`.onyx-modal__*`), so this sheet only
  * styles the panel's interior: the identity card, the section rhythm, the
  * protection switches, the certificate list, and the danger zone. Every value
  * is a design token (see styles/tokens.css); nothing is hardcoded. All motion
@@ -198,7 +198,7 @@
   align-items: flex-start;
 }
 
-.acct-section-body form > .ruri-button {
+.acct-section-body form > .onyx-button {
   align-self: flex-start;
 }
 
@@ -210,7 +210,7 @@
   gap: var(--space-2);
 }
 
-.acct-password-row .ruri-field__input {
+.acct-password-row .onyx-field__input {
   flex: 1;
   min-width: 0;
 }
@@ -241,8 +241,8 @@
 .acct-password-toggle:focus-visible { outline: 2px solid var(--lapis-bright); outline-offset: 2px; }
 .acct-password-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.acct-password.ruri-field,
-.acct-section-body .ruri-field {
+.acct-password.onyx-field,
+.acct-section-body .onyx-field {
   width: 100%;
 }
 

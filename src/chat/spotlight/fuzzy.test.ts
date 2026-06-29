@@ -16,10 +16,10 @@ describe('fuzzyMatch', () => {
   });
 
   it('ranks tight prefix and substring matches ahead of loose matches', () => {
-    const items = ['Switch theme: Ruri', 'Go to #ruri-lab', 'Disconnect'];
-    const result = fuzzyFilter(items, 'ruri', (item) => item, () => []);
+    const items = ['Switch theme: Onyx', 'Go to #onyx-lab', 'Disconnect'];
+    const result = fuzzyFilter(items, 'onyx', (item) => item, () => []);
 
-    expect(result[0]?.item).toBe('Go to #ruri-lab');
+    expect(result[0]?.item).toBe('Go to #onyx-lab');
     expect(result.at(-1)?.item).not.toBe('Disconnect');
   });
 

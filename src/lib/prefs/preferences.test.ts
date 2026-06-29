@@ -12,7 +12,7 @@ import {
   setPreference,
 } from './preferences';
 
-const STORAGE_KEY = 'ruri:preferences';
+const STORAGE_KEY = 'onyx:preferences';
 
 function readStored(): Record<string, unknown> {
   return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');

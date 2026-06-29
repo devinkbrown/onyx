@@ -69,12 +69,12 @@ afterEach(() => {
 
 describe('applyThemeToDom', () => {
   it('writes every token in the theme onto documentElement', () => {
-    applyThemeToDom('ruri');
+    applyThemeToDom('onyx');
 
-    expect(document.documentElement.getAttribute('data-theme')).toBe('ruri');
+    expect(document.documentElement.getAttribute('data-theme')).toBe('onyx');
 
-    const ruriTheme = THEMES.ruri;
-    expect(ruriTheme).toBeDefined();
+    const onyxTheme = THEMES.onyx;
+    expect(onyxTheme).toBeDefined();
 
     // Spot-check several well-known tokens.
     expect(getVar('--ink')).toBeTruthy();
@@ -87,7 +87,7 @@ describe('applyThemeToDom', () => {
     applyThemeToDom('pearl');
     expect(getVar('color-scheme')).toBe('light');
 
-    applyThemeToDom('ruri');
+    applyThemeToDom('onyx');
     expect(getVar('color-scheme')).toBe('dark');
   });
 
@@ -122,7 +122,7 @@ describe('ThemeProvider', () => {
   });
 
   it('reads an existing localStorage value on mount', () => {
-    localStorage.setItem('ruri:theme', 'obsidian');
+    localStorage.setItem('onyx:theme', 'obsidian');
 
     render(() => (
       <ThemeProvider>
@@ -135,7 +135,7 @@ describe('ThemeProvider', () => {
   });
 
   it('falls back to the default when localStorage has an unknown value', () => {
-    localStorage.setItem('ruri:theme', 'unknown-theme-xyz');
+    localStorage.setItem('onyx:theme', 'unknown-theme-xyz');
 
     render(() => (
       <ThemeProvider>
@@ -155,7 +155,7 @@ describe('ThemeProvider', () => {
 
     fireEvent.click(screen.getByTestId('set-theme-btn'));
 
-    expect(localStorage.getItem('ruri:theme')).toBe('sumi');
+    expect(localStorage.getItem('onyx:theme')).toBe('sumi');
   });
 
   it('setTheme applies the new theme to the DOM', () => {
@@ -202,7 +202,7 @@ describe('Export / import round-trip', () => {
     };
 
     const blob = {
-      __ruri_theme_export__: true as const,
+      __onyx_theme_export__: true as const,
       base,
       overrides,
       exported: new Date().toISOString(),
@@ -211,7 +211,7 @@ describe('Export / import round-trip', () => {
     const json = JSON.stringify(blob);
     const parsed = JSON.parse(json) as typeof blob;
 
-    expect(parsed.__ruri_theme_export__).toBe(true);
+    expect(parsed.__onyx_theme_export__).toBe(true);
     expect(parsed.base).toBe('obsidian');
     expect(parsed.overrides['--gold']).toBe('#ff9900');
     expect(parsed.overrides['--r-0']).toBe('4px');
@@ -225,8 +225,8 @@ describe('Export / import round-trip', () => {
     }
 
     const blob = {
-      __ruri_theme_export__: true as const,
-      base: 'ruri' as ThemeId,
+      __onyx_theme_export__: true as const,
+      base: 'onyx' as ThemeId,
       overrides,
       exported: new Date().toISOString(),
     };

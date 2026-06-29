@@ -3,7 +3,7 @@
  *
  * Each theme is a typed map of CSS-custom-property overrides keyed to the
  * token names defined in src/styles/tokens.css.  A theme only needs to
- * declare the vars it wants to change; the flagship `ruri` theme declares
+ * declare the vars it wants to change; the flagship `onyx` theme declares
  * every token so it can serve as an exhaustive reference.
  *
  * Identity constraints (ALL themes must honour):
@@ -34,7 +34,7 @@ export type ThemeId =
   | 'tide'
   | 'abyss'
   | 'reef'
-  | 'ruri'
+  | 'onyx'
   | 'obsidian'
   | 'pearl'
   | 'sumi'
@@ -289,10 +289,10 @@ const reefTokens: TokenMap = {
 };
 
 // ---------------------------------------------------------------------------
-// ruri — Onyx: black banded stone × gold inlay × terminal (dark)
+// onyx — Onyx: black banded stone × gold inlay × terminal (dark)
 // The older flagship cut, kept selectable.
 // ---------------------------------------------------------------------------
-const ruriTokens: TokenMap = {
+const onyxTokens: TokenMap = {
   // Ground — onyx black → graphite strata
   '--ink':        '#050507',
   '--ink-2':      '#08080c',
@@ -837,12 +837,12 @@ export const THEMES: Record<ThemeId, ThemeMeta> = {
     scheme: 'dark',
     tokens: reefTokens,
   },
-  ruri: {
-    id: 'ruri',
+  onyx: {
+    id: 'onyx',
     label: 'Onyx',
     description: 'Black banded stone, gold inlay, moonstone sheen — the older cut.',
     scheme: 'dark',
-    tokens: ruriTokens,
+    tokens: onyxTokens,
   },
   obsidian: {
     id: 'obsidian',

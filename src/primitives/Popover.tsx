@@ -20,8 +20,8 @@ export function Popover(props: PopoverProps) {
   const [local, rest] = splitProps(props, ['trigger', 'id', 'open', 'defaultOpen', 'onOpenChange', 'placement', 'children']);
   const [innerOpen, setInnerOpen] = createSignal(local.defaultOpen ?? false);
   const instanceId = ++popoverId;
-  const id = local.id ?? `ruri-popover-${instanceId}`;
-  const anchorName = `--ruri-popover-anchor-${instanceId}`;
+  const id = local.id ?? `onyx-popover-${instanceId}`;
+  const anchorName = `--onyx-popover-anchor-${instanceId}`;
   let panelRef: PopoverElement | undefined;
   let triggerRef: HTMLButtonElement | undefined;
 
@@ -101,11 +101,11 @@ export function Popover(props: PopoverProps) {
   });
 
   return (
-    <span {...rest} class="ruri-popover" data-placement={local.placement ?? 'bottom'} style={{ '--ruri-anchor-name': anchorName }}>
+    <span {...rest} class="onyx-popover" data-placement={local.placement ?? 'bottom'} style={{ '--onyx-anchor-name': anchorName }}>
       <button
         ref={triggerRef}
         type="button"
-        class="ruri-popover__trigger"
+        class="onyx-popover__trigger"
         aria-haspopup="dialog"
         aria-expanded={isOpen()}
         aria-controls={id}
@@ -125,7 +125,7 @@ export function Popover(props: PopoverProps) {
         }}
         id={id}
         role="dialog"
-        class="ruri-popover__panel"
+        class="onyx-popover__panel"
         hidden={!isOpen()}
       >
         <Show when={isOpen()}>{local.children}</Show>

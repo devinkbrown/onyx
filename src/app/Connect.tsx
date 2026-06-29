@@ -188,15 +188,15 @@ function PasswordInput(props: PasswordInputProps): JSX.Element {
     [descriptionId(), errorId()].filter(Boolean).join(' ') || undefined;
 
   return (
-    <div class="ruri-field conn-password">
-      <label class="ruri-field__label" for={props.id}>{props.label}</label>
+    <div class="onyx-field conn-password">
+      <label class="onyx-field__label" for={props.id}>{props.label}</label>
       <Show when={props.description}>
-        <p class="ruri-field__description" id={descriptionId()}>{props.description}</p>
+        <p class="onyx-field__description" id={descriptionId()}>{props.description}</p>
       </Show>
       <div class="conn-password-row">
         <input
           id={props.id}
-          class="ruri-field__input"
+          class="onyx-field__input"
           type={shown() ? 'text' : 'password'}
           placeholder={props.placeholder}
           autocomplete={props.autocomplete}
@@ -219,7 +219,7 @@ function PasswordInput(props: PasswordInputProps): JSX.Element {
         </button>
       </div>
       <Show when={props.error}>
-        <p class="ruri-field__error" id={errorId()}>{props.error}</p>
+        <p class="onyx-field__error" id={errorId()}>{props.error}</p>
       </Show>
     </div>
   );

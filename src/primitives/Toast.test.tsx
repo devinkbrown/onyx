@@ -29,7 +29,7 @@ describe('Toast', () => {
     const alert = screen.getByRole('alert');
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss Disconnected' }));
 
-    expect(alert.classList.contains('ruri-toast--danger')).toBe(true);
+    expect(alert.classList.contains('onyx-toast--danger')).toBe(true);
     expect(screen.queryByRole('alert')).toBeNull();
   });
 

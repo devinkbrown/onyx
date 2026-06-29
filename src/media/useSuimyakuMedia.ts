@@ -199,11 +199,11 @@ export function mountMedia(): void {
     },
 
     onAudioLevel(nick, level) {
-      dispatchWindowEvent('ruri:voice-audio-level', { nick, level });
+      dispatchWindowEvent('onyx:voice-audio-level', { nick, level });
     },
 
     onPresence(nick, available) {
-      dispatchWindowEvent('ruri:voice-presence', { nick, available });
+      dispatchWindowEvent('onyx:voice-presence', { nick, available });
       if (!available) {
         removeNickFromVoicePresence(nick);
       }
@@ -262,11 +262,11 @@ export function mountMedia(): void {
     },
 
     onChannelInfo(channel: string, info: SuimyakuChannelInfo) {
-      dispatchWindowEvent('ruri:voice-channel-info', { channel, info });
+      dispatchWindowEvent('onyx:voice-channel-info', { channel, info });
     },
 
     onTsumugiState(nick, epoch, fingerprint) {
-      dispatchWindowEvent('ruri:voice-tsumugi', { nick, epoch, fingerprint });
+      dispatchWindowEvent('onyx:voice-tsumugi', { nick, epoch, fingerprint });
     },
 
     enableVideoCalls: () => true,

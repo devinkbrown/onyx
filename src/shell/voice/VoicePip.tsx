@@ -18,7 +18,7 @@ type PipParticipant = {
   self: boolean;
 };
 
-const storageKey = 'ruri-voice-pip-position';
+const storageKey = 'onyx-voice-pip-position';
 const margin = 12;
 
 function viewportSize() {

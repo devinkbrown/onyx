@@ -11,7 +11,7 @@ describe('Avatar', () => {
     const avatar = screen.getByRole('img', { name: 'Ada Lovelace' });
 
     expect(avatar.textContent).toBe('AL');
-    expect(avatar.classList.contains('ruri-avatar--md')).toBe(true);
+    expect(avatar.classList.contains('onyx-avatar--md')).toBe(true);
   });
 
   it('uses deterministic color variables for repeated names', () => {
@@ -24,8 +24,8 @@ describe('Avatar', () => {
 
     const avatars = screen.getAllByRole('img', { name: 'Onyx Operator' });
 
-    expect(avatars[0]?.style.getPropertyValue('--ruri-avatar-bg')).toBe(avatars[1]?.style.getPropertyValue('--ruri-avatar-bg'));
-    expect(avatars[0]?.classList.contains('ruri-avatar--sm')).toBe(true);
+    expect(avatars[0]?.style.getPropertyValue('--onyx-avatar-bg')).toBe(avatars[1]?.style.getPropertyValue('--onyx-avatar-bg'));
+    expect(avatars[0]?.classList.contains('onyx-avatar--sm')).toBe(true);
   });
 
   it('adds owner status to the accessible name and owner ring class', () => {
@@ -33,6 +33,6 @@ describe('Avatar', () => {
 
     const avatar = screen.getByRole('img', { name: 'Root User, owner' });
 
-    expect(avatar.classList.contains('ruri-avatar--owner')).toBe(true);
+    expect(avatar.classList.contains('onyx-avatar--owner')).toBe(true);
   });
 });

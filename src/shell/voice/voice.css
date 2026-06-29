@@ -238,7 +238,7 @@
 }
 
 /* Oversize the avatar in a tile */
-.voice-tile__avatar-wrap .ruri-avatar {
+.voice-tile__avatar-wrap .onyx-avatar {
   width: 52px;
   height: 52px;
   font-size: 1.25rem;
@@ -625,7 +625,7 @@
 }
 
 /* Reactions popover trigger — match the icon-button chrome around it */
-.voice-bar__group .ruri-popover__trigger {
+.voice-bar__group .onyx-popover__trigger {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -649,7 +649,7 @@
     transform var(--dur) var(--ease);
 }
 
-.voice-bar__group .ruri-popover__trigger:hover {
+.voice-bar__group .onyx-popover__trigger:hover {
   color: var(--lapis-bright);
   background: color-mix(in oklab, var(--lapis) 12%, var(--stone));
   border-color: var(--seam);
@@ -659,12 +659,12 @@
   transform: translateY(-1px);
 }
 
-.voice-bar__group .ruri-popover__trigger:focus-visible {
+.voice-bar__group .onyx-popover__trigger:focus-visible {
   outline: 2px solid var(--lapis-bright);
   outline-offset: 3px;
 }
 
-.voice-bar__group .ruri-popover__trigger[aria-expanded="true"] {
+.voice-bar__group .onyx-popover__trigger[aria-expanded="true"] {
   color: var(--washi);
   border-color: color-mix(in oklab, var(--lapis-bright) 72%, var(--seam));
   background:
@@ -675,8 +675,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .voice-bar__group .ruri-popover__trigger { transition: color var(--dur) var(--ease); }
-  .voice-bar__group .ruri-popover__trigger:hover { transform: none; }
+  .voice-bar__group .onyx-popover__trigger { transition: color var(--dur) var(--ease); }
+  .voice-bar__group .onyx-popover__trigger:hover { transform: none; }
 }
 
 /* Reactions popover panel */
@@ -735,7 +735,7 @@
 }
 
 /* Override IconButton for voice context */
-.voice-bar .ruri-icon-button {
+.voice-bar .onyx-icon-button {
   border-radius: var(--r-pill);
   color: var(--washi-dim);
   background:
@@ -744,7 +744,7 @@
   box-shadow: inset 0 1px 0 color-mix(in oklab, var(--washi) 7%, transparent);
 }
 
-.voice-bar .ruri-icon-button:hover:not(:disabled) {
+.voice-bar .onyx-icon-button:hover:not(:disabled) {
   color: var(--lapis-bright);
   background: color-mix(in oklab, var(--lapis) 12%, var(--stone));
   border-color: var(--seam);
@@ -754,7 +754,7 @@
   transform: translateY(-1px);
 }
 
-.voice-bar .ruri-icon-button:focus-visible {
+.voice-bar .onyx-icon-button:focus-visible {
   outline: 2px solid var(--lapis-bright);
   outline-offset: 3px;
   box-shadow:
@@ -763,7 +763,7 @@
 }
 
 /* Pressed / active state — azure bioluminescent tint */
-.voice-bar .ruri-icon-button[aria-pressed="true"] {
+.voice-bar .onyx-icon-button[aria-pressed="true"] {
   background:
     linear-gradient(180deg, color-mix(in oklab, var(--lapis) 30%, var(--stone)), color-mix(in oklab, var(--lapis-deep) 32%, var(--ink)));
   color: var(--washi);
@@ -775,14 +775,14 @@
 }
 
 /* Muted microphone — coral danger accent */
-.voice-bar .ruri-icon-button--muted {
+.voice-bar .onyx-icon-button--muted {
   background: color-mix(in oklab, var(--shu) 16%, var(--ink));
   color: var(--washi);
   border: 1px solid color-mix(in oklab, var(--shu) 36%, transparent);
 }
 
 /* Leave button — coral, restrained */
-.voice-bar__leave.ruri-icon-button {
+.voice-bar__leave.onyx-icon-button {
   background:
     linear-gradient(180deg, color-mix(in oklab, var(--shu) 74%, var(--stone)), color-mix(in oklab, var(--shu) 58%, var(--ink)));
   color: var(--washi);
@@ -793,8 +793,8 @@
   box-shadow: 0 10px 28px -22px color-mix(in oklab, var(--shu) 88%, transparent);
 }
 
-.voice-bar__leave.ruri-icon-button:hover,
-.voice-bar__leave.ruri-icon-button:focus-visible {
+.voice-bar__leave.onyx-icon-button:hover,
+.voice-bar__leave.onyx-icon-button:focus-visible {
   background: color-mix(in oklab, var(--shu) 82%, var(--stone));
   border-color: color-mix(in oklab, var(--shu) 72%, var(--washi));
   color: var(--washi);

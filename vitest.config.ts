@@ -2,7 +2,7 @@ import { defineConfig } from 'vitest/config';
 import solid from 'vite-plugin-solid';
 import { fileURLToPath, URL } from 'node:url';
 
-// Ruri test harness — vitest + SolidJS (vite-plugin-solid + jsdom).
+// Onyx test harness — vitest + SolidJS (vite-plugin-solid + jsdom).
 export default defineConfig({
   plugins: [solid()],
   resolve: {

@@ -10,15 +10,15 @@ describe('Spinner', () => {
 
     const status = screen.getByRole('status', { name: 'Loading channels' });
 
-    expect(status.classList.contains('ruri-spinner--md')).toBe(true);
+    expect(status.classList.contains('onyx-spinner--md')).toBe(true);
     expect(status.textContent).toBe('Loading channels');
   });
 
   it('renders as decorative when no label is provided', () => {
     const { container } = render(() => <Spinner size="sm" />);
-    const spinner = container.querySelector('.ruri-spinner');
+    const spinner = container.querySelector('.onyx-spinner');
 
     expect(spinner?.getAttribute('aria-hidden')).toBe('true');
-    expect(spinner?.classList.contains('ruri-spinner--sm')).toBe(true);
+    expect(spinner?.classList.contains('onyx-spinner--sm')).toBe(true);
   });
 });

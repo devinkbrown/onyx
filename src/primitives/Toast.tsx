@@ -35,7 +35,7 @@ export function clearToasts() {
 }
 
 export function toast(input: ToastInput) {
-  const id = `ruri-toast-${++toastId}`;
+  const id = `onyx-toast-${++toastId}`;
   const item: ToastRecord = {
     id,
     title: input.title,
@@ -58,11 +58,11 @@ export function Toaster(props: ToasterProps) {
 
   return (
     <Portal>
-      <ol {...rest} class={['ruri-toaster', local.class].filter(Boolean).join(' ')} aria-live="polite" aria-label="Notifications">
+      <ol {...rest} class={['onyx-toaster', local.class].filter(Boolean).join(' ')} aria-live="polite" aria-label="Notifications">
         <For each={toastStore.items}>
           {(item) => (
-            <li class={`ruri-toast ruri-toast--${item.intent}`} role={item.intent === 'danger' ? 'alert' : 'status'}>
-              <div class="ruri-toast__body">
+            <li class={`onyx-toast onyx-toast--${item.intent}`} role={item.intent === 'danger' ? 'alert' : 'status'}>
+              <div class="onyx-toast__body">
                 <strong>{item.title}</strong>
                 <Show when={item.description}>
                   <p>{item.description}</p>

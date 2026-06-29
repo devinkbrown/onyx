@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
-// Headless-Chromium e2e for the Ruri launch site.
-test.describe('Ruri landing', () => {
+// Headless-Chromium e2e for the Onyx launch site.
+test.describe('Onyx landing', () => {
   test('hero loads with the brutalist headline', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('h1')).toContainText(/living mesh/i);
@@ -22,7 +22,7 @@ test.describe('Ruri landing', () => {
 
   test('the entry point routes into the app', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('link', { name: /open ruri/i }).first().click();
+    await page.getByRole('link', { name: /open onyx/i }).first().click();
     await expect(page).toHaveURL(/\/app/);
   });
 

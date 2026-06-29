@@ -421,7 +421,7 @@
   align-items: stretch;
   gap: 8px;
 }
-.conn-password-row .ruri-field__input {
+.conn-password-row .onyx-field__input {
   flex: 1;
   min-width: 0;
 }

@@ -11,9 +11,9 @@ export type ButtonProps = JSX.ButtonHTMLAttributes<HTMLButtonElement> & {
 
 function classes(variant: ButtonVariant | undefined, size: ButtonSize | undefined, className: string | undefined) {
   return [
-    'ruri-button',
-    `ruri-button--${variant ?? 'primary'}`,
-    `ruri-button--${size ?? 'md'}`,
+    'onyx-button',
+    `onyx-button--${variant ?? 'primary'}`,
+    `onyx-button--${size ?? 'md'}`,
     className,
   ].filter(Boolean).join(' ');
 }

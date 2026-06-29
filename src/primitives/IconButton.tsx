@@ -10,9 +10,9 @@ export type IconButtonProps = JSX.ButtonHTMLAttributes<HTMLButtonElement> & {
 
 function iconButtonClass(variant: IconButtonProps['variant'], size: IconButtonProps['size'], className: string | undefined) {
   return [
-    'ruri-icon-button',
-    `ruri-icon-button--${variant ?? 'ghost'}`,
-    `ruri-icon-button--${size ?? 'md'}`,
+    'onyx-icon-button',
+    `onyx-icon-button--${variant ?? 'ghost'}`,
+    `onyx-icon-button--${size ?? 'md'}`,
     className,
   ].filter(Boolean).join(' ');
 }
@@ -27,7 +27,7 @@ function BareIconButton(props: IconButtonProps) {
       class={iconButtonClass(local.variant, local.size, local.class)}
       aria-label={local.label}
     >
-      <span class="ruri-icon-button__glyph" aria-hidden="true">{local.children}</span>
+      <span class="onyx-icon-button__glyph" aria-hidden="true">{local.children}</span>
     </button>
   );
 }

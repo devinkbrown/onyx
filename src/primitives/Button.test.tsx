@@ -10,8 +10,8 @@ describe('Button', () => {
 
     const button = screen.getByRole('button', { name: 'Enter mesh' });
 
-    expect(button.classList.contains('ruri-button--primary')).toBe(true);
-    expect(button.classList.contains('ruri-button--md')).toBe(true);
+    expect(button.classList.contains('onyx-button--primary')).toBe(true);
+    expect(button.classList.contains('onyx-button--md')).toBe(true);
   });
 
   it('renders a polymorphic anchor when href is provided', () => {
@@ -20,8 +20,8 @@ describe('Button', () => {
     const link = screen.getByRole('link', { name: 'Open Onyx' });
 
     expect(link.getAttribute('href')).toBe('/app');
-    expect(link.classList.contains('ruri-button--ghost')).toBe(true);
-    expect(link.classList.contains('ruri-button--sm')).toBe(true);
+    expect(link.classList.contains('onyx-button--ghost')).toBe(true);
+    expect(link.classList.contains('onyx-button--sm')).toBe(true);
   });
 
   it('activates from Enter and Space key presses', () => {
@@ -32,7 +32,7 @@ describe('Button', () => {
     fireEvent.keyDown(button, { key: 'Enter' });
     fireEvent.keyDown(button, { key: ' ' });
 
-    expect(button.classList.contains('ruri-button--danger')).toBe(true);
+    expect(button.classList.contains('onyx-button--danger')).toBe(true);
     expect(onClick).toHaveBeenCalledTimes(2);
   });
 

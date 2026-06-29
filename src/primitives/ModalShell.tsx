@@ -75,30 +75,30 @@ export function ModalShell(props: ModalShellProps) {
   return (
     <Show when={local.open}>
       <Portal>
-        <div {...rest} class="ruri-modal" role="presentation">
+        <div {...rest} class="onyx-modal" role="presentation">
           {/* Decorative click-to-dismiss layer — keyboard users dismiss via Esc /
               the labelled close button, so the backdrop stays out of the a11y tree. */}
-          <div class="ruri-modal__backdrop" aria-hidden="true" onClick={() => local.onOpenChange(false)} />
+          <div class="onyx-modal__backdrop" aria-hidden="true" onClick={() => local.onOpenChange(false)} />
           <section
             ref={dialogRef}
-            class="ruri-modal__dialog"
+            class="onyx-modal__dialog"
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId()}
             aria-describedby={descriptionId()}
             tabindex="-1"
           >
-            <header class="ruri-modal__header">
+            <header class="onyx-modal__header">
               <div>
-                <p class="ruri-modal__kicker">dialog</p>
+                <p class="onyx-modal__kicker">dialog</p>
                 <h2 id={titleId()}>{local.title}</h2>
                 <Show when={local.description}>
                   <p id={descriptionId()}>{local.description}</p>
                 </Show>
               </div>
-              <button class="ruri-modal__close" type="button" aria-label={local.closeLabel ?? 'Close dialog'} onClick={() => local.onOpenChange(false)}>×</button>
+              <button class="onyx-modal__close" type="button" aria-label={local.closeLabel ?? 'Close dialog'} onClick={() => local.onOpenChange(false)}>×</button>
             </header>
-            <div class="ruri-modal__body">{local.children}</div>
+            <div class="onyx-modal__body">{local.children}</div>
           </section>
         </div>
       </Portal>

@@ -36,7 +36,7 @@ describe('Spotlight', () => {
     store.setState(initialState, true);
     localStorage.clear();
     document.documentElement.removeAttribute('data-theme');
-    document.documentElement.removeAttribute('data-ruri-background');
+    document.documentElement.removeAttribute('data-onyx-background');
   });
 
   it('opens on Cmd/Ctrl+K and traps focus in the palette', async () => {

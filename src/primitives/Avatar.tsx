@@ -37,14 +37,14 @@ export function Avatar(props: AvatarProps) {
     <div
       {...rest}
       class={[
-        'ruri-avatar',
-        `ruri-avatar--${local.size ?? 'md'}`,
-        local.owner ? 'ruri-avatar--owner' : undefined,
+        'onyx-avatar',
+        `onyx-avatar--${local.size ?? 'md'}`,
+        local.owner ? 'onyx-avatar--owner' : undefined,
         local.class,
       ].filter(Boolean).join(' ')}
       role="img"
       aria-label={local.owner ? `${local.name}, owner` : local.name}
-      style={{ '--ruri-avatar-bg': swatch()?.[0], '--ruri-avatar-fg': swatch()?.[1] }}
+      style={{ '--onyx-avatar-bg': swatch()?.[0], '--onyx-avatar-fg': swatch()?.[1] }}
     >
       <span>{initials(local.name)}</span>
     </div>

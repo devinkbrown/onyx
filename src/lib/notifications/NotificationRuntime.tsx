@@ -79,7 +79,7 @@ export function NotificationRuntime(): null {
       showDesktopNotification({
         title,
         body: bodyFor(note),
-        tag: `ruri-${target.key}`,
+        tag: `onyx-${target.key}`,
         onClick: () => {
           focusApp();
           target.navigate();

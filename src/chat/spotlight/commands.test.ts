@@ -101,14 +101,14 @@ describe('buildCommands', () => {
     command?.run();
 
     expect(document.documentElement.getAttribute('data-theme')).toBe('shu');
-    expect(localStorage.getItem('ruri:theme')).toBe('shu');
+    expect(localStorage.getItem('onyx:theme')).toBe('shu');
   });
 
   it('applies background commands immediately', () => {
     const command = buildCommands(getState()).find((entry) => entry.id === 'background:obsidian');
     command?.run();
 
-    expect(document.documentElement.dataset.ruriBackground).toBe('obsidian');
-    expect(localStorage.getItem('ruri:bg')).toBe('obsidian');
+    expect(document.documentElement.dataset.onyxBackground).toBe('obsidian');
+    expect(localStorage.getItem('onyx:bg')).toBe('obsidian');
   });
 });

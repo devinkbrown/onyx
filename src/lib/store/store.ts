@@ -8594,17 +8594,19 @@ function _saveNickAliases(aliases: string[]): void {
   try { localStorage.setItem('ocean-nick-aliases', JSON.stringify(aliases)); } catch {}
 }
 
-// ── Background persistence (shared with the Appearance route, key 'ruri:bg') ──
+// ── Background persistence (shared with the Appearance route, key 'onyx:bg') ──
 // NB: literals are inlined (not module-level consts) because _loadBackground is
 // invoked while the store's initial state is built — earlier in module eval
 // than any const declared down here would be initialized (TDZ).
 function _loadBackground(): string {
   if (typeof window === 'undefined') return 'deep-current';
-  try { return localStorage.getItem('ruri:bg') || 'deep-current'; } catch { return 'deep-current'; }
+  // Current key first, then the legacy 'ruri:bg' key (read-old-write-new) so the
+  // saved background survives the rebrand; the next _saveBackground writes 'onyx:bg'.
+  try { return localStorage.getItem('onyx:bg') || localStorage.getItem('ruri:bg') || 'deep-current'; } catch { return 'deep-current'; }
 }
 function _saveBackground(id: string): void {
   if (typeof window === 'undefined') return;
-  try { localStorage.setItem('ruri:bg', id); } catch {}
+  try { localStorage.setItem('onyx:bg', id); } catch {}
 }
 
 // ── Watch list persistence ────────────────────────────────────────────────────

@@ -76,7 +76,9 @@ export function clearCommands(): void {
 
 // ── Recent targets ────────────────────────────────────────────────────────────
 
-const RECENTS_KEY = 'ruri:palette-recents';
+const RECENTS_KEY = 'onyx:palette-recents';
+/** Legacy key from the previous brand name; read-only for one-time migration. */
+const LEGACY_RECENTS_KEY = 'ruri:palette-recents';
 const MAX_RECENTS = 6;
 
 export type RecentTarget = {
@@ -93,7 +95,9 @@ export type RecentTarget = {
 export function loadRecents(): RecentTarget[] {
   if (typeof localStorage === 'undefined') return [];
   try {
-    const raw = localStorage.getItem(RECENTS_KEY);
+    // Current key first, then fall back to the legacy key (read-old-write-new)
+    // so recent palette targets survive one load after the rebrand.
+    const raw = localStorage.getItem(RECENTS_KEY) ?? localStorage.getItem(LEGACY_RECENTS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];

@@ -3,7 +3,7 @@ import solid from 'vite-plugin-solid';
 import tailwindcss from '@tailwindcss/vite';
 import { fileURLToPath, URL } from 'node:url';
 
-// Ruri — Vite + SolidJS static SPA. Output to out/ (gitignored; nginx serves it).
+// Onyx — Vite + SolidJS static SPA. Output to out/ (gitignored; nginx serves it).
 export default defineConfig({
   plugins: [solid(), tailwindcss()],
   resolve: {

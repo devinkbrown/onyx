@@ -19,8 +19,8 @@ export type SpotlightCommand = {
 
 type CommandState = Pick<State, 'channels' | 'dms' | 'server' | 'networkName' | 'activeView' | 'showMemberList' | 'voice'>;
 
-const THEME_STORAGE_KEY = 'ruri:theme';
-const BACKGROUND_STORAGE_KEY = 'ruri:bg';
+const THEME_STORAGE_KEY = 'onyx:theme';
+const BACKGROUND_STORAGE_KEY = 'onyx:bg';
 
 function normalizeChannel(input: string): string {
   const trimmed = input.trim();
@@ -47,7 +47,7 @@ function applyTheme(id: ThemeId): void {
   applyThemeToDom(id);
   persistTheme(id);
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('ruri:theme-change', { detail: { id } }));
+    window.dispatchEvent(new CustomEvent('onyx:theme-change', { detail: { id } }));
   }
 }
 
@@ -59,11 +59,11 @@ function applyBackground(id: BackgroundId): void {
   }
 
   if (typeof document !== 'undefined') {
-    document.documentElement.dataset.ruriBackground = id;
+    document.documentElement.dataset.onyxBackground = id;
   }
 
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('ruri:background-change', { detail: { id } }));
+    window.dispatchEvent(new CustomEvent('onyx:background-change', { detail: { id } }));
   }
 }
 
@@ -76,7 +76,7 @@ async function copyText(text: string): Promise<void> {
   }
 
   try {
-    localStorage.setItem('ruri:last-copied-node-address', text);
+    localStorage.setItem('onyx:last-copied-node-address', text);
   } catch {
     /* storage unavailable */
   }
