@@ -336,7 +336,8 @@ export function AppShell(props: AppShellProps): JSX.Element {
             onToggleMembers={handleToggleMembers}
           />
 
-          {/* Content: home or message view + composer */}
+          {/* Content: read-only status buffer, conversation, or home */}
+          <Show when={activeView().kind === 'status'} fallback={
           <Show
             when={hasConversation()}
             fallback={<HomeView />}
@@ -366,6 +367,10 @@ export function AppShell(props: AppShellProps): JSX.Element {
             </Show>
             <TypingIndicator />
             <Composer />
+          </Show>
+          }>
+            {/* Read-only server/status buffer — no composer, no voice */}
+            <MessageView selfNick={displayNick()} />
           </Show>
         </div>
 

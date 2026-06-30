@@ -114,31 +114,31 @@ describe('ChannelSidebar accessibility', () => {
   });
 
   it('moves focus down with ArrowDown', () => {
-    // Arrange — rows sort to: #alpha, #bravo, #charlie, dave
+    // Arrange — rows are: Status, #alpha, #bravo, #charlie, dave
     seed();
     const { container } = render(() => <ChannelSidebar />);
     const items = rows(container);
-    items[0]!.focus(); // #alpha
+    items[1]!.focus(); // #alpha
 
     // Act
-    fireEvent.keyDown(items[0]!, { key: 'ArrowDown' });
+    fireEvent.keyDown(items[1]!, { key: 'ArrowDown' });
 
     // Assert
-    expect(document.activeElement).toBe(items[1]); // #bravo
+    expect(document.activeElement).toBe(items[2]); // #bravo
   });
 
   it('moves focus up with ArrowUp', () => {
-    // Arrange
+    // Arrange — rows are: Status, #alpha, #bravo, #charlie, dave
     seed();
     const { container } = render(() => <ChannelSidebar />);
     const items = rows(container);
-    items[2]!.focus(); // #charlie
+    items[3]!.focus(); // #charlie
 
     // Act
-    fireEvent.keyDown(items[2]!, { key: 'ArrowUp' });
+    fireEvent.keyDown(items[3]!, { key: 'ArrowUp' });
 
     // Assert
-    expect(document.activeElement).toBe(items[1]); // #bravo
+    expect(document.activeElement).toBe(items[2]); // #bravo
   });
 
   it('jumps to the first row with Home and last with End', () => {
@@ -148,7 +148,7 @@ describe('ChannelSidebar accessibility', () => {
     const items = rows(container);
     items[1]!.focus();
 
-    // Act + Assert — End → last (the DM), Home → first (#alpha)
+    // Act + Assert — End → last (the DM), Home → first (the Status row)
     fireEvent.keyDown(items[1]!, { key: 'End' });
     expect(document.activeElement).toBe(items[items.length - 1]);
 
@@ -176,7 +176,7 @@ describe('ChannelSidebar accessibility', () => {
     const navigateSpy = vi.spyOn(store.getState(), 'navigate');
     const { container } = render(() => <ChannelSidebar />);
     const items = rows(container);
-    const alpha = items[0]!; // #alpha
+    const alpha = items[1]!; // rows are: Status, #alpha, …
 
     // Act — a real <button> activates on Enter via a synthesized click.
     alpha.focus();
@@ -184,6 +184,22 @@ describe('ChannelSidebar accessibility', () => {
 
     // Assert
     expect(navigateSpy).toHaveBeenCalledWith({ kind: 'channel', channel: '#alpha' });
+    navigateSpy.mockRestore();
+  });
+
+  it('navigates to the status buffer when the Status row is clicked', () => {
+    // Arrange
+    seed();
+    const navigateSpy = vi.spyOn(store.getState(), 'navigate');
+    const { container } = render(() => <ChannelSidebar />);
+    const status = rows(container)[0]!; // the always-present Status row is first
+
+    // Act
+    fireEvent.click(status);
+
+    // Assert
+    expect(status.getAttribute('aria-label')).toBe('Server status');
+    expect(navigateSpy).toHaveBeenCalledWith({ kind: 'status' });
     navigateSpy.mockRestore();
   });
 });

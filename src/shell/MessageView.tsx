@@ -24,7 +24,7 @@ import {
   splitProps,
   type JSX,
 } from 'solid-js';
-import { useStore, getState } from '@/lib/store';
+import { useStore, getState, STATUS_TARGET } from '@/lib/store';
 import type { ChatMessage, MessageReaction } from '@/lib/irc/types';
 import { Avatar } from '@/primitives/index';
 import { Sheet } from '@/primitives/index';
@@ -232,6 +232,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   const activeView = useStore((s) => s.activeView);
   const channels = useStore((s) => s.channels);
   const dms = useStore((s) => s.dms);
+  const serverLog = useStore((s) => s.serverLog);
   const ourNick = useStore((s) => s.ourNick);
   const canEditMessages = useStore((s) => s.canEditMessages);
   const historyLoading = useStore((s) => s.historyLoading);
@@ -247,6 +248,8 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     } else if (view.kind === 'dm') {
       list = dms().get(view.nick.toLowerCase())?.messages ??
              dms().get(view.nick)?.messages ?? [];
+    } else if (view.kind === 'status') {
+      list = serverLog();
     }
     // Render chronologically. Live lines append in arrival order, but replayed
     // CHATHISTORY / event-playback lines (joins, parts, topics) can land after
@@ -261,6 +264,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     const view = activeView();
     if (view.kind === 'channel') return view.channel;
     if (view.kind === 'dm') return view.nick;
+    if (view.kind === 'status') return STATUS_TARGET;
     return '';
   });
 

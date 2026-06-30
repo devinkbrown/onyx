@@ -112,6 +112,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
   // only via the arrow keys, keeping the list a single Tab landing point.
   const rovingKey = createMemo((): string | null => {
     const view = activeView();
+    if (view.kind === 'status') return 'status';
     if (view.kind === 'channel') {
       const match = sortedChannels().find(
         (ch) => ch.name.toLowerCase() === view.channel.toLowerCase(),
@@ -128,7 +129,9 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
     if (firstChannel) return `ch:${firstChannel.name.toLowerCase()}`;
     const firstDm = sortedDms()[0];
     if (firstDm) return `dm:${firstDm.nick.toLowerCase()}`;
-    return null;
+    // The Status entry always exists, so it owns the single tab stop when there
+    // are no channels or DMs yet (keeps the list keyboard-reachable).
+    return 'status';
   });
 
   function channelKey(ch: Channel): string {
@@ -205,6 +208,11 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
     local.onMobileClose?.();
   }
 
+  function handleStatusClick(): void {
+    getState().navigate({ kind: 'status' });
+    local.onMobileClose?.();
+  }
+
   return (
     <aside class="shell-sidebar" aria-label="Channel navigation">
       {/* Header */}
@@ -229,6 +237,26 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
         aria-label="Channels and direct messages"
         onKeyDown={handleListKeyDown}
       >
+        {/* Server / status entry — always present, read-only server buffer */}
+        <div class="shell-sidebar-section">
+          <ul class="shell-channel-list" role="list">
+            <li>
+              <button
+                type="button"
+                data-sidebar-item
+                tabindex={rovingKey() === 'status' ? 0 : -1}
+                class={`shell-channel-item${activeView().kind === 'status' ? ' shell-channel-item--active' : ''}`}
+                aria-current={activeView().kind === 'status' ? 'page' : undefined}
+                aria-label="Server status"
+                onClick={handleStatusClick}
+              >
+                <span class="shell-channel-sigil" aria-hidden="true">✦</span>
+                <span class="shell-channel-name">Status</span>
+              </button>
+            </li>
+          </ul>
+        </div>
+
         {/* Channels section */}
         <div class="shell-sidebar-section">
           <p class="shell-sidebar-section-label" id="sidebar-channels-label">

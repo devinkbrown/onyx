@@ -362,3 +362,60 @@ describe('navigate() reconciles the focused channel roster', () => {
     expect(client.sendRaw.mock.calls).toContainEqual(['NAMES', '#resume1']);
   });
 });
+
+// ── Server / status buffer ──────────────────────────────────────────────────
+describe('server status buffer (serverLog)', () => {
+  beforeEach(() => {
+    store.setState({ ...initialState, ourNick: 'me' }, true);
+  });
+
+  const log = () => store.getState().serverLog;
+
+  it('starts empty and addServerLog appends a system message at the status target', () => {
+    expect(log()).toEqual([]);
+    store.getState().addServerLog('hello there', 'irc.example');
+    expect(log()).toHaveLength(1);
+    expect(log()[0]!.text).toBe('hello there');
+    expect(log()[0]!.from).toBe('irc.example');
+    expect(log()[0]!.type).toBe('system');
+    expect(log()[0]!.target).toBe('*status');
+  });
+
+  it('captures the 001 welcome', () => {
+    feed(':irc.example 001 me :Welcome to the IRCXNet network, me');
+    expect(log().some(m => /Welcome to the IRCXNet network/.test(m.text))).toBe(true);
+  });
+
+  it('surfaces an otherwise-unhandled server numeric instead of dropping it', () => {
+    // 265 RPL_LOCALUSERS has no dedicated case → would hit `default` and vanish.
+    feed(':irc.example 265 me 2 2 :Current local users 2, max 2');
+    expect(log().some(m => /Current local users 2, max 2/.test(m.text))).toBe(true);
+  });
+
+  it('does NOT log a non-numeric unhandled command to the status buffer', () => {
+    feed(':irc.example FOOBAR me :some payload');
+    expect(log()).toHaveLength(0);
+  });
+
+  it('records a server-wide NOTICE in the status buffer', () => {
+    feed(':irc.example NOTICE * :Server going down for maintenance');
+    expect(log().some(m => /going down for maintenance/.test(m.text))).toBe(true);
+  });
+
+  it('records your own user MODE', () => {
+    feed(':me MODE me :+iw');
+    expect(log().some(m => /your user mode: \+iw/.test(m.text))).toBe(true);
+  });
+
+  it('caps the buffer at 500 entries', () => {
+    for (let i = 0; i < 520; i++) store.getState().addServerLog(`line ${i}`);
+    expect(log()).toHaveLength(500);
+    expect(log()[0]!.text).toBe('line 20'); // oldest 20 dropped
+    expect(log()[499]!.text).toBe('line 519');
+  });
+
+  it('ignores empty text', () => {
+    store.getState().addServerLog('');
+    expect(log()).toHaveLength(0);
+  });
+});

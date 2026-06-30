@@ -296,7 +296,11 @@ export interface Toast {
 export type ActiveView =
   | { kind: 'channel'; channel: string }
   | { kind: 'dm'; nick: string }
+  | { kind: 'status' }
   | { kind: 'home' };
+
+/** Sentinel target for the server/status buffer (not a real channel or nick). */
+export const STATUS_TARGET = '*status';
 
 export interface Announcement {
   id: string;
@@ -650,6 +654,16 @@ export interface OnyxState {
   serviceNotices: Array<{ source: string; text: string; time: Date }>;
   addServiceNotice(source: string, text: string): void;
   clearServiceNotices(): void;
+
+  // ── Server / status buffer ────────────────────────────────────────────────
+  // Human-readable server-level messages that belong to no channel or DM —
+  // connect/disconnect, server numerics (incl. ones otherwise dropped), the
+  // MOTD, server-wide NOTICEs/WALLOPS, your own user MODE, oper status. Rendered
+  // as the read-only "Status" view ({ kind: 'status' }). Distinct from `rawLog`
+  // (the raw wire-protocol debug log).
+  serverLog: ChatMessage[];
+  addServerLog(text: string, from?: string, type?: 'system' | 'error'): void;
+  clearServerLog(): void;
 
   // ── Channel Join Prompt ───────────────────────────────────────────────────────
   channelJoinPrompt: { channel: string; error: string } | null;
@@ -2097,6 +2111,7 @@ export const store = createStore<OnyxState>()(
     showServices: false,
     servicesTab: 'account',
     serviceNotices: [],
+    serverLog: [],
     channelJoinPrompt: null,
     motd: null,
     showMotd: false,
@@ -2237,6 +2252,7 @@ export const store = createStore<OnyxState>()(
           _clearReconnectCountdown();
           _reconnectAttempts = 0;
           set({ status: 'connected', connectionStatus: 'connected', reconnectIn: 0, autoReconnect: true, connectedAt: new Date() });
+          get().addServerLog(hasRegistered ? 'Reconnected.' : `Connected to ${get().server?.url ?? 'server'}.`);
           // On a RECONNECT / session-resume, reattach does not necessarily replay
           // NAMES, so members who joined or left during the gap leave the roster
           // stale (missing or ghost nicks). Re-request NAMES for every joined
@@ -2263,6 +2279,7 @@ export const store = createStore<OnyxState>()(
             connectedAt: null,
           }));
           get().addNotification({ type: 'system', text: `Disconnected: ${reason}` });
+          get().addServerLog(`Disconnected: ${reason}`, '', 'error');
 
           // Start auto-reconnect countdown if enabled
           if (get().autoReconnect) {
@@ -2274,6 +2291,7 @@ export const store = createStore<OnyxState>()(
         onError(err) {
           set({ status: 'error' });
           get().addNotification({ type: 'error', text: err });
+          get().addServerLog(err, '', 'error');
         },
         onNickChanged(newNick) {
           set(s => ({
@@ -3633,6 +3651,19 @@ export const store = createStore<OnyxState>()(
       set({ serviceNotices: [] });
     },
 
+    addServerLog(text, from = '', type = 'system') {
+      if (!text) return;
+      set(s => ({
+        serverLog: [
+          ...s.serverLog,
+          { id: uid(), time: new Date(), from, text, type, target: STATUS_TARGET } as ChatMessage,
+        ].slice(-500),
+      }));
+    },
+    clearServerLog() {
+      set({ serverLog: [] });
+    },
+
     // ── Ignore list ───────────────────────────────────────────────────────
     ignoreUser(nick) {
       const key = nick.toLowerCase();
@@ -3990,6 +4021,7 @@ export const store = createStore<OnyxState>()(
           // registered member — there is no media cap to gate on, so mark it
           // available on registration. MEDIA EVENTs keep it true.
           set({ ourNick: params[0], mediaAvailable: true });
+          get().addServerLog(params[1] ?? `Welcome, ${params[0]}.`, msg.prefix ?? '');
           // Subscribe to the IRCX MEDIA event plane so the server delivers live
           // voice/video presence as `:server EVENT <me> MEDIA …`. The feed is
           // membership-gated server-side, so the `*` mask only yields calls in
@@ -4424,6 +4456,7 @@ export const store = createStore<OnyxState>()(
               text,
               type: 'global-notice',
             });
+            get().addServerLog(text, sender || '');
             break;
           }
 
@@ -4828,12 +4861,14 @@ export const store = createStore<OnyxState>()(
               get().addNotification({ type: 'dm', text: displayText, from: sender });
             }
           } else {
-            // Server-sourced message with no nick — show as announcement
+            // Server-sourced message with no nick — show as announcement AND in
+            // the status buffer (its natural home alongside numerics/MOTD).
             get().addAnnouncement({
               from: chatMsg.target || 'Server',
               text: displayText,
               type: 'global-notice',
             });
+            get().addServerLog(displayText, chatMsg.target || '');
           }
           break;
         }
@@ -4845,8 +4880,14 @@ export const store = createStore<OnyxState>()(
             text: params[params.length - 1] ?? '',
             type: 'wallops',
           });
+          get().addServerLog(`WALLOPS: ${params[params.length - 1] ?? ''}`, nick ?? '');
           break;
         }
+
+        // ── ERROR — server is closing the link / fatal protocol error ──────
+        case 'ERROR':
+          get().addServerLog(`ERROR: ${params.join(' ')}`, '', 'error');
+          break;
 
         // ── Nick changes ──────────────────────────────────────────────────
         case 'NICK': {
@@ -5030,6 +5071,8 @@ export const store = createStore<OnyxState>()(
             const modeStr = params[1] ?? '';
             if (modeStr.includes('+') && modeStr.includes('o')) set({ isOper: true });
             if (modeStr.includes('-') && modeStr.includes('o')) set({ isOper: false });
+            const byWhom = nick && nick.toLowerCase() !== target.toLowerCase() ? `${nick} set ` : '';
+            get().addServerLog(`${byWhom}your user mode: ${params.slice(1).join(' ')}`.trim());
           }
           break;
         }
@@ -5657,6 +5700,9 @@ export const store = createStore<OnyxState>()(
         case '372': { // RPL_MOTD
           const motdLine = params[1] ?? '';
           _motdBuffer += (_motdBuffer ? '\n' : '') + motdLine;
+          // Mirror MOTD lines into the status buffer so they're browsable there
+          // (the modal is a separate, dismissable convenience).
+          get().addServerLog(motdLine, msg.prefix ?? '');
           break;
         }
 
@@ -6174,7 +6220,10 @@ export const store = createStore<OnyxState>()(
         case '306': set({ isAway: true }); break;
 
         // 381 RPL_YOUREOPER — we are now an IRC operator
-        case '381': set({ isOper: true }); break;
+        case '381':
+          set({ isOper: true });
+          get().addServerLog(params[1] ?? 'You are now an IRC operator.', msg.prefix ?? '');
+          break;
 
         // ── Latency tracking ─────────────────────────────────────────────
         case 'PONG': {
@@ -6228,6 +6277,14 @@ export const store = createStore<OnyxState>()(
           break;
 
         default:
+          // Unhandled SERVER NUMERIC → surface it in the status buffer instead of
+          // silently dropping it (LUSERS 25x, 042 unique-id, 396 hidden-host, oper
+          // notices, etc.). On a numeric the first param is our own nick, so skip
+          // it; the rest is the human-readable trailing text.
+          if (/^\d{3}$/.test(command)) {
+            const numericText = params.slice(1).join(' ').trim();
+            if (numericText) get().addServerLog(numericText, msg.prefix ?? '');
+          }
           break;
       }
     },
