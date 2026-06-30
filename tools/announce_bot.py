@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Ruri announce bot — lives in #root on IRCXNet (eshmaki.me) and announces build
-stats, changelog, progress, and planning for the Ruri Orochi web client, with the
+"""Onyx announce bot — lives in #root on IRCXNet (eshmaki.me) and announces build
+stats, changelog, progress, and planning for the Onyx Orochi web client, with the
 feature set of a normal IRC bot:
 IRCv3 CAP negotiation + optional SASL PLAIN, nick recovery (433), CTCP, rich
 !commands (channel + PM), admin (say/announce/topic/raw), auto-rejoin on KICK,
@@ -42,7 +42,7 @@ RECONNECT_MIN, RECONNECT_MAX = 6, 300
 MAX_MESSAGE_TEXT_BYTES = 360  # stay comfortably under IRC's 512-byte line cap
 # IRCv3 caps we use if the server offers them (graceful degrade otherwise).
 WANT_CAPS = {"server-time", "message-tags", "account-tag", "echo-message"}
-VERSION = "Ruri-announce 1.0 (Vite 8 + SolidJS Orochi web-client build bot)"
+VERSION = "Onyx-announce 1.0 (Vite 8 + SolidJS Orochi web-client build bot)"
 START = time.time()
 PROTECTED_TOPIC_CHANNELS = {"#root"}
 
@@ -187,7 +187,7 @@ def stats_lines() -> list[str]:
 
 def project_lines() -> list[str]:
     return [
-        f"{B}{BLUE}\U0001f48e Ruri{RST} (瑠璃) — the Orochi web client. A SolidJS, dark-luxury, "
+        f"{B}{BLUE}\U0001f48e Onyx{RST} — the Orochi web client. A SolidJS, dark-luxury, "
         f"mesh-native chat + realtime-media app. Fully recoded (Vite 8 + Solid signals).",
         f"IRCv3/IRCX over WebSocket, SASL + SESSION-TOKEN resume, threaded chat, live "
         f"presence/activity, E2EE voice/video via {B}Suimyaku{RST}+{B}Tsumugi{RST} (no WebRTC).",
@@ -370,7 +370,7 @@ class Bot:
         if PASSWORD:
             self.send_raw(f"PASS {PASSWORD}")
         self.send_raw(f"NICK {self.nick}")
-        self.send_raw(f"USER {NICK} 0 * :Ruri build announcer")
+        self.send_raw(f"USER {NICK} 0 * :Onyx build announcer")
 
     def loop(self) -> None:
         buf = b""
@@ -480,7 +480,7 @@ class Bot:
             log.info("topic updates disabled for %s", CHANNEL)
             return
         self.send_raw(
-            f"TOPIC {CHANNEL} :Ruri · {git('rev-parse','--short','HEAD')} · "
+            f"TOPIC {CHANNEL} :Onyx · {git('rev-parse','--short','HEAD')} · "
             f"{test_count()} tests · {module_count()} components · !help"
         )
 
