@@ -725,6 +725,15 @@
   min-width: 0;
 }
 
+/* LEFT zone — conversation identity (name + topic share the slack). */
+.shell-ribbon-identity {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  flex: 1;
+  min-width: 0;
+}
+
 .shell-ribbon-channel {
   font-family: var(--font-display);
   font-size: 1.15rem;
@@ -737,6 +746,8 @@
   flex: none;
   max-width: 22ch;
 }
+
+.shell-ribbon-sigil--status { color: var(--gold-bright); }
 
 /* The channel sigil reads in bioluminescent azure — never gold. */
 .shell-ribbon-sigil {
@@ -768,24 +779,81 @@
   font-style: italic;
 }
 
+/* RIGHT zone — scoped action clusters separated by hairline dividers. */
 .shell-ribbon-right {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   flex: none;
   margin-left: auto;
 }
 
-.shell-ribbon-identity {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
-  color: var(--washi-dim);
-  text-transform: uppercase;
+/* A cluster of same-scope controls sits tight; the divider does the separating. */
+.shell-ribbon-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.shell-ribbon-identity-nick {
+/* Vertical hairline between scopes (channel | workspace | status). */
+.shell-ribbon-divider {
+  width: 1px;
+  height: 22px;
+  flex: none;
+  background: linear-gradient(
+    var(--seam-faint) 0%,
+    var(--seam) 50%,
+    var(--seam-faint) 100%
+  );
+  margin-inline: 2px;
+}
+
+/* Unified icon-button base — settings, appearance, members all build on this. */
+.shell-ribbon-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  color: var(--washi-dim);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  transition:
+    color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+
+.shell-ribbon-iconbtn:hover {
   color: var(--lapis-bright);
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--lapis-deep) 14%, transparent);
+}
+
+.shell-ribbon-iconbtn:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.shell-ribbon-ico {
+  width: 1.02rem;
+  height: 1.02rem;
+  display: block;
+  flex: none;
+}
+
+.shell-ribbon-count {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: inherit;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Account chip (opens the account panel) ───────────────────────────────── */
@@ -859,15 +927,51 @@
   .shell-ribbon-account { transition: none; }
 }
 
+/* Connection status — a compact labelled chip (state-coloured), not a lone dot. */
 .shell-ribbon-conn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: 6px;
+  padding: 3px 9px 3px 7px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--stone) 22%, transparent);
   font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.1em;
-  color: var(--washi-mute);
+  font-size: 0.62rem;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
+  color: var(--washi-mute);
+}
+
+.shell-ribbon-conn-label { line-height: 1; color: var(--washi-dim); }
+.shell-ribbon-conn[data-state='connected'] .shell-ribbon-conn-label {
+  color: color-mix(in oklab, var(--ok) 65%, var(--washi));
+}
+.shell-ribbon-conn[data-state='connecting'] .shell-ribbon-conn-label,
+.shell-ribbon-conn[data-state='reconnecting'] .shell-ribbon-conn-label {
+  color: var(--lapis-bright);
+}
+.shell-ribbon-conn[data-state='disconnected'] .shell-ribbon-conn-label,
+.shell-ribbon-conn[data-state='error'] .shell-ribbon-conn-label {
+  color: var(--shu);
+}
+
+/* Responsive: shed secondary detail as the column narrows, keeping the icon
+   clusters and dividers intact so the bar never crowds or overflows. */
+@media (max-width: 760px) {
+  .shell-ribbon-account-nick { display: none; }
+  .shell-ribbon-conn-label { display: none; }
+  .shell-ribbon-conn {
+    border-color: transparent;
+    background: transparent;
+    padding: 0;
+    gap: 0;
+  }
+}
+
+@media (max-width: 600px) {
+  .shell-ribbon-topic,
+  .shell-ribbon-sep { display: none; }
 }
 
 .shell-ribbon-conn-dot {
@@ -888,114 +992,31 @@
   50% { opacity: 0.38; }
 }
 
+/* Members — an icon-button that also carries the count (builds on iconbtn). */
 .shell-ribbon-members {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-1) var(--space-2);
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  color: var(--washi-dim);
-  letter-spacing: 0.06em;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--r-pill);
-  cursor: pointer;
-  transition:
-    color var(--dur) var(--ease),
-    border-color var(--dur) var(--ease),
-    background var(--dur) var(--ease);
+  padding-inline: 7px;
+  gap: 5px;
 }
 
-.shell-ribbon-members::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--ok);
-  box-shadow: 0 0 6px color-mix(in oklab, var(--ok) 50%, transparent);
-}
-
-.shell-ribbon-members:hover {
-  color: var(--lapis-bright);
-  border-color: var(--seam);
-  background: color-mix(in oklab, var(--lapis-deep) 14%, transparent);
-}
-
-/* ── Channel settings gear ── */
-.shell-ribbon-settings {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  color: var(--washi-dim);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--r-pill);
-  cursor: pointer;
-  transition:
-    color var(--dur) var(--ease),
-    border-color var(--dur) var(--ease),
-    background var(--dur) var(--ease),
-    transform var(--dur) var(--ease);
-}
-
+/* ── Channel settings gear (iconbtn + the signature rotate-on-hover) ── */
 .shell-ribbon-settings-glyph {
   font-size: 0.92rem;
   line-height: 1;
 }
 
 .shell-ribbon-settings:hover {
-  color: var(--lapis-bright);
-  border-color: var(--seam);
-  background: color-mix(in oklab, var(--lapis-deep) 14%, transparent);
   transform: rotate(35deg);
 }
 
-.shell-ribbon-settings:focus-visible {
-  outline: 2px solid var(--lapis-bright);
-  outline-offset: 2px;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .shell-ribbon-settings { transition: color var(--dur) var(--ease); }
+  .shell-ribbon-iconbtn { transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease), background var(--dur) var(--ease); }
   .shell-ribbon-settings:hover { transform: none; }
 }
 
-/* ── Appearance (theme/background) ribbon button ── */
-.shell-ribbon-appearance {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  color: var(--washi-dim);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--r-pill);
-  cursor: pointer;
-  transition:
-    color var(--dur) var(--ease),
-    border-color var(--dur) var(--ease),
-    background var(--dur) var(--ease);
-}
-
-.shell-ribbon-appearance-glyph {
-  width: 1.05rem;
-  height: 1.05rem;
-  display: block;
-}
-
+/* ── Appearance (theme/background) — iconbtn with a gold hover accent ── */
 .shell-ribbon-appearance:hover {
   color: var(--gold-bright);
-  border-color: var(--seam);
   background: color-mix(in oklab, var(--gold-deep) 16%, transparent);
-}
-
-.shell-ribbon-appearance:focus-visible {
-  outline: 2px solid var(--lapis-bright);
-  outline-offset: 2px;
 }
 
 /* ── Appearance panel (in-shell theme + background picker) ── */
