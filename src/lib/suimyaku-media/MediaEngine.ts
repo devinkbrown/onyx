@@ -2,10 +2,10 @@
 
 import type { IRCClient } from '../irc/client';
 import {
-  OpcodecWasm, OpvoxEncoder, OpvisEncoder,
+  OpcodecWasm, KaguraVoxEncoder, KaguraVisEncoder,
   rgbaToYuv420,
-  OPVOX_FRAME_48K,
-  type OpvoxQuality,
+  KAGURAVOX_FRAME_48K,
+  type KaguraVoxQuality,
 } from './OpcodecWasm';
 import { TsumugiSession } from './TsumugiSession';
 import { TsumugiGroup } from './TsumugiGroup';
@@ -24,9 +24,9 @@ import type {
 
 // WS media-plane Kagura band ids: media bands are >= 64. band_id discriminates
 // how a relayed datagram's payload is handled (the codec tag is informational).
-const WS_BAND_AUDIO = 64;          // opvox audio, plaintext
-const WS_BAND_VIDEO = 65;          // opvis video
-const WS_BAND_TSUMUGI_AUDIO = 66;  // opvox audio, TSUMUGI group-encrypted ciphertext
+const WS_BAND_AUDIO = 64;          // kaguravox audio, plaintext
+const WS_BAND_VIDEO = 65;          // kaguravis video
+const WS_BAND_TSUMUGI_AUDIO = 66;  // kaguravox audio, TSUMUGI group-encrypted ciphertext
 
 function base64ToBytes(b64: string): Uint8Array {
   const bin = atob(b64);
@@ -58,7 +58,7 @@ export function getMountedSuimyakuMediaEngine(): SuimyakuMediaEngine | null {
 
 const SAMPLE_RATE    = 48000;
 const AUDIO_CHANNELS = 2;
-const AUDIO_QUALITY: OpvoxQuality = 2;
+const AUDIO_QUALITY: KaguraVoxQuality = 2;
 const VIDEO_QUALITY  = 70;
 const VIDEO_FPS      = 60;
 const VIDEO_WIDTH    = 1920;
@@ -215,8 +215,8 @@ export class SuimyakuMediaEngine {
   private callState:   CallState          = 'idle';
   private callWith     = '';
 
-  private audEnc: OpvoxEncoder | null = null;
-  private vidEnc: OpvisEncoder | null = null;
+  private audEnc: KaguraVoxEncoder | null = null;
+  private vidEnc: KaguraVisEncoder | null = null;
   private localVideoProfile: VideoCaptureProfile | null = null;
 
   private audioCtx:     AudioContext | null = null;
@@ -273,7 +273,7 @@ export class SuimyakuMediaEngine {
   private networkTier: NetworkQualityTier = 0;
   private prevNetworkTier: NetworkQualityTier = 0;
   private videoSkipCount   = 0;
-  private audioQuality: OpvoxQuality = AUDIO_QUALITY;
+  private audioQuality: KaguraVoxQuality = AUDIO_QUALITY;
 
   private lastLossRate  = 0;
   private lastDecodeAt  = 0;
@@ -494,7 +494,7 @@ export class SuimyakuMediaEngine {
     const ctx = new AudioContext({ sampleRate: SAMPLE_RATE });
     this.audioCtx = ctx;
     const src = ctx.createMediaStreamSource(stream);
-    const FRAME = OPVOX_FRAME_48K * AUDIO_CHANNELS;
+    const FRAME = KAGURAVOX_FRAME_48K * AUDIO_CHANNELS;
     let useWorklet = false;
     try {
       await ctx.audioWorklet.addModule(
@@ -504,7 +504,7 @@ export class SuimyakuMediaEngine {
     } catch { /* fallback */ }
 
     if (useWorklet) {
-      const node = new AudioWorkletNode(ctx, 'opvox-capture', {
+      const node = new AudioWorkletNode(ctx, 'kaguravox-capture', {
         processorOptions: { frameSize: FRAME },
       });
       node.port.onmessage = (e: MessageEvent) => this.onAudioFrame(e.data as Int16Array);
@@ -523,15 +523,15 @@ export class SuimyakuMediaEngine {
         merged.set(acc, 0); merged.set(ch0, acc.length);
         acc = merged;
         let off = 0;
-        while (acc.length - off >= OPVOX_FRAME_48K) {
+        while (acc.length - off >= KAGURAVOX_FRAME_48K) {
           const i16 = new Int16Array(FRAME);
-          for (let s = 0; s < OPVOX_FRAME_48K; s++) {
+          for (let s = 0; s < KAGURAVOX_FRAME_48K; s++) {
             const v = Math.max(-1, Math.min(1, acc[off + s]!));
             i16[s * 2]     = v * 32767;
             i16[s * 2 + 1] = v * 32767;
           }
           this.onAudioFrame(i16);
-          off += OPVOX_FRAME_48K;
+          off += KAGURAVOX_FRAME_48K;
         }
         acc = acc.slice(off);
       };
@@ -890,10 +890,10 @@ export class SuimyakuMediaEngine {
     let keyframe = false;
     let kind: 'audio' | 'video';
     switch (ftype) {
-      case 'AUDIO':        bandId = WS_BAND_AUDIO;         codec = KaguraCodec.opvoxAudio; kind = 'audio'; break;
-      case 'TSUMUGI_DATA': bandId = WS_BAND_TSUMUGI_AUDIO; codec = KaguraCodec.opvoxAudio; kind = 'audio'; break;
-      case 'KEYFRAME':     bandId = WS_BAND_VIDEO;         codec = KaguraCodec.opvisVideo; keyframe = true; kind = 'video'; break;
-      case 'FRAME':        bandId = WS_BAND_VIDEO;         codec = KaguraCodec.opvisVideo; kind = 'video'; break;
+      case 'AUDIO':        bandId = WS_BAND_AUDIO;         codec = KaguraCodec.kaguravoxAudio; kind = 'audio'; break;
+      case 'TSUMUGI_DATA': bandId = WS_BAND_TSUMUGI_AUDIO; codec = KaguraCodec.kaguravoxAudio; kind = 'audio'; break;
+      case 'KEYFRAME':     bandId = WS_BAND_VIDEO;         codec = KaguraCodec.kaguravisVideo; keyframe = true; kind = 'video'; break;
+      case 'FRAME':        bandId = WS_BAND_VIDEO;         codec = KaguraCodec.kaguravisVideo; kind = 'video'; break;
       default: return;
     }
 
@@ -985,11 +985,11 @@ export class SuimyakuMediaEngine {
     switch (subtype) {
       case 'VOICE_JOIN':
         this.client.sendRaw('MEDIA', 'JOIN', channel, 'voice');
-        this.client.sendRaw('MEDIA', 'OFFER', channel, 'opvox,opvis', 'transport=webrtc');
+        this.client.sendRaw('MEDIA', 'OFFER', channel, 'kaguravox,kaguravis', 'transport=webrtc');
         break;
       case 'VIDEO_JOIN':
         this.client.sendRaw('MEDIA', 'JOIN', channel, payload.includes('screen') ? 'screen' : 'video');
-        this.client.sendRaw('MEDIA', 'OFFER', channel, 'opvox,opvis', 'transport=webrtc');
+        this.client.sendRaw('MEDIA', 'OFFER', channel, 'kaguravox,kaguravis', 'transport=webrtc');
         break;
       case 'VOICE_LEAVE':
       case 'VIDEO_LEAVE':
@@ -1775,7 +1775,7 @@ export class SuimyakuMediaEngine {
           videoTrack.applyConstraints(c).catch(() => {});
         }
       }
-      const targetQ: OpvoxQuality = tier <= 1 ? 2 : tier === 2 ? 1 : 0;
+      const targetQ: KaguraVoxQuality = tier <= 1 ? 2 : tier === 2 ? 1 : 0;
       if (targetQ !== this.audioQuality && this.audEnc && this.wasm) {
         this.audioQuality = targetQ;
         this.audEnc.destroy();
@@ -1828,11 +1828,11 @@ export class SuimyakuMediaEngine {
 // ----------------------------------------------------------------
 
 const AUDIO_WORKLET_CODE = `
-class OpvoxCapture extends AudioWorkletProcessor {
+class KaguraVoxCapture extends AudioWorkletProcessor {
   constructor(opts) {
     super();
     // frameSize is the interleaved-stereo sample count the encoder expects
-    // (OPVOX_FRAME_48K * 2). The mic delivers MONO, so accumulate half that
+    // (KAGURAVOX_FRAME_48K * 2). The mic delivers MONO, so accumulate half that
     // many mono samples per frame, then duplicate each into L and R. The
     // previous code accumulated the full stereo count of mono samples and
     // copied 1:1, which the encoder read as alternating L/R — decimating
@@ -1867,7 +1867,7 @@ class OpvoxCapture extends AudioWorkletProcessor {
     return true;
   }
 }
-registerProcessor('opvox-capture', OpvoxCapture);
+registerProcessor('kaguravox-capture', KaguraVoxCapture);
 `;
 
 // ----------------------------------------------------------------

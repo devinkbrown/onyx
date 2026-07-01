@@ -1,11 +1,11 @@
 'use client';
 
 import {
-  OpvoxDecoder, OpvisDecoder,
+  KaguraVoxDecoder, KaguraVisDecoder,
   OpcodecWasm,
   yuv420ToRgba,
-  OPVOX_FRAME_48K,
-  type OpvoxQuality,
+  KAGURAVOX_FRAME_48K,
+  type KaguraVoxQuality,
 } from './OpcodecWasm';
 import type { SuimyakuPeerState, MediaKind } from './types';
 
@@ -15,9 +15,9 @@ import type { SuimyakuPeerState, MediaKind } from './types';
 
 export interface PeerMedia {
   state:          SuimyakuPeerState;
-  audDec:         OpvoxDecoder | null;
-  vidDec:         OpvisDecoder | null;
-  screenVidDec:   OpvisDecoder | null;
+  audDec:         KaguraVoxDecoder | null;
+  vidDec:         KaguraVisDecoder | null;
+  screenVidDec:   KaguraVisDecoder | null;
   audCtx:         AudioContext | null;
   vidCanvas:      HTMLCanvasElement | null;
   screenCanvas:   HTMLCanvasElement | null;
@@ -58,7 +58,7 @@ export class PeerRegistry {
 
   private wasm: OpcodecWasm | null = null;
   private readonly sampleRate: number;
-  private readonly audioQuality: () => OpvoxQuality;
+  private readonly audioQuality: () => KaguraVoxQuality;
   private readonly videoW: number;
   private readonly videoH: number;
   private readonly speakingRms: number;
@@ -75,7 +75,7 @@ export class PeerRegistry {
 
   constructor(opts: {
     sampleRate:   number;
-    audioQuality: () => OpvoxQuality;
+    audioQuality: () => KaguraVoxQuality;
     videoW:       number;
     videoH:       number;
     speakingRms:  number;
@@ -280,10 +280,10 @@ export class PeerRegistry {
 
     const ctx = pm.audCtx;
     this.applySink(pm);
-    // OpvoxDecoder returns OPVOX_FRAME_48K mono Int16 samples.
+    // KaguraVoxDecoder returns KAGURAVOX_FRAME_48K mono Int16 samples.
     // Create a stereo AudioBuffer and copy the same mono data to both channels.
-    const buf = ctx.createBuffer(2, OPVOX_FRAME_48K, this.sampleRate);
-    const monoSamples = Math.min(pcm.length, OPVOX_FRAME_48K);
+    const buf = ctx.createBuffer(2, KAGURAVOX_FRAME_48K, this.sampleRate);
+    const monoSamples = Math.min(pcm.length, KAGURAVOX_FRAME_48K);
     for (let ch = 0; ch < 2; ch++) {
       const out = buf.getChannelData(ch);
       for (let i = 0; i < monoSamples; i++) {
@@ -301,7 +301,7 @@ export class PeerRegistry {
     const now = Date.now();
     if (this.lastDecodeAt > 0) {
       const iat      = now - this.lastDecodeAt;
-      const expected = (OPVOX_FRAME_48K / this.sampleRate) * 1000;
+      const expected = (KAGURAVOX_FRAME_48K / this.sampleRate) * 1000;
       const diff     = Math.abs(iat - expected);
       this.lastJitterMs = this.lastJitterMs * 0.9 + diff * 0.1;
     }

@@ -133,12 +133,12 @@ describe('About page — source structure', () => {
     expect(srcContains('id="developer"')).toBe(true);
   });
 
-  it('mentions OPVOX (audio codec)', () => {
-    expect(srcContains('OPVOX')).toBe(true);
+  it('mentions KaguraVox (audio codec)', () => {
+    expect(/kaguravox/i.test(src)).toBe(true);
   });
 
-  it('mentions OPVIS (video codec)', () => {
-    expect(srcContains('OPVIS')).toBe(true);
+  it('mentions KaguraVis (video codec)', () => {
+    expect(/kaguravis/i.test(src)).toBe(true);
   });
 
   it('mentions WebTransport as the primary/default transport', () => {

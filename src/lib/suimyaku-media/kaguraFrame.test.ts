@@ -20,14 +20,14 @@ function toHex(b: Uint8Array): string {
 describe('kaguraFrame — wire format matches Orochi kagura_frame.zig', () => {
   it('encodes the canonical KAT frame byte-for-byte', () => {
     // Same fields the Zig KAT uses: band 64, stream 0x11223344, seq 7, ts 9000,
-    // keyframe, opvox audio, payload "voice".
+    // keyframe, kaguravox audio, payload "voice".
     const frame = encodeKaguraFrame({
       bandId: 64,
       streamId: 0x11223344,
       sequence: 7,
       timestamp: 9000,
       keyframe: true,
-      codec: KaguraCodec.opvoxAudio,
+      codec: KaguraCodec.kaguravoxAudio,
       payload: new TextEncoder().encode('voice'),
     });
     expect(toHex(frame)).toBe(vectors.vector.frame_hex);
@@ -41,7 +41,7 @@ describe('kaguraFrame — wire format matches Orochi kagura_frame.zig', () => {
       sequence: 4242,
       timestamp: 1_700_000_000,
       keyframe: false,
-      codec: KaguraCodec.opvisVideo,
+      codec: KaguraCodec.kaguravisVideo,
       payload,
     };
     const decoded = decodeKaguraFrame(encodeKaguraFrame(frame));
@@ -51,7 +51,7 @@ describe('kaguraFrame — wire format matches Orochi kagura_frame.zig', () => {
     expect(decoded!.sequence).toBe(4242);
     expect(decoded!.timestamp).toBe(1_700_000_000);
     expect(decoded!.keyframe).toBe(false);
-    expect(decoded!.codec).toBe(KaguraCodec.opvisVideo);
+    expect(decoded!.codec).toBe(KaguraCodec.kaguravisVideo);
     expect(Array.from(decoded!.payload)).toEqual(Array.from(payload));
   });
 

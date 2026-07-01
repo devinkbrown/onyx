@@ -366,15 +366,15 @@ Subcommands: `JOIN <kind>` · `LEAVE` · `OFFER <codecs> [transport=webrtc]` ·
 `CAPTION` · `TRANSCRIPT`.
 
 - **kind** = `voice` | `video` | `screen` (default `voice`).
-- **codecs** (CSV) = `opvox` (audio) | `opvis` (video) | `raw`. `OFFER` may request
-  `transport=webrtc` for the browser/WebRTC leg; otherwise the native OPVOX/OPVIS
+- **codecs** (CSV) = `kaguravox` (audio) | `kaguravis` (video) | `raw`. `OFFER` may request
+  `transport=webrtc` for the browser/WebRTC leg; otherwise the native KAGURAVOX/KAGURAVIS
   UDP leg is used.
 - Two media planes, bridged by header-rewrap only (no transcode): a **WebRTC-compatible
   RTP/STUN UDP plane** (`MEDIA OFFER transport=webrtc` → ICE creds, SRTP group key)
-  and a **native OPVOX/OPVIS UDP leg** (`kagura_frame` datagrams). SFU forwarding,
+  and a **native KAGURAVOX/KAGURAVIS UDP leg** (`kagura_frame` datagrams). SFU forwarding,
   simulcast, ABR; room cap 64 participants.
-- **Browser codec:** Orochi ships WASM codec exports (`kagura_wasm.zig`: OPVOX
-  audio + OPVIS video encode/decode for `wasm32-freestanding`) — Ocean can use these
+- **Browser codec:** Orochi ships WASM codec exports (`kagura_wasm.zig`: KAGURAVOX
+  audio + KAGURAVIS video encode/decode for `wasm32-freestanding`) — Ocean can use these
   for the native leg, or use standard WebRTC for the RTP leg.
 - **`ACTIVITY <target> <state> [text]`** — presence/activity broadcast (rich presence).
 
@@ -486,6 +486,6 @@ Orochi is a CRDT **mesh** (not a TS6 tree). What a client sees:
 - [ ] Parse `time=`/`msgid=`/`account=` tags; render typing/react/reply TAGMSG tags.
 - [ ] Honor `MODES` (combine modes per line per the advertised value; live = 1).
 - [ ] Map service `FAIL`/`NOTE`/`NOTICE` replies to UI (REGISTER/IDENTIFY/CHANNEL/…).
-- [ ] Voice/video via `MEDIA` (control) + WebRTC RTP leg or native OPVOX/OPVIS WASM
+- [ ] Voice/video via `MEDIA` (control) + WebRTC RTP leg or native KAGURAVOX/KAGURAVIS WASM
       codec; render roster/speaking/mute from `NOTE MEDIA`.
 - [ ] Treat `:server NOTE EVENT <CAT> :…` and `EVENT … OBSERVE …` as the oper feed.

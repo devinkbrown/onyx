@@ -20,8 +20,8 @@ export const KAGURA_MEDIA_BAND_FLOOR = 64;
 
 export const KaguraCodec = {
   raw: 0x00,
-  opvoxAudio: 0x01,
-  opvisVideo: 0x02,
+  kaguravoxAudio: 0x01,
+  kaguravisVideo: 0x02,
 } as const;
 export type KaguraCodecTag = (typeof KaguraCodec)[keyof typeof KaguraCodec];
 
@@ -76,7 +76,7 @@ export function decodeKaguraFrame(buf: Uint8Array, macTagBytes = 16): KaguraFram
   const timestamp = Number(dv.getBigUint64(p, true)); p += 8;
   const flags = buf[p]!; p += 1;
   const codecByte = buf[p]!; p += 1;
-  if (codecByte !== KaguraCodec.raw && codecByte !== KaguraCodec.opvoxAudio && codecByte !== KaguraCodec.opvisVideo) {
+  if (codecByte !== KaguraCodec.raw && codecByte !== KaguraCodec.kaguravoxAudio && codecByte !== KaguraCodec.kaguravisVideo) {
     return null;
   }
   return {

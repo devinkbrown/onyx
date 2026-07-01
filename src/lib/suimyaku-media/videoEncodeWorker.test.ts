@@ -1,21 +1,21 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { buildEncoder, tierDimensions } from './videoEncodeWorker';
-import type { OpcodecWasm, OpvisEncoder } from './OpcodecWasm';
+import type { OpcodecWasm, KaguraVisEncoder } from './OpcodecWasm';
 
 // Covers the encoder fallback ladder added so worker video encoding keeps
-// working even when the opvis WASM codec rejects the requested resolution
+// working even when the kaguravis WASM codec rejects the requested resolution
 // (it returns a null handle for some sizes, e.g. 1920x1080, making
-// OpvisEncoder throw "opvis encoder init failed").
+// KaguraVisEncoder throw "kaguravis encoder init failed").
 
 /** Build a fake OpcodecWasm whose videoEncoder() only accepts the given sizes. */
 function fakeWasm(accepted: ReadonlyArray<[number, number]>) {
   const ok = new Set(accepted.map(([w, h]) => `${w}x${h}`));
   const videoEncoder = vi.fn((width: number, height: number) => {
     if (!ok.has(`${width}x${height}`)) {
-      throw new Error('opvis encoder init failed');
+      throw new Error('kaguravis encoder init failed');
     }
-    return { width, height, destroy: vi.fn() } as unknown as OpvisEncoder;
+    return { width, height, destroy: vi.fn() } as unknown as KaguraVisEncoder;
   });
   return { wasm: { videoEncoder } as unknown as OpcodecWasm, videoEncoder };
 }
@@ -70,6 +70,6 @@ describe('buildEncoder fallback ladder', () => {
 
   it('propagates the error when no size is accepted', () => {
     const { wasm } = fakeWasm([]);
-    expect(() => buildEncoder(wasm, 0, 1920, 1080, 70, 'camera', 60)).toThrow(/opvis encoder init failed/);
+    expect(() => buildEncoder(wasm, 0, 1920, 1080, 70, 'camera', 60)).toThrow(/kaguravis encoder init failed/);
   });
 });

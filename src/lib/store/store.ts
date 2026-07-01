@@ -7767,7 +7767,7 @@ export const store = createStore<OnyxState>()(
       const c = encodeURIComponent(category);
       void t; void c; void key;
       client.sendRaw('MEDIA', 'JOIN', channel, mode === 'screen' ? 'screen' : 'video');
-      client.sendRaw('MEDIA', 'OFFER', channel, 'opvox,opvis', 'transport=webrtc');
+      client.sendRaw('MEDIA', 'OFFER', channel, 'kaguravox,kaguravis', 'transport=webrtc');
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('ocean:stream-start', {
           detail: { channel, mode, quality },

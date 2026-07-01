@@ -148,7 +148,7 @@ async function makeUser(nick: string): Promise<VoiceUser> {
   const mediaLogs: string[] = [];
   page.on('console', (m) => {
     const t = m.text();
-    if (/media|voice|codec|opus|opvox|datacloneerror|error/i.test(t)) {
+    if (/media|voice|codec|opus|kaguravox|datacloneerror|error/i.test(t)) {
       mediaLogs.push(`[${m.type()}] ${t}`.slice(0, 200));
     }
   });

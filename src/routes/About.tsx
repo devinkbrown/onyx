@@ -183,7 +183,7 @@ export default function About() {
             class="ab-media-diagram"
             viewBox="0 0 580 320"
             role="img"
-            aria-label="Media path: clients encode with OPVOX/OPVIS (or WASM on browser), send opaque kagura frames over WebTransport or WebRTC DataChannel to the SFU, which forwards them unchanged."
+            aria-label="Media path: clients encode with KAGURAVOX/KAGURAVIS (or WASM on browser), send opaque kagura frames over WebTransport or WebRTC DataChannel to the SFU, which forwards them unchanged."
           >
             {/* SFU center */}
             <rect x="230" y="120" width="120" height="80" fill="none" stroke="var(--seam)" stroke-width="1.5" />
@@ -194,25 +194,25 @@ export default function About() {
             {/* Desktop client left */}
             <rect x="30" y="60" width="100" height="50" fill="none" stroke="var(--lapis-bright)" stroke-width="1" rx="2" />
             <text x="80" y="82" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--lapis-bright)" text-anchor="middle">Desktop</text>
-            <text x="80" y="96" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">OPVOX/OPVIS</text>
+            <text x="80" y="96" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">KAGURAVOX/KAGURAVIS</text>
             <text x="80" y="108" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">native</text>
 
             {/* Browser client left-lower */}
             <rect x="30" y="200" width="100" height="50" fill="none" stroke="var(--ok)" stroke-width="1" rx="2" />
             <text x="80" y="222" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--ok)" text-anchor="middle">Browser</text>
-            <text x="80" y="236" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">OPVOX/OPVIS</text>
+            <text x="80" y="236" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">KAGURAVOX/KAGURAVIS</text>
             <text x="80" y="248" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">WASM</text>
 
             {/* Mobile right-upper */}
             <rect x="450" y="60" width="100" height="50" fill="none" stroke="var(--ok)" stroke-width="1" rx="2" />
             <text x="500" y="82" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--ok)" text-anchor="middle">Mobile</text>
-            <text x="500" y="96" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">OPVOX/OPVIS</text>
+            <text x="500" y="96" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">KAGURAVOX/KAGURAVIS</text>
             <text x="500" y="108" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">WASM</text>
 
             {/* Desktop right-lower */}
             <rect x="450" y="200" width="100" height="50" fill="none" stroke="var(--lapis-bright)" stroke-width="1" rx="2" />
             <text x="500" y="222" font-family="'JetBrains Mono Variable', monospace" font-size="9" fill="var(--lapis-bright)" text-anchor="middle">Desktop</text>
-            <text x="500" y="236" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">OPVOX/OPVIS</text>
+            <text x="500" y="236" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">KAGURAVOX/KAGURAVIS</text>
             <text x="500" y="248" font-family="'JetBrains Mono Variable', monospace" font-size="8" fill="var(--washi-mute)" text-anchor="middle">native</text>
 
             {/* Arrows from left clients to SFU */}
@@ -232,7 +232,7 @@ export default function About() {
 
           <div class="ab-media-body">
             <p>
-              <b>OPVOX</b> (audio) and <b>OPVIS</b> (video) are Orochi's own codecs —
+              <b>KaguraVox</b> (audio) and <b>KaguraVis</b> (video) are Orochi's own codecs —
               not Opus, not H.264. Desktop clients run them natively. Browsers and mobile
               run the exact same codecs compiled to <b>WebAssembly</b>, with SIMD and
               threads. The media path is identical on every platform.
@@ -278,7 +278,7 @@ export default function About() {
             <span class="t-label">Opt-in only</span>
             <h4>Standard WebRTC<br />codecs</h4>
             <p>
-              A user on a device that can't WASM-decode OPVIS at framerate — or simply
+              A user on a device that can't WASM-decode KaguraVis at framerate — or simply
               prefers hardware codecs — can <em>choose</em> to use Opus/H.264/VP8 via
               standard WebRTC. This is a deliberate per-user choice. The server still
               never transcodes; convergence on a shared codec is a client responsibility.
