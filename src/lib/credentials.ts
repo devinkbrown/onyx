@@ -1,8 +1,8 @@
 /**
  * lib/credentials.ts
- * Ocean — login credential persistence
+ * Onyx — login credential persistence
  *
- * Storage layout (localStorage key: 'ocean-credentials'):
+ * Storage layout (localStorage key: 'onyx:credentials'):
  *   version     — storage schema version
  *   activeKey   — last-used credential key
  *   entries     — saved credentials keyed by normalized server + nick
@@ -24,7 +24,7 @@
  * every desktop IRC client config file.
  */
 
-const KEY = 'ocean-credentials';
+const KEY = 'onyx:credentials';
 
 export interface SavedCredentials {
   nick: string;
@@ -172,7 +172,7 @@ export function saveCredentials(opts: {
     store.activeKey = key;
     writeStore(store);
     // Also keep legacy key so the nick field stays pre-filled
-    localStorage.setItem('ocean-saved-nick', opts.nick);
+    localStorage.setItem('onyx:saved-nick', opts.nick);
   } catch { /* quota */ }
 }
 
@@ -206,7 +206,7 @@ export function storeSessionToken(token: string, expiresAt?: number, canonicalNi
     store.activeKey = nextKey;
     writeStore(store);
     // Keep legacy nick key in sync
-    if (canonicalNick) localStorage.setItem('ocean-saved-nick', canonicalNick);
+    if (canonicalNick) localStorage.setItem('onyx:saved-nick', canonicalNick);
   } catch { /* quota */ }
 }
 
@@ -250,7 +250,7 @@ export function clearCredentials(): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.removeItem(KEY);
-    localStorage.removeItem('ocean-saved-nick');
+    localStorage.removeItem('onyx:saved-nick');
   } catch { /* ignore */ }
 }
 

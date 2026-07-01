@@ -365,7 +365,12 @@ export function Composer(props: ComposerProps): JSX.Element {
 
   async function uploadPendingAttachments(): Promise<string[] | null> {
     const uploaded: string[] = [];
-    const mediaUrl = import.meta.env.VITE_MEDIA_URL;
+    // Production default: same-origin '/upload' (nginx proxies it to the
+    // nexus-upload service). Dev has no default — uploads surface a config
+    // error unless VITE_MEDIA_URL is set, and previews stay local blob URLs.
+    const mediaUrl =
+      (import.meta.env.VITE_MEDIA_URL as string | undefined) ||
+      (import.meta.env.PROD ? '/upload' : '');
 
     for (const item of attachments()) {
       if (item.uploadedUrl) {

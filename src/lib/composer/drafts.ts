@@ -1,4 +1,4 @@
-export const COMPOSER_DRAFTS_KEY = 'ocean-composer-drafts';
+export const COMPOSER_DRAFTS_KEY = 'onyx:composer-drafts';
 
 export type ComposerDrafts = Record<string, string>;
 

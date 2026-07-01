@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Ocean deploy — build the static export and stamp the service-worker cache
+# Onyx deploy — build the static export and stamp the service-worker cache
 # version so already-cached clients re-install on their next visit.
 #
 # nginx serves /home/kain/onyx/out directly at eshmaki.me, so building IS
@@ -28,9 +28,9 @@ for route in app about appearance; do
   cp out/index.html "out/${route}/index.html"
 done
 
-echo "==> stamping service-worker cache: ocean-shell-${VERSION}"
-sed -i "s/ocean-shell-__BUILD_VERSION__/ocean-shell-${VERSION}/" out/sw.js
-grep -q "ocean-shell-${VERSION}" out/sw.js \
-  || { echo "FAIL: sw.js placeholder not found — check public/sw.js has 'ocean-shell-__BUILD_VERSION__'"; exit 1; }
+echo "==> stamping service-worker cache: onyx-shell-${VERSION}"
+sed -i "s/onyx-shell-__BUILD_VERSION__/onyx-shell-${VERSION}/" out/sw.js
+grep -q "onyx-shell-${VERSION}" out/sw.js \
+  || { echo "FAIL: sw.js placeholder not found — check public/sw.js has 'onyx-shell-__BUILD_VERSION__'"; exit 1; }
 
-echo "==> deployed ocean-shell-${VERSION} — live at https://eshmaki.me (nginx root: $(pwd)/out)"
+echo "==> deployed onyx-shell-${VERSION} — live at https://eshmaki.me (nginx root: $(pwd)/out)"

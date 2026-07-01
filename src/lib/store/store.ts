@@ -93,6 +93,9 @@ export interface RichUserProfile {
   bannerColor?: string;
   bannerUrl?: string;
   pronouns?: string;
+  // NOTE: the 'ocean.*' METADATA names below are WIRE FORMAT — server-persisted
+  // IRCX METADATA keys that existing accounts already carry. They intentionally
+  // keep the legacy 'ocean' namespace; renaming them would orphan stored data.
   /** Preferred display name (METADATA ocean.display-name) */
   displayName?: string;
   /** Per-user accent color (METADATA ocean.accent) */
@@ -182,7 +185,7 @@ type StoredVoiceSettings = Pick<
   | 'cameraDeviceId'
 >;
 
-const VOICE_SETTINGS_KEY = 'ocean-voice-settings';
+const VOICE_SETTINGS_KEY = 'onyx:voice-settings';
 
 /**
  * Fire a window CustomEvent (SSR-safe). The voice overlays (reactions, etc.)
@@ -232,7 +235,7 @@ function _saveVoiceSettings(voice: VoiceState): void {
   };
   try {
     localStorage.setItem(VOICE_SETTINGS_KEY, JSON.stringify(saved));
-    if (voice.pushToTalkKey) localStorage.setItem('ocean-ptt-key', voice.pushToTalkKey);
+    if (voice.pushToTalkKey) localStorage.setItem('onyx:ptt-key', voice.pushToTalkKey);
   } catch {}
 }
 
@@ -532,7 +535,7 @@ export interface OnyxState {
   monitoredNicks: Set<string>;
 
   // ── Friends / Contacts ───────────────────────────────────────────────
-  /** Friends list persisted to localStorage 'ocean-friends' */
+  /** Friends list persisted to localStorage 'onyx:friends' */
   friends: Map<string, { nick: string; online: boolean; note?: string }>;
   showFriendsPanel: boolean;
   addFriend(nick: string): void;
@@ -974,9 +977,9 @@ export interface OnyxState {
   theme: 'lacquer' | 'midnight' | 'onyx' | 'ash' | 'amoled' | 'light' | 'system';
   /** UI base font size in px (12 | 14 | 16 | 18 | 20) */
   fontSize: number;
-  /** Set UI theme and persist to localStorage 'ocean-display-theme' */
+  /** Set UI theme and persist to localStorage 'onyx:display-theme' */
   setDisplayTheme(theme: OnyxState['theme']): void;
-  /** Set UI font size and persist to localStorage 'ocean-ui-font-size' */
+  /** Set UI font size and persist to localStorage 'onyx:ui-font-size' */
   setFontSize(size: number): void;
 
   // ── Message density ──────────────────────────────────────────────────
@@ -1906,7 +1909,7 @@ function _startReconnectCountdown(get: GetFn, set: SetFn) {
 function _loadChannelColors(): Map<string, string> {
   if (typeof window === 'undefined') return new Map();
   try {
-    const raw = localStorage.getItem('ocean-channel-colors');
+    const raw = localStorage.getItem('onyx:channel-colors');
     if (!raw) return new Map();
     return new Map(Object.entries(JSON.parse(raw) as Record<string, string>));
   } catch { return new Map(); }
@@ -1915,14 +1918,14 @@ function _loadChannelColors(): Map<string, string> {
 function _saveChannelColors(colors: Map<string, string>): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem('ocean-channel-colors', JSON.stringify(Object.fromEntries(colors)));
+    localStorage.setItem('onyx:channel-colors', JSON.stringify(Object.fromEntries(colors)));
   } catch {}
 }
 
 function _loadChannelNotify(): Map<string, 'all' | 'mentions' | 'none'> {
   if (typeof window === 'undefined') return new Map();
   try {
-    const raw = localStorage.getItem('ocean-channel-notify');
+    const raw = localStorage.getItem('onyx:channel-notify');
     if (!raw) return new Map();
     return new Map(Object.entries(JSON.parse(raw) as Record<string, 'mentions' | 'none'>));
   } catch { return new Map(); }
@@ -1932,23 +1935,23 @@ function _saveChannelNotify(notify: Map<string, 'all' | 'mentions' | 'none'>): v
   if (typeof window === 'undefined') return;
   try {
     const persisted = [...notify].filter(([, level]) => level !== 'all');
-    localStorage.setItem('ocean-channel-notify', JSON.stringify(Object.fromEntries(persisted)));
+    localStorage.setItem('onyx:channel-notify', JSON.stringify(Object.fromEntries(persisted)));
   } catch {}
 }
 
 function _loadCompactSidebar(): boolean {
-  return typeof window !== 'undefined' && localStorage.getItem('ocean-compact-sidebar') === '1';
+  return typeof window !== 'undefined' && localStorage.getItem('onyx:compact-sidebar') === '1';
 }
 
 function _loadIdleAwayMinutes(): number {
   if (typeof window === 'undefined') return 15;
-  const parsed = Number(localStorage.getItem('ocean-idle-away-minutes'));
+  const parsed = Number(localStorage.getItem('onyx:idle-away-minutes'));
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 15;
 }
 
 function _loadDndEnabled(): boolean {
   if (typeof window === 'undefined') return false;
-  return localStorage.getItem('ocean-dnd-enabled') === 'true';
+  return localStorage.getItem('onyx:dnd-enabled') === 'true';
 }
 
 function _loadDndHour(key: string, fallback: number): number {
@@ -1959,29 +1962,29 @@ function _loadDndHour(key: string, fallback: number): number {
 
 function _loadDndUntil(): number | null {
   if (typeof window === 'undefined') return null;
-  const parsed = Number(localStorage.getItem('ocean-dnd-until'));
+  const parsed = Number(localStorage.getItem('onyx:dnd-until'));
   return Number.isFinite(parsed) && parsed > Date.now() ? parsed : null;
 }
 
 function _loadSoundEnabled(): boolean {
   if (typeof window === 'undefined') return true;
-  const stored = localStorage.getItem('ocean-sound');
+  const stored = localStorage.getItem('onyx:sound');
   if (stored !== null) return stored !== 'false';
-  const legacy = localStorage.getItem('ocean-notif-sounds');
+  const legacy = localStorage.getItem('onyx:notif-sounds');
   return legacy === null ? true : legacy === 'true';
 }
 
 function _loadPushNotificationsEnabled(): boolean {
   if (typeof window === 'undefined') return true;
-  const stored = localStorage.getItem('ocean-push-notifications');
+  const stored = localStorage.getItem('onyx:push-notifications');
   if (stored !== null) return stored !== 'false';
-  const legacy = localStorage.getItem('ocean-notif-desktop');
+  const legacy = localStorage.getItem('onyx:notif-desktop');
   return legacy === null ? true : legacy !== 'false';
 }
 
 function _loadEmojiSkinTone(): OnyxState['emojiSkinTone'] {
   if (typeof window === 'undefined') return '';
-  const stored = localStorage.getItem('ocean-emoji-skin-tone');
+  const stored = localStorage.getItem('onyx:emoji-skin-tone');
   return stored === '\u{1F3FB}' || stored === '\u{1F3FC}' || stored === '\u{1F3FD}' ||
     stored === '\u{1F3FE}' || stored === '\u{1F3FF}' ? stored : '';
 }
@@ -2123,7 +2126,7 @@ export const store = createStore<OnyxState>()(
     showThemeModal: false,
     messageDensity: (() => {
       if (typeof window === 'undefined') return 'cozy';
-      const stored = localStorage.getItem('ocean-density');
+      const stored = localStorage.getItem('onyx:density');
       return (stored === 'compact' || stored === 'spacious' ? stored : 'cozy') as 'cozy' | 'compact' | 'spacious';
     })(),
     voice: {
@@ -3184,9 +3187,9 @@ export const store = createStore<OnyxState>()(
       try {
         if (typeof window !== 'undefined') {
           if (status) {
-            localStorage.setItem('ocean-custom-status', status);
+            localStorage.setItem('onyx:custom-status', status);
           } else {
-            localStorage.removeItem('ocean-custom-status');
+            localStorage.removeItem('onyx:custom-status');
           }
         }
       } catch { /* ignore */ }
@@ -3225,9 +3228,9 @@ export const store = createStore<OnyxState>()(
       try {
         if (typeof window !== 'undefined') {
           if (expiry) {
-            localStorage.setItem('ocean-custom-status-expiry', expiry.toISOString());
+            localStorage.setItem('onyx:custom-status-expiry', expiry.toISOString());
           } else {
-            localStorage.removeItem('ocean-custom-status-expiry');
+            localStorage.removeItem('onyx:custom-status-expiry');
           }
         }
       } catch { /* ignore */ }
@@ -3469,7 +3472,7 @@ export const store = createStore<OnyxState>()(
     skipOnboarding() {
       set({ showOnboarding: false });
       const hostname = get().server?.url ?? 'unknown';
-      const key = `ocean-onboarded-${hostname}`;
+      const key = `onyx:onboarded-${hostname}`;
       try {
         if (typeof window !== 'undefined') {
           localStorage.setItem(key, '1');
@@ -3593,7 +3596,7 @@ export const store = createStore<OnyxState>()(
 
     // ── Theme ─────────────────────────────────────────────────────────────
     setTheme(theme) {
-      if (typeof window !== 'undefined') localStorage.setItem('ocean-active-theme', theme);
+      if (typeof window !== 'undefined') localStorage.setItem('onyx:active-theme', theme);
       set({ activeTheme: theme });
     },
 
@@ -3607,7 +3610,7 @@ export const store = createStore<OnyxState>()(
 
     // ── Message density ──────────────────────────────────────────────────
     setMessageDensity(messageDensity) {
-      if (typeof window !== 'undefined') localStorage.setItem('ocean-density', messageDensity);
+      if (typeof window !== 'undefined') localStorage.setItem('onyx:density', messageDensity);
       set({ messageDensity });
     },
 
@@ -4030,7 +4033,7 @@ export const store = createStore<OnyxState>()(
           get().client?.sendRaw('EVENT', 'ADD', 'MEDIA', '*');
           // Show onboarding if this server hasn't been visited before
           const hostname = get().server?.url ?? 'unknown';
-          const onboardKey = `ocean-onboarded-${hostname}`;
+          const onboardKey = `onyx:onboarded-${hostname}`;
           if (typeof window !== 'undefined' && !localStorage.getItem(onboardKey)) {
             get().startOnboarding();
           }
@@ -5708,7 +5711,7 @@ export const store = createStore<OnyxState>()(
 
         case '376': { // RPL_ENDOFMOTD
           const hostname376 = get().server?.url ?? 'unknown';
-          const suppressKey = `ocean-hide-motd-${hostname376}`;
+          const suppressKey = `onyx:hide-motd-${hostname376}`;
           const suppress =
             typeof window !== 'undefined' && !!localStorage.getItem(suppressKey);
           if (!suppress && _motdBuffer) {
@@ -6380,7 +6383,7 @@ export const store = createStore<OnyxState>()(
     idleAwayMinutes: _loadIdleAwayMinutes(),
     setIdleAwayMinutes: (minutes) => {
       if (typeof window !== 'undefined') {
-        try { localStorage.setItem('ocean-idle-away-minutes', String(minutes)); } catch {}
+        try { localStorage.setItem('onyx:idle-away-minutes', String(minutes)); } catch {}
       }
       set({ idleAwayMinutes: minutes });
     },
@@ -6406,7 +6409,7 @@ export const store = createStore<OnyxState>()(
     // ── Scheduled Messages ──────────────────────────────────────────────
     scheduledMessages: (() => {
       if (typeof window === 'undefined') return [];
-      try { return JSON.parse(localStorage.getItem('ocean-scheduled') || '[]'); }
+      try { return JSON.parse(localStorage.getItem('onyx:scheduled') || '[]'); }
       catch { return []; }
     })(),
     showScheduledMessages: false,
@@ -6414,14 +6417,14 @@ export const store = createStore<OnyxState>()(
       const entry = { id: `sched-${Date.now()}-${Math.random().toString(36).slice(2)}`, channel, text, sendAt };
       set(s => {
         const next = [...s.scheduledMessages, entry].sort((a, b) => a.sendAt - b.sendAt);
-        if (typeof window !== 'undefined') localStorage.setItem('ocean-scheduled', JSON.stringify(next));
+        if (typeof window !== 'undefined') localStorage.setItem('onyx:scheduled', JSON.stringify(next));
         return { scheduledMessages: next };
       });
     },
     cancelScheduledMessage: (id) => {
       set(s => {
         const next = s.scheduledMessages.filter(m => m.id !== id);
-        if (typeof window !== 'undefined') localStorage.setItem('ocean-scheduled', JSON.stringify(next));
+        if (typeof window !== 'undefined') localStorage.setItem('onyx:scheduled', JSON.stringify(next));
         return { scheduledMessages: next };
       });
     },
@@ -6432,21 +6435,21 @@ export const store = createStore<OnyxState>()(
     soundEnabled: _loadSoundEnabled(),
     soundVolume: (() => {
       if (typeof window === 'undefined') return 0.5;
-      return parseFloat(localStorage.getItem('ocean-sound-volume') || '0.5');
+      return parseFloat(localStorage.getItem('onyx:sound-volume') || '0.5');
     })(),
     setSoundEnabled: (v) => {
-      if (typeof window !== 'undefined') localStorage.setItem('ocean-sound', String(v));
+      if (typeof window !== 'undefined') localStorage.setItem('onyx:sound', String(v));
       set({ soundEnabled: v });
     },
     setSoundVolume: (v) => {
-      if (typeof window !== 'undefined') localStorage.setItem('ocean-sound-volume', String(v));
+      if (typeof window !== 'undefined') localStorage.setItem('onyx:sound-volume', String(v));
       set({ soundVolume: v });
     },
 
     // ── Push notifications ───────────────────────────────────────────────
     pushNotificationsEnabled: _loadPushNotificationsEnabled(),
     setPushNotificationsEnabled: (enabled) => {
-      if (typeof window !== 'undefined') localStorage.setItem('ocean-push-notifications', String(enabled));
+      if (typeof window !== 'undefined') localStorage.setItem('onyx:push-notifications', String(enabled));
       set({ pushNotificationsEnabled: enabled });
     },
 
@@ -6463,53 +6466,53 @@ export const store = createStore<OnyxState>()(
     // ── Auto-join ────────────────────────────────────────────────────────
     autoJoinChannels: (() => {
       if (typeof window === 'undefined') return [];
-      try { return JSON.parse(localStorage.getItem('ocean-autojoin') || '[]') as string[]; }
+      try { return JSON.parse(localStorage.getItem('onyx:autojoin') || '[]') as string[]; }
       catch { return []; }
     })(),
     addAutoJoin: (channel) => set(s => {
       const next = [...new Set([...s.autoJoinChannels, channel])];
-      if (typeof window !== 'undefined') localStorage.setItem('ocean-autojoin', JSON.stringify(next));
+      if (typeof window !== 'undefined') localStorage.setItem('onyx:autojoin', JSON.stringify(next));
       return { autoJoinChannels: next };
     }),
     removeAutoJoin: (channel) => set(s => {
       const next = s.autoJoinChannels.filter(c => c !== channel);
-      if (typeof window !== 'undefined') localStorage.setItem('ocean-autojoin', JSON.stringify(next));
+      if (typeof window !== 'undefined') localStorage.setItem('onyx:autojoin', JSON.stringify(next));
       return { autoJoinChannels: next };
     }),
 
     // ── Starred channels ──────────────────────────────────────────────────
     starredChannels: (() => {
       if (typeof window === 'undefined') return new Set<string>();
-      try { return new Set<string>(JSON.parse(localStorage.getItem('ocean-starred') || '[]') as string[]); }
+      try { return new Set<string>(JSON.parse(localStorage.getItem('onyx:starred') || '[]') as string[]); }
       catch { return new Set<string>(); }
     })(),
     starChannel: (ch) => set(s => {
       const next = new Set(s.starredChannels);
       next.add(ch);
-      if (typeof window !== 'undefined') localStorage.setItem('ocean-starred', JSON.stringify([...next]));
+      if (typeof window !== 'undefined') localStorage.setItem('onyx:starred', JSON.stringify([...next]));
       return { starredChannels: next };
     }),
     unstarChannel: (ch) => set(s => {
       const next = new Set(s.starredChannels);
       next.delete(ch);
-      if (typeof window !== 'undefined') localStorage.setItem('ocean-starred', JSON.stringify([...next]));
+      if (typeof window !== 'undefined') localStorage.setItem('onyx:starred', JSON.stringify([...next]));
       return { starredChannels: next };
     }),
 
     // ── Custom emoji ──────────────────────────────────────────────────────
     customEmoji: (() => {
       if (typeof window === 'undefined') return [];
-      try { return JSON.parse(localStorage.getItem('ocean-custom-emoji') || '[]') as Array<{ name: string; url: string; addedBy?: string }>; }
+      try { return JSON.parse(localStorage.getItem('onyx:custom-emoji') || '[]') as Array<{ name: string; url: string; addedBy?: string }>; }
       catch { return []; }
     })(),
     addCustomEmoji: (name, url) => set(s => {
       const next = [...s.customEmoji.filter(e => e.name !== name), { name, url }];
-      if (typeof window !== 'undefined') localStorage.setItem('ocean-custom-emoji', JSON.stringify(next));
+      if (typeof window !== 'undefined') localStorage.setItem('onyx:custom-emoji', JSON.stringify(next));
       return { customEmoji: next };
     }),
     removeCustomEmoji: (name) => set(s => {
       const next = s.customEmoji.filter(e => e.name !== name);
-      if (typeof window !== 'undefined') localStorage.setItem('ocean-custom-emoji', JSON.stringify(next));
+      if (typeof window !== 'undefined') localStorage.setItem('onyx:custom-emoji', JSON.stringify(next));
       return { customEmoji: next };
     }),
 
@@ -6524,7 +6527,7 @@ export const store = createStore<OnyxState>()(
       set(s => {
         const recent = [emoji, ...s.recentEmojis.filter(e => e !== emoji)].slice(0, 20);
         if (typeof window !== 'undefined') {
-          try { localStorage.setItem('ocean-recent-emoji', JSON.stringify(recent)); } catch {}
+          try { localStorage.setItem('onyx:recent-emoji', JSON.stringify(recent)); } catch {}
         }
         return { recentEmojis: recent };
       });
@@ -6533,7 +6536,7 @@ export const store = createStore<OnyxState>()(
     setEmojiSkinTone: (tone) => {
       const normalized = _normalizeEmojiSkinTone(tone);
       if (typeof window !== 'undefined') {
-        try { localStorage.setItem('ocean-emoji-skin-tone', normalized); } catch {}
+        try { localStorage.setItem('onyx:emoji-skin-tone', normalized); } catch {}
       }
       set({ emojiSkinTone: normalized });
     },
@@ -6542,7 +6545,7 @@ export const store = createStore<OnyxState>()(
       set(s => {
         const counts = { ...s.emojiUsageCounts, [emoji]: (s.emojiUsageCounts[emoji] ?? 0) + 1 };
         if (typeof window !== 'undefined') {
-          try { localStorage.setItem('ocean-emoji-usage', JSON.stringify(counts)); } catch {}
+          try { localStorage.setItem('onyx:emoji-usage', JSON.stringify(counts)); } catch {}
         }
         return { emojiUsageCounts: counts };
       });
@@ -6690,21 +6693,21 @@ export const store = createStore<OnyxState>()(
 
     // ── Do Not Disturb ────────────────────────────────────────────────────
     dndEnabled: _loadDndEnabled(),
-    dndQuietStart: _loadDndHour('ocean-dnd-quiet-start', 22),
-    dndQuietEnd: _loadDndHour('ocean-dnd-quiet-end', 8),
+    dndQuietStart: _loadDndHour('onyx:dnd-quiet-start', 22),
+    dndQuietEnd: _loadDndHour('onyx:dnd-quiet-end', 8),
     dndUntil: _loadDndUntil(),
     showDndModal: false,
     setDndEnabled: (enabled) => {
       if (typeof window !== 'undefined') {
-        try { localStorage.setItem('ocean-dnd-enabled', String(enabled)); } catch {}
+        try { localStorage.setItem('onyx:dnd-enabled', String(enabled)); } catch {}
       }
       set({ dndEnabled: enabled });
     },
     setDndQuietHours: (start, end) => {
       if (typeof window !== 'undefined') {
         try {
-          localStorage.setItem('ocean-dnd-quiet-start', String(start));
-          localStorage.setItem('ocean-dnd-quiet-end', String(end));
+          localStorage.setItem('onyx:dnd-quiet-start', String(start));
+          localStorage.setItem('onyx:dnd-quiet-end', String(end));
         } catch {}
       }
       set({ dndQuietStart: start, dndQuietEnd: end });
@@ -6712,8 +6715,8 @@ export const store = createStore<OnyxState>()(
     setDndUntil: (until) => {
       if (typeof window !== 'undefined') {
         try {
-          if (until === null) localStorage.removeItem('ocean-dnd-until');
-          else localStorage.setItem('ocean-dnd-until', String(until));
+          if (until === null) localStorage.removeItem('onyx:dnd-until');
+          else localStorage.setItem('onyx:dnd-until', String(until));
         } catch {}
       }
       set({ dndUntil: until });
@@ -6737,7 +6740,7 @@ export const store = createStore<OnyxState>()(
     timeFormat: _loadTimeFormat(),
     setTimeFormat: (format) => {
       if (typeof window !== 'undefined') {
-        try { localStorage.setItem('ocean-time-format', format); } catch {}
+        try { localStorage.setItem('onyx:time-format', format); } catch {}
       }
       set({ timeFormat: format });
     },
@@ -6819,7 +6822,7 @@ export const store = createStore<OnyxState>()(
     compactSidebar: _loadCompactSidebar(),
     setCompactSidebar: (compact) => {
       if (typeof window !== 'undefined') {
-        try { localStorage.setItem('ocean-compact-sidebar', compact ? '1' : '0'); } catch {}
+        try { localStorage.setItem('onyx:compact-sidebar', compact ? '1' : '0'); } catch {}
       }
       set({ compactSidebar: compact });
     },
@@ -6846,7 +6849,7 @@ export const store = createStore<OnyxState>()(
         document.documentElement.style.setProperty('--msg-font-size', `${size}px`);
       }
       if (typeof window !== 'undefined') {
-        try { localStorage.setItem('ocean-message-font-size', String(size)); } catch {}
+        try { localStorage.setItem('onyx:message-font-size', String(size)); } catch {}
       }
       set({ messageFontSize: size });
     },
@@ -6856,7 +6859,7 @@ export const store = createStore<OnyxState>()(
     setAccentColor: (color) => {
       _applyAccentColor(color);
       if (typeof window !== 'undefined') {
-        try { localStorage.setItem('ocean-accent-color', color); } catch {}
+        try { localStorage.setItem('onyx:accent-color', color); } catch {}
       }
       set({ accentColor: color });
     },
@@ -6868,7 +6871,7 @@ export const store = createStore<OnyxState>()(
         document.documentElement.classList.toggle('reduced-motion', reduced);
       }
       if (typeof window !== 'undefined') {
-        try { localStorage.setItem('ocean-reduced-motion', reduced ? '1' : '0'); } catch {}
+        try { localStorage.setItem('onyx:reduced-motion', reduced ? '1' : '0'); } catch {}
       }
       set({ reducedMotion: reduced });
     },
@@ -6880,7 +6883,7 @@ export const store = createStore<OnyxState>()(
         document.documentElement.setAttribute('data-bg', bg);
       }
       if (typeof window !== 'undefined') {
-        try { localStorage.setItem('ocean-chat-background', bg); } catch {}
+        try { localStorage.setItem('onyx:chat-background', bg); } catch {}
       }
       set({ chatBackground: bg });
     },
@@ -6892,7 +6895,7 @@ export const store = createStore<OnyxState>()(
         document.documentElement.style.setProperty('--ui-font', font);
       }
       if (typeof window !== 'undefined') {
-        try { localStorage.setItem('ocean-ui-font', font); } catch {}
+        try { localStorage.setItem('onyx:ui-font', font); } catch {}
       }
       set({ uiFont: font });
     },
@@ -6904,7 +6907,7 @@ export const store = createStore<OnyxState>()(
         document.body.classList.toggle('bubble-mode', v);
       }
       if (typeof window !== 'undefined') {
-        try { localStorage.setItem('ocean-bubble-mode', v ? '1' : '0'); } catch {}
+        try { localStorage.setItem('onyx:bubble-mode', v ? '1' : '0'); } catch {}
       }
       set({ bubbleMode: v });
     },
@@ -6913,16 +6916,16 @@ export const store = createStore<OnyxState>()(
     customCss: _loadCustomCss(),
     setCustomCss: (css) => {
       if (typeof document !== 'undefined') {
-        let el = document.getElementById('ocean-custom-css') as HTMLStyleElement | null;
+        let el = document.getElementById('onyx:custom-css') as HTMLStyleElement | null;
         if (!el) {
           el = document.createElement('style');
-          el.id = 'ocean-custom-css';
+          el.id = 'onyx:custom-css';
           document.head.appendChild(el);
         }
         el.textContent = css;
       }
       if (typeof window !== 'undefined') {
-        try { localStorage.setItem('ocean-custom-css', css); } catch {}
+        try { localStorage.setItem('onyx:custom-css', css); } catch {}
       }
       set({ customCss: css });
     },
@@ -6935,7 +6938,7 @@ export const store = createStore<OnyxState>()(
         document.documentElement.style.setProperty('--sidebar-width', clamped + 'px');
       }
       if (typeof window !== 'undefined') {
-        try { localStorage.setItem('ocean-sidebar-width', String(clamped)); } catch {}
+        try { localStorage.setItem('onyx:sidebar-width', String(clamped)); } catch {}
       }
       set({ sidebarWidth: clamped });
     },
@@ -6947,7 +6950,7 @@ export const store = createStore<OnyxState>()(
         document.documentElement.style.setProperty('--msg-max-width', w === 0 ? 'none' : w + 'px');
       }
       if (typeof window !== 'undefined') {
-        try { localStorage.setItem('ocean-msg-maxw', String(w)); } catch {}
+        try { localStorage.setItem('onyx:msg-maxw', String(w)); } catch {}
       }
       set({ messageMaxWidth: w });
     },
@@ -6959,7 +6962,7 @@ export const store = createStore<OnyxState>()(
         document.documentElement.classList.toggle('glass-sidebar', v);
       }
       if (typeof window !== 'undefined') {
-        try { localStorage.setItem('ocean-glass-sidebar', v ? '1' : '0'); } catch {}
+        try { localStorage.setItem('onyx:glass-sidebar', v ? '1' : '0'); } catch {}
       }
       set({ glassSidebar: v });
     },
@@ -7070,7 +7073,7 @@ export const store = createStore<OnyxState>()(
       const topicHistory = { ...s.topicHistory, [key]: hist };
       try {
         if (typeof window !== 'undefined') {
-          localStorage.setItem('ocean-topic-history', JSON.stringify(topicHistory));
+          localStorage.setItem('onyx:topic-history', JSON.stringify(topicHistory));
         }
       } catch {}
       return { topicHistory };
@@ -7182,48 +7185,48 @@ export const store = createStore<OnyxState>()(
     highContrastMode: _loadHighContrast(),
     setHighContrastMode: (v) => {
       if (typeof window !== 'undefined') {
-        if (v) localStorage.setItem('ocean-high-contrast', '1');
-        else localStorage.removeItem('ocean-high-contrast');
+        if (v) localStorage.setItem('onyx:high-contrast', '1');
+        else localStorage.removeItem('onyx:high-contrast');
       }
       set({ highContrastMode: v });
     },
 
     // ── Developer mode ────────────────────────────────────────────────────
-    devMode: _loadBoolPref('ocean-devMode'),
+    devMode: _loadBoolPref('onyx:devMode'),
     setDevMode: (v) => {
       if (typeof window !== 'undefined') {
-        if (v) localStorage.setItem('ocean-devMode', '1');
-        else localStorage.removeItem('ocean-devMode');
+        if (v) localStorage.setItem('onyx:devMode', '1');
+        else localStorage.removeItem('onyx:devMode');
       }
       set({ devMode: v });
     },
 
     // ── Streamer mode ─────────────────────────────────────────────────────
-    streamerMode: _loadBoolPref('ocean-streamerMode'),
-    streamerModeBlurLinks: _loadBoolPref('ocean-streamerModeBlurLinks'),
+    streamerMode: _loadBoolPref('onyx:streamerMode'),
+    streamerModeBlurLinks: _loadBoolPref('onyx:streamerModeBlurLinks'),
     setStreamerMode: (v) => {
       if (typeof window !== 'undefined') {
-        if (v) localStorage.setItem('ocean-streamerMode', '1');
-        else localStorage.removeItem('ocean-streamerMode');
+        if (v) localStorage.setItem('onyx:streamerMode', '1');
+        else localStorage.removeItem('onyx:streamerMode');
         document.documentElement.setAttribute('data-streamer-mode', v ? 'true' : 'false');
       }
       set({ streamerMode: v });
     },
     setStreamerModeBlurLinks: (v) => {
       if (typeof window !== 'undefined') {
-        if (v) localStorage.setItem('ocean-streamerModeBlurLinks', '1');
-        else localStorage.removeItem('ocean-streamerModeBlurLinks');
+        if (v) localStorage.setItem('onyx:streamerModeBlurLinks', '1');
+        else localStorage.removeItem('onyx:streamerModeBlurLinks');
       }
       set({ streamerModeBlurLinks: v });
     },
 
     // ── Accessibility extras ──────────────────────────────────────────────
-    reduceMotion: _loadBoolPref('ocean-reduceMotion'),
-    compactMemberList: _loadBoolPref('ocean-compactMemberList'),
+    reduceMotion: _loadBoolPref('onyx:reduceMotion'),
+    compactMemberList: _loadBoolPref('onyx:compactMemberList'),
     setReduceMotion: (v) => {
       if (typeof window !== 'undefined') {
-        if (v) localStorage.setItem('ocean-reduceMotion', '1');
-        else localStorage.removeItem('ocean-reduceMotion');
+        if (v) localStorage.setItem('onyx:reduceMotion', '1');
+        else localStorage.removeItem('onyx:reduceMotion');
         if (v) document.documentElement.setAttribute('data-reduce-motion', 'true');
         else document.documentElement.removeAttribute('data-reduce-motion');
       }
@@ -7231,8 +7234,8 @@ export const store = createStore<OnyxState>()(
     },
     setCompactMemberList: (v) => {
       if (typeof window !== 'undefined') {
-        if (v) localStorage.setItem('ocean-compactMemberList', '1');
-        else localStorage.removeItem('ocean-compactMemberList');
+        if (v) localStorage.setItem('onyx:compactMemberList', '1');
+        else localStorage.removeItem('onyx:compactMemberList');
       }
       set({ compactMemberList: v });
     },
@@ -7259,7 +7262,7 @@ export const store = createStore<OnyxState>()(
       else next.add(key);
       try {
         if (typeof window !== 'undefined') {
-          localStorage.setItem('ocean-forum-channels', JSON.stringify([...next]));
+          localStorage.setItem('onyx:forum-channels', JSON.stringify([...next]));
         }
       } catch {}
       return { forumChannels: next };
@@ -7298,32 +7301,32 @@ export const store = createStore<OnyxState>()(
     selfDisplayName: _loadSelfDisplayName(),
     setSelfDisplayName: (name) => {
       if (typeof window !== 'undefined') {
-        try { localStorage.setItem('ocean-self-display-name', name); } catch {}
+        try { localStorage.setItem('onyx:self-display-name', name); } catch {}
       }
       set({ selfDisplayName: name });
     },
 
     // ── Self profile ──────────────────────────────────────────────────────────
-    selfBio: typeof window !== 'undefined' ? (localStorage.getItem('ocean-selfBio') ?? '') : '',
-    selfPronouns: typeof window !== 'undefined' ? (localStorage.getItem('ocean-selfPronouns') ?? '') : '',
-    selfBannerUrl: typeof window !== 'undefined' ? (localStorage.getItem('ocean-selfBannerUrl') ?? '') : '',
+    selfBio: typeof window !== 'undefined' ? (localStorage.getItem('onyx:selfBio') ?? '') : '',
+    selfPronouns: typeof window !== 'undefined' ? (localStorage.getItem('onyx:selfPronouns') ?? '') : '',
+    selfBannerUrl: typeof window !== 'undefined' ? (localStorage.getItem('onyx:selfBannerUrl') ?? '') : '',
     setSelfBio: (bio) => {
-      if (typeof window !== 'undefined') { try { localStorage.setItem('ocean-selfBio', bio); } catch {} }
+      if (typeof window !== 'undefined') { try { localStorage.setItem('onyx:selfBio', bio); } catch {} }
       set({ selfBio: bio });
     },
     setSelfPronouns: (pronouns) => {
-      if (typeof window !== 'undefined') { try { localStorage.setItem('ocean-selfPronouns', pronouns); } catch {} }
+      if (typeof window !== 'undefined') { try { localStorage.setItem('onyx:selfPronouns', pronouns); } catch {} }
       set({ selfPronouns: pronouns });
     },
     setSelfBannerUrl: (url) => {
-      if (typeof window !== 'undefined') { try { localStorage.setItem('ocean-selfBannerUrl', url); } catch {} }
+      if (typeof window !== 'undefined') { try { localStorage.setItem('onyx:selfBannerUrl', url); } catch {} }
       set({ selfBannerUrl: url });
     },
 
     // ── Invisible mode ────────────────────────────────────────────────────────
-    invisibleMode: typeof window !== 'undefined' && localStorage.getItem('ocean-invisibleMode') === '1',
+    invisibleMode: typeof window !== 'undefined' && localStorage.getItem('onyx:invisibleMode') === '1',
     setInvisibleMode: (v) => {
-      if (typeof window !== 'undefined') { try { localStorage.setItem('ocean-invisibleMode', v ? '1' : '0'); } catch {} }
+      if (typeof window !== 'undefined') { try { localStorage.setItem('onyx:invisibleMode', v ? '1' : '0'); } catch {} }
       const { client, ourNick } = get();
       if (client && ourNick) {
         client.sendRaw('MODE', ourNick, v ? '+i' : '-i');
@@ -7442,7 +7445,7 @@ export const store = createStore<OnyxState>()(
     channelOrder: _loadChannelOrder(),
     setChannelOrder: (order) => {
       if (typeof window !== 'undefined') {
-        try { localStorage.setItem('ocean-channel-order', JSON.stringify(order)); } catch {}
+        try { localStorage.setItem('onyx:channel-order', JSON.stringify(order)); } catch {}
       }
       set({ channelOrder: order });
     },
@@ -7473,13 +7476,13 @@ export const store = createStore<OnyxState>()(
     fontSize: _loadDisplayFontSize(),
     setDisplayTheme: (theme) => {
       if (typeof window !== 'undefined') {
-        try { localStorage.setItem('ocean-display-theme', theme); } catch {}
+        try { localStorage.setItem('onyx:display-theme', theme); } catch {}
       }
       set({ theme });
     },
     setFontSize: (size) => {
       if (typeof window !== 'undefined') {
-        try { localStorage.setItem('ocean-ui-font-size', String(size)); } catch {}
+        try { localStorage.setItem('onyx:ui-font-size', String(size)); } catch {}
       }
       if (typeof document !== 'undefined') {
         document.documentElement.style.fontSize = size + 'px';
@@ -8242,14 +8245,14 @@ function _addDMMessage(
 function _loadHighlightWords(): string[] {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = localStorage.getItem('ocean-highlight-words');
+    const raw = localStorage.getItem('onyx:highlight-words');
     if (!raw) return [];
     return JSON.parse(raw) as string[];
   } catch { return []; }
 }
 function _saveHighlightWords(words: string[]): void {
   if (typeof window === 'undefined') return;
-  try { localStorage.setItem('ocean-highlight-words', JSON.stringify(words)); } catch {
+  try { localStorage.setItem('onyx:highlight-words', JSON.stringify(words)); } catch {
     // Storage quota exceeded or unavailable — silently degrade
   }
 }
@@ -8259,7 +8262,7 @@ function _saveHighlightWords(words: string[]): void {
 function _loadCustomStatus(): string {
   if (typeof window === 'undefined') return '';
   try {
-    return localStorage.getItem('ocean-custom-status') ?? '';
+    return localStorage.getItem('onyx:custom-status') ?? '';
   } catch {
     return '';
   }
@@ -8268,7 +8271,7 @@ function _loadCustomStatus(): string {
 function _loadCustomStatusExpiry(): Date | null {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = localStorage.getItem('ocean-custom-status-expiry');
+    const raw = localStorage.getItem('onyx:custom-status-expiry');
     if (!raw) return null;
     const d = new Date(raw);
     return isNaN(d.getTime()) ? null : d;
@@ -8279,7 +8282,7 @@ function _loadCustomStatusExpiry(): Date | null {
 
 // ── Bookmark persistence ──────────────────────────────────────────────────────
 
-const BOOKMARK_KEY = 'ocean-bookmarks';
+const BOOKMARK_KEY = 'onyx:bookmarks';
 
 function _loadBookmarks(): ChatMessage[] {
   if (typeof window === 'undefined') return [];
@@ -8304,7 +8307,7 @@ function _saveBookmarks(bookmarks: ChatMessage[]): void {
 
 // ── Ignore list persistence ───────────────────────────────────────────────────
 
-const IGNORED_USERS_KEY = 'ocean-ignored-users';
+const IGNORED_USERS_KEY = 'onyx:ignored-users';
 
 function _loadIgnoredUsers(): Set<string> {
   if (typeof window === 'undefined') return new Set();
@@ -8334,7 +8337,7 @@ type FriendEntry = { nick: string; online: boolean; note?: string };
 function _loadFriends(): Map<string, FriendEntry> {
   if (typeof window === 'undefined') return new Map();
   try {
-    const raw = localStorage.getItem('ocean-friends');
+    const raw = localStorage.getItem('onyx:friends');
     if (!raw) return new Map();
     const arr = JSON.parse(raw) as Array<{ nick: string; note?: string }>;
     return new Map(arr.map(f => [f.nick.toLowerCase(), { nick: f.nick, online: false, note: f.note }]));
@@ -8347,7 +8350,7 @@ function _saveFriends(friends: Map<string, FriendEntry>): void {
   if (typeof window === 'undefined') return;
   try {
     const arr = Array.from(friends.values()).map(f => ({ nick: f.nick, note: f.note }));
-    localStorage.setItem('ocean-friends', JSON.stringify(arr));
+    localStorage.setItem('onyx:friends', JSON.stringify(arr));
   } catch {
     // Storage quota exceeded or unavailable — silently degrade
   }
@@ -8358,7 +8361,7 @@ function _saveFriends(friends: Map<string, FriendEntry>): void {
 function _loadUserNotes(): Map<string, string> {
   if (typeof window === 'undefined') return new Map();
   try {
-    const raw = localStorage.getItem('ocean-user-notes');
+    const raw = localStorage.getItem('onyx:user-notes');
     if (!raw) return new Map();
     const obj = JSON.parse(raw) as Record<string, string>;
     return new Map(Object.entries(obj));
@@ -8368,7 +8371,7 @@ function _loadUserNotes(): Map<string, string> {
 function _saveUserNotes(notes: Map<string, string>): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem('ocean-user-notes', JSON.stringify(Object.fromEntries(notes)));
+    localStorage.setItem('onyx:user-notes', JSON.stringify(Object.fromEntries(notes)));
   } catch {
     // Storage quota exceeded or unavailable — silently degrade
   }
@@ -8379,7 +8382,7 @@ function _saveUserNotes(notes: Map<string, string>): void {
 function _loadNickColorOverrides(): Map<string, string> {
   if (typeof window === 'undefined') return new Map();
   try {
-    const raw = localStorage.getItem('ocean-nick-colors');
+    const raw = localStorage.getItem('onyx:nick-colors');
     if (!raw) return new Map();
     return new Map(Object.entries(JSON.parse(raw) as Record<string, string>));
   } catch { return new Map(); }
@@ -8388,7 +8391,7 @@ function _loadNickColorOverrides(): Map<string, string> {
 function _saveNickColorOverrides(overrides: Map<string, string>): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem('ocean-nick-colors', JSON.stringify(Object.fromEntries(overrides)));
+    localStorage.setItem('onyx:nick-colors', JSON.stringify(Object.fromEntries(overrides)));
   } catch {
     // Storage quota exceeded or unavailable — silently degrade
   }
@@ -8399,7 +8402,7 @@ function _saveNickColorOverrides(overrides: Map<string, string>): void {
 function _loadDMPins(): Map<string, ChatMessage[]> {
   if (typeof window === 'undefined') return new Map();
   try {
-    const raw = localStorage.getItem('ocean-dm-pins');
+    const raw = localStorage.getItem('onyx:dm-pins');
     if (!raw) return new Map();
     const obj = JSON.parse(raw) as Record<string, Array<ChatMessage & { time: string }>>;
     const map = new Map<string, ChatMessage[]>();
@@ -8415,13 +8418,13 @@ function _saveDMPins(pins: Map<string, ChatMessage[]>): void {
   try {
     const obj: Record<string, ChatMessage[]> = {};
     pins.forEach((msgs, key) => { obj[key] = msgs; });
-    localStorage.setItem('ocean-dm-pins', JSON.stringify(obj));
+    localStorage.setItem('onyx:dm-pins', JSON.stringify(obj));
   } catch {}
 }
 
 // ── CTCP config helpers ───────────────────────────────────────────────────────
 
-const CTCP_CONFIG_KEY = 'ocean-ctcp-config';
+const CTCP_CONFIG_KEY = 'onyx:ctcp-config';
 interface CTCPConfig { versionReply: string; timeEnabled: boolean; }
 
 function _loadCTCPConfig(): CTCPConfig {
@@ -8442,7 +8445,7 @@ function _saveCTCPConfig(cfg: CTCPConfig): void {
 function _loadTimeFormat(): '12h' | '24h' | 'hidden' {
   if (typeof window === 'undefined') return '24h';
   try {
-    const raw = localStorage.getItem('ocean-time-format');
+    const raw = localStorage.getItem('onyx:time-format');
     if (raw === '12h' || raw === '24h' || raw === 'hidden') return raw;
   } catch {}
   return '24h';
@@ -8470,24 +8473,24 @@ function _loadActiveTheme(): string {
       'pearl',
       'system',
     ];
-    const stored = localStorage.getItem('ocean-active-theme');
-    const legacy = localStorage.getItem('ocean-theme');
+    const stored = localStorage.getItem('onyx:active-theme');
+    const legacy = localStorage.getItem('onyx:theme');
     // v3 migration: 'lacquer' is the new flagship default. Move users who are
     // still on the old auto-default ('ocean', the value that REMOVED data-theme
     // and fell back to the plain :root base) — or who have no stored preference
     // at all — onto 'lacquer'. Any explicit non-ocean choice is preserved.
-    const v3done = localStorage.getItem('ocean-theme-v3') === '1';
+    const v3done = localStorage.getItem('onyx:theme-v3') === '1';
     if (!v3done) {
       const effective = (stored && validThemes.includes(stored))
         ? stored
         : (legacy && validThemes.includes(legacy) ? legacy : null);
-      localStorage.setItem('ocean-theme-v3', '1');
+      localStorage.setItem('onyx:theme-v3', '1');
       if (effective === null || effective === 'ocean') {
-        localStorage.setItem('ocean-active-theme', 'lacquer');
+        localStorage.setItem('onyx:active-theme', 'lacquer');
         return 'lacquer';
       }
       // Explicit choice — persist it forward and keep it.
-      localStorage.setItem('ocean-active-theme', effective);
+      localStorage.setItem('onyx:active-theme', effective);
       return effective;
     }
     if (stored && validThemes.includes(stored)) return stored;
@@ -8500,7 +8503,7 @@ function _loadActiveTheme(): string {
 function _loadMessageFontSize(): number {
   if (typeof window === 'undefined') return 14;
   try {
-    const raw = localStorage.getItem('ocean-message-font-size') ?? localStorage.getItem('ocean-font-size') ?? '14';
+    const raw = localStorage.getItem('onyx:message-font-size') ?? localStorage.getItem('onyx:font-size') ?? '14';
     const v = parseInt(raw, 10);
     return isNaN(v) ? 14 : Math.max(12, Math.min(20, v));
   } catch { return 14; }
@@ -8511,10 +8514,10 @@ function _loadMessageFontSize(): number {
 function _loadAccentColor(): string {
   if (typeof window === 'undefined') return '#0ea5e9';
   try {
-    const stored = localStorage.getItem('ocean-accent-color');
+    const stored = localStorage.getItem('onyx:accent-color');
     // Migrate old violet default → sky blue
     if (!stored || stored === '#7c5af5') {
-      localStorage.setItem('ocean-accent-color', '#0ea5e9');
+      localStorage.setItem('onyx:accent-color', '#0ea5e9');
       return '#0ea5e9';
     }
     return stored;
@@ -8538,7 +8541,7 @@ export function _applyAccentColor(hex: string): void {
 function _loadReducedMotion(): boolean {
   if (typeof window === 'undefined') return false;
   try {
-    const stored = localStorage.getItem('ocean-reduced-motion');
+    const stored = localStorage.getItem('onyx:reduced-motion');
     if (stored !== null) return stored === '1';
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   } catch { return false; }
@@ -8547,7 +8550,7 @@ function _loadReducedMotion(): boolean {
 function _loadChatBackground(): OnyxState['chatBackground'] {
   if (typeof window === 'undefined') return 'solid';
   try {
-    const stored = localStorage.getItem('ocean-chat-background');
+    const stored = localStorage.getItem('onyx:chat-background');
     if (stored === 'dots' || stored === 'grid' || stored === 'noise' || stored === 'diagonal') return stored;
   } catch {}
   return 'solid';
@@ -8556,7 +8559,7 @@ function _loadChatBackground(): OnyxState['chatBackground'] {
 function _loadRecentEmojis(): string[] {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = localStorage.getItem('ocean-recent-emoji');
+    const raw = localStorage.getItem('onyx:recent-emoji');
     return raw ? (JSON.parse(raw) as string[]) : [];
   } catch { return []; }
 }
@@ -8564,7 +8567,7 @@ function _loadRecentEmojis(): string[] {
 function _loadEmojiUsage(): Record<string, number> {
   if (typeof window === 'undefined') return {};
   try {
-    const raw = localStorage.getItem('ocean-emoji-usage');
+    const raw = localStorage.getItem('onyx:emoji-usage');
     return raw ? (JSON.parse(raw) as Record<string, number>) : {};
   } catch { return {}; }
 }
@@ -8572,27 +8575,27 @@ function _loadEmojiUsage(): Record<string, number> {
 function _loadMutedDMs(): Set<string> {
   if (typeof window === 'undefined') return new Set();
   try {
-    const raw = localStorage.getItem('ocean-muted-dms');
+    const raw = localStorage.getItem('onyx:muted-dms');
     return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
   } catch { return new Set(); }
 }
 
 function _saveMutedDMs(muted: Set<string>): void {
   if (typeof window === 'undefined') return;
-  try { localStorage.setItem('ocean-muted-dms', JSON.stringify([...muted])); } catch {}
+  try { localStorage.setItem('onyx:muted-dms', JSON.stringify([...muted])); } catch {}
 }
 
 function _loadFavoriteEmojis(): string[] {
   if (typeof window === 'undefined') return ['👍','❤️','😂','😮','😢','🙏'];
   try {
-    const raw = localStorage.getItem('ocean-fav-emojis');
+    const raw = localStorage.getItem('onyx:fav-emojis');
     return raw ? JSON.parse(raw) as string[] : ['👍','❤️','😂','😮','😢','🙏'];
   } catch { return ['👍','❤️','😂','😮','😢','🙏']; }
 }
 
 function _saveFavoriteEmojis(emojis: string[]): void {
   if (typeof window === 'undefined') return;
-  try { localStorage.setItem('ocean-fav-emojis', JSON.stringify(emojis)); } catch {}
+  try { localStorage.setItem('onyx:fav-emojis', JSON.stringify(emojis)); } catch {}
 }
 
 // ── Topic history persistence ─────────────────────────────────────────────────
@@ -8600,14 +8603,14 @@ function _saveFavoriteEmojis(emojis: string[]): void {
 function _loadTopicHistory(): Record<string, string[]> {
   if (typeof window === 'undefined') return {};
   try {
-    const raw = localStorage.getItem('ocean-topic-history');
+    const raw = localStorage.getItem('onyx:topic-history');
     return raw ? (JSON.parse(raw) as Record<string, string[]>) : {};
   } catch { return {}; }
 }
 
 // ── Channel folders persistence ───────────────────────────────────────────────
 
-const FOLDERS_KEY = 'ocean-channel-folders';
+const FOLDERS_KEY = 'onyx:channel-folders';
 
 function _loadChannelFolders(): ChannelFolder[] {
   const DEFAULT: ChannelFolder[] = [{ id: 'default', name: 'TEXT CHANNELS', channels: [], collapsed: false }];
@@ -8624,31 +8627,31 @@ function _saveChannelFolders(folders: ChannelFolder[]): void {
 }
 
 // ── UI font persistence ────────────────────────────────────────────────────────
-function _loadUiFont(): string { return typeof window !== 'undefined' ? (localStorage.getItem('ocean-ui-font') ?? 'system-ui') : 'system-ui'; }
+function _loadUiFont(): string { return typeof window !== 'undefined' ? (localStorage.getItem('onyx:ui-font') ?? 'system-ui') : 'system-ui'; }
 
 // ── Bubble mode persistence ───────────────────────────────────────────────────
-function _loadBubbleMode(): boolean { return typeof window !== 'undefined' && localStorage.getItem('ocean-bubble-mode') === '1'; }
+function _loadBubbleMode(): boolean { return typeof window !== 'undefined' && localStorage.getItem('onyx:bubble-mode') === '1'; }
 
 // ── Custom CSS persistence ────────────────────────────────────────────────────
-function _loadCustomCss(): string { return typeof window !== 'undefined' ? (localStorage.getItem('ocean-custom-css') ?? '') : ''; }
+function _loadCustomCss(): string { return typeof window !== 'undefined' ? (localStorage.getItem('onyx:custom-css') ?? '') : ''; }
 
 // ── Sidebar width persistence ─────────────────────────────────────────────────
-function _loadSidebarWidth(): number { const v = typeof window !== 'undefined' ? parseInt(localStorage.getItem('ocean-sidebar-width') ?? '240') : 240; return isNaN(v) ? 240 : Math.max(180, Math.min(320, v)); }
+function _loadSidebarWidth(): number { const v = typeof window !== 'undefined' ? parseInt(localStorage.getItem('onyx:sidebar-width') ?? '240') : 240; return isNaN(v) ? 240 : Math.max(180, Math.min(320, v)); }
 
 // ── Message max width persistence ─────────────────────────────────────────────
-function _loadMessageMaxWidth(): 680 | 860 | 0 { const v = typeof window !== 'undefined' ? localStorage.getItem('ocean-msg-maxw') : null; if (v === '680') return 680; if (v === '860') return 860; return 0; }
+function _loadMessageMaxWidth(): 680 | 860 | 0 { const v = typeof window !== 'undefined' ? localStorage.getItem('onyx:msg-maxw') : null; if (v === '680') return 680; if (v === '860') return 860; return 0; }
 
 // ── Glass sidebar persistence ──────────────────────────────────────────────────
-function _loadGlassSidebar(): boolean { return typeof window !== 'undefined' && localStorage.getItem('ocean-glass-sidebar') === '1'; }
+function _loadGlassSidebar(): boolean { return typeof window !== 'undefined' && localStorage.getItem('onyx:glass-sidebar') === '1'; }
 
 // ── Nick aliases persistence ──────────────────────────────────────────────────
 function _loadNickAliases(): string[] {
   if (typeof window === 'undefined') return [];
-  try { return JSON.parse(localStorage.getItem('ocean-nick-aliases') ?? '[]') as string[]; } catch { return []; }
+  try { return JSON.parse(localStorage.getItem('onyx:nick-aliases') ?? '[]') as string[]; } catch { return []; }
 }
 function _saveNickAliases(aliases: string[]): void {
   if (typeof window === 'undefined') return;
-  try { localStorage.setItem('ocean-nick-aliases', JSON.stringify(aliases)); } catch {}
+  try { localStorage.setItem('onyx:nick-aliases', JSON.stringify(aliases)); } catch {}
 }
 
 // ── Background persistence (shared with the Appearance route, key 'onyx:bg') ──
@@ -8670,22 +8673,22 @@ function _saveBackground(id: string): void {
 function _loadWatchList(): Array<{ nick: string; online: boolean; lastSeen?: Date }> {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = JSON.parse(localStorage.getItem('ocean-watch-list') ?? '[]') as Array<{ nick: string; online: boolean; lastSeen?: string }>;
+    const raw = JSON.parse(localStorage.getItem('onyx:watch-list') ?? '[]') as Array<{ nick: string; online: boolean; lastSeen?: string }>;
     return raw.map(w => ({ ...w, online: false, lastSeen: w.lastSeen ? new Date(w.lastSeen) : undefined }));
   } catch { return []; }
 }
 function _saveWatchList(list: Array<{ nick: string; online: boolean }>): void {
   if (typeof window === 'undefined') return;
-  try { localStorage.setItem('ocean-watch-list', JSON.stringify(list.map(w => ({ nick: w.nick, online: false })))); } catch {}
+  try { localStorage.setItem('onyx:watch-list', JSON.stringify(list.map(w => ({ nick: w.nick, online: false })))); } catch {}
 }
 
 // ── High contrast mode persistence ───────────────────────────────────────────
-function _loadHighContrast(): boolean { return typeof window !== 'undefined' && localStorage.getItem('ocean-high-contrast') === '1'; }
+function _loadHighContrast(): boolean { return typeof window !== 'undefined' && localStorage.getItem('onyx:high-contrast') === '1'; }
 
 function _loadForumChannels(): Set<string> {
   if (typeof window === 'undefined') return new Set();
   try {
-    const saved = localStorage.getItem('ocean-forum-channels');
+    const saved = localStorage.getItem('onyx:forum-channels');
     return new Set(JSON.parse(saved ?? '[]') as string[]);
   } catch {
     return new Set();
@@ -8696,27 +8699,27 @@ function _loadForumChannels(): Set<string> {
 function _loadSoftIgnoreList(): Set<string> {
   if (typeof window === 'undefined') return new Set();
   try {
-    const raw = localStorage.getItem('ocean-soft-ignore');
+    const raw = localStorage.getItem('onyx:soft-ignore');
     return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
   } catch { return new Set(); }
 }
 function _saveSoftIgnoreList(list: Set<string>): void {
   if (typeof window === 'undefined') return;
-  try { localStorage.setItem('ocean-soft-ignore', JSON.stringify([...list])); } catch {}
+  try { localStorage.setItem('onyx:soft-ignore', JSON.stringify([...list])); } catch {}
 }
 
 // ── Display name override persistence ────────────────────────────────────────
 function _loadDisplayNameOverrides(): Record<string, string> {
   if (typeof window === 'undefined') return {};
-  try { return JSON.parse(localStorage.getItem('ocean-display-names') ?? '{}'); } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem('onyx:display-names') ?? '{}'); } catch { return {}; }
 }
 function _saveDisplayNameOverrides(overrides: Record<string, string>): void {
   if (typeof window === 'undefined') return;
-  try { localStorage.setItem('ocean-display-names', JSON.stringify(overrides)); } catch {}
+  try { localStorage.setItem('onyx:display-names', JSON.stringify(overrides)); } catch {}
 }
 function _loadSelfDisplayName(): string {
   if (typeof window === 'undefined') return '';
-  return localStorage.getItem('ocean-self-display-name') ?? '';
+  return localStorage.getItem('onyx:self-display-name') ?? '';
 }
 
 // ── Generic boolean pref loader ───────────────────────────────────────────────
@@ -8728,34 +8731,34 @@ function _loadBoolPref(key: string): boolean {
 // ── Display theme persistence ─────────────────────────────────────────────────
 function _loadDisplayTheme(): OnyxState['theme'] {
   if (typeof window === 'undefined') return 'lacquer';
-  const stored = localStorage.getItem('ocean-display-theme') ?? localStorage.getItem('ocean-theme');
+  const stored = localStorage.getItem('onyx:display-theme') ?? localStorage.getItem('onyx:theme');
   const valid = (t: string | null): t is OnyxState['theme'] =>
     t === 'lacquer' || t === 'midnight' || t === 'onyx' || t === 'ash' ||
     t === 'amoled' || t === 'light' || t === 'system';
   // v2 migration: 'onyx' was the old default — migrate to 'midnight' unless
   // the user explicitly re-selected it after the migration flag was written.
-  if (stored === 'onyx' && !localStorage.getItem('ocean-theme-v2')) {
-    localStorage.setItem('ocean-display-theme', 'midnight');
-    localStorage.setItem('ocean-theme-v2', '1');
+  if (stored === 'onyx' && !localStorage.getItem('onyx:theme-v2')) {
+    localStorage.setItem('onyx:display-theme', 'midnight');
+    localStorage.setItem('onyx:theme-v2', '1');
   }
   // v3 migration: 'lacquer' is the new flagship default. Mirror the active-theme
   // migration so the two loaders agree even though either may run first and set
-  // the shared 'ocean-theme-v3' flag. Users still on the old auto-default display
+  // the shared 'onyx:theme-v3' flag. Users still on the old auto-default display
   // theme ('midnight', the value v2 wrote) — or with no stored preference — move
-  // to 'lacquer'. An explicit choice is identified by ocean-active-theme being a
+  // to 'lacquer'. An explicit choice is identified by 'onyx:active-theme' being a
   // non-ocean named theme; we never overwrite that. This is idempotent: once the
   // display value is 'lacquer' or any explicit theme, it stays put.
-  const active = localStorage.getItem('ocean-active-theme');
-  const cur = localStorage.getItem('ocean-display-theme') ?? stored;
+  const active = localStorage.getItem('onyx:active-theme');
+  const cur = localStorage.getItem('onyx:display-theme') ?? stored;
   const explicit = active != null && active !== 'ocean' && active !== 'system' && active !== 'lacquer';
   const isAutoDefault = cur == null || cur === 'midnight';
   if (!explicit && isAutoDefault) {
-    localStorage.setItem('ocean-display-theme', 'lacquer');
-    localStorage.setItem('ocean-theme-v3', '1');
+    localStorage.setItem('onyx:display-theme', 'lacquer');
+    localStorage.setItem('onyx:theme-v3', '1');
     return 'lacquer';
   }
-  localStorage.setItem('ocean-theme-v3', '1');
-  const final = localStorage.getItem('ocean-display-theme') ?? stored;
+  localStorage.setItem('onyx:theme-v3', '1');
+  const final = localStorage.getItem('onyx:display-theme') ?? stored;
   if (valid(final)) return final;
   return 'lacquer';
 }
@@ -8763,7 +8766,7 @@ function _loadDisplayTheme(): OnyxState['theme'] {
 // ── Display font size persistence ─────────────────────────────────────────────
 function _loadDisplayFontSize(): number {
   if (typeof window === 'undefined') return 16;
-  const raw = localStorage.getItem('ocean-ui-font-size') ?? localStorage.getItem('ocean-font-size');
+  const raw = localStorage.getItem('onyx:ui-font-size') ?? localStorage.getItem('onyx:font-size');
   if (!raw) return 16;
   const v = parseInt(raw, 10);
   if (v === 12 || v === 14 || v === 16 || v === 18 || v === 20) return v;
@@ -8774,7 +8777,7 @@ function _loadDisplayFontSize(): number {
 function _loadChannelOrder(): string[] {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = localStorage.getItem('ocean-channel-order');
+    const raw = localStorage.getItem('onyx:channel-order');
     return raw ? (JSON.parse(raw) as string[]) : [];
   } catch {
     return [];
@@ -8785,7 +8788,7 @@ function _loadChannelOrder(): string[] {
 function _loadNsfwChannels(): Set<string> {
   if (typeof window === 'undefined') return new Set();
   try {
-    const raw = localStorage.getItem('ocean-nsfw-channels');
+    const raw = localStorage.getItem('onyx:nsfw-channels');
     return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
   } catch {
     return new Set();
@@ -8795,7 +8798,7 @@ function _loadNsfwChannels(): Set<string> {
 function _saveNsfwChannels(channels: Set<string>): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem('ocean-nsfw-channels', JSON.stringify([...channels]));
+    localStorage.setItem('onyx:nsfw-channels', JSON.stringify([...channels]));
   } catch {
     // ignore quota errors
   }

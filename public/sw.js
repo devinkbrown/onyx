@@ -1,4 +1,4 @@
-/* Ocean service worker
+/* Onyx service worker
  * Handles push notifications and a minimal cache-first shell strategy.
  */
 
@@ -6,7 +6,7 @@
 // purges the old cache, and clients pick up the new build instead of serving
 // a stale cache-first bundle. A stale SW silently breaks features baked in at
 // build time (e.g. the media-upload URL).
-const CACHE_NAME = 'ocean-shell-__BUILD_VERSION__';
+const CACHE_NAME = 'onyx-shell-__BUILD_VERSION__';
 
 // App shell assets to precache on install
 const PRECACHE_URLS = [
@@ -84,7 +84,7 @@ self.addEventListener('push', (event) => {
       body: data.body ?? '',
       icon: '/favicon.ico',
       badge: '/favicon.ico',
-      tag: data.tag ?? 'ocean-notification',
+      tag: data.tag ?? 'onyx-notification',
       renotify: !!data.tag,
       data: { url: data.url ?? '/' },
       vibrate: [100, 50, 100],

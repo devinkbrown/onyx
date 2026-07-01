@@ -1,4 +1,7 @@
 /* @refresh reload */
+// MUST stay the first import: migrates legacy 'ocean-*' localStorage keys to
+// 'onyx:*' as an import side effect, before any module-scope storage reads.
+import './lib/migrateStorage';
 import { render } from 'solid-js/web';
 import { Router, Route } from '@solidjs/router';
 import { lazy } from 'solid-js';

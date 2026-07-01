@@ -460,7 +460,7 @@ describe('GHOST reclaim', () => {
 describe('Session resume', () => {
   function seedSavedCredentials(): void {
     window.localStorage.setItem(
-      'ocean-credentials',
+      'onyx:credentials',
       JSON.stringify({
         version: 2,
         activeKey: 'wss://ircx.us:8080|kain',

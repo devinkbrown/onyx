@@ -1,79 +1,81 @@
-# Ocean — IRC Webchat
+# Onyx — IRC webchat (SolidJS)
 
-Modern IRC client backed by the Orochi IRC engine (pure-Zig, clean-room; source at /home/kain/orochi). Dark luxury design.
+Modern web client for the IRCXNet/Orochi network (Orochi is the pure-Zig IRC
+daemon at /home/kain/orochi). Pre-release/internal; branch `onyx-solid`.
+The brand is **Onyx** (formerly Ocean, briefly Ruri — both dead names).
 
 ## Stack
-- **Next.js 16** (App Router, static export)
-- **TypeScript + Tailwind 4**
-- **Zustand** state management
-- **pnpm** (always pnpm, never npm)
+- **SolidJS 1.9** + `@solidjs/router` — SPA, no SSR
+- **Vite 7** (`pnpm build` → static export in `out/`)
+- **Zustand vanilla** store + `useStore` Solid bridge (`src/lib/store/`)
+- **Tailwind 4** + hand-rolled CSS tokens; **TypeScript**
+- **pnpm always, never npm**
 
-## Key libs (do NOT rewrite these from scratch)
-- `lib/irc/` — IRC WebSocket client with SASL PLAIN/SCRAM, CAP, IRCv3, IRCX
-- `lib/suimyaku-media/` — Orochi voice+video engine (default: native KAGURAVOX/KAGURAVIS kagura frames over WS/WebTransport; **WebRTC/RTP is an opt-in transport** for mobile & hardware-codec clients); signaling = MEDIA subcommands + NOTE MEDIA events
-  - TsumugiSession.ts — P-256 ECDH + AES-256-GCM encryption
-  - MediaEngine.ts — voice/video send+recv, adaptive bitrate
-  - TsumugiGroup.ts — group session key derivation
-  - ChunkAssembler.ts — MCHUNK reassembly
-  - PeerRegistry.ts — per-peer audio/video decode
+## Layout
+- Entry: `src/index.tsx` — routes `/` (Landing), `/about`, `/app` (AppShell),
+  `/appearance`. Route list MUST stay in sync with deploy.sh's SPA
+  entrypoint list (`for route in app about appearance`).
+  First import is `src/lib/migrateStorage.ts` (legacy `ocean-*` →
+  `onyx:*` localStorage migration, runs as an import side effect) — keep it first.
+- IRC layer: `src/lib/irc/` — `client.ts` (WS client, SASL PLAIN/SCRAM,
+  CAP/IRCv3, IRCX), `parser.ts`, `types.ts`
+- Store: `src/lib/store/store.ts` — single Zustand vanilla store; most UI
+  prefs persist to localStorage under the `onyx:` prefix
+- Node selection: `src/app/nodes.ts` — probes mesh nodes, attaches to the
+  fastest; `VITE_IRC_WS` pins an endpoint and disables probing
+- Theming: `src/theme/` — `ThemeProvider.tsx`, `themes.ts` (14 built-in
+  themes, `DEFAULT_THEME_ID = 'ocean'` — a THEME name, not the brand),
+  `ThemeStudio.tsx`, `customThemes.ts`
+- Tokens: `src/styles/tokens.css` (+ `global.css`)
+- Primitives: `src/primitives/` — reusable UI building blocks
+- Media engine: `src/lib/suimyaku-media/` — Orochi voice/video
+  (TsumugiSession ECDH/AES-GCM, MediaEngine, TsumugiGroup, ChunkAssembler,
+  PeerRegistry). Default transport: kagura frames over WS; WebRTC is opt-in.
+  Signaling = `MEDIA` subcommands + `NOTE MEDIA` events.
+- Backgrounds: `src/backgrounds/` — animated canvas scenes
+- Uploads: `src/lib/upload/` — multipart POST (field `file`) to
+  `${VITE_MEDIA_URL}/upload`; prod default is same-origin `/upload`
 
-## Voice / Audio
-Two transports, one signaling. The **default** is the **Orochi media protocol** —
-opaque KAGURAVOX/KAGURAVIS kagura frames over WebSocket/WebTransport (the codec is Orochi's,
-not a browser codec), so that leg needs no STUN/TURN. **WebRTC is available as an
-opt-in transport** (RTP/SRTP + ICE) for mobile and standard hardware-codec clients;
-it is bridged to the native plane by header-rewrap only (no transcode). Both use the
-same `MEDIA` subcommands + `NOTE MEDIA` signaling — `MEDIA OFFER … transport=webrtc`
-selects the WebRTC leg.
+## Persistence conventions
+- localStorage keys: `onyx:` prefix. Legacy `ocean-*` keys are migrated
+  (copied, never deleted) by `src/lib/migrateStorage.ts`; `ruri:` shims in
+  ThemeProvider/preferences/etc. stay as read-old-write-new fallbacks.
+- IRCX METADATA keys `ocean.display-name` / `ocean.accent` / `ocean.links`
+  are WIRE FORMAT (server-persisted) — never rename them.
 
-## IRC → Ocean concept mapping
-| IRC | Ocean |
-|-----|-------|
-| IRC network | Server |
+## Env (Vite exposes only `VITE_*`)
+- `VITE_IRC_WS` — pin the Orochi WS endpoint (unset = auto node selection)
+- `VITE_DEFAULT_CHANNEL` — reserved, not currently read
+- `VITE_MEDIA_URL` — upload base (unset = `/upload` in prod builds)
+
+## Tests
+- Unit: Vitest, co-located `*.test.ts(x)` next to sources (`pnpm test`)
+- E2E: Playwright in `tests/e2e/` (`pnpm test:e2e`); connected e2e must hit
+  the live origin (WS is origin-sensitive); `tests/_legacy-ocean-e2e/` is dead
+- `pnpm typecheck` and `pnpm lint` must pass before finishing
+
+## Build & deploy
+```bash
+pnpm dev        # dev server
+pnpm build      # → out/
+./deploy.sh     # build + materialise /app /about /appearance route copies
+                # + stamp sw cache 'onyx-shell-<version>' (nginx serves out/)
+```
+nginx serves `out/` at eshmaki.me — building via deploy.sh IS deploying.
+
+## IRC → Onyx concept mapping
+| IRC | Onyx |
+|-----|------|
 | #channel | Text channel |
 | Private message | DM |
-| +q (owner) | Owner role (gold) |
-| +o (operator) | Op role (violet) |
-| +v (voice) | Voice role (green) |
-| Orochi account (built-in) | Ocean account |
+| +q / +o / +v | Owner / Op / Voice roles |
+| Orochi account (built-in services) | Onyx account |
 | CHATHISTORY | Message history |
-| IRCX PROP | Channel/user properties |
-| IRCX ACCESS | Permission overrides |
+| IRCX PROP / ACCESS / METADATA | Channel & profile properties |
 | MEDIA subcommands + NOTE MEDIA | Voice/video channel |
 
-## Build
-```bash
-pnpm build          # builds to out/
-pnpm dev            # development server
-```
-
-## Deploy
-```bash
-./deploy.sh    # build + auto-stamp SW cache version (nginx serves out/ at eshmaki.me)
-```
-
-Configure `NEXT_PUBLIC_IRC_WS` in `.env.local` to point to your Orochi WebSocket endpoint; `NEXT_PUBLIC_MEDIA_URL` points at the nexus-upload proxy (`/upload` POST, files under `/uploads`).
-
-## Design system
-All design tokens live in `app/globals.css` under `:root`.
-- Surfaces: `--bg-void` through `--bg-overlay` (6 levels)
-- Default theme: `midnight` — sky blue `--accent` (#0ea5e9), bioluminescent cyan `--gold` (#67e8f9)
-- Accent: `--accent` (sky blue #0ea5e9 in default/midnight theme)
-- Gold: `--gold` (#67e8f9, bioluminescent cyan)
-- Component styles are co-located as `<style>` tags inside components
-
-## Auth features integrated
-- **SASL PLAIN** — direct password login
-- **SESSION TOKEN / RESUME** — persistent login: after SASL, request `SESSION TOKEN` (arrives as `NOTE SESSION TOKEN`); reconnect with `SESSION RESUME <token>`
-- **SCRAM-SHA-256** — preferred when advertised (Orochi: sasl=PLAIN,EXTERNAL,SCRAM-SHA-256)
-- **CERTFP** — future: cert-based auth
-- **IDENTIFY** — automatic on connect when password provided
-- **ACCOUNT GHOST** — kill a stale session using Orochi's built-in services (no NickServ)
-- **ACCOUNT** tag — account name auto-populates from server
-
-## Services (Orochi built-in — NO NickServ bot)
-Orochi services are real server commands; results arrive as standard replies (NOTE/FAIL/WARN), not NOTICE text.
-- `REGISTER` / `VERIFY` — account signup (draft/account-registration)
-- `IDENTIFY` / `LOGOUT` / `DROP` / `ACCOUNTINFO` / `ACCOUNTSET` — account lifecycle
-- `GHOST <nick>` — kill a stale session claiming your nick
-- `CERTADD` / `CERTLIST` / `CERTDEL` — certificate fingerprint binding
+## Services (Orochi built-in — NO NickServ pseudo-clients)
+Real server commands with structured replies (NOTE/FAIL/WARN): `REGISTER`,
+`VERIFY`, `IDENTIFY`, `LOGOUT`, `DROP`, `ACCOUNTINFO`, `ACCOUNTSET`,
+`GHOST`, `CERTADD`/`CERTLIST`/`CERTDEL`. Session resume: after SASL the
+server issues `NOTE SESSION TOKEN`/`MTOKEN`; reconnect with `SESSION RESUME`.

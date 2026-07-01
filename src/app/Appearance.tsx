@@ -34,8 +34,8 @@ export default function Appearance() {
         <p class="ap-kicker">customization</p>
         <h1 class="ap-h1">Make it <span class="gold">yours</span></h1>
         <p class="ap-lede">
-          Seven gem palettes, living and solid backgrounds, and a studio to tune every
-          token — all previewing live and (soon) following your account across the mesh.
+          A whole vault of gem palettes, living and solid backgrounds, and a studio to tune
+          every token — all previewing live and (soon) following your account across the mesh.
         </p>
 
         <div class="ap-group">

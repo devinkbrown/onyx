@@ -14,6 +14,13 @@ import type { IRCMessage, ISupport } from './types';
 export type IRCEventHandler = (msg: IRCMessage) => void;
 export type RawHandler = (line: string, direction: 'in' | 'out') => void;
 
+/** One row of a LIST reply (numeric 322). */
+export interface ChannelListRow {
+  channel: string;
+  users: number;
+  topic: string;
+}
+
 export interface IRCClientOptions {
   url: string;           // e.g. wss://eshmaki.me:8080
   nick: string;
@@ -80,6 +87,13 @@ export class IRCClient {
   private _nickRetries = 0;
   /** SASL auth timeout guard */
   private _saslTimer: ReturnType<typeof setTimeout> | null = null;
+  /** In-flight LIST collection (see list()). */
+  private _listPending: {
+    rows: ChannelListRow[];
+    resolve: (rows: ChannelListRow[]) => void;
+    promise: Promise<ChannelListRow[]>;
+    timer: ReturnType<typeof setTimeout>;
+  } | null = null;
 
   /** Caps that were ACKed by the server — readable by the store */
   public negotiatedCaps = new Set<string>();
@@ -166,6 +180,8 @@ export class IRCClient {
     this._nickRetries = 0;
     this.negotiatedCaps = new Set();
     this.capValues = new Map();
+    // Resolve any LIST left hanging by the previous connection.
+    this._finishList();
     if (this._saslTimer) { clearTimeout(this._saslTimer); this._saslTimer = null; }
     // Clear ping timers from any prior connection before opening a new socket.
     // Without this, a stale pongTimeout fires on the brand-new WebSocket.
@@ -279,6 +295,34 @@ export class IRCClient {
 
   whois(nick: string) {
     this.sendRaw('WHOIS', nick);
+  }
+
+  /**
+   * Run a server LIST and collect the reply into rows.
+   *
+   * Sends `LIST`, accumulates 322 RPL_LIST rows until 323 RPL_LISTEND, then
+   * resolves. Orochi merges mesh-wide results server-side, so a single LIST
+   * yields the whole network. A timeout guard resolves with whatever has been
+   * collected if the end numeric never arrives (e.g. disconnect mid-reply).
+   * Concurrent callers share the same in-flight request.
+   */
+  list(timeoutMs = 15_000): Promise<ChannelListRow[]> {
+    if (this._listPending) return this._listPending.promise;
+
+    let resolve!: (rows: ChannelListRow[]) => void;
+    const promise = new Promise<ChannelListRow[]>((r) => { resolve = r; });
+    const timer = setTimeout(() => this._finishList(), timeoutMs);
+    this._listPending = { rows: [], resolve, promise, timer };
+    this.sendRaw('LIST');
+    return promise;
+  }
+
+  private _finishList() {
+    const pending = this._listPending;
+    if (!pending) return;
+    this._listPending = null;
+    clearTimeout(pending.timer);
+    pending.resolve(pending.rows);
   }
 
   /**
@@ -557,6 +601,28 @@ export class IRCClient {
         }
         break;
 
+      // ── LIST collection (see list()) ─────────────────────────────────────
+      case '321': // RPL_LISTSTART — reset any partial rows
+        if (this._listPending) this._listPending.rows = [];
+        break;
+
+      case '322': { // RPL_LIST: :server 322 me #channel <users> :<topic>
+        const pending = this._listPending;
+        if (pending) {
+          const channel = msg.params[1] ?? '';
+          const users = Number.parseInt(msg.params[2] ?? '0', 10);
+          const topic = msg.params[3] ?? '';
+          if (channel) {
+            pending.rows.push({ channel, users: Number.isFinite(users) ? users : 0, topic });
+          }
+        }
+        break;
+      }
+
+      case '323': // RPL_LISTEND — resolve the pending list()
+        this._finishList();
+        break;
+
       case '001':
         this._registered = true;
         // Send IRCX before notifying the store (which will trigger JOIN)
@@ -664,9 +730,11 @@ export class IRCClient {
       if (cap === 'no-implicit-names') return false;
 
       // ── Unimplemented protocol caps ───────────────────────────────────────
-      // draft/multiline: Ocean splits newlines into separate PRIVMSGs; the
-      // BATCH-based multiline protocol is not implemented.
-      if (cap === 'draft/multiline') return false;
+      // draft/multiline: requested — the store sends newline-containing
+      // composer text as a BATCH-based multiline message (see
+      // src/lib/irc/multiline.ts) and reassembles incoming multiline batches
+      // into a single ChatMessage. Falls back to per-line PRIVMSGs when the
+      // cap is not ACKed.
       // draft/search: searchMessages() filters locally loaded messages;
       // the server-side SEARCH command is not used.
       if (cap === 'draft/search') return false;
@@ -854,6 +922,7 @@ export class IRCClient {
   private _clearTimers() {
     if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; }
     if (this._saslTimer) { clearTimeout(this._saslTimer); this._saslTimer = null; }
+    this._finishList(); // never leave a list() caller hanging
     this._clearPingTimers();
   }
 }
