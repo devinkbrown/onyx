@@ -10,7 +10,7 @@ Modern IRC client backed by the Orochi IRC engine (pure-Zig, clean-room; source 
 
 ## Key libs (do NOT rewrite these from scratch)
 - `lib/irc/` — IRC WebSocket client with SASL PLAIN/SCRAM, CAP, IRCv3, IRCX
-- `lib/suimyaku-media/` — Orochi voice+video engine (NOT WebRTC); signaling = MEDIA subcommands + NOTE MEDIA events
+- `lib/suimyaku-media/` — Orochi voice+video engine (default: native OPVOX/OPVIS kagura frames over WS/WebTransport; **WebRTC/RTP is an opt-in transport** for mobile & hardware-codec clients); signaling = MEDIA subcommands + NOTE MEDIA events
   - TsumugiSession.ts — P-256 ECDH + AES-256-GCM encryption
   - MediaEngine.ts — voice/video send+recv, adaptive bitrate
   - TsumugiGroup.ts — group session key derivation
@@ -18,9 +18,13 @@ Modern IRC client backed by the Orochi IRC engine (pure-Zig, clean-room; source 
   - PeerRegistry.ts — per-peer audio/video decode
 
 ## Voice / Audio
-Voice and video use the **Orochi media protocol**, NOT WebRTC.
-Transport: IRC messages (MEDIA subcommands + NOTE MEDIA events over WebSocket).
-No STUN/TURN servers needed.
+Two transports, one signaling. The **default** is the **Orochi media protocol** —
+opaque OPVOX/OPVIS kagura frames over WebSocket/WebTransport (the codec is Orochi's,
+not a browser codec), so that leg needs no STUN/TURN. **WebRTC is available as an
+opt-in transport** (RTP/SRTP + ICE) for mobile and standard hardware-codec clients;
+it is bridged to the native plane by header-rewrap only (no transcode). Both use the
+same `MEDIA` subcommands + `NOTE MEDIA` signaling — `MEDIA OFFER … transport=webrtc`
+selects the WebRTC leg.
 
 ## IRC → Ocean concept mapping
 | IRC | Ocean |
