@@ -796,3 +796,23 @@
     animation: none !important;
   }
 }
+
+/* ── Deep-link hint (website ?join= handoff) ─────────────────────────── */
+.conn-deeplink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  padding: 0.3rem 0.85rem;
+  font-size: 0.8rem;
+  color: var(--washi-dim);
+  background: color-mix(in oklab, var(--gold) 10%, transparent);
+  border: 1px solid color-mix(in oklab, var(--gold) 35%, transparent);
+  border-radius: 999px;
+}
+.conn-deeplink strong {
+  color: var(--gold-bright);
+  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+}

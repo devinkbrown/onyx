@@ -1,0 +1,90 @@
+/* ChannelBrowser sheet */
+.chb { display: flex; flex-direction: column; gap: 14px; min-height: 200px; }
+
+.chb-toolbar { display: flex; gap: 10px; }
+.chb-filter {
+  flex: 1;
+  font: inherit;
+  color: var(--washi);
+  background: var(--stone);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 8px 12px;
+}
+.chb-filter:focus-visible { outline: 2px solid var(--lapis); outline-offset: 1px; }
+.chb-refresh {
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--washi-dim);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 8px 14px;
+  cursor: pointer;
+}
+.chb-refresh:hover:not(:disabled) { color: var(--washi); border-color: var(--stone-line); }
+.chb-refresh:disabled { opacity: 0.6; cursor: default; }
+
+.chb-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  padding: 40px 12px;
+  color: var(--washi-mute);
+  font-size: 0.9rem;
+  text-align: center;
+}
+.chb-mono { font-family: var(--font-mono); color: var(--gold-bright); font-size: 0.9em; }
+
+.chb-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: min(52vh, 480px);
+  overflow-y: auto;
+}
+.chb-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: 'main join' 'topic join';
+  gap: 2px 14px;
+  align-items: center;
+  padding: 10px 6px;
+  border-bottom: 1px solid var(--line);
+}
+.chb-row:last-child { border-bottom: 0; }
+.chb-row-main { grid-area: main; display: flex; align-items: baseline; gap: 10px; }
+.chb-name { font-family: var(--font-mono); font-weight: 600; color: var(--washi); }
+.chb-count {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.72rem;
+  color: var(--lapis-bright);
+}
+.chb-topic {
+  grid-area: topic;
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--washi-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chb-topic.is-empty { color: var(--washi-mute); font-style: italic; }
+.chb-join {
+  grid-area: join;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--gold-bright);
+  background: transparent;
+  border: 1px solid color-mix(in oklab, var(--gold) 35%, transparent);
+  border-radius: 999px;
+  padding: 5px 16px;
+  cursor: pointer;
+  transition: background 160ms var(--ease), color 160ms var(--ease);
+}
+.chb-join:hover { background: color-mix(in oklab, var(--gold) 16%, transparent); color: var(--washi); }

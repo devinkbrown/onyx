@@ -367,7 +367,7 @@ describe('AppShell', () => {
       const { getByRole } = render(() => <AppShell />);
 
       // Assert
-      const main = getByRole('main', { name: 'Welcome screen' });
+      const main = getByRole('main', { name: 'Network home' });
       expect(main).toBeDefined();
     });
 

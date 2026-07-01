@@ -104,6 +104,18 @@ function baseActionCommands(state: CommandState): SpotlightCommand[] {
 
   return [
     {
+      id: 'action-browse-channels',
+      section: 'Actions',
+      title: 'Browse channels',
+      hint: 'Every public channel on the network (LIST)',
+      keywords: ['channels', 'browse', 'list', 'discover', 'directory'],
+      run: () => {
+        const current = getState();
+        current.refreshChannelList();
+        current.openChannelBrowser();
+      },
+    },
+    {
       id: 'action:join-channel',
       section: 'Actions',
       title: 'Join channel...',

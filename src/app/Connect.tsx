@@ -39,6 +39,7 @@ import {
   type JSX,
 } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
+import { parseJoinParam } from '@/lib/deeplink';
 import { AppShell } from '@/shell';
 import { Button } from '@/primitives/index';
 import { FormField } from '@/primitives/index';
@@ -237,6 +238,15 @@ export function Connect(props: ConnectProps): JSX.Element {
 
   // ── Mode ──────────────────────────────────────────────────────────────────
   const [mode, setMode] = createSignal<Mode>('guest');
+
+  // Website → app handoff: /app?join=%23channel. Validated before it goes
+  // anywhere near a JOIN; a bad link is simply ignored.
+  const deepLinkJoin = parseJoinParam(
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('join')
+      : null,
+  );
+  if (deepLinkJoin) getState().setPendingDeepLinkJoin(deepLinkJoin);
 
   // ── Shared form state ──────────────────────────────────────────────────────
   const [nick, setNick] = createSignal('');
@@ -623,6 +633,11 @@ export function Connect(props: ConnectProps): JSX.Element {
                   <Mascot variant="mark" class="conn-brand-mark" />
                 </span>
                 <span class="conn-eyebrow">IRCXNet</span>
+                <Show when={deepLinkJoin}>
+                  <span class="conn-deeplink" data-testid="deeplink-hint">
+                    You’re headed to <strong>{deepLinkJoin}</strong>
+                  </span>
+                </Show>
                 <h1 class="conn-title">Connect</h1>
                 <p class="conn-sub">
                   Choose how you arrive. Onyx finds the nearest node by latency

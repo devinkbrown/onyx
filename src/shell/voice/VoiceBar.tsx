@@ -17,7 +17,7 @@
  * bar is a role="toolbar". Reduced-motion is handled in voice.css.
  */
 
-import { createEffect, createMemo, createSignal, onCleanup, Show } from 'solid-js';
+import { For, createEffect, createMemo, createSignal, onCleanup, Show } from 'solid-js';
 import { getState, useStore } from '@/lib/store';
 import { getMountedSuimyakuMediaEngine } from '@/lib/suimyaku-media/MediaEngine';
 import { Avatar, Popover, Tooltip } from '@/primitives';
@@ -101,11 +101,13 @@ function ConnectionQualityPip() {
               style={{ '--cq-color': meta.color }}
             >
               <span class="voice-cq__bars" aria-hidden="true">
-                {([1, 2, 3, 4] as const).map((i) => (
-                  <span
-                    class={`voice-cq__bar ${i <= meta.bars ? 'voice-cq__bar--on' : 'voice-cq__bar--off'}`}
-                  />
-                ))}
+                <For each={[1, 2, 3, 4] as const}>
+                  {(i) => (
+                    <span
+                      class={`voice-cq__bar ${i <= meta.bars ? 'voice-cq__bar--on' : 'voice-cq__bar--off'}`}
+                    />
+                  )}
+                </For>
               </span>
               <Show when={s.suggestedBps > 0}>
                 <span class="voice-cq__rate" aria-hidden="true">
@@ -338,7 +340,7 @@ export function VoiceBar() {
               }
             >
               <div class="voice-bar__reactions" role="menu" aria-label="Send a reaction">
-                {QUICK_REACTIONS.map((emoji) => (
+                <For each={QUICK_REACTIONS}>{(emoji) => (
                   <button
                     type="button"
                     class="voice-bar__reaction"
@@ -349,7 +351,7 @@ export function VoiceBar() {
                   >
                     <span aria-hidden="true">{emoji}</span>
                   </button>
-                ))}
+                )}</For>
               </div>
             </Popover>
 

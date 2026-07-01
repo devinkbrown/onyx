@@ -20,7 +20,7 @@
  *   - Nick label + animated speaking bars
  */
 
-import { createEffect, createMemo, onCleanup, Show, splitProps, type JSX } from 'solid-js';
+import { For, createEffect, createMemo, onCleanup, Show, splitProps, type JSX } from 'solid-js';
 import { Avatar } from '@/primitives';
 import { CameraOffIcon, MicOffIcon, DeafenIcon } from './icons';
 import type { NetworkQualityTier, SuimyakuPeerState } from '@/lib/suimyaku-media/types';
@@ -219,9 +219,9 @@ export function ParticipantTile(props: ParticipantTileProps): JSX.Element {
             data-testid="tile-quality"
             title={`${QUALITY_META[local.quality!].label} connection`}
           >
-            {([1, 2, 3] as const).map((i) => (
-              <span class={i <= QUALITY_META[local.quality!].bars ? 'on' : 'off'} />
-            ))}
+            <For each={[1, 2, 3] as const}>
+              {(i) => <span class={i <= QUALITY_META[local.quality!].bars ? 'on' : 'off'} />}
+            </For>
           </span>
         </Show>
 

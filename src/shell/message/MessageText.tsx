@@ -95,7 +95,6 @@ function MediaUnfurl(props: MediaUnfurlProps): JSX.Element {
             </a>
           </Match>
           <Match when={local.kind === 'video'}>
-            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
             <video
               src={local.href}
               controls
@@ -105,7 +104,6 @@ function MediaUnfurl(props: MediaUnfurlProps): JSX.Element {
             />
           </Match>
           <Match when={local.kind === 'audio'}>
-            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
             <audio
               src={local.href}
               controls

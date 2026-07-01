@@ -4,6 +4,7 @@ import { createStore } from 'zustand/vanilla';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { IRCClient } from '@/lib/irc/client';
 import type { IRCMessage, Channel, ChannelUser, ChatMessage, ConnectionStatus, MessageReaction } from '@/lib/irc/types';
+import { parseMultilineLimits, planMultilineBatches, buildMultilineLines, assembleMultilineText } from '@/lib/irc/multiline';
 import { loadCredentials } from '@/lib/credentials';
 import { parseAccountInfo, parseCHANLIMIT, parseMonitorNumeric, parsePREFIX, parseSessionMeshTokenNote, parseSessionTokenNote, parseStandardReply } from '@/lib/irc/parser';
 import type { SuimyakuPeerState, SuimyakuRoomStats, CallState } from '@/lib/suimyaku-media/types';
@@ -375,6 +376,8 @@ export interface OnyxState {
 
   // ── Navigation ──────────────────────────────────────────────────────
   activeView: ActiveView;
+  /** Channel from a website ?join= deep link, joined once connected */
+  pendingDeepLinkJoin: string | null;
   /** Whether the member list panel is open */
   showMemberList: boolean;
   /** Whether the settings modal is open */
@@ -714,6 +717,9 @@ export interface OnyxState {
 
   /** Join a channel */
   joinChannel(channel: string, key?: string): void;
+
+  /** Stash a validated ?join= deep-link channel until the connection lands */
+  setPendingDeepLinkJoin(channel: string | null): void;
 
   /** Leave a channel */
   partChannel(channel: string): void;
@@ -1675,7 +1681,16 @@ const _typingLastSent = new Map<string, number>();
 
 // ── CHATHISTORY batch collectors (module-level) ───────────────────────────────
 /** ref → { target, messages[] } — accumulates PRIVMSG during a BATCH */
-const _batchCollectors = new Map<string, { target: string; messages: ChatMessage[] }>();
+const _batchCollectors = new Map<string, {
+  target: string;
+  messages: ChatMessage[];
+  /** 'multiline' collectors reassemble one logical message; default is chathistory. */
+  kind?: 'multiline';
+  /** Raw line parts for multiline assembly (concat = join without newline). */
+  parts?: { text: string; concat: boolean }[];
+  /** First inner line's provenance, reused for the assembled synthetic PRIVMSG. */
+  src?: { tags: Record<string, string>; prefix: string | null; nick: string | null; host: string | null };
+}>();
 /**
  * Lowercased target → batch ref for every currently-open `chathistory` BATCH.
  * Orochi's CHATHISTORY replay does NOT stamp `@batch=<ref>` on the inner
@@ -2015,6 +2030,7 @@ export const store = createStore<OnyxState>()(
     latencyMs: null,
     serverStats: null,
     activeView: { kind: 'home' },
+    pendingDeepLinkJoin: null,
     showMemberList: true,
     showSettings: false,
     settingsTab: 'account',
@@ -2395,6 +2411,10 @@ export const store = createStore<OnyxState>()(
       get().client?.join(channel, key);
     },
 
+    setPendingDeepLinkJoin(channel) {
+      set({ pendingDeepLinkJoin: channel });
+    },
+
     // ── partChannel ──────────────────────────────────────────────────────
     partChannel(channel) {
       get().client?.sendRaw('PART', channel, 'Goodbye');
@@ -2490,14 +2510,28 @@ export const store = createStore<OnyxState>()(
       const { replyingTo } = get();
       const waitForServerEcho = client.negotiatedCaps.has('echo-message');
 
-      // Send multiline as separate messages, with +draft/reply tag on first line when replying
-      const lines = text.split('\n').filter(l => l.trim());
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i]!;
-        if (replyingTo && i === 0) {
-          client.send(`@+draft/reply=${replyingTo.id} PRIVMSG ${target} :${line}\r\n`);
-        } else {
-          client.sendRaw('PRIVMSG', target, line);
+      // Multiline: prefer a draft/multiline batch when the server ACKed the
+      // cap, so the network delivers ONE logical message. Falls back to the
+      // historical one-PRIVMSG-per-line behaviour otherwise.
+      const multilinePlan = client.negotiatedCaps.has('draft/multiline')
+        ? planMultilineBatches(text, parseMultilineLimits(client.capValues.get('draft/multiline')))
+        : null;
+      if (multilinePlan) {
+        const firstTags: Record<string, string> = replyingTo
+          ? { '+draft/reply': replyingTo.id }
+          : {};
+        for (const rawLine of buildMultilineLines(target, multilinePlan, undefined, firstTags).lines) {
+          client.send(rawLine);
+        }
+      } else {
+        const lines = text.split('\n').filter(l => l.trim());
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i]!;
+          if (replyingTo && i === 0) {
+            client.send(`@+draft/reply=${replyingTo.id} PRIVMSG ${target} :${line}\r\n`);
+          } else {
+            client.sendRaw('PRIVMSG', target, line);
+          }
         }
       }
 
@@ -4083,6 +4117,18 @@ export const store = createStore<OnyxState>()(
                 }, 1000);
               }
             }
+            // Website ?join= deep link: joined last (and slightly after the
+            // autojoin/session-sync bursts) so its self-JOIN echo wins the
+            // active view. Fires in every mode, including session resume.
+            {
+              const pendingJoin = get().pendingDeepLinkJoin;
+              if (pendingJoin) {
+                setTimeout(() => {
+                  get().client?.sendRaw('JOIN', pendingJoin);
+                  set({ pendingDeepLinkJoin: null });
+                }, 1600);
+              }
+            }
           }
           // Reset nick alias counter — we successfully registered
           _nickAliasTryIdx = 0;
@@ -4817,7 +4863,17 @@ export const store = createStore<OnyxState>()(
           //     open-batch-by-target map populated on `BATCH +ref chathistory`.
           const batchTag = tags['batch'];
           if (batchTag && _batchCollectors.has(batchTag)) {
-            _batchCollectors.get(batchTag)!.messages.push(chatMsg);
+            const collector = _batchCollectors.get(batchTag)!;
+            if (collector.kind === 'multiline') {
+              const concat =
+                'draft/multiline-concat' in tags || '+draft/multiline-concat' in tags;
+              collector.parts!.push({ text: params[params.length - 1] ?? '', concat });
+              if (!collector.src) {
+                collector.src = { tags: { ...tags }, prefix: msg.prefix, nick, host: msg.host };
+              }
+            } else {
+              collector.messages.push(chatMsg);
+            }
             break;
           }
           const openBatchRef = _openChathistoryByTarget.get(msgKey);
@@ -5597,11 +5653,42 @@ export const store = createStore<OnyxState>()(
             ) {
               _batchCollectors.set(batchRef, { target: batchTarget, messages: [] });
               _openChathistoryByTarget.set(batchTarget.toLowerCase(), batchRef);
+            } else if (batchTarget && batchType === 'draft/multiline') {
+              // draft/multiline: the inner PRIVMSGs reassemble into ONE message
+              // when the batch closes (echo of our own sends included).
+              _batchCollectors.set(batchRef, {
+                target: batchTarget,
+                messages: [],
+                kind: 'multiline',
+                parts: [],
+              });
             }
           } else if (batchParam.startsWith('-')) {
             // BATCH -ref — end of batch
             const batchRef = batchParam.slice(1);
             const collector = _batchCollectors.get(batchRef);
+            if (collector && collector.kind === 'multiline') {
+              _batchCollectors.delete(batchRef);
+              const parts = collector.parts ?? [];
+              if (parts.length > 0 && collector.src) {
+                // Re-dispatch the assembled body as one synthetic PRIVMSG so it
+                // flows through the full delivery path (highlights, unread,
+                // notifications, DM routing) exactly like a plain message.
+                const tags = { ...collector.src.tags };
+                delete tags['batch'];
+                delete tags['draft/multiline-concat'];
+                get()._handleMessage({
+                  tags,
+                  prefix: collector.src.prefix,
+                  nick: collector.src.nick,
+                  host: collector.src.host,
+                  command: 'PRIVMSG',
+                  params: [collector.target, assembleMultilineText(parts)],
+                  raw: '',
+                });
+              }
+              break;
+            }
             if (collector) {
               _batchCollectors.delete(batchRef);
               const { target: batchTarget, messages: batchMsgs } = collector;
