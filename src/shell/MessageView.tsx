@@ -25,6 +25,7 @@ import {
   type JSX,
 } from 'solid-js';
 import { useStore, getState, STATUS_TARGET } from '@/lib/store';
+import { LOCKED_PLACEHOLDER } from '@/lib/e2ee/dmCipher';
 import type { ChatMessage, MessageReaction } from '@/lib/irc/types';
 import { Avatar } from '@/primitives/index';
 import { Sheet } from '@/primitives/index';
@@ -167,16 +168,25 @@ type MsgBodyProps = {
 function MsgBody(props: MsgBodyProps): JSX.Element {
   const [local] = splitProps(props, ['msg', 'selfNick', 'onChannelClick']);
 
+  // An E2EE DM with no decrypted plaintext yet (no key, or sent to a different
+  // device) shows a locked placeholder; `text` is always the ciphertext.
+  const locked = createMemo(() => local.msg.encrypted && local.msg.plaintext === undefined);
+  const bodyText = createMemo(() =>
+    local.msg.encrypted ? (local.msg.plaintext ?? '') : local.msg.text,
+  );
+
   const cls = createMemo(() => {
     if (local.msg.deleted || local.msg.redacted) return 'shell-msg-text shell-msg-text--deleted';
+    if (locked()) return 'shell-msg-text shell-msg-text--locked';
     if (local.msg.type === 'action') return 'shell-msg-text shell-msg-text--action';
     return 'shell-msg-text';
   });
 
   const displayText = createMemo(() => {
     if (local.msg.deleted || local.msg.redacted) return '[message deleted]';
-    if (local.msg.type === 'action') return `* ${local.msg.from} ${local.msg.text}`;
-    return local.msg.text;
+    if (locked()) return LOCKED_PLACEHOLDER;
+    if (local.msg.type === 'action') return `* ${local.msg.from} ${bodyText()}`;
+    return bodyText();
   });
 
   return (

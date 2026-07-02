@@ -68,8 +68,11 @@ function openVault(): Promise<IDBDatabase | null> {
 }
 
 export function serializeMessage(target: string, msg: ChatMessage): StoredMessage {
+  // `plaintext` is the decrypted body of an E2EE DM — view-only, never at
+  // rest. Drop it so the vault stores only the ciphertext envelope (`text`).
+  const { plaintext: _plaintext, ...rest } = msg;
   return {
-    ...msg,
+    ...rest,
     time: msg.time instanceof Date ? msg.time.getTime() : Number(msg.time) || 0,
     target_key: target.toLowerCase(),
   };

@@ -65,6 +65,13 @@ export interface ChatMessage {
   redacted?: boolean;
   /** true while the message sits in the offline outbox (not yet sent) */
   pending?: boolean;
+  /** true for an end-to-end-encrypted DM: `text` ALWAYS holds the Tsumugi
+   *  ciphertext envelope (so the wire, CHATHISTORY and the vault only ever
+   *  carry ciphertext). The decrypted view text lives in `plaintext`. */
+  encrypted?: boolean;
+  /** Decrypted body of an `encrypted` DM — transient, view-only, NEVER
+   *  persisted (the vault strips it). Absent = not yet / can't decrypt. */
+  plaintext?: string;
 }
 
 /**

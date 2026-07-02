@@ -11,6 +11,8 @@ import type { SuimyakuPeerState, SuimyakuRoomStats, CallState } from '@/lib/suim
 import { getMountedSuimyakuMediaEngine } from '@/lib/suimyaku-media/MediaEngine';
 import { parseActivity } from '@/lib/activity';
 import { OUTBOX_MAX_AGE_MS, deleteOutboxEntry, loadOutbox, queueOutbox, type OutboxEntry } from '@/lib/vault/historyVault';
+import { deviceKeys, isEnvelope, openDm, sealDm } from '@/lib/e2ee/dmCipher';
+import { preferences } from '@/lib/prefs/preferences';
 import {
   composerDraftKey,
   getComposerDraft as readComposerDraft,
@@ -1565,6 +1567,12 @@ export interface OnyxState {
   // ── Orochi integration (serial integration pass) ─────────────────────────
   /** nick.toLowerCase() → raw METADATA key/value pairs (761 RPL_KEYVALUE) */
   userMetadata: Map<string, Record<string, string>>;
+  /** nick.toLowerCase() → peer E2EE device public key (METADATA ocean.dm-key) */
+  peerDmKeys: Map<string, string>;
+  /** Publish our device key + kick a NAMES-free key fetch for a DM peer */
+  publishDeviceKey(): void;
+  /** Decrypt an in-store encrypted DM in place (async; no-op if not ours) */
+  _decryptDm(target: string, id: string): void;
   /** channel.toLowerCase() → rolling caption transcript for the live media session */
   mediaTranscripts: Map<string, Array<{ nick: string; text: string; time: Date }>>;
   /** sender.toLowerCase() → offline (TEGAMI) delivery aggregate */
@@ -2700,6 +2708,13 @@ export const store = createStore<OnyxState>()(
         }
         return {};
       });
+      // E2EE: vaulted DMs are ciphertext at rest — decrypt the hydrated
+      // envelopes once the buffer exists (peer key may already be known; if
+      // not, the METADATA fetch on DM-open re-runs decryption).
+      const dmNow = get().dms.get(key);
+      if (dmNow) for (const m of dmNow.messages) {
+        if (m.encrypted && m.plaintext === undefined) get()._decryptDm(key, m.id);
+      }
     },
 
     // ── partChannel ──────────────────────────────────────────────────────
@@ -2836,6 +2851,11 @@ export const store = createStore<OnyxState>()(
         get().clearTegami(view.nick);
         // Track presence via MONITOR
         get().monitorAdd(view.nick);
+        // Fetch the peer's E2EE device key (METADATA ocean.dm-key) so DMs to
+        // them can be sealed. Cheap; the reply lands in peerDmKeys.
+        if (preferences().e2eeDms && !get().peerDmKeys.has(view.nick.toLowerCase())) {
+          get().client?.sendRaw('METADATA', view.nick, 'GET', 'ocean.dm-key');
+        }
       }
     },
 
@@ -2876,6 +2896,47 @@ export const store = createStore<OnyxState>()(
 
       const { replyingTo } = get();
       const waitForServerEcho = client.negotiatedCaps.has('echo-message');
+
+      // ── E2EE DM path ──────────────────────────────────────────────────────
+      // A DM to a peer who published a device key (and with E2EE on) is sealed
+      // into a single Tsumugi envelope PRIVMSG. The wire, CHATHISTORY, search
+      // index and outbox only ever see ciphertext. Local echo (echo-message
+      // off) shows plaintext immediately, flagged encrypted for the lock chip.
+      {
+        const cp = client.isupport.CHANTYPES ?? '#&';
+        const isDm = target.length > 0 && !cp.includes(target[0]!);
+        const peerKey = get().peerDmKeys.get(target.toLowerCase());
+        if (isDm && peerKey && preferences().e2eeDms) {
+          const replyTag = replyingTo ? `@+draft/reply=${replyingTo.id} ` : '';
+          const replySnapshot = replyingTo ? { id: replyingTo.id, from: replyingTo.from, text: replyingTo.text } : null;
+          void sealDm(peerKey, text).then((envelope) => {
+            if (!envelope) {
+              // Sealing genuinely failed — send plaintext rather than drop the
+              // message, and echo it unencrypted (no lock chip, honestly).
+              client.send(`${replyTag}PRIVMSG ${target} :${text}\r\n`);
+              if (!waitForServerEcho) {
+                set(s => _addMessage(s, target, {
+                  id: uid(), time: new Date(), from: ourNick, text, type: 'msg', target,
+                  ...(replySnapshot ? { replyTo: replySnapshot } : {}),
+                }));
+              }
+              return;
+            }
+            client.send(`${replyTag}PRIVMSG ${target} :${envelope}\r\n`);
+            if (!waitForServerEcho) {
+              // Echo stores the ENVELOPE as text (ciphertext at rest) with the
+              // plaintext held transiently for display — same shape as inbound.
+              set(s => _addMessage(s, target, {
+                id: uid(), time: new Date(), from: ourNick, text: envelope, plaintext: text,
+                type: 'msg', target, encrypted: true,
+                ...(replySnapshot ? { replyTo: replySnapshot } : {}),
+              }));
+            }
+          });
+          if (replyingTo) set({ replyingTo: null });
+          return;
+        }
+      }
 
       // Multiline: prefer a draft/multiline batch when the server ACKed the
       // cap, so the network delivers ONE logical message. Falls back to the
@@ -4443,6 +4504,9 @@ export const store = createStore<OnyxState>()(
           // channels we are in; a re-subscribe after reconnect is a harmless
           // ERR_EVENTDUP we ignore.
           get().client?.sendRaw('EVENT', 'ADD', 'MEDIA', '*');
+          // Publish this device's E2EE public key (METADATA ocean.dm-key) so
+          // peers can encrypt DMs to us. Idempotent across reconnects.
+          get().publishDeviceKey();
           // Show onboarding if this server hasn't been visited before
           const hostname = get().server?.url ?? 'unknown';
           const onboardKey = `onyx:onboarded-${hostname}`;
@@ -5306,6 +5370,10 @@ export const store = createStore<OnyxState>()(
 
           // Use server-provided msgid when available (e.g. from CHATHISTORY batch)
           const serverMsgId = tags['msgid'] ?? tags['draft/msgid'];
+          // E2EE: a DM carrying a Tsumugi envelope stays ciphertext in the
+          // store (and thus in CHATHISTORY/vault) until decrypted in place.
+          // The view shows a locked placeholder while `text` is an envelope.
+          const isEncryptedDm = !isChannel && isEnvelope(displayText);
           const chatMsg: ChatMessage = {
             id: serverMsgId ?? uid(),
             time,
@@ -5314,6 +5382,7 @@ export const store = createStore<OnyxState>()(
             type: msgType as ChatMessage['type'],
             highlight,
             target: msgTarget,
+            ...(isEncryptedDm ? { encrypted: true } : {}),
             ...(replyTo ? { replyTo } : {}),
           };
 
@@ -5377,7 +5446,16 @@ export const store = createStore<OnyxState>()(
             // those to announcements instead. Self-echo files under msgTarget so
             // it lands in the conversation, not a DM with yourself.
             set(s => _addDMMessage(s, msgTarget, chatMsg, isSelf));
-            if (!isSelf && highlight && !get().isDMMuted(sender)) {
+            if (isEncryptedDm) {
+              // Decrypt in place; the DM notification fires post-decrypt (we
+              // have no plaintext to show yet). Fires async after the store add.
+              // If we lack the peer's key, fetch it — the METADATA reply's
+              // handler re-runs decryption for this message.
+              if (!get().peerDmKeys.has(msgTarget.toLowerCase())) {
+                get().client?.sendRaw('METADATA', sender, 'GET', 'ocean.dm-key');
+              }
+              get()._decryptDm(msgTarget, chatMsg.id);
+            } else if (!isSelf && highlight && !get().isDMMuted(sender)) {
               get().addNotification({ type: 'dm', text: displayText, from: sender });
             }
           } else {
@@ -6252,6 +6330,15 @@ export const store = createStore<OnyxState>()(
               {
                 const storedMarker = get().readMarkers.get(batchKey);
                 if (storedMarker) set(s => _applyReadMarker(s, batchKey, storedMarker));
+              }
+
+              // E2EE: CHATHISTORY-replayed encrypted DMs arrive as ciphertext
+              // envelopes — decrypt them in place now they are merged.
+              {
+                const dmAfter = get().dms.get(batchKey);
+                if (dmAfter) for (const m of dmAfter.messages) {
+                  if (m.encrypted && m.plaintext === undefined) get()._decryptDm(batchKey, m.id);
+                }
               }
 
               // Time-travel landing: this batch answered a travelTo() AROUND
@@ -7974,6 +8061,7 @@ export const store = createStore<OnyxState>()(
 
     // ── Orochi integration (serial integration pass) ──────────────────────────
     userMetadata: new Map(),
+    peerDmKeys: new Map(),
     mediaTranscripts: new Map(),
     tegami: new Map(),
     readMarkers: new Map(),
@@ -8018,6 +8106,22 @@ export const store = createStore<OnyxState>()(
         userMetadata.set(nickKey, entry);
         return { userMetadata };
       });
+      // E2EE device key (METADATA ocean.dm-key): remember the peer's published
+      // key so their DMs decrypt and ours to them encrypt. Any change re-derives.
+      if (key.toLowerCase() === 'ocean.dm-key') {
+        set(s => {
+          const peerDmKeys = new Map(s.peerDmKeys);
+          if (value) peerDmKeys.set(nickKey, value);
+          else peerDmKeys.delete(nickKey);
+          return { peerDmKeys };
+        });
+        // Decrypt any already-stored encrypted DMs from this peer now that the
+        // key is known (covers key arriving after the message, e.g. WHOIS-late).
+        const dm = get().dms.get(nickKey);
+        if (dm) for (const m of dm.messages) {
+          if (m.encrypted && m.plaintext === undefined) get()._decryptDm(nickKey, m.id);
+        }
+      }
       // Map namespaced ocean.* (and bare metadata-2 standard) keys onto the
       // rich profile so profile components can consume them via selectors.
       const norm = key.toLowerCase().replace(/^ocean\./, '');
@@ -8036,6 +8140,46 @@ export const store = createStore<OnyxState>()(
                     ? { bannerUrl: value || undefined }
                     : null;
       if (profilePatch) get().setUserProfile(resolvedTarget, profilePatch);
+    },
+
+    publishDeviceKey() {
+      // Announce this device's E2EE public key so peers can encrypt to us.
+      // METADATA is account/nick-scoped and server-persisted, so it survives
+      // for the peer to fetch on WHOIS/next contact. Best-effort, pref-gated.
+      if (!preferences().e2eeDms) return;
+      void deviceKeys().then((keys) => {
+        if (!keys) return;
+        get().client?.sendRaw('METADATA', '*', 'SET', 'ocean.dm-key', keys.publicB64);
+      });
+    },
+
+    _decryptDm(target, id) {
+      const key = target.toLowerCase();
+      const peerKey = get().peerDmKeys.get(key);
+      if (!peerKey) return;
+      const dm = get().dms.get(key);
+      const msg = dm?.messages.find(m => m.id === id);
+      if (!msg || !msg.encrypted || msg.plaintext !== undefined || !isEnvelope(msg.text)) return;
+      const envelope = msg.text;
+      void openDm(peerKey, envelope).then((plain) => {
+        if (plain == null) return; // wrong device / rotated key — stays locked
+        set(s => {
+          const dms = new Map(s.dms);
+          const cur = dms.get(key);
+          if (!cur) return {};
+          dms.set(key, {
+            ...cur,
+            messages: cur.messages.map(m => (m.id === id ? { ...m, plaintext: plain } : m)),
+          });
+          return { dms };
+        });
+        // Surface the DM notification now that we have plaintext (it was
+        // suppressed at receive time — the ciphertext told us nothing).
+        const sender = get().dms.get(key)?.messages.find(m => m.id === id)?.from;
+        if (sender && sender.toLowerCase() !== get().ourNick.toLowerCase() && !get().isDMMuted(sender)) {
+          get().addNotification({ type: 'dm', text: plain, from: sender });
+        }
+      });
     },
 
     clearTegami(target) {

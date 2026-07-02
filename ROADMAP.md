@@ -69,12 +69,18 @@ down to TLS.
    click-dead results strips (pointer-events). Verified live via
    `tools/vault-search-live.mjs`.
 
-## Phase 2 — Reach (the tab is closed and it still works)
+## Phase 2 — Reach (the tab is closed and it still works) ✅ COMPLETE 2026-07-02
 4. **Web Push** *(server + client)* — IRCv3 `draft/webpush`-shaped: VAPID
    (ES256), per-account push subscriptions in the account store, RFC 8291
    aes128gcm payloads, sent for mentions/DMs when no session is attached. The
    SW already handles `push` events — the server half is the work. Zig has the
    P-256/HKDF/AES-GCM pieces in-tree.
+   ✅ **SHIPPED 2026-07-02** — crypto/webpush.zig (RFC 8291 KAT-pinned +
+   ES256 VAPID) + daemon worker (in-house HTTPS transport), WEBPUSH
+   SUBSCRIBE/UNSUBSCRIBE/LIST, tegami trigger, ISUPPORT `VAPID=` discovery
+   (no NOTE data channel — lifecycle on the Event Spine), client toggle +
+   SW payload mapping. Live on both nodes (node-local subscriptions;
+   cross-mesh propagation is future work).
 5. **Offline outbox** — messages composed offline queue in the vault and send
    on reconnect (labeled-response for acks).
    ✅ **SHIPPED 2026-07-02** — vault `outbox` store (DB v2, 24h expiry),

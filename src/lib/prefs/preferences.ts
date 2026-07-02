@@ -43,6 +43,8 @@ export interface Preferences {
   clock: Clock;
   /** Local-first scrollback: persist conversations to this device (vault). */
   localHistory: boolean;
+  /** Encrypt DMs end-to-end (Tsumugi) when the other party has a device key. */
+  e2eeDms: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Readonly<Preferences> = {
@@ -54,6 +56,7 @@ export const DEFAULT_PREFERENCES: Readonly<Preferences> = {
   linkPreviews: true,
   clock: '24h',
   localHistory: true,
+  e2eeDms: true,
 };
 
 // ── persistence ─────────────────────────────────────────────────────────────
@@ -95,6 +98,7 @@ export function loadPreferences(): Preferences {
     linkPreviews: typeof raw.linkPreviews === 'boolean' ? raw.linkPreviews : DEFAULT_PREFERENCES.linkPreviews,
     clock: isOneOf(raw.clock, CLOCKS) ? raw.clock : DEFAULT_PREFERENCES.clock,
     localHistory: typeof raw.localHistory === 'boolean' ? raw.localHistory : DEFAULT_PREFERENCES.localHistory,
+    e2eeDms: typeof raw.e2eeDms === 'boolean' ? raw.e2eeDms : DEFAULT_PREFERENCES.e2eeDms,
   };
 }
 

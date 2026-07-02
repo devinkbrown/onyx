@@ -48,6 +48,7 @@ describe('preferences store', () => {
         linkPreviews: true,
         clock: '24h',
         localHistory: true,
+        e2eeDms: true,
       });
     });
 
@@ -65,6 +66,7 @@ describe('preferences store', () => {
         linkPreviews: true,
         clock: '24h',
         localHistory: true,
+        e2eeDms: true,
       });
     });
 
@@ -110,6 +112,7 @@ describe('preferences store', () => {
         linkPreviews: false,
         clock: '12h',
         localHistory: false,
+        e2eeDms: false,
       });
       const ds = document.documentElement.dataset;
       expect(ds.density).toBe('compact');

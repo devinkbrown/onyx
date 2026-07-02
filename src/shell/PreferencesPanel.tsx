@@ -177,6 +177,14 @@ export function PreferencesPanel(): JSX.Element {
         />
 
         <Toggle
+          legend="Encrypted DMs"
+          title="End-to-end encrypt direct messages"
+          description="When the other person's app supports it, DMs are sealed on your device — the server relays only ciphertext. A lock marks encrypted messages; ones sent to another device stay locked."
+          value={() => preferences().e2eeDms}
+          onToggle={(value) => setPreference('e2eeDms', value)}
+        />
+
+        <Toggle
           legend="Motion"
           title="Reduce motion"
           description="Force-disable animations regardless of your OS setting."
