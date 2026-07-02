@@ -142,7 +142,7 @@
 .conn-stage > .cpulse { grid-column: 3; justify-self: start; }
 @media (max-width: 1180px) {
   .conn-stage { grid-template-columns: minmax(0, 540px); justify-content: center; }
-  .conn-stage > .conn-card { grid-column: 1; }
-  .conn-stage > .cpulse { grid-column: 1; justify-self: stretch; max-width: 500px; padding-top: 0; }
+  .conn-stage > .conn-card { grid-column: 1; justify-self: center; }
+  .conn-stage > .cpulse { grid-column: 1; justify-self: center; width: min(540px, calc(100vw - 40px)); max-width: none; padding-top: 0; }
   .cpulse-rooms { display: none; } /* keep the narrow door light */
 }

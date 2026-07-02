@@ -4393,6 +4393,15 @@ export const store = createStore<OnyxState>()(
             _refreshChannelRoster(get, ch);
           } else {
             // Someone else joined
+            // A mesh relink re-announces JOINs for members who never left —
+            // an idempotent join refreshes the roster silently instead of
+            // spamming "X joined" for the whole remote side of the channel.
+            const alreadyPresent = get().channels.get(key)?.users.has(joiner.toLowerCase()) ?? false;
+            // Traditional IRC shows the mask on join — Orochi hosts are
+            // cloaks/personas, so this is safe to render.
+            const joinMask = msg.prefix && msg.prefix.includes('!')
+              ? msg.prefix.slice(msg.prefix.indexOf('!') + 1)
+              : null;
             set(s => {
               const channels = new Map(s.channels);
               const c = channels.get(key);
@@ -4400,16 +4409,20 @@ export const store = createStore<OnyxState>()(
                 const users = new Map(c.users);
                 users.set(joiner.toLowerCase(), {
                   nick: joiner,
-                  modes: new Set(),
-                  away: false,
+                  modes: new Set(alreadyPresent ? c.users.get(joiner.toLowerCase())?.modes ?? [] : []),
+                  away: alreadyPresent ? (c.users.get(joiner.toLowerCase())?.away ?? false) : false,
                   ...(joinAccount ? { account: joinAccount } : {}),
                 });
-                const msgs = [...(c.messages ?? []), sysMsg(`${joiner} joined`, ch, eventTime(tags))];
+                const msgs = alreadyPresent
+                  ? c.messages
+                  : [...(c.messages ?? []), sysMsg(`${joiner}${joinMask ? ` (${joinMask})` : ''} joined`, ch, eventTime(tags))];
                 channels.set(key, { ...c, users, messages: msgs } as Channel);
               }
               return { channels };
             });
-            get().addChannelEvent(ch, { type: 'join', nick: joiner, text: `${joiner} joined`, time: new Date() });
+            if (!alreadyPresent) {
+              get().addChannelEvent(ch, { type: 'join', nick: joiner, text: `${joiner} joined`, time: new Date() });
+            }
           }
           break;
         }
