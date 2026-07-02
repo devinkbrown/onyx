@@ -4244,41 +4244,15 @@ export const store = createStore<OnyxState>()(
             _pingTimestamps.set(cookie, t);
             get().client?.sendRaw('PING', cookie);
           }
-          // Auto-join configured channels (fall back to #root on eshmaki.me).
-          // SKIP this blind autojoin storm when the server advertised
-          // `orochi/session-sync`: in that mode the server itself pushes JOIN +
-          // NAMES/topic + CHATHISTORY replay for every channel the account's
-          // session is live in, so reconnect reclaims the live session without
-          // the client guessing from localStorage. Falls back to the old
-          // behavior on servers that don't ACK the cap (backward compatible).
+          // NO blind autojoin: joining is a choice, not a default. An account
+          // with orochi/session-sync gets its live channels replayed by the
+          // server; everyone else lands on the Home view (a real directory)
+          // unless they asked for a room — via the ?join= deep link or the
+          // connect form's optional channel field, both of which flow through
+          // pendingDeepLinkJoin below.
           {
-            const sessionSync = get().client?.sessionSyncActive ?? false;
-            // Session-sync reclaims an ACCOUNT's live sessions, so the server
-            // pushes their JOINs and the client shouldn't guess. But a GUEST
-            // (no SASL account) has no live sessions to reclaim — skipping the
-            // autojoin would strand them on the empty home view with no #root.
-            // So guests still autojoin #root even when session-sync is active.
-            const loggedIn = _saslAccount !== null;
-            if (!sessionSync || !loggedIn) {
-              const { autoJoinChannels } = get();
-              const serverUrl = get().server?.url ?? '';
-              // Both eshmaki.me and ircx.us are the same IRCXNet mesh — and the
-              // client now auto-routes to whichever node is nearest, so the
-              // #root fallback must fire for either entrance (not just eshmaki).
-              const isIrcxNet = serverUrl.includes('eshmaki.me') || serverUrl.includes('ircx.us');
-              const channels = autoJoinChannels.length > 0
-                ? autoJoinChannels
-                : (isIrcxNet ? ['#root'] : []);
-              if (channels.length > 0) {
-                setTimeout(() => {
-                  for (const ch of channels) {
-                    get().client?.sendRaw('JOIN', ch);
-                  }
-                }, 1000);
-              }
-            }
-            // Website ?join= deep link: joined last (and slightly after the
-            // autojoin/session-sync bursts) so its self-JOIN echo wins the
+            // Requested room (deep link or connect-form field): joined slightly
+            // after the session-sync burst so its self-JOIN echo wins the
             // active view. Fires in every mode, including session resume.
             {
               const pendingJoin = get().pendingDeepLinkJoin;

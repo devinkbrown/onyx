@@ -612,3 +612,33 @@ describe('Node name is never shown', () => {
     }
   });
 });
+
+describe('optional room to join (no autojoin)', () => {
+  it('renders the optional Channel field in guest mode', () => {
+    render(() => <Connect />);
+    expect(screen.getByLabelText(/channel/i)).toBeInTheDocument();
+  });
+
+  it('a filled room normalizes (# added) and queues the pending join on submit', () => {
+    render(() => <Connect />);
+    fireEvent.input(screen.getByLabelText(/nick/i), { target: { value: 'tester' } });
+    fireEvent.input(screen.getByLabelText(/channel/i), { target: { value: 'lounge' } });
+    fireEvent.click(screen.getByTestId('conn-submit'));
+    expect(store.getState().pendingDeepLinkJoin).toBe('#lounge');
+  });
+
+  it('an empty room leaves no pending join — landing on Home is the default', () => {
+    render(() => <Connect />);
+    fireEvent.input(screen.getByLabelText(/nick/i), { target: { value: 'tester' } });
+    fireEvent.click(screen.getByTestId('conn-submit'));
+    expect(store.getState().pendingDeepLinkJoin).toBeNull();
+  });
+
+  it('a malformed room blocks submit with an error', () => {
+    render(() => <Connect />);
+    fireEvent.input(screen.getByLabelText(/nick/i), { target: { value: 'tester' } });
+    fireEvent.input(screen.getByLabelText(/channel/i), { target: { value: '#bad channel' } });
+    fireEvent.click(screen.getByTestId('conn-submit'));
+    expect(screen.getByText(/no spaces or commas/i)).toBeInTheDocument();
+  });
+});

@@ -249,6 +249,20 @@ export function Connect(props: ConnectProps): JSX.Element {
   );
   if (deepLinkJoin) getState().setPendingDeepLinkJoin(deepLinkJoin);
 
+  // Optional room to join after connect (there is NO automatic join). The
+  // field prefills from the ?join= deep link; on submit it becomes the
+  // pending join. Empty = land on Home and choose from the directory.
+  const [room, setRoom] = createSignal(deepLinkJoin ?? '');
+  const [roomError, setRoomError] = createSignal<string | undefined>(undefined);
+
+  /** '#chan' | 'chan' → validated '#chan'; empty → null; garbage → undefined. */
+  function normalizeRoom(raw: string): string | null | undefined {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    const withHash = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+    return parseJoinParam(withHash) ?? undefined;
+  }
+
   // ── Shared form state ──────────────────────────────────────────────────────
   const [nick, setNick] = createSignal('');
   const [password, setPassword] = createSignal('');
@@ -516,6 +530,16 @@ export function Connect(props: ConnectProps): JSX.Element {
     const err = validateNick(n);
     setNickError(err);
     if (err) return;
+
+    // Optional room: validated, normalized, then queued for the post-connect
+    // join (same path as the website's ?join= deep link).
+    const normalizedRoom = normalizeRoom(room());
+    if (normalizedRoom === undefined) {
+      setRoomError('Channel names are like #lounge — no spaces or commas.');
+      return;
+    }
+    setRoomError(undefined);
+    getState().setPendingDeepLinkJoin(normalizedRoom);
 
     if (m === 'signin') {
       const pErr = password() ? undefined : 'Password is required to sign in.';
@@ -790,6 +814,25 @@ export function Connect(props: ConnectProps): JSX.Element {
                       error={nickError()}
                       aria-required="true"
                     />
+
+                    {/* Optional room — nothing joins automatically */}
+                    <Show when={mode() !== 'register'}>
+                      <FormField
+                        id="conn-room"
+                        label="Channel"
+                        description="Optional — join a room right away, or browse from Home"
+                        type="text"
+                        placeholder="#root"
+                        maxlength={64}
+                        disabled={!isFormReady()}
+                        value={room()}
+                        onInput={(e) => {
+                          setRoom(e.currentTarget.value);
+                          setRoomError(undefined);
+                        }}
+                        error={roomError()}
+                      />
+                    </Show>
 
                     {/* Email — register only, optional */}
                     <Show when={mode() === 'register'}>
