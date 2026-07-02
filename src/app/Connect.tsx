@@ -40,6 +40,7 @@ import {
 } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
 import { parseJoinParam } from '@/lib/deeplink';
+import { ConnectPulse } from './ConnectPulse';
 import { AppShell } from '@/shell';
 import { Button } from '@/primitives/index';
 import { FormField } from '@/primitives/index';
@@ -623,6 +624,7 @@ export function Connect(props: ConnectProps): JSX.Element {
         <div class="conn" data-testid="connect-screen" data-mode={mode()}>
           <Atmosphere />
 
+          <div class="conn-stage">
           <div class="conn-card" role="main">
             <div class="conn-crest" aria-hidden="true" />
 
@@ -633,11 +635,6 @@ export function Connect(props: ConnectProps): JSX.Element {
                   <Mascot variant="mark" class="conn-brand-mark" />
                 </span>
                 <span class="conn-eyebrow">IRCXNet</span>
-                <Show when={deepLinkJoin}>
-                  <span class="conn-deeplink" data-testid="deeplink-hint">
-                    You’re headed to <strong>{deepLinkJoin}</strong>
-                  </span>
-                </Show>
                 <h1 class="conn-title">Connect</h1>
                 <p class="conn-sub">
                   Choose how you arrive. Onyx finds the nearest node by latency
@@ -999,6 +996,9 @@ export function Connect(props: ConnectProps): JSX.Element {
             <footer class="conn-foot">
               <b>IRCXNet</b> · encrypted · auto-routed
             </footer>
+          </div>
+
+          <ConnectPulse deepLink={deepLinkJoin} />
           </div>
         </div>
       }

@@ -253,15 +253,16 @@
   max-width: 44ch;
 }
 
-/* ── Divider seam (azure current dashes) ── */
+/* ── Divider seam — a whisper hairline with an azure head ── */
 .conn-seam {
   height: 1px;
-  background: repeating-linear-gradient(
+  background: linear-gradient(
     90deg,
-    var(--seam) 0 16px,
-    transparent 16px 24px
+    color-mix(in oklab, var(--lapis) 38%, transparent) 0%,
+    var(--line) 30%,
+    transparent 100%
   );
-  opacity: 0.7;
+  opacity: 0.8;
 }
 
 /* ── Auto-routing indicator (no server is ever named) ── */
