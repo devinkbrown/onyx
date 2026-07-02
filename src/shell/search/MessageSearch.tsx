@@ -1,11 +1,9 @@
-import {
-  createEffect,
+import { For, createEffect,
   createMemo,
   onCleanup,
   Show,
   splitProps,
-  type JSX,
-} from 'solid-js';
+  type JSX, } from 'solid-js';
 import {
   closeMessageSearch,
   useMessageSearch,
@@ -85,11 +83,19 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
     if (pulseTimer !== undefined) window.clearTimeout(pulseTimer);
   });
 
+  const timeLabel = (time: Date) =>
+    time.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
   const handleInput: JSX.EventHandlerUnion<HTMLInputElement, InputEvent> = (event) => {
     search.setQuery((event.currentTarget as HTMLInputElement).value);
   };
 
   const handleKeyDown: JSX.EventHandlerUnion<HTMLInputElement, KeyboardEvent> = (event) => {
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      search.runServerSearch();
+      return;
+    }
     if (event.key === 'Escape') {
       event.preventDefault();
       closeMessageSearch();
@@ -216,6 +222,53 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
             </button>
           </div>
         </div>
+        <Show when={search.canServerSearch() && search.query().trim().length > 0}>
+          <div class="onyx-message-search__server" data-testid="server-search">
+            <div class="onyx-message-search__server-bar">
+              <button
+                type="button"
+                class="onyx-message-search__deep"
+                disabled={search.serverStatus() === 'pending'}
+                onClick={() => search.runServerSearch()}
+                title="Search the server's full history for this conversation (Ctrl+Enter)"
+              >
+                {search.serverStatus() === 'pending'
+                  ? 'Searching history…'
+                  : 'Search full history ↵'}
+              </button>
+              <Show when={search.serverStatus() === 'done'}>
+                <span class="onyx-message-search__server-count">
+                  {search.serverResults().length === 0
+                    ? 'no archived matches'
+                    : `${search.serverResults().length} archived match${search.serverResults().length === 1 ? '' : 'es'}`}
+                </span>
+              </Show>
+              <Show when={search.serverStatus() === 'error'}>
+                <span class="onyx-message-search__server-error">{search.serverError()}</span>
+              </Show>
+            </div>
+            <Show when={search.serverStatus() === 'done' && search.serverResults().length > 0}>
+              <ul class="onyx-message-search__server-list" role="list">
+                <For each={search.serverResults()}>
+                  {(result) => (
+                    <li>
+                      <button
+                        type="button"
+                        class="onyx-message-search__server-row"
+                        title="Jump to message (when loaded in the conversation)"
+                        onClick={() => scrollToMessage(result.id)}
+                      >
+                        <span class="onyx-message-search__server-when">{timeLabel(result.time)}</span>
+                        <strong>{result.from}</strong>
+                        <span class="onyx-message-search__server-text">{result.text}</span>
+                      </button>
+                    </li>
+                  )}
+                </For>
+              </ul>
+            </Show>
+          </div>
+        </Show>
         <span class="sr-only" aria-live="polite">{statusLabel()}</span>
       </div>
     </Show>

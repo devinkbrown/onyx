@@ -26,6 +26,9 @@ import {
   splitProps,
   type JSX,
 } from 'solid-js';
+import { createResource } from 'solid-js';
+import { preferences } from '@/lib/prefs/preferences';
+import { pickPreviewUrl, fetchLinkPreview } from '@/lib/preview/linkPreview';
 import { parseMessage } from '@/lib/format/parseMessage';
 import { lookupEmoji } from '@/lib/format/emoji';
 import type {
@@ -453,10 +456,63 @@ export type MessageTextProps = {
  * Usage:
  *   <MessageText text={msg.text} selfNick={selfNick()} />
  */
+function LinkPreviewCard(props: { url: string }): JSX.Element {
+  const [local] = splitProps(props, ['url']);
+  const [preview] = createResource(() => local.url, fetchLinkPreview);
+
+  return (
+    <Show when={preview()}>
+      {(p) => (
+        <a
+          class="shell-msg-preview"
+          href={p().url}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Link preview: ${p().title || p().url}`}
+        >
+          <span class="shell-msg-preview-body">
+            <Show when={p().site}>
+              <span class="shell-msg-preview-site">{p().site}</span>
+            </Show>
+            <Show when={p().title}>
+              <span class="shell-msg-preview-title">{p().title}</span>
+            </Show>
+            <Show when={p().description}>
+              <span class="shell-msg-preview-desc">{p().description}</span>
+            </Show>
+          </span>
+          <Show when={p().image}>
+            <img
+              class="shell-msg-preview-thumb"
+              src={p().image}
+              alt=""
+              loading="lazy"
+              decoding="async"
+            />
+          </Show>
+        </a>
+      )}
+    </Show>
+  );
+}
+
 export function MessageText(props: MessageTextProps): JSX.Element {
   const [local] = splitProps(props, ['text', 'selfNick', 'onChannelClick', 'class']);
 
   const tokens = createMemo(() => parseMessage(local.text));
+
+  /** First plain web link → OG preview card (preference-gated). */
+  const previewUrl = createMemo<string | null>(() => {
+    if (!preferences().linkPreviews) return null;
+    const hrefs: string[] = [];
+    for (const t of tokens()) {
+      if (t.type === 'link') {
+        const href = (t as { href: string }).href;
+        if (detectMediaKind(href) === null) hrefs.push(href);
+      }
+    }
+    return pickPreviewUrl(hrefs);
+  });
 
   /** Collect top-level link tokens that are media URLs for unfurling. */
   const mediaLinks = createMemo<Array<{ href: string; kind: NonNullable<MediaKind> }>>(() => {
@@ -484,6 +540,9 @@ export function MessageText(props: MessageTextProps): JSX.Element {
         <For each={mediaLinks()}>
           {(media) => <MediaUnfurl href={media.href} kind={media.kind} />}
         </For>
+      </Show>
+      <Show when={previewUrl()}>
+        {(url) => <LinkPreviewCard url={url()} />}
       </Show>
     </p>
   );

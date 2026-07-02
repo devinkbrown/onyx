@@ -12,6 +12,12 @@ export type MessageSearchResult = {
 };
 
 export type UseMessageSearch = {
+  /** Server-side (draft/search) history search over the active conversation */
+  canServerSearch: Accessor<boolean>;
+  serverStatus: Accessor<'idle' | 'pending' | 'done' | 'error'>;
+  serverResults: Accessor<MessageSearchResult[]>;
+  serverError: Accessor<string | null>;
+  runServerSearch: () => void;
   isOpen: Accessor<boolean>;
   query: Accessor<string>;
   setQuery: (next: string) => void;
@@ -69,6 +75,7 @@ export function closeMessageSearch(): void {
   setMessageSearchQuerySignal('');
   setMessageSearchActiveIndex(0);
   setMessageSearchActiveResultId(null);
+  getState().clearServerSearch();
 }
 
 export function activeMessageSearchResultId(): string | null {
@@ -79,6 +86,35 @@ export function useMessageSearch(): UseMessageSearch {
   const activeView = useStore((s) => s.activeView);
   const channels = useStore((s) => s.channels);
   const dms = useStore((s) => s.dms);
+  const canSearchHistory = useStore((s) => s.canSearchHistory);
+  const serverSearch = useStore((s) => s.serverSearch);
+
+  const searchTarget = createMemo(() => {
+    const view = activeView();
+    if (view.kind === 'channel') return view.channel;
+    if (view.kind === 'dm') return view.nick;
+    return null;
+  });
+
+  const canServerSearch = createMemo(() => canSearchHistory() && searchTarget() !== null);
+
+  const serverResults = createMemo((): MessageSearchResult[] =>
+    serverSearch().results.map((message, ordinal) => ({
+      id: message.id,
+      from: message.from,
+      text: message.text,
+      time: message.time,
+      target: message.target,
+      ordinal,
+    })),
+  );
+
+  function runServerSearch(): void {
+    const target = searchTarget();
+    const query = messageSearchQuery().trim();
+    if (!target || !query || !canServerSearch()) return;
+    getState().searchServerHistory(target, query);
+  }
 
   const hasConversation = createMemo(() => {
     const view = activeView();
@@ -176,6 +212,11 @@ export function useMessageSearch(): UseMessageSearch {
   }
 
   return {
+    canServerSearch,
+    serverStatus: () => serverSearch().status,
+    serverResults,
+    serverError: () => serverSearch().error,
+    runServerSearch,
     isOpen: isMessageSearchOpen,
     query: messageSearchQuery,
     setQuery,

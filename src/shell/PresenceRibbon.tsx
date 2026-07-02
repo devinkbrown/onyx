@@ -10,6 +10,7 @@
 import { createMemo, createSignal, Show, splitProps, type JSX } from 'solid-js';
 import { useStore, getState, selectAccount } from '@/lib/store';
 import { ChannelSettings } from './ChannelSettings';
+import { NotificationCenter } from './NotificationCenter';
 
 export type PresenceRibbonProps = {
   selfNick?: string;
@@ -194,6 +195,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
             </svg>
           </button>
 
+          <NotificationCenter />
           <button
             type="button"
             class="shell-ribbon-account"

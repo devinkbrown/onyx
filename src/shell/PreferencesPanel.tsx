@@ -147,6 +147,14 @@ export function PreferencesPanel(): JSX.Element {
         />
 
         <Toggle
+          legend="Link previews"
+          title="Preview web links"
+          description="Unfurl the first link in a message into a title-and-image card (fetched via this server, never your browser)."
+          value={() => preferences().linkPreviews}
+          onToggle={(value) => setPreference('linkPreviews', value)}
+        />
+
+        <Toggle
           legend="Motion"
           title="Reduce motion"
           description="Force-disable animations regardless of your OS setting."

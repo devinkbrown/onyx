@@ -1,0 +1,73 @@
+/**
+ * NotificationCenter tests — badge counting, list rendering, jump + mark-read.
+ */
+import { cleanup, fireEvent, render } from '@solidjs/testing-library';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { store } from '@/lib/store/store';
+import type { Notification } from '@/lib/store/store';
+import { NotificationCenter } from './NotificationCenter';
+
+const initialState = store.getInitialState();
+
+const note = (over: Partial<Notification>): Notification => ({
+  id: over.id ?? Math.random().toString(36).slice(2),
+  type: 'mention',
+  text: 'hello there',
+  at: new Date(),
+  ...over,
+});
+
+beforeEach(() => {
+  store.setState({ ...initialState, readNotificationIds: new Set<string>() }, true);
+});
+
+afterEach(() => cleanup());
+
+describe('<NotificationCenter>', () => {
+  it('shows the empty state when there are no notifications', () => {
+    const { getByTestId, getByText } = render(() => <NotificationCenter />);
+    fireEvent.click(getByTestId('ribbon-bell'));
+    expect(getByText(/Nothing yet/)).toBeInTheDocument();
+  });
+
+  it('counts only unread mentions and DMs in the badge', () => {
+    store.setState({
+      notifications: [
+        note({ id: 'a', type: 'mention', from: 'trev', channel: '#root' }),
+        note({ id: 'b', type: 'dm', from: 'mizu' }),
+        note({ id: 'c', type: 'system', text: 'connected' }),
+        note({ id: 'd', type: 'mention', from: 'kagura', channel: '#zig' }),
+      ],
+      readNotificationIds: new Set(['d']),
+    });
+    const { getByTestId } = render(() => <NotificationCenter />);
+    expect(getByTestId('ribbon-bell').textContent).toContain('2');
+  });
+
+  it('clicking a mention marks it read and navigates to the channel', () => {
+    store.setState({
+      notifications: [note({ id: 'm1', type: 'mention', from: 'trev', channel: '#root', text: 'ping kain' })],
+    });
+    const { getByTestId, getByText } = render(() => <NotificationCenter />);
+    fireEvent.click(getByTestId('ribbon-bell'));
+    fireEvent.click(getByText('ping kain'));
+    expect(store.getState().readNotificationIds.has('m1')).toBe(true);
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#root' });
+  });
+
+  it('dismiss removes a notification; mark-all clears the badge', () => {
+    store.setState({
+      notifications: [
+        note({ id: 'x', type: 'dm', from: 'mizu', text: 'psst' }),
+        note({ id: 'y', type: 'mention', from: 'trev', channel: '#root', text: 'oi' }),
+      ],
+    });
+    const { getByTestId, getByText, getAllByLabelText } = render(() => <NotificationCenter />);
+    fireEvent.click(getByTestId('ribbon-bell'));
+    // The list renders newest-first, so the first dismiss removes 'y'.
+    fireEvent.click(getAllByLabelText('Dismiss notification')[0]!);
+    expect(store.getState().notifications.map((n) => n.id)).toEqual(['x']);
+    fireEvent.click(getByText('Mark all read'));
+    expect(store.getState().readNotificationIds.has('x')).toBe(true);
+  });
+});

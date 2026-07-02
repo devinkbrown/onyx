@@ -35,6 +35,9 @@ The brand is **Onyx** (formerly Ocean, briefly Ruri — both dead names).
 - Backgrounds: `src/backgrounds/` — animated canvas scenes
 - Uploads: `src/lib/upload/` — multipart POST (field `file`) to
   `${VITE_MEDIA_URL}/upload`; prod default is same-origin `/upload`
+- Link previews: `src/lib/preview/linkPreview.ts` → same-origin
+  `/linkpreview?url=` (SSRF-guarded OG fetcher in
+  /home/kain/website/upload_server.py); preference-gated (`linkPreviews`)
 
 ## Persistence conventions
 - localStorage keys: `onyx:` prefix. Legacy `ocean-*` keys are migrated

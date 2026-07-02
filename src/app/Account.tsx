@@ -144,6 +144,9 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
   const infoPending = useStore((s) => s.accountInfoPending);
   const actionError = useStore((s) => s.accountActionError);
   const serviceNotices = useStore((s) => s.serviceNotices);
+  const totp = useStore((s) => s.totp);
+  const personas = useStore((s) => s.personas);
+  const personaOffers = useStore((s) => s.personaOffers);
 
   const isGuest = createMemo(() => !account());
 
@@ -163,6 +166,17 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
   const [recoverPassword, setRecoverPassword] = createSignal('');
 
   const [certFingerprint, setCertFingerprint] = createSignal('');
+
+  const [totpCode, setTotpCode] = createSignal('');
+  const [claimHost, setClaimHost] = createSignal('');
+  const [copiedField, setCopiedField] = createSignal<string | null>(null);
+
+  const copyField = (field: string, value: string) => {
+    void navigator.clipboard?.writeText(value).then(() => {
+      setCopiedField(field);
+      setTimeout(() => setCopiedField((cur) => (cur === field ? null : cur)), 1400);
+    });
+  };
 
   // Danger zone — drop requires typing the account name + password.
   const [dropConfirm, setDropConfirm] = createSignal('');
@@ -188,6 +202,8 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
   createEffect(() => {
     if (local.open && account()) {
       getState().accountInfo_fetch();
+      getState().totpStatus();
+      getState().vhostList();
     }
   });
 
@@ -538,6 +554,151 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
                 Remove fingerprint
               </Button>
             </form>
+          </Section>
+
+          {/* Two-factor authentication */}
+          <Section title="Two-factor authentication" hint="A six-digit code from your authenticator app, required at every login.">
+            <div class="acct-totp">
+              <p class="acct-totp-status" data-status={totp().status}>
+                <span class="acct-totp-dot" aria-hidden="true" />
+                {totp().status === 'active' && 'Two-factor is active on this account.'}
+                {totp().status === 'pending' && 'Enrollment pending — confirm with a code to activate.'}
+                {totp().status === 'disabled' && 'Two-factor is off.'}
+                {totp().status === 'unknown' && 'Checking status…'}
+              </p>
+
+              <Show when={totp().status === 'disabled' || totp().status === 'unknown'}>
+                <Button type="button" variant="ghost" size="sm" disabled={totp().busy} onClick={() => getState().totpEnroll()}>
+                  {totp().busy ? 'Working…' : 'Enable two-factor'}
+                </Button>
+              </Show>
+
+              <Show when={totp().secret}>
+                {(secret) => (
+                  <div class="acct-totp-enroll">
+                    <p class="acct-totp-note">
+                      Add this secret to your authenticator (or use the otpauth link), then confirm with the current code.
+                    </p>
+                    <div class="acct-totp-row">
+                      <code class="acct-totp-secret">{secret()}</code>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => copyField('secret', secret())}>
+                        {copiedField() === 'secret' ? 'Copied' : 'Copy secret'}
+                      </Button>
+                      <Show when={totp().otpauth}>
+                        {(uri) => (
+                          <Button type="button" variant="ghost" size="sm" onClick={() => copyField('otpauth', uri())}>
+                            {copiedField() === 'otpauth' ? 'Copied' : 'Copy otpauth link'}
+                          </Button>
+                        )}
+                      </Show>
+                    </div>
+                  </div>
+                )}
+              </Show>
+
+              <Show when={totp().status === 'pending'}>
+                <form
+                  class="acct-totp-confirm"
+                  noValidate
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    getState().totpConfirm(totpCode());
+                    setTotpCode('');
+                  }}
+                  aria-label="Confirm two-factor enrollment"
+                >
+                  <FormField
+                    id="acct-totp-code"
+                    label="Six-digit code"
+                    type="text"
+                    placeholder="123456"
+                    value={totpCode()}
+                    onInput={(e) => setTotpCode(e.currentTarget.value)}
+                  />
+                  <Button type="submit" variant="primary" size="sm" disabled={totp().busy || totpCode().trim().length < 6}>
+                    Confirm &amp; activate
+                  </Button>
+                </form>
+              </Show>
+
+              <Show when={totp().status === 'active'}>
+                <Button type="button" variant="ghost" size="sm" disabled={totp().busy} onClick={() => getState().totpDisable()}>
+                  Disable two-factor
+                </Button>
+              </Show>
+
+              <Show when={totp().error}>
+                <p class="acct-error" role="alert">{totp().error}</p>
+              </Show>
+            </div>
+          </Section>
+
+          {/* Personas (Guise wardrobe) */}
+          <Section title="Personas" hint="Your Guise wardrobe — change the host others see, instantly and mid-session.">
+            <div class="acct-personas">
+              <Show
+                when={personas().length > 0}
+                fallback={<p class="acct-personas-empty">No personas yet — claim one below, or ask staff for a grant.</p>}
+              >
+                <ul class="acct-persona-list" aria-label="Your personas">
+                  <For each={personas()}>
+                    {(p) => (
+                      <li class="acct-persona-row">
+                        <div class="acct-persona-id">
+                          <strong>{p.name}</strong>
+                          <code>{p.host}</code>
+                          <span class="acct-persona-src">{p.source}</span>
+                        </div>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => getState().vhostUse(p.name)}>
+                          Wear
+                        </Button>
+                      </li>
+                    )}
+                  </For>
+                </ul>
+                <Button type="button" variant="ghost" size="sm" onClick={() => getState().vhostOff()}>
+                  Take persona off
+                </Button>
+              </Show>
+
+              <Show when={personaOffers().length > 0}>
+                <div class="acct-persona-offers">
+                  <p class="acct-persona-offers-label">Open offers</p>
+                  <ul aria-label="Claimable persona templates">
+                    <For each={personaOffers()}>
+                      {(o) => (
+                        <li class="acct-persona-offer">
+                          <code>{o.template}</code>
+                          <Show when={o.label}><span>{o.label}</span></Show>
+                        </li>
+                      )}
+                    </For>
+                  </ul>
+                  <form
+                    class="acct-persona-claim"
+                    noValidate
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      getState().vhostClaim(claimHost());
+                      setClaimHost('');
+                    }}
+                    aria-label="Claim a persona host"
+                  >
+                    <FormField
+                      id="acct-persona-host"
+                      label="Claim a host"
+                      type="text"
+                      placeholder="poets.society/you"
+                      value={claimHost()}
+                      onInput={(e) => setClaimHost(e.currentTarget.value)}
+                    />
+                    <Button type="submit" variant="ghost" size="sm" disabled={!claimHost().trim()}>
+                      Claim
+                    </Button>
+                  </form>
+                </div>
+              </Show>
+            </div>
           </Section>
 
           {/* Recover nick */}

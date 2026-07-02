@@ -34,6 +34,8 @@ export interface Preferences {
   width: Width;
   /** Force-disable animations regardless of OS preference. */
   reduceMotion: boolean;
+  /** Unfurl the first web link in a message into an OG preview card. */
+  linkPreviews: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Readonly<Preferences> = {
@@ -42,6 +44,7 @@ export const DEFAULT_PREFERENCES: Readonly<Preferences> = {
   hideEvents: false,
   width: 'measured',
   reduceMotion: false,
+  linkPreviews: true,
 };
 
 // ── persistence ─────────────────────────────────────────────────────────────
@@ -80,6 +83,7 @@ export function loadPreferences(): Preferences {
     hideEvents: typeof raw.hideEvents === 'boolean' ? raw.hideEvents : DEFAULT_PREFERENCES.hideEvents,
     width: isOneOf(raw.width, WIDTHS) ? raw.width : DEFAULT_PREFERENCES.width,
     reduceMotion: typeof raw.reduceMotion === 'boolean' ? raw.reduceMotion : DEFAULT_PREFERENCES.reduceMotion,
+    linkPreviews: typeof raw.linkPreviews === 'boolean' ? raw.linkPreviews : DEFAULT_PREFERENCES.linkPreviews,
   };
 }
 

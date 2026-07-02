@@ -387,3 +387,86 @@
     animation: none !important;
   }
 }
+
+/* ── Two-factor authentication ─────────────────────────────────────────── */
+.acct-totp { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.acct-totp-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--washi-dim);
+}
+.acct-totp-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--washi-mute); flex: none; }
+.acct-totp-status[data-status='active'] .acct-totp-dot { background: var(--lapis); box-shadow: 0 0 8px color-mix(in oklab, var(--lapis) 55%, transparent); }
+.acct-totp-status[data-status='pending'] .acct-totp-dot { background: var(--gold); }
+.acct-totp-enroll {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in oklab, var(--gold) 30%, transparent);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--gold) 7%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.acct-totp-note { margin: 0; font-size: 0.78rem; color: var(--washi-dim); }
+.acct-totp-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.acct-totp-secret {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  letter-spacing: 0.12em;
+  color: var(--gold-bright);
+  background: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 10px;
+  user-select: all;
+}
+.acct-totp-confirm { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+
+/* ── Personas (Guise wardrobe) ─────────────────────────────────────────── */
+.acct-personas { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.acct-personas-empty { margin: 0; font-size: 0.82rem; color: var(--washi-mute); font-style: italic; }
+.acct-persona-list { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 6px; }
+.acct-persona-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--stone-2) 55%, transparent);
+}
+.acct-persona-id { display: flex; align-items: baseline; gap: 10px; min-width: 0; flex: 1; }
+.acct-persona-id strong { color: var(--washi); font-size: 0.85rem; }
+.acct-persona-id code {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--lapis-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.acct-persona-src {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--washi-mute);
+}
+.acct-persona-offers { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+.acct-persona-offers-label {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--washi-mute);
+}
+.acct-persona-offers ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.acct-persona-offer { display: flex; gap: 10px; align-items: baseline; font-size: 0.8rem; color: var(--washi-dim); }
+.acct-persona-offer code { font-family: var(--font-mono); color: var(--gold-bright); font-size: 0.78rem; }
+.acct-persona-claim { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }

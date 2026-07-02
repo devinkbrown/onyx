@@ -240,6 +240,31 @@ function _saveVoiceSettings(voice: VoiceState): void {
   } catch {}
 }
 
+/** TOTP two-factor state, driven by the server's `TOTP:` notices. */
+export interface TotpState {
+  status: 'unknown' | 'disabled' | 'pending' | 'active';
+  secret: string | null;
+  otpauth: string | null;
+  error: string | null;
+  busy: boolean;
+}
+
+/** One Guise persona (VHOST wardrobe entry). */
+export interface PersonaEntry {
+  name: string;
+  host: string;
+  source: string;
+}
+
+/** Server-side SEARCH (draft/search) — one in-flight search at a time. */
+export interface ServerSearchState {
+  target: string;
+  query: string;
+  status: 'idle' | 'pending' | 'done' | 'error';
+  results: ChatMessage[];
+  error: string | null;
+}
+
 export interface Notification {
   id: string;
   type: 'mention' | 'dm' | 'system' | 'error';
@@ -425,6 +450,16 @@ export interface OnyxState {
 
   // ── Notifications ────────────────────────────────────────────────────
   notifications: Notification[];
+  /** Last server-side SEARCH request/results (draft/search) */
+  serverSearch: ServerSearchState;
+  /** draft/search negotiated — gate the "search history" affordance */
+  canSearchHistory: boolean;
+  /** TOTP 2FA state (server `TOTP:` notices) */
+  totp: TotpState;
+  /** Guise persona wardrobe (VHOST LIST) */
+  personas: PersonaEntry[];
+  /** Operator-published VHOST offer templates the account can CLAIM */
+  personaOffers: { template: string; label: string }[];
   readNotificationIds: Set<string>;
 
   // ── Toast system ──────────────────────────────────────────────────────
@@ -750,6 +785,26 @@ export interface OnyxState {
 
   /** Navigate to a channel or DM */
   navigate(view: ActiveView): void;
+
+  /** Run a server-side history search (SEARCH <target> :<query>) */
+  searchServerHistory(target: string, query: string): void;
+  /** Reset the server search state */
+  clearServerSearch(): void;
+
+  /** TOTP two-factor management (server verbs, structured notices) */
+  totpEnroll(): void;
+  totpConfirm(code: string): void;
+  totpDisable(): void;
+  totpStatus(): void;
+
+  /** Guise personas: refresh the wardrobe (VHOST LIST) */
+  vhostList(): void;
+  /** Wear a persona instantly */
+  vhostUse(name: string): void;
+  /** Claim an operator-published offer template */
+  vhostClaim(host: string): void;
+  /** Take the persona off (back to the account cloak) */
+  vhostOff(): void;
 
   /** Send a message (PRIVMSG) */
   sendMessage(target: string, text: string): void;
@@ -1681,11 +1736,14 @@ const _typingLastSent = new Map<string, number>();
 
 // ── CHATHISTORY batch collectors (module-level) ───────────────────────────────
 /** ref → { target, messages[] } — accumulates PRIVMSG during a BATCH */
+let _serverSearchTimeout: ReturnType<typeof setTimeout> | null = null;
+
 const _batchCollectors = new Map<string, {
   target: string;
   messages: ChatMessage[];
-  /** 'multiline' collectors reassemble one logical message; default is chathistory. */
-  kind?: 'multiline';
+  /** 'multiline' reassembles one message; 'search' diverts a history replay
+      into serverSearch.results; default (absent) is chathistory merge. */
+  kind?: 'multiline' | 'search';
   /** Raw line parts for multiline assembly (concat = join without newline). */
   parts?: { text: string; concat: boolean }[];
   /** First inner line's provenance, reused for the assembled synthetic PRIVMSG. */
@@ -2087,6 +2145,11 @@ export const store = createStore<OnyxState>()(
     accountInfoPending: false,
     accountActionError: null,
     notifications: [],
+    serverSearch: { target: '', query: '', status: 'idle', results: [], error: null },
+    canSearchHistory: false,
+    totp: { status: 'unknown', secret: null, otpauth: null, error: null, busy: false },
+    personas: [],
+    personaOffers: [],
     readNotificationIds: new Set(),
     showNotificationCenter: false,
     toasts: [],
@@ -2334,6 +2397,7 @@ export const store = createStore<OnyxState>()(
           canEditMessages: client.negotiatedCaps.has('draft/message-editing'),
           canRedactMessages: client.negotiatedCaps.has('draft/message-redaction'),
           canReact: client.negotiatedCaps.has('draft/react'),
+          canSearchHistory: client.negotiatedCaps.has('draft/search'),
         });
       };
 
@@ -2472,6 +2536,62 @@ export const store = createStore<OnyxState>()(
     },
 
     // ── navigate ─────────────────────────────────────────────────────────
+    totpEnroll() {
+      set(st => ({ totp: { ...st.totp, busy: true, error: null, secret: null, otpauth: null } }));
+      get().client?.sendRaw('TOTP', 'ENROLL');
+    },
+    totpConfirm(code) {
+      const trimmed = code.trim();
+      if (!trimmed) return;
+      set(st => ({ totp: { ...st.totp, busy: true, error: null } }));
+      get().client?.sendRaw('TOTP', 'CONFIRM', trimmed);
+    },
+    totpDisable() {
+      set(st => ({ totp: { ...st.totp, busy: true, error: null } }));
+      get().client?.sendRaw('TOTP', 'DISABLE');
+    },
+    totpStatus() {
+      get().client?.sendRaw('TOTP', 'STATUS');
+    },
+
+    vhostList() {
+      set({ personas: [], personaOffers: [] });
+      get().client?.sendRaw('VHOST', 'LIST');
+    },
+    vhostUse(name) {
+      if (!name.trim()) return;
+      get().client?.sendRaw('VHOST', 'USE', name.trim());
+    },
+    vhostClaim(host) {
+      if (!host.trim()) return;
+      get().client?.sendRaw('VHOST', 'CLAIM', host.trim());
+    },
+    vhostOff() {
+      get().client?.sendRaw('VHOST', 'OFF');
+    },
+
+    searchServerHistory(target, query) {
+      const { client } = get();
+      const trimmed = query.trim();
+      if (!client?.negotiatedCaps.has('draft/search') || !target || !trimmed) return;
+      if (_serverSearchTimeout) clearTimeout(_serverSearchTimeout);
+      set({ serverSearch: { target, query: trimmed, status: 'pending', results: [], error: null } });
+      client.sendRaw('SEARCH', target, trimmed);
+      // The reply is a chathistory-shaped batch (diverted in the BATCH
+      // handler); if nothing arrives, surface a timeout instead of spinning.
+      _serverSearchTimeout = setTimeout(() => {
+        _serverSearchTimeout = null;
+        set(st => st.serverSearch.status === 'pending'
+          ? { serverSearch: { ...st.serverSearch, status: 'error', error: 'No response from the server' } }
+          : {});
+      }, 6000);
+    },
+
+    clearServerSearch() {
+      if (_serverSearchTimeout) { clearTimeout(_serverSearchTimeout); _serverSearchTimeout = null; }
+      set({ serverSearch: { target: '', query: '', status: 'idle', results: [], error: null } });
+    },
+
     navigate(view) {
       set({ activeView: view });
       if (view.kind === 'channel') {
@@ -3905,6 +4025,17 @@ export const store = createStore<OnyxState>()(
           }
           return;
         }
+        if (standard.kind === 'FAIL' && standard.command === 'TOTP') {
+          set(st => ({ totp: { ...st.totp, busy: false, error: standard.description || 'TOTP command failed' } }));
+          return;
+        }
+        if (standard.kind === 'FAIL' && standard.command === 'SEARCH') {
+          if (_serverSearchTimeout) { clearTimeout(_serverSearchTimeout); _serverSearchTimeout = null; }
+          set(st => st.serverSearch.status === 'pending'
+            ? { serverSearch: { ...st.serverSearch, status: 'error', error: standard.description || 'Search failed' } }
+            : {});
+          return;
+        }
         if (standard.command === 'MEDIA') {
           // `NOTE MEDIA` is NOT a standard reply: it has the shape
           //   :server NOTE MEDIA <#chan> <verb> [<nick>] [extra...]
@@ -4525,6 +4656,54 @@ export const store = createStore<OnyxState>()(
             !isChan(target) &&
             !sender
           ) {
+            // ── TOTP: structured 2FA notices ─────────────────────────────
+            if (text.startsWith('TOTP:')) {
+              const body = text.slice(5).trim();
+              const secretMatch = body.match(/^secret ([A-Z2-7]+)$/);
+              const isOtpauth = body.startsWith('otpauth://');
+              set(st => {
+                const totp = { ...st.totp, busy: false };
+                if (secretMatch) totp.secret = secretMatch[1]!;
+                else if (isOtpauth) totp.otpauth = body;
+                else if (/now ACTIVE/i.test(body)) { totp.status = 'active'; totp.secret = null; totp.otpauth = null; }
+                else if (/is active$/i.test(body)) totp.status = 'active';
+                else if (/pending/i.test(body)) totp.status = 'pending';
+                else if (/disabled|was not enabled/i.test(body)) { totp.status = 'disabled'; totp.secret = null; totp.otpauth = null; }
+                else if (/add this to your authenticator/i.test(body)) totp.status = 'pending';
+                return { totp };
+              });
+              get().addServiceNotice('Account', text);
+              break;
+            }
+
+            // ── VHOST: Guise persona wardrobe lines ──────────────────────
+            if (text.startsWith('VHOST')) {
+              const persona = text.match(/^VHOST persona (\S+) = (\S+) \(([^)]*)\)$/);
+              const offer = text.match(/^VHOST offer (\S+) :?(.*)$/);
+              if (persona) {
+                set(st => ({
+                  personas: [
+                    ...st.personas.filter(pn => pn.name !== persona[1]),
+                    { name: persona[1]!, host: persona[2]!, source: persona[3]! },
+                  ],
+                }));
+              } else if (offer) {
+                set(st => ({
+                  personaOffers: [
+                    ...st.personaOffers.filter(o => o.template !== offer[1]),
+                    { template: offer[1]!, label: offer[2]! },
+                  ],
+                }));
+              } else {
+                get().addServiceNotice('Account', text);
+                // A wear/claim confirmation changes the wardrobe — refresh it.
+                if (/now wearing|claimed|persona off|removed/i.test(text)) {
+                  setTimeout(() => get().vhostList(), 300);
+                }
+              }
+              break;
+            }
+
             const info = parseAccountInfo(text);
             if (info) {
               _applyAccountInfo(set, get, info);
@@ -4741,7 +4920,17 @@ export const store = createStore<OnyxState>()(
             break;
           }
 
-          if (isSelf && !get().client?.negotiatedCaps.has('echo-message')) break; // We already echoed our own messages
+          // Echo suppression — but NEVER for batch replay: a CHATHISTORY /
+          // SEARCH batch legitimately replays our own old messages, which are
+          // not echoes of a just-sent line and must not be dropped.
+          {
+            const batchRef = tags['batch'];
+            const replayKey = (isChan(target) ? target : (isSelf ? target : sender)).toLowerCase();
+            const inKnownBatch =
+              (batchRef !== undefined && _batchCollectors.has(batchRef)) ||
+              _openChathistoryByTarget.has(replayKey);
+            if (isSelf && !inKnownBatch && !get().client?.negotiatedCaps.has('echo-message')) break; // We already echoed our own messages
+          }
 
           // ── Handle FORUM post encoding ───────────────────────────────────
           const forumMatch = text.match(/^\x01FORUM ([\s\S]+)\x01$/);
@@ -5651,7 +5840,16 @@ export const store = createStore<OnyxState>()(
               batchTarget &&
               (batchType === 'draft/chathistory' || batchType === 'chathistory')
             ) {
-              _batchCollectors.set(batchRef, { target: batchTarget, messages: [] });
+              // A pending server SEARCH replays as a chathistory batch for the
+              // same target — divert it into serverSearch instead of merging.
+              const pendingSearch = get().serverSearch;
+              const isSearchReplay = pendingSearch.status === 'pending' &&
+                pendingSearch.target.toLowerCase() === batchTarget.toLowerCase();
+              _batchCollectors.set(batchRef, {
+                target: batchTarget,
+                messages: [],
+                ...(isSearchReplay ? { kind: 'search' as const } : {}),
+              });
               _openChathistoryByTarget.set(batchTarget.toLowerCase(), batchRef);
             } else if (batchTarget && batchType === 'draft/multiline') {
               // draft/multiline: the inner PRIVMSGs reassemble into ONE message
@@ -5667,6 +5865,17 @@ export const store = createStore<OnyxState>()(
             // BATCH -ref — end of batch
             const batchRef = batchParam.slice(1);
             const collector = _batchCollectors.get(batchRef);
+            if (collector && collector.kind === 'search') {
+              _batchCollectors.delete(batchRef);
+              if (_openChathistoryByTarget.get(collector.target.toLowerCase()) === batchRef) {
+                _openChathistoryByTarget.delete(collector.target.toLowerCase());
+              }
+              if (_serverSearchTimeout) { clearTimeout(_serverSearchTimeout); _serverSearchTimeout = null; }
+              set(st => ({
+                serverSearch: { ...st.serverSearch, status: 'done', results: collector.messages, error: null },
+              }));
+              break;
+            }
             if (collector && collector.kind === 'multiline') {
               _batchCollectors.delete(batchRef);
               const parts = collector.parts ?? [];

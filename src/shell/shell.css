@@ -3354,3 +3354,69 @@
   pointer-events: none;
   z-index: 1;
 }
+
+/* ── Link preview card (OG unfurl via /linkpreview) ─────────────────────── */
+.shell-msg-preview {
+  display: flex;
+  gap: 14px;
+  align-items: stretch;
+  max-width: 480px;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-left: 2px solid color-mix(in oklab, var(--lapis) 55%, transparent);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--stone-2) 50%, transparent);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.shell-msg-preview:hover {
+  border-color: color-mix(in oklab, var(--lapis) 40%, var(--line));
+  background: color-mix(in oklab, var(--stone-2) 70%, transparent);
+}
+.shell-msg-preview-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+.shell-msg-preview-site {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--washi-mute);
+}
+.shell-msg-preview-title {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--lapis-bright);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.shell-msg-preview:hover .shell-msg-preview-title { text-decoration: underline; }
+.shell-msg-preview-desc {
+  font-size: 0.78rem;
+  color: var(--washi-dim);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.shell-msg-preview-thumb {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  align-self: center;
+}
+@media (max-width: 600px) {
+  .shell-msg-preview { max-width: 100%; }
+  .shell-msg-preview-thumb { width: 56px; height: 56px; }
+}
