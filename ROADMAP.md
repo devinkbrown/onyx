@@ -115,6 +115,11 @@ down to TLS.
 8. **Pinned messages on IRCX PROP** — ops pin msgids into a channel PROP;
    every client sees the same pins; Onyx renders a pins drawer. (Needs a small
    server PROP provider addition; verify write-scoping.)
+   ✅ **SHIPPED 2026-07-03** — server-validated PINS channel prop (op-gated,
+   ≤50 msgids); Onyx pins drawer (ribbon count → Sheet, jump + unpin from ⋯
+   menu). ALSO fixed a latent bug: channel/entity PROP CRDT never propagated
+   cross-mesh (origin stamped config.node_id not key shortId) — now live +
+   bidirectional, which also makes EPHEMERAL/STAGE mesh-correct.
 9. ~~**Comic Chat rendering in Onyx**~~ — DROPPED (user direction 2026-07-03).
 10. **Presence heatline** — a live 24h activity sparkline in the channel
     ribbon fed by chanstats hours[], so a room's rhythm is visible in-chat.
