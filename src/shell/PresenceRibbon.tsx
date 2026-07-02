@@ -8,7 +8,7 @@
  */
 
 import { createMemo, createSignal, Show, splitProps, type JSX } from 'solid-js';
-import { useStore, getState, selectAccount } from '@/lib/store';
+import { useStore, getState, selectAccount, selectChannelPins } from '@/lib/store';
 import { ChannelSettings } from './ChannelSettings';
 import { NotificationCenter } from './NotificationCenter';
 
@@ -39,6 +39,11 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     if (view.kind === 'dm') return view.nick;
     if (view.kind === 'status') return 'Status';
     return null;
+  });
+
+  const pinCount = useStore((s) => {
+    const view = s.activeView;
+    return view.kind === 'channel' ? selectChannelPins(view.channel)(s).length : 0;
   });
 
   const topic = createMemo(() => {
@@ -137,6 +142,22 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
         {/* Channel-scoped cluster: members + settings (channels only). */}
         <Show when={activeView().kind === 'channel'}>
           <div class="shell-ribbon-group" role="group" aria-label="Channel">
+            <Show when={pinCount() > 0}>
+              <button
+                type="button"
+                class="shell-ribbon-iconbtn shell-ribbon-pins"
+                aria-label={`${pinCount()} pinned message${pinCount() === 1 ? '' : 's'}`}
+                onClick={() => getState().openPinnedMessages()}
+                data-testid="ribbon-pins"
+              >
+                <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"
+                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M9 4h6l-1 5 3 3v2H7v-2l3-3-1-5Z" />
+                  <path d="M12 14v6" />
+                </svg>
+                <span class="shell-ribbon-count">{pinCount()}</span>
+              </button>
+            </Show>
             <Show when={memberCount() > 0}>
               <button
                 type="button"

@@ -1,0 +1,102 @@
+/* Pinned-messages drawer — shared channel pins (IRCX PINS prop). */
+.pins-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+}
+
+.pins-empty {
+  color: var(--washi-dim, #8aa);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  padding: 1rem 0.25rem;
+}
+
+.pins-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.pins-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: color-mix(in oklab, var(--stone-2, #16202a) 55%, transparent);
+  border: 1px solid var(--seam, #24323f);
+  border-radius: 0.6rem;
+  padding: 0.6rem 0.7rem;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+.pins-item:hover {
+  background: color-mix(in oklab, var(--lapis, #2e7fae) 14%, transparent);
+  border-color: color-mix(in oklab, var(--lapis-bright, #6fc3e8) 45%, transparent);
+}
+
+.pins-item-ico {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin-top: 0.15rem;
+  color: var(--lapis-bright, #6fc3e8);
+}
+
+.pins-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1;
+}
+.pins-item-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.pins-item-from {
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+.pins-item-when {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.66rem;
+  color: var(--washi-mute, #6a8);
+}
+.pins-item-body {
+  font-size: 0.85rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  color: var(--washi, #cde);
+}
+.pins-item-body--missing {
+  flex: 1;
+  color: var(--washi-dim, #8aa);
+  font-style: italic;
+}
+
+.pins-item-unpin {
+  flex: none;
+  align-self: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--washi-mute, #6a8);
+  font-size: 1.05rem;
+  line-height: 1;
+  transition: background 150ms ease, color 150ms ease;
+}
+.pins-item-unpin:hover {
+  background: color-mix(in oklab, var(--coral, #ff6f61) 22%, transparent);
+  color: var(--washi, #fff);
+}

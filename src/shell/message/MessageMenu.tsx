@@ -25,11 +25,11 @@ import {
   splitProps,
   type JSX,
 } from 'solid-js';
-import { getState } from '@/lib/store';
+import { getState, useStore, selectChannelPins, selectIsChannelOp } from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
 import { Popover } from '@/primitives/index';
 import { searchEmojis } from '@/lib/emoji/emoji';
-import { CopyIcon, EditIcon, OverflowIcon, ReactIcon, ReplyIcon, TrashIcon } from './icons';
+import { CopyIcon, EditIcon, OverflowIcon, PinIcon, ReactIcon, ReplyIcon, TrashIcon } from './icons';
 
 import './message-menu.css';
 
@@ -159,6 +159,20 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
   function remove(): void {
     if (!caps().canDelete) return;
     getState().deleteMessage(local.target, local.msg.id);
+    setMenuOpen(false);
+  }
+
+  // Pin/unpin (ops only, channels only). Reactive to the live PINS prop.
+  const isChannelTarget = createMemo(() => {
+    const t = local.target;
+    return t.length > 0 && (t[0] === '#' || t[0] === '&');
+  });
+  const canPin = useStore((s) => isChannelTarget() && selectIsChannelOp(local.target)(s));
+  const isPinned = useStore((s) => selectChannelPins(local.target)(s).includes(local.msg.id));
+  function togglePin(): void {
+    if (!canPin()) return;
+    if (isPinned()) getState().unpinMessage(local.target, local.msg.id);
+    else getState().pinMessage(local.target, local.msg.id);
     setMenuOpen(false);
   }
 
@@ -304,6 +318,12 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
               <button type="button" class="msg-menu-item" role="menuitem" onClick={edit}>
                 <EditIcon class="msg-menu-item-icon" />
                 <span>Edit</span>
+              </button>
+            </Show>
+            <Show when={canPin()}>
+              <button type="button" class="msg-menu-item" role="menuitem" onClick={togglePin}>
+                <PinIcon class="msg-menu-item-icon" />
+                <span>{isPinned() ? 'Unpin message' : 'Pin message'}</span>
               </button>
             </Show>
             <Show when={caps().canDelete}>

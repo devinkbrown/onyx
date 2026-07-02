@@ -52,6 +52,7 @@ import { MemberList } from './MemberList';
 import { AccountPanel } from '@/app/Account';
 import { AppearancePanel } from './AppearancePanel';
 import { PreferencesPanel } from './PreferencesPanel';
+import { PinnedMessages } from './PinnedMessages';
 import { applyPreferences } from '@/lib/prefs/preferences';
 import { Spotlight } from '@/chat/spotlight';
 import { useSpotlightHotkeys } from '@/chat/spotlight/useSpotlight';
@@ -379,6 +380,9 @@ export function AppShell(props: AppShellProps): JSX.Element {
 
       {/* Preferences panel — display & behaviour, gated on isPreferencesOpen() */}
       <PreferencesPanel />
+
+      {/* Pinned messages drawer — gated on store.showPinnedMessages */}
+      <PinnedMessages />
 
       {/* Voice/video overlays — each self-gates on store.voice */}
       <VoicePip />

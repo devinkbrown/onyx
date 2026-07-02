@@ -111,13 +111,11 @@ down to TLS.
    mesh-propagates. 4 tests; live-verified SET/GET/bounds. Server-side only
    (no client UI yet).
 
-## Phase 4 — Presence & heritage (nobody else CAN build these)
+## Phase 4 — Presence & heritage (nobody else CAN build these) ← IN PROGRESS
 8. **Pinned messages on IRCX PROP** — ops pin msgids into a channel PROP;
    every client sees the same pins; Onyx renders a pins drawer. (Needs a small
    server PROP provider addition; verify write-scoping.)
-9. **Comic Chat rendering in Onyx** — the /home/kain/comicchat RE gives us the
-   .avb assets and semantics; render `+V`-less channels' comic data plane as
-   actual panels in a toggleable view. The single most unreplicable feature.
+9. ~~**Comic Chat rendering in Onyx**~~ — DROPPED (user direction 2026-07-03).
 10. **Presence heatline** — a live 24h activity sparkline in the channel
     ribbon fed by chanstats hours[], so a room's rhythm is visible in-chat.
 11. **Voice rooms as places** — persistent stage layouts (PROP-stored),

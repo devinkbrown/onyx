@@ -449,8 +449,9 @@ export interface OnyxState {
   showAccessList: boolean;
 
   // ── Pinned Messages Panel ────────────────────────────────────────────
+  // Pins themselves live in the channel's IRCX PINS prop (server-synced);
+  // this is only the drawer's open/closed UI state.
   showPinnedMessages: boolean;
-  pinnedMessages: Map<string, ChatMessage[]>;
 
   // ── Voice ────────────────────────────────────────────────────────────
   voice: VoiceState;
@@ -769,6 +770,9 @@ export interface OnyxState {
   /** Consume the time-travel landing id after the feed has scrolled to it */
   clearTimeTravelLanding(): void;
 
+  /** Scroll the feed to + pulse a message by id (e.g. jumping to a pin) */
+  focusMessage(messageId: string): void;
+
   /** Open a vault (device-memory) search hit: navigate there and land on it */
   openVaultResult(target: string, messageId: string): void;
 
@@ -897,15 +901,19 @@ export interface OnyxState {
   openAccessList(): void;
   closeAccessList(): void;
 
-  // pinned messages panel
+  // pinned messages panel (pins are stored in the IRCX PINS channel prop)
   openPinnedMessages(): void;
   closePinnedMessages(): void;
-  pinMessage(target: string, msg: ChatMessage): void;
-  unpinMessage(target: string, messageId: string): void;
 
   // IRCX PROP requests
   requestChannelProps(channel: string): void;
   requestUserProps(nick: string): void;
+
+  // Pinned messages (IRCX PINS channel prop)
+  pinMessage(channel: string, msgid: string): void;
+  unpinMessage(channel: string, msgid: string): void;
+  /** Internal: rewrite a channel's PINS prop (whole msgid list) + optimistic. */
+  _writePins(channel: string, msgids: string[]): void;
 
   // MONITOR (presence)
   monitorAdd(nick: string): void;
@@ -2191,7 +2199,6 @@ export const store = createStore<OnyxState>()(
     showServerSettings: false,
     showAccessList: false,
     showPinnedMessages: false,
-    pinnedMessages: new Map(),
     monitoredNicks: new Set(),
     friends: _loadFriends(),
     showFriendsPanel: false,
@@ -2579,6 +2586,12 @@ export const store = createStore<OnyxState>()(
       if (!hasChatHistoryCap(client)) return;
       _pendingTravel = { key: target.toLowerCase(), at };
       client?.sendRaw('CHATHISTORY', 'AROUND', target, `timestamp=${at.toISOString()}`, String(HISTORY_PAGE_SIZE));
+    },
+
+    focusMessage(messageId) {
+      // Reuse the time-travel landing machinery — the feed scrolls to and
+      // pulses whatever id sits here. The MessageView effect clears it.
+      set({ timeTravelLandingId: messageId });
     },
 
     clearTimeTravelLanding() {
@@ -3549,23 +3562,38 @@ export const store = createStore<OnyxState>()(
     closePinnedMessages() {
       set({ showPinnedMessages: false });
     },
-    pinMessage(target, msg) {
-      const key = target.toLowerCase();
-      set(s => {
-        const pinnedMessages = new Map(s.pinnedMessages);
-        const existing = pinnedMessages.get(key) ?? [];
-        if (existing.some(m => m.id === msg.id)) return {};
-        pinnedMessages.set(key, [...existing, msg]);
-        return { pinnedMessages };
-      });
+
+    // ── Pinned messages (IRCX PINS channel prop) ─────────────────────────
+    // Pins are a comma-separated msgid list in the channel's PINS prop —
+    // server-validated, op-gated, mesh-propagated. Pin/unpin rewrites the
+    // whole list via PROP SET and optimistically updates local props so the
+    // acting client's drawer reacts immediately (the 818 echo confirms).
+    pinMessage(channel, msgid) {
+      const key = channel.toLowerCase();
+      const current = selectChannelPins(key)(get());
+      if (current.includes(msgid)) return;
+      const next = [...current, msgid].slice(-50);
+      get()._writePins(channel, next);
     },
-    unpinMessage(target, messageId) {
-      const key = target.toLowerCase();
+    unpinMessage(channel, msgid) {
+      const key = channel.toLowerCase();
+      const next = selectChannelPins(key)(get()).filter(id => id !== msgid);
+      get()._writePins(channel, next);
+    },
+    _writePins(channel, msgids) {
+      const value = msgids.join(',');
+      // PROP SET with an empty trailing value deletes the prop server-side.
+      get().client?.sendRaw('PROP', channel, 'PINS', value);
+      // Optimistic local update (the delete path emits no 818 with an empty
+      // value, so without this an "unpin the last one" wouldn't reflect).
       set(s => {
-        const pinnedMessages = new Map(s.pinnedMessages);
-        const existing = pinnedMessages.get(key) ?? [];
-        pinnedMessages.set(key, existing.filter(m => m.id !== messageId));
-        return { pinnedMessages };
+        const channelProps = new Map(s.channelProps);
+        const key = channel.toLowerCase();
+        const existing = { ...(channelProps.get(key) ?? {}) };
+        if (value) existing.PINS = value;
+        else delete existing.PINS;
+        channelProps.set(key, existing);
+        return { channelProps };
       });
     },
 
@@ -5990,7 +6018,6 @@ export const store = createStore<OnyxState>()(
               firstUnreadId: moveKey(s.firstUnreadId),
               channelNotify: moveKey(s.channelNotify),
               channelProps: moveKey(s.channelProps),
-              pinnedMessages: moveKey(s.pinnedMessages),
               historyLoading: moveKey(s.historyLoading),
               historyExhausted: moveKey(s.historyExhausted),
               typingUsers: moveKey(s.typingUsers),
@@ -8661,6 +8688,12 @@ export const selectOwnPrefix = (channel: string) => (s: OnyxState): string => {
  * higher (owner q, founder Q, network-oper Y). Network opers (Y) are always
  * treated as privileged. Used to gate Op/Kick/Ban/Mode controls in the UI.
  */
+/** Pinned msgids for a channel, parsed from its IRCX PINS prop (oldest→newest). */
+export const selectChannelPins = (channel: string) => (s: OnyxState): string[] => {
+  const raw = s.channelProps.get(channel.toLowerCase())?.PINS ?? '';
+  return raw.split(',').map(id => id.trim()).filter(Boolean);
+};
+
 export const selectIsChannelOp = (channel: string) => (s: OnyxState): boolean => {
   if (s.isOper) return true;
   const ch = s.channels.get(channel.toLowerCase());

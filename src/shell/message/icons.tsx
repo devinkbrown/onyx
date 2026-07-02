@@ -92,3 +92,12 @@ export function TrashIcon(props: IconProps): JSX.Element {
     </Svg>
   );
 }
+
+export function PinIcon(props: IconProps): JSX.Element {
+  return (
+    <Svg class={props.class}>
+      <path d="M9 4h6l-1 5 3 3v2H7v-2l3-3-1-5Z" />
+      <path d="M12 14v6" />
+    </Svg>
+  );
+}
