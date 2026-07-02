@@ -127,18 +127,22 @@
 .cpulse-node[data-nearest='true'] .cpulse-node-host { color: var(--washi); }
 .cpulse-node-ms { color: var(--washi-mute); }
 
-/* Stage layout — form + pulse side by side, stacking on narrow screens.
-   (The stage class wraps both in Connect.tsx.) */
+/* Stage layout — the CARD is dead-center in the viewport; the pulse lives
+   in the right gutter as a secondary rail. Symmetric 1fr spacers keep the
+   dialog on the true center line (the user reads the card as "the dialog"
+   — it should not drift left to make room for the rail). */
 .conn-stage {
   display: grid;
-  grid-template-columns: minmax(0, 460px) minmax(0, 380px);
-  gap: clamp(24px, 6vw, 96px);
+  grid-template-columns: 1fr minmax(0, 540px) 1fr;
+  gap: clamp(20px, 3.5vw, 56px);
   align-items: center;
-  justify-content: center;
   width: 100%;
 }
-@media (max-width: 980px) {
-  .conn-stage { grid-template-columns: minmax(0, 500px); }
-  .cpulse { max-width: 500px; padding-top: 0; }
-  .cpulse-rooms { display: none; } /* keep the mobile door light */
+.conn-stage > .conn-card { grid-column: 2; }
+.conn-stage > .cpulse { grid-column: 3; justify-self: start; }
+@media (max-width: 1180px) {
+  .conn-stage { grid-template-columns: minmax(0, 540px); justify-content: center; }
+  .conn-stage > .conn-card { grid-column: 1; }
+  .conn-stage > .cpulse { grid-column: 1; justify-self: stretch; max-width: 500px; padding-top: 0; }
+  .cpulse-rooms { display: none; } /* keep the narrow door light */
 }
