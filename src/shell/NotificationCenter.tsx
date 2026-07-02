@@ -49,6 +49,7 @@ export function NotificationCenter(): JSX.Element {
   };
 
   return (
+    <span class="shell-ribbon-inbox">
     <Popover
       placement="bottom"
       trigger={
@@ -140,5 +141,6 @@ export function NotificationCenter(): JSX.Element {
         </Show>
       </div>
     </Popover>
+    </span>
   );
 }

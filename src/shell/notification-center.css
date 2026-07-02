@@ -3,7 +3,10 @@
    gradient) doesn't belong in the ribbon — it stretched a 47px slab around
    the bell and threw the whole right cluster off its centerline. The bell
    styles itself; the trigger goes invisible here. */
-.onyx-popover__trigger:has(> .shell-ribbon-bell) {
+.shell-ribbon-inbox { display: inline-flex; align-items: center; }
+.shell-ribbon-inbox .onyx-popover { display: inline-flex; align-items: center; }
+.shell-ribbon-inbox .onyx-popover__trigger,
+.shell-ribbon-inbox .onyx-popover__trigger:hover {
   min-height: 0;
   padding: 0;
   border: 0;
@@ -11,10 +14,6 @@
   box-shadow: none;
   display: inline-flex;
   align-items: center;
-}
-.onyx-popover__trigger:has(> .shell-ribbon-bell):hover {
-  border: 0;
-  background: none;
 }
 .shell-ribbon-bell {
   position: relative;
