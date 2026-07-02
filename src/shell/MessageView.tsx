@@ -55,6 +55,26 @@ function fmtTime(date: Date): string {
   return date.toTimeString().slice(0, 5); // HH:MM
 }
 
+/** Human day label for the elegant date dividers. */
+function dayLabel(date: Date): string {
+  const today = new Date();
+  const yesterday = new Date(today.getTime() - 86400000);
+  if (date.toDateString() === today.toDateString()) return 'Today';
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+}
+
+/** Per-nick tint inside the water: hue walks the cyan→azure→ice band, so every
+    speaker is distinct yet the palette never leaves the ocean. */
+export function nickTint(nick: string): string {
+  let hash = 0;
+  for (let i = 0; i < nick.length; i += 1) hash = (hash * 31 + nick.charCodeAt(i)) >>> 0;
+  const hue = 186 + (hash % 46);        // 186..231 — teal-cyan through azure
+  const sat = 52 + (hash % 26);         // 52..77%
+  const light = 68 + ((hash >> 3) % 14); // 68..81%
+  return `hsl(${hue} ${sat}% ${light}%)`;
+}
+
 function isSystemMsg(msg: ChatMessage): boolean {
   return SYSTEM_TYPES.has(msg.type);
 }
@@ -240,6 +260,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   const ourNick = useStore((s) => s.ourNick);
   const canEditMessages = useStore((s) => s.canEditMessages);
   const historyLoading = useStore((s) => s.historyLoading);
+  const historyExhausted = useStore((s) => s.historyExhausted);
 
   const selfNick = createMemo(() => local.selfNick ?? ourNick() ?? '');
 
@@ -438,6 +459,21 @@ export function MessageView(props: MessageViewProps): JSX.Element {
             </Show>
           }
         >
+          <Show when={(() => {
+            const view = activeView();
+            if (view.kind !== 'channel') return false;
+            return historyExhausted().get(view.channel.toLowerCase()) === true;
+          })()}>
+            <div class="shell-channel-intro" data-testid="channel-intro">
+              <span class="shell-channel-intro-glyph" aria-hidden="true">#</span>
+              <h2 class="shell-channel-intro-title">
+                {activeView().kind === 'channel' ? (activeView() as { kind: 'channel'; channel: string }).channel : ''}
+              </h2>
+              <p class="shell-channel-intro-note">
+                This is the very beginning of the conversation. Say something worth scrolling back to.
+              </p>
+            </div>
+          </Show>
           <For each={messages()}>
             {(msg, index) => {
               const prevMsg = createMemo(() => {
@@ -450,6 +486,19 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                 if (!prev) return false;
                 return sameAuthorGroup(prev, msg);
               });
+
+              // Elegant date boundary — a hairline with a floating day chip.
+              const dayBoundary = createMemo(() => {
+                const prev = prevMsg();
+                return !prev || prev.time.toDateString() !== msg.time.toDateString();
+              });
+              const dayEl = (
+                <Show when={dayBoundary()}>
+                  <div class="shell-day-divider" role="separator" aria-label={dayLabel(msg.time)}>
+                    <span class="shell-day-divider-label">{dayLabel(msg.time)}</span>
+                  </div>
+                </Show>
+              );
 
               // "New messages" boundary, rendered above the captured divider message.
               const dividerEl = (
@@ -464,6 +513,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
               if (isSystemMsg(msg)) {
                 return (
                   <>
+                    {dayEl}
                     {dividerEl}
                     <div
                       class={[
@@ -499,6 +549,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
               if (isContinuation()) {
                 return (
                   <>
+                  {dayEl}
                   {dividerEl}
                   <div
                     class={[
@@ -558,6 +609,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
               // Full group (avatar + meta)
               return (
                 <>
+                {dayEl}
                 {dividerEl}
                 <div
                   class={[
@@ -588,7 +640,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                   </div>
                   <div class="shell-msg-body">
                     <div class="shell-msg-meta">
-                      <span class="shell-msg-author">{msg.from}</span>
+                      <span class="shell-msg-author" style={{ color: nickTint(msg.from) }}>{msg.from}</span>
                       <time
                         class="shell-msg-ts"
                         dateTime={msg.time.toISOString()}
