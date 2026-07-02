@@ -3108,7 +3108,10 @@
   .shell-ribbon { gap: 8px; padding: 0 12px; }
   .shell-ribbon-channel { font-size: 1rem; max-width: 10ch; }
   .shell-ribbon-topic { display: none; }
-  .shell-ribbon-identity { display: none; }
+  /* Keep the identity (channel NAME) — hiding the whole block left a dead
+     void at the ribbon's left and the controls looked unanchored. Only the
+     topic yields on phones (rule above). */
+  .shell-ribbon-identity { min-width: 0; overflow: hidden; }
   .shell-composer { padding: 8px 12px; }
   .shell-composer-inner { gap: 6px; }
   .shell-command-item { grid-template-columns: 1fr; gap: 2px; }
