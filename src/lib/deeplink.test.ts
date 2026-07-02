@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseJoinParam } from './deeplink';
+import { parseAtParam, parseJoinParam } from './deeplink';
 
 describe('parseJoinParam', () => {
   it('accepts a plain #channel', () => {
@@ -56,5 +56,44 @@ describe('parseJoinParam', () => {
   it('rejects malformed percent-encoding instead of throwing', () => {
     expect(parseJoinParam('%23bad%')).toBeNull();
     expect(parseJoinParam('%E0%A4%A')).toBeNull();
+  });
+});
+
+describe('parseAtParam', () => {
+  it('accepts epoch seconds', () => {
+    const at = parseAtParam('1751000000');
+    expect(at?.getTime()).toBe(1_751_000_000_000);
+  });
+
+  it('accepts epoch milliseconds', () => {
+    const at = parseAtParam('1751000000000');
+    expect(at?.getTime()).toBe(1_751_000_000_000);
+  });
+
+  it('accepts an ISO-8601 datetime (encoded or plain)', () => {
+    expect(parseAtParam('2026-06-30T12:00:00Z')?.toISOString()).toBe('2026-06-30T12:00:00.000Z');
+    expect(parseAtParam('2026-06-30T12%3A00%3A00Z')?.toISOString()).toBe('2026-06-30T12:00:00.000Z');
+  });
+
+  it('accepts a bare ISO date', () => {
+    expect(parseAtParam('2026-06-30')).toBeInstanceOf(Date);
+  });
+
+  it('takes the first value when the router surfaces an array', () => {
+    expect(parseAtParam(['1751000000', '9'])?.getTime()).toBe(1_751_000_000_000);
+  });
+
+  it('rejects missing, empty and malformed values', () => {
+    expect(parseAtParam(null)).toBeNull();
+    expect(parseAtParam(undefined)).toBeNull();
+    expect(parseAtParam('')).toBeNull();
+    expect(parseAtParam('yesterday')).toBeNull();
+    expect(parseAtParam('%E0%A4%A')).toBeNull();
+  });
+
+  it('rejects instants before 2020 and far-future instants', () => {
+    expect(parseAtParam('2019-12-31T23:59:59Z')).toBeNull();
+    expect(parseAtParam('946684800')).toBeNull(); // 2000-01-01 epoch s
+    expect(parseAtParam(String(Date.now() + 3 * 24 * 60 * 60 * 1000))).toBeNull();
   });
 });

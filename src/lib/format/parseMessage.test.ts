@@ -27,15 +27,6 @@ function only(tokens: Token[], type: Token['type']): Token[] {
   return tokens.filter((t) => t.type === type);
 }
 
-function text(tokens: Token[]): string {
-  return tokens
-    .map((t) => {
-      if (t.type === 'text') return t.text;
-      return '';
-    })
-    .join('');
-}
-
 // ── Plain text ────────────────────────────────────────────────────────────────
 
 describe('plain text', () => {

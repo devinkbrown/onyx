@@ -112,10 +112,6 @@ interface OnyxStoreState {
 interface OnyxStore {
   store?: { getState(): OnyxStoreState };
 }
-interface OnyxWindow extends Window {
-  __onyx?: OnyxStore;
-}
-
 const ONYX = '__onyx' as const;
 
 // A single connected user (its own browser context — isolated storage/media).
@@ -317,9 +313,9 @@ test.describe('voice / video MEDIA path (two fake-media users)', () => {
       const a = await snapshot(A, chan);
       const b = await snapshot(B, chan);
       // Logged so a skipped run still leaves a diagnosable trail.
-      // eslint-disable-next-line no-console
+       
       console.log('A(signal):', JSON.stringify(a));
-      // eslint-disable-next-line no-console
+       
       console.log('B(signal):', JSON.stringify(b));
 
       // The server MUST understand MEDIA — this is the core regression guard and
@@ -366,7 +362,7 @@ test.describe('voice / video MEDIA path (two fake-media users)', () => {
       await A.page.waitForTimeout(SETTLE_AFTER_VOICE);
 
       const a = await snapshot(A, chan);
-      // eslint-disable-next-line no-console
+       
       console.log('A(audio):', JSON.stringify(a));
 
       expect(a.unknownMediaCommand, 'A saw "Unknown command: MEDIA"').toBe(false);
@@ -405,9 +401,9 @@ test.describe('voice / video MEDIA path (two fake-media users)', () => {
 
       const a = await snapshot(A, chan);
       const b = await snapshot(B, chan);
-      // eslint-disable-next-line no-console
+       
       console.log('A(voice):', JSON.stringify(a));
-      // eslint-disable-next-line no-console
+       
       console.log('B(video):', JSON.stringify(b));
 
       // DataCloneError would mean MediaFrame/transfer wiring is broken — that is a
@@ -445,7 +441,7 @@ test.describe('voice / video MEDIA path (two fake-media users)', () => {
       await A.page.waitForTimeout(SETTLE_AFTER_VOICE);
 
       const joined = await snapshot(A, chan);
-      // eslint-disable-next-line no-console
+       
       console.log('A(before leave):', JSON.stringify(joined));
       expect(joined.unknownMediaCommand, 'A saw "Unknown command: MEDIA"').toBe(false);
 
@@ -470,7 +466,7 @@ test.describe('voice / video MEDIA path (two fake-media users)', () => {
       await A.page.waitForTimeout(1_500);
 
       const left = await snapshot(A, chan);
-      // eslint-disable-next-line no-console
+       
       console.log('A(after leave):', JSON.stringify(left));
       expect(left.callChannel, 'callChannel cleared after leaveVoiceChannel()').toBeNull();
     } finally {

@@ -10,8 +10,8 @@
  */
 
 import { cleanup, render, screen, fireEvent } from '@solidjs/testing-library';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createSignal, type JSX } from 'solid-js';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createSignal, Show } from 'solid-js';
 
 import { applyThemeToDom, ThemeProvider, useTheme } from './ThemeProvider';
 import { THEMES, THEME_IDS, DEFAULT_THEME_ID, type ThemeId, type TokenMap } from './themes';
@@ -24,10 +24,6 @@ import { ALL_STUDIO_TOKENS, EDITABLE_PROPERTIES } from './tokens';
 
 function getVar(prop: string): string {
   return document.documentElement.style.getPropertyValue(prop).trim();
-}
-
-function Wrapper(props: { children: JSX.Element }) {
-  return <ThemeProvider>{props.children}</ThemeProvider>;
 }
 
 function ThemeIdDisplay() {
@@ -175,6 +171,9 @@ describe('ThemeProvider', () => {
   it('respects a controlled value prop', () => {
     const [value, setValue] = createSignal<ThemeId>('hisui');
 
+    // render()'s callback IS a tracked component scope — the plugin just
+    // doesn't recognise the testing-library entrypoint.
+    // eslint-disable-next-line solid/reactivity
     render(() => (
       <ThemeProvider value={value()}>
         <ThemeIdDisplay />
@@ -409,12 +408,17 @@ describe('Ocean family', () => {
 describe('useTheme', () => {
   it('throws when called outside a ThemeProvider', () => {
     function BareConsumer() {
+      let thrown: unknown = null;
       try {
         useTheme();
       } catch (err) {
-        return <span data-testid="error">{String(err)}</span>;
+        thrown = err;
       }
-      return <span data-testid="no-error" />;
+      return (
+        <Show when={thrown !== null} fallback={<span data-testid="no-error" />}>
+          <span data-testid="error">{String(thrown)}</span>
+        </Show>
+      );
     }
 
     render(() => <BareConsumer />);

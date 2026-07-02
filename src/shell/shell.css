@@ -3586,3 +3586,16 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* ── Offline outbox: queued-but-unsent messages ─────────────────────────── */
+/* Dimmed with a soft pulse so "written but not delivered" reads at a glance;
+   the row returns at full strength when the echo lands after reconnect. */
+.shell-msg-pending {
+  opacity: 0.55;
+}
+.shell-msg-pending .shell-msg-ts::after,
+.shell-msg-pending .shell-msg-cont-ts::after {
+  content: ' · queued';
+  color: var(--washi-mute);
+  font-style: italic;
+}

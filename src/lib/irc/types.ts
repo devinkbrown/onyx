@@ -63,6 +63,8 @@ export interface ChatMessage {
   deleted?: boolean;
   /** true if the message was redacted via IRCv3 REDACT */
   redacted?: boolean;
+  /** true while the message sits in the offline outbox (not yet sent) */
+  pending?: boolean;
 }
 
 /**
@@ -125,4 +127,6 @@ export interface ISupport {
    * non-media feature badge in HomeView still reads it; never set from 005.
    */
   SILENCE: number;     // max silence list entries (0 = not supported)
+  /** base64url Web Push VAPID public key (ISUPPORT `VAPID=`); '' = no push */
+  VAPID: string;
 }

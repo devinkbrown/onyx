@@ -369,13 +369,9 @@ function RenderInlineToken(props: SingleInlineProps): JSX.Element {
         {(() => {
           const shortcode = (local.token as { shortcode: string }).shortcode;
           const unicode = lookupEmoji(shortcode);
-          return unicode !== null ? (
-            <span class="shell-msg-emoji" aria-label={shortcode} role="img">
+          return <Show when={unicode !== null} fallback={<span>:{shortcode}:</span>}><span class="shell-msg-emoji" aria-label={shortcode} role="img">
               {unicode}
-            </span>
-          ) : (
-            <span>:{shortcode}:</span>
-          );
+            </span></Show>;
         })()}
       </Match>
     </Switch>

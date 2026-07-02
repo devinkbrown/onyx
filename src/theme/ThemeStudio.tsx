@@ -90,25 +90,25 @@ function StudioPreview() {
   return (
     <div class="ts-preview" aria-label="Live preview">
       <div class="ts-preview__bar">
-        <span class="ts-preview__bar-dot" style="background: var(--shu)" />
-        <span class="ts-preview__bar-dot" style="background: var(--gold)" />
-        <span class="ts-preview__bar-dot" style="background: var(--ok)" />
+        <span class="ts-preview__bar-dot" style={{"background":"var(--shu)"}} />
+        <span class="ts-preview__bar-dot" style={{"background":"var(--gold)"}} />
+        <span class="ts-preview__bar-dot" style={{"background":"var(--ok)"}} />
         <span class="ts-preview__bar-title">#general — eshmaki.me</span>
       </div>
       <div class="ts-preview__body">
         <div class="ts-preview__msg">
-          <span class="ts-preview__nick" style="color: var(--lapis-bright)">aoi</span>
+          <span class="ts-preview__nick" style={{"color":"var(--lapis-bright)"}}>aoi</span>
           <span class="ts-preview__text">surfaced from the deep current</span>
         </div>
         <div class="ts-preview__msg">
-          <span class="ts-preview__nick" style="color: var(--gold-bright)">kain</span>
+          <span class="ts-preview__nick" style={{"color":"var(--gold-bright)"}}>kain</span>
           <span class="ts-preview__text">
             the tide is calm —{' '}
-            <span style="color: var(--shu-bright)">a coral light</span> drifting through the dark water
+            <span style={{"color":"var(--shu-bright)"}}>a coral light</span> drifting through the dark water
           </span>
         </div>
         <div class="ts-preview__msg">
-          <span class="ts-preview__nick" style="color: var(--ok)">orochi</span>
+          <span class="ts-preview__nick" style={{"color":"var(--ok)"}}>orochi</span>
           <span class="ts-preview__text ts-preview__text--dim">→ mesh: 2 shards online</span>
         </div>
         <div class="ts-preview__input-row">
@@ -238,7 +238,7 @@ type TokenControlProps = {
 
 function TokenControl(props: TokenControlProps) {
   const [local] = splitProps(props, ['token', 'currentValue', 'onInput', 'modified', 'onReset']);
-  const id = `ts-control-${local.token.property.replace(/^--/, '').replace(/-/g, '_')}`;
+  const id = () => `ts-control-${local.token.property.replace(/^--/, '').replace(/-/g, '_')}`;
 
   // Derive a usable current value for each control type.
   const raw = () => local.currentValue();
@@ -265,12 +265,12 @@ function TokenControl(props: TokenControlProps) {
     <Tooltip content={local.token.hint} placement="top">
       <div class="ts-token-control">
         <Show when={local.token.type === 'color'}>
-          <label class="ts-token-label" for={id}>
+          <label class="ts-token-label" for={id()}>
             {local.token.label}
           </label>
           <div class="ts-token-color-row">
             <input
-              id={id}
+              id={id()}
               type="color"
               class="ts-token-swatch"
               value={raw().startsWith('#') ? raw() : '#000000'}
@@ -282,12 +282,12 @@ function TokenControl(props: TokenControlProps) {
         </Show>
 
         <Show when={local.token.type === 'radius'}>
-          <label class="ts-token-label" for={id}>
+          <label class="ts-token-label" for={id()}>
             {local.token.label}
             <span class="ts-token-badge">{raw()}</span>
           </label>
           <input
-            id={id}
+            id={id()}
             type="range"
             class="ts-token-range"
             min={local.token.min ?? 0}
@@ -301,12 +301,12 @@ function TokenControl(props: TokenControlProps) {
         </Show>
 
         <Show when={local.token.type === 'duration'}>
-          <label class="ts-token-label" for={id}>
+          <label class="ts-token-label" for={id()}>
             {local.token.label}
             <span class="ts-token-badge">{raw()}</span>
           </label>
           <input
-            id={id}
+            id={id()}
             type="range"
             class="ts-token-range"
             min={local.token.min ?? 0}
@@ -321,7 +321,7 @@ function TokenControl(props: TokenControlProps) {
 
         <Show when={local.token.type === 'font' || local.token.type === 'easing'}>
           <FormField
-            id={id}
+            id={id()}
             label={local.token.label}
             value={raw()}
             onInput={handleTextInput}
@@ -335,7 +335,7 @@ function TokenControl(props: TokenControlProps) {
           <button
             type="button"
             class="ts-token-revert"
-            onClick={local.onReset}
+            onClick={() => local.onReset()}
             aria-label={`Revert ${local.token.label} to base`}
             title="Revert to base value"
             data-testid={`ts-revert-${local.token.property.replace(/^--/, '')}`}

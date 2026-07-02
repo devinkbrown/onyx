@@ -1,4 +1,4 @@
-import { createEffect, onCleanup, Show, splitProps, type JSX, type ParentProps } from 'solid-js';
+import { createEffect, onCleanup, Show, splitProps, type ParentProps } from 'solid-js';
 import { Portal } from 'solid-js/web';
 
 export type SheetProps = ParentProps<{

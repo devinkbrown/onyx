@@ -12,6 +12,7 @@
 
 import { For, type JSX } from 'solid-js';
 import { Sheet } from '@/primitives';
+import { clearVault } from '@/lib/vault/historyVault';
 import '@/lib/prefs/preferences.css';
 import { CLOCKS,
   DENSITIES,
@@ -162,6 +163,17 @@ export function PreferencesPanel(): JSX.Element {
           description="Unfurl the first link in a message into a title-and-image card (fetched via this server, never your browser)."
           value={() => preferences().linkPreviews}
           onToggle={(value) => setPreference('linkPreviews', value)}
+        />
+
+        <Toggle
+          legend="Local history"
+          title="Remember conversations on this device"
+          description="Keeps recent scrollback in this browser so rooms open instantly and read offline. Turning it off erases what's stored here."
+          value={() => preferences().localHistory}
+          onToggle={(value) => {
+            setPreference('localHistory', value);
+            if (!value) void clearVault();
+          }}
         />
 
         <Toggle

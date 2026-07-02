@@ -47,6 +47,7 @@ describe('preferences store', () => {
         reduceMotion: true,
         linkPreviews: true,
         clock: '24h',
+        localHistory: true,
       });
     });
 
@@ -63,6 +64,7 @@ describe('preferences store', () => {
         reduceMotion: false,
         linkPreviews: true,
         clock: '24h',
+        localHistory: true,
       });
     });
 
@@ -107,6 +109,7 @@ describe('preferences store', () => {
         reduceMotion: true,
         linkPreviews: false,
         clock: '12h',
+        localHistory: false,
       });
       const ds = document.documentElement.dataset;
       expect(ds.density).toBe('compact');

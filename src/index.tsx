@@ -19,6 +19,7 @@ if (import.meta.env.PROD && typeof navigator !== 'undefined' && 'serviceWorker' 
   });
 }
 import { render } from 'solid-js/web';
+import { initVaultSync } from './lib/vault/vaultSync';
 import { Router, Route } from '@solidjs/router';
 import { lazy } from 'solid-js';
 import '@fontsource/anton';
@@ -43,6 +44,8 @@ if (import.meta.env.DEV) {
     (window as unknown as { __onyx?: unknown }).__onyx = m;
   });
 }
+
+initVaultSync();
 
 render(
   () => (

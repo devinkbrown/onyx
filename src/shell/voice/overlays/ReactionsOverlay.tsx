@@ -65,7 +65,7 @@ export function ReactionsOverlay() {
           {(item) => (
             <span
               class="voice-reaction"
-              style={`--voice-reaction-start: ${item.startX}px; --voice-reaction-drift: ${item.drift}px;`}
+              style={{ '--voice-reaction-start': `${item.startX}px`, '--voice-reaction-drift': `${item.drift}px` }}
             >
               <span class="voice-reaction__emoji">{item.emoji}</span>
               <span class="voice-reaction__nick">{item.nick}</span>

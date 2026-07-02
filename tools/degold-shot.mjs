@@ -1,0 +1,13 @@
+import { chromium } from '@playwright/test';
+const shots = '/tmp/claude-1000/-home-kain/ffc683ba-855e-4799-99d5-312b3890a1db/scratchpad/shots';
+const browser = await chromium.launch();
+const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+await page.goto('https://eshmaki.me/', { waitUntil: 'networkidle' });
+await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight * 0.82));
+await page.waitForTimeout(1200);
+await page.screenshot({ path: `${shots}/degold-landing.png` });
+await page.goto('https://eshmaki.me/stats/', { waitUntil: 'networkidle' });
+await page.waitForTimeout(1200);
+await page.screenshot({ path: `${shots}/degold-stats.png` });
+console.log('done');
+await browser.close();

@@ -1,0 +1,14 @@
+import { chromium } from '@playwright/test';
+const browser = await chromium.launch();
+const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+const events = [];
+page.on('console', (m) => events.push(`[${m.type()}] ${m.text().slice(0, 120)}`));
+page.on('pageerror', (e) => events.push(`[pageerror] ${String(e).slice(0, 200)}`));
+page.on('framenavigated', (f) => { if (f === page.mainFrame()) events.push(`[nav] ${f.url()}`); });
+await page.goto('https://eshmaki.me/app', { waitUntil: 'domcontentloaded' });
+await page.waitForTimeout(12000);
+const inputs = await page.locator('input').count();
+events.push(`inputs after 12s: ${inputs}`);
+await page.screenshot({ path: '/tmp/claude-1000/-home-kain/ffc683ba-855e-4799-99d5-312b3890a1db/scratchpad/shots/app-debug.png' });
+for (const e of events.slice(-25)) console.log(e);
+await browser.close();

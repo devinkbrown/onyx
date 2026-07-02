@@ -274,7 +274,7 @@ export function VoicePip() {
         role="region"
         aria-label={`Mini voice view for ${target()}`}
         tabindex="0"
-        style={`--voice-pip-x: ${position().x}px; --voice-pip-y: ${position().y}px;`}
+        style={{ '--voice-pip-x': `${position().x}px`, '--voice-pip-y': `${position().y}px` }}
         onKeyDown={onKeyDown}
         data-testid="voice-pip"
       >

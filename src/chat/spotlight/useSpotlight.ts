@@ -1,4 +1,4 @@
-import { createSignal, onCleanup, onMount, type Accessor, type ParentProps } from 'solid-js';
+import { children, createSignal, onCleanup, onMount, type Accessor, type JSX, type ParentProps } from 'solid-js';
 
 const [isSpotlightOpen, setSpotlightOpen] = createSignal(false);
 
@@ -60,7 +60,10 @@ export function useSpotlightHotkeys(): void {
   });
 }
 
-export function SpotlightProvider(props: ParentProps) {
+export function SpotlightProvider(props: ParentProps): JSX.Element {
   useSpotlightHotkeys();
-  return props.children;
+  const resolved = children(() => props.children);
+  // A children() accessor is a valid Solid JSX child at runtime; the TS JSX
+  // typing just doesn't admit the accessor type in a .ts file.
+  return resolved as unknown as JSX.Element;
 }

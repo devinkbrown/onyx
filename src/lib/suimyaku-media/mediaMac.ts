@@ -62,7 +62,7 @@ export async function deriveMediaMacKey(
   msg.set(ch, o); o += ch.length;
   msg[o++] = 0x00;
   msg.set(pa, o); o += pa.length;
-  msg[o++] = 0x01;
+  msg[o] = 0x01;
 
   return hmacSha256(prk, msg);
 }

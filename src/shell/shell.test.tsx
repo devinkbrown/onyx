@@ -234,7 +234,7 @@ describe('AppShell', () => {
       sendMessageSpy.mockRestore();
     });
 
-    it('disables the composer when not connected', () => {
+    it('keeps the composer usable while disconnected (offline outbox)', () => {
       // Arrange — active channel present, but the connection has dropped
       seedStore('#general');
       store.setState({ connectionStatus: 'disconnected' });
@@ -242,9 +242,14 @@ describe('AppShell', () => {
       // Act
       const { container } = render(() => <AppShell />);
 
-      // Assert — composer renders for the active channel but is disabled
+      // Assert — composing stays possible: text written offline queues to
+      // the outbox and sends on reconnect. The placeholder says so.
       const textarea = container.querySelector('.shell-composer-textarea') as HTMLTextAreaElement;
-      expect(textarea).toBeDisabled();
+      expect(textarea).not.toBeDisabled();
+      expect(textarea.placeholder).toContain('Offline');
+      // Attachments DO need the network right now — that tool locks.
+      const attach = container.querySelector('button[aria-label="Attach files"]') as HTMLButtonElement;
+      expect(attach).toBeDisabled();
     });
   });
 

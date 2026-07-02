@@ -26,7 +26,7 @@
 
 import './shell.css';
 
-import { lazy, createMemo, createSignal, For, onCleanup, onMount, Show, splitProps, type JSX } from 'solid-js';
+import { lazy, createMemo, createSignal, onCleanup, onMount, Show, splitProps, type JSX } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
 import { Background } from '@/backgrounds/index';
 import { NotificationRuntime } from '@/lib/notifications';

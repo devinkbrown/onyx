@@ -344,5 +344,6 @@ export function useCommands(): Accessor<SpotlightCommand[]> {
     ),
   );
 
-  return createMemo(() => buildCommands(state()));
+  const commands = createMemo(() => buildCommands(state()));
+  return commands;
 }

@@ -1,0 +1,10 @@
+import { chromium } from '@playwright/test';
+const shots = '/tmp/claude-1000/-home-kain/ffc683ba-855e-4799-99d5-312b3890a1db/scratchpad/shots';
+const browser = await chromium.launch();
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+const page = await ctx.newPage();
+await page.goto('https://eshmaki.me/', { waitUntil: 'networkidle' });
+await page.waitForTimeout(1500);
+await page.screenshot({ path: `${shots}/site-mobile-full.png`, fullPage: true });
+console.log('done');
+await browser.close();

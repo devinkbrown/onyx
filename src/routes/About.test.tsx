@@ -18,7 +18,7 @@
 
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { describe, expect, it, vi, beforeAll } from 'vitest';
+import { describe, expect, it, beforeAll } from 'vitest';
 
 // ── Source file ──────────────────────────────────────────────────────────────
 const ABOUT_SRC_PATH = resolve(__dirname, 'About.tsx');

@@ -23,7 +23,6 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   const activeView = useStore((s) => s.activeView);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const channels = useStore((s) => s.channels);
-  const dms = useStore((s) => s.dms);
   const ourNick = useStore((s) => s.ourNick);
   const account = useStore(selectAccount);
 
@@ -32,12 +31,6 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     const view = activeView();
     if (view.kind !== 'channel') return null;
     return channels().get(view.channel) ?? null;
-  });
-
-  const activeDm = createMemo(() => {
-    const view = activeView();
-    if (view.kind !== 'dm') return null;
-    return dms().get(view.nick.toLowerCase()) ?? dms().get(view.nick) ?? null;
   });
 
   const channelName = createMemo(() => {

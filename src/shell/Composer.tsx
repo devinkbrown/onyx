@@ -116,15 +116,16 @@ export function Composer(props: ComposerProps): JSX.Element {
     return edit.target.toLowerCase() === t.toLowerCase() ? edit : null;
   });
 
-  const isEnabled = createMemo(() => {
-    return !!target() && connectionStatus() === 'connected';
-  });
+  // The composer stays USABLE while the connection is down — text written
+  // offline queues to the outbox (store.sendMessage) and fires on reconnect.
+  // Attachments are the exception: uploads need the network right now.
+  const isOffline = createMemo(() => connectionStatus() !== 'connected');
+  const isEnabled = createMemo(() => !!target());
 
   const placeholder = createMemo(() => {
     const t = target();
-    const cs = connectionStatus();
     if (activeEditing()) return 'Edit message';
-    if (cs !== 'connected') return 'Reconnecting…';
+    if (isOffline()) return t ? `Offline — queues for ${t}` : 'Reconnecting…';
     if (!t) return 'Pick a room or a person to begin';
     return `Message ${t}`;
   });
@@ -439,6 +440,18 @@ export function Composer(props: ComposerProps): JSX.Element {
     if (!t || !isEnabled() || !canSend()) return;
     setComposerError(null);
 
+    if (isOffline()) {
+      // Edits and uploads need the network NOW; plain text queues fine.
+      if (activeEditing()) {
+        setComposerError('Reconnect before editing messages.');
+        return;
+      }
+      if (attachments().length > 0) {
+        setComposerError('Attachments need a connection — remove them to queue the text.');
+        return;
+      }
+    }
+
     const edit = activeEditing();
     if (edit) {
       if (attachments().length > 0) {
@@ -630,7 +643,7 @@ export function Composer(props: ComposerProps): JSX.Element {
         <button
           type="button"
           class="shell-composer-tool"
-          disabled={!isEnabled() || !!activeEditing()}
+          disabled={!isEnabled() || !!activeEditing() || isOffline()}
           aria-label="Attach files"
           onClick={handleAttachClick}
         >

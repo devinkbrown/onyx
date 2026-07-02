@@ -135,6 +135,7 @@ export class IRCClient {
     TOPICLEN: 390,
     IRCX: false,
     SILENCE: 0,          // SILENCE=20 — max entries in server-side silence list
+    VAPID: '',           // VAPID=<key> — Web Push server key (empty = push off)
   };
 
   /** Map prefix char → mode letter, e.g. '@' → 'o'. Orochi: (YQqov)*!.@+ */
@@ -227,6 +228,21 @@ export class IRCClient {
 
   sendRaw(command: string, ...params: string[]) {
     this.send(formatIRCLine(command, ...params));
+  }
+
+  /**
+   * Force-close the socket through the NORMAL close path, so onDisconnected
+   * fires and the store's reconnect machinery takes over. Used when the OS
+   * reports the network gone (window 'offline') — the TCP stack can take
+   * minutes to notice on its own, and messages composed in that window would
+   * silently vanish instead of queueing to the offline outbox.
+   */
+  dropConnection(reason = 'network offline') {
+    try {
+      this.ws?.close(4002, reason);
+    } catch {
+      /* already closing/closed */
+    }
   }
 
   /** The effective current nick (registration nick, or the post-433 alias). */
@@ -888,6 +904,9 @@ export class IRCClient {
           break;
         case 'SILENCE':
           this.isupport.SILENCE = parseInt(val, 10) || 20;
+          break;
+        case 'VAPID':
+          this.isupport.VAPID = val;
           break;
       }
     }

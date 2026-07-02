@@ -87,8 +87,8 @@ type RoleBadgeProps = {
 
 function RoleBadge(props: RoleBadgeProps): JSX.Element {
   const [local] = splitProps(props, ['role']);
-  if (local.role.key === 'member') return <></>;
   return (
+    <Show when={local.role.key !== 'member'}>
     <span
       class={`shell-role-badge shell-role-badge--${local.role.key}`}
       aria-label={local.role.label}
@@ -96,6 +96,7 @@ function RoleBadge(props: RoleBadgeProps): JSX.Element {
     >
       {local.role.symbol}
     </span>
+    </Show>
   );
 }
 

@@ -1,0 +1,12 @@
+import { chromium } from '@playwright/test';
+const shots = '/tmp/claude-1000/-home-kain/ffc683ba-855e-4799-99d5-312b3890a1db/scratchpad/shots';
+const browser = await chromium.launch();
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+const page = await ctx.newPage();
+await page.goto('http://localhost:8901/stats/', { waitUntil: 'networkidle' });
+await page.waitForTimeout(800);
+await page.click('.chan-feature .card-cover');
+await page.waitForTimeout(1800);
+await page.screenshot({ path: `${shots}/stats-channel.png`, fullPage: true });
+await browser.close();
+console.log('url after click:', page.url ? 'done' : '');

@@ -1,6 +1,8 @@
-import { createEffect, createMemo, createSignal, type Accessor } from 'solid-js';
+import { createEffect, createMemo, createSignal, onCleanup, type Accessor } from 'solid-js';
 import { getState, useStore } from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
+import { preferences } from '@/lib/prefs/preferences';
+import { searchVault } from '@/lib/vault/historyVault';
 
 export type MessageSearchResult = {
   id: string;
@@ -9,6 +11,15 @@ export type MessageSearchResult = {
   time: Date;
   target: string;
   ordinal: number;
+};
+
+export type VaultSearchResult = {
+  id: string;
+  from: string;
+  text: string;
+  time: Date;
+  /** Conversation key the hit lives in ('#channel' or a DM nick). */
+  target: string;
 };
 
 export type UseMessageSearch = {
@@ -29,6 +40,10 @@ export type UseMessageSearch = {
   activeResultId: Accessor<string | null>;
   targetLabel: Accessor<string>;
   hasConversation: Accessor<boolean>;
+  /** Device-memory (vault) hits from OTHER conversations, newest first */
+  vaultResults: Accessor<VaultSearchResult[]>;
+  /** Open a vault hit: navigate to its conversation and land on the message */
+  openVaultResult: (result: VaultSearchResult) => void;
   open: () => void;
   close: () => void;
   next: () => void;
@@ -205,6 +220,49 @@ export function useMessageSearch(): UseMessageSearch {
     setMessageSearchActiveIndex(0);
   }
 
+  // ── device-memory (vault) search across ALL conversations ──
+  // Debounced against the query; hits from the ACTIVE conversation are
+  // dropped (the in-buffer search above already surfaces those live).
+  const [vaultHits, setVaultHits] = createSignal<VaultSearchResult[]>([]);
+  let vaultTimer: ReturnType<typeof setTimeout> | undefined;
+  let vaultSeq = 0;
+  createEffect(() => {
+    const query = messageSearchQuery().trim();
+    const open = isMessageSearchOpen();
+    const activeKey = searchTarget()?.toLocaleLowerCase() ?? null;
+    if (vaultTimer !== undefined) clearTimeout(vaultTimer);
+    if (!open || query.length < 2 || !preferences().localHistory) {
+      setVaultHits([]);
+      return;
+    }
+    const seq = ++vaultSeq;
+    vaultTimer = setTimeout(() => {
+      void searchVault(query).then((hits) => {
+        if (seq !== vaultSeq) return; // a newer query superseded this one
+        setVaultHits(
+          hits
+            .filter((h) => h.target !== activeKey)
+            .slice(0, 25)
+            .map((h) => ({
+              id: h.message.id,
+              from: h.message.from,
+              text: h.message.text,
+              time: h.message.time,
+              target: h.target,
+            })),
+        );
+      });
+    }, 200);
+  });
+  onCleanup(() => {
+    if (vaultTimer !== undefined) clearTimeout(vaultTimer);
+  });
+
+  function openVaultResult(result: VaultSearchResult): void {
+    getState().openVaultResult(result.target, result.id);
+    closeMessageSearch();
+  }
+
   function move(delta: number): void {
     const count = resultCount();
     if (count === 0) return;
@@ -228,6 +286,8 @@ export function useMessageSearch(): UseMessageSearch {
     activeResultId,
     targetLabel,
     hasConversation,
+    vaultResults: vaultHits,
+    openVaultResult,
     open: openMessageSearch,
     close: closeMessageSearch,
     next: () => move(1),

@@ -20,7 +20,6 @@ import {
   createMemo,
   createSignal,
   For,
-  onCleanup,
   Show,
   splitProps,
   type JSX,
@@ -387,6 +386,37 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     });
   });
 
+  // ── time-travel landing (?at= deep link, vault search hits) ──
+  // When the store points at a landing message (a CHATHISTORY AROUND answer,
+  // or a device-memory search hit), scroll to it and pulse. The node may not
+  // be in the DOM yet — an AROUND merge is still rendering, or a vault hit
+  // just triggered a join + hydration — so retry against a deadline generous
+  // enough to cover join + hydrate latency before giving up.
+  const timeTravelLandingId = useStore((s) => s.timeTravelLandingId);
+  createEffect(() => {
+    const landingId = timeTravelLandingId();
+    if (!landingId) return;
+    const deadline = performance.now() + 3000;
+    const attempt = (): void => {
+      if (getState().timeTravelLandingId !== landingId) return; // superseded
+      const esc = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+        ? CSS.escape(landingId)
+        : landingId.replace(/["\\]/g, '\\$&');
+      const node = feedEl?.querySelector<HTMLElement>(`[data-message-search-id="${esc}"]`);
+      if (node) {
+        node.scrollIntoView({ block: 'center' });
+        setAtBottom(false);
+        node.classList.add('shell-msg-search-pulse');
+        window.setTimeout(() => node.classList.remove('shell-msg-search-pulse'), 1400);
+        getState().clearTimeTravelLanding();
+        return;
+      }
+      if (performance.now() < deadline) requestAnimationFrame(attempt);
+      else getState().clearTimeTravelLanding();
+    };
+    requestAnimationFrame(attempt);
+  });
+
   // ── thread panel ──
   const [threadOpen, setThreadOpen] = createSignal(false);
   const [threadParentId, setThreadParentId] = createSignal<string | null>(null);
@@ -546,7 +576,11 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                 setMenuOpen(true);
               };
 
-              // Continuation line (same author within 5 min)
+              // Continuation line (same author within 5 min). Branching on
+              // isContinuation() outside JSX is intentional: rows are keyed by
+              // message id and a message's continuation status is fixed at
+              // insert time — the row re-creates whenever the list changes.
+              // eslint-disable-next-line solid/reactivity
               if (isContinuation()) {
                 return (
                   <>
@@ -558,6 +592,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                       isHighlight() ? 'shell-msg-cont--highlight' : '',
                       revealedId() === msg.id ? 'shell-msg-revealed' : '',
                       activeMessageSearchResultId() === msg.id ? 'shell-msg-search-current' : '',
+                      msg.pending ? 'shell-msg-pending' : '',
                     ].filter(Boolean).join(' ')}
                     data-message-search-id={msg.id}
                     onContextMenu={openMenuFromRow}
@@ -618,6 +653,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                     isHighlight() ? 'shell-msg-group--highlight' : '',
                     revealedId() === msg.id ? 'shell-msg-revealed' : '',
                     activeMessageSearchResultId() === msg.id ? 'shell-msg-search-current' : '',
+                    msg.pending ? 'shell-msg-pending' : '',
                   ].filter(Boolean).join(' ')}
                   data-message-search-id={msg.id}
                   aria-label={`${msg.from} at ${fmtTime(msg.time)}`}

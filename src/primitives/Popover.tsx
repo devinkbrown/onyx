@@ -20,7 +20,7 @@ export function Popover(props: PopoverProps) {
   const [local, rest] = splitProps(props, ['trigger', 'id', 'open', 'defaultOpen', 'onOpenChange', 'placement', 'children']);
   const [innerOpen, setInnerOpen] = createSignal(local.defaultOpen ?? false);
   const instanceId = ++popoverId;
-  const id = local.id ?? `onyx-popover-${instanceId}`;
+  const id = () => local.id ?? `onyx-popover-${instanceId}`;
   const anchorName = `--onyx-popover-anchor-${instanceId}`;
   let panelRef: PopoverElement | undefined;
   let triggerRef: HTMLButtonElement | undefined;
@@ -90,6 +90,9 @@ export function Popover(props: PopoverProps) {
   createEffect(() => {
     if (!isOpen() || typeof window === 'undefined') return;
     const raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (cb: FrameRequestCallback) => setTimeout(() => cb(0), 0);
+    // Deferred one-shot DOM measurement — deliberately untracked; the effect
+    // re-runs on isOpen() and the resize/scroll listeners cover the rest.
+    // eslint-disable-next-line solid/reactivity
     raf(() => positionPanel());
     const reflow = () => positionPanel();
     window.addEventListener('resize', reflow);
@@ -108,7 +111,7 @@ export function Popover(props: PopoverProps) {
         class="onyx-popover__trigger"
         aria-haspopup="dialog"
         aria-expanded={isOpen()}
-        aria-controls={id}
+        aria-controls={id()}
         onClick={() => setOpen(!isOpen())}
       >
         {local.trigger}
@@ -123,7 +126,7 @@ export function Popover(props: PopoverProps) {
             element.setAttribute('popover', 'auto');
           }
         }}
-        id={id}
+        id={id()}
         role="dialog"
         class="onyx-popover__panel"
         hidden={!isOpen()}

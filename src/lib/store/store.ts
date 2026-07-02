@@ -10,6 +10,7 @@ import { parseAccountInfo, parseCHANLIMIT, parseMonitorNumeric, parsePREFIX, par
 import type { SuimyakuPeerState, SuimyakuRoomStats, CallState } from '@/lib/suimyaku-media/types';
 import { getMountedSuimyakuMediaEngine } from '@/lib/suimyaku-media/MediaEngine';
 import { parseActivity } from '@/lib/activity';
+import { OUTBOX_MAX_AGE_MS, deleteOutboxEntry, loadOutbox, queueOutbox, type OutboxEntry } from '@/lib/vault/historyVault';
 import {
   composerDraftKey,
   getComposerDraft as readComposerDraft,
@@ -403,6 +404,10 @@ export interface OnyxState {
   activeView: ActiveView;
   /** Channel from a website ?join= deep link, joined once connected */
   pendingDeepLinkJoin: string | null;
+  /** Moment from a website ?at= deep link — time travel after the join */
+  pendingDeepLinkAt: Date | null;
+  /** Message id the feed should scroll to + pulse (time-travel landing) */
+  timeTravelLandingId: string | null;
   /** Whether the member list panel is open */
   showMemberList: boolean;
   /** Whether the settings modal is open */
@@ -754,7 +759,22 @@ export interface OnyxState {
   joinChannel(channel: string, key?: string): void;
 
   /** Stash a validated ?join= deep-link channel until the connection lands */
-  setPendingDeepLinkJoin(channel: string | null): void;
+  setPendingDeepLinkJoin(channel: string | null, at?: Date | null): void;
+
+  /** Time travel: fetch history around a moment and land the feed on it */
+  travelTo(target: string, at: Date): void;
+
+  /** Consume the time-travel landing id after the feed has scrolled to it */
+  clearTimeTravelLanding(): void;
+
+  /** Open a vault (device-memory) search hit: navigate there and land on it */
+  openVaultResult(target: string, messageId: string): void;
+
+  /** Send queued offline messages (runs on reconnect; retries while joins land) */
+  flushOutbox(): void;
+
+  /** Prepend locally-vaulted history (deduped by id) into a buffer */
+  hydrateHistory(target: string, msgs: ChatMessage[]): void;
 
   /** Leave a channel */
   partChannel(channel: string): void;
@@ -1791,6 +1811,33 @@ const _batchCollectors = new Map<string, {
  */
 const _openChathistoryByTarget = new Map<string, string>();
 
+// ── Time travel (module-level) ────────────────────────────────────────────────
+/**
+ * A pending CHATHISTORY AROUND fetch started by travelTo(). When the next
+ * chathistory batch for this target closes, the merged buffer is searched for
+ * the message nearest `at` and its id becomes timeTravelLandingId (the feed
+ * scrolls to it and pulses). One-shot; cleared on connect/disconnect resets.
+ */
+let _pendingTravel: { key: string; at: Date } | null = null;
+
+/** flushOutbox retry budget per connection (reset on each successful connect). */
+let _outboxRetries = 0;
+
+/** The message whose timestamp is closest to `at` (buffer is time-sorted). */
+function nearestMessageId(messages: readonly ChatMessage[], at: Date): string | null {
+  const t = at.getTime();
+  let best: string | null = null;
+  let bestDelta = Infinity;
+  for (const m of messages) {
+    const delta = Math.abs(m.time.getTime() - t);
+    if (delta < bestDelta) {
+      bestDelta = delta;
+      best = m.id;
+    }
+  }
+  return best;
+}
+
 // ── NAMES accumulation (module-level) ─────────────────────────────────────────
 /**
  * Lowercased channel keys with a NAMES reply in progress. A channel's roster
@@ -2099,7 +2146,7 @@ function _normalizeEmojiSkinTone(tone: string): OnyxState['emojiSkinTone'] {
 export type State = OnyxState;
 
 type ActionKey = {
-  [K in keyof State]: State[K] extends (...args: any[]) => any ? K : never;
+  [K in keyof State]: State[K] extends (...args: never[]) => unknown ? K : never;
 }[keyof State];
 
 export type Actions = Pick<State, ActionKey>;
@@ -2118,6 +2165,8 @@ export const store = createStore<OnyxState>()(
     serverStats: null,
     activeView: { kind: 'home' },
     pendingDeepLinkJoin: null,
+    pendingDeepLinkAt: null,
+    timeTravelLandingId: null,
     showMemberList: true,
     showSettings: false,
     settingsTab: 'account',
@@ -2312,6 +2361,7 @@ export const store = createStore<OnyxState>()(
       // leak across a (re)connect.
       _batchCollectors.clear();
       _openChathistoryByTarget.clear();
+      _pendingTravel = null;
       _namesInProgress.clear();
       _lastRosterRefresh.clear();
       _motdBuffer = '';
@@ -2364,11 +2414,14 @@ export const store = createStore<OnyxState>()(
           _reconnectAttempts = 0;
           set({ status: 'connected', connectionStatus: 'connected', reconnectIn: 0, autoReconnect: true, connectedAt: new Date() });
           get().addServerLog(hasRegistered ? 'Reconnected.' : `Connected to ${get().server?.url ?? 'server'}.`);
-          // On a RECONNECT / session-resume, reattach does not necessarily replay
-          // NAMES, so members who joined or left during the gap leave the roster
-          // stale (missing or ghost nicks). Re-request NAMES for every joined
-          // channel to resync — our NAMES handling is authoritative, so each
-          // reply rebuilds that channel's roster exactly. Skipped on the first
+          // On a RECONNECT, re-establish every channel the UI still shows.
+          // A session-resumed account is still in them server-side (JOIN is
+          // then a no-op our idempotent handler absorbs), but a GUEST's
+          // reconnect is a brand-new session — without the JOIN the server
+          // has no idea about these channels and silently rejects everything
+          // sent to them while the UI pretends all is well. NAMES then
+          // resyncs the roster either way (authoritative rebuild), catching
+          // members who came or went during the gap. Skipped on the first
           // connect (its JOINs already pull fresh NAMES).
           if (hasRegistered) {
             setTimeout(() => {
@@ -2377,6 +2430,7 @@ export const store = createStore<OnyxState>()(
               const c = st.client;
               if (!c) return;
               for (const ch of st.channels.values()) {
+                c.sendRaw('JOIN', ch.name);
                 c.sendRaw('NAMES', ch.name);
               }
             }, 600);
@@ -2479,6 +2533,7 @@ export const store = createStore<OnyxState>()(
       // swallow live messages after a fresh connect.
       _batchCollectors.clear();
       _openChathistoryByTarget.clear();
+      _pendingTravel = null;
       _stopRosterPoll();
       _motdBuffer = '';
       get().client?.destroy();
@@ -2504,8 +2559,147 @@ export const store = createStore<OnyxState>()(
       get().client?.join(channel, key);
     },
 
-    setPendingDeepLinkJoin(channel) {
-      set({ pendingDeepLinkJoin: channel });
+    setPendingDeepLinkJoin(channel, at) {
+      set({ pendingDeepLinkJoin: channel, pendingDeepLinkAt: channel ? (at ?? null) : null });
+    },
+
+    travelTo(target, at) {
+      // Time travel (?at= deep link / stats links): pull a window of history
+      // AROUND the moment; the batch-close merge sorts the buffer and picks
+      // the nearest message as the landing (timeTravelLandingId → feed scroll).
+      const { client } = get();
+      if (!hasChatHistoryCap(client)) return;
+      _pendingTravel = { key: target.toLowerCase(), at };
+      client?.sendRaw('CHATHISTORY', 'AROUND', target, `timestamp=${at.toISOString()}`, String(HISTORY_PAGE_SIZE));
+    },
+
+    clearTimeTravelLanding() {
+      set({ timeTravelLandingId: null });
+    },
+
+    flushOutbox() {
+      void (async () => {
+        const entries = await loadOutbox();
+        if (entries.length === 0) return;
+        const dropPlaceholder = (e: OutboxEntry): void => {
+          set(s => {
+            const strip = (msgs: ChatMessage[]) => msgs.filter(m => m.id !== `outbox:${e.id}`);
+            const channels = new Map(s.channels);
+            const c = channels.get(e.target_key);
+            if (c) {
+              channels.set(e.target_key, { ...c, messages: strip(c.messages) });
+              return { channels };
+            }
+            const dms = new Map(s.dms);
+            const dm = dms.get(e.target_key);
+            if (dm) {
+              dms.set(e.target_key, { ...dm, messages: strip(dm.messages) });
+              return { dms };
+            }
+            return {};
+          });
+        };
+
+        let sent = 0;
+        let expired = 0;
+        let waiting = 0;
+        for (const e of entries) {
+          const st = get();
+          if (st.connectionStatus !== 'connected' || !st.client) {
+            waiting += 1;
+            continue;
+          }
+          if (Date.now() - e.queued_at > OUTBOX_MAX_AGE_MS) {
+            await deleteOutboxEntry(e.id);
+            dropPlaceholder(e);
+            expired += 1;
+            continue;
+          }
+          // A channel message can only send once the join has landed; DMs go
+          // straight away. Not-yet-joined entries stay queued for the retry.
+          const chantypes = st.client.isupport.CHANTYPES ?? '#&';
+          const isChannel = e.target.length > 0 && chantypes.includes(e.target[0]!);
+          if (isChannel && !st.channels.has(e.target_key)) {
+            waiting += 1;
+            continue;
+          }
+          // Placeholder out first — the send's echo appends the real message.
+          dropPlaceholder(e);
+          await deleteOutboxEntry(e.id);
+          get().sendMessage(e.target, e.text);
+          sent += 1;
+        }
+
+        if (sent > 0) {
+          get().addToast({
+            variant: 'success',
+            title: sent === 1 ? 'Queued message sent' : `${sent} queued messages sent`,
+            description: 'Written while offline, delivered now.',
+          });
+        }
+        if (expired > 0) {
+          get().addToast({
+            variant: 'warning',
+            title: expired === 1 ? 'Queued message expired' : `${expired} queued messages expired`,
+            description: 'Older than a day — dropped instead of sent.',
+          });
+        }
+        if (waiting > 0 && _outboxRetries < 5) {
+          _outboxRetries += 1;
+          setTimeout(() => get().flushOutbox(), 4000);
+        }
+      })();
+    },
+
+    openVaultResult(target, messageId) {
+      // A device-memory search hit can point anywhere: a joined channel, a
+      // channel we've left, or a DM. Open the conversation (joining/creating
+      // as needed — the vault hydration then repopulates its scrollback) and
+      // hand the message to the feed's landing scroll. The landing effect
+      // retries for a few seconds, which covers join + hydrate latency.
+      const key = target.toLowerCase();
+      const s = get();
+      const channel = s.channels.get(key);
+      if (channel) {
+        get().navigate({ kind: 'channel', channel: channel.name });
+      } else if (key.startsWith('#')) {
+        get().joinChannel(key); // self-JOIN echo activates the view
+      } else {
+        const dm = s.dms.get(key);
+        if (!dm) {
+          const dms = new Map(s.dms);
+          dms.set(key, { nick: target, account: null, unread: 0, highlights: 0, messages: [] });
+          set({ dms });
+        }
+        get().navigate({ kind: 'dm', nick: dm?.nick ?? target });
+      }
+      set({ timeTravelLandingId: messageId });
+    },
+
+    hydrateHistory(target, localMsgs) {
+      // Local-first scrollback (vault): renders instantly; the server's
+      // CHATHISTORY replay later merges on top and dedupes by the same ids.
+      const key = target.toLowerCase();
+      set(s => {
+        const merge = (existing: ChatMessage[]): ChatMessage[] => {
+          const ids = new Set(existing.map(m => m.id));
+          const fresh = localMsgs.filter(m => !ids.has(m.id));
+          return fresh.length === 0 ? existing : [...fresh, ...existing];
+        };
+        const channels = new Map(s.channels);
+        const c = channels.get(key);
+        if (c) {
+          channels.set(key, { ...c, messages: merge(c.messages) });
+          return { channels };
+        }
+        const dms = new Map(s.dms);
+        const dm = dms.get(key);
+        if (dm) {
+          dms.set(key, { ...dm, messages: merge(dm.messages) });
+          return { dms };
+        }
+        return {};
+      });
     },
 
     // ── partChannel ──────────────────────────────────────────────────────
@@ -2648,6 +2842,30 @@ export const store = createStore<OnyxState>()(
     // ── sendMessage ──────────────────────────────────────────────────────
     sendMessage(target, text) {
       const { client, ourNick } = get();
+
+      // Offline outbox (Roadmap Phase 2): composing while disconnected queues
+      // the message in the vault and shows a pending placeholder; it fires on
+      // reconnect via flushOutbox(). Slash commands never queue — replaying a
+      // stale command into a fresh session is surprising, a message isn't.
+      if ((!client || get().connectionStatus !== 'connected') && !text.startsWith('/')) {
+        void queueOutbox(target, text).then((entry) => {
+          if (!entry) {
+            get().addToast({ variant: 'error', title: 'Offline', description: 'Message could not be queued on this device.' });
+            return;
+          }
+          const placeholder: ChatMessage = {
+            id: `outbox:${entry.id}`,
+            time: new Date(),
+            from: get().ourNick || 'you',
+            text,
+            type: 'msg',
+            target,
+            pending: true,
+          };
+          set(s => _addMessage(s, target, placeholder));
+        });
+        return;
+      }
       if (!client) return;
 
       if (text.startsWith('/')) {
@@ -4255,11 +4473,24 @@ export const store = createStore<OnyxState>()(
             // after the session-sync burst so its self-JOIN echo wins the
             // active view. Fires in every mode, including session resume.
             {
+              // Offline outbox: fire queued messages once the session settles
+              // (after the session-sync join replay, so channel sends land).
+              _outboxRetries = 0;
+              setTimeout(() => get().flushOutbox(), 2500);
+            }
+            {
               const pendingJoin = get().pendingDeepLinkJoin;
+              const pendingAt = get().pendingDeepLinkAt;
               if (pendingJoin) {
                 setTimeout(() => {
                   get().client?.sendRaw('JOIN', pendingJoin);
-                  set({ pendingDeepLinkJoin: null });
+                  set({ pendingDeepLinkJoin: null, pendingDeepLinkAt: null });
+                  if (pendingAt) {
+                    // ?at= time travel: fetch AROUND the moment once the join
+                    // replay has had a beat to land (the sorted merge tolerates
+                    // either order; the delay just keeps one batch in flight).
+                    setTimeout(() => get().travelTo(pendingJoin, pendingAt), 2400);
+                  }
                 }, 1600);
               }
             }
@@ -5116,7 +5347,7 @@ export const store = createStore<OnyxState>()(
             const notifyLevel = get().channelNotify.get(msgKey) ?? 'all';
             // 'none' → never increment unread/highlights; store message only
             // 'mentions' → only count as unread if it mentions us or a channel-wide ping
-            const isChannelWidePing = /\@(everyone|here)\b/i.test(displayText);
+            const isChannelWidePing = /@(everyone|here)\b/i.test(displayText);
             const effectiveHighlight =
               isSelf ? false
               : notifyLevel === 'none' ? false
@@ -5963,6 +6194,7 @@ export const store = createStore<OnyxState>()(
                 _openChathistoryByTarget.delete(batchTarget.toLowerCase());
               }
               const batchKey = batchTarget.toLowerCase();
+              const isTravelBatch = _pendingTravel !== null && _pendingTravel.key === batchKey;
 
               if (batchMsgs.length > 0) {
                 set(s => {
@@ -5976,7 +6208,13 @@ export const store = createStore<OnyxState>()(
                   const mergeHistory = (existing: ChatMessage[]): ChatMessage[] => {
                     const existingIds = new Set(existing.map(m => m.id));
                     const newHistory = batchMsgs.filter(m => !existingIds.has(m.id));
-                    return [...newHistory, ...existing];
+                    if (newHistory.length === 0) return existing;
+                    // Stable time-sort: a plain prepend breaks chronology when
+                    // batches land out of order (AROUND time travel fetches an
+                    // older window while the join replay is still arriving).
+                    return [...newHistory, ...existing].sort(
+                      (a, b) => a.time.getTime() - b.time.getTime(),
+                    );
                   };
                   const channels = new Map(s.channels);
                   const c = channels.get(batchKey);
@@ -5995,12 +6233,14 @@ export const store = createStore<OnyxState>()(
                 });
               }
 
-              // Mark loading done; mark exhausted if fewer than 50 messages came back
+              // Mark loading done; mark exhausted if fewer than 50 messages came
+              // back — but never off the back of an AROUND (time-travel) fetch,
+              // whose short answer says nothing about the top of history.
               set(s => {
                 const historyLoading = new Map(s.historyLoading);
                 historyLoading.set(batchKey, false);
                 const historyExhausted = new Map(s.historyExhausted);
-                if (batchMsgs.length < 50) {
+                if (batchMsgs.length < 50 && !isTravelBatch) {
                   historyExhausted.set(batchKey, true);
                 }
                 return { historyLoading, historyExhausted };
@@ -6012,6 +6252,19 @@ export const store = createStore<OnyxState>()(
               {
                 const storedMarker = get().readMarkers.get(batchKey);
                 if (storedMarker) set(s => _applyReadMarker(s, batchKey, storedMarker));
+              }
+
+              // Time-travel landing: this batch answered a travelTo() AROUND
+              // fetch — pick the merged message nearest the requested moment
+              // and hand it to the feed (scroll + pulse), one-shot.
+              if (_pendingTravel && _pendingTravel.key === batchKey) {
+                const at = _pendingTravel.at;
+                _pendingTravel = null;
+                const st = get();
+                const buf =
+                  st.channels.get(batchKey)?.messages ?? st.dms.get(batchKey)?.messages ?? [];
+                const landing = nearestMessageId(buf, at);
+                if (landing) set({ timeTravelLandingId: landing });
               }
             }
           }
@@ -9183,6 +9436,27 @@ if (typeof window !== 'undefined') {
       }
     } catch {
       // best-effort; never block unload
+    }
+  });
+}
+
+// ── OS network events: honest status + instant outbox handoff ────────────────
+// The keepalive ping cycle takes up to ~40s to notice a dead link; the OS
+// knows the network is gone IMMEDIATELY. Reflecting that at once means a
+// message composed right after the drop queues to the offline outbox instead
+// of vanishing into a socket the TCP stack still believes in. 'online' then
+// short-circuits the reconnect backoff.
+if (typeof window !== 'undefined') {
+  window.addEventListener('offline', () => {
+    const s = store.getState();
+    if (s.connectionStatus === 'connected') {
+      s.client?.dropConnection('network offline');
+    }
+  });
+  window.addEventListener('online', () => {
+    const s = store.getState();
+    if ((s.connectionStatus === 'reconnecting' || s.connectionStatus === 'disconnected') && s.autoReconnect) {
+      s.reconnectNow();
     }
   });
 }

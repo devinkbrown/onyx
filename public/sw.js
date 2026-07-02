@@ -85,7 +85,22 @@ self.addEventListener('fetch', (event) => {
 
 // ── Push notifications ─────────────────────────────────────────────────────────
 self.addEventListener('push', (event) => {
-  const data = event.data?.json() ?? {};
+  let data = {};
+  try {
+    data = event.data?.json() ?? {};
+  } catch {
+    data = { body: event.data?.text() ?? '' };
+  }
+  // Orochi's webpushNotify sends {type:'dm', from, text} (RFC 8291-encrypted
+  // end to end); map it onto the generic {title, body, url} shape.
+  if (data.type === 'dm' && data.from) {
+    data = {
+      title: `Message from ${data.from}`,
+      body: data.text ?? '',
+      tag: `onyx-dm-${data.from}`,
+      url: '/app',
+    };
+  }
   event.waitUntil(
     self.registration.showNotification(data.title ?? 'Onyx', {
       body: data.body ?? '',

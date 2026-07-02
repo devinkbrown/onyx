@@ -85,7 +85,7 @@ export type Token = InlineToken | CodeBlockToken | BlockquoteToken;
 const MAX_LENGTH = 4_000;
 
 /** Characters that can end a @nick token. */
-const NICK_END_RE = /[^\w\-]/;
+const NICK_END_RE = /[^\w-]/;
 
 /** Characters that end a #channel name token. */
 const CHAN_NAME_END_RE = /[\s,;!?'"()[\]{}<>]/;
@@ -159,16 +159,6 @@ function findClose(src: string, start: number, end: number, close: string): numb
 }
 
 // ── Inline token helper ────────────────────────────────────────────────────────
-
-/** Append a single character as text to a token array (merging if possible). */
-function pushChar(tokens: InlineToken[], ch: string): void {
-  const last = tokens[tokens.length - 1];
-  if (last?.type === 'text') {
-    (last as TextToken).text += ch;
-  } else {
-    tokens.push({ type: 'text', text: ch });
-  }
-}
 
 /** Push a string segment as a text token (merging with last if possible). */
 function pushText(tokens: InlineToken[], text: string): void {

@@ -39,7 +39,7 @@ import {
   type JSX,
 } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
-import { parseJoinParam } from '@/lib/deeplink';
+import { parseAtParam, parseJoinParam } from '@/lib/deeplink';
 import { ConnectPulse } from './ConnectPulse';
 import { AppShell } from '@/shell';
 import { Button } from '@/primitives/index';
@@ -127,7 +127,7 @@ export function validateNick(value: string): string | undefined {
   const v = value.trim();
   if (!v) return 'Nick is required.';
   if (v.length > 64) return 'Nick must be 64 characters or fewer.';
-  if (!/^[A-Za-z\[\]\\`_^{|}][A-Za-z0-9\[\]\\`_^{|}\-]*$/.test(v)) {
+  if (!/^[A-Za-z[\]\\`_^{|}][A-Za-z0-9[\]\\`_^{|}-]*$/.test(v)) {
     return 'Nick must start with a letter or IRC special char and contain only letters, numbers, or -[]\\`_^{|}.';
   }
   return undefined;
@@ -240,14 +240,20 @@ export function Connect(props: ConnectProps): JSX.Element {
   // ── Mode ──────────────────────────────────────────────────────────────────
   const [mode, setMode] = createSignal<Mode>('guest');
 
-  // Website → app handoff: /app?join=%23channel. Validated before it goes
-  // anywhere near a JOIN; a bad link is simply ignored.
+  // Website → app handoff: /app?join=%23channel (+ optional &at=<moment> for
+  // time travel). Validated before it goes anywhere near a JOIN; a bad link is
+  // simply ignored.
   const deepLinkJoin = parseJoinParam(
     typeof window !== 'undefined'
       ? new URLSearchParams(window.location.search).get('join')
       : null,
   );
-  if (deepLinkJoin) getState().setPendingDeepLinkJoin(deepLinkJoin);
+  const deepLinkAt = parseAtParam(
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('at')
+      : null,
+  );
+  if (deepLinkJoin) getState().setPendingDeepLinkJoin(deepLinkJoin, deepLinkAt);
 
   // Optional room to join after connect (there is NO automatic join). The
   // field prefills from the ?join= deep link; on submit it becomes the
@@ -322,6 +328,7 @@ export function Connect(props: ConnectProps): JSX.Element {
 
   // ── Store reads ─────────────────────────────────────────────────────────────
   const connectionStatus = useStore((s) => s.connectionStatus);
+  const autoReconnect = useStore((s) => s.autoReconnect);
   const ourNick = useStore((s) => s.ourNick);
   const registerPending = useStore((s) => s.registerPending);
   const registerError = useStore((s) => s.registerError);
@@ -452,6 +459,10 @@ export function Connect(props: ConnectProps): JSX.Element {
     const inFlight = registerInFlight();
     const pending = registerPending();
     if ((phase === 'submitting' || phase === 'verifying') && inFlight && !pending) {
+      // Deliberately untracked: the microtask samples the LATEST signal values
+      // once, after the store batch settles — tracking here would re-arm the
+      // effect on every read and defeat the settle-then-decide design above.
+      // eslint-disable-next-line solid/reactivity
       queueMicrotask(() => {
         if (!registerInFlight()) return;
         if (registerError()) {
@@ -539,7 +550,12 @@ export function Connect(props: ConnectProps): JSX.Element {
       return;
     }
     setRoomError(undefined);
-    getState().setPendingDeepLinkJoin(normalizedRoom);
+    // Preserve the ?at= moment when the room came from the deep link; a
+    // manually retyped different room shouldn't inherit someone else's moment.
+    getState().setPendingDeepLinkJoin(
+      normalizedRoom,
+      normalizedRoom === deepLinkJoin ? deepLinkAt : null,
+    );
 
     if (m === 'signin') {
       const pErr = password() ? undefined : 'Password is required to sign in.';
@@ -643,7 +659,11 @@ export function Connect(props: ConnectProps): JSX.Element {
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <Show
-      when={connectionStatus() === 'connected' && registerPhase() === 'idle'}
+      // The shell stays mounted through a DROP: autoReconnect is true only
+      // after a successful connect (and false again on deliberate disconnect
+      // or when retries give up), so a network blip shows the reconnect
+      // banner + offline composer instead of bouncing to this form.
+      when={(connectionStatus() === 'connected' || autoReconnect()) && registerPhase() === 'idle'}
       fallback={
         <div class="conn" data-testid="connect-screen" data-mode={mode()}>
           <Atmosphere />

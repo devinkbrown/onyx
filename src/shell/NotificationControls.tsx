@@ -1,11 +1,12 @@
-import { createSignal, type JSX } from 'solid-js';
+import { createSignal, onMount, Show, type JSX } from 'solid-js';
 
-import { useStore, getState } from '@/lib/store';
+import { useStore, getState, selectAccount } from '@/lib/store';
 import {
   getDesktopNotificationPermission,
   requestDesktopNotificationPermission,
   type DesktopNotificationPermission,
 } from '@/lib/notifications';
+import { disableWebPush, enableWebPush, webPushActive, webPushSupported } from '@/lib/notifications/webPush';
 
 function permissionLabel(permission: DesktopNotificationPermission): string {
   if (permission === 'unsupported') return 'Desktop notifications are not supported';
@@ -19,7 +20,36 @@ export function NotificationControls(): JSX.Element {
   const soundEnabled = useStore((s) => s.soundEnabled);
   const dndEnabled = useStore((s) => s.dndEnabled);
   const dndUntil = useStore((s) => s.dndUntil);
+  const account = useStore(selectAccount);
   const [permission, setPermission] = createSignal(getDesktopNotificationPermission());
+  const [webPushOn, setWebPushOn] = createSignal(false);
+  const [webPushBusy, setWebPushBusy] = createSignal(false);
+
+  onMount(() => {
+    void webPushActive().then(setWebPushOn);
+  });
+
+  async function handleWebPushToggle(): Promise<void> {
+    if (webPushBusy()) return;
+    setWebPushBusy(true);
+    try {
+      if (webPushOn()) {
+        await disableWebPush();
+        setWebPushOn(false);
+        getState().addToast({ variant: 'info', title: 'Push off', description: 'This browser will no longer be nudged while closed.' });
+      } else {
+        const result = await enableWebPush();
+        if (result.ok) {
+          setWebPushOn(true);
+          getState().addToast({ variant: 'success', title: 'Push on', description: 'DMs reach this browser even with the tab closed.' });
+        } else {
+          getState().addToast({ variant: 'warning', title: 'Push unavailable', description: result.reason });
+        }
+      }
+    } finally {
+      setWebPushBusy(false);
+    }
+  }
 
   const dndActive = (): boolean => {
     const until = dndUntil();
@@ -76,6 +106,19 @@ export function NotificationControls(): JSX.Element {
       >
         <span aria-hidden="true">♪</span>
       </button>
+      <Show when={webPushSupported() && account()}>
+        <button
+          type="button"
+          class={`shell-notify-btn${webPushOn() ? ' shell-notify-btn--on' : ''}`}
+          disabled={webPushBusy()}
+          title={webPushOn() ? 'Turn off push (tab-closed DMs)' : 'Push DMs to this browser even when the tab is closed'}
+          aria-label={webPushOn() ? 'Disable web push' : 'Enable web push'}
+          aria-pressed={webPushOn()}
+          onClick={() => void handleWebPushToggle()}
+        >
+          <span aria-hidden="true">P</span>
+        </button>
+      </Show>
       <button
         type="button"
         class={`shell-notify-btn${dndActive() ? ' shell-notify-btn--dnd' : ''}`}

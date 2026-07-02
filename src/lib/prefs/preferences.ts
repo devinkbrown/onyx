@@ -41,6 +41,8 @@ export interface Preferences {
   linkPreviews: boolean;
   /** Timestamp clock format for messages and sidebar activity. */
   clock: Clock;
+  /** Local-first scrollback: persist conversations to this device (vault). */
+  localHistory: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Readonly<Preferences> = {
@@ -51,6 +53,7 @@ export const DEFAULT_PREFERENCES: Readonly<Preferences> = {
   reduceMotion: false,
   linkPreviews: true,
   clock: '24h',
+  localHistory: true,
 };
 
 // ── persistence ─────────────────────────────────────────────────────────────
@@ -91,6 +94,7 @@ export function loadPreferences(): Preferences {
     reduceMotion: typeof raw.reduceMotion === 'boolean' ? raw.reduceMotion : DEFAULT_PREFERENCES.reduceMotion,
     linkPreviews: typeof raw.linkPreviews === 'boolean' ? raw.linkPreviews : DEFAULT_PREFERENCES.linkPreviews,
     clock: isOneOf(raw.clock, CLOCKS) ? raw.clock : DEFAULT_PREFERENCES.clock,
+    localHistory: typeof raw.localHistory === 'boolean' ? raw.localHistory : DEFAULT_PREFERENCES.localHistory,
   };
 }
 

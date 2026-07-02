@@ -7,7 +7,9 @@
   right: clamp(0.75rem, 2vw, 1.5rem);
   z-index: 35;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
   pointer-events: none;
   color: var(--washi);
 }
@@ -205,10 +207,26 @@
 }
 
 /* ── Server-side history search (draft/search) ───────────────────────── */
-.onyx-message-search__server {
-  margin-top: 6px;
-  border-top: 1px solid var(--line);
-  padding-top: 6px;
+/* The results strips are SIBLINGS of the input surface: they must restore
+   pointer-events (the root disables them to let clicks reach the feed) and
+   carry the same glass treatment so the panel reads as one unit. */
+.onyx-message-search__server,
+.onyx-message-search__vault {
+  pointer-events: auto;
+  width: min(42rem, 100%);
+  padding: 6px 10px;
+  border: 1px solid var(--seam);
+  border-radius: var(--r-md);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--stone-2) 66%, transparent),
+      color-mix(in oklab, var(--ink) 78%, transparent)
+    ),
+    color-mix(in oklab, var(--ink) 88%, var(--stone));
+  box-shadow: 0 22px 60px -34px color-mix(in oklab, var(--ink) 96%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
 }
 .onyx-message-search__server-bar {
   display: flex;
@@ -277,6 +295,33 @@
 .onyx-message-search__server-row strong { flex: none; color: var(--washi); font-weight: 600; }
 .onyx-message-search__server-text {
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Device-memory (vault) search across other conversations ─────────── */
+.onyx-message-search__vault-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 22px;
+}
+.onyx-message-search__vault-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--washi-mute);
+}
+.onyx-message-search__vault-target {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis) 10%, transparent);
+  border-radius: 5px;
+  padding: 1px 6px;
+  max-width: 9rem;
   overflow: hidden;
   text-overflow: ellipsis;
 }

@@ -269,6 +269,35 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
             </Show>
           </div>
         </Show>
+        <Show when={search.vaultResults().length > 0}>
+          <div class="onyx-message-search__vault" data-testid="vault-search">
+            <div class="onyx-message-search__vault-bar">
+              <span class="onyx-message-search__vault-label">Elsewhere on this device</span>
+              <span class="onyx-message-search__server-count">
+                {search.vaultResults().length} remembered
+              </span>
+            </div>
+            <ul class="onyx-message-search__server-list" role="list">
+              <For each={search.vaultResults()}>
+                {(result) => (
+                  <li>
+                    <button
+                      type="button"
+                      class="onyx-message-search__server-row"
+                      title={`Open ${result.target} at this message`}
+                      onClick={() => search.openVaultResult(result)}
+                    >
+                      <span class="onyx-message-search__vault-target">{result.target}</span>
+                      <span class="onyx-message-search__server-when">{timeLabel(result.time)}</span>
+                      <strong>{result.from}</strong>
+                      <span class="onyx-message-search__server-text">{result.text}</span>
+                    </button>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </div>
+        </Show>
         <span class="sr-only" aria-live="polite">{statusLabel()}</span>
       </div>
     </Show>

@@ -141,7 +141,7 @@ function msgpackArray3(a: string, b: string, c: number): Uint8Array {
   out[i++] = 0x93;
   out[i++] = 0xa0 | (aB.length & 0x1f); out.set(aB, i); i += aB.length;
   out[i++] = 0xa0 | (bB.length & 0x1f); out.set(bB, i); i += bB.length;
-  out[i++] = 0xcd; out[i++] = (c >> 8) & 0xff; out[i++] = c & 0xff;
+  out[i++] = 0xcd; out[i++] = (c >> 8) & 0xff; out[i] = c & 0xff;
   return out;
 }
 
