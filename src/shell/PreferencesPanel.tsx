@@ -13,7 +13,7 @@
 import { For, type JSX } from 'solid-js';
 import { Sheet } from '@/primitives';
 import '@/lib/prefs/preferences.css';
-import {
+import { CLOCKS,
   DENSITIES,
   FONT_SCALES,
   WIDTHS,
@@ -28,6 +28,7 @@ import {
   type Width,
 } from '@/lib/prefs/preferences';
 
+const CLOCK_LABELS = { '24h': '24-hour', '12h': '12-hour' } as const;
 const DENSITY_LABELS: Record<Density, string> = { compact: 'Compact', cozy: 'Cozy', roomy: 'Roomy' };
 const FONT_SCALE_LABELS: Record<FontScale, string> = { sm: 'Small', md: 'Medium', lg: 'Large' };
 const WIDTH_LABELS: Record<Width, string> = { measured: 'Measured', full: 'Full-width' };
@@ -136,6 +137,15 @@ export function PreferencesPanel(): JSX.Element {
           labels={WIDTH_LABELS}
           value={() => preferences().width}
           onSelect={(value) => setPreference('width', value)}
+        />
+
+        <Segmented
+          legend="Clock"
+          description="Timestamp format for messages and channel activity."
+          options={CLOCKS}
+          labels={CLOCK_LABELS}
+          value={() => preferences().clock}
+          onSelect={(value) => setPreference('clock', value)}
         />
 
         <Toggle

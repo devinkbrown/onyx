@@ -11,6 +11,7 @@
 import {
   createMemo,
   createSignal,
+  onCleanup,
   For,
   Show,
   splitProps,
@@ -83,6 +84,23 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
 
   // ── store selectors ──
   const channels = useStore((s) => s.channels);
+  const channelLastActivity = useStore((s) => s.channelLastActivity);
+
+  // One shared minute-tick drives every activity stamp in the list.
+  const [nowMs, setNowMs] = createSignal(Date.now());
+  const activityClock = setInterval(() => setNowMs(Date.now()), 60_000);
+  onCleanup(() => clearInterval(activityClock));
+
+  /** Compact relative activity stamp: 4m · 2h · 3d (empty when unknown/fresh). */
+  const activityStamp = (name: string): string => {
+    const at = channelLastActivity().get(name.toLowerCase());
+    if (!at) return '';
+    const sec = Math.max(0, Math.floor((nowMs() - at) / 1000));
+    if (sec < 60) return 'now';
+    if (sec < 3600) return `${Math.floor(sec / 60)}m`;
+    if (sec < 86400) return `${Math.floor(sec / 3600)}h`;
+    return `${Math.floor(sec / 86400)}d`;
+  };
   const dms = useStore((s) => s.dms);
   const activeView = useStore((s) => s.activeView);
   const connectionStatus = useStore((s) => s.connectionStatus);
@@ -299,6 +317,11 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
                       >
                         <span class="shell-channel-sigil" aria-hidden="true">#</span>
                         <span class="shell-channel-name">{ch.name.replace(/^#/, '')}</span>
+                        <Show when={activityStamp(ch.name) && ch.unread === 0 && ch.highlights === 0}>
+                          <span class="shell-channel-time" aria-hidden="true">
+                            {activityStamp(ch.name)}
+                          </span>
+                        </Show>
                         <Show when={ch.highlights > 0}>
                           <span class="shell-channel-badge" aria-hidden="true">
                             {ch.highlights}

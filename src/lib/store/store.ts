@@ -7794,15 +7794,24 @@ export const store = createStore<OnyxState>()(
       const { client } = get();
       if (!client) return;
       const engine = getMountedSuimyakuMediaEngine();
-      if (!engine) return;
+      if (!engine) {
+        get().addToast({
+          variant: 'error',
+          title: 'Media engine not ready',
+          description: 'Voice/video is still initialising — try again in a moment.',
+        });
+        return;
+      }
 
       await (withVideo ? engine.joinVideo(channel) : engine.joinVoice(channel));
       const stream = engine.getLocalStream();
       if (!stream) {
         get().addToast({
           variant: 'error',
-          title: 'Microphone Error',
-          description: 'Could not access your microphone. Check permissions.',
+          title: withVideo ? 'Camera unavailable' : 'Microphone unavailable',
+          description: withVideo
+            ? 'Could not access your camera/microphone. Check browser permissions and that no other app holds the camera.'
+            : 'Could not access your microphone. Check browser permissions.',
         });
         return;
       }

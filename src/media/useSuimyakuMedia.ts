@@ -191,7 +191,15 @@ export function mountMedia(): void {
     },
 
     onError(message) {
+      // Both surfaces: the inbox keeps a record, the toast makes the failure
+      // visible AT THE MOMENT it happens (a silent camera/permission failure
+      // reads as "clicking Join video does nothing").
       getState().addNotification({ type: 'error', text: `Voice: ${message}` });
+      getState().addToast({
+        variant: 'error',
+        title: 'Media error',
+        description: message,
+      });
     },
 
     onDecodeError() {

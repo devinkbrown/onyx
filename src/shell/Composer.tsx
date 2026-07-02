@@ -634,7 +634,9 @@ export function Composer(props: ComposerProps): JSX.Element {
           aria-label="Attach files"
           onClick={handleAttachClick}
         >
-          <span aria-hidden="true">📎</span>
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M13.2 7.3 8.3 12.2a3.4 3.4 0 0 1-4.8-4.8l5.4-5.4a2.3 2.3 0 0 1 3.2 3.2L6.7 10.6a1.15 1.15 0 0 1-1.6-1.6l4.6-4.6" />
+          </svg>
         </button>
         <input
           ref={fileInputRef!}
@@ -655,7 +657,12 @@ export function Composer(props: ComposerProps): JSX.Element {
           aria-controls={emojiOpen() ? 'shell-emoji-picker' : undefined}
           onClick={() => setEmojiOpen((open) => !open)}
         >
-          <span aria-hidden="true">☺</span>
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true">
+            <circle cx="8" cy="8" r="6.2" />
+            <path d="M5.6 9.4a3.1 3.1 0 0 0 4.8 0" />
+            <circle cx="6" cy="6.4" r="0.5" fill="currentColor" stroke="none" />
+            <circle cx="10" cy="6.4" r="0.5" fill="currentColor" stroke="none" />
+          </svg>
         </button>
 
         <label for="shell-composer-input" class="sr-only">
@@ -687,9 +694,18 @@ export function Composer(props: ComposerProps): JSX.Element {
           aria-label={activeEditing() ? 'Save edit' : 'Send message'}
           onClick={() => void sendMessage()}
         >
-          <span aria-hidden="true" style={{ 'font-family': 'var(--font-mono)', 'font-size': '1.1rem', 'line-height': '1' }}>
-            {activeEditing() ? '✓' : '↵'}
-          </span>
+          <Show
+            when={activeEditing()}
+            fallback={
+              <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
+                <path d="M1.7 7.3 13.9 1.6a.55.55 0 0 1 .75.68L10.6 14.1a.55.55 0 0 1-1.03.06L7.5 9.7a.55.55 0 0 0-.26-.26L2 7.3a.55.55 0 0 1-.3 0Z" transform="rotate(8 8 8)" />
+              </svg>
+            }
+          >
+            <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m3 8.5 3.4 3.4L13 5.2" />
+            </svg>
+          </Show>
         </button>
       </div>
       <Show when={composerError()}>

@@ -290,11 +290,18 @@ export function AppShell(props: AppShellProps): JSX.Element {
             <Show when={canJoinVoice()}>
               <div class="shell-voice-join">
                 <button type="button" class="shell-voice-join-btn" onClick={() => joinVoice(false)}>
-                  <span class="shell-voice-join-icon" aria-hidden="true">◍</span>
+                  <svg class="shell-voice-join-icon" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 9.5V8a5 5 0 0 1 10 0v1.5" />
+                    <rect x="2" y="9.5" width="2.6" height="4" rx="1.1" />
+                    <rect x="11.4" y="9.5" width="2.6" height="4" rx="1.1" />
+                  </svg>
                   Join voice
                 </button>
                 <button type="button" class="shell-voice-join-btn" onClick={() => joinVoice(true)}>
-                  <span class="shell-voice-join-icon" aria-hidden="true">▤</span>
+                  <svg class="shell-voice-join-icon" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="1.5" y="4" width="9" height="8" rx="1.6" />
+                    <path d="m10.5 7 3.4-2.1a.4.4 0 0 1 .6.34v5.5a.4.4 0 0 1-.6.35L10.5 9" />
+                  </svg>
                   Join video
                 </button>
               </div>

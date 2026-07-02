@@ -14,6 +14,7 @@
  * createEffect/onCleanup; For/Show/Switch/Match; strong a11y.
  */
 
+import { preferences } from '@/lib/prefs/preferences';
 import {
   createEffect,
   createMemo,
@@ -48,6 +49,9 @@ const SKELETON_ROWS = [2, 1, 3, 2, 1] as const;
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtTime(date: Date): string {
+  if (preferences().clock === '12h') {
+    return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
+  }
   return date.toTimeString().slice(0, 5); // HH:MM
 }
 

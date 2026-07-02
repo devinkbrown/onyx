@@ -46,6 +46,7 @@ describe('preferences store', () => {
         width: 'full',
         reduceMotion: true,
         linkPreviews: true,
+        clock: '24h',
       });
     });
 
@@ -61,6 +62,7 @@ describe('preferences store', () => {
         width: DEFAULT_PREFERENCES.width,
         reduceMotion: false,
         linkPreviews: true,
+        clock: '24h',
       });
     });
 
@@ -104,6 +106,7 @@ describe('preferences store', () => {
         width: 'full',
         reduceMotion: true,
         linkPreviews: false,
+        clock: '12h',
       });
       const ds = document.documentElement.dataset;
       expect(ds.density).toBe('compact');

@@ -78,10 +78,12 @@ export function pingNode(node: IrcNode, timeoutMs = 4000): Promise<number> {
     const start = performance.now();
     // no-cors: we only need the round-trip, not the body (opaque response is fine).
     // A cache-buster avoids timing a cached 0ms response.
+    // NOTE: no-cors REQUIRES redirect:'follow' — 'manual' makes the fetch
+    // reject outright ("redirect mode is not follow"), which read as the node
+    // being permanently unreachable and broke nearest-node selection.
     fetch(`https://${node.host}/?_lat=${start}`, {
       mode: 'no-cors',
       cache: 'no-store',
-      redirect: 'manual',
       signal: controller?.signal,
     })
       .then(() => finish(performance.now() - start))

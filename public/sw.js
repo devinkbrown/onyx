@@ -11,13 +11,20 @@ const CACHE_NAME = 'onyx-shell-__BUILD_VERSION__';
 // App shell assets to precache on install
 const PRECACHE_URLS = [
   '/',
-  '/favicon.ico',
+  '/app',
 ];
 
 // ── Install: precache shell ────────────────────────────────────────────────────
+// CRITICAL: precache failures must NEVER abort install. cache.addAll rejects
+// wholesale if any single URL 404s, which bricks the update pipeline — every
+// returning client then keeps the OLD service worker (and its stale bundle)
+// forever. That exact failure shipped once (/favicon.ico vanished) and froze
+// live users on a weeks-old build. Precache best-effort, always install.
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS))
+    caches.open(CACHE_NAME).then((cache) =>
+      Promise.allSettled(PRECACHE_URLS.map((url) => cache.add(url)))
+    )
   );
   self.skipWaiting();
 });
@@ -53,9 +60,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cache-first for static assets (_next/static, fonts, icons)
+  // Cache-first for static assets (hashed /assets from Vite, fonts, icons)
   if (
-    url.pathname.startsWith('/_next/static/') ||
+    url.pathname.startsWith('/assets/') ||
     url.pathname.startsWith('/fonts/') ||
     url.pathname.endsWith('.ico') ||
     url.pathname.endsWith('.png') ||
@@ -80,10 +87,10 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('push', (event) => {
   const data = event.data?.json() ?? {};
   event.waitUntil(
-    self.registration.showNotification(data.title ?? 'Ocean', {
+    self.registration.showNotification(data.title ?? 'Onyx', {
       body: data.body ?? '',
-      icon: '/favicon.ico',
-      badge: '/favicon.ico',
+      icon: '/favicon.svg',
+      badge: '/favicon.svg',
       tag: data.tag ?? 'onyx-notification',
       renotify: !!data.tag,
       data: { url: data.url ?? '/' },

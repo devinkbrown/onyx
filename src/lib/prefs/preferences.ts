@@ -23,6 +23,9 @@ export type FontScale = (typeof FONT_SCALES)[number];
 export const WIDTHS = ['measured', 'full'] as const;
 export type Width = (typeof WIDTHS)[number];
 
+export const CLOCKS = ['24h', '12h'] as const;
+export type Clock = (typeof CLOCKS)[number];
+
 export interface Preferences {
   /** Vertical rhythm of the message feed. */
   density: Density;
@@ -36,6 +39,8 @@ export interface Preferences {
   reduceMotion: boolean;
   /** Unfurl the first web link in a message into an OG preview card. */
   linkPreviews: boolean;
+  /** Timestamp clock format for messages and sidebar activity. */
+  clock: Clock;
 }
 
 export const DEFAULT_PREFERENCES: Readonly<Preferences> = {
@@ -45,6 +50,7 @@ export const DEFAULT_PREFERENCES: Readonly<Preferences> = {
   width: 'measured',
   reduceMotion: false,
   linkPreviews: true,
+  clock: '24h',
 };
 
 // ── persistence ─────────────────────────────────────────────────────────────
@@ -84,6 +90,7 @@ export function loadPreferences(): Preferences {
     width: isOneOf(raw.width, WIDTHS) ? raw.width : DEFAULT_PREFERENCES.width,
     reduceMotion: typeof raw.reduceMotion === 'boolean' ? raw.reduceMotion : DEFAULT_PREFERENCES.reduceMotion,
     linkPreviews: typeof raw.linkPreviews === 'boolean' ? raw.linkPreviews : DEFAULT_PREFERENCES.linkPreviews,
+    clock: isOneOf(raw.clock, CLOCKS) ? raw.clock : DEFAULT_PREFERENCES.clock,
   };
 }
 

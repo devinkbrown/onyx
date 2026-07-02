@@ -496,19 +496,21 @@
 /* A mention/highlight badge glows bioluminescent azure — it is a call to you,
    not a danger. Coral is reserved for genuine alerts. */
 .shell-channel-item--highlight .shell-channel-badge {
+  /* A MENTION is the one hot moment in the sidebar — coral, not another blue,
+     so it can't be mistaken for ordinary unread. */
   background: linear-gradient(
     180deg,
-    color-mix(in oklab, var(--lapis-bright) 64%, transparent) 0%,
-    var(--lapis) 100%
+    color-mix(in oklab, var(--shu-bright) 80%, transparent) 0%,
+    var(--shu) 100%
   );
   color: var(--ink);
   box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--lapis-bright) 40%, transparent),
-    0 0 12px color-mix(in oklab, var(--lapis-bright) 44%, transparent);
+    0 0 0 1px color-mix(in oklab, var(--shu-bright) 40%, transparent),
+    0 0 12px color-mix(in oklab, var(--shu-bright) 40%, transparent);
 }
 
 .shell-channel-item--highlight:not(.shell-channel-item--active) {
-  box-shadow: inset 2px 0 0 var(--lapis-bright);
+  box-shadow: inset 2px 0 0 var(--shu-bright);
 }
 
 .shell-channel-sigil {
@@ -3419,4 +3421,47 @@
 @media (max-width: 600px) {
   .shell-msg-preview { max-width: 100%; }
   .shell-msg-preview-thumb { width: 56px; height: 56px; }
+}
+
+/* ── Channel activity stamps (sidebar) ─────────────────────────────────── */
+.shell-channel-time {
+  margin-left: auto;
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  color: var(--washi-mute);
+  opacity: 0.85;
+  transition: color var(--dur) var(--ease);
+}
+.shell-channel-item:hover .shell-channel-time { color: var(--washi-dim); }
+.shell-channel-item--active .shell-channel-time { color: var(--lapis-bright); opacity: 1; }
+
+/* ── Professional scrollbars across the shell ──────────────────────────── */
+.shell-feed::-webkit-scrollbar,
+.shell-sidebar-scroll::-webkit-scrollbar,
+.shell-members-scroll::-webkit-scrollbar,
+.shell-composer-textarea::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.shell-feed::-webkit-scrollbar-thumb,
+.shell-sidebar-scroll::-webkit-scrollbar-thumb,
+.shell-members-scroll::-webkit-scrollbar-thumb,
+.shell-composer-textarea::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--lapis-deep) 45%, transparent);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.shell-feed::-webkit-scrollbar-thumb:hover,
+.shell-sidebar-scroll::-webkit-scrollbar-thumb:hover,
+.shell-members-scroll::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklab, var(--lapis) 55%, transparent);
+  background-clip: padding-box;
+}
+.shell-feed::-webkit-scrollbar-track,
+.shell-sidebar-scroll::-webkit-scrollbar-track,
+.shell-members-scroll::-webkit-scrollbar-track {
+  background: transparent;
 }

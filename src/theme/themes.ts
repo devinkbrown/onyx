@@ -63,10 +63,10 @@ const oceanTokens: TokenMap = {
   '--lapis-bright':'#7fe2ff',
   '--lapis-deep':  '#0e6aa8',
 
-  // Champagne — warm gold treasure inlay (second accent)
-  '--gold':       '#d8b96a',
-  '--gold-bright':'#f2dca0',
-  '--gold-deep':  '#9a7c38',
+  // Glacier — icy pale azure, second accent (was champagne gold)
+  '--gold':       '#6fc3e8',
+  '--gold-bright':'#b9e9ff',
+  '--gold-deep':  '#2e7fae',
 
   // Coral — the single hot accent (danger / badges)
   '--shu':        '#ff6f61',
@@ -79,7 +79,7 @@ const oceanTokens: TokenMap = {
 
   // Status
   '--ok':      '#34d399',
-  '--warn':    'var(--gold-bright)',
+  '--warn':    '#f2dca0', // warnings stay WARM — decoupled from the glacier second accent
   '--danger':  'var(--shu)',
 
   // Seams (bioluminescent current lines) + bands (pale tide)
@@ -140,7 +140,7 @@ const tideTokens: TokenMap = {
 
   // Status
   '--ok':      '#3ee0a8',
-  '--warn':    'var(--gold-bright)',
+  '--warn':    '#f2dca0', // warnings stay WARM — decoupled from the glacier second accent
   '--danger':  'var(--shu)',
 
   // Seams (brighter current lines) + bands (pale tide)
@@ -201,7 +201,7 @@ const abyssTokens: TokenMap = {
 
   // Status
   '--ok':      '#2fcf93',
-  '--warn':    'var(--gold-bright)',
+  '--warn':    '#f2dca0', // warnings stay WARM — decoupled from the glacier second accent
   '--danger':  'var(--shu)',
 
   // Seams (restrained current lines) + bands (faint tide)
@@ -262,7 +262,7 @@ const reefTokens: TokenMap = {
 
   // Status
   '--ok':      '#34d399',
-  '--warn':    'var(--gold-bright)',
+  '--warn':    '#f2dca0', // warnings stay WARM — decoupled from the glacier second accent
   '--danger':  'var(--shu)',
 
   // Seams — azure current with a warm coral wash in the faint band
@@ -322,7 +322,7 @@ const onyxTokens: TokenMap = {
 
   // Status
   '--ok':      '#57b98a',
-  '--warn':    'var(--gold-bright)',
+  '--warn':    '#f2dca0', // warnings stay WARM — decoupled from the glacier second accent
   '--danger':  'var(--shu)',
 
   // Seams (gold inlay) + bands (pale strata)
@@ -470,7 +470,7 @@ const sumiTokens: TokenMap = {
   '--washi-mute': '#807a68',
 
   '--ok':      '#68d098',
-  '--warn':    'var(--gold-bright)',
+  '--warn':    '#f2dca0', // warnings stay WARM — decoupled from the glacier second accent
   '--danger':  'var(--shu)',
 
   '--seam':       'color-mix(in oklab, var(--gold) 50%, transparent)',
@@ -517,7 +517,7 @@ const shuTokens: TokenMap = {
   '--washi-mute': '#6c5e52',
 
   '--ok':      '#5aaa78',
-  '--warn':    'var(--gold-bright)',
+  '--warn':    '#f2dca0', // warnings stay WARM — decoupled from the glacier second accent
   '--danger':  'var(--shu)',
 
   '--seam':       'color-mix(in oklab, var(--shu) 38%, transparent)',
@@ -564,7 +564,7 @@ const hisuiTokens: TokenMap = {
   '--washi-mute': '#607054',
 
   '--ok':      '#3cb87a',
-  '--warn':    'var(--gold-bright)',
+  '--warn':    '#f2dca0', // warnings stay WARM — decoupled from the glacier second accent
   '--danger':  'var(--shu)',
 
   '--seam':       'color-mix(in oklab, var(--lapis) 40%, transparent)',
@@ -610,7 +610,7 @@ const kohakuTokens: TokenMap = {
   '--washi-mute': '#806858',
 
   '--ok':      '#5aac78',
-  '--warn':    'var(--gold-bright)',
+  '--warn':    '#f2dca0', // warnings stay WARM — decoupled from the glacier second accent
   '--danger':  'var(--shu)',
 
   '--seam':       'color-mix(in oklab, var(--gold) 48%, transparent)',
@@ -660,7 +660,7 @@ const tealTokens: TokenMap = {
 
   // Status
   '--ok':      '#42d69a',
-  '--warn':    'var(--gold-bright)',
+  '--warn':    '#f2dca0', // warnings stay WARM — decoupled from the glacier second accent
   '--danger':  'var(--shu)',
 
   // Seams (mint current) + bands (brass wash)
@@ -719,7 +719,7 @@ const slateTokens: TokenMap = {
 
   // Status
   '--ok':      '#70b77b',
-  '--warn':    'var(--gold-bright)',
+  '--warn':    '#f2dca0', // warnings stay WARM — decoupled from the glacier second accent
   '--danger':  'var(--shu)',
 
   // Seams (bronze inlay) + bands (chalk strata)
@@ -812,7 +812,7 @@ export const THEMES: Record<ThemeId, ThemeMeta> = {
   ocean: {
     id: 'ocean',
     label: 'Ocean',
-    description: 'The flagship — deep water, electric azure current, bioluminescent crests, champagne gold.',
+    description: 'The flagship — deep water, electric azure current, bioluminescent crests, glacier ice.',
     scheme: 'dark',
     tokens: oceanTokens,
   },

@@ -323,7 +323,10 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
         {/* ── Guest state ── */}
         <Show when={isGuest()}>
           <div class="acct-guest" data-testid="account-guest">
-            <span class="acct-guest-glyph" aria-hidden="true">◌</span>
+            <svg class="acct-guest-glyph" viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true">
+              <circle cx="12" cy="8.2" r="3.6" stroke-dasharray="3.2 2.2" />
+              <path d="M4.8 20a7.2 7.2 0 0 1 14.4 0" stroke-dasharray="3.2 2.2" />
+            </svg>
             <h3 class="acct-guest-title">You're browsing as a guest</h3>
             <p class="acct-guest-body">
               Sign in or register from the Connect screen to claim a name, keep

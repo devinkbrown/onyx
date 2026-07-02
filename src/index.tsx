@@ -2,6 +2,22 @@
 // MUST stay the first import: migrates legacy 'ocean-*' localStorage keys to
 // 'onyx:*' as an import side effect, before any module-scope storage reads.
 import './lib/migrateStorage';
+
+// ── Service worker: register + self-heal ────────────────────────────────────
+// The SW registration survives from older builds even though no current code
+// registered it — so keep registering explicitly, and when a NEW worker takes
+// control (skipWaiting + clients.claim after a deploy), reload ONCE so the
+// page can't keep running a stale bundle whose hashed chunks no longer exist
+// ("clicking X does nothing" syndrome).
+if (import.meta.env.PROD && typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+  void navigator.serviceWorker.register('/sw.js').catch(() => {});
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloaded) return;
+    reloaded = true;
+    window.location.reload();
+  });
+}
 import { render } from 'solid-js/web';
 import { Router, Route } from '@solidjs/router';
 import { lazy } from 'solid-js';
