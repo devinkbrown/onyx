@@ -735,9 +735,10 @@ export class IRCClient {
       // src/lib/irc/multiline.ts) and reassembles incoming multiline batches
       // into a single ChatMessage. Falls back to per-line PRIVMSGs when the
       // cap is not ACKed.
-      // draft/search: searchMessages() filters locally loaded messages;
-      // the server-side SEARCH command is not used.
-      if (cap === 'draft/search') return false;
+      // draft/search: requested — the store's searchServerHistory() drives
+      // the server-side SEARCH command (results replay as a chathistory-shaped
+      // batch, diverted into serverSearch.results); the MessageSearch bar
+      // exposes it as "Search full history".
       // labeled-response: no @label= request/response correlation in Ocean.
       if (cap === 'labeled-response') return false;
       // draft/channel-rename: requested — the store handles the native

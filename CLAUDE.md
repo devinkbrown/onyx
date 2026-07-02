@@ -60,11 +60,13 @@ The brand is **Onyx** (formerly Ocean, briefly Ruri — both dead names).
 ## Build & deploy
 ```bash
 pnpm dev        # dev server
-pnpm build      # → out/
-./deploy.sh     # build + materialise /app /about /appearance route copies
-                # + stamp sw cache 'onyx-shell-<version>' (nginx serves out/)
+pnpm build      # → dist/ (safe: NEVER touches production)
+./deploy.sh     # dist/ build + /app /about /appearance route copies + sw
+                # stamp + community-site overlay from /home/kain/landing,
+                # then rsync --delete dist/ → out/ (nginx serves out/)
 ```
-nginx serves `out/` at eshmaki.me — building via deploy.sh IS deploying.
+nginx serves `out/` at eshmaki.me. ONLY deploy.sh writes out/ — plain builds
+go to dist/, so tests/e2e can never wipe or half-replace production.
 
 ## IRC → Onyx concept mapping
 | IRC | Onyx |

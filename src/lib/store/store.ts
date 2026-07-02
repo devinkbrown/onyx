@@ -5144,17 +5144,29 @@ export const store = createStore<OnyxState>()(
           const isSelf = oldNick.toLowerCase() === ourNick.toLowerCase();
 
           if (isSelf) {
-            // Any successful self-nick-change cancels the reclaim timer:
-            //   • If newNick == desiredNick  → reclaim succeeded, stop ✓
-            //   • If newNick == something else → user moved on, stop ✓
-            // In both cases the alias banner should clear.
+            // A rename to Guest##### that we never asked for is the server's
+            // nick ENFORCEMENT evicting us from a protected nick. Without this
+            // branch the client silently became "Guest12345" with zero
+            // explanation (the alias flag was even cleared below) — deeply
+            // confusing. Keep the alias state and say what happened.
+            const forcedGuest = /^Guest\d+$/i.test(newNick) && !/^Guest\d+$/i.test(oldNick);
             _stopNickReclaim();
             set(s => ({
               ourNick: newNick,
-              currentNickIsAlias: false,
-              // Keep server.nick mirrored so downstream reads see the right value.
+              currentNickIsAlias: forcedGuest,
               server: s.server ? { ...s.server, nick: newNick } : null,
             }));
+            if (forcedGuest) {
+              get().addToast({
+                variant: 'error',
+                title: `Renamed to ${newNick}`,
+                description: `${oldNick} is a protected nick — sign in to the account to use it.`,
+              });
+              get().addNotification({
+                type: 'system',
+                text: `The server renamed you to ${newNick}: “${oldNick}” is protected. Sign in (or /IDENTIFY) to reclaim it.`,
+              });
+            }
           }
 
           set(s => {

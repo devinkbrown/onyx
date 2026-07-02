@@ -10,7 +10,7 @@ export default defineConfig({
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
   build: {
-    outDir: 'out',
+    outDir: 'dist', // build target — deploy.sh syncs this into the live-served out/
     emptyOutDir: true,
     target: 'es2022',
   },

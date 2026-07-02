@@ -2,22 +2,21 @@ import { test, expect } from '@playwright/test';
 
 // Headless-Chromium e2e for the Onyx launch site.
 test.describe('Onyx landing', () => {
-  test('hero loads with the brutalist headline', async ({ page }) => {
+  test('hero loads with the current headline', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('h1')).toContainText(/living mesh/i);
+    await expect(page.locator('h1')).toContainText(/come live/i);
+    await expect(page.locator('h1')).toContainText(/on the water/i);
   });
 
-  test('capability offerings + mythos render', async ({ page }) => {
+  test('kicker + primary CTAs render', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByText('Difference you can feel')).toBeVisible();
-    await expect(page.getByText(/eshmaki · the gate/i)).toBeVisible();
-    await expect(page.getByText(/The server never sees you/i)).toBeVisible();
+    await expect(page.getByText(/a home on the open IRC ocean/i)).toBeVisible();
+    await expect(page.getByRole('link', { name: /open onyx/i }).first()).toBeVisible();
   });
 
-  test('both mesh nodes are advertised', async ({ page }) => {
+  test('the page references the network', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByText(/eshmaki\.me : 8080/i)).toBeVisible();
-    await expect(page.getByText(/ircx\.us : 8080/i)).toBeVisible();
+    await expect(page.getByText(/IRCXNet/i).first()).toBeVisible();
   });
 
   test('the entry point routes into the app', async ({ page }) => {
