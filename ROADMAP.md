@@ -92,11 +92,17 @@ down to TLS.
    recovery), and guests reconnecting into ghost channels (now re-JOINs).
    Verified live via `tools/outbox-live.mjs`.
 
-## Phase 3 — Privacy (close the Matrix gap where it matters)
+## Phase 3 — Privacy (close the Matrix gap where it matters) ← IN PROGRESS
 6. **E2EE DMs over Tsumugi** — reuse the shipping media ratchet (ECDH +
    AES-GCM) for DM payloads between Onyx clients; keys pinned via certfp +
    METADATA discovery; graceful cleartext fallback with a visible state chip.
    No new cryptography — new plumbing only.
+   ✅ **SHIPPED 2026-07-02** — src/lib/e2ee/dmCipher.ts (static-static
+   P-256/HKDF/AES-GCM), device key in its own IndexedDB, published via
+   METADATA ocean.dm-key; text stays ciphertext (wire/history/vault/search),
+   plaintext transient+view-only; locked placeholder for undecryptable;
+   e2eeDms pref. 9 unit tests; live-verified publish + server relay. Client
+   only, no server change. (Future: multi-device, verification, PFS.)
 7. **Ephemeral rooms** — IRCX PROP TTL prop: messages past N hours drop from
    history/replay/stats server-side.
 
