@@ -191,25 +191,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 52px;
-  height: 52px;
-  margin-bottom: 8px;
-  border-radius: var(--r-md);
+  margin-bottom: 10px;
   color: var(--lapis-bright);
-  background:
-    radial-gradient(70% 70% at 50% 30%,
-      color-mix(in oklab, var(--lapis) 26%, transparent),
-      transparent 72%),
-    color-mix(in oklab, var(--ink) 60%, transparent);
-  border: 1px solid var(--seam-faint);
-  box-shadow:
-    inset 0 0 18px -6px color-mix(in oklab, var(--lapis) 70%, transparent),
-    0 0 22px -10px color-mix(in oklab, var(--lapis-bright) 80%, transparent);
+  filter: drop-shadow(0 0 14px color-mix(in oklab, var(--lapis-bright) 55%, transparent));
 }
 
 .conn-brand-mark {
-  width: 30px;
-  height: 30px;
+  width: 44px;
+  height: 44px;
 }
 
 .conn-eyebrow {
@@ -326,12 +315,13 @@
 }
 
 .conn-mode[data-active='true'] {
-  color: var(--washi);
-  background: color-mix(in oklab, var(--lapis-deep) 46%, var(--stone));
-  border-color: color-mix(in oklab, var(--lapis) 50%, transparent);
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--lapis-bright), var(--lapis));
+  border-color: transparent;
+  font-weight: 700;
   box-shadow:
-    0 0 16px -6px color-mix(in oklab, var(--lapis) 70%, transparent),
-    inset 0 1px 0 color-mix(in oklab, var(--lapis-bright) 22%, transparent);
+    0 0 18px -6px color-mix(in oklab, var(--lapis-bright) 70%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .conn-mode:focus-visible {
@@ -701,7 +691,7 @@
   transition: border-color var(--dur) var(--ease);
 }
 
-.conn-status[data-phase='idle']        { border-color: var(--seam-faint); }
+.conn-status[data-phase='idle']        { display: none; }
 .conn-status[data-phase='connecting']  { border-color: color-mix(in oklab, var(--lapis) 62%, transparent); }
 .conn-status[data-phase='error']       { border-color: color-mix(in oklab, var(--shu) 60%, transparent); }
 
