@@ -1738,6 +1738,35 @@ const _typingLastSent = new Map<string, number>();
 /** ref → { target, messages[] } — accumulates PRIVMSG during a BATCH */
 let _serverSearchTimeout: ReturnType<typeof setTimeout> | null = null;
 
+/**
+ * draft/event-playback guard — CHATHISTORY replays include historical
+ * JOIN/PART/QUIT/KICK/TOPIC lines. They must NEVER mutate live state: a QUIT
+ * from three hours ago replayed into the handler deleted members who are in
+ * the channel RIGHT NOW (the "nicklist shrinks after a while" bug). Orochi's
+ * replay lines carry @time+msgid but NO batch tag, so detection is:
+ *   1. spec path — a batch tag referencing an open collector;
+ *   2. Orochi path — the event's channel has an open chathistory batch;
+ *   3. channel-less events (QUIT/NICK) — some batch is open AND the line
+ *      carries a msgid (live event lines don't; replayed ones always do).
+ */
+function _isHistoryReplay(tags: Record<string, string>, channel: string | null): boolean {
+  const batchTag = tags['batch'];
+  if (batchTag !== undefined && _batchCollectors.has(batchTag)) return true;
+  if (channel) return _openChathistoryByTarget.has(channel.toLowerCase());
+  return _openChathistoryByTarget.size > 0 && tags['msgid'] !== undefined;
+}
+
+/** Append a replayed event line into its open history collector (so it still
+    renders in scrollback at its historical position) without touching state. */
+function _pushReplayEvent(tags: Record<string, string>, channel: string | null, text: string): void {
+  const key = channel?.toLowerCase() ?? _openChathistoryByTarget.keys().next().value;
+  if (!key) return;
+  const ref = _openChathistoryByTarget.get(key) ?? tags['batch'];
+  const collector = ref !== undefined ? _batchCollectors.get(ref) : undefined;
+  if (!collector || collector.kind) return; // only plain chathistory collectors
+  collector.messages.push(sysMsg(text, collector.target, eventTime(tags)));
+}
+
 const _batchCollectors = new Map<string, {
   target: string;
   messages: ChatMessage[];
@@ -4326,6 +4355,12 @@ export const store = createStore<OnyxState>()(
           const ch = params[0]!;
           const key = ch.toLowerCase();
           const joiner = nick ?? '';
+          // draft/event-playback: a replayed historical JOIN must render into
+          // the history batch, never touch the live roster.
+          if (_isHistoryReplay(tags, ch)) {
+            _pushReplayEvent(tags, ch, `${joiner} joined`);
+            break;
+          }
           const isSelf = joiner.toLowerCase() === ourNick.toLowerCase();
           // extended-join: params[1] = account ('*' = not logged in), params[2] = realname
           const joinAccount = params[1] && params[1] !== '*' ? params[1] : undefined;
@@ -4383,6 +4418,10 @@ export const store = createStore<OnyxState>()(
           const ch = params[0]!;
           const key = ch.toLowerCase();
           const parter = nick ?? '';
+          if (_isHistoryReplay(tags, ch)) {
+            _pushReplayEvent(tags, ch, `${parter} left${params[1] ? ` (${params[1]})` : ''}`);
+            break;
+          }
           const isSelf = parter.toLowerCase() === ourNick.toLowerCase();
 
           if (isSelf) {
@@ -4423,6 +4462,12 @@ export const store = createStore<OnyxState>()(
         case 'QUIT': {
           const quitter = nick ?? '';
           const quitReason = params[0] ?? '';
+          // Channel-less: replay-detected via open batch + history msgid. A
+          // replayed QUIT deleting a CURRENT member was the roster-shrink bug.
+          if (_isHistoryReplay(tags, null)) {
+            _pushReplayEvent(tags, null, `${quitter} quit${quitReason ? `: ${quitReason}` : ''}`);
+            break;
+          }
           const quitChannels: string[] = [];
           set(s => {
             const channels = new Map(s.channels);
@@ -4447,6 +4492,10 @@ export const store = createStore<OnyxState>()(
         case 'KICK': {
           const [ch, target, reason] = params as [string, string, string?];
           const key = ch.toLowerCase();
+          if (_isHistoryReplay(tags, ch)) {
+            _pushReplayEvent(tags, ch, `${target} was kicked by ${nick ?? 'someone'}${reason ? ` (${reason})` : ''}`);
+            break;
+          }
           const isSelf = target.toLowerCase() === ourNick.toLowerCase();
           set(s => {
             const channels = new Map(s.channels);
@@ -4577,6 +4626,11 @@ export const store = createStore<OnyxState>()(
           const ch = (command === 'TOPIC' ? params[0] : params[1])!;
           const topic = command === 'TOPIC' ? params[1] : params[2];
           const key = ch.toLowerCase();
+          // A replayed TOPIC must not overwrite the CURRENT topic.
+          if (command === 'TOPIC' && _isHistoryReplay(tags, ch)) {
+            _pushReplayEvent(tags, ch, `${nick ?? 'someone'} set the topic: ${topic ?? ''}`);
+            break;
+          }
           set(s => {
             const channels = new Map(s.channels);
             const c = channels.get(key);
@@ -5142,6 +5196,11 @@ export const store = createStore<OnyxState>()(
           const oldNick = nick ?? '';
           const newNick = params[0]!;
           const isSelf = oldNick.toLowerCase() === ourNick.toLowerCase();
+          // A replayed historical rename must not rename anyone NOW.
+          if (_isHistoryReplay(tags, null)) {
+            _pushReplayEvent(tags, null, `${oldNick} is now known as ${newNick}`);
+            break;
+          }
 
           if (isSelf) {
             // A rename to Guest##### that we never asked for is the server's
