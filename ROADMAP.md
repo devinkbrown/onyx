@@ -92,7 +92,7 @@ down to TLS.
    recovery), and guests reconnecting into ghost channels (now re-JOINs).
    Verified live via `tools/outbox-live.mjs`.
 
-## Phase 3 — Privacy (close the Matrix gap where it matters) ← IN PROGRESS
+## Phase 3 — Privacy (close the Matrix gap where it matters) ✅ COMPLETE 2026-07-02
 6. **E2EE DMs over Tsumugi** — reuse the shipping media ratchet (ECDH +
    AES-GCM) for DM payloads between Onyx clients; keys pinned via certfp +
    METADATA discovery; graceful cleartext fallback with a visible state chip.
@@ -105,6 +105,11 @@ down to TLS.
    only, no server change. (Future: multi-device, verification, PFS.)
 7. **Ephemeral rooms** — IRCX PROP TTL prop: messages past N hours drop from
    history/replay/stats server-side.
+   ✅ **SHIPPED 2026-07-02** — channel IRCX prop `EPHEMERAL <secs>` (60s..30d,
+   0=off); enforced at the single renderHistoryReplay funnel (CHATHISTORY +
+   bouncer rewind + SEARCH) + chanstats skip; plain prop = persists +
+   mesh-propagates. 4 tests; live-verified SET/GET/bounds. Server-side only
+   (no client UI yet).
 
 ## Phase 4 — Presence & heritage (nobody else CAN build these)
 8. **Pinned messages on IRCX PROP** — ops pin msgids into a channel PROP;
