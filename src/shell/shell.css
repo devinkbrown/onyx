@@ -3539,3 +3539,47 @@
   color: var(--washi-mute);
 }
 
+
+/* ── Polish pass: event-tinted system bullets, micro reactor stacks,
+      tinted avatar rings ─────────────────────────────────────────────── */
+/* Joins arrive azure; departures fade out muted; kicks/quits read warm-muted. */
+.shell-msg-system[data-event='join']::before {
+  background: var(--lapis);
+  box-shadow: 0 0 6px color-mix(in oklab, var(--lapis) 55%, transparent);
+}
+.shell-msg-system[data-event='part']::before,
+.shell-msg-system[data-event='quit']::before {
+  background: var(--washi-mute);
+  box-shadow: none;
+}
+
+/* Reactor stacks inside reaction chips shrink to micro-badges so the chip
+   stays one compact line. */
+.shell-reaction-avatars .onyx-avatar {
+  width: 15px;
+  height: 15px;
+  min-width: 15px;
+  min-height: 15px;
+  font-size: 6.5px;
+  border-radius: 5px;
+}
+
+/* The author's nick-tint rings their avatar — name and face share a hue. */
+.shell-msg-avatar .onyx-avatar {
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--nick-tint, var(--lapis)) 45%, transparent),
+    0 0 10px -2px color-mix(in oklab, var(--nick-tint, var(--lapis)) 30%, transparent);
+}
+
+/* Thread indicator: a quiet ghost link, not a boxy chip. */
+.shell-thread-indicator {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: var(--lapis-bright) !important;
+  padding-left: 0 !important;
+}
+.shell-thread-indicator:hover {
+  color: var(--washi) !important;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

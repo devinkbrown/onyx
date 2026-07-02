@@ -98,7 +98,7 @@ type ReactionProps = {
 function ReactionPill(props: ReactionProps): JSX.Element {
   const [local] = splitProps(props, ['reaction', 'target', 'messageId', 'selfNick']);
 
-  const topUsers = createMemo(() => local.reaction.users.slice(0, 4));
+  const topUsers = createMemo(() => local.reaction.users.slice(0, 3));
   const mine = createMemo(() => !!local.selfNick && local.reaction.users.includes(local.selfNick));
 
   function handleClick(): void {
@@ -521,6 +521,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                         activeMessageSearchResultId() === msg.id ? 'shell-msg-search-current' : '',
                       ].filter(Boolean).join(' ')}
                       data-message-search-id={msg.id}
+                      data-event={msg.type}
                       role="status"
                       aria-label={msg.text}
                     >
@@ -631,7 +632,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                     menuOpen={menuOpen()}
                     onMenuOpenChange={setMenuOpen}
                   />
-                  <div class="shell-msg-avatar">
+                  <div class="shell-msg-avatar" style={{ '--nick-tint': nickTint(msg.from) }}>
                     <Avatar
                       name={msg.from}
                       size="sm"
