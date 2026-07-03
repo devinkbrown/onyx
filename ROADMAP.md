@@ -134,9 +134,13 @@ down to TLS.
     a live countdown card with Join-call (when live+voice) and an op clear.
     9 tests; live cross-node verified. Client-only.
 
-## Phase 5 — Operations
+## Phase 5 — Operations ← IN PROGRESS
 12. **Public status page** from mesh health (links states, node latency,
     uptime) on the community site.
+    ✅ **SHIPPED 2026-07-03** — daemon emits status.json (node uptime, users,
+    mesh quorum, per-peer link state + RTT from peer_health); /status/ page on
+    the community site renders node cards + an operational/degraded banner,
+    30s refresh. Live-verified both nodes.
 13. **Prometheus on** + a public graph or two; stats index gains node health.
 14. **Nightly vault-safe backups** of accounts.db + chanstats snapshots.
 
