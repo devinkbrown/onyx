@@ -3631,3 +3631,71 @@
   /* Reclaim ribbon width on phones — the count/topic matter more there. */
   .shell-ribbon-heatline { display: none; }
 }
+
+/* ── Scheduled event line — a channel "place" marker in the intro ─────────── */
+.shell-event-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 0.7rem;
+  border: 1px solid color-mix(in oklab, var(--lapis-bright, #6fc3e8) 32%, transparent);
+  background: color-mix(in oklab, var(--lapis, #2e7fae) 12%, transparent);
+  max-width: min(38rem, 90%);
+}
+.shell-event-line--live {
+  border-color: color-mix(in oklab, var(--coral, #ff6f61) 45%, transparent);
+  background: color-mix(in oklab, var(--coral, #ff6f61) 12%, transparent);
+}
+.shell-event-cal { font-size: 1rem; flex: none; }
+.shell-event-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1;
+}
+.shell-event-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--washi, #dfe);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shell-event-when {
+  font-size: 0.74rem;
+  color: var(--washi-dim, #9ab);
+}
+.shell-event-when strong { color: var(--lapis-bright, #6fc3e8); font-weight: 600; }
+.shell-event-line--live .shell-event-when strong { color: var(--coral, #ff6f61); }
+.shell-event-actions { display: inline-flex; align-items: center; gap: 0.4rem; flex: none; }
+.shell-event-join {
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--ink, #04121c);
+  background: var(--coral, #ff6f61);
+  border: 0;
+  border-radius: 999px;
+  padding: 0.28rem 0.7rem;
+  cursor: pointer;
+  transition: filter 150ms ease;
+}
+.shell-event-join:hover { filter: brightness(1.08); }
+.shell-event-clear {
+  width: 1.4rem;
+  height: 1.4rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--washi-mute, #6a8);
+  font-size: 1.05rem;
+  line-height: 1;
+  transition: background 150ms ease, color 150ms ease;
+}
+.shell-event-clear:hover {
+  background: color-mix(in oklab, var(--washi, #cde) 14%, transparent);
+  color: var(--washi, #fff);
+}

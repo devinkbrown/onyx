@@ -158,6 +158,7 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
   { name: 'msg', usage: '/msg <nick> <text>', description: 'Send a private message.', kind: 'irc', aliases: ['query'] },
   { name: 'whois', usage: '/whois <nick>', description: 'Request user information.', kind: 'irc' },
   { name: 'invite', usage: '/invite <nick>', description: 'Invite someone into the channel.', kind: 'irc' },
+  { name: 'event', usage: '/event <YYYY-MM-DDThh:mmZ> <title>', description: 'Schedule a channel event (ops); /event clear to remove.', kind: 'irc' },
   { name: 'shrug', usage: '/shrug', description: 'Insert a shrug.', kind: 'text', insertText: String.raw`¯\_(ツ)_/¯` },
   { name: 'tableflip', usage: '/tableflip', description: 'Insert a table flip.', kind: 'text', insertText: '(╯°□°）╯︵ ┻━┻' },
 ];

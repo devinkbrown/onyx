@@ -70,3 +70,29 @@ export function parseAtParam(raw: string | string[] | null | undefined): Date | 
   if (ms < AT_PARAM_MIN_MS || ms > Date.now() + AT_PARAM_FUTURE_SLACK_MS) return null;
   return new Date(ms);
 }
+
+/** How far ahead a scheduled event may be set (one year). */
+const EVENT_MAX_FUTURE_MS = 366 * 24 * 60 * 60 * 1000;
+
+/**
+ * Parse a FUTURE instant for scheduling a channel event. Accepts the same
+ * forms as `parseAtParam` (epoch s/ms, ISO-8601) but validates the opposite
+ * window: the moment must be in the future (allowing 5 min of clock skew) and
+ * within a year. Past or far-future values return null.
+ */
+export function parseEventTime(raw: string | null | undefined): Date | null {
+  if (typeof raw !== 'string' || raw.length === 0) return null;
+  const trimmed = raw.trim();
+  let ms: number;
+  if (/^\d{1,10}$/.test(trimmed)) {
+    ms = Number(trimmed) * 1000;
+  } else if (/^\d{11,14}$/.test(trimmed)) {
+    ms = Number(trimmed);
+  } else {
+    ms = Date.parse(trimmed);
+  }
+  if (!Number.isFinite(ms)) return null;
+  const now = Date.now();
+  if (ms < now - 5 * 60 * 1000 || ms > now + EVENT_MAX_FUTURE_MS) return null;
+  return new Date(ms);
+}

@@ -26,6 +26,7 @@ import {
 } from 'solid-js';
 import { useStore, getState, STATUS_TARGET } from '@/lib/store';
 import { LOCKED_PLACEHOLDER } from '@/lib/e2ee/dmCipher';
+import { ScheduledEventLine } from './ScheduledEventLine';
 import type { ChatMessage, MessageReaction } from '@/lib/irc/types';
 import { Avatar } from '@/primitives/index';
 import { Sheet } from '@/primitives/index';
@@ -512,6 +513,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
               <p class="shell-channel-intro-note">
                 This is the very beginning of the conversation. Say something worth scrolling back to.
               </p>
+              <ScheduledEventLine channel={(activeView() as { kind: 'channel'; channel: string }).channel} />
             </div>
           </Show>
           <For each={messages()}>

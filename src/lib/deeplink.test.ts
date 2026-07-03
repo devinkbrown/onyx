@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseAtParam, parseJoinParam } from './deeplink';
+import { parseAtParam, parseEventTime, parseJoinParam } from './deeplink';
 
 describe('parseJoinParam', () => {
   it('accepts a plain #channel', () => {
@@ -95,5 +95,26 @@ describe('parseAtParam', () => {
     expect(parseAtParam('2019-12-31T23:59:59Z')).toBeNull();
     expect(parseAtParam('946684800')).toBeNull(); // 2000-01-01 epoch s
     expect(parseAtParam(String(Date.now() + 3 * 24 * 60 * 60 * 1000))).toBeNull();
+  });
+});
+
+describe('parseEventTime', () => {
+  it('accepts a near-future ISO time and epoch seconds', () => {
+    const iso = new Date(Date.now() + 3 * 24 * 3600 * 1000).toISOString();
+    expect(parseEventTime(iso)?.toISOString()).toBe(iso);
+    const sec = Math.floor(Date.now() / 1000) + 3600;
+    expect(parseEventTime(String(sec))?.getTime()).toBe(sec * 1000);
+  });
+
+  it('rejects past instants and moments over a year out', () => {
+    expect(parseEventTime('2000-01-01T00:00:00Z')).toBeNull();
+    const twoYears = new Date(Date.now() + 2 * 366 * 24 * 3600 * 1000).toISOString();
+    expect(parseEventTime(twoYears)).toBeNull();
+  });
+
+  it('rejects empty and malformed input', () => {
+    expect(parseEventTime('')).toBeNull();
+    expect(parseEventTime(null)).toBeNull();
+    expect(parseEventTime('someday')).toBeNull();
   });
 });

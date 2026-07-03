@@ -13,6 +13,7 @@ import { parseActivity } from '@/lib/activity';
 import { OUTBOX_MAX_AGE_MS, deleteOutboxEntry, loadOutbox, queueOutbox, type OutboxEntry } from '@/lib/vault/historyVault';
 import { deviceKeys, isEnvelope, openDm, sealDm } from '@/lib/e2ee/dmCipher';
 import { preferences } from '@/lib/prefs/preferences';
+import { parseEventTime } from '@/lib/deeplink';
 import {
   composerDraftKey,
   getComposerDraft as readComposerDraft,
@@ -914,6 +915,12 @@ export interface OnyxState {
   unpinMessage(channel: string, msgid: string): void;
   /** Internal: rewrite a channel's PINS prop (whole msgid list) + optimistic. */
   _writePins(channel: string, msgids: string[]): void;
+  /** Internal: set/clear an arbitrary channel prop (empty value deletes). */
+  _writeChannelProp(channel: string, key: string, value: string): void;
+
+  // Scheduled events ("voice rooms as places" — ocean.event channel prop)
+  scheduleEvent(channel: string, at: Date, title: string): void;
+  clearChannelEvent(channel: string): void;
 
   // MONITOR (presence)
   monitorAdd(nick: string): void;
@@ -2903,6 +2910,27 @@ export const store = createStore<OnyxState>()(
 
       if (text.startsWith('/')) {
         const [cmd, ...args] = text.slice(1).split(' ');
+        const lc = (cmd ?? '').toLowerCase();
+        // Client-side commands that write a channel prop rather than a raw
+        // server verb. `/event <when> <title…>` schedules a channel event;
+        // `/event clear` (or an empty title) removes it. `<when>` is ISO-8601
+        // or a unix timestamp (parseEventTime bounds it to the future).
+        const targetIsChannel = target.length > 0 && (client.isupport.CHANTYPES ?? '#&').includes(target[0]!);
+        if (lc === 'event' && targetIsChannel) {
+          const first = (args[0] ?? '').toLowerCase();
+          if (!args.length || first === 'clear' || first === 'off') {
+            get().clearChannelEvent(target);
+            return;
+          }
+          const at = parseEventTime(args[0]);
+          const title = args.slice(1).join(' ').trim();
+          if (!at || !title) {
+            get().addToast({ variant: 'warning', title: 'Event not set', description: 'Use /event <YYYY-MM-DDThh:mmZ> <title>.' });
+            return;
+          }
+          get().scheduleEvent(target, at, title);
+          return;
+        }
         client.sendRaw(cmd!.toUpperCase(), ...args);
         return;
       }
@@ -3581,20 +3609,34 @@ export const store = createStore<OnyxState>()(
       get()._writePins(channel, next);
     },
     _writePins(channel, msgids) {
-      const value = msgids.join(',');
+      get()._writeChannelProp(channel, 'PINS', msgids.join(','));
+    },
+
+    _writeChannelProp(channel, key, value) {
       // PROP SET with an empty trailing value deletes the prop server-side.
-      get().client?.sendRaw('PROP', channel, 'PINS', value);
+      get().client?.sendRaw('PROP', channel, key, value);
       // Optimistic local update (the delete path emits no 818 with an empty
-      // value, so without this an "unpin the last one" wouldn't reflect).
+      // value, so a clear wouldn't otherwise reflect until a re-fetch).
       set(s => {
         const channelProps = new Map(s.channelProps);
-        const key = channel.toLowerCase();
-        const existing = { ...(channelProps.get(key) ?? {}) };
-        if (value) existing.PINS = value;
-        else delete existing.PINS;
-        channelProps.set(key, existing);
+        const k = channel.toLowerCase();
+        const existing = { ...(channelProps.get(k) ?? {}) };
+        if (value) existing[key] = value;
+        else delete existing[key];
+        channelProps.set(k, existing);
         return { channelProps };
       });
+    },
+
+    scheduleEvent(channel, at, title) {
+      const clean = title.replace(/[\r\n]+/g, ' ').trim().slice(0, 180);
+      if (!clean) return;
+      const unix = Math.floor(at.getTime() / 1000);
+      get()._writeChannelProp(channel, 'ocean.event', `${unix}|${clean}`);
+    },
+
+    clearChannelEvent(channel) {
+      get()._writeChannelProp(channel, 'ocean.event', '');
     },
 
     // ── IRCX PROP requests ────────────────────────────────────────────────
@@ -8692,6 +8734,26 @@ export const selectOwnPrefix = (channel: string) => (s: OnyxState): string => {
 export const selectChannelPins = (channel: string) => (s: OnyxState): string[] => {
   const raw = s.channelProps.get(channel.toLowerCase())?.PINS ?? '';
   return raw.split(',').map(id => id.trim()).filter(Boolean);
+};
+
+/** A scheduled event on a channel — an op-set "voice room as a place" marker. */
+export type ScheduledEvent = { at: number; title: string };
+
+/**
+ * The channel's scheduled event, parsed from its `ocean.event` prop
+ * (`<unix_seconds>|<title>`). Returns null when unset or malformed. Events
+ * more than an hour past their start are treated as expired (the intro hides
+ * them; an op can overwrite or clear).
+ */
+export const selectChannelEvent = (channel: string) => (s: OnyxState): ScheduledEvent | null => {
+  const raw = s.channelProps.get(channel.toLowerCase())?.['ocean.event'];
+  if (!raw) return null;
+  const sep = raw.indexOf('|');
+  if (sep < 1) return null;
+  const at = Number(raw.slice(0, sep));
+  const title = raw.slice(sep + 1).trim();
+  if (!Number.isFinite(at) || at <= 0 || !title) return null;
+  return { at, title };
 };
 
 export const selectIsChannelOp = (channel: string) => (s: OnyxState): boolean => {
