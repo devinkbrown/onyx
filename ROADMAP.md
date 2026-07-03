@@ -123,6 +123,10 @@ down to TLS.
 9. ~~**Comic Chat rendering in Onyx**~~ — DROPPED (user direction 2026-07-03).
 10. **Presence heatline** — a live 24h activity sparkline in the channel
     ribbon fed by chanstats hours[], so a room's rhythm is visible in-chat.
+    ✅ **SHIPPED 2026-07-03** — 24-bar UTC-hour sparkline in the ribbon fed by
+    the channel's chanstats hours[] (same-origin /stats/data/<slug>.json),
+    current hour in coral, hidden when quiet. Byte-faithful channelToSlug (8
+    tests); client-only. Live-verified with a real stats flush.
 11. **Voice rooms as places** — persistent stage layouts (PROP-stored),
     scheduled events line in the channel intro.
 
