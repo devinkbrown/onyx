@@ -3599,3 +3599,35 @@
   color: var(--washi-mute);
   font-style: italic;
 }
+
+/* ── Presence heatline — live 24h activity rhythm in the channel ribbon ──── */
+.shell-ribbon-heatline {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 16px;
+  margin-left: 0.6rem;
+  padding-left: 0.6rem;
+  border-left: 1px solid var(--seam, color-mix(in oklab, var(--washi, #cde) 12%, transparent));
+  flex: none;
+}
+.shell-heat-bar {
+  width: 2px;
+  height: calc(3px + var(--heat, 0) * 13px);
+  border-radius: 1px;
+  background: color-mix(in oklab, var(--washi, #9ab) 22%, transparent);
+  transition: height 400ms var(--ease-out, ease), background 300ms ease;
+}
+/* A bar with any traffic glows with the glacier accent, scaled by intensity. */
+.shell-heat-bar--live {
+  background: color-mix(in oklab, var(--lapis-bright, #6fc3e8) calc(30% + var(--heat, 0) * 55%), transparent);
+}
+/* The current UTC hour is marked with the hot accent so "now" reads at a glance. */
+.shell-heat-bar--now {
+  background: var(--coral, #ff6f61);
+  box-shadow: 0 0 5px color-mix(in oklab, var(--coral, #ff6f61) 60%, transparent);
+}
+@media (max-width: 720px) {
+  /* Reclaim ribbon width on phones — the count/topic matter more there. */
+  .shell-ribbon-heatline { display: none; }
+}

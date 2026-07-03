@@ -11,6 +11,7 @@ import { createMemo, createSignal, Show, splitProps, type JSX } from 'solid-js';
 import { useStore, getState, selectAccount, selectChannelPins } from '@/lib/store';
 import { ChannelSettings } from './ChannelSettings';
 import { NotificationCenter } from './NotificationCenter';
+import { PresenceHeatline } from './PresenceHeatline';
 
 export type PresenceRibbonProps = {
   selfNick?: string;
@@ -134,6 +135,11 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
               </p>
             </>
           )}
+        </Show>
+
+        {/* Live 24h activity rhythm (channels only) — hides when there's none. */}
+        <Show when={activeView().kind === 'channel'}>
+          <PresenceHeatline channel={() => (activeView().kind === 'channel' ? channelName() : null)} />
         </Show>
       </div>
 
