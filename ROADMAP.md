@@ -111,7 +111,7 @@ down to TLS.
    mesh-propagates. 4 tests; live-verified SET/GET/bounds. Server-side only
    (no client UI yet).
 
-## Phase 4 — Presence & heritage (nobody else CAN build these) ← IN PROGRESS
+## Phase 4 — Presence & heritage (nobody else CAN build these) ✅ COMPLETE 2026-07-03 (Comic Chat dropped)
 8. **Pinned messages on IRCX PROP** — ops pin msgids into a channel PROP;
    every client sees the same pins; Onyx renders a pins drawer. (Needs a small
    server PROP provider addition; verify write-scoping.)
@@ -129,6 +129,10 @@ down to TLS.
     tests); client-only. Live-verified with a real stats flush.
 11. **Voice rooms as places** — persistent stage layouts (PROP-stored),
     scheduled events line in the channel intro.
+    ✅ **SHIPPED 2026-07-03** — /event <when> <title> schedules a channel
+    event in the ocean.event prop (mesh-propagated); the channel intro shows
+    a live countdown card with Join-call (when live+voice) and an op clear.
+    9 tests; live cross-node verified. Client-only.
 
 ## Phase 5 — Operations
 12. **Public status page** from mesh health (links states, node latency,
