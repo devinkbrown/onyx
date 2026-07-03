@@ -24,7 +24,7 @@ const DB_VERSION = 1;
 const STORE = 'device';
 const KEY_ID = 'dm-v1';
 
-export const ENVELOPE_PREFIX = 'TSUMUGI1 ';
+export const ENVELOPE_PREFIX = 'TSUMUGI1 ';
 /** Rendered in place of ciphertext we cannot open (wrong device, lost key). */
 export const LOCKED_PLACEHOLDER = '🔒 Encrypted message (sent to another device)';
 
