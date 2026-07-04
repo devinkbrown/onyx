@@ -19,83 +19,24 @@
   overflow: hidden;
   font-family: var(--font-sans);
   color: var(--washi);
-  /* Translucent depth veil over the live Background canvas: a calm tint that lets
-     the chosen background read through as ambiance (the canvas sits at z-index:-1
-     behind this). Kept genuinely alpha'd — mixing with var(--ink) here would make
-     it opaque and bury the background entirely. The working surfaces below add
-     their own translucent legibility wash. */
+  /* Light legibility wash ONLY — let the real animated Background canvas (z-index
+     -1) read through just like it does in the Theme Factory. A faint top glow and
+     a soft bottom fade keep the header and composer legible without a heavy ink
+     veil burying the scene. (The old ::before/::after faux current + biolume
+     layers were removed: they competed with and dimmed the real, theme-matched
+     canvas, and their CSS animation ignored prefers-reduced-motion.) */
   background:
     radial-gradient(
       ellipse at 50% 0%,
-      color-mix(in oklab, var(--lapis-deep) 22%, transparent) 0%,
-      transparent 46%
+      color-mix(in oklab, var(--lapis-deep) 14%, transparent) 0%,
+      transparent 42%
     ),
     linear-gradient(
       180deg,
-      color-mix(in oklab, var(--stone-2) 26%, transparent) 0%,
-      color-mix(in oklab, var(--ink) 24%, transparent) 38%,
-      color-mix(in oklab, var(--ink) 40%, transparent) 100%
-    );
-}
-
-.shell::before,
-.shell::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-}
-
-.shell::before {
-  background:
-    linear-gradient(
-      112deg,
       transparent 0%,
-      transparent 31%,
-      color-mix(in oklab, var(--lapis) 10%, transparent) 43%,
-      transparent 57%,
-      transparent 100%
-    ),
-    linear-gradient(
-      72deg,
-      transparent 0%,
-      color-mix(in oklab, var(--lapis-bright) 6%, transparent) 49%,
-      transparent 68%
+      transparent 62%,
+      color-mix(in oklab, var(--ink) 22%, transparent) 100%
     );
-  opacity: 0.72;
-  animation: shell-current-drift 24s var(--ease) infinite alternate;
-}
-
-.shell::after {
-  background-image:
-    radial-gradient(
-      circle at 12% 18%,
-      color-mix(in oklab, var(--lapis-bright) 80%, transparent) 0,
-      color-mix(in oklab, var(--lapis-bright) 80%, transparent) 1px,
-      transparent 2px
-    ),
-    radial-gradient(
-      circle at 74% 14%,
-      color-mix(in oklab, var(--lapis) 64%, transparent) 0,
-      color-mix(in oklab, var(--lapis) 64%, transparent) 1px,
-      transparent 2px
-    ),
-    radial-gradient(
-      circle at 92% 58%,
-      color-mix(in oklab, var(--gold-bright) 48%, transparent) 0,
-      color-mix(in oklab, var(--gold-bright) 48%, transparent) 1px,
-      transparent 2px
-    ),
-    radial-gradient(
-      circle at 36% 72%,
-      color-mix(in oklab, var(--lapis-bright) 56%, transparent) 0,
-      color-mix(in oklab, var(--lapis-bright) 56%, transparent) 1px,
-      transparent 2px
-    );
-  opacity: 0.42;
-  filter: drop-shadow(0 0 6px color-mix(in oklab, var(--lapis-bright) 42%, transparent));
-  animation: shell-biolume-drift 18s var(--ease) infinite alternate;
 }
 
 .shell > * {
