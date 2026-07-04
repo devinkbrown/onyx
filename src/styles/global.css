@@ -42,3 +42,14 @@ a {
   background: color-mix(in oklab, var(--lapis) 35%, transparent);
   color: var(--washi);
 }
+
+/* ── Background canvas visibility ────────────────────────────────────────────
+   The animated backgrounds are authored subtle (dark-luxury, non-distracting),
+   which reads well on a large desktop canvas but nearly disappears on a small,
+   dense phone screen. Lift brightness + saturation on narrow viewports so the
+   theme's scene is clearly present on mobile. One rule covers every variant. */
+@media (max-width: 680px) {
+  [data-background-canvas] {
+    filter: brightness(1.34) saturate(1.14) contrast(1.04);
+  }
+}
