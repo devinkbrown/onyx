@@ -44,12 +44,16 @@ a {
 }
 
 /* ── Background canvas visibility ────────────────────────────────────────────
-   The animated backgrounds are authored subtle (dark-luxury, non-distracting),
-   which reads well on a large desktop canvas but nearly disappears on a small,
-   dense phone screen. Lift brightness + saturation on narrow viewports so the
-   theme's scene is clearly present on mobile. One rule covers every variant. */
+   The animated backgrounds correctly re-tint to each theme (a red theme gets a
+   red scene), but several variants are authored so subtle that the tint barely
+   reads. A base saturation/brightness lift makes the theme colour clearly show
+   through every variant; narrow viewports get a stronger push (small dense
+   screens swallow the subtlety entirely). One rule covers all 15 variants. */
+[data-background-canvas] {
+  filter: saturate(1.22) brightness(1.1);
+}
 @media (max-width: 680px) {
   [data-background-canvas] {
-    filter: brightness(1.34) saturate(1.14) contrast(1.04);
+    filter: saturate(1.3) brightness(1.36) contrast(1.05);
   }
 }
