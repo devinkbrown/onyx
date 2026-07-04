@@ -96,7 +96,12 @@ export function mix(colorA: string, colorB: string, amount: number): string {
   const r = Math.round(a.r + (b.r - a.r) * ratio);
   const g = Math.round(a.g + (b.g - a.g) * ratio);
   const bl = Math.round(a.b + (b.b - a.b) * ratio);
-  return `rgb(${r}, ${g}, ${bl})`;
+  // Hex output keeps mixed colors composable with rgba() above.
+  return `#${toHexByte(r)}${toHexByte(g)}${toHexByte(bl)}`;
+}
+
+function toHexByte(value: number): string {
+  return Math.max(0, Math.min(255, value)).toString(16).padStart(2, '0');
 }
 
 export function seeded(index: number): number {

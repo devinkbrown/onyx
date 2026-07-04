@@ -38,6 +38,12 @@ describe('background registry', () => {
       aurora: 'animated',
       'pyrite-field': 'animated',
       'kintsugi-veins': 'animated',
+      ember: 'animated',
+      forest: 'animated',
+      resin: 'animated',
+      'sumi-e': 'animated',
+      mist: 'animated',
+      frost: 'animated',
       obsidian: 'solid',
       'lapis-gradient': 'solid',
       washi: 'solid',
@@ -144,6 +150,60 @@ describe('background variants', () => {
       variant.init(ctx);
       variant.frame(ctx, 1234);
       variant.dispose();
+    };
+
+    // Assert
+    expect(runVariant).not.toThrow();
+  });
+});
+
+describe('themed background variants', () => {
+  const themedVariants: Array<{ id: BackgroundId; label: string }> = [
+    { id: 'ember', label: 'Ember' },
+    { id: 'forest', label: 'Grove' },
+    { id: 'resin', label: 'Resin' },
+    { id: 'sumi-e', label: 'Sumi-e' },
+    { id: 'mist', label: 'Mist' },
+    { id: 'frost', label: 'Frost' },
+  ];
+
+  it.each(themedVariants)('registers $id with the label $label', ({ id, label }) => {
+    // Act
+    const variant = getBackground(id);
+
+    // Assert
+    expect(variant?.label).toBe(label);
+    expect(variant?.kind).toBe('animated');
+  });
+
+  it.each(themedVariants)('renders $id across a long animation timeline without throwing', ({ id }) => {
+    // Arrange
+    const variant = getBackground(id);
+    const ctx = createFrameContext();
+    const timeline = [0, 16, 1000, 60_000, 3_600_000];
+
+    // Act
+    const runTimeline = () => {
+      variant?.init(ctx);
+      for (const time of timeline) variant?.frame(ctx, time);
+      variant?.dispose();
+    };
+
+    // Assert
+    expect(variant).toBeDefined();
+    expect(runTimeline).not.toThrow();
+  });
+
+  it.each(themedVariants)('renders $id at reduced quality scales without throwing', ({ id }) => {
+    // Arrange
+    const variant = getBackground(id);
+    const ctx = { ...createFrameContext(), quality: 'low' as const, qualityScale: 0.52 };
+
+    // Act
+    const runVariant = () => {
+      variant?.init(ctx);
+      variant?.frame(ctx, 5678);
+      variant?.dispose();
     };
 
     // Assert

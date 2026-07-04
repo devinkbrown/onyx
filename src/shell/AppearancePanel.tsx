@@ -14,6 +14,7 @@ import { Sheet } from '@/primitives';
 import { useStore, getState } from '@/lib/store';
 import { useThemeOptional, THEMES, THEME_IDS, customThemeTokens } from '@/theme';
 import { backgroundOptions } from '@/backgrounds';
+import { AUTO_BACKGROUND_ID } from './themeBackground';
 
 type ThemeEntry = { id: string; label: string; title: string; swatch: string[]; custom: boolean };
 
@@ -92,6 +93,18 @@ export function AppearancePanel(): JSX.Element {
         <section class="ap-panel-group">
           <h3 class="ap-panel-label">Background</h3>
           <div class="ap-panel-bgs" role="radiogroup" aria-label="Background">
+            <button
+              type="button"
+              class="ap-bg-chip"
+              classList={{ 'ap-bg-chip--on': backgroundId() === AUTO_BACKGROUND_ID }}
+              role="radio"
+              aria-checked={backgroundId() === AUTO_BACKGROUND_ID}
+              aria-label="Auto — theme-matched background"
+              onClick={() => getState().setBackground(AUTO_BACKGROUND_ID)}
+            >
+              <span class="ap-bg-name">Auto</span>
+              <span class="ap-bg-kind" data-kind="animated">match theme</span>
+            </button>
             <For each={backgroundOptions}>
               {(opt) => {
                 const active = () => backgroundId() === opt.id;

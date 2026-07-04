@@ -4,8 +4,8 @@ import { clearCanvas, drawGrain, mix, readBackgroundTheme, rgba } from './utils'
 /**
  * Caustic Tide — the rippling net of light that plays across a seabed. Layered
  * sine-warped bright lines in screen-blend over a deep gradient, drifting slowly
- * with two interfering frequencies so the pattern never obviously repeats. Azure
- * crests warming toward champagne as the lines descend.
+ * with two interfering frequencies so the pattern never obviously repeats. Bright
+ * crests sinking toward the deep primary accent as the lines descend.
  */
 export const caustics = {
   id: 'caustics',
@@ -46,7 +46,7 @@ export const caustics = {
       }
       const t = i / lines;
       const glow = 0.04 + 0.05 * Math.abs(Math.sin(phase * 1.3));
-      c.strokeStyle = rgba(mix(theme.lapisBright, theme.goldBright, t * 0.45), glow);
+      c.strokeStyle = rgba(mix(theme.lapisBright, theme.lapisDeep, t * 0.6), glow);
       c.lineWidth = 1.1 + (i % 3 === 0 ? 1.6 : 0.2);
       c.stroke();
     }

@@ -28,7 +28,9 @@ import './shell.css';
 
 import { lazy, createMemo, createSignal, onCleanup, onMount, Show, splitProps, type JSX } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
+import { useThemeOptional } from '@/theme';
 import { Background } from '@/backgrounds/index';
+import { resolveBackgroundId } from './themeBackground';
 import { NotificationRuntime } from '@/lib/notifications';
 import { ServerRail } from './ServerRail';
 import { ChannelSidebar } from './ChannelSidebar';
@@ -169,7 +171,10 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const showRail = createMemo(() => CONNECTED_SERVERS >= 3);
 
   // ── active background (reactive: live-updates when changed in the panel) ──
+  // 'auto' follows the active theme's signature background (see themeBackground).
   const bgId = useStore((s) => s.backgroundId);
+  const theme = useThemeOptional();
+  const effectiveBgId = createMemo(() => resolveBackgroundId(bgId(), theme.themeId()));
 
   // ── derived nick ──
   const displayNick = createMemo(() => local.selfNick ?? ourNick() ?? '');
@@ -243,7 +248,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
       <NotificationRuntime />
 
       {/* Fixed background canvas behind everything */}
-      <Background id={bgId()} quality="high" />
+      <Background id={effectiveBgId()} quality="high" />
 
       <div class={shellClass()} data-testid="app-shell">
         {/* ── Server Rail — hidden when < 3 servers ── */}

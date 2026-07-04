@@ -2,6 +2,7 @@ import { createMemo, For } from 'solid-js';
 import { Background, backgroundOptions, type BackgroundId } from '@/backgrounds';
 import { useTheme, THEMES, THEME_IDS, ThemeStudio } from '@/theme';
 import { useStore, getState } from '@/lib/store';
+import { AUTO_BACKGROUND_ID, resolveBackgroundId } from '@/shell/themeBackground';
 import './appearance.css';
 
 type ThemeChip = { id: string; label: string; custom: boolean };
@@ -13,7 +14,9 @@ export default function Appearance() {
   // Background lives in the reactive store so the choice persists and applies
   // live across the whole app (shell + this page) without a reload.
   const backgroundId = useStore((s) => s.backgroundId);
-  const chooseBg = (id: BackgroundId) => getState().setBackground(id);
+  const chooseBg = (id: string) => getState().setBackground(id);
+  // 'auto' follows the active theme; resolve it for the live preview.
+  const previewBgId = createMemo(() => resolveBackgroundId(backgroundId(), theme.themeId()) as BackgroundId);
 
   const themeChips = createMemo<ThemeChip[]>(() => [
     ...THEME_IDS.map((id) => ({ id, label: THEMES[id].label, custom: false })),
@@ -22,7 +25,7 @@ export default function Appearance() {
 
   return (
     <main class="ap">
-      <Background id={backgroundId()} />
+      <Background id={previewBgId()} />
 
       <header class="ap-bar">
         <a class="ap-back" href="/app">← back to app</a>
@@ -60,6 +63,16 @@ export default function Appearance() {
         <div class="ap-group">
           <span class="ap-glabel">Background</span>
           <div class="ap-chips">
+            <button
+              type="button"
+              class="ap-chip"
+              classList={{ on: backgroundId() === AUTO_BACKGROUND_ID }}
+              aria-pressed={backgroundId() === AUTO_BACKGROUND_ID}
+              onClick={() => chooseBg(AUTO_BACKGROUND_ID)}
+            >
+              Auto
+              <i class="ap-kind">match theme</i>
+            </button>
             <For each={backgroundOptions}>
               {(opt) => (
                 <button

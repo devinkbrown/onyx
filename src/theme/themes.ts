@@ -25,6 +25,12 @@ export type ThemeMeta = {
   description: string;
   /** Light or dark — written to the `color-scheme` property. */
   scheme: 'light' | 'dark';
+  /**
+   * The animated background variant this theme pairs with by default.
+   * Kept as a plain string (a background variant id from src/backgrounds)
+   * to avoid coupling the theme registry to the backgrounds module.
+   */
+  signatureBg: string;
   /** The CSS custom property overrides for this theme. */
   tokens: TokenMap;
 };
@@ -228,9 +234,9 @@ const abyssTokens: TokenMap = {
 };
 
 // ---------------------------------------------------------------------------
-// reef — Ocean sub-variant: the base deep water with a warm coral + gold lean.
-// Azure stays the primary current, but the second accent shifts from champagne
-// toward living coral and warm reef-gold — a touch more colour, still elegant.
+// reef — Ocean sub-variant: the base deep water with a living-coral lean.
+// Azure stays the primary current, but the second accent is CORAL — the warmth
+// of the reef itself, not gold — a touch more colour, still elegant.
 // ---------------------------------------------------------------------------
 const reefTokens: TokenMap = {
   // Ground — deep water with the faintest warm coral undertone in the strata
@@ -246,10 +252,10 @@ const reefTokens: TokenMap = {
   '--lapis-bright':'#83e4ff',
   '--lapis-deep':  '#0e6aa8',
 
-  // Reef-gold — warmer, more saturated treasure than the flagship champagne
-  '--gold':       '#e8a94e',
-  '--gold-bright':'#ffcf86',
-  '--gold-deep':  '#a8702a',
+  // Coral — the reef's own warmth as the second accent (not gold)
+  '--gold':       '#ff9f7a',
+  '--gold-bright':'#ffc4a6',
+  '--gold-deep':  '#c85f3f',
 
   // Coral — promoted from rare danger accent to a visible warm secondary
   '--shu':        '#ff6f5e',
@@ -265,9 +271,9 @@ const reefTokens: TokenMap = {
   '--warn':    '#f2dca0', // warnings stay WARM — decoupled from the glacier second accent
   '--danger':  'var(--shu)',
 
-  // Seams — azure current with a warm coral wash in the faint band
+  // Seams — azure current lines (primary hue), coral kept to accents
   '--seam':       'color-mix(in oklab, var(--lapis) 40%, transparent)',
-  '--seam-faint': 'color-mix(in oklab, var(--shu) 16%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--lapis) 16%, transparent)',
   '--line':       'color-mix(in oklab, var(--washi) 14%, transparent)',
   '--line-faint': 'color-mix(in oklab, var(--gold) 12%, transparent)',
 
@@ -349,7 +355,8 @@ const onyxTokens: TokenMap = {
 };
 
 // ---------------------------------------------------------------------------
-// obsidian — deeper / AMOLED; pure volcanic black ground, dimmed moonstone
+// obsidian — pure AMOLED; volcanic black ground, cool steel accents, minimal.
+// No gold anywhere — the second accent is steel, the seams are steel.
 // ---------------------------------------------------------------------------
 const obsidianTokens: TokenMap = {
   '--ink':        '#000000',
@@ -359,13 +366,15 @@ const obsidianTokens: TokenMap = {
   '--stone-3':    '#17171f',
   '--stone-line': '#212129',
 
-  '--lapis':        '#52719e',
-  '--lapis-bright': '#9bbce4',
-  '--lapis-deep':   '#2e466c',
+  // Steel — cool, restrained primary sheen on the black glass
+  '--lapis':        '#7c93b8',
+  '--lapis-bright': '#b9cbe6',
+  '--lapis-deep':   '#43597e',
 
-  '--gold':        '#b8902e',
-  '--gold-bright': '#dab85a',
-  '--gold-deep':   '#8a6520',
+  // Pale steel — the second accent stays in the same cold family (NOT gold)
+  '--gold':        '#8a9bb0',
+  '--gold-bright': '#c2cfdd',
+  '--gold-deep':   '#55647a',
 
   '--shu':        '#cc3a22',
   '--shu-bright': '#f04828',
@@ -375,11 +384,11 @@ const obsidianTokens: TokenMap = {
   '--washi-mute': '#5c5d68',
 
   '--ok':   '#4ea87a',
-  '--warn': 'var(--gold-bright)',
+  '--warn': '#f2dca0', // warnings stay WARM — decoupled from the steel second accent
   '--danger': 'var(--shu)',
 
-  '--seam':       'color-mix(in oklab, var(--gold) 38%, transparent)',
-  '--seam-faint': 'color-mix(in oklab, var(--gold) 12%, transparent)',
+  '--seam':       'color-mix(in oklab, var(--lapis) 30%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--lapis) 12%, transparent)',
   '--line':       'color-mix(in oklab, var(--washi) 12%, transparent)',
   '--line-faint': 'color-mix(in oklab, var(--washi) 5%, transparent)',
 
@@ -443,7 +452,8 @@ const pearlTokens: TokenMap = {
 };
 
 // ---------------------------------------------------------------------------
-// sumi — high-contrast ink; near-white washi on deepest sumi-black
+// sumi — INK: monochrome brushwork. Bone-white on deepest black, greyscale
+// accents, and a single red — the artist's seal — as the only colour.
 // ---------------------------------------------------------------------------
 const sumiTokens: TokenMap = {
   '--ink':        '#05060a',
@@ -453,16 +463,19 @@ const sumiTokens: TokenMap = {
   '--stone-3':    '#101528',
   '--stone-line': '#141a2e',
 
-  '--lapis':        '#4a78ff',
-  '--lapis-bright': '#6a94ff',
-  '--lapis-deep':   '#2840c0',
+  // Bone — warm near-white as the "primary accent"; ink has no colour
+  '--lapis':        '#c9c4ba',
+  '--lapis-bright': '#ece8e0',
+  '--lapis-deep':   '#8a867c',
 
-  '--gold':        '#d8b050',
-  '--gold-bright': '#f0cc70',
-  '--gold-deep':   '#a88030',
+  // Greyscale second accent — NO gold in the ink story
+  '--gold':        '#b8b3a8',
+  '--gold-bright': '#dcd7cc',
+  '--gold-deep':   '#7c786f',
 
-  '--shu':        '#e84530',
-  '--shu-bright': '#ff5a40',
+  // The seal — the single red, the only colour on the page
+  '--shu':        '#d8412c',
+  '--shu-bright': '#ff5d44',
 
   // High-contrast: near-pure washi
   '--washi':      '#f4ede0',
@@ -470,11 +483,11 @@ const sumiTokens: TokenMap = {
   '--washi-mute': '#807a68',
 
   '--ok':      '#68d098',
-  '--warn':    '#f2dca0', // warnings stay WARM — decoupled from the glacier second accent
+  '--warn':    '#f2dca0', // warnings stay WARM — decoupled from the greyscale second accent
   '--danger':  'var(--shu)',
 
-  '--seam':       'color-mix(in oklab, var(--gold) 50%, transparent)',
-  '--seam-faint': 'color-mix(in oklab, var(--gold) 20%, transparent)',
+  '--seam':       'color-mix(in oklab, var(--washi) 16%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--washi) 7%, transparent)',
   '--line':       'color-mix(in oklab, var(--lapis) 25%, transparent)',
   '--line-faint': 'color-mix(in oklab, var(--lapis) 10%, transparent)',
 
@@ -488,9 +501,11 @@ const sumiTokens: TokenMap = {
 };
 
 // ---------------------------------------------------------------------------
-// shu — vermilion-forward dark; shu as the primary accent colour
+// shu — GARNET: crimson is the PRIMARY accent over a warm maroon-black ground,
+// with ember orange as the second. No blue, no gold — one red-hot story.
 // ---------------------------------------------------------------------------
 const shuTokens: TokenMap = {
+  // Ground — warm-dark, maroon-leaning strata
   '--ink':        '#0e0806',
   '--ink-2':      '#120a07',
   '--stone':      '#1c0e0a',
@@ -498,17 +513,17 @@ const shuTokens: TokenMap = {
   '--stone-3':    '#341a14',
   '--stone-line': '#3c2018',
 
-  // Lapis recedes — shu leads
-  '--lapis':        '#3a6adc',
-  '--lapis-bright': '#5a86f0',
-  '--lapis-deep':   '#1e3e9a',
+  // Garnet — crimson IS the primary (the theme's namesake leads)
+  '--lapis':        '#e0413a',
+  '--lapis-bright': '#ff6f61',
+  '--lapis-deep':   '#a02620',
 
-  // Gold as supporting seam (kintsugi still present)
-  '--gold':        '#c09838',
-  '--gold-bright': '#dcb84e',
-  '--gold-deep':   '#8e7020',
+  // Ember — glowing orange second accent (not gold)
+  '--gold':        '#ff7a45',
+  '--gold-bright': '#ffa06e',
+  '--gold-deep':   '#c2531f',
 
-  // Shu as the dominant accent
+  // Shu — the hot/danger accent stays vermilion
   '--shu':        '#e84530',
   '--shu-bright': '#ff5e44',
 
@@ -517,11 +532,11 @@ const shuTokens: TokenMap = {
   '--washi-mute': '#6c5e52',
 
   '--ok':      '#5aaa78',
-  '--warn':    '#f2dca0', // warnings stay WARM — decoupled from the glacier second accent
+  '--warn':    '#f2dca0', // warnings stay WARM — decoupled from the ember second accent
   '--danger':  'var(--shu)',
 
-  '--seam':       'color-mix(in oklab, var(--shu) 38%, transparent)',
-  '--seam-faint': 'color-mix(in oklab, var(--shu) 14%, transparent)',
+  '--seam':       'color-mix(in oklab, var(--lapis) 40%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--lapis) 16%, transparent)',
   '--line':       'color-mix(in oklab, var(--shu) 18%, transparent)',
   '--line-faint': 'color-mix(in oklab, var(--shu) 8%, transparent)',
 
@@ -535,7 +550,8 @@ const shuTokens: TokenMap = {
 };
 
 // ---------------------------------------------------------------------------
-// hisui — jade-green variant; deep forest ground + jade accent
+// hisui — JADE: green-black forest ground, jade primary, pale-jade mineral
+// second. One green story from the deepest stratum to the brightest vein.
 // ---------------------------------------------------------------------------
 const hisuiTokens: TokenMap = {
   '--ink':        '#060e09',
@@ -545,15 +561,15 @@ const hisuiTokens: TokenMap = {
   '--stone-3':    '#122c18',
   '--stone-line': '#163420',
 
-  // Jade as primary accent (replaces lapis)
-  '--lapis':        '#1e9458',
-  '--lapis-bright': '#2db86e',
-  '--lapis-deep':   '#127040',
+  // Jade — the primary accent (replaces lapis)
+  '--lapis':        '#17a05c',
+  '--lapis-bright': '#5fd497',
+  '--lapis-deep':   '#0d6b3c',
 
-  // Gold — still present as kintsugi seams
-  '--gold':        '#c0a030',
-  '--gold-bright': '#dcbc48',
-  '--gold-deep':   '#907820',
+  // Pale jade / mint — the mineral second accent (NO gold in the stone)
+  '--gold':        '#59c7a0',
+  '--gold-bright': '#9fe6cd',
+  '--gold-deep':   '#2f8f70',
 
   // Shu accent stays (contrast on green ground)
   '--shu':        '#e04030',
@@ -564,10 +580,10 @@ const hisuiTokens: TokenMap = {
   '--washi-mute': '#607054',
 
   '--ok':      '#3cb87a',
-  '--warn':    '#f2dca0', // warnings stay WARM — decoupled from the glacier second accent
+  '--warn':    '#f2dca0', // warnings stay WARM — decoupled from the pale-jade second accent
   '--danger':  'var(--shu)',
 
-  '--seam':       'color-mix(in oklab, var(--lapis) 40%, transparent)',
+  '--seam':       'color-mix(in oklab, var(--lapis) 38%, transparent)',
   '--seam-faint': 'color-mix(in oklab, var(--lapis) 15%, transparent)',
   '--line':       'color-mix(in oklab, var(--lapis) 22%, transparent)',
   '--line-faint': 'color-mix(in oklab, var(--lapis) 9%, transparent)',
@@ -582,7 +598,8 @@ const hisuiTokens: TokenMap = {
 };
 
 // ---------------------------------------------------------------------------
-// kohaku — amber variant; warm amber ground + deep amber seams
+// kohaku — AMBER resin: amber is the primary (warmer and more orange than the
+// onyx gold), honey the second. Legitimately warm, but distinct from onyx.
 // ---------------------------------------------------------------------------
 const kohakuTokens: TokenMap = {
   '--ink':        '#0e0a04',
@@ -592,15 +609,15 @@ const kohakuTokens: TokenMap = {
   '--stone-3':    '#32200c',
   '--stone-line': '#3a2610',
 
-  // Amber as primary accent (replaces lapis with deep amber)
-  '--lapis':        '#c07820',
-  '--lapis-bright': '#e09030',
-  '--lapis-deep':   '#8a5414',
+  // Amber — the primary accent (replaces lapis)
+  '--lapis':        '#e0912a',
+  '--lapis-bright': '#ffb95a',
+  '--lapis-deep':   '#a5641a',
 
-  // Gold leans warm amber-gold
-  '--gold':        '#d4960e',
-  '--gold-bright': '#f0b020',
-  '--gold-deep':   '#a07008',
+  // Honey — lighter, sweeter second accent
+  '--gold':        '#f0b34e',
+  '--gold-bright': '#ffd98a',
+  '--gold-deep':   '#b8842c',
 
   '--shu':        '#dc3c28',
   '--shu-bright': '#f85040',
@@ -610,11 +627,11 @@ const kohakuTokens: TokenMap = {
   '--washi-mute': '#806858',
 
   '--ok':      '#5aac78',
-  '--warn':    '#f2dca0', // warnings stay WARM — decoupled from the glacier second accent
+  '--warn':    '#f2dca0', // warnings stay WARM — in-family with the honey second accent
   '--danger':  'var(--shu)',
 
-  '--seam':       'color-mix(in oklab, var(--gold) 48%, transparent)',
-  '--seam-faint': 'color-mix(in oklab, var(--gold) 18%, transparent)',
+  '--seam':       'color-mix(in oklab, var(--lapis) 36%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--lapis) 15%, transparent)',
   '--line':       'color-mix(in oklab, var(--lapis) 28%, transparent)',
   '--line-faint': 'color-mix(in oklab, var(--lapis) 12%, transparent)',
 
@@ -628,7 +645,8 @@ const kohakuTokens: TokenMap = {
 };
 
 // ---------------------------------------------------------------------------
-// teal — deep teal cut; cyan-green ground, mint crest, brass inlay
+// teal — deep teal cut; cyan-green ground, mint primary, seafoam second.
+// One cool water-green story — no brass, no gold.
 // ---------------------------------------------------------------------------
 const tealTokens: TokenMap = {
   // Ground — deep cyan-green waterstone strata
@@ -639,15 +657,15 @@ const tealTokens: TokenMap = {
   '--stone-3':    '#194c42',
   '--stone-line': '#236457',
 
-  // Mint — clear seafoam current as the primary accent
-  '--lapis':       '#4bcda9',
-  '--lapis-bright':'#a6f0dc',
-  '--lapis-deep':  '#14765e',
+  // Mint — clear teal current as the primary accent
+  '--lapis':       '#2fc6a4',
+  '--lapis-bright':'#7fe6cf',
+  '--lapis-deep':  '#12876e',
 
-  // Brass — warm inlay against the cool ground
-  '--gold':       '#c5a15a',
-  '--gold-bright':'#ead086',
-  '--gold-deep':  '#8b6830',
+  // Seafoam — paler water-green second accent (NOT gold)
+  '--gold':       '#79d9c0',
+  '--gold-bright':'#b6efe1',
+  '--gold-deep':  '#3f9f88',
 
   // Coral — restrained hot accent for danger
   '--shu':        '#dc654f',
@@ -663,9 +681,9 @@ const tealTokens: TokenMap = {
   '--warn':    '#f2dca0', // warnings stay WARM — decoupled from the glacier second accent
   '--danger':  'var(--shu)',
 
-  // Seams (mint current) + bands (brass wash)
-  '--seam':       'color-mix(in oklab, var(--lapis) 42%, transparent)',
-  '--seam-faint': 'color-mix(in oklab, var(--lapis) 16%, transparent)',
+  // Seams (mint current) + bands (seafoam wash)
+  '--seam':       'color-mix(in oklab, var(--lapis) 36%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--lapis) 15%, transparent)',
   '--line':       'color-mix(in oklab, var(--washi) 14%, transparent)',
   '--line-faint': 'color-mix(in oklab, var(--gold) 11%, transparent)',
 
@@ -687,7 +705,8 @@ const tealTokens: TokenMap = {
 };
 
 // ---------------------------------------------------------------------------
-// slate — warm neutral graphite; no blue cast, bronze inlay
+// slate — warm neutral graphite; mineral sage primary, MUTED bronze second,
+// mineral seams. Quiet and stone-like — the bronze is a whisper, not gold.
 // ---------------------------------------------------------------------------
 const slateTokens: TokenMap = {
   // Ground — warm graphite and charcoal strata
@@ -698,15 +717,15 @@ const slateTokens: TokenMap = {
   '--stone-3':    '#302c26',
   '--stone-line': '#423b32',
 
-  // Stone-sage — muted mineral accent without a blue cast
+  // Stone-sage — muted mineral primary without a blue cast
   '--lapis':       '#9aa28f',
-  '--lapis-bright':'#c6cdb8',
-  '--lapis-deep':  '#626b57',
+  '--lapis-bright':'#c4ccbc',
+  '--lapis-deep':  '#6a7160',
 
-  // Bronze — primary seam and command accent
-  '--gold':       '#c28a45',
-  '--gold-bright':'#e1b66f',
-  '--gold-deep':  '#855a2a',
+  // Muted bronze — restrained warm second accent (dimmer than gold)
+  '--gold':       '#a87a44',
+  '--gold-bright':'#c99a63',
+  '--gold-deep':  '#7a5730',
 
   // Fired clay — danger accent
   '--shu':        '#c95a3e',
@@ -722,9 +741,9 @@ const slateTokens: TokenMap = {
   '--warn':    '#f2dca0', // warnings stay WARM — decoupled from the glacier second accent
   '--danger':  'var(--shu)',
 
-  // Seams (bronze inlay) + bands (chalk strata)
-  '--seam':       'color-mix(in oklab, var(--gold) 43%, transparent)',
-  '--seam-faint': 'color-mix(in oklab, var(--gold) 16%, transparent)',
+  // Seams (mineral, NOT bronze) + bands (chalk strata)
+  '--seam':       'color-mix(in oklab, var(--lapis) 28%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--lapis) 12%, transparent)',
   '--line':       'color-mix(in oklab, var(--washi) 13%, transparent)',
   '--line-faint': 'color-mix(in oklab, var(--lapis) 10%, transparent)',
 
@@ -746,7 +765,8 @@ const slateTokens: TokenMap = {
 };
 
 // ---------------------------------------------------------------------------
-// frost — light; cool frost paper, deep slate ink, steel-blue accent
+// frost — light; cool frost paper, deep slate ink, steel-blue primary and a
+// pale-steel second. One cold story — no brass on the ice.
 // ---------------------------------------------------------------------------
 const frostTokens: TokenMap = {
   // Ground (reversed — cool light surfaces)
@@ -757,15 +777,16 @@ const frostTokens: TokenMap = {
   '--stone-3':    '#bdcccf',
   '--stone-line': '#a9bcc1',
 
-  // Steel-blue — cool accent, dark enough for light paper
+  // Steel-blue — cool primary, dark enough for light paper
   '--lapis':       '#2f6f8f',
-  '--lapis-bright':'#3f88ac',
-  '--lapis-deep':  '#1d4e68',
+  '--lapis-bright':'#5b93b0',
+  '--lapis-deep':  '#1d4c66',
 
-  // Pale brass — a warmer counterpoint to the frost
-  '--gold':       '#8c6b2e',
-  '--gold-bright':'#a7813a',
-  '--gold-deep':  '#654d20',
+  // Pale steel — the second accent stays in the cold family (NOT brass).
+  // Base darkened from the spec's #6f97ad to keep >=3:1 on the light grounds.
+  '--gold':       '#5d8298',
+  '--gold-bright':'#9bbccd',
+  '--gold-deep':  '#4a6f85',
 
   // Brick red — danger accent with AA contrast on paper
   '--shu':        '#b94432',
@@ -778,12 +799,12 @@ const frostTokens: TokenMap = {
 
   // Status
   '--ok':      '#2e7d5b',
-  '--warn':    'var(--gold)',
+  '--warn':    '#8a6418', // warnings stay WARM — a deep amber that reads on light paper
   '--danger':  'var(--shu)',
 
-  // Seams (steel-blue linework) + bands (pale brass)
-  '--seam':       'color-mix(in oklab, var(--lapis) 44%, transparent)',
-  '--seam-faint': 'color-mix(in oklab, var(--lapis) 18%, transparent)',
+  // Seams (steel-blue linework) + bands (pale steel)
+  '--seam':       'color-mix(in oklab, var(--lapis) 34%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--lapis) 14%, transparent)',
   '--line':       'color-mix(in oklab, var(--washi) 18%, transparent)',
   '--line-faint': 'color-mix(in oklab, var(--gold) 14%, transparent)',
 
@@ -814,6 +835,7 @@ export const THEMES: Record<ThemeId, ThemeMeta> = {
     label: 'Ocean',
     description: 'The flagship — deep water, electric azure current, bioluminescent crests, glacier ice.',
     scheme: 'dark',
+    signatureBg: 'bioluminescence',
     tokens: oceanTokens,
   },
   tide: {
@@ -821,6 +843,7 @@ export const THEMES: Record<ThemeId, ThemeMeta> = {
     label: 'Ocean · Tide',
     description: 'Shallow sunlit water — lifted azure surfaces, a more luminous crest, bright sand gold.',
     scheme: 'dark',
+    signatureBg: 'caustics',
     tokens: tideTokens,
   },
   abyss: {
@@ -828,13 +851,15 @@ export const THEMES: Record<ThemeId, ThemeMeta> = {
     label: 'Ocean · Abyss',
     description: 'The deep trench — near-black water, restrained azure that glows, high-contrast sea-foam.',
     scheme: 'dark',
+    signatureBg: 'bioluminescence',
     tokens: abyssTokens,
   },
   reef: {
     id: 'reef',
     label: 'Ocean · Reef',
-    description: 'Living reef — azure current with a warm coral and reef-gold lean. A touch more colour.',
+    description: 'Living reef — azure current warmed by living coral. A touch more colour.',
     scheme: 'dark',
+    signatureBg: 'caustics',
     tokens: reefTokens,
   },
   onyx: {
@@ -842,13 +867,15 @@ export const THEMES: Record<ThemeId, ThemeMeta> = {
     label: 'Onyx',
     description: 'Black banded stone, gold inlay, moonstone sheen — the older cut.',
     scheme: 'dark',
+    signatureBg: 'kintsugi-veins',
     tokens: onyxTokens,
   },
   obsidian: {
     id: 'obsidian',
     label: 'Obsidian',
-    description: 'Pure AMOLED black. The deepest cut of the stone.',
+    description: 'Pure AMOLED black, cool steel sheen. The deepest cut of the stone.',
     scheme: 'dark',
+    signatureBg: 'obsidian',
     tokens: obsidianTokens,
   },
   pearl: {
@@ -856,55 +883,63 @@ export const THEMES: Record<ThemeId, ThemeMeta> = {
     label: 'Pearl',
     description: 'The light cut — warm paper, ink text, gold inlay.',
     scheme: 'light',
+    signatureBg: 'washi',
     tokens: pearlTokens,
   },
   sumi: {
     id: 'sumi',
     label: 'Ink',
-    description: 'High-contrast. Bone-white on the deepest black.',
+    description: 'Monochrome brushwork — bone-white on the deepest black, one red seal.',
     scheme: 'dark',
+    signatureBg: 'sumi-e',
     tokens: sumiTokens,
   },
   shu: {
     id: 'shu',
     label: 'Garnet',
-    description: 'Garnet-forward dark — deep red ground, gold seams.',
+    description: 'Garnet-forward dark — crimson current over warm maroon ground, ember second.',
     scheme: 'dark',
+    signatureBg: 'ember',
     tokens: shuTokens,
   },
   hisui: {
     id: 'hisui',
     label: 'Jade',
-    description: 'Jade green. Deep forest ground, mineral accent.',
+    description: 'Jade green. Deep forest ground, pale-jade mineral second.',
     scheme: 'dark',
+    signatureBg: 'forest',
     tokens: hisuiTokens,
   },
   kohaku: {
     id: 'kohaku',
     label: 'Amber',
-    description: 'Amber. Warm resin ground and seams.',
+    description: 'Amber resin. Warm amber current, honey second.',
     scheme: 'dark',
+    signatureBg: 'resin',
     tokens: kohakuTokens,
   },
   teal: {
     id: 'teal',
     label: 'Teal',
-    description: 'Deep teal ground, seafoam text, mint current, and brass seams.',
+    description: 'Deep teal ground, seafoam text, mint current, and seafoam marks.',
     scheme: 'dark',
+    signatureBg: 'deep-current',
     tokens: tealTokens,
   },
   slate: {
     id: 'slate',
     label: 'Slate',
-    description: 'Warm graphite, chalk text, quiet mineral accents, and bronze seams.',
+    description: 'Warm graphite, chalk text, quiet mineral seams, and muted bronze marks.',
     scheme: 'dark',
+    signatureBg: 'mist',
     tokens: slateTokens,
   },
   frost: {
     id: 'frost',
     label: 'Frost',
-    description: 'Cool frost paper, deep slate ink, steel-blue current, and pale brass linework.',
+    description: 'Cool frost paper, deep slate ink, steel-blue current, and pale steel linework.',
     scheme: 'light',
+    signatureBg: 'frost',
     tokens: frostTokens,
   },
 };

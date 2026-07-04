@@ -3,10 +3,16 @@ import { aurora } from './variants/aurora';
 import { bioluminescence } from './variants/bioluminescence';
 import { caustics } from './variants/caustics';
 import { deepCurrent } from './variants/deep-current';
+import { ember } from './variants/ember';
+import { forest } from './variants/forest';
+import { frost } from './variants/frost';
 import { kintsugiVeins } from './variants/kintsugi-veins';
 import { lapisGradient } from './variants/lapis-gradient';
+import { mist } from './variants/mist';
 import { obsidian } from './variants/obsidian';
 import { pyriteField } from './variants/pyrite-field';
+import { resin } from './variants/resin';
+import { sumiE } from './variants/sumi-e';
 import { washi } from './variants/washi';
 
 export const backgroundRegistry = [
@@ -16,6 +22,12 @@ export const backgroundRegistry = [
   aurora,
   pyriteField,
   kintsugiVeins,
+  ember,
+  forest,
+  resin,
+  sumiE,
+  mist,
+  frost,
   obsidian,
   lapisGradient,
   washi,

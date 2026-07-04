@@ -1,6 +1,6 @@
 import type { BackgroundFrameContext, BackgroundVariant } from '../engine';
 import type { BackgroundTheme } from './utils';
-import { clearCanvas, drawGrain, readBackgroundTheme, rgba, seeded } from './utils';
+import { clearCanvas, drawGrain, mix, readBackgroundTheme, rgba, seeded } from './utils';
 
 const TAU = Math.PI * 2;
 
@@ -161,8 +161,8 @@ function drawBioluminescence(ctx: BackgroundFrameContext, theme: BackgroundTheme
 
   for (let i = 0; i < count; i += 1) {
     const seed = i * 19 + 503;
-    const warm = i % 23 === 0;
-    const color = warm ? theme.goldBright : theme.lapisBright;
+    const pale = i % 23 === 0;
+    const color = pale ? mix(theme.lapisBright, theme.washi, 0.55) : theme.lapisBright;
     const driftX = time * (0.002 + seeded(seed + 1) * 0.006);
     const driftY = time * (0.0004 + seeded(seed + 2) * 0.0016);
     const x =
@@ -172,13 +172,13 @@ function drawBioluminescence(ctx: BackgroundFrameContext, theme: BackgroundTheme
       (seeded(seed + 4) * travelHeight - driftY + Math.cos(time * 0.00009 + seed) * 14 + travelHeight) %
         travelHeight -
       26;
-    const radius = 0.42 + seeded(seed + 5) * (warm ? 1.2 : 1.65);
+    const radius = 0.42 + seeded(seed + 5) * (pale ? 1.2 : 1.65);
     const pulse = 0.66 + Math.sin(time * (0.00055 + seeded(seed + 6) * 0.00042) + seed) * 0.26;
     const depthFade = 1 - Math.min(0.42, y / Math.max(1, ctx.height) * 0.34);
 
-    c.globalAlpha = (0.1 + seeded(seed + 7) * 0.24) * pulse * depthFade * (warm ? 0.48 : 1);
+    c.globalAlpha = (0.1 + seeded(seed + 7) * 0.24) * pulse * depthFade * (pale ? 0.48 : 1);
     c.fillStyle = color;
-    c.shadowColor = rgba(color, warm ? 0.22 : 0.3);
+    c.shadowColor = rgba(color, pale ? 0.22 : 0.3);
     c.shadowBlur = 5 + radius * 4;
     c.beginPath();
     c.arc(x, y, radius, 0, TAU);

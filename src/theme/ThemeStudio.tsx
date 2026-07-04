@@ -667,6 +667,18 @@ export function ThemeStudio(props: ThemeStudioProps) {
       <section class="ts-section" aria-labelledby="ts-bg-label">
         <h2 class="ts-section__heading" id="ts-bg-label">Background</h2>
         <div class="ts-theme-grid" role="radiogroup" aria-label="Select background">
+          {/* 'auto' follows the active theme's signature scene (see themeBackground.ts). */}
+          <button
+            type="button"
+            class="ts-theme-chip"
+            aria-pressed={backgroundId() === 'auto'}
+            data-active={backgroundId() === 'auto' ? 'true' : undefined}
+            data-testid="ts-bg-chip-auto"
+            onClick={() => chooseBackground('auto')}
+          >
+            <span class="ts-theme-chip__label">Auto</span>
+            <span class="ts-theme-chip__scheme">match theme</span>
+          </button>
           <For each={backgroundOptions}>
             {(opt) => {
               const isActive = () => backgroundId() === opt.id;

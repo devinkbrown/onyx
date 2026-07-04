@@ -9514,10 +9514,12 @@ function _saveNickAliases(aliases: string[]): void {
 // invoked while the store's initial state is built — earlier in module eval
 // than any const declared down here would be initialized (TDZ).
 function _loadBackground(): string {
-  if (typeof window === 'undefined') return 'deep-current';
+  // Default 'auto' → the background follows the active theme's signature scene
+  // (see src/shell/themeBackground.ts). Legacy stored ids still pin a scene.
+  if (typeof window === 'undefined') return 'auto';
   // Current key first, then the legacy 'ruri:bg' key (read-old-write-new) so the
   // saved background survives the rebrand; the next _saveBackground writes 'onyx:bg'.
-  try { return localStorage.getItem('onyx:bg') || localStorage.getItem('ruri:bg') || 'deep-current'; } catch { return 'deep-current'; }
+  try { return localStorage.getItem('onyx:bg') || localStorage.getItem('ruri:bg') || 'auto'; } catch { return 'auto'; }
 }
 function _saveBackground(id: string): void {
   if (typeof window === 'undefined') return;
