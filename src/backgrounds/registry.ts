@@ -1,4 +1,4 @@
-import type { BackgroundKind, BackgroundVariant } from './engine';
+import type { AnyBackgroundVariant, BackgroundKind, BackgroundVariant } from './engine';
 import { aurora } from './variants/aurora';
 import { bioluminescence } from './variants/bioluminescence';
 import { caustics } from './variants/caustics';
@@ -14,7 +14,9 @@ import { pyriteField } from './variants/pyrite-field';
 import { resin } from './variants/resin';
 import { sumiE } from './variants/sumi-e';
 import { washi } from './variants/washi';
+import { sceneRegistry } from './scenes';
 
+/** Canvas-engine variants only — everything here runs init/frame/dispose. */
 export const backgroundRegistry = [
   deepCurrent,
   bioluminescence,
@@ -33,19 +35,27 @@ export const backgroundRegistry = [
   washi,
 ] as const satisfies readonly BackgroundVariant[];
 
-export type BackgroundId = (typeof backgroundRegistry)[number]['id'];
+export { sceneRegistry };
 
-export const backgroundOptions = backgroundRegistry.map(({ id, label, kind }) => ({ id, label, kind }));
+/** Every selectable background: canvas variants first, then DOM scenes. */
+export const allBackgroundVariants = [
+  ...backgroundRegistry,
+  ...sceneRegistry,
+] as const satisfies readonly AnyBackgroundVariant[];
 
-export const backgroundIds = backgroundRegistry.map(({ id }) => id) as BackgroundId[];
+export type BackgroundId = (typeof allBackgroundVariants)[number]['id'];
 
-export const backgroundLabels = backgroundRegistry.map(({ id, label }) => ({ id, label }));
+export const backgroundOptions = allBackgroundVariants.map(({ id, label, kind }) => ({ id, label, kind }));
 
-export const backgroundKinds = backgroundRegistry.reduce<Record<BackgroundId, BackgroundKind>>(
+export const backgroundIds = allBackgroundVariants.map(({ id }) => id) as BackgroundId[];
+
+export const backgroundLabels = allBackgroundVariants.map(({ id, label }) => ({ id, label }));
+
+export const backgroundKinds = allBackgroundVariants.reduce<Record<BackgroundId, BackgroundKind>>(
   (kinds, variant) => ({ ...kinds, [variant.id]: variant.kind }),
   {} as Record<BackgroundId, BackgroundKind>,
 );
 
-export function getBackground(id: string | null | undefined): BackgroundVariant | undefined {
-  return backgroundRegistry.find((variant) => variant.id === id);
+export function getBackground(id: string | null | undefined): AnyBackgroundVariant | undefined {
+  return allBackgroundVariants.find((variant) => variant.id === id);
 }

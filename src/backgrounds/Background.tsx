@@ -1,5 +1,12 @@
-import { createEffect, createSignal, onCleanup } from 'solid-js';
-import { BackgroundEngine, type BackgroundQuality } from './engine';
+import { createEffect, createMemo, createSignal, onCleanup, Show } from 'solid-js';
+import { Dynamic } from 'solid-js/web';
+import {
+  BackgroundEngine,
+  isSceneVariant,
+  type BackgroundQuality,
+  type BackgroundVariant,
+  type SceneVariant,
+} from './engine';
 import { getBackground, type BackgroundId } from './registry';
 
 export interface BackgroundProps {
@@ -22,7 +29,6 @@ export function selectBackgroundId(id: string | undefined, _reducedMotion: boole
 }
 
 export function Background(props: BackgroundProps) {
-  let canvas!: HTMLCanvasElement;
   const [reducedMotion, setReducedMotion] = createSignal(matchesReducedMotion());
 
   createEffect(() => {
@@ -42,12 +48,42 @@ export function Background(props: BackgroundProps) {
     onCleanup(() => query.removeListener?.(syncReducedMotion));
   });
 
+  const variant = createMemo(() => getBackground(selectBackgroundId(props.id, reducedMotion())));
+
+  const scene = createMemo(() => {
+    const active = variant();
+    return active && isSceneVariant(active) ? active : undefined;
+  });
+  const canvasVariant = createMemo(() => {
+    const active = variant();
+    return active && !isSceneVariant(active) ? active : undefined;
+  });
+
+  return (
+    <Show
+      when={scene()}
+      fallback={<CanvasBackground variant={canvasVariant()} quality={props.quality} reducedMotion={reducedMotion()} />}
+    >
+      {(active) => <SceneBackground scene={active()} reducedMotion={reducedMotion()} />}
+    </Show>
+  );
+}
+
+export default Background;
+
+/** Canvas-engine path: renders a <canvas> driven by BackgroundEngine. */
+function CanvasBackground(props: {
+  variant: BackgroundVariant | undefined;
+  quality?: BackgroundQuality;
+  reducedMotion: boolean;
+}) {
+  let canvas!: HTMLCanvasElement;
+
   createEffect(() => {
-    const reduce = reducedMotion();
-    const selectedId = selectBackgroundId(props.id, reduce);
-    const variant = getBackground(selectedId);
+    const variant = props.variant;
     if (!variant) return;
 
+    const reduce = props.reducedMotion;
     canvas.dataset.backgroundId = variant.id;
     // Report the effective kind so tests/telemetry see a reduced-motion scene
     // as static even though its variant is authored 'animated'.
@@ -82,7 +118,30 @@ export function Background(props: BackgroundProps) {
   );
 }
 
-export default Background;
+/**
+ * Scene path: renders a DOM/SVG scene component inside a fixed full-screen
+ * container. The container carries `data-background-canvas` so the mobile
+ * visibility filter in global.css applies to scenes exactly like canvases.
+ */
+function SceneBackground(props: { scene: SceneVariant; reducedMotion: boolean }) {
+  return (
+    <div
+      aria-hidden="true"
+      data-background-canvas="true"
+      data-background-id={props.scene.id}
+      data-background-kind={props.reducedMotion ? 'solid' : 'scene'}
+      style={{
+        position: 'fixed',
+        inset: '0',
+        'z-index': '-1',
+        'pointer-events': 'none',
+        overflow: 'hidden',
+      }}
+    >
+      <Dynamic component={props.scene.component} reducedMotion={props.reducedMotion} />
+    </div>
+  );
+}
 
 function matchesReducedMotion(): boolean {
   return getReducedMotionQuery()?.matches ?? false;

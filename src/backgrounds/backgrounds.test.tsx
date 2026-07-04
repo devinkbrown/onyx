@@ -1,15 +1,21 @@
 import { cleanup, render } from '@solidjs/testing-library';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { Dynamic } from 'solid-js/web';
 import { Background, selectBackgroundId } from './Background';
-import { BackgroundEngine, type BackgroundFrameContext, type BackgroundVariant } from './engine';
-import { backgroundRegistry, getBackground, type BackgroundId } from './registry';
+import {
+  BackgroundEngine,
+  type BackgroundFrameContext,
+  type BackgroundKind,
+  type BackgroundVariant,
+} from './engine';
+import { allBackgroundVariants, backgroundRegistry, getBackground, sceneRegistry, type BackgroundId } from './registry';
 
 afterEach(() => cleanup());
 
 describe('background registry', () => {
-  it('keeps every variant id unique', () => {
+  it('keeps every variant id unique across canvas and scene variants', () => {
     // Arrange
-    const ids = backgroundRegistry.map((variant) => variant.id);
+    const ids = allBackgroundVariants.map((variant) => variant.id);
 
     // Act
     const uniqueIds = new Set(ids);
@@ -20,7 +26,7 @@ describe('background registry', () => {
 
   it('exposes readable labels for every variant', () => {
     // Arrange
-    const labels = backgroundRegistry.map((variant) => variant.label);
+    const labels = allBackgroundVariants.map((variant) => variant.label);
 
     // Act
     const blankLabels = labels.filter((label) => label.trim().length === 0);
@@ -29,9 +35,9 @@ describe('background registry', () => {
     expect(blankLabels).toEqual([]);
   });
 
-  it('classifies animated and solid variants correctly', () => {
+  it('classifies animated, solid, and scene variants correctly', () => {
     // Arrange
-    const expectedKinds: Record<BackgroundId, BackgroundVariant['kind']> = {
+    const expectedKinds: Record<BackgroundId, BackgroundKind> = {
       'deep-current': 'animated',
       bioluminescence: 'animated',
       caustics: 'animated',
@@ -47,10 +53,17 @@ describe('background registry', () => {
       obsidian: 'solid',
       'lapis-gradient': 'solid',
       washi: 'solid',
+      'retro-arcade': 'scene',
+      starfield: 'scene',
+      lightning: 'scene',
+      phoenix: 'scene',
+      'aurora-borealis': 'scene',
+      volcanic: 'scene',
+      'tokyo-night': 'scene',
     };
 
     // Act
-    const actualKinds = Object.fromEntries(backgroundRegistry.map((variant) => [variant.id, variant.kind]));
+    const actualKinds = Object.fromEntries(allBackgroundVariants.map((variant) => [variant.id, variant.kind]));
 
     // Assert
     expect(actualKinds).toEqual(expectedKinds);
@@ -179,7 +192,7 @@ describe('themed background variants', () => {
 
   it.each(themedVariants)('renders $id across a long animation timeline without throwing', ({ id }) => {
     // Arrange
-    const variant = getBackground(id);
+    const variant = backgroundRegistry.find((entry) => entry.id === id);
     const ctx = createFrameContext();
     const timeline = [0, 16, 1000, 60_000, 3_600_000];
 
@@ -197,7 +210,7 @@ describe('themed background variants', () => {
 
   it.each(themedVariants)('renders $id at reduced quality scales without throwing', ({ id }) => {
     // Arrange
-    const variant = getBackground(id);
+    const variant = backgroundRegistry.find((entry) => entry.id === id);
     const ctx = { ...createFrameContext(), quality: 'low' as const, qualityScale: 0.52 };
 
     // Act
@@ -209,6 +222,63 @@ describe('themed background variants', () => {
 
     // Assert
     expect(runVariant).not.toThrow();
+  });
+});
+
+describe('scene variants', () => {
+  // Scenes are DOM/SVG components — they must NOT run through the canvas
+  // init/frame/dispose iterator above. Render-smoke them instead.
+  it.each(sceneRegistry)('mounts the $id scene without throwing', (scene) => {
+    // Act
+    const { container } = render(() => <Dynamic component={scene.component} reducedMotion={false} />);
+    const root = container.querySelector('.onyx-scene');
+
+    // Assert
+    expect(root).not.toBeNull();
+    expect(root?.hasAttribute('data-scene-static')).toBe(false);
+    // More than just the injected <style> — the scene actually drew layers.
+    expect(root?.children.length ?? 0).toBeGreaterThan(1);
+  });
+
+  it.each(sceneRegistry)('freezes the $id scene under reduced motion', (scene) => {
+    // Act
+    const { container } = render(() => <Dynamic component={scene.component} reducedMotion={true} />);
+    const root = container.querySelector('.onyx-scene');
+
+    // Assert
+    expect(root?.getAttribute('data-scene-static')).toBe('true');
+  });
+});
+
+describe('Background scene rendering', () => {
+  it('renders a scene variant in a fixed DOM container instead of a canvas', () => {
+    // Act
+    const { container } = render(() => <Background id="starfield" />);
+    const host = container.querySelector('[data-background-canvas]');
+
+    // Assert
+    expect(container.querySelector('canvas')).toBeNull();
+    expect(host?.getAttribute('data-background-id')).toBe('starfield');
+    expect(host?.getAttribute('data-background-kind')).toBe('scene');
+    expect(host?.querySelector('.onyx-scene')).not.toBeNull();
+  });
+
+  it('keeps the canvas engine path for canvas variants', () => {
+    // Arrange
+    const originalGetContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = vi.fn(
+      () => create2dContext(),
+    ) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+
+    try {
+      // Act
+      const { container } = render(() => <Background id="deep-current" />);
+
+      // Assert
+      expect(container.querySelector('canvas')).not.toBeNull();
+    } finally {
+      HTMLCanvasElement.prototype.getContext = originalGetContext;
+    }
   });
 });
 

@@ -43,7 +43,9 @@ describe('AppearancePanel', () => {
     render(() => <AppearancePanel />);
 
     const before = store.getState().backgroundId;
-    const auroraChip = screen.getByRole('radio', { name: /aurora/i });
+    // "Mineral Aurora" is the canvas variant; the scene "Aurora Borealis"
+    // also matches a loose /aurora/i, so anchor on the full label.
+    const auroraChip = screen.getByRole('radio', { name: /mineral aurora/i });
     fireEvent.click(auroraChip);
 
     expect(store.getState().backgroundId).toBe('aurora');

@@ -1,5 +1,12 @@
+import type { JSX } from 'solid-js';
+
 export type BackgroundQuality = 'low' | 'med' | 'high';
-export type BackgroundKind = 'animated' | 'solid';
+
+/** Kinds rendered by the canvas engine (init/frame/dispose loop). */
+export type CanvasBackgroundKind = 'animated' | 'solid';
+
+/** All background kinds, including DOM/SVG scene backgrounds. */
+export type BackgroundKind = CanvasBackgroundKind | 'scene';
 
 export interface BackgroundFrameContext {
   canvas: HTMLCanvasElement;
@@ -14,10 +21,33 @@ export interface BackgroundFrameContext {
 export interface BackgroundVariant {
   id: string;
   label: string;
-  kind: BackgroundKind;
+  kind: CanvasBackgroundKind;
   init(ctx: BackgroundFrameContext): void;
   frame(ctx: BackgroundFrameContext, time: number): void;
   dispose(): void;
+}
+
+export interface SceneProps {
+  /** True when the user prefers reduced motion — scenes freeze their CSS animations. */
+  reducedMotion: boolean;
+}
+
+/**
+ * A DOM/SVG scene background: a self-contained Solid component (fixed
+ * colorway, CSS keyframe animation) rendered instead of the canvas engine.
+ * Scene variants never go through init/frame/dispose.
+ */
+export interface SceneVariant {
+  id: string;
+  label: string;
+  kind: 'scene';
+  component: (props: SceneProps) => JSX.Element;
+}
+
+export type AnyBackgroundVariant = BackgroundVariant | SceneVariant;
+
+export function isSceneVariant(variant: AnyBackgroundVariant): variant is SceneVariant {
+  return variant.kind === 'scene';
 }
 
 export interface BackgroundEngineOptions {
