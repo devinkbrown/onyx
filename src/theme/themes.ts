@@ -835,7 +835,7 @@ export const THEMES: Record<ThemeId, ThemeMeta> = {
     label: 'Ocean',
     description: 'The flagship — deep water, electric azure current, bioluminescent crests, glacier ice.',
     scheme: 'dark',
-    signatureBg: 'bioluminescence',
+    signatureBg: 'deep-current',
     tokens: oceanTokens,
   },
   tide: {
@@ -875,7 +875,7 @@ export const THEMES: Record<ThemeId, ThemeMeta> = {
     label: 'Obsidian',
     description: 'Pure AMOLED black, cool steel sheen. The deepest cut of the stone.',
     scheme: 'dark',
-    signatureBg: 'obsidian',
+    signatureBg: 'bioluminescence',
     tokens: obsidianTokens,
   },
   pearl: {
