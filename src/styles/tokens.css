@@ -21,36 +21,38 @@
 [data-theme='ocean'] {
   color-scheme: dark;
 
-  /* Ground — abyssal trench → mid depth → near-surface crests */
-  --ink: #02060d;        /* the trench, beneath everything */
-  --ink-2: #04090f;
-  --stone: #08182a;      /* deep water body */
-  --stone-2: #0f2740;    /* mid depth, raised surface */
-  --stone-3: #173550;    /* upper layer, near the light */
-  --stone-line: #21466a; /* current banding line */
+  /* Ground — abyssal trench → mid depth → near-surface crests.
+     OKLCH engine ramp (seed: primary 232°, depth .8, vibrancy .85) — even
+     perceptual lightness steps, azure-tinted all the way down. */
+  --ink: #000306;        /* the trench, beneath everything */
+  --ink-2: #00050a;
+  --stone: #000e17;      /* deep water body */
+  --stone-2: #051821;    /* mid depth, raised surface */
+  --stone-3: #10232c;    /* upper layer, near the light */
+  --stone-line: #0f2d3b; /* current banding line */
 
   /* Azure — electric sky-blue current + bioluminescent crest (primary) */
-  --lapis: #2bb4f0;
-  --lapis-bright: #7fe2ff;
-  --lapis-deep: #0e6aa8;
+  --lapis: #00ace9;
+  --lapis-bright: #87d6ff;
+  --lapis-deep: #00668c;
 
   /* Glacier — icy pale azure, the second accent (was champagne gold) */
-  --gold: #6fc3e8;
-  --gold-bright: #b9e9ff;
-  --gold-deep: #2e7fae;
+  --gold: #6bc8d5;
+  --gold-bright: #a2edf7;
+  --gold-deep: #35818b;
 
   /* Coral — the single hot accent (danger / badges; ocean coral, sparingly) */
   --shu: #ff6f61;
   --shu-bright: #ff9484;
 
   /* Text — sea-foam ivory over deep water */
-  --washi: #e6f4ff;
-  --washi-dim: #9fc6e0;
-  --washi-mute: #5f87a2; /* deep-tide graphite, least important */
+  --washi: #d1e1e9;
+  --washi-dim: #8c9ba3;
+  --washi-mute: #536771; /* deep-tide graphite, least important */
 
   /* Functional status (kept in-palette where possible) */
-  --ok: #34d399;
-  --warn: #f2dca0; /* warnings stay WARM — decoupled from the (now glacier) second accent */
+  --ok: #5bc78e;
+  --warn: #e6d08c; /* warnings stay WARM — decoupled from the (now glacier) second accent */
   --danger: var(--shu);
 
   /* Seams (bioluminescent current lines) + bands (pale tide) */
@@ -109,30 +111,30 @@
 [data-theme='onyx'] {
   color-scheme: dark;
 
-  --ink: #050507;
-  --ink-2: #08080c;
-  --stone: #0f0f15;
-  --stone-2: #16161e;
-  --stone-3: #20202a;
-  --stone-line: #2c2c39;
+  --ink: #000101;
+  --ink-2: #010203;
+  --stone: #050709;
+  --stone-2: #0d0f12;
+  --stone-3: #16191c;
+  --stone-line: #1e2226;
 
-  --lapis: #5a7fb8;
-  --lapis-bright: #a8c8ee;
-  --lapis-deep: #34507e;
+  --lapis: #6996c5;
+  --lapis-bright: #9cc2ea;
+  --lapis-deep: #385b7e;
 
   --gold: #c9a24a;
   --gold-bright: #f1d489;
   --gold-deep: #8c6c2c;
 
-  --shu: #d8412c;
-  --shu-bright: #ff5d44;
+  --shu: #e95145;
+  --shu-bright: #ff7f71;
 
-  --washi: #ece8e0;
-  --washi-dim: #a6a299;
-  --washi-mute: #6a6b78;
+  --washi: #eae8e0;
+  --washi-dim: #a4a19a;
+  --washi-mute: #6e6c63;
 
-  --ok: #57b98a;
-  --warn: #f2dca0; /* warnings stay WARM — decoupled from the (now glacier) second accent */
+  --ok: #5bc78e;
+  --warn: #e6d08c; /* warnings stay WARM — in-family with the gold inlay */
   --danger: var(--shu);
 
   --seam: color-mix(in oklab, var(--gold) 40%, transparent);

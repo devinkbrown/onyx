@@ -17,6 +17,7 @@ import { applyThemeToDom, ThemeProvider, useTheme } from './ThemeProvider';
 import { THEMES, THEME_IDS, DEFAULT_THEME_ID, type ThemeId, type TokenMap } from './themes';
 import { ThemeStudio } from './ThemeStudio';
 import { ALL_STUDIO_TOKENS, EDITABLE_PROPERTIES } from './tokens';
+import { auditPalette, hexToOklch } from './paletteFactory';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -342,6 +343,57 @@ describe('Token catalogue', () => {
   it('exposes the expected light-scheme themes', () => {
     const lightThemes = THEME_IDS.filter((id) => THEMES[id]?.scheme === 'light');
     expect(lightThemes.sort()).toEqual(['frost', 'pearl']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 8. Palette quality — every built-in theme passes the factory's AA audit and
+//    keeps every chromatic accent out of the banned purple/indigo band.
+// ---------------------------------------------------------------------------
+
+describe('Palette quality (all built-in themes)', () => {
+  const ACCENT_TOKENS = [
+    '--lapis', '--lapis-bright', '--lapis-deep',
+    '--gold', '--gold-bright', '--gold-deep',
+    '--shu', '--shu-bright',
+    '--ok', '--warn',
+  ];
+
+  it('every theme passes every WCAG AA pair in auditPalette', () => {
+    for (const id of THEME_IDS) {
+      const rows = auditPalette(THEMES[id].tokens);
+      for (const row of rows) {
+        expect(row.pass, `${id}: ${row.fg} on ${row.bg} is ${row.ratio} (needs ${row.min})`).toBe(true);
+      }
+    }
+  });
+
+  it('no chromatic accent sits in the banned purple/indigo band (258–342°)', () => {
+    for (const id of THEME_IDS) {
+      for (const token of ACCENT_TOKENS) {
+        const value = THEMES[id].tokens[token];
+        if (!value) continue;
+        const o = hexToOklch(value);
+        if (!o || o.c <= 0.03) continue; // var()/near-neutral tokens are exempt
+        const banned = o.h >= 258 && o.h <= 342;
+        expect(banned, `${id} ${token} hue ${o.h.toFixed(1)} chroma ${o.c.toFixed(3)}`).toBe(false);
+      }
+    }
+  });
+
+  it('dark themes ramp ground lightness ink → stone-line strictly upward', () => {
+    const GROUNDS = ['--ink', '--stone', '--stone-2', '--stone-3', '--stone-line'];
+    for (const id of THEME_IDS) {
+      const theme = THEMES[id];
+      const ls = GROUNDS.map((g) => hexToOklch(theme.tokens[g]!)!.l);
+      for (let i = 1; i < ls.length; i += 1) {
+        if (theme.scheme === 'dark') {
+          expect(ls[i]!, `${id} ${GROUNDS[i]} should sit above ${GROUNDS[i - 1]}`).toBeGreaterThan(ls[i - 1]!);
+        } else {
+          expect(ls[i]!, `${id} ${GROUNDS[i]} should sit below ${GROUNDS[i - 1]}`).toBeLessThan(ls[i - 1]!);
+        }
+      }
+    }
   });
 });
 
