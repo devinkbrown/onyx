@@ -65,14 +65,23 @@ export function ConnectPulse(props: { deepLink?: string | null }): JSX.Element {
         <p class="cpulse-eyebrow">tonight, on the water</p>
         <Show
           when={stats()}
-          fallback={<p class="cpulse-wire">:ircxnet 251 you :the mesh is listening</p>}
+          fallback={
+            <p class="cpulse-wire">
+              <span class="cpulse-wire-tag">251</span>
+              <span class="cpulse-wire-body">the mesh is listening</span>
+            </p>
+          }
         >
           {(data) => (
             <p class="cpulse-wire" aria-live="polite">
-              :{(data().network || 'ircxnet').toLowerCase()} 251 you :
-              {data().channels.length} channel{data().channels.length === 1 ? '' : 's'} ·{' '}
-              {totalMessages().toLocaleString('en-US')} messages ·{' '}
-              updated {relTime(data().generated_at, nowMs())}
+              <span class="cpulse-wire-tag">251</span>
+              <span class="cpulse-wire-body">
+                <b>{data().channels.length}</b> channel{data().channels.length === 1 ? '' : 's'}
+                <span class="cpulse-wire-sep">·</span>
+                <b>{totalMessages().toLocaleString('en-US')}</b> messages
+                <span class="cpulse-wire-sep">·</span>
+                updated {relTime(data().generated_at, nowMs())}
+              </span>
             </p>
           )}
         </Show>

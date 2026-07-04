@@ -27,11 +27,35 @@
 
 .cpulse-wire {
   margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
   font-family: var(--font-mono);
-  font-size: 0.72rem;
-  line-height: 1.6;
+  font-size: 0.74rem;
+  line-height: 1.55;
   color: var(--washi-dim);
   overflow-wrap: anywhere;
+}
+/* A subtle IRC-numeric badge (RPL_LUSERCLIENT) instead of a raw wire prefix. */
+.cpulse-wire-tag {
+  flex: none;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  color: var(--lapis-bright);
+  border: 1px solid color-mix(in oklab, var(--lapis) 34%, transparent);
+  background: color-mix(in oklab, var(--lapis) 9%, transparent);
+  border-radius: 999px;
+  padding: 1px 7px;
+  transform: translateY(-1px);
+}
+.cpulse-wire-body b {
+  color: var(--washi);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.cpulse-wire-sep {
+  margin: 0 7px;
+  color: var(--washi-mute);
 }
 
 .cpulse-deeplink {
