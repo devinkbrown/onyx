@@ -67,14 +67,14 @@ export function ConnectPulse(props: { deepLink?: string | null }): JSX.Element {
           when={stats()}
           fallback={
             <p class="cpulse-wire">
-              <span class="cpulse-wire-tag">251</span>
+              <span class="cpulse-wire-live" aria-hidden="true" />
               <span class="cpulse-wire-body">the mesh is listening</span>
             </p>
           }
         >
           {(data) => (
             <p class="cpulse-wire" aria-live="polite">
-              <span class="cpulse-wire-tag">251</span>
+              <span class="cpulse-wire-live" aria-hidden="true" />
               <span class="cpulse-wire-body">
                 <b>{data().channels.length}</b> channel{data().channels.length === 1 ? '' : 's'}
                 <span class="cpulse-wire-sep">·</span>

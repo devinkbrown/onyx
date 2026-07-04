@@ -36,17 +36,24 @@
   color: var(--washi-dim);
   overflow-wrap: anywhere;
 }
-/* A subtle IRC-numeric badge (RPL_LUSERCLIENT) instead of a raw wire prefix. */
-.cpulse-wire-tag {
+/* A small live-pulse dot instead of a cryptic IRC numeric. */
+.cpulse-wire-live {
   flex: none;
-  font-size: 0.6rem;
-  letter-spacing: 0.08em;
-  color: var(--lapis-bright);
-  border: 1px solid color-mix(in oklab, var(--lapis) 34%, transparent);
-  background: color-mix(in oklab, var(--lapis) 9%, transparent);
+  width: 7px;
+  height: 7px;
   border-radius: 999px;
-  padding: 1px 7px;
-  transform: translateY(-1px);
+  background: var(--ok);
+  box-shadow: 0 0 0 0 color-mix(in oklab, var(--ok) 60%, transparent);
+  transform: translateY(1px);
+  animation: cpulse-live 2.4s var(--ease) infinite;
+}
+@keyframes cpulse-live {
+  0%   { box-shadow: 0 0 0 0 color-mix(in oklab, var(--ok) 55%, transparent); }
+  70%  { box-shadow: 0 0 0 6px color-mix(in oklab, var(--ok) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--ok) 0%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cpulse-wire-live { animation: none; }
 }
 .cpulse-wire-body b {
   color: var(--washi);
