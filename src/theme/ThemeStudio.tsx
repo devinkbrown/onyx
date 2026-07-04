@@ -1,9 +1,23 @@
 /**
- * ThemeStudio — live theme editor.
+ * ThemeStudio — live theme editor + generative theme factory.
  *
  * Pick a base theme, tweak any editable token, see changes in the live preview
  * panel.  Export the current override set as a JSON blob; import a previously
  * exported blob.
+ *
+ * The Factory section (top) drives src/theme/paletteFactory.ts:
+ *   - GENERATE: a tiny seed (two hues + depth/vibrancy/warmth/contrast knobs)
+ *     produces a full coherent token map, AA-clean by construction. Randomize
+ *     rolls a tasteful fresh seed; "seed from current" recovers a seed from
+ *     whatever palette is live so built-ins can be riffed on.
+ *   - ADJUST: global relative transforms (hue rotate / saturation / warmth /
+ *     contrast) over the current palette. A baseline is snapshotted when the
+ *     user starts dragging, so transforms compose from that baseline and
+ *     dragging back to zero restores it exactly. Bake (or Save) commits.
+ *
+ * Everything the factory produces flows through the same `overrides` signal
+ * the manual editor uses, so the live preview, contrast audit, save, and
+ * export all see the generated palette with no parallel state.
  *
  * Solid idioms used throughout:
  *   - Components run once; props are never destructured at the call site.
@@ -34,6 +48,17 @@ import { THEMES, THEME_IDS, type ThemeId, type TokenMap } from './themes';
 import { customThemeTokens, getCustomTheme, isCustomThemeId } from './customThemes';
 import { STUDIO_GROUPS, type StudioGroup, type StudioToken } from './tokens';
 import { resolveCssColor, wcagRating } from './contrast';
+import {
+  DEFAULT_SEED,
+  adjustPalette,
+  enforceAA,
+  generatePalette,
+  hexToOklch,
+  oklchToHex,
+  randomSeed,
+  seedFromTokens,
+  type PaletteSeed,
+} from './paletteFactory';
 import { useStore, getState } from '@/lib/store';
 import { backgroundOptions } from '@/backgrounds';
 
@@ -47,6 +72,32 @@ type ExportBlob = {
   overrides: TokenMap;
   exported: string; // ISO timestamp
 };
+
+/** The Adjust panel's transform state — identity means "no change". */
+type AdjustState = {
+  hueShift: number;
+  saturation: number;
+  warmth: number;
+  contrast: number;
+};
+
+const ADJUST_IDENTITY: AdjustState = { hueShift: 0, saturation: 1, warmth: 0, contrast: 0 };
+
+/** Debounce for live re-generation while factory seed knobs are dragged. */
+const REGEN_DEBOUNCE_MS = 120;
+
+function isAdjustIdentity(a: AdjustState): boolean {
+  return (
+    a.hueShift === ADJUST_IDENTITY.hueShift &&
+    a.saturation === ADJUST_IDENTITY.saturation &&
+    a.warmth === ADJUST_IDENTITY.warmth &&
+    a.contrast === ADJUST_IDENTITY.contrast
+  );
+}
+
+function fmtSigned(v: number): string {
+  return `${v >= 0 ? '+' : ''}${v.toFixed(2)}`;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -83,7 +134,11 @@ function isExportBlob(value: unknown): value is ExportBlob {
 }
 
 // ---------------------------------------------------------------------------
-// Live-preview panel — fake IRC message thread
+// Live-preview panel — a compact but realistic slice of the app chrome (fake
+// data, no store): channel rail with unread marks, header, message thread with
+// role-coloured nicks, action buttons + badges, member list, composer. Every
+// surface is painted with the live CSS vars so the whole mock re-tints as the
+// palette changes — this is the "does my theme actually look good" surface.
 // ---------------------------------------------------------------------------
 
 function StudioPreview() {
@@ -93,36 +148,101 @@ function StudioPreview() {
         <span class="ts-preview__bar-dot" style={{"background":"var(--shu)"}} />
         <span class="ts-preview__bar-dot" style={{"background":"var(--gold)"}} />
         <span class="ts-preview__bar-dot" style={{"background":"var(--ok)"}} />
-        <span class="ts-preview__bar-title">#general — eshmaki.me</span>
+        <span class="ts-preview__bar-title">onyx — eshmaki.me</span>
       </div>
-      <div class="ts-preview__body">
-        <div class="ts-preview__msg">
-          <span class="ts-preview__nick" style={{"color":"var(--lapis-bright)"}}>aoi</span>
-          <span class="ts-preview__text">surfaced from the deep current</span>
-        </div>
-        <div class="ts-preview__msg">
-          <span class="ts-preview__nick" style={{"color":"var(--gold-bright)"}}>kain</span>
-          <span class="ts-preview__text">
-            the tide is calm —{' '}
-            <span style={{"color":"var(--shu-bright)"}}>a coral light</span> drifting through the dark water
-          </span>
-        </div>
-        <div class="ts-preview__msg">
-          <span class="ts-preview__nick" style={{"color":"var(--ok)"}}>orochi</span>
-          <span class="ts-preview__text ts-preview__text--dim">→ mesh: 2 shards online</span>
-        </div>
-        <div class="ts-preview__input-row">
-          <div class="ts-preview__input">
-            <span class="ts-preview__prompt" aria-hidden="true">›</span>
-            <span class="ts-preview__cursor" aria-hidden="true">█</span>
+
+      <div class="ts-preview__chrome" aria-hidden="true">
+        {/* Channel rail */}
+        <div class="ts-pv-side">
+          <div class="ts-pv-side__server">
+            <span class="ts-pv-side__sigil">◆</span>ircxnet
           </div>
-          <div class="ts-preview__actions">
-            <button class="onyx-button onyx-button--primary onyx-button--sm" type="button" tabIndex={-1}>
-              send
-            </button>
-            <button class="onyx-button onyx-button--ghost onyx-button--sm" type="button" tabIndex={-1}>
-              attach
-            </button>
+          <div class="ts-pv-side__group">channels</div>
+          <div class="ts-pv-chan" data-active="true">
+            <span class="ts-pv-chan__hash">#</span>general
+          </div>
+          <div class="ts-pv-chan">
+            <span class="ts-pv-chan__hash">#</span>reef
+            <span class="ts-pv-chan__pip" />
+          </div>
+          <div class="ts-pv-chan">
+            <span class="ts-pv-chan__hash">#</span>dev
+            <span class="ts-pv-chan__count">3</span>
+          </div>
+          <div class="ts-pv-chan ts-pv-chan--muted">
+            <span class="ts-pv-chan__hash">#</span>abyss
+          </div>
+          <div class="ts-pv-side__group">voice</div>
+          <div class="ts-pv-chan">
+            <span class="ts-pv-chan__hash ts-pv-chan__hash--voice">◉</span>tide-pool
+          </div>
+        </div>
+
+        {/* Main column: header, thread, actions, composer */}
+        <div class="ts-pv-main">
+          <div class="ts-pv-head">
+            <span class="ts-pv-head__chan">#general</span>
+            <span class="ts-pv-head__topic">the tide is calm tonight</span>
+            <span class="ts-pv-badge ts-pv-badge--accent">beta</span>
+            <span class="ts-pv-badge ts-pv-badge--hot">3 new</span>
+          </div>
+
+          <div class="ts-pv-thread">
+            <div class="ts-pv-msg">
+              <span class="ts-pv-msg__time">21:04</span>
+              <span class="ts-pv-msg__nick" style={{"color":"var(--lapis-bright)"}}>aoi</span>
+              <span class="ts-pv-msg__text">surfaced from the deep current</span>
+            </div>
+            <div class="ts-pv-msg">
+              <span class="ts-pv-msg__time">21:06</span>
+              <span class="ts-pv-msg__nick" style={{"color":"var(--gold-bright)"}}>kain</span>
+              <span class="ts-pv-msg__text">
+                pushing the reef build tonight — <span class="ts-pv-msg__link">eshmaki.me/stats</span>
+              </span>
+            </div>
+            <div class="ts-pv-msg">
+              <span class="ts-pv-msg__time">21:07</span>
+              <span class="ts-pv-msg__nick" style={{"color":"var(--ok)"}}>orochi</span>
+              <span class="ts-pv-msg__text ts-pv-msg__text--dim">→ mesh: 2 shards linked, quorum ok</span>
+            </div>
+            <div class="ts-pv-msg">
+              <span class="ts-pv-msg__time">21:09</span>
+              <span class="ts-pv-msg__nick" style={{"color":"var(--shu)"}}>rei</span>
+              <span class="ts-pv-msg__text">a coral light drifting through dark water</span>
+            </div>
+          </div>
+
+          <div class="ts-pv-actions">
+            <button class="ts-pv-btn ts-pv-btn--primary" type="button" tabIndex={-1}>join voice</button>
+            <button class="ts-pv-btn ts-pv-btn--danger" type="button" tabIndex={-1}>leave</button>
+          </div>
+
+          <div class="ts-pv-composer">
+            <span class="ts-pv-composer__prompt">›</span>
+            <span class="ts-pv-composer__ghost">message #general</span>
+            <span class="ts-pv-composer__cursor">█</span>
+            <button class="ts-pv-btn ts-pv-btn--primary ts-pv-btn--send" type="button" tabIndex={-1}>send</button>
+          </div>
+        </div>
+
+        {/* Member list with role sigils */}
+        <div class="ts-pv-members">
+          <div class="ts-pv-members__head">online — 4</div>
+          <div class="ts-pv-member">
+            <span class="ts-pv-member__sigil" style={{"color":"var(--gold-bright)"}}>!</span>aoi
+            <span class="ts-pv-member__dot" style={{"background":"var(--ok)"}} />
+          </div>
+          <div class="ts-pv-member">
+            <span class="ts-pv-member__sigil" style={{"color":"var(--lapis-bright)"}}>@</span>kain
+            <span class="ts-pv-member__dot" style={{"background":"var(--ok)"}} />
+          </div>
+          <div class="ts-pv-member">
+            <span class="ts-pv-member__sigil" style={{"color":"var(--ok)"}}>+</span>rei
+            <span class="ts-pv-member__dot" style={{"background":"var(--warn)"}} />
+          </div>
+          <div class="ts-pv-member ts-pv-member--plain">
+            <span class="ts-pv-member__sigil"> </span>mira
+            <span class="ts-pv-member__dot" style={{"background":"var(--washi-mute)"}} />
           </div>
         </div>
       </div>
@@ -135,17 +255,20 @@ function StudioPreview() {
 // so a theme can't silently become unreadable. Reacts to live token edits.
 // ---------------------------------------------------------------------------
 
-type ContrastPair = { label: string; fg: string; bg: string };
+// `min` is each pair's WCAG bar: body/secondary text needs AA 4.5; metadata and
+// UI accents (links, status, danger — icon/large-text components) need 3:1.
+// This mirrors paletteFactory's AA_PAIRS so a generated palette reads "all pass".
+type ContrastPair = { label: string; fg: string; bg: string; min: number };
 
 const CONTRAST_PAIRS: ContrastPair[] = [
-  { label: 'Body text', fg: '--washi', bg: '--ink' },
-  { label: 'Secondary text', fg: '--washi-dim', bg: '--ink' },
-  { label: 'Metadata', fg: '--washi-mute', bg: '--ink' },
-  { label: 'Text on panel', fg: '--washi', bg: '--stone-2' },
-  { label: 'Links / accent', fg: '--lapis-bright', bg: '--ink' },
-  { label: 'Gold accent', fg: '--gold-bright', bg: '--ink' },
-  { label: 'Status OK', fg: '--ok', bg: '--ink' },
-  { label: 'Danger', fg: '--shu-bright', bg: '--ink' },
+  { label: 'Body text', fg: '--washi', bg: '--ink', min: 4.5 },
+  { label: 'Secondary text', fg: '--washi-dim', bg: '--ink', min: 4.5 },
+  { label: 'Metadata', fg: '--washi-mute', bg: '--ink', min: 3 },
+  { label: 'Text on panel', fg: '--washi', bg: '--stone-2', min: 4.5 },
+  { label: 'Links / accent', fg: '--lapis-bright', bg: '--ink', min: 3 },
+  { label: 'Gold accent', fg: '--gold-bright', bg: '--ink', min: 3 },
+  { label: 'Status OK', fg: '--ok', bg: '--ink', min: 3 },
+  { label: 'Danger', fg: '--shu-bright', bg: '--ink', min: 3 },
 ];
 
 type ContrastAuditProps = {
@@ -153,10 +276,12 @@ type ContrastAuditProps = {
   overrides: () => TokenMap;
   /** Tracked so the audit re-runs when the base theme switches. */
   themeId: () => string;
+  /** One-click repair — enforceAA over the resolved palette. */
+  onAutoFix: () => void;
 };
 
 function ContrastAudit(props: ContrastAuditProps) {
-  const [local] = splitProps(props, ['overrides', 'themeId']);
+  const [local] = splitProps(props, ['overrides', 'themeId', 'onAutoFix']);
 
   const rows = createMemo(() => {
     local.overrides(); // dependency: live edits
@@ -170,7 +295,7 @@ function ContrastAudit(props: ContrastAuditProps) {
   });
 
   const failing = createMemo(
-    () => rows().filter((r) => r.rating && !r.rating.passesAA).length,
+    () => rows().filter((r) => r.rating && r.rating.ratio < r.min).length,
   );
 
   return (
@@ -218,6 +343,64 @@ function ContrastAudit(props: ContrastAuditProps) {
           )}
         </For>
       </ul>
+      <button
+        type="button"
+        class="ts-audit__fix"
+        data-failing={failing() > 0 ? 'true' : undefined}
+        onClick={() => local.onAutoFix()}
+        data-testid="ts-autofix"
+        title="Nudge text tokens until every pair clears its WCAG floor."
+      >
+        ⚑ auto-fix to AA
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Factory slider — a labelled range control in the studio's visual language,
+// shared by the Generate seed knobs and the Adjust transform knobs.
+// ---------------------------------------------------------------------------
+
+type FactorySliderProps = {
+  id: string;
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  value: () => number;
+  format: (v: number) => string;
+  onValue: (v: number) => void;
+  /** Snapshot hook — the Adjust panel captures its baseline on drag start. */
+  onPointerDown?: () => void;
+  testid?: string;
+};
+
+function FactorySlider(props: FactorySliderProps) {
+  const [local] = splitProps(props, [
+    'id', 'label', 'min', 'max', 'step', 'value', 'format', 'onValue', 'onPointerDown', 'testid',
+  ]);
+
+  return (
+    <div class="ts-token-control">
+      <label class="ts-token-label" for={local.id}>
+        {local.label}
+        <span class="ts-token-badge">{local.format(local.value())}</span>
+      </label>
+      <input
+        id={local.id}
+        type="range"
+        class="ts-token-range"
+        min={local.min}
+        max={local.max}
+        step={local.step}
+        value={local.value()}
+        onInput={(e) => local.onValue(Number((e.currentTarget as HTMLInputElement).value))}
+        onPointerDown={() => local.onPointerDown?.()}
+        aria-label={local.label}
+        aria-valuetext={local.format(local.value())}
+        data-testid={local.testid}
+      />
     </div>
   );
 }
@@ -411,6 +594,21 @@ export function ThemeStudio(props: ThemeStudioProps) {
   let copyTimer: ReturnType<typeof setTimeout> | undefined;
   let saveInputRef: HTMLInputElement | undefined;
 
+  // ── Factory state ──
+  // The generative seed driving the GENERATE panel.
+  const [seed, setSeed] = createSignal<PaletteSeed>({ ...DEFAULT_SEED });
+  // Once the user has generated at least once, seed knobs re-generate live.
+  const [factoryArmed, setFactoryArmed] = createSignal(false);
+  // The ADJUST panel's relative transform (identity = untouched).
+  const [adjust, setAdjust] = createSignal<AdjustState>({ ...ADJUST_IDENTITY });
+  // When Generate produces a palette whose scheme differs from the base theme,
+  // color-scheme is overridden live so the preview stays legible.
+  const [schemeOverride, setSchemeOverride] = createSignal<'dark' | 'light' | null>(null);
+  // Snapshot taken when an Adjust drag starts: transforms compose from this
+  // baseline (not from each other), and identity restores it exactly.
+  let adjustBaseline: { resolved: TokenMap; overrides: TokenMap } | null = null;
+  let regenTimer: ReturnType<typeof setTimeout> | undefined;
+
   // When the base theme changes, clear per-session overrides so the new
   // theme's values render cleanly.  The ThemeProvider already writes the new
   // token set onto the root.
@@ -418,6 +616,7 @@ export function ThemeStudio(props: ThemeStudioProps) {
     themeId(); // track
     setOverrides({});
     setImportError(null);
+    resetFactoryState();
   });
 
   // Apply per-session overrides live — directly writing CSS vars.
@@ -435,6 +634,9 @@ export function ThemeStudio(props: ThemeStudioProps) {
       removeVar(prop);
     }
     if (copyTimer !== undefined) clearTimeout(copyTimer);
+    if (regenTimer !== undefined) clearTimeout(regenTimer);
+    // Restore the base theme's color-scheme if a generated palette changed it.
+    if (schemeOverride() !== null) applyVar('color-scheme', baseScheme());
   });
 
   const handleTokenChange = (property: string, value: string): void => {
@@ -451,6 +653,167 @@ export function ThemeStudio(props: ThemeStudioProps) {
       return c ? customThemeTokens(c) : {};
     }
     return THEMES[id as ThemeId]?.tokens ?? {};
+  };
+
+  // ── Factory plumbing ──
+
+  /** Scheme of the active base theme (built-in or a custom theme's base). */
+  const baseScheme = (): 'dark' | 'light' => activeThemeMeta()?.scheme ?? 'dark';
+
+  /** Effective scheme: a generated palette's scheme wins over the base's. */
+  const activeScheme = (): 'dark' | 'light' => schemeOverride() ?? baseScheme();
+
+  /** The palette as currently rendered: base tokens overlaid with overrides. */
+  const resolvedTokens = (): TokenMap => ({ ...baseTokens(), ...overrides() });
+
+  /**
+   * Replace the whole override set with `map` and apply it live. Entries equal
+   * to the base value are dropped (they change nothing), and overrides no
+   * longer present are reverted to base — so Save/Export/audit all see exactly
+   * the palette on screen, with no stale vars left behind.
+   */
+  const setAllOverrides = (map: TokenMap): void => {
+    const base = baseTokens();
+    const next: TokenMap = {};
+    for (const [prop, val] of Object.entries(map)) {
+      if (base[prop] !== val) next[prop] = val;
+    }
+    for (const prop of Object.keys(overrides())) {
+      if (next[prop] === undefined) {
+        removeVar(prop);
+        const baseVal = base[prop];
+        if (baseVal !== undefined) applyVar(prop, baseVal);
+      }
+    }
+    for (const [prop, val] of Object.entries(next)) {
+      applyVar(prop, val);
+    }
+    setOverrides(next);
+  };
+
+  /** Keep the preview legible when the generated scheme differs from base. */
+  const applySchemeForPreview = (scheme: 'dark' | 'light'): void => {
+    setSchemeOverride(scheme === baseScheme() ? null : scheme);
+    applyVar('color-scheme', scheme);
+  };
+
+  /** Run the engine on a seed and apply the full result as live overrides. */
+  const generateNow = (s: PaletteSeed = seed()): void => {
+    setAllOverrides(generatePalette(s));
+    applySchemeForPreview(s.scheme);
+    // A fresh generation supersedes any in-flight adjust session.
+    adjustBaseline = null;
+    setAdjust({ ...ADJUST_IDENTITY });
+    setFactoryArmed(true);
+  };
+
+  /** Update the seed; once armed (first Generate), re-generate live, debounced. */
+  const updateSeed = (patch: Partial<PaletteSeed>): void => {
+    const next = { ...seed(), ...patch };
+    setSeed(next);
+    if (!factoryArmed()) return;
+    if (regenTimer !== undefined) clearTimeout(regenTimer);
+    regenTimer = setTimeout(() => generateNow(next), REGEN_DEBOUNCE_MS);
+  };
+
+  const handleRandomize = (): void => {
+    const s = randomSeed();
+    setSeed(s);
+    generateNow(s);
+  };
+
+  /** Recover a seed from whatever palette is live so it can be riffed on. */
+  const handleSeedFromCurrent = (): void => {
+    setSeed(seedFromTokens(resolvedTokens(), activeScheme()));
+  };
+
+  /** Capture the Adjust baseline once per drag session. */
+  const ensureAdjustBaseline = (): void => {
+    if (!adjustBaseline) {
+      adjustBaseline = { resolved: resolvedTokens(), overrides: { ...overrides() } };
+    }
+  };
+
+  /** Apply a transform patch, composing from the drag-start baseline. */
+  const applyAdjustPatch = (patch: Partial<AdjustState>): void => {
+    ensureAdjustBaseline();
+    const next = { ...adjust(), ...patch };
+    setAdjust(next);
+    if (isAdjustIdentity(next)) {
+      // Back to zero — restore the baseline exactly (no oklch round-trip drift).
+      setAllOverrides(adjustBaseline!.overrides);
+      return;
+    }
+    setAllOverrides(adjustPalette(adjustBaseline!.resolved, next, activeScheme()));
+  };
+
+  const adjustDirty = createMemo(() => !isAdjustIdentity(adjust()));
+
+  /** Commit the adjusted palette: keep the tokens, zero the knobs. */
+  const bakeAdjust = (): void => {
+    adjustBaseline = null;
+    setAdjust({ ...ADJUST_IDENTITY });
+  };
+
+  /** Abandon the adjust session and restore the baseline palette. */
+  const revertAdjust = (): void => {
+    if (adjustBaseline) setAllOverrides(adjustBaseline.overrides);
+    bakeAdjust();
+  };
+
+  /** One-click AA repair over the resolved palette. */
+  const handleAutoFix = (): void => {
+    setAllOverrides(enforceAA(resolvedTokens(), activeScheme()));
+  };
+
+  const resetFactoryState = (): void => {
+    adjustBaseline = null;
+    setAdjust({ ...ADJUST_IDENTITY });
+    setFactoryArmed(false);
+    setSchemeOverride(null);
+    if (regenTimer !== undefined) {
+      clearTimeout(regenTimer);
+      regenTimer = undefined;
+    }
+  };
+
+  /**
+   * When the factory generated a palette whose scheme differs from the active
+   * base, anchor saves/exports on a same-scheme built-in so `color-scheme`
+   * (form controls, scrollbars) matches the palette when it is re-applied.
+   */
+  const schemeCorrectedBase = (base: ThemeId): ThemeId => {
+    const target = schemeOverride();
+    if (!target || THEMES[base]?.scheme === target) return base;
+    return target === 'light' ? 'pearl' : THEME_IDS[0]!;
+  };
+
+  // Representative swatches for the seed colour pickers — derived from the
+  // seed the same way the engine derives --lapis / --gold, so the swatch is a
+  // faithful preview of the accent the seed will produce.
+  const primarySwatch = createMemo(() =>
+    oklchToHex({
+      l: seed().scheme === 'dark' ? 0.62 : 0.5,
+      c: 0.09 + 0.15 * seed().vibrancy,
+      h: seed().primaryHue,
+    }),
+  );
+  const accentSwatch = createMemo(() =>
+    oklchToHex({
+      l: seed().scheme === 'dark' ? 0.7 : 0.52,
+      c: 0.075 + 0.13 * seed().vibrancy,
+      h: seed().accentHue,
+    }),
+  );
+
+  const handlePrimarySeedColor: JSX.EventHandlerUnion<HTMLInputElement, InputEvent> = (e) => {
+    const ok = hexToOklch((e.currentTarget as HTMLInputElement).value);
+    if (ok) updateSeed({ primaryHue: Math.round(ok.h) });
+  };
+
+  const handleAccentSeedColor: JSX.EventHandlerUnion<HTMLInputElement, InputEvent> = (e) => {
+    const ok = hexToOklch((e.currentTarget as HTMLInputElement).value);
+    if (ok) updateSeed({ accentHue: Math.round(ok.h) });
   };
 
   // Revert a single token to its base value, dropping just that override.
@@ -472,6 +835,7 @@ export function ThemeStudio(props: ThemeStudioProps) {
     }
     setOverrides({});
     setImportError(null);
+    resetFactoryState();
     // Re-apply the active theme's tokens (built-in or custom: base + overrides).
     const id = themeId();
     const tokens = isCustomThemeId(id)
@@ -480,11 +844,14 @@ export function ThemeStudio(props: ThemeStudioProps) {
     for (const [prop, val] of Object.entries(tokens)) {
       applyVar(prop, val);
     }
+    applyVar('color-scheme', baseScheme());
   };
 
   const handleExport = (): void => {
     const id = themeId();
-    const base: ThemeId = isCustomThemeId(id) ? (getCustomTheme(id)?.base ?? THEME_IDS[0]!) : (id as ThemeId);
+    const base: ThemeId = schemeCorrectedBase(
+      isCustomThemeId(id) ? (getCustomTheme(id)?.base ?? THEME_IDS[0]!) : (id as ThemeId),
+    );
     const baseOverrides = isCustomThemeId(id) ? (getCustomTheme(id)?.overrides ?? {}) : {};
     const blob: ExportBlob = {
       __onyx_theme_export__: true,
@@ -576,7 +943,9 @@ export function ThemeStudio(props: ThemeStudioProps) {
     const name = saveName().trim();
     if (!name) return;
     const id = themeId();
-    const base: ThemeId = isCustomThemeId(id) ? (getCustomTheme(id)?.base ?? THEME_IDS[0]!) : (id as ThemeId);
+    const base: ThemeId = schemeCorrectedBase(
+      isCustomThemeId(id) ? (getCustomTheme(id)?.base ?? THEME_IDS[0]!) : (id as ThemeId),
+    );
     const baseOverrides = isCustomThemeId(id) ? (getCustomTheme(id)?.overrides ?? {}) : {};
     const merged: TokenMap = { ...baseOverrides, ...overrides() };
     const newId = saveCustom(name, base, merged);
@@ -605,6 +974,192 @@ export function ThemeStudio(props: ThemeStudioProps) {
           {activeThemeMeta().description}
         </p>
       </header>
+
+      {/* ── Factory — the generative palette engine ── */}
+      <section class="ts-section ts-factory" aria-labelledby="ts-factory-label" data-testid="ts-factory">
+        <h2 class="ts-section__heading" id="ts-factory-label">Factory</h2>
+        <div class="ts-factory__grid">
+
+          {/* Generate: seed → whole palette */}
+          <div class="ts-factory__col" role="group" aria-label="Generate a palette from a seed">
+            <div class="ts-factory__col-head">
+              <span class="ts-eyebrow">// Generate</span>
+              <div class="ts-scheme-toggle" role="group" aria-label="Colour scheme">
+                <button
+                  type="button"
+                  class="ts-scheme-toggle__btn"
+                  aria-pressed={seed().scheme === 'dark'}
+                  data-testid="ts-scheme-dark"
+                  onClick={() => updateSeed({ scheme: 'dark' })}
+                >
+                  dark
+                </button>
+                <button
+                  type="button"
+                  class="ts-scheme-toggle__btn"
+                  aria-pressed={seed().scheme === 'light'}
+                  data-testid="ts-scheme-light"
+                  onClick={() => updateSeed({ scheme: 'light' })}
+                >
+                  light
+                </button>
+              </div>
+            </div>
+
+            <div class="ts-seed-colors">
+              <div class="ts-seed-color">
+                <label class="ts-token-label" for="ts-seed-primary">Primary seed</label>
+                <div class="ts-token-color-row">
+                  <input
+                    id="ts-seed-primary"
+                    type="color"
+                    class="ts-token-swatch"
+                    value={primarySwatch()}
+                    onInput={handlePrimarySeedColor}
+                    aria-label="Primary seed colour"
+                    data-testid="ts-seed-primary"
+                  />
+                  <code class="ts-token-value">{primarySwatch()} · {Math.round(seed().primaryHue)}°</code>
+                </div>
+              </div>
+              <div class="ts-seed-color">
+                <label class="ts-token-label" for="ts-seed-accent">Accent seed</label>
+                <div class="ts-token-color-row">
+                  <input
+                    id="ts-seed-accent"
+                    type="color"
+                    class="ts-token-swatch"
+                    value={accentSwatch()}
+                    onInput={handleAccentSeedColor}
+                    aria-label="Accent seed colour"
+                    data-testid="ts-seed-accent"
+                  />
+                  <code class="ts-token-value">{accentSwatch()} · {Math.round(seed().accentHue)}°</code>
+                </div>
+              </div>
+            </div>
+
+            <div class="ts-factory__sliders">
+              <FactorySlider
+                id="ts-gen-primary-hue" label="Primary hue" min={0} max={360} step={1}
+                value={() => seed().primaryHue}
+                format={(v) => `${Math.round(v)}°`}
+                onValue={(v) => updateSeed({ primaryHue: v })}
+              />
+              <FactorySlider
+                id="ts-gen-accent-hue" label="Accent hue" min={0} max={360} step={1}
+                value={() => seed().accentHue}
+                format={(v) => `${Math.round(v)}°`}
+                onValue={(v) => updateSeed({ accentHue: v })}
+              />
+              <FactorySlider
+                id="ts-gen-depth" label="Depth" min={0} max={1} step={0.01}
+                value={() => seed().depth}
+                format={(v) => v.toFixed(2)}
+                onValue={(v) => updateSeed({ depth: v })}
+              />
+              <FactorySlider
+                id="ts-gen-vibrancy" label="Vibrancy" min={0} max={1} step={0.01}
+                value={() => seed().vibrancy}
+                format={(v) => v.toFixed(2)}
+                onValue={(v) => updateSeed({ vibrancy: v })}
+              />
+              <FactorySlider
+                id="ts-gen-warmth" label="Warmth" min={-1} max={1} step={0.02}
+                value={() => seed().warmth}
+                format={fmtSigned}
+                onValue={(v) => updateSeed({ warmth: v })}
+              />
+              <FactorySlider
+                id="ts-gen-contrast" label="Contrast" min={4.5} max={12} step={0.1}
+                value={() => seed().contrast}
+                format={(v) => `${v.toFixed(1)}:1`}
+                onValue={(v) => updateSeed({ contrast: v })}
+              />
+            </div>
+
+            <div class="ts-factory__actions">
+              <Button variant="primary" size="sm" onClick={() => generateNow()} data-testid="ts-generate">
+                [generate]
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleRandomize} data-testid="ts-randomize">
+                [🎲 randomize]
+              </Button>
+              <Tooltip content="Recover a seed from the palette that is live right now." placement="top">
+                <Button variant="ghost" size="sm" onClick={handleSeedFromCurrent} data-testid="ts-seed-from-current">
+                  [seed from current]
+                </Button>
+              </Tooltip>
+            </div>
+            <p class="ts-factory__hint">
+              One seed → a whole coherent palette, AA-clean by construction.
+              After the first generate, the knobs re-generate live.
+            </p>
+          </div>
+
+          {/* Adjust: global transforms on the current palette */}
+          <div class="ts-factory__col" role="group" aria-label="Adjust the current palette">
+            <div class="ts-factory__col-head">
+              <span class="ts-eyebrow">// Adjust</span>
+              <Show when={adjustDirty()}>
+                <span class="ts-badge ts-badge--modified">live</span>
+              </Show>
+            </div>
+
+            <div class="ts-factory__sliders">
+              <FactorySlider
+                id="ts-adj-hue" label="Hue rotate" min={-180} max={180} step={1}
+                value={() => adjust().hueShift}
+                format={(v) => `${v > 0 ? '+' : ''}${Math.round(v)}°`}
+                onValue={(v) => applyAdjustPatch({ hueShift: v })}
+                onPointerDown={ensureAdjustBaseline}
+                testid="ts-adjust-hue"
+              />
+              <FactorySlider
+                id="ts-adj-sat" label="Saturation" min={0} max={1.6} step={0.01}
+                value={() => adjust().saturation}
+                format={(v) => `×${v.toFixed(2)}`}
+                onValue={(v) => applyAdjustPatch({ saturation: v })}
+                onPointerDown={ensureAdjustBaseline}
+                testid="ts-adjust-saturation"
+              />
+              <FactorySlider
+                id="ts-adj-warmth" label="Warmth" min={-1} max={1} step={0.02}
+                value={() => adjust().warmth}
+                format={fmtSigned}
+                onValue={(v) => applyAdjustPatch({ warmth: v })}
+                onPointerDown={ensureAdjustBaseline}
+                testid="ts-adjust-warmth"
+              />
+              <FactorySlider
+                id="ts-adj-contrast" label="Contrast" min={-1} max={1} step={0.02}
+                value={() => adjust().contrast}
+                format={fmtSigned}
+                onValue={(v) => applyAdjustPatch({ contrast: v })}
+                onPointerDown={ensureAdjustBaseline}
+                testid="ts-adjust-contrast"
+              />
+            </div>
+
+            <div class="ts-factory__actions">
+              <Tooltip content="Commit the adjusted palette and zero the knobs." placement="top">
+                <Button variant="primary" size="sm" onClick={bakeAdjust} disabled={!adjustDirty()} data-testid="ts-bake">
+                  [bake]
+                </Button>
+              </Tooltip>
+              <Tooltip content="Abandon the adjustment and restore the palette you started from." placement="top">
+                <Button variant="ghost" size="sm" onClick={revertAdjust} disabled={!adjustDirty()} data-testid="ts-adjust-revert">
+                  [revert]
+                </Button>
+              </Tooltip>
+            </div>
+            <p class="ts-factory__hint">
+              Relative nudges from the palette as it was when you started dragging —
+              zero restores it exactly. Bake (or Save) keeps the result.
+            </p>
+          </div>
+        </div>
+      </section>
 
       {/* ── Base theme selector ── */}
       <section class="ts-section" aria-labelledby="ts-base-label">
@@ -734,7 +1289,7 @@ export function ThemeStudio(props: ThemeStudioProps) {
         <aside class="ts-preview-pane" aria-label="Live preview">
           <span class="ts-eyebrow">// Preview</span>
           <StudioPreview />
-          <ContrastAudit overrides={overrides} themeId={themeId} />
+          <ContrastAudit overrides={overrides} themeId={themeId} onAutoFix={handleAutoFix} />
         </aside>
       </div>
 
@@ -945,6 +1500,91 @@ const STUDIO_CSS = `
   opacity: 0.6;
 }
 
+/* ── Factory — generative palette engine ── */
+.ts-factory__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+@media (max-width: 860px) {
+  .ts-factory__grid { grid-template-columns: 1fr; }
+}
+.ts-factory__col {
+  border: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--ink) 82%, var(--stone));
+  padding: 0.8rem 0.9rem 0.9rem;
+  display: grid;
+  gap: 0.75rem;
+  align-content: start;
+}
+.ts-factory__col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.ts-factory__sliders {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem 1rem;
+}
+@media (max-width: 520px) {
+  .ts-factory__sliders { grid-template-columns: 1fr; }
+}
+.ts-factory__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.1rem;
+}
+.ts-factory__hint {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: var(--washi-mute);
+}
+.ts-seed-colors {
+  display: flex;
+  gap: 1.1rem;
+  flex-wrap: wrap;
+}
+.ts-seed-color {
+  display: grid;
+  gap: 0.3rem;
+}
+.ts-scheme-toggle {
+  display: inline-flex;
+  border: 1px solid var(--seam-faint);
+  width: max-content;
+}
+.ts-scheme-toggle__btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--washi-dim);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+  transition:
+    background var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+.ts-scheme-toggle__btn:hover { color: var(--washi); }
+.ts-scheme-toggle__btn[aria-pressed='true'] {
+  background: color-mix(in oklab, var(--lapis-deep) 30%, var(--stone));
+  color: var(--lapis-bright);
+}
+.ts-scheme-toggle__btn:focus-visible {
+  outline: 2px solid var(--lapis);
+  outline-offset: -2px;
+}
+
 /* Custom (user-saved) theme chip + its delete affordance. */
 .ts-theme-chip-wrap {
   position: relative;
@@ -1144,6 +1784,43 @@ const STUDIO_CSS = `
 .ts-audit__badge--fail { color: var(--ink); background: var(--shu); border-color: var(--shu); }
 .ts-audit__badge--na { color: var(--washi-mute); border-color: var(--seam-faint); }
 
+/* One-click AA repair — lives with the audit so a failing row has its fix. */
+.ts-audit__fix {
+  width: 100%;
+  margin-top: 0.6rem;
+  padding: 0.3rem 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold-bright);
+  background: transparent;
+  border: 1px solid color-mix(in oklab, var(--gold-bright) 36%, transparent);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition:
+    background var(--dur) var(--ease),
+    color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+}
+.ts-audit__fix[data-failing='true'] {
+  color: var(--shu-bright);
+  border-color: color-mix(in oklab, var(--shu-bright) 50%, transparent);
+}
+.ts-audit__fix:hover {
+  color: var(--ink);
+  background: var(--gold-bright);
+  border-color: var(--gold-bright);
+}
+.ts-audit__fix[data-failing='true']:hover {
+  background: var(--shu-bright);
+  border-color: var(--shu-bright);
+}
+.ts-audit__fix:focus-visible {
+  outline: 2px solid var(--lapis);
+  outline-offset: 2px;
+}
+
 /* ── Per-token revert ── */
 .ts-token-revert {
   justify-self: start;
@@ -1165,12 +1842,14 @@ const STUDIO_CSS = `
   border-color: var(--gold-bright);
 }
 
-/* ── Preview widget ── */
+/* ── Preview widget — miniature app chrome ── */
 .ts-preview {
   border: 1px solid var(--seam);
   background: color-mix(in oklab, var(--stone) 26%, var(--ink));
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .ts-preview__bar {
   display: flex;
@@ -1194,57 +1873,281 @@ const STUDIO_CSS = `
   color: var(--washi-mute);
   text-align: center;
 }
-.ts-preview__body {
+/* The three-column chrome mock: channel rail | main | member list. */
+.ts-preview__chrome {
   display: grid;
-  gap: 0.6rem;
-  padding: 0.85rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  flex: 1;
+  min-height: 0;
 }
-.ts-preview__msg {
+
+/* Channel rail */
+.ts-pv-side {
+  width: 5.6rem;
+  padding: 0.5rem 0.4rem;
+  border-right: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--ink) 78%, var(--stone));
   display: flex;
-  gap: 0.55rem;
-  font-size: 0.84rem;
-  line-height: 1.45;
-}
-.ts-preview__nick {
+  flex-direction: column;
+  gap: 0.18rem;
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+}
+.ts-pv-side__server {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.56rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--washi);
+  padding: 0.15rem 0.3rem 0.42rem;
+  border-bottom: 1px solid var(--seam-faint);
+  margin-bottom: 0.3rem;
+}
+.ts-pv-side__sigil { color: var(--lapis-bright); font-size: 0.6rem; }
+.ts-pv-side__group {
+  font-size: 0.5rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--washi-mute);
+  margin: 0.32rem 0.3rem 0.08rem;
+}
+.ts-pv-chan {
+  display: flex;
+  align-items: center;
+  gap: 0.24rem;
+  font-size: 0.62rem;
+  color: var(--washi-dim);
+  padding: 0.16rem 0.3rem;
+  border-radius: var(--r-sm);
+}
+.ts-pv-chan__hash { color: var(--washi-mute); }
+.ts-pv-chan__hash--voice { color: var(--ok); font-size: 0.52rem; }
+.ts-pv-chan[data-active='true'] {
+  background: color-mix(in oklab, var(--lapis-deep) 32%, transparent);
+  color: var(--lapis-bright);
+}
+.ts-pv-chan[data-active='true'] .ts-pv-chan__hash { color: var(--lapis); }
+.ts-pv-chan--muted { color: var(--washi-mute); }
+.ts-pv-chan__pip {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--shu);
+  margin-left: auto;
+  flex: none;
+}
+.ts-pv-chan__count {
+  margin-left: auto;
+  font-size: 0.5rem;
+  font-weight: 700;
+  background: var(--shu);
+  color: var(--ink);
+  padding: 0 0.26rem;
+  border-radius: var(--r-pill);
+  flex: none;
+}
+
+/* Main column */
+.ts-pv-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ts-pv-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.55rem;
+  border-bottom: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--ink) 68%, var(--stone));
+}
+.ts-pv-head__chan {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.66rem;
+  color: var(--washi);
+  flex: none;
+}
+.ts-pv-head__topic {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.6rem;
+  color: var(--washi-mute);
+}
+.ts-pv-badge {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.08rem 0.3rem;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+}
+.ts-pv-badge--accent {
+  color: var(--lapis-bright);
+  border-color: color-mix(in oklab, var(--lapis-bright) 45%, transparent);
+}
+.ts-pv-badge--hot {
+  color: var(--ink);
+  background: var(--shu);
+  font-weight: 700;
+}
+.ts-pv-thread {
+  display: grid;
+  gap: 0.34rem;
+  padding: 0.55rem;
+  align-content: start;
+  flex: 1;
+}
+.ts-pv-msg {
+  display: flex;
+  gap: 0.38rem;
+  align-items: baseline;
+  font-size: 0.68rem;
+  line-height: 1.4;
+  min-width: 0;
+}
+.ts-pv-msg__time {
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  color: var(--washi-mute);
+  flex: none;
+}
+.ts-pv-msg__nick {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
   font-weight: 700;
   flex: none;
   white-space: nowrap;
 }
-.ts-preview__nick::after { content: ':'; color: var(--washi-mute); }
-.ts-preview__text {
-  color: var(--washi-dim);
-  font-family: var(--font-sans);
-}
-.ts-preview__text--dim { color: var(--washi-mute); font-style: italic; }
-.ts-preview__input-row {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  margin-top: 0.35rem;
-}
-.ts-preview__input {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.42rem 0.58rem;
-  border: 1px solid var(--seam-faint);
-  background: color-mix(in oklab, var(--ink) 70%, var(--stone));
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  color: var(--washi-mute);
-}
-.ts-preview__prompt { color: var(--gold); }
-.ts-preview__cursor {
+.ts-pv-msg__nick::after { content: ':'; color: var(--washi-mute); }
+.ts-pv-msg__text {
   color: var(--washi);
+  font-family: var(--font-sans);
+  min-width: 0;
+}
+.ts-pv-msg__text--dim { color: var(--washi-mute); font-style: italic; }
+.ts-pv-msg__link {
+  color: var(--lapis-bright);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.ts-pv-actions {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0 0.55rem 0.5rem;
+}
+.ts-pv-btn {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  padding: 0.26rem 0.6rem;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition:
+    background var(--dur) var(--ease),
+    color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+}
+.ts-pv-btn--primary {
+  background: var(--lapis);
+  color: var(--ink);
+  border-color: color-mix(in oklab, var(--lapis-bright) 55%, transparent);
+}
+.ts-pv-btn--primary:hover { background: var(--lapis-bright); }
+.ts-pv-btn--danger {
+  background: transparent;
+  color: var(--shu-bright);
+  border-color: color-mix(in oklab, var(--shu) 55%, transparent);
+}
+.ts-pv-btn--danger:hover {
+  background: var(--shu);
+  color: var(--ink);
+  border-color: var(--shu);
+}
+.ts-pv-composer {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.1rem 0.55rem 0.55rem;
+  padding: 0.3rem 0.45rem;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--ink) 70%, var(--stone));
+}
+.ts-pv-composer__prompt {
+  color: var(--gold);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+}
+.ts-pv-composer__ghost {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--washi-mute);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+}
+.ts-pv-composer__cursor {
+  color: var(--washi);
+  font-size: 0.6rem;
   animation: ts-blink 1.1s steps(1) infinite;
 }
 @keyframes ts-blink { 50% { opacity: 0; } }
-.ts-preview__actions {
+.ts-pv-btn--send { padding: 0.16rem 0.5rem; }
+
+/* Member list */
+.ts-pv-members {
+  width: 5.8rem;
+  padding: 0.5rem 0.45rem;
+  border-left: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--ink) 78%, var(--stone));
   display: flex;
-  gap: 0.35rem;
+  flex-direction: column;
+  gap: 0.26rem;
+  font-family: var(--font-mono);
+}
+.ts-pv-members__head {
+  font-size: 0.5rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--washi-mute);
+  margin-bottom: 0.15rem;
+}
+.ts-pv-member {
+  display: flex;
+  align-items: center;
+  gap: 0.26rem;
+  font-size: 0.62rem;
+  color: var(--washi-dim);
+}
+.ts-pv-member--plain { color: var(--washi-mute); }
+.ts-pv-member__sigil {
+  width: 0.6rem;
+  text-align: center;
+  font-weight: 700;
+  flex: none;
+  white-space: pre;
+}
+.ts-pv-member__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  margin-left: auto;
+  flex: none;
+}
+@media (max-width: 560px) {
+  .ts-pv-members { display: none; }
 }
 
 /* ── Footer toolbar ── */

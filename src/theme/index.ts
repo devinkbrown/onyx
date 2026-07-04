@@ -36,3 +36,16 @@ export {
   EDITABLE_PROPERTIES,
 } from './tokens';
 export type { StudioGroup, StudioToken, StudioTokenType } from './tokens';
+
+export {
+  generatePalette,
+  adjustPalette,
+  enforceAA,
+  auditPalette,
+  randomSeed,
+  seedFromTokens,
+  hexToOklch,
+  oklchToHex,
+  DEFAULT_SEED,
+} from './paletteFactory';
+export type { PaletteSeed, PaletteTransform, Oklch, AuditRow } from './paletteFactory';
