@@ -17,9 +17,9 @@ const stars = (() => {
       : 3.2 + rand() * 0.8;
     const hueRoll = rand();
     const color = hueRoll < 0.45 ? '#e8eeff'
-      : hueRoll < 0.65 ? '#a0b4ff'
+      : hueRoll < 0.65 ? '#7ac0fa'
       : hueRoll < 0.8 ? '#ffd6aa'
-      : hueRoll < 0.92 ? '#c8a0ff'
+      : hueRoll < 0.92 ? '#8fd6ff'
       : '#ffe0e0';
     return {
       x: rand() * 100, y: rand() * 100, size, color,
@@ -89,10 +89,10 @@ const SHOOTERS = [
 
 function StarfieldScene(props: SceneProps) {
   return (
-    <SceneShell reducedMotion={props.reducedMotion} base="radial-gradient(ellipse at 30% 25%, #0c1030 0%, #070a1c 45%, #04050e 100%)">
+    <SceneShell reducedMotion={props.reducedMotion} base="radial-gradient(ellipse at 30% 25%, #001427 0%, #000d1b 45%, #04050e 100%)">
       {/* Milky Way band — diagonal haze */}
       <div class="absolute inset-0" style={{
-        background: 'linear-gradient(135deg, transparent 15%, rgba(160,180,255,0.04) 30%, rgba(200,180,255,0.06) 45%, rgba(180,190,255,0.05) 55%, rgba(160,180,255,0.03) 70%, transparent 85%)',
+        background: 'linear-gradient(135deg, transparent 15%, rgba(122,192,250,0.04) 30%, rgba(137,201,255,0.06) 45%, rgba(144,202,251,0.05) 55%, rgba(122,192,250,0.03) 70%, transparent 85%)',
         filter: 'blur(40px)',
       }} />
       <div class="absolute inset-0" style={{
@@ -131,16 +131,16 @@ function StarfieldScene(props: SceneProps) {
 
       {/* Nebula clouds — vivid, large */}
       <div class="absolute w-[800px] h-[800px] sm:w-[1200px] sm:h-[1200px] -top-[300px] -right-[250px] rounded-full"
-        style={{ background: 'radial-gradient(circle, rgba(129,140,248,0.14) 0%, rgba(129,140,248,0.04) 35%, transparent 55%)', animation: 'sf-drift-a 40s ease-in-out infinite', filter: 'blur(20px)' }} />
+        style={{ background: 'radial-gradient(circle, rgba(39,160,242,0.14) 0%, rgba(39,160,242,0.04) 35%, transparent 55%)', animation: 'sf-drift-a 40s ease-in-out infinite', filter: 'blur(20px)' }} />
       <div class="absolute w-[700px] h-[700px] sm:w-[1000px] sm:h-[1000px] -bottom-[350px] -left-[250px] rounded-full"
-        style={{ background: 'radial-gradient(circle, rgba(192,132,252,0.12) 0%, rgba(192,132,252,0.03) 35%, transparent 55%)', animation: 'sf-drift-b 48s ease-in-out infinite', filter: 'blur(20px)' }} />
+        style={{ background: 'radial-gradient(circle, rgba(61,173,255,0.12) 0%, rgba(61,173,255,0.03) 35%, transparent 55%)', animation: 'sf-drift-b 48s ease-in-out infinite', filter: 'blur(20px)' }} />
       <div class="absolute w-[500px] h-[500px] top-[25%] left-[50%] rounded-full"
         style={{ background: 'radial-gradient(circle, rgba(45,212,191,0.08) 0%, transparent 50%)', animation: 'sf-drift-c 35s ease-in-out infinite', filter: 'blur(15px)' }} />
       {/* Warm nebula wisp */}
       <div class="absolute w-[600px] h-[300px] top-[10%] left-[5%] rounded-full"
         style={{ background: 'radial-gradient(ellipse, rgba(255,180,120,0.06) 0%, transparent 55%)', transform: 'rotate(-25deg)', animation: 'sf-drift-c 55s ease-in-out infinite', filter: 'blur(25px)' }} />
       <div class="absolute w-[500px] h-[250px] bottom-[12%] right-[3%] rounded-full"
-        style={{ background: 'radial-gradient(ellipse, rgba(192,132,252,0.07) 0%, transparent 55%)', transform: 'rotate(18deg)', animation: 'sf-drift-a 50s ease-in-out infinite', filter: 'blur(25px)' }} />
+        style={{ background: 'radial-gradient(ellipse, rgba(61,173,255,0.07) 0%, transparent 55%)', transform: 'rotate(18deg)', animation: 'sf-drift-a 50s ease-in-out infinite', filter: 'blur(25px)' }} />
       {/* Deep rose cloud */}
       <div class="absolute w-[400px] h-[400px] top-[50%] left-[25%] rounded-full"
         style={{ background: 'radial-gradient(circle, rgba(255,120,150,0.05) 0%, transparent 50%)', animation: 'sf-drift-b 42s ease-in-out infinite', filter: 'blur(20px)' }} />
@@ -148,25 +148,25 @@ function StarfieldScene(props: SceneProps) {
       {/* Galaxy 1 — spiral with arms */}
       <div class="absolute" style={{ top: '15%', right: '10%', width: '120px', height: '120px', animation: 'sf-galaxy-spin 100s linear infinite' }}>
         <div class="absolute inset-0 rounded-full"
-          style={{ background: 'radial-gradient(circle, rgba(200,210,255,0.25) 0%, rgba(129,140,248,0.08) 30%, transparent 55%)' }} />
+          style={{ background: 'radial-gradient(circle, rgba(178,218,252,0.25) 0%, rgba(39,160,242,0.08) 30%, transparent 55%)' }} />
         <svg class="absolute inset-0" viewBox="0 0 120 120" style={{ opacity: 0.15 }}>
-          <path d="M60 60 Q75 45 82 30 Q87 18 78 14 Q69 12 63 27 Q58 42 60 60" fill="rgba(200,210,255,0.6)" />
-          <path d="M60 60 Q45 75 38 90 Q33 102 42 106 Q51 108 57 93 Q62 78 60 60" fill="rgba(200,210,255,0.6)" />
-          <path d="M60 60 Q75 72 87 78 Q99 82 102 72 Q102 62 87 60 Q72 58 60 60" fill="rgba(180,190,255,0.5)" />
-          <path d="M60 60 Q45 48 33 42 Q21 38 18 48 Q18 58 33 60 Q48 62 60 60" fill="rgba(180,190,255,0.5)" />
+          <path d="M60 60 Q75 45 82 30 Q87 18 78 14 Q69 12 63 27 Q58 42 60 60" fill="rgba(178,218,252,0.6)" />
+          <path d="M60 60 Q45 75 38 90 Q33 102 42 106 Q51 108 57 93 Q62 78 60 60" fill="rgba(178,218,252,0.6)" />
+          <path d="M60 60 Q75 72 87 78 Q99 82 102 72 Q102 62 87 60 Q72 58 60 60" fill="rgba(144,202,251,0.5)" />
+          <path d="M60 60 Q45 48 33 42 Q21 38 18 48 Q18 58 33 60 Q48 62 60 60" fill="rgba(144,202,251,0.5)" />
         </svg>
-        <div class="absolute rounded-full" style={{ top: '40%', left: '40%', width: '20%', height: '20%', background: 'radial-gradient(circle, rgba(255,255,255,0.4) 0%, rgba(200,210,255,0.1) 60%, transparent 100%)', 'box-shadow': '0 0 15px rgba(200,210,255,0.2)' }} />
+        <div class="absolute rounded-full" style={{ top: '40%', left: '40%', width: '20%', height: '20%', background: 'radial-gradient(circle, rgba(255,255,255,0.4) 0%, rgba(178,218,252,0.1) 60%, transparent 100%)', 'box-shadow': '0 0 15px rgba(178,218,252,0.2)' }} />
       </div>
 
-      {/* Galaxy 2 — smaller, purple tint */}
+      {/* Galaxy 2 — smaller, azure tint */}
       <div class="absolute" style={{ bottom: '22%', left: '6%', width: '75px', height: '75px', animation: 'sf-galaxy-spin 80s linear infinite reverse' }}>
         <div class="absolute inset-0 rounded-full"
-          style={{ background: 'radial-gradient(circle, rgba(192,132,252,0.2) 0%, rgba(192,132,252,0.06) 30%, transparent 55%)' }} />
+          style={{ background: 'radial-gradient(circle, rgba(61,173,255,0.2) 0%, rgba(61,173,255,0.06) 30%, transparent 55%)' }} />
         <svg class="absolute inset-0" viewBox="0 0 75 75" style={{ opacity: 0.12 }}>
-          <path d="M37.5 37.5 Q50 28 53 18 Q55 10 49 9 Q43 9 40 18 Q37 28 37.5 37.5" fill="rgba(220,180,255,0.6)" />
-          <path d="M37.5 37.5 Q25 47 22 57 Q20 65 26 66 Q32 66 35 57 Q38 47 37.5 37.5" fill="rgba(220,180,255,0.6)" />
+          <path d="M37.5 37.5 Q50 28 53 18 Q55 10 49 9 Q43 9 40 18 Q37 28 37.5 37.5" fill="rgba(149,206,255,0.6)" />
+          <path d="M37.5 37.5 Q25 47 22 57 Q20 65 26 66 Q32 66 35 57 Q38 47 37.5 37.5" fill="rgba(149,206,255,0.6)" />
         </svg>
-        <div class="absolute rounded-full" style={{ top: '40%', left: '40%', width: '20%', height: '20%', background: 'radial-gradient(circle, rgba(255,255,255,0.25), transparent 70%)', 'box-shadow': '0 0 10px rgba(192,132,252,0.15)' }} />
+        <div class="absolute rounded-full" style={{ top: '40%', left: '40%', width: '20%', height: '20%', background: 'radial-gradient(circle, rgba(255,255,255,0.25), transparent 70%)', 'box-shadow': '0 0 10px rgba(61,173,255,0.15)' }} />
       </div>
 
       {/* Galaxy 3 — tiny deep field */}
@@ -176,22 +176,22 @@ function StarfieldScene(props: SceneProps) {
         <div class="absolute rounded-full" style={{ top: '40%', left: '40%', width: '20%', height: '20%', background: 'rgba(255,255,255,0.15)' }} />
       </div>
 
-      {/* Supernova 1 — bright indigo with lens flare */}
+      {/* Supernova 1 — bright azure with lens flare */}
       <div class="absolute" style={{ top: '38%', left: '80%' }}>
-        <div class="absolute rounded-full" style={{ width: '70px', height: '70px', top: '-32px', left: '-32px', background: 'radial-gradient(circle, rgba(129,140,248,0.25) 0%, transparent 55%)', animation: 'sf-nova 7s ease-in-out infinite' }} />
-        <div class="absolute" style={{ width: '50px', height: '2px', top: '2px', left: '-22px', background: 'linear-gradient(90deg, transparent, rgba(200,210,255,0.4), rgba(255,255,255,0.8), rgba(200,210,255,0.4), transparent)', animation: 'sf-nova 7s ease-in-out infinite' }} />
-        <div class="absolute" style={{ width: '2px', height: '50px', top: '-22px', left: '2px', background: 'linear-gradient(180deg, transparent, rgba(200,210,255,0.4), rgba(255,255,255,0.8), rgba(200,210,255,0.4), transparent)', animation: 'sf-nova 7s ease-in-out infinite' }} />
-        <div class="absolute" style={{ width: '35px', height: '1px', top: '2.5px', left: '-14.5px', background: 'linear-gradient(90deg, transparent, rgba(200,210,255,0.2), transparent)', transform: 'rotate(45deg)', animation: 'sf-nova 7s ease-in-out infinite' }} />
-        <div class="absolute" style={{ width: '35px', height: '1px', top: '2.5px', left: '-14.5px', background: 'linear-gradient(90deg, transparent, rgba(200,210,255,0.2), transparent)', transform: 'rotate(-45deg)', animation: 'sf-nova 7s ease-in-out infinite' }} />
-        <div class="rounded-full" style={{ width: '6px', height: '6px', background: 'radial-gradient(circle, #fff, rgba(129,140,248,0.5))', 'box-shadow': '0 0 12px rgba(129,140,248,0.6), 0 0 25px rgba(129,140,248,0.2)' }} />
+        <div class="absolute rounded-full" style={{ width: '70px', height: '70px', top: '-32px', left: '-32px', background: 'radial-gradient(circle, rgba(39,160,242,0.25) 0%, transparent 55%)', animation: 'sf-nova 7s ease-in-out infinite' }} />
+        <div class="absolute" style={{ width: '50px', height: '2px', top: '2px', left: '-22px', background: 'linear-gradient(90deg, transparent, rgba(178,218,252,0.4), rgba(255,255,255,0.8), rgba(178,218,252,0.4), transparent)', animation: 'sf-nova 7s ease-in-out infinite' }} />
+        <div class="absolute" style={{ width: '2px', height: '50px', top: '-22px', left: '2px', background: 'linear-gradient(180deg, transparent, rgba(178,218,252,0.4), rgba(255,255,255,0.8), rgba(178,218,252,0.4), transparent)', animation: 'sf-nova 7s ease-in-out infinite' }} />
+        <div class="absolute" style={{ width: '35px', height: '1px', top: '2.5px', left: '-14.5px', background: 'linear-gradient(90deg, transparent, rgba(178,218,252,0.2), transparent)', transform: 'rotate(45deg)', animation: 'sf-nova 7s ease-in-out infinite' }} />
+        <div class="absolute" style={{ width: '35px', height: '1px', top: '2.5px', left: '-14.5px', background: 'linear-gradient(90deg, transparent, rgba(178,218,252,0.2), transparent)', transform: 'rotate(-45deg)', animation: 'sf-nova 7s ease-in-out infinite' }} />
+        <div class="rounded-full" style={{ width: '6px', height: '6px', background: 'radial-gradient(circle, #fff, rgba(39,160,242,0.5))', 'box-shadow': '0 0 12px rgba(39,160,242,0.6), 0 0 25px rgba(39,160,242,0.2)' }} />
       </div>
 
-      {/* Supernova 2 — purple */}
+      {/* Supernova 2 — cyan */}
       <div class="absolute" style={{ top: '68%', left: '32%' }}>
-        <div class="absolute rounded-full" style={{ width: '50px', height: '50px', top: '-22px', left: '-22px', background: 'radial-gradient(circle, rgba(192,132,252,0.2) 0%, transparent 55%)', animation: 'sf-nova 11s ease-in-out 2s infinite' }} />
-        <div class="absolute" style={{ width: '40px', height: '1.5px', top: '2px', left: '-17px', background: 'linear-gradient(90deg, transparent, rgba(220,200,255,0.4), rgba(255,255,255,0.7), rgba(220,200,255,0.4), transparent)', animation: 'sf-nova 11s ease-in-out 2s infinite' }} />
-        <div class="absolute" style={{ width: '1.5px', height: '40px', top: '-17px', left: '2px', background: 'linear-gradient(180deg, transparent, rgba(220,200,255,0.4), rgba(255,255,255,0.7), rgba(220,200,255,0.4), transparent)', animation: 'sf-nova 11s ease-in-out 2s infinite' }} />
-        <div class="rounded-full" style={{ width: '5px', height: '5px', background: 'radial-gradient(circle, #fff, rgba(192,132,252,0.4))', 'box-shadow': '0 0 10px rgba(192,132,252,0.5)' }} />
+        <div class="absolute rounded-full" style={{ width: '50px', height: '50px', top: '-22px', left: '-22px', background: 'radial-gradient(circle, rgba(61,173,255,0.2) 0%, transparent 55%)', animation: 'sf-nova 11s ease-in-out 2s infinite' }} />
+        <div class="absolute" style={{ width: '40px', height: '1.5px', top: '2px', left: '-17px', background: 'linear-gradient(90deg, transparent, rgba(173,217,255,0.4), rgba(255,255,255,0.7), rgba(173,217,255,0.4), transparent)', animation: 'sf-nova 11s ease-in-out 2s infinite' }} />
+        <div class="absolute" style={{ width: '1.5px', height: '40px', top: '-17px', left: '2px', background: 'linear-gradient(180deg, transparent, rgba(173,217,255,0.4), rgba(255,255,255,0.7), rgba(173,217,255,0.4), transparent)', animation: 'sf-nova 11s ease-in-out 2s infinite' }} />
+        <div class="rounded-full" style={{ width: '5px', height: '5px', background: 'radial-gradient(circle, #fff, rgba(61,173,255,0.4))', 'box-shadow': '0 0 10px rgba(61,173,255,0.5)' }} />
       </div>
 
       {/* Supernova 3 — teal */}
@@ -261,7 +261,7 @@ function StarfieldScene(props: SceneProps) {
               style={{
                 left: `${d.left}px`, top: `${d.top}px`,
                 width: `${d.size}px`, height: `${d.size}px`,
-                background: '#a0b4ff',
+                background: '#7ac0fa',
                 opacity: d.opacity,
                 animation: `sf-twinkle ${d.dur}s ease-in-out ${d.delay}s infinite`,
               }} />
@@ -317,7 +317,7 @@ function StarfieldScene(props: SceneProps) {
           position: absolute;
           width: 90px;
           height: 2px;
-          background: linear-gradient(90deg, rgba(255,255,255,0.8), rgba(200,210,255,0.3), transparent);
+          background: linear-gradient(90deg, rgba(255,255,255,0.8), rgba(178,218,252,0.3), transparent);
           transform: rotate(-35deg);
           animation: sf-shoot 8s ease-in infinite;
           opacity: 0;
@@ -326,7 +326,7 @@ function StarfieldScene(props: SceneProps) {
         .sf-shooter-long {
           width: 160px;
           height: 2.5px;
-          background: linear-gradient(90deg, rgba(255,255,255,0.9), rgba(129,140,248,0.4), transparent);
+          background: linear-gradient(90deg, rgba(255,255,255,0.9), rgba(39,160,242,0.4), transparent);
         }
         .sf-shooter-fast {
           animation-duration: 6s !important;

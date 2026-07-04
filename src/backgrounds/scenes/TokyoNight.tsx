@@ -7,7 +7,7 @@ import { SceneShell, seededRand } from './SceneShell';
    neon sign glows, car headlights and a distant lightning flash. Ported from
    darkbear's TokyoNightBg. */
 
-const WINDOW_COLORS = ['#7aa2f7', '#ff9e64', '#9ece6a', '#bb9af7', '#7dcfff', '#e0af68', '#f7768e'];
+const WINDOW_COLORS = ['#54acf1', '#ff9e64', '#9ece6a', '#5ce0d6', '#7dcfff', '#e0af68', '#f7768e'];
 
 const buildings = (() => {
   const rand = seededRand(779);
@@ -45,7 +45,7 @@ const puddles = (() => {
   return Array.from({ length: 15 }, () => ({
     x: rand() * 85, w: 40 + rand() * 80,
     dur: 2 + rand() * 2, delay: rand() * 4,
-    color: ['#7aa2f7', '#bb9af7', '#ff9e64', '#9ece6a'][Math.floor(rand() * 4)]!,
+    color: ['#54acf1', '#5ce0d6', '#ff9e64', '#9ece6a'][Math.floor(rand() * 4)]!,
   }));
 })();
 
@@ -55,7 +55,7 @@ const cars = (() => {
     anim: i < 5 ? 'tn-carL' : 'tn-carR',
     speed: 4 + rand() * 8,
     delay: rand() * 15,
-    color: ['#ff9e64', '#7aa2f7', '#9ece6a', '#e0af68', '#bb9af7', '#7dcfff', '#f7768e', '#73daca', '#2ac3de', '#e0af68'][i]!,
+    color: ['#ff9e64', '#54acf1', '#9ece6a', '#e0af68', '#5ce0d6', '#7dcfff', '#f7768e', '#73daca', '#2ac3de', '#e0af68'][i]!,
     y: 0.1 + rand() * 1.2,
   }));
 })();
@@ -72,7 +72,7 @@ const neons = (() => {
   const rand = seededRand(784);
   return [
     { x: 15, y: 25, color: '#ff9e64', dur: 3, delay: 0 },
-    { x: 35, y: 20, color: '#bb9af7', dur: 4, delay: 1.5 },
+    { x: 35, y: 20, color: '#5ce0d6', dur: 4, delay: 1.5 },
     { x: 55, y: 30, color: '#7dcfff', dur: 2.5, delay: 0.8 },
     { x: 75, y: 22, color: '#9ece6a', dur: 5, delay: 2.5 },
     { x: 25, y: 35, color: '#f7768e', dur: 3.5, delay: 3 },
@@ -82,15 +82,15 @@ const neons = (() => {
 
 function TokyoNightScene(props: SceneProps) {
   return (
-    <SceneShell reducedMotion={props.reducedMotion} base="linear-gradient(180deg, #100c22 0%, #16112e 55%, #0a0716 100%)">
+    <SceneShell reducedMotion={props.reducedMotion} base="linear-gradient(180deg, #0a1420 0%, #0f1e2b 55%, #060b12 100%)">
       {/* Dark cyberpunk sky */}
       <div class="absolute top-0 left-0 right-0 h-[70%]"
-        style={{ background: 'linear-gradient(180deg, rgba(25,15,45,0.8), rgba(122,162,247,0.25) 60%, rgba(187,154,247,0.15) 80%, transparent)' }} />
+        style={{ background: 'linear-gradient(180deg, rgba(0,24,44,0.8), rgba(84,172,241,0.25) 60%, rgba(93,182,254,0.15) 80%, transparent)' }} />
 
       {/* City glow horizon */}
       <div class="absolute left-0 right-0" style={{ bottom: '25%', height: '20%' }}>
         <div class="absolute inset-0" style={{
-          background: 'linear-gradient(180deg, transparent, rgba(122,162,247,0.3) 30%, rgba(187,154,247,0.2) 60%, rgba(255,158,100,0.1) 80%, transparent)',
+          background: 'linear-gradient(180deg, transparent, rgba(84,172,241,0.3) 30%, rgba(93,182,254,0.2) 60%, rgba(255,158,100,0.1) 80%, transparent)',
           filter: 'blur(6px)' }} />
       </div>
 
@@ -99,7 +99,7 @@ function TokyoNightScene(props: SceneProps) {
         {(cl) => (
           <div class="absolute"
             style={{ top: `${cl.y}%`, left: '-20%', width: `${cl.w}px`, height: `${cl.h}px`,
-              background: 'radial-gradient(ellipse, rgba(60,55,90,0.6), rgba(40,35,70,0.3) 60%, transparent)',
+              background: 'radial-gradient(ellipse, rgba(31,64,90,0.6), rgba(7,43,70,0.3) 60%, transparent)',
               filter: 'blur(12px)', 'border-radius': '50%',
               animation: `tn-cloud ${cl.dur}s linear ${cl.delay}s infinite` }} />
         )}
@@ -107,10 +107,10 @@ function TokyoNightScene(props: SceneProps) {
 
       {/* Atmospheric fog layers */}
       <div class="absolute left-0 right-0" style={{ bottom: '30%', height: '20%',
-        background: 'linear-gradient(180deg, transparent, rgba(80,70,120,0.4) 40%, rgba(60,50,100,0.3) 70%, transparent)',
+        background: 'linear-gradient(180deg, transparent, rgba(34,83,121,0.4) 40%, rgba(6,63,100,0.3) 70%, transparent)',
         filter: 'blur(10px)' }} />
       <div class="absolute left-0 right-0" style={{ bottom: '20%', height: '15%',
-        background: 'linear-gradient(180deg, transparent, rgba(100,90,140,0.3) 50%, transparent)',
+        background: 'linear-gradient(180deg, transparent, rgba(57,103,141,0.3) 50%, transparent)',
         filter: 'blur(8px)' }} />
 
       {/* Neon sign glows */}
@@ -127,20 +127,20 @@ function TokyoNightScene(props: SceneProps) {
 
       {/* Dark street ground */}
       <div class="absolute bottom-0 left-0 right-0 h-[15%]"
-        style={{ background: 'linear-gradient(180deg, rgba(25,25,40,0.9), rgba(15,15,25,0.95))' }} />
+        style={{ background: 'linear-gradient(180deg, rgba(15,28,40,0.9), rgba(15,15,25,0.95))' }} />
 
       {/* Building silhouettes */}
       <For each={buildings}>
         {(b) => (
           <div class="absolute bottom-[15%]"
             style={{ left: `${b.x}%`, width: `${b.w}%`, height: `${b.h}%`,
-              background: 'rgba(20,20,35,0.95)',
-              'border-top': '2px solid rgba(80,90,140,0.6)',
-              'box-shadow': 'inset 0 1px 0 rgba(80,90,140,0.3)' }}>
+              background: 'rgba(10,23,35,0.95)',
+              'border-top': '2px solid rgba(50,98,137,0.6)',
+              'box-shadow': 'inset 0 1px 0 rgba(50,98,137,0.3)' }}>
             <Show when={b.spire}>
               <div style={{ position: 'absolute', left: '45%', top: `-${b.spireH}px`, width: '3px', height: `${b.spireH}px`,
-                background: 'rgba(122,162,247,0.6)',
-                'box-shadow': '0 0 6px rgba(122,162,247,0.8)' }} />
+                background: 'rgba(84,172,241,0.6)',
+                'box-shadow': '0 0 6px rgba(84,172,241,0.8)' }} />
             </Show>
             <For each={b.windows}>
               {(w) => (
@@ -159,7 +159,7 @@ function TokyoNightScene(props: SceneProps) {
 
       {/* Bright street reflections */}
       <div class="absolute bottom-[15%] left-0 right-0 h-[2px]"
-        style={{ background: 'linear-gradient(90deg, rgba(122,162,247,0.4), rgba(187,154,247,0.3), rgba(255,158,100,0.2))', filter: 'blur(1px)' }} />
+        style={{ background: 'linear-gradient(90deg, rgba(84,172,241,0.4), rgba(93,182,254,0.3), rgba(255,158,100,0.2))', filter: 'blur(1px)' }} />
 
       {/* Colorful puddle reflections */}
       <For each={puddles}>
@@ -177,7 +177,7 @@ function TokyoNightScene(props: SceneProps) {
         {(r) => (
           <div class="absolute opacity-0"
             style={{ left: `${r.x}%`, top: '-8%', width: '2px', height: `${r.h}px`,
-              background: 'linear-gradient(180deg, transparent, rgba(122,162,247,0.6), rgba(122,162,247,0.4))',
+              background: 'linear-gradient(180deg, transparent, rgba(84,172,241,0.6), rgba(84,172,241,0.4))',
               transform: `rotate(${r.angle}deg)`,
               animation: `tn-rain ${r.dur}s linear ${r.delay}s infinite` }} />
         )}
@@ -210,7 +210,7 @@ function TokyoNightScene(props: SceneProps) {
         @keyframes tn-neon6 { 0%,100%{opacity:0.8} 50%{opacity:0.3} }
         @keyframes tn-cloud { 0%{transform:translateX(0)} 100%{transform:translateX(125vw)} }
         @keyframes tn-puddle { 0%,100%{opacity:0.8;transform:scaleX(1)} 50%{opacity:0.4;transform:scaleX(1.4)} }
-        @keyframes tn-lightning { 0%,100%{background:transparent} 52%{background:transparent} 52.2%{background:rgba(122,162,247,0.15)} 52.4%{background:transparent} 52.8%{background:rgba(122,162,247,0.25)} 53%{background:transparent} }
+        @keyframes tn-lightning { 0%,100%{background:transparent} 52%{background:transparent} 52.2%{background:rgba(84,172,241,0.15)} 52.4%{background:transparent} 52.8%{background:rgba(84,172,241,0.25)} 53%{background:transparent} }
       `}</style>
     </SceneShell>
   );
