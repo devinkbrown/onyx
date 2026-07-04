@@ -10,15 +10,15 @@ export interface BackgroundProps {
 export const DEFAULT_BACKGROUND_ID: BackgroundId = 'kintsugi-veins';
 export const REDUCED_MOTION_BACKGROUND_ID: BackgroundId = 'lapis-gradient';
 
-export function selectBackgroundId(id: string | undefined, reducedMotion: boolean): BackgroundId {
+/**
+ * Resolve the concrete variant to render. Reduced motion NO LONGER swaps to a
+ * generic solid — the engine renders the theme's own scene as a still frame
+ * (see `staticMode`), so a reduced-motion / low-power device still gets its
+ * theme-coloured background, just frozen. Only a missing variant falls back.
+ */
+export function selectBackgroundId(id: string | undefined, _reducedMotion: boolean): BackgroundId {
   const requested = getBackground(id) ?? getBackground(DEFAULT_BACKGROUND_ID);
-
-  if (!requested) return REDUCED_MOTION_BACKGROUND_ID;
-  if (reducedMotion && requested.kind === 'animated') {
-    return (getBackground(REDUCED_MOTION_BACKGROUND_ID)?.id ?? requested.id) as BackgroundId;
-  }
-
-  return requested.id as BackgroundId;
+  return (requested?.id ?? REDUCED_MOTION_BACKGROUND_ID) as BackgroundId;
 }
 
 export function Background(props: BackgroundProps) {
@@ -43,17 +43,21 @@ export function Background(props: BackgroundProps) {
   });
 
   createEffect(() => {
-    const selectedId = selectBackgroundId(props.id, reducedMotion());
+    const reduce = reducedMotion();
+    const selectedId = selectBackgroundId(props.id, reduce);
     const variant = getBackground(selectedId);
     if (!variant) return;
 
     canvas.dataset.backgroundId = variant.id;
-    canvas.dataset.backgroundKind = variant.kind;
+    // Report the effective kind so tests/telemetry see a reduced-motion scene
+    // as static even though its variant is authored 'animated'.
+    canvas.dataset.backgroundKind = reduce ? 'solid' : variant.kind;
 
     const engine = new BackgroundEngine({
       canvas,
       variant,
       quality: props.quality ?? 'high',
+      staticMode: reduce,
     });
 
     engine.start();

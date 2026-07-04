@@ -26,6 +26,12 @@ export interface BackgroundEngineOptions {
   quality?: BackgroundQuality;
   targetFps?: number;
   fpsGuardFrames?: number;
+  /**
+   * Render a single still frame and never loop, regardless of the variant's
+   * kind. Used to honour `prefers-reduced-motion` while still showing the
+   * theme's own scene (frozen), instead of swapping to a generic solid.
+   */
+  staticMode?: boolean;
 }
 
 const QUALITY_ORDER: BackgroundQuality[] = ['low', 'med', 'high'];
@@ -55,6 +61,7 @@ export class BackgroundEngine {
   readonly variant: BackgroundVariant;
   readonly targetFps: number;
   readonly fpsGuardFrames: number;
+  readonly staticMode: boolean;
 
   private context: CanvasRenderingContext2D | null = null;
   private frameContext: BackgroundFrameContext | null = null;
@@ -73,6 +80,7 @@ export class BackgroundEngine {
     this.currentQuality = options.quality ?? 'high';
     this.targetFps = options.targetFps ?? 50;
     this.fpsGuardFrames = options.fpsGuardFrames ?? 42;
+    this.staticMode = options.staticMode ?? false;
   }
 
   get quality(): BackgroundQuality {
@@ -179,7 +187,7 @@ export class BackgroundEngine {
   }
 
   private applyFpsGuard(time: number): void {
-    if (this.variant.kind !== 'animated') {
+    if (this.staticMode || this.variant.kind !== 'animated') {
       this.lastFrameAt = time;
       return;
     }
@@ -209,7 +217,7 @@ export class BackgroundEngine {
   }
 
   private scheduleNextFrame(): void {
-    if (!this.running || this.variant.kind === 'solid' || isDocumentHidden()) return;
+    if (!this.running || this.staticMode || this.variant.kind === 'solid' || isDocumentHidden()) return;
     if (this.rafId !== null) return;
 
     this.rafId = requestAnimationFrame((time) => {

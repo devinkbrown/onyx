@@ -113,7 +113,7 @@ describe('Background reduced-motion selection', () => {
     HTMLCanvasElement.prototype.getContext = originalGetContext;
   });
 
-  it('selects a solid variant when the user prefers reduced motion', () => {
+  it('keeps the theme scene but renders it static under reduced motion', () => {
     // Arrange
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
       matches: query === '(prefers-reduced-motion: reduce)',
@@ -133,9 +133,10 @@ describe('Background reduced-motion selection', () => {
     const { container } = render(() => <Background id="deep-current" quality="high" />);
     const canvas = container.querySelector('canvas');
 
-    // Assert
-    expect(selectBackgroundId('deep-current', true)).toBe('lapis-gradient');
-    expect(canvas?.getAttribute('data-background-id')).toBe('lapis-gradient');
+    // Assert: the requested (animated) variant is kept — NOT swapped for a
+    // generic solid — but reported/rendered as a still frame.
+    expect(selectBackgroundId('deep-current', true)).toBe('deep-current');
+    expect(canvas?.getAttribute('data-background-id')).toBe('deep-current');
     expect(canvas?.getAttribute('data-background-kind')).toBe('solid');
   });
 });
