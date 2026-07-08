@@ -1,5 +1,3 @@
-'use client';
-
 /*
  * TsumugiSession.ts — Browser-side TSUMUGI encrypted media session.
  *

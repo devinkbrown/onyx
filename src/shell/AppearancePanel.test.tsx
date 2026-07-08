@@ -9,7 +9,8 @@
 import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { store } from '@/lib/store/store';
-import { THEME_IDS } from '@/theme';
+import { encodeTheme } from '@/lib/theme/themeShare';
+import { THEME_IDS, type CustomTheme } from '@/theme';
 import { AppearancePanel } from './AppearancePanel';
 
 const initialState = store.getInitialState();
@@ -17,10 +18,12 @@ const initialState = store.getInitialState();
 describe('AppearancePanel', () => {
   beforeEach(() => {
     store.setState(initialState, true);
+    localStorage.clear();
   });
 
   afterEach(() => {
     cleanup();
+    localStorage.clear();
   });
 
   it('stays closed until showAppearance is set', () => {
@@ -50,6 +53,34 @@ describe('AppearancePanel', () => {
 
     expect(store.getState().backgroundId).toBe('aurora');
     expect(store.getState().backgroundId).not.toBe(before === 'aurora' ? 'x' : before);
+  });
+
+  it('imports a shared theme code from the appearance panel', () => {
+    const imported: CustomTheme = {
+      id: 'custom:shared',
+      name: 'Shared Theme',
+      base: 'ocean',
+      overrides: { '--lapis': '#33ccff' },
+    };
+    store.getState().openAppearance();
+    render(() => <AppearancePanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Share / import' }));
+    fireEvent.input(screen.getByLabelText('Theme code or link'), {
+      target: { value: encodeTheme(imported) },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Import theme' }));
+
+    expect(screen.queryByTestId('theme-import-dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Shared Theme theme' })).toHaveAttribute('aria-checked', 'true');
+    expect(JSON.parse(localStorage.getItem('onyx:custom-themes') ?? '[]')).toEqual([
+      expect.objectContaining({
+        id: 'custom:shared-theme',
+        name: 'Shared Theme',
+        base: 'ocean',
+        overrides: { '--lapis': '#33ccff' },
+      }),
+    ]);
   });
 
   it('closes through onOpenChange when the store flag clears', () => {

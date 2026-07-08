@@ -1,7 +1,6 @@
-'use client';
-
 import {
   buildSessionResumeLine,
+  escapeTagValue,
   parseCHANLIMIT,
   parseIRCMessage,
   formatIRCLine,
@@ -42,16 +41,6 @@ export interface IRCClientOptions {
 }
 
 const RECONNECT_BASE = 2000;
-
-/** Escape a tag value per IRCv3 spec (inverse of parser's unescapeTagValue). */
-function escapeTagValue(val: string): string {
-  return val
-    .replace(/\\/g, '\\\\')
-    .replace(/;/g, '\\:')
-    .replace(/ /g, '\\s')
-    .replace(/\r/g, '\\r')
-    .replace(/\n/g, '\\n');
-}
 
 export class IRCClient {
   private ws: WebSocket | null = null;

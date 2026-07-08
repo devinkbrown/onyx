@@ -35,13 +35,14 @@ describe('<NotificationCenter>', () => {
       notifications: [
         note({ id: 'a', type: 'mention', from: 'trev', channel: '#root' }),
         note({ id: 'b', type: 'dm', from: 'mizu' }),
+        note({ id: 'f', type: 'follow', from: 'lapis', channel: '#root' }),
         note({ id: 'c', type: 'system', text: 'connected' }),
         note({ id: 'd', type: 'mention', from: 'kagura', channel: '#zig' }),
       ],
       readNotificationIds: new Set(['d']),
     });
     const { getByTestId } = render(() => <NotificationCenter />);
-    expect(getByTestId('ribbon-bell').textContent).toContain('2');
+    expect(getByTestId('ribbon-bell').textContent).toContain('3');
   });
 
   it('clicking a mention marks it read and navigates to the channel', () => {
@@ -52,6 +53,17 @@ describe('<NotificationCenter>', () => {
     fireEvent.click(getByTestId('ribbon-bell'));
     fireEvent.click(getByText('ping kain'));
     expect(store.getState().readNotificationIds.has('m1')).toBe(true);
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#root' });
+  });
+
+  it('clicking a followed conversation notification marks it read and navigates to the channel', () => {
+    store.setState({
+      notifications: [note({ id: 'f1', type: 'follow', from: 'trev', channel: '#root', text: 'quiet update' })],
+    });
+    const { getByTestId, getByText } = render(() => <NotificationCenter />);
+    fireEvent.click(getByTestId('ribbon-bell'));
+    fireEvent.click(getByText('quiet update'));
+    expect(store.getState().readNotificationIds.has('f1')).toBe(true);
     expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#root' });
   });
 

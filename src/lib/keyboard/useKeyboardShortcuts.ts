@@ -19,6 +19,8 @@
 import { onCleanup, onMount } from 'solid-js';
 import { getState } from '@/lib/store';
 import { openSpotlight, closeSpotlight, useSpotlight } from '@/chat/spotlight/useSpotlight';
+import { openPreferences, preferences, setPreference } from '@/lib/prefs/preferences';
+import { toggleFollow } from '@/lib/notifications/followed';
 
 // ── Shortcut definitions ──────────────────────────────────────────────────────
 
@@ -77,12 +79,42 @@ export const SHORTCUTS: ShortcutDescriptor[] = [
     group: 'Navigation',
   },
   {
+    keys: 'N',
+    description: 'Jump to next unread channel / DM',
+    group: 'Navigation',
+  },
+  {
+    keys: 'G then H',
+    description: 'Go to Home',
+    group: 'Navigation',
+  },
+  {
+    keys: 'G then D',
+    description: 'Focus jump date',
+    group: 'Navigation',
+  },
+  {
+    keys: 'U',
+    description: 'Follow current channel / DM',
+    group: 'Chat',
+  },
+  {
     keys: 'Alt+M',
     description: 'Toggle member list',
     group: 'View',
   },
   {
-    keys: 'Alt+Enter',
+    keys: '⌘⇧R / Ctrl+Shift+R',
+    description: 'Toggle Reader mode',
+    group: 'View',
+  },
+  {
+    keys: '⌘, / Ctrl+,',
+    description: 'Open preferences',
+    group: 'View',
+  },
+  {
+    keys: 'Enter / Alt+Enter',
     description: 'Focus message composer',
     group: 'Chat',
   },
@@ -102,6 +134,20 @@ function isEditableTarget(target: EventTarget | null): boolean {
     target.isContentEditable ||
     target.getAttribute('role') === 'textbox'
   );
+}
+
+function isInteractiveTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return !!target.closest([
+    'button',
+    'a[href]',
+    'summary',
+    '[role="button"]',
+    '[role="menuitem"]',
+    '[role="option"]',
+    '[role="tab"]',
+    '[aria-controls]',
+  ].join(','));
 }
 
 /**
@@ -145,6 +191,46 @@ function navigateRelative(delta: number): void {
   state.navigate(target);
 }
 
+function isUnreadTarget(target: { kind: 'channel'; channel: string } | { kind: 'dm'; nick: string }): boolean {
+  const state = getState();
+  if (target.kind === 'channel') {
+    const channel = state.channels.get(target.channel.toLowerCase());
+    return (channel?.unread ?? 0) > 0 || (channel?.highlights ?? 0) > 0;
+  }
+  const dm = state.dms.get(target.nick.toLowerCase());
+  return (dm?.unread ?? 0) > 0 || (dm?.highlights ?? 0) > 0;
+}
+
+function navigateNextUnread(): void {
+  const state = getState();
+  const targets = getNavTargets();
+  const unreadTargets = targets.filter(isUnreadTarget);
+  if (unreadTargets.length === 0) return;
+
+  const current = state.activeView;
+  const currentIndex = targets.findIndex((t) =>
+    t.kind === 'channel' && current.kind === 'channel'
+      ? t.channel === current.channel
+      : t.kind === 'dm' && current.kind === 'dm'
+        ? t.nick.toLowerCase() === current.nick.toLowerCase()
+        : false,
+  );
+  const next =
+    unreadTargets.find((target) => targets.indexOf(target) > currentIndex) ??
+    unreadTargets[0];
+  if (!next) return;
+  state.navigate(next);
+}
+
+function toggleActiveFollow(): void {
+  const view = getState().activeView;
+  if (view.kind === 'channel') {
+    toggleFollow(view.channel);
+  } else if (view.kind === 'dm') {
+    toggleFollow(view.nick);
+  }
+}
+
 /**
  * Focus the composer textarea in the current conversation (if visible).
  * The composer uses `data-composer-input` to be discoverable.
@@ -154,7 +240,14 @@ function focusComposer(): void {
   el?.focus();
 }
 
+function focusTimeScrubberDate(): void {
+  const el = document.querySelector<HTMLElement>('[data-time-scrubber-date]');
+  el?.focus();
+}
+
 // ── Main hook ─────────────────────────────────────────────────────────────────
+
+const KEY_SEQUENCE_TIMEOUT_MS = 1200;
 
 /**
  * Register global keyboard shortcuts. Call this once inside a SolidJS
@@ -163,8 +256,25 @@ function focusComposer(): void {
 export function useKeyboardShortcuts(): void {
   // We need spotlight state to implement Esc correctly.
   const spotlight = useSpotlight();
+  let pendingPrefix: 'g' | null = null;
+  let pendingPrefixTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function clearPendingPrefix(): void {
+    pendingPrefix = null;
+    if (pendingPrefixTimer) {
+      clearTimeout(pendingPrefixTimer);
+      pendingPrefixTimer = null;
+    }
+  }
+
+  function armPrefix(prefix: 'g'): void {
+    clearPendingPrefix();
+    pendingPrefix = prefix;
+    pendingPrefixTimer = setTimeout(clearPendingPrefix, KEY_SEQUENCE_TIMEOUT_MS);
+  }
 
   function handleKeyDown(event: KeyboardEvent): void {
+    if (event.defaultPrevented) return;
     const inEditable = isEditableTarget(event.target);
 
     // ── Escape — always close overlays regardless of focus ──────────────────
@@ -185,16 +295,77 @@ export function useKeyboardShortcuts(): void {
 
     // ── Cmd/Ctrl+K — command palette ────────────────────────────────────────
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+      clearPendingPrefix();
       event.preventDefault();
       openSpotlight();
       return;
     }
 
+    // ── Cmd/Ctrl+, — preferences panel ─────────────────────────────────────
+    if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey && event.key === ',') {
+      clearPendingPrefix();
+      event.preventDefault();
+      openPreferences();
+      return;
+    }
+
     // ── From here on, shortcuts are suppressed inside editable targets ───────
-    if (inEditable) return;
+    if (inEditable) {
+      clearPendingPrefix();
+      return;
+    }
+
+    // ── Cmd/Ctrl+Shift+R — reader mode ─────────────────────────────────────
+    if ((event.metaKey || event.ctrlKey) && event.shiftKey && !event.altKey && event.key.toLowerCase() === 'r') {
+      clearPendingPrefix();
+      event.preventDefault();
+      setPreference('readerMode', !preferences().readerMode);
+      return;
+    }
+
+    // ── N — jump to next unread conversation ──────────────────────────────
+    if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'n') {
+      clearPendingPrefix();
+      event.preventDefault();
+      navigateNextUnread();
+      return;
+    }
+
+    // ── G sequences — time-native navigation ─────────────────────────────
+    if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'g') {
+      event.preventDefault();
+      armPrefix('g');
+      return;
+    }
+
+    if (pendingPrefix === 'g' && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+      const key = event.key.toLowerCase();
+      if (key === 'h') {
+        event.preventDefault();
+        clearPendingPrefix();
+        getState().navigate({ kind: 'home' });
+        return;
+      }
+      if (key === 'd') {
+        event.preventDefault();
+        clearPendingPrefix();
+        focusTimeScrubberDate();
+        return;
+      }
+      clearPendingPrefix();
+    }
+
+    // ── U — follow/unfollow current conversation ──────────────────────────
+    if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'u') {
+      clearPendingPrefix();
+      event.preventDefault();
+      toggleActiveFollow();
+      return;
+    }
 
     // ── ? (Shift+/) — keyboard shortcuts help ───────────────────────────────
     if (event.key === '?') {
+      clearPendingPrefix();
       event.preventDefault();
       const state = getState();
       if (state.showKeyboardShortcuts) {
@@ -207,12 +378,14 @@ export function useKeyboardShortcuts(): void {
 
     // ── Alt+↑ / Alt+↓ — channel navigation ──────────────────────────────────
     if (event.altKey && event.key === 'ArrowUp') {
+      clearPendingPrefix();
       event.preventDefault();
       navigateRelative(-1);
       return;
     }
 
     if (event.altKey && event.key === 'ArrowDown') {
+      clearPendingPrefix();
       event.preventDefault();
       navigateRelative(1);
       return;
@@ -220,13 +393,21 @@ export function useKeyboardShortcuts(): void {
 
     // ── Alt+M — toggle member list ───────────────────────────────────────────
     if (event.altKey && event.key.toLowerCase() === 'm') {
+      clearPendingPrefix();
       event.preventDefault();
       getState().toggleMemberList();
       return;
     }
 
-    // ── Alt+Enter — focus composer ───────────────────────────────────────────
-    if (event.altKey && event.key === 'Enter') {
+    // ── Enter / Alt+Enter — focus composer ──────────────────────────────────
+    if (
+      event.key === 'Enter' &&
+      !event.metaKey &&
+      !event.ctrlKey &&
+      !event.shiftKey &&
+      !isInteractiveTarget(event.target)
+    ) {
+      clearPendingPrefix();
       event.preventDefault();
       focusComposer();
       return;
@@ -235,6 +416,9 @@ export function useKeyboardShortcuts(): void {
 
   onMount(() => {
     window.addEventListener('keydown', handleKeyDown);
-    onCleanup(() => window.removeEventListener('keydown', handleKeyDown));
+    onCleanup(() => {
+      clearPendingPrefix();
+      window.removeEventListener('keydown', handleKeyDown);
+    });
   });
 }

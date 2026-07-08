@@ -31,6 +31,13 @@ describe('shouldNotify', () => {
     });
   });
 
+  it('allows followed conversation alerts through the same inactive path', () => {
+    expect(shouldNotify({ ...base, kind: 'follow' })).toMatchObject({
+      desktop: true,
+      sound: true,
+    });
+  });
+
   it('suppresses alerts while focused', () => {
     expect(shouldNotify({ ...base, pageVisible: true, appFocused: true })).toMatchObject({
       desktop: false,

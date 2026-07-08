@@ -9,8 +9,12 @@ import {
   type BackgroundVariant,
 } from './engine';
 import { allBackgroundVariants, backgroundRegistry, getBackground, sceneRegistry, type BackgroundId } from './registry';
+import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  resetPreferences();
+});
 
 describe('background registry', () => {
   it('keeps every variant id unique across canvas and scene variants', () => {
@@ -151,6 +155,55 @@ describe('Background reduced-motion selection', () => {
     expect(selectBackgroundId('deep-current', true)).toBe('deep-current');
     expect(canvas?.getAttribute('data-background-id')).toBe('deep-current');
     expect(canvas?.getAttribute('data-background-kind')).toBe('solid');
+  });
+
+  it('renders animated canvas backgrounds static when the user forces reduced motion', () => {
+    // Arrange
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+    HTMLCanvasElement.prototype.getContext = vi.fn(
+      () => create2dContext(),
+    ) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+    setPreference('reduceMotion', true);
+
+    // Act
+    const { container } = render(() => <Background id="deep-current" quality="high" />);
+    const canvas = container.querySelector('canvas');
+
+    // Assert
+    expect(canvas?.getAttribute('data-background-id')).toBe('deep-current');
+    expect(canvas?.getAttribute('data-background-kind')).toBe('solid');
+  });
+
+  it('renders DOM scenes static when the user forces reduced motion', () => {
+    // Arrange
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+    setPreference('reduceMotion', true);
+
+    // Act
+    const { container } = render(() => <Background id="starfield" quality="high" />);
+    const host = container.querySelector('[data-background-canvas]');
+
+    // Assert
+    expect(host?.getAttribute('data-background-id')).toBe('starfield');
+    expect(host?.getAttribute('data-background-kind')).toBe('solid');
   });
 });
 

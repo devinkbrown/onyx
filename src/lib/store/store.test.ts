@@ -6,6 +6,7 @@ const initialState = store.getInitialState();
 
 describe('vanilla store', () => {
   beforeEach(() => {
+    localStorage.clear();
     store.setState(initialState, true);
   });
 
@@ -56,6 +57,22 @@ describe('vanilla store', () => {
     const finalState = store.getState();
     expect(finalState.toasts).toEqual([]);
     expect(finalState.showSettings).toBe(false);
+  });
+
+  it('persists theme changes through the current ThemeProvider storage key', () => {
+    store.getState().setTheme('sumi');
+
+    expect(store.getState().activeTheme).toBe('sumi');
+    expect(store.getState().theme).toBe('sumi');
+    expect(localStorage.getItem('onyx:theme')).toBe('sumi');
+    expect(localStorage.getItem('onyx:active-theme')).toBeNull();
+
+    store.getState().setDisplayTheme('pearl');
+
+    expect(store.getState().activeTheme).toBe('pearl');
+    expect(store.getState().theme).toBe('pearl');
+    expect(localStorage.getItem('onyx:theme')).toBe('pearl');
+    expect(localStorage.getItem('onyx:display-theme')).toBeNull();
   });
 
   it('notifies selector subscribers when selected state changes', () => {

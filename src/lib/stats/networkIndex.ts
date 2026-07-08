@@ -7,21 +7,46 @@
  * consumers must always receive either `null` or a fully-typed value.
  */
 
+import { relativeTime } from '@/lib/time/relativeTime';
+
 export type StatsChannel = {
   channel: string;
   messages: number;
   active_users: number;
+  present: number;
   last_active: number;
   topic: string;
   spark: number[];
+};
+
+export type NetworkDay = {
+  date: string;
+  messages: number;
 };
 
 export type StatsIndex = {
   generated_at: number;
   network: string;
   node: string;
+  users_online: number;
+  network_days: NetworkDay[];
   channels: StatsChannel[];
 };
+
+function normalizeNetworkDays(raw: unknown): NetworkDay[] {
+  if (!Array.isArray(raw)) return [];
+  const days: NetworkDay[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const e = entry as Record<string, unknown>;
+    if (typeof e['date'] !== 'string' || !e['date']) continue;
+    days.push({
+      date: e['date'],
+      messages: typeof e['messages'] === 'number' && e['messages'] > 0 ? Math.floor(e['messages']) : 0,
+    });
+  }
+  return days;
+}
 
 export function normalizeIndex(raw: unknown): StatsIndex | null {
   if (typeof raw !== 'object' || raw === null) return null;
@@ -36,6 +61,7 @@ export function normalizeIndex(raw: unknown): StatsIndex | null {
       channel: e['channel'],
       messages: typeof e['messages'] === 'number' ? e['messages'] : 0,
       active_users: typeof e['active_users'] === 'number' ? e['active_users'] : 0,
+      present: typeof e['present'] === 'number' ? e['present'] : 0,
       last_active: typeof e['last_active'] === 'number' ? e['last_active'] : 0,
       topic: typeof e['topic'] === 'string' ? e['topic'] : '',
       spark: Array.isArray(e['spark'])
@@ -47,6 +73,8 @@ export function normalizeIndex(raw: unknown): StatsIndex | null {
     generated_at: typeof r['generated_at'] === 'number' ? r['generated_at'] : 0,
     network: typeof r['network'] === 'string' ? r['network'] : '',
     node: typeof r['node'] === 'string' ? r['node'] : '',
+    users_online: typeof r['users_online'] === 'number' ? r['users_online'] : 0,
+    network_days: normalizeNetworkDays(r['network_days']),
     channels,
   };
 }
@@ -66,9 +94,5 @@ export async function fetchStatsIndex(): Promise<StatsIndex | null> {
 /** Compact relative time from a unix-seconds stamp. */
 export function relTime(unixSec: number, nowMs: number): string {
   if (!unixSec) return 'a while ago';
-  const s = Math.max(0, Math.floor(nowMs / 1000 - unixSec));
-  if (s < 50) return `${s}s ago`;
-  if (s < 3000) return `${Math.round(s / 60)}m ago`;
-  if (s < 90000) return `${Math.round(s / 3600)}h ago`;
-  return `${Math.round(s / 86400)}d ago`;
+  return relativeTime(new Date(unixSec * 1000), new Date(nowMs));
 }

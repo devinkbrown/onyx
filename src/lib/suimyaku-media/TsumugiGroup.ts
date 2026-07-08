@@ -1,5 +1,3 @@
-'use client';
-
 /*
  * TsumugiGroup.ts — Multi-party TSUMUGI group key for encrypted channel media.
  *

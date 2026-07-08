@@ -4,14 +4,13 @@
  * Responsibilities:
  *   - Applies a theme by writing CSS custom-property overrides onto
  *     `document.documentElement` and toggling `data-theme` / `color-scheme`.
- *   - Persists the user's choice to localStorage under STORAGE_KEY.
+ *   - Persists the user's choice through the shared theme storage helper.
  *   - Exposes `useTheme()` + `setTheme()` to all descendants.
  *
  * Account-sync hook (future wave):
  *   When server-side account preferences are ready, call `setTheme()` with the
- *   account value after the IRC ACCOUNTINFO response is parsed.  The provider
- *   already accepts an external `value` prop for controlled usage.
- *   // TODO(account-sync): accept ThemeId from account store and pass as `value`.
+ *   account value after the IRC ACCOUNTINFO response is parsed. The provider
+ *   accepts an external `value` prop for controlled usage.
  */
 
 import {
@@ -35,26 +34,7 @@ import {
   type CustomTheme,
 } from './customThemes';
 import { parseThemeParam } from '@/lib/theme/themeShare';
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const STORAGE_KEY = 'onyx:theme';
-/** Legacy key from the previous brand name; read-only for one-time migration. */
-const LEGACY_STORAGE_KEY = 'ruri:theme';
-/** Legacy built-in theme id that was renamed to its current brand-consistent id. */
-const LEGACY_THEME_ID = 'ruri';
-const MIGRATED_THEME_ID = 'onyx';
-
-/** Map a stored (possibly legacy) theme id to its current id. */
-function migrateThemeId(id: string): string {
-  return id === LEGACY_THEME_ID ? MIGRATED_THEME_ID : id;
-}
-
-// ---------------------------------------------------------------------------
-// Context shape
-// ---------------------------------------------------------------------------
+import { persistThemeId, readThemeId } from './themeStorage';
 
 type ThemeContextValue = {
   /** The currently active theme ID (a built-in ThemeId or a `custom:` id). */
@@ -93,11 +73,11 @@ let _fallbackTheme: ThemeContextValue | undefined;
 function fallbackThemeController(): ThemeContextValue {
   if (_fallbackTheme) return _fallbackTheme;
   _fallbackTheme = createRoot(() => {
-    const [id, setId] = createSignal<string>(readStoredTheme());
+    const [id, setId] = createSignal<string>(readThemeId());
     const [custom, setCustom] = createSignal<CustomTheme[]>(loadCustomThemes());
     const setTheme = (next: string): void => {
       setId(next);
-      persistTheme(next);
+      persistThemeId(next);
       if (typeof document !== 'undefined') applyThemeToDom(next);
     };
     const saveCustom = (name: string, base: ThemeId, overrides: TokenMap): string => {
@@ -118,33 +98,6 @@ function fallbackThemeController(): ThemeContextValue {
 
 export function useThemeOptional(): ThemeContextValue {
   return useContext(ThemeContext) ?? fallbackThemeController();
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function readStoredTheme(): string {
-  try {
-    // Read the current key first; fall back to the legacy key (read-old-write-new)
-    // so existing users keep their saved theme through one load after the rebrand.
-    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
-    const stored = raw ? migrateThemeId(raw) : null;
-    if (stored && (stored in THEMES || (isCustomThemeId(stored) && getCustomTheme(stored)))) {
-      return stored;
-    }
-  } catch {
-    // localStorage may be unavailable in some environments.
-  }
-  return DEFAULT_THEME_ID;
-}
-
-function persistTheme(id: string): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, id);
-  } catch {
-    // Ignore write failures.
-  }
 }
 
 /** URL query key carrying a shared custom theme (see lib/theme/themeShare.ts). */
@@ -208,22 +161,20 @@ export function applyThemeToDom(id: string): void {
 export type ThemeProviderProps = ParentProps<{
   /**
    * Controlled value.  If provided the provider will follow this value instead
-   * of its internal signal.  Useful for account-sync (future wave).
-   *
-   * // TODO(account-sync): wire this to the account preferences store.
+   * of its internal signal. Useful for account-synced preferences.
    */
   value?: ThemeId;
 }>;
 
 export function ThemeProvider(props: ThemeProviderProps) {
-  const [innerThemeId, setInnerThemeId] = createSignal<string>(readStoredTheme());
+  const [innerThemeId, setInnerThemeId] = createSignal<string>(readThemeId());
   const [customThemes, setCustomThemes] = createSignal<CustomTheme[]>(loadCustomThemes());
 
   const themeId = (): string => props.value ?? innerThemeId();
 
   const setTheme = (id: string): void => {
     setInnerThemeId(id);
-    persistTheme(id);
+    persistThemeId(id);
   };
 
   const saveCustom = (name: string, base: ThemeId, overrides: TokenMap): string => {

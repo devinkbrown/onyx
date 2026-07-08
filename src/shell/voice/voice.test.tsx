@@ -109,6 +109,7 @@ describe('VoiceStage', () => {
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
   });
 
   it('renders a tile for each participant (self + 2 peers)', () => {
@@ -553,14 +554,18 @@ describe('VoiceBar', () => {
 
   it('shows the live duration timer with an accessible label', () => {
     // Arrange
-    seedVoiceStore([], [], { callStartedAt: Date.now() });
+    const now = new Date('2026-07-08T12:00:00Z');
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    seedVoiceStore([], [], { callStartedAt: now.getTime() - 65_000 });
 
     // Act
     const { getByRole } = render(() => <VoiceBar />);
 
     // Assert
     const timer = getByRole('timer');
-    expect(timer.getAttribute('aria-label')).toMatch(/Call duration:/);
+    expect(timer).toHaveTextContent('01:05');
+    expect(timer).toHaveAttribute('aria-label', 'Call duration: 1m 5s');
   });
 
   it('shows the participant count (self + peers)', () => {

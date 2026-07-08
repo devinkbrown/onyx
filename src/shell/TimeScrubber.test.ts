@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildTimeScrubberBars } from './TimeScrubber';
+import { buildMomentLink, buildTimeScrubberBars } from './TimeScrubber';
 
 describe('buildTimeScrubberBars', () => {
   it('returns 24 quiet bars when stats are absent or malformed', () => {
@@ -30,5 +30,17 @@ describe('buildTimeScrubberBars', () => {
     const bars = buildTimeScrubberBars(Array.from({ length: 24 }, () => 1), 24);
 
     expect(bars.some((bar) => bar.isNow)).toBe(false);
+  });
+});
+
+describe('buildMomentLink', () => {
+  it('builds a canonical app deep link for a room moment', () => {
+    const link = buildMomentLink(
+      '#general',
+      new Date('2026-06-30T12:00:00.000Z'),
+      'https://chat.example/about?old=1#section',
+    );
+
+    expect(link).toBe('https://chat.example/app?join=%23general&at=2026-06-30T12%3A00%3A00.000Z');
   });
 });

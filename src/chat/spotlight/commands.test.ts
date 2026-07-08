@@ -96,11 +96,57 @@ describe('buildCommands', () => {
     expect(navigate).toHaveBeenCalledWith({ kind: 'channel', channel: '#forge' });
   });
 
+  it('builds a literal goto command for channel navigation', () => {
+    const joinChannel = vi.fn();
+    const navigate = vi.fn();
+    setState({
+      channels: new Map([['#forge', channel('#forge')]]),
+      joinChannel,
+      navigate,
+    });
+
+    const command = buildCommands(getState(), 'goto #forge').find((entry) => entry.id === 'grammar:goto:#forge');
+    expect(command?.title).toBe('Go to #forge');
+    command?.run();
+
+    expect(joinChannel).toHaveBeenCalledWith('#forge');
+    expect(navigate).toHaveBeenCalledWith({ kind: 'channel', channel: '#forge' });
+  });
+
+  it('builds a literal dm command for direct messages', () => {
+    const navigate = vi.fn();
+    setState({
+      dms: new Map([['aoi', dm('aoi')]]),
+      navigate,
+    });
+
+    const command = buildCommands(getState(), 'dm @aoi').find((entry) => entry.id === 'grammar:dm:aoi');
+    expect(command?.title).toBe('Open DM with aoi');
+    command?.run();
+
+    expect(navigate).toHaveBeenCalledWith({ kind: 'dm', nick: 'aoi' });
+  });
+
+  it('builds a literal mute command for timed do-not-disturb', () => {
+    const before = Date.now();
+    const command = buildCommands(getState(), 'mute 1h').find((entry) => entry.id === 'grammar:mute:1 hour');
+
+    expect(command?.title).toBe('Mute notifications for 1 hour');
+    command?.run();
+
+    const until = store.getState().dndUntil;
+    expect(store.getState().dndEnabled).toBe(false);
+    expect(until).toBeGreaterThanOrEqual(before + 3_600_000);
+    expect(until).toBeLessThanOrEqual(Date.now() + 3_600_000);
+  });
+
   it('applies theme commands immediately', () => {
     const command = buildCommands(getState()).find((entry) => entry.id === 'theme:shu');
     command?.run();
 
     expect(document.documentElement.getAttribute('data-theme')).toBe('shu');
+    expect(store.getState().activeTheme).toBe('shu');
+    expect(store.getState().theme).toBe('shu');
     expect(localStorage.getItem('onyx:theme')).toBe('shu');
   });
 

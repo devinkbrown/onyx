@@ -15,6 +15,11 @@
  */
 
 import { preferences } from '@/lib/prefs/preferences';
+import { listTopics, summarizeTopics } from '@/lib/search/topicFilter';
+import { bucketUnreadByTopic, isValidTopicLabel, parseTopicRegistry, TOPIC_PROP } from '@/lib/topics/topics';
+import { followed, isFollowed, toggleFollow } from '@/lib/notifications/followed';
+import { buildSinceDigest } from '@/lib/notifications/sinceDigest';
+import { aggregateBoosts } from '@/lib/reactions/quietBoosts';
 import {
   createEffect,
   createMemo,
@@ -27,12 +32,15 @@ import {
 import { useStore, getState, STATUS_TARGET } from '@/lib/store';
 import { LOCKED_PLACEHOLDER } from '@/lib/e2ee/dmCipher';
 import { ScheduledEventLine } from './ScheduledEventLine';
-import type { ChatMessage, MessageReaction } from '@/lib/irc/types';
+import type { ChatMessage } from '@/lib/irc/types';
 import { Avatar } from '@/primitives/index';
 import { Sheet } from '@/primitives/index';
 import { MessageText } from '@/shell/message/MessageText';
 import { MessageMenu } from '@/shell/message/MessageMenu';
 import { activeMessageSearchResultId } from './search/useMessageSearch';
+import { TopicFilterBar } from './TopicChip';
+import { BoostBar } from './BoostBar';
+import { SinceDigestCard } from './SinceDigestCard';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -54,6 +62,15 @@ function fmtTime(date: Date): string {
     return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
   }
   return date.toTimeString().slice(0, 5); // HH:MM
+}
+
+function clipped(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max)}...` : text;
+}
+
+function messageAccessibleLabel(msg: ChatMessage): string {
+  const text = msg.plaintext ?? msg.text;
+  return `${msg.from} at ${fmtTime(msg.time)}: ${clipped(text, 120)}`;
 }
 
 /** Human day label for the elegant date dividers. */
@@ -87,48 +104,14 @@ function sameAuthorGroup(a: ChatMessage, b: ChatMessage): boolean {
   return Math.abs(b.time.getTime() - a.time.getTime()) < 5 * 60 * 1000;
 }
 
-// ── Reaction avatars ─────────────────────────────────────────────────────────
+// ── Quiet boosts ─────────────────────────────────────────────────────────────
 
-type ReactionProps = {
-  reaction: MessageReaction;
-  target: string;
-  messageId: string;
-  selfNick: string;
-};
-
-function ReactionPill(props: ReactionProps): JSX.Element {
-  const [local] = splitProps(props, ['reaction', 'target', 'messageId', 'selfNick']);
-
-  const topUsers = createMemo(() => local.reaction.users.slice(0, 3));
-  const mine = createMemo(() => !!local.selfNick && local.reaction.users.includes(local.selfNick));
-
-  function handleClick(): void {
-    const emoji = local.reaction.emoji;
-    const self = local.selfNick;
-    if (!self) return;
-    if (local.reaction.users.includes(self)) {
-      getState().removeReaction(local.target, local.messageId, emoji, self);
-    } else {
-      getState().addReaction(local.target, local.messageId, emoji);
-    }
-  }
-
-  return (
-    <button
-      type="button"
-      class={`shell-reaction${mine() ? ' shell-reaction--mine' : ''}`}
-      aria-label={`${local.reaction.emoji} — ${local.reaction.users.join(', ')} reacted`}
-      aria-pressed={mine()}
-      onClick={handleClick}
-    >
-      <span class="shell-reaction-emoji" aria-hidden="true">{local.reaction.emoji}</span>
-      <span class="shell-reaction-avatars" aria-hidden="true">
-        <For each={topUsers()}>
-          {(nick) => <Avatar name={nick} size="sm" />}
-        </For>
-      </span>
-      <span class="shell-reaction-count">{local.reaction.users.length}</span>
-    </button>
+function boostGroupsFor(msg: ChatMessage, selfNick: string) {
+  return aggregateBoosts(
+    (msg.reactions ?? []).flatMap((reaction) =>
+      reaction.users.map((from) => ({ emoji: reaction.emoji, from })),
+    ),
+    selfNick,
   );
 }
 
@@ -267,6 +250,8 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   const channels = useStore((s) => s.channels);
   const dms = useStore((s) => s.dms);
   const serverLog = useStore((s) => s.serverLog);
+  const channelProps = useStore((s) => s.channelProps);
+  const activeChannelTopics = useStore((s) => s.activeChannelTopics);
   const ourNick = useStore((s) => s.ourNick);
   const canEditMessages = useStore((s) => s.canEditMessages);
   const historyLoading = useStore((s) => s.historyLoading);
@@ -275,7 +260,19 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   const selfNick = createMemo(() => local.selfNick ?? ourNick() ?? '');
 
   // ── active messages ──
-  const messages = createMemo((): ChatMessage[] => {
+  const activeTopic = createMemo((): string | null => {
+    const view = activeView();
+    if (view.kind !== 'channel') return null;
+    return activeChannelTopics().get(view.channel.toLowerCase()) ?? null;
+  });
+
+  function setActiveTopic(topic: string | null): void {
+    const view = activeView();
+    if (view.kind !== 'channel') return;
+    getState().setActiveChannelTopic(view.channel, topic);
+  }
+
+  const allMessages = createMemo((): ChatMessage[] => {
     const view = activeView();
     let list: ChatMessage[] = [];
     if (view.kind === 'channel') {
@@ -294,6 +291,57 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     return [...list].sort((a, b) => a.time.getTime() - b.time.getTime());
   });
 
+  const availableTopics = createMemo((): string[] => {
+    const view = activeView();
+    if (view.kind !== 'channel') return [];
+
+    const fromRegistry = parseTopicRegistry(
+      channelProps().get(view.channel.toLowerCase())?.[TOPIC_PROP],
+    );
+    const fromMessages = listTopics(
+      allMessages().map((message) => ({
+        id: message.id,
+        topic: message.topic ?? null,
+        at: message.time,
+      })),
+    );
+
+    const topics: string[] = [];
+    const seen = new Set<string>();
+    for (const topic of [...fromRegistry, ...fromMessages]) {
+      const key = topic.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      topics.push(topic);
+    }
+    return topics;
+  });
+
+  const messages = createMemo((): ChatMessage[] => {
+    const topic = activeTopic();
+    if (topic === null) return allMessages();
+    const key = topic.toLowerCase();
+    return allMessages().filter((message) => (message.topic ?? '').toLowerCase() === key);
+  });
+
+  const followTarget = createMemo(() => {
+    const view = activeView();
+    if (view.kind !== 'channel') return null;
+    return { channel: view.channel, topic: activeTopic() };
+  });
+
+  const followActive = createMemo(() => {
+    followed();
+    const target = followTarget();
+    return target ? isFollowed(target.channel, target.topic) : false;
+  });
+
+  function toggleActiveFollow(): void {
+    const target = followTarget();
+    if (!target) return;
+    toggleFollow(target.channel, target.topic);
+  }
+
   // ── active target for reactions/sends ──
   const activeTarget = createMemo(() => {
     const view = activeView();
@@ -301,6 +349,10 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     if (view.kind === 'dm') return view.nick;
     if (view.kind === 'status') return STATUS_TARGET;
     return '';
+  });
+
+  createEffect(() => {
+    activeTarget();
   });
 
   // True while CHATHISTORY is in flight for the open target — lets the empty
@@ -320,6 +372,54 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     const t = activeTarget();
     if (!t) return null;
     return viewUnreadDividerId().get(t.toLowerCase()) ?? null;
+  });
+
+  const topicUnreadCounts = createMemo((): ReadonlyMap<string, number> => {
+    const dividerId = unreadDividerId();
+    if (!dividerId) return new Map<string, number>();
+    const all = allMessages();
+    const dividerIndex = all.findIndex((message) => message.id === dividerId);
+    if (dividerIndex < 0) return new Map<string, number>();
+    const rawCounts = bucketUnreadByTopic(
+      all.map((message, index) => ({
+        topic: message.topic ?? null,
+        unread: index >= dividerIndex && !isSystemMsg(message),
+      })),
+    );
+    const normalized = new Map<string, number>();
+    for (const [topic, count] of rawCounts) {
+      if (topic) normalized.set(topic.toLowerCase(), count);
+    }
+    return normalized;
+  });
+
+  const sinceDigest = createMemo(() => {
+    const dividerId = unreadDividerId();
+    if (!dividerId) return null;
+    const visible = messages();
+    const divider = allMessages().find((message) => message.id === dividerId);
+    const channel = activeTarget();
+    if (!divider || !channel || !channel.startsWith('#')) return null;
+    const dividerIndex = allMessages().findIndex((message) => message.id === dividerId);
+    if (dividerIndex < 0) return null;
+    const visibleUnread = visible.filter((message) => {
+      const index = allMessages().findIndex((candidate) => candidate.id === message.id);
+      return index >= dividerIndex;
+    });
+    const since = new Date(divider.time.getTime() - 1);
+    const digest = buildSinceDigest(
+      visibleUnread
+        .filter((message) => !isSystemMsg(message) && message.time.getTime() > since.getTime())
+        .map((message) => ({
+          channel,
+          nick: message.from,
+          at: message.time,
+          isMention: !!message.highlight,
+        })),
+      since,
+      { maxChannels: 1 },
+    );
+    return digest.totalMessages > 0 ? digest : null;
   });
 
   // ── scroll state ──
@@ -431,10 +531,43 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   // ── thread panel ──
   const [threadOpen, setThreadOpen] = createSignal(false);
   const [threadParentId, setThreadParentId] = createSignal<string | null>(null);
+  const [forumView, setForumView] = createSignal(false);
+  const [topicDraft, setTopicDraft] = createSignal('');
 
   function openThread(msgId: string): void {
     setThreadParentId(msgId);
     setThreadOpen(true);
+  }
+
+  const topicSummaries = createMemo(() => summarizeTopics(
+    allMessages().map((message) => ({
+      id: message.id,
+      topic: message.topic ?? null,
+      at: message.time,
+    })),
+  ));
+
+  function latestTopicMessage(topic: string): ChatMessage | null {
+    const key = topic.toLowerCase();
+    return allMessages()
+      .filter((message) => (message.topic ?? '').toLowerCase() === key && !isSystemMsg(message))
+      .at(-1) ?? null;
+  }
+
+  function openTopic(topic: string): void {
+    setActiveTopic(topic);
+    setForumView(false);
+  }
+
+  const canStartTopic = createMemo(() => isValidTopicLabel(topicDraft().trim()));
+
+  function startTopic(event: Event): void {
+    event.preventDefault();
+    const topic = topicDraft().trim();
+    if (!isValidTopicLabel(topic)) return;
+    setActiveTopic(topic);
+    setForumView(false);
+    setTopicDraft('');
   }
 
   // ── tap-to-reveal action bar (touch) ──
@@ -453,8 +586,66 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     setRevealedId((current) => (current === msgId ? null : msgId));
   }
 
+  function toggleRevealFromKeyboard(msgId: string, event: KeyboardEvent): void {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    setRevealedId((current) => (current === msgId ? null : msgId));
+  }
+
   return (
     <main class="shell-messages" aria-label="Messages">
+      <Show when={activeView().kind === 'channel'}>
+        <div class="shell-topic-filter">
+          <Show when={availableTopics().length > 0}>
+            <TopicFilterBar
+              topics={availableTopics()}
+              active={activeTopic()}
+              unreadCounts={topicUnreadCounts()}
+              onSelect={setActiveTopic}
+            />
+          </Show>
+          <form class="shell-topic-create" onSubmit={startTopic}>
+            <label class="sr-only" for="shell-topic-create-input">New topic</label>
+            <input
+              id="shell-topic-create-input"
+              class="shell-topic-create-input"
+              value={topicDraft()}
+              placeholder="new topic"
+              maxlength="50"
+              autocomplete="off"
+              aria-label="New topic"
+              onInput={(event) => setTopicDraft(event.currentTarget.value)}
+            />
+            <button type="submit" class="shell-topic-action" disabled={!canStartTopic()}>
+              Start topic
+            </button>
+          </form>
+          <div class="shell-topic-actions">
+            <Show when={topicSummaries().length > 0}>
+              <button
+                type="button"
+                class="shell-topic-action"
+                classList={{ 'is-active': forumView() }}
+                aria-pressed={forumView()}
+                onClick={() => setForumView((open) => !open)}
+              >
+                Forum
+              </button>
+            </Show>
+            <button
+              type="button"
+              class="shell-topic-follow"
+              classList={{ 'is-active': followActive() }}
+              aria-pressed={followActive()}
+              onClick={toggleActiveFollow}
+            >
+              {followActive()
+                ? activeTopic() ? `Following ${activeTopic()}` : 'Following room'
+                : activeTopic() ? `Follow ${activeTopic()}` : 'Follow room'}
+            </button>
+          </div>
+        </div>
+      </Show>
       {/* Message feed */}
       <div
         ref={feedEl!}
@@ -464,6 +655,33 @@ export function MessageView(props: MessageViewProps): JSX.Element {
         aria-label="Message history"
         onScroll={checkScroll}
       >
+        <Show when={forumView() && topicSummaries().length > 0}>
+          <section class="shell-topic-forum" aria-label="Topic forum">
+            <For each={topicSummaries()}>
+              {(summary) => {
+                const latest = createMemo(() => latestTopicMessage(summary.topic));
+                return (
+                  <article class="shell-topic-card">
+                    <button type="button" class="shell-topic-card-main" onClick={() => openTopic(summary.topic)}>
+                      <span class="shell-topic-card-title">#{summary.topic}</span>
+                      <span class="shell-topic-card-meta">
+                        {summary.count} {summary.count === 1 ? 'message' : 'messages'}
+                      </span>
+                      <Show when={latest()}>
+                        {(message) => (
+                          <span class="shell-topic-card-preview">
+                            <span class="shell-topic-card-author">{message().from}</span>
+                            <span>{clipped(message().plaintext ?? message().text, 110)}</span>
+                          </span>
+                        )}
+                      </Show>
+                    </button>
+                  </article>
+                );
+              }}
+            </For>
+          </section>
+        </Show>
         <Show
           when={messages().length > 0}
           fallback={
@@ -515,6 +733,13 @@ export function MessageView(props: MessageViewProps): JSX.Element {
               </p>
               <ScheduledEventLine channel={(activeView() as { kind: 'channel'; channel: string }).channel} />
             </div>
+          </Show>
+          <Show when={sinceDigest()}>
+            {(digest) => (
+              <div class="shell-since-digest-card">
+                <SinceDigestCard digest={digest()} />
+              </div>
+            )}
           </Show>
           <For each={messages()}>
             {(msg, index) => {
@@ -574,7 +799,11 @@ export function MessageView(props: MessageViewProps): JSX.Element {
               }
 
               const isHighlight = createMemo(() => !!msg.highlight);
-              const hasReactions = createMemo(() => (msg.reactions?.length ?? 0) > 0);
+              const boostGroups = createMemo(() => boostGroupsFor(msg, selfNick()));
+              const hasBoosts = createMemo(() => boostGroups().length > 0);
+              const toggleBoost = (emoji: string): void => {
+                getState().addReaction(activeTarget(), msg.id, emoji);
+              };
               const hasThread = createMemo(() => {
                 // A message has a thread if there's at least one reply to it
                 return messages().some((m) => m.replyTo?.id === msg.id);
@@ -607,8 +836,12 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                       msg.pending ? 'shell-msg-pending' : '',
                     ].filter(Boolean).join(' ')}
                     data-message-search-id={msg.id}
+                    role="article"
+                    tabIndex={0}
+                    aria-label={messageAccessibleLabel(msg)}
                     onContextMenu={openMenuFromRow}
                     onClick={(e) => toggleReveal(msg.id, e)}
+                    onKeyDown={(e) => toggleRevealFromKeyboard(msg.id, e)}
                   >
                     <span class="shell-msg-cont-ts" aria-hidden="true">
                       {fmtTime(msg.time)}
@@ -631,18 +864,9 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                         )}
                       </Show>
                       <MsgBody msg={msg} selfNick={selfNick()} onChannelClick={(name) => getState().navigate({ kind: 'channel', channel: name })} />
-                      <Show when={hasReactions()}>
-                        <div class="shell-reactions" role="group" aria-label="Reactions">
-                          <For each={msg.reactions ?? []}>
-                            {(reaction) => (
-                              <ReactionPill
-                                reaction={reaction}
-                                target={activeTarget()}
-                                messageId={msg.id}
-                                selfNick={selfNick()}
-                              />
-                            )}
-                          </For>
+                      <Show when={hasBoosts()}>
+                        <div class="shell-boosts">
+                          <BoostBar boosts={boostGroups()} onBoost={toggleBoost} />
                         </div>
                       </Show>
                       <Show when={hasThread()}>
@@ -668,9 +892,12 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                     msg.pending ? 'shell-msg-pending' : '',
                   ].filter(Boolean).join(' ')}
                   data-message-search-id={msg.id}
-                  aria-label={`${msg.from} at ${fmtTime(msg.time)}`}
+                  role="article"
+                  tabIndex={0}
+                  aria-label={messageAccessibleLabel(msg)}
                   onContextMenu={openMenuFromRow}
                   onClick={(e) => toggleReveal(msg.id, e)}
+                  onKeyDown={(e) => toggleRevealFromKeyboard(msg.id, e)}
                 >
                   <MessageMenu
                     msg={msg}
@@ -712,18 +939,9 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                       )}
                     </Show>
                     <MsgBody msg={msg} selfNick={selfNick()} onChannelClick={(name) => getState().navigate({ kind: 'channel', channel: name })} />
-                    <Show when={hasReactions()}>
-                      <div class="shell-reactions" role="group" aria-label="Reactions">
-                        <For each={msg.reactions ?? []}>
-                          {(reaction) => (
-                            <ReactionPill
-                              reaction={reaction}
-                              target={activeTarget()}
-                              messageId={msg.id}
-                              selfNick={selfNick()}
-                            />
-                          )}
-                        </For>
+                    <Show when={hasBoosts()}>
+                      <div class="shell-boosts">
+                        <BoostBar boosts={boostGroups()} onBoost={toggleBoost} />
                       </div>
                     </Show>
                     <Show when={hasThread()}>

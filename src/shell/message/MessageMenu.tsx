@@ -29,7 +29,8 @@ import { getState, useStore, selectChannelPins, selectIsChannelOp } from '@/lib/
 import type { ChatMessage } from '@/lib/irc/types';
 import { Popover } from '@/primitives/index';
 import { searchEmojis } from '@/lib/emoji/emoji';
-import { CopyIcon, EditIcon, OverflowIcon, PinIcon, ReactIcon, ReplyIcon, TrashIcon } from './icons';
+import { isValidTopicLabel } from '@/lib/topics/topics';
+import { CopyIcon, EditIcon, OverflowIcon, PinIcon, ReactIcon, ReplyIcon, TopicIcon, TrashIcon } from './icons';
 
 import './message-menu.css';
 
@@ -41,6 +42,8 @@ export type MessageMenuCapabilities = {
   canReact: boolean;
   /** Copy is offered whenever there is real text to copy. */
   canCopy: boolean;
+  /** Start a named conversation from this message; channel messages only. */
+  canStartTopic: boolean;
   /** Edit: own, non-deleted, plain text message, and editing is enabled. */
   canEdit: boolean;
   /** Delete: own, non-deleted message (store supports redaction). */
@@ -54,6 +57,8 @@ export type CapabilityInput = {
   editingEnabled: boolean;
   /** store exposes a delete/redact action */
   deleteSupported: boolean;
+  /** true when the target accepts named-conversation topic tags */
+  channelTarget: boolean;
 };
 
 /**
@@ -70,9 +75,27 @@ export function messageMenuCapabilities(input: CapabilityInput): MessageMenuCapa
     canReply: !gone,
     canReact: !gone,
     canCopy: hasText,
+    canStartTopic: !gone && input.channelTarget && hasText,
     canEdit: !gone && isOwn && editingEnabled && msg.type === 'msg',
     canDelete: !gone && isOwn && deleteSupported,
   };
+}
+
+export function suggestTopicLabelFromMessage(text: string): string | null {
+  const normalized = text
+    .replace(/https?:\/\/\S+/giu, '')
+    .replace(/[`*_~>#[\]()+={}]/gu, ' ')
+    .replace(/\s+/gu, ' ')
+    .trim();
+  if (!normalized) return null;
+
+  const words = normalized.split(' ').filter(Boolean).slice(0, 6);
+  while (words.length > 0) {
+    const candidate = words.join(' ').replace(/[,:;.!?]+$/u, '').trim();
+    if (isValidTopicLabel(candidate)) return candidate;
+    words.pop();
+  }
+  return null;
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -100,6 +123,11 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
     'onMenuOpenChange',
   ]);
 
+  const isChannelTarget = createMemo(() => {
+    const t = local.target;
+    return t.length > 0 && (t[0] === '#' || t[0] === '&');
+  });
+
   // ── capability gating ──
   const caps = createMemo(() =>
     messageMenuCapabilities({
@@ -109,6 +137,7 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
       // Delete rides IRCv3 REDACT via store.deleteMessage; it always exists on
       // the store, so the affordance is governed purely by ownership/state.
       deleteSupported: true,
+      channelTarget: isChannelTarget(),
     }),
   );
 
@@ -139,6 +168,23 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
     setMenuOpen(false);
   }
 
+  function startTopic(): void {
+    if (!caps().canStartTopic) return;
+    const topic = suggestTopicLabelFromMessage(local.msg.plaintext ?? local.msg.text);
+    if (!topic) {
+      getState().addToast({
+        variant: 'warning',
+        title: 'Topic not started',
+        description: 'This message does not contain a usable topic label.',
+      });
+      setMenuOpen(false);
+      return;
+    }
+    getState().setActiveChannelTopic(local.target, topic);
+    getState().setReplyingTo(local.msg);
+    setMenuOpen(false);
+  }
+
   function edit(): void {
     if (!caps().canEdit) return;
     getState().setComposerEditingMessage(local.msg);
@@ -163,10 +209,6 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
   }
 
   // Pin/unpin (ops only, channels only). Reactive to the live PINS prop.
-  const isChannelTarget = createMemo(() => {
-    const t = local.target;
-    return t.length > 0 && (t[0] === '#' || t[0] === '&');
-  });
   const canPin = useStore((s) => isChannelTarget() && selectIsChannelOp(local.target)(s));
   const isPinned = useStore((s) => selectChannelPins(local.target)(s).includes(local.msg.id));
   function togglePin(): void {
@@ -312,6 +354,12 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
               <button type="button" class="msg-menu-item" role="menuitem" onClick={reply}>
                 <ReplyIcon class="msg-menu-item-icon" />
                 <span>Reply</span>
+              </button>
+            </Show>
+            <Show when={caps().canStartTopic}>
+              <button type="button" class="msg-menu-item" role="menuitem" onClick={startTopic}>
+                <TopicIcon class="msg-menu-item-icon" />
+                <span>Start topic from here</span>
               </button>
             </Show>
             <Show when={caps().canEdit}>

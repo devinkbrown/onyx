@@ -271,6 +271,10 @@ export function Connect(props: ConnectProps): JSX.Element {
           origin: window.location.origin,
         })
       : null;
+  const suggestedGuestNick =
+    inviteCard?.guestName && !validateNick(inviteCard.guestName)
+      ? inviteCard.guestName
+      : '';
 
   // Optional room to join after connect (there is NO automatic join). The
   // field prefills from the ?join= deep link; on submit it becomes the
@@ -287,7 +291,7 @@ export function Connect(props: ConnectProps): JSX.Element {
   }
 
   // ── Shared form state ──────────────────────────────────────────────────────
-  const [nick, setNick] = createSignal('');
+  const [nick, setNick] = createSignal(suggestedGuestNick);
   const [password, setPassword] = createSignal('');
   const [staySignedIn, setStaySignedIn] = createSignal(true);
 

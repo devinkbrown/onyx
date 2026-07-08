@@ -10,6 +10,7 @@ import {
 } from './browser';
 import { calmPreset, classifyNotification, type CalmContext } from './calmMode';
 import { shouldNotify } from './decision';
+import { isFollowed } from './followed';
 
 const DESKTOP_THROTTLE_MS = 6000;
 const SOUND_THROTTLE_MS = 1500;
@@ -21,7 +22,7 @@ interface PendingDesktop {
 }
 
 function notificationTarget(note: StoreNotification): { key: string; label: string; navigate: () => void } | null {
-  if (note.type === 'mention' && note.channel) {
+  if ((note.type === 'mention' || note.type === 'follow') && note.channel) {
     const channel = note.channel;
     return {
       key: channel.toLowerCase(),
@@ -56,6 +57,7 @@ function focusApp(): void {
 
 function titleFor(note: StoreNotification, targetLabel: string): string {
   if (note.type === 'dm') return `Direct message from ${note.from ?? targetLabel}`;
+  if (note.type === 'follow') return `${note.from ?? 'Someone'} posted in ${targetLabel}`;
   return `${note.from ?? 'Someone'} mentioned you in ${targetLabel}`;
 }
 
@@ -123,7 +125,7 @@ export function NotificationRuntime(): null {
       const calmContext: CalmContext = {
         isMention: note.type === 'mention',
         isDirect: note.type === 'dm',
-        isFollowed: false,
+        isFollowed: note.type === 'follow' || (!!note.channel && (isFollowed(note.channel, note.topic) || isFollowed(note.channel))),
         isBoost: false,
       };
       if (classifyNotification(calmPreset(), calmContext) !== 'notify') return;

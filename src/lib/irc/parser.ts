@@ -107,6 +107,16 @@ function unescapeTagValue(val: string): string {
     .replace(/\\n/g, '\n');
 }
 
+/** Escape a tag value per IRCv3 spec. */
+export function escapeTagValue(val: string): string {
+  return val
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\:')
+    .replace(/ /g, '\\s')
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n');
+}
+
 /**
  * Format a raw IRC line to send.
  * Appends \r\n.

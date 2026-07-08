@@ -31,6 +31,7 @@ import {
 import {
   useStore,
   getState,
+  selectChannelEphemeralSeconds,
   selectChannelModeState,
   selectIsChannelOp,
 } from '@/lib/store';
@@ -46,6 +47,24 @@ const FLAG_TOGGLES: ReadonlyArray<{ letter: string; label: string; hint: string 
   { letter: 's', label: 'Secret', hint: 'Hide the channel from listings (+s)' },
 ];
 
+const EPHEMERAL_PRESETS: ReadonlyArray<{ seconds: number; label: string }> = [
+  { seconds: 0, label: 'Off' },
+  { seconds: 3600, label: '1 hour' },
+  { seconds: 86_400, label: '1 day' },
+  { seconds: 604_800, label: '7 days' },
+  { seconds: 2_592_000, label: '30 days' },
+];
+
+function formatEphemeral(seconds: number | null): string {
+  if (!seconds) return 'Full history';
+  const preset = EPHEMERAL_PRESETS.find((p) => p.seconds === seconds);
+  if (preset && preset.seconds !== 0) return preset.label;
+  if (seconds % 86_400 === 0) return `${seconds / 86_400} days`;
+  if (seconds % 3600 === 0) return `${seconds / 3600} hours`;
+  if (seconds % 60 === 0) return `${seconds / 60} minutes`;
+  return `${seconds} seconds`;
+}
+
 export type ChannelSettingsProps = {
   /** The active channel name (e.g. "#general"). */
   channel: string;
@@ -58,6 +77,8 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
 
   const channels = useStore((s) => s.channels);
   const modeState = useStore((s) => selectChannelModeState(local.channel)(s));
+  const ephemeralSeconds = useStore((s) => selectChannelEphemeralSeconds(local.channel)(s));
+  const serviceNotices = useStore((s) => s.serviceNotices);
   const isOp = useStore((s) => selectIsChannelOp(local.channel)(s));
 
   const channel = createMemo(() =>
@@ -133,6 +154,51 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
     if (!Number.isFinite(n) || n <= 0) return;
     if (n === current) return;
     getState().setChannelMode(name, '+l', String(n));
+  }
+
+  // ── Ephemeral history (IRCX EPHEMERAL prop) ─────────────────────────────
+  const [ephemeralDraft, setEphemeralDraft] = createSignal('0');
+  createEffect(() => {
+    if (local.open) setEphemeralDraft(String(ephemeralSeconds() ?? 0));
+  });
+
+  function applyEphemeral(event: Event): void {
+    event.preventDefault();
+    if (!isOp()) return;
+    const seconds = Number(ephemeralDraft());
+    if (!Number.isInteger(seconds)) return;
+    if (seconds === (ephemeralSeconds() ?? 0)) return;
+    getState().setChannelEphemeral(channel()?.name ?? local.channel, seconds);
+  }
+
+  // ── Incoming webhooks (WEBHOOK command) ─────────────────────────────────
+  const [webhookName, setWebhookName] = createSignal('ci');
+  const [webhookDeleteId, setWebhookDeleteId] = createSignal('');
+  const webhookNotices = createMemo(() =>
+    serviceNotices()
+      .filter((notice) => notice.source === 'Webhook')
+      .slice(-4)
+      .reverse(),
+  );
+
+  function createWebhook(event: Event): void {
+    event.preventDefault();
+    if (!isOp()) return;
+    getState().webhookCreate(channel()?.name ?? local.channel, webhookName());
+  }
+
+  function listWebhooks(): void {
+    if (!isOp()) return;
+    getState().webhookList(channel()?.name ?? local.channel);
+  }
+
+  function deleteWebhook(event: Event): void {
+    event.preventDefault();
+    if (!isOp()) return;
+    const id = webhookDeleteId().trim();
+    if (!id) return;
+    getState().webhookDelete(id);
+    setWebhookDeleteId('');
   }
 
   // Read-only summary for non-ops (and a quick glance for ops).
@@ -267,6 +333,101 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
               />
               <Button type="submit" variant="ghost" size="sm">Apply limit</Button>
             </form>
+          </Show>
+        </section>
+
+        {/* ── History retention ── */}
+        <section class="shell-chset-section" aria-labelledby="chset-history-heading">
+          <h3 id="chset-history-heading" class="shell-chset-heading">History</h3>
+
+          <Show
+            when={isOp()}
+            fallback={
+              <div class="shell-chset-readonly">
+                <p class="shell-chset-readonly-label">Ephemeral history</p>
+                <p class="shell-chset-readonly-value shell-chset-modes-mono">
+                  {formatEphemeral(ephemeralSeconds())}
+                </p>
+                <p class="shell-chset-hint">Only ops can change history retention.</p>
+              </div>
+            }
+          >
+            <form onSubmit={applyEphemeral} class="shell-chset-param shell-chset-retention">
+              <label class="shell-chset-label" for="chset-ephemeral">Ephemeral history</label>
+              <select
+                id="chset-ephemeral"
+                class="shell-chset-select"
+                value={ephemeralDraft()}
+                aria-describedby="chset-ephemeral-hint"
+                onChange={(e) => setEphemeralDraft(e.currentTarget.value)}
+              >
+                <For each={EPHEMERAL_PRESETS}>
+                  {(preset) => <option value={String(preset.seconds)}>{preset.label}</option>}
+                </For>
+              </select>
+              <p id="chset-ephemeral-hint" class="shell-chset-hint">
+                When enabled, replay and search omit messages older than this window, and channel stats skip new messages.
+              </p>
+              <Button type="submit" variant="ghost" size="sm" disabled={ephemeralDraft() === String(ephemeralSeconds() ?? 0)}>
+                Apply retention
+              </Button>
+            </form>
+          </Show>
+        </section>
+
+        {/* ── Integrations ── */}
+        <section class="shell-chset-section" aria-labelledby="chset-integrations-heading">
+          <h3 id="chset-integrations-heading" class="shell-chset-heading">Integrations</h3>
+
+          <Show
+            when={isOp()}
+            fallback={
+              <div class="shell-chset-readonly">
+                <p class="shell-chset-readonly-label">Incoming webhooks</p>
+                <p class="shell-chset-readonly-value">Managed by channel ops.</p>
+                <p class="shell-chset-hint">Discord-compatible webhook URLs can post into this channel.</p>
+              </div>
+            }
+          >
+            <div class="shell-chset-webhooks">
+              <form onSubmit={createWebhook} class="shell-chset-param">
+                <FormField
+                  id="chset-webhook-name"
+                  label="Webhook name"
+                  description="The created URL is shown once in server notices."
+                  type="text"
+                  value={webhookName()}
+                  maxLength={32}
+                  onInput={(e) => setWebhookName(e.currentTarget.value)}
+                />
+                <div class="shell-chset-inline-actions">
+                  <Button type="submit" variant="ghost" size="sm">Create webhook</Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={listWebhooks}>List webhooks</Button>
+                </div>
+              </form>
+
+              <form onSubmit={deleteWebhook} class="shell-chset-param">
+                <FormField
+                  id="chset-webhook-delete"
+                  label="Delete webhook id"
+                  description="Use WEBHOOK LIST if you do not know the id."
+                  type="text"
+                  value={webhookDeleteId()}
+                  onInput={(e) => setWebhookDeleteId(e.currentTarget.value)}
+                />
+                <Button type="submit" variant="ghost" size="sm" disabled={!webhookDeleteId().trim()}>
+                  Delete webhook
+                </Button>
+              </form>
+
+              <Show when={webhookNotices().length > 0}>
+                <div class="shell-chset-notices" aria-live="polite">
+                  <For each={webhookNotices()}>
+                    {(notice) => <p class="shell-chset-notice">{notice.text}</p>}
+                  </For>
+                </div>
+              </Show>
+            </div>
           </Show>
         </section>
       </div>

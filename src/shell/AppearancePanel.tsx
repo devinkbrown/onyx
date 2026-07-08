@@ -9,12 +9,13 @@
  * SOLID IDIOMS: never destructure props; For/Show; createMemo; useStore accessor.
  */
 
-import { createMemo, For, type JSX } from 'solid-js';
+import { createMemo, createSignal, For, Show, type JSX } from 'solid-js';
 import { Sheet } from '@/primitives';
 import { useStore, getState } from '@/lib/store';
-import { useThemeOptional, THEMES, THEME_IDS, customThemeTokens } from '@/theme';
+import { useThemeOptional, THEMES, THEME_IDS, customThemeTokens, getCustomTheme, type CustomTheme } from '@/theme';
 import { backgroundOptions } from '@/backgrounds';
 import { AUTO_BACKGROUND_ID } from './themeBackground';
+import { ThemeImportDialog } from './ThemeImportDialog';
 
 type ThemeEntry = { id: string; label: string; title: string; swatch: string[]; custom: boolean };
 
@@ -31,6 +32,7 @@ export function AppearancePanel(): JSX.Element {
   const theme = useThemeOptional();
   const open = useStore((s) => s.showAppearance);
   const backgroundId = useStore((s) => s.backgroundId);
+  const [themeDialogOpen, setThemeDialogOpen] = createSignal(false);
 
   // Built-in themes followed by the user's saved custom themes.
   const themeEntries = createMemo<ThemeEntry[]>(() => {
@@ -51,86 +53,115 @@ export function AppearancePanel(): JSX.Element {
     return [...builtin, ...custom];
   });
 
+  const shareTheme = createMemo<CustomTheme | undefined>(() => {
+    const active = theme.themeId();
+    return getCustomTheme(active);
+  });
+
+  function importTheme(imported: CustomTheme): void {
+    const id = theme.saveCustom(imported.name, imported.base, imported.overrides);
+    theme.setTheme(id);
+  }
+
   return (
-    <Sheet
-      open={open()}
-      title="Appearance"
-      description="Theme and background — applied live."
-      onOpenChange={(next) => (next ? getState().openAppearance() : getState().closeAppearance())}
-      closeLabel="Close appearance"
-    >
-      <div class="ap-panel" data-testid="appearance-panel">
-        {/* ── Theme ── */}
-        <section class="ap-panel-group">
-          <h3 class="ap-panel-label">Theme</h3>
-          <div class="ap-panel-themes" role="radiogroup" aria-label="Theme">
-            <For each={themeEntries()}>
-              {(entry) => {
-                const active = () => theme.themeId() === entry.id;
-                return (
-                  <button
-                    type="button"
-                    class="ap-theme-chip"
-                    classList={{ 'ap-theme-chip--on': active(), 'ap-theme-chip--custom': entry.custom }}
-                    role="radio"
-                    aria-checked={active()}
-                    aria-label={`${entry.label} theme`}
-                    title={entry.title}
-                    onClick={() => theme.setTheme(entry.id)}
-                  >
-                    <span class="ap-theme-swatch" aria-hidden="true">
-                      <For each={entry.swatch}>{(c) => <span style={{ background: c }} />}</For>
-                    </span>
-                    <span class="ap-theme-name">{entry.label}</span>
-                  </button>
-                );
-              }}
-            </For>
-          </div>
-        </section>
+    <>
+      <Sheet
+        open={open()}
+        title="Appearance"
+        description="Theme and background — applied live."
+        onOpenChange={(next) => (next ? getState().openAppearance() : getState().closeAppearance())}
+        closeLabel="Close appearance"
+      >
+        <div class="ap-panel" data-testid="appearance-panel">
+          {/* ── Theme ── */}
+          <section class="ap-panel-group">
+            <div class="ap-panel-heading-row">
+              <h3 class="ap-panel-label">Theme</h3>
+              <button
+                type="button"
+                class="ap-panel-link"
+                onClick={() => setThemeDialogOpen(true)}
+              >
+                Share / import
+              </button>
+            </div>
+            <div class="ap-panel-themes" role="radiogroup" aria-label="Theme">
+              <For each={themeEntries()}>
+                {(entry) => {
+                  const active = () => theme.themeId() === entry.id;
+                  return (
+                    <button
+                      type="button"
+                      class="ap-theme-chip"
+                      classList={{ 'ap-theme-chip--on': active(), 'ap-theme-chip--custom': entry.custom }}
+                      role="radio"
+                      aria-checked={active()}
+                      aria-label={`${entry.label} theme`}
+                      title={entry.title}
+                      onClick={() => theme.setTheme(entry.id)}
+                    >
+                      <span class="ap-theme-swatch" aria-hidden="true">
+                        <For each={entry.swatch}>{(c) => <span style={{ background: c }} />}</For>
+                      </span>
+                      <span class="ap-theme-name">{entry.label}</span>
+                    </button>
+                  );
+                }}
+              </For>
+            </div>
+          </section>
 
-        {/* ── Background ── */}
-        <section class="ap-panel-group">
-          <h3 class="ap-panel-label">Background</h3>
-          <div class="ap-panel-bgs" role="radiogroup" aria-label="Background">
-            <button
-              type="button"
-              class="ap-bg-chip"
-              classList={{ 'ap-bg-chip--on': backgroundId() === AUTO_BACKGROUND_ID }}
-              role="radio"
-              aria-checked={backgroundId() === AUTO_BACKGROUND_ID}
-              aria-label="Auto — theme-matched background"
-              onClick={() => getState().setBackground(AUTO_BACKGROUND_ID)}
-            >
-              <span class="ap-bg-name">Auto</span>
-              <span class="ap-bg-kind" data-kind="animated">match theme</span>
-            </button>
-            <For each={backgroundOptions}>
-              {(opt) => {
-                const active = () => backgroundId() === opt.id;
-                return (
-                  <button
-                    type="button"
-                    class="ap-bg-chip"
-                    classList={{ 'ap-bg-chip--on': active() }}
-                    role="radio"
-                    aria-checked={active()}
-                    onClick={() => getState().setBackground(opt.id)}
-                  >
-                    <span class="ap-bg-name">{opt.label}</span>
-                    <span class="ap-bg-kind" data-kind={opt.kind}>{opt.kind}</span>
-                  </button>
-                );
-              }}
-            </For>
-          </div>
-        </section>
+          {/* ── Background ── */}
+          <section class="ap-panel-group">
+            <h3 class="ap-panel-label">Background</h3>
+            <div class="ap-panel-bgs" role="radiogroup" aria-label="Background">
+              <button
+                type="button"
+                class="ap-bg-chip"
+                classList={{ 'ap-bg-chip--on': backgroundId() === AUTO_BACKGROUND_ID }}
+                role="radio"
+                aria-checked={backgroundId() === AUTO_BACKGROUND_ID}
+                aria-label="Auto — theme-matched background"
+                onClick={() => getState().setBackground(AUTO_BACKGROUND_ID)}
+              >
+                <span class="ap-bg-name">Auto</span>
+                <span class="ap-bg-kind" data-kind="animated">match theme</span>
+              </button>
+              <For each={backgroundOptions}>
+                {(opt) => {
+                  const active = () => backgroundId() === opt.id;
+                  return (
+                    <button
+                      type="button"
+                      class="ap-bg-chip"
+                      classList={{ 'ap-bg-chip--on': active() }}
+                      role="radio"
+                      aria-checked={active()}
+                      onClick={() => getState().setBackground(opt.id)}
+                    >
+                      <span class="ap-bg-name">{opt.label}</span>
+                      <span class="ap-bg-kind" data-kind={opt.kind}>{opt.kind}</span>
+                    </button>
+                  );
+                }}
+              </For>
+            </div>
+          </section>
 
-        {/* ── Deep customization ── */}
-        <a class="ap-panel-studio" href="/appearance">
-          Open the full Theme Studio →
-        </a>
-      </div>
-    </Sheet>
+          {/* ── Deep customization ── */}
+          <a class="ap-panel-studio" href="/appearance">
+            Open the full Theme Studio →
+          </a>
+        </div>
+      </Sheet>
+      <Show when={open()}>
+        <ThemeImportDialog
+          open={themeDialogOpen()}
+          onClose={() => setThemeDialogOpen(false)}
+          onImport={importTheme}
+          shareTheme={shareTheme()}
+        />
+      </Show>
+    </>
   );
 }

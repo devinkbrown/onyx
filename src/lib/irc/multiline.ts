@@ -20,6 +20,8 @@
  * the chunking maths is unit-testable without a socket.
  */
 
+import { escapeTagValue } from './parser';
+
 export interface MultilineLimits {
   /** Max total bytes of message content per batch (sum of line payloads). */
   maxBytes: number;
@@ -179,7 +181,7 @@ export function buildMultilineLines(
     const tagStr =
       batchIdx === 0
         ? Object.entries(firstLineTags)
-            .map(([k, v]) => (v ? `${k}=${v}` : k))
+            .map(([k, v]) => (v ? `${k}=${escapeTagValue(v)}` : k))
             .join(';')
         : '';
     lines.push(`${tagStr ? `@${tagStr} ` : ''}BATCH +${ref} draft/multiline ${target}\r\n`);

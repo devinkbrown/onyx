@@ -1,5 +1,3 @@
-'use client';
-
 /*
  * OpcodecWasm.ts — TypeScript wrapper for the opcodec WASM module.
  *

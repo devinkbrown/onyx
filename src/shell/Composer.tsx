@@ -78,6 +78,7 @@ export function Composer(props: ComposerProps): JSX.Element {
 
   const activeView = useStore((s) => s.activeView);
   const connectionStatus = useStore((s) => s.connectionStatus);
+  const activeChannelTopics = useStore((s) => s.activeChannelTopics);
   const replyingTo = useStore((s) => s.replyingTo);
   const editingMessage = useStore((s) => s.editingMessage);
 
@@ -121,6 +122,11 @@ export function Composer(props: ComposerProps): JSX.Element {
   // Attachments are the exception: uploads need the network right now.
   const isOffline = createMemo(() => connectionStatus() !== 'connected');
   const isEnabled = createMemo(() => !!target());
+  const activeTopic = createMemo(() => {
+    const view = activeView();
+    if (view.kind !== 'channel') return null;
+    return activeChannelTopics().get(view.channel.toLowerCase()) ?? null;
+  });
 
   const placeholder = createMemo(() => {
     const t = target();
@@ -492,6 +498,11 @@ export function Composer(props: ComposerProps): JSX.Element {
     setComposerText(t ? getState().getComposerDraft(t) : '', false);
   }
 
+  function clearTopic(): void {
+    const view = activeView();
+    if (view.kind === 'channel') getState().setActiveChannelTopic(view.channel, null);
+  }
+
   return (
     <section
       class={[
@@ -505,6 +516,18 @@ export function Composer(props: ComposerProps): JSX.Element {
       onDrop={handleDrop}
     >
       <div class="shell-composer-measure">
+      <Show when={activeTopic()}>
+        {(topic) => (
+          <div class="shell-composer-topic" role="status" aria-live="polite">
+            <span class="shell-composer-topic-label">topic</span>
+            <span class="shell-composer-topic-name">#{topic()}</span>
+            <button type="button" class="shell-composer-topic-clear" aria-label={`Clear topic ${topic()}`} onClick={clearTopic}>
+              ×
+            </button>
+          </div>
+        )}
+      </Show>
+
       <Show when={replyingTo()}>
         {(reply) => (
           <div class="shell-composer-context" role="status" aria-live="polite">

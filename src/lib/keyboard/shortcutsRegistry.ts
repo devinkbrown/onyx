@@ -27,7 +27,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
   },
   {
     id: 'composer.focus',
-    chord: { key: '/' },
+    chord: { key: 'Enter' },
     label: 'Focus message composer',
     group: 'Composing',
   },
@@ -60,6 +60,18 @@ export const SHORTCUTS: readonly Shortcut[] = [
     chord: { key: 'ArrowUp', alt: true },
     label: 'Previous channel',
     group: 'Navigation',
+  },
+  {
+    id: 'navigation.unread.next',
+    chord: { key: 'n' },
+    label: 'Jump to next unread',
+    group: 'Navigation',
+  },
+  {
+    id: 'conversation.follow.toggle',
+    chord: { key: 'u' },
+    label: 'Follow current conversation',
+    group: 'Reading',
   },
   {
     id: 'reader.mode.toggle',

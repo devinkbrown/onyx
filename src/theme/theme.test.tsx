@@ -131,6 +131,19 @@ describe('ThemeProvider', () => {
     expect(document.documentElement.getAttribute('data-theme')).toBe('obsidian');
   });
 
+  it('normalizes old stored theme names into the current theme ids', () => {
+    localStorage.setItem('onyx:theme', 'lacquer');
+
+    render(() => (
+      <ThemeProvider>
+        <ThemeIdDisplay />
+      </ThemeProvider>
+    ));
+
+    expect(screen.getByTestId('theme-id').textContent).toBe('shu');
+    expect(document.documentElement.getAttribute('data-theme')).toBe('shu');
+  });
+
   it('falls back to the default when localStorage has an unknown value', () => {
     localStorage.setItem('onyx:theme', 'unknown-theme-xyz');
 

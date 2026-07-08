@@ -101,3 +101,14 @@ export function PinIcon(props: IconProps): JSX.Element {
     </Svg>
   );
 }
+
+export function TopicIcon(props: IconProps): JSX.Element {
+  return (
+    <Svg class={props.class}>
+      <path d="M10 4 8 20" />
+      <path d="M16 4l-2 16" />
+      <path d="M5 9h14" />
+      <path d="M4 15h14" />
+    </Svg>
+  );
+}

@@ -17,6 +17,8 @@ import {
 } from './store';
 import type { Channel, ChannelUser } from '@/lib/irc/types';
 import { parseIRCMessage } from '@/lib/irc/parser';
+import { TOPIC_TAG } from '@/lib/topics/topics';
+import { follow, followed, unfollow } from '@/lib/notifications/followed';
 
 const initialState = store.getInitialState();
 
@@ -24,8 +26,10 @@ const initialState = store.getInitialState();
 function makeClient() {
   return {
     sendRaw: vi.fn(),
+    send: vi.fn(),
     isupport: { CHANTYPES: '#&', CHANMODES: ['beIZ', 'k', 'lfj', 'imnstCTNMSgWOA'] },
     negotiatedCaps: new Set<string>(),
+    capValues: new Map<string, string>(),
     modeToPrefix: { Q: '!', q: '.', o: '@', v: '+' } as Record<string, string>,
     prefixToMode: { '!': 'Q', '.': 'q', '@': 'o', '+': 'v' } as Record<string, string>,
   };
@@ -63,6 +67,7 @@ function seed(channelName: string, users: ChannelUser[], ourNick = 'me', modes =
     channels,
     ourNick,
     activeView: { kind: 'channel', channel: channelName.toLowerCase() },
+    connectionStatus: 'connected',
   }, true);
   return client;
 }
@@ -73,6 +78,8 @@ function feed(line: string): void {
 
 beforeEach(() => {
   store.setState(initialState, true);
+  for (const key of followed()) unfollow(key);
+  localStorage.clear();
 });
 
 // ── Raw command dispatch ────────────────────────────────────────────────────
@@ -126,6 +133,92 @@ describe('channel management — raw command dispatch', () => {
     const client = seed('#general', [makeUser('me', ['o'])]);
     store.getState().inviteUser('#general', 'carol');
     expect(client.sendRaw).toHaveBeenCalledWith('INVITE', 'carol', '#general');
+  });
+
+  it('webhook actions send WEBHOOK subcommands', () => {
+    const client = seed('#general', [makeUser('me', ['o'])]);
+    store.getState().webhookCreate('#general', 'ci bot');
+    store.getState().webhookList('#general');
+    store.getState().webhookDelete('wh_123');
+
+    expect(client.sendRaw).toHaveBeenNthCalledWith(1, 'WEBHOOK', 'CREATE', '#general', 'ci bot');
+    expect(client.sendRaw).toHaveBeenNthCalledWith(2, 'WEBHOOK', 'LIST', '#general');
+    expect(client.sendRaw).toHaveBeenNthCalledWith(3, 'WEBHOOK', 'DELETE', 'wh_123');
+  });
+
+  it('WEBHOOK notices route to service notices', () => {
+    seed('#general', [makeUser('me', ['o'])]);
+    feed(':server.test NOTICE me :WEBHOOK: created for #general - POST Discord webhook JSON to https://chat.example/api/webhooks/id/token');
+    expect(store.getState().serviceNotices.at(-1)).toMatchObject({
+      source: 'Webhook',
+      text: expect.stringContaining('WEBHOOK: created for #general'),
+    });
+  });
+
+  it('stores Orochi topic tags on channel messages', () => {
+    seed('#general', [makeUser('me', ['o'])]);
+    feed(`@${TOPIC_TAG}=roadmap;msgid=m-topic :alice!a@host PRIVMSG #general :next milestone`);
+
+    expect(store.getState().channels.get('#general')?.messages.at(-1)).toMatchObject({
+      id: 'm-topic',
+      text: 'next milestone',
+      topic: 'roadmap',
+    });
+  });
+
+  it('tags outbound messages with the active named conversation', () => {
+    const client = seed('#general', [makeUser('me', ['o'])]);
+    store.getState().setActiveChannelTopic('#general', 'release train');
+
+    store.getState().sendMessage('#general', 'ship it');
+
+    expect(client.send).toHaveBeenCalledWith('@orochi/topic=release\\strain PRIVMSG #general :ship it\r\n');
+    expect(store.getState().channels.get('#general')?.messages.at(-1)).toMatchObject({
+      text: 'ship it',
+      topic: 'release train',
+    });
+  });
+
+  it('refuses invalid active topic labels', () => {
+    seed('#general', [makeUser('me', ['o'])]);
+
+    store.getState().setActiveChannelTopic('#general', 'bad,label');
+
+    expect(store.getState().activeChannelTopics.has('#general')).toBe(false);
+  });
+
+  it('adds topic and reply tags to outbound multiline batches', () => {
+    const client = seed('#general', [makeUser('me', ['o'])]);
+    client.negotiatedCaps.add('draft/multiline');
+    store.getState().setActiveChannelTopic('#general', 'roadmap');
+    store.getState().setReplyingTo({
+      id: 'parent-1',
+      from: 'alice',
+      text: 'earlier',
+      time: new Date('2025-01-01T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    });
+
+    store.getState().sendMessage('#general', 'line one\nline two');
+
+    expect(client.send).toHaveBeenCalledWith(expect.stringMatching(/^@orochi\/topic=roadmap;\+draft\/reply=parent-1 BATCH \+/));
+  });
+
+  it('adds a follow notification for followed channel topics', () => {
+    seed('#general', [makeUser('me', ['o'])]);
+    store.setState({ activeView: { kind: 'home' } });
+    follow('#general', 'roadmap');
+
+    feed(`@${TOPIC_TAG}=roadmap;msgid=m-follow :alice!a@host PRIVMSG #general :quiet update`);
+
+    expect(store.getState().notifications.at(-1)).toMatchObject({
+      type: 'follow',
+      from: 'alice',
+      channel: '#general',
+      topic: 'roadmap',
+      text: 'quiet update',
+    });
   });
 
   it('opMember() toggles +o / -o', () => {

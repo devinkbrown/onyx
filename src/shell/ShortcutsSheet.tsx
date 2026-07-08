@@ -3,6 +3,7 @@
  */
 
 import { For, type JSX } from 'solid-js';
+import { SHORTCUTS, type ShortcutGroup as LiveShortcutGroup } from '@/lib/keyboard/useKeyboardShortcuts';
 import { Sheet } from '@/primitives';
 import './ShortcutsSheet.css';
 
@@ -16,44 +17,33 @@ export interface ShortcutGroup {
   shortcuts: Shortcut[];
 }
 
-export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
-  {
-    title: 'Navigation',
-    shortcuts: [
-      { label: 'Go to Home', keys: ['g', 'then', 'h'] },
-      { label: 'Next channel', keys: ['Alt', 'ArrowDown'] },
-      { label: 'Previous channel', keys: ['Alt', 'ArrowUp'] },
-      { label: 'Jump to date', keys: ['g', 'then', 'd'] },
-    ],
-  },
-  {
-    title: 'Composing',
-    shortcuts: [
-      { label: 'Focus composer', keys: ['Enter'] },
-      { label: 'Send message', keys: ['Ctrl', 'Enter'] },
-      { label: 'Insert a new line', keys: ['Shift', 'Enter'] },
-      { label: 'Open command palette', keys: ['Ctrl', 'K'] },
-      { label: 'Open command palette', keys: ['⌘', 'K'] },
-    ],
-  },
-  {
-    title: 'Reading',
-    shortcuts: [
-      { label: 'Close sheet or menu', keys: ['Esc'] },
-      { label: 'Search current channel', keys: ['Ctrl', 'F'] },
-      { label: 'Search current channel', keys: ['⌘', 'F'] },
-      { label: 'Jump to unread', keys: ['u'] },
-    ],
-  },
-  {
-    title: 'Appearance',
-    shortcuts: [
-      { label: 'Toggle Reader mode', keys: ['r'] },
-      { label: 'Open preferences', keys: ['Ctrl', ','] },
-      { label: 'Open preferences', keys: ['⌘', ','] },
-    ],
-  },
-];
+const GROUP_ORDER: readonly LiveShortcutGroup[] = ['Palette', 'Navigation', 'Chat', 'View', 'Voice & Video'];
+
+function tokenizeChord(chord: string): string[] {
+  if (chord.includes(' then ')) return chord.split(' ');
+  const expanded = chord
+    .replace('⌘⇧', '⌘+Shift+')
+    .replace(/^⌘(?=.)/u, '⌘+');
+  return expanded.split('+').filter(Boolean);
+}
+
+function tokenizeKeys(keys: string): string[] {
+  return keys
+    .split(' / ')
+    .flatMap((chord, index) => (index === 0 ? tokenizeChord(chord) : ['/', ...tokenizeChord(chord)]));
+}
+
+export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = GROUP_ORDER
+  .map((group) => ({
+    title: group,
+    shortcuts: SHORTCUTS
+      .filter((shortcut) => shortcut.group === group)
+      .map((shortcut) => ({
+        label: shortcut.description,
+        keys: tokenizeKeys(shortcut.keys),
+      })),
+  }))
+  .filter((group) => group.shortcuts.length > 0);
 
 export function ShortcutsSheet(props: { open: boolean; onClose: () => void }): JSX.Element {
   return (

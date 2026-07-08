@@ -6,8 +6,18 @@
  * shell integration tests and e2e; here we pin the gating rules in isolation.
  */
 
-import { describe, expect, it } from 'vitest';
-import { messageMenuCapabilities, type CapabilityInput } from './MessageMenu';
+import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
+import { beforeEach, describe, expect, it } from 'vitest';
+import type { ChatMessage } from '@/lib/irc/types';
+import { store } from '@/lib/store/store';
+import { MessageMenu, messageMenuCapabilities, suggestTopicLabelFromMessage, type CapabilityInput } from './MessageMenu';
+
+const initialState = store.getInitialState();
+
+beforeEach(() => {
+  cleanup();
+  store.setState(initialState, true);
+});
 
 function input(overrides: Partial<CapabilityInput> = {}): CapabilityInput {
   const { msg: msgOverride, ...rest } = overrides;
@@ -15,6 +25,7 @@ function input(overrides: Partial<CapabilityInput> = {}): CapabilityInput {
     selfNick: 'alice',
     editingEnabled: true,
     deleteSupported: true,
+    channelTarget: true,
     ...rest,
     msg: {
       from: 'alice',
@@ -40,6 +51,7 @@ describe('messageMenuCapabilities', () => {
       canReply: true,
       canReact: true,
       canCopy: true,
+      canStartTopic: true,
       canEdit: true,
       canDelete: true,
     });
@@ -56,6 +68,7 @@ describe('messageMenuCapabilities', () => {
     expect(caps.canReply).toBe(true);
     expect(caps.canReact).toBe(true);
     expect(caps.canCopy).toBe(true);
+    expect(caps.canStartTopic).toBe(true);
     expect(caps.canEdit).toBe(false);
     expect(caps.canDelete).toBe(false);
   });
@@ -84,6 +97,7 @@ describe('messageMenuCapabilities', () => {
 
     // Assert
     expect(caps.canReact).toBe(false);
+    expect(caps.canStartTopic).toBe(false);
     expect(caps.canDelete).toBe(false);
   });
 
@@ -138,6 +152,18 @@ describe('messageMenuCapabilities', () => {
     expect(caps.canReply).toBe(true);
   });
 
+  it('does not offer topic starts for direct messages', () => {
+    // Arrange
+    const args = input({ channelTarget: false });
+
+    // Act
+    const caps = messageMenuCapabilities(args);
+
+    // Assert
+    expect(caps.canStartTopic).toBe(false);
+    expect(caps.canReply).toBe(true);
+  });
+
   it('matches nicks case-insensitively when deciding ownership', () => {
     // Arrange
     const args = input({ msg: { from: 'Alice', text: 'hi', type: 'msg' }, selfNick: 'alice' });
@@ -148,5 +174,55 @@ describe('messageMenuCapabilities', () => {
     // Assert
     expect(caps.canEdit).toBe(true);
     expect(caps.canDelete).toBe(true);
+  });
+});
+
+describe('suggestTopicLabelFromMessage', () => {
+  it('uses the first meaningful words from a message', () => {
+    expect(suggestTopicLabelFromMessage('Release blockers for mobile onboarding today')).toBe(
+      'Release blockers for mobile onboarding today',
+    );
+  });
+
+  it('strips markdown markers, links, and trailing punctuation', () => {
+    expect(suggestTopicLabelFromMessage('## `Deploy notes`: https://example.test/build')).toBe('Deploy notes');
+  });
+
+  it('shrinks long messages to a valid topic label', () => {
+    expect(suggestTopicLabelFromMessage('This is a very long incident investigation with many extra words')).toBe(
+      'This is a very long incident',
+    );
+  });
+
+  it('returns null when no usable label remains', () => {
+    expect(suggestTopicLabelFromMessage('https://example.test')).toBeNull();
+  });
+});
+
+describe('<MessageMenu>', () => {
+  it('starts a named conversation from a channel message', () => {
+    const msg: ChatMessage = {
+      id: 'm-topic',
+      from: 'alice',
+      text: 'Release blockers for mobile onboarding today',
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    };
+
+    render(() => (
+      <MessageMenu
+        msg={msg}
+        target="#general"
+        selfNick="bob"
+        canEdit={false}
+        menuOpen
+      />
+    ));
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Start topic from here' }));
+
+    expect(store.getState().activeChannelTopics.get('#general')).toBe('Release blockers for mobile onboarding today');
+    expect(store.getState().replyingTo).toMatchObject({ id: 'm-topic', from: 'alice' });
   });
 });

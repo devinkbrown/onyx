@@ -1,6 +1,6 @@
 export type DesktopNotificationPermission = NotificationPermission | 'unsupported';
 
-export type NotifyKind = 'mention' | 'dm' | 'system' | 'error';
+export type NotifyKind = 'mention' | 'dm' | 'follow' | 'system' | 'error';
 
 export interface NotifyDecisionInput {
   kind: NotifyKind;
@@ -45,7 +45,7 @@ export interface NotifyDecision {
 }
 
 export function isAlertKind(kind: NotifyKind): boolean {
-  return kind === 'mention' || kind === 'dm';
+  return kind === 'mention' || kind === 'dm' || kind === 'follow';
 }
 
 export function isAppInactive(pageVisible: boolean, appFocused: boolean): boolean {

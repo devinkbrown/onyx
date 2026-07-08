@@ -39,6 +39,7 @@ const initialState = store.getInitialState();
 
 beforeEach(() => {
   store.setState(initialState, true);
+  window.history.pushState({}, '', '/app');
   // Each test starts from a clean localStorage so a remembered session from one
   // test never bleeds into the next.
   try {
@@ -620,18 +621,22 @@ describe('optional room to join (no autojoin)', () => {
   });
 
   it('a filled room normalizes (# added) and queues the pending join on submit', () => {
+    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
     render(() => <Connect />);
     fireEvent.input(screen.getByLabelText(/nick/i), { target: { value: 'tester' } });
     fireEvent.input(screen.getByLabelText(/channel/i), { target: { value: 'lounge' } });
     fireEvent.click(screen.getByTestId('conn-submit'));
     expect(store.getState().pendingDeepLinkJoin).toBe('#lounge');
+    connectSpy.mockRestore();
   });
 
   it('an empty room leaves no pending join — landing on Home is the default', () => {
+    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
     render(() => <Connect />);
     fireEvent.input(screen.getByLabelText(/nick/i), { target: { value: 'tester' } });
     fireEvent.click(screen.getByTestId('conn-submit'));
     expect(store.getState().pendingDeepLinkJoin).toBeNull();
+    connectSpy.mockRestore();
   });
 
   it('a malformed room blocks submit with an error', () => {
@@ -640,5 +645,38 @@ describe('optional room to join (no autojoin)', () => {
     fireEvent.input(screen.getByLabelText(/channel/i), { target: { value: '#bad channel' } });
     fireEvent.click(screen.getByTestId('conn-submit'));
     expect(screen.getByText(/no spaces or commas/i)).toBeInTheDocument();
+  });
+
+  it('uses invite link channel and suggested guest nick as form defaults', () => {
+    window.history.pushState({}, '', '/app?join=%23general&as=yuki');
+
+    render(() => <Connect />);
+
+    expect(screen.getByRole('note', { name: /invite preview/i })).toHaveTextContent('Join #general');
+    expect(screen.getByLabelText(/nick/i)).toHaveValue('yuki');
+    expect(screen.getByLabelText(/channel/i)).toHaveValue('#general');
+  });
+
+  it('queues the invite room when connecting with the suggested guest nick', async () => {
+    window.history.pushState({}, '', '/app?join=%23general&as=yuki');
+    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
+
+    render(() => <Connect />);
+    fireEvent.click(screen.getByTestId('conn-submit'));
+
+    await waitFor(() => expect(connectSpy).toHaveBeenCalledOnce());
+    expect(connectSpy.mock.calls[0]![0].nick).toBe('yuki');
+    expect(store.getState().pendingDeepLinkJoin).toBe('#general');
+
+    connectSpy.mockRestore();
+  });
+
+  it('does not prefill an invalid invite guest nick', () => {
+    window.history.pushState({}, '', '/app?join=%23general&as=bad%20nick');
+
+    render(() => <Connect />);
+
+    expect(screen.getByLabelText(/nick/i)).toHaveValue('');
+    expect(screen.getByLabelText(/channel/i)).toHaveValue('#general');
   });
 });

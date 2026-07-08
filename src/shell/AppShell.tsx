@@ -26,7 +26,7 @@
 
 import './shell.css';
 
-import { lazy, createMemo, createSignal, onCleanup, onMount, Show, splitProps, type JSX } from 'solid-js';
+import { lazy, createEffect, createMemo, createSignal, onCleanup, onMount, Show, splitProps, type JSX } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
 import { useThemeOptional } from '@/theme';
 import { Background } from '@/backgrounds/index';
@@ -61,10 +61,16 @@ import { applySceneMotion } from '@/lib/prefs/sceneMotion';
 import { applyCalmPreset } from '@/lib/notifications/calmMode';
 import { Spotlight } from '@/chat/spotlight';
 import { useSpotlightHotkeys } from '@/chat/spotlight/useSpotlight';
-import { KeyboardHelpOverlay } from './KeyboardHelpOverlay';
+import { ShortcutsSheet } from './ShortcutsSheet';
 import { useKeyboardShortcuts } from '@/lib/keyboard/useKeyboardShortcuts';
 import { MessageSearch } from './search/MessageSearch';
 import { hasMessageSearchableConversation, openMessageSearch } from './search/useMessageSearch';
+import {
+  forcedColors,
+  prefersMoreContrast,
+  prefersReducedMotion,
+  prefersReducedTransparency,
+} from '@/lib/a11y/mediaPrefs';
 
 // ── AppShell props ───────────────────────────────────────────────────────────
 
@@ -121,6 +127,15 @@ function handleMessageSearchHotkey(event: KeyboardEvent): void {
   openMessageSearch();
 }
 
+function applyA11yMediaAttributes(): void {
+  if (typeof document === 'undefined') return;
+  const root = document.documentElement;
+  root.dataset.prefersReducedMotion = String(prefersReducedMotion());
+  root.dataset.prefersMoreContrast = String(prefersMoreContrast());
+  root.dataset.prefersReducedTransparency = String(prefersReducedTransparency());
+  root.dataset.forcedColors = String(forcedColors());
+}
+
 // ── AppShell ─────────────────────────────────────────────────────────────────
 
 export function AppShell(props: AppShellProps): JSX.Element {
@@ -132,6 +147,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const mobileSidebarOpen = useStore((s) => s.mobileSidebarOpen);
   const ourNick = useStore((s) => s.ourNick);
   const showAccount = useStore((s) => s.showAccount);
+  const showKeyboardShortcuts = useStore((s) => s.showKeyboardShortcuts);
 
   // ── Global keyboard shortcuts (palette, nav, member list, composer, help) ──
   // useSpotlightHotkeys wires Cmd/Ctrl+K and "/" → open spotlight.
@@ -140,6 +156,10 @@ export function AppShell(props: AppShellProps): JSX.Element {
   // Both register/clean-up their window listeners via onMount/onCleanup.
   useSpotlightHotkeys();
   useKeyboardShortcuts();
+
+  createEffect(() => {
+    applyA11yMediaAttributes();
+  });
 
   onMount(() => {
     window.addEventListener('keydown', handleMessageSearchHotkey);
@@ -407,10 +427,8 @@ export function AppShell(props: AppShellProps): JSX.Element {
       {/* Command palette — self-gates on spotlight.isOpen() */}
       <Spotlight />
 
-      {/* Keyboard shortcuts help overlay — self-gates on store.showKeyboardShortcuts */}
-      <KeyboardHelpOverlay />
-
-      {/* Keyboard shortcuts cheat sheet — opened with "?" (local shell state) */}
+      {/* Keyboard shortcuts sheet — opened with "?" or Home shortcuts action */}
+      <ShortcutsSheet open={showKeyboardShortcuts()} onClose={() => getState().closeKeyboardShortcuts()} />
     </>
   );
 }

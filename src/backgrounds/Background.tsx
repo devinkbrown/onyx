@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, onCleanup, Show } from 'solid-js';
+import { createEffect, createMemo, onCleanup, Show } from 'solid-js';
 import { Dynamic } from 'solid-js/web';
 import {
   BackgroundEngine,
@@ -8,6 +8,8 @@ import {
   type SceneVariant,
 } from './engine';
 import { getBackground, type BackgroundId } from './registry';
+import { preferences } from '@/lib/prefs/preferences';
+import { makeMediaSignal } from '@/lib/a11y/mediaPrefs';
 
 export interface BackgroundProps {
   id?: BackgroundId | string;
@@ -16,6 +18,7 @@ export interface BackgroundProps {
 
 export const DEFAULT_BACKGROUND_ID: BackgroundId = 'kintsugi-veins';
 export const REDUCED_MOTION_BACKGROUND_ID: BackgroundId = 'lapis-gradient';
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
 /**
  * Resolve the concrete variant to render. Reduced motion NO LONGER swaps to a
@@ -29,26 +32,9 @@ export function selectBackgroundId(id: string | undefined, _reducedMotion: boole
 }
 
 export function Background(props: BackgroundProps) {
-  const [reducedMotion, setReducedMotion] = createSignal(matchesReducedMotion());
-
-  createEffect(() => {
-    const query = getReducedMotionQuery();
-    if (!query) return;
-
-    const syncReducedMotion = () => setReducedMotion(query.matches);
-    syncReducedMotion();
-
-    if (query.addEventListener) {
-      query.addEventListener('change', syncReducedMotion);
-      onCleanup(() => query.removeEventListener('change', syncReducedMotion));
-      return;
-    }
-
-    query.addListener?.(syncReducedMotion);
-    onCleanup(() => query.removeListener?.(syncReducedMotion));
-  });
-
-  const variant = createMemo(() => getBackground(selectBackgroundId(props.id, reducedMotion())));
+  const reducedMotion = makeMediaSignal(REDUCED_MOTION_QUERY);
+  const effectiveReducedMotion = createMemo(() => reducedMotion() || preferences().reduceMotion);
+  const variant = createMemo(() => getBackground(selectBackgroundId(props.id, effectiveReducedMotion())));
 
   const scene = createMemo(() => {
     const active = variant();
@@ -62,9 +48,9 @@ export function Background(props: BackgroundProps) {
   return (
     <Show
       when={scene()}
-      fallback={<CanvasBackground variant={canvasVariant()} quality={props.quality} reducedMotion={reducedMotion()} />}
+      fallback={<CanvasBackground variant={canvasVariant()} quality={props.quality} reducedMotion={effectiveReducedMotion()} />}
     >
-      {(active) => <SceneBackground scene={active()} reducedMotion={reducedMotion()} />}
+      {(active) => <SceneBackground scene={active()} reducedMotion={effectiveReducedMotion()} />}
     </Show>
   );
 }
@@ -141,13 +127,4 @@ function SceneBackground(props: { scene: SceneVariant; reducedMotion: boolean })
       <Dynamic component={props.scene.component} reducedMotion={props.reducedMotion} />
     </div>
   );
-}
-
-function matchesReducedMotion(): boolean {
-  return getReducedMotionQuery()?.matches ?? false;
-}
-
-function getReducedMotionQuery(): MediaQueryList | null {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return null;
-  return window.matchMedia('(prefers-reduced-motion: reduce)');
 }

@@ -1,5 +1,3 @@
-'use client';
-
 /*
  * TsumugiIdentity.ts — Persistent P-256 identity key via IndexedDB.
  *

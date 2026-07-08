@@ -11,7 +11,7 @@
   margin-inline: auto;
   padding: 8px 16px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 12px;
 }
@@ -129,6 +129,30 @@
   outline-offset: 2px;
 }
 
+.time-scrubber__copy {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.time-scrubber__copy:hover,
+.time-scrubber__copy:focus-visible {
+  border-color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis-deep) 28%, transparent);
+}
+
+.time-scrubber__copy:focus-visible {
+  outline: 1px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
 @media (max-width: 720px) {
   .time-scrubber__inner {
     grid-template-columns: 1fr;
@@ -136,6 +160,10 @@
   }
 
   .time-scrubber__date {
+    justify-self: start;
+  }
+
+  .time-scrubber__copy {
     justify-self: start;
   }
 }

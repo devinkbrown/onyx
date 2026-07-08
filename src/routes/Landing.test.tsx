@@ -52,4 +52,12 @@ describe('Landing', () => {
     const enter = getAllByRole('link').filter((a) => a.getAttribute('href') === '/app');
     expect(enter.length).toBeGreaterThan(0);
   });
+
+  it('links the main website telemetry pages from the root page', () => {
+    const { getAllByRole } = render(() => <Landing />);
+    const hrefs = getAllByRole('link').map((a) => a.getAttribute('href'));
+
+    expect(hrefs).toContain('/stats');
+    expect(hrefs).toContain('/status');
+  });
 });

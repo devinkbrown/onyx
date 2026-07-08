@@ -53,6 +53,8 @@ export interface ChatMessage {
   highlight?: boolean;
   /** raw target (channel or nick) */
   target: string;
+  /** Orochi named-conversation label from the `orochi/topic` IRCv3 tag. */
+  topic?: string | null;
   /** emoji reactions on this message */
   reactions?: MessageReaction[];
   /** message being replied to */

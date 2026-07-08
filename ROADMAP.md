@@ -143,6 +143,10 @@ down to TLS.
     30s refresh. Live-verified both nodes.
 13. **Prometheus on** + a public graph or two; stats index gains node health.
 14. **Nightly vault-safe backups** of accounts.db + chanstats snapshots.
+    ✅ **SERVER SHIPPED 2026-07-08** — Orochi `[backup]` emits timestamped
+    account-store snapshots and chanstats snapshots plus `latest.json` on a
+    configurable cadence. Deployment still needs the target directory pointed at
+    the operator's vault/sync path.
 
 *Sequencing logic: 1–3 need no server deploys (ship fastest), 4–5 are one
 focused server feature each, 6+ are compound. Every phase lands something

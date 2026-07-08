@@ -20,6 +20,7 @@
 import { For, createEffect, createMemo, createSignal, onCleanup, Show } from 'solid-js';
 import { getState, useStore } from '@/lib/store';
 import { getMountedSuimyakuMediaEngine } from '@/lib/suimyaku-media/MediaEngine';
+import { shortDuration } from '@/lib/time/relativeTime';
 import { Avatar, Popover, Tooltip } from '@/primitives';
 import { VoiceSettings } from './settings/VoiceSettings';
 import {
@@ -153,6 +154,7 @@ function CallTimer(props: { active: boolean; startedAt: number | null }) {
   });
 
   const formatted = createMemo(() => formatElapsed(elapsed()));
+  const durationLabel = createMemo(() => shortDuration(elapsed() * 1000));
 
   return (
     <Show when={props.active}>
@@ -160,7 +162,7 @@ function CallTimer(props: { active: boolean; startedAt: number | null }) {
         class="voice-bar__timer"
         role="timer"
         aria-live="polite"
-        aria-label={`Call duration: ${formatted()}`}
+        aria-label={`Call duration: ${durationLabel()}`}
       >
         {formatted()}
       </span>

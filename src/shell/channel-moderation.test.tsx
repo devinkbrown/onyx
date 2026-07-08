@@ -46,14 +46,16 @@ function makeChannel(name: string, users: ChannelUser[], modes = ''): Channel {
   };
 }
 
-function seedChannel(opts: { ourNick: string; users: ChannelUser[]; modes?: string }) {
+function seedChannel(opts: { ourNick: string; users: ChannelUser[]; modes?: string; props?: Record<string, string> }) {
   const client = makeClient();
   const channels = new Map<string, Channel>();
   channels.set('#general', makeChannel('#general', opts.users, opts.modes ?? ''));
+  const channelProps = opts.props ? new Map([['#general', opts.props]]) : new Map();
   store.setState({
     ...initialState,
     client: client as never,
     channels,
+    channelProps,
     ourNick: opts.ourNick,
     activeView: { kind: 'channel', channel: '#general' },
     connectionStatus: 'connected',
@@ -163,6 +165,7 @@ describe('ChannelSettings panel', () => {
     expect(screen.getByRole('heading', { name: 'Topic' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Channel mode flags' })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /Moderated/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'History' })).toBeInTheDocument();
   });
 
   it('shows a read-only modes view to a non-op', () => {
@@ -212,6 +215,75 @@ describe('ChannelSettings panel', () => {
 
     // Assert
     expect(client.sendRaw).toHaveBeenCalledWith('TOPIC', '#general', 'A brand new topic');
+  });
+
+  it('lets an op set ephemeral history retention', () => {
+    // Arrange — op, no retention currently set
+    const client = seedChannel({ ourNick: 'me', users: [makeUser('me', ['o'])] });
+
+    // Act
+    openSettings();
+    fireEvent.change(screen.getByLabelText('Ephemeral history'), { target: { value: '86400' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply retention' }));
+
+    // Assert
+    expect(client.sendRaw).toHaveBeenCalledWith('PROP', '#general', 'EPHEMERAL', '86400');
+    expect(store.getState().channelProps.get('#general')?.EPHEMERAL).toBe('86400');
+  });
+
+  it('shows ephemeral retention read-only to a non-op', () => {
+    // Arrange — plain member, retention already set
+    seedChannel({ ourNick: 'me', users: [makeUser('me', [])], props: { EPHEMERAL: '3600' } });
+
+    // Act
+    openSettings();
+
+    // Assert
+    expect(screen.queryByLabelText('Ephemeral history')).toBeNull();
+    expect(screen.getByText('1 hour')).toBeInTheDocument();
+    expect(screen.getByText('Only ops can change history retention.')).toBeInTheDocument();
+  });
+
+  it('lets an op create, list, and delete webhooks', () => {
+    // Arrange — op
+    const client = seedChannel({ ourNick: 'me', users: [makeUser('me', ['o'])] });
+
+    // Act
+    openSettings();
+    fireEvent.input(screen.getByLabelText('Webhook name'), { target: { value: 'deploy' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create webhook' }));
+    fireEvent.click(screen.getByRole('button', { name: 'List webhooks' }));
+    fireEvent.input(screen.getByLabelText('Delete webhook id'), { target: { value: 'wh_123' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Delete webhook' }));
+
+    // Assert
+    expect(client.sendRaw).toHaveBeenNthCalledWith(1, 'WEBHOOK', 'CREATE', '#general', 'deploy');
+    expect(client.sendRaw).toHaveBeenNthCalledWith(2, 'WEBHOOK', 'LIST', '#general');
+    expect(client.sendRaw).toHaveBeenNthCalledWith(3, 'WEBHOOK', 'DELETE', 'wh_123');
+  });
+
+  it('shows recent webhook notices in channel settings', () => {
+    // Arrange — op with a previously-created webhook URL notice
+    seedChannel({ ourNick: 'me', users: [makeUser('me', ['o'])] });
+    store.getState().addServiceNotice('Webhook', 'WEBHOOK: created for #general - POST Discord webhook JSON to https://chat.example/api/webhooks/id/token');
+
+    // Act
+    openSettings();
+
+    // Assert
+    expect(screen.getByText(/WEBHOOK: created for #general/)).toBeInTheDocument();
+  });
+
+  it('shows webhook controls read-only to a non-op', () => {
+    // Arrange — plain member
+    seedChannel({ ourNick: 'me', users: [makeUser('me', [])] });
+
+    // Act
+    openSettings();
+
+    // Assert
+    expect(screen.queryByLabelText('Webhook name')).toBeNull();
+    expect(screen.getByText('Discord-compatible webhook URLs can post into this channel.')).toBeInTheDocument();
   });
 
   it('makes the topic read-only for a non-op in a +t channel', () => {

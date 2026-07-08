@@ -36,6 +36,8 @@ import Landing from './routes/Landing';
 const About = lazy(() => import('./routes/About'));
 const AppShell = lazy(() => import('./routes/AppRoute'));
 const Appearance = lazy(() => import('./app/Appearance'));
+const Stats = lazy(() => import('./routes/Stats'));
+const Status = lazy(() => import('./routes/Status'));
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Onyx: #root not found');
@@ -58,6 +60,10 @@ render(
           <Route path="/about" component={About} />
           <Route path="/app" component={AppShell} />
           <Route path="/appearance" component={Appearance} />
+          <Route path="/stats" component={Stats} />
+          <Route path="/stats/" component={Stats} />
+          <Route path="/status" component={Status} />
+          <Route path="/status/" component={Status} />
         </Router>
         {/* Global command palette — Cmd/Ctrl+K or / opens it from any route */}
         <Spotlight />

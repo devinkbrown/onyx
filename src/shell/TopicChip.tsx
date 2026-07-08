@@ -11,6 +11,7 @@ import './TopicChip.css';
 
 export type TopicChipProps = {
   label: string;
+  unread?: number;
   active?: boolean;
   onClick?: (label: string) => void;
 };
@@ -18,14 +19,20 @@ export type TopicChipProps = {
 export type TopicFilterBarProps = {
   topics: readonly string[];
   active: string | null;
+  unreadCounts?: ReadonlyMap<string, number>;
   onSelect: (label: string | null) => void;
 };
 
-function TopicChipContent(props: { label: string }): JSX.Element {
+function TopicChipContent(props: { label: string; unread?: number }): JSX.Element {
   return (
     <>
       <span class="topic-chip__hash" aria-hidden="true">#</span>
       <span class="topic-chip__label">{props.label}</span>
+      <Show when={(props.unread ?? 0) > 0}>
+        <span class="topic-chip__unread" aria-label={`${props.unread} unread`}>
+          {props.unread}
+        </span>
+      </Show>
     </>
   );
 }
@@ -37,7 +44,7 @@ export function TopicChip(props: TopicChipProps): JSX.Element {
       keyed
       fallback={
         <span class="topic-chip" classList={{ 'is-active': props.active === true }}>
-          <TopicChipContent label={props.label} />
+          <TopicChipContent label={props.label} unread={props.unread} />
         </span>
       }
     >
@@ -49,7 +56,7 @@ export function TopicChip(props: TopicChipProps): JSX.Element {
           aria-pressed={props.active}
           onClick={() => handleClick(props.label)}
         >
-          <TopicChipContent label={props.label} />
+          <TopicChipContent label={props.label} unread={props.unread} />
         </button>
       )}
     </Show>
@@ -72,6 +79,7 @@ export function TopicFilterBar(props: TopicFilterBarProps): JSX.Element {
         {(topic) => (
           <TopicChip
             label={topic}
+            unread={props.unreadCounts?.get(topic.toLowerCase()) ?? 0}
             active={props.active === topic}
             onClick={() => props.onSelect(topic)}
           />

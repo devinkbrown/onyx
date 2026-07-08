@@ -40,9 +40,9 @@ describe('matchShortcut', () => {
     expect(metaMatch?.id).toBe('command.palette');
   });
 
-  it('matches plain slash only when no modifiers are held', () => {
-    const plainMatch = matchShortcut(makeEvent({ key: '/' }));
-    const modifiedMatch = matchShortcut(makeEvent({ key: '/', ctrlKey: true }));
+  it('matches plain Enter for composer focus only when no modifiers are held', () => {
+    const plainMatch = matchShortcut(makeEvent({ key: 'Enter' }));
+    const modifiedMatch = matchShortcut(makeEvent({ key: 'Enter', ctrlKey: true }));
 
     expect(plainMatch?.id).toBe('composer.focus');
     expect(modifiedMatch).toBeNull();
@@ -54,6 +54,30 @@ describe('matchShortcut', () => {
 
     expect(shiftedMatch?.id).toBe('keyboard.help');
     expect(plainMatch).toBeNull();
+  });
+
+  it('matches reader mode only with mod and shift', () => {
+    const shiftedModMatch = matchShortcut(makeEvent({ key: 'r', ctrlKey: true, shiftKey: true }));
+    const plainModMatch = matchShortcut(makeEvent({ key: 'r', ctrlKey: true }));
+
+    expect(shiftedModMatch?.id).toBe('reader.mode.toggle');
+    expect(plainModMatch).toBeNull();
+  });
+
+  it('matches the plain unread jump shortcut', () => {
+    const plainMatch = matchShortcut(makeEvent({ key: 'n' }));
+    const modifiedMatch = matchShortcut(makeEvent({ key: 'n', ctrlKey: true }));
+
+    expect(plainMatch?.id).toBe('navigation.unread.next');
+    expect(modifiedMatch).toBeNull();
+  });
+
+  it('matches the plain follow toggle shortcut', () => {
+    const plainMatch = matchShortcut(makeEvent({ key: 'u' }));
+    const modifiedMatch = matchShortcut(makeEvent({ key: 'u', ctrlKey: true }));
+
+    expect(plainMatch?.id).toBe('conversation.follow.toggle');
+    expect(modifiedMatch).toBeNull();
   });
 
   it('returns null for an unknown key', () => {

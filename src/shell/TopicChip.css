@@ -92,6 +92,23 @@ button.topic-chip.is-active:hover {
   white-space: nowrap;
 }
 
+.topic-chip__unread {
+  flex: none;
+  min-width: 1.25rem;
+  padding: 0.1rem 0.38rem;
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--washi) 16%, transparent);
+  color: var(--washi);
+  font-size: 0.64rem;
+  line-height: 1;
+  text-align: center;
+}
+
+.topic-chip.is-active .topic-chip__unread {
+  background: color-mix(in oklab, var(--ink) 22%, transparent);
+  color: var(--ink);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .topic-chip {
     transition: none;

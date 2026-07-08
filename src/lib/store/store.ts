@@ -1,12 +1,10 @@
-'use client';
-
 import { createStore } from 'zustand/vanilla';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { IRCClient } from '@/lib/irc/client';
 import type { IRCMessage, Channel, ChannelUser, ChatMessage, ConnectionStatus, MessageReaction } from '@/lib/irc/types';
 import { parseMultilineLimits, planMultilineBatches, buildMultilineLines, assembleMultilineText } from '@/lib/irc/multiline';
-import { loadCredentials } from '@/lib/credentials';
-import { parseAccountInfo, parseCHANLIMIT, parseMonitorNumeric, parsePREFIX, parseSessionMeshTokenNote, parseSessionTokenNote, parseStandardReply } from '@/lib/irc/parser';
+import { clearSessionToken, loadCredentials, storeMeshToken, storeSessionToken } from '@/lib/credentials';
+import { escapeTagValue, parseAccountInfo, parseCHANLIMIT, parseMonitorNumeric, parsePREFIX, parseSessionMeshTokenNote, parseSessionTokenNote, parseStandardReply } from '@/lib/irc/parser';
 import type { SuimyakuPeerState, SuimyakuRoomStats, CallState } from '@/lib/suimyaku-media/types';
 import { getMountedSuimyakuMediaEngine } from '@/lib/suimyaku-media/MediaEngine';
 import { parseActivity } from '@/lib/activity';
@@ -14,6 +12,8 @@ import { OUTBOX_MAX_AGE_MS, deleteOutboxEntry, loadOutbox, queueOutbox, type Out
 import { deviceKeys, isEnvelope, openDm, sealDm } from '@/lib/e2ee/dmCipher';
 import { preferences } from '@/lib/prefs/preferences';
 import { parseEventTime } from '@/lib/deeplink';
+import { isValidTopicLabel, parseMessageTopic, topicMessageTag } from '@/lib/topics/topics';
+import { isFollowed } from '@/lib/notifications/followed';
 import {
   composerDraftKey,
   getComposerDraft as readComposerDraft,
@@ -30,10 +30,14 @@ import {
   getPasskeyAssertion,
   isPasskeySupported,
 } from '@/lib/webauthn/passkey';
+import { DEFAULT_THEME_ID, THEME_IDS, type ThemeId } from '@/theme/themes';
+import { persistThemeId, readThemeId } from '@/theme/themeStorage';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export type ChannelEventType = 'join' | 'part' | 'quit' | 'kick' | 'mode' | 'nick';
+
+export type DisplayTheme = ThemeId;
 
 export interface ChannelEvent {
   type: ChannelEventType;
@@ -278,10 +282,11 @@ export interface ServerSearchState {
 
 export interface Notification {
   id: string;
-  type: 'mention' | 'dm' | 'system' | 'error';
+  type: 'mention' | 'dm' | 'follow' | 'system' | 'error';
   text: string;
   from?: string;
   channel?: string;
+  topic?: string | null;
   at: Date;
 }
 
@@ -710,6 +715,11 @@ export interface OnyxState {
   /** target.toLowerCase() → true when no more history exists */
   historyExhausted: Map<string, boolean>;
 
+  // ── Named conversations ───────────────────────────────────────────────
+  /** channel.toLowerCase() → selected topic; missing means the whole room */
+  activeChannelTopics: Map<string, string>;
+  setActiveChannelTopic(channel: string, topic: string | null): void;
+
   // ── Media Gallery Panel ───────────────────────────────────────────────────
   showMediaGallery: boolean;
 
@@ -820,6 +830,12 @@ export interface OnyxState {
   unbanMask(channel: string, mask: string): void;
   /** Invite a user — `INVITE <nick> <#chan>`. */
   inviteUser(channel: string, nick: string): void;
+  /** Create a Discord-compatible incoming webhook for a channel. */
+  webhookCreate(channel: string, name?: string): void;
+  /** List Discord-compatible incoming webhooks for a channel. */
+  webhookList(channel: string): void;
+  /** Delete a Discord-compatible incoming webhook by id. */
+  webhookDelete(id: string): void;
   /** Grant / revoke op — `MODE <#chan> +o|-o <nick>`. */
   opMember(channel: string, nick: string, on: boolean): void;
   /** Grant / revoke voice — `MODE <#chan> +v|-v <nick>`. */
@@ -938,6 +954,9 @@ export interface OnyxState {
   // Scheduled events ("voice rooms as places" — ocean.event channel prop)
   scheduleEvent(channel: string, at: Date, title: string): void;
   clearChannelEvent(channel: string): void;
+
+  // Ephemeral room history (IRCX EPHEMERAL channel prop; seconds, 0 = off)
+  setChannelEphemeral(channel: string, seconds: number): void;
 
   // MONITOR (presence)
   monitorAdd(nick: string): void;
@@ -1088,12 +1107,12 @@ export interface OnyxState {
   closeThemeModal(): void;
 
   // ── Theme & display ───────────────────────────────────────────────────
-  /** New theme system: 'lacquer' | 'midnight' | 'onyx' | 'ash' | 'amoled' | 'light' | 'system' */
-  theme: 'lacquer' | 'midnight' | 'onyx' | 'ash' | 'amoled' | 'light' | 'system';
+  /** Current built-in ThemeProvider theme id. Custom ids live in activeTheme. */
+  theme: DisplayTheme;
   /** UI base font size in px (12 | 14 | 16 | 18 | 20) */
   fontSize: number;
-  /** Set UI theme and persist to localStorage 'onyx:display-theme' */
-  setDisplayTheme(theme: OnyxState['theme']): void;
+  /** Set UI theme and persist to localStorage 'onyx:theme' */
+  setDisplayTheme(theme: DisplayTheme): void;
   /** Set UI font size and persist to localStorage 'onyx:ui-font-size' */
   setFontSize(size: number): void;
 
@@ -1721,6 +1740,13 @@ export interface StreamPollInfo {
 let _uidCounter = 0;
 const uid = () => `onyx-${Date.now()}-${++_uidCounter}`;
 
+function formatClientTags(tags: Record<string, string>): string {
+  const tagStr = Object.entries(tags)
+    .map(([key, value]) => (value ? `${key}=${escapeTagValue(value)}` : key))
+    .join(';');
+  return tagStr ? `@${tagStr} ` : '';
+}
+
 const HISTORY_PAGE_SIZE = 50;
 const SERVICE_BOTS = new Set(['nickserv', 'chanserv', 'hostserv', 'memoserv']);
 
@@ -2296,6 +2322,7 @@ export const store = createStore<OnyxState>()(
     typingUsers: new Map(),
     showThreadPanel: false,
     threadParentId: null,
+    activeChannelTopics: new Map(),
     threadLastSeen: {},
     archivedThreads: new Set(),
     activeThreads: new Set(),
@@ -2817,6 +2844,22 @@ export const store = createStore<OnyxState>()(
       get().client?.sendRaw('INVITE', nick, channel);
     },
 
+    webhookCreate(channel, name) {
+      const clean = name?.trim();
+      if (clean) get().client?.sendRaw('WEBHOOK', 'CREATE', channel, clean.slice(0, 32));
+      else get().client?.sendRaw('WEBHOOK', 'CREATE', channel);
+    },
+
+    webhookList(channel) {
+      get().client?.sendRaw('WEBHOOK', 'LIST', channel);
+    },
+
+    webhookDelete(id) {
+      const clean = id.trim();
+      if (!clean) return;
+      get().client?.sendRaw('WEBHOOK', 'DELETE', clean);
+    },
+
     opMember(channel, nick, on) {
       get().client?.sendRaw('MODE', channel, on ? '+o' : '-o', nick);
     },
@@ -2973,6 +3016,14 @@ export const store = createStore<OnyxState>()(
 
       const { replyingTo } = get();
       const waitForServerEcho = client.negotiatedCaps.has('echo-message');
+      const targetIsChannel = target.length > 0 && (client.isupport.CHANTYPES ?? '#&').includes(target[0]!);
+      const activeTopic = targetIsChannel ? get().activeChannelTopics.get(target.toLowerCase()) ?? null : null;
+      const topicTags = activeTopic ? topicMessageTag(activeTopic) ?? {} : {};
+      const outboundTags = replyingTo
+        ? { ...topicTags, '+draft/reply': replyingTo.id }
+        : topicTags;
+      const outboundTagPrefix = formatClientTags(outboundTags);
+      const replySnapshot = replyingTo ? { id: replyingTo.id, from: replyingTo.from, text: replyingTo.text } : null;
 
       // ── E2EE DM path ──────────────────────────────────────────────────────
       // A DM to a peer who published a device key (and with E2EE on) is sealed
@@ -2984,8 +3035,7 @@ export const store = createStore<OnyxState>()(
         const isDm = target.length > 0 && !cp.includes(target[0]!);
         const peerKey = get().peerDmKeys.get(target.toLowerCase());
         if (isDm && peerKey && preferences().e2eeDms) {
-          const replyTag = replyingTo ? `@+draft/reply=${replyingTo.id} ` : '';
-          const replySnapshot = replyingTo ? { id: replyingTo.id, from: replyingTo.from, text: replyingTo.text } : null;
+          const replyTag = outboundTagPrefix;
           void sealDm(peerKey, text).then((envelope) => {
             if (!envelope) {
               // Sealing genuinely failed — send plaintext rather than drop the
@@ -3022,18 +3072,15 @@ export const store = createStore<OnyxState>()(
         ? planMultilineBatches(text, parseMultilineLimits(client.capValues.get('draft/multiline')))
         : null;
       if (multilinePlan) {
-        const firstTags: Record<string, string> = replyingTo
-          ? { '+draft/reply': replyingTo.id }
-          : {};
-        for (const rawLine of buildMultilineLines(target, multilinePlan, undefined, firstTags).lines) {
+        for (const rawLine of buildMultilineLines(target, multilinePlan, undefined, outboundTags).lines) {
           client.send(rawLine);
         }
       } else {
         const lines = text.split('\n').filter(l => l.trim());
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i]!;
-          if (replyingTo && i === 0) {
-            client.send(`@+draft/reply=${replyingTo.id} PRIVMSG ${target} :${line}\r\n`);
+          if (i === 0 && outboundTagPrefix) {
+            client.send(`${outboundTagPrefix}PRIVMSG ${target} :${line}\r\n`);
           } else {
             client.sendRaw('PRIVMSG', target, line);
           }
@@ -3048,7 +3095,8 @@ export const store = createStore<OnyxState>()(
           text,
           type: 'msg',
           target,
-          ...(replyingTo ? { replyTo: { id: replyingTo.id, from: replyingTo.from, text: replyingTo.text } } : {}),
+          ...(activeTopic ? { topic: activeTopic } : {}),
+          ...(replySnapshot ? { replyTo: replySnapshot } : {}),
         };
         set(s => _addMessage(s, target, msg));
         {
@@ -3416,6 +3464,18 @@ export const store = createStore<OnyxState>()(
       set({ editingMessage: msg });
     },
 
+    setActiveChannelTopic(channel, topic) {
+      const key = channel.toLowerCase();
+      set(s => {
+        const activeChannelTopics = new Map(s.activeChannelTopics);
+        const clean = topic?.trim() ?? '';
+        if (clean && isValidTopicLabel(clean)) activeChannelTopics.set(key, clean);
+        else if (clean) return {};
+        else activeChannelTopics.delete(key);
+        return { activeChannelTopics };
+      });
+    },
+
     addLocalReaction(target, messageId, emoji) {
       const { ourNick } = get();
       const key = target.toLowerCase();
@@ -3704,6 +3764,12 @@ export const store = createStore<OnyxState>()(
 
     clearChannelEvent(channel) {
       get()._writeChannelProp(channel, 'ocean.event', '');
+    },
+
+    setChannelEphemeral(channel, seconds) {
+      if (!Number.isInteger(seconds)) return;
+      if (seconds !== 0 && (seconds < 60 || seconds > 30 * 24 * 60 * 60)) return;
+      get()._writeChannelProp(channel, 'EPHEMERAL', String(seconds));
     },
 
     // ── IRCX PROP requests ────────────────────────────────────────────────
@@ -4195,8 +4261,11 @@ export const store = createStore<OnyxState>()(
 
     // ── Theme ─────────────────────────────────────────────────────────────
     setTheme(theme) {
-      if (typeof window !== 'undefined') localStorage.setItem('onyx:active-theme', theme);
-      set({ activeTheme: theme });
+      persistThemeId(theme);
+      set({
+        activeTheme: theme,
+        ...(isThemeId(theme) ? { theme } : {}),
+      });
     },
 
     // ── Theme modal ────────────────────────────────────────────────────────
@@ -4417,9 +4486,7 @@ export const store = createStore<OnyxState>()(
           const token = parseSessionTokenNote(msg);
           if (token) {
             const canonicalNick = _saslAccount ?? undefined;
-            import('@/lib/credentials').then(({ storeSessionToken }) => {
-              storeSessionToken(token, undefined, canonicalNick);
-            }).catch(() => {});
+            storeSessionToken(token, undefined, canonicalNick);
           }
           return;
         }
@@ -4429,16 +4496,12 @@ export const store = createStore<OnyxState>()(
           // (server.zig handleSession TOKEN → handleMeshReclaim).
           const mtoken = parseSessionMeshTokenNote(msg);
           if (mtoken) {
-            import('@/lib/credentials').then(({ storeMeshToken }) => {
-              storeMeshToken(mtoken);
-            }).catch(() => {});
+            storeMeshToken(mtoken);
           }
           return;
         }
         if (standard.kind === 'FAIL' && standard.command === 'SESSION') {
-          import('@/lib/credentials').then(({ clearSessionToken }) => {
-            clearSessionToken(get().server?.url, _connectNick || get().ourNick);
-          }).catch(() => {});
+          clearSessionToken(get().server?.url, _connectNick || get().ourNick);
           get().addNotification({ type: 'error', text: standard.description || `SESSION ${standard.code}` });
           return;
         }
@@ -5289,6 +5352,7 @@ export const store = createStore<OnyxState>()(
               ['NickServ', 'ChanServ', 'HostServ', 'MemoServ'].find(s => s.toUpperCase() === sourceUpper) ??
               (text.match(/^\[?(Account|Channel|Memo|VHost|NickServ|ChanServ|HostServ|MemoServ)\]?:?\s+/i)?.[1]) ??
               (/\b(MEMO|MEMOS)\b/.test(textUpper) ? 'Memo' : undefined) ??
+              (/\bWEBHOOK\b/.test(textUpper) ? 'Webhook' : undefined) ??
               (/\bVHOST\b/.test(textUpper) ? 'VHost' : undefined) ??
               (/\b(ACCESS LIST|HOST MASK|CERTIFICATE|CERTLIST|CERTADD|CERTDEL|FINGERPRINT)\b/.test(textUpper) ? 'Account' : undefined) ??
               (/\b(ACCOUNT|IDENTIFIED|REGISTERED|PASSWORD|EMAIL|GHOST|RECOVER|GROUPED|UNGROUP)\b/.test(textUpper) ? 'Account' : undefined);
@@ -5573,6 +5637,7 @@ export const store = createStore<OnyxState>()(
           const msgKey = msgTarget.toLowerCase();
 
           const time = tags['time'] ? new Date(tags['time']) : new Date();
+          const messageTopic = isChannel ? parseMessageTopic(tags) : null;
 
           // Use server-provided msgid when available (e.g. from CHATHISTORY batch)
           const serverMsgId = tags['msgid'] ?? tags['draft/msgid'];
@@ -5588,6 +5653,7 @@ export const store = createStore<OnyxState>()(
             type: msgType as ChatMessage['type'],
             highlight,
             target: msgTarget,
+            topic: messageTopic,
             ...(isEncryptedDm ? { encrypted: true } : {}),
             ...(replyTo ? { replyTo } : {}),
           };
@@ -5629,16 +5695,23 @@ export const store = createStore<OnyxState>()(
               : notifyLevel === 'mentions' ? (mentionsMe(text, ourNick) || isChannelWidePing)
               : highlight;
             const skipUnread = isSelf || notifyLevel === 'none' || (notifyLevel === 'mentions' && !mentionsMe(text, ourNick) && !isChannelWidePing);
+            const activeTarget = get().activeView;
+            const isActiveChannel = activeTarget.kind === 'channel' &&
+              activeTarget.channel.toLowerCase() === msgKey;
             set(s => _addChannelMessage(s, msgKey, chatMsg, effectiveHighlight, skipUnread));
             get().updateChannelActivity(msgTarget);
             if (effectiveHighlight && notifyLevel !== 'none') {
               get().addNotification({ type: 'mention', text: displayText, from: sender, channel: msgTarget });
+            } else if (
+              !isSelf &&
+              !isActiveChannel &&
+              notifyLevel !== 'none' &&
+              (isFollowed(msgTarget, messageTopic) || isFollowed(msgTarget))
+            ) {
+              get().addNotification({ type: 'follow', text: displayText, from: sender, channel: msgTarget, topic: messageTopic });
             }
             // Track per-channel unread for sidebar badges
             if (!skipUnread) {
-              const activeTarget = get().activeView;
-              const isActiveChannel = activeTarget.kind === 'channel' &&
-                activeTarget.channel.toLowerCase() === msgKey;
               if (!isActiveChannel) {
                 const isMention = effectiveHighlight ||
                   isChannelWidePing ||
@@ -8433,14 +8506,12 @@ export const store = createStore<OnyxState>()(
       return { nsfwAcknowledged: next };
     }),
 
-    // ── Theme & display (new system) ──────────────────────────────────────────
+    // ── Theme & display ───────────────────────────────────────────────────────
     theme: _loadDisplayTheme(),
     fontSize: _loadDisplayFontSize(),
     setDisplayTheme: (theme) => {
-      if (typeof window !== 'undefined') {
-        try { localStorage.setItem('onyx:display-theme', theme); } catch {}
-      }
-      set({ theme });
+      persistThemeId(theme);
+      set({ activeTheme: theme, theme });
     },
     setFontSize: (size) => {
       if (typeof window !== 'undefined') {
@@ -8896,6 +8967,17 @@ export const selectChannelEvent = (channel: string) => (s: OnyxState): Scheduled
   const title = raw.slice(sep + 1).trim();
   if (!Number.isFinite(at) || at <= 0 || !title) return null;
   return { at, title };
+};
+
+/** Ephemeral-room TTL, parsed from the IRCX `EPHEMERAL` channel prop. */
+export const selectChannelEphemeralSeconds = (channel: string) => (s: OnyxState): number | null => {
+  const props = s.channelProps.get(channel.toLowerCase());
+  const raw = props?.EPHEMERAL ?? props?.ephemeral ?? '';
+  if (!raw) return null;
+  const seconds = Number(raw);
+  if (!Number.isInteger(seconds) || seconds <= 0) return null;
+  if (seconds < 60 || seconds > 30 * 24 * 60 * 60) return null;
+  return seconds;
 };
 
 export const selectIsChannelOp = (channel: string) => (s: OnyxState): boolean => {
@@ -9450,49 +9532,12 @@ function _loadTimeFormat(): '12h' | '24h' | 'hidden' {
 
 // ── Theme persistence ─────────────────────────────────────────────────────────
 
+function isThemeId(value: string): value is ThemeId {
+  return (THEME_IDS as readonly string[]).includes(value);
+}
+
 function _loadActiveTheme(): string {
-  if (typeof window === 'undefined') return 'lacquer';
-  try {
-    const validThemes = [
-      'ocean',
-      'abyss',
-      'midnight',
-      'bathyal',
-      'coral',
-      'kelp',
-      'brine',
-      'onyx',
-      'amoled',
-      'arctic',
-      'ash',
-      'light',
-      'lacquer',
-      'pearl',
-      'system',
-    ];
-    const stored = localStorage.getItem('onyx:active-theme');
-    const legacy = localStorage.getItem('onyx:theme');
-    // v3 migration: 'lacquer' is the new flagship default. Move users who are
-    // still on the old auto-default ('ocean', the value that REMOVED data-theme
-    // and fell back to the plain :root base) — or who have no stored preference
-    // at all — onto 'lacquer'. Any explicit non-ocean choice is preserved.
-    const v3done = localStorage.getItem('onyx:theme-v3') === '1';
-    if (!v3done) {
-      const effective = (stored && validThemes.includes(stored))
-        ? stored
-        : (legacy && validThemes.includes(legacy) ? legacy : null);
-      localStorage.setItem('onyx:theme-v3', '1');
-      if (effective === null || effective === 'ocean') {
-        localStorage.setItem('onyx:active-theme', 'lacquer');
-        return 'lacquer';
-      }
-      // Explicit choice — persist it forward and keep it.
-      localStorage.setItem('onyx:active-theme', effective);
-      return effective;
-    }
-    if (stored && validThemes.includes(stored)) return stored;
-    return legacy && validThemes.includes(legacy) ? legacy : 'lacquer';
-  } catch { return 'lacquer'; }
+  return readThemeId();
 }
 
 // ── Font size persistence ──────────────────────────────────────────────────────
@@ -9729,37 +9774,8 @@ function _loadBoolPref(key: string): boolean {
 
 // ── Display theme persistence ─────────────────────────────────────────────────
 function _loadDisplayTheme(): OnyxState['theme'] {
-  if (typeof window === 'undefined') return 'lacquer';
-  const stored = localStorage.getItem('onyx:display-theme') ?? localStorage.getItem('onyx:theme');
-  const valid = (t: string | null): t is OnyxState['theme'] =>
-    t === 'lacquer' || t === 'midnight' || t === 'onyx' || t === 'ash' ||
-    t === 'amoled' || t === 'light' || t === 'system';
-  // v2 migration: 'onyx' was the old default — migrate to 'midnight' unless
-  // the user explicitly re-selected it after the migration flag was written.
-  if (stored === 'onyx' && !localStorage.getItem('onyx:theme-v2')) {
-    localStorage.setItem('onyx:display-theme', 'midnight');
-    localStorage.setItem('onyx:theme-v2', '1');
-  }
-  // v3 migration: 'lacquer' is the new flagship default. Mirror the active-theme
-  // migration so the two loaders agree even though either may run first and set
-  // the shared 'onyx:theme-v3' flag. Users still on the old auto-default display
-  // theme ('midnight', the value v2 wrote) — or with no stored preference — move
-  // to 'lacquer'. An explicit choice is identified by 'onyx:active-theme' being a
-  // non-ocean named theme; we never overwrite that. This is idempotent: once the
-  // display value is 'lacquer' or any explicit theme, it stays put.
-  const active = localStorage.getItem('onyx:active-theme');
-  const cur = localStorage.getItem('onyx:display-theme') ?? stored;
-  const explicit = active != null && active !== 'ocean' && active !== 'system' && active !== 'lacquer';
-  const isAutoDefault = cur == null || cur === 'midnight';
-  if (!explicit && isAutoDefault) {
-    localStorage.setItem('onyx:display-theme', 'lacquer');
-    localStorage.setItem('onyx:theme-v3', '1');
-    return 'lacquer';
-  }
-  localStorage.setItem('onyx:theme-v3', '1');
-  const final = localStorage.getItem('onyx:display-theme') ?? stored;
-  if (valid(final)) return final;
-  return 'lacquer';
+  const active = readThemeId();
+  return isThemeId(active) ? active : DEFAULT_THEME_ID;
 }
 
 // ── Display font size persistence ─────────────────────────────────────────────

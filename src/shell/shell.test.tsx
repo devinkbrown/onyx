@@ -12,11 +12,12 @@
  * AAA pattern throughout. Descriptive test names.
  */
 
-import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen, within } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { store } from '@/lib/store/store';
 import type { Channel } from '@/lib/irc/types';
 import type { ChatMessage, ChannelUser } from '@/lib/irc/types';
+import { followed, isFollowed, unfollow } from '@/lib/notifications/followed';
 import { AppShell } from './AppShell';
 
 // ── Shared fixture helpers ────────────────────────────────────────────────────
@@ -32,6 +33,7 @@ function makeMessage(
   from: string,
   text: string,
   target = '#general',
+  topic?: string | null,
 ): ChatMessage {
   return {
     id,
@@ -40,6 +42,7 @@ function makeMessage(
     time: new Date('2025-01-01T12:00:00Z'),
     type: 'msg',
     target,
+    ...(topic !== undefined ? { topic } : {}),
   };
 }
 
@@ -94,6 +97,8 @@ function seedStore(channelName: string): void {
 describe('AppShell', () => {
   beforeEach(() => {
     store.setState(initialState, true);
+    for (const key of followed()) unfollow(key);
+    localStorage.clear();
   });
 
   afterEach(() => {
@@ -128,6 +133,17 @@ describe('AppShell', () => {
   });
 
   describe('message view rendering', () => {
+    it('reflects OS accessibility media signals on the root element', () => {
+      seedStore('#general');
+
+      render(() => <AppShell />);
+
+      expect(document.documentElement.dataset.prefersReducedMotion).toBe('false');
+      expect(document.documentElement.dataset.prefersMoreContrast).toBe('false');
+      expect(document.documentElement.dataset.prefersReducedTransparency).toBe('false');
+      expect(document.documentElement.dataset.forcedColors).toBe('false');
+    });
+
     it('renders messages from the active channel', () => {
       // Arrange
       seedStore('#general');
@@ -139,6 +155,209 @@ describe('AppShell', () => {
       const log = getByRole('log', { name: 'Message history' });
       expect(log.textContent).toContain('Hello world');
       expect(log.textContent).toContain('Hey there');
+    });
+
+    it('makes message rows keyboard traversable and revealable', () => {
+      seedStore('#general');
+
+      render(() => <AppShell />);
+
+      const rows = screen.getAllByRole('article', { name: / at .*:/ });
+      expect(rows.length).toBeGreaterThanOrEqual(3);
+      const firstRow = rows[0];
+      if (!firstRow) throw new Error('expected at least one message row');
+      expect(firstRow).toHaveAttribute('tabindex', '0');
+      expect(firstRow).toHaveAccessibleName(/alice at .*Hello world/);
+
+      firstRow.focus();
+      expect(document.activeElement).toBe(firstRow);
+
+      fireEvent.keyDown(firstRow, { key: 'Enter' });
+      expect(firstRow).toHaveClass('shell-msg-revealed');
+      expect(within(firstRow).getByRole('group', { name: 'Actions for message from alice' })).toBeInTheDocument();
+
+      fireEvent.keyDown(firstRow, { key: ' ' });
+      expect(firstRow).not.toHaveClass('shell-msg-revealed');
+    });
+
+    it('filters channel messages by named conversation topic', () => {
+      const channel = makeChannel(
+        '#general',
+        [
+          makeMessage('msg-topic-a', 'alice', 'Roadmap item', '#general', 'roadmap'),
+          makeMessage('msg-topic-b', 'bob', 'Release item', '#general', 'release'),
+          makeMessage('msg-loose', 'carol', 'Loose note', '#general', null),
+        ],
+        [makeUser('alice'), makeUser('bob'), makeUser('carol')],
+      );
+      const channels = new Map<string, Channel>();
+      channels.set('#general', channel);
+      store.setState({
+        ...initialState,
+        channels,
+        activeView: { kind: 'channel', channel: '#general' },
+        connectionStatus: 'connected',
+        ourNick: 'testuser',
+        viewUnreadDividerId: new Map([['#general', 'msg-topic-b']]),
+      }, true);
+
+      render(() => <AppShell />);
+
+      expect(screen.getByText('Roadmap item')).toBeInTheDocument();
+      expect(screen.getByText('Release item')).toBeInTheDocument();
+      expect(screen.getByLabelText('1 unread')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /roadmap/i }));
+
+      expect(screen.getByText('Roadmap item')).toBeInTheDocument();
+      expect(screen.queryByText('Release item')).not.toBeInTheDocument();
+      expect(screen.queryByText('Loose note')).not.toBeInTheDocument();
+      expect(screen.getByText('#roadmap')).toBeInTheDocument();
+      expect(store.getState().activeChannelTopics.get('#general')).toBe('roadmap');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Clear topic roadmap' }));
+
+      expect(store.getState().activeChannelTopics.has('#general')).toBe(false);
+    });
+
+    it('starts a new named conversation before the first message', () => {
+      seedStore('#general');
+
+      render(() => <AppShell />);
+
+      fireEvent.input(screen.getByLabelText('New topic'), { target: { value: 'incident' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Start topic' }));
+
+      expect(store.getState().activeChannelTopics.get('#general')).toBe('incident');
+      expect(screen.getByText('#incident')).toBeInTheDocument();
+    });
+
+    it('projects named conversations into a browsable forum view', () => {
+      const channel = makeChannel(
+        '#general',
+        [
+          makeMessage('msg-topic-a', 'alice', 'Roadmap item', '#general', 'roadmap'),
+          makeMessage('msg-topic-b', 'bob', 'Another roadmap item', '#general', 'roadmap'),
+          makeMessage('msg-topic-c', 'carol', 'Release item', '#general', 'release'),
+        ],
+        [makeUser('alice'), makeUser('bob'), makeUser('carol')],
+      );
+      const channels = new Map<string, Channel>();
+      channels.set('#general', channel);
+      store.setState({
+        ...initialState,
+        channels,
+        activeView: { kind: 'channel', channel: '#general' },
+        connectionStatus: 'connected',
+        ourNick: 'testuser',
+      }, true);
+
+      render(() => <AppShell />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Forum' }));
+
+      const forum = screen.getByLabelText('Topic forum');
+      expect(forum).toBeInTheDocument();
+      expect(within(forum).getByText('2 messages')).toBeInTheDocument();
+      expect(within(forum).getByText('Another roadmap item')).toBeInTheDocument();
+
+      fireEvent.click(within(forum).getByRole('button', { name: /#roadmap/i }));
+
+      expect(store.getState().activeChannelTopics.get('#general')).toBe('roadmap');
+      expect(screen.queryByLabelText('Topic forum')).not.toBeInTheDocument();
+    });
+
+    it('renders reactions as quiet boosts and toggles them without notifications', () => {
+      const channel = makeChannel(
+        '#general',
+        [
+          {
+            ...makeMessage('boosted', 'alice', 'Worth boosting', '#general'),
+            reactions: [{ emoji: '🌊', users: ['alice', 'testuser'] }],
+          },
+        ],
+        [makeUser('alice'), makeUser('testuser')],
+      );
+      const channels = new Map<string, Channel>();
+      channels.set('#general', channel);
+      store.setState({
+        ...initialState,
+        channels,
+        activeView: { kind: 'channel', channel: '#general' },
+        connectionStatus: 'connected',
+        ourNick: 'testuser',
+      }, true);
+
+      render(() => <AppShell />);
+
+      const boosts = screen.getByLabelText('Boosts');
+      expect(within(boosts).getByText('2')).toBeInTheDocument();
+
+      fireEvent.click(within(boosts).getByTitle('alice, testuser'));
+
+      expect(store.getState().notifications).toHaveLength(0);
+      expect(store.getState().channels.get('#general')?.messages[0]?.reactions).toEqual([
+        { emoji: '🌊', users: ['alice'] },
+      ]);
+    });
+
+    it('renders a since-you-left digest from the unread boundary', () => {
+      const channel = makeChannel(
+        '#general',
+        [
+          makeMessage('msg-old', 'alice', 'Old note', '#general'),
+          makeMessage('msg-new-a', 'bob', 'New note one', '#general'),
+          { ...makeMessage('msg-new-b', 'carol', 'New note two', '#general'), highlight: true },
+        ],
+        [makeUser('alice'), makeUser('bob'), makeUser('carol')],
+      );
+      const channels = new Map<string, Channel>();
+      channels.set('#general', channel);
+      store.setState({
+        ...initialState,
+        channels,
+        activeView: { kind: 'channel', channel: '#general' },
+        connectionStatus: 'connected',
+        ourNick: 'testuser',
+        viewUnreadDividerId: new Map([['#general', 'msg-new-a']]),
+      }, true);
+
+      render(() => <AppShell />);
+
+      const digest = screen.getByRole('region', { name: 'Since you left' });
+      expect(within(digest).getByText('Since you left')).toBeInTheDocument();
+      expect(within(digest).getByText('2 messages across 1 channel · 1 mention')).toBeInTheDocument();
+      expect(within(digest).getByText('bob')).toBeInTheDocument();
+      expect(within(digest).getByText('carol')).toBeInTheDocument();
+    });
+
+    it('follows the room or selected topic from the topic strip', () => {
+      const channel = makeChannel(
+        '#general',
+        [
+          makeMessage('msg-topic-a', 'alice', 'Roadmap item', '#general', 'roadmap'),
+          makeMessage('msg-topic-b', 'bob', 'Release item', '#general', 'release'),
+        ],
+        [makeUser('alice'), makeUser('bob')],
+      );
+      const channels = new Map<string, Channel>();
+      channels.set('#general', channel);
+      store.setState({
+        ...initialState,
+        channels,
+        activeView: { kind: 'channel', channel: '#general' },
+        connectionStatus: 'connected',
+        ourNick: 'testuser',
+      }, true);
+
+      render(() => <AppShell />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Follow room' }));
+      expect(isFollowed('#general')).toBe(true);
+
+      fireEvent.click(screen.getByRole('button', { name: /roadmap/i }));
+      fireEvent.click(screen.getByRole('button', { name: 'Follow roadmap' }));
+      expect(isFollowed('#general', 'roadmap')).toBe(true);
     });
 
     it('shows author names above their message groups', () => {

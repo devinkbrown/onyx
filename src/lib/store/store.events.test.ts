@@ -6,7 +6,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { store, selectChannelEvent } from './store';
+import { store, selectChannelEphemeralSeconds, selectChannelEvent } from './store';
 
 const initialState = store.getInitialState();
 
@@ -77,5 +77,35 @@ describe('scheduled events', () => {
     const title = evt()!.title;
     expect(title.length).toBeLessThanOrEqual(180);
     expect(title).not.toContain('\n');
+  });
+});
+
+describe('ephemeral room prop', () => {
+  it('selectChannelEphemeralSeconds parses valid retention and treats 0 as off', () => {
+    store.setState({ channelProps: new Map([['#room', { EPHEMERAL: '3600' }]]) });
+    expect(selectChannelEphemeralSeconds('#room')(store.getState())).toBe(3600);
+
+    store.setState({ channelProps: new Map([['#room', { EPHEMERAL: '0' }]]) });
+    expect(selectChannelEphemeralSeconds('#room')(store.getState())).toBeNull();
+  });
+
+  it('rejects malformed or out-of-range retention values', () => {
+    for (const raw of ['', 'nope', '5', '9999999999']) {
+      store.setState({ channelProps: new Map([['#room', { EPHEMERAL: raw }]]) });
+      expect(selectChannelEphemeralSeconds('#room')(store.getState())).toBeNull();
+    }
+  });
+
+  it('setChannelEphemeral writes the EPHEMERAL prop and updates locally', () => {
+    const sendRaw = vi.fn();
+    store.setState({ client: mockClient(sendRaw) });
+
+    store.getState().setChannelEphemeral('#room', 86_400);
+    expect(sendRaw).toHaveBeenCalledWith('PROP', '#room', 'EPHEMERAL', '86400');
+    expect(selectChannelEphemeralSeconds('#room')(store.getState())).toBe(86_400);
+
+    store.getState().setChannelEphemeral('#room', 0);
+    expect(sendRaw).toHaveBeenLastCalledWith('PROP', '#room', 'EPHEMERAL', '0');
+    expect(selectChannelEphemeralSeconds('#room')(store.getState())).toBeNull();
   });
 });

@@ -3,6 +3,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { SHORTCUTS } from '@/lib/keyboard/useKeyboardShortcuts';
 import { SHORTCUT_GROUPS } from './ShortcutsSheet';
 
 describe('SHORTCUT_GROUPS', () => {
@@ -29,5 +30,31 @@ describe('SHORTCUT_GROUPS', () => {
     ));
 
     expect(commandPaletteShortcut).toBeDefined();
+  });
+
+  it('documents reader mode with a modified shortcut', () => {
+    const shortcuts = SHORTCUT_GROUPS.flatMap((group) => group.shortcuts);
+    const readerShortcut = shortcuts.find((shortcut) => shortcut.label === 'Toggle Reader mode');
+
+    expect(readerShortcut).toBeDefined();
+    expect(readerShortcut!.keys).toContain('Shift');
+    expect(readerShortcut!.keys).toContain('R');
+  });
+
+  it('documents next unread and follow as separate reading shortcuts', () => {
+    const shortcuts = SHORTCUT_GROUPS.flatMap((group) => group.shortcuts);
+
+    expect(shortcuts.find((shortcut) => shortcut.label === 'Jump to next unread channel / DM')?.keys).toEqual(['N']);
+    expect(shortcuts.find((shortcut) => shortcut.label === 'Follow current channel / DM')?.keys).toEqual(['U']);
+  });
+
+  it('mirrors every live global shortcut descriptor', () => {
+    const rendered = SHORTCUT_GROUPS.flatMap((group) => (
+      group.shortcuts.map((shortcut) => `${group.title}:${shortcut.label}`)
+    ));
+
+    for (const shortcut of SHORTCUTS) {
+      expect(rendered).toContain(`${shortcut.group}:${shortcut.description}`);
+    }
   });
 });

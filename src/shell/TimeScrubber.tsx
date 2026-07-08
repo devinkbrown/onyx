@@ -23,6 +23,7 @@ type TimeScrubberBar = {
 const HOUR_COUNT = 24;
 const REFRESH_MS = 60_000;
 const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+const COPY_RESET_MS = 1800;
 
 export function buildTimeScrubberBars(
   hours: readonly number[] | null | undefined,
@@ -88,11 +89,24 @@ function barLabel(bar: TimeScrubberBar, dateValue: string): string {
   return `Jump to ${dateValue} ${pad2(bar.hour)}:00 UTC, ${countText}`;
 }
 
+export function buildMomentLink(channel: string, at: Date, href = 'https://onyx.local/app'): string {
+  const url = new URL(href);
+  url.pathname = '/app';
+  url.hash = '';
+  url.search = '';
+  url.searchParams.set('join', channel);
+  url.searchParams.set('at', at.toISOString());
+  return url.toString();
+}
+
 export function TimeScrubber(): JSX.Element {
   const activeView = useStore((s) => s.activeView);
   const travelTo = useStore((s) => s.travelTo);
   const [selectedDate, setSelectedDate] = createSignal(formatUtcDate(new Date()));
+  const [selectedMoment, setSelectedMoment] = createSignal(new Date());
+  const [copied, setCopied] = createSignal(false);
   const [nowMs, setNowMs] = createSignal(Date.now());
+  let copyResetTimer: ReturnType<typeof setTimeout> | null = null;
 
   const activeChannel = createMemo(() => {
     const view = activeView();
@@ -108,7 +122,10 @@ export function TimeScrubber(): JSX.Element {
     setNowMs(Date.now());
     void refetch();
   }, REFRESH_MS);
-  onCleanup(() => clearInterval(timer));
+  onCleanup(() => {
+    clearInterval(timer);
+    if (copyResetTimer) clearTimeout(copyResetTimer);
+  });
 
   const bars = createMemo(() =>
     buildTimeScrubberBars(pulse()?.hours ?? null, new Date(nowMs()).getUTCHours()),
@@ -125,6 +142,8 @@ export function TimeScrubber(): JSX.Element {
     const channel = activeChannel();
     const at = dateAtUtc(selectedDate(), hour, minute);
     if (!channel || !at) return;
+    setSelectedMoment(at);
+    setCopied(false);
     travelTo()(channel, at);
   }
 
@@ -141,7 +160,34 @@ export function TimeScrubber(): JSX.Element {
     const channel = activeChannel();
     const at = dateAtUtc(next, 12, 0);
     if (!channel || !at) return;
+    setSelectedMoment(at);
+    setCopied(false);
     travelTo()(channel, at);
+  }
+
+  async function copyMoment(): Promise<void> {
+    const channel = activeChannel();
+    if (!channel) return;
+    const href = typeof window !== 'undefined' ? window.location.href : undefined;
+    const link = buildMomentLink(channel, selectedMoment(), href);
+
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(link);
+      } else if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('onyx:last-copied-moment', link);
+      }
+      setCopied(true);
+      if (copyResetTimer) clearTimeout(copyResetTimer);
+      copyResetTimer = setTimeout(() => setCopied(false), COPY_RESET_MS);
+    } catch {
+      try {
+        if (typeof localStorage !== 'undefined') localStorage.setItem('onyx:last-copied-moment', link);
+        setCopied(true);
+      } catch {
+        setCopied(false);
+      }
+    }
   }
 
   return (
@@ -182,12 +228,21 @@ export function TimeScrubber(): JSX.Element {
             <label class="time-scrubber__date">
               <span>jump date</span>
               <input
+                data-time-scrubber-date
                 type="date"
                 value={selectedDate()}
                 onInput={handleDateInput}
                 aria-label="Jump to date at 12:00 UTC"
               />
             </label>
+            <button
+              type="button"
+              class="time-scrubber__copy"
+              aria-label="Copy moment link"
+              onClick={() => void copyMoment()}
+            >
+              {copied() ? 'Copied' : 'Copy moment'}
+            </button>
           </div>
         </section>
       )}

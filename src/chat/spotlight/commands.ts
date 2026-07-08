@@ -21,7 +21,6 @@ export type SpotlightCommand = {
 
 type CommandState = Pick<State, 'channels' | 'dms' | 'server' | 'networkName' | 'activeView' | 'showMemberList' | 'voice'>;
 
-const THEME_STORAGE_KEY = 'onyx:theme';
 const BACKGROUND_STORAGE_KEY = 'onyx:bg';
 const SPOTLIGHT_INPUT_ID = 'onyx-spotlight-input';
 
@@ -57,6 +56,31 @@ function timeExprFromQuery(query: string): string | null {
   return null;
 }
 
+function commandArg(query: string, command: string): string | null {
+  const trimmed = query.trim();
+  const prefix = `${command} `;
+  return trimmed.toLowerCase().startsWith(prefix) ? trimmed.slice(prefix.length).trim() : null;
+}
+
+function parseMuteDuration(expr: string): { ms: number; label: string } | null {
+  const match = expr.trim().match(/^(\d{1,3})\s*(m|min|mins|minute|minutes|h|hr|hrs|hour|hours|d|day|days)$/i);
+  if (!match) return null;
+  const value = Number(match[1]);
+  if (!Number.isInteger(value) || value <= 0) return null;
+  const unit = match[2]!.toLowerCase();
+  const multiplier =
+    unit.startsWith('m') ? 60_000 :
+    unit.startsWith('h') ? 3_600_000 :
+    86_400_000;
+  const ms = value * multiplier;
+  if (ms > 7 * 86_400_000) return null;
+  const noun =
+    multiplier === 60_000 ? 'minute' :
+    multiplier === 3_600_000 ? 'hour' :
+    'day';
+  return { ms, label: `${value} ${noun}${value === 1 ? '' : 's'}` };
+}
+
 function readSpotlightQuery(): string {
   if (typeof document === 'undefined') return '';
   const input = document.getElementById(SPOTLIGHT_INPUT_ID);
@@ -90,6 +114,66 @@ function timeJumpCommands(state: CommandState, query: string): SpotlightCommand[
   ];
 }
 
+function grammarCommands(state: CommandState, query: string): SpotlightCommand[] {
+  const commands: SpotlightCommand[] = [];
+  const gotoArg = commandArg(query, 'goto');
+  if (gotoArg) {
+    const channel = normalizeChannel(gotoArg);
+    if (channel.length > 1) {
+      const known = state.channels.get(channel.toLowerCase());
+      commands.push({
+        id: `grammar:goto:${channel.toLowerCase()}`,
+        section: 'Actions',
+        title: known ? `Go to ${known.name}` : `Join ${channel}`,
+        hint: known ? channelHint(known) : 'channel',
+        keywords: [query.trim(), 'goto', 'go to', channel],
+        run: () => {
+          const current = getState();
+          current.joinChannel(known?.name ?? channel);
+          current.navigate({ kind: 'channel', channel: known?.name ?? channel });
+        },
+      });
+    }
+  }
+
+  const dmArg = commandArg(query, 'dm');
+  if (dmArg) {
+    const nick = dmArg.replace(/^@/, '').trim();
+    if (/^[^\s,]{1,64}$/.test(nick)) {
+      const known = state.dms.get(nick.toLowerCase());
+      commands.push({
+        id: `grammar:dm:${nick.toLowerCase()}`,
+        section: 'Actions',
+        title: `Open DM with ${known?.nick ?? nick}`,
+        hint: known ? dmHint(known) : '@nick',
+        keywords: [query.trim(), 'dm', 'message', nick],
+        run: () => getState().navigate({ kind: 'dm', nick: known?.nick ?? nick }),
+      });
+    }
+  }
+
+  const muteArg = commandArg(query, 'mute');
+  if (muteArg) {
+    const duration = parseMuteDuration(muteArg);
+    if (duration) {
+      commands.push({
+        id: `grammar:mute:${duration.label}`,
+        section: 'Actions',
+        title: `Mute notifications for ${duration.label}`,
+        hint: 'Do not disturb',
+        keywords: [query.trim(), 'mute', 'do not disturb', duration.label],
+        run: () => {
+          const current = getState();
+          current.setDndEnabled(false);
+          current.setDndUntil(Date.now() + duration.ms);
+        },
+      });
+    }
+  }
+
+  return commands;
+}
+
 function navigateTo(path: string): void {
   if (typeof window === 'undefined') return;
 
@@ -97,17 +181,9 @@ function navigateTo(path: string): void {
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
-function persistTheme(id: ThemeId): void {
-  try {
-    localStorage.setItem(THEME_STORAGE_KEY, id);
-  } catch {
-    /* storage unavailable */
-  }
-}
-
 function applyTheme(id: ThemeId): void {
   applyThemeToDom(id);
-  persistTheme(id);
+  getState().setTheme(id);
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('onyx:theme-change', { detail: { id } }));
   }
@@ -375,6 +451,7 @@ export function buildCommands(state: CommandState = getState(), query = ''): Spo
   }));
 
   return [
+    ...grammarCommands(state, query),
     ...timeJumpCommands(state, query),
     ...channels,
     ...dms,

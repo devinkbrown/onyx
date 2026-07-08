@@ -20,12 +20,13 @@ import { relTime } from './HomeView';
 const TYPE_GLYPH: Record<Notification['type'], string> = {
   mention: '@',
   dm: 'dm',
+  follow: '•',
   system: '·',
   error: '!',
 };
 
 function targetOf(n: Notification): { kind: 'channel'; channel: string } | { kind: 'dm'; nick: string } | null {
-  if (n.type === 'mention' && n.channel) return { kind: 'channel', channel: n.channel };
+  if ((n.type === 'mention' || n.type === 'follow') && n.channel) return { kind: 'channel', channel: n.channel };
   if (n.type === 'dm' && n.from) return { kind: 'dm', nick: n.from };
   return null;
 }
@@ -38,7 +39,7 @@ export function NotificationCenter(): JSX.Element {
   const unreadCount = createMemo(
     () =>
       notifications().filter(
-        (n) => (n.type === 'mention' || n.type === 'dm') && !readIds().has(n.id),
+        (n) => (n.type === 'mention' || n.type === 'dm' || n.type === 'follow') && !readIds().has(n.id),
       ).length,
   );
 

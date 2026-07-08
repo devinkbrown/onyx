@@ -1,5 +1,3 @@
-'use client';
-
 import type { IRCClient } from '../irc/client';
 import {
   OpcodecWasm, KaguraVoxEncoder, KaguraVisEncoder,

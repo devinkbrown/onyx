@@ -124,6 +124,14 @@ describe('buildMultilineLines', () => {
     // second batch start carries no tags
     expect(lines[4]).toBe('BATCH +r2 draft/multiline #chan\r\n');
   });
+
+  it('escapes extra tag values on the first BATCH command', () => {
+    const batches = planMultilineBatches('one\ntwo')!;
+    const { lines } = buildMultilineLines('#chan', batches, makeRef, {
+      'orochi/topic': 'release train',
+    });
+    expect(lines[0]).toBe('@orochi/topic=release\\strain BATCH +ref1 draft/multiline #chan\r\n');
+  });
 });
 
 describe('assembleMultilineText', () => {

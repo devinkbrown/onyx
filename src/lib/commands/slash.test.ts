@@ -19,6 +19,7 @@ describe('slash command registry', () => {
   it('returns typed command suggestions by name or alias', () => {
     expect(getSlashCommandSuggestions('/jo').map((command) => command.name)).toEqual(['join']);
     expect(getSlashCommandSuggestions('/j').some((command) => command.name === 'join')).toBe(true);
+    expect(getSlashCommandSuggestions('/web').map((command) => command.name)).toEqual(['webhook']);
     expect(findSlashCommand('leave')?.name).toBe('part');
   });
 

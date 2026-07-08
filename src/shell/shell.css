@@ -1105,6 +1105,41 @@
   color: var(--washi-mute);
 }
 
+.ap-panel-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.ap-panel-link {
+  appearance: none;
+  border: 0;
+  border-bottom: 1px solid color-mix(in oklab, var(--lapis-bright) 30%, transparent);
+  border-radius: 0;
+  background: transparent;
+  color: var(--lapis-bright);
+  cursor: pointer;
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  padding: 0 0 2px;
+  transition:
+    color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+}
+
+.ap-panel-link:hover {
+  color: var(--gold-bright);
+  border-color: var(--gold-bright);
+}
+
+.ap-panel-link:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 3px;
+}
+
 .ap-panel-themes {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1290,6 +1325,23 @@
   border-color: var(--lapis-bright);
 }
 
+.shell-chset-select {
+  width: min(100%, 18rem);
+  min-height: 2.4rem;
+  padding: 0 var(--space-3);
+  color: var(--washi);
+  background: color-mix(in oklab, var(--ink) 18%, transparent);
+  border: 1px solid var(--seam);
+  border-radius: var(--r-md);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
+.shell-chset-select:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
 .shell-chset-hint {
   font-family: var(--font-mono);
   font-size: 0.66rem;
@@ -1429,11 +1481,50 @@
   justify-items: start;
 }
 
+.shell-chset-retention {
+  padding: var(--space-3);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--ink) 10%, transparent);
+}
+
+.shell-chset-webhooks {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--ink) 10%, transparent);
+}
+
+.shell-chset-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.shell-chset-notices {
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--seam-faint);
+}
+
+.shell-chset-notice {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  line-height: 1.45;
+  color: var(--washi-dim);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .shell-chset-toggle,
   .shell-chset-toggle-track,
   .shell-chset-toggle-thumb,
-  .shell-chset-textarea {
+  .shell-chset-textarea,
+  .shell-chset-select {
     transition: none;
   }
 }
@@ -1464,6 +1555,188 @@
   padding: var(--space-3) 0 var(--space-2);
   scrollbar-width: thin;
   scrollbar-color: var(--seam-faint) transparent;
+}
+
+.shell-topic-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  flex: none;
+  padding: var(--space-3) var(--space-5) var(--space-2);
+  border-bottom: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--ink) 16%, transparent);
+}
+
+.shell-topic-follow {
+  flex: none;
+  min-height: 2rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--seam);
+  border-radius: var(--r-pill);
+  appearance: none;
+  background: color-mix(in oklab, var(--stone) 70%, transparent);
+  color: var(--washi-dim);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.shell-topic-follow:hover,
+.shell-topic-follow:focus-visible {
+  border-color: var(--lapis-bright);
+  color: var(--washi);
+}
+
+.shell-topic-follow:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.shell-topic-follow.is-active {
+  border-color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis-bright) 84%, var(--stone));
+  color: var(--ink);
+}
+
+.shell-topic-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.shell-topic-action {
+  min-height: 2rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-pill);
+  appearance: none;
+  background: transparent;
+  color: var(--washi-mute);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.shell-topic-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.shell-topic-action:hover,
+.shell-topic-action:focus-visible {
+  border-color: var(--lapis-bright);
+  color: var(--washi);
+}
+
+.shell-topic-action.is-active {
+  border-color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis-deep) 24%, transparent);
+  color: var(--lapis-bright);
+}
+
+.shell-topic-create {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: min(100%, 16rem);
+}
+
+.shell-topic-create-input {
+  width: 9rem;
+  min-height: 2rem;
+  min-width: 0;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  color: var(--washi);
+  background: color-mix(in oklab, var(--stone) 58%, transparent);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.shell-topic-create-input::placeholder {
+  color: var(--washi-mute);
+}
+
+.shell-topic-create-input:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.shell-topic-forum {
+  display: grid;
+  gap: var(--space-2);
+  max-width: var(--shell-measure);
+  margin: 0 auto var(--space-3);
+  padding: 0 var(--space-4);
+}
+
+.shell-topic-card {
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--stone-2) 34%, transparent);
+}
+
+.shell-topic-card-main {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-1) var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  background: transparent;
+}
+
+.shell-topic-card-main:hover,
+.shell-topic-card-main:focus-visible {
+  outline: none;
+  background: color-mix(in oklab, var(--lapis-deep) 16%, transparent);
+}
+
+.shell-topic-card-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--washi);
+  font-weight: 800;
+}
+
+.shell-topic-card-meta {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--washi-mute);
+}
+
+.shell-topic-card-preview {
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--washi-dim);
+  font-size: 0.78rem;
+}
+
+.shell-topic-card-author {
+  margin-right: var(--space-2);
+  color: var(--lapis-bright);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+}
+
+.shell-boosts {
+  margin-top: var(--space-2);
 }
 
 .shell-feed-empty {
@@ -1601,12 +1874,20 @@
 }
 
 .shell-msg-group:hover,
-.shell-msg-cont:hover {
+.shell-msg-group:focus-visible,
+.shell-msg-cont:hover,
+.shell-msg-cont:focus-visible {
   background: linear-gradient(
     90deg,
     color-mix(in oklab, var(--lapis-deep) 11%, transparent) 0%,
     color-mix(in oklab, var(--lapis-deep) 5%, transparent) 100%
   );
+}
+
+.shell-msg-group:focus-visible,
+.shell-msg-cont:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
 }
 
 .shell-msg-group--system {
@@ -1644,7 +1925,8 @@
   transition: color var(--dur) var(--ease);
 }
 
-.shell-msg-group:hover .shell-msg-author {
+.shell-msg-group:hover .shell-msg-author,
+.shell-msg-group:focus-visible .shell-msg-author {
   color: var(--lapis-bright);
 }
 
@@ -1744,7 +2026,8 @@
   transition: opacity var(--dur) var(--ease);
 }
 
-.shell-msg-cont:hover .shell-msg-cont-ts { opacity: 0.85; }
+.shell-msg-cont:hover .shell-msg-cont-ts,
+.shell-msg-cont:focus-visible .shell-msg-cont-ts { opacity: 0.85; }
 
 .shell-msg-cont-body {
   grid-column: 2;
@@ -1814,6 +2097,56 @@
   border-radius: var(--r-pill);
   background: color-mix(in oklab, var(--lapis-deep) 24%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 26%, transparent);
+}
+
+.shell-since-digest {
+  display: grid;
+  gap: var(--space-1);
+  max-width: var(--shell-measure);
+  margin: var(--space-3) auto;
+  padding: var(--space-3) var(--space-5);
+  border-block: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--ink) 12%, transparent);
+}
+
+.shell-since-digest__kicker {
+  color: var(--lapis-bright);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.shell-since-digest__headline,
+.shell-since-digest__detail {
+  margin: 0;
+}
+
+.shell-since-digest__headline {
+  color: var(--washi);
+  font-family: var(--font-serif);
+  font-size: 0.92rem;
+}
+
+.shell-since-digest__detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  color: var(--washi-dim);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+}
+
+.shell-since-digest__detail strong {
+  color: var(--lapis-bright);
+  font-weight: 900;
+}
+
+.shell-since-digest-card {
+  max-width: min(var(--shell-measure), calc(100% - var(--space-6)));
+  margin: var(--space-4) auto;
 }
 
 /* Highlight — a message that names you. Bioluminescent azure crest, never
@@ -2115,6 +2448,56 @@
   border-radius: var(--r-md);
   color: var(--washi-dim);
   background: color-mix(in oklab, var(--stone-2) 38%, transparent);
+}
+
+.shell-composer-topic {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: min(100%, 360px);
+  margin-bottom: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid color-mix(in oklab, var(--lapis) 34%, var(--seam-faint));
+  border-radius: var(--r-md);
+  color: var(--washi-dim);
+  background: color-mix(in oklab, var(--lapis-deep) 16%, var(--stone-2));
+}
+
+.shell-composer-topic-label {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lapis-bright);
+}
+
+.shell-composer-topic-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  color: var(--washi);
+}
+
+.shell-composer-topic-clear {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  color: var(--washi-mute);
+  background: transparent;
+  line-height: 1;
+}
+
+.shell-composer-topic-clear:hover {
+  color: var(--washi);
+  border-color: var(--seam-faint);
+  background: color-mix(in oklab, var(--stone-2) 48%, transparent);
 }
 
 .shell-composer-context--edit {
