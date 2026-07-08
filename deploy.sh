@@ -28,8 +28,8 @@ test -f dist/sw.js      || { echo "FAIL: dist/sw.js missing"; exit 1; }
 # (e.g. /app, the 'Open Onyx' target) 404s under nginx's
 # `try_files $uri $uri/ $uri/index.html =404`. Materialise each client route as
 # its own index.html copy. Keep this list in sync with the <Route> table in index.tsx.
-echo "==> materialising SPA route entrypoints (app, about, appearance)"
-for route in app about appearance; do
+echo "==> materialising SPA route entrypoints (app, about, appearance, stats, status, roadmap)"
+for route in app about appearance stats status roadmap; do
   mkdir -p "dist/${route}"
   cp dist/index.html "dist/${route}/index.html"
 done
