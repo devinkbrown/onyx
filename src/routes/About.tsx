@@ -81,7 +81,7 @@ export default function About() {
         <h2 id="protocol-heading" class="r-title">Open wire,<br />bring any client</h2>
         <p class="r-lede">
           IRCv3 + IRCX over a plain WebSocket. No SDK required. The wire format is
-          documented, interoperable, and you can point any IRC client at the port.
+          documented, interoperable, and open to any tool that speaks the protocol.
         </p>
 
         <div class="ab-proto-grid">
@@ -185,7 +185,7 @@ export default function About() {
             class="ab-media-diagram"
             viewBox="0 0 580 320"
             role="img"
-            aria-label="Media path: clients encode with KAGURAVOX/KAGURAVIS (or WASM on browser), send opaque kagura frames over WebTransport or WebRTC DataChannel to the SFU, which forwards them unchanged."
+            aria-label="Media path: clients encode with KAGURAVOX/KAGURAVIS or WASM, send opaque LADON media frames over Ophion transport to the SFU, which forwards them unchanged."
           >
             {/* SFU center */}
             <rect x="230" y="120" width="120" height="80" fill="none" stroke="var(--seam)" stroke-width="1.5" />
@@ -258,32 +258,31 @@ export default function About() {
         <div class="ab-transport-row" role="list" aria-label="Transport options">
           <article class="ab-transport primary" role="listitem">
             <span class="t-label">Default</span>
-            <h4>WebTransport<br />over QUIC</h4>
+            <h4>LADON media<br />over QUIC</h4>
             <p>
-              The preferred transport. Datagram-eligible, head-of-line-blocking free,
-              lower latency than TCP. Kagura frames ride QUIC datagrams — a lost media
-              packet never stalls channel state.
+              The preferred transport path. Datagram-eligible, head-of-line-blocking
+              free, lower latency than TCP. LADON media frames ride the Ophion path,
+              so a lost media packet never stalls channel state.
             </p>
           </article>
 
           <article class="ab-transport secondary" role="listitem">
             <span class="t-label">Fallback carrier</span>
-            <h4>WebRTC<br />DataChannel</h4>
+            <h4>Ophion relay<br />over WebSocket</h4>
             <p>
-              Where QUIC isn't available — older iOS Safari, restrictive NATs —
-              a WebRTC DataChannel carries the exact same opaque kagura frames.
-              Same bytes, same codec, different pipe. WebRTC is the pipe, not the codec.
+              Where QUIC is not available, the browser keeps the same opaque LADON
+              frames moving over the WebSocket relay path. Same bytes, same codec,
+              different pipe.
             </p>
           </article>
 
           <article class="ab-transport fallback" role="listitem">
-            <span class="t-label">Opt-in only</span>
-            <h4>Standard WebRTC<br />codecs</h4>
+            <span class="t-label">Portable fallback</span>
+            <h4>WASM decode<br />everywhere</h4>
             <p>
-              A user on a device that can't WASM-decode KaguraVis at framerate — or simply
-              prefers hardware codecs — can <em>choose</em> to use Opus/H.264/VP8 via
-              standard WebRTC. This is a deliberate per-user choice. The server still
-              never transcodes; convergence on a shared codec is a client responsibility.
+              Browsers and mobile clients run the same KaguraVox/KaguraVis codecs via
+              WebAssembly. The server still never transcodes; codec convergence is a
+              client responsibility.
             </p>
           </article>
         </div>
@@ -674,7 +673,7 @@ export default function About() {
         <span class="r-eyebrow">07 — build on it</span>
         <h2 id="developer-heading" class="r-title">Open protocol.<br />Sovereign mesh.</h2>
         <p class="r-lede">
-          The wire format is documented and speaks to any IRC client. You can also run
+          The wire format is documented and usable outside Onyx. You can also run
           your own Orochi node and peer it into the mesh — full sovereignty over your
           slice of the network.
         </p>
@@ -685,8 +684,8 @@ export default function About() {
             <h3>Any client,<br />any language</h3>
             <p>
               IRCv3 + IRCX over WebSocket. The protocol is public and interoperable.
-              You don't need Onyx. Connect with <b>irssi, WeeChat, Thunderbird</b>, a
-              custom bot, or a new client you build from scratch.
+              You don't need Onyx. Connect with a protocol-compatible tool, a custom
+              bot, or a new client you build from scratch.
             </p>
             <p>
               SASL PLAIN gets you in. Add SESSION for persistent reconnect.

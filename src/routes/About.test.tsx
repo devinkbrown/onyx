@@ -141,16 +141,20 @@ describe('About page — source structure', () => {
     expect(/kaguravis/i.test(src)).toBe(true);
   });
 
-  it('mentions WebTransport as the primary/default transport', () => {
-    expect(srcContains('WebTransport')).toBe(true);
+  it('mentions LADON media as the primary/default transport framing', () => {
+    expect(srcContains('LADON media')).toBe(true);
   });
 
-  it('mentions WebRTC DataChannel as a carrier (not the default codec)', () => {
-    expect(srcContains('DataChannel')).toBe(true);
+  it('mentions Ophion relay as the browser fallback carrier', () => {
+    expect(srcContains('Ophion relay')).toBe(true);
   });
 
-  it('marks standard WebRTC codecs as opt-in', () => {
-    expect(/opt-in/i.test(src)).toBe(true);
+  it('does not use WebRTC framing in the main website copy', () => {
+    expect(/webrtc/i.test(src)).toBe(false);
+  });
+
+  it('does not frame Onyx as an IRC client in the main website copy', () => {
+    expect(/irc client/i.test(src)).toBe(false);
   });
 
   it('mentions TreeKEM for group key derivation', () => {
