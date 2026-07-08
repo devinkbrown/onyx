@@ -59,6 +59,7 @@ describe('Landing', () => {
 
     expect(hrefs).toContain('/stats');
     expect(hrefs).toContain('/status');
+    expect(hrefs).toContain('/roadmap');
   });
 
   it('surfaces live public telemetry on the root website', () => {

@@ -45,6 +45,7 @@ export default function Landing() {
           <a class="hideable" href="#rooms">Rooms</a>
           <a class="hideable" href="/stats">Stats</a>
           <a class="hideable" href="/status">Status</a>
+          <a class="hideable" href="/roadmap">Roadmap</a>
           <a class="hideable" href="#join">Join</a>
           <span class="live hideable"><i aria-hidden="true" />network online</span>
           <a class="enter" href="/app">Open Onyx</a>
@@ -298,7 +299,7 @@ export default function Landing() {
             <p>A warm, open home on the Orochi network — real rooms, real people, encrypted media, and a name that's yours to keep. Built in the open.</p>
           </div>
           <div class="col"><h5>Community</h5><a href="#community">Who's here</a><a href="#rooms">Rooms</a><a href="#join">Join</a><a href="/app">Open Onyx</a></div>
-          <div class="col"><h5>Network</h5><a href="/about">The network</a><a href="/stats">Channel stats</a><a href="/status">Mesh status</a><a href="/about">Run a node</a></div>
+          <div class="col"><h5>Network</h5><a href="/about">The network</a><a href="/stats">Channel stats</a><a href="/status">Mesh status</a><a href="/roadmap">Roadmap</a></div>
           <div class="col"><h5>Get in</h5><a href="/app">Drop into #root</a><a href="/app">Browse rooms</a><a href="/about">Build a client</a><a href="/about">Read more</a></div>
         </div>
         <div class="base"><span><Mascot variant="mark" /> Onyx — on the Orochi network</span><span>Open IRC · made for people · 2026</span></div>

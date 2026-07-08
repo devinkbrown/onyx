@@ -25,6 +25,7 @@ function PageChrome(props: { children: JSX.Element }) {
           <a class="hideable" href="/">Home</a>
           <a class="hideable" href="/stats" aria-current="page">Stats</a>
           <a class="hideable" href="/status">Status</a>
+          <a class="hideable" href="/roadmap">Roadmap</a>
           <a class="hideable" href="/about">About</a>
           <span class="live hideable"><i aria-hidden="true" />network online</span>
           <a class="enter" href="/app">Open Onyx</a>

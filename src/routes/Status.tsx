@@ -38,6 +38,7 @@ export default function StatusRoute() {
           <a class="hideable" href="/">Home</a>
           <a class="hideable" href="/stats">Stats</a>
           <a class="hideable" href="/status" aria-current="page">Status</a>
+          <a class="hideable" href="/roadmap">Roadmap</a>
           <a class="hideable" href="/about">About</a>
           <span class="live hideable"><i aria-hidden="true" />mesh online</span>
           <a class="enter" href="/app">Open Onyx</a>

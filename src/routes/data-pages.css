@@ -279,6 +279,107 @@
   font-weight: 650;
 }
 
+.roadmap-track {
+  display: grid;
+  gap: 18px;
+  margin-top: 42px;
+}
+
+.roadmap-phase {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: clamp(16px, 2vw, 30px);
+}
+
+.roadmap-phase__rail {
+  position: relative;
+  min-height: 100%;
+}
+
+.roadmap-phase__rail::before {
+  content: '';
+  position: absolute;
+  inset: 20px auto -20px 50%;
+  width: 1px;
+  background: var(--seam-faint);
+}
+
+.roadmap-phase:last-child .roadmap-phase__rail::before {
+  display: none;
+}
+
+.roadmap-phase__rail span {
+  position: sticky;
+  top: 76px;
+  display: block;
+  width: 18px;
+  height: 18px;
+  margin: 20px auto 0;
+  border-radius: var(--r-pill);
+  background: var(--ok);
+  box-shadow: 0 0 18px color-mix(in oklab, var(--ok) 60%, transparent);
+}
+
+.roadmap-phase[data-state='active'] .roadmap-phase__rail span {
+  background: var(--lapis-bright);
+  box-shadow: 0 0 22px color-mix(in oklab, var(--lapis-bright) 70%, transparent);
+}
+
+.roadmap-phase__body {
+  padding: clamp(20px, 2.4vw, 30px);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--stone-2) 42%, var(--ink));
+}
+
+.roadmap-phase__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--lapis-bright);
+}
+
+.roadmap-phase h3 {
+  margin: 14px 0 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(1.9rem, 1rem + 2.4vw, 3.8rem);
+  line-height: 0.95;
+  text-transform: uppercase;
+  color: var(--washi);
+}
+
+.roadmap-phase p {
+  margin: 14px 0 0;
+  max-width: 68ch;
+  color: var(--washi-dim);
+  line-height: 1.6;
+}
+
+.roadmap-phase ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.roadmap-phase li {
+  padding: 7px 10px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--washi-dim);
+}
+
 @media (max-width: 640px) {
   .data-row {
     grid-template-columns: 1fr;
@@ -308,5 +409,13 @@
   .peer-table td {
     border-top: 0;
     padding: 4px 0;
+  }
+
+  .roadmap-phase {
+    grid-template-columns: 1fr;
+  }
+
+  .roadmap-phase__rail {
+    display: none;
   }
 }
