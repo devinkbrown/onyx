@@ -2,6 +2,7 @@ import './landing.css';
 import './data-pages.css';
 import { For } from 'solid-js';
 import { Mascot } from '@/components/brand/Mascot';
+import { setPageMeta } from './pageMeta';
 
 type Phase = {
   phase: string;
@@ -56,6 +57,10 @@ const phases: Phase[] = [
 ];
 
 export default function RoadmapRoute() {
+  setPageMeta(
+    'Onyx roadmap — what shipped and what is next',
+    'Track the public Onyx roadmap across memory, reach, privacy, presence, and operational visibility.',
+  );
   return (
     <main class="r data-page roadmap-page">
       <div class="r-ground" aria-hidden="true" />

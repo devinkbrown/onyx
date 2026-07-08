@@ -5,12 +5,17 @@ import { Mascot } from '@/components/brand/Mascot';
 import { fetchBackupManifest } from '@/lib/stats/backups';
 import { relTime } from '@/lib/stats/networkIndex';
 import { fetchNetworkStatus, formatDuration } from '@/lib/stats/status';
+import { setPageMeta } from './pageMeta';
 
 function statusState(quorum: boolean, partitioned: boolean): 'up' | 'degraded' {
   return quorum && !partitioned ? 'up' : 'degraded';
 }
 
 export default function StatusRoute() {
+  setPageMeta(
+    'Onyx status — IRCXNet mesh health',
+    'Public IRCXNet mesh health, node uptime, peer latency, users online, and backup readiness.',
+  );
   const [status] = createResource(fetchNetworkStatus);
   const [backups] = createResource(fetchBackupManifest);
   const [nowMs, setNowMs] = createSignal(Date.now());

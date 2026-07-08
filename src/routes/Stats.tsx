@@ -3,6 +3,7 @@ import './data-pages.css';
 import { createMemo, createResource, createSignal, For, onCleanup, Show, type JSX } from 'solid-js';
 import { Mascot } from '@/components/brand/Mascot';
 import { fetchStatsIndex, relTime, type NetworkDay, type StatsChannel } from '@/lib/stats/networkIndex';
+import { setPageMeta } from './pageMeta';
 
 function PageChrome(props: { children: JSX.Element }) {
   return (
@@ -68,6 +69,10 @@ function ChannelRow(props: { channel: StatsChannel; nowMs: number }) {
 }
 
 export default function StatsRoute() {
+  setPageMeta(
+    'Onyx stats — live IRCXNet room activity',
+    'See public IRCXNet room activity, network message trends, people online, and channel sparklines.',
+  );
   const [stats] = createResource(fetchStatsIndex);
   const [nowMs, setNowMs] = createSignal(Date.now());
   const timer = setInterval(() => setNowMs(Date.now()), 30_000);

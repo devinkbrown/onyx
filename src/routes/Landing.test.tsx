@@ -68,4 +68,11 @@ describe('Landing', () => {
     expect(getByText(/The network\s*is visible/i)).toBeInTheDocument();
     expect(getByText(/Public telemetry is part of the front door/i)).toBeInTheDocument();
   });
+
+  it('sets root website metadata', () => {
+    render(() => <Landing />);
+
+    expect(document.title).toMatch(/open rooms/i);
+    expect(document.querySelector('meta[name="description"]')?.getAttribute('content')).toMatch(/front door/i);
+  });
 });

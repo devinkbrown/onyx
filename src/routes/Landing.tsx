@@ -3,12 +3,17 @@ import { createMemo, createResource, Show } from 'solid-js';
 import { Mascot } from '@/components/brand/Mascot';
 import { fetchStatsIndex } from '@/lib/stats/networkIndex';
 import { fetchNetworkStatus, formatDuration } from '@/lib/stats/status';
+import { setPageMeta } from './pageMeta';
 
 /** Onyx launch site — Ocean: deep-water dark luxury, community-first.
  *  Leads with people and place: a real IRC network you join, not a product you buy.
  *  Atmosphere is ocean depth + flowing azure currents + drifting bioluminescence,
  *  all reduced-motion safe. The friendly water-dragon Mascot is the brand face. */
 export default function Landing() {
+  setPageMeta(
+    'Onyx — open rooms and encrypted media on IRCXNet',
+    'Onyx is the public front door to IRCXNet: open rooms, encrypted media, live network stats, and a name that is yours.',
+  );
   const [stats] = createResource(fetchStatsIndex);
   const [status] = createResource(fetchNetworkStatus);
   const busiest = createMemo(() =>

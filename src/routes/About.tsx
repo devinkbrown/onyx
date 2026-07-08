@@ -2,6 +2,7 @@ import './landing.css';
 import './about.css';
 import { Mascot } from '@/components/brand/Mascot';
 import { AccessibilityStatement } from '@/shell/AccessibilityStatement';
+import { setPageMeta } from './pageMeta';
 
 /**
  * Onyx /about — full editorial deep-dive.
@@ -16,6 +17,10 @@ import { AccessibilityStatement } from '@/shell/AccessibilityStatement';
  *   docs/architecture/00-overview.md
  */
 export default function About() {
+  setPageMeta(
+    'About Onyx — open protocol, sovereign mesh',
+    'Learn how Onyx, Orochi, LADON media, and the IRCXNet mesh work together without closed-platform lock-in.',
+  );
   return (
     <main class="r ab-ocean">
       {/* ── Living atmosphere (shared with landing, ocean-tinted here) ── */}
