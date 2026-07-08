@@ -441,6 +441,50 @@
 .conn-password-toggle:focus-visible { outline: 2px solid var(--lapis-bright); outline-offset: 2px; }
 .conn-password-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* ── Passkey sign-in option ── */
+.conn-passkey {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.conn-passkey-divider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  color: var(--washi-mute);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.conn-passkey-divider::before,
+.conn-passkey-divider::after {
+  content: '';
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--lapis) 36%, var(--line)),
+    transparent
+  );
+}
+
+.conn-passkey-button {
+  width: 100%;
+}
+
+.conn-passkey-error {
+  margin: 0;
+  color: var(--shu-bright);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  line-height: 1.45;
+  letter-spacing: 0.04em;
+}
+
 /* ── Password strength meter (register) ── */
 .conn-strength {
   display: flex;
