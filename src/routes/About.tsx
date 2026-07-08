@@ -1,6 +1,7 @@
 import './landing.css';
 import './about.css';
 import { Mascot } from '@/components/brand/Mascot';
+import { AccessibilityStatement } from '@/shell/AccessibilityStatement';
 
 /**
  * Onyx /about — full editorial deep-dive.
@@ -45,6 +46,7 @@ export default function About() {
           <a class="hideable" href="#protocol">Protocol</a>
           <a class="hideable" href="#media">Media</a>
           <a class="hideable" href="#mesh">Mesh</a>
+          <a class="hideable" href="#accessibility">Accessibility</a>
           <span class="live hideable"><i aria-hidden="true" />mesh online</span>
           <a class="enter" href="/app">Open Onyx</a>
         </nav>
@@ -737,6 +739,14 @@ export default function About() {
 
       <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
 
+      {/* ── 8. Accessibility ── */}
+      <section id="accessibility" class="r-wrap ab-section" aria-labelledby="a11y-statement-title">
+        <span class="r-eyebrow">08 — accessibility</span>
+        <AccessibilityStatement class="ab-a11y" />
+      </section>
+
+      <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
+
       {/* ── Footer ── */}
       <footer class="r-wrap r-footer">
         <div class="cols">
@@ -756,6 +766,7 @@ export default function About() {
             <a href="#services">Services</a>
             <a href="#mythos">Names</a>
             <a href="#developer">Build on it</a>
+            <a href="#accessibility">Accessibility</a>
           </div>
           <div class="col">
             <h5>Network</h5>

@@ -8,6 +8,7 @@ import {
   playNotificationBeep,
   showDesktopNotification,
 } from './browser';
+import { calmPreset, classifyNotification, type CalmContext } from './calmMode';
 import { shouldNotify } from './decision';
 
 const DESKTOP_THROTTLE_MS = 6000;
@@ -113,6 +114,19 @@ export function NotificationRuntime(): null {
     function handleNotification(note: StoreNotification): void {
       const target = notificationTarget(note);
       if (!target) return;
+
+      // The active calm preset governs whether this alert may surface at all,
+      // before the finer-grained desktop/sound decision runs.
+      //  - 'silent': omit entirely (the store already tracks the unread entry)
+      //  - 'badge':  unread count only, no sound and no OS notification
+      //  - 'notify': fall through to the existing full sound + desktop path
+      const calmContext: CalmContext = {
+        isMention: note.type === 'mention',
+        isDirect: note.type === 'dm',
+        isFollowed: false,
+        isBoost: false,
+      };
+      if (classifyNotification(calmPreset(), calmContext) !== 'notify') return;
 
       const state = getState();
       const nowMs = Date.now();

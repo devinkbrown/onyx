@@ -399,6 +399,48 @@
 .conn-resume-dismiss:hover { color: var(--washi-dim); }
 .conn-resume-dismiss:focus-visible { outline: 2px solid var(--lapis-bright); outline-offset: 2px; border-radius: 3px; }
 
+/* ── Invite preview — a calm welcome when arriving via an invite link ── */
+.conn-invite {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 15px 17px;
+  border-radius: var(--r-sm);
+  border: 1px solid color-mix(in oklab, var(--lapis) 34%, transparent);
+  background:
+    radial-gradient(130% 150% at 100% 0%,
+      color-mix(in oklab, var(--lapis-deep) 26%, transparent), transparent 62%),
+    color-mix(in oklab, var(--ink) 58%, var(--stone));
+  box-shadow: 0 0 26px -14px color-mix(in oklab, var(--lapis) 70%, transparent);
+}
+
+.conn-invite-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--lapis-bright);
+}
+
+.conn-invite-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.12rem;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  color: var(--washi);
+}
+
+.conn-invite-desc {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--washi-dim);
+}
+
 /* ── Form fields ── */
 .conn-fields {
   display: flex;
@@ -808,7 +850,8 @@
 .conn-fields,
 .conn-verify,
 .conn-reclaim-form,
-.conn-resume {
+.conn-resume,
+.conn-invite {
   animation: conn-rise var(--dur) var(--ease) both;
 }
 @keyframes conn-rise {
@@ -827,7 +870,8 @@
   .conn-fields,
   .conn-verify,
   .conn-reclaim-form,
-  .conn-resume {
+  .conn-resume,
+  .conn-invite {
     animation: none !important;
   }
 }

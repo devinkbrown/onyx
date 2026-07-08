@@ -40,6 +40,7 @@ import {
 } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
 import { parseAtParam, parseJoinParam } from '@/lib/deeplink';
+import { buildInviteCard, inviteTitle, inviteDescription } from '@/lib/invite/inviteCard';
 import { isPasskeySupported } from '@/lib/webauthn/passkey';
 import { ConnectPulse } from './ConnectPulse';
 import { AppShell } from '@/shell';
@@ -120,6 +121,9 @@ const MODES: ReadonlyArray<{ id: Mode; label: string }> = [
 
 /** Account passwords must be at least this long to register. */
 const MIN_PASSWORD_LEN = 8;
+
+/** Network name — used in the invite preview built from a `?join=` deep link. */
+const NETWORK_NAME = 'IRCXNet';
 
 // ── Validation helpers (pure) ────────────────────────────────────────────────
 
@@ -255,6 +259,18 @@ export function Connect(props: ConnectProps): JSX.Element {
       : null,
   );
   if (deepLinkJoin) getState().setPendingDeepLinkJoin(deepLinkJoin, deepLinkAt);
+
+  // A welcoming preview of what the invite opens onto — built from the SAME deep
+  // link the component already parsed. Only present when a join is pending; a
+  // plain visit (no ?join=) leaves this null and renders no card. SSR-safe: the
+  // search params and origin come from window, guarded above via deepLinkJoin.
+  const inviteCard =
+    deepLinkJoin && typeof window !== 'undefined'
+      ? buildInviteCard(new URLSearchParams(window.location.search), {
+          network: NETWORK_NAME,
+          origin: window.location.origin,
+        })
+      : null;
 
   // Optional room to join after connect (there is NO automatic join). The
   // field prefills from the ?join= deep link; on submit it becomes the
@@ -699,6 +715,17 @@ export function Connect(props: ConnectProps): JSX.Element {
                   configure.
                 </p>
               </header>
+
+              {/* Invite preview — a calm welcome when arriving via an invite link */}
+              <Show when={inviteCard} keyed>
+                {(card) => (
+                  <div class="conn-invite" role="note" aria-label="Invite preview">
+                    <span class="conn-invite-eyebrow">You're invited</span>
+                    <h2 class="conn-invite-title">{inviteTitle(card)}</h2>
+                    <p class="conn-invite-desc">{inviteDescription(card)}</p>
+                  </div>
+                )}
+              </Show>
 
               {/* Session resume — one-tap welcome back */}
               <Show when={showResume()}>

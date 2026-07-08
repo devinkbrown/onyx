@@ -1,0 +1,103 @@
+/**
+ * TopicChip.css — token-only topic chip and filter bar styling.
+ *
+ * Imported by TopicChip.tsx.
+ */
+
+.topic-filter-bar {
+  display: flex;
+  max-width: 100%;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.topic-chip {
+  display: inline-flex;
+  max-width: min(100%, 18rem);
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.36rem var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  appearance: none;
+  background: color-mix(in oklab, var(--stone) 82%, var(--ink));
+  color: var(--washi-dim);
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  text-align: left;
+  transition:
+    border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease),
+    color var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+
+button.topic-chip {
+  cursor: pointer;
+}
+
+span.topic-chip {
+  cursor: default;
+}
+
+button.topic-chip:hover {
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--lapis) 16%, var(--stone));
+  color: var(--washi);
+  transform: translateY(-1px);
+}
+
+.topic-chip:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.topic-chip.is-active {
+  border-color: var(--lapis-bright);
+  background: var(--lapis-bright);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ink) 20%, transparent);
+}
+
+button.topic-chip.is-active:hover {
+  border-color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis-bright) 88%, var(--washi));
+  color: var(--ink);
+}
+
+.topic-chip--all {
+  justify-content: center;
+  padding-inline: var(--space-3);
+}
+
+.topic-chip__hash {
+  flex: none;
+  color: var(--washi-mute);
+}
+
+.topic-chip.is-active .topic-chip__hash {
+  color: color-mix(in oklab, var(--ink) 68%, var(--stone));
+}
+
+.topic-chip__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topic-chip {
+    transition: none;
+  }
+
+  button.topic-chip:hover {
+    transform: none;
+  }
+}

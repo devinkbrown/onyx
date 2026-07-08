@@ -62,6 +62,7 @@ import { applyCalmPreset } from '@/lib/notifications/calmMode';
 import { Spotlight } from '@/chat/spotlight';
 import { useSpotlightHotkeys } from '@/chat/spotlight/useSpotlight';
 import { KeyboardHelpOverlay } from './KeyboardHelpOverlay';
+import { ShortcutsSheet } from './ShortcutsSheet';
 import { useKeyboardShortcuts } from '@/lib/keyboard/useKeyboardShortcuts';
 import { MessageSearch } from './search/MessageSearch';
 import { hasMessageSearchableConversation, openMessageSearch } from './search/useMessageSearch';
@@ -144,6 +145,30 @@ export function AppShell(props: AppShellProps): JSX.Element {
   onMount(() => {
     window.addEventListener('keydown', handleMessageSearchHotkey);
     onCleanup(() => window.removeEventListener('keydown', handleMessageSearchHotkey));
+  });
+
+  // ── Keyboard shortcuts cheat sheet ("?" / Shift+/) ──
+  // Local shell state (no store field). The Sheet handles Escape/close itself.
+  const [shortcutsOpen, setShortcutsOpen] = createSignal(false);
+
+  function handleShortcutsHotkey(event: KeyboardEvent): void {
+    if (event.defaultPrevented) return;
+    if (event.key !== '?') return;
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+
+    const target = event.target as HTMLElement | null;
+    if (target) {
+      const tag = target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) return;
+    }
+
+    event.preventDefault();
+    setShortcutsOpen(true);
+  }
+
+  onMount(() => {
+    window.addEventListener('keydown', handleShortcutsHotkey);
+    onCleanup(() => window.removeEventListener('keydown', handleShortcutsHotkey));
   });
 
   // Reflect saved display/behaviour preferences onto <html> on first paint.
@@ -409,6 +434,9 @@ export function AppShell(props: AppShellProps): JSX.Element {
 
       {/* Keyboard shortcuts help overlay — self-gates on store.showKeyboardShortcuts */}
       <KeyboardHelpOverlay />
+
+      {/* Keyboard shortcuts cheat sheet — opened with "?" (local shell state) */}
+      <ShortcutsSheet open={shortcutsOpen()} onClose={() => setShortcutsOpen(false)} />
     </>
   );
 }
