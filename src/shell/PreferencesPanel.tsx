@@ -140,6 +140,14 @@ export function PreferencesPanel(): JSX.Element {
           onSelect={(value) => setPreference('width', value)}
         />
 
+        <Toggle
+          legend="Reader mode"
+          title="Read as a transcript"
+          description="A calm, typographic single-column layout — quiet chrome, the words lead."
+          value={() => preferences().readerMode}
+          onToggle={(value) => setPreference('readerMode', value)}
+        />
+
         <Segmented
           legend="Clock"
           description="Timestamp format for messages and channel activity."

@@ -35,6 +35,9 @@ export interface Preferences {
   hideEvents: boolean;
   /** Reading measure: capped (measured) or edge-to-edge (full). */
   width: Width;
+  /** Reader mode: a calm, typographic single-column transcript — the reading
+   * persona treated as primary (larger measure, quiet chrome, grouped prose). */
+  readerMode: boolean;
   /** Force-disable animations regardless of OS preference. */
   reduceMotion: boolean;
   /** Unfurl the first web link in a message into an OG preview card. */
@@ -52,6 +55,7 @@ export const DEFAULT_PREFERENCES: Readonly<Preferences> = {
   fontScale: 'md',
   hideEvents: false,
   width: 'measured',
+  readerMode: false,
   reduceMotion: false,
   linkPreviews: true,
   clock: '24h',
@@ -94,6 +98,8 @@ export function loadPreferences(): Preferences {
     fontScale: isOneOf(raw.fontScale, FONT_SCALES) ? raw.fontScale : DEFAULT_PREFERENCES.fontScale,
     hideEvents: typeof raw.hideEvents === 'boolean' ? raw.hideEvents : DEFAULT_PREFERENCES.hideEvents,
     width: isOneOf(raw.width, WIDTHS) ? raw.width : DEFAULT_PREFERENCES.width,
+    readerMode:
+      typeof raw.readerMode === 'boolean' ? raw.readerMode : DEFAULT_PREFERENCES.readerMode,
     reduceMotion: typeof raw.reduceMotion === 'boolean' ? raw.reduceMotion : DEFAULT_PREFERENCES.reduceMotion,
     linkPreviews: typeof raw.linkPreviews === 'boolean' ? raw.linkPreviews : DEFAULT_PREFERENCES.linkPreviews,
     clock: isOneOf(raw.clock, CLOCKS) ? raw.clock : DEFAULT_PREFERENCES.clock,
@@ -125,6 +131,7 @@ export function applyPreferences(prefs: Preferences = preferences()): void {
   root.dataset.fontScale = prefs.fontScale;
   root.dataset.hideEvents = String(prefs.hideEvents);
   root.dataset.width = prefs.width;
+  root.dataset.reader = String(prefs.readerMode);
   root.dataset.reduceMotion = String(prefs.reduceMotion);
 }
 

@@ -10,6 +10,7 @@ export default tseslint.config(
     ignores: [
       '.next/**',
       '.wt/**',
+      '.claude/**',
       'out/**',
       'coverage/**',
       'dist/**',

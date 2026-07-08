@@ -44,6 +44,7 @@ describe('preferences store', () => {
         fontScale: 'lg',
         hideEvents: true,
         width: 'full',
+        readerMode: false,
         reduceMotion: true,
         linkPreviews: true,
         clock: '24h',
@@ -62,6 +63,7 @@ describe('preferences store', () => {
         fontScale: 'md',
         hideEvents: DEFAULT_PREFERENCES.hideEvents,
         width: DEFAULT_PREFERENCES.width,
+        readerMode: DEFAULT_PREFERENCES.readerMode,
         reduceMotion: false,
         linkPreviews: true,
         clock: '24h',
@@ -108,6 +110,7 @@ describe('preferences store', () => {
         fontScale: 'sm',
         hideEvents: true,
         width: 'full',
+        readerMode: true,
         reduceMotion: true,
         linkPreviews: false,
         clock: '12h',
@@ -116,6 +119,7 @@ describe('preferences store', () => {
       });
       const ds = document.documentElement.dataset;
       expect(ds.density).toBe('compact');
+      expect(ds.reader).toBe('true');
       expect(ds.fontScale).toBe('sm');
       expect(ds.hideEvents).toBe('true');
       expect(ds.width).toBe('full');
