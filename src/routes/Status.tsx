@@ -15,11 +15,16 @@ export default function StatusRoute() {
   setPageMeta(
     'Onyx status — IRCXNet mesh health',
     'Public IRCXNet mesh health, node uptime, peer latency, users online, and backup readiness.',
+    '/status',
   );
-  const [status] = createResource(fetchNetworkStatus);
-  const [backups] = createResource(fetchBackupManifest);
+  const [status, { refetch: refetchStatus }] = createResource(fetchNetworkStatus);
+  const [backups, { refetch: refetchBackups }] = createResource(fetchBackupManifest);
   const [nowMs, setNowMs] = createSignal(Date.now());
-  const timer = setInterval(() => setNowMs(Date.now()), 30_000);
+  const timer = setInterval(() => {
+    setNowMs(Date.now());
+    void refetchStatus();
+    void refetchBackups();
+  }, 30_000);
   onCleanup(() => clearInterval(timer));
 
   return (
@@ -132,6 +137,21 @@ export default function StatusRoute() {
               </For>
             </div>
           </Show>
+        </aside>
+      </section>
+
+      <section class="r-wrap r-section data-grid" aria-label="Related public surfaces">
+        <article class="data-card">
+          <span class="label">activity</span>
+          <h2>Rooms and graph history</h2>
+          <p>Move from node health into public room activity, daily message bars, and room handoff links.</p>
+          <div class="r-cta"><a class="r-btn ghost" href="/stats">Open stats &rarr;</a></div>
+        </article>
+        <aside class="data-card">
+          <span class="label">plan</span>
+          <h3>Roadmap context</h3>
+          <p>See how status, stats, and backup readiness fit into the operations phase.</p>
+          <div class="r-cta"><a class="r-btn ghost" href="/roadmap">Open roadmap &rarr;</a></div>
         </aside>
       </section>
 

@@ -60,6 +60,7 @@ export default function RoadmapRoute() {
   setPageMeta(
     'Onyx roadmap — what shipped and what is next',
     'Track the public Onyx roadmap across memory, reach, privacy, presence, and operational visibility.',
+    '/roadmap',
   );
   return (
     <main class="r data-page roadmap-page">

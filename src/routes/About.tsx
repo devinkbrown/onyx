@@ -20,6 +20,7 @@ export default function About() {
   setPageMeta(
     'About Onyx — open protocol, sovereign mesh',
     'Learn how Onyx, Orochi, LADON media, and the IRCXNet mesh work together without closed-platform lock-in.',
+    '/about',
   );
   return (
     <main class="r ab-ocean">

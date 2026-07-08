@@ -81,10 +81,14 @@ export default function StatsRoute() {
   setPageMeta(
     'Onyx stats — live IRCXNet room activity',
     'See public IRCXNet room activity, network message trends, people online, and channel sparklines.',
+    '/stats',
   );
-  const [stats] = createResource(fetchStatsIndex);
+  const [stats, { refetch: refetchStats }] = createResource(fetchStatsIndex);
   const [nowMs, setNowMs] = createSignal(Date.now());
-  const timer = setInterval(() => setNowMs(Date.now()), 30_000);
+  const timer = setInterval(() => {
+    setNowMs(Date.now());
+    void refetchStats();
+  }, 30_000);
   onCleanup(() => clearInterval(timer));
 
   const channels = createMemo(() => [...(stats()?.channels ?? [])].sort((a, b) => b.messages - a.messages));

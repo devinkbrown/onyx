@@ -1,5 +1,5 @@
 import './landing.css';
-import { createMemo, createResource, Show } from 'solid-js';
+import { createMemo, createResource, onCleanup, Show } from 'solid-js';
 import { Mascot } from '@/components/brand/Mascot';
 import { fetchStatsIndex } from '@/lib/stats/networkIndex';
 import { fetchNetworkStatus, formatDuration } from '@/lib/stats/status';
@@ -13,9 +13,15 @@ export default function Landing() {
   setPageMeta(
     'Onyx — open rooms and encrypted media on IRCXNet',
     'Onyx is the public front door to IRCXNet: open rooms, encrypted media, live network stats, and a name that is yours.',
+    '/',
   );
-  const [stats] = createResource(fetchStatsIndex);
-  const [status] = createResource(fetchNetworkStatus);
+  const [stats, { refetch: refetchStats }] = createResource(fetchStatsIndex);
+  const [status, { refetch: refetchStatus }] = createResource(fetchNetworkStatus);
+  const refreshTimer = setInterval(() => {
+    void refetchStats();
+    void refetchStatus();
+  }, 30_000);
+  onCleanup(() => clearInterval(refreshTimer));
   const busiest = createMemo(() =>
     [...(stats()?.channels ?? [])].sort((a, b) => b.messages - a.messages)[0] ?? null,
   );

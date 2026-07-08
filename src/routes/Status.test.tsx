@@ -9,6 +9,8 @@ describe('StatusRoute', () => {
 
     expect(screen.getByRole('heading', { name: /mesh health/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /vault backups/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /open stats/i })).toHaveAttribute('href', '/stats');
+    expect(screen.getByRole('link', { name: /open roadmap/i })).toHaveAttribute('href', '/roadmap');
     expect(await screen.findByText(/status is waiting/i)).toBeInTheDocument();
   });
 });
