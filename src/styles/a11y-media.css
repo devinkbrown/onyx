@@ -1,0 +1,281 @@
+/* Accessibility media-query overrides for OS contrast, transparency, and forced-color signals. */
+
+/* More contrast: tokens from src/styles/tokens.css; focus selectors from
+   src/styles/global.css, src/shell/shell.css, src/primitives/primitives.css,
+   src/chat/spotlight/spotlight.css, src/shell/keyboard-help.css, and
+   src/shell/search/message-search.css. */
+@media (prefers-contrast: more) {
+  :root {
+    --line: color-mix(in oklab, var(--washi) 42%, transparent);
+    --line-faint: color-mix(in oklab, var(--washi) 26%, transparent);
+    --seam: color-mix(in oklab, var(--lapis-bright) 72%, var(--washi) 28%);
+    --seam-faint: color-mix(in oklab, var(--lapis-bright) 46%, var(--washi) 54%);
+    --washi-dim: color-mix(in oklab, var(--washi) 82%, var(--lapis-bright) 18%);
+    --washi-mute: color-mix(in oklab, var(--washi) 68%, var(--stone-3) 32%);
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--lapis-bright);
+    outline-offset: 3px;
+  }
+
+  .shell button:focus-visible,
+  .shell [role='button']:focus-visible,
+  .shell input:focus-visible,
+  .shell textarea:focus-visible,
+  .shell-mobile-nav-btn:focus-visible,
+  .shell-rail-entry:focus-visible,
+  .shell-ribbon-voice-chip:focus-visible,
+  .shell-ribbon-iconbtn:focus-visible,
+  .shell-ribbon-account:focus-visible,
+  .shell-composer-inner:focus-within,
+  .onyx-button:focus-visible,
+  .onyx-icon-button:focus-visible,
+  .onyx-popover__trigger:focus-visible,
+  .onyx-sheet__close:focus-visible,
+  .onyx-modal__close:focus-visible,
+  .onyx-toast button:focus-visible,
+  .onyx-tabs__trigger:focus-visible,
+  .onyx-field__input:focus,
+  .onyx-message-search__button:focus-visible,
+  .onyx-spotlight__close:focus-visible,
+  .kbd-help__close:focus-visible {
+    outline: 3px solid var(--lapis-bright);
+    outline-offset: 3px;
+    border-color: var(--lapis-bright);
+    box-shadow:
+      0 0 0 1px var(--ink),
+      0 0 0 5px color-mix(in oklab, var(--lapis-bright) 88%, transparent);
+  }
+
+  .onyx-sheet__panel:focus-visible,
+  .onyx-modal__dialog:focus-visible,
+  .onyx-tabs__content:focus-visible,
+  .kbd-help__panel:focus-visible {
+    outline: 3px solid var(--lapis-bright);
+    outline-offset: 4px;
+  }
+}
+
+/* Reduced transparency: shell surfaces from src/shell/shell.css, shared
+   primitives from src/primitives/primitives.css, command/search overlays from
+   src/chat/spotlight/spotlight.css and src/shell/search/message-search.css, and
+   keyboard help from src/shell/keyboard-help.css. */
+@media (prefers-reduced-transparency: reduce) {
+  .shell {
+    background: var(--ink);
+  }
+
+  .shell-rail,
+  .shell-sidebar,
+  .shell-ribbon,
+  .shell-members,
+  .shell-composer,
+  .shell-mobile-nav {
+    background: var(--ink);
+  }
+
+  .shell-conversation,
+  .shell-messages {
+    background: var(--stone);
+  }
+
+  .shell-sidebar-backdrop,
+  .shell-members-backdrop,
+  .kbd-help__scrim,
+  .onyx-spotlight,
+  .onyx-sheet__backdrop,
+  .onyx-modal__backdrop {
+    background: var(--ink);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .shell-jump-latest,
+  .kbd-help__panel,
+  .onyx-message-search__surface,
+  .onyx-message-search__server,
+  .onyx-message-search__vault,
+  .onyx-spotlight__panel,
+  .onyx-popover__panel,
+  .onyx-sheet__panel,
+  .onyx-modal__dialog,
+  .onyx-toast,
+  .onyx-tabs__content {
+    background: var(--stone);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .onyx-tooltip__content,
+  .onyx-button--ghost,
+  .onyx-icon-button,
+  .onyx-popover__trigger,
+  .onyx-field__input,
+  .onyx-tabs__list,
+  .kbd-help__kbd,
+  .shell-composer-inner,
+  .shell-ribbon-account,
+  .shell-ribbon-conn,
+  .shell-command-menu,
+  .shell-emoji-picker,
+  .ap-theme-chip,
+  .ap-bg-chip {
+    background: var(--stone-2);
+  }
+}
+
+/* Forced colors: classes are from src/shell/shell.css, src/primitives/primitives.css,
+   src/chat/spotlight/spotlight.css, src/shell/keyboard-help.css, and
+   src/shell/search/message-search.css. */
+@media (forced-colors: active) {
+  :root {
+    --ink: Canvas;
+    --ink-2: Canvas;
+    --stone: Canvas;
+    --stone-2: Canvas;
+    --stone-3: Canvas;
+    --stone-line: CanvasText;
+    --lapis: LinkText;
+    --lapis-bright: LinkText;
+    --lapis-deep: LinkText;
+    --gold: LinkText;
+    --gold-bright: LinkText;
+    --gold-deep: LinkText;
+    --shu: Mark;
+    --shu-bright: Mark;
+    --washi: CanvasText;
+    --washi-dim: CanvasText;
+    --washi-mute: CanvasText;
+    --line: CanvasText;
+    --line-faint: CanvasText;
+    --seam: CanvasText;
+    --seam-faint: CanvasText;
+    --ok: LinkText;
+    --warn: Mark;
+    --danger: Mark;
+  }
+
+  *,
+  *::before,
+  *::after {
+    forced-color-adjust: auto;
+  }
+
+  body,
+  .shell,
+  .shell-rail,
+  .shell-sidebar,
+  .shell-ribbon,
+  .shell-conversation,
+  .shell-messages,
+  .shell-composer,
+  .shell-members,
+  .shell-mobile-nav,
+  .kbd-help__panel,
+  .onyx-spotlight__panel,
+  .onyx-popover__panel,
+  .onyx-sheet__panel,
+  .onyx-modal__dialog,
+  .onyx-toast,
+  .shell-command-menu,
+  .shell-emoji-picker {
+    color: CanvasText;
+    background: Canvas;
+  }
+
+  .shell-sidebar-backdrop,
+  .shell-members-backdrop,
+  .kbd-help__scrim,
+  .onyx-spotlight,
+  .onyx-sheet__backdrop,
+  .onyx-modal__backdrop {
+    background: Canvas;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  a,
+  .shell-msg-text a,
+  .shell-thread-msg-text a,
+  .shell-msg-link,
+  .shell-msg-channel-link,
+  .onyx-spotlight__title mark {
+    color: LinkText;
+  }
+
+  button,
+  [role='button'],
+  input,
+  textarea,
+  .shell-ribbon-account,
+  .shell-ribbon-conn,
+  .shell-jump-latest,
+  .shell-composer-inner,
+  .shell-composer-tool,
+  .shell-composer-send,
+  .onyx-button,
+  .onyx-icon-button,
+  .onyx-popover__trigger,
+  .onyx-sheet__close,
+  .onyx-modal__close,
+  .onyx-toast button,
+  .onyx-tabs__trigger,
+  .onyx-field__input,
+  .onyx-message-search__button,
+  .onyx-spotlight__close,
+  .kbd-help__close {
+    color: ButtonText;
+    background: ButtonFace;
+    border-color: ButtonText;
+  }
+
+  .shell *,
+  .kbd-help__panel,
+  .onyx-spotlight__panel,
+  .onyx-popover__panel,
+  .onyx-sheet__panel,
+  .onyx-modal__dialog,
+  .onyx-toast,
+  .onyx-tooltip__content,
+  .onyx-tabs__content,
+  .onyx-message-search__surface,
+  .onyx-message-search__server,
+  .onyx-message-search__vault {
+    border-color: CanvasText;
+    box-shadow: none;
+    text-shadow: none;
+  }
+
+  :focus-visible,
+  .shell-composer-inner:focus-within {
+    outline: 3px solid Highlight;
+    outline-offset: 3px;
+    box-shadow: none;
+  }
+
+  .onyx-button--primary,
+  .onyx-icon-button--primary,
+  .onyx-tabs__trigger[aria-selected='true'],
+  .shell-composer-send:not(:disabled),
+  .shell-jump-latest--unread,
+  .onyx-spotlight__option[aria-selected='true'] {
+    color: HighlightText;
+    background: Highlight;
+    border-color: Highlight;
+  }
+
+  .shell-ribbon-divider,
+  .shell-rail-sep,
+  .shell-day-divider::before,
+  .shell-day-divider::after {
+    background: CanvasText;
+  }
+
+  /* Theme preview chips must preserve their authored swatch colors so users can
+     still distinguish saved themes in Windows High Contrast. */
+  .ap-theme-swatch,
+  .ap-theme-swatch > span {
+    forced-color-adjust: none;
+  }
+}
