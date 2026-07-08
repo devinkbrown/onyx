@@ -45,7 +45,8 @@ import { Tooltip } from '../primitives/Tooltip';
 
 import { useTheme } from './ThemeProvider';
 import { THEMES, THEME_IDS, type ThemeId, type TokenMap } from './themes';
-import { customThemeTokens, getCustomTheme, isCustomThemeId } from './customThemes';
+import { customThemeTokens, getCustomTheme, isCustomThemeId, type CustomTheme } from './customThemes';
+import { themeShareUrl } from '@/lib/theme/themeShare';
 import { STUDIO_GROUPS, type StudioGroup, type StudioToken } from './tokens';
 import { resolveCssColor, wcagRating } from './contrast';
 import {
@@ -588,10 +589,12 @@ export function ThemeStudio(props: ThemeStudioProps) {
   const [overrides, setOverrides] = createSignal<TokenMap>({});
   const [importError, setImportError] = createSignal<string | null>(null);
   const [exportCopied, setExportCopied] = createSignal(false);
+  const [shareCopied, setShareCopied] = createSignal(false);
   // Inline "save theme" naming (replaces a browser prompt).
   const [saving, setSaving] = createSignal(false);
   const [saveName, setSaveName] = createSignal('');
   let copyTimer: ReturnType<typeof setTimeout> | undefined;
+  let shareTimer: ReturnType<typeof setTimeout> | undefined;
   let saveInputRef: HTMLInputElement | undefined;
 
   // ── Factory state ──
@@ -634,6 +637,7 @@ export function ThemeStudio(props: ThemeStudioProps) {
       removeVar(prop);
     }
     if (copyTimer !== undefined) clearTimeout(copyTimer);
+    if (shareTimer !== undefined) clearTimeout(shareTimer);
     if (regenTimer !== undefined) clearTimeout(regenTimer);
     // Restore the base theme's color-scheme if a generated palette changed it.
     if (schemeOverride() !== null) applyVar('color-scheme', baseScheme());
@@ -868,6 +872,29 @@ export function ThemeStudio(props: ThemeStudioProps) {
     setExportCopied(true);
     if (copyTimer !== undefined) clearTimeout(copyTimer);
     copyTimer = setTimeout(() => setExportCopied(false), 2200);
+  };
+
+  // The active theme, when it is a saved custom theme — the only thing that can
+  // be turned into a shareable link. Tracks the saved list so it stays current.
+  const shareableTheme = createMemo<CustomTheme | null>(() => {
+    customThemes(); // dependency: saved custom themes changed
+    const id = themeId();
+    if (!isCustomThemeId(id)) return null;
+    return getCustomTheme(id) ?? null;
+  });
+
+  // Copy a share link for the current custom theme to the clipboard. Guards a
+  // missing Clipboard API and shows brief "copied" feedback on success.
+  const handleShare = (): void => {
+    const theme = shareableTheme();
+    if (!theme) return;
+    if (typeof navigator === 'undefined' || !navigator.clipboard) return;
+
+    navigator.clipboard.writeText(themeShareUrl(theme, location.origin)).catch(() => undefined);
+
+    setShareCopied(true);
+    if (shareTimer !== undefined) clearTimeout(shareTimer);
+    shareTimer = setTimeout(() => setShareCopied(false), 2200);
   };
 
   const handleImport = (): void => {
@@ -1353,6 +1380,24 @@ export function ThemeStudio(props: ThemeStudioProps) {
                 {err()}
               </span>
             )}
+          </Show>
+
+          <Show when={shareableTheme()}>
+            <Tooltip
+              content={shareCopied() ? 'Link copied to clipboard!' : 'Copy a shareable link to this custom theme.'}
+              placement="top"
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleShare}
+                data-testid="ts-share-btn"
+              >
+                <Show when={shareCopied()} fallback="[share link]">
+                  [copied!]
+                </Show>
+              </Button>
+            </Tooltip>
           </Show>
 
           <Tooltip content="Import a previously exported theme JSON blob." placement="top">

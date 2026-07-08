@@ -34,6 +34,7 @@ import {
   removeCustomTheme,
   type CustomTheme,
 } from './customThemes';
+import { parseThemeParam } from '@/lib/theme/themeShare';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -146,6 +147,26 @@ function persistTheme(id: string): void {
   }
 }
 
+/** URL query key carrying a shared custom theme (see lib/theme/themeShare.ts). */
+const SHARE_PARAM = 'theme';
+
+/**
+ * Remove the `?theme=` param from the address bar after a one-time import so a
+ * page refresh does not re-import the same theme. Best-effort and guarded — a
+ * missing `history.replaceState` (older/non-browser env) is simply a no-op.
+ */
+function stripShareParam(params: URLSearchParams): void {
+  if (typeof history === 'undefined' || typeof history.replaceState !== 'function') return;
+  try {
+    params.delete(SHARE_PARAM);
+    const query = params.toString();
+    const next = `${location.pathname}${query ? `?${query}` : ''}${location.hash}`;
+    history.replaceState(history.state, '', next);
+  } catch {
+    // Address-bar rewrite is a nicety, never fatal.
+  }
+}
+
 /**
  * Writes all token overrides for `id` onto `document.documentElement` and
  * updates `data-theme` + `color-scheme`.  This is intentionally side-effectful
@@ -217,6 +238,31 @@ export function ThemeProvider(props: ThemeProviderProps) {
     setCustomThemes(loadCustomThemes());
     if (themeId() === id) setTheme(fallback);
   };
+
+  /**
+   * One-time import of a shared theme from `?theme=<code>` on boot. Untrusted
+   * input fails closed to null in parseThemeParam, so this never throws; a valid
+   * theme is persisted through the existing customThemes helper (saveCustom →
+   * addCustomTheme) and made active. The param is stripped afterwards so a
+   * refresh does not re-import.
+   */
+  const importSharedThemeFromUrl = (): void => {
+    if (typeof window === 'undefined' || typeof location === 'undefined') return;
+    try {
+      const params = new URLSearchParams(location.search);
+      if (!params.has(SHARE_PARAM)) return;
+      const parsed = parseThemeParam(params.get(SHARE_PARAM));
+      if (parsed) {
+        const importedId = saveCustom(parsed.name, parsed.base, parsed.overrides);
+        setTheme(importedId);
+      }
+      stripShareParam(params);
+    } catch {
+      // Never let a malformed share link break app boot.
+    }
+  };
+
+  importSharedThemeFromUrl();
 
   // Apply CSS variables whenever the active theme (or its custom overrides) change.
   createEffect(() => {
