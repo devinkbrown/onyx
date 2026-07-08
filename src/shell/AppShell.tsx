@@ -37,6 +37,7 @@ import { ChannelSidebar } from './ChannelSidebar';
 import { HomeView } from './HomeView';
 const ChannelBrowser = lazy(() => import('./ChannelBrowser'));
 import { PresenceRibbon } from './PresenceRibbon';
+import { TimeScrubber } from './TimeScrubber';
 import { MessageView } from './MessageView';
 import { TypingIndicator } from './TypingIndicator';
 import { Composer } from './Composer';
@@ -281,6 +282,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
             selfNick={displayNick()}
             onToggleMembers={handleToggleMembers}
           />
+          <TimeScrubber />
 
           {/* Content: read-only status buffer, conversation, or home */}
           <Show when={activeView().kind === 'status'} fallback={

@@ -40,6 +40,7 @@ import {
 } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
 import { parseAtParam, parseJoinParam } from '@/lib/deeplink';
+import { isPasskeySupported } from '@/lib/webauthn/passkey';
 import { ConnectPulse } from './ConnectPulse';
 import { AppShell } from '@/shell';
 import { Button } from '@/primitives/index';
@@ -333,6 +334,8 @@ export function Connect(props: ConnectProps): JSX.Element {
   const registerPending = useStore((s) => s.registerPending);
   const registerError = useStore((s) => s.registerError);
   const verifyRequired = useStore((s) => s.verifyRequired);
+  const passkeyBusy = useStore((s) => s.passkeyBusy);
+  const passkeyError = useStore((s) => s.passkeyError);
   const currentNickIsAlias = useStore((s) => s.currentNickIsAlias);
   const notifications = useStore((s) => s.notifications);
 
@@ -420,6 +423,7 @@ export function Connect(props: ConnectProps): JSX.Element {
 
   // ── Live validity (drives submit-button enablement, no error text yet) ──────
   const nickTrimmed = createMemo(() => nick().trim());
+  const passkeySupported = createMemo(() => isPasskeySupported());
 
   const canSubmit = createMemo<boolean>(() => {
     if (!isFormReady()) return false;
@@ -619,6 +623,15 @@ export function Connect(props: ConnectProps): JSX.Element {
     setVerifyError(undefined);
     setRegisterInFlight(true);
     getState().verifyAccount(nickTrimmed(), code);
+  }
+
+  function handlePasskeySignIn(): void {
+    const account = nickTrimmed();
+    const err = validateNick(account);
+    setNickError(err);
+    setPasswordError(undefined);
+    if (err) return;
+    getState().signInWithPasskey(account);
   }
 
   // ── GHOST reclaim ───────────────────────────────────────────────────────────
@@ -889,6 +902,31 @@ export function Connect(props: ConnectProps): JSX.Element {
                           setPasswordError(undefined);
                         }}
                       />
+                    </Show>
+
+                    <Show when={mode() === 'signin' && passkeySupported()}>
+                      <div class="conn-passkey">
+                        <div class="conn-passkey-divider" aria-hidden="true">
+                          <span>or use a passkey</span>
+                        </div>
+                        <Button
+                          class="conn-passkey-button"
+                          type="button"
+                          variant="ghost"
+                          disabled={!isFormReady() || passkeyBusy()}
+                          onClick={handlePasskeySignIn}
+                          data-testid="conn-passkey-submit"
+                        >
+                          {passkeyBusy() ? 'Waiting for your device…' : 'Sign in with a passkey'}
+                        </Button>
+                        <Show when={passkeyError()}>
+                          {(message) => (
+                            <p class="conn-passkey-error" role="alert">
+                              {message()}
+                            </p>
+                          )}
+                        </Show>
+                      </div>
                     </Show>
 
                     {/* Strength meter + confirm — register only */}
