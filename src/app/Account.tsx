@@ -145,6 +145,10 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
   const actionError = useStore((s) => s.accountActionError);
   const serviceNotices = useStore((s) => s.serviceNotices);
   const totp = useStore((s) => s.totp);
+  const passkeyBusy = useStore((s) => s.passkeyBusy);
+  const passkeyNotice = useStore((s) => s.passkeyNotice);
+  const passkeyError = useStore((s) => s.passkeyError);
+  const [passkeyLabel, setPasskeyLabel] = createSignal('');
   const personas = useStore((s) => s.personas);
   const personaOffers = useStore((s) => s.personaOffers);
 
@@ -637,6 +641,45 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
           </Section>
 
           {/* Personas (Guise wardrobe) */}
+          {/* Passkeys — WebAuthn passwordless login */}
+          <Section title="Passkeys" hint="Sign in without a password using a device passkey — Face ID, fingerprint, or a security key.">
+            <form
+              class="acct-passkey"
+              noValidate
+              onSubmit={(e) => {
+                e.preventDefault();
+                getState().registerPasskey(passkeyLabel());
+                setPasskeyLabel('');
+              }}
+              aria-label="Add a passkey"
+            >
+              <FormField
+                id="acct-passkey-label"
+                label="Passkey name (optional)"
+                placeholder="e.g. My laptop"
+                value={passkeyLabel()}
+                onInput={(e) => setPasskeyLabel(e.currentTarget.value)}
+              />
+              <Button type="submit" variant="ghost" size="sm" disabled={passkeyBusy()}>
+                {passkeyBusy() ? 'Waiting for your device…' : 'Add a passkey'}
+              </Button>
+              <Show when={passkeyNotice()}>
+                {(m) => (
+                  <p class="acct-passkey-msg is-ok" role="status">
+                    {m()}
+                  </p>
+                )}
+              </Show>
+              <Show when={passkeyError()}>
+                {(m) => (
+                  <p class="acct-passkey-msg is-err" role="alert">
+                    {m()}
+                  </p>
+                )}
+              </Show>
+            </form>
+          </Section>
+
           <Section title="Personas" hint="Your Guise wardrobe — change the host others see, instantly and mid-session.">
             <div class="acct-personas">
               <Show

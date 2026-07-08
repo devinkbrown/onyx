@@ -23,6 +23,13 @@ import {
   type ComposerDrafts,
 } from '@/lib/composer/drafts';
 import { markViewedRead, normalizeTargetKey, totalMentions } from '@/lib/notifications/readState';
+import {
+  buildCreateOptions,
+  buildGetOptions,
+  createPasskey,
+  getPasskeyAssertion,
+  isPasskeySupported,
+} from '@/lib/webauthn/passkey';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -500,6 +507,16 @@ export interface OnyxState {
   registerPending: boolean;
   registerError: string | null;
   verifyRequired: boolean;
+  /** A passkey (WebAuthn) ceremony is in flight. */
+  passkeyBusy: boolean;
+  passkeyError: string | null;
+  /** Transient success notice, e.g. "Passkey added". */
+  passkeyNotice: string | null;
+  /** Register a new passkey for the current account (must be logged in). */
+  registerPasskey(label?: string): void;
+  /** Passwordless sign-in with a passkey for `account`. */
+  signInWithPasskey(account: string): void;
+  dismissPasskeyMessage(): void;
   registerAccount(account: string, email: string | undefined, password: string): void;
   verifyAccount(account: string, code: string): void;
 
@@ -1843,6 +1860,22 @@ const _openChathistoryByTarget = new Map<string, string>();
  */
 let _pendingTravel: { key: string; at: Date } | null = null;
 
+/** Collected WEBAUTHN AUTH-CHALLENGE + ALLOW-CRED lines; the get ceremony runs
+ * once the allow-list has settled (a short debounce after the challenge). */
+let _pendingPasskeyAuth: {
+  challenge: string;
+  rpId: string;
+  allowCreds: string[];
+  timer: ReturnType<typeof setTimeout> | null;
+} | null = null;
+
+function passkeyErrText(e: unknown): string {
+  if (e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'AbortError')) {
+    return 'Passkey prompt was dismissed.';
+  }
+  return e instanceof Error && e.message ? e.message : 'Passkey ceremony failed.';
+}
+
 /** flushOutbox retry budget per connection (reset on each successful connect). */
 let _outboxRetries = 0;
 
@@ -2239,6 +2272,9 @@ export const store = createStore<OnyxState>()(
     canRedactMessages: false,
     canReact: false,
     registerPending: false,
+    passkeyBusy: false,
+    passkeyError: null,
+    passkeyNotice: null,
     registerError: null,
     verifyRequired: false,
     accountInfo: null,
@@ -3058,6 +3094,37 @@ export const store = createStore<OnyxState>()(
       // Login success returns as 900 RPL_LOGGEDIN (sets server.account);
       // failure as 464 ERR_PASSWDMISMATCH or `FAIL IDENTIFY`.
       client.sendRaw('IDENTIFY', acct, password);
+    },
+
+    registerPasskey(label) {
+      const { client } = get();
+      if (!client) return;
+      if (!isPasskeySupported()) {
+        set({ passkeyError: 'This browser does not support passkeys.', passkeyNotice: null });
+        return;
+      }
+      set({ passkeyBusy: true, passkeyError: null, passkeyNotice: null });
+      // Server replies `NOTE WEBAUTHN REGISTER-CHALLENGE …`; the message handler
+      // runs the create ceremony and sends REGISTER-FINISH.
+      client.sendRaw('WEBAUTHN', 'REGISTER', ...(label && label.trim() ? [label.trim()] : []));
+    },
+
+    signInWithPasskey(account) {
+      const { client } = get();
+      const acct = account.trim();
+      if (!client || !acct) return;
+      if (!isPasskeySupported()) {
+        set({ passkeyError: 'This browser does not support passkeys.', passkeyNotice: null });
+        return;
+      }
+      set({ passkeyBusy: true, passkeyError: null, passkeyNotice: null });
+      // Server replies AUTH-CHALLENGE + ALLOW-CRED lines; the handler collects
+      // them and runs the get ceremony → AUTH-FINISH → 900 RPL_LOGGEDIN.
+      client.sendRaw('WEBAUTHN', 'AUTH', acct);
+    },
+
+    dismissPasskeyMessage() {
+      set({ passkeyError: null, passkeyNotice: null });
     },
 
     logout() {
@@ -4277,6 +4344,75 @@ export const store = createStore<OnyxState>()(
       const isChan = (t: string): boolean => t.length > 0 && chanPfx.includes(t[0]!);
       const standard = parseStandardReply(msg);
       if (standard) {
+        if (standard.command === 'WEBAUTHN') {
+          const waClient = get().client;
+          if (standard.kind === 'FAIL' || standard.kind === 'WARN') {
+            if (_pendingPasskeyAuth?.timer) clearTimeout(_pendingPasskeyAuth.timer);
+            _pendingPasskeyAuth = null;
+            set({ passkeyBusy: false, passkeyError: standard.description || standard.code });
+            return;
+          }
+          switch (standard.code) {
+            case 'REGISTER-CHALLENGE': {
+              const challenge = standard.context[0];
+              const rpId = standard.context[1];
+              if (!waClient || !challenge || !rpId) {
+                set({ passkeyBusy: false, passkeyError: 'Malformed passkey challenge.' });
+                break;
+              }
+              createPasskey(buildCreateOptions(challenge, rpId, standard.description))
+                .then((f) =>
+                  waClient.sendRaw('WEBAUTHN', 'REGISTER-FINISH', f.credId, f.clientDataJSON, f.authData),
+                )
+                .catch((e) => set({ passkeyBusy: false, passkeyError: passkeyErrText(e) }));
+              break;
+            }
+            case 'REGISTERED': {
+              const label = standard.description;
+              set({
+                passkeyBusy: false,
+                passkeyError: null,
+                passkeyNotice: label ? `Passkey added (${label})` : 'Passkey added',
+              });
+              break;
+            }
+            case 'AUTH-CHALLENGE': {
+              if (_pendingPasskeyAuth?.timer) clearTimeout(_pendingPasskeyAuth.timer);
+              _pendingPasskeyAuth = {
+                challenge: standard.context[0] ?? '',
+                rpId: standard.context[1] ?? '',
+                allowCreds: [],
+                timer: null,
+              };
+              // ALLOW-CRED lines arrive right after; run once they've settled.
+              _pendingPasskeyAuth.timer = setTimeout(() => {
+                const p = _pendingPasskeyAuth;
+                _pendingPasskeyAuth = null;
+                const c = get().client;
+                if (!p || !c || !p.challenge || !p.rpId) {
+                  set({ passkeyBusy: false, passkeyError: 'No passkey challenge to answer.' });
+                  return;
+                }
+                getPasskeyAssertion(buildGetOptions(p.challenge, p.rpId, p.allowCreds))
+                  .then((f) =>
+                    c.sendRaw('WEBAUTHN', 'AUTH-FINISH', f.credId, f.clientDataJSON, f.authData, f.signature),
+                  )
+                  .catch((e) => set({ passkeyBusy: false, passkeyError: passkeyErrText(e) }));
+              }, 80);
+              break;
+            }
+            case 'ALLOW-CRED': {
+              if (_pendingPasskeyAuth && standard.description) {
+                _pendingPasskeyAuth.allowCreds.push(standard.description);
+              }
+              break;
+            }
+            default:
+              break;
+          }
+          return;
+        }
+
         if (standard.kind === 'NOTE' && standard.command === 'SESSION' && standard.code === 'TOKEN') {
           const token = parseSessionTokenNote(msg);
           if (token) {
@@ -6587,7 +6723,13 @@ export const store = createStore<OnyxState>()(
             const account900 = params[2];
             // Capture before server object exists (900 arrives during CAP/SASL, before 001)
             _saslAccount = account900;
-            set(s => ({ server: s.server ? { ...s.server, account: account900 } : null }));
+            // Clear any in-flight passkey ceremony — a passkey AUTH-FINISH that
+            // verifies lands here as RPL_LOGGEDIN.
+            set(s => ({
+              server: s.server ? { ...s.server, account: account900 } : null,
+              passkeyBusy: false,
+              passkeyError: null,
+            }));
           }
           break;
         }

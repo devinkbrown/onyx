@@ -22,6 +22,7 @@ import {
   type JSX,
 } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
+import { buildCatchUp, catchUpSummary, type CatchUpItem } from '@/lib/notifications/catchUp';
 import { fetchStatsIndex, relTime } from '@/lib/stats/networkIndex';
 
 export { relTime };
@@ -61,9 +62,24 @@ function Sparkline(props: { values: number[] }): JSX.Element {
 export function HomeView(): JSX.Element {
   const joinHistory = useStore((s) => s.joinHistory);
   const channels = useStore((s) => s.channels);
+  const dms = useStore((s) => s.dms);
+  const channelLastActivity = useStore((s) => s.channelLastActivity);
+  const connectionStatus = useStore((s) => s.connectionStatus);
   const networkName = useStore((s) => s.networkName);
 
   const [stats] = createResource(fetchStatsIndex);
+
+  // "Catch up" — what you missed across every joined room + DM, ranked so
+  // mentions and DMs surface and ambient chatter accumulates quietly below.
+  const catchUp = createMemo<CatchUpItem[]>(() =>
+    buildCatchUp(channels().values(), dms().values(), channelLastActivity()),
+  );
+  const catchUpTotals = createMemo(() => catchUpSummary(catchUp()));
+  const hasRooms = createMemo(() => channels().size > 0 || dms().size > 0);
+  const openCatchUp = (item: CatchUpItem) =>
+    item.kind === 'channel'
+      ? getState().navigate({ kind: 'channel', channel: item.target })
+      : getState().navigate({ kind: 'dm', nick: item.target });
 
   // One shared clock for all relative-time labels.
   const [nowMs, setNowMs] = createSignal(Date.now());
@@ -101,6 +117,62 @@ export function HomeView(): JSX.Element {
             <b>⌘K</b> opens the palette, <b>?</b> shows every shortcut.
           </p>
         </header>
+
+        <Show when={connectionStatus() === 'connected' && hasRooms()}>
+          <section class="home-catchup" aria-label="Catch up on what you missed">
+            <div class="home-catchup-head">
+              <h3 class="home-section-label">Catch up</h3>
+              <Show
+                when={catchUp().length > 0}
+                fallback={<span class="home-catchup-clear">You're all caught up ✓</span>}
+              >
+                <span class="home-catchup-summary">
+                  {catchUpTotals().unread} unread
+                  <Show when={catchUpTotals().mentions > 0}>
+                    {' · '}
+                    <b>
+                      {catchUpTotals().mentions} mention{catchUpTotals().mentions === 1 ? '' : 's'}
+                    </b>
+                  </Show>
+                </span>
+              </Show>
+            </div>
+            <Show when={catchUp().length > 0}>
+              <ul class="home-catchup-list">
+                <For each={catchUp()}>
+                  {(item) => (
+                    <li>
+                      <button
+                        type="button"
+                        class={`home-catchup-item${item.highlights > 0 || item.kind === 'dm' ? ' is-priority' : ''}`}
+                        onClick={() => openCatchUp(item)}
+                        aria-label={`Open ${item.name}, ${item.unread} unread${item.highlights > 0 ? `, ${item.highlights} mention${item.highlights === 1 ? '' : 's'}` : ''}`}
+                      >
+                        <span class="home-catchup-name">
+                          <span class="home-catchup-kind" aria-hidden="true">
+                            {item.kind === 'dm' ? '@' : '#'}
+                          </span>
+                          {item.kind === 'dm' ? item.name : item.name.replace(/^#/, '')}
+                        </span>
+                        <span class="home-catchup-meta">
+                          <Show when={item.highlights > 0}>
+                            <span class="home-catchup-mention">{item.highlights} @you</span>
+                          </Show>
+                          <span class="home-catchup-unread">{item.unread}</span>
+                          <Show when={item.lastActivity > 0}>
+                            <span class="home-catchup-when">
+                              {relTime(Math.floor(item.lastActivity / 1000), nowMs())}
+                            </span>
+                          </Show>
+                        </span>
+                      </button>
+                    </li>
+                  )}
+                </For>
+              </ul>
+            </Show>
+          </section>
+        </Show>
 
         <Show when={stats()}>
           {(data) => (

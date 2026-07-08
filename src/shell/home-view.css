@@ -227,3 +227,103 @@
 @media (prefers-reduced-motion: reduce) {
   .home-card, .home-cta, .home-card-join { transition: none; }
 }
+
+/* ── Catch up — "what did I miss" across joined rooms + DMs ─────────────────── */
+.home-catchup {
+  margin: 4px 0 28px;
+}
+.home-catchup-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.home-catchup-head .home-section-label {
+  margin: 0;
+}
+.home-catchup-summary,
+.home-catchup-clear {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--washi-mute);
+}
+.home-catchup-summary b {
+  color: var(--gold-bright);
+  font-weight: 500;
+}
+.home-catchup-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.home-catchup-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  text-align: left;
+  background: color-mix(in oklab, var(--stone) 85%, transparent);
+  border: 1px solid var(--line);
+  border-left: 2px solid transparent;
+  border-radius: var(--r-md);
+  color: var(--washi);
+  cursor: pointer;
+  transition: border-color var(--dur, 200ms) var(--ease),
+    background var(--dur, 200ms) var(--ease);
+}
+.home-catchup-item:hover {
+  border-color: var(--stone-line);
+  background: color-mix(in oklab, var(--stone) 70%, transparent);
+}
+.home-catchup-item.is-priority {
+  border-left-color: var(--gold-bright);
+}
+.home-catchup-name {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-catchup-kind {
+  color: var(--washi-mute);
+  font-family: var(--font-mono);
+}
+.home-catchup-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.home-catchup-mention {
+  color: var(--gold-deep);
+  background: color-mix(in oklab, var(--gold) 18%, transparent);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+.home-catchup-unread {
+  min-width: 22px;
+  text-align: center;
+  color: var(--washi);
+  background: color-mix(in oklab, var(--lapis) 22%, transparent);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.home-catchup-when {
+  color: var(--washi-mute);
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-catchup-item { transition: none; }
+}
