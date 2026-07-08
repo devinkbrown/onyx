@@ -1,10 +1,12 @@
-import { createMemo, type Accessor } from 'solid-js';
+import { createEffect, createMemo, createSignal, onCleanup, onMount, type Accessor } from 'solid-js';
 import { backgroundOptions, type BackgroundId } from '@/backgrounds';
 import { getState, useStore } from '@/lib/store';
 import type { State } from '@/lib/store/store';
 import { applyThemeToDom, THEME_IDS, THEMES, type ThemeId } from '@/theme';
 import { saveRecent } from '@/lib/commands/registry';
 import { openPreferences } from '@/lib/prefs/preferences';
+import { useSpotlight } from './useSpotlight';
+import { parseTimeExpr } from './timeGrammar';
 
 export type SpotlightSection = 'Channels' | 'DMs' | 'People' | 'Actions';
 
@@ -21,11 +23,71 @@ type CommandState = Pick<State, 'channels' | 'dms' | 'server' | 'networkName' | 
 
 const THEME_STORAGE_KEY = 'onyx:theme';
 const BACKGROUND_STORAGE_KEY = 'onyx:bg';
+const SPOTLIGHT_INPUT_ID = 'onyx-spotlight-input';
+
+const JUMP_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+});
 
 function normalizeChannel(input: string): string {
   const trimmed = input.trim();
   if (!trimmed) return '';
   return trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+}
+
+function activeTarget(state: Pick<State, 'activeView'>): string | null {
+  const view = state.activeView;
+  if (view.kind === 'channel') return view.channel;
+  if (view.kind === 'dm') return view.nick;
+  return null;
+}
+
+function activeTargetLabel(state: Pick<State, 'activeView'>): string {
+  const view = state.activeView;
+  if (view.kind === 'channel') return view.channel;
+  if (view.kind === 'dm') return `@${view.nick}`;
+  return '';
+}
+
+function timeExprFromQuery(query: string): string | null {
+  const trimmed = query.trim();
+  if (trimmed.toLowerCase().startsWith('at:')) return trimmed.slice(3).trim();
+  if (trimmed.startsWith('@')) return trimmed.slice(1).trim();
+  return null;
+}
+
+function readSpotlightQuery(): string {
+  if (typeof document === 'undefined') return '';
+  const input = document.getElementById(SPOTLIGHT_INPUT_ID);
+  return input instanceof HTMLInputElement ? input.value : '';
+}
+
+function timeJumpCommands(state: CommandState, query: string): SpotlightCommand[] {
+  const expr = timeExprFromQuery(query);
+  if (!expr) return [];
+
+  const target = activeTarget(state);
+  if (!target) return [];
+
+  const at = parseTimeExpr(expr);
+  if (!at) return [];
+
+  return [
+    {
+      id: `action:time-jump:${target}:${at.toISOString()}`,
+      section: 'Actions',
+      title: `Jump to ${JUMP_TIME_FORMATTER.format(at)}`,
+      hint: activeTargetLabel(state),
+      keywords: [query.trim(), expr, 'at', 'jump time history'],
+      run: () => {
+        const current = getState();
+        const currentTarget = activeTarget(current);
+        if (!currentTarget) return;
+        current.travelTo(currentTarget, at);
+      },
+    },
+  ];
 }
 
 function navigateTo(path: string): void {
@@ -256,7 +318,7 @@ function peopleCommands(state: CommandState): SpotlightCommand[] {
     }));
 }
 
-export function buildCommands(state: CommandState = getState()): SpotlightCommand[] {
+export function buildCommands(state: CommandState = getState(), query = ''): SpotlightCommand[] {
   const seenChannels = new Set<string>();
   const channels = Array.from(state.channels.values())
     .filter((channel) => {
@@ -313,6 +375,7 @@ export function buildCommands(state: CommandState = getState()): SpotlightComman
   }));
 
   return [
+    ...timeJumpCommands(state, query),
     ...channels,
     ...dms,
     ...peopleCommands(state),
@@ -323,6 +386,8 @@ export function buildCommands(state: CommandState = getState()): SpotlightComman
 }
 
 export function useCommands(): Accessor<SpotlightCommand[]> {
+  const spotlight = useSpotlight();
+  const [query, setQuery] = createSignal('');
   const state = useStore(
     (store) => ({
       channels: store.channels,
@@ -344,6 +409,27 @@ export function useCommands(): Accessor<SpotlightCommand[]> {
     ),
   );
 
-  const commands = createMemo(() => buildCommands(state()));
+  onMount(() => {
+    const handleInput = (event: Event): void => {
+      const target = event.target;
+      if (target instanceof HTMLInputElement && target.id === SPOTLIGHT_INPUT_ID) {
+        setQuery(target.value);
+      }
+    };
+
+    document.addEventListener('input', handleInput);
+    onCleanup(() => document.removeEventListener('input', handleInput));
+  });
+
+  createEffect(() => {
+    if (!spotlight.isOpen()) {
+      setQuery('');
+      return;
+    }
+
+    queueMicrotask(() => setQuery(readSpotlightQuery()));
+  });
+
+  const commands = createMemo(() => buildCommands(state(), query()));
   return commands;
 }
