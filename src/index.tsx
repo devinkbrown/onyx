@@ -27,6 +27,8 @@ import '@fontsource-variable/fraunces';
 import '@fontsource-variable/jetbrains-mono';
 import '@fontsource-variable/instrument-sans';
 import './styles/global.css';
+import './styles/a11y-media.css';
+import './backgrounds/scene-motion.css';
 import { ThemeProvider } from './theme';
 import { Spotlight, SpotlightProvider } from './chat/spotlight';
 import Landing from './routes/Landing';

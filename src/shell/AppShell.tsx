@@ -57,6 +57,8 @@ import { AppearancePanel } from './AppearancePanel';
 import { PreferencesPanel } from './PreferencesPanel';
 import { PinnedMessages } from './PinnedMessages';
 import { applyPreferences } from '@/lib/prefs/preferences';
+import { applySceneMotion } from '@/lib/prefs/sceneMotion';
+import { applyCalmPreset } from '@/lib/notifications/calmMode';
 import { Spotlight } from '@/chat/spotlight';
 import { useSpotlightHotkeys } from '@/chat/spotlight/useSpotlight';
 import { KeyboardHelpOverlay } from './KeyboardHelpOverlay';
@@ -145,7 +147,11 @@ export function AppShell(props: AppShellProps): JSX.Element {
   });
 
   // Reflect saved display/behaviour preferences onto <html> on first paint.
-  onMount(() => applyPreferences());
+  onMount(() => {
+    applyPreferences();
+    applySceneMotion();
+    applyCalmPreset();
+  });
 
   // ── voice/video ──
   // Boot the SUIMYAKU media engine once and wire its callbacks into the store.

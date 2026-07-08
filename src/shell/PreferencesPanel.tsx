@@ -13,6 +13,13 @@
 import { For, type JSX } from 'solid-js';
 import { Sheet } from '@/primitives';
 import { clearVault } from '@/lib/vault/historyVault';
+import { CalmModeControl } from './CalmModeControl';
+import {
+  SCENE_MOTIONS,
+  sceneMotion,
+  setSceneMotion,
+  type SceneMotion,
+} from '@/lib/prefs/sceneMotion';
 import '@/lib/prefs/preferences.css';
 import { CLOCKS,
   DENSITIES,
@@ -33,6 +40,11 @@ const CLOCK_LABELS = { '24h': '24-hour', '12h': '12-hour' } as const;
 const DENSITY_LABELS: Record<Density, string> = { compact: 'Compact', cozy: 'Cozy', roomy: 'Roomy' };
 const FONT_SCALE_LABELS: Record<FontScale, string> = { sm: 'Small', md: 'Medium', lg: 'Large' };
 const WIDTH_LABELS: Record<Width, string> = { measured: 'Measured', full: 'Full-width' };
+const SCENE_MOTION_LABELS: Record<SceneMotion, string> = {
+  animated: 'Animated',
+  still: 'Still',
+  off: 'Off',
+};
 
 type SegmentedProps<T extends string> = {
   legend: string;
@@ -157,6 +169,8 @@ export function PreferencesPanel(): JSX.Element {
           onSelect={(value) => setPreference('clock', value)}
         />
 
+        <CalmModeControl />
+
         <Toggle
           legend="System events"
           title="Hide join, part & quit"
@@ -190,6 +204,15 @@ export function PreferencesPanel(): JSX.Element {
           description="When the other person's app supports it, DMs are sealed on your device — the server relays only ciphertext. A lock marks encrypted messages; ones sent to another device stay locked."
           value={() => preferences().e2eeDms}
           onToggle={(value) => setPreference('e2eeDms', value)}
+        />
+
+        <Segmented
+          legend="Background motion"
+          description="Animate the scene, freeze it on a still frame, or turn it off — independent of your OS motion setting."
+          options={SCENE_MOTIONS}
+          labels={SCENE_MOTION_LABELS}
+          value={() => sceneMotion()}
+          onSelect={(value) => setSceneMotion(value)}
         />
 
         <Toggle
