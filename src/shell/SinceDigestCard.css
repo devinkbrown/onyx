@@ -1,0 +1,267 @@
+/* SinceDigestCard - compact missed-message card. */
+.since-digest-card {
+  --since-digest-ground: var(--surface, color-mix(in oklab, var(--stone) 86%, transparent));
+  --since-digest-row: color-mix(in oklab, var(--stone-2) 54%, transparent);
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  color: var(--washi);
+  background: var(--since-digest-ground);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: var(--space-4);
+}
+
+.since-digest-card__head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.since-digest-card__kicker {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--lapis-bright);
+}
+
+.since-digest-card__title {
+  margin: 0;
+  color: var(--washi);
+  font-size: clamp(1.05rem, 0.92rem + 0.55vw, 1.38rem);
+  font-weight: 650;
+  line-height: 1.18;
+}
+
+.since-digest-card__since {
+  margin: 0;
+  color: var(--washi-mute);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.since-digest-card__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.since-digest-card__item {
+  min-width: 0;
+}
+
+.since-digest-card__row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 58px;
+  padding: 10px 12px;
+  color: inherit;
+  text-align: left;
+  background: var(--since-digest-row);
+  border: 1px solid var(--line);
+  border-left: 2px solid transparent;
+  border-radius: var(--r-md);
+}
+
+.since-digest-card__row.is-mentioned {
+  border-left-color: var(--shu-bright);
+  background: color-mix(in oklab, var(--shu) 7%, var(--since-digest-row));
+}
+
+.since-digest-card__row--button {
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background var(--dur, 200ms) var(--ease),
+    border-color var(--dur, 200ms) var(--ease),
+    transform var(--dur, 200ms) var(--ease);
+}
+
+.since-digest-card__row--button:hover {
+  background: color-mix(in oklab, var(--stone-2) 70%, transparent);
+  border-color: var(--stone-line);
+  transform: translateY(-1px);
+}
+
+.since-digest-card__row--button:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--lapis-bright) 72%, transparent);
+  outline-offset: 2px;
+}
+
+.since-digest-card__main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.since-digest-card__channel {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--washi);
+  font-family: var(--font-mono);
+  font-size: 0.94rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.since-digest-card__meta {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--washi-mute);
+  font-size: 0.76rem;
+}
+
+.since-digest-card__participants {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.since-digest-card__participant,
+.since-digest-card__participant-overflow {
+  max-width: 12ch;
+  overflow: hidden;
+  color: var(--washi-dim);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.since-digest-card__participant-overflow {
+  color: var(--lapis-bright);
+  font-family: var(--font-mono);
+}
+
+.since-digest-card__muted,
+.since-digest-card__window {
+  color: var(--washi-mute);
+}
+
+.since-digest-card__window {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+}
+
+.since-digest-card__stats {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.since-digest-card__mentions {
+  color: var(--shu-bright);
+  background: color-mix(in oklab, var(--shu) 18%, transparent);
+  border: 1px solid color-mix(in oklab, var(--shu-bright) 32%, transparent);
+  border-radius: var(--r-pill);
+  padding: 2px 8px;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.since-digest-card__count {
+  min-width: 50px;
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 4px;
+  color: var(--washi);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.since-digest-card__count span {
+  color: var(--washi-mute);
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.since-digest-card__empty {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 18px;
+  color: var(--washi-dim);
+  background: color-mix(in oklab, var(--lapis) 7%, transparent);
+  border: 1px dashed color-mix(in oklab, var(--lapis-bright) 28%, var(--line));
+  border-radius: var(--r-md);
+}
+
+.since-digest-card__empty-mark {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--lapis-bright);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: 700;
+  background: color-mix(in oklab, var(--lapis) 14%, transparent);
+  border-radius: var(--r-pill);
+}
+
+.since-digest-card__empty h3,
+.since-digest-card__empty p {
+  margin: 0;
+}
+
+.since-digest-card__empty h3 {
+  color: var(--washi);
+  font-size: 0.94rem;
+}
+
+.since-digest-card__empty p {
+  margin-top: 3px;
+  color: var(--washi-mute);
+  font-size: 0.82rem;
+}
+
+@media (max-width: 520px) {
+  .since-digest-card {
+    padding: var(--space-3);
+  }
+
+  .since-digest-card__row {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .since-digest-card__stats {
+    justify-content: flex-start;
+  }
+
+  .since-digest-card__count {
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .since-digest-card__row--button {
+    transition: none;
+  }
+
+  .since-digest-card__row--button:hover {
+    transform: none;
+  }
+}
