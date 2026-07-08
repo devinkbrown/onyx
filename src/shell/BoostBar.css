@@ -1,0 +1,86 @@
+/**
+ * BoostBar.css — token-only pill styling for quiet boosts.
+ *
+ * Imported by BoostBar.tsx.
+ */
+
+.boost-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.boost-pill {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 1.8rem;
+  appearance: none;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--stone) 72%, var(--ink));
+  color: var(--washi-dim);
+  font: inherit;
+  line-height: 1;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease),
+    color var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+
+.boost-pill:hover {
+  border-color: color-mix(in oklab, var(--lapis-bright) 42%, var(--line));
+  background: color-mix(in oklab, var(--stone) 84%, var(--lapis) 16%);
+  color: var(--washi);
+  transform: translateY(-1px);
+}
+
+.boost-pill:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.boost-pill.you {
+  border-color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis) 24%, var(--ink));
+  color: var(--washi);
+}
+
+.boost-pill.you:hover {
+  background: color-mix(in oklab, var(--lapis) 30%, var(--ink));
+}
+
+.boost-emoji {
+  flex: 0 0 auto;
+  font-size: 0.98rem;
+  line-height: 1;
+}
+
+.boost-count {
+  min-width: 1ch;
+  color: inherit;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.boost-add {
+  width: 1.8rem;
+  padding: 0;
+  color: var(--washi-mute);
+  font-size: 0.95rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boost-pill {
+    transition: none;
+  }
+
+  .boost-pill:hover {
+    transform: none;
+  }
+}
