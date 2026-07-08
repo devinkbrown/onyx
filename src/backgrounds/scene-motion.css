@@ -1,0 +1,21 @@
+/**
+ * scene-motion.css - user-driven background scene motion overrides.
+ *
+ * These controls are orthogonal to `@media (prefers-reduced-motion)`: the user
+ * chooses Animated, Still, or Off independently of the OS motion signal.
+ */
+
+/* Background.tsx renders both canvas and DOM scene hosts with
+   `data-background-canvas="true"`; SceneShell.tsx renders DOM scenes as
+   `.onyx-scene` inside that host. */
+:root[data-scene-motion='still'] [data-background-canvas='true'],
+:root[data-scene-motion='still'] [data-background-canvas='true'] *,
+:root[data-scene-motion='still'] [data-background-canvas='true'] *::before,
+:root[data-scene-motion='still'] [data-background-canvas='true'] *::after {
+  animation-play-state: paused !important;
+  transition: none !important;
+}
+
+:root[data-scene-motion='off'] [data-background-canvas='true'] {
+  display: none !important;
+}
