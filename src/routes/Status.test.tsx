@@ -8,6 +8,7 @@ describe('StatusRoute', () => {
     render(() => <StatusRoute />);
 
     expect(screen.getByRole('heading', { name: /mesh health/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /vault backups/i })).toBeInTheDocument();
     expect(await screen.findByText(/status is waiting/i)).toBeInTheDocument();
   });
 });

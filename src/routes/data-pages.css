@@ -143,6 +143,11 @@
   margin-top: 22px;
 }
 
+.data-list--compact {
+  gap: 0;
+  margin-top: 18px;
+}
+
 .data-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

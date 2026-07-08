@@ -2,6 +2,7 @@ import './landing.css';
 import './data-pages.css';
 import { createResource, createSignal, For, onCleanup, Show } from 'solid-js';
 import { Mascot } from '@/components/brand/Mascot';
+import { fetchBackupManifest } from '@/lib/stats/backups';
 import { relTime } from '@/lib/stats/networkIndex';
 import { fetchNetworkStatus, formatDuration } from '@/lib/stats/status';
 
@@ -11,6 +12,7 @@ function statusState(quorum: boolean, partitioned: boolean): 'up' | 'degraded' {
 
 export default function StatusRoute() {
   const [status] = createResource(fetchNetworkStatus);
+  const [backups] = createResource(fetchBackupManifest);
   const [nowMs, setNowMs] = createSignal(Date.now());
   const timer = setInterval(() => setNowMs(Date.now()), 30_000);
   onCleanup(() => clearInterval(timer));
@@ -101,12 +103,29 @@ export default function StatusRoute() {
         </article>
 
         <aside class="data-card">
-          <span class="label">feed</span>
-          <h3>Public by design</h3>
+          <span class="label">backups</span>
+          <h3>Vault backups</h3>
           <p>
-            This page reads static JSON written by Orochi on the stats cadence. It
-            does not need an account, a socket, or operator access.
+            <Show when={backups()} fallback="Waiting for the public backup manifest.">
+              {(manifest) => manifest().files.length === 0
+                ? 'The backup manifest is present, but no snapshot files are listed.'
+                : `${manifest().files.length} snapshot file${manifest().files.length === 1 ? '' : 's'} published ${relTime(manifest().generated_at, nowMs())}.`}
+            </Show>
           </p>
+          <Show when={backups()?.files.length}>
+            <div class="data-list data-list--compact">
+              <For each={backups()?.files ?? []}>
+                {(file) => (
+                  <div class="data-row">
+                    <div>
+                      <strong>{file.kind}</strong>
+                      <span>{file.name}</span>
+                    </div>
+                  </div>
+                )}
+              </For>
+            </div>
+          </Show>
         </aside>
       </section>
 
