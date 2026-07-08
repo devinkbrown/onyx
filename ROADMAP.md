@@ -142,11 +142,19 @@ down to TLS.
     the community site renders node cards + an operational/degraded banner,
     30s refresh. Live-verified both nodes.
 13. **Prometheus on** + a public graph or two; stats index gains node health.
+    ✅ **WEBSITE SHIPPED 2026-07-08** — Onyx now has `/stats` with network
+    daily bars, per-channel sparklines, live users/rooms/messages summaries, and
+    room handoff links into `/app?join=...&at=...`. The root page also surfaces
+    the live public pulse. Server Prometheus remains the richer metrics source;
+    this closes the public website graph surface from the chanstats/status feeds.
 14. **Nightly vault-safe backups** of accounts.db + chanstats snapshots.
     ✅ **SERVER SHIPPED 2026-07-08** — Orochi `[backup]` emits timestamped
     account-store snapshots and chanstats snapshots plus `latest.json` on a
     configurable cadence. Deployment still needs the target directory pointed at
     the operator's vault/sync path.
+    ✅ **WEBSITE SURFACED 2026-07-08** — `/status` reads a public backup
+    `latest.json` manifest when served and shows snapshot readiness without
+    requiring an account or operator socket.
 
 *Sequencing logic: 1–3 need no server deploys (ship fastest), 4–5 are one
 focused server feature each, 6+ are compound. Every phase lands something
