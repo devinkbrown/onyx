@@ -123,6 +123,19 @@
 .r-divider { height: 1px; background: repeating-linear-gradient(90deg, var(--seam) 0 22px, transparent 22px 34px); }
 
 /* ───────── Who's here / community ───────── */
+.r-live { padding-block: clamp(54px, 8vw, 118px); }
+.r-live-head { display: flex; align-items: end; justify-content: space-between; gap: 24px; }
+.r-live-link { flex: none; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--lapis-bright); border-bottom: 1px solid var(--seam); padding-bottom: 5px; }
+.r-live-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(12px, 1.6vw, 20px); margin-top: 38px; }
+.r-live-tile { min-height: 162px; display: flex; flex-direction: column; justify-content: space-between; gap: 16px; padding: clamp(20px, 2.3vw, 30px); border: 1px solid var(--seam-faint); border-radius: var(--r-md); background: linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 45%, var(--ink)), color-mix(in oklab, var(--stone) 24%, var(--ink))); overflow: hidden; }
+.r-live-tile .k { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--lapis-bright); }
+.r-live-tile strong { display: block; font-family: var(--font-display); font-weight: 400; text-transform: uppercase; font-size: clamp(1.7rem, 1rem + 1.8vw, 3.1rem); line-height: 0.95; color: var(--washi); overflow-wrap: anywhere; }
+.r-live-tile strong[data-state='operational'] { color: var(--ok); }
+.r-live-tile strong[data-state='degraded'] { color: var(--shu-bright); }
+.r-live-tile p { margin: 0; font-size: 0.95rem; line-height: 1.45; color: var(--washi-mute); }
+@media (max-width: 980px) { .r-live-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .r-live-head { display: block; } .r-live-link { display: inline-flex; margin-top: 22px; } .r-live-grid { grid-template-columns: 1fr; } }
+
 .r-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: clamp(16px, 2vw, 28px); margin-top: 44px; }
 .r-stat { display: flex; flex-direction: column; gap: 8px; padding: clamp(22px, 2.4vw, 32px); border-left: 2px solid var(--seam); background: linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 36%, var(--ink)), color-mix(in oklab, var(--stone) 22%, var(--ink))); border-radius: 0 var(--r-md) var(--r-md) 0; transition: border-color var(--dur) var(--ease), transform var(--dur) var(--ease); }
 .r-stat:hover { transform: translateY(-3px); border-left-color: var(--lapis-bright); }

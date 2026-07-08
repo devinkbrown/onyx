@@ -60,4 +60,11 @@ describe('Landing', () => {
     expect(hrefs).toContain('/stats');
     expect(hrefs).toContain('/status');
   });
+
+  it('surfaces live public telemetry on the root website', () => {
+    const { getByText } = render(() => <Landing />);
+
+    expect(getByText(/The network\s*is visible/i)).toBeInTheDocument();
+    expect(getByText(/Public telemetry is part of the front door/i)).toBeInTheDocument();
+  });
 });

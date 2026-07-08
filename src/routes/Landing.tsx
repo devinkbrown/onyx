@@ -1,11 +1,25 @@
 import './landing.css';
+import { createMemo, createResource, Show } from 'solid-js';
 import { Mascot } from '@/components/brand/Mascot';
+import { fetchStatsIndex } from '@/lib/stats/networkIndex';
+import { fetchNetworkStatus, formatDuration } from '@/lib/stats/status';
 
 /** Onyx launch site — Ocean: deep-water dark luxury, community-first.
  *  Leads with people and place: a real IRC network you join, not a product you buy.
  *  Atmosphere is ocean depth + flowing azure currents + drifting bioluminescence,
  *  all reduced-motion safe. The friendly water-dragon Mascot is the brand face. */
 export default function Landing() {
+  const [stats] = createResource(fetchStatsIndex);
+  const [status] = createResource(fetchNetworkStatus);
+  const busiest = createMemo(() =>
+    [...(stats()?.channels ?? [])].sort((a, b) => b.messages - a.messages)[0] ?? null,
+  );
+  const meshState = createMemo(() => {
+    const s = status();
+    if (!s) return 'listening';
+    return s.mesh.quorum && !s.mesh.partitioned ? 'operational' : 'degraded';
+  });
+
   return (
     <main class="r">
       {/* ── living atmosphere: depth · currents · bioluminescence · grain ── */}
@@ -62,6 +76,70 @@ export default function Landing() {
           <div class="r-hero-art" aria-hidden="true">
             <Mascot variant="hero" />
           </div>
+        </div>
+      </section>
+
+      <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
+
+      {/* ── live pulse from public feeds ── */}
+      <section id="live" class="r-wrap r-section r-live" aria-labelledby="live-heading">
+        <div class="r-live-head">
+          <div>
+            <span class="r-eyebrow">live pulse</span>
+            <h2 class="r-title" id="live-heading">The network<br />is visible</h2>
+          </div>
+          <a class="r-live-link" href="/status">Open status</a>
+        </div>
+        <p class="r-lede">
+          Public telemetry is part of the front door: room activity, mesh health,
+          and node state are readable before you join.
+        </p>
+        <div class="r-live-grid" aria-label="Live network summary">
+          <article class="r-live-tile">
+            <span class="k">mesh</span>
+            <strong data-state={meshState()}>{meshState()}</strong>
+            <p>
+              <Show when={status()} fallback="waiting for the public status feed">
+                {(s) => s().mesh.partitioned
+                  ? `${s().mesh.components} visible mesh components`
+                  : `${s().peers.filter((p) => p.up).length}/${s().peers.length} peer links up`}
+              </Show>
+            </p>
+          </article>
+          <article class="r-live-tile">
+            <span class="k">people</span>
+            <strong>
+              <Show when={stats()} fallback="--">
+                {(data) => data().users_online.toLocaleString('en-US')}
+              </Show>
+            </strong>
+            <p>online across the mesh</p>
+          </article>
+          <article class="r-live-tile">
+            <span class="k">rooms</span>
+            <strong>
+              <Show when={stats()} fallback="--">
+                {(data) => data().channels.length.toLocaleString('en-US')}
+              </Show>
+            </strong>
+            <p>tracked in the public index</p>
+          </article>
+          <article class="r-live-tile">
+            <span class="k">busiest</span>
+            <strong>
+              <Show when={busiest()} fallback="#root">
+                {(room) => room().channel}
+              </Show>
+            </strong>
+            <p>
+              <Show when={status()} fallback="updated by the stats cadence">
+                {(s) => `${s().node || s().network || 'node'} up ${formatDuration(s().uptime_seconds)}`}
+              </Show>
+            </p>
+          </article>
+        </div>
+        <div class="r-cta">
+          <a class="r-btn ghost" href="/stats">Open channel stats &rarr;</a>
         </div>
       </section>
 
