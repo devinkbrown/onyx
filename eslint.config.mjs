@@ -11,6 +11,7 @@ export default tseslint.config(
       '.next/**',
       '.wt/**',
       '.claude/**',
+      'scratchpad/**',
       'out/**',
       'coverage/**',
       'dist/**',

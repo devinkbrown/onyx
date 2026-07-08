@@ -61,7 +61,7 @@ export function AccessibilityStatement(props: { class?: string }): JSX.Element {
     props.class ? `a11y-statement ${props.class}` : 'a11y-statement';
 
   return (
-    <main class={rootClass()} aria-labelledby="a11y-statement-title">
+    <section class={rootClass()} aria-labelledby="a11y-statement-title">
       <article class="a11y-document">
         <header class="a11y-header">
           <p class="a11y-kicker">Accessibility conformance</p>
@@ -120,6 +120,6 @@ export function AccessibilityStatement(props: { class?: string }): JSX.Element {
           </section>
         </section>
       </article>
-    </main>
+    </section>
   );
 }
