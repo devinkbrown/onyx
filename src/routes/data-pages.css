@@ -181,12 +181,31 @@
   white-space: nowrap;
 }
 
+.data-action {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--washi);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-pill);
+  padding: 6px 10px;
+  transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+
+.data-action:hover,
+.data-action:focus-visible {
+  color: var(--lapis-bright);
+  border-color: var(--lapis);
+  background: color-mix(in oklab, var(--lapis) 12%, transparent);
+}
+
 .channel-spark {
-  min-width: 168px;
+  min-width: 230px;
   display: flex;
   align-items: center;
   justify-content: end;
-  gap: 14px;
+  gap: 12px;
 }
 
 .channel-spark-bars {

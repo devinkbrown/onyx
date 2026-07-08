@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@solidjs/testing-library';
 
-import StatsRoute from './Stats';
+import StatsRoute, { roomDeepLink } from './Stats';
 
 describe('StatsRoute', () => {
   afterEach(() => {
@@ -39,5 +39,15 @@ describe('StatsRoute', () => {
 
     expect(await screen.findByLabelText(/daily message totals/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/#root recent activity/i)).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /open/i }).some((a) =>
+      a.getAttribute('href')?.startsWith('/app?join=%23root&at='),
+    )).toBe(true);
+  });
+
+  it('builds channel deep links with optional time-travel moments', () => {
+    expect(roomDeepLink('#root')).toBe('/app?join=%23root');
+    expect(roomDeepLink('#root', Date.parse('2026-07-08T12:00:00.000Z') / 1000)).toBe(
+      '/app?join=%23root&at=2026-07-08T12%3A00%3A00.000Z',
+    );
   });
 });

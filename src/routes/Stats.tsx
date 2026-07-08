@@ -42,6 +42,14 @@ function barHeight(day: NetworkDay, max: number): string {
   return String(Math.max(3, Math.round((day.messages / max) * 100)));
 }
 
+export function roomDeepLink(channel: string, lastActiveUnixSec = 0): string {
+  const params = new URLSearchParams({ join: channel });
+  if (lastActiveUnixSec > 0) {
+    params.set('at', new Date(lastActiveUnixSec * 1000).toISOString());
+  }
+  return `/app?${params.toString()}`;
+}
+
 function ChannelRow(props: { channel: StatsChannel; nowMs: number }) {
   const c = () => props.channel;
   const active = () => c().present || c().active_users;
@@ -63,6 +71,7 @@ function ChannelRow(props: { channel: StatsChannel; nowMs: number }) {
           </span>
         </Show>
         <span class="num">{active() > 0 ? `${active()} present` : relTime(c().last_active, props.nowMs)}</span>
+        <a class="data-action" href={roomDeepLink(c().channel, c().last_active)}>Open</a>
       </div>
     </article>
   );
@@ -159,6 +168,9 @@ export default function StatsRoute() {
                     <span class="value">{(room().present || room().active_users).toLocaleString('en-US')}</span>
                     <span class="note">right now</span>
                   </div>
+                </div>
+                <div class="r-cta">
+                  <a class="r-btn ghost" href={roomDeepLink(room().channel, room().last_active)}>Open this room &rarr;</a>
                 </div>
               </>
             )}
