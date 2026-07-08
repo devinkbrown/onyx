@@ -181,6 +181,38 @@
   white-space: nowrap;
 }
 
+.channel-spark {
+  min-width: 168px;
+  display: flex;
+  align-items: center;
+  justify-content: end;
+  gap: 14px;
+}
+
+.channel-spark-bars {
+  width: 82px;
+  height: 34px;
+  display: grid;
+  grid-template-columns: repeat(14, 1fr);
+  align-items: end;
+  gap: 3px;
+}
+
+.channel-spark-bars i {
+  display: block;
+  height: max(3px, calc(var(--h) * 1%));
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+  background: color-mix(in oklab, var(--lapis-bright) 78%, var(--lapis-deep));
+}
+
+.channel-spark-empty {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--washi-mute);
+}
+
 .data-empty {
   margin-top: 26px;
   padding: clamp(22px, 3vw, 34px);
@@ -251,6 +283,10 @@
   .data-row {
     grid-template-columns: 1fr;
     gap: 8px;
+  }
+
+  .channel-spark {
+    justify-content: space-between;
   }
 
   .peer-table,

@@ -43,14 +43,24 @@ function barHeight(day: NetworkDay, max: number): string {
 function ChannelRow(props: { channel: StatsChannel; nowMs: number }) {
   const c = () => props.channel;
   const active = () => c().present || c().active_users;
+  const maxSpark = createMemo(() => Math.max(0, ...c().spark));
   return (
     <article class="data-row">
       <div>
         <strong>{c().channel}</strong>
         <p>{c().topic || 'No topic set yet.'}</p>
       </div>
-      <div class="num">
-        {active() > 0 ? `${active()} present` : relTime(c().last_active, props.nowMs)}
+      <div class="channel-spark" aria-label={`${c().channel} recent activity`}>
+        <Show when={c().spark.length > 0} fallback={<span class="channel-spark-empty">no trend</span>}>
+          <span class="channel-spark-bars" aria-hidden="true">
+            <For each={c().spark.slice(-14)}>
+              {(n) => (
+                <i style={`--h: ${maxSpark() <= 0 ? 3 : Math.max(3, Math.round((n / maxSpark()) * 100))}`} />
+              )}
+            </For>
+          </span>
+        </Show>
+        <span class="num">{active() > 0 ? `${active()} present` : relTime(c().last_active, props.nowMs)}</span>
       </div>
     </article>
   );
