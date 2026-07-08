@@ -75,7 +75,7 @@ describe('buildInviteCard', () => {
     );
 
     expect(card.url).toBe(
-      `${ORIGIN}?join=%23space&at=2025-06-27T01%3A46%3A40.000Z&as=guest+nick`,
+      `${ORIGIN}?join=%23space&at=2025-06-27T04%3A53%3A20.000Z&as=guest+nick`,
     );
   });
 });
