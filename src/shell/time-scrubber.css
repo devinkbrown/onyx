@@ -1,0 +1,153 @@
+.time-scrubber {
+  flex: none;
+  color: var(--washi);
+  background: color-mix(in oklab, var(--stone) 72%, transparent);
+  border-bottom: 1px solid var(--line);
+}
+
+.time-scrubber__inner {
+  width: 100%;
+  max-width: 980px;
+  margin-inline: auto;
+  padding: 8px 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.time-scrubber__main {
+  min-width: 0;
+}
+
+.time-scrubber__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 5px;
+  font-family: var(--font-mono);
+  line-height: 1;
+}
+
+.time-scrubber__label {
+  color: var(--lapis-bright);
+  font-size: 0.66rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.time-scrubber__status {
+  color: var(--washi-mute);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-scrubber__track {
+  min-height: 34px;
+  padding: 5px;
+  display: grid;
+  grid-template-columns: repeat(24, minmax(0, 1fr));
+  align-items: end;
+  gap: 2px;
+  background: color-mix(in oklab, var(--stone) 58%, transparent);
+  border: 1px solid var(--line);
+}
+
+.time-scrubber__bar {
+  height: 24px;
+  min-width: 0;
+  padding: 0;
+  display: flex;
+  align-items: end;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.84;
+  transform: translateZ(0);
+  transition: transform 140ms ease, opacity 140ms ease;
+}
+
+.time-scrubber__bar:hover,
+.time-scrubber__bar:focus-visible {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.time-scrubber__bar:focus-visible {
+  outline: 1px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.time-scrubber__bar-fill {
+  width: 100%;
+  height: 100%;
+  min-height: 3px;
+  display: block;
+  background: color-mix(in oklab, var(--washi-mute) 34%, transparent);
+  opacity: calc(0.26 + var(--scrub-heat, 0) * 0.7);
+  transform: scaleY(calc(0.12 + var(--scrub-heat, 0) * 0.88));
+  transform-origin: bottom;
+  transition: transform 220ms ease, opacity 220ms ease;
+}
+
+.time-scrubber__bar--live .time-scrubber__bar-fill {
+  background: color-mix(in oklab, var(--lapis) 78%, var(--washi));
+}
+
+.time-scrubber__bar--now .time-scrubber__bar-fill {
+  background: var(--lapis-bright);
+  opacity: 1;
+}
+
+.time-scrubber__date {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--washi-mute);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.time-scrubber__date input {
+  width: 9.5rem;
+  min-width: 0;
+  color: var(--washi);
+  background: color-mix(in oklab, var(--stone) 70%, transparent);
+  border: 1px solid var(--line);
+  padding: 5px 7px;
+  font: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.time-scrubber__date input:focus-visible {
+  outline: 1px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+@media (max-width: 720px) {
+  .time-scrubber__inner {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .time-scrubber__date {
+    justify-self: start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .time-scrubber__bar,
+  .time-scrubber__bar-fill {
+    transition: none;
+  }
+
+  .time-scrubber__bar:hover,
+  .time-scrubber__bar:focus-visible {
+    transform: none;
+  }
+}
