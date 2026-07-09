@@ -17,6 +17,7 @@ import {
   exportPortableTransfer,
   importPortableTransfer,
   parsePortableTransfer,
+  type PortableTransferSnapshot,
 } from '@/lib/vault/portableTransfer';
 import { CalmModeControl } from './CalmModeControl';
 import {
@@ -50,6 +51,10 @@ const SCENE_MOTION_LABELS: Record<SceneMotion, string> = {
   still: 'Still',
   off: 'Off',
 };
+
+function countLabel(count: number, singular: string): string {
+  return `${count} ${singular}${count === 1 ? '' : 's'}`;
+}
 
 const ACCESS_AUDIT_ROWS = [
   {
@@ -278,6 +283,11 @@ function AccessibilityAuditLedger(): JSX.Element {
 function PortableVaultControls(): JSX.Element {
   const [status, setStatus] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal(false);
+  const [pendingImport, setPendingImport] = createSignal<{
+    fileName: string;
+    snapshot: PortableTransferSnapshot;
+    messages: number;
+  } | null>(null);
 
   async function handleExport(): Promise<void> {
     setBusy(true);
@@ -309,12 +319,30 @@ function PortableVaultControls(): JSX.Element {
       const parsed = parsePortableTransfer(JSON.parse(await file.text()));
       if (!parsed) {
         setStatus('Import rejected. Choose an Onyx portable JSON file.');
+        setPendingImport(null);
         return;
       }
-      const result = await importPortableTransfer(parsed);
-      setStatus(`Imported ${result.messages} messages, ${result.targets} targets, and ${result.reviews} reviews.`);
+      const messages = parsed.targets.reduce((sum, target) => sum + target.messages.length, 0);
+      setPendingImport({ fileName: file.name, snapshot: parsed, messages });
+      setStatus(`Ready to import ${countLabel(messages, 'message')}, ${countLabel(parsed.targets.length, 'target')}, and ${countLabel(parsed.reviewHistory.length, 'review')}.`);
     } catch {
       setStatus('Import failed. Choose a readable Onyx portable JSON file.');
+      setPendingImport(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmImport(): Promise<void> {
+    const pending = pendingImport();
+    if (!pending) return;
+    setBusy(true);
+    try {
+      const result = await importPortableTransfer(pending.snapshot);
+      setPendingImport(null);
+      setStatus(`Imported ${result.messages} messages, ${result.targets} targets, and ${result.reviews} reviews.`);
+    } catch {
+      setStatus('Import failed while merging this portable vault.');
     } finally {
       setBusy(false);
     }
@@ -342,6 +370,34 @@ function PortableVaultControls(): JSX.Element {
           />
         </label>
       </div>
+      <Show when={pendingImport()}>
+        {(pending) => (
+          <div class="pref-import-review" role="group" aria-labelledby="pref-import-review-title">
+            <h4 id="pref-import-review-title">Review import</h4>
+            <p>
+              {pending().fileName}: {countLabel(pending().messages, 'message')},
+              {' '}{countLabel(pending().snapshot.targets.length, 'target')}, and
+              {' '}{countLabel(pending().snapshot.reviewHistory.length, 'review')}. Existing local history is merged, not replaced.
+            </p>
+            <div class="pref-import-review__actions">
+              <button type="button" class="pref-reset" disabled={busy()} onClick={() => void confirmImport()}>
+                Import reviewed file
+              </button>
+              <button
+                type="button"
+                class="pref-reset"
+                disabled={busy()}
+                onClick={() => {
+                  setPendingImport(null);
+                  setStatus('Import cancelled.');
+                }}
+              >
+                Cancel import
+              </button>
+            </div>
+          </div>
+        )}
+      </Show>
       <Show when={status()}>
         <p class="pref-status" role="status">{status()}</p>
       </Show>

@@ -452,6 +452,10 @@ client or public site needs to expose the result.
     ✅ **WEBSITE SLICE SHIPPED 2026-07-09** — `/integrations/` now documents
     incoming webhooks, server snapshots, Slack exports, IRC-log-to-vault import,
     bridge status, provenance, and review-before-publish import behavior.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Portable vault imports now stage
+    selected Onyx JSON files in Preferences, show file name plus message,
+    target, and reviewed-catch-up counts, and require an explicit "Import
+    reviewed file" confirmation before merging local history.
 
 ## Phase 13 — Amanogawa Local Intelligence ← PLANNED
 34. **AI provenance chrome** *(client)* — every recap, search answer,

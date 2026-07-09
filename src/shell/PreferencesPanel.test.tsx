@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { closePreferences, openPreferences, resetPreferences } from '@/lib/prefs/preferences';
 import { PreferencesPanel } from './PreferencesPanel';
@@ -74,5 +74,63 @@ describe('PreferencesPanel', () => {
       'href',
       '/accessibility/',
     );
+  });
+
+  it('reviews portable vault imports before merging them', async () => {
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    const snapshot = {
+      kind: 'onyx-vault',
+      version: 1,
+      exportedAt: '2026-07-09T00:00:00.000Z',
+      targets: [
+        {
+          target: '#root',
+          messages: [
+            {
+              id: 'm1',
+              time: '2026-07-09T00:00:00.000Z',
+              from: 'kain',
+              text: 'hello',
+              type: 'msg',
+              target: '#root',
+            },
+            {
+              id: 'm2',
+              time: '2026-07-09T00:01:00.000Z',
+              from: 'onyx',
+              text: 'world',
+              type: 'msg',
+              target: '#root',
+            },
+          ],
+        },
+      ],
+      reviewHistory: [
+        {
+          target: '#root',
+          name: '#root',
+          kind: 'channel',
+          firstMessageId: 'm1',
+          firstAt: '2026-07-09T00:00:00.000Z',
+          reviewedAt: '2026-07-09T00:02:00.000Z',
+          messageCount: 2,
+          mentionCount: 0,
+          preview: 'hello world',
+        },
+      ],
+    };
+
+    const input = screen.getByLabelText('Import portable JSON') as HTMLInputElement;
+    const file = new File([JSON.stringify(snapshot)], 'onyx-portable.json', {
+      type: 'application/json',
+    });
+    await fireEvent.change(input, { target: { files: [file] } });
+
+    expect(await screen.findByRole('heading', { name: 'Review import' })).toBeInTheDocument();
+    expect(screen.getByText(/onyx-portable\.json: 2 messages, 1 target, and 1 review/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Import reviewed file' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel import' })).toBeInTheDocument();
   });
 });
