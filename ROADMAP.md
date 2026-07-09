@@ -64,7 +64,7 @@ down to TLS.
 3. **Vault-backed global search** — extend the deep-search UI to query the
    vault across ALL targets locally, merged with server SEARCH per target.
    ✅ **SHIPPED 2026-07-02** — `searchVault` (all-targets IDB scan), an
-   "Elsewhere on this device" section in the search panel, `openVaultResult`
+   "Saved on this device" section in the search panel, `openVaultResult`
    (navigate/join/create-DM + landing scroll); also fixed the pre-existing
    click-dead results strips (pointer-events). Verified live via
    `tools/vault-search-live.mjs`.
@@ -241,6 +241,9 @@ down to TLS.
     `shortcuts` commands, reader on/off/toggle, density projections, measured
     and full-width projections, still/animated motion controls, timed mute, and
     quiet-mode on/off.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — The global keyboard layer now adds
+    `J`/`K` transcript navigation over rendered message rows, reusing the
+    existing message landing pulse so reader-mode review can move line by line.
     ⏭️ **NEXT** — carry reviewed anchors into richer cross-room handoffs without
     adding new server surface.
 17. **Accessibility conformance ledger** *(main site + client)* — publish the
@@ -275,7 +278,8 @@ down to TLS.
     unread/mention names, and target-specific join action.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Keyboard shortcuts now carries pass
     evidence for its named Sheet dialog, labelled close action, and grouped
-    shortcut lists generated from the live keymap descriptors.
+    shortcut lists generated from the live keymap descriptors, including `J`/`K`
+    transcript navigation.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Command palette now carries pass
     evidence for its named dialog, described grammar examples, live
     selected-command status, and literal goto/search/time/reader/mute actions.
@@ -308,6 +312,114 @@ down to TLS.
     buttons, date jump input, and target-specific moment copy action.
     ⏭️ **CLIENT NEXT** — continue remaining dense-surface audit rows until every
     app panel has pass/fix evidence.
+
+## Master roadmap backlog folded into Onyx/public-site scope
+
+Source: `/home/kain/OROCHI_ONYX_MASTER_ROADMAP.md`, filtered to Onyx and the
+main website. Orochi daemon work stays out of this client roadmap unless the
+client or public site needs to expose the result.
+
+## Phase 8 — Torii Product Entry ← PLANNED
+18. **Rich invite entry** *(client + main site)* — make `?join=` links a true
+    first-run surface with Open Graph-ready public unfurls, instant guest
+    identity, channel context, and a clear path from guest nick to claimed
+    account.
+19. **Native onboarding and account claim** *(client)* — remove the NickServ
+    cliff from first use with registration, identify, certificate, and future
+    passkey flows expressed as first-party forms over the real server commands.
+20. **Brand and glossary cleanup** *(main site + client)* — enforce one public
+    glossary across home, about, status, roadmap, accessibility, app chrome,
+    invite unfurls, and docs. Track the master-roadmap direction to make
+    protocol/engine names supporting context instead of public product clutter.
+
+## Phase 9 — Sumi-e Venue Model ← PLANNED
+21. **Named conversations and forum projection** *(client)* — promote existing
+    topic tags into a softer Zulip-style model with topic-aware unread state,
+    one-tap split/follow actions, and a durable forum projection for long-lived
+    room knowledge.
+22. **Calm notifications and quiet boosts** *(client)* — formalize calm,
+    regular, and power notification presets; keep followed conversations and
+    mentions prominent while quiet reactions and ambient movement collect into
+    Home instead of interrupting users.
+23. **Presence-as-place header** *(client)* — consolidate facepile, heatline,
+    scheduled event, and voice corner into a peripheral room-presence surface
+    that shows life in the room without turning presence into a summons.
+24. **One-canvas responsive projection** *(client)* — keep Reader, Standard,
+    Dense, and mobile as projections of the same information model, avoiding a
+    separate mobile information architecture.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Mobile channel views now have a
+    visible Home tab in the bottom navigation, so the catch-up surface is a
+    touch affordance instead of keyboard-only.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home recap and recent-review action
+    cards now stack into touch-sized mobile rows.
+
+## Phase 10 — Washi Atmosphere ← PLANNED
+25. **Background system consolidation** *(client)* — collapse the canvas and DOM
+    scene set into a smaller Ink-on-Living-Paper system with shared layers,
+    capped motion, idle deceleration, and explicit Animated/Still/Off controls.
+26. **Theme-reactive community identity** *(client + main site)* — allow bounded
+    accent, tint, banner, and wordmark expression within contrast-locked OKLCH
+    tokens so rooms can feel distinct without unbounded CSS or broken access.
+27. **Contrast, transparency, and drawer focus variants** *(client + main site)*
+    — mechanically derive `prefers-contrast: more`, forced-colors, and
+    reduced-transparency variants from the same tokens already used by the app
+    and site; finish mobile drawer focus handoff/trap/restore semantics.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Time scrubber hourly bars now
+    activate exactly at the announced `HH:00 UTC` moment for pointer and
+    keyboard users.
+
+## Phase 11 — Kagura Media Presence ← PLANNED
+28. **Voice-room-as-place UI** *(client)* — turn voice/video from a button row
+    into persistent room presence with stage context, speaker/listener state,
+    device health, and call status visible in the room header.
+29. **Spatial audio and screenshare controls** *(client)* — add explicit spatial
+    audio, screenshare, and watch-together controls that degrade cleanly when a
+    node or browser lacks the underlying media feature.
+30. **Watch-together surface** *(client)* — expose synchronized playback as a
+    room activity with clear host, participant, pause, seek, and handoff states.
+
+## Phase 12 — Yorishiro Apps and Integrations ← PLANNED
+31. **Block-Kit-lite renderer** *(client)* — render structured webhook/plugin
+    components such as buttons, selects, and compact forms from protocol-tagged
+    payloads, with text fallback for classic clients.
+32. **Client extension surface** *(client)* — prepare a capability-scoped,
+    UI-safe extension surface for first-party plugins, starting with command
+    palette actions and message/room cards.
+33. **Importer and webhook migration path** *(client + main site)* — document
+    and surface server-snapshot imports, incoming webhooks, Slack export import,
+    IRC-log-to-vault import, and bridge status as switching-cost reducers rather
+    than generic integrations.
+
+## Phase 13 — Amanogawa Local Intelligence ← PLANNED
+34. **AI provenance chrome** *(client)* — every recap, search answer,
+    translation, or moderation suggestion must show where inference ran: this
+    device, this server, or an external endpoint.
+35. **Vault RAG and semantic recall** *(client)* — add local embeddings over the
+    decrypted vault for "when did we decide X?" queries that stay on the user's
+    device when content is private.
+36. **Local catch-up, captions, and translation** *(client)* — extend catch-up
+    and media surfaces with optional local recap, caption, and translation
+    affordances, keeping AI out of the front-door interaction model.
+37. **Agent-safe public contract** *(client + main site)* — document that channel
+    content is hostile input for any agent surface, exclude E2EE payloads, and
+    require visible audit trails for agent actions.
+
+## Phase 14 — Hyoryu Local-First Roaming ← PLANNED
+38. **Full offline-first UX** *(client)* — generalize the vault and outbox so
+    read, compose, search, catch-up, and moderation drafts all work during
+    disconnection, then reconcile with calm "caught up" cues on reconnect.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Message search now keeps
+    active-target local-vault hits when they are not already loaded in the live
+    buffer, de-duping by message id instead of dropping the whole open room.
+    ⏭️ **CLIENT NEXT** — add vault fallback for `travelTo()` when CHATHISTORY is
+    unavailable and make remembered unjoined channel vault results navigate
+    immediately while still sending JOIN when connected.
+39. **PWA and desktop packaging path** *(client + main site)* — make install,
+    update, notification, and wrapped push behavior explicit for browser PWA,
+    desktop shell, and future mobile wrappers.
+40. **Portable import/export** *(client)* — expose device-safe export/import for
+    vault history, room snapshots, account handoff data, and reviewed catch-up
+    state where protocol support exists.
 
 *Sequencing logic: 1–3 need no server deploys (ship fastest), 4–5 are one
 focused server feature each, 6+ are compound. Every phase lands something

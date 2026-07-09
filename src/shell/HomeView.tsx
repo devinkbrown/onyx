@@ -216,8 +216,11 @@ export function HomeView(): JSX.Element {
     for (const event of scheduledEvents()) byChannel.set(event.channel.toLowerCase(), event);
     return byChannel;
   });
-  const openEvent = (event: ScheduledEventItem) =>
-    getState().navigate({ kind: 'channel', channel: event.channel });
+  const openEvent = (event: ScheduledEventItem) => {
+    const state = getState();
+    state.navigate({ kind: 'channel', channel: event.channel });
+    state.travelTo(event.channel, new Date(event.at * 1000));
+  };
   const eventWhenLabel = (event: ScheduledEventItem) =>
     new Date(event.at * 1000).toLocaleString(undefined, {
       weekday: 'short',
@@ -582,7 +585,7 @@ export function HomeView(): JSX.Element {
                   <button
                     type="button"
                     class={`home-rhythm-item${item.event?.live ? ' is-live' : ''}`}
-                    onClick={() => getState().navigate({ kind: 'channel', channel: item.channel })}
+                    onClick={() => item.event ? openEvent(item.event) : getState().navigate({ kind: 'channel', channel: item.channel })}
                     aria-label={`Open ${item.channel}, ${trendLabel(item)}${item.event ? `, ${item.event.title} ${eventCountdown(item.event, nowMs())}` : ''}`}
                   >
                     <span class="home-rhythm-main">

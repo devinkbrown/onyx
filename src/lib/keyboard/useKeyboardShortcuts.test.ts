@@ -88,6 +88,11 @@ describe('SHORTCUTS descriptor', () => {
     expect(found!.group).toBe('Navigation');
   });
 
+  it('includes J/K for message navigation', () => {
+    expect(SHORTCUTS.find((s) => s.keys === 'J')?.description).toBe('Move to next message');
+    expect(SHORTCUTS.find((s) => s.keys === 'K')?.description).toBe('Move to previous message');
+  });
+
   it('includes G sequences for Home and date navigation', () => {
     expect(SHORTCUTS.find((s) => s.keys === 'G then H')?.description).toBe('Go to Home');
     expect(SHORTCUTS.find((s) => s.keys === 'G then D')?.description).toBe('Focus jump date');
@@ -193,6 +198,61 @@ describe('SHORTCUTS descriptor', () => {
 
     fireEvent.keyDown(window, { key: 'n' });
     expect(store.getState().activeView).toEqual({ kind: 'dm', nick: 'trev' });
+    dispose();
+  });
+
+  it('moves through transcript messages with J and K', () => {
+    const dispose = mountKeyboardHarness();
+    const feed = document.createElement('div');
+    feed.className = 'shell-feed';
+    const first = document.createElement('article');
+    const second = document.createElement('article');
+    const third = document.createElement('article');
+    for (const [node, id] of [[first, 'm1'], [second, 'm2'], [third, 'm3']] as const) {
+      node.tabIndex = 0;
+      node.dataset.messageSearchId = id;
+      feed.append(node);
+    }
+    document.body.append(feed);
+
+    fireEvent.keyDown(window, { key: 'j' });
+    expect(document.activeElement).toBe(first);
+    expect(store.getState().timeTravelLandingId).toBe('m1');
+
+    fireEvent.keyDown(window, { key: 'j' });
+    expect(document.activeElement).toBe(second);
+    expect(store.getState().timeTravelLandingId).toBe('m2');
+
+    fireEvent.keyDown(window, { key: 'k' });
+    expect(document.activeElement).toBe(first);
+    expect(store.getState().timeTravelLandingId).toBe('m1');
+
+    store.getState().clearTimeTravelLanding();
+    first.blur();
+    fireEvent.keyDown(window, { key: 'k' });
+    expect(document.activeElement).toBe(third);
+    expect(store.getState().timeTravelLandingId).toBe('m3');
+
+    feed.remove();
+    dispose();
+  });
+
+  it('does not steal J/K from focused interactive controls', () => {
+    const dispose = mountKeyboardHarness();
+    const button = document.createElement('button');
+    button.type = 'button';
+    const row = document.createElement('article');
+    row.tabIndex = 0;
+    row.dataset.messageSearchId = 'm1';
+    document.body.append(button, row);
+    button.focus();
+
+    fireEvent.keyDown(button, { key: 'j' });
+
+    expect(document.activeElement).toBe(button);
+    expect(store.getState().timeTravelLandingId).toBeNull();
+    button.remove();
+    row.remove();
     dispose();
   });
 

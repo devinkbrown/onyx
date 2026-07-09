@@ -638,6 +638,39 @@
   .home-event-open {
     display: none;
   }
+  .home-recap-card__head,
+  .home-recap-card__actions,
+  .home-review-history__head,
+  .home-review-history__meta {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .home-recap-card__actions,
+  .home-review-history__actions {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+  .home-recap-card__open,
+  .home-recap-card__review,
+  .home-recap-card__spotlight,
+  .home-review-history__actions button {
+    flex: 1 1 8.5rem;
+    min-height: 44px;
+    justify-content: center;
+  }
+  .home-review-history__item {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "meta"
+      "preview"
+      "actions";
+    align-items: start;
+  }
+  .home-review-history__target,
+  .home-review-history__preview {
+    max-width: 100%;
+    white-space: normal;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .home-card, .home-cta, .home-card-join, .home-event, .home-memory-card, .home-quiet-item, .home-rhythm-item { transition: none; }

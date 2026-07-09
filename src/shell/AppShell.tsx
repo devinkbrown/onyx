@@ -59,8 +59,6 @@ import { PinnedMessages } from './PinnedMessages';
 import { applyPreferences } from '@/lib/prefs/preferences';
 import { applySceneMotion } from '@/lib/prefs/sceneMotion';
 import { applyCalmPreset } from '@/lib/notifications/calmMode';
-import { Spotlight } from '@/chat/spotlight';
-import { useSpotlightHotkeys } from '@/chat/spotlight/useSpotlight';
 import { ShortcutsSheet } from './ShortcutsSheet';
 import { useKeyboardShortcuts } from '@/lib/keyboard/useKeyboardShortcuts';
 import { MessageSearch } from './search/MessageSearch';
@@ -149,12 +147,9 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const showAccount = useStore((s) => s.showAccount);
   const showKeyboardShortcuts = useStore((s) => s.showKeyboardShortcuts);
 
-  // ── Global keyboard shortcuts (palette, nav, member list, composer, help) ──
-  // useSpotlightHotkeys wires Cmd/Ctrl+K and "/" → open spotlight.
-  // useKeyboardShortcuts adds: Esc (close overlays), Alt+↑/↓ (channel nav),
-  // Alt+M (member list), Alt+Enter (focus composer), ? (keyboard help).
-  // Both register/clean-up their window listeners via onMount/onCleanup.
-  useSpotlightHotkeys();
+  // ── Global keyboard shortcuts (nav, member list, composer, help) ──
+  // Spotlight is mounted once at the app root. This hook adds connected-app
+  // shortcuts: Esc, Alt+↑/↓, Alt+M, Enter, reader mode, and help.
   useKeyboardShortcuts();
 
   createEffect(() => {
@@ -251,6 +246,12 @@ export function AppShell(props: AppShellProps): JSX.Element {
 
   function closeMobileMembers(): void {
     setMobileMembersOpen(false);
+  }
+
+  function openHome(): void {
+    closeMobileSidebar();
+    closeMobileMembers();
+    getState().navigate({ kind: 'home' });
   }
 
   // ── is the member surface visible (column on desktop, drawer on mobile)? ──
@@ -370,6 +371,15 @@ export function AppShell(props: AppShellProps): JSX.Element {
       <nav class="shell-mobile-nav" aria-label="Mobile navigation">
         <button
           type="button"
+          class={`shell-mobile-nav-btn${activeView().kind === 'home' ? ' shell-mobile-nav-btn--active' : ''}`}
+          aria-label="Open Home"
+          aria-current={activeView().kind === 'home' ? 'page' : undefined}
+          onClick={openHome}
+        >
+          <b aria-hidden="true">⌂</b>home
+        </button>
+        <button
+          type="button"
           class={`shell-mobile-nav-btn${mobileSidebarOpen() ? ' shell-mobile-nav-btn--active' : ''}`}
           aria-label="Toggle channel list"
           aria-expanded={mobileSidebarOpen()}
@@ -423,9 +433,6 @@ export function AppShell(props: AppShellProps): JSX.Element {
       <OutgoingCallOverlay />
       <CaptionsOverlay />
       <ReactionsOverlay />
-
-      {/* Command palette — self-gates on spotlight.isOpen() */}
-      <Spotlight />
 
       {/* Keyboard shortcuts sheet — opened with "?" or Home shortcuts action */}
       <ShortcutsSheet open={showKeyboardShortcuts()} onClose={() => getState().closeKeyboardShortcuts()} />

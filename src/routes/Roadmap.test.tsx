@@ -46,6 +46,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Motion commands')).toBeInTheDocument();
     expect(screen.getByText('Timed mute')).toBeInTheDocument();
     expect(screen.getByText('Quiet on/off')).toBeInTheDocument();
+    expect(screen.getByText('J/K transcript nav')).toBeInTheDocument();
     expect(screen.getByText('Client access audit')).toBeInTheDocument();
     expect(screen.getByText('Dense-panel evidence')).toBeInTheDocument();
     expect(screen.getByText('Home access evidence')).toBeInTheDocument();
@@ -65,7 +66,27 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Member list evidence')).toBeInTheDocument();
     expect(screen.getByText('Notification control evidence')).toBeInTheDocument();
     expect(screen.getByText('Time scrubber evidence')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Torii entry' })).toBeInTheDocument();
+    expect(screen.getByText('Rich invite entry')).toBeInTheDocument();
+    expect(screen.getByText('Native onboarding forms')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Venue model' })).toBeInTheDocument();
+    expect(screen.getByText('Named conversations')).toBeInTheDocument();
+    expect(screen.getByText('Mobile Home tab')).toBeInTheDocument();
+    expect(screen.getByText('Touch-sized Home review cards')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Atmosphere' })).toBeInTheDocument();
+    expect(screen.getByText('Mobile drawer focus management')).toBeInTheDocument();
+    expect(screen.getByText('Deterministic time scrubber jumps')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Media presence' })).toBeInTheDocument();
+    expect(screen.getByText('Watch-together surface')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Apps' })).toBeInTheDocument();
+    expect(screen.getByText('Block-Kit-lite renderer')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Local intelligence' })).toBeInTheDocument();
+    expect(screen.getByText('AI provenance chrome')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Roaming' })).toBeInTheDocument();
+    expect(screen.getByText('TravelTo vault fallback')).toBeInTheDocument();
+    expect(screen.getAllByText('Active-target vault search').length).toBeGreaterThan(0);
     expect(screen.getByText(/time is active/i)).toBeInTheDocument();
+    expect(screen.getByText('complete phases').closest('.data-metric')).toHaveTextContent('4');
     expect(screen.getByRole('heading', { name: 'Washi' })).toBeInTheDocument();
   });
 

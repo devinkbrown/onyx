@@ -59,18 +59,76 @@ const phases: Phase[] = [
     title: 'Time-native',
     state: 'active',
     date: '2026-07-09',
-    summary: 'Home now brings followed activity, scheduled rooms, local memory, quiet rooms, return recaps, room rhythm, review-from-start handoffs, review history, channel directory dedupe, review text search, reader summaries, shareable moments, reader memory, search handoff, transcript jumps, digest review completion, reader return-home affordances, reviewed-span recall, hydrated context trails, vault context trails, vault anchor jumps, and a 20-command palette grammar batch into view.',
-    items: ['Followed catch-up', 'Scheduled events on Home', 'Vault memory previews', 'Quiet room activity', 'Home return recaps', 'Spotlight handoff', 'Room rhythm heatlines', 'Event context', 'Review from start', 'Catch-up review history', 'Review text search', 'Channel directory dedupe', 'Reader digest notes', 'Shareable moment links', 'Reader memory context', 'Moment search handoff', 'Reader transcript jumps', 'Digest review handoff', 'Review completion', 'Reader return Home', 'Reviewed span recall', 'Hydrated context trails', 'Vault context trails', 'Vault anchor jumps', 'Command grammar examples', 'Selected-command status', 'Join/open aliases', 'Goto-at jump', 'Targeted at jump', 'Search/find grammar', 'Home command', 'Preferences command', 'Shortcuts command', 'Reader command', 'Density commands', 'Width commands', 'Motion commands', 'Timed mute', 'Quiet on/off'],
+    summary: 'Home now brings followed activity, scheduled rooms, local memory, quiet rooms, return recaps, room rhythm, review-from-start handoffs, review history, channel directory dedupe, review text search, active-target vault search, reader summaries, shareable moments, reader memory, search handoff, transcript jumps, digest review completion, reader return-home affordances, reviewed-span recall, hydrated context trails, vault context trails, vault anchor jumps, a 20-command palette grammar batch, and J/K transcript navigation into view.',
+    items: ['Followed catch-up', 'Scheduled events on Home', 'Vault memory previews', 'Quiet room activity', 'Home return recaps', 'Spotlight handoff', 'Room rhythm heatlines', 'Event context', 'Review from start', 'Catch-up review history', 'Review text search', 'Active-target vault search', 'Channel directory dedupe', 'Reader digest notes', 'Shareable moment links', 'Reader memory context', 'Moment search handoff', 'Reader transcript jumps', 'Digest review handoff', 'Review completion', 'Reader return Home', 'Reviewed span recall', 'Hydrated context trails', 'Vault context trails', 'Vault anchor jumps', 'Command grammar examples', 'Selected-command status', 'Join/open aliases', 'Goto-at jump', 'Targeted at jump', 'Search/find grammar', 'Home command', 'Preferences command', 'Shortcuts command', 'Reader command', 'Density commands', 'Width commands', 'Motion commands', 'Timed mute', 'Quiet on/off', 'J/K transcript nav'],
   },
   {
     phase: 'Phase 7',
     title: 'Washi',
     state: 'active',
     date: '2026-07-09',
-    summary: 'Accessibility is now a public ledger and an in-client audit surface with dense-panel, Home catch-up, message-search, notification-center, channel-browser, account-panel, channel-sidebar, keyboard-shortcuts, command-palette, pinned-messages, theme-import, thread-panel, voice-settings, call-overlay, message-action, member-list, notification-control, and time-scrubber pass evidence.',
+    summary: 'Accessibility is now a public ledger and an in-client audit surface with dense-panel, Home catch-up, message-search, notification-center, channel-browser, account-panel, channel-sidebar, keyboard-shortcuts including transcript navigation, command-palette, pinned-messages, theme-import, thread-panel, voice-settings, call-overlay, message-action, member-list, notification-control, and time-scrubber pass evidence.',
     items: ['Public accessibility ledger', 'Client access audit', 'Motion controls', 'Dense-panel evidence', 'Home access evidence', 'Search access evidence', 'Inbox access evidence', 'Directory access evidence', 'Account access evidence', 'Sidebar access evidence', 'Shortcuts access evidence', 'Command palette evidence', 'Pins access evidence', 'Theme import evidence', 'Thread access evidence', 'Voice settings evidence', 'Call overlay evidence', 'Message action evidence', 'Member list evidence', 'Notification control evidence', 'Time scrubber evidence'],
   },
+  {
+    phase: 'Phase 8',
+    title: 'Torii entry',
+    state: 'planned',
+    date: 'planned',
+    summary: 'Fold the master roadmap product-entry work into Onyx and the main site: rich invites, native onboarding, account claim, and a stricter public glossary.',
+    items: ['Rich invite entry', 'Instant guest identity', 'Native onboarding forms', 'Account claim flow', 'Brand glossary cleanup'],
+  },
+  {
+    phase: 'Phase 9',
+    title: 'Venue model',
+    state: 'planned',
+    date: 'planned',
+    summary: 'Keep building the time-native venue: named conversations, calm notifications, presence-as-place, and one responsive information model across desktop and mobile.',
+    items: ['Named conversations', 'Forum projection', 'Calm notification presets', 'Quiet boosts', 'Presence-as-place header', 'One-canvas responsive projection', 'Mobile Home tab', 'Touch-sized Home review cards'],
+  },
+  {
+    phase: 'Phase 10',
+    title: 'Atmosphere',
+    state: 'planned',
+    date: 'planned',
+    summary: 'Consolidate the background system and finish mechanically derived accessibility variants, including reduced transparency, contrast, and mobile drawer focus semantics.',
+    items: ['Background consolidation', 'Theme-reactive identity', 'Contrast variants', 'Reduced-transparency variants', 'Mobile drawer focus management', 'Deterministic time scrubber jumps'],
+  },
+  {
+    phase: 'Phase 11',
+    title: 'Media presence',
+    state: 'planned',
+    date: 'planned',
+    summary: 'Promote voice and video into room presence with stage context, spatial controls, screenshare controls, and watch-together surfaces.',
+    items: ['Voice-room-as-place UI', 'Stage context', 'Spatial audio controls', 'Screenshare controls', 'Watch-together surface'],
+  },
+  {
+    phase: 'Phase 12',
+    title: 'Apps',
+    state: 'planned',
+    date: 'planned',
+    summary: 'Prepare the client and site for structured integrations: Block-Kit-lite rendering, a constrained extension surface, and migration/importer paths.',
+    items: ['Block-Kit-lite renderer', 'Client extension surface', 'Importer path', 'Incoming webhook migration', 'Bridge status surface'],
+  },
+  {
+    phase: 'Phase 13',
+    title: 'Local intelligence',
+    state: 'planned',
+    date: 'planned',
+    summary: 'Add local-first intelligence without making AI the front door: provenance chrome, vault recall, local catch-up, captions, translation, and agent-safe contracts.',
+    items: ['AI provenance chrome', 'Vault RAG', 'Semantic recall', 'Local catch-up', 'Local captions', 'Local translation', 'Agent-safe public contract'],
+  },
+  {
+    phase: 'Phase 14',
+    title: 'Roaming',
+    state: 'planned',
+    date: 'planned',
+    summary: 'Generalize offline-first behavior into read, compose, search, moderation drafts, PWA/desktop packaging, and portable import/export.',
+    items: ['TravelTo vault fallback', 'Active-target vault search', 'Immediate vault-result navigation', 'Full offline-first UX', 'PWA packaging path', 'Desktop packaging path', 'Portable import/export'],
+  },
 ];
+
+const completePhaseCount = phases.filter((phase) => phase.state === 'complete').length;
 
 export default function RoadmapRoute() {
   setPageMeta(
@@ -108,18 +166,19 @@ export default function RoadmapRoute() {
         <h1 id="roadmap-heading">What shipped,<br /><span class="gold">what is next</span></h1>
         <p class="sub">
           The public product plan, reduced to what matters on the site: memory,
-          reach, privacy, presence, and the operational surfaces now coming online.
+          reach, privacy, presence, operations, and the Onyx backlog folded in
+          from the master roadmap.
         </p>
         <div class="data-summary">
           <div class="data-metric">
             <span class="label">complete phases</span>
-            <span class="value">5</span>
+            <span class="value">{completePhaseCount}</span>
             <span class="note">client features shipped</span>
           </div>
           <div class="data-metric">
             <span class="label">next tranche</span>
             <span class="value">Time</span>
-            <span class="note">catch-up, reader mode, quiet activity</span>
+            <span class="note">venue model, access, local-first roaming</span>
           </div>
           <div class="data-metric">
             <span class="label">site role</span>
@@ -172,7 +231,7 @@ export default function RoadmapRoute() {
             handoff, room rhythm heatlines, event context, review-from-start
             handoffs, review history, review text search, channel directory dedupe, reader digest notes, shareable moment links, reader memory context, moment search handoff,
             reader transcript jumps, digest review handoff, review completion, reader return-home affordances, reviewed-span recall, hydrated context trails, vault context trails, vault anchor jumps, and
-            command grammar for goto, search, time jumps, reading projections, and quieter activity surfaces.
+            command grammar for goto, search, time jumps, reading projections, J/K transcript navigation, and quieter activity surfaces.
           </p>
         </article>
         <aside class="data-card">
@@ -182,6 +241,7 @@ export default function RoadmapRoute() {
             <div class="data-row"><div><strong>Catch-up Home</strong><span>Continue richer cross-room review handoffs on the return screen.</span></div></div>
             <div class="data-row"><div><strong>Reader mode</strong><span>Carry reviewed anchors into richer cross-room handoffs.</span></div></div>
             <div class="data-row"><div><strong>Accessibility conformance</strong><span><a href="/accessibility/">Continue remaining dense-surface pass/fix evidence.</a></span></div></div>
+            <div class="data-row"><div><strong>Master roadmap fold-in</strong><span>Track rich invites, onboarding, calm presets, media presence, app surfaces, local intelligence, and offline roaming here.</span></div></div>
           </div>
         </aside>
       </section>

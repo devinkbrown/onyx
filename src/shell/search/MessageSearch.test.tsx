@@ -58,7 +58,9 @@ describe('MessageSearch', () => {
     const live = message('live-needle', 'Kai', 'needle in the live buffer', 1);
     const archived = message('archived-needle', 'Mira', 'needle from archived history', 2);
     const vaulted = message('vault-needle', 'Noa', 'needle on another device-memory target', 3, '#other');
+    const sameRoomVaultOnly = message('vault-root-needle', 'Ira', 'needle saved only on this device', 4, '#root');
     await saveMessages('#other', [vaulted]);
+    await saveMessages('#root', [live, sameRoomVaultOnly]);
     store.setState({
       ...initialState,
       activeView: { kind: 'channel', channel: '#root' },
@@ -87,6 +89,9 @@ describe('MessageSearch', () => {
     await waitFor(() => {
       expect(within(vaultList).getByText('#other')).toBeInTheDocument();
       expect(within(vaultList).getByText('needle on another device-memory target')).toBeInTheDocument();
+      expect(within(vaultList).getByText('#root')).toBeInTheDocument();
+      expect(within(vaultList).getByText('needle saved only on this device')).toBeInTheDocument();
+      expect(within(vaultList).queryByText('needle in the live buffer')).not.toBeInTheDocument();
     });
   });
 });

@@ -192,6 +192,8 @@ export function useMessageSearch(): UseMessageSearch {
       }));
   });
 
+  const loadedMessageIds = createMemo(() => new Set(messages().map((message) => message.id)));
+
   const resultCount = createMemo(() => results().length);
   const activeResult = createMemo(() => results()[messageSearchActiveIndex()] ?? null);
   const activeResultId = createMemo(() => (
@@ -230,15 +232,15 @@ export function useMessageSearch(): UseMessageSearch {
   }
 
   // ── device-memory (vault) search across ALL conversations ──
-  // Debounced against the query; hits from the ACTIVE conversation are
-  // dropped (the in-buffer search above already surfaces those live).
+  // Debounced against the query; loaded rows are de-duped by id while older
+  // same-room rows that only exist in the local vault remain searchable.
   const [vaultHits, setVaultHits] = createSignal<VaultSearchResult[]>([]);
   let vaultTimer: ReturnType<typeof setTimeout> | undefined;
   let vaultSeq = 0;
   createEffect(() => {
     const query = messageSearchQuery().trim();
     const open = isMessageSearchOpen();
-    const activeKey = searchTarget()?.toLocaleLowerCase() ?? null;
+    const loadedIds = loadedMessageIds();
     if (vaultTimer !== undefined) clearTimeout(vaultTimer);
     if (!open || query.length < 2 || !preferences().localHistory) {
       setVaultHits([]);
@@ -250,7 +252,7 @@ export function useMessageSearch(): UseMessageSearch {
         if (seq !== vaultSeq) return; // a newer query superseded this one
         setVaultHits(
           hits
-            .filter((h) => h.target !== activeKey)
+            .filter((h) => !loadedIds.has(h.message.id))
             .slice(0, 25)
             .map((h) => ({
               id: h.message.id,

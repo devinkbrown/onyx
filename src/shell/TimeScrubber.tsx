@@ -77,14 +77,6 @@ function dateAtUtc(value: string, hour: number, minute: number): Date | null {
   return date;
 }
 
-function minuteFromClick(event: MouseEvent & { currentTarget: HTMLElement }): number {
-  if (event.detail === 0) return 30;
-  const rect = event.currentTarget.getBoundingClientRect();
-  if (rect.width <= 0) return 30;
-  const ratio = Math.min(0.999, Math.max(0, (event.clientX - rect.left) / rect.width));
-  return Math.floor(ratio * 60);
-}
-
 function barLabel(bar: TimeScrubberBar, dateValue: string): string {
   const countText = bar.count === 1 ? '1 message' : `${bar.count} messages`;
   return `Jump to ${dateValue} ${pad2(bar.hour)}:00 UTC, ${countText}`;
@@ -140,11 +132,8 @@ export function TimeScrubber(): JSX.Element {
     travelTo()(channel, at);
   }
 
-  function handleBarClick(
-    hour: number,
-    event: MouseEvent & { currentTarget: HTMLButtonElement },
-  ): void {
-    jumpTo(hour, minuteFromClick(event));
+  function handleBarClick(hour: number): void {
+    jumpTo(hour, 0);
   }
 
   function handleDateInput(event: InputEvent & { currentTarget: HTMLInputElement }): void {
@@ -214,7 +203,7 @@ export function TimeScrubber(): JSX.Element {
                       style={{ '--scrub-heat': bar.heat.toFixed(3) }}
                       aria-label={barLabel(bar, selectedDate())}
                       title={`${pad2(bar.hour)}:00 UTC - ${bar.count} msgs`}
-                      onClick={(event) => handleBarClick(bar.hour, event)}
+                      onClick={() => handleBarClick(bar.hour)}
                     >
                       <span class="time-scrubber__bar-fill" aria-hidden="true" />
                     </button>

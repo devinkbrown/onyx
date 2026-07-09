@@ -23,6 +23,7 @@ import { followed, isFollowed, unfollow } from '@/lib/notifications/followed';
 import { recordReviewHistory } from '@/lib/notifications/reviewHistory';
 import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
 import { _resetVaultForTests, saveMessages } from '@/lib/vault/historyVault';
+import { Spotlight } from '@/chat/spotlight';
 import { AppShell } from './AppShell';
 
 // ── Shared fixture helpers ────────────────────────────────────────────────────
@@ -145,7 +146,12 @@ describe('AppShell', () => {
     it('reflects OS accessibility media signals on the root element', () => {
       seedStore('#general');
 
-      render(() => <AppShell />);
+      render(() => (
+        <>
+          <AppShell />
+          <Spotlight />
+        </>
+      ));
 
       expect(document.documentElement.dataset.prefersReducedMotion).toBe('false');
       expect(document.documentElement.dataset.prefersMoreContrast).toBe('false');
@@ -572,7 +578,7 @@ describe('AppShell', () => {
       const { getByRole } = render(() => <AppShell />);
 
       // Assert — carol appears in member list without a role badge
-      const aside = getByRole('complementary', { name: 'Member list' });
+      const aside = getByRole('complementary', { name: 'Member list for #general' });
       expect(aside.textContent).toContain('carol');
     });
   });
@@ -775,6 +781,16 @@ describe('AppShell', () => {
       expect(container.querySelector('.shell-composer-textarea')).toBeNull();
     });
 
+    it('exposes Home in the mobile navigation', () => {
+      seedStore('#general');
+
+      render(() => <AppShell />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Open Home' }));
+      expect(store.getState().activeView).toEqual({ kind: 'home' });
+      expect(screen.getByRole('button', { name: 'Open Home' })).toHaveAttribute('aria-current', 'page');
+    });
+
     it('summarizes unread home recaps and hands them to Spotlight', async () => {
       const travelToSpy = vi.spyOn(store.getState(), 'travelTo');
       const channel = {
@@ -801,7 +817,12 @@ describe('AppShell', () => {
         channelLastActivity: new Map([['#general', new Date('2025-01-01T12:02:00Z').getTime()]]),
       }, true);
 
-      render(() => <AppShell />);
+      render(() => (
+        <>
+          <AppShell />
+          <Spotlight />
+        </>
+      ));
 
       const recaps = screen.getByRole('list', { name: 'Since you left recaps' });
       expect(within(recaps).getByText('#general')).toBeInTheDocument();
@@ -909,6 +930,7 @@ describe('AppShell', () => {
         networkName: 'IRCXNet',
         channelProps: new Map([['#general', { 'ocean.event': `${eventAt}|Office hours` }]]),
       }, true);
+      const travelToSpy = vi.spyOn(store.getState(), 'travelTo').mockImplementation(() => {});
 
       render(() => <AppShell />);
 
@@ -920,6 +942,17 @@ describe('AppShell', () => {
       expect(within(rhythm).getByText('Planning call')).toBeInTheDocument();
       expect(within(rhythm).getByText('Office hours')).toBeInTheDocument();
       expect(within(rhythm).queryByText('#outside')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /Open #general for Office hours/i }));
+      expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#general' });
+      expect(travelToSpy).toHaveBeenLastCalledWith('#general', new Date(eventAt * 1000));
+
+      store.getState().navigate({ kind: 'home' });
+      const nextRhythm = await screen.findByLabelText('Room rhythm');
+      fireEvent.click(within(nextRhythm).getByRole('button', { name: /Open #general, 2 chatting/i }));
+      expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#general' });
+      expect(travelToSpy).toHaveBeenLastCalledWith('#general', new Date(eventAt * 1000));
+      travelToSpy.mockRestore();
     });
   });
 });

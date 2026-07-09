@@ -110,7 +110,7 @@ const ACCESS_AUDIT_ROWS = [
   {
     surface: 'Keyboard shortcuts',
     status: 'checked',
-    note: 'Named shortcuts dialog, labelled close action, and grouped shortcut lists generated from live keymap descriptors.',
+    note: 'Named shortcuts dialog, labelled close action, grouped live keymap lists, and J/K transcript navigation.',
   },
   {
     surface: 'Command palette',

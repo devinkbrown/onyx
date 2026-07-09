@@ -1,6 +1,6 @@
 // Vault global-search live check — send a distinctive message in channel A,
 // move to channel B, open the in-conversation search (Ctrl+F) and verify the
-// "Elsewhere on this device" section surfaces the hit from A; click it and
+// "Saved on this device" section surfaces the hit from A; click it and
 // confirm navigation back to A.
 import { chromium } from '@playwright/test';
 

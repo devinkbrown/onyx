@@ -276,7 +276,7 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
         <Show when={search.vaultResults().length > 0}>
           <div class="onyx-message-search__vault" data-testid="vault-search">
             <div class="onyx-message-search__vault-bar">
-              <span class="onyx-message-search__vault-label">Elsewhere on this device</span>
+              <span class="onyx-message-search__vault-label">Saved on this device</span>
               <span class="onyx-message-search__server-count">
                 {search.vaultResults().length} remembered
               </span>

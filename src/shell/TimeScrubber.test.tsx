@@ -86,7 +86,7 @@ describe('TimeScrubber accessibility', () => {
     fireEvent.click(hour);
 
     await waitFor(() => {
-      expect(travelToSpy).toHaveBeenLastCalledWith('#root', new Date('2026-07-09T05:30:00.000Z'));
+      expect(travelToSpy).toHaveBeenLastCalledWith('#root', new Date('2026-07-09T05:00:00.000Z'));
     });
   });
 });

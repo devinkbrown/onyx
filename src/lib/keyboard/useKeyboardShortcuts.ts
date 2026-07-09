@@ -18,7 +18,7 @@
 
 import { onCleanup, onMount } from 'solid-js';
 import { getState } from '@/lib/store';
-import { openSpotlight, closeSpotlight, useSpotlight } from '@/chat/spotlight/useSpotlight';
+import { closeSpotlight, useSpotlight } from '@/chat/spotlight/useSpotlight';
 import { openPreferences, preferences, setPreference } from '@/lib/prefs/preferences';
 import { toggleFollow } from '@/lib/notifications/followed';
 
@@ -82,6 +82,16 @@ export const SHORTCUTS: ShortcutDescriptor[] = [
     keys: 'N',
     description: 'Jump to next unread channel / DM',
     group: 'Navigation',
+  },
+  {
+    keys: 'J',
+    description: 'Move to next message',
+    group: 'Chat',
+  },
+  {
+    keys: 'K',
+    description: 'Move to previous message',
+    group: 'Chat',
   },
   {
     keys: 'G then H',
@@ -245,6 +255,53 @@ function focusTimeScrubberDate(): void {
   el?.focus();
 }
 
+function messageRows(): HTMLElement[] {
+  const feed = document.querySelector<HTMLElement>('.shell-feed');
+  const root = feed ?? document;
+  return Array.from(root.querySelectorAll<HTMLElement>('[data-message-search-id]'))
+    .filter((node) => node.isConnected && !node.hasAttribute('hidden') && node.getAttribute('aria-hidden') !== 'true');
+}
+
+function rowMessageId(row: HTMLElement): string | null {
+  const id = row.dataset.messageSearchId;
+  return id && id.trim() ? id : null;
+}
+
+function currentMessageIndex(rows: readonly HTMLElement[]): number {
+  const activeRow = document.activeElement instanceof HTMLElement
+    ? document.activeElement.closest<HTMLElement>('[data-message-search-id]')
+    : null;
+  if (activeRow) {
+    const activeIndex = rows.indexOf(activeRow);
+    if (activeIndex !== -1) return activeIndex;
+  }
+
+  const landingId = getState().timeTravelLandingId;
+  if (landingId) {
+    const landingIndex = rows.findIndex((row) => rowMessageId(row) === landingId);
+    if (landingIndex !== -1) return landingIndex;
+  }
+
+  return -1;
+}
+
+function focusRelativeMessage(delta: 1 | -1): void {
+  const rows = messageRows();
+  if (rows.length === 0) return;
+
+  const current = currentMessageIndex(rows);
+  const next = current === -1
+    ? (delta > 0 ? 0 : rows.length - 1)
+    : Math.max(0, Math.min(rows.length - 1, current + delta));
+  const row = rows[next];
+  if (!row) return;
+
+  const id = rowMessageId(row);
+  if (!id) return;
+  row.focus({ preventScroll: true });
+  getState().focusMessage(id);
+}
+
 // ── Main hook ─────────────────────────────────────────────────────────────────
 
 const KEY_SEQUENCE_TIMEOUT_MS = 1200;
@@ -293,14 +350,6 @@ export function useKeyboardShortcuts(): void {
       return;
     }
 
-    // ── Cmd/Ctrl+K — command palette ────────────────────────────────────────
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-      clearPendingPrefix();
-      event.preventDefault();
-      openSpotlight();
-      return;
-    }
-
     // ── Cmd/Ctrl+, — preferences panel ─────────────────────────────────────
     if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey && event.key === ',') {
       clearPendingPrefix();
@@ -329,6 +378,23 @@ export function useKeyboardShortcuts(): void {
       event.preventDefault();
       navigateNextUnread();
       return;
+    }
+
+    // ── J/K — transcript message navigation ──────────────────────────────
+    if (
+      !event.metaKey &&
+      !event.ctrlKey &&
+      !event.shiftKey &&
+      !event.altKey &&
+      !isInteractiveTarget(event.target)
+    ) {
+      const key = event.key.toLowerCase();
+      if (key === 'j' || key === 'k') {
+        clearPendingPrefix();
+        event.preventDefault();
+        focusRelativeMessage(key === 'j' ? 1 : -1);
+        return;
+      }
     }
 
     // ── G sequences — time-native navigation ─────────────────────────────
