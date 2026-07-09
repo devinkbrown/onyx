@@ -733,6 +733,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
           nick: message.from,
           at: message.time,
           isMention: !!message.highlight,
+          text: message.plaintext ?? message.text,
         })),
       since,
       { maxChannels: 1 },

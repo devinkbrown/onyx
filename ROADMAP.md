@@ -468,6 +468,9 @@ client or public site needs to expose the result.
 35. **Vault RAG and semantic recall** *(client)* — add local embeddings over the
     decrypted vault for "when did we decide X?" queries that stay on the user's
     device when content is private.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Since-you-left digests now extract
+    local lexical recall terms from missed visible lines and render them as
+    device-local cue chips, adding recall help without network inference.
 36. **Local catch-up, captions, and translation** *(client)* — extend catch-up
     and media surfaces with optional local recap, caption, and translation
     affordances, keeping AI out of the front-door interaction model.

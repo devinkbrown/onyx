@@ -95,6 +95,7 @@ function ChannelDigestRowContent(props: { channelDigest: ChannelDigest }): JSX.E
   const overflowCount = createMemo(() =>
     Math.max(props.channelDigest.participants.length - MAX_VISIBLE_PARTICIPANTS, 0),
   );
+  const recallTerms = createMemo(() => props.channelDigest.recallTerms.slice(0, 3));
 
   return (
     <>
@@ -118,6 +119,16 @@ function ChannelDigestRowContent(props: { channelDigest: ChannelDigest }): JSX.E
           </Show>
           <span class="since-digest-card__window">{formatChannelWindow(props.channelDigest)}</span>
         </span>
+        <Show when={recallTerms().length > 0}>
+          <span
+            class="since-digest-card__recall"
+            aria-label={`Local recall terms for ${props.channelDigest.channel}: ${recallTerms().join(', ')}`}
+          >
+            <For each={recallTerms()}>
+              {(term) => <span class="since-digest-card__recall-term">{term}</span>}
+            </For>
+          </span>
+        </Show>
       </span>
 
       <span class="since-digest-card__stats">

@@ -22,8 +22,9 @@ function message(
   nick: string,
   at: Date,
   isMention = false,
+  text?: string,
 ): DigestMessage {
-  return { channel, nick, at, isMention };
+  return { channel, nick, at, isMention, text };
 }
 
 describe('buildSinceDigest', () => {
@@ -70,9 +71,23 @@ describe('buildSinceDigest', () => {
       count: 3,
       mentions: 1,
       participants: ['Kai', 'Mira'],
+      recallTerms: [],
       firstAt: earliest,
       lastAt: latest,
     });
+  });
+
+  it('extracts a few local recall terms from missed message text', () => {
+    const digest = buildSinceDigest(
+      [
+        message('#alpha', 'Kai', atOffset(1), false, 'Release blocker is the mobile launch wrapper.'),
+        message('#alpha', 'Mira', atOffset(2), false, 'Mobile wrapper launch needs storage checks.'),
+        message('#alpha', 'Nia', atOffset(3), false, 'Storage contract before release.'),
+      ],
+      SINCE,
+    );
+
+    expect(digest.channels[0]?.recallTerms).toEqual(['launch', 'mobile', 'release']);
   });
 
   it('sorts channels by mentions, then count, then channel name', () => {

@@ -3,12 +3,48 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DEFAULT_MAX_CHANNELS = 8;
+const MAX_RECALL_TERMS = 3;
+const RECALL_STOP_WORDS = new Set([
+  'about',
+  'after',
+  'again',
+  'also',
+  'because',
+  'before',
+  'being',
+  'could',
+  'from',
+  'have',
+  'here',
+  'into',
+  'just',
+  'like',
+  'line',
+  'lines',
+  'message',
+  'messages',
+  'need',
+  'note',
+  'once',
+  'only',
+  'over',
+  'room',
+  'that',
+  'their',
+  'then',
+  'there',
+  'they',
+  'this',
+  'with',
+  'would',
+]);
 
 export interface DigestMessage {
   channel: string;
   nick: string;
   at: Date;
   isMention: boolean;
+  text?: string;
 }
 
 export interface ChannelDigest {
@@ -16,6 +52,7 @@ export interface ChannelDigest {
   count: number;
   mentions: number;
   participants: readonly string[];
+  recallTerms: readonly string[];
   firstAt: Date;
   lastAt: Date;
 }
@@ -34,6 +71,7 @@ interface ChannelAccumulator {
   mentions: number;
   participants: string[];
   seenParticipants: Set<string>;
+  termCounts: Map<string, number>;
   firstAt: Date;
   lastAt: Date;
 }
@@ -61,6 +99,7 @@ export function buildSinceDigest(
         mentions: 0,
         participants: [],
         seenParticipants: new Set<string>(),
+        termCounts: new Map<string, number>(),
         firstAt: message.at,
         lastAt: message.at,
       };
@@ -80,6 +119,10 @@ export function buildSinceDigest(
     if (!accumulator.seenParticipants.has(message.nick)) {
       accumulator.seenParticipants.add(message.nick);
       accumulator.participants.push(message.nick);
+    }
+
+    for (const term of recallTermsFromText(message.text ?? '')) {
+      accumulator.termCounts.set(term, (accumulator.termCounts.get(term) ?? 0) + 1);
     }
 
     if (message.at.getTime() < accumulator.firstAt.getTime()) {
@@ -149,6 +192,7 @@ function toChannelDigest(accumulator: ChannelAccumulator): ChannelDigest {
     count: accumulator.count,
     mentions: accumulator.mentions,
     participants: [...accumulator.participants],
+    recallTerms: topRecallTerms(accumulator.termCounts),
     firstAt: accumulator.firstAt,
     lastAt: accumulator.lastAt,
   };
@@ -160,4 +204,21 @@ function compareChannelDigest(a: ChannelDigest, b: ChannelDigest): number {
 
 function pluralize(count: number, singular: string): string {
   return count === 1 ? singular : `${singular}s`;
+}
+
+function recallTermsFromText(text: string): string[] {
+  const terms = new Set<string>();
+  for (const raw of text.toLowerCase().match(/[a-z0-9][a-z0-9-]{2,}/g) ?? []) {
+    const term = raw.replace(/^-+|-+$/g, '');
+    if (term.length < 3 || RECALL_STOP_WORDS.has(term)) continue;
+    terms.add(term);
+  }
+  return [...terms];
+}
+
+function topRecallTerms(termCounts: Map<string, number>): string[] {
+  return [...termCounts.entries()]
+    .sort(([aTerm, aCount], [bTerm, bCount]) => bCount - aCount || aTerm.localeCompare(bTerm))
+    .slice(0, MAX_RECALL_TERMS)
+    .map(([term]) => term);
 }

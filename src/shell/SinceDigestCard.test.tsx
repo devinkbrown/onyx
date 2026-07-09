@@ -18,6 +18,7 @@ describe('SinceDigestCard', () => {
           count: 2,
           mentions: 1,
           participants: ['kain'],
+          recallTerms: ['launch', 'storage'],
           firstAt: new Date('2026-07-09T08:01:00.000Z'),
           lastAt: new Date('2026-07-09T08:02:00.000Z'),
         },
@@ -28,5 +29,7 @@ describe('SinceDigestCard', () => {
 
     expect(screen.getByLabelText(/Since-you-left digest provenance: This device/i)).toBeInTheDocument();
     expect(screen.getByText('This device')).toBeInTheDocument();
+    expect(screen.getByLabelText('Local recall terms for #root: launch, storage')).toBeInTheDocument();
+    expect(screen.getByText('launch')).toBeInTheDocument();
   });
 });
