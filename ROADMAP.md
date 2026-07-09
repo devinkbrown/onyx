@@ -193,8 +193,11 @@ down to TLS.
     ✅ **WEBSITE SHIPPED 2026-07-09** — `/accessibility/` on the main site now
     documents keyboard access, motion controls, contrast checks, live-update
     behavior, and the remaining audit path. The public sitemap includes it.
-    ⏭️ **CLIENT NEXT** — audit dense Onyx surfaces: connect, shell, composer,
-    channel settings, voice controls, appearance, and modal focus traps.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Preferences now includes a compact
+    client access audit ledger for connect, shell, composer, channel settings,
+    voice controls, and modal focus traps, linked back to the public ledger.
+    ⏭️ **CLIENT NEXT** — continue the channel settings, voice controls, and
+    appearance audit rows until every dense surface has pass/fix evidence.
 
 *Sequencing logic: 1–3 need no server deploys (ship fastest), 4–5 are one
 focused server feature each, 6+ are compound. Every phase lands something

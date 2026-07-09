@@ -65,10 +65,10 @@ const phases: Phase[] = [
   {
     phase: 'Phase 7',
     title: 'Washi',
-    state: 'planned',
-    date: 'next',
-    summary: 'Turn atmosphere and accessibility into a published conformance system.',
-    items: ['Accessibility ledger', 'Contrast checks', 'Motion controls'],
+    state: 'active',
+    date: '2026-07-09',
+    summary: 'Accessibility is now a public ledger and an in-client audit surface.',
+    items: ['Public accessibility ledger', 'Client access audit', 'Motion controls'],
   },
 ];
 
@@ -178,7 +178,7 @@ export default function RoadmapRoute() {
           <div class="data-list data-list--compact">
             <div class="data-row"><div><strong>Catch-up Home</strong><span>Fold richer since-you-left recaps and Spotlight handoff into the return screen.</span></div></div>
             <div class="data-row"><div><strong>Reader mode</strong><span>Add shareable moment framing and deeper vault-backed reading context.</span></div></div>
-            <div class="data-row"><div><strong>Accessibility conformance</strong><span><a href="/accessibility/">Continue the client audit from the public ledger.</a></span></div></div>
+            <div class="data-row"><div><strong>Accessibility conformance</strong><span><a href="/accessibility/">Continue channel, voice, and appearance audit evidence.</a></span></div></div>
           </div>
         </aside>
       </section>

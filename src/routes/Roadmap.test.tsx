@@ -15,6 +15,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Vault memory previews')).toBeInTheDocument();
     expect(screen.getByText('Quiet room activity')).toBeInTheDocument();
     expect(screen.getByText('Reader digest notes')).toBeInTheDocument();
+    expect(screen.getByText('Client access audit')).toBeInTheDocument();
     expect(screen.getByText(/time is active/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Washi' })).toBeInTheDocument();
   });

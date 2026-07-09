@@ -46,6 +46,39 @@ const SCENE_MOTION_LABELS: Record<SceneMotion, string> = {
   off: 'Off',
 };
 
+const ACCESS_AUDIT_ROWS = [
+  {
+    surface: 'Connect',
+    status: 'checked',
+    note: 'Keyboard form flow, labels, status messaging.',
+  },
+  {
+    surface: 'Shell',
+    status: 'checked',
+    note: 'Landmarks, live log, focusable message actions.',
+  },
+  {
+    surface: 'Composer',
+    status: 'checked',
+    note: 'Keyboard send/edit paths and visible focus.',
+  },
+  {
+    surface: 'Channel settings',
+    status: 'queued',
+    note: 'Mode forms and destructive actions still need a pass.',
+  },
+  {
+    surface: 'Voice controls',
+    status: 'queued',
+    note: 'Stage controls and media-device states need a pass.',
+  },
+  {
+    surface: 'Modals',
+    status: 'checked',
+    note: 'Sheet focus trap, Escape close, labelled close buttons.',
+  },
+] as const;
+
 type SegmentedProps<T extends string> = {
   legend: string;
   description: string;
@@ -111,6 +144,33 @@ function Toggle(props: ToggleProps): JSX.Element {
         </span>
         <span class="pref-switch" aria-hidden="true" />
       </button>
+    </section>
+  );
+}
+
+function AccessibilityAuditLedger(): JSX.Element {
+  return (
+    <section class="pref-group pref-a11y-ledger" aria-labelledby="pref-a11y-ledger-title">
+      <div class="pref-group-head">
+        <h3 id="pref-a11y-ledger-title" class="pref-label">Client access audit</h3>
+        <a class="pref-a11y-link" href="/accessibility/">Public ledger</a>
+      </div>
+      <p class="pref-desc">
+        WCAG 2.2 AA / EN 301 549 tracking for the dense app surfaces.
+      </p>
+      <div class="pref-a11y-rows" role="list">
+        <For each={ACCESS_AUDIT_ROWS}>
+          {(row) => (
+            <div class="pref-a11y-row" role="listitem" data-status={row.status}>
+              <span class="pref-a11y-status">{row.status}</span>
+              <span class="pref-a11y-main">
+                <span class="pref-a11y-surface">{row.surface}</span>
+                <span class="pref-desc">{row.note}</span>
+              </span>
+            </div>
+          )}
+        </For>
+      </div>
     </section>
   );
 }
@@ -222,6 +282,8 @@ export function PreferencesPanel(): JSX.Element {
           value={() => preferences().reduceMotion}
           onToggle={(value) => setPreference('reduceMotion', value)}
         />
+
+        <AccessibilityAuditLedger />
 
         <button type="button" class="pref-reset" onClick={() => resetPreferences()}>
           Reset to defaults

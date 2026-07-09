@@ -249,6 +249,80 @@
   outline-offset: 2px;
 }
 
+/* ── Client accessibility audit ledger ─────────────────────────────────────── */
+
+.pref-a11y-link {
+  flex: none;
+  color: var(--lapis-bright);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-decoration-color: color-mix(in oklab, var(--lapis-bright) 42%, transparent);
+  text-underline-offset: 0.18em;
+}
+
+.pref-a11y-link:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+.pref-a11y-rows {
+  display: grid;
+  gap: 6px;
+}
+
+.pref-a11y-row {
+  display: grid;
+  grid-template-columns: 4.9rem minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--ink) 36%, transparent);
+}
+
+.pref-a11y-status {
+  width: fit-content;
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.pref-a11y-row[data-status='checked'] .pref-a11y-status {
+  color: var(--ink);
+  background: var(--lapis-bright);
+}
+
+.pref-a11y-row[data-status='queued'] .pref-a11y-status {
+  color: var(--gold-bright);
+  background: color-mix(in oklab, var(--gold) 15%, transparent);
+  border: 1px solid color-mix(in oklab, var(--gold) 34%, transparent);
+}
+
+.pref-a11y-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pref-a11y-surface {
+  color: var(--washi);
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
+@media (max-width: 520px) {
+  .pref-a11y-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── Reader mode ──────────────────────────────────────────────────────────────
    The reading persona treated as primary: a calm, typographic single-column
    transcript. Text set in a serif reading face at a comfortable measure and
