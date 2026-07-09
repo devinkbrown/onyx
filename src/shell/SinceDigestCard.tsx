@@ -5,6 +5,7 @@ import './SinceDigestCard.css';
 import { createMemo, For, Show, type JSX } from 'solid-js';
 import {
   digestHeadline,
+  digestReaderNote,
   type ChannelDigest,
   type SinceDigest,
 } from '@/lib/notifications/sinceDigest';
@@ -20,6 +21,7 @@ export function SinceDigestCard(props: {
       <header class="since-digest-card__head">
         <p class="since-digest-card__kicker">Since you left</p>
         <h2 class="since-digest-card__title">{digestHeadline(props.digest)}</h2>
+        <p class="since-digest-card__reader-note">{digestReaderNote(props.digest)}</p>
         <p class="since-digest-card__since">since {formatSince(props.digest.since)}</p>
       </header>
 

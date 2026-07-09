@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildSinceDigest,
   digestHeadline,
+  digestReaderNote,
   type DigestMessage,
   type SinceDigest,
 } from './sinceDigest';
@@ -136,6 +137,40 @@ describe('digestHeadline', () => {
     );
     expect(digestHeadline(digestWithTotals(42, 3, 5))).toBe(
       '42 messages across 5 channels · 3 mentions',
+    );
+  });
+});
+
+describe('digestReaderNote', () => {
+  it('returns a calm empty transcript note', () => {
+    expect(digestReaderNote(buildSinceDigest([], SINCE))).toBe(
+      'No new transcript lines since your last visit.',
+    );
+  });
+
+  it('summarizes a single channel by participant names', () => {
+    const digest = buildSinceDigest(
+      [
+        message('#alpha', 'Kai', atOffset(1)),
+        message('#alpha', 'Mira', atOffset(2)),
+      ],
+      SINCE,
+    );
+
+    expect(digestReaderNote(digest)).toBe('Read from here: Kai and Mira added 2 lines.');
+  });
+
+  it('summarizes multi-room digests by active room count and lead channel', () => {
+    const digest = buildSinceDigest(
+      [
+        message('#alpha', 'Kai', atOffset(1), true),
+        message('#beta', 'Mira', atOffset(2)),
+      ],
+      SINCE,
+    );
+
+    expect(digestReaderNote(digest)).toBe(
+      'Read from here: 2 lines across 2 rooms, led by #alpha.',
     );
   });
 });

@@ -43,6 +43,14 @@
   font-size: 0.72rem;
 }
 
+.since-digest-card__reader-note {
+  margin: 2px 0 0;
+  max-width: 58ch;
+  color: var(--washi-dim);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
 .since-digest-card__list {
   display: flex;
   flex-direction: column;
@@ -235,6 +243,47 @@
   margin-top: 3px;
   color: var(--washi-mute);
   font-size: 0.82rem;
+}
+
+/* In Reader mode the missed-message digest becomes a transcript bookmark. */
+:root[data-reader='true'] .shell-since-digest-card {
+  max-width: var(--shell-measure);
+  margin-block: 1.6rem 1.35rem;
+}
+
+:root[data-reader='true'] .since-digest-card {
+  padding: 1.1rem 0 1.1rem 1.15rem;
+  border-block: 1px solid color-mix(in oklab, var(--lapis-bright) 24%, transparent);
+  border-inline: 0;
+  border-radius: 0;
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--lapis) 11%, transparent),
+    transparent 62%
+  );
+}
+
+:root[data-reader='true'] .since-digest-card__title {
+  font-family: 'Iowan Old Style', 'Charter', Georgia, 'Times New Roman', serif;
+  font-size: 1.22rem;
+  line-height: 1.28;
+}
+
+:root[data-reader='true'] .since-digest-card__reader-note {
+  color: var(--washi);
+  font-family: 'Iowan Old Style', 'Charter', Georgia, 'Times New Roman', serif;
+  font-size: 1rem;
+  line-height: 1.58;
+}
+
+:root[data-reader='true'] .since-digest-card__list {
+  gap: 5px;
+}
+
+:root[data-reader='true'] .since-digest-card__row {
+  min-height: 50px;
+  padding: 8px 10px;
+  background: color-mix(in oklab, var(--ink) 26%, transparent);
 }
 
 @media (max-width: 520px) {

@@ -182,8 +182,11 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Reader mode now applies a stronger
     transcript measure, reading typography, avatar-free alignment, calmer topic
     chrome, and keyboard-focus metadata/action reveals.
-    ⏭️ **NEXT** — start as a per-channel client view over existing message
-    buffers and vault hydration; later wire digest/since-you-left summaries.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Since-you-left digests now include
+    a transcript reader note and render as a quieter chapter marker in reader
+    mode, tying catch-up summaries into long-form reading.
+    ⏭️ **NEXT** — add shareable moment framing and deeper vault-backed reading
+    context over existing message buffers and hydration.
 17. **Accessibility conformance ledger** *(main site + client)* — publish the
     public WCAG 2.2 / EN 301 549 audit path and keep it linked from the front
     door while app panels are audited.

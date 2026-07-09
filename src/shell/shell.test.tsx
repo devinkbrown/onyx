@@ -327,6 +327,7 @@ describe('AppShell', () => {
       const digest = screen.getByRole('region', { name: 'Since you left' });
       expect(within(digest).getByText('Since you left')).toBeInTheDocument();
       expect(within(digest).getByText('2 messages across 1 channel · 1 mention')).toBeInTheDocument();
+      expect(within(digest).getByText('Read from here: bob and carol added 2 lines.')).toBeInTheDocument();
       expect(within(digest).getByText('bob')).toBeInTheDocument();
       expect(within(digest).getByText('carol')).toBeInTheDocument();
     });

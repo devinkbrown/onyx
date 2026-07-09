@@ -121,6 +121,28 @@ export function digestHeadline(d: SinceDigest): string {
   return `${messageSummary} across ${channelSummary} · ${mentionSummary}`;
 }
 
+export function digestReaderNote(d: SinceDigest): string {
+  if (d.totalMessages === 0) {
+    return 'No new transcript lines since your last visit.';
+  }
+
+  const firstChannel = d.channels[0];
+  const people = firstChannel?.participants.slice(0, 2) ?? [];
+  const peopleText =
+    people.length === 0
+      ? 'the room'
+      : people.length === 1
+        ? people[0]
+        : `${people[0]} and ${people[1]}`;
+  const messageText = `${d.totalMessages} ${pluralize(d.totalMessages, 'line')}`;
+
+  if (d.activeChannels <= 1) {
+    return `Read from here: ${peopleText} added ${messageText}.`;
+  }
+
+  return `Read from here: ${messageText} across ${d.activeChannels} ${pluralize(d.activeChannels, 'room')}, led by ${firstChannel?.channel ?? 'the latest room'}.`;
+}
+
 function toChannelDigest(accumulator: ChannelAccumulator): ChannelDigest {
   return {
     channel: accumulator.channel,
