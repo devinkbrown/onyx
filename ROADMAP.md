@@ -250,6 +250,9 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home catch-up, reviewed ranges, and
     channel directory cards now expose labelled list semantics and carry pass
     evidence in both the client and public audit ledgers.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Message search now carries pass
+    evidence for its search landmark, result navigation group, and named
+    archived/device-memory result lists.
     ⏭️ **CLIENT NEXT** — continue remaining dense-surface audit rows until every
     app panel has pass/fix evidence.
 

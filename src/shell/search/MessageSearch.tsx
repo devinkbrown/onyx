@@ -248,7 +248,11 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
               </Show>
             </div>
             <Show when={search.serverStatus() === 'done' && search.serverResults().length > 0}>
-              <ul class="onyx-message-search__server-list" role="list">
+              <ul
+                class="onyx-message-search__server-list"
+                role="list"
+                aria-label="Archived message results"
+              >
                 <For each={search.serverResults()}>
                   {(result) => (
                     <li>
@@ -277,7 +281,11 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
                 {search.vaultResults().length} remembered
               </span>
             </div>
-            <ul class="onyx-message-search__server-list" role="list">
+            <ul
+              class="onyx-message-search__server-list"
+              role="list"
+              aria-label="Device-memory message results"
+            >
               <For each={search.vaultResults()}>
                 {(result) => (
                   <li>

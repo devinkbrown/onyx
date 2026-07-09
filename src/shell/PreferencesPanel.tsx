@@ -83,6 +83,11 @@ const ACCESS_AUDIT_ROWS = [
     note: 'Catch-up recaps, reviewed ranges, and channel directory cards expose list semantics and labelled actions.',
   },
   {
+    surface: 'Message search',
+    status: 'checked',
+    note: 'Search landmark, labelled result navigation, and named archived/device-memory result lists.',
+  },
+  {
     surface: 'Modals',
     status: 'checked',
     note: 'Sheet focus trap, Escape close, labelled close buttons.',

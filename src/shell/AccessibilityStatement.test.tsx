@@ -14,5 +14,6 @@ describe('AccessibilityStatement', () => {
     expect(screen.getByText(/Voice controls use a toolbar/i)).toBeInTheDocument();
     expect(screen.getByText(/Appearance uses radio groups/i)).toBeInTheDocument();
     expect(screen.getByText(/Home catch-up exposes recaps/i)).toBeInTheDocument();
+    expect(screen.getByText(/Message search uses a search landmark/i)).toBeInTheDocument();
   });
 });
