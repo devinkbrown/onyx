@@ -631,6 +631,96 @@
 
 .shell-voice-join-btn:hover .shell-voice-join-icon { color: var(--lapis-bright); }
 
+/* ── Watch-together room activity ─────────────────────────────────────── */
+.shell-watch-together {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 7px clamp(12px, 2vw, 20px);
+  border-bottom: 1px solid var(--seam-faint);
+  background:
+    linear-gradient(90deg, color-mix(in oklab, var(--lapis) 15%, transparent), transparent 42%),
+    color-mix(in oklab, var(--stone) 52%, transparent);
+  font-family: var(--font-mono);
+}
+
+.shell-watch-together__pulse {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--lapis-bright);
+  box-shadow: 0 0 14px color-mix(in oklab, var(--lapis-bright) 60%, transparent);
+}
+
+.shell-watch-together[data-state='paused'] .shell-watch-together__pulse {
+  background: var(--gold-bright);
+  box-shadow: 0 0 14px color-mix(in oklab, var(--gold-bright) 52%, transparent);
+}
+
+.shell-watch-together[data-state='handoff'] .shell-watch-together__pulse,
+.shell-watch-together[data-state='seeking'] .shell-watch-together__pulse {
+  background: var(--shu);
+  box-shadow: 0 0 14px color-mix(in oklab, var(--shu) 46%, transparent);
+}
+
+.shell-watch-together__main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.shell-watch-together__label {
+  color: var(--washi-mute);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.shell-watch-together__title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--washi);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell-watch-together__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  color: var(--washi-dim);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.shell-watch-together__meta span {
+  padding: 4px 7px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--ink) 42%, transparent);
+}
+
+.shell-watch-together__open {
+  flex: none;
+  color: var(--lapis-bright);
+  font-size: 10px;
+  font-weight: 800;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.shell-watch-together__open:hover,
+.shell-watch-together__open:focus-visible {
+  color: var(--washi);
+}
+
 /* ── Presence ribbon ── */
 .shell-ribbon {
   position: relative;

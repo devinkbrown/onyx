@@ -423,6 +423,11 @@ client or public site needs to expose the result.
     when the current media path cannot support it.
 30. **Watch-together surface** *(client)* — expose synchronized playback as a
     room activity with clear host, participant, pause, seek, and handoff states.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Channels can now surface a
+    watch-together activity strip from `ocean.watch` room metadata, showing the
+    title, open link, host, participant count, synchronized position/duration,
+    and playing/paused/seeking/handoff state without turning it into a chat
+    message.
 
 ## Phase 12 — Yorishiro Apps and Integrations ← PLANNED
 31. **Block-Kit-lite renderer** *(client)* — render structured webhook/plugin

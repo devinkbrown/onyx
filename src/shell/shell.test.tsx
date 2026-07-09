@@ -843,6 +843,29 @@ describe('AppShell', () => {
       });
       expect(voiceChip).toHaveTextContent('3 in voice · alice speaking · muted, sharing');
     });
+
+    it('shows watch-together room activity from channel metadata', () => {
+      seedStore('#general');
+      store.setState({
+        channelProps: new Map([[
+          '#general',
+          {
+            'ocean.watch': 'title=Demo%20Night;url=https%3A%2F%2Fexample.test%2Fv;host=alice;state=paused;position=90;duration=300;participants=alice,bob',
+          },
+        ]]),
+      });
+
+      render(() => <AppShell />);
+
+      const watch = screen.getByRole('region', {
+        name: /Watch together: Demo Night, Paused 1:30, host alice, 2 watching/i,
+      });
+      expect(watch).toHaveTextContent('Watch together');
+      expect(watch).toHaveTextContent('Demo Night');
+      expect(watch).toHaveTextContent('1:30 / 5:00');
+      expect(watch).toHaveTextContent('Host alice');
+      expect(screen.getByRole('link', { name: 'Open' })).toHaveAttribute('href', 'https://example.test/v');
+    });
   });
 
   describe('home state', () => {

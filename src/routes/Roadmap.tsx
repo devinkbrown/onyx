@@ -100,7 +100,7 @@ const phases: Phase[] = [
     state: 'planned',
     date: 'planned',
     summary: 'Promote voice and video into room presence with stage context, spatial controls, screenshare controls, and watch-together surfaces.',
-    items: ['Voice-room-as-place UI', 'Voice room status chip', 'Stage context', 'Spatial audio controls', 'Spatial audio availability state', 'Screenshare controls', 'Watch-together surface'],
+    items: ['Voice-room-as-place UI', 'Voice room status chip', 'Stage context', 'Spatial audio controls', 'Spatial audio availability state', 'Screenshare controls', 'Watch-together surface', 'Watch-together room activity'],
   },
   {
     phase: 'Phase 12',
