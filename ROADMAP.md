@@ -442,9 +442,9 @@ client or public site needs to expose the result.
     vault history, room snapshots, account handoff data, and reviewed catch-up
     state where protocol support exists.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Preferences now exports a portable
-    Onyx vault JSON snapshot and imports validated snapshots back into
-    IndexedDB, preserving the existing ciphertext-only behavior for encrypted
-    DM vault rows.
+    Onyx JSON snapshot and imports validated snapshots back into IndexedDB and
+    local review history, preserving the existing ciphertext-only behavior for
+    encrypted DM vault rows while carrying reviewed catch-up checkpoints.
 
 *Sequencing logic: 1–3 need no server deploys (ship fastest), 4–5 are one
 focused server feature each, 6+ are compound. Every phase lands something

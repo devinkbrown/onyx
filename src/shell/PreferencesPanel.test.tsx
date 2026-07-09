@@ -24,7 +24,7 @@ describe('PreferencesPanel', () => {
     expect(screen.getByRole('heading', { name: 'Client access audit' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Portable vault' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Export vault' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Import vault JSON')).toHaveAttribute('type', 'file');
+    expect(screen.getByLabelText('Import portable JSON')).toHaveAttribute('type', 'file');
     expect(screen.getByText('Connect')).toBeInTheDocument();
     expect(screen.getByText('Channel settings')).toBeInTheDocument();
     expect(screen.getByText('Voice controls')).toBeInTheDocument();

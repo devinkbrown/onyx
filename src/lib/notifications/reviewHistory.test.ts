@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, test } from 'vitest';
 import {
   latestReviewForTarget,
+  mergeReviewHistory,
+  parseReviewHistoryEntries,
   readReviewHistory,
   recordReviewHistory,
   REVIEW_HISTORY_KEY,
@@ -63,5 +65,23 @@ describe('reviewHistory', () => {
     expect(latestReviewForTarget('#GENERAL', 'channel')?.firstMessageId).toBe('new');
     expect(latestReviewForTarget('#general', 'dm')).toBeNull();
     expect(latestReviewForTarget('kai')?.kind).toBe('dm');
+  });
+
+  test('parses and merges portable review history entries', () => {
+    recordReviewHistory(entry('#general', '2026-07-09T00:00:00.000Z', 'same'));
+
+    expect(parseReviewHistoryEntries([{ target: '#broken' }, entry('#alpha', '2026-07-09T00:02:00.000Z')]).map((item) => item.target)).toEqual(['#alpha']);
+
+    const result = mergeReviewHistory([
+      entry('#general', '2026-07-09T00:05:00.000Z', 'same'),
+      entry('#beta', '2026-07-09T00:04:00.000Z'),
+      { target: '#broken' },
+    ]);
+
+    expect(result).toEqual({ imported: 2, total: 2 });
+    expect(readReviewHistory().map((item) => [item.target, item.firstMessageId, item.reviewedAt])).toEqual([
+      ['#general', 'same', '2026-07-09T00:05:00.000Z'],
+      ['#beta', '#beta-m', '2026-07-09T00:04:00.000Z'],
+    ]);
   });
 });

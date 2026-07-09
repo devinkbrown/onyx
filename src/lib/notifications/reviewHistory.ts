@@ -33,17 +33,25 @@ function isReviewHistoryEntry(value: unknown): value is ReviewHistoryEntry {
     && typeof item.preview === 'string';
 }
 
+function reviewHistoryKey(entry: ReviewHistoryEntry): string {
+  return `${entry.kind}:${entry.target.toLowerCase()}:${entry.firstMessageId}`;
+}
+
+export function parseReviewHistoryEntries(value: unknown): ReviewHistoryEntry[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(isReviewHistoryEntry)
+    .sort((a, b) => Date.parse(b.reviewedAt) - Date.parse(a.reviewedAt))
+    .slice(0, REVIEW_HISTORY_LIMIT);
+}
+
 export function readReviewHistory(): ReviewHistoryEntry[] {
   const store = storage();
   if (!store) return [];
   try {
     const raw = store.getItem(REVIEW_HISTORY_KEY);
     const parsed = JSON.parse(raw ?? '[]');
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter(isReviewHistoryEntry)
-      .sort((a, b) => Date.parse(b.reviewedAt) - Date.parse(a.reviewedAt))
-      .slice(0, REVIEW_HISTORY_LIMIT);
+    return parseReviewHistoryEntries(parsed);
   } catch {
     return [];
   }
@@ -63,11 +71,11 @@ export function recordReviewHistory(entry: ReviewHistoryEntry): ReviewHistoryEnt
   const store = storage();
   if (!store) return [entry];
 
-  const key = `${entry.kind}:${entry.target.toLowerCase()}:${entry.firstMessageId}`;
+  const key = reviewHistoryKey(entry);
   const next = [
     entry,
     ...readReviewHistory().filter((item) =>
-      `${item.kind}:${item.target.toLowerCase()}:${item.firstMessageId}` !== key,
+      reviewHistoryKey(item) !== key,
     ),
   ]
     .sort((a, b) => Date.parse(b.reviewedAt) - Date.parse(a.reviewedAt))
@@ -79,4 +87,29 @@ export function recordReviewHistory(entry: ReviewHistoryEntry): ReviewHistoryEnt
     // Storage may be full or disabled; keep the in-memory result for this render.
   }
   return next;
+}
+
+export function mergeReviewHistory(entries: readonly unknown[]): { imported: number; total: number } {
+  const imported = parseReviewHistoryEntries(entries);
+  const store = storage();
+  if (!store) return { imported: imported.length, total: imported.length };
+
+  const byKey = new Map<string, ReviewHistoryEntry>();
+  for (const entry of [...readReviewHistory(), ...imported]) {
+    const key = reviewHistoryKey(entry);
+    const current = byKey.get(key);
+    if (!current || Date.parse(entry.reviewedAt) > Date.parse(current.reviewedAt)) {
+      byKey.set(key, entry);
+    }
+  }
+  const next = [...byKey.values()]
+    .sort((a, b) => Date.parse(b.reviewedAt) - Date.parse(a.reviewedAt))
+    .slice(0, REVIEW_HISTORY_LIMIT);
+
+  try {
+    store.setItem(REVIEW_HISTORY_KEY, JSON.stringify(next));
+  } catch {
+    // Storage may be full or disabled; report the in-memory merge.
+  }
+  return { imported: imported.length, total: next.length };
 }

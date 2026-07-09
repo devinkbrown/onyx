@@ -12,7 +12,12 @@
 
 import { createSignal, For, Show, type JSX } from 'solid-js';
 import { Sheet } from '@/primitives';
-import { clearVault, exportVault, importVault, parseVaultExport } from '@/lib/vault/historyVault';
+import { clearVault } from '@/lib/vault/historyVault';
+import {
+  exportPortableTransfer,
+  importPortableTransfer,
+  parsePortableTransfer,
+} from '@/lib/vault/portableTransfer';
 import { CalmModeControl } from './CalmModeControl';
 import {
   SCENE_MOTIONS,
@@ -272,16 +277,16 @@ function PortableVaultControls(): JSX.Element {
   async function handleExport(): Promise<void> {
     setBusy(true);
     try {
-      const snapshot = await exportVault();
+      const snapshot = await exportPortableTransfer();
       const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `onyx-vault-${new Date().toISOString().slice(0, 10)}.json`;
+      link.download = `onyx-portable-${new Date().toISOString().slice(0, 10)}.json`;
       link.click();
       URL.revokeObjectURL(url);
       const messageCount = snapshot.targets.reduce((sum, target) => sum + target.messages.length, 0);
-      setStatus(`Exported ${messageCount} messages across ${snapshot.targets.length} targets.`);
+      setStatus(`Exported ${messageCount} messages, ${snapshot.targets.length} targets, and ${snapshot.reviewHistory.length} reviews.`);
     } catch {
       setStatus('Export failed. Try again after closing private browsing or freeing storage.');
     } finally {
@@ -296,15 +301,15 @@ function PortableVaultControls(): JSX.Element {
     if (!file) return;
     setBusy(true);
     try {
-      const parsed = parseVaultExport(JSON.parse(await file.text()));
+      const parsed = parsePortableTransfer(JSON.parse(await file.text()));
       if (!parsed) {
-        setStatus('Import rejected. Choose an Onyx portable vault JSON file.');
+        setStatus('Import rejected. Choose an Onyx portable JSON file.');
         return;
       }
-      const result = await importVault(parsed);
-      setStatus(`Imported ${result.messages} messages across ${result.targets} targets.`);
+      const result = await importPortableTransfer(parsed);
+      setStatus(`Imported ${result.messages} messages, ${result.targets} targets, and ${result.reviews} reviews.`);
     } catch {
-      setStatus('Import failed. Choose a readable Onyx portable vault JSON file.');
+      setStatus('Import failed. Choose a readable Onyx portable JSON file.');
     } finally {
       setBusy(false);
     }
@@ -316,14 +321,14 @@ function PortableVaultControls(): JSX.Element {
         <h3 id="pref-vault-portable-title" class="pref-label">Portable vault</h3>
       </div>
       <p class="pref-desc">
-        Export or merge this device's local history; encrypted DM plaintext is not included.
+        Export or merge this device's local history and reviewed catch-up state; encrypted DM plaintext is not included.
       </p>
       <div class="pref-vault-actions">
         <button type="button" class="pref-reset" disabled={busy()} onClick={() => void handleExport()}>
           Export vault
         </button>
         <label class="pref-file">
-          <span>Import vault JSON</span>
+          <span>Import portable JSON</span>
           <input
             type="file"
             accept="application/json,.json"

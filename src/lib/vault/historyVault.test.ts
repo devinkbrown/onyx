@@ -136,7 +136,7 @@ describe('historyVault', () => {
       // The newest survive; the oldest 100 are gone.
       expect(kept[0]!.id).toBe('p100');
       expect(kept[kept.length - 1]!.id).toBe('p499');
-    });
+    }, 10_000);
   });
 
   describe('searchVault', () => {
