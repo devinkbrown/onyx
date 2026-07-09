@@ -440,6 +440,11 @@ client or public site needs to expose the result.
 32. **Client extension surface** *(client)* — prepare a capability-scoped,
     UI-safe extension surface for first-party plugins, starting with command
     palette actions and message/room cards.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — First-party client extensions can
+    now register sanitized command-palette actions from a manifest-like storage
+    surface with explicit `open-url` and `copy-text` capabilities; unsafe URLs,
+    duplicate IDs, unknown capabilities, and arbitrary executable payloads are
+    rejected before commands are built.
 33. **Importer and webhook migration path** *(client + main site)* — document
     and surface server-snapshot imports, incoming webhooks, Slack export import,
     IRC-log-to-vault import, and bridge status as switching-cost reducers rather

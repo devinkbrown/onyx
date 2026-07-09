@@ -4,6 +4,7 @@ import type { Channel } from '@/lib/irc/types';
 import { getState, setState } from '@/lib/store';
 import { store } from '@/lib/store/store';
 import { preferences, resetPreferences } from '@/lib/prefs/preferences';
+import { writeClientExtensionActionsForTests } from '@/lib/extensions/clientActions';
 import type { DMConversation, Server } from '@/lib/store/store';
 import { THEME_IDS } from '@/theme';
 import { buildCommands } from './commands';
@@ -271,5 +272,27 @@ describe('buildCommands', () => {
 
     expect(document.documentElement.dataset.onyxBackground).toBe('obsidian');
     expect(localStorage.getItem('onyx:bg')).toBe('obsidian');
+  });
+
+  it('builds capability-scoped client extension actions', () => {
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    writeClientExtensionActionsForTests([
+      {
+        id: 'build.open',
+        title: 'Open build dashboard',
+        capability: 'open-url',
+        url: 'https://example.test/build',
+        keywords: ['build'],
+      },
+    ]);
+
+    const command = buildCommands(getState()).find((entry) => entry.id === 'extension:build.open');
+    expect(command?.section).toBe('Actions');
+    expect(command?.title).toBe('Open build dashboard');
+    expect(command?.keywords).toContain('extension');
+
+    command?.run();
+    expect(open).toHaveBeenCalledWith('https://example.test/build', '_blank', 'noopener,noreferrer');
+    open.mockRestore();
   });
 });

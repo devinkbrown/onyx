@@ -12,6 +12,7 @@ import {
   type Width,
 } from '@/lib/prefs/preferences';
 import { openMessageSearchWithQuery } from '@/shell/search/useMessageSearch';
+import { readClientExtensionActions, type ClientExtensionAction } from '@/lib/extensions/clientActions';
 import { useSpotlight } from './useSpotlight';
 import { parseTimeExpr } from './timeGrammar';
 
@@ -454,6 +455,27 @@ async function copyText(text: string): Promise<void> {
   }
 }
 
+function runClientExtensionAction(action: ClientExtensionAction): void | Promise<void> {
+  if (action.capability === 'open-url' && action.url) {
+    if (typeof window !== 'undefined') window.open(action.url, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  if (action.capability === 'copy-text' && action.text) {
+    return copyText(action.text);
+  }
+}
+
+function clientExtensionCommands(): SpotlightCommand[] {
+  return readClientExtensionActions().map((action) => ({
+    id: `extension:${action.id}`,
+    section: 'Actions',
+    title: action.title,
+    hint: action.hint,
+    keywords: ['extension', action.capability, ...action.keywords],
+    run: () => runClientExtensionAction(action),
+  }));
+}
+
 function channelHint(channel: CommandState['channels'] extends Map<string, infer C> ? C : never): string {
   const parts = [`${channel.users.size} users`];
   if (channel.unread > 0) parts.push(`${channel.unread} unread`);
@@ -691,6 +713,7 @@ export function buildCommands(state: CommandState = getState(), query = ''): Spo
     ...dms,
     ...peopleCommands(state),
     ...baseActionCommands(state),
+    ...clientExtensionCommands(),
     ...themeCommands,
     ...backgroundCommands,
   ];
