@@ -116,7 +116,7 @@ const phases: Phase[] = [
     state: 'planned',
     date: 'planned',
     summary: 'Add local-first intelligence without making AI the front door: provenance chrome, vault recall, local catch-up, captions, translation, and agent-safe contracts.',
-    items: ['AI provenance chrome', 'Search provenance labels', 'Digest provenance labels', 'Vault RAG', 'Semantic recall', 'Local catch-up', 'Local captions', 'Local translation', 'Agent-safe public contract', 'Agent safety page', 'Provenance labels'],
+    items: ['AI provenance chrome', 'Search provenance labels', 'Digest provenance labels', 'Caption provenance labels', 'Vault RAG', 'Semantic recall', 'Local catch-up', 'Local captions', 'Local translation', 'Agent-safe public contract', 'Agent safety page', 'Provenance labels'],
   },
   {
     phase: 'Phase 14',

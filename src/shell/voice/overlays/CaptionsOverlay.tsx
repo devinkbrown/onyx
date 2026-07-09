@@ -1,6 +1,7 @@
 import { createMemo, For, Show } from 'solid-js';
 
 import { useStore } from '@/lib/store';
+import { ProvenanceBadge } from '@/shell/ProvenanceBadge';
 
 import './voice-overlays.css';
 
@@ -48,6 +49,10 @@ export function CaptionsOverlay() {
         aria-label="Live captions"
         data-testid="captions-overlay"
       >
+        <div class="voice-captions__head">
+          <span>Live captions</span>
+          <ProvenanceBadge scope="server" subject="Live captions" />
+        </div>
         <For each={visibleLines()}>
           {(line, index) => {
             const opacity = createMemo(() => 0.58 + ((index() + 1) / visibleLines().length) * 0.42);

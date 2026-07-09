@@ -471,6 +471,10 @@ client or public site needs to expose the result.
 36. **Local catch-up, captions, and translation** *(client)* — extend catch-up
     and media surfaces with optional local recap, caption, and translation
     affordances, keeping AI out of the front-door interaction model.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Live caption overlays now include
+    the shared provenance badge and explicitly label caption/transcript text as
+    "This server" output, keeping media intelligence source-visible before
+    local caption or translation paths are added.
 37. **Agent-safe public contract** *(client + main site)* — document that channel
     content is hostile input for any agent surface, exclude E2EE payloads, and
     require visible audit trails for agent actions.

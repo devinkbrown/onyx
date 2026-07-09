@@ -78,6 +78,7 @@ describe('voice overlays', () => {
     render(() => <CaptionsOverlay />);
 
     expect(screen.getByRole('log', { name: 'Live captions' })).toBeTruthy();
+    expect(screen.getByLabelText(/Live captions provenance: This server/i)).toBeTruthy();
     expect(screen.getByText('Aki')).toBeTruthy();
     expect(screen.getByText('Signal is clean.')).toBeTruthy();
     expect(screen.getByText('Moving to the relay room.')).toBeTruthy();

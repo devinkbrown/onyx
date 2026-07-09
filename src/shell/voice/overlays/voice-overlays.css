@@ -169,6 +169,20 @@
   backdrop-filter: blur(18px);
 }
 
+.voice-captions__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem 0.65rem;
+  color: var(--washi-mute);
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
 .voice-caption-line {
   display: grid;
   grid-template-columns: minmax(4.2rem, max-content) minmax(0, 1fr);
