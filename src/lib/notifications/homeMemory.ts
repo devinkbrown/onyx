@@ -1,0 +1,67 @@
+import type { ChatMessage } from '@/lib/irc/types';
+
+export interface HomeMemoryItem {
+  target: string;
+  count: number;
+  participants: readonly string[];
+  lastAt: Date;
+  lastFrom: string;
+  preview: string;
+}
+
+const SYSTEM_TYPES = new Set(['join', 'part', 'quit', 'kick', 'mode', 'topic', 'nick', 'system', 'error']);
+
+export function summarizeHomeMemory(target: string, messages: readonly ChatMessage[]): HomeMemoryItem | null {
+  const readable = messages.filter((message) => {
+    if (message.deleted || message.redacted || message.pending) return false;
+    return !SYSTEM_TYPES.has(message.type);
+  });
+
+  if (readable.length === 0) return null;
+
+  const participants: string[] = [];
+  const seen = new Set<string>();
+  for (const message of readable) {
+    if (!seen.has(message.from)) {
+      seen.add(message.from);
+      participants.push(message.from);
+    }
+  }
+
+  const last = readable.reduce((latest, message) =>
+    message.time.getTime() > latest.time.getTime() ? message : latest,
+  );
+
+  return {
+    target,
+    count: readable.length,
+    participants,
+    lastAt: last.time,
+    lastFrom: last.from,
+    preview: previewText(last),
+  };
+}
+
+export async function buildHomeMemory(
+  targets: readonly string[],
+  loadRecent: (target: string) => Promise<readonly ChatMessage[]>,
+  limit = 4,
+): Promise<HomeMemoryItem[]> {
+  const summaries = await Promise.all(
+    targets.map(async (target) => summarizeHomeMemory(target, await loadRecent(target))),
+  );
+
+  return summaries
+    .filter((item): item is HomeMemoryItem => item !== null)
+    .sort((a, b) => b.lastAt.getTime() - a.lastAt.getTime() || a.target.localeCompare(b.target))
+    .slice(0, limit);
+}
+
+function previewText(message: ChatMessage): string {
+  if (message.encrypted && !message.plaintext) return 'Encrypted message';
+
+  const text = (message.plaintext ?? message.text).replace(/\s+/g, ' ').trim();
+  if (!text) return message.type === 'action' ? 'Action message' : 'Message';
+  if (text.length <= 96) return text;
+  return `${text.slice(0, 95)}…`;
+}

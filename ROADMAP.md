@@ -167,6 +167,9 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home now surfaces joined-room
     scheduled events from the existing `ocean.event` prop, with live-first
     ordering and stale-event expiry shared with the channel intro.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home now reads the local history
+    vault for recently left rooms and shows remembered previews without joining
+    the room or asking the server.
     ⏭️ **NEXT** — pure Onyx work. Reuse the local vault, `?at=` time travel,
     chanstats heatlines, scheduled-event props, and Spotlight navigation before
     adding new server surface.

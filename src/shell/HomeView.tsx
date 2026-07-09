@@ -24,12 +24,15 @@ import {
 import { useStore, getState } from '@/lib/store';
 import { buildCatchUp, catchUpSummary, type CatchUpItem } from '@/lib/notifications/catchUp';
 import { followed } from '@/lib/notifications/followed';
+import { buildHomeMemory, type HomeMemoryItem } from '@/lib/notifications/homeMemory';
 import {
   collectScheduledEvents,
   eventCountdown,
   type ScheduledEventItem,
 } from '@/lib/notifications/scheduledEvents';
+import { preferences } from '@/lib/prefs/preferences';
 import { fetchStatsIndex, relTime } from '@/lib/stats/networkIndex';
+import { loadRecent } from '@/lib/vault/historyVault';
 
 export { relTime };
 
@@ -109,6 +112,21 @@ export function HomeView(): JSX.Element {
       minute: '2-digit',
     });
 
+  // Recently-visited rooms the user has since left — one tap to rejoin.
+  const recentRooms = createMemo(() =>
+    joinHistory().filter((c) => !channels().has(c.toLowerCase())).slice(0, 6),
+  );
+  const memoryKey = createMemo(() =>
+    preferences().localHistory ? recentRooms().join('\n') : '',
+  );
+  const [homeMemory] = createResource(memoryKey, async (key) => {
+    const targets = key.split('\n').filter(Boolean);
+    if (targets.length === 0) return [];
+    return buildHomeMemory(targets, (target) => loadRecent(target, 24), 4);
+  });
+  const rememberedRooms = createMemo<HomeMemoryItem[]>(() => homeMemory() ?? []);
+  const openMemory = (item: HomeMemoryItem) => void getState().joinChannel(item.target);
+
   const directory = createMemo(() => {
     const data = stats();
     if (!data || data.channels.length === 0) return [];
@@ -123,11 +141,6 @@ export function HomeView(): JSX.Element {
     (stats()?.channels ?? []).reduce((sum, c) => sum + c.active_users, 0),
   );
   const isJoined = (name: string) => channels().has(name.toLowerCase());
-
-  // Recently-visited rooms the user has since left — one tap to rejoin.
-  const recentRooms = createMemo(() =>
-    joinHistory().filter((c) => !channels().has(c.toLowerCase())).slice(0, 6),
-  );
 
   return (
     <div class="home" role="main" aria-label="Network home">
@@ -283,6 +296,45 @@ export function HomeView(): JSX.Element {
             Shortcuts
           </button>
         </div>
+
+        <Show when={preferences().localHistory && rememberedRooms().length > 0}>
+          <section class="home-memory" aria-label="Remembered rooms on this device">
+            <div class="home-memory-head">
+              <h3 class="home-section-label">Device memory</h3>
+              <span class="home-memory-summary">local history</span>
+            </div>
+            <div class="home-memory-grid">
+              <For each={rememberedRooms()}>
+                {(item) => (
+                  <button
+                    type="button"
+                    class="home-memory-card"
+                    onClick={() => openMemory(item)}
+                    aria-label={`Rejoin ${item.target}, last remembered ${relTime(Math.floor(item.lastAt.getTime() / 1000), nowMs())}`}
+                  >
+                    <span class="home-memory-card-head">
+                      <span class="home-memory-room">{item.target}</span>
+                      <span class="home-memory-when">
+                        {relTime(Math.floor(item.lastAt.getTime() / 1000), nowMs())}
+                      </span>
+                    </span>
+                    <span class="home-memory-preview">
+                      <b>{item.lastFrom}</b>: {item.preview}
+                    </span>
+                    <span class="home-memory-foot">
+                      <span>
+                        {item.count} remembered {item.count === 1 ? 'message' : 'messages'}
+                      </span>
+                      <span>
+                        {item.participants.length} {item.participants.length === 1 ? 'voice' : 'voices'}
+                      </span>
+                    </span>
+                  </button>
+                )}
+              </For>
+            </div>
+          </section>
+        </Show>
 
         <Show when={directory().length > 0}>
           <section class="home-directory" aria-label="Active channels">

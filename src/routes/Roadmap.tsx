@@ -59,8 +59,8 @@ const phases: Phase[] = [
     title: 'Time-native',
     state: 'active',
     date: '2026-07-09',
-    summary: 'Home now brings followed activity, scheduled rooms, and calmer reading into view.',
-    items: ['Followed catch-up', 'Scheduled events on Home', 'Reader mode'],
+    summary: 'Home now brings followed activity, scheduled rooms, local memory, and calmer reading into view.',
+    items: ['Followed catch-up', 'Scheduled events on Home', 'Vault memory previews', 'Reader mode'],
   },
   {
     phase: 'Phase 7',
@@ -167,7 +167,8 @@ export default function RoadmapRoute() {
           <p>
             The site now carries `/status`, `/stats`, backup readiness, and a live
             root pulse. Onyx's current client work makes the app a time-native
-            place to return to: followed catch-up, scheduled room events, a
+            place to return to: followed catch-up, scheduled room events, local
+            memory previews, a
             reader-mode transcript, and quieter activity surfaces.
           </p>
         </article>
@@ -175,7 +176,7 @@ export default function RoadmapRoute() {
           <span class="label">open surfaces</span>
           <h3>Keep tightening</h3>
           <div class="data-list data-list--compact">
-            <div class="data-row"><div><strong>Catch-up Home</strong><span>Fold vault recaps and quiet room activity into the return screen.</span></div></div>
+            <div class="data-row"><div><strong>Catch-up Home</strong><span>Fold quiet room activity and richer since-you-left recaps into the return screen.</span></div></div>
             <div class="data-row"><div><strong>Reader mode</strong><span>Wire digest and since-you-left summaries into long transcript reading.</span></div></div>
             <div class="data-row"><div><strong>Accessibility conformance</strong><span><a href="/accessibility/">Continue the client audit from the public ledger.</a></span></div></div>
           </div>
