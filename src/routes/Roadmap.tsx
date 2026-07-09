@@ -7,7 +7,7 @@ import { setPageMeta } from './pageMeta';
 type Phase = {
   phase: string;
   title: string;
-  state: 'complete' | 'active';
+  state: 'complete' | 'active' | 'planned';
   date: string;
   summary: string;
   items: string[];
@@ -54,12 +54,28 @@ const phases: Phase[] = [
     summary: 'The public site now shows the network, not just describes it.',
     items: ['Mesh status page', 'Stats graphs', 'Backup readiness'],
   },
+  {
+    phase: 'Phase 6',
+    title: 'Time-native',
+    state: 'planned',
+    date: 'next',
+    summary: 'Promote the vault, heatline, and time links into a calmer way to catch up.',
+    items: ['Catch-up Home', 'Reader mode', 'Followed conversations'],
+  },
+  {
+    phase: 'Phase 7',
+    title: 'Washi',
+    state: 'planned',
+    date: 'next',
+    summary: 'Turn atmosphere and accessibility into a published conformance system.',
+    items: ['Accessibility ledger', 'Contrast checks', 'Motion controls'],
+  },
 ];
 
 export default function RoadmapRoute() {
   setPageMeta(
     'Onyx roadmap — what shipped and what is next',
-    'Track the public Onyx roadmap across memory, reach, privacy, presence, and operational visibility.',
+    'Track the public Onyx roadmap across memory, reach, privacy, presence, operations, and the time-native client work next.',
     '/roadmap',
   );
   return (
@@ -97,13 +113,13 @@ export default function RoadmapRoute() {
         <div class="data-summary">
           <div class="data-metric">
             <span class="label">complete phases</span>
-            <span class="value">4</span>
+            <span class="value">5</span>
             <span class="note">client features shipped</span>
           </div>
           <div class="data-metric">
-            <span class="label">active phase</span>
-            <span class="value">Ops</span>
-            <span class="note">status, graphs, backups</span>
+            <span class="label">next tranche</span>
+            <span class="value">Time</span>
+            <span class="note">catch-up, reader mode, access</span>
           </div>
           <div class="data-metric">
             <span class="label">site role</span>
@@ -147,21 +163,21 @@ export default function RoadmapRoute() {
       <section class="r-wrap r-section data-grid" aria-label="Roadmap next steps">
         <article class="data-card">
           <span class="label">now</span>
-          <h2>Operations become visible</h2>
+          <h2>Operations are visible; time comes next</h2>
           <p>
             The site now carries `/status`, `/stats`, backup readiness, and a live
-            root pulse. The remaining work is mostly deployment and feed polish:
-            point backup manifests at their public path and keep Prometheus-backed
-            health graphs moving toward richer history.
+            root pulse. The master roadmap's next client work is to make Onyx a
+            time-native place to return to: a catch-up Home, reader-mode transcript,
+            followed conversations, and quieter notification defaults.
           </p>
         </article>
         <aside class="data-card">
           <span class="label">open surfaces</span>
           <h3>Keep tightening</h3>
           <div class="data-list data-list--compact">
-            <div class="data-row"><div><strong>Prometheus graph history</strong><span>Turn point-in-time metrics into visible trends.</span></div></div>
-            <div class="data-row"><div><strong>Backup feed deployment</strong><span>Serve `latest.json` from the operator vault path.</span></div></div>
-            <div class="data-row"><div><strong>Roadmap freshness</strong><span>Keep shipped-state copy in the site, not only in docs.</span></div></div>
+            <div class="data-row"><div><strong>Catch-up Home</strong><span>Make return-to-network the first screen after connection.</span></div></div>
+            <div class="data-row"><div><strong>Reader mode</strong><span>Give long room history a calm transcript view.</span></div></div>
+            <div class="data-row"><div><strong>Accessibility conformance</strong><span><a href="/accessibility/">Publish the public audit ledger.</a></span></div></div>
           </div>
         </aside>
       </section>

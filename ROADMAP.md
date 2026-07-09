@@ -156,6 +156,28 @@ down to TLS.
     `latest.json` manifest when served and shows snapshot readiness without
     requiring an account or operator socket.
 
+## Phase 6 — Time-Native Client + Washi Access ← NEXT
+15. **Catch-up Home** *(client)* — promote the vault, unread state, followed
+    conversations, mentions, scheduled events, and quiet room activity into the
+    first screen after connection. The app should open as a place to return to,
+    not just the last channel buffer.
+    ⏭️ **NEXT** — pure Onyx work. Reuse the local vault, `?at=` time travel,
+    chanstats heatlines, scheduled-event props, and Spotlight navigation before
+    adding new server surface.
+16. **Reader mode** *(client)* — a calm single-pane transcript view for long
+    room history, optimized for reading and sharing moments. This is the
+    Sumi-e roadmap item that makes the "network that remembers" visible.
+    ⏭️ **NEXT** — start as a per-channel client view over existing message
+    buffers and vault hydration; later wire digest/since-you-left summaries.
+17. **Accessibility conformance ledger** *(main site + client)* — publish the
+    public WCAG 2.2 / EN 301 549 audit path and keep it linked from the front
+    door while app panels are audited.
+    ✅ **WEBSITE SHIPPED 2026-07-09** — `/accessibility/` on the main site now
+    documents keyboard access, motion controls, contrast checks, live-update
+    behavior, and the remaining audit path. The public sitemap includes it.
+    ⏭️ **CLIENT NEXT** — audit dense Onyx surfaces: connect, shell, composer,
+    channel settings, voice controls, appearance, and modal focus traps.
+
 *Sequencing logic: 1–3 need no server deploys (ship fastest), 4–5 are one
 focused server feature each, 6+ are compound. Every phase lands something
 user-visible on its own.*

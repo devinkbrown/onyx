@@ -344,6 +344,11 @@
   box-shadow: 0 0 22px color-mix(in oklab, var(--lapis-bright) 70%, transparent);
 }
 
+.roadmap-phase[data-state='planned'] .roadmap-phase__rail span {
+  background: var(--washi-mute);
+  box-shadow: 0 0 16px color-mix(in oklab, var(--washi-mute) 45%, transparent);
+}
+
 .roadmap-phase__body {
   padding: clamp(20px, 2.4vw, 30px);
   border: 1px solid var(--seam-faint);
@@ -397,6 +402,10 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--washi-dim);
+}
+
+.roadmap-phase[data-state='planned'] .roadmap-phase__meta {
+  color: var(--washi-mute);
 }
 
 @media (max-width: 640px) {

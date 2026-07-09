@@ -9,7 +9,9 @@ describe('RoadmapRoute', () => {
 
     expect(screen.getByRole('heading', { name: /what shipped/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Memory' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Operations become visible/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Operations are visible/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Time-native' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Washi' })).toBeInTheDocument();
   });
 
   it('links to the rest of the public website', () => {
@@ -19,5 +21,6 @@ describe('RoadmapRoute', () => {
     expect(hrefs).toContain('/stats');
     expect(hrefs).toContain('/status');
     expect(hrefs).toContain('/app');
+    expect(hrefs).toContain('/accessibility/');
   });
 });
