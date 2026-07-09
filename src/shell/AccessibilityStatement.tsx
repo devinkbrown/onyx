@@ -77,6 +77,7 @@ const ACCESSIBILITY_TOPICS: readonly AccessibilityTopic[] = [
       'Call overlays use named incoming/outgoing dialogs with target-specific accept, decline, and cancel actions.',
       'Message actions use per-row action groups, named reaction and overflow triggers, labelled menus, and row-specific action names.',
       'Member list uses a channel-scoped complementary landmark, labelled role groups, named member-detail dialogs, and target-specific member actions.',
+      'Notification controls use a labelled compact control group, described calm-mode radios, and pressed-state desktop, sound, push, and do-not-disturb toggles.',
     ],
   },
 ];

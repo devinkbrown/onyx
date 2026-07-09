@@ -35,12 +35,14 @@ export function CalmModeControl(props: CalmModeControlProps = {}): JSX.Element {
   const className = (): string => (props.class ? `calm-control ${props.class}` : 'calm-control');
 
   return (
-    <section class={className()}>
-      <h3 class="calm-label">Notification mode</h3>
-      <div class="calm-segments" role="radiogroup" aria-label="Notification mode">
+    <section class={className()} aria-labelledby="calm-mode-title">
+      <h3 id="calm-mode-title" class="calm-label">Notification mode</h3>
+      <div class="calm-segments" role="radiogroup" aria-labelledby="calm-mode-title">
         <For each={CALM_PRESETS}>
           {(option) => {
             const active = (): boolean => calmPreset() === option;
+            const labelId = `calm-mode-${option}-label`;
+            const descriptionId = `calm-mode-${option}-description`;
 
             return (
               <button
@@ -48,10 +50,12 @@ export function CalmModeControl(props: CalmModeControlProps = {}): JSX.Element {
                 class="calm-segment"
                 role="radio"
                 aria-checked={active()}
+                aria-labelledby={labelId}
+                aria-describedby={descriptionId}
                 onClick={() => setCalmPreset(option)}
               >
-                <span class="calm-segment-label">{CALM_PRESET_LABELS[option]}</span>
-                <span class="calm-segment-desc">{CALM_PRESET_DESCRIPTIONS[option]}</span>
+                <span id={labelId} class="calm-segment-label">{CALM_PRESET_LABELS[option]}</span>
+                <span id={descriptionId} class="calm-segment-desc">{CALM_PRESET_DESCRIPTIONS[option]}</span>
               </button>
             );
           }}

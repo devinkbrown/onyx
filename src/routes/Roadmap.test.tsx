@@ -50,6 +50,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Call overlay evidence')).toBeInTheDocument();
     expect(screen.getByText('Message action evidence')).toBeInTheDocument();
     expect(screen.getByText('Member list evidence')).toBeInTheDocument();
+    expect(screen.getByText('Notification control evidence')).toBeInTheDocument();
     expect(screen.getByText(/time is active/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Washi' })).toBeInTheDocument();
   });

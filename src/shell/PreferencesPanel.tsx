@@ -148,6 +148,11 @@ const ACCESS_AUDIT_ROWS = [
     note: 'Channel-scoped member landmark, labelled role groups, named detail dialogs, and target-specific member actions.',
   },
   {
+    surface: 'Notification controls',
+    status: 'checked',
+    note: 'Labelled compact control group, described calm-mode radios, and pressed-state desktop/sound/push/DND toggles.',
+  },
+  {
     surface: 'Modals',
     status: 'checked',
     note: 'Sheet focus trap, Escape close, labelled close buttons.',

@@ -15,6 +15,12 @@ function permissionLabel(permission: DesktopNotificationPermission): string {
   return 'Enable desktop notifications';
 }
 
+function desktopStateLabel(active: boolean, permission: DesktopNotificationPermission): string {
+  if (permission === 'unsupported') return 'Desktop notifications unsupported';
+  if (permission === 'denied') return 'Desktop notifications blocked';
+  return active ? 'Desktop notifications on' : 'Desktop notifications off';
+}
+
 export function NotificationControls(): JSX.Element {
   const pushEnabled = useStore((s) => s.pushNotificationsEnabled);
   const soundEnabled = useStore((s) => s.soundEnabled);
@@ -80,7 +86,16 @@ export function NotificationControls(): JSX.Element {
   }
 
   return (
-    <div class="shell-notify-controls" role="group" aria-label="Notification controls">
+    <div
+      class="shell-notify-controls"
+      role="group"
+      aria-labelledby="notify-controls-title"
+      aria-describedby="notify-controls-state"
+    >
+      <span id="notify-controls-title" class="sr-only">Notification controls</span>
+      <span id="notify-controls-state" class="sr-only">
+        {desktopStateLabel(desktopActive(), permission())}; notification sound {soundEnabled() ? 'on' : 'off'}; do not disturb {dndActive() ? 'on' : 'off'}.
+      </span>
       <button
         type="button"
         class={[
@@ -95,6 +110,7 @@ export function NotificationControls(): JSX.Element {
         onClick={() => void handleDesktopToggle()}
       >
         <span aria-hidden="true">N</span>
+        <span class="sr-only">{desktopStateLabel(desktopActive(), permission())}</span>
       </button>
       <button
         type="button"
@@ -105,6 +121,7 @@ export function NotificationControls(): JSX.Element {
         onClick={handleSoundToggle}
       >
         <span aria-hidden="true">♪</span>
+        <span class="sr-only">Notification sound {soundEnabled() ? 'on' : 'off'}</span>
       </button>
       <Show when={webPushSupported() && account()}>
         <button
@@ -117,6 +134,7 @@ export function NotificationControls(): JSX.Element {
           onClick={() => void handleWebPushToggle()}
         >
           <span aria-hidden="true">P</span>
+          <span class="sr-only">Web push {webPushOn() ? 'on' : 'off'}</span>
         </button>
       </Show>
       <button
@@ -128,6 +146,7 @@ export function NotificationControls(): JSX.Element {
         onClick={handleDndToggle}
       >
         <span aria-hidden="true">D</span>
+        <span class="sr-only">Do not disturb {dndActive() ? 'on' : 'off'}</span>
       </button>
     </div>
   );
