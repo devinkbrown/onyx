@@ -183,6 +183,43 @@
   text-transform: uppercase;
 }
 
+.voice-captions__tools {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  pointer-events: auto;
+}
+
+.voice-captions__copy {
+  appearance: none;
+  border: 1px solid color-mix(in oklab, var(--lapis-bright) 34%, transparent);
+  border-radius: var(--r-sm);
+  padding: 0.28rem 0.48rem;
+  color: var(--washi);
+  background: color-mix(in oklab, var(--lapis) 14%, transparent);
+  font: inherit;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.voice-captions__copy:hover {
+  border-color: color-mix(in oklab, var(--lapis-bright) 62%, transparent);
+  background: color-mix(in oklab, var(--lapis) 22%, transparent);
+}
+
+.voice-captions__copy:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.voice-captions__copy-state {
+  color: var(--washi-mute);
+  letter-spacing: 0.08em;
+}
+
 .voice-caption-line {
   display: grid;
   grid-template-columns: minmax(4.2rem, max-content) minmax(0, 1fr);

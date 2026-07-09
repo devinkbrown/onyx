@@ -105,6 +105,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Search provenance labels')).toBeInTheDocument();
     expect(screen.getByText('Digest provenance labels')).toBeInTheDocument();
     expect(screen.getByText('Caption provenance labels')).toBeInTheDocument();
+    expect(screen.getByText('Caption transcript copy')).toBeInTheDocument();
     expect(screen.getByText('Extension action audit')).toBeInTheDocument();
     expect(screen.getByText('Digest recall terms')).toBeInTheDocument();
     expect(screen.getByText('Digest review history')).toBeInTheDocument();

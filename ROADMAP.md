@@ -478,6 +478,10 @@ client or public site needs to expose the result.
     the shared provenance badge and explicitly label caption/transcript text as
     "This server" output, keeping media intelligence source-visible before
     local caption or translation paths are added.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Live captions now expose a
+    copy-transcript control that copies the current call transcript from local
+    client state, giving caption users a device-side handoff without adding an
+    inference endpoint.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Reviewing a since-you-left digest
     now records the reviewed span into local review history, so Home and offline
     recall can reopen the same catch-up anchor after the boundary is cleared.

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@solidjs/testing-library';
+import { fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { store } from '@/lib/store/store';
@@ -82,6 +82,37 @@ describe('voice overlays', () => {
     expect(screen.getByText('Aki')).toBeTruthy();
     expect(screen.getByText('Signal is clean.')).toBeTruthy();
     expect(screen.getByText('Moving to the relay room.')).toBeTruthy();
+  });
+
+  it('copies the current live caption transcript', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      clipboard: { writeText },
+    });
+    const mediaTranscripts = new Map([
+      [
+        '#voice',
+        [
+          { nick: 'Aki', text: 'Signal is clean.', time: new Date('2026-06-19T12:00:00Z') },
+          { nick: 'Mina', text: 'Moving to the relay room.', time: new Date('2026-06-19T12:00:02Z') },
+          { nick: 'Noa', text: 'I have the bridge notes.', time: new Date('2026-06-19T12:00:04Z') },
+          { nick: 'Ren', text: 'Copy the whole transcript.', time: new Date('2026-06-19T12:00:06Z') },
+        ],
+      ],
+    ]);
+    store.setState({ mediaTranscripts });
+    store.getState().setVoiceCallState({ callState: 'in_call', callChannel: '#voice', captionsEnabled: true });
+
+    render(() => <CaptionsOverlay />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy live caption transcript' }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    const copied = writeText.mock.calls[0]?.[0] as string;
+    expect(copied).toContain('Aki: Signal is clean.');
+    expect(copied).toContain('Ren: Copy the whole transcript.');
+    expect(screen.getByText('Copied')).toBeTruthy();
   });
 
   it('shows the PIP only while in voice and off the active channel', () => {

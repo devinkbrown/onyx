@@ -1,4 +1,4 @@
-import { createMemo, For, Show } from 'solid-js';
+import { createMemo, createSignal, For, Show } from 'solid-js';
 
 import { useStore } from '@/lib/store';
 import { ProvenanceBadge } from '@/shell/ProvenanceBadge';
@@ -26,7 +26,12 @@ function nickColor(nick: string) {
   return swatches[hash % swatches.length] ?? swatches[0];
 }
 
+function transcriptLine(line: CaptionLine): string {
+  return `[${line.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}] ${line.nick}: ${line.text}`;
+}
+
 export function CaptionsOverlay() {
+  const [copyState, setCopyState] = createSignal<'idle' | 'copied' | 'blocked'>('idle');
   const lines = useStore((state) => {
     // Captions are opt-in: the VoiceBar toggle drives state.voice.captionsEnabled
     // (default off). Honour it so toggling actually shows/hides the overlay.
@@ -39,6 +44,17 @@ export function CaptionsOverlay() {
   });
 
   const visibleLines = createMemo(() => lines().slice(-3));
+  const transcriptText = createMemo(() => lines().map(transcriptLine).join('\n'));
+  const copyTranscript = async () => {
+    const text = transcriptText();
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyState('copied');
+    } catch {
+      setCopyState('blocked');
+    }
+  };
 
   return (
     <Show when={visibleLines().length > 0}>
@@ -51,7 +67,22 @@ export function CaptionsOverlay() {
       >
         <div class="voice-captions__head">
           <span>Live captions</span>
-          <ProvenanceBadge scope="server" subject="Live captions" />
+          <div class="voice-captions__tools">
+            <ProvenanceBadge scope="server" subject="Live captions" />
+            <button
+              class="voice-captions__copy"
+              type="button"
+              aria-label="Copy live caption transcript"
+              onClick={() => void copyTranscript()}
+            >
+              Copy transcript
+            </button>
+            <Show when={copyState() !== 'idle'}>
+              <span class="voice-captions__copy-state" aria-live="polite">
+                {copyState() === 'copied' ? 'Copied' : 'Clipboard unavailable'}
+              </span>
+            </Show>
+          </div>
         </div>
         <For each={visibleLines()}>
           {(line, index) => {
