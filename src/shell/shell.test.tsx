@@ -340,6 +340,8 @@ describe('AppShell', () => {
 
       fireEvent.click(within(digest).getByRole('button', { name: 'Review new messages' }));
       expect(scrollIntoView).toHaveBeenCalled();
+      expect(screen.queryByRole('region', { name: 'Since you left' })).not.toBeInTheDocument();
+      expect(store.getState().viewUnreadDividerId.has('#general')).toBe(false);
     });
 
     it('shows device-memory context in reader mode', () => {

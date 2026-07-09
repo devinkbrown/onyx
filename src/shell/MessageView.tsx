@@ -585,6 +585,13 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     setAtBottom(false);
   }
 
+  function reviewUnreadBoundary(): void {
+    const target = activeTarget();
+    if (!target) return;
+    scrollToUnreadBoundary();
+    getState().clearViewUnreadDivider(target);
+  }
+
   // Autoscroll when new messages arrive and we're already at bottom
   createEffect(() => {
     // Track messages() so effect re-runs on change
@@ -873,7 +880,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
           <Show when={sinceDigest()}>
             {(digest) => (
               <div class="shell-since-digest-card">
-                <SinceDigestCard digest={digest()} onReviewUnread={scrollToUnreadBoundary} />
+                <SinceDigestCard digest={digest()} onReviewUnread={reviewUnreadBoundary} />
               </div>
             )}
           </Show>

@@ -199,7 +199,10 @@ down to TLS.
     and unread boundaries.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Since-you-left digests now include
     a review handoff that jumps straight to the unread transcript boundary.
-    ⏭️ **NEXT** — continue catch-up navigation and review completion affordances
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Reviewing the since-you-left handoff
+    now clears the rendered unread chapter marker, so reader mode has an explicit
+    completion state after the catch-up range is opened.
+    ⏭️ **NEXT** — continue catch-up review history and return-home affordances
     over existing message buffers and hydration.
 17. **Accessibility conformance ledger** *(main site + client)* — publish the
     public WCAG 2.2 / EN 301 549 audit path and keep it linked from the front
