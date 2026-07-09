@@ -1,7 +1,6 @@
 # Onyx — IRC webchat (SolidJS)
 
-Modern web client for the IRCXNet/Orochi network (Orochi is the pure-Zig IRC
-daemon at /home/kain/orochi). Pre-release/internal; branch `onyx-solid`.
+Modern web client for IRCXNet. Pre-release/internal; branch `onyx-solid`.
 The brand is **Onyx** (formerly Ocean, briefly Ruri — both dead names).
 
 ## Stack
@@ -28,9 +27,9 @@ The brand is **Onyx** (formerly Ocean, briefly Ruri — both dead names).
   `ThemeStudio.tsx`, `customThemes.ts`
 - Tokens: `src/styles/tokens.css` (+ `global.css`)
 - Primitives: `src/primitives/` — reusable UI building blocks
-- Media engine: `src/lib/suimyaku-media/` — Orochi voice/video
+- Media engine: `src/lib/suimyaku-media/` — Onyx voice/video
   (TsumugiSession ECDH/AES-GCM, MediaEngine, TsumugiGroup, ChunkAssembler,
-  PeerRegistry). Default transport: kagura frames over WS; WebRTC is opt-in.
+  PeerRegistry). Default transport: Suimyaku/Kagura frames over WS.
   Signaling = `MEDIA` subcommands + Event Spine `EVENT ... MEDIA ...` events.
 - Backgrounds: `src/backgrounds/` — animated canvas scenes
 - Uploads: `src/lib/upload/` — multipart POST (field `file`) to

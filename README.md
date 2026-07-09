@@ -1,6 +1,6 @@
 # Onyx
 
-Onyx is a SolidJS web client for the IRCXNet/Orochi network — text chat plus
+Onyx is a SolidJS web client for IRCXNet — text chat plus
 realtime voice/video (Suimyaku media engine) over IRC/IRCX with WebSocket
 transport. Live at https://eshmaki.me.
 

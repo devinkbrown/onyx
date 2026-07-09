@@ -1,5 +1,5 @@
-// Kagura media frame — the JS twin of Orochi's wire container
-// (orochi/src/substrate/kagura_frame.zig). One encoded media payload per frame;
+// Kagura media frame — Onyx's browser-side media datagram container.
+// One encoded media payload per frame;
 // the browser sends each frame as a binary WebSocket frame (optionally followed
 // by a 16-byte MAC tag — see ./mediaMac).
 //

@@ -2588,7 +2588,7 @@ export const store = createStore<OnyxState>()(
         },
       });
       client.onCapChange = () => {
-        // mediaAvailable is NOT a cap: Orochi exposes MEDIA as a plain channel
+        // mediaAvailable is NOT a cap: MEDIA is exposed as a plain channel
         // command for any registered member (no advertised media cap), so it is
         // set on registration (001) / first media event, not here. Only mirror
         // genuinely cap-gated UI affordances off the negotiated set.

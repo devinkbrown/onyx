@@ -53,7 +53,7 @@ const MASCOT_CSS = `
 export function Mascot(props: MascotProps) {
   const variant = (): 'mark' | 'hero' | 'full' => props.variant ?? 'mark';
   const label = (): string =>
-    props['aria-label'] ?? 'The Ocean water-dragon, mascot of the Orochi network';
+    props['aria-label'] ?? 'The Onyx water-dragon mascot';
 
   // Stable per-instance gradient ids so multiple mascots can coexist on a page
   // without clobbering one another's <defs>.

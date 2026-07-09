@@ -130,7 +130,7 @@ export interface ISupport {
   TOPICLEN: number;
   IRCX: boolean;
   /**
-   * Deprecated compatibility field — Orochi advertises NO media ISUPPORT token.
+   * Deprecated compatibility field — media availability is not an ISUPPORT token.
    * Voice/video availability is gated by the store's `mediaAvailable` selector
    * (set on 001 / MEDIA Event Spine traffic), not a 005 token. Retained only because a
    * non-media feature badge in HomeView still reads it; never set from 005.

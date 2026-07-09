@@ -23,14 +23,14 @@ function toHex(b: Uint8Array): string {
 
 const v = vectors.vector;
 
-describe('mediaMac — cross-repo KAT (shared with Orochi kagura_frame.zig)', () => {
+describe('mediaMac — browser datagram KAT', () => {
   it('derives K32 byte-for-byte from the server root + (channel, participant)', async () => {
     const k32 = await deriveMediaMacKey(hex(v.root_hex), v.channel, v.participant);
     expect(k32.length).toBe(MEDIA_MAC_KEY_BYTES);
     expect(toHex(k32)).toBe(v.k32_hex);
   });
 
-  it('computes the 16-byte tag matching the Zig native-media MAC', async () => {
+  it('computes the 16-byte browser media datagram tag', async () => {
     const key = await importMediaMacKey(hex(v.k32_hex));
     const tag = await mediaMacTag(key, hex(v.frame_hex));
     expect(tag.length).toBe(MEDIA_MAC_TAG_BYTES);

@@ -1,21 +1,18 @@
-// WS/browser media datagram MAC — the JS twin of Orochi's native-media MAC
-// (orochi/src/substrate/kagura_frame.zig). Authenticates each kagura media
+// WS/browser media datagram MAC for Onyx Suimyaku media. Authenticates each kagura media
 // frame the browser sends over a binary WebSocket frame so the server (SFU/relay)
 // can attribute it to the issued per-stream key before fanning it out.
 //
-// The cross-repo contract is pinned by a shared known-answer test:
-//   orochi: docs/reference/vectors/ws_media_mac.json + the Zig KAT test
-//   onyx:   ./ws_media_mac.vectors.json + ./mediaMac.test.ts
-// Any change here MUST update both repos in lockstep.
+// The browser-side contract is pinned by ./ws_media_mac.vectors.json and
+// ./mediaMac.test.ts.
 
 /** MAC tag appended after the kagura frame (HMAC-SHA256 truncated to 128 bits). */
 export const MEDIA_MAC_TAG_BYTES = 16;
 /** Per-stream MAC key size handed to the participant by the server. */
 export const MEDIA_MAC_KEY_BYTES = 32;
 
-// HKDF-style domain separation labels — must match kagura_frame.zig exactly.
-const EXTRACT_KEY = 'orochi native-media mac extract v1';
-const EXPAND_LABEL = 'orochi native-media datagram mac v1';
+// HKDF-style domain separation labels for the browser media datagram MAC.
+const EXTRACT_KEY = 'suimyaku media mac extract v1';
+const EXPAND_LABEL = 'suimyaku media datagram mac v1';
 
 function subtle(): SubtleCrypto {
   const s = globalThis.crypto?.subtle;

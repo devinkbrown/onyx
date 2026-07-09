@@ -141,12 +141,17 @@ describe('About page — source structure', () => {
     expect(/kaguravis/i.test(src)).toBe(true);
   });
 
-  it('mentions LADON media as the primary/default transport framing', () => {
-    expect(srcContains('LADON media')).toBe(true);
+  it('does not mention old transport branding in the main website copy', () => {
+    const oldTransportBrand = ['la', 'don media'].join('');
+    expect(src.toLowerCase()).not.toContain(oldTransportBrand);
   });
 
-  it('mentions Ophion relay as the browser fallback carrier', () => {
-    expect(srcContains('Ophion relay')).toBe(true);
+  it('mentions Kagura frames as the primary/default transport framing', () => {
+    expect(srcContains('Kagura frames')).toBe(true);
+  });
+
+  it('mentions mesh relay as the browser fallback carrier', () => {
+    expect(srcContains('Mesh relay')).toBe(true);
   });
 
   it('does not use WebRTC framing in the main website copy', () => {

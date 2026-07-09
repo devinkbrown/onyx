@@ -68,12 +68,12 @@ const SPEAKING_RMS   = 0.012;
 const SPEAKING_POLL_MS = 120;
 
 // Outbound MCHUNK split constants (chunk size / small-payload threshold / frame
-// cap) used to live here, but the IRC media-frame send path (sendFrame) is a
-// deliberate no-op now that Orochi carries media on a native transport rather
-// than as IRC commands. The matching inbound bounds — 120-byte chunks, a 65535
-// chunk ceiling, and the reassembled-frame size cap — are enforced directly in
-// ChunkAssembler (MAX_CHUNKS / MAX_CHUNK_BYTES / MAX_FRAME_BYTES), so the
-// sender-side copies were dead and have been removed.
+// cap) used to live here, but the IRC media-frame send path (sendFrame) is now
+// handled by the browser media datagram path rather than as IRC commands. The
+// matching inbound bounds — 120-byte chunks, a 65535 chunk ceiling, and the
+// reassembled-frame size cap — are enforced directly in ChunkAssembler
+// (MAX_CHUNKS / MAX_CHUNK_BYTES / MAX_FRAME_BYTES), so the sender-side copies
+// were dead and have been removed.
 const WASM_URL   = '/opcodec_wasm.js';
 
 type VideoCaptureProfile = {
@@ -863,7 +863,7 @@ export class SuimyakuMediaEngine {
   }
 
   // ----------------------------------------------------------------
-  // Frame send (Orochi media transport)
+  // Frame send (Suimyaku media transport)
   // ----------------------------------------------------------------
 
   private static toB64(data: Uint8Array): string {

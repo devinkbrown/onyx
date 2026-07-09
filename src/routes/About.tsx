@@ -19,7 +19,7 @@ import { setPageMeta } from './pageMeta';
 export default function About() {
   setPageMeta(
     'About Onyx — open protocol, sovereign mesh',
-    'Learn how Onyx, Orochi, LADON media, and the IRCXNet mesh work together without closed-platform lock-in.',
+    'Learn how Onyx, Suimyaku media, and the IRCXNet mesh work together without closed-platform lock-in.',
     '/about',
   );
   return (
@@ -191,7 +191,7 @@ export default function About() {
             class="ab-media-diagram"
             viewBox="0 0 580 320"
             role="img"
-            aria-label="Media path: clients encode with KAGURAVOX/KAGURAVIS or WASM, send opaque LADON media frames over Ophion transport to the SFU, which forwards them unchanged."
+            aria-label="Media path: clients encode with KAGURAVOX/KAGURAVIS or WASM, send opaque Kagura frames over the mesh relay to the SFU, which forwards them unchanged."
           >
             {/* SFU center */}
             <rect x="230" y="120" width="120" height="80" fill="none" stroke="var(--seam)" stroke-width="1.5" />
@@ -240,7 +240,7 @@ export default function About() {
 
           <div class="ab-media-body">
             <p>
-              <b>KaguraVox</b> (audio) and <b>KaguraVis</b> (video) are Orochi's own codecs —
+              <b>KaguraVox</b> (audio) and <b>KaguraVis</b> (video) are Suimyaku codecs —
               not Opus, not H.264. Desktop clients run them natively. Browsers and mobile
               run the exact same codecs compiled to <b>WebAssembly</b>, with SIMD and
               threads. The media path is identical on every platform.
@@ -252,7 +252,7 @@ export default function About() {
               before it ever leaves the sender.
             </p>
             <p>
-              The Orochi server is a <b>pure selective-forwarding unit</b>. It reads the
+              The media relay is a <b>pure selective-forwarding unit</b>. It reads the
               kagura container header to know where to send the frame, then forwards the
               opaque payload byte-for-byte. It does not encode, decode, or transcode.
               Your keys stay with you; plaintext never crosses the server.
@@ -264,19 +264,19 @@ export default function About() {
         <div class="ab-transport-row" role="list" aria-label="Transport options">
           <article class="ab-transport primary" role="listitem">
             <span class="t-label">Default</span>
-            <h4>LADON media<br />over QUIC</h4>
+            <h4>Kagura frames<br />over QUIC</h4>
             <p>
               The preferred transport path. Datagram-eligible, head-of-line-blocking
-              free, lower latency than TCP. LADON media frames ride the Ophion path,
+              free, lower latency than TCP. Opaque media frames ride the mesh path,
               so a lost media packet never stalls channel state.
             </p>
           </article>
 
           <article class="ab-transport secondary" role="listitem">
             <span class="t-label">Fallback carrier</span>
-            <h4>Ophion relay<br />over WebSocket</h4>
+            <h4>Mesh relay<br />over WebSocket</h4>
             <p>
-              Where QUIC is not available, the browser keeps the same opaque LADON
+              Where QUIC is not available, the browser keeps the same opaque Kagura
               frames moving over the WebSocket relay path. Same bytes, same codec,
               different pipe.
             </p>
@@ -758,7 +758,7 @@ export default function About() {
           <div class="sig">
             <div class="logo"><Mascot variant="mark" aria-label="Onyx" />ONYX</div>
             <p>
-              A mesh-native client for the open Orochi network — end-to-end-encrypted
+              A mesh-native client for IRCXNet — end-to-end-encrypted
               media, real services, and a home you own. Built in the open with Claude and Codex.
             </p>
           </div>
