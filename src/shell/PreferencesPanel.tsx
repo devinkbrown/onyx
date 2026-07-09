@@ -108,6 +108,11 @@ const ACCESS_AUDIT_ROWS = [
     note: 'Complementary navigation landmark, roving channel/DM rows, unread/mention names, and target-specific join action.',
   },
   {
+    surface: 'Keyboard shortcuts',
+    status: 'checked',
+    note: 'Named shortcuts dialog, labelled close action, and grouped shortcut lists generated from live keymap descriptors.',
+  },
+  {
     surface: 'Modals',
     status: 'checked',
     note: 'Sheet focus trap, Escape close, labelled close buttons.',

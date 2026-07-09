@@ -32,6 +32,7 @@ describe('PreferencesPanel', () => {
     expect(screen.getByText('Channel browser')).toBeInTheDocument();
     expect(screen.getByText('Account panel')).toBeInTheDocument();
     expect(screen.getByText('Channel sidebar')).toBeInTheDocument();
+    expect(screen.getByText('Keyboard shortcuts')).toBeInTheDocument();
     expect(screen.getByText('Labelled Sheet, topic form, switch-mode flags, read-only non-op fallbacks.')).toBeInTheDocument();
     expect(screen.getByText('Toolbar groups, labelled icon buttons, aria-pressed media states, live timer.')).toBeInTheDocument();
     expect(screen.getByText('Theme and background radio groups, labelled swatches, Sheet focus trap.')).toBeInTheDocument();
@@ -41,6 +42,7 @@ describe('PreferencesPanel', () => {
     expect(screen.getByText('Sheet dialog, named directory search, labelled public-channel list, and target-specific Join/Open actions.')).toBeInTheDocument();
     expect(screen.getByText('Named account-management regions, alert/status feedback, and target-specific persona actions.')).toBeInTheDocument();
     expect(screen.getByText('Complementary navigation landmark, roving channel/DM rows, unread/mention names, and target-specific join action.')).toBeInTheDocument();
+    expect(screen.getByText('Named shortcuts dialog, labelled close action, and grouped shortcut lists generated from live keymap descriptors.')).toBeInTheDocument();
     expect(screen.queryByText(/still need a pass/i)).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Public ledger' })).toHaveAttribute(
       'href',

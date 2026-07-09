@@ -265,6 +265,9 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Channel sidebar now carries pass
     evidence for its complementary navigation landmark, roving channel/DM rows,
     unread/mention names, and target-specific join action.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Keyboard shortcuts now carries pass
+    evidence for its named Sheet dialog, labelled close action, and grouped
+    shortcut lists generated from the live keymap descriptors.
     ⏭️ **CLIENT NEXT** — continue remaining dense-surface audit rows until every
     app panel has pass/fix evidence.
 

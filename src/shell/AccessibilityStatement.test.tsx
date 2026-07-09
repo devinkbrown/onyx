@@ -19,5 +19,6 @@ describe('AccessibilityStatement', () => {
     expect(screen.getByText(/Channel browser uses a Sheet dialog/i)).toBeInTheDocument();
     expect(screen.getByText(/Account panel groups account management/i)).toBeInTheDocument();
     expect(screen.getByText(/Channel sidebar uses a complementary navigation landmark/i)).toBeInTheDocument();
+    expect(screen.getByText(/Keyboard shortcuts uses a named Sheet dialog/i)).toBeInTheDocument();
   });
 });

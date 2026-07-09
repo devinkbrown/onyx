@@ -45,6 +45,10 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = GROUP_ORDER
   }))
   .filter((group) => group.shortcuts.length > 0);
 
+function groupId(title: string): string {
+  return `shortcuts-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
+}
+
 export function ShortcutsSheet(props: { open: boolean; onClose: () => void }): JSX.Element {
   return (
     <Sheet
@@ -59,11 +63,15 @@ export function ShortcutsSheet(props: { open: boolean; onClose: () => void }): J
       <div class="shortcuts-sheet" data-testid="shortcuts-sheet">
         <For each={SHORTCUT_GROUPS}>
           {(group) => (
-            <section class="shortcuts-sheet__group" aria-labelledby={`shortcuts-${group.title.toLowerCase()}`}>
-              <h3 class="shortcuts-sheet__title" id={`shortcuts-${group.title.toLowerCase()}`}>
+            <section class="shortcuts-sheet__group" aria-labelledby={groupId(group.title)}>
+              <h3 class="shortcuts-sheet__title" id={groupId(group.title)}>
                 {group.title}
               </h3>
-              <div class="shortcuts-sheet__rows" role="list">
+              <div
+                class="shortcuts-sheet__rows"
+                role="list"
+                aria-label={`${group.title} shortcuts`}
+              >
                 <For each={group.shortcuts}>
                   {(shortcut) => (
                     <div class="shortcuts-sheet__row" role="listitem">
