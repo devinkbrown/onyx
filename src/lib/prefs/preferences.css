@@ -257,19 +257,53 @@
 
 :root[data-reader='true'] {
   /* A comfortable reading measure regardless of the width setting. */
-  --shell-measure: 42rem;
+  --shell-measure: 46rem;
+}
+
+:root[data-reader='true'] .shell-feed {
+  padding: clamp(1.2rem, 4vh, 2.5rem) clamp(1rem, 4vw, 2.5rem) var(--space-4);
+}
+
+:root[data-reader='true'] .shell-topic-filter {
+  background: transparent;
+  border-bottom-color: color-mix(in oklab, var(--seam-faint) 70%, transparent);
+  padding-inline: clamp(1rem, 4vw, 2.5rem);
 }
 
 :root[data-reader='true'] .shell-msg-body {
   font-family: 'Iowan Old Style', 'Charter', Georgia, 'Times New Roman', serif;
-  font-size: 1.05rem;
-  line-height: 1.72;
+  font-size: 1.08rem;
+  line-height: 1.78;
   letter-spacing: 0.003em;
+}
+
+:root[data-reader='true'] .shell-msg-text {
+  font-size: 1em;
+  line-height: inherit;
 }
 
 /* More breathing room between author groups — paragraphs of a transcript. */
 :root[data-reader='true'] .shell-msg-group {
+  grid-template-columns: minmax(0, 1fr);
+  padding-inline: 0;
   margin-top: 1.15rem;
+}
+
+:root[data-reader='true'] .shell-msg-body {
+  grid-column: 1;
+}
+
+:root[data-reader='true'] .shell-msg-cont {
+  grid-template-columns: 3.25rem minmax(0, 1fr);
+  padding-inline: 0;
+}
+
+:root[data-reader='true'] .shell-msg-cont-body {
+  grid-column: 2;
+}
+
+:root[data-reader='true'] .shell-msg-system {
+  padding-inline: 0;
 }
 
 /* Text-first: drop avatars, quiet the author, recede the metadata. */
@@ -290,8 +324,15 @@
 }
 
 :root[data-reader='true'] .shell-msg-group:hover .shell-msg-meta,
+:root[data-reader='true'] .shell-msg-group:focus-within .shell-msg-meta,
+:root[data-reader='true'] .shell-msg-group:focus-visible .shell-msg-meta,
 :root[data-reader='true'] .shell-msg-cont:hover .shell-msg-cont-ts {
-  opacity: 0.6;
+  opacity: 0.68;
+}
+
+:root[data-reader='true'] .shell-msg-cont:focus-within .shell-msg-cont-ts,
+:root[data-reader='true'] .shell-msg-cont:focus-visible .shell-msg-cont-ts {
+  opacity: 0.68;
 }
 
 /* Hover-only actions — nothing competes with the prose at rest. */
@@ -300,8 +341,31 @@
 }
 
 :root[data-reader='true'] .shell-msg-cont:hover .shell-msg-actions,
+:root[data-reader='true'] .shell-msg-cont:focus-within .shell-msg-actions,
 :root[data-reader='true'] .shell-msg-group:hover .shell-msg-actions {
   opacity: 1;
+}
+
+:root[data-reader='true'] .shell-msg-group:focus-within .shell-msg-actions {
+  opacity: 1;
+}
+
+@media (max-width: 720px) {
+  :root[data-reader='true'] .shell-feed {
+    padding-inline: 1rem;
+  }
+
+  :root[data-reader='true'] .shell-msg-cont {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  :root[data-reader='true'] .shell-msg-cont-body {
+    grid-column: 1;
+  }
+
+  :root[data-reader='true'] .shell-msg-cont-ts {
+    display: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

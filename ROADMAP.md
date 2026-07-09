@@ -161,12 +161,18 @@ down to TLS.
     conversations, mentions, scheduled events, and quiet room activity into the
     first screen after connection. The app should open as a place to return to,
     not just the last channel buffer.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home catch-up now promotes
+    followed rooms, followed topics via their parent room, and followed DMs
+    above ambient unread activity while preserving mentions/DM priority.
     ⏭️ **NEXT** — pure Onyx work. Reuse the local vault, `?at=` time travel,
     chanstats heatlines, scheduled-event props, and Spotlight navigation before
     adding new server surface.
 16. **Reader mode** *(client)* — a calm single-pane transcript view for long
     room history, optimized for reading and sharing moments. This is the
     Sumi-e roadmap item that makes the "network that remembers" visible.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Reader mode now applies a stronger
+    transcript measure, reading typography, avatar-free alignment, calmer topic
+    chrome, and keyboard-focus metadata/action reveals.
     ⏭️ **NEXT** — start as a per-channel client view over existing message
     buffers and vault hydration; later wire digest/since-you-left summaries.
 17. **Accessibility conformance ledger** *(main site + client)* — publish the

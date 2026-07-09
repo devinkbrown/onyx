@@ -23,6 +23,8 @@ export interface CatchUpItem {
   unread: number;
   /** Messages that mention you (channel highlights) — the priority signal. */
   highlights: number;
+  /** Conversation is locally followed, so it should rise above ambient chatter. */
+  followed: boolean;
   /** Last activity, unix ms; 0 when unknown. */
   lastActivity: number;
 }
@@ -40,6 +42,34 @@ interface DmLike {
   lastSeen?: Date;
 }
 
+export interface CatchUpOptions {
+  limit?: number;
+  followedKeys?: ReadonlySet<string>;
+}
+
+function normalizeTarget(target: string): string {
+  return target.trim().toLowerCase();
+}
+
+function isFollowedTarget(
+  target: string,
+  followedKeys: ReadonlySet<string>,
+  includeTopics = false,
+): boolean {
+  if (followedKeys.size === 0) return false;
+
+  const normalized = normalizeTarget(target);
+  const candidates = normalized.startsWith('@')
+    ? [normalized, normalized.slice(1)]
+    : [normalized, `@${normalized}`];
+
+  return (
+    candidates.some((key) => followedKeys.has(key)) ||
+    (includeTopics &&
+      Array.from(followedKeys).some((key) => key.startsWith(`${normalized}/`)))
+  );
+}
+
 /**
  * Build the ranked catch-up list from joined channels + DMs. Only targets with
  * something unread appear. Priority: DMs and mentioned channels first, then by
@@ -49,12 +79,15 @@ export function buildCatchUp(
   channels: Iterable<ChannelLike>,
   dms: Iterable<DmLike>,
   channelLastActivity: Map<string, number>,
-  limit = 8,
+  options: number | CatchUpOptions = 8,
 ): CatchUpItem[] {
+  const limit = typeof options === 'number' ? options : options.limit ?? 8;
+  const followedKeys = typeof options === 'number' ? new Set<string>() : options.followedKeys ?? new Set<string>();
   const items: CatchUpItem[] = [];
 
   for (const ch of channels) {
     if (ch.unread > 0 || ch.highlights > 0) {
+      const followed = isFollowedTarget(ch.name, followedKeys, true);
       items.push({
         key: `c:${ch.name.toLowerCase()}`,
         kind: 'channel',
@@ -62,6 +95,7 @@ export function buildCatchUp(
         target: ch.name,
         unread: ch.unread,
         highlights: ch.highlights,
+        followed,
         lastActivity: channelLastActivity.get(ch.name.toLowerCase()) ?? 0,
       });
     }
@@ -69,6 +103,7 @@ export function buildCatchUp(
 
   for (const dm of dms) {
     if (dm.unread > 0 || dm.highlights > 0) {
+      const followed = isFollowedTarget(dm.nick, followedKeys);
       items.push({
         key: `d:${dm.nick.toLowerCase()}`,
         kind: 'dm',
@@ -76,12 +111,14 @@ export function buildCatchUp(
         target: dm.nick,
         unread: dm.unread,
         highlights: dm.highlights,
+        followed,
         lastActivity: dm.lastSeen ? dm.lastSeen.getTime() : 0,
       });
     }
   }
 
-  const priority = (i: CatchUpItem): number => (i.highlights > 0 || i.kind === 'dm' ? 1 : 0);
+  const priority = (i: CatchUpItem): number =>
+    i.highlights > 0 || i.kind === 'dm' ? 2 : i.followed ? 1 : 0;
 
   return items
     .sort((a, b) => priority(b) - priority(a) || b.lastActivity - a.lastActivity)
@@ -92,9 +129,14 @@ export function buildCatchUp(
 export function catchUpSummary(items: readonly CatchUpItem[]): {
   unread: number;
   mentions: number;
+  followed: number;
 } {
   return items.reduce(
-    (acc, i) => ({ unread: acc.unread + i.unread, mentions: acc.mentions + i.highlights }),
-    { unread: 0, mentions: 0 },
+    (acc, i) => ({
+      unread: acc.unread + i.unread,
+      mentions: acc.mentions + i.highlights,
+      followed: acc.followed + (i.followed ? 1 : 0),
+    }),
+    { unread: 0, mentions: 0, followed: 0 },
   );
 }

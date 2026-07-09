@@ -284,6 +284,9 @@
 .home-catchup-item.is-priority {
   border-left-color: var(--gold-bright);
 }
+.home-catchup-item.is-followed:not(.is-priority) {
+  border-left-color: var(--lapis-bright);
+}
 .home-catchup-name {
   display: inline-flex;
   align-items: baseline;
@@ -309,6 +312,14 @@
 .home-catchup-mention {
   color: var(--gold-deep);
   background: color-mix(in oklab, var(--gold) 18%, transparent);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+.home-catchup-followed {
+  color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis) 16%, transparent);
+  border: 1px solid color-mix(in oklab, var(--lapis) 30%, transparent);
   border-radius: 999px;
   padding: 2px 8px;
   font-size: 11px;

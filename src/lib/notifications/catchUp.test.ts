@@ -43,6 +43,34 @@ describe('buildCatchUp', () => {
     expect(out.map((i) => i.target)).toEqual(['#new', '#old']);
   });
 
+  test('followed channels rank above plain-unread channels', () => {
+    const out = buildCatchUp(
+      [ch('#ambient', 5, 0), ch('#followed', 1, 0)],
+      [],
+      new Map([
+        ['#ambient', 9000],
+        ['#followed', 1000],
+      ]),
+      { followedKeys: new Set(['#followed']) },
+    );
+    expect(out.map((i) => i.target)).toEqual(['#followed', '#ambient']);
+    expect(out[0]?.followed).toBe(true);
+  });
+
+  test('followed topic keys promote the parent channel catch-up item', () => {
+    const out = buildCatchUp(
+      [ch('#books', 2, 0), ch('#music', 4, 0)],
+      [],
+      new Map([
+        ['#books', 1000],
+        ['#music', 3000],
+      ]),
+      { followedKeys: new Set(['#books/longform']) },
+    );
+    expect(out[0]?.target).toBe('#books');
+    expect(out[0]?.followed).toBe(true);
+  });
+
   test('caps the list at the limit', () => {
     const many = Array.from({ length: 20 }, (_, i) => ch(`#c${i}`, 1, 0));
     expect(buildCatchUp(many, [], new Map(), 5)).toHaveLength(5);
@@ -65,10 +93,20 @@ describe('catchUpSummary', () => {
       [dm('x', 4, 1)],
       new Map(),
     );
-    expect(catchUpSummary(items)).toEqual({ unread: 9, mentions: 2 });
+    expect(catchUpSummary(items)).toEqual({ unread: 9, mentions: 2, followed: 0 });
   });
 
   test('empty list is zero', () => {
-    expect(catchUpSummary([])).toEqual({ unread: 0, mentions: 0 });
+    expect(catchUpSummary([])).toEqual({ unread: 0, mentions: 0, followed: 0 });
+  });
+
+  test('counts followed conversations', () => {
+    const items = buildCatchUp(
+      [ch('#a', 3, 0), ch('#b', 2, 0)],
+      [dm('x', 1, 0)],
+      new Map(),
+      { followedKeys: new Set(['#a', '@x']) },
+    );
+    expect(catchUpSummary(items)).toEqual({ unread: 6, mentions: 0, followed: 2 });
   });
 });

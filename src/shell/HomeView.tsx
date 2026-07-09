@@ -23,6 +23,7 @@ import {
 } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
 import { buildCatchUp, catchUpSummary, type CatchUpItem } from '@/lib/notifications/catchUp';
+import { followed } from '@/lib/notifications/followed';
 import { fetchStatsIndex, relTime } from '@/lib/stats/networkIndex';
 
 export { relTime };
@@ -72,7 +73,9 @@ export function HomeView(): JSX.Element {
   // "Catch up" — what you missed across every joined room + DM, ranked so
   // mentions and DMs surface and ambient chatter accumulates quietly below.
   const catchUp = createMemo<CatchUpItem[]>(() =>
-    buildCatchUp(channels().values(), dms().values(), channelLastActivity()),
+    buildCatchUp(channels().values(), dms().values(), channelLastActivity(), {
+      followedKeys: followed(),
+    }),
   );
   const catchUpTotals = createMemo(() => catchUpSummary(catchUp()));
   const hasRooms = createMemo(() => channels().size > 0 || dms().size > 0);
@@ -134,6 +137,10 @@ export function HomeView(): JSX.Element {
                       {catchUpTotals().mentions} mention{catchUpTotals().mentions === 1 ? '' : 's'}
                     </b>
                   </Show>
+                  <Show when={catchUpTotals().followed > 0}>
+                    {' · '}
+                    {catchUpTotals().followed} followed
+                  </Show>
                 </span>
               </Show>
             </div>
@@ -144,9 +151,9 @@ export function HomeView(): JSX.Element {
                     <li>
                       <button
                         type="button"
-                        class={`home-catchup-item${item.highlights > 0 || item.kind === 'dm' ? ' is-priority' : ''}`}
+                        class={`home-catchup-item${item.highlights > 0 || item.kind === 'dm' ? ' is-priority' : ''}${item.followed ? ' is-followed' : ''}`}
                         onClick={() => openCatchUp(item)}
-                        aria-label={`Open ${item.name}, ${item.unread} unread${item.highlights > 0 ? `, ${item.highlights} mention${item.highlights === 1 ? '' : 's'}` : ''}`}
+                        aria-label={`Open ${item.name}, ${item.unread} unread${item.highlights > 0 ? `, ${item.highlights} mention${item.highlights === 1 ? '' : 's'}` : ''}${item.followed ? ', followed' : ''}`}
                       >
                         <span class="home-catchup-name">
                           <span class="home-catchup-kind" aria-hidden="true">
@@ -157,6 +164,9 @@ export function HomeView(): JSX.Element {
                         <span class="home-catchup-meta">
                           <Show when={item.highlights > 0}>
                             <span class="home-catchup-mention">{item.highlights} @you</span>
+                          </Show>
+                          <Show when={item.followed}>
+                            <span class="home-catchup-followed">followed</span>
                           </Show>
                           <span class="home-catchup-unread">{item.unread}</span>
                           <Show when={item.lastActivity > 0}>
