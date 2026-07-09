@@ -220,15 +220,28 @@
 
 @media (max-width: 560px) {
   .onyx-message-search {
-    top: calc(48px + 0.5rem);
-    left: 0.5rem;
-    right: 0.5rem;
+    position: fixed;
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px) + 0.5rem);
+    z-index: 96;
+    max-height: calc(100svh - 64px - env(safe-area-inset-bottom, 0px) - 1rem);
+    align-items: stretch;
+    padding: 0 0.55rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .onyx-message-search__surface {
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 0.4rem;
+    padding: 0.55rem;
+    border-radius: var(--r-lg) var(--r-lg) var(--r-md) var(--r-md);
   }
+
+  .onyx-message-search__sigil { display: none; }
 
   .onyx-message-search__count {
     min-width: 3.85rem;
@@ -236,15 +249,69 @@
   }
 
   .onyx-message-search__controls {
-    grid-column: 2 / -1;
+    grid-column: 1 / -1;
     justify-content: flex-end;
-    padding-top: 0.15rem;
+    padding-top: 0.35rem;
     border-top: 1px solid var(--seam-faint);
   }
 
   .onyx-message-search__provenance {
     grid-column: 1 / 2;
     justify-self: start;
+  }
+
+  .onyx-message-search__recall,
+  .onyx-message-search__server,
+  .onyx-message-search__vault {
+    width: 100%;
+  }
+
+  .onyx-message-search__recall {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+
+  .onyx-message-search__recall::-webkit-scrollbar {
+    display: none;
+  }
+
+  .onyx-message-search__recall-chip {
+    min-height: 34px;
+    flex: none;
+  }
+
+  .onyx-message-search__server-bar,
+  .onyx-message-search__vault-bar {
+    flex-wrap: wrap;
+  }
+
+  .onyx-message-search__server-list {
+    max-height: min(36svh, 240px);
+  }
+
+  .onyx-message-search__server-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.2rem 0.55rem;
+    min-height: 46px;
+  }
+
+  .onyx-message-search__vault-target,
+  .onyx-message-search__server-when {
+    grid-row: 1;
+  }
+
+  .onyx-message-search__server-row strong,
+  .onyx-message-search__server-text {
+    grid-column: 1 / -1;
+  }
+
+  .onyx-message-search__server-text {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
   }
 }
 

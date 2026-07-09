@@ -3831,7 +3831,7 @@
     grid-template-columns: 1fr;
   }
   .shell {
-    --mnav-h: 54px;
+    --mnav-h: 64px;
     grid-template-columns: 1fr;
     grid-template-rows: 1fr;
     /* Sit above the fixed bottom tab bar; clear the notch up top. */
@@ -3845,7 +3845,7 @@
   .shell-sidebar {
     position: fixed;
     top: 0;
-    bottom: calc(54px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(var(--mnav-h) + env(safe-area-inset-bottom, 0px));
     left: 0;
     z-index: 90;
     width: min(300px, 86vw);
@@ -3873,7 +3873,7 @@
   .shell-members {
     position: fixed;
     top: 0;
-    bottom: calc(54px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(var(--mnav-h) + env(safe-area-inset-bottom, 0px));
     right: 0;
     z-index: 90;
     width: min(290px, 84vw);
@@ -3891,7 +3891,10 @@
   }
   .shell-members:not(.shell-members--hidden) { transform: translateX(0); }
 
-  .shell-conversation { grid-column: 1; min-width: 0; }
+  .shell-conversation {
+    grid-column: 1;
+    min-width: 0;
+  }
 
   /* Bigger tap target for the member toggle in the ribbon */
   .shell-ribbon-members {
@@ -3902,10 +3905,28 @@
   }
 
   /* Composer: 16px kills iOS zoom-on-focus; larger send target; drop the hint */
-  .shell-composer-textarea { font-size: 16px; min-height: 42px; }
-  .shell-composer-tool { width: 42px; height: 42px; }
-  .shell-composer-send { width: 42px; height: 42px; }
+  .shell-composer {
+    padding: 10px 12px 12px;
+  }
+  .shell-composer-context,
+  .shell-composer-topic {
+    max-width: 100%;
+    min-height: 38px;
+  }
+  .shell-composer-textarea {
+    font-size: 16px;
+    min-height: 44px;
+    max-height: min(34svh, 168px);
+    padding-inline: 10px;
+  }
+  .shell-composer-tool { width: 44px; height: 44px; }
+  .shell-composer-send { width: 46px; height: 46px; }
   .shell-composer-hint { display: none; }
+  .shell-command-menu,
+  .shell-emoji-picker {
+    max-height: min(46svh, 320px);
+    overflow-y: auto;
+  }
 
   /* Bottom tab bar — fixed, safe-area aware, real touch targets */
   .shell-mobile-nav {
@@ -3919,9 +3940,15 @@
     z-index: 95;
     height: calc(var(--mnav-h, 54px) + env(safe-area-inset-bottom, 0px));
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    background: color-mix(in oklab, var(--ink) 90%, var(--stone));
+    background:
+      linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 42%, transparent), transparent 42%),
+      color-mix(in oklab, var(--ink) 94%, var(--stone));
     border-top: 1px solid var(--seam);
-    box-shadow: 0 -20px 50px -34px color-mix(in oklab, var(--ink) 92%, transparent);
+    box-shadow:
+      0 -22px 54px -34px color-mix(in oklab, var(--ink) 92%, transparent),
+      inset 0 1px 0 color-mix(in oklab, var(--washi) 7%, transparent);
+    -webkit-backdrop-filter: blur(18px) saturate(1.2);
+    backdrop-filter: blur(18px) saturate(1.2);
   }
 
   .shell-mobile-nav-btn {
@@ -3931,8 +3958,8 @@
     align-items: center;
     justify-content: center;
     gap: 3px;
-    min-height: 44px;
-    padding: 0 6px;
+    min-height: 54px;
+    padding: 5px 6px 7px;
     color: var(--washi-mute);
     font-family: var(--font-mono);
     font-size: 0.58rem;
@@ -3944,10 +3971,25 @@
     -webkit-tap-highlight-color: transparent;
     transition: color var(--dur) var(--ease);
   }
-  .shell-mobile-nav-btn b { font-size: 1.05rem; line-height: 1; font-weight: 400; }
+  .shell-mobile-nav-btn b {
+    width: 1.6rem;
+    height: 1.45rem;
+    display: grid;
+    place-items: center;
+    border-radius: var(--r-pill);
+    font-size: 1.08rem;
+    line-height: 1;
+    font-weight: 400;
+    background: color-mix(in oklab, var(--stone-2) 28%, transparent);
+  }
   .shell-mobile-nav-btn:active { color: var(--lapis-bright); }
   .shell-mobile-nav-btn:hover,
   .shell-mobile-nav-btn--active { color: var(--lapis-bright); }
+  .shell-mobile-nav-btn--active b {
+    color: var(--ink);
+    background: linear-gradient(180deg, var(--lapis-bright), var(--lapis));
+    box-shadow: 0 0 18px -8px color-mix(in oklab, var(--lapis-bright) 72%, transparent);
+  }
 
   /* Join voice/video — full-width, taller tap targets */
   .shell-voice-join-btn { flex: 1; padding: 11px 12px; text-align: center; }
@@ -3968,7 +4010,7 @@
      void at the ribbon's left and the controls looked unanchored. Only the
      topic yields on phones (rule above). */
   .shell-ribbon-identity { min-width: 0; overflow: hidden; }
-  .shell-composer { padding: 8px 12px; }
+  .shell-composer { padding: 8px 10px 10px; }
   .shell-composer-inner { gap: 6px; }
   .shell-command-item { grid-template-columns: 1fr; gap: 2px; }
   .shell-emoji-grid { grid-template-columns: repeat(7, minmax(28px, 1fr)); }

@@ -381,6 +381,11 @@ client or public site needs to expose the result.
     touch affordance instead of keyboard-only.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home recap and recent-review action
     cards now stack into touch-sized mobile rows.
+    ✅ **CLIENT + WEBSITE SLICE SHIPPED 2026-07-09** — Mobile ergonomics pass:
+    the app bottom nav is taller and stateful, drawers clear the thumb bar,
+    composer/search/caption overlays respect safe-area and bottom-nav space, and
+    the main site mobile menu, doc tables, hero CTAs, and install cards use
+    scroll-safe touch layouts.
 
 ## Phase 10 — Washi Atmosphere ← PLANNED
 25. **Background system consolidation** *(client)* — collapse the canvas and DOM

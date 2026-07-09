@@ -80,6 +80,9 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Compact calm preset control')).toBeInTheDocument();
     expect(screen.getByText('Mobile Home tab')).toBeInTheDocument();
     expect(screen.getByText('Touch-sized Home review cards')).toBeInTheDocument();
+    expect(screen.getByText('Mobile thumb bar polish')).toBeInTheDocument();
+    expect(screen.getByText('Mobile overlay clearance')).toBeInTheDocument();
+    expect(screen.getByText('Mobile website nav polish')).toBeInTheDocument();
     expect(screen.getByText('Quiet boost Home digest')).toBeInTheDocument();
     expect(screen.getByText('Scheduled event header chip')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Atmosphere' })).toBeInTheDocument();
