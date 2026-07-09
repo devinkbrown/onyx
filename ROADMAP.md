@@ -501,6 +501,9 @@ client or public site needs to expose the result.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home now keeps reviewed catch-up
     ranges visible while disconnected, labelling them as offline recall so
     locally remembered review anchors remain usable before reconnect.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Message search now treats
+    full-history server search as connected-only while preserving local buffer
+    and vault search during disconnection.
 39. **PWA and desktop packaging path** *(client + main site)* — make install,
     update, notification, and wrapped push behavior explicit for browser PWA,
     desktop shell, and future mobile wrappers.

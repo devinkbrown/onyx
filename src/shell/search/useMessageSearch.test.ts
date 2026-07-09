@@ -150,6 +150,45 @@ describe('useMessageSearch', () => {
     dispose();
   });
 
+  it('keeps full-history server search unavailable while disconnected', () => {
+    setState({
+      activeView: { kind: 'channel', channel: '#root' },
+      channels: new Map([['#root', channel('#root', [message('a', 'Kai', 'needle', 1)])]]),
+      canSearchHistory: true,
+      connectionStatus: 'disconnected',
+    });
+
+    let dispose!: () => void;
+    createRoot((cleanup) => {
+      dispose = cleanup;
+      const search = useMessageSearch();
+      openMessageSearchWithQuery('needle');
+
+      expect(search.results().map((result) => result.id)).toEqual(['a']);
+      expect(search.canServerSearch()).toBe(false);
+    });
+    dispose();
+  });
+
+  it('enables full-history server search when connected and capable', () => {
+    setState({
+      activeView: { kind: 'channel', channel: '#root' },
+      channels: new Map([['#root', channel('#root', [message('a', 'Kai', 'needle', 1)])]]),
+      canSearchHistory: true,
+      connectionStatus: 'connected',
+    });
+
+    let dispose!: () => void;
+    createRoot((cleanup) => {
+      dispose = cleanup;
+      const search = useMessageSearch();
+      openMessageSearchWithQuery('needle');
+
+      expect(search.canServerSearch()).toBe(true);
+    });
+    dispose();
+  });
+
   it('wraps previous and next through matches', () => {
     setState({
       activeView: { kind: 'channel', channel: '#root' },

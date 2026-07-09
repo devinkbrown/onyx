@@ -66,6 +66,7 @@ describe('MessageSearch', () => {
       activeView: { kind: 'channel', channel: '#root' },
       channels: new Map([['#root', channel('#root', [live])]]),
       canSearchHistory: true,
+      connectionStatus: 'connected',
       serverSearch: {
         target: '#root',
         query: 'needle',

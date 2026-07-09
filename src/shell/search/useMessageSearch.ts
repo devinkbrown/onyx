@@ -111,6 +111,7 @@ export function useMessageSearch(): UseMessageSearch {
   const channels = useStore((s) => s.channels);
   const dms = useStore((s) => s.dms);
   const canSearchHistory = useStore((s) => s.canSearchHistory);
+  const connectionStatus = useStore((s) => s.connectionStatus);
   const serverSearch = useStore((s) => s.serverSearch);
 
   const searchTarget = createMemo(() => {
@@ -120,7 +121,9 @@ export function useMessageSearch(): UseMessageSearch {
     return null;
   });
 
-  const canServerSearch = createMemo(() => canSearchHistory() && searchTarget() !== null);
+  const canServerSearch = createMemo(() =>
+    connectionStatus() === 'connected' && canSearchHistory() && searchTarget() !== null,
+  );
 
   const serverResults = createMemo((): MessageSearchResult[] =>
     serverSearch().results.map((message, ordinal) => ({
