@@ -73,6 +73,79 @@
   scroll-behavior: auto !important;
 }
 
+/* ── High contrast ───────────────────────────────────────────────────────────
+   Mechanically derived from theme tokens: surfaces move toward the ground,
+   borders and text move toward washi/lapis, and decorative translucency recedes. */
+
+:root[data-high-contrast='true'],
+:root[data-prefers-more-contrast='true'] {
+  --line: color-mix(in oklab, var(--washi) 42%, var(--ink));
+  --seam-faint: color-mix(in oklab, var(--washi) 36%, transparent);
+  --seam: color-mix(in oklab, var(--washi) 58%, var(--lapis));
+}
+
+:root[data-high-contrast='true'] .shell-conversation,
+:root[data-prefers-more-contrast='true'] .shell-conversation,
+:root[data-high-contrast='true'] .shell-sidebar,
+:root[data-prefers-more-contrast='true'] .shell-sidebar,
+:root[data-high-contrast='true'] .shell-ribbon,
+:root[data-prefers-more-contrast='true'] .shell-ribbon,
+:root[data-high-contrast='true'] .shell-composer,
+:root[data-prefers-more-contrast='true'] .shell-composer,
+:root[data-high-contrast='true'] .shell-members,
+:root[data-prefers-more-contrast='true'] .shell-members,
+:root[data-high-contrast='true'] .onyx-sheet__panel,
+:root[data-prefers-more-contrast='true'] .onyx-sheet__panel {
+  background: color-mix(in oklab, var(--ink) 94%, var(--stone)) !important;
+  border-color: var(--seam) !important;
+}
+
+:root[data-high-contrast='true'] .shell-msg-text,
+:root[data-prefers-more-contrast='true'] .shell-msg-text,
+:root[data-high-contrast='true'] .shell-msg-author,
+:root[data-prefers-more-contrast='true'] .shell-msg-author,
+:root[data-high-contrast='true'] .shell-ribbon-channel,
+:root[data-prefers-more-contrast='true'] .shell-ribbon-channel,
+:root[data-high-contrast='true'] .shell-composer-textarea,
+:root[data-prefers-more-contrast='true'] .shell-composer-textarea,
+:root[data-high-contrast='true'] .pref-toggle-title,
+:root[data-prefers-more-contrast='true'] .pref-toggle-title {
+  color: var(--washi) !important;
+}
+
+:root[data-high-contrast='true'] .shell-msg-ts,
+:root[data-prefers-more-contrast='true'] .shell-msg-ts,
+:root[data-high-contrast='true'] .shell-msg-cont-ts,
+:root[data-prefers-more-contrast='true'] .shell-msg-cont-ts,
+:root[data-high-contrast='true'] .shell-msg-system,
+:root[data-prefers-more-contrast='true'] .shell-msg-system,
+:root[data-high-contrast='true'] .pref-desc,
+:root[data-prefers-more-contrast='true'] .pref-desc,
+:root[data-high-contrast='true'] .shell-mobile-nav-btn,
+:root[data-prefers-more-contrast='true'] .shell-mobile-nav-btn {
+  color: color-mix(in oklab, var(--washi) 82%, var(--lapis-bright)) !important;
+}
+
+:root[data-high-contrast='true'] .shell-msg-group,
+:root[data-prefers-more-contrast='true'] .shell-msg-group,
+:root[data-high-contrast='true'] .home-card,
+:root[data-prefers-more-contrast='true'] .home-card,
+:root[data-high-contrast='true'] .pref-toggle,
+:root[data-prefers-more-contrast='true'] .pref-toggle,
+:root[data-high-contrast='true'] .pref-segments,
+:root[data-prefers-more-contrast='true'] .pref-segments,
+:root[data-high-contrast='true'] .time-scrubber__track,
+:root[data-prefers-more-contrast='true'] .time-scrubber__track {
+  border-color: var(--seam) !important;
+  background: color-mix(in oklab, var(--ink) 88%, var(--stone)) !important;
+}
+
+:root[data-high-contrast='true'] :focus-visible,
+:root[data-prefers-more-contrast='true'] :focus-visible {
+  outline-color: var(--lapis-bright) !important;
+  outline-width: 3px !important;
+}
+
 /* ── Reduce transparency ─────────────────────────────────────────────────────
    Force-solid panel/chrome surfaces for users who prefer clearer separation
    from the animated background. Mirrors the OS media preference below. */

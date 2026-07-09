@@ -653,6 +653,14 @@ export function PreferencesPanel(): JSX.Element {
           onToggle={(value) => setPreference('reduceTransparency', value)}
         />
 
+        <Toggle
+          legend="Contrast"
+          title="Raise interface contrast"
+          description="Strengthens text, borders, focus outlines, and panel separation across the active theme."
+          value={() => preferences().highContrast}
+          onToggle={(value) => setPreference('highContrast', value)}
+        />
+
         <AccessibilityAuditLedger />
 
         <button type="button" class="pref-reset" onClick={() => resetPreferences()}>

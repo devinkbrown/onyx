@@ -54,6 +54,7 @@ describe('preferences store', () => {
         readerMode: false,
         reduceMotion: true,
         reduceTransparency: true,
+        highContrast: false,
         linkPreviews: true,
         clock: '24h',
         localHistory: true,
@@ -78,6 +79,7 @@ describe('preferences store', () => {
         readerMode: DEFAULT_PREFERENCES.readerMode,
         reduceMotion: false,
         reduceTransparency: DEFAULT_PREFERENCES.reduceTransparency,
+        highContrast: DEFAULT_PREFERENCES.highContrast,
         linkPreviews: true,
         clock: '24h',
         localHistory: true,
@@ -92,6 +94,12 @@ describe('preferences store', () => {
     it('returns defaults for corrupt JSON', () => {
       localStorage.setItem(STORAGE_KEY, '{not json');
       expect(loadPreferences()).toEqual(DEFAULT_PREFERENCES);
+    });
+
+    it('migrates the old high-contrast storage key when preferences are absent', () => {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.setItem('onyx:high-contrast', '1');
+      expect(loadPreferences().highContrast).toBe(true);
     });
   });
 
@@ -130,6 +138,7 @@ describe('preferences store', () => {
         readerMode: true,
         reduceMotion: true,
         reduceTransparency: true,
+        highContrast: true,
         linkPreviews: false,
         clock: '12h',
         localHistory: false,
@@ -147,6 +156,7 @@ describe('preferences store', () => {
       expect(ds.width).toBe('full');
       expect(ds.reduceMotion).toBe('true');
       expect(ds.reduceTransparency).toBe('true');
+      expect(ds.highContrast).toBe('true');
     });
 
     it('applies the live store value when called without an argument', () => {
@@ -162,11 +172,13 @@ describe('preferences store', () => {
       setPreference('density', 'compact');
       setPreference('reduceMotion', true);
       setPreference('reduceTransparency', true);
+      setPreference('highContrast', true);
       resetPreferences();
       expect(preferences()).toEqual(DEFAULT_PREFERENCES);
       expect(readStored()).toEqual(DEFAULT_PREFERENCES);
       expect(document.documentElement.dataset.reduceMotion).toBe('false');
       expect(document.documentElement.dataset.reduceTransparency).toBe('false');
+      expect(document.documentElement.dataset.highContrast).toBe('false');
     });
   });
 

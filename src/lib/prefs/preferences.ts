@@ -42,6 +42,8 @@ export interface Preferences {
   reduceMotion: boolean;
   /** Flatten translucent surfaces regardless of OS preference. */
   reduceTransparency: boolean;
+  /** Raise interface contrast regardless of OS preference. */
+  highContrast: boolean;
   /** Unfurl the first web link in a message into an OG preview card. */
   linkPreviews: boolean;
   /** Timestamp clock format for messages and sidebar activity. */
@@ -68,6 +70,7 @@ export const DEFAULT_PREFERENCES: Readonly<Preferences> = {
   readerMode: false,
   reduceMotion: false,
   reduceTransparency: false,
+  highContrast: false,
   linkPreviews: true,
   clock: '24h',
   localHistory: true,
@@ -83,6 +86,8 @@ export const DEFAULT_PREFERENCES: Readonly<Preferences> = {
 const STORAGE_KEY = 'onyx:preferences';
 /** Legacy key from the previous brand name; read-only for one-time migration. */
 const LEGACY_STORAGE_KEY = 'ruri:preferences';
+/** Older store-level high-contrast toggle; read-only for migration. */
+const LEGACY_HIGH_CONTRAST_KEY = 'onyx:high-contrast';
 
 function hasStorage(): boolean {
   return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
@@ -119,6 +124,9 @@ export function loadPreferences(): Preferences {
     reduceTransparency: typeof raw.reduceTransparency === 'boolean'
       ? raw.reduceTransparency
       : DEFAULT_PREFERENCES.reduceTransparency,
+    highContrast: typeof raw.highContrast === 'boolean'
+      ? raw.highContrast
+      : localStorage.getItem(LEGACY_HIGH_CONTRAST_KEY) === '1',
     linkPreviews: typeof raw.linkPreviews === 'boolean' ? raw.linkPreviews : DEFAULT_PREFERENCES.linkPreviews,
     clock: isOneOf(raw.clock, CLOCKS) ? raw.clock : DEFAULT_PREFERENCES.clock,
     localHistory: typeof raw.localHistory === 'boolean' ? raw.localHistory : DEFAULT_PREFERENCES.localHistory,
@@ -156,6 +164,7 @@ export function applyPreferences(prefs: Preferences = preferences()): void {
   root.dataset.reader = String(prefs.readerMode);
   root.dataset.reduceMotion = String(prefs.reduceMotion);
   root.dataset.reduceTransparency = String(prefs.reduceTransparency);
+  root.dataset.highContrast = String(prefs.highContrast);
 }
 
 // ── reactive store ──────────────────────────────────────────────────────────
