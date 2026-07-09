@@ -37,6 +37,7 @@ import {
   type ScheduledEventItem,
 } from '@/lib/notifications/scheduledEvents';
 import { preferences } from '@/lib/prefs/preferences';
+import { buildQuietBoostDigest, type QuietBoostDigestItem } from '@/lib/reactions/quietBoosts';
 import { fetchStatsIndex, relTime } from '@/lib/stats/networkIndex';
 import { loadRecent } from '@/lib/vault/historyVault';
 import type { ChatMessage } from '@/lib/irc/types';
@@ -49,6 +50,7 @@ const HOME_RECAP_LIMIT = 3;
 const HOME_RECAP_VOICE_LIMIT = 2;
 const HOME_SYSTEM_TYPES = new Set(['join', 'part', 'quit', 'kick', 'mode', 'topic', 'nick', 'system', 'error']);
 const HOME_RHYTHM_LIMIT = 4;
+const HOME_BOOST_LIMIT = 4;
 
 type HomeCatchUpRecap = {
   item: CatchUpItem;
@@ -152,6 +154,7 @@ export function HomeView(): JSX.Element {
   const channelProps = useStore((s) => s.channelProps);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const networkName = useStore((s) => s.networkName);
+  const ourNick = useStore((s) => s.ourNick);
 
   const [stats] = createResource(fetchStatsIndex);
   const [reviewHistory, setReviewHistory] = createSignal<ReviewHistoryEntry[]>(readReviewHistory());
@@ -249,6 +252,32 @@ export function HomeView(): JSX.Element {
   );
   const openQuietActivity = (item: QuietActivityItem) =>
     getState().navigate({ kind: 'channel', channel: item.name });
+  const quietBoosts = createMemo<QuietBoostDigestItem[]>(() =>
+    buildQuietBoostDigest(
+      [
+        ...Array.from(channels().values(), (channel) => ({
+          target: channel.name,
+          messages: channel.messages,
+        })),
+        ...Array.from(dms().values(), (dm) => ({
+          target: dm.nick,
+          messages: dm.messages,
+        })),
+      ],
+      ourNick(),
+      HOME_BOOST_LIMIT,
+    ),
+  );
+  const openQuietBoost = (item: QuietBoostDigestItem) => {
+    const state = getState();
+    if (item.target.startsWith('#')) {
+      state.navigate({ kind: 'channel', channel: item.target });
+      state.travelTo(item.target, item.at);
+    } else {
+      state.navigate({ kind: 'dm', nick: item.target });
+    }
+    state.focusMessage(item.messageId);
+  };
   const catchUpRecaps = createMemo<HomeCatchUpRecap[]>(() =>
     catchUp()
       .map((item) => {
@@ -691,6 +720,49 @@ export function HomeView(): JSX.Element {
                       {relTime(Math.floor(item.lastActivity / 1000), nowMs())}
                     </span>
                   </button>
+                )}
+              </For>
+            </div>
+          </section>
+        </Show>
+
+        <Show when={connectionStatus() === 'connected' && quietBoosts().length > 0}>
+          <section class="home-boosts" aria-label="Quiet boosts">
+            <div class="home-boosts-head">
+              <h3 class="home-section-label">Quiet boosts</h3>
+              <span class="home-boosts-summary">non-notifying reactions</span>
+            </div>
+            <div class="home-boosts-list" role="list" aria-label="Quiet boost cards">
+              <For each={quietBoosts()}>
+                {(item) => (
+                  <article class="home-boost-card" role="listitem">
+                    <button
+                      type="button"
+                      class="home-boost-card__open"
+                      onClick={() => openQuietBoost(item)}
+                      aria-label={`Open boosted message in ${item.target}`}
+                    >
+                      <span class="home-boost-card__target">
+                        {item.target.startsWith('#') ? item.target : `@${item.target}`}
+                      </span>
+                      <span class="home-boost-card__badges" aria-label={`${item.total} quiet boosts`}>
+                        <For each={item.groups.slice(0, 3)}>
+                          {(group) => (
+                            <span class={`home-boost-card__badge${group.youBoosted ? ' is-you' : ''}`}>
+                              <span aria-hidden="true">{group.emoji}</span>
+                              <span>{group.count}</span>
+                            </span>
+                          )}
+                        </For>
+                      </span>
+                      <span class="home-boost-card__preview">
+                        <b>{item.from}</b>: {clipped(item.text, 96)}
+                      </span>
+                      <span class="home-boost-card__when">
+                        {relTime(Math.floor(item.at.getTime() / 1000), nowMs())}
+                      </span>
+                    </button>
+                  </article>
                 )}
               </For>
             </div>

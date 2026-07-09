@@ -354,6 +354,10 @@ client or public site needs to expose the result.
     regular, and power notification presets; keep followed conversations and
     mentions prominent while quiet reactions and ambient movement collect into
     Home instead of interrupting users.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home now collects recent quiet
+    boosts from hydrated channel and DM buffers into a non-notifying digest,
+    ranking boosted messages by reaction count and opening them through the
+    existing message-focus/time-travel path.
 23. **Presence-as-place header** *(client)* — consolidate facepile, heatline,
     scheduled event, and voice corner into a peripheral room-presence surface
     that shows life in the room without turning presence into a summons.

@@ -3,7 +3,27 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { aggregateBoosts, BOOST_NOTIFIES, type BoostGroup, toggleBoost, totalBoosts } from './quietBoosts';
+import type { ChatMessage } from '@/lib/irc/types';
+import {
+  aggregateBoosts,
+  BOOST_NOTIFIES,
+  buildQuietBoostDigest,
+  type BoostGroup,
+  toggleBoost,
+  totalBoosts,
+} from './quietBoosts';
+
+function msg(id: string, text: string, reactions: ChatMessage['reactions'], at: number): ChatMessage {
+  return {
+    id,
+    from: 'alice',
+    text,
+    time: new Date(at),
+    type: 'msg',
+    target: '#general',
+    reactions,
+  };
+}
 
 describe('quiet boost aggregation', () => {
   it('groups boosts by emoji, counts reactors, and sorts by count then emoji', () => {
@@ -86,5 +106,52 @@ describe('quiet boost optimistic toggles', () => {
     const next = toggleBoost(groups, '🌊', 'kai');
 
     expect(next).toEqual([]);
+  });
+});
+
+describe('quiet boost Home digest', () => {
+  it('collects boosted messages by total boosts then recency', () => {
+    const digest = buildQuietBoostDigest(
+      [
+        {
+          target: '#general',
+          messages: [
+            msg('low', 'one boost', [{ emoji: 'a', users: ['mio'] }], 1000),
+            msg('top', 'two boosts', [{ emoji: 'b', users: ['mio', 'ren'] }], 2000),
+          ],
+        },
+        {
+          target: 'kai',
+          messages: [
+            msg('dm', 'new one boost', [{ emoji: 'c', users: ['ren'] }], 3000),
+          ],
+        },
+      ],
+      'mio',
+    );
+
+    expect(digest.map((item) => [item.target, item.messageId, item.total])).toEqual([
+      ['#general', 'top', 2],
+      ['kai', 'dm', 1],
+      ['#general', 'low', 1],
+    ]);
+    expect(digest[0]?.groups[0]).toMatchObject({ emoji: 'b', count: 2, youBoosted: true });
+  });
+
+  it('skips deleted/redacted and blank boosted messages', () => {
+    const digest = buildQuietBoostDigest(
+      [{
+        target: '#general',
+        messages: [
+          { ...msg('deleted', 'hidden', [{ emoji: 'a', users: ['mio'] }], 1000), deleted: true },
+          { ...msg('redacted', 'hidden', [{ emoji: 'a', users: ['mio'] }], 2000), redacted: true },
+          msg('blank', '   ', [{ emoji: 'a', users: ['mio'] }], 3000),
+          msg('visible', 'quiet thanks', [{ emoji: 'a', users: ['mio'] }], 4000),
+        ],
+      }],
+      'mio',
+    );
+
+    expect(digest.map((item) => item.messageId)).toEqual(['visible']);
   });
 });

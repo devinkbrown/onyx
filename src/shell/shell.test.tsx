@@ -954,5 +954,46 @@ describe('AppShell', () => {
       expect(travelToSpy).toHaveBeenLastCalledWith('#general', new Date(eventAt * 1000));
       travelToSpy.mockRestore();
     });
+
+    it('collects quiet boosts on Home and opens the boosted message', () => {
+      const travelToSpy = vi.spyOn(store.getState(), 'travelTo').mockImplementation(() => {});
+      const boosted = {
+        ...makeMessage('boosted-home', 'alice', 'Quietly boosted note', '#general'),
+        reactions: [
+          { emoji: 'a', users: ['mio', 'testuser'] },
+          { emoji: 'b', users: ['ren'] },
+        ],
+      };
+      const channels = new Map<string, Channel>();
+      channels.set('#general', makeChannel('#general', [boosted], [makeUser('alice')]));
+      store.setState({
+        ...initialState,
+        channels,
+        activeView: { kind: 'home' },
+        connectionStatus: 'connected',
+        networkName: 'IRCXNet',
+        ourNick: 'testuser',
+      }, true);
+
+      render(() => <AppShell />);
+
+      const boosts = screen.getByLabelText('Quiet boosts');
+      const boostCards = screen.getByRole('list', { name: 'Quiet boost cards' });
+      expect(within(boosts).getByText('non-notifying reactions')).toBeInTheDocument();
+      expect(within(boostCards).getAllByRole('listitem')).toHaveLength(1);
+      expect(within(boosts).getByText('#general')).toBeInTheDocument();
+      expect(boosts).toHaveTextContent('Quietly boosted note');
+      expect(within(boosts).getByLabelText('3 quiet boosts')).toBeInTheDocument();
+      expect(within(boosts).getByText('2')).toBeInTheDocument();
+
+      fireEvent.click(within(boosts).getByRole('button', { name: 'Open boosted message in #general' }));
+
+      const activeView = store.getState().activeView;
+      expect(activeView.kind).toBe('channel');
+      if (activeView.kind === 'channel') expect(activeView.channel).toBe('#general');
+      expect(store.getState().timeTravelLandingId).toBe('boosted-home');
+      expect(travelToSpy).toHaveBeenCalledWith('#general', boosted.time);
+      travelToSpy.mockRestore();
+    });
   });
 });

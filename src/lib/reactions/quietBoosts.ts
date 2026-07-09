@@ -1,6 +1,7 @@
 /**
  * quietBoosts.ts — pure aggregation and optimistic toggles for calm reactions.
  */
+import type { ChatMessage } from '@/lib/irc/types';
 
 export const BOOST_NOTIFIES = false;
 
@@ -14,6 +15,21 @@ export interface BoostGroup {
   count: number;
   reactors: readonly string[];
   youBoosted: boolean;
+}
+
+export interface BoostConversation {
+  target: string;
+  messages: readonly ChatMessage[];
+}
+
+export interface QuietBoostDigestItem {
+  target: string;
+  messageId: string;
+  at: Date;
+  from: string;
+  text: string;
+  groups: readonly BoostGroup[];
+  total: number;
 }
 
 function sameNick(a: string, b: string): boolean {
@@ -95,4 +111,47 @@ export function toggleBoost(groups: readonly BoostGroup[], emoji: string, you: s
 
 export function totalBoosts(groups: readonly BoostGroup[]): number {
   return groups.reduce((total, group) => total + group.count, 0);
+}
+
+function messageBoosts(message: ChatMessage, you: string): BoostGroup[] {
+  return aggregateBoosts(
+    (message.reactions ?? []).flatMap((reaction) =>
+      reaction.users.map((from) => ({ emoji: reaction.emoji, from })),
+    ),
+    you,
+  );
+}
+
+export function buildQuietBoostDigest(
+  conversations: Iterable<BoostConversation>,
+  you: string,
+  limit = 4,
+): QuietBoostDigestItem[] {
+  const items: QuietBoostDigestItem[] = [];
+  for (const conversation of conversations) {
+    for (const message of conversation.messages) {
+      if (message.deleted || message.redacted) continue;
+      const groups = messageBoosts(message, you);
+      const total = totalBoosts(groups);
+      const text = (message.plaintext ?? message.text).replace(/\s+/g, ' ').trim();
+      if (total === 0 || text.length === 0) continue;
+      items.push({
+        target: conversation.target,
+        messageId: message.id,
+        at: message.time,
+        from: message.from,
+        text,
+        groups,
+        total,
+      });
+    }
+  }
+  return items
+    .sort((a, b) =>
+      b.total - a.total ||
+      b.at.getTime() - a.at.getTime() ||
+      a.target.localeCompare(b.target) ||
+      a.messageId.localeCompare(b.messageId),
+    )
+    .slice(0, limit);
 }
