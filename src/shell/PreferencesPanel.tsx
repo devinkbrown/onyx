@@ -98,6 +98,11 @@ const ACCESS_AUDIT_ROWS = [
     note: 'Sheet dialog, named directory search, labelled public-channel list, and target-specific Join/Open actions.',
   },
   {
+    surface: 'Account panel',
+    status: 'checked',
+    note: 'Named account-management regions, alert/status feedback, and target-specific persona actions.',
+  },
+  {
     surface: 'Modals',
     status: 'checked',
     note: 'Sheet focus trap, Escape close, labelled close buttons.',

@@ -118,14 +118,20 @@ interface SectionProps {
   children: JSX.Element;
 }
 
+function sectionId(title: string, suffix: string): string {
+  return `acct-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${suffix}`;
+}
+
 function Section(props: SectionProps): JSX.Element {
   const [local] = splitProps(props, ['title', 'hint', 'children']);
+  const titleId = () => sectionId(local.title, 'title');
+  const hintId = () => (local.hint ? sectionId(local.title, 'hint') : undefined);
   return (
-    <section class="acct-section">
+    <section class="acct-section" aria-labelledby={titleId()} aria-describedby={hintId()}>
       <div class="acct-section-head">
-        <h3 class="acct-section-title">{local.title}</h3>
+        <h3 class="acct-section-title" id={titleId()}>{local.title}</h3>
         <Show when={local.hint}>
-          <p class="acct-section-hint">{local.hint}</p>
+          <p class="acct-section-hint" id={hintId()}>{local.hint}</p>
         </Show>
       </div>
       <div class="acct-section-body">{local.children}</div>
@@ -342,7 +348,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
         {/* ── Signed-in state ── */}
         <Show when={!isGuest()}>
           {/* Identity card */}
-          <div class="acct-identity" aria-label="Account summary">
+          <section class="acct-identity" aria-label="Account summary">
             <div class="acct-identity-avatar" aria-hidden="true">
               {(account() ?? '?').slice(0, 2).toUpperCase()}
             </div>
@@ -391,7 +397,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
                 )}
               </Show>
             </div>
-          </div>
+          </section>
 
           {/* Last action error */}
           <Show when={actionError()}>
@@ -695,7 +701,13 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
                           <code>{p.host}</code>
                           <span class="acct-persona-src">{p.source}</span>
                         </div>
-                        <Button type="button" variant="ghost" size="sm" onClick={() => getState().vhostUse(p.name)}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Wear persona ${p.name}`}
+                          onClick={() => getState().vhostUse(p.name)}
+                        >
                           Wear
                         </Button>
                       </li>
@@ -781,10 +793,10 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
           </Section>
 
           {/* Danger zone — DROP */}
-          <section class="acct-section acct-danger" aria-label="Danger zone">
+          <section class="acct-section acct-danger" aria-labelledby="acct-delete-account-title" aria-describedby="acct-delete-account-hint">
             <div class="acct-section-head">
-              <h3 class="acct-section-title acct-danger-title">Delete account</h3>
-              <p class="acct-section-hint">
+              <h3 class="acct-section-title acct-danger-title" id="acct-delete-account-title">Delete account</h3>
+              <p class="acct-section-hint" id="acct-delete-account-hint">
                 Permanently deletes <b>{account()}</b>. This cannot be undone.
               </p>
             </div>

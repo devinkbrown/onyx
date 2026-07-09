@@ -87,6 +87,16 @@ describe('Account panel — signed in', () => {
     expect(client.sendRaw).toHaveBeenCalledWith('ACCOUNTINFO');
   });
 
+  it('exposes dense account sections as named regions', () => {
+    renderPanel({ account: 'alice' });
+
+    expect(screen.getByRole('region', { name: 'Account summary' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Email' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Password' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Protection' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Delete account' })).toBeInTheDocument();
+  });
+
   it('renders structured account facts from accountInfo', () => {
     store.setState({
       accountInfo: {
@@ -165,7 +175,7 @@ describe('Account panel — signed in', () => {
     renderPanel({ account: 'alice' });
 
     fireEvent.input(screen.getByLabelText('Nick'), { target: { value: 'alice' } });
-    fireEvent.submit(screen.getByLabelText('Recover a nick'));
+    fireEvent.submit(screen.getByRole('form', { name: 'Recover a nick' }));
     expect(spy).toHaveBeenCalledWith('alice', undefined);
   });
 
@@ -184,6 +194,15 @@ describe('Account panel — signed in', () => {
     renderPanel({ account: 'alice' });
     fireEvent.click(screen.getByTestId('account-signout'));
     expect(spy).toHaveBeenCalled();
+  });
+
+  it('labels persona actions with the persona name', () => {
+    renderPanel({ account: 'alice' });
+    store.setState({
+      personas: [{ name: 'poet', host: 'poets.society/alice', source: 'grant' }],
+    });
+
+    expect(screen.getByRole('button', { name: 'Wear persona poet' })).toBeInTheDocument();
   });
 
   it('surfaces the last action error', () => {

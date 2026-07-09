@@ -67,6 +67,7 @@ const ACCESSIBILITY_TOPICS: readonly AccessibilityTopic[] = [
       'Message search uses a search landmark, labelled match navigation, and named archived/device-memory result lists.',
       'Notification center uses a named inbox dialog, labelled notification list, and row-specific open/dismiss actions.',
       'Channel browser uses a Sheet dialog, named directory search, labelled public-channel list, and target-specific Join/Open actions.',
+      'Account panel groups account management into named regions with alert/status feedback and target-specific persona actions.',
     ],
   },
 ];

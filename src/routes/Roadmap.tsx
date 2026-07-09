@@ -67,8 +67,8 @@ const phases: Phase[] = [
     title: 'Washi',
     state: 'active',
     date: '2026-07-09',
-    summary: 'Accessibility is now a public ledger and an in-client audit surface with dense-panel, Home catch-up, message-search, notification-center, and channel-browser pass evidence.',
-    items: ['Public accessibility ledger', 'Client access audit', 'Motion controls', 'Dense-panel evidence', 'Home access evidence', 'Search access evidence', 'Inbox access evidence', 'Directory access evidence'],
+    summary: 'Accessibility is now a public ledger and an in-client audit surface with dense-panel, Home catch-up, message-search, notification-center, channel-browser, and account-panel pass evidence.',
+    items: ['Public accessibility ledger', 'Client access audit', 'Motion controls', 'Dense-panel evidence', 'Home access evidence', 'Search access evidence', 'Inbox access evidence', 'Directory access evidence', 'Account access evidence'],
   },
 ];
 

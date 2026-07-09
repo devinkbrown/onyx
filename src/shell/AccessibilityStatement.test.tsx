@@ -17,5 +17,6 @@ describe('AccessibilityStatement', () => {
     expect(screen.getByText(/Message search uses a search landmark/i)).toBeInTheDocument();
     expect(screen.getByText(/Notification center uses a named inbox dialog/i)).toBeInTheDocument();
     expect(screen.getByText(/Channel browser uses a Sheet dialog/i)).toBeInTheDocument();
+    expect(screen.getByText(/Account panel groups account management/i)).toBeInTheDocument();
   });
 });
