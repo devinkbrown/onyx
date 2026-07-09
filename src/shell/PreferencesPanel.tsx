@@ -26,6 +26,7 @@ import {
   type PortableTransferSnapshot,
 } from '@/lib/vault/portableTransfer';
 import { localTranslationReadiness, preferredTranslationTarget } from '@/lib/intelligence/localLanguage';
+import { pwaReadiness } from '@/pwa/readiness';
 import { CalmModeControl } from './CalmModeControl';
 import { ProvenanceBadge } from './ProvenanceBadge';
 import {
@@ -519,6 +520,36 @@ function LocalLanguageTools(): JSX.Element {
   );
 }
 
+function PwaReadinessPanel(): JSX.Element {
+  const items = createMemo(() => pwaReadiness());
+
+  return (
+    <section class="pref-group pref-pwa-readiness" aria-labelledby="pref-pwa-readiness-title">
+      <div class="pref-group-head">
+        <h3 id="pref-pwa-readiness-title" class="pref-label">Installed app readiness</h3>
+        <a class="pref-a11y-link" href="/install/">Install guide</a>
+      </div>
+      <p class="pref-desc">
+        Browser PWA and wrapper health on this device. Desktop shells should
+        reuse these same routes, storage, update, and notification contracts.
+      </p>
+      <div class="pref-pwa-readiness__rows" role="list" aria-label="Installed app readiness checks">
+        <For each={items()}>
+          {(item) => (
+            <div class="pref-pwa-readiness__row" role="listitem" data-state={item.state}>
+              <span class="pref-pwa-readiness__status">{item.state}</span>
+              <span class="pref-pwa-readiness__main">
+                <span class="pref-pwa-readiness__title">{item.label}</span>
+                <span class="pref-desc">{item.detail}</span>
+              </span>
+            </div>
+          )}
+        </For>
+      </div>
+    </section>
+  );
+}
+
 function PreferenceSection(props: { title: string; description: string }): JSX.Element {
   return (
     <div class="pref-section">
@@ -662,6 +693,8 @@ export function PreferencesPanel(): JSX.Element {
         />
 
         <PortableVaultControls />
+
+        <PwaReadinessPanel />
 
         <ExtensionAuditControls />
 

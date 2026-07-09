@@ -555,9 +555,54 @@
   font-weight: 650;
 }
 
+.pref-pwa-readiness__rows {
+  display: grid;
+  gap: 6px;
+}
+
+.pref-pwa-readiness__row {
+  display: grid;
+  grid-template-columns: 5.8rem minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--ink) 36%, transparent);
+}
+
+.pref-pwa-readiness__status {
+  color: var(--lapis-bright);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.pref-pwa-readiness__row[data-state='attention'] .pref-pwa-readiness__status {
+  color: var(--gold-bright);
+}
+
+.pref-pwa-readiness__row[data-state='unavailable'] .pref-pwa-readiness__status {
+  color: var(--washi-mute);
+}
+
+.pref-pwa-readiness__main {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.pref-pwa-readiness__title {
+  color: var(--washi);
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
 @media (max-width: 560px) {
   .pref-extension-audit__row,
-  .pref-local-language__row {
+  .pref-local-language__row,
+  .pref-pwa-readiness__row {
     grid-template-columns: 1fr;
   }
 

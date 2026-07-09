@@ -32,6 +32,13 @@ describe('PreferencesPanel', () => {
     expect(screen.getByRole('heading', { name: 'Portable vault' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Export vault' })).toBeInTheDocument();
     expect(screen.getByLabelText('Import portable JSON')).toHaveAttribute('type', 'file');
+    expect(screen.getByRole('heading', { name: 'Installed app readiness' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Install guide' })).toHaveAttribute('href', '/install/');
+    expect(screen.getByRole('list', { name: 'Installed app readiness checks' })).toBeInTheDocument();
+    expect(screen.getByText('App window')).toBeInTheDocument();
+    expect(screen.getByText('Service worker')).toBeInTheDocument();
+    expect(screen.getByText('Notifications')).toBeInTheDocument();
+    expect(screen.getByText('Local state')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Extension action audit' })).toBeInTheDocument();
     expect(screen.getByText('No extension actions recorded on this device.')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Local language tools' })).toBeInTheDocument();

@@ -582,6 +582,11 @@ client or public site needs to expose the result.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — The web manifest now includes
     install screenshots generated from the live app and a launch handler that
     reuses an existing installed window before opening another shell.
+    ✅ **CLIENT + WEBSITE SLICE SHIPPED 2026-07-09** — Preferences now exposes
+    installed-app readiness for the current device: standalone-window state,
+    service-worker control, notification permission, and local storage support.
+    The install page now names that in-app readiness panel as the first wrapper
+    smoke test before desktop or mobile shell release.
 40. **Portable import/export** *(client)* — expose device-safe export/import for
     vault history, room snapshots, account handoff data, and reviewed catch-up
     state where protocol support exists.

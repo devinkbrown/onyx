@@ -153,6 +153,8 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('PWA shortcuts')).toBeInTheDocument();
     expect(screen.getByText('Install screenshots')).toBeInTheDocument();
     expect(screen.getByText('Launch handler')).toBeInTheDocument();
+    expect(screen.getByText('Installed app readiness')).toBeInTheDocument();
+    expect(screen.getByText('Service worker readiness')).toBeInTheDocument();
     expect(screen.getByText('Wrapper readiness matrix')).toBeInTheDocument();
     expect(screen.getByText('Wrapper contract')).toBeInTheDocument();
     expect(screen.getByText('Portable vault export')).toBeInTheDocument();
