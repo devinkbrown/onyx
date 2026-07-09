@@ -2590,7 +2590,7 @@ export const store = createStore<OnyxState>()(
       client.onCapChange = () => {
         // mediaAvailable is NOT a cap: Orochi exposes MEDIA as a plain channel
         // command for any registered member (no advertised media cap), so it is
-        // set on registration (001) / first NOTE MEDIA, not here. Only mirror
+        // set on registration (001) / first media event, not here. Only mirror
         // genuinely cap-gated UI affordances off the negotiated set.
         set({
           canEditMessages: client.negotiatedCaps.has('draft/message-editing'),
@@ -4645,8 +4645,8 @@ export const store = createStore<OnyxState>()(
           return;
         }
         if (standard.command === 'MEDIA') {
-          // `NOTE MEDIA` is NOT a standard reply: it has the shape
-          //   :server NOTE MEDIA <#chan> <verb> [<nick>] [extra...]
+          // Legacy MEDIA service replies used a channel-first param shape:
+          //   <#chan> <verb> [<nick>] [extra...]
           // The standard-reply context/description split mis-attributes the
           // actor when there is no trailing kind (e.g. LEAVE), so parse the raw
           // params directly. params = ['MEDIA', '#chan', verb, nick?, ...extra].
@@ -4656,8 +4656,8 @@ export const store = createStore<OnyxState>()(
           const mediaActor = mediaParams[3] ?? '';
 
           // ── Live captions / transcript replay ──────────────────────────
-          // `:server NOTE MEDIA <#chan> CAPTION <nick> :<text>` (live fan-out)
-          // `:server NOTE MEDIA <#chan> TRANSCRIPT <speaker> :<text>` (replay)
+          // `:server EVENT <me> MEDIA CAPTION <#chan> <nick> :<text>` (live fan-out)
+          // `:server EVENT <me> MEDIA TRANSCRIPT <#chan> <speaker> :<text>` (replay)
           if (mediaVerb === 'CAPTION' || mediaVerb === 'TRANSCRIPT') {
             const capChannel = mediaChannel;
             const capNick = mediaActor;
@@ -4777,10 +4777,9 @@ export const store = createStore<OnyxState>()(
         case 'EVENT': {
           // The server surfaces real-time voice/video presence on the IRCX EVENT
           // plane: `:server EVENT <me> MEDIA <verb> <#chan> <nick> [detail]`.
-          // Re-shape it into the legacy NOTE MEDIA param order and re-dispatch so
-          // the single MEDIA handler processes it unchanged (presence moved off
-          // NOTE → EVENT server-side; per-client replies — MACKEY, ROSTER, STATS,
-          // TRANSPORT, PROFILE — still arrive as NOTE MEDIA).
+          // Re-shape it into the MEDIA service-reply param order and re-dispatch
+          // so the single media handler processes both broadcast state and
+          // caller-targeted replies (MACKEY, ROSTER, STATS, TRANSPORT, PROFILE).
           if ((params[1] ?? '').toUpperCase() === 'MEDIA') {
             get()._handleMessage({
               ...msg,

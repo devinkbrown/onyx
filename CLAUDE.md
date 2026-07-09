@@ -31,7 +31,7 @@ The brand is **Onyx** (formerly Ocean, briefly Ruri — both dead names).
 - Media engine: `src/lib/suimyaku-media/` — Orochi voice/video
   (TsumugiSession ECDH/AES-GCM, MediaEngine, TsumugiGroup, ChunkAssembler,
   PeerRegistry). Default transport: kagura frames over WS; WebRTC is opt-in.
-  Signaling = `MEDIA` subcommands + `NOTE MEDIA` events.
+  Signaling = `MEDIA` subcommands + Event Spine `EVENT ... MEDIA ...` events.
 - Backgrounds: `src/backgrounds/` — animated canvas scenes
 - Uploads: `src/lib/upload/` — multipart POST (field `file`) to
   `${VITE_MEDIA_URL}/upload`; prod default is same-origin `/upload`
@@ -77,7 +77,7 @@ go to dist/, so tests/e2e can never wipe or half-replace production.
 | Orochi account (built-in services) | Onyx account |
 | CHATHISTORY | Message history |
 | IRCX PROP / ACCESS / METADATA | Channel & profile properties |
-| MEDIA subcommands + NOTE MEDIA | Voice/video channel |
+| MEDIA subcommands + Event Spine MEDIA | Voice/video channel |
 
 ## Services (Orochi built-in — NO NickServ pseudo-clients)
 Real server commands with structured replies (NOTE/FAIL/WARN): `REGISTER`,

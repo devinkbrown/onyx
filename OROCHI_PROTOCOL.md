@@ -354,11 +354,13 @@ operator/admin view.)
 
 ---
 
-## 12. Voice / Video / Screen (MEDIA) — Discord-style calls
+## 12. Voice / Video / Screen (MEDIA) — rich channel calls
 
 `MEDIA <subcommand> <#channel> [args]` (feature-gated; control plane only — **media
-bytes never flow over the IRC socket**). You must be a channel member. All replies
-are `NOTE MEDIA …` lines; failures `FAIL MEDIA <CODE>`.
+bytes never flow over the IRC socket**). You must be a channel member. Media
+control replies and call-state notifications arrive as
+`:<server> EVENT <target> MEDIA <verb> <#channel> ...`; failures are
+`FAIL MEDIA <CODE>`.
 
 Subcommands: `JOIN <kind>` · `LEAVE` · `OFFER <codecs> [transport=webrtc]` ·
 `ANSWER <codecs>` · `ROSTER` · `PROFILE` · `STATS` · `MUTE`/`UNMUTE <kind>` ·
@@ -379,8 +381,8 @@ Subcommands: `JOIN <kind>` · `LEAVE` · `OFFER <codecs> [transport=webrtc]` ·
 - **`ACTIVITY <target> <state> [text]`** — presence/activity broadcast (rich presence).
 
 `MEDIA ROSTER`/`SPEAKING`/`MUTE` give you the call roster + live speaking/mute state
-to render a Discord-style voice UI. `OFFER-ACK`/`ANSWER-ACK`/`TRANSPORT`/`NATIVE`
-`NOTE MEDIA` lines carry the negotiated transport + endpoint info.
+to render a rich voice UI. `OFFER-ACK`/`ANSWER-ACK`/`TRANSPORT`/`NATIVE`
+`EVENT ... MEDIA ...` lines carry the negotiated transport + endpoint info.
 
 ---
 
@@ -487,5 +489,5 @@ Orochi is a CRDT **mesh** (not a TS6 tree). What a client sees:
 - [ ] Honor `MODES` (combine modes per line per the advertised value; live = 1).
 - [ ] Map service `FAIL`/`NOTE`/`NOTICE` replies to UI (REGISTER/IDENTIFY/CHANNEL/…).
 - [ ] Voice/video via `MEDIA` (control) + WebRTC RTP leg or native KAGURAVOX/KAGURAVIS WASM
-      codec; render roster/speaking/mute from `NOTE MEDIA`.
+      codec; render roster/speaking/mute from `EVENT ... MEDIA ...`.
 - [ ] Treat `:server NOTE EVENT <CAT> :…` and `EVENT … OBSERVE …` as the oper feed.

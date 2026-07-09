@@ -1,13 +1,9 @@
 /**
  * store.media.test.ts
  *
- * MEDIA (voice/video) presence now arrives on the IRCX EVENT plane
- * (`:server EVENT <me> MEDIA <verb> <#chan> <nick> [detail]`) instead of the old
- * local-only NOTE MEDIA broadcast. The store re-shapes EVENT MEDIA into the
- * NOTE MEDIA param order and routes it through the single media handler, so the
- * call roster updates identically. The legacy NOTE form still works (per-client
- * replies — MACKEY/ROSTER — stay NOTE). On registration the client subscribes
- * via `EVENT ADD MEDIA *`.
+ * MEDIA (voice/video) presence and targeted media replies arrive on the IRCX
+ * EVENT plane (`:server EVENT <me> MEDIA <verb> <#chan> [detail...]`). On
+ * registration the client subscribes via `EVENT ADD MEDIA *`.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -76,12 +72,6 @@ describe('MEDIA presence via the IRCX EVENT plane', () => {
     feed(':eshmaki.me EVENT me MEDIA JOIN #root alice voice');
     feed(':eshmaki.me EVENT me MEDIA LEAVE #root alice');
     expect(callRoster('#root')?.has('alice') ?? false).toBe(false);
-  });
-
-  it('still accepts the legacy NOTE MEDIA presence form (backward compatible)', () => {
-    seedChannel('#root');
-    feed(':eshmaki.me NOTE MEDIA #root JOIN bob voice');
-    expect(callRoster('#root')?.has('bob')).toBe(true);
   });
 
   it('ignores a non-MEDIA EVENT (e.g. a CHANNEL/MEMBER oper feed)', () => {

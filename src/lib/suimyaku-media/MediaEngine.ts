@@ -189,9 +189,9 @@ export class SuimyakuMediaEngine {
   private readonly defaultKind: MediaKind;
 
   // --- WS media plane (browser media over binary WebSocket frames) ----------
-  /** Server-issued per-stream MAC key for the active call. Null until a
-   *  `NOTE MEDIA <#chan> MACKEY <b64>` arrives — i.e. the server opted in
-   *  (`[media].ws_media_relay`). While null, sendFrame stays a no-op. */
+  /** Server-issued per-stream MAC key for the active call. Null until an
+   *  `EVENT <nick> MEDIA MACKEY <#chan> <b64>` arrives — i.e. the server opted
+   *  in (`[media].ws_media_relay`). While null, sendFrame stays a no-op. */
   private wsMediaKey: CryptoKey | null = null;
   private wsMyNick = '';
   private wsAudSeq = 0;
@@ -290,7 +290,7 @@ export class SuimyakuMediaEngine {
     const prev = this.client;
     this.client = client;
     // Move the media-plane subscriptions to the new client (binary datagrams +
-    // NOTE MEDIA MACKEY/JOIN/ROSTER), tolerating repeat calls with the same client.
+    // EVENT MEDIA MACKEY/JOIN/ROSTER), tolerating repeat calls with the same client.
     if (this.boundMediaClient && this.boundMediaClient !== client) {
       this.boundMediaClient.binaryHandlers.delete(this.onMediaDatagramBound);
       this.boundMediaClient.extraMessageHandlers.delete(this.onMediaServerMessageBound);
@@ -914,10 +914,9 @@ export class SuimyakuMediaEngine {
       .catch(() => { /* a MAC failure drops one media frame; loss-tolerant */ });
   }
 
-  /** Observe MEDIA control events to drive the WS media plane. Accepts both the
-   * per-client NOTE MEDIA replies (MACKEY, ROSTER) and the live EVENT MEDIA
-   * presence feed (JOIN …) — presence moved off NOTE onto the IRCX EVENT plane,
-   * which orders fields `<verb> <#chan> <nick>` vs NOTE's `<#chan> <verb> <nick>`. */
+  /** Observe MEDIA control events to drive the WS media plane. EVENT MEDIA orders
+   * fields as `<verb> <#chan> [detail...]`, covering caller-targeted replies
+   * (MACKEY, ROSTER) and live presence feed (JOIN, LEAVE, speaking state). */
   private handleMediaServerMessage(msg: IRCMessage) {
     let channel: string | undefined;
     let verb: string | undefined;

@@ -132,7 +132,7 @@ export interface ISupport {
   /**
    * Deprecated compatibility field — Orochi advertises NO media ISUPPORT token.
    * Voice/video availability is gated by the store's `mediaAvailable` selector
-   * (set on 001 / NOTE MEDIA), not a 005 token. Retained only because a
+   * (set on 001 / MEDIA Event Spine traffic), not a 005 token. Retained only because a
    * non-media feature badge in HomeView still reads it; never set from 005.
    */
   SILENCE: number;     // max silence list entries (0 = not supported)
