@@ -15,7 +15,11 @@ import { Sheet } from '@/primitives';
 import { clearVault } from '@/lib/vault/historyVault';
 import {
   clearClientExtensionAudit,
+  clearClientExtensionActions,
+  exportClientExtensionActionManifest,
+  parseClientExtensionActionManifest,
   readClientExtensionAudit,
+  readClientExtensionActions,
   type ClientExtensionAuditEntry,
 } from '@/lib/extensions/clientActions';
 import { getState } from '@/lib/store';
@@ -496,6 +500,69 @@ function ExtensionAuditControls(): JSX.Element {
   );
 }
 
+function ExtensionActionManifestControls(): JSX.Element {
+  const [actionCount, setActionCount] = createSignal(readClientExtensionActions().length);
+  const [manifestText, setManifestText] = createSignal('');
+  const [status, setStatus] = createSignal('');
+
+  function importManifest(): void {
+    const imported = parseClientExtensionActionManifest(manifestText());
+    if (!imported) {
+      setStatus('Manifest was not valid JSON with an actions array.');
+      return;
+    }
+    setActionCount(imported.length);
+    setStatus(`Imported ${countLabel(imported.length, 'safe action')}.`);
+  }
+
+  function exportManifest(): void {
+    setManifestText(exportClientExtensionActionManifest());
+    setStatus(`Exported ${countLabel(actionCount(), 'safe action')}.`);
+  }
+
+  function clearManifest(): void {
+    clearClientExtensionActions();
+    setActionCount(0);
+    setManifestText('');
+    setStatus('Extension actions cleared on this device.');
+  }
+
+  return (
+    <section class="pref-group pref-extension-actions" aria-labelledby="pref-extension-actions-title">
+      <div class="pref-group-head">
+        <h3 id="pref-extension-actions-title" class="pref-label">Extension actions</h3>
+        <span class="pref-count">{countLabel(actionCount(), 'safe action')}</span>
+      </div>
+      <p class="pref-desc">
+        Import reviewed action manifests for the command palette. Onyx accepts only open-url and copy-text capabilities.
+      </p>
+      <label class="pref-label" for="pref-extension-manifest">Action manifest JSON</label>
+      <textarea
+        id="pref-extension-manifest"
+        class="pref-json-input"
+        rows={5}
+        spellcheck={false}
+        value={manifestText()}
+        onInput={(event) => setManifestText(event.currentTarget.value)}
+      />
+      <div class="pref-import-review__actions">
+        <button type="button" class="pref-reset" onClick={importManifest} disabled={!manifestText().trim()}>
+          Import actions
+        </button>
+        <button type="button" class="pref-reset" onClick={exportManifest}>
+          Export actions
+        </button>
+        <button type="button" class="pref-reset" onClick={clearManifest} disabled={actionCount() === 0}>
+          Clear actions
+        </button>
+      </div>
+      <Show when={status()}>
+        <p class="pref-status" role="status">{status()}</p>
+      </Show>
+    </section>
+  );
+}
+
 function LocalLanguageTools(): JSX.Element {
   const targetLanguage = createMemo(() => preferredTranslationTarget());
   const translation = createMemo(() => localTranslationReadiness(targetLanguage()));
@@ -753,6 +820,8 @@ export function PreferencesPanel(): JSX.Element {
         <PortableVaultControls />
 
         <PwaReadinessPanel />
+
+        <ExtensionActionManifestControls />
 
         <ExtensionAuditControls />
 

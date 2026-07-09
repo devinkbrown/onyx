@@ -110,6 +110,50 @@ export function readClientExtensionActions(): ClientExtensionAction[] {
   }
 }
 
+export function saveClientExtensionActions(rawActions: unknown[]): ClientExtensionAction[] {
+  const seen = new Set<string>();
+  const actions: ClientExtensionAction[] = [];
+  for (const entry of rawActions) {
+    const action = normalizeClientExtensionAction(entry);
+    if (!action || seen.has(action.id)) continue;
+    seen.add(action.id);
+    actions.push(action);
+    if (actions.length >= MAX_ACTIONS) break;
+  }
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(actions));
+  } catch {
+    /* storage unavailable */
+  }
+  return actions;
+}
+
+export function parseClientExtensionActionManifest(raw: string): ClientExtensionAction[] | null {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    const source = Array.isArray(parsed)
+      ? parsed
+      : parsed && typeof parsed === 'object' && Array.isArray((parsed as { actions?: unknown }).actions)
+        ? (parsed as { actions: unknown[] }).actions
+        : null;
+    return source ? saveClientExtensionActions(source) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function exportClientExtensionActionManifest(): string {
+  return JSON.stringify({ version: 1, actions: readClientExtensionActions() }, null, 2);
+}
+
+export function clearClientExtensionActions(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 function auditDetail(action: ClientExtensionAction): string {
   if (action.capability === 'open-url' && action.url) {
     try {

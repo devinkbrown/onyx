@@ -105,10 +105,10 @@ const phases: Phase[] = [
   {
     phase: 'Phase 12',
     title: 'Apps',
-    state: 'planned',
-    date: 'planned',
-    summary: 'Prepare the client and site for structured integrations: Block-Kit-lite rendering, safe message controls, a constrained extension surface, and migration/importer paths.',
-    items: ['Block-Kit-lite renderer', 'Block-Kit-lite message controls', 'Safe value-copy controls', 'No command execution', 'Client extension surface', 'Capability-scoped extension actions', 'Importer path', 'Reviewed portable import', 'Incoming webhook migration', 'Server snapshot imports', 'IRC-log-to-vault import', 'Bridge status surface', 'Integrations page'],
+    state: 'active',
+    date: '2026-07-09',
+    summary: 'Prepare the client and site for structured integrations: Block-Kit-lite rendering, safe message controls, reviewed extension action manifests, a constrained extension surface, and migration/importer paths.',
+    items: ['Block-Kit-lite renderer', 'Block-Kit-lite message controls', 'Safe value-copy controls', 'No command execution', 'Client extension surface', 'Capability-scoped extension actions', 'Extension action manifest import', 'Extension action manifest export', 'Importer path', 'Reviewed portable import', 'Incoming webhook migration', 'Server snapshot imports', 'IRC-log-to-vault import', 'Bridge status surface', 'Integrations page'],
   },
   {
     phase: 'Phase 13',

@@ -131,6 +131,8 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Safe value-copy controls')).toBeInTheDocument();
     expect(screen.getByText('No command execution')).toBeInTheDocument();
     expect(screen.getByText('Capability-scoped extension actions')).toBeInTheDocument();
+    expect(screen.getByText('Extension action manifest import')).toBeInTheDocument();
+    expect(screen.getByText('Extension action manifest export')).toBeInTheDocument();
     expect(screen.getByText('Reviewed portable import')).toBeInTheDocument();
     expect(screen.getByText('Server snapshot imports')).toBeInTheDocument();
     expect(screen.getByText('IRC-log-to-vault import')).toBeInTheDocument();

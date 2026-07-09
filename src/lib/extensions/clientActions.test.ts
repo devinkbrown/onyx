@@ -1,10 +1,14 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   clearClientExtensionAudit,
+  clearClientExtensionActions,
+  exportClientExtensionActionManifest,
   normalizeClientExtensionAction,
+  parseClientExtensionActionManifest,
   readClientExtensionAudit,
   readClientExtensionActions,
   recordClientExtensionActionRun,
+  saveClientExtensionActions,
   writeClientExtensionActionsForTests,
 } from './clientActions';
 
@@ -54,6 +58,35 @@ describe('client extension actions', () => {
       capability: 'copy-text',
       text: 'main',
     });
+  });
+
+  it('imports, exports, and clears reviewed extension action manifests', () => {
+    const imported = parseClientExtensionActionManifest(JSON.stringify({
+      version: 1,
+      actions: [
+        { id: 'open.status', title: 'Open status', capability: 'open-url', url: '/status/', keywords: ['status'] },
+        { id: 'copy.room', title: 'Copy room', capability: 'copy-text', text: '#root' },
+        { id: 'bad', title: 'Run script', capability: 'open-url', url: 'javascript:alert(1)' },
+      ],
+    }));
+
+    expect(imported).toHaveLength(2);
+    expect(readClientExtensionActions().map((action) => action.id)).toEqual(['open.status', 'copy.room']);
+    expect(exportClientExtensionActionManifest()).toContain('"actions"');
+
+    clearClientExtensionActions();
+    expect(readClientExtensionActions()).toEqual([]);
+  });
+
+  it('saves only normalized manifest entries', () => {
+    const saved = saveClientExtensionActions([
+      { id: 'copy.branch', title: 'Copy branch', capability: 'copy-text', text: 'main' },
+      { id: 'copy.branch', title: 'Duplicate', capability: 'copy-text', text: 'dupe' },
+      { id: 'bad', title: 'Bad', capability: 'raw-js' },
+    ]);
+
+    expect(saved).toHaveLength(1);
+    expect(readClientExtensionActions()[0]).toMatchObject({ id: 'copy.branch', text: 'main' });
   });
 
   it('records bounded payload-safe action audit entries', () => {

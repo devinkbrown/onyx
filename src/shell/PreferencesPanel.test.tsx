@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { recordClientExtensionActionRun } from '@/lib/extensions/clientActions';
+import { readClientExtensionActions, recordClientExtensionActionRun } from '@/lib/extensions/clientActions';
 import { closePreferences, openPreferences, resetPreferences } from '@/lib/prefs/preferences';
 import { sceneMotion, setSceneMotion } from '@/lib/prefs/sceneMotion';
 import { store } from '@/lib/store/store';
@@ -47,6 +47,8 @@ describe('PreferencesPanel', () => {
     expect(screen.getByText('Notifications')).toBeInTheDocument();
     expect(screen.getByText('Local state')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Extension action audit' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Extension actions' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Action manifest JSON')).toBeInTheDocument();
     expect(screen.getByText('No extension actions recorded on this device.')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Local language tools' })).toBeInTheDocument();
     expect(screen.getByLabelText(/Local language tools provenance: This device/i)).toBeInTheDocument();
@@ -236,6 +238,31 @@ describe('PreferencesPanel', () => {
 
     expect(screen.queryByRole('list', { name: 'Recent extension actions' })).not.toBeInTheDocument();
     expect(screen.getByText('No extension actions recorded on this device.')).toBeInTheDocument();
+  });
+
+  it('imports reviewed extension action manifests into the command palette store', () => {
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    fireEvent.input(screen.getByLabelText('Action manifest JSON'), {
+      target: {
+        value: JSON.stringify({
+          version: 1,
+          actions: [
+            { id: 'open.status', title: 'Open status', capability: 'open-url', url: '/status/' },
+            { id: 'copy.room', title: 'Copy room', capability: 'copy-text', text: '#root' },
+            { id: 'bad', title: 'Bad', capability: 'open-url', url: 'javascript:alert(1)' },
+          ],
+        }),
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Import actions' }));
+
+    expect(screen.getByText('Imported 2 safe actions.')).toBeInTheDocument();
+    expect(readClientExtensionActions().map((action) => action.id)).toEqual(['open.status', 'copy.room']);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear actions' }));
+    expect(readClientExtensionActions()).toEqual([]);
   });
 
   it('resets background motion with the rest of preferences', () => {

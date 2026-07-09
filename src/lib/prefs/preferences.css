@@ -520,6 +520,29 @@
   color: var(--lapis-bright);
 }
 
+.pref-count {
+  color: var(--washi-mute);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+}
+
+.pref-json-input {
+  width: 100%;
+  min-height: 118px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--ink) 62%, transparent);
+  color: var(--washi);
+  font: 0.74rem/1.45 var(--font-mono);
+  padding: var(--space-3);
+}
+
+.pref-json-input:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
 .pref-audit-clear {
   appearance: none;
   padding: 0;
