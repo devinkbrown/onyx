@@ -369,6 +369,11 @@ export function HomeView(): JSX.Element {
             Pick a hall below, or press <b>/</b> to search rooms, people and commands —{' '}
             <b>⌘K</b> opens the palette, <b>?</b> shows every shortcut.
           </p>
+          <Show when={connectionStatus() !== 'connected'}>
+            <p class="home-offline-note" role="status">
+              Local-memory mode: remembered rooms, reviewed spans, drafts, and queued sends stay available until reconnect.
+            </p>
+          </Show>
         </header>
 
         <Show when={connectionStatus() === 'connected' && hasRooms()}>

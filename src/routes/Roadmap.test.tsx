@@ -113,6 +113,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getAllByText('Active-target vault search').length).toBeGreaterThan(0);
     expect(screen.getByText('Offline reviewed recall')).toBeInTheDocument();
     expect(screen.getByText('Offline search gating')).toBeInTheDocument();
+    expect(screen.getByText('Local-memory mode status')).toBeInTheDocument();
     expect(screen.getByText('Installable manifest')).toBeInTheDocument();
     expect(screen.getByText('PWA shortcuts')).toBeInTheDocument();
     expect(screen.getByText('Wrapper readiness matrix')).toBeInTheDocument();

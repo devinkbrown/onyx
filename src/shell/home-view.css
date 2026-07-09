@@ -44,6 +44,19 @@
   border-radius: 5px;
   background: var(--stone);
 }
+.home-offline-note {
+  width: fit-content;
+  max-width: 62ch;
+  margin: 14px 0 0;
+  padding: 8px 11px;
+  border: 1px solid color-mix(in oklab, var(--gold) 34%, var(--line));
+  border-left: 2px solid var(--gold);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--gold) 9%, var(--stone));
+  color: var(--washi-dim);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
 
 /* Pulse strip */
 .home-events {

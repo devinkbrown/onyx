@@ -1070,6 +1070,7 @@ describe('AppShell', () => {
 
       render(() => <AppShell />);
 
+      expect(screen.getByRole('status')).toHaveTextContent('Local-memory mode');
       const reviewHistory = await screen.findByLabelText('Recent catch-up reviews');
       expect(within(reviewHistory).getByText('Reviewed recently')).toBeInTheDocument();
       expect(within(reviewHistory).getByText('offline recall')).toBeInTheDocument();

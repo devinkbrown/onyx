@@ -504,6 +504,9 @@ client or public site needs to expose the result.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Message search now treats
     full-history server search as connected-only while preserving local buffer
     and vault search during disconnection.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home now shows a local-memory mode
+    status while disconnected so offline reading, reviewed spans, drafts, and
+    queued sends are presented as deliberate behavior.
 39. **PWA and desktop packaging path** *(client + main site)* — make install,
     update, notification, and wrapped push behavior explicit for browser PWA,
     desktop shell, and future mobile wrappers.
