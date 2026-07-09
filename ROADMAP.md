@@ -462,6 +462,11 @@ client or public site needs to expose the result.
     `[onyx:block]` JSON payload lines, sanitizes and clamps the schema, renders
     compact fields, selects, safe links, and disabled command buttons, and leaves
     malformed payloads as readable text fallback for classic clients.
+    ✅ **CLIENT + WEBSITE SLICE SHIPPED 2026-07-09** — Block-Kit message
+    controls now keep the safe split explicit: URL buttons open sanitized
+    links, value buttons copy their bounded value with live feedback, and
+    command-like payloads still do not execute. The public integrations page
+    now documents structured controls as safe link/copy affordances.
 32. **Client extension surface** *(client)* — prepare a capability-scoped,
     UI-safe extension surface for first-party plugins, starting with command
     palette actions and message/room cards.

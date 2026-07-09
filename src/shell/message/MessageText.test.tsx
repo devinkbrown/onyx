@@ -1,9 +1,15 @@
-import { render, screen } from '@solidjs/testing-library';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
+import { describe, expect, it, vi } from 'vitest';
 import { MessageText } from './MessageText';
 
 describe('MessageText Block-Kit-lite', () => {
-  it('renders structured webhook controls and hides the protocol payload line', () => {
+  it('renders structured webhook controls and hides the protocol payload line', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
     render(() => (
       <MessageText
         text={[
@@ -21,6 +27,14 @@ describe('MessageText Block-Kit-lite', () => {
     expect(screen.getByText('Onyx')).toBeInTheDocument();
     expect(screen.getByLabelText('Environment')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open build' })).toHaveAttribute('href', 'https://example.test/build');
-    expect(screen.getByRole('button', { name: 'Approve' })).toBeDisabled();
+    expect(screen.getByText('Safe controls only: links open, values copy, commands do not run.')).toBeInTheDocument();
+
+    const approve = screen.getByRole('button', { name: 'Copy value for Approve' });
+    expect(approve).not.toBeDisabled();
+
+    fireEvent.click(approve);
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('approve'));
+    expect(screen.getByRole('button', { name: 'Copy value for Approve' })).toHaveTextContent('Copied');
   });
 });

@@ -118,6 +118,8 @@ describe('RoadmapRoute', () => {
     expect(screen.getByRole('heading', { name: 'Apps' })).toBeInTheDocument();
     expect(screen.getByText('Block-Kit-lite renderer')).toBeInTheDocument();
     expect(screen.getByText('Block-Kit-lite message controls')).toBeInTheDocument();
+    expect(screen.getByText('Safe value-copy controls')).toBeInTheDocument();
+    expect(screen.getByText('No command execution')).toBeInTheDocument();
     expect(screen.getByText('Capability-scoped extension actions')).toBeInTheDocument();
     expect(screen.getByText('Reviewed portable import')).toBeInTheDocument();
     expect(screen.getByText('Server snapshot imports')).toBeInTheDocument();

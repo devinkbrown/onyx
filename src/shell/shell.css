@@ -4699,6 +4699,7 @@
   color: var(--washi);
   font: 700 0.74rem var(--font-mono);
   text-decoration: none;
+  cursor: pointer;
 }
 
 .shell-msg-blockkit-actions button:disabled {
@@ -4706,10 +4707,24 @@
   opacity: 0.62;
 }
 
+.shell-msg-blockkit-actions button[data-copied='true'] {
+  border-color: color-mix(in oklab, var(--ok) 62%, var(--line));
+  background: color-mix(in oklab, var(--ok) 18%, var(--stone));
+  color: var(--washi);
+}
+
 .shell-msg-blockkit-actions a:hover,
-.shell-msg-blockkit-actions a:focus-visible {
+.shell-msg-blockkit-actions a:focus-visible,
+.shell-msg-blockkit-actions button:not(:disabled):hover,
+.shell-msg-blockkit-actions button:not(:disabled):focus-visible {
   border-color: color-mix(in oklab, var(--lapis-bright) 64%, var(--line));
   color: var(--lapis-bright);
+}
+
+.shell-msg-blockkit-hint {
+  color: var(--washi-mute);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
 }
 
 @media (prefers-reduced-motion: reduce) {

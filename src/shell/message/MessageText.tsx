@@ -31,7 +31,7 @@ import { preferences } from '@/lib/prefs/preferences';
 import { pickPreviewUrl, fetchLinkPreview } from '@/lib/preview/linkPreview';
 import { parseMessage } from '@/lib/format/parseMessage';
 import { lookupEmoji } from '@/lib/format/emoji';
-import { extractBlockKitLite, type BlockKitLiteBlock } from '@/lib/integrations/blockKitLite';
+import { extractBlockKitLite, type BlockKitLiteBlock, type BlockKitLiteButton } from '@/lib/integrations/blockKitLite';
 import type {
   Token,
   InlineToken,
@@ -126,6 +126,46 @@ type BlockKitLiteViewProps = {
   block: BlockKitLiteBlock;
 };
 
+function BlockKitLiteButtonView(props: { button: BlockKitLiteButton }): JSX.Element {
+  const [local] = splitProps(props, ['button']);
+  const [copied, setCopied] = createSignal(false);
+
+  async function copyValue(): Promise<void> {
+    if (!local.button.value) return;
+    try {
+      await navigator.clipboard?.writeText(local.button.value);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <Show
+      when={local.button.url}
+      fallback={(
+        <button
+          type="button"
+          disabled={!local.button.value}
+          title={local.button.value ? `Copy ${local.button.value}` : undefined}
+          aria-label={local.button.value ? `Copy value for ${local.button.label}` : local.button.label}
+          data-copied={copied() ? 'true' : undefined}
+          onClick={() => void copyValue()}
+        >
+          {copied() ? 'Copied' : local.button.label}
+        </button>
+      )}
+    >
+      {(url) => (
+        <a href={url()} target="_blank" rel="noopener noreferrer">
+          {local.button.label}
+        </a>
+      )}
+    </Show>
+  );
+}
+
 function BlockKitLiteView(props: BlockKitLiteViewProps): JSX.Element {
   const [local] = splitProps(props, ['block']);
 
@@ -168,20 +208,12 @@ function BlockKitLiteView(props: BlockKitLiteViewProps): JSX.Element {
       <Show when={local.block.buttons.length > 0}>
         <div class="shell-msg-blockkit-actions">
           <For each={local.block.buttons}>
-            {(button) => (
-              <Show
-                when={button.url}
-                fallback={<button type="button" disabled title={button.value ?? undefined}>{button.label}</button>}
-              >
-                {(url) => (
-                  <a href={url()} target="_blank" rel="noopener noreferrer">
-                    {button.label}
-                  </a>
-                )}
-              </Show>
-            )}
+            {(button) => <BlockKitLiteButtonView button={button} />}
           </For>
         </div>
+        <span class="shell-msg-blockkit-hint" aria-live="polite">
+          Safe controls only: links open, values copy, commands do not run.
+        </span>
       </Show>
     </div>
   );
