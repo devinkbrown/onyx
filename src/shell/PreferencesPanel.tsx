@@ -10,9 +10,9 @@
  * SOLID IDIOMS: component runs once; never destructure props; For/Show; createMemo.
  */
 
-import { For, type JSX } from 'solid-js';
+import { createSignal, For, Show, type JSX } from 'solid-js';
 import { Sheet } from '@/primitives';
-import { clearVault } from '@/lib/vault/historyVault';
+import { clearVault, exportVault, importVault, parseVaultExport } from '@/lib/vault/historyVault';
 import { CalmModeControl } from './CalmModeControl';
 import {
   SCENE_MOTIONS,
@@ -265,6 +265,80 @@ function AccessibilityAuditLedger(): JSX.Element {
   );
 }
 
+function PortableVaultControls(): JSX.Element {
+  const [status, setStatus] = createSignal<string | null>(null);
+  const [busy, setBusy] = createSignal(false);
+
+  async function handleExport(): Promise<void> {
+    setBusy(true);
+    try {
+      const snapshot = await exportVault();
+      const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `onyx-vault-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      const messageCount = snapshot.targets.reduce((sum, target) => sum + target.messages.length, 0);
+      setStatus(`Exported ${messageCount} messages across ${snapshot.targets.length} targets.`);
+    } catch {
+      setStatus('Export failed. Try again after closing private browsing or freeing storage.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleImport(event: Event): Promise<void> {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+    input.value = '';
+    if (!file) return;
+    setBusy(true);
+    try {
+      const parsed = parseVaultExport(JSON.parse(await file.text()));
+      if (!parsed) {
+        setStatus('Import rejected. Choose an Onyx portable vault JSON file.');
+        return;
+      }
+      const result = await importVault(parsed);
+      setStatus(`Imported ${result.messages} messages across ${result.targets} targets.`);
+    } catch {
+      setStatus('Import failed. Choose a readable Onyx portable vault JSON file.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section class="pref-group pref-vault-portable" aria-labelledby="pref-vault-portable-title">
+      <div class="pref-group-head">
+        <h3 id="pref-vault-portable-title" class="pref-label">Portable vault</h3>
+      </div>
+      <p class="pref-desc">
+        Export or merge this device's local history; encrypted DM plaintext is not included.
+      </p>
+      <div class="pref-vault-actions">
+        <button type="button" class="pref-reset" disabled={busy()} onClick={() => void handleExport()}>
+          Export vault
+        </button>
+        <label class="pref-file">
+          <span>Import vault JSON</span>
+          <input
+            type="file"
+            accept="application/json,.json"
+            disabled={busy()}
+            onChange={(event) => void handleImport(event)}
+          />
+        </label>
+      </div>
+      <Show when={status()}>
+        <p class="pref-status" role="status">{status()}</p>
+      </Show>
+    </section>
+  );
+}
+
 export function PreferencesPanel(): JSX.Element {
   return (
     <Sheet
@@ -355,6 +429,8 @@ export function PreferencesPanel(): JSX.Element {
           value={() => preferences().e2eeDms}
           onToggle={(value) => setPreference('e2eeDms', value)}
         />
+
+        <PortableVaultControls />
 
         <Segmented
           legend="Background motion"

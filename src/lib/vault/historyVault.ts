@@ -24,6 +24,20 @@ export const OUTBOX_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 type StoredMessage = Omit<ChatMessage, 'time'> & { time: number; target_key: string };
 
+export interface VaultExportTarget {
+  /** Lowercase conversation key stored in this device vault. */
+  target: string;
+  /** Chronological, vault-safe messages for the target. */
+  messages: ChatMessage[];
+}
+
+export interface VaultExportSnapshot {
+  kind: 'onyx-vault';
+  version: 1;
+  exportedAt: string;
+  targets: VaultExportTarget[];
+}
+
 export interface OutboxEntry {
   /** Stable id; the buffer's pending placeholder reuses it as `outbox:<id>`. */
   id: string;
@@ -162,6 +176,159 @@ export async function loadAround(target: string, at: Date, limit = 50): Promise<
   } catch {
     return [];
   }
+}
+
+/** Export every locally remembered target as a portable, device-safe JSON shape. */
+export async function exportVault(): Promise<VaultExportSnapshot> {
+  const db = await openVault();
+  const snapshot: VaultExportSnapshot = {
+    kind: 'onyx-vault',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    targets: [],
+  };
+  if (!db) return snapshot;
+
+  try {
+    const tx = db.transaction(STORE, 'readonly');
+    const store = tx.objectStore(STORE);
+    const rows = await new Promise<StoredMessage[]>((resolve) => {
+      const req = store.getAll();
+      req.onsuccess = () => resolve((req.result ?? []) as StoredMessage[]);
+      req.onerror = () => resolve([]);
+    });
+    const grouped = new Map<string, StoredMessage[]>();
+    for (const row of rows) {
+      const target = row.target_key || row.target.toLowerCase();
+      const group = grouped.get(target) ?? [];
+      group.push(row);
+      grouped.set(target, group);
+    }
+    snapshot.targets = [...grouped.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([target, messages]) => ({
+        target,
+        messages: messages
+          .slice()
+          .sort((a, b) => a.time - b.time)
+          .map(deserializeMessage),
+      }));
+    return snapshot;
+  } catch {
+    return snapshot;
+  }
+}
+
+/** Merge a validated portable vault snapshot into the local IndexedDB vault. */
+export async function importVault(snapshot: VaultExportSnapshot): Promise<{ targets: number; messages: number }> {
+  let targetCount = 0;
+  let messageCount = 0;
+  for (const entry of snapshot.targets) {
+    if (entry.messages.length === 0) continue;
+    await saveMessages(entry.target, entry.messages);
+    targetCount += 1;
+    messageCount += entry.messages.length;
+  }
+  return { targets: targetCount, messages: messageCount };
+}
+
+const MESSAGE_TYPES = new Set([
+  'msg',
+  'action',
+  'notice',
+  'join',
+  'part',
+  'quit',
+  'kick',
+  'mode',
+  'topic',
+  'nick',
+  'system',
+  'error',
+  'whisper',
+]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function reviveExportMessage(raw: unknown, fallbackTarget: string): ChatMessage | null {
+  if (!isRecord(raw)) return null;
+  const id = raw.id;
+  const from = raw.from;
+  const text = raw.text;
+  const type = raw.type;
+  const target = typeof raw.target === 'string' && raw.target.trim() ? raw.target : fallbackTarget;
+  if (
+    typeof id !== 'string' ||
+    typeof from !== 'string' ||
+    typeof text !== 'string' ||
+    typeof type !== 'string' ||
+    !MESSAGE_TYPES.has(type) ||
+    !target.trim()
+  ) {
+    return null;
+  }
+
+  const rawTime = raw.time;
+  const time = rawTime instanceof Date ? rawTime : new Date(typeof rawTime === 'number' || typeof rawTime === 'string' ? rawTime : NaN);
+  if (Number.isNaN(time.getTime())) return null;
+
+  const message: ChatMessage = {
+    id,
+    time,
+    from,
+    text,
+    type: type as ChatMessage['type'],
+    target,
+  };
+  if (typeof raw.highlight === 'boolean') message.highlight = raw.highlight;
+  if (typeof raw.topic === 'string' || raw.topic === null) message.topic = raw.topic;
+  if (typeof raw.edited === 'boolean') message.edited = raw.edited;
+  if (typeof raw.deleted === 'boolean') message.deleted = raw.deleted;
+  if (typeof raw.redacted === 'boolean') message.redacted = raw.redacted;
+  if (typeof raw.pending === 'boolean') message.pending = raw.pending;
+  if (typeof raw.encrypted === 'boolean') message.encrypted = raw.encrypted;
+  if (Array.isArray(raw.reactions)) {
+    message.reactions = raw.reactions
+      .filter(isRecord)
+      .map((reaction) => ({
+        emoji: typeof reaction.emoji === 'string' ? reaction.emoji : '',
+        users: Array.isArray(reaction.users) ? reaction.users.filter((user): user is string => typeof user === 'string') : [],
+      }))
+      .filter((reaction) => reaction.emoji.length > 0);
+  }
+  if (isRecord(raw.replyTo) && typeof raw.replyTo.id === 'string' && typeof raw.replyTo.from === 'string' && typeof raw.replyTo.text === 'string') {
+    message.replyTo = { id: raw.replyTo.id, from: raw.replyTo.from, text: raw.replyTo.text };
+  }
+  return message;
+}
+
+/** Validate and normalize unknown JSON before it can be imported into the vault. */
+export function parseVaultExport(raw: unknown): VaultExportSnapshot | null {
+  if (!isRecord(raw) || raw.kind !== 'onyx-vault' || raw.version !== 1 || !Array.isArray(raw.targets)) {
+    return null;
+  }
+  const exportedAt = typeof raw.exportedAt === 'string' && !Number.isNaN(Date.parse(raw.exportedAt))
+    ? raw.exportedAt
+    : new Date().toISOString();
+  const targets: VaultExportTarget[] = [];
+  for (const targetRaw of raw.targets) {
+    if (!isRecord(targetRaw) || typeof targetRaw.target !== 'string' || !targetRaw.target.trim() || !Array.isArray(targetRaw.messages)) {
+      continue;
+    }
+    const target = targetRaw.target.toLowerCase();
+    const messages = targetRaw.messages
+      .map((message) => reviveExportMessage(message, target))
+      .filter((message): message is ChatMessage => message !== null);
+    targets.push({ target, messages });
+  }
+  return {
+    kind: 'onyx-vault',
+    version: 1,
+    exportedAt,
+    targets,
+  };
 }
 
 async function pruneTarget(db: IDBDatabase, key: string): Promise<void> {

@@ -123,8 +123,8 @@ const phases: Phase[] = [
     title: 'Roaming',
     state: 'active',
     date: '2026-07-09',
-    summary: 'Generalize offline-first behavior into read, compose, search, PWA install clarity, moderation drafts, desktop packaging, and portable import/export.',
-    items: ['TravelTo vault fallback', 'Active-target vault search', 'Immediate vault-result navigation', 'Installable manifest', 'PWA shortcuts', 'Full offline-first UX', 'Desktop packaging path', 'Portable import/export'],
+    summary: 'Generalize offline-first behavior into read, compose, search, PWA install clarity, moderation drafts, desktop packaging, and portable vault transfer.',
+    items: ['TravelTo vault fallback', 'Active-target vault search', 'Immediate vault-result navigation', 'Installable manifest', 'PWA shortcuts', 'Portable vault export', 'Portable vault import', 'Full offline-first UX', 'Desktop packaging path'],
   },
 ];
 

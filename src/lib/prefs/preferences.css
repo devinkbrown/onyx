@@ -249,6 +249,51 @@
   outline-offset: 2px;
 }
 
+.pref-reset:disabled,
+.pref-file:has(input:disabled) {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.pref-vault-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.pref-file {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  color: var(--washi-dim);
+  font-size: 0.8rem;
+}
+
+.pref-file input {
+  max-width: 13rem;
+  min-width: 0;
+  color: var(--washi-mute);
+  font: inherit;
+  font-size: 0.72rem;
+}
+
+.pref-file:focus-within {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.pref-status {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.35;
+  color: var(--lapis-bright);
+}
+
 /* ── Client accessibility audit ledger ─────────────────────────────────────── */
 
 .pref-a11y-link {

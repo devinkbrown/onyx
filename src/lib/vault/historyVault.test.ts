@@ -14,9 +14,12 @@ import {
   clearVault,
   deleteOutboxEntry,
   deserializeMessage,
+  exportVault,
+  importVault,
   loadAround,
   loadOutbox,
   loadRecent,
+  parseVaultExport,
   queueOutbox,
   saveMessages,
   searchVault,
@@ -174,6 +177,57 @@ describe('historyVault', () => {
 
     it('returns [] for a blank query', async () => {
       expect(await searchVault('   ')).toEqual([]);
+    });
+  });
+
+  describe('portable vault import/export', () => {
+    it('exports every target chronologically without decrypted DM plaintext', async () => {
+      await saveMessages('#Alpha', [
+        msg('a2', 2000, { target: '#Alpha', text: 'second' }),
+        msg('a1', 1000, { target: '#Alpha', text: 'first' }),
+      ]);
+      await saveMessages('Trev', [
+        msg('d1', 1500, {
+          target: 'Trev',
+          encrypted: true,
+          text: 'tsumugi.ciphertext',
+          plaintext: 'never store this',
+        }),
+      ]);
+
+      const snapshot = await exportVault();
+
+      expect(snapshot.kind).toBe('onyx-vault');
+      expect(snapshot.version).toBe(1);
+      expect(snapshot.targets.map((entry) => entry.target)).toEqual(['#alpha', 'trev']);
+      expect(snapshot.targets[0]!.messages.map((m) => m.id)).toEqual(['a1', 'a2']);
+      expect(snapshot.targets[1]!.messages[0]).toMatchObject({
+        id: 'd1',
+        encrypted: true,
+        text: 'tsumugi.ciphertext',
+      });
+      expect('plaintext' in snapshot.targets[1]!.messages[0]!).toBe(false);
+    });
+
+    it('imports a validated JSON round trip into the local vault', async () => {
+      await saveMessages('#Alpha', [msg('a1', 1000, { target: '#Alpha' })]);
+      await saveMessages('Trev', [msg('d1', 2000, { target: 'Trev' })]);
+      const exported = await exportVault();
+      const parsed = parseVaultExport(JSON.parse(JSON.stringify(exported)));
+
+      await clearVault();
+      expect(parsed).not.toBeNull();
+      const result = await importVault(parsed!);
+
+      expect(result).toEqual({ targets: 2, messages: 2 });
+      expect((await loadRecent('#alpha')).map((m) => m.id)).toEqual(['a1']);
+      expect((await loadRecent('trev')).map((m) => m.id)).toEqual(['d1']);
+    });
+
+    it('rejects unknown portable vault documents', () => {
+      expect(parseVaultExport({ kind: 'not-onyx', version: 1, targets: [] })).toBeNull();
+      expect(parseVaultExport({ kind: 'onyx-vault', version: 2, targets: [] })).toBeNull();
+      expect(parseVaultExport({ kind: 'onyx-vault', version: 1, targets: 'nope' })).toBeNull();
     });
   });
 

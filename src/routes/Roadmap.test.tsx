@@ -96,6 +96,8 @@ describe('RoadmapRoute', () => {
     expect(screen.getAllByText('Active-target vault search').length).toBeGreaterThan(0);
     expect(screen.getByText('Installable manifest')).toBeInTheDocument();
     expect(screen.getByText('PWA shortcuts')).toBeInTheDocument();
+    expect(screen.getByText('Portable vault export')).toBeInTheDocument();
+    expect(screen.getByText('Portable vault import')).toBeInTheDocument();
     expect(screen.getByText(/time is active/i)).toBeInTheDocument();
     expect(screen.getByText('complete phases').closest('.data-metric')).toHaveTextContent('4');
     expect(screen.getByRole('heading', { name: 'Washi' })).toBeInTheDocument();
