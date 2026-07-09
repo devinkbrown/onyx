@@ -103,6 +103,11 @@ const ACCESS_AUDIT_ROWS = [
     note: 'Named account-management regions, alert/status feedback, and target-specific persona actions.',
   },
   {
+    surface: 'Channel sidebar',
+    status: 'checked',
+    note: 'Complementary navigation landmark, roving channel/DM rows, unread/mention names, and target-specific join action.',
+  },
+  {
     surface: 'Modals',
     status: 'checked',
     note: 'Sheet focus trap, Escape close, labelled close buttons.',

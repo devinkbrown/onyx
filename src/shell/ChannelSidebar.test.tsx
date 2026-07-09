@@ -113,6 +113,18 @@ describe('ChannelSidebar accessibility', () => {
     expect(bravo.getAttribute('aria-label')).toBe('#bravo, 3 unread, 2 mentions');
   });
 
+  it('labels the join action with the target channel', () => {
+    seed();
+
+    const { getByLabelText, getByRole } = render(() => <ChannelSidebar />);
+
+    fireEvent.input(getByLabelText('Channel name to join'), {
+      target: { value: 'harbor' },
+    });
+
+    expect(getByRole('button', { name: 'Join #harbor' })).toBeInTheDocument();
+  });
+
   it('moves focus down with ArrowDown', () => {
     // Arrange — rows are: Status, #alpha, #bravo, #charlie, dave
     seed();

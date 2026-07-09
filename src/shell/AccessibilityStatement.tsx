@@ -68,6 +68,7 @@ const ACCESSIBILITY_TOPICS: readonly AccessibilityTopic[] = [
       'Notification center uses a named inbox dialog, labelled notification list, and row-specific open/dismiss actions.',
       'Channel browser uses a Sheet dialog, named directory search, labelled public-channel list, and target-specific Join/Open actions.',
       'Account panel groups account management into named regions with alert/status feedback and target-specific persona actions.',
+      'Channel sidebar uses a complementary navigation landmark, roving channel and DM rows, unread/mention names, and a target-specific join action.',
     ],
   },
 ];

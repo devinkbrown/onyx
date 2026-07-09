@@ -41,6 +41,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Inbox access evidence')).toBeInTheDocument();
     expect(screen.getByText('Directory access evidence')).toBeInTheDocument();
     expect(screen.getByText('Account access evidence')).toBeInTheDocument();
+    expect(screen.getByText('Sidebar access evidence')).toBeInTheDocument();
     expect(screen.getByText(/time is active/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Washi' })).toBeInTheDocument();
   });

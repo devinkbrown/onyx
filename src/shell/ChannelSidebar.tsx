@@ -108,6 +108,11 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
 
   // ── join input ──
   const [joinInput, setJoinInput] = createSignal('');
+  const joinTarget = createMemo(() => {
+    const raw = joinInput().trim();
+    if (!raw) return '';
+    return raw.startsWith('#') ? raw : `#${raw}`;
+  });
 
   // ── sorted channel list ──
   const sortedChannels = createMemo(() => {
@@ -206,9 +211,8 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
 
   function handleJoin(e: SubmitEvent): void {
     e.preventDefault();
-    const raw = joinInput().trim();
-    if (!raw) return;
-    const target = raw.startsWith('#') ? raw : `#${raw}`;
+    const target = joinTarget();
+    if (!target) return;
     getState().joinChannel(target);
     setJoinInput('');
     // Navigate to the new channel
@@ -420,7 +424,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
           type="submit"
           class="shell-join-btn"
           disabled={!joinInput().trim()}
-          aria-label="Join channel"
+          aria-label={joinTarget() ? `Join ${joinTarget()}` : 'Join channel'}
         >
           <span aria-hidden="true">+</span>
         </button>

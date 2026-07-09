@@ -18,5 +18,6 @@ describe('AccessibilityStatement', () => {
     expect(screen.getByText(/Notification center uses a named inbox dialog/i)).toBeInTheDocument();
     expect(screen.getByText(/Channel browser uses a Sheet dialog/i)).toBeInTheDocument();
     expect(screen.getByText(/Account panel groups account management/i)).toBeInTheDocument();
+    expect(screen.getByText(/Channel sidebar uses a complementary navigation landmark/i)).toBeInTheDocument();
   });
 });

@@ -262,6 +262,9 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Account panel now carries pass
     evidence for named account-management regions, alert/status feedback, and
     target-specific persona actions.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Channel sidebar now carries pass
+    evidence for its complementary navigation landmark, roving channel/DM rows,
+    unread/mention names, and target-specific join action.
     ⏭️ **CLIENT NEXT** — continue remaining dense-surface audit rows until every
     app panel has pass/fix evidence.
 
