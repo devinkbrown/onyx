@@ -26,5 +26,6 @@ describe('AccessibilityStatement', () => {
     expect(screen.getByText(/Voice settings uses a named Sheet dialog/i)).toBeInTheDocument();
     expect(screen.getByText(/Call overlays use named incoming\/outgoing dialogs/i)).toBeInTheDocument();
     expect(screen.getByText(/Message actions use per-row action groups/i)).toBeInTheDocument();
+    expect(screen.getByText(/Member list uses a channel-scoped complementary landmark/i)).toBeInTheDocument();
   });
 });

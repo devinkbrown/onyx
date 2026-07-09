@@ -67,8 +67,8 @@ const phases: Phase[] = [
     title: 'Washi',
     state: 'active',
     date: '2026-07-09',
-    summary: 'Accessibility is now a public ledger and an in-client audit surface with dense-panel, Home catch-up, message-search, notification-center, channel-browser, account-panel, channel-sidebar, keyboard-shortcuts, pinned-messages, theme-import, thread-panel, voice-settings, call-overlay, and message-action pass evidence.',
-    items: ['Public accessibility ledger', 'Client access audit', 'Motion controls', 'Dense-panel evidence', 'Home access evidence', 'Search access evidence', 'Inbox access evidence', 'Directory access evidence', 'Account access evidence', 'Sidebar access evidence', 'Shortcuts access evidence', 'Pins access evidence', 'Theme import evidence', 'Thread access evidence', 'Voice settings evidence', 'Call overlay evidence', 'Message action evidence'],
+    summary: 'Accessibility is now a public ledger and an in-client audit surface with dense-panel, Home catch-up, message-search, notification-center, channel-browser, account-panel, channel-sidebar, keyboard-shortcuts, pinned-messages, theme-import, thread-panel, voice-settings, call-overlay, message-action, and member-list pass evidence.',
+    items: ['Public accessibility ledger', 'Client access audit', 'Motion controls', 'Dense-panel evidence', 'Home access evidence', 'Search access evidence', 'Inbox access evidence', 'Directory access evidence', 'Account access evidence', 'Sidebar access evidence', 'Shortcuts access evidence', 'Pins access evidence', 'Theme import evidence', 'Thread access evidence', 'Voice settings evidence', 'Call overlay evidence', 'Message action evidence', 'Member list evidence'],
   },
 ];
 

@@ -143,6 +143,11 @@ const ACCESS_AUDIT_ROWS = [
     note: 'Per-message action groups, named reaction/overflow triggers, labelled menus, and row-specific action names.',
   },
   {
+    surface: 'Member list',
+    status: 'checked',
+    note: 'Channel-scoped member landmark, labelled role groups, named detail dialogs, and target-specific member actions.',
+  },
+  {
     surface: 'Modals',
     status: 'checked',
     note: 'Sheet focus trap, Escape close, labelled close buttons.',

@@ -119,6 +119,11 @@ function MemberCard(props: MemberCardProps): JSX.Element {
   // Whether the target currently holds the named status mode.
   const hasMode = (m: string): boolean => local.user.modes.has(m);
   const isSelf = (): boolean => local.user.nick.toLowerCase() === ourNick().toLowerCase();
+  const cardId = createMemo(() => {
+    const channel = local.channel.replace(/[^a-z0-9_-]+/giu, '-').replace(/^-|-$/gu, '') || 'channel';
+    const nick = local.user.nick.replace(/[^a-z0-9_-]+/giu, '-').replace(/^-|-$/gu, '') || 'member';
+    return `member-card-${channel}-${nick}`;
+  });
 
   function handleDm(): void {
     getState().navigate({ kind: 'dm', nick: local.user.nick });
@@ -146,12 +151,19 @@ function MemberCard(props: MemberCardProps): JSX.Element {
   }
 
   return (
-    <div class="shell-member-card" role="document">
+    <div
+      class="shell-member-card"
+      role="region"
+      aria-labelledby={`${cardId()}-nick`}
+      aria-describedby={`${cardId()}-role`}
+    >
       <div class="shell-member-card-head">
         <Avatar name={local.user.nick} size="md" owner={local.role.key === 'owner' || local.role.key === 'founder'} />
         <div>
-          <p class="shell-member-card-nick">{local.user.nick}</p>
-          <p class="shell-member-card-role">{local.role.label}</p>
+          <p class="shell-member-card-nick" id={`${cardId()}-nick`}>{local.user.nick}</p>
+          <p class="shell-member-card-role" id={`${cardId()}-role`}>
+            {local.role.label} in {local.channel}
+          </p>
           <Show when={local.user.account}>
             {(acct) => (
               <p class="shell-member-card-account">~{acct()}</p>
@@ -302,10 +314,20 @@ export function MemberList(props: MemberListProps): JSX.Element {
     return groups().reduce((sum, g) => sum + g.members.length, 0);
   });
 
+  const memberListLabel = createMemo(() => {
+    const channel = activeChannel();
+    return channel ? `Member list for ${channel.name}` : 'Member list';
+  });
+
+  const rosterLabel = createMemo(() => {
+    const channel = activeChannel();
+    return channel ? `Channel members in ${channel.name}` : 'Channel members';
+  });
+
   return (
     <aside
       class={`shell-members${local.hidden ? ' shell-members--hidden' : ''}`}
-      aria-label="Member list"
+      aria-label={memberListLabel()}
       aria-hidden={local.hidden ? 'true' : 'false'}
     >
       <div class="shell-members-head">
@@ -320,7 +342,7 @@ export function MemberList(props: MemberListProps): JSX.Element {
         </span>
       </div>
 
-      <div class="shell-members-scroll" role="region" aria-label="Channel members">
+      <div class="shell-members-scroll" role="region" aria-label={rosterLabel()}>
         <Show
           when={groups().length > 0}
           fallback={
@@ -364,10 +386,10 @@ export function MemberList(props: MemberListProps): JSX.Element {
                       {({ user, role }) => (
                         <li class="shell-members-group-item">
                           <Popover
+                            panelLabel={`Member details for ${user.nick}`}
                             trigger={
                               <div
                                 class={`shell-member-row${user.away ? ' shell-member-row--away' : ''}`}
-                                aria-label={`${user.nick}, ${role.label}${user.away ? ', away' : ''}`}
                               >
                                 <span class="shell-member-avatar">
                                   <Avatar
@@ -385,6 +407,9 @@ export function MemberList(props: MemberListProps): JSX.Element {
                                   class={`shell-member-nick${user.away ? ' shell-member-nick--away' : ''}`}
                                 >
                                   {user.nick}
+                                </span>
+                                <span class="sr-only">
+                                  Open member details for {user.nick}, {role.label}{user.away ? ', away' : ''}
                                 </span>
                                 <Show when={role.key !== 'member'}>
                                   <RoleBadge role={role} />

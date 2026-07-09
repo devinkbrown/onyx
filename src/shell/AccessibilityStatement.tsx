@@ -76,6 +76,7 @@ const ACCESSIBILITY_TOPICS: readonly AccessibilityTopic[] = [
       'Voice settings uses a named Sheet dialog, labelled device/processing/push-to-talk regions, described selects, and target-specific push-to-talk key actions.',
       'Call overlays use named incoming/outgoing dialogs with target-specific accept, decline, and cancel actions.',
       'Message actions use per-row action groups, named reaction and overflow triggers, labelled menus, and row-specific action names.',
+      'Member list uses a channel-scoped complementary landmark, labelled role groups, named member-detail dialogs, and target-specific member actions.',
     ],
   },
 ];

@@ -286,6 +286,9 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Message actions now carry pass
     evidence for per-message action groups, named reaction/overflow triggers,
     labelled menus, and row-specific action names.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Member list now carries pass
+    evidence for its channel-scoped complementary landmark, labelled role
+    groups, named member-detail dialogs, and target-specific member actions.
     ⏭️ **CLIENT NEXT** — continue remaining dense-surface audit rows until every
     app panel has pass/fix evidence.
 

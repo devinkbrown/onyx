@@ -39,6 +39,7 @@ describe('PreferencesPanel', () => {
     expect(screen.getByText('Voice settings')).toBeInTheDocument();
     expect(screen.getByText('Call overlays')).toBeInTheDocument();
     expect(screen.getByText('Message actions')).toBeInTheDocument();
+    expect(screen.getByText('Member list')).toBeInTheDocument();
     expect(screen.getByText('Labelled Sheet, topic form, switch-mode flags, read-only non-op fallbacks.')).toBeInTheDocument();
     expect(screen.getByText('Toolbar groups, labelled icon buttons, aria-pressed media states, live timer.')).toBeInTheDocument();
     expect(screen.getByText('Theme and background radio groups, labelled swatches, Sheet focus trap.')).toBeInTheDocument();
@@ -55,6 +56,7 @@ describe('PreferencesPanel', () => {
     expect(screen.getByText('Named settings Sheet, labelled device/processing/PTT regions, described selects, and target-specific PTT key actions.')).toBeInTheDocument();
     expect(screen.getByText('Named incoming/outgoing call dialogs with target-specific accept, decline, and cancel actions.')).toBeInTheDocument();
     expect(screen.getByText('Per-message action groups, named reaction/overflow triggers, labelled menus, and row-specific action names.')).toBeInTheDocument();
+    expect(screen.getByText('Channel-scoped member landmark, labelled role groups, named detail dialogs, and target-specific member actions.')).toBeInTheDocument();
     expect(screen.queryByText(/still need a pass/i)).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Public ledger' })).toHaveAttribute(
       'href',

@@ -74,6 +74,23 @@ afterEach(() => {
 // ── MemberList moderation menu ────────────────────────────────────────────────
 
 describe('MemberList moderation', () => {
+  it('labels the member landmark, roster region, and member detail dialog by channel and nick', () => {
+    seedChannel({ ourNick: 'me', users: [makeUser('me', ['o']), makeUser('bob', ['v'])] });
+
+    render(() => <MemberList />);
+
+    expect(screen.getByRole('complementary', { name: 'Member list for #general' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Channel members in #general' })).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: /Voice/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Open member details for bob, Voice/ }));
+
+    expect(screen.getByRole('dialog', { name: 'Member details for bob' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'bob', description: 'Voice in #general' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send DM to bob' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View profile of bob' })).toBeInTheDocument();
+  });
+
   it('shows Kick/Ban controls to an op when targeting another member', () => {
     // Arrange — we are op, bob is a plain member
     seedChannel({ ourNick: 'me', users: [makeUser('me', ['o']), makeUser('bob')] });
