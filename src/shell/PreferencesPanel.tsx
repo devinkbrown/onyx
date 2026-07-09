@@ -18,6 +18,7 @@ import {
   readClientExtensionAudit,
   type ClientExtensionAuditEntry,
 } from '@/lib/extensions/clientActions';
+import { getState } from '@/lib/store';
 import {
   exportPortableTransfer,
   importPortableTransfer,
@@ -303,6 +304,7 @@ function PortableVaultControls(): JSX.Element {
     fileName: string;
     snapshot: PortableTransferSnapshot;
     messages: number;
+    drafts: number;
   } | null>(null);
 
   async function handleExport(): Promise<void> {
@@ -317,7 +319,8 @@ function PortableVaultControls(): JSX.Element {
       link.click();
       URL.revokeObjectURL(url);
       const messageCount = snapshot.targets.reduce((sum, target) => sum + target.messages.length, 0);
-      setStatus(`Exported ${messageCount} messages, ${snapshot.targets.length} targets, and ${snapshot.reviewHistory.length} reviews.`);
+      const draftCount = Object.keys(snapshot.composerDrafts).length;
+      setStatus(`Exported ${countLabel(messageCount, 'message')}, ${countLabel(snapshot.targets.length, 'target')}, ${countLabel(snapshot.reviewHistory.length, 'review')}, and ${countLabel(draftCount, 'room draft')}.`);
     } catch {
       setStatus('Export failed. Try again after closing private browsing or freeing storage.');
     } finally {
@@ -339,8 +342,9 @@ function PortableVaultControls(): JSX.Element {
         return;
       }
       const messages = parsed.targets.reduce((sum, target) => sum + target.messages.length, 0);
-      setPendingImport({ fileName: file.name, snapshot: parsed, messages });
-      setStatus(`Ready to import ${countLabel(messages, 'message')}, ${countLabel(parsed.targets.length, 'target')}, and ${countLabel(parsed.reviewHistory.length, 'review')}.`);
+      const drafts = Object.keys(parsed.composerDrafts).length;
+      setPendingImport({ fileName: file.name, snapshot: parsed, messages, drafts });
+      setStatus(`Ready to import ${countLabel(messages, 'message')}, ${countLabel(parsed.targets.length, 'target')}, ${countLabel(parsed.reviewHistory.length, 'review')}, and ${countLabel(drafts, 'room draft')}.`);
     } catch {
       setStatus('Import failed. Choose a readable Onyx portable JSON file.');
       setPendingImport(null);
@@ -355,8 +359,11 @@ function PortableVaultControls(): JSX.Element {
     setBusy(true);
     try {
       const result = await importPortableTransfer(pending.snapshot);
+      for (const [target, draft] of Object.entries(pending.snapshot.composerDrafts)) {
+        getState().setComposerDraft(target, draft);
+      }
       setPendingImport(null);
-      setStatus(`Imported ${result.messages} messages, ${result.targets} targets, and ${result.reviews} reviews.`);
+      setStatus(`Imported ${countLabel(result.messages, 'message')}, ${countLabel(result.targets, 'target')}, ${countLabel(result.reviews, 'review')}, and ${countLabel(result.drafts, 'room draft')}.`);
     } catch {
       setStatus('Import failed while merging this portable vault.');
     } finally {
@@ -370,7 +377,7 @@ function PortableVaultControls(): JSX.Element {
         <h3 id="pref-vault-portable-title" class="pref-label">Portable vault</h3>
       </div>
       <p class="pref-desc">
-        Export or merge this device's local history and reviewed catch-up state; encrypted DM plaintext is not included.
+        Export or merge this device's local history, reviewed catch-up state, and room composer drafts; encrypted DM plaintext is not included.
       </p>
       <div class="pref-vault-actions">
         <button type="button" class="pref-reset" disabled={busy()} onClick={() => void handleExport()}>
@@ -392,8 +399,9 @@ function PortableVaultControls(): JSX.Element {
             <h4 id="pref-import-review-title">Review import</h4>
             <p>
               {pending().fileName}: {countLabel(pending().messages, 'message')},
-              {' '}{countLabel(pending().snapshot.targets.length, 'target')}, and
-              {' '}{countLabel(pending().snapshot.reviewHistory.length, 'review')}. Existing local history is merged, not replaced.
+              {' '}{countLabel(pending().snapshot.targets.length, 'target')},
+              {' '}{countLabel(pending().snapshot.reviewHistory.length, 'review')}, and
+              {' '}{countLabel(pending().drafts, 'room draft')}. Existing local history is merged, not replaced.
             </p>
             <div class="pref-import-review__actions">
               <button type="button" class="pref-reset" disabled={busy()} onClick={() => void confirmImport()}>

@@ -10,26 +10,44 @@ import {
   readReviewHistory,
   type ReviewHistoryEntry,
 } from '@/lib/notifications/reviewHistory';
+import {
+  loadComposerDrafts,
+  sanitizeComposerDrafts,
+  saveComposerDrafts,
+  type ComposerDrafts,
+} from '@/lib/composer/drafts';
 
 export interface PortableTransferSnapshot extends VaultExportSnapshot {
   /** Home catch-up checkpoints the user explicitly reviewed on this device. */
   reviewHistory: ReviewHistoryEntry[];
+  /** Channel/room composer drafts only. DM draft plaintext stays on this device. */
+  composerDrafts: ComposerDrafts;
 }
 
 export interface PortableTransferImportResult {
   targets: number;
   messages: number;
   reviews: number;
+  drafts: number;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function portableComposerDrafts(value: ComposerDrafts): ComposerDrafts {
+  const drafts: ComposerDrafts = {};
+  for (const [target, draft] of Object.entries(value)) {
+    if (target.startsWith('#') || target.startsWith('&')) drafts[target] = draft;
+  }
+  return drafts;
+}
+
 export async function exportPortableTransfer(): Promise<PortableTransferSnapshot> {
   return {
     ...(await exportVault()),
     reviewHistory: readReviewHistory(),
+    composerDrafts: portableComposerDrafts(loadComposerDrafts()),
   };
 }
 
@@ -39,9 +57,13 @@ export function parsePortableTransfer(raw: unknown): PortableTransferSnapshot | 
   const reviewHistory = isRecord(raw)
     ? parseReviewHistoryEntries(raw.reviewHistory ?? [])
     : [];
+  const composerDrafts = isRecord(raw)
+    ? portableComposerDrafts(sanitizeComposerDrafts(raw.composerDrafts ?? {}))
+    : {};
   return {
     ...vault,
     reviewHistory,
+    composerDrafts,
   };
 }
 
@@ -50,9 +72,15 @@ export async function importPortableTransfer(
 ): Promise<PortableTransferImportResult> {
   const vault = await importVault(snapshot);
   const reviews = mergeReviewHistory(snapshot.reviewHistory);
+  const drafts = portableComposerDrafts(snapshot.composerDrafts);
+  saveComposerDrafts({
+    ...loadComposerDrafts(),
+    ...drafts,
+  });
   return {
     targets: vault.targets,
     messages: vault.messages,
     reviews: reviews.imported,
+    drafts: Object.keys(drafts).length,
   };
 }

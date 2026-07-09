@@ -512,6 +512,10 @@ client or public site needs to expose the result.
     Onyx JSON snapshot and imports validated snapshots back into IndexedDB and
     local review history, preserving the existing ciphertext-only behavior for
     encrypted DM vault rows while carrying reviewed catch-up checkpoints.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Portable transfer now carries
+    sanitized room composer drafts, excludes DM draft plaintext, previews draft
+    counts before import, and merges imported room drafts into the live composer
+    state after confirmation.
 
 *Sequencing logic: 1–3 need no server deploys (ship fastest), 4–5 are one
 focused server feature each, 6+ are compound. Every phase lands something

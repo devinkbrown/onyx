@@ -8,6 +8,7 @@ import {
   recordReviewHistory,
   type ReviewHistoryEntry,
 } from '@/lib/notifications/reviewHistory';
+import { loadComposerDrafts, saveComposerDrafts } from '@/lib/composer/drafts';
 import { _resetVaultForTests, clearVault, loadRecent, saveMessages } from './historyVault';
 import {
   exportPortableTransfer,
@@ -48,13 +49,18 @@ describe('portableTransfer', () => {
     localStorage.clear();
   });
 
-  it('round-trips vault rows and reviewed catch-up checkpoints', async () => {
+  it('round-trips vault rows, reviewed checkpoints, and channel drafts', async () => {
     await saveMessages('#alpha', [msg('a1', 1000, { target: '#alpha' })]);
     recordReviewHistory(review('#alpha'));
+    saveComposerDrafts({
+      '#alpha': 'room draft',
+      alice: 'dm draft should stay local',
+    });
 
     const exported = await exportPortableTransfer();
     expect(exported.targets).toHaveLength(1);
     expect(exported.reviewHistory.map((entry) => entry.target)).toEqual(['#alpha']);
+    expect(exported.composerDrafts).toEqual({ '#alpha': 'room draft' });
 
     const parsed = parsePortableTransfer(JSON.parse(JSON.stringify(exported)));
     expect(parsed).not.toBeNull();
@@ -63,9 +69,10 @@ describe('portableTransfer', () => {
     localStorage.clear();
     const result = await importPortableTransfer(parsed!);
 
-    expect(result).toEqual({ targets: 1, messages: 1, reviews: 1 });
+    expect(result).toEqual({ targets: 1, messages: 1, reviews: 1, drafts: 1 });
     expect((await loadRecent('#alpha')).map((message) => message.id)).toEqual(['a1']);
     expect(readReviewHistory().map((entry) => entry.target)).toEqual(['#alpha']);
+    expect(loadComposerDrafts()).toEqual({ '#alpha': 'room draft' });
   });
 
   it('rejects non-Onyx portable transfer files', () => {
