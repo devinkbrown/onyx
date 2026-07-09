@@ -25,6 +25,7 @@ import { useStore, getState } from '@/lib/store';
 import { buildCatchUp, catchUpSummary, type CatchUpItem } from '@/lib/notifications/catchUp';
 import { followed } from '@/lib/notifications/followed';
 import { buildHomeMemory, type HomeMemoryItem } from '@/lib/notifications/homeMemory';
+import { buildQuietActivity, type QuietActivityItem } from '@/lib/notifications/quietActivity';
 import {
   collectScheduledEvents,
   eventCountdown,
@@ -126,6 +127,11 @@ export function HomeView(): JSX.Element {
   });
   const rememberedRooms = createMemo<HomeMemoryItem[]>(() => homeMemory() ?? []);
   const openMemory = (item: HomeMemoryItem) => void getState().joinChannel(item.target);
+  const quietActivity = createMemo<QuietActivityItem[]>(() =>
+    buildQuietActivity(channels().values(), channelLastActivity(), nowMs()),
+  );
+  const openQuietActivity = (item: QuietActivityItem) =>
+    getState().navigate({ kind: 'channel', channel: item.name });
 
   const directory = createMemo(() => {
     const data = stats();
@@ -328,6 +334,37 @@ export function HomeView(): JSX.Element {
                       <span>
                         {item.participants.length} {item.participants.length === 1 ? 'voice' : 'voices'}
                       </span>
+                    </span>
+                  </button>
+                )}
+              </For>
+            </div>
+          </section>
+        </Show>
+
+        <Show when={connectionStatus() === 'connected' && quietActivity().length > 0}>
+          <section class="home-quiet" aria-label="Quiet room activity">
+            <div class="home-quiet-head">
+              <h3 class="home-section-label">Quiet activity</h3>
+              <span class="home-quiet-summary">read rooms</span>
+            </div>
+            <div class="home-quiet-list">
+              <For each={quietActivity()}>
+                {(item) => (
+                  <button
+                    type="button"
+                    class="home-quiet-item"
+                    onClick={() => openQuietActivity(item)}
+                    aria-label={`Open ${item.name}, active ${relTime(Math.floor(item.lastActivity / 1000), nowMs())}`}
+                  >
+                    <span class="home-quiet-main">
+                      <span class="home-quiet-room">{item.name}</span>
+                      <span class={`home-quiet-topic${item.topic ? '' : ' is-empty'}`}>
+                        {item.topic || 'No topic set'}
+                      </span>
+                    </span>
+                    <span class="home-quiet-when">
+                      {relTime(Math.floor(item.lastActivity / 1000), nowMs())}
                     </span>
                   </button>
                 )}

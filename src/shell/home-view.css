@@ -300,6 +300,84 @@
   font-weight: 650;
 }
 
+/* Quiet activity */
+.home-quiet {
+  margin: 0 0 34px;
+}
+.home-quiet-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.home-quiet-head .home-section-label {
+  margin: 0;
+}
+.home-quiet-summary {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--washi-mute);
+}
+.home-quiet-list {
+  display: grid;
+  gap: 6px;
+}
+.home-quiet-item {
+  width: 100%;
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--stone) 72%, transparent);
+  color: var(--washi);
+  cursor: pointer;
+  transition: border-color var(--dur, 200ms) var(--ease),
+    background var(--dur, 200ms) var(--ease);
+}
+.home-quiet-item:hover {
+  border-color: color-mix(in oklab, var(--lapis) 36%, var(--line));
+  background: color-mix(in oklab, var(--stone) 62%, transparent);
+}
+.home-quiet-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.home-quiet-room {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+.home-quiet-topic {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--washi-dim);
+  font-size: 0.8rem;
+}
+.home-quiet-topic.is-empty {
+  color: var(--washi-mute);
+  font-style: italic;
+}
+.home-quiet-when {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--washi-mute);
+}
+
 /* Directory */
 .home-section-label {
   display: block;
@@ -416,6 +494,7 @@
   .home-pulse { grid-template-columns: 1fr 1fr; }
   .home-inner { padding-top: 20px; }
   .home-memory-grid { grid-template-columns: 1fr; }
+  .home-quiet-item { grid-template-columns: 1fr; }
   .home-event {
     grid-template-columns: 1fr;
     align-items: start;
@@ -425,7 +504,7 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .home-card, .home-cta, .home-card-join, .home-event, .home-memory-card { transition: none; }
+  .home-card, .home-cta, .home-card-join, .home-event, .home-memory-card, .home-quiet-item { transition: none; }
   .home-memory-card:hover { transform: none; }
 }
 

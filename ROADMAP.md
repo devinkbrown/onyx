@@ -170,6 +170,9 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home now reads the local history
     vault for recently left rooms and shows remembered previews without joining
     the room or asking the server.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home now adds a quiet activity
+    section for recently active joined rooms that are already read, keeping
+    low-pressure movement visible without promoting it to catch-up urgency.
     ⏭️ **NEXT** — pure Onyx work. Reuse the local vault, `?at=` time travel,
     chanstats heatlines, scheduled-event props, and Spotlight navigation before
     adding new server surface.

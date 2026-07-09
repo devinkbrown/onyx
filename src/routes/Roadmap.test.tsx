@@ -13,6 +13,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByRole('heading', { name: 'Time-native' })).toBeInTheDocument();
     expect(screen.getByText('Scheduled events on Home')).toBeInTheDocument();
     expect(screen.getByText('Vault memory previews')).toBeInTheDocument();
+    expect(screen.getByText('Quiet room activity')).toBeInTheDocument();
     expect(screen.getByText(/time is active/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Washi' })).toBeInTheDocument();
   });
