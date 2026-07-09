@@ -71,6 +71,16 @@ export function CopyIcon(props: IconProps): JSX.Element {
   );
 }
 
+/** Magnifier — "search". */
+export function SearchIcon(props: IconProps): JSX.Element {
+  return (
+    <Svg class={props.class}>
+      <circle cx="10.5" cy="10.5" r="5.5" />
+      <path d="m15 15 5 5" />
+    </Svg>
+  );
+}
+
 /** Pencil — "edit". */
 export function EditIcon(props: IconProps): JSX.Element {
   return (

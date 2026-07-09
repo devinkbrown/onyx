@@ -31,7 +31,8 @@ import { Popover } from '@/primitives/index';
 import { buildMomentLink } from '@/lib/deeplink';
 import { searchEmojis } from '@/lib/emoji/emoji';
 import { isValidTopicLabel } from '@/lib/topics/topics';
-import { CopyIcon, EditIcon, OverflowIcon, PinIcon, ReactIcon, ReplyIcon, TopicIcon, TrashIcon } from './icons';
+import { openMessageSearchWithQuery } from '@/shell/search/useMessageSearch';
+import { CopyIcon, EditIcon, OverflowIcon, PinIcon, ReactIcon, ReplyIcon, SearchIcon, TopicIcon, TrashIcon } from './icons';
 
 import './message-menu.css';
 
@@ -43,6 +44,8 @@ export type MessageMenuCapabilities = {
   canReact: boolean;
   /** Copy is offered whenever there is real text to copy. */
   canCopy: boolean;
+  /** Open message search prefilled from this line. */
+  canSearchText: boolean;
   /** Copy a shareable `/app?join=...&at=...` link for channel messages. */
   canCopyMoment: boolean;
   /** Start a named conversation from this message; channel messages only. */
@@ -78,6 +81,7 @@ export function messageMenuCapabilities(input: CapabilityInput): MessageMenuCapa
     canReply: !gone,
     canReact: !gone,
     canCopy: hasText,
+    canSearchText: hasText,
     canCopyMoment: !gone && input.channelTarget,
     canStartTopic: !gone && input.channelTarget && hasText,
     canEdit: !gone && isOwn && editingEnabled && msg.type === 'msg',
@@ -100,6 +104,19 @@ export function suggestTopicLabelFromMessage(text: string): string | null {
     words.pop();
   }
   return null;
+}
+
+export function suggestSearchQueryFromMessage(text: string): string | null {
+  const normalized = text
+    .replace(/https?:\/\/\S+/giu, '')
+    .replace(/[`*_~>#[\]()+={}]/gu, ' ')
+    .replace(/\s+/gu, ' ')
+    .trim();
+  if (!normalized) return null;
+
+  const words = normalized.split(' ').filter(Boolean).slice(0, 8);
+  const candidate = words.join(' ').replace(/[,:;.!?]+$/u, '').trim();
+  return candidate.length > 0 ? candidate : null;
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -236,6 +253,14 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
         /* no clipboard or storage — non-fatal */
       }
     }
+    setMenuOpen(false);
+  }
+
+  function searchText(): void {
+    if (!caps().canSearchText) return;
+    const query = suggestSearchQueryFromMessage(local.msg.plaintext ?? local.msg.text);
+    if (!query) return;
+    openMessageSearchWithQuery(query);
     setMenuOpen(false);
   }
 
@@ -391,6 +416,12 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
               <button type="button" class="msg-menu-item" role="menuitem" onClick={() => void copyMomentLink()}>
                 <CopyIcon class="msg-menu-item-icon" />
                 <span>Copy moment link</span>
+              </button>
+            </Show>
+            <Show when={caps().canSearchText}>
+              <button type="button" class="msg-menu-item" role="menuitem" onClick={searchText}>
+                <SearchIcon class="msg-menu-item-icon" />
+                <span>Search this text</span>
               </button>
             </Show>
             <Show when={caps().canReply}>

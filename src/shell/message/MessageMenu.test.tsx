@@ -7,16 +7,25 @@
  */
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
+import { createRoot } from 'solid-js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatMessage } from '@/lib/irc/types';
 import { store } from '@/lib/store/store';
-import { MessageMenu, messageMenuCapabilities, suggestTopicLabelFromMessage, type CapabilityInput } from './MessageMenu';
+import { closeMessageSearch, useMessageSearch } from '@/shell/search/useMessageSearch';
+import {
+  MessageMenu,
+  messageMenuCapabilities,
+  suggestSearchQueryFromMessage,
+  suggestTopicLabelFromMessage,
+  type CapabilityInput,
+} from './MessageMenu';
 
 const initialState = store.getInitialState();
 
 beforeEach(() => {
   cleanup();
   store.setState(initialState, true);
+  closeMessageSearch();
   localStorage.clear();
 });
 
@@ -52,6 +61,7 @@ describe('messageMenuCapabilities', () => {
       canReply: true,
       canReact: true,
       canCopy: true,
+      canSearchText: true,
       canCopyMoment: true,
       canStartTopic: true,
       canEdit: true,
@@ -70,6 +80,7 @@ describe('messageMenuCapabilities', () => {
     expect(caps.canReply).toBe(true);
     expect(caps.canReact).toBe(true);
     expect(caps.canCopy).toBe(true);
+    expect(caps.canSearchText).toBe(true);
     expect(caps.canCopyMoment).toBe(true);
     expect(caps.canStartTopic).toBe(true);
     expect(caps.canEdit).toBe(false);
@@ -87,6 +98,7 @@ describe('messageMenuCapabilities', () => {
     expect(caps.canReply).toBe(false);
     expect(caps.canReact).toBe(false);
     expect(caps.canCopy).toBe(false);
+    expect(caps.canSearchText).toBe(false);
     expect(caps.canCopyMoment).toBe(false);
     expect(caps.canEdit).toBe(false);
     expect(caps.canDelete).toBe(false);
@@ -153,6 +165,7 @@ describe('messageMenuCapabilities', () => {
 
     // Assert
     expect(caps.canCopy).toBe(false);
+    expect(caps.canSearchText).toBe(false);
     expect(caps.canCopyMoment).toBe(true);
     // reply/react still allowed on a live message
     expect(caps.canReply).toBe(true);
@@ -206,6 +219,22 @@ describe('suggestTopicLabelFromMessage', () => {
   });
 });
 
+describe('suggestSearchQueryFromMessage', () => {
+  it('uses a compact readable phrase from message text', () => {
+    expect(suggestSearchQueryFromMessage('Release blockers for mobile onboarding today are waiting')).toBe(
+      'Release blockers for mobile onboarding today are waiting',
+    );
+  });
+
+  it('strips markdown markers and links before searching', () => {
+    expect(suggestSearchQueryFromMessage('## `Deploy notes`: https://example.test/build')).toBe('Deploy notes');
+  });
+
+  it('returns null when no searchable words remain', () => {
+    expect(suggestSearchQueryFromMessage('https://example.test')).toBeNull();
+  });
+});
+
 describe('<MessageMenu>', () => {
   it('copies a shareable moment link for channel messages', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
@@ -240,6 +269,42 @@ describe('<MessageMenu>', () => {
         expect.stringContaining('/app?join=%23general&at=2026-07-08T12%3A00%3A00.000Z'),
       );
     });
+  });
+
+  it('opens message search prefilled from a selected moment', () => {
+    store.setState({
+      ...initialState,
+      activeView: { kind: 'channel', channel: '#general' },
+    }, true);
+    let dispose!: () => void;
+    createRoot((cleanup) => {
+      dispose = cleanup;
+      const search = useMessageSearch();
+      const msg: ChatMessage = {
+        id: 'm-search',
+        from: 'alice',
+        text: 'Release blockers for mobile onboarding today',
+        time: new Date('2026-07-08T12:00:00Z'),
+        type: 'msg',
+        target: '#general',
+      };
+
+      render(() => (
+        <MessageMenu
+          msg={msg}
+          target="#general"
+          selfNick="bob"
+          canEdit={false}
+          menuOpen
+        />
+      ));
+
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Search this text' }));
+
+      expect(search.isOpen()).toBe(true);
+      expect(search.query()).toBe('Release blockers for mobile onboarding today');
+    });
+    dispose();
   });
 
   it('starts a named conversation from a channel message', () => {

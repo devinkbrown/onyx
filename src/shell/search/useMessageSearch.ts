@@ -85,6 +85,15 @@ export function openMessageSearch(): void {
   setMessageSearchOpen(true);
 }
 
+export function openMessageSearchWithQuery(query: string): void {
+  if (!hasMessageSearchableConversation()) return;
+  const trimmed = query.trim();
+  if (!trimmed) return;
+  setMessageSearchQuerySignal(trimmed);
+  setMessageSearchActiveIndex(0);
+  setMessageSearchOpen(true);
+}
+
 export function closeMessageSearch(): void {
   setMessageSearchOpen(false);
   setMessageSearchQuerySignal('');

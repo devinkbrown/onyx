@@ -17,6 +17,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Reader digest notes')).toBeInTheDocument();
     expect(screen.getByText('Shareable moment links')).toBeInTheDocument();
     expect(screen.getByText('Reader memory context')).toBeInTheDocument();
+    expect(screen.getByText('Moment search handoff')).toBeInTheDocument();
     expect(screen.getByText('Client access audit')).toBeInTheDocument();
     expect(screen.getByText(/time is active/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Washi' })).toBeInTheDocument();

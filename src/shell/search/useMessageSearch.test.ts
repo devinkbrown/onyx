@@ -8,6 +8,7 @@ import {
   closeMessageSearch,
   hasMessageSearchableConversation,
   openMessageSearch,
+  openMessageSearchWithQuery,
   useMessageSearch,
 } from './useMessageSearch';
 
@@ -93,6 +94,33 @@ describe('useMessageSearch', () => {
 
       search.setQuery('ali');
       expect(search.results().map((result) => result.id)).toEqual(['early']);
+    });
+    dispose();
+  });
+
+  it('opens search with a prefilled query for moment handoffs', () => {
+    setState({
+      activeView: { kind: 'channel', channel: '#root' },
+      channels: new Map([[
+        '#root',
+        channel('#root', [
+          message('a', 'Kai', 'needle one', 1),
+          message('b', 'Kai', 'other line', 2),
+        ]),
+      ]]),
+    });
+
+    let dispose!: () => void;
+    createRoot((cleanup) => {
+      dispose = cleanup;
+      const search = useMessageSearch();
+
+      openMessageSearchWithQuery('  needle  ');
+
+      expect(search.isOpen()).toBe(true);
+      expect(search.query()).toBe('needle');
+      expect(search.results().map((result) => result.id)).toEqual(['a']);
+      expect(search.activePosition()).toBe(1);
     });
     dispose();
   });
