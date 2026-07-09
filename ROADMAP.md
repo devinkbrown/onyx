@@ -411,9 +411,10 @@ client or public site needs to expose the result.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Message search now keeps
     active-target local-vault hits when they are not already loaded in the live
     buffer, de-duping by message id instead of dropping the whole open room.
-    ⏭️ **CLIENT NEXT** — add vault fallback for `travelTo()` when CHATHISTORY is
-    unavailable and make remembered unjoined channel vault results navigate
-    immediately while still sending JOIN when connected.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — `travelTo()` now falls back to a
+    local-vault timestamp window when CHATHISTORY is unavailable, and remembered
+    unjoined channel vault results create/navigate a local shell immediately
+    while still sending JOIN when connected.
 39. **PWA and desktop packaging path** *(client + main site)* — make install,
     update, notification, and wrapped push behavior explicit for browser PWA,
     desktop shell, and future mobile wrappers.

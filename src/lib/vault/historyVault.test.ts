@@ -14,6 +14,7 @@ import {
   clearVault,
   deleteOutboxEntry,
   deserializeMessage,
+  loadAround,
   loadOutbox,
   loadRecent,
   queueOutbox,
@@ -98,6 +99,20 @@ describe('historyVault', () => {
       await saveMessages('#room', msgs);
       const loaded = await loadRecent('#room', 3);
       expect(loaded.map((m) => m.id)).toEqual(['m7', 'm8', 'm9']);
+    });
+
+    it('loads the nearest local window around a timestamp', async () => {
+      await saveMessages('#room', [
+        msg('m1150', Date.parse('2026-06-30T11:50:00.000Z')),
+        msg('m1159', Date.parse('2026-06-30T11:59:00.000Z')),
+        msg('m1202', Date.parse('2026-06-30T12:02:00.000Z')),
+        msg('m1210', Date.parse('2026-06-30T12:10:00.000Z')),
+        msg('m1220', Date.parse('2026-06-30T12:20:00.000Z')),
+      ]);
+
+      const loaded = await loadAround('#room', new Date('2026-06-30T12:00:00.000Z'), 3);
+
+      expect(loaded.map((m) => m.id)).toEqual(['m1150', 'm1159', 'm1202']);
     });
 
     it('returns [] for an unknown target', async () => {

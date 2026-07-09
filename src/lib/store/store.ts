@@ -8,7 +8,7 @@ import { escapeTagValue, parseAccountInfo, parseCHANLIMIT, parseMonitorNumeric, 
 import type { SuimyakuPeerState, SuimyakuRoomStats, CallState } from '@/lib/suimyaku-media/types';
 import { getMountedSuimyakuMediaEngine } from '@/lib/suimyaku-media/MediaEngine';
 import { parseActivity } from '@/lib/activity';
-import { OUTBOX_MAX_AGE_MS, deleteOutboxEntry, loadOutbox, queueOutbox, type OutboxEntry } from '@/lib/vault/historyVault';
+import { OUTBOX_MAX_AGE_MS, deleteOutboxEntry, loadAround, loadOutbox, loadRecent, queueOutbox, type OutboxEntry } from '@/lib/vault/historyVault';
 import { deviceKeys, isEnvelope, openDm, sealDm } from '@/lib/e2ee/dmCipher';
 import { preferences } from '@/lib/prefs/preferences';
 import { parseEventTime } from '@/lib/deeplink';
@@ -2699,7 +2699,16 @@ export const store = createStore<OnyxState>()(
       // AROUND the moment; the batch-close merge sorts the buffer and picks
       // the nearest message as the landing (timeTravelLandingId → feed scroll).
       const { client } = get();
-      if (!hasChatHistoryCap(client)) return;
+      if (!hasChatHistoryCap(client)) {
+        if (!preferences().localHistory) return;
+        void loadAround(target, at, HISTORY_PAGE_SIZE).then((localMsgs) => {
+          if (localMsgs.length === 0) return;
+          get().hydrateHistory(target, localMsgs);
+          const landingId = nearestMessageId(localMsgs, at);
+          if (landingId) set({ timeTravelLandingId: landingId });
+        });
+        return;
+      }
       _pendingTravel = { key: target.toLowerCase(), at };
       client?.sendRaw('CHATHISTORY', 'AROUND', target, `timestamp=${at.toISOString()}`, String(HISTORY_PAGE_SIZE));
     },
@@ -2800,7 +2809,15 @@ export const store = createStore<OnyxState>()(
       if (channel) {
         get().navigate({ kind: 'channel', channel: channel.name });
       } else if (key.startsWith('#')) {
-        get().joinChannel(key); // self-JOIN echo activates the view
+        const channels = new Map(s.channels);
+        channels.set(key, emptyChannel(target));
+        set({ channels, activeView: { kind: 'channel', channel: target } });
+        get().joinChannel(target);
+        if (preferences().localHistory) {
+          void loadRecent(target, HISTORY_PAGE_SIZE).then((localMsgs) => {
+            if (localMsgs.length > 0) get().hydrateHistory(target, localMsgs);
+          });
+        }
       } else {
         const dm = s.dms.get(key);
         if (!dm) {

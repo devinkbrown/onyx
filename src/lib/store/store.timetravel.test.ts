@@ -6,20 +6,24 @@
  * with the join replay), the message nearest the requested moment becomes
  * timeTravelLandingId, and the short batch must NOT mark history exhausted.
  */
+import 'fake-indexeddb/auto';
+import { IDBFactory } from 'fake-indexeddb';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { store } from './store';
 import type { Channel, ChatMessage } from '@/lib/irc/types';
 import { parseIRCMessage } from '@/lib/irc/parser';
+import { resetPreferences } from '@/lib/prefs/preferences';
+import { _resetVaultForTests, saveMessages } from '@/lib/vault/historyVault';
 
 const initialState = store.getInitialState();
 
-const live = (id: string, time: string, text: string): ChatMessage => ({
+const live = (id: string, time: string, text: string, target = '#root'): ChatMessage => ({
   id,
   time: new Date(time),
   from: 'kain',
   text,
   type: 'msg',
-  target: '#root',
+  target,
 });
 
 const channel = (name: string, messages: ChatMessage[]): Channel => ({
@@ -37,9 +41,24 @@ const channel = (name: string, messages: ChatMessage[]): Channel => ({
 
 const feed = (line: string) => store.getState()._handleMessage(parseIRCMessage(line));
 
-function mockClient(sendRaw = vi.fn(), join = vi.fn()) {
+async function waitForExpect(assertion: () => void, ms = 1000): Promise<void> {
+  const deadline = Date.now() + ms;
+  let lastError: unknown;
+  for (;;) {
+    try {
+      assertion();
+      return;
+    } catch (error) {
+      lastError = error;
+      if (Date.now() > deadline) throw lastError;
+      await new Promise((r) => setTimeout(r, 10));
+    }
+  }
+}
+
+function mockClient(sendRaw = vi.fn(), join = vi.fn(), caps: readonly string[] = ['draft/chathistory']) {
   return {
-    negotiatedCaps: new Set(['draft/chathistory']),
+    negotiatedCaps: new Set(caps),
     capValues: new Map<string, string>(),
     isupport: {},
     prefixToMode: {},
@@ -50,6 +69,9 @@ function mockClient(sendRaw = vi.fn(), join = vi.fn()) {
 }
 
 beforeEach(() => {
+  globalThis.indexedDB = new IDBFactory();
+  _resetVaultForTests();
+  resetPreferences();
   store.setState(
     {
       ...initialState,
@@ -132,12 +154,19 @@ describe('travelTo', () => {
     expect(store.getState().timeTravelLandingId).toBe('live-1');
   });
 
-  it('opens a vault hit in an unjoined channel by joining it', () => {
+  it('opens a vault hit in an unjoined channel immediately and hydrates it', async () => {
     const join = vi.fn();
+    await saveMessages('#elsewhere', [
+      live('old-9', '2026-06-30T12:00:00.000Z', 'saved elsewhere', '#elsewhere'),
+    ]);
     store.setState({ client: mockClient(vi.fn(), join) });
     store.getState().openVaultResult('#elsewhere', 'old-9');
     expect(join).toHaveBeenCalledWith('#elsewhere', undefined);
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#elsewhere' });
     expect(store.getState().timeTravelLandingId).toBe('old-9');
+    await waitForExpect(() => {
+      expect(store.getState().channels.get('#elsewhere')?.messages.map((m) => m.id)).toContain('old-9');
+    });
   });
 
   it('opens a vault DM hit, creating the conversation when missing', () => {
@@ -147,20 +176,26 @@ describe('travelTo', () => {
     expect(store.getState().timeTravelLandingId).toBe('dm-1');
   });
 
-  it('does nothing without the chathistory cap', () => {
+  it('hydrates from the local vault without the chathistory cap', async () => {
     const sendRaw = vi.fn();
-    store.setState({
-      client: {
-        negotiatedCaps: new Set<string>(),
-        capValues: new Map<string, string>(),
-        isupport: {},
-        prefixToMode: {},
-        sendRaw,
-        send: () => {},
-      } as never,
-    });
+    await saveMessages('#root', [
+      live('old-1', '2026-06-30T11:50:00.000Z', 'past one'),
+      live('old-2', '2026-06-30T12:01:00.000Z', 'past two'),
+      live('old-3', '2026-06-30T12:08:00.000Z', 'past three'),
+    ]);
+    store.setState({ client: mockClient(sendRaw, vi.fn(), []) });
 
     store.getState().travelTo('#root', new Date('2026-06-30T12:00:00.000Z'));
     expect(sendRaw).not.toHaveBeenCalled();
+    await waitForExpect(() => {
+      expect(store.getState().channels.get('#root')!.messages.map((m) => m.id)).toEqual([
+        'old-1',
+        'old-2',
+        'old-3',
+        'live-1',
+        'live-2',
+      ]);
+      expect(store.getState().timeTravelLandingId).toBe('old-2');
+    });
   });
 });

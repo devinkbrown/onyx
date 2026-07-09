@@ -129,6 +129,41 @@ export async function loadRecent(target: string, limit = VAULT_KEEP): Promise<Ch
   }
 }
 
+/** Load the local messages nearest a timestamp, returned chronological. */
+export async function loadAround(target: string, at: Date, limit = 50): Promise<ChatMessage[]> {
+  const db = await openVault();
+  if (!db) return [];
+  try {
+    const key = target.toLowerCase();
+    const anchor = at.getTime();
+    const tx = db.transaction(STORE, 'readonly');
+    const idx = tx.objectStore(STORE).index('by_target_time');
+    const range = IDBKeyRange.bound([key, 0], [key, Number.MAX_SAFE_INTEGER]);
+    const rows = await new Promise<StoredMessage[]>((resolve) => {
+      const out: StoredMessage[] = [];
+      const cursorReq = idx.openCursor(range);
+      cursorReq.onsuccess = () => {
+        const cursor = cursorReq.result;
+        if (!cursor) {
+          resolve(out);
+          return;
+        }
+        out.push(cursor.value as StoredMessage);
+        cursor.continue();
+      };
+      cursorReq.onerror = () => resolve(out);
+    });
+    return rows
+      .filter((r) => !r.deleted && !r.redacted)
+      .sort((a, b) => Math.abs(a.time - anchor) - Math.abs(b.time - anchor) || a.time - b.time)
+      .slice(0, limit)
+      .sort((a, b) => a.time - b.time)
+      .map(deserializeMessage);
+  } catch {
+    return [];
+  }
+}
+
 async function pruneTarget(db: IDBDatabase, key: string): Promise<void> {
   try {
     const tx = db.transaction(STORE, 'readwrite');
