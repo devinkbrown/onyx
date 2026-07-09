@@ -386,9 +386,13 @@ describe('AppShell', () => {
       expect(within(memory).getByRole('button', { name: 'Start' })).toBeInTheDocument();
       expect(within(memory).getByRole('button', { name: 'New' })).toBeInTheDocument();
       expect(within(memory).getByRole('button', { name: 'Latest' })).toBeInTheDocument();
+      expect(within(memory).getByRole('button', { name: 'Home' })).toBeInTheDocument();
 
       fireEvent.click(within(memory).getByRole('button', { name: 'Start' }));
       expect(scrollIntoView).toHaveBeenCalled();
+
+      fireEvent.click(within(memory).getByRole('button', { name: 'Home' }));
+      expect(store.getState().activeView).toEqual({ kind: 'home' });
     });
 
     it('follows the room or selected topic from the topic strip', () => {

@@ -178,6 +178,7 @@ function ReaderMemoryStrip(props: {
   onJumpStart: () => void;
   onJumpUnread: () => void;
   onJumpLatest: () => void;
+  onReturnHome: () => void;
 }): JSX.Element {
   const overflow = createMemo(() =>
     Math.max(props.context.voiceCount - props.context.participants.length, 0),
@@ -213,6 +214,7 @@ function ReaderMemoryStrip(props: {
           <button type="button" onClick={() => props.onJumpUnread()}>New</button>
         </Show>
         <button type="button" onClick={() => props.onJumpLatest()}>Latest</button>
+        <button type="button" onClick={() => props.onReturnHome()}>Home</button>
       </nav>
     </section>
   );
@@ -892,6 +894,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                 onJumpStart={scrollToReaderStart}
                 onJumpUnread={scrollToUnreadBoundary}
                 onJumpLatest={() => scrollToBottom(true)}
+                onReturnHome={() => getState().navigate({ kind: 'home' })}
               />
             )}
           </Show>

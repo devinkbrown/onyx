@@ -59,8 +59,8 @@ const phases: Phase[] = [
     title: 'Time-native',
     state: 'active',
     date: '2026-07-09',
-    summary: 'Home now brings followed activity, scheduled rooms, local memory, quiet rooms, return recaps, room rhythm, review-from-start handoffs, reader summaries, shareable moments, reader memory, search handoff, transcript jumps, and digest review completion into view.',
-    items: ['Followed catch-up', 'Scheduled events on Home', 'Vault memory previews', 'Quiet room activity', 'Home return recaps', 'Spotlight handoff', 'Room rhythm heatlines', 'Event context', 'Review from start', 'Reader digest notes', 'Shareable moment links', 'Reader memory context', 'Moment search handoff', 'Reader transcript jumps', 'Digest review handoff', 'Review completion'],
+    summary: 'Home now brings followed activity, scheduled rooms, local memory, quiet rooms, return recaps, room rhythm, review-from-start handoffs, reader summaries, shareable moments, reader memory, search handoff, transcript jumps, digest review completion, and reader return-home affordances into view.',
+    items: ['Followed catch-up', 'Scheduled events on Home', 'Vault memory previews', 'Quiet room activity', 'Home return recaps', 'Spotlight handoff', 'Room rhythm heatlines', 'Event context', 'Review from start', 'Reader digest notes', 'Shareable moment links', 'Reader memory context', 'Moment search handoff', 'Reader transcript jumps', 'Digest review handoff', 'Review completion', 'Reader return Home'],
   },
   {
     phase: 'Phase 7',
@@ -171,7 +171,7 @@ export default function RoadmapRoute() {
             memory previews, quiet room activity, home return recaps, Spotlight
             handoff, room rhythm heatlines, event context, review-from-start
             handoffs, reader digest notes, shareable moment links, reader memory context, moment search handoff,
-            reader transcript jumps, digest review handoff, review completion, and
+            reader transcript jumps, digest review handoff, review completion, reader return-home affordances, and
             quieter activity surfaces.
           </p>
         </article>
@@ -180,7 +180,7 @@ export default function RoadmapRoute() {
           <h3>Keep tightening</h3>
           <div class="data-list data-list--compact">
             <div class="data-row"><div><strong>Catch-up Home</strong><span>Continue local-vault and time-travel review handoffs on the return screen.</span></div></div>
-            <div class="data-row"><div><strong>Reader mode</strong><span>Continue catch-up review history and return-home affordances around remembered transcript context.</span></div></div>
+            <div class="data-row"><div><strong>Reader mode</strong><span>Continue catch-up review history around remembered transcript context.</span></div></div>
             <div class="data-row"><div><strong>Accessibility conformance</strong><span><a href="/accessibility/">Continue channel, voice, and appearance audit evidence.</a></span></div></div>
           </div>
         </aside>

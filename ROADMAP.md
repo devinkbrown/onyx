@@ -210,8 +210,11 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Reviewing the since-you-left handoff
     now clears the rendered unread chapter marker, so reader mode has an explicit
     completion state after the catch-up range is opened.
-    ⏭️ **NEXT** — continue catch-up review history and return-home affordances
-    over existing message buffers and hydration.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — The reader memory strip now includes
+    a direct Home return handoff, so long transcript review can land back on the
+    catch-up surface without losing the remembered context.
+    ⏭️ **NEXT** — continue catch-up review history over existing message buffers
+    and hydration.
 17. **Accessibility conformance ledger** *(main site + client)* — publish the
     public WCAG 2.2 / EN 301 549 audit path and keep it linked from the front
     door while app panels are audited.
