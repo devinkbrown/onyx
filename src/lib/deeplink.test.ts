@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseAtParam, parseEventTime, parseJoinParam } from './deeplink';
+import { buildMomentLink, parseAtParam, parseEventTime, parseJoinParam } from './deeplink';
 
 describe('parseJoinParam', () => {
   it('accepts a plain #channel', () => {
@@ -95,6 +95,18 @@ describe('parseAtParam', () => {
     expect(parseAtParam('2019-12-31T23:59:59Z')).toBeNull();
     expect(parseAtParam('946684800')).toBeNull(); // 2000-01-01 epoch s
     expect(parseAtParam(String(Date.now() + 3 * 24 * 60 * 60 * 1000))).toBeNull();
+  });
+});
+
+describe('buildMomentLink', () => {
+  it('builds the canonical app time-travel URL for a channel moment', () => {
+    expect(
+      buildMomentLink(
+        '#root',
+        new Date('2026-07-08T18:30:00.000Z'),
+        'https://onyx.example/stats?from=old#pulse',
+      ),
+    ).toBe('https://onyx.example/app?join=%23root&at=2026-07-08T18%3A30%3A00.000Z');
   });
 });
 

@@ -71,6 +71,16 @@ export function parseAtParam(raw: string | string[] | null | undefined): Date | 
   return new Date(ms);
 }
 
+export function buildMomentLink(channel: string, at: Date, href = 'https://onyx.local/app'): string {
+  const url = new URL(href);
+  url.pathname = '/app';
+  url.hash = '';
+  url.search = '';
+  url.searchParams.set('join', channel);
+  url.searchParams.set('at', at.toISOString());
+  return url.toString();
+}
+
 /** How far ahead a scheduled event may be set (one year). */
 const EVENT_MAX_FUTURE_MS = 366 * 24 * 60 * 60 * 1000;
 

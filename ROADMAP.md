@@ -185,8 +185,11 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Since-you-left digests now include
     a transcript reader note and render as a quieter chapter marker in reader
     mode, tying catch-up summaries into long-form reading.
-    ⏭️ **NEXT** — add shareable moment framing and deeper vault-backed reading
-    context over existing message buffers and hydration.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Message actions now copy shareable
+    moment links using the same `/app?join=...&at=...` time-travel path as the
+    scrubber, giving reader mode stable anchors into remembered rooms.
+    ⏭️ **NEXT** — deepen vault-backed reading context over existing message
+    buffers and hydration.
 17. **Accessibility conformance ledger** *(main site + client)* — publish the
     public WCAG 2.2 / EN 301 549 audit path and keep it linked from the front
     door while app panels are audited.

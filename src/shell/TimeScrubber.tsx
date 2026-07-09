@@ -10,6 +10,7 @@ import {
   type JSX,
 } from 'solid-js';
 import { useStore } from '@/lib/store';
+import { buildMomentLink } from '@/lib/deeplink';
 import { fetchChannelPulse } from '@/lib/stats/channelStats';
 
 type TimeScrubberBar = {
@@ -89,15 +90,7 @@ function barLabel(bar: TimeScrubberBar, dateValue: string): string {
   return `Jump to ${dateValue} ${pad2(bar.hour)}:00 UTC, ${countText}`;
 }
 
-export function buildMomentLink(channel: string, at: Date, href = 'https://onyx.local/app'): string {
-  const url = new URL(href);
-  url.pathname = '/app';
-  url.hash = '';
-  url.search = '';
-  url.searchParams.set('join', channel);
-  url.searchParams.set('at', at.toISOString());
-  return url.toString();
-}
+export { buildMomentLink };
 
 export function TimeScrubber(): JSX.Element {
   const activeView = useStore((s) => s.activeView);

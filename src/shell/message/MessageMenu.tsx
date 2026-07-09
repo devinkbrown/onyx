@@ -28,6 +28,7 @@ import {
 import { getState, useStore, selectChannelPins, selectIsChannelOp } from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
 import { Popover } from '@/primitives/index';
+import { buildMomentLink } from '@/lib/deeplink';
 import { searchEmojis } from '@/lib/emoji/emoji';
 import { isValidTopicLabel } from '@/lib/topics/topics';
 import { CopyIcon, EditIcon, OverflowIcon, PinIcon, ReactIcon, ReplyIcon, TopicIcon, TrashIcon } from './icons';
@@ -42,6 +43,8 @@ export type MessageMenuCapabilities = {
   canReact: boolean;
   /** Copy is offered whenever there is real text to copy. */
   canCopy: boolean;
+  /** Copy a shareable `/app?join=...&at=...` link for channel messages. */
+  canCopyMoment: boolean;
   /** Start a named conversation from this message; channel messages only. */
   canStartTopic: boolean;
   /** Edit: own, non-deleted, plain text message, and editing is enabled. */
@@ -75,6 +78,7 @@ export function messageMenuCapabilities(input: CapabilityInput): MessageMenuCapa
     canReply: !gone,
     canReact: !gone,
     canCopy: hasText,
+    canCopyMoment: !gone && input.channelTarget,
     canStartTopic: !gone && input.channelTarget && hasText,
     canEdit: !gone && isOwn && editingEnabled && msg.type === 'msg',
     canDelete: !gone && isOwn && deleteSupported,
@@ -198,6 +202,39 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
     } catch {
       // Clipboard can reject (denied permission / insecure context). Failing to
       // copy is non-fatal; we simply close the menu without surfacing an error.
+    }
+    setMenuOpen(false);
+  }
+
+  async function copyMomentLink(): Promise<void> {
+    if (!caps().canCopyMoment) return;
+    const href = typeof window !== 'undefined' ? window.location.href : undefined;
+    const link = buildMomentLink(local.target, local.msg.time, href);
+
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(link);
+      } else if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('onyx:last-copied-moment', link);
+      }
+      getState().addToast({
+        variant: 'success',
+        title: 'Moment copied',
+        description: 'Link opens this room near the selected message.',
+      });
+    } catch {
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('onyx:last-copied-moment', link);
+          getState().addToast({
+            variant: 'success',
+            title: 'Moment saved',
+            description: 'Clipboard was unavailable, so the link was saved locally.',
+          });
+        }
+      } catch {
+        /* no clipboard or storage — non-fatal */
+      }
     }
     setMenuOpen(false);
   }
@@ -348,6 +385,12 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
               <button type="button" class="msg-menu-item" role="menuitem" onClick={() => void copyText()}>
                 <CopyIcon class="msg-menu-item-icon" />
                 <span>Copy text</span>
+              </button>
+            </Show>
+            <Show when={caps().canCopyMoment}>
+              <button type="button" class="msg-menu-item" role="menuitem" onClick={() => void copyMomentLink()}>
+                <CopyIcon class="msg-menu-item-icon" />
+                <span>Copy moment link</span>
               </button>
             </Show>
             <Show when={caps().canReply}>
