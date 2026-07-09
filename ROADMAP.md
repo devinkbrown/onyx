@@ -414,6 +414,10 @@ client or public site needs to expose the result.
     shell root, and uses them for subtle ribbon/conversation chrome. The public
     accessibility ledger now documents that room identity stays token-bounded
     instead of accepting arbitrary community CSS.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Preferences now starts with a
+    dedicated Theme and background launcher, giving mobile users a persistent
+    path from the bottom `prefs` tab into the Appearance sheet without adding
+    another crowded bottom-nav item.
 27. **Contrast, transparency, and drawer focus variants** *(client + main site)*
     — mechanically derive `prefers-contrast: more`, forced-colors, and
     reduced-transparency variants from the same tokens already used by the app

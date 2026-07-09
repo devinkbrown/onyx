@@ -254,6 +254,61 @@
   color: var(--washi-mute);
 }
 
+.pref-action-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 58px;
+  padding: var(--space-3);
+  border: 1px solid color-mix(in oklab, var(--lapis-bright) 34%, var(--line));
+  border-radius: var(--r-md);
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--lapis) 14%, transparent), transparent 70%),
+    color-mix(in oklab, var(--ink) 45%, transparent);
+  color: var(--washi);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+
+.pref-action-card:hover {
+  border-color: color-mix(in oklab, var(--lapis-bright) 58%, var(--line));
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--lapis) 20%, transparent), transparent 70%),
+    color-mix(in oklab, var(--ink) 52%, transparent);
+}
+
+.pref-action-card:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.pref-action-card__icon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  color: var(--lapis-bright);
+  font-size: 1.05rem;
+}
+
+.pref-action-card__body {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.pref-action-card__title {
+  color: var(--washi);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
 /* Segmented control — a row of mutually-exclusive options. */
 .pref-segments {
   display: flex;

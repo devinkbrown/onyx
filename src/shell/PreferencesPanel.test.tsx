@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { recordClientExtensionActionRun } from '@/lib/extensions/clientActions';
 import { closePreferences, openPreferences, resetPreferences } from '@/lib/prefs/preferences';
 import { sceneMotion, setSceneMotion } from '@/lib/prefs/sceneMotion';
+import { store } from '@/lib/store/store';
 import { PreferencesPanel } from './PreferencesPanel';
 
 describe('PreferencesPanel', () => {
@@ -10,12 +11,14 @@ describe('PreferencesPanel', () => {
     localStorage.clear();
     resetPreferences();
     closePreferences();
+    store.setState({ showAppearance: false });
   });
 
   afterEach(() => {
     cleanup();
     closePreferences();
     localStorage.clear();
+    store.setState({ showAppearance: false });
   });
 
   it('surfaces the client accessibility audit ledger', () => {
@@ -23,6 +26,8 @@ describe('PreferencesPanel', () => {
     render(() => <PreferencesPanel />);
 
     expect(screen.getByTestId('preferences-panel')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Theme and background/i })).toBeInTheDocument();
+    expect(screen.getByText('Open Appearance for themes, room atmosphere, shared theme import, and background selection.')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Client access audit' })).toBeInTheDocument();
     expect(screen.getByText('Feature switches')).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /Show 24-hour activity strip/i })).toHaveAttribute('aria-checked', 'true');
@@ -99,6 +104,15 @@ describe('PreferencesPanel', () => {
       'href',
       '/accessibility/',
     );
+  });
+
+  it('opens Appearance from Preferences for mobile theming discoverability', () => {
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Theme and background/i }));
+
+    expect(store.getState().showAppearance).toBe(true);
   });
 
   it('reviews portable vault imports before merging them', async () => {

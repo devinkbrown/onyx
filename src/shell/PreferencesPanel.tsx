@@ -559,6 +559,32 @@ function PreferenceSection(props: { title: string; description: string }): JSX.E
   );
 }
 
+function AppearanceLauncher(): JSX.Element {
+  function openAppearanceFromPreferences(): void {
+    closePreferences();
+    getState().openAppearance();
+  }
+
+  return (
+    <section class="pref-group pref-appearance-entry" aria-labelledby="pref-appearance-entry-title">
+      <button
+        type="button"
+        class="pref-action-card"
+        aria-haspopup="dialog"
+        onClick={openAppearanceFromPreferences}
+      >
+        <span class="pref-action-card__icon" aria-hidden="true">◐</span>
+        <span class="pref-action-card__body">
+          <span id="pref-appearance-entry-title" class="pref-action-card__title">Theme and background</span>
+          <span class="pref-desc">
+            Open Appearance for themes, room atmosphere, shared theme import, and background selection.
+          </span>
+        </span>
+      </button>
+    </section>
+  );
+}
+
 export function PreferencesPanel(): JSX.Element {
   return (
     <Sheet
@@ -569,6 +595,8 @@ export function PreferencesPanel(): JSX.Element {
       closeLabel="Close preferences"
     >
       <div class="pref-panel" data-testid="preferences-panel">
+        <AppearanceLauncher />
+
         <PreferenceSection
           title="Display"
           description="Reading rhythm, type scale, and transcript behavior."
