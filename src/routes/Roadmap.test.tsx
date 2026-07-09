@@ -107,6 +107,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Caption provenance labels')).toBeInTheDocument();
     expect(screen.getByText('Extension action audit')).toBeInTheDocument();
     expect(screen.getByText('Digest recall terms')).toBeInTheDocument();
+    expect(screen.getByText('Digest review history')).toBeInTheDocument();
     expect(screen.getByText('Agent safety page')).toBeInTheDocument();
     expect(screen.getByText('Provenance labels')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Roaming' })).toBeInTheDocument();

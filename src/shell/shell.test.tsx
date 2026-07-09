@@ -20,7 +20,7 @@ import { store } from '@/lib/store/store';
 import type { Channel } from '@/lib/irc/types';
 import type { ChatMessage, ChannelUser } from '@/lib/irc/types';
 import { followed, isFollowed, unfollow } from '@/lib/notifications/followed';
-import { recordReviewHistory } from '@/lib/notifications/reviewHistory';
+import { readReviewHistory, recordReviewHistory } from '@/lib/notifications/reviewHistory';
 import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
 import { _resetVaultForTests, queueOutbox, saveMessages } from '@/lib/vault/historyVault';
 import { Spotlight } from '@/chat/spotlight';
@@ -410,6 +410,13 @@ describe('AppShell', () => {
       expect(scrollIntoView).toHaveBeenCalled();
       expect(screen.queryByRole('region', { name: 'Since you left' })).not.toBeInTheDocument();
       expect(store.getState().viewUnreadDividerId.has('#general')).toBe(false);
+      expect(readReviewHistory()[0]).toMatchObject({
+        target: '#general',
+        firstMessageId: 'msg-new-a',
+        messageCount: 2,
+        mentionCount: 1,
+        preview: 'New note two',
+      });
     });
 
     it('shows device-memory context in reader mode', () => {

@@ -20,6 +20,7 @@ import { bucketUnreadByTopic, isValidTopicLabel, parseTopicRegistry, TOPIC_PROP 
 import { followed, isFollowed, toggleFollow } from '@/lib/notifications/followed';
 import {
   latestReviewForTarget,
+  recordReviewHistory,
   type ReviewHistoryEntry,
 } from '@/lib/notifications/reviewHistory';
 import { buildSinceDigest } from '@/lib/notifications/sinceDigest';
@@ -57,6 +58,11 @@ export type MessageViewProps = {
 
 const SYSTEM_TYPES = new Set(['join', 'part', 'quit', 'kick', 'mode', 'topic', 'nick', 'system', 'error']);
 const READER_MEMORY_PARTICIPANTS = 4;
+
+function clippedDigestPreview(text: string, max = 96): string {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  return normalized.length > max ? `${normalized.slice(0, max)}...` : normalized;
+}
 
 export type ReaderMemoryContext = {
   target: string;
@@ -835,6 +841,28 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   function reviewUnreadBoundary(): void {
     const target = activeTarget();
     if (!target) return;
+    const dividerId = unreadDividerId();
+    const digest = sinceDigest();
+    const divider = dividerId ? allMessages().find((message) => message.id === dividerId) : null;
+    if (target.startsWith('#') && dividerId && digest && divider) {
+      const dividerIndex = allMessages().findIndex((message) => message.id === dividerId);
+      const unreadMessages = messages().filter((message) => {
+        const index = allMessages().findIndex((candidate) => candidate.id === message.id);
+        return index >= dividerIndex && !isSystemMsg(message);
+      });
+      const latest = unreadMessages[unreadMessages.length - 1];
+      recordReviewHistory({
+        target,
+        name: target,
+        kind: 'channel',
+        firstMessageId: dividerId,
+        firstAt: divider.time.toISOString(),
+        reviewedAt: new Date().toISOString(),
+        messageCount: digest.totalMessages,
+        mentionCount: digest.totalMentions,
+        preview: clippedDigestPreview(latest ? (latest.plaintext ?? latest.text) : target),
+      });
+    }
     scrollToUnreadBoundary();
     getState().clearViewUnreadDivider(target);
   }
