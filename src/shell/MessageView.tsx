@@ -873,7 +873,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
           <Show when={sinceDigest()}>
             {(digest) => (
               <div class="shell-since-digest-card">
-                <SinceDigestCard digest={digest()} />
+                <SinceDigestCard digest={digest()} onReviewUnread={scrollToUnreadBoundary} />
               </div>
             )}
           </Show>

@@ -15,6 +15,7 @@ const MAX_VISIBLE_PARTICIPANTS = 3;
 export function SinceDigestCard(props: {
   digest: SinceDigest;
   onOpenChannel?: (channel: string) => void;
+  onReviewUnread?: () => void;
 }): JSX.Element {
   return (
     <section class="since-digest-card" aria-label="Since you left">
@@ -22,7 +23,20 @@ export function SinceDigestCard(props: {
         <p class="since-digest-card__kicker">Since you left</p>
         <h2 class="since-digest-card__title">{digestHeadline(props.digest)}</h2>
         <p class="since-digest-card__reader-note">{digestReaderNote(props.digest)}</p>
-        <p class="since-digest-card__since">since {formatSince(props.digest.since)}</p>
+        <div class="since-digest-card__handoff">
+          <p class="since-digest-card__since">since {formatSince(props.digest.since)}</p>
+          <Show when={props.digest.totalMessages > 0 ? props.onReviewUnread : undefined} keyed>
+            {(onReviewUnread) => (
+              <button
+                type="button"
+                class="since-digest-card__review"
+                onClick={() => onReviewUnread()}
+              >
+                Review new messages
+              </button>
+            )}
+          </Show>
+        </div>
       </header>
 
       <Show

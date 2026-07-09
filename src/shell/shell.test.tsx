@@ -304,6 +304,11 @@ describe('AppShell', () => {
     });
 
     it('renders a since-you-left digest from the unread boundary', () => {
+      const scrollIntoView = vi.fn();
+      Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
+        value: scrollIntoView,
+        configurable: true,
+      });
       const channel = makeChannel(
         '#general',
         [
@@ -332,6 +337,9 @@ describe('AppShell', () => {
       expect(within(digest).getByText('Read from here: bob and carol added 2 lines.')).toBeInTheDocument();
       expect(within(digest).getByText('bob')).toBeInTheDocument();
       expect(within(digest).getByText('carol')).toBeInTheDocument();
+
+      fireEvent.click(within(digest).getByRole('button', { name: 'Review new messages' }));
+      expect(scrollIntoView).toHaveBeenCalled();
     });
 
     it('shows device-memory context in reader mode', () => {

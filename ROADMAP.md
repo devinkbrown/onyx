@@ -197,7 +197,9 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — The reader memory band now doubles
     as transcript navigation with Start/New/Latest jumps for hydrated buffers
     and unread boundaries.
-    ⏭️ **NEXT** — continue reader-mode review handoff and catch-up navigation
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Since-you-left digests now include
+    a review handoff that jumps straight to the unread transcript boundary.
+    ⏭️ **NEXT** — continue catch-up navigation and review completion affordances
     over existing message buffers and hydration.
 17. **Accessibility conformance ledger** *(main site + client)* — publish the
     public WCAG 2.2 / EN 301 549 audit path and keep it linked from the front

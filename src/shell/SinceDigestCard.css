@@ -43,6 +43,32 @@
   font-size: 0.72rem;
 }
 
+.since-digest-card__handoff {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+
+.since-digest-card__review {
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in oklab, var(--lapis-bright) 34%, transparent);
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--lapis) 12%, transparent);
+  color: var(--washi);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.since-digest-card__review:hover,
+.since-digest-card__review:focus-visible {
+  border-color: color-mix(in oklab, var(--lapis-bright) 62%, transparent);
+  background: color-mix(in oklab, var(--lapis) 20%, transparent);
+}
+
 .since-digest-card__reader-note {
   margin: 2px 0 0;
   max-width: 58ch;
