@@ -510,6 +510,9 @@ client or public site needs to expose the result.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home now reads the persisted offline
     outbox and shows the exact queued-send count in local-memory mode, turning
     reconnect reconciliation into visible device state instead of hidden queueing.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Channel topic moderation now keeps
+    unsaved edits as local offline drafts, disables connected-only saves while
+    disconnected, and sends the same draft through TOPIC after reconnect.
 39. **PWA and desktop packaging path** *(client + main site)* — make install,
     update, notification, and wrapped push behavior explicit for browser PWA,
     desktop shell, and future mobile wrappers.

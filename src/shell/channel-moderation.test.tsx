@@ -65,6 +65,7 @@ function seedChannel(opts: { ourNick: string; users: ChannelUser[]; modes?: stri
 
 beforeEach(() => {
   store.setState(initialState, true);
+  localStorage.clear();
 });
 
 afterEach(() => {
@@ -232,6 +233,33 @@ describe('ChannelSettings panel', () => {
 
     // Assert
     expect(client.sendRaw).toHaveBeenCalledWith('TOPIC', '#general', 'A brand new topic');
+  });
+
+  it('keeps an offline topic draft until reconnect', () => {
+    // Arrange — op with the channel settings sheet available, but transport down.
+    const client = seedChannel({ ourNick: 'me', users: [makeUser('me', ['o'])] });
+    store.setState({ connectionStatus: 'disconnected' });
+
+    // Act — draft while offline.
+    openSettings();
+    const textarea = screen.getByLabelText('Topic text') as HTMLTextAreaElement;
+    fireEvent.input(textarea, { target: { value: 'Drafted during a tunnel drop' } });
+
+    // Assert — the draft is local and cannot silently no-op as a TOPIC command.
+    expect(screen.getByText('Offline: topic changes stay drafted on this device and can be saved after reconnect.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save topic' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Save topic' }));
+    expect(client.sendRaw).not.toHaveBeenCalledWith('TOPIC', '#general', 'Drafted during a tunnel drop');
+
+    // Act — reopen later and reconnect.
+    cleanup();
+    openSettings();
+    expect(screen.getByLabelText('Topic text')).toHaveValue('Drafted during a tunnel drop');
+    store.setState({ connectionStatus: 'connected' });
+    fireEvent.click(screen.getByRole('button', { name: 'Save topic' }));
+
+    // Assert — the same draft sends through the normal server path.
+    expect(client.sendRaw).toHaveBeenCalledWith('TOPIC', '#general', 'Drafted during a tunnel drop');
   });
 
   it('lets an op set ephemeral history retention', () => {

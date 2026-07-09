@@ -55,6 +55,45 @@ const EPHEMERAL_PRESETS: ReadonlyArray<{ seconds: number; label: string }> = [
   { seconds: 2_592_000, label: '30 days' },
 ];
 
+const CHANNEL_TOPIC_DRAFTS_KEY = 'onyx:channel-topic-drafts';
+
+function channelTopicDraftKey(channel: string): string {
+  return channel.trim().toLowerCase();
+}
+
+function readTopicDrafts(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(CHANNEL_TOPIC_DRAFTS_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? Object.fromEntries(
+          Object.entries(parsed).filter(([, value]) => typeof value === 'string'),
+        ) as Record<string, string>
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function readTopicDraft(channel: string): string | null {
+  const key = channelTopicDraftKey(channel);
+  return readTopicDrafts()[key] ?? null;
+}
+
+function saveTopicDraft(channel: string, draft: string, serverTopic: string): void {
+  const key = channelTopicDraftKey(channel);
+  if (!key) return;
+  try {
+    const drafts = readTopicDrafts();
+    if (draft === serverTopic) delete drafts[key];
+    else drafts[key] = draft;
+    if (Object.keys(drafts).length === 0) localStorage.removeItem(CHANNEL_TOPIC_DRAFTS_KEY);
+    else localStorage.setItem(CHANNEL_TOPIC_DRAFTS_KEY, JSON.stringify(drafts));
+  } catch {
+    /* best-effort local draft */
+  }
+}
+
 function formatEphemeral(seconds: number | null): string {
   if (!seconds) return 'Full history';
   const preset = EPHEMERAL_PRESETS.find((p) => p.seconds === seconds);
@@ -80,10 +119,12 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
   const ephemeralSeconds = useStore((s) => selectChannelEphemeralSeconds(local.channel)(s));
   const serviceNotices = useStore((s) => s.serviceNotices);
   const isOp = useStore((s) => selectIsChannelOp(local.channel)(s));
+  const connectionStatus = useStore((s) => s.connectionStatus);
 
   const channel = createMemo(() =>
     channels().get(local.channel.toLowerCase()) ?? null,
   );
+  const isConnected = createMemo(() => connectionStatus() === 'connected');
 
   // ── Topic editing ──────────────────────────────────────────────────────
   const serverTopic = createMemo(() => channel()?.topic ?? '');
@@ -93,7 +134,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
   // (and we're not mid-edit). Keeps the field in sync without clobbering typing.
   createEffect(() => {
     if (local.open) {
-      setTopicDraft(serverTopic());
+      setTopicDraft(readTopicDraft(local.channel) ?? serverTopic());
     }
   });
 
@@ -104,13 +145,14 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
 
   function submitTopic(event: Event): void {
     event.preventDefault();
-    if (!canEditTopic() || !topicDirty()) return;
+    if (!canEditTopic() || !topicDirty() || !isConnected()) return;
     getState().setTopic(channel()?.name ?? local.channel, topicDraft());
+    saveTopicDraft(local.channel, serverTopic(), serverTopic());
   }
 
   // ── Mode toggles (op-only) ───────────────────────────────────────────────
   function toggleFlag(letter: string, currentlyOn: boolean): void {
-    if (!isOp()) return;
+    if (!isOp() || !isConnected()) return;
     getState().setChannelMode(channel()?.name ?? local.channel, currentlyOn ? `-${letter}` : `+${letter}`);
   }
 
@@ -122,7 +164,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
 
   function applyKey(event: Event): void {
     event.preventDefault();
-    if (!isOp()) return;
+    if (!isOp() || !isConnected()) return;
     const next = keyDraft().trim();
     const current = modeState().key ?? '';
     if (next === current) return;
@@ -142,7 +184,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
 
   function applyLimit(event: Event): void {
     event.preventDefault();
-    if (!isOp()) return;
+    if (!isOp() || !isConnected()) return;
     const raw = limitDraft().trim();
     const current = modeState().limit;
     const name = channel()?.name ?? local.channel;
@@ -164,7 +206,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
 
   function applyEphemeral(event: Event): void {
     event.preventDefault();
-    if (!isOp()) return;
+    if (!isOp() || !isConnected()) return;
     const seconds = Number(ephemeralDraft());
     if (!Number.isInteger(seconds)) return;
     if (seconds === (ephemeralSeconds() ?? 0)) return;
@@ -183,18 +225,18 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
 
   function createWebhook(event: Event): void {
     event.preventDefault();
-    if (!isOp()) return;
+    if (!isOp() || !isConnected()) return;
     getState().webhookCreate(channel()?.name ?? local.channel, webhookName());
   }
 
   function listWebhooks(): void {
-    if (!isOp()) return;
+    if (!isOp() || !isConnected()) return;
     getState().webhookList(channel()?.name ?? local.channel);
   }
 
   function deleteWebhook(event: Event): void {
     event.preventDefault();
-    if (!isOp()) return;
+    if (!isOp() || !isConnected()) return;
     const id = webhookDeleteId().trim();
     if (!id) return;
     getState().webhookDelete(id);
@@ -243,17 +285,25 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                 id="chset-topic-input"
                 class="shell-chset-textarea"
                 value={topicDraft()}
-                onInput={(e) => setTopicDraft(e.currentTarget.value)}
+                onInput={(e) => {
+                  setTopicDraft(e.currentTarget.value);
+                  saveTopicDraft(local.channel, e.currentTarget.value, serverTopic());
+                }}
                 rows={3}
                 aria-describedby="chset-topic-hint"
               />
               <p id="chset-topic-hint" class="shell-chset-hint">
-                <Show when={topicLocked()} fallback="Press Save to update the channel topic.">
-                  Topic-locked (+t): your op rank lets you edit it.
+                <Show
+                  when={isConnected()}
+                  fallback="Offline: topic changes stay drafted on this device and can be saved after reconnect."
+                >
+                  <Show when={topicLocked()} fallback="Press Save to update the channel topic.">
+                    Topic-locked (+t): your op rank lets you edit it.
+                  </Show>
                 </Show>
               </p>
               <div class="shell-chset-actions">
-                <Button type="submit" variant="primary" size="sm" disabled={!topicDirty()}>
+                <Button type="submit" variant="primary" size="sm" disabled={!topicDirty() || !isConnected()}>
                   Save topic
                 </Button>
               </div>
@@ -287,6 +337,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                         role="switch"
                         aria-checked={on() ? 'true' : 'false'}
                         class={`shell-chset-toggle${on() ? ' shell-chset-toggle--on' : ''}`}
+                        disabled={!isConnected()}
                         onClick={() => toggleFlag(flag.letter, on())}
                       >
                         <span class="shell-chset-toggle-track" aria-hidden="true">
@@ -316,7 +367,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                 autocomplete="off"
                 onInput={(e) => setKeyDraft(e.currentTarget.value)}
               />
-              <Button type="submit" variant="ghost" size="sm">Apply key</Button>
+              <Button type="submit" variant="ghost" size="sm" disabled={!isConnected()}>Apply key</Button>
             </form>
 
             {/* Limit (+l) */}
@@ -331,7 +382,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                 value={limitDraft()}
                 onInput={(e) => setLimitDraft(e.currentTarget.value)}
               />
-              <Button type="submit" variant="ghost" size="sm">Apply limit</Button>
+              <Button type="submit" variant="ghost" size="sm" disabled={!isConnected()}>Apply limit</Button>
             </form>
           </Show>
         </section>
@@ -368,7 +419,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
               <p id="chset-ephemeral-hint" class="shell-chset-hint">
                 When enabled, replay and search omit messages older than this window, and channel stats skip new messages.
               </p>
-              <Button type="submit" variant="ghost" size="sm" disabled={ephemeralDraft() === String(ephemeralSeconds() ?? 0)}>
+              <Button type="submit" variant="ghost" size="sm" disabled={!isConnected() || ephemeralDraft() === String(ephemeralSeconds() ?? 0)}>
                 Apply retention
               </Button>
             </form>
@@ -401,8 +452,8 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                   onInput={(e) => setWebhookName(e.currentTarget.value)}
                 />
                 <div class="shell-chset-inline-actions">
-                  <Button type="submit" variant="ghost" size="sm">Create webhook</Button>
-                  <Button type="button" variant="ghost" size="sm" onClick={listWebhooks}>List webhooks</Button>
+                  <Button type="submit" variant="ghost" size="sm" disabled={!isConnected()}>Create webhook</Button>
+                  <Button type="button" variant="ghost" size="sm" disabled={!isConnected()} onClick={listWebhooks}>List webhooks</Button>
                 </div>
               </form>
 
@@ -415,7 +466,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                   value={webhookDeleteId()}
                   onInput={(e) => setWebhookDeleteId(e.currentTarget.value)}
                 />
-                <Button type="submit" variant="ghost" size="sm" disabled={!webhookDeleteId().trim()}>
+                <Button type="submit" variant="ghost" size="sm" disabled={!isConnected() || !webhookDeleteId().trim()}>
                   Delete webhook
                 </Button>
               </form>
