@@ -42,6 +42,9 @@ export type UseMessageSearch = {
   hasConversation: Accessor<boolean>;
   /** Device-memory (vault) hits from OTHER conversations, newest first */
   vaultResults: Accessor<VaultSearchResult[]>;
+  /** Device-only lexical pivots from visible and vault hits */
+  recallSuggestions: Accessor<string[]>;
+  applyRecallSuggestion: (term: string) => void;
   /** Open a vault hit: navigate to its conversation and land on the message */
   openVaultResult: (result: VaultSearchResult) => void;
   open: () => void;
@@ -54,9 +57,54 @@ const [isMessageSearchOpen, setMessageSearchOpen] = createSignal(false);
 const [messageSearchQuery, setMessageSearchQuerySignal] = createSignal('');
 const [messageSearchActiveIndex, setMessageSearchActiveIndex] = createSignal(0);
 const [messageSearchActiveResultId, setMessageSearchActiveResultId] = createSignal<string | null>(null);
+const SEARCH_RECALL_LIMIT = 5;
+const SEARCH_RECALL_STOP_WORDS = new Set([
+  'about',
+  'after',
+  'again',
+  'also',
+  'because',
+  'before',
+  'being',
+  'could',
+  'from',
+  'have',
+  'here',
+  'into',
+  'just',
+  'like',
+  'line',
+  'lines',
+  'message',
+  'messages',
+  'need',
+  'note',
+  'once',
+  'only',
+  'over',
+  'room',
+  'that',
+  'their',
+  'then',
+  'there',
+  'they',
+  'this',
+  'with',
+  'would',
+]);
 
 function normalized(value: string): string {
   return value.trim().toLocaleLowerCase();
+}
+
+function recallTermsFromText(text: string): string[] {
+  const terms = new Set<string>();
+  for (const raw of text.toLowerCase().match(/[a-z0-9][a-z0-9-]{2,}/g) ?? []) {
+    const term = raw.replace(/^-+|-+$/g, '');
+    if (term.length < 3 || SEARCH_RECALL_STOP_WORDS.has(term)) continue;
+    terms.add(term);
+  }
+  return [...terms];
 }
 
 function sortedMessages(messages: readonly ChatMessage[]): ChatMessage[] {
@@ -272,6 +320,26 @@ export function useMessageSearch(): UseMessageSearch {
     if (vaultTimer !== undefined) clearTimeout(vaultTimer);
   });
 
+  const recallSuggestions = createMemo(() => {
+    const query = normalized(messageSearchQuery());
+    if (query.length < 2) return [];
+
+    const blocked = new Set(recallTermsFromText(query));
+    blocked.add(query);
+    const counts = new Map<string, number>();
+    for (const result of [...results(), ...vaultHits()]) {
+      for (const term of recallTermsFromText(result.text)) {
+        if (blocked.has(term)) continue;
+        counts.set(term, (counts.get(term) ?? 0) + 1);
+      }
+    }
+
+    return [...counts.entries()]
+      .sort(([aTerm, aCount], [bTerm, bCount]) => bCount - aCount || aTerm.localeCompare(bTerm))
+      .slice(0, SEARCH_RECALL_LIMIT)
+      .map(([term]) => term);
+  });
+
   function openVaultResult(result: VaultSearchResult): void {
     getState().openVaultResult(result.target, result.id);
     closeMessageSearch();
@@ -301,6 +369,8 @@ export function useMessageSearch(): UseMessageSearch {
     targetLabel,
     hasConversation,
     vaultResults: vaultHits,
+    recallSuggestions,
+    applyRecallSuggestion: setQuery,
     openVaultResult,
     open: openMessageSearch,
     close: closeMessageSearch,

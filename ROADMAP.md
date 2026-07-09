@@ -471,6 +471,10 @@ client or public site needs to expose the result.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Since-you-left digests now extract
     local lexical recall terms from missed visible lines and render them as
     device-local cue chips, adding recall help without network inference.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Message search now derives local
+    recall pivot chips from visible-buffer and device-vault hits only, letting
+    users refine "what did we decide" searches without invoking server history
+    or any external inference endpoint.
 36. **Local catch-up, captions, and translation** *(client)* — extend catch-up
     and media surfaces with optional local recap, caption, and translation
     affordances, keeping AI out of the front-door interaction model.

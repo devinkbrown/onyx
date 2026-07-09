@@ -138,6 +138,51 @@
   color: var(--washi-mute);
 }
 
+.onyx-message-search__recall {
+  pointer-events: auto;
+  width: min(42rem, 100%);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--stone-2) 54%, transparent),
+      color-mix(in oklab, var(--ink) 72%, transparent)
+    ),
+    color-mix(in oklab, var(--ink) 82%, var(--stone));
+  box-shadow: 0 16px 42px -32px color-mix(in oklab, var(--ink) 96%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.15);
+  backdrop-filter: blur(16px) saturate(1.15);
+}
+
+.onyx-message-search__recall-chip {
+  appearance: none;
+  border: 1px solid color-mix(in oklab, var(--lapis-bright) 28%, transparent);
+  border-radius: 999px;
+  padding: 0.22rem 0.55rem;
+  color: var(--washi);
+  background: color-mix(in oklab, var(--lapis) 10%, transparent);
+  font: 740 0.68rem/1 var(--font-mono);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.onyx-message-search__recall-chip:hover {
+  color: var(--lapis-bright);
+  border-color: color-mix(in oklab, var(--lapis-bright) 54%, transparent);
+  background: color-mix(in oklab, var(--lapis) 18%, transparent);
+}
+
+.onyx-message-search__recall-chip:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
 .shell-msg-search-current {
   background:
     linear-gradient(

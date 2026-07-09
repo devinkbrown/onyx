@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import { cleanup, render, screen, waitFor, within } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -97,5 +97,29 @@ describe('MessageSearch', () => {
       expect(within(vaultList).getByText('needle saved only on this device')).toBeInTheDocument();
       expect(within(vaultList).queryByText('needle in the live buffer')).not.toBeInTheDocument();
     });
+  });
+
+  it('offers device recall terms for local search pivots', async () => {
+    const liveA = message('live-needle-a', 'Kai', 'needle mobile launch brief', 1);
+    const liveB = message('live-needle-b', 'Mira', 'needle mobile release plan', 2);
+    const vaulted = message('vault-needle', 'Noa', 'needle mobile archive handoff', 3, '#other');
+    await saveMessages('#other', [vaulted]);
+    store.setState({
+      ...initialState,
+      activeView: { kind: 'channel', channel: '#root' },
+      channels: new Map([['#root', channel('#root', [liveA, liveB])]]),
+      connectionStatus: 'disconnected',
+    }, true);
+    openMessageSearchWithQuery('needle');
+
+    render(() => <MessageSearch />);
+
+    const recall = await screen.findByRole('group', { name: 'Device recall terms' });
+    expect(screen.getByLabelText(/Search recall terms provenance: This device/i)).toBeInTheDocument();
+    expect(within(recall).getByRole('button', { name: 'mobile' })).toBeInTheDocument();
+
+    fireEvent.click(within(recall).getByRole('button', { name: 'mobile' }));
+
+    expect(screen.getByRole('searchbox', { name: 'Search messages' })).toHaveValue('mobile');
   });
 });

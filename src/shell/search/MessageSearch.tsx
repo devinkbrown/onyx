@@ -228,6 +228,22 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
             </button>
           </div>
         </div>
+        <Show when={search.recallSuggestions().length > 0}>
+          <div class="onyx-message-search__recall" role="group" aria-label="Device recall terms">
+            <ProvenanceBadge scope="device" subject="Search recall terms" />
+            <For each={search.recallSuggestions()}>
+              {(term) => (
+                <button
+                  type="button"
+                  class="onyx-message-search__recall-chip"
+                  onClick={() => search.applyRecallSuggestion(term)}
+                >
+                  {term}
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
         <Show when={search.canServerSearch() && search.query().trim().length > 0}>
           <div class="onyx-message-search__server" data-testid="server-search">
             <div class="onyx-message-search__server-bar">
