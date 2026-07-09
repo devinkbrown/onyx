@@ -7,6 +7,7 @@
  */
 import { createMemo, createSignal, onCleanup, Show, type JSX } from 'solid-js';
 import { useStore, getState, selectChannelEvent, selectIsChannelOp } from '@/lib/store';
+import { eventCountdown, scheduledEventVisible } from '@/lib/notifications/scheduledEvents';
 
 type ScheduledEventLineProps = { channel: string };
 
@@ -24,17 +25,12 @@ export function ScheduledEventLine(props: ScheduledEventLineProps): JSX.Element 
   // Hide an event more than an hour after it started (it has happened).
   const visible = createMemo(() => {
     const e = event();
-    return !!e && now() < startMs() + 60 * 60 * 1000;
+    return !!e && scheduledEventVisible(e, now());
   });
 
   const countdown = createMemo(() => {
-    const delta = startMs() - now();
-    if (delta <= 0) return 'happening now';
-    const mins = Math.round(delta / 60000);
-    if (mins < 60) return `in ${mins} min`;
-    const hrs = Math.round(mins / 60);
-    if (hrs < 48) return `in ${hrs}h`;
-    return `in ${Math.round(hrs / 24)}d`;
+    const e = event();
+    return e ? eventCountdown(e, now()) : '';
   });
 
   const whenLabel = createMemo(() =>

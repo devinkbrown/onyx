@@ -14,6 +14,7 @@ import { preferences } from '@/lib/prefs/preferences';
 import { parseEventTime } from '@/lib/deeplink';
 import { isValidTopicLabel, parseMessageTopic, topicMessageTag } from '@/lib/topics/topics';
 import { isFollowed } from '@/lib/notifications/followed';
+import { parseScheduledEvent, type ScheduledEvent } from '@/lib/notifications/scheduledEvents';
 import {
   composerDraftKey,
   getComposerDraft as readComposerDraft,
@@ -8949,9 +8950,6 @@ export const selectChannelPins = (channel: string) => (s: OnyxState): string[] =
   return raw.split(',').map(id => id.trim()).filter(Boolean);
 };
 
-/** A scheduled event on a channel — an op-set "voice room as a place" marker. */
-export type ScheduledEvent = { at: number; title: string };
-
 /**
  * The channel's scheduled event, parsed from its `ocean.event` prop
  * (`<unix_seconds>|<title>`). Returns null when unset or malformed. Events
@@ -8960,13 +8958,7 @@ export type ScheduledEvent = { at: number; title: string };
  */
 export const selectChannelEvent = (channel: string) => (s: OnyxState): ScheduledEvent | null => {
   const raw = s.channelProps.get(channel.toLowerCase())?.['ocean.event'];
-  if (!raw) return null;
-  const sep = raw.indexOf('|');
-  if (sep < 1) return null;
-  const at = Number(raw.slice(0, sep));
-  const title = raw.slice(sep + 1).trim();
-  if (!Number.isFinite(at) || at <= 0 || !title) return null;
-  return { at, title };
+  return parseScheduledEvent(raw);
 };
 
 /** Ephemeral-room TTL, parsed from the IRCX `EPHEMERAL` channel prop. */

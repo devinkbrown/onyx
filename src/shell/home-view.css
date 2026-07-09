@@ -46,6 +46,100 @@
 }
 
 /* Pulse strip */
+.home-events {
+  margin: 0 0 28px;
+}
+.home-events-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.home-events-head .home-section-label {
+  margin: 0;
+}
+.home-events-summary {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--washi-mute);
+}
+.home-events-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.home-event {
+  width: 100%;
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: minmax(112px, 0.34fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  text-align: left;
+  border: 1px solid color-mix(in oklab, var(--lapis) 28%, var(--line));
+  border-left: 2px solid var(--lapis-bright);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--lapis) 10%, var(--stone));
+  color: var(--washi);
+  cursor: pointer;
+  transition: border-color var(--dur, 200ms) var(--ease),
+    background var(--dur, 200ms) var(--ease);
+}
+.home-event:hover {
+  border-color: color-mix(in oklab, var(--lapis-bright) 55%, var(--line));
+  background: color-mix(in oklab, var(--lapis) 15%, var(--stone));
+}
+.home-event.is-live {
+  border-color: color-mix(in oklab, var(--gold-bright) 55%, var(--line));
+  border-left-color: var(--gold-bright);
+  background: color-mix(in oklab, var(--gold) 10%, var(--stone));
+}
+.home-event-time,
+.home-event-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.home-event-time {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--washi-mute);
+}
+.home-event-state {
+  width: fit-content;
+  color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis) 18%, transparent);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.home-event.is-live .home-event-state {
+  color: var(--gold-bright);
+  background: color-mix(in oklab, var(--gold) 16%, transparent);
+}
+.home-event-title {
+  font-size: 0.94rem;
+  font-weight: 650;
+  color: var(--washi);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-event-channel,
+.home-event-open {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--washi-mute);
+}
+.home-event-open {
+  color: var(--lapis-bright);
+  white-space: nowrap;
+}
+
 .home-pulse {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -223,9 +317,16 @@
 @media (max-width: 700px) {
   .home-pulse { grid-template-columns: 1fr 1fr; }
   .home-inner { padding-top: 20px; }
+  .home-event {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+  .home-event-open {
+    display: none;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .home-card, .home-cta, .home-card-join { transition: none; }
+  .home-card, .home-cta, .home-card-join, .home-event { transition: none; }
 }
 
 /* ── Catch up — "what did I miss" across joined rooms + DMs ─────────────────── */

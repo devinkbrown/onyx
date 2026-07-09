@@ -164,6 +164,9 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home catch-up now promotes
     followed rooms, followed topics via their parent room, and followed DMs
     above ambient unread activity while preserving mentions/DM priority.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home now surfaces joined-room
+    scheduled events from the existing `ocean.event` prop, with live-first
+    ordering and stale-event expiry shared with the channel intro.
     ⏭️ **NEXT** — pure Onyx work. Reuse the local vault, `?at=` time travel,
     chanstats heatlines, scheduled-event props, and Spotlight navigation before
     adding new server surface.

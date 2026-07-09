@@ -24,6 +24,11 @@ import {
 import { useStore, getState } from '@/lib/store';
 import { buildCatchUp, catchUpSummary, type CatchUpItem } from '@/lib/notifications/catchUp';
 import { followed } from '@/lib/notifications/followed';
+import {
+  collectScheduledEvents,
+  eventCountdown,
+  type ScheduledEventItem,
+} from '@/lib/notifications/scheduledEvents';
 import { fetchStatsIndex, relTime } from '@/lib/stats/networkIndex';
 
 export { relTime };
@@ -65,6 +70,7 @@ export function HomeView(): JSX.Element {
   const channels = useStore((s) => s.channels);
   const dms = useStore((s) => s.dms);
   const channelLastActivity = useStore((s) => s.channelLastActivity);
+  const channelProps = useStore((s) => s.channelProps);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const networkName = useStore((s) => s.networkName);
 
@@ -88,6 +94,20 @@ export function HomeView(): JSX.Element {
   const [nowMs, setNowMs] = createSignal(Date.now());
   const clock = setInterval(() => setNowMs(Date.now()), 30_000);
   onCleanup(() => clearInterval(clock));
+
+  const scheduledEvents = createMemo<ScheduledEventItem[]>(() =>
+    collectScheduledEvents(channels().values(), channelProps(), nowMs()),
+  );
+  const openEvent = (event: ScheduledEventItem) =>
+    getState().navigate({ kind: 'channel', channel: event.channel });
+  const eventWhenLabel = (event: ScheduledEventItem) =>
+    new Date(event.at * 1000).toLocaleString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
 
   const directory = createMemo(() => {
     const data = stats();
@@ -181,6 +201,41 @@ export function HomeView(): JSX.Element {
                 </For>
               </ul>
             </Show>
+          </section>
+        </Show>
+
+        <Show when={connectionStatus() === 'connected' && scheduledEvents().length > 0}>
+          <section class="home-events" aria-label="Upcoming room events">
+            <div class="home-events-head">
+              <h3 class="home-section-label">Scheduled</h3>
+              <span class="home-events-summary">
+                {scheduledEvents().filter((event) => event.live).length > 0 ? 'live now' : 'coming up'}
+              </span>
+            </div>
+            <ul class="home-events-list">
+              <For each={scheduledEvents()}>
+                {(event) => (
+                  <li>
+                    <button
+                      type="button"
+                      class={`home-event${event.live ? ' is-live' : ''}`}
+                      onClick={() => openEvent(event)}
+                      aria-label={`Open ${event.channel} for ${event.title}, ${eventCountdown(event, nowMs())}`}
+                    >
+                      <span class="home-event-time">
+                        <span class="home-event-state">{event.live ? 'live' : eventCountdown(event, nowMs())}</span>
+                        <span>{eventWhenLabel(event)}</span>
+                      </span>
+                      <span class="home-event-main">
+                        <span class="home-event-title">{event.title}</span>
+                        <span class="home-event-channel">{event.channel}</span>
+                      </span>
+                      <span class="home-event-open" aria-hidden="true">Open →</span>
+                    </button>
+                  </li>
+                )}
+              </For>
+            </ul>
           </section>
         </Show>
 
