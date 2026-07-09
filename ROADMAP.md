@@ -184,6 +184,9 @@ down to TLS.
     and reuses the existing `?at=` time-travel path.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Browse all channels now deduplicates
     repeated mesh `LIST` rows by room name before rendering the Home directory.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home now records recent catch-up
+    review ranges locally and lets the return screen reopen or search those
+    reviewed spans.
     ⏭️ **NEXT** — pure Onyx work. Reuse the local vault, `?at=` time travel,
     and richer cross-room review handoffs before adding new server surface.
 16. **Reader mode** *(client)* — a calm single-pane transcript view for long
@@ -215,8 +218,8 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — The reader memory strip now includes
     a direct Home return handoff, so long transcript review can land back on the
     catch-up surface without losing the remembered context.
-    ⏭️ **NEXT** — continue catch-up review history over existing message buffers
-    and hydration.
+    ⏭️ **NEXT** — continue reader-side recall and hydration links from reviewed
+    catch-up spans.
 17. **Accessibility conformance ledger** *(main site + client)* — publish the
     public WCAG 2.2 / EN 301 549 audit path and keep it linked from the front
     door while app panels are audited.

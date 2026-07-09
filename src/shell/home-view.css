@@ -862,11 +862,106 @@
 .home-recap-card__spotlight:focus-visible {
   transform: translateY(-1px);
 }
+.home-review-history {
+  margin: 0 0 28px;
+}
+.home-review-history__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.home-review-history__head .home-section-label {
+  margin: 0;
+}
+.home-review-history__summary {
+  color: var(--washi-mute);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.home-review-history__list {
+  display: grid;
+  gap: 7px;
+}
+.home-review-history__item {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "meta actions"
+    "preview actions";
+  gap: 5px 12px;
+  align-items: center;
+  padding: 10px 12px;
+  background: color-mix(in oklab, var(--lapis) 9%, var(--stone));
+  border: 1px solid color-mix(in oklab, var(--lapis-bright) 28%, var(--line));
+  border-left: 2px solid color-mix(in oklab, var(--lapis-bright) 58%, transparent);
+  border-radius: var(--r-md);
+}
+.home-review-history__meta {
+  grid-area: meta;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--washi-mute);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+}
+.home-review-history__target {
+  min-width: 0;
+  max-width: 18ch;
+  overflow: hidden;
+  color: var(--washi);
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-review-history__preview {
+  grid-area: preview;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--washi-dim);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-review-history__actions {
+  grid-area: actions;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.home-review-history__actions button {
+  min-height: 30px;
+  border-radius: 999px;
+  padding: 5px 10px;
+  color: var(--washi);
+  background: color-mix(in oklab, var(--stone) 62%, transparent);
+  border: 1px solid var(--line);
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 0.67rem;
+  font-weight: 750;
+  cursor: pointer;
+  transition:
+    border-color var(--dur, 200ms) var(--ease),
+    transform var(--dur, 200ms) var(--ease);
+}
+.home-review-history__actions button:hover,
+.home-review-history__actions button:focus-visible {
+  border-color: color-mix(in oklab, var(--lapis-bright) 48%, var(--line));
+  transform: translateY(-1px);
+}
 @media (prefers-reduced-motion: reduce) {
   .home-catchup-item,
   .home-recap-card__open,
   .home-recap-card__review,
-  .home-recap-card__spotlight {
+  .home-recap-card__spotlight,
+  .home-review-history__actions button {
     transition: none;
   }
   .home-recap-card__open:hover,
@@ -874,7 +969,9 @@
   .home-recap-card__spotlight:hover,
   .home-recap-card__open:focus-visible,
   .home-recap-card__review:focus-visible,
-  .home-recap-card__spotlight:focus-visible {
+  .home-recap-card__spotlight:focus-visible,
+  .home-review-history__actions button:hover,
+  .home-review-history__actions button:focus-visible {
     transform: none;
   }
 }

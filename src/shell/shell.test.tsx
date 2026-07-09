@@ -723,6 +723,33 @@ describe('AppShell', () => {
       expect(store.getState().timeTravelLandingId).toBe('msg-new-a');
       expect(travelToSpy).toHaveBeenCalledWith('#general', new Date('2025-01-01T12:00:00Z'));
 
+      store.getState().navigate({ kind: 'home' });
+
+      const reviewHistory = await screen.findByLabelText('Recent catch-up reviews');
+      expect(within(reviewHistory).getByText('Reviewed recently')).toBeInTheDocument();
+      expect(within(reviewHistory).getByText('#general')).toBeInTheDocument();
+      expect(within(reviewHistory).getByText('2 lines, 1 mention')).toBeInTheDocument();
+      expect(within(reviewHistory).getByText('New handoff note two')).toBeInTheDocument();
+
+      fireEvent.click(within(reviewHistory).getByRole('button', {
+        name: 'Find related actions for reviewed #general',
+      }));
+      await waitFor(() => {
+        expect(screen.getByRole('dialog', { name: 'Command palette' })).toBeInTheDocument();
+        expect(screen.getByRole('combobox', { name: 'Command search' })).toHaveValue('goto #general');
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Close spotlight' }));
+
+      fireEvent.click(within(reviewHistory).getByRole('button', {
+        name: 'Reopen reviewed catch-up for #general',
+      }));
+      const reopenedView = store.getState().activeView;
+      expect(reopenedView.kind).toBe('channel');
+      if (reopenedView.kind === 'channel') expect(reopenedView.channel).toBe('#general');
+      expect(store.getState().timeTravelLandingId).toBe('msg-new-a');
+      expect(travelToSpy).toHaveBeenCalledTimes(2);
+      expect(travelToSpy).toHaveBeenLastCalledWith('#general', new Date('2025-01-01T12:00:00Z'));
+
       travelToSpy.mockRestore();
     });
 

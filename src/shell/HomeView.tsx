@@ -27,6 +27,11 @@ import { followed } from '@/lib/notifications/followed';
 import { buildHomeMemory, type HomeMemoryItem } from '@/lib/notifications/homeMemory';
 import { buildQuietActivity, type QuietActivityItem } from '@/lib/notifications/quietActivity';
 import {
+  readReviewHistory,
+  recordReviewHistory,
+  type ReviewHistoryEntry,
+} from '@/lib/notifications/reviewHistory';
+import {
   collectScheduledEvents,
   eventCountdown,
   type ScheduledEventItem,
@@ -117,10 +122,14 @@ function voiceSummary(recap: HomeCatchUpRecap): string {
 }
 
 function recapSummary(recap: HomeCatchUpRecap): string {
-  const lineLabel = recap.messageCount === 1 ? 'line' : 'lines';
-  const mentionLabel = recap.mentionCount === 1 ? 'mention' : 'mentions';
-  const mentionPart = recap.mentionCount > 0 ? `, ${recap.mentionCount} ${mentionLabel}` : '';
-  return `${recap.messageCount} ${lineLabel}${mentionPart}`;
+  return reviewCountSummary(recap.messageCount, recap.mentionCount);
+}
+
+function reviewCountSummary(messageCount: number, mentionCount: number): string {
+  const lineLabel = messageCount === 1 ? 'line' : 'lines';
+  const mentionLabel = mentionCount === 1 ? 'mention' : 'mentions';
+  const mentionPart = mentionCount > 0 ? `, ${mentionCount} ${mentionLabel}` : '';
+  return `${messageCount} ${lineLabel}${mentionPart}`;
 }
 
 function spotlightQueryFor(item: CatchUpItem): string {
@@ -144,6 +153,7 @@ export function HomeView(): JSX.Element {
   const networkName = useStore((s) => s.networkName);
 
   const [stats] = createResource(fetchStatsIndex);
+  const [reviewHistory, setReviewHistory] = createSignal<ReviewHistoryEntry[]>(readReviewHistory());
 
   // "Catch up" — what you missed across every joined room + DM, ranked so
   // mentions and DMs surface and ambient chatter accumulates quietly below.
@@ -161,10 +171,30 @@ export function HomeView(): JSX.Element {
   const openCatchUpSpotlight = (item: CatchUpItem) => openSpotlight(spotlightQueryFor(item));
   const reviewCatchUpFromStart = (recap: HomeCatchUpRecap) => {
     const state = getState();
+    setReviewHistory(recordReviewHistory({
+      target: recap.item.target,
+      name: recap.item.name,
+      kind: recap.item.kind,
+      firstMessageId: recap.firstMessage.id,
+      firstAt: recap.firstMessage.time.toISOString(),
+      reviewedAt: new Date().toISOString(),
+      messageCount: recap.messageCount,
+      mentionCount: recap.mentionCount,
+      preview: recap.preview,
+    }));
     openCatchUp(recap.item);
     state.focusMessage(recap.firstMessage.id);
     if (recap.item.kind === 'channel') state.travelTo(recap.item.target, recap.firstMessage.time);
   };
+  const reopenReview = (entry: ReviewHistoryEntry) => {
+    const state = getState();
+    if (entry.kind === 'channel') state.navigate({ kind: 'channel', channel: entry.target });
+    else state.navigate({ kind: 'dm', nick: entry.target });
+    state.focusMessage(entry.firstMessageId);
+    if (entry.kind === 'channel') state.travelTo(entry.target, new Date(entry.firstAt));
+  };
+  const openReviewSpotlight = (entry: ReviewHistoryEntry) =>
+    openSpotlight(entry.kind === 'channel' ? `goto ${entry.target}` : `dm ${entry.target}`);
 
   // One shared clock for all relative-time labels.
   const [nowMs, setNowMs] = createSignal(Date.now());
@@ -402,6 +432,47 @@ export function HomeView(): JSX.Element {
                 </For>
               </div>
             </Show>
+          </section>
+        </Show>
+
+        <Show when={connectionStatus() === 'connected' && reviewHistory().length > 0}>
+          <section class="home-review-history" aria-label="Recent catch-up reviews">
+            <div class="home-review-history__head">
+              <h3 class="home-section-label">Reviewed recently</h3>
+              <span class="home-review-history__summary">catch-up ranges</span>
+            </div>
+            <div class="home-review-history__list">
+              <For each={reviewHistory()}>
+                {(entry) => (
+                  <article class="home-review-history__item">
+                    <div class="home-review-history__meta">
+                      <span class="home-review-history__target">
+                        {entry.kind === 'dm' ? `@${entry.name}` : entry.name}
+                      </span>
+                      <span>{reviewCountSummary(entry.messageCount, entry.mentionCount)}</span>
+                      <span>{relTime(Math.floor(Date.parse(entry.reviewedAt) / 1000), nowMs())}</span>
+                    </div>
+                    <p class="home-review-history__preview">{entry.preview}</p>
+                    <div class="home-review-history__actions">
+                      <button
+                        type="button"
+                        onClick={() => reopenReview(entry)}
+                        aria-label={`Reopen reviewed catch-up for ${entry.name}`}
+                      >
+                        Reopen
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openReviewSpotlight(entry)}
+                        aria-label={`Find related actions for reviewed ${entry.name}`}
+                      >
+                        Find related
+                      </button>
+                    </div>
+                  </article>
+                )}
+              </For>
+            </div>
           </section>
         </Show>
 
