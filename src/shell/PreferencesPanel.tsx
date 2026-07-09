@@ -153,6 +153,11 @@ const ACCESS_AUDIT_ROWS = [
     note: 'Labelled compact control group, described calm-mode radios, and pressed-state desktop/sound/push/DND toggles.',
   },
   {
+    surface: 'Time scrubber',
+    status: 'checked',
+    note: 'Channel-scoped scrubber region, labelled UTC-hour jump buttons, date jump input, and target-specific moment copy action.',
+  },
+  {
     surface: 'Modals',
     status: 'checked',
     note: 'Sheet focus trap, Escape close, labelled close buttons.',

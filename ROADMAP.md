@@ -292,6 +292,9 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Notification controls now carry
     pass evidence for their compact labelled control group, described calm-mode
     radios, and pressed-state desktop/sound/push/DND toggles.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Time scrubber now carries pass
+    evidence for its channel-scoped scrubber region, labelled UTC-hour jump
+    buttons, date jump input, and target-specific moment copy action.
     ⏭️ **CLIENT NEXT** — continue remaining dense-surface audit rows until every
     app panel has pass/fix evidence.
 

@@ -186,12 +186,16 @@ export function TimeScrubber(): JSX.Element {
   return (
     <Show when={activeChannel()}>
       {(channel) => (
-        <section class="time-scrubber" aria-label={`Time scrubber for ${channel()}`}>
+        <section
+          class="time-scrubber"
+          aria-label={`Time scrubber for ${channel()}`}
+          aria-describedby="time-scrubber-status"
+        >
           <div class="time-scrubber__inner">
             <div class="time-scrubber__main">
               <div class="time-scrubber__head">
                 <span class="time-scrubber__label">24h UTC</span>
-                <span class="time-scrubber__status" aria-live="polite">{status()}</span>
+                <span id="time-scrubber-status" class="time-scrubber__status" aria-live="polite">{status()}</span>
               </div>
               <div
                 class="time-scrubber__track"
@@ -231,7 +235,7 @@ export function TimeScrubber(): JSX.Element {
             <button
               type="button"
               class="time-scrubber__copy"
-              aria-label="Copy moment link"
+              aria-label={`Copy moment link for ${channel()}`}
               onClick={() => void copyMoment()}
             >
               {copied() ? 'Copied' : 'Copy moment'}

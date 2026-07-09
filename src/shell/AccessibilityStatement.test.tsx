@@ -28,5 +28,6 @@ describe('AccessibilityStatement', () => {
     expect(screen.getByText(/Message actions use per-row action groups/i)).toBeInTheDocument();
     expect(screen.getByText(/Member list uses a channel-scoped complementary landmark/i)).toBeInTheDocument();
     expect(screen.getByText(/Notification controls use a labelled compact control group/i)).toBeInTheDocument();
+    expect(screen.getByText(/Time scrubber uses a channel-scoped region/i)).toBeInTheDocument();
   });
 });
