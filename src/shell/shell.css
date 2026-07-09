@@ -1237,6 +1237,18 @@
   transform: rotate(35deg);
 }
 
+.shell-ribbon-call {
+  color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis-deep) 20%, transparent);
+}
+
+.shell-ribbon-call:hover,
+.shell-ribbon-call:focus-visible {
+  color: var(--washi);
+  border-color: color-mix(in oklab, var(--lapis-bright) 52%, var(--seam));
+  background: color-mix(in oklab, var(--lapis) 20%, var(--stone));
+}
+
 @media (prefers-reduced-motion: reduce) {
   .shell-ribbon-iconbtn { transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease), background var(--dur) var(--ease); }
   .shell-ribbon-face,
@@ -3831,7 +3843,7 @@
     grid-template-columns: 1fr;
   }
   .shell {
-    --mnav-h: 64px;
+    --mnav-h: 58px;
     grid-template-columns: 1fr;
     grid-template-rows: 1fr;
     /* Sit above the fixed bottom tab bar; clear the notch up top. */
@@ -3894,6 +3906,116 @@
   .shell-conversation {
     grid-column: 1;
     min-width: 0;
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in oklab, var(--ink) 68%, transparent) 0%,
+        color-mix(in oklab, var(--ink) 78%, transparent) 100%
+      );
+  }
+
+  .shell-conversation::before {
+    top: 42px;
+    opacity: 0.45;
+  }
+
+  .shell-ribbon {
+    height: 42px;
+    padding: 0 10px;
+    background:
+      linear-gradient(180deg, color-mix(in oklab, var(--ink) 86%, var(--stone)), color-mix(in oklab, var(--ink) 94%, var(--stone)));
+  }
+
+  .shell-ribbon-inner {
+    gap: 8px;
+  }
+
+  .shell-ribbon-identity {
+    gap: 6px;
+  }
+
+  .shell-ribbon-channel {
+    max-width: min(42vw, 15ch);
+    font-size: 1.02rem;
+    letter-spacing: 0;
+  }
+
+  .shell-ribbon-right {
+    gap: 2px;
+  }
+
+  .shell-ribbon-group {
+    gap: 2px;
+  }
+
+  .shell-ribbon-account,
+  .shell-ribbon-appearance,
+  .shell-ribbon-conn,
+  .shell-ribbon-divider,
+  .shell-ribbon-event-chip {
+    display: none;
+  }
+
+  .shell-ribbon-iconbtn {
+    min-width: 34px;
+    height: 34px;
+  }
+
+  .shell-ribbon-count {
+    font-size: 0.64rem;
+  }
+
+  .shell-ribbon-voice-chip {
+    max-width: 8.75rem;
+    height: 32px;
+    padding-inline: 8px;
+  }
+
+  .shell-ribbon-voice-text {
+    max-width: 7.2rem;
+  }
+
+  .time-scrubber {
+    background: color-mix(in oklab, var(--ink) 76%, transparent);
+    min-height: 28px;
+  }
+
+  .time-scrubber__inner {
+    padding: 4px 10px 5px;
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .time-scrubber__head,
+  .time-scrubber__date,
+  .time-scrubber__copy {
+    display: none;
+  }
+
+  .time-scrubber__track {
+    min-height: 20px;
+    padding: 3px;
+    gap: 1px;
+    border-color: color-mix(in oklab, var(--lapis) 22%, transparent);
+    background: color-mix(in oklab, var(--stone) 32%, transparent);
+  }
+
+  .time-scrubber__bar {
+    height: 14px;
+  }
+
+  .shell-watch-together {
+    min-height: 38px;
+    padding: 6px 10px;
+  }
+
+  .shell-watch-together__label,
+  .shell-watch-together__meta {
+    display: none;
+  }
+
+  .shell-watch-together__title {
+    font-size: 11px;
   }
 
   /* Bigger tap target for the member toggle in the ribbon */
@@ -3906,21 +4028,44 @@
 
   /* Composer: 16px kills iOS zoom-on-focus; larger send target; drop the hint */
   .shell-composer {
-    padding: 10px 12px 12px;
+    padding: 7px 9px 8px;
+    background:
+      linear-gradient(180deg, color-mix(in oklab, var(--ink) 70%, transparent), color-mix(in oklab, var(--ink) 94%, var(--stone)));
+  }
+  .shell-composer-measure {
+    max-width: none;
   }
   .shell-composer-context,
   .shell-composer-topic {
     max-width: 100%;
-    min-height: 38px;
+    min-height: 32px;
+    margin-bottom: 6px;
+    padding-block: 5px;
+  }
+  .shell-composer-inner {
+    gap: 5px;
+    border-radius: 16px;
   }
   .shell-composer-textarea {
     font-size: 16px;
-    min-height: 44px;
-    max-height: min(34svh, 168px);
+    min-height: 38px;
+    max-height: min(26svh, 132px);
+    padding: 8px 7px 8px 9px;
     padding-inline: 10px;
+    line-height: 1.35;
   }
-  .shell-composer-tool { width: 44px; height: 44px; }
-  .shell-composer-send { width: 46px; height: 46px; }
+  .shell-composer-tool {
+    width: 38px;
+    height: 38px;
+    margin-bottom: 0;
+    border-radius: 13px;
+  }
+  .shell-composer-send {
+    width: 40px;
+    height: 40px;
+    margin: 0 2px 1px 0;
+    border-radius: 14px;
+  }
   .shell-composer-hint { display: none; }
   .shell-command-menu,
   .shell-emoji-picker {
@@ -3957,13 +4102,13 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
-    min-height: 54px;
-    padding: 5px 6px 7px;
+    gap: 2px;
+    min-height: 50px;
+    padding: 4px 3px 6px;
     color: var(--washi-mute);
     font-family: var(--font-mono);
-    font-size: 0.58rem;
-    letter-spacing: 0.1em;
+    font-size: 0.52rem;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     background: transparent;
     border: none;
@@ -3972,12 +4117,12 @@
     transition: color var(--dur) var(--ease);
   }
   .shell-mobile-nav-btn b {
-    width: 1.6rem;
-    height: 1.45rem;
+    width: 1.36rem;
+    height: 1.26rem;
     display: grid;
     place-items: center;
     border-radius: var(--r-pill);
-    font-size: 1.08rem;
+    font-size: 0.96rem;
     line-height: 1;
     font-weight: 400;
     background: color-mix(in oklab, var(--stone-2) 28%, transparent);
@@ -3992,7 +4137,170 @@
   }
 
   /* Join voice/video — full-width, taller tap targets */
-  .shell-voice-join-btn { flex: 1; padding: 11px 12px; text-align: center; }
+  .shell-voice-join {
+    gap: 5px;
+    padding: 5px 8px;
+  }
+  .shell-voice-join-btn {
+    flex: 1;
+    min-height: 34px;
+    justify-content: center;
+    padding: 6px 8px;
+    text-align: center;
+    font-size: 0.72rem;
+  }
+
+  .shell-topic-filter {
+    gap: 6px;
+    flex-wrap: nowrap;
+    align-items: center;
+    padding: 6px 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  .shell-topic-filter::-webkit-scrollbar {
+    display: none;
+  }
+
+  .shell-topic-filter .topic-filter {
+    flex: 0 0 auto;
+  }
+
+  .shell-topic-create {
+    flex: 1 0 12.25rem;
+    min-width: 0;
+    gap: 5px;
+  }
+
+  .shell-topic-create-input {
+    flex: 1 1 7.5rem;
+    width: auto;
+    min-height: 34px;
+    border-radius: 10px;
+    font-size: 0.74rem;
+  }
+
+  .shell-topic-create .shell-topic-action {
+    width: 36px;
+    min-width: 36px;
+    min-height: 34px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    font-size: 0;
+  }
+
+  .shell-topic-create .shell-topic-action::before {
+    content: "+";
+    font-size: 1.08rem;
+    line-height: 1;
+  }
+
+  .shell-topic-actions {
+    flex: 0 0 auto;
+    gap: 5px;
+    margin-left: 0;
+  }
+
+  .shell-topic-action,
+  .shell-topic-follow {
+    min-height: 34px;
+    padding-inline: 10px;
+    font-size: 0.62rem;
+    white-space: nowrap;
+  }
+
+  .shell-topic-follow {
+    max-width: 8.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .shell-feed {
+    padding-top: 6px;
+    padding-bottom: 4px;
+  }
+
+  .shell-msg-group {
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 0 8px;
+    padding: 7px 10px 4px;
+    margin-top: 4px;
+  }
+
+  .shell-msg-cont {
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 0 8px;
+    padding: 1px 10px;
+  }
+
+  .shell-msg-group--system,
+  .shell-msg-system {
+    padding: 3px 10px 3px 48px;
+  }
+
+  .shell-msg-avatar .onyx-avatar {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
+    font-size: 0.62rem;
+  }
+
+  .shell-msg-avatar {
+    padding-top: 1px;
+  }
+
+  .shell-msg-meta {
+    gap: 6px;
+    margin-bottom: 1px;
+  }
+
+  .shell-msg-author {
+    font-size: 0.86rem;
+  }
+
+  .shell-msg-ts,
+  .shell-msg-cont-ts {
+    font-size: 0.56rem;
+    letter-spacing: 0.03em;
+  }
+
+  .shell-msg-cont-ts {
+    opacity: 0.58;
+    text-align: left;
+    padding-right: 0;
+  }
+
+  .shell-msg-text {
+    font-size: 0.92rem;
+    line-height: 1.46;
+  }
+
+  .shell-msg-actions {
+    gap: 4px;
+    margin-top: 3px;
+  }
+
+  .shell-reactions {
+    margin-top: 4px;
+  }
+
+  .shell-reaction {
+    padding: 2px 7px 2px 5px;
+  }
+
+  .shell-day-divider {
+    margin: 12px auto 7px;
+    padding-inline: 10px;
+  }
+
+  .shell-day-divider-label {
+    padding-inline: 9px;
+    font-size: 0.56rem;
+  }
 }
 
 @media (min-width: 901px) {
@@ -4003,19 +4311,40 @@
 
 /* Phone-specific tightening */
 @media (max-width: 480px) {
-  .shell-ribbon { gap: 8px; padding: 0 12px; }
-  .shell-ribbon-channel { font-size: 1rem; max-width: 10ch; }
+  .shell {
+    --mnav-h: 56px;
+  }
+  .shell-ribbon { gap: 6px; padding: 0 8px; }
+  .shell-ribbon-channel { font-size: 0.98rem; max-width: min(48vw, 13ch); }
   .shell-ribbon-topic { display: none; }
   /* Keep the identity (channel NAME) — hiding the whole block left a dead
      void at the ribbon's left and the controls looked unanchored. Only the
      topic yields on phones (rule above). */
   .shell-ribbon-identity { min-width: 0; overflow: hidden; }
-  .shell-composer { padding: 8px 10px 10px; }
-  .shell-composer-inner { gap: 6px; }
+  .shell-ribbon-pins .shell-ribbon-count {
+    display: none;
+  }
+  .shell-ribbon-voice-chip {
+    max-width: 6.9rem;
+  }
+  .shell-ribbon-voice-text {
+    max-width: 5.6rem;
+  }
+  .shell-composer { padding: 6px 8px 7px; }
+  .shell-composer-inner { gap: 4px; }
   .shell-command-item { grid-template-columns: 1fr; gap: 2px; }
   .shell-emoji-grid { grid-template-columns: repeat(7, minmax(28px, 1fr)); }
   .shell-attachment { grid-template-columns: 34px minmax(0, 1fr) 24px; max-width: 100%; }
-  .shell-voice-join { padding: 8px 12px; }
+  .shell-voice-join { padding: 5px 8px; }
+  .shell-msg-group,
+  .shell-msg-cont {
+    padding-inline: 8px;
+  }
+  .shell-msg-group--system,
+  .shell-msg-system {
+    padding-left: 46px;
+    padding-right: 8px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

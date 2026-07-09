@@ -477,6 +477,15 @@ function ExtensionAuditControls(): JSX.Element {
   );
 }
 
+function PreferenceSection(props: { title: string; description: string }): JSX.Element {
+  return (
+    <div class="pref-section">
+      <h3 class="pref-section-title">{props.title}</h3>
+      <p class="pref-desc">{props.description}</p>
+    </div>
+  );
+}
+
 export function PreferencesPanel(): JSX.Element {
   return (
     <Sheet
@@ -487,6 +496,11 @@ export function PreferencesPanel(): JSX.Element {
       closeLabel="Close preferences"
     >
       <div class="pref-panel" data-testid="preferences-panel">
+        <PreferenceSection
+          title="Display"
+          description="Reading rhythm, type scale, and transcript behavior."
+        />
+
         <Segmented
           legend="Message density"
           description="Vertical rhythm of the message feed."
@@ -533,6 +547,43 @@ export function PreferencesPanel(): JSX.Element {
 
         <CalmModeControl />
 
+        <PreferenceSection
+          title="Feature switches"
+          description="Turn off optional channel surfaces on this device. Core chat stays available."
+        />
+
+        <Toggle
+          legend="Time scrubber"
+          title="Show 24-hour activity strip"
+          description="Shows the channel activity bars and moment jump affordance above the transcript."
+          value={() => preferences().timeScrubber}
+          onToggle={(value) => setPreference('timeScrubber', value)}
+        />
+
+        <Toggle
+          legend="Voice and video"
+          title="Show join voice/video controls"
+          description="Keeps media available in the app, but removes the channel join row when off."
+          value={() => preferences().voiceEntry}
+          onToggle={(value) => setPreference('voiceEntry', value)}
+        />
+
+        <Toggle
+          legend="Topic tools"
+          title="Show topic, forum, and follow controls"
+          description="Removes the topic creation row and forum/follow buttons above channel messages."
+          value={() => preferences().topicTools}
+          onToggle={(value) => setPreference('topicTools', value)}
+        />
+
+        <Toggle
+          legend="Watch together"
+          title="Show shared watch activity"
+          description="Hides the synchronized watch activity strip when a room has one."
+          value={() => preferences().watchTogether}
+          onToggle={(value) => setPreference('watchTogether', value)}
+        />
+
         <Toggle
           legend="System events"
           title="Hide join, part & quit"
@@ -571,6 +622,11 @@ export function PreferencesPanel(): JSX.Element {
         <PortableVaultControls />
 
         <ExtensionAuditControls />
+
+        <PreferenceSection
+          title="Accessibility"
+          description="Motion, transparency, and verified access surfaces."
+        />
 
         <Segmented
           legend="Background motion"

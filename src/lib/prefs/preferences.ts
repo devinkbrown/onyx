@@ -50,6 +50,14 @@ export interface Preferences {
   localHistory: boolean;
   /** Encrypt DMs end-to-end (Tsumugi) when the other party has a device key. */
   e2eeDms: boolean;
+  /** Show the channel activity time scrubber. */
+  timeScrubber: boolean;
+  /** Show the channel voice/video join affordance. */
+  voiceEntry: boolean;
+  /** Show channel topic creation/follow/forum tools above the feed. */
+  topicTools: boolean;
+  /** Show shared watch-together activity above the feed. */
+  watchTogether: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Readonly<Preferences> = {
@@ -64,6 +72,10 @@ export const DEFAULT_PREFERENCES: Readonly<Preferences> = {
   clock: '24h',
   localHistory: true,
   e2eeDms: true,
+  timeScrubber: true,
+  voiceEntry: true,
+  topicTools: false,
+  watchTogether: true,
 };
 
 // ── persistence ─────────────────────────────────────────────────────────────
@@ -111,6 +123,10 @@ export function loadPreferences(): Preferences {
     clock: isOneOf(raw.clock, CLOCKS) ? raw.clock : DEFAULT_PREFERENCES.clock,
     localHistory: typeof raw.localHistory === 'boolean' ? raw.localHistory : DEFAULT_PREFERENCES.localHistory,
     e2eeDms: typeof raw.e2eeDms === 'boolean' ? raw.e2eeDms : DEFAULT_PREFERENCES.e2eeDms,
+    timeScrubber: typeof raw.timeScrubber === 'boolean' ? raw.timeScrubber : DEFAULT_PREFERENCES.timeScrubber,
+    voiceEntry: typeof raw.voiceEntry === 'boolean' ? raw.voiceEntry : DEFAULT_PREFERENCES.voiceEntry,
+    topicTools: typeof raw.topicTools === 'boolean' ? raw.topicTools : DEFAULT_PREFERENCES.topicTools,
+    watchTogether: typeof raw.watchTogether === 'boolean' ? raw.watchTogether : DEFAULT_PREFERENCES.watchTogether,
   };
 }
 

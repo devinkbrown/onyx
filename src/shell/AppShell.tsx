@@ -57,7 +57,7 @@ import { AccountPanel } from '@/app/Account';
 import { AppearancePanel } from './AppearancePanel';
 import { PreferencesPanel } from './PreferencesPanel';
 import { PinnedMessages } from './PinnedMessages';
-import { applyPreferences } from '@/lib/prefs/preferences';
+import { applyPreferences, isPreferencesOpen, openPreferences, preferences } from '@/lib/prefs/preferences';
 import { applySceneMotion } from '@/lib/prefs/sceneMotion';
 import { applyCalmPreset } from '@/lib/notifications/calmMode';
 import { ShortcutsSheet } from './ShortcutsSheet';
@@ -196,7 +196,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
     const v = activeView();
     return inCall() && v.kind === 'channel' && v.channel === voice().callChannel;
   });
-  const canJoinVoice = createMemo(() => activeView().kind === 'channel' && !inCall());
+  const canJoinVoice = createMemo(() => preferences().voiceEntry && activeView().kind === 'channel' && !inCall());
   function joinVoice(withVideo: boolean): void {
     const v = activeView();
     if (v.kind === 'channel') void getState().joinVoiceChannel(v.channel, withVideo);
@@ -432,9 +432,15 @@ export function AppShell(props: AppShellProps): JSX.Element {
           <PresenceRibbon
             selfNick={displayNick()}
             onToggleMembers={handleToggleMembers}
+            showJoinVoice={isMobile() && canJoinVoice()}
+            onJoinVoice={joinVoice}
           />
-          <TimeScrubber />
-          <WatchTogetherActivity />
+          <Show when={preferences().timeScrubber}>
+            <TimeScrubber />
+          </Show>
+          <Show when={preferences().watchTogether}>
+            <WatchTogetherActivity />
+          </Show>
 
           {/* Content: read-only status buffer, conversation, or home */}
           <Show when={activeView().kind === 'status'} fallback={
@@ -447,7 +453,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
               <VoiceStage />
             </Show>
             {/* Join-voice affordance for a text channel you're not yet in a call on */}
-            <Show when={canJoinVoice()}>
+            <Show when={canJoinVoice() && !isMobile()}>
               <div class="shell-voice-join">
                 <button type="button" class="shell-voice-join-btn" onClick={() => joinVoice(false)}>
                   <svg class="shell-voice-join-icon" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -525,6 +531,15 @@ export function AppShell(props: AppShellProps): JSX.Element {
             <b aria-hidden="true">◇</b>members
           </button>
         </Show>
+        <button
+          type="button"
+          class={`shell-mobile-nav-btn${isPreferencesOpen() ? ' shell-mobile-nav-btn--active' : ''}`}
+          aria-label="Open preferences"
+          aria-haspopup="dialog"
+          onClick={() => openPreferences()}
+        >
+          <b aria-hidden="true">⚙</b>prefs
+        </button>
         <button
           type="button"
           class="shell-mobile-nav-btn"

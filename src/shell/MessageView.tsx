@@ -1050,7 +1050,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
 
   return (
     <main class="shell-messages" aria-label="Messages">
-      <Show when={activeView().kind === 'channel'}>
+      <Show when={activeView().kind === 'channel' && preferences().topicTools}>
         <div class="shell-topic-filter">
           <Show when={availableTopics().length > 0}>
             <TopicFilterBar

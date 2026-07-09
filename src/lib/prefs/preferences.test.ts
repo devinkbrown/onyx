@@ -58,6 +58,10 @@ describe('preferences store', () => {
         clock: '24h',
         localHistory: true,
         e2eeDms: true,
+        timeScrubber: true,
+        voiceEntry: true,
+        topicTools: false,
+        watchTogether: true,
       });
     });
 
@@ -78,6 +82,10 @@ describe('preferences store', () => {
         clock: '24h',
         localHistory: true,
         e2eeDms: true,
+        timeScrubber: true,
+        voiceEntry: true,
+        topicTools: false,
+        watchTogether: true,
       });
     });
 
@@ -126,6 +134,10 @@ describe('preferences store', () => {
         clock: '12h',
         localHistory: false,
         e2eeDms: false,
+        timeScrubber: true,
+        voiceEntry: false,
+        topicTools: true,
+        watchTogether: false,
       });
       const ds = document.documentElement.dataset;
       expect(ds.density).toBe('compact');

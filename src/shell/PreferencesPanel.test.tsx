@@ -23,6 +23,11 @@ describe('PreferencesPanel', () => {
 
     expect(screen.getByTestId('preferences-panel')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Client access audit' })).toBeInTheDocument();
+    expect(screen.getByText('Feature switches')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: /Show 24-hour activity strip/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('switch', { name: /Show join voice\/video controls/i })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('switch', { name: /Show topic, forum, and follow controls/i })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('switch', { name: /Show shared watch activity/i })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('heading', { name: 'Portable vault' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Export vault' })).toBeInTheDocument();
     expect(screen.getByLabelText('Import portable JSON')).toHaveAttribute('type', 'file');
@@ -48,7 +53,7 @@ describe('PreferencesPanel', () => {
     expect(screen.getByText('Message actions')).toBeInTheDocument();
     expect(screen.getByText('Member list')).toBeInTheDocument();
     expect(screen.getByText('Notification controls')).toBeInTheDocument();
-    expect(screen.getByText('Time scrubber')).toBeInTheDocument();
+    expect(screen.getByText('Channel-scoped scrubber region, labelled UTC-hour jump buttons, date jump input, and target-specific moment copy action.')).toBeInTheDocument();
     expect(screen.getByText('Mobile drawers')).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /Reduce transparency/i })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByText('Flatten glassy overlays and translucent panels for stronger separation from the background.')).toBeInTheDocument();

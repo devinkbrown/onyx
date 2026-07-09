@@ -135,6 +135,28 @@
   gap: var(--space-2);
 }
 
+.pref-section {
+  display: grid;
+  gap: 4px;
+  padding-top: var(--space-2);
+  border-top: 1px solid color-mix(in oklab, var(--line) 72%, transparent);
+}
+
+.pref-panel > .pref-section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.pref-section-title {
+  margin: 0;
+  color: var(--washi);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .pref-group-head {
   display: flex;
   align-items: baseline;

@@ -168,6 +168,36 @@
   }
 }
 
+@media (max-width: 900px) {
+  .time-scrubber {
+    background: color-mix(in oklab, var(--ink) 76%, transparent);
+  }
+
+  .time-scrubber__inner {
+    padding: 4px 10px 5px;
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .time-scrubber__head,
+  .time-scrubber__date,
+  .time-scrubber__copy {
+    display: none;
+  }
+
+  .time-scrubber__track {
+    min-height: 20px;
+    padding: 3px;
+    gap: 1px;
+    border-color: color-mix(in oklab, var(--lapis) 22%, transparent);
+    background: color-mix(in oklab, var(--stone) 32%, transparent);
+  }
+
+  .time-scrubber__bar {
+    height: 14px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .time-scrubber__bar,
   .time-scrubber__bar-fill {

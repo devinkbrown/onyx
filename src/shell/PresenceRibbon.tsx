@@ -19,6 +19,8 @@ import { PresenceHeatline } from './PresenceHeatline';
 export type PresenceRibbonProps = {
   selfNick?: string;
   onToggleMembers?: () => void;
+  showJoinVoice?: boolean;
+  onJoinVoice?: (withVideo: boolean) => void;
 };
 
 const FACEPILE_LIMIT = 6;
@@ -137,7 +139,7 @@ export function buildVoiceRoomStatus(input: VoiceRoomStatusInput): VoiceRoomStat
 }
 
 export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
-  const [local] = splitProps(props, ['selfNick', 'onToggleMembers']);
+  const [local] = splitProps(props, ['selfNick', 'onToggleMembers', 'showJoinVoice', 'onJoinVoice']);
 
   const activeView = useStore((s) => s.activeView);
   const connectionStatus = useStore((s) => s.connectionStatus);
@@ -412,6 +414,35 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
               >
                 <span class="shell-ribbon-voice-dot" aria-hidden="true" />
                 <span class="shell-ribbon-voice-text">{voiceChipLabel()}</span>
+              </button>
+            </Show>
+            <Show when={local.showJoinVoice && local.onJoinVoice}>
+              <button
+                type="button"
+                class="shell-ribbon-iconbtn shell-ribbon-call"
+                aria-label="Join voice"
+                title="Join voice"
+                onClick={() => local.onJoinVoice?.(false)}
+              >
+                <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"
+                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 14v-2a8 8 0 0 1 16 0v2" />
+                  <path d="M4 14h3v6H4a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2Z" />
+                  <path d="M20 14h-3v6h3a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2Z" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                class="shell-ribbon-iconbtn shell-ribbon-call"
+                aria-label="Join video"
+                title="Join video"
+                onClick={() => local.onJoinVoice?.(true)}
+              >
+                <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"
+                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M15 10 20 7v10l-5-3" />
+                  <rect x="3" y="6" width="12" height="12" rx="2" />
+                </svg>
               </button>
             </Show>
             <Show when={facepile().total > 0}>

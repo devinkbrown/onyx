@@ -230,6 +230,7 @@ describe('AppShell', () => {
         viewUnreadDividerId: new Map([['#general', 'msg-topic-b']]),
       }, true);
 
+      setPreference('topicTools', true);
       render(() => <AppShell />);
 
       expect(screen.getByText('Roadmap item')).toBeInTheDocument();
@@ -252,6 +253,7 @@ describe('AppShell', () => {
     it('starts a new named conversation before the first message', () => {
       seedStore('#general');
 
+      setPreference('topicTools', true);
       render(() => <AppShell />);
 
       fireEvent.input(screen.getByLabelText('New topic'), { target: { value: 'incident' } });
@@ -281,6 +283,7 @@ describe('AppShell', () => {
         ourNick: 'testuser',
       }, true);
 
+      setPreference('topicTools', true);
       render(() => <AppShell />);
 
       fireEvent.click(screen.getByRole('button', { name: 'Forum' }));
@@ -332,6 +335,7 @@ describe('AppShell', () => {
         ourNick: 'testuser',
       }, true);
 
+      setPreference('topicTools', true);
       render(() => <AppShell />);
 
       expect(screen.getByLabelText('Topic forum')).toBeInTheDocument();
@@ -584,6 +588,7 @@ describe('AppShell', () => {
         ourNick: 'testuser',
       }, true);
 
+      setPreference('topicTools', true);
       render(() => <AppShell />);
 
       fireEvent.click(screen.getByRole('button', { name: 'Follow room' }));
