@@ -821,6 +821,28 @@ describe('AppShell', () => {
       expect(travelToSpy).toHaveBeenLastCalledWith('#general', new Date(eventAt * 1000));
       travelToSpy.mockRestore();
     });
+
+    it('shows voice room activity and local device health in the presence header', () => {
+      seedStore('#general');
+      store.setState({
+        voiceChannelParticipants: new Map([['#general', new Set(['alice', 'bob', 'carol'])]]),
+        speakingNicks: new Set(['alice']),
+        voice: {
+          ...initialState.voice,
+          callState: 'in_call',
+          callChannel: '#general',
+          muted: true,
+          screenshareActive: true,
+        },
+      });
+
+      render(() => <AppShell />);
+
+      const voiceChip = screen.getByRole('button', {
+        name: /3 people in voice in #general, current call, alice is speaking, your microphone is muted, you are sharing your screen/i,
+      });
+      expect(voiceChip).toHaveTextContent('3 in voice · alice speaking · muted, sharing');
+    });
   });
 
   describe('home state', () => {

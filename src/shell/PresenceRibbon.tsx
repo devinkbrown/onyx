@@ -35,6 +35,24 @@ export type FacepileModel = {
   total: number;
 };
 
+export type VoiceRoomStatusInput = {
+  participants: readonly string[];
+  speakingNicks: ReadonlySet<string>;
+  mutedNicks: ReadonlySet<string>;
+  raisedHands: ReadonlySet<string>;
+  currentCall: boolean;
+  localMuted: boolean;
+  localDeafened: boolean;
+  localCameraOn: boolean;
+  localScreenshareActive: boolean;
+  localCaptionsEnabled: boolean;
+};
+
+export type VoiceRoomStatus = {
+  label: string;
+  ariaStatus: string;
+};
+
 function facepileRank(user: ChannelUser): number {
   const modes = user.modes;
   if (modes.has('Y')) return 0;
@@ -67,6 +85,57 @@ export function buildFacepile(users: readonly ChannelUser[], limit = FACEPILE_LI
   };
 }
 
+export function buildVoiceRoomStatus(input: VoiceRoomStatusInput): VoiceRoomStatus {
+  const speakers = input.participants.filter((nick) => input.speakingNicks.has(nick));
+  const raised = input.participants.filter((nick) => input.raisedHands.has(nick));
+  const mutedPeers = input.participants.filter((nick) => input.mutedNicks.has(nick));
+  const labelParts: string[] = [];
+  const ariaParts: string[] = [];
+
+  if (speakers.length === 1) {
+    labelParts.push(`${speakers[0]} speaking`);
+    ariaParts.push(`${speakers[0]} is speaking`);
+  } else if (speakers.length > 1) {
+    labelParts.push(`${speakers.length} speaking`);
+    ariaParts.push(`${speakers.length} people are speaking`);
+  } else if (raised.length === 1) {
+    labelParts.push(`${raised[0]} raised`);
+    ariaParts.push(`${raised[0]} has a hand raised`);
+  } else if (raised.length > 1) {
+    labelParts.push(`${raised.length} raised`);
+    ariaParts.push(`${raised.length} people have hands raised`);
+  } else if (input.currentCall) {
+    labelParts.push('listening');
+    ariaParts.push('you are listening');
+  }
+
+  const localHealth: Array<{ label: string; aria: string }> = [];
+  if (input.localMuted) localHealth.push({ label: 'muted', aria: 'your microphone is muted' });
+  if (input.localDeafened) localHealth.push({ label: 'deafened', aria: 'you are deafened' });
+  if (input.localScreenshareActive) localHealth.push({ label: 'sharing', aria: 'you are sharing your screen' });
+  if (input.localCameraOn) localHealth.push({ label: 'video', aria: 'your camera is on' });
+  if (input.localCaptionsEnabled) localHealth.push({ label: 'captions', aria: 'captions are on' });
+
+  if (input.currentCall && localHealth.length > 0) {
+    const visibleHealth = localHealth.slice(0, 2);
+    const hidden = localHealth.length - visibleHealth.length;
+    labelParts.push(
+      hidden > 0
+        ? `${visibleHealth.map((part) => part.label).join(', ')} +${hidden}`
+        : visibleHealth.map((part) => part.label).join(', '),
+    );
+    ariaParts.push(...localHealth.map((part) => part.aria));
+  } else if (!input.currentCall && mutedPeers.length > 0 && speakers.length === 0 && raised.length === 0) {
+    labelParts.push(`${mutedPeers.length} muted`);
+    ariaParts.push(`${mutedPeers.length} ${mutedPeers.length === 1 ? 'person is' : 'people are'} muted`);
+  }
+
+  return {
+    label: labelParts.join(' · '),
+    ariaStatus: ariaParts.join(', '),
+  };
+}
+
 export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   const [local] = splitProps(props, ['selfNick', 'onToggleMembers']);
 
@@ -81,6 +150,8 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   const account = useStore(selectAccount);
   const voice = useStore((s) => s.voice);
   const voiceChannelParticipants = useStore((s) => s.voiceChannelParticipants);
+  const speakingNicks = useStore((s) => s.speakingNicks);
+  const mutedNicks = useStore((s) => s.mutedNicks);
   const [now, setNow] = createSignal(Date.now());
   const timer = setInterval(() => setNow(Date.now()), 30_000);
   onCleanup(() => clearInterval(timer));
@@ -171,6 +242,26 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
 
   const voiceCount = createMemo(() => voiceParticipants().length);
 
+  const currentVoiceCall = createMemo(() => {
+    const channel = settingsChannel();
+    return !!channel
+      && voice().callChannel?.toLowerCase() === channel.toLowerCase()
+      && voice().callState === 'in_call';
+  });
+
+  const voiceRoomStatus = createMemo(() => buildVoiceRoomStatus({
+    participants: voiceParticipants(),
+    speakingNicks: speakingNicks(),
+    mutedNicks: mutedNicks(),
+    raisedHands: voice().raisedHands,
+    currentCall: currentVoiceCall(),
+    localMuted: voice().muted,
+    localDeafened: voice().deafened,
+    localCameraOn: voice().cameraOn,
+    localScreenshareActive: voice().screenshareActive,
+    localCaptionsEnabled: voice().captionsEnabled,
+  }));
+
   const ribbonEvent = createMemo(() => {
     const event = scheduledEvent();
     if (!event || !scheduledEventVisible(event, now())) return null;
@@ -197,17 +288,18 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
 
   const voiceChipLabel = createMemo(() => {
     const count = voiceCount();
-    return `${count} in voice`;
+    const status = voiceRoomStatus().label;
+    return status ? `${count} in voice · ${status}` : `${count} in voice`;
   });
 
   const voiceChipAria = createMemo(() => {
     const channel = settingsChannel();
     const count = voiceCount();
     const noun = count === 1 ? 'person' : 'people';
-    const currentCall = voice().callChannel?.toLowerCase() === channel?.toLowerCase()
-      && voice().callState === 'in_call';
-    if (currentCall) return `${count} ${noun} in voice in ${channel}`;
-    return `${count} ${noun} in voice in ${channel}; join voice`;
+    const status = voiceRoomStatus().ariaStatus;
+    const statusText = status ? `, ${status}` : '';
+    if (currentVoiceCall()) return `${count} ${noun} in voice in ${channel}, current call${statusText}`;
+    return `${count} ${noun} in voice in ${channel}${statusText}; join voice`;
   });
 
   function handleMembersClick(): void {
@@ -313,8 +405,9 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
               <button
                 type="button"
                 class="shell-ribbon-voice-chip"
+                classList={{ 'shell-ribbon-voice-chip--active': currentVoiceCall() }}
                 aria-label={voiceChipAria()}
-                title={voiceParticipants().join(', ')}
+                title={[voiceParticipants().join(', '), voiceRoomStatus().label].filter(Boolean).join(' · ')}
                 onClick={handleVoiceChipClick}
               >
                 <span class="shell-ribbon-voice-dot" aria-hidden="true" />

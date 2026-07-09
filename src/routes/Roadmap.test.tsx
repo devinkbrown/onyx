@@ -88,6 +88,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Mobile drawer focus trap')).toBeInTheDocument();
     expect(screen.getByText('Deterministic time scrubber jumps')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Media presence' })).toBeInTheDocument();
+    expect(screen.getByText('Voice room status chip')).toBeInTheDocument();
     expect(screen.getByText('Watch-together surface')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Apps' })).toBeInTheDocument();
     expect(screen.getByText('Block-Kit-lite renderer')).toBeInTheDocument();

@@ -909,6 +909,11 @@
   transform: translate3d(0, -1px, 0);
 }
 
+.shell-ribbon-voice-chip--active {
+  border-color: color-mix(in oklab, var(--lapis-bright) 54%, var(--line));
+  background: color-mix(in oklab, var(--lapis) 20%, var(--stone) 58%);
+}
+
 .shell-ribbon-voice-chip:focus-visible {
   outline: 2px solid var(--lapis-bright);
   outline-offset: 2px;

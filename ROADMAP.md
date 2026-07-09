@@ -409,6 +409,10 @@ client or public site needs to expose the result.
 28. **Voice-room-as-place UI** *(client)* — turn voice/video from a button row
     into persistent room presence with stage context, speaker/listener state,
     device health, and call status visible in the room header.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — The room header voice chip now
+    reports active speaker or listener state, raised-hand fallback, muted peer
+    fallback, and local device health such as muted, deafened, sharing, camera,
+    and captions while preserving the join-current-room action.
 29. **Spatial audio and screenshare controls** *(client)* — add explicit spatial
     audio, screenshare, and watch-together controls that degrade cleanly when a
     node or browser lacks the underlying media feature.
