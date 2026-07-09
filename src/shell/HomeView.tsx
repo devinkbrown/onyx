@@ -158,6 +158,9 @@ export function HomeView(): JSX.Element {
 
   const [stats] = createResource(fetchStatsIndex);
   const [reviewHistory, setReviewHistory] = createSignal<ReviewHistoryEntry[]>(readReviewHistory());
+  const reviewHistorySummary = createMemo(() =>
+    connectionStatus() === 'connected' ? 'catch-up ranges' : 'offline recall',
+  );
 
   // "Catch up" — what you missed across every joined room + DM, ranked so
   // mentions and DMs surface and ambient chatter accumulates quietly below.
@@ -474,11 +477,11 @@ export function HomeView(): JSX.Element {
           </section>
         </Show>
 
-        <Show when={connectionStatus() === 'connected' && reviewHistory().length > 0}>
+        <Show when={reviewHistory().length > 0}>
           <section class="home-review-history" aria-label="Recent catch-up reviews">
             <div class="home-review-history__head">
               <h3 class="home-section-label">Reviewed recently</h3>
-              <span class="home-review-history__summary">catch-up ranges</span>
+              <span class="home-review-history__summary">{reviewHistorySummary()}</span>
             </div>
             <div class="home-review-history__list" role="list" aria-label="Recent catch-up review cards">
               <For each={reviewHistory()}>

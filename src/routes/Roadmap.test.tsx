@@ -111,6 +111,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByRole('heading', { name: 'Roaming' })).toBeInTheDocument();
     expect(screen.getByText('TravelTo vault fallback')).toBeInTheDocument();
     expect(screen.getAllByText('Active-target vault search').length).toBeGreaterThan(0);
+    expect(screen.getByText('Offline reviewed recall')).toBeInTheDocument();
     expect(screen.getByText('Installable manifest')).toBeInTheDocument();
     expect(screen.getByText('PWA shortcuts')).toBeInTheDocument();
     expect(screen.getByText('Portable vault export')).toBeInTheDocument();

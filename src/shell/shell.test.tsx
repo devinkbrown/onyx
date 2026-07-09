@@ -1049,6 +1049,34 @@ describe('AppShell', () => {
       travelToSpy.mockRestore();
     });
 
+    it('keeps reviewed catch-up ranges visible while disconnected', async () => {
+      recordReviewHistory({
+        target: '#general',
+        name: '#general',
+        kind: 'channel',
+        firstMessageId: 'msg-new-a',
+        firstAt: '2025-01-01T12:00:00.000Z',
+        reviewedAt: '2025-01-01T12:03:00.000Z',
+        messageCount: 2,
+        mentionCount: 1,
+        preview: 'Offline recall note',
+      });
+      store.setState({
+        ...initialState,
+        activeView: { kind: 'home' },
+        connectionStatus: 'disconnected',
+        networkName: 'IRCXNet',
+      }, true);
+
+      render(() => <AppShell />);
+
+      const reviewHistory = await screen.findByLabelText('Recent catch-up reviews');
+      expect(within(reviewHistory).getByText('Reviewed recently')).toBeInTheDocument();
+      expect(within(reviewHistory).getByText('offline recall')).toBeInTheDocument();
+      expect(within(reviewHistory).getByText('#general')).toBeInTheDocument();
+      expect(within(reviewHistory).getByText('Offline recall note')).toBeInTheDocument();
+    });
+
     it('shows joined-room chanstats rhythm with scheduled event context', async () => {
       const eventAt = Math.floor(Date.now() / 1000) + 3600;
       vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({

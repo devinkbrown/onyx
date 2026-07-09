@@ -498,6 +498,9 @@ client or public site needs to expose the result.
     local-vault timestamp window when CHATHISTORY is unavailable, and remembered
     unjoined channel vault results create/navigate a local shell immediately
     while still sending JOIN when connected.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home now keeps reviewed catch-up
+    ranges visible while disconnected, labelling them as offline recall so
+    locally remembered review anchors remain usable before reconnect.
 39. **PWA and desktop packaging path** *(client + main site)* — make install,
     update, notification, and wrapped push behavior explicit for browser PWA,
     desktop shell, and future mobile wrappers.
