@@ -69,7 +69,15 @@ describe('RoadmapRoute', () => {
     expect(screen.getByRole('heading', { name: 'Torii entry' })).toBeInTheDocument();
     expect(screen.getByText('Rich invite route')).toBeInTheDocument();
     expect(screen.getByText('Invite Open Graph metadata')).toBeInTheDocument();
+    expect(screen.getByText('Invite topic metadata')).toBeInTheDocument();
+    expect(screen.getByText('Invite reader metadata')).toBeInTheDocument();
+    expect(screen.getByText('Copyable canonical invite')).toBeInTheDocument();
+    expect(screen.getByText('Invite first-run runway')).toBeInTheDocument();
+    expect(screen.getByText('App topic handoff')).toBeInTheDocument();
+    expect(screen.getByText('App reader handoff')).toBeInTheDocument();
     expect(screen.getByText('Install guide')).toBeInTheDocument();
+    expect(screen.getByText('Install release checks')).toBeInTheDocument();
+    expect(screen.getByText('Wrapper link contract')).toBeInTheDocument();
     expect(screen.getByText('Generated public sitemap')).toBeInTheDocument();
     expect(screen.getByText('Public glossary')).toBeInTheDocument();
     expect(screen.getByText('Native onboarding forms')).toBeInTheDocument();
@@ -88,6 +96,9 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Scheduled event header chip')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Atmosphere' })).toBeInTheDocument();
     expect(screen.getByText('User reduced-transparency control')).toBeInTheDocument();
+    expect(screen.getByText('Public high-contrast ledger')).toBeInTheDocument();
+    expect(screen.getByText('Public reduced-transparency ledger')).toBeInTheDocument();
+    expect(screen.getByText('Forced-colors audit notes')).toBeInTheDocument();
     expect(screen.getByText('Mobile drawer focus management')).toBeInTheDocument();
     expect(screen.getByText('Mobile drawer focus trap')).toBeInTheDocument();
     expect(screen.getByText('Deterministic time scrubber jumps')).toBeInTheDocument();

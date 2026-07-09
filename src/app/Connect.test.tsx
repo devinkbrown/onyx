@@ -17,6 +17,7 @@ import { cleanup, render, screen, fireEvent, waitFor, within } from '@solidjs/te
 import { Connect } from './Connect';
 import { NODES } from './nodes';
 import { store, getState } from '@/lib/store';
+import { preferences, resetPreferences } from '@/lib/prefs/preferences';
 
 // The connect screen probes node latency by opening real WebSockets on mount.
 // In jsdom that would hit the live servers, so stub the probe + selector here —
@@ -45,6 +46,7 @@ beforeEach(() => {
   try {
     window.localStorage.clear();
   } catch { /* ignore */ }
+  resetPreferences();
 });
 
 afterEach(() => {
@@ -679,6 +681,21 @@ describe('optional room to join (no autojoin)', () => {
     await waitFor(() => expect(connectSpy).toHaveBeenCalledOnce());
     expect(connectSpy.mock.calls[0]![0].nick).toBe('yuki');
     expect(store.getState().pendingDeepLinkJoin).toBe('#general');
+
+    connectSpy.mockRestore();
+  });
+
+  it('preserves invite topic and reader projection for the post-connect room', async () => {
+    window.history.pushState({}, '', '/app?join=%23general&topic=release%20train&reader=1&as=yuki');
+    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
+
+    render(() => <Connect />);
+    fireEvent.click(screen.getByTestId('conn-submit'));
+
+    await waitFor(() => expect(connectSpy).toHaveBeenCalledOnce());
+    expect(store.getState().pendingDeepLinkJoin).toBe('#general');
+    expect(store.getState().pendingDeepLinkTopic).toBe('release train');
+    expect(preferences().readerMode).toBe(true);
 
     connectSpy.mockRestore();
   });

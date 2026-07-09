@@ -75,8 +75,8 @@ const phases: Phase[] = [
     title: 'Torii entry',
     state: 'active',
     date: '2026-07-09',
-    summary: 'Fold the master roadmap product-entry work into Onyx and the main site: rich invite previews, instant guest handoff, native onboarding, install guidance, and a stricter public glossary.',
-    items: ['Rich invite route', 'Invite Open Graph metadata', 'Instant guest identity', 'Invite moment handoff', 'Native onboarding forms', 'Account claim flow', 'Install guide', 'Generated public sitemap', 'Public glossary', 'Brand glossary cleanup'],
+    summary: 'Fold the master roadmap product-entry work into Onyx and the main site: rich invite previews, topic and reader handoff, instant guest entry, native onboarding, install guidance, release checks, and a stricter public glossary.',
+    items: ['Rich invite route', 'Invite Open Graph metadata', 'Instant guest identity', 'Invite moment handoff', 'Invite topic metadata', 'Invite reader metadata', 'Copyable canonical invite', 'Invite first-run runway', 'App topic handoff', 'App reader handoff', 'Native onboarding forms', 'Account claim flow', 'Install guide', 'Install release checks', 'Wrapper link contract', 'Generated public sitemap', 'Public glossary', 'Brand glossary cleanup'],
   },
   {
     phase: 'Phase 9',
@@ -91,8 +91,8 @@ const phases: Phase[] = [
     title: 'Atmosphere',
     state: 'planned',
     date: 'planned',
-    summary: 'Consolidate the background system and finish mechanically derived accessibility variants, including reduced transparency, contrast, and mobile drawer focus semantics.',
-    items: ['Background consolidation', 'Theme-reactive identity', 'Contrast variants', 'Reduced-transparency variants', 'User reduced-transparency control', 'Mobile drawer focus management', 'Mobile drawer focus trap', 'Deterministic time scrubber jumps'],
+    summary: 'Consolidate the background system and finish mechanically derived accessibility variants, including reduced transparency, contrast, forced-colors, and mobile drawer focus semantics.',
+    items: ['Background consolidation', 'Theme-reactive identity', 'Contrast variants', 'Reduced-transparency variants', 'User reduced-transparency control', 'Public high-contrast ledger', 'Public reduced-transparency ledger', 'Forced-colors audit notes', 'Mobile drawer focus management', 'Mobile drawer focus trap', 'Deterministic time scrubber jumps'],
   },
   {
     phase: 'Phase 11',

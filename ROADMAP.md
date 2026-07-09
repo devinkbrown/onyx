@@ -329,6 +329,12 @@ client or public site needs to expose the result.
     suggested guest metadata, then hands off to `/app` with the same params.
     The main site now links the install/first-run path and generates sitemap
     entries for public app, stats, invite, and documentation routes.
+    ✅ **CLIENT + WEBSITE 10-ITEM SLICE SHIPPED 2026-07-09** — Rich invite entry
+    now preserves validated named-conversation topics, reader-mode projection,
+    copyable canonical invite URLs, a first-run runway, app-side topic handoff,
+    app-side reader handoff, public high-contrast ledger notes, public
+    reduced-transparency ledger notes, forced-colors/drawer-focus audit notes,
+    and install/wrapper release checks.
 19. **Native onboarding and account claim** *(client)* — remove the NickServ
     cliff from first use with registration, identify, certificate, and future
     passkey flows expressed as first-party forms over the real server commands.

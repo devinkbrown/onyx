@@ -12,6 +12,8 @@
  */
 
 const JOIN_PARAM_RE = /^#[^\s,\x07]{1,63}$/;
+const TOPIC_PARAM_CONTROL_PATTERN = /[\x00-\x1f\x7f,]/u;
+const textEncoder = new TextEncoder();
 
 /**
  * Parse and validate a `?join=` search-param value into a channel name.
@@ -32,6 +34,29 @@ export function parseJoinParam(raw: string | string[] | null | undefined): strin
 
   const trimmed = decoded.trim();
   return JOIN_PARAM_RE.test(trimmed) ? trimmed : null;
+}
+
+export function parseTopicParam(raw: string | string[] | null | undefined): string | null {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof value !== 'string' || value.length === 0) return null;
+
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+
+  const trimmed = decoded.trim();
+  if (trimmed.length === 0 || TOPIC_PARAM_CONTROL_PATTERN.test(trimmed)) return null;
+  return textEncoder.encode(trimmed).length <= 50 ? trimmed : null;
+}
+
+export function parseReaderParam(raw: string | string[] | null | undefined): boolean {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof value !== 'string') return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'reader';
 }
 
 /** Earliest instant an `?at=` link may point to (sanity bound, not history). */

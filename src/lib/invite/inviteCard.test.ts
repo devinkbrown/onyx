@@ -11,6 +11,8 @@ describe('buildInviteCard', () => {
       as: '  yuki  ',
       at: '2026-06-30T12:00:00Z',
       join: '#general',
+      topic: 'release train',
+      reader: '1',
       ignored: 'noise',
     });
 
@@ -19,9 +21,11 @@ describe('buildInviteCard', () => {
     expect(card).toEqual({
       channel: '#general',
       at: new Date('2026-06-30T12:00:00.000Z'),
+      topic: 'release train',
+      readerMode: true,
       guestName: 'yuki',
       network: NETWORK,
-      url: `${ORIGIN}?join=%23general&at=2026-06-30T12%3A00%3A00.000Z&as=yuki`,
+      url: `${ORIGIN}?join=%23general&at=2026-06-30T12%3A00%3A00.000Z&topic=release+train&reader=1&as=yuki`,
     });
   });
 
@@ -29,6 +33,8 @@ describe('buildInviteCard', () => {
     const card = buildInviteCard(new URLSearchParams(), { network: NETWORK, origin: ORIGIN });
 
     expect(card.channel).toBeNull();
+    expect(card.topic).toBeNull();
+    expect(card.readerMode).toBe(false);
     expect(inviteTitle(card)).toBe(`Join ${NETWORK}`);
     expect(card.url).toBe(ORIGIN);
   });
@@ -45,12 +51,12 @@ describe('buildInviteCard', () => {
 
   it('creates a human description with moment and guest details', () => {
     const card = buildInviteCard(
-      new URLSearchParams({ at: '2026-06-30T12:00:00Z', as: 'yuki', join: '#general' }),
+    new URLSearchParams({ at: '2026-06-30T12:00:00Z', as: 'yuki', join: '#general', topic: 'release', reader: 'true' }),
       { network: NETWORK, origin: ORIGIN },
     );
 
     expect(inviteDescription(card)).toBe(
-      'Jump into the conversation from 2026-06-30T12:00:00.000Z. Continue as yuki',
+      'Jump into the conversation from 2026-06-30T12:00:00.000Z. Open the release topic. Start in reader mode. Continue as yuki',
     );
   });
 
@@ -77,5 +83,16 @@ describe('buildInviteCard', () => {
     expect(card.url).toBe(
       `${ORIGIN}?join=%23space&at=2025-06-27T04%3A53%3A20.000Z&as=guest+nick`,
     );
+  });
+
+  it('drops malformed topic and reader params from the canonical URL', () => {
+    const card = buildInviteCard(
+      new URLSearchParams({ join: '#general', topic: 'bad,label', reader: '0' }),
+      { network: NETWORK, origin: ORIGIN },
+    );
+
+    expect(card.topic).toBeNull();
+    expect(card.readerMode).toBe(false);
+    expect(card.url).toBe(`${ORIGIN}?join=%23general`);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildMomentLink, parseAtParam, parseEventTime, parseJoinParam } from './deeplink';
+import { buildMomentLink, parseAtParam, parseEventTime, parseJoinParam, parseReaderParam, parseTopicParam } from './deeplink';
 
 describe('parseJoinParam', () => {
   it('accepts a plain #channel', () => {
@@ -95,6 +95,34 @@ describe('parseAtParam', () => {
     expect(parseAtParam('2019-12-31T23:59:59Z')).toBeNull();
     expect(parseAtParam('946684800')).toBeNull(); // 2000-01-01 epoch s
     expect(parseAtParam(String(Date.now() + 3 * 24 * 60 * 60 * 1000))).toBeNull();
+  });
+});
+
+describe('parseTopicParam', () => {
+  it('accepts trimmed named-conversation labels', () => {
+    expect(parseTopicParam(' release train ')).toBe('release train');
+    expect(parseTopicParam('release%20train')).toBe('release train');
+  });
+
+  it('rejects empty, comma-separated, control, and oversized labels', () => {
+    expect(parseTopicParam('')).toBeNull();
+    expect(parseTopicParam('a,b')).toBeNull();
+    expect(parseTopicParam('bad%0Aline')).toBeNull();
+    expect(parseTopicParam('x'.repeat(51))).toBeNull();
+  });
+});
+
+describe('parseReaderParam', () => {
+  it('accepts explicit reader flags', () => {
+    expect(parseReaderParam('1')).toBe(true);
+    expect(parseReaderParam('true')).toBe(true);
+    expect(parseReaderParam('reader')).toBe(true);
+  });
+
+  it('ignores absent or falsey reader flags', () => {
+    expect(parseReaderParam(null)).toBe(false);
+    expect(parseReaderParam('0')).toBe(false);
+    expect(parseReaderParam('false')).toBe(false);
   });
 });
 

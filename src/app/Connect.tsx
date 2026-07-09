@@ -39,8 +39,9 @@ import {
   type JSX,
 } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
-import { parseAtParam, parseJoinParam } from '@/lib/deeplink';
+import { parseAtParam, parseJoinParam, parseReaderParam, parseTopicParam } from '@/lib/deeplink';
 import { buildInviteCard, inviteTitle, inviteDescription } from '@/lib/invite/inviteCard';
+import { setPreference } from '@/lib/prefs/preferences';
 import { isPasskeySupported } from '@/lib/webauthn/passkey';
 import { ConnectPulse } from './ConnectPulse';
 import { AppShell } from '@/shell';
@@ -301,7 +302,18 @@ export function Connect(props: ConnectProps): JSX.Element {
       ? new URLSearchParams(window.location.search).get('at')
       : null,
   );
-  if (deepLinkJoin) getState().setPendingDeepLinkJoin(deepLinkJoin, deepLinkAt);
+  const deepLinkTopic = parseTopicParam(
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('topic')
+      : null,
+  );
+  const deepLinkReader = parseReaderParam(
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('reader')
+      : null,
+  );
+  if (deepLinkReader) setPreference('readerMode', true);
+  if (deepLinkJoin) getState().setPendingDeepLinkJoin(deepLinkJoin, deepLinkAt, deepLinkTopic);
 
   // A welcoming preview of what the invite opens onto — built from the SAME deep
   // link the component already parsed. Only present when a join is pending; a
@@ -622,6 +634,7 @@ export function Connect(props: ConnectProps): JSX.Element {
     getState().setPendingDeepLinkJoin(
       normalizedRoom,
       normalizedRoom === deepLinkJoin ? deepLinkAt : null,
+      normalizedRoom === deepLinkJoin ? deepLinkTopic : null,
     );
 
     if (m === 'signin') {

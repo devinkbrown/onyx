@@ -428,6 +428,8 @@ export interface OnyxState {
   pendingDeepLinkJoin: string | null;
   /** Moment from a website ?at= deep link — time travel after the join */
   pendingDeepLinkAt: Date | null;
+  /** Named conversation from a website ?topic= deep link */
+  pendingDeepLinkTopic: string | null;
   /** Message id the feed should scroll to + pulse (time-travel landing) */
   timeTravelLandingId: string | null;
   /** Whether the member list panel is open */
@@ -796,8 +798,8 @@ export interface OnyxState {
   /** Join a channel */
   joinChannel(channel: string, key?: string): void;
 
-  /** Stash a validated ?join= deep-link channel until the connection lands */
-  setPendingDeepLinkJoin(channel: string | null, at?: Date | null): void;
+  /** Stash a validated deep-link channel until the connection lands */
+  setPendingDeepLinkJoin(channel: string | null, at?: Date | null, topic?: string | null): void;
 
   /** Time travel: fetch history around a moment and land the feed on it */
   travelTo(target: string, at: Date): void;
@@ -2315,6 +2317,7 @@ export const store = createStore<OnyxState>()(
     activeView: { kind: 'home' },
     pendingDeepLinkJoin: null,
     pendingDeepLinkAt: null,
+    pendingDeepLinkTopic: null,
     timeTravelLandingId: null,
     showMemberList: true,
     showSettings: false,
@@ -2711,8 +2714,12 @@ export const store = createStore<OnyxState>()(
       get().client?.join(channel, key);
     },
 
-    setPendingDeepLinkJoin(channel, at) {
-      set({ pendingDeepLinkJoin: channel, pendingDeepLinkAt: channel ? (at ?? null) : null });
+    setPendingDeepLinkJoin(channel, at, topic) {
+      set({
+        pendingDeepLinkJoin: channel,
+        pendingDeepLinkAt: channel ? (at ?? null) : null,
+        pendingDeepLinkTopic: channel ? (topic ?? null) : null,
+      });
     },
 
     travelTo(target, at) {
@@ -4897,10 +4904,12 @@ export const store = createStore<OnyxState>()(
             {
               const pendingJoin = get().pendingDeepLinkJoin;
               const pendingAt = get().pendingDeepLinkAt;
+              const pendingTopic = get().pendingDeepLinkTopic;
               if (pendingJoin) {
                 setTimeout(() => {
                   get().client?.sendRaw('JOIN', pendingJoin);
-                  set({ pendingDeepLinkJoin: null, pendingDeepLinkAt: null });
+                  if (pendingTopic) get().setActiveChannelTopic(pendingJoin, pendingTopic);
+                  set({ pendingDeepLinkJoin: null, pendingDeepLinkAt: null, pendingDeepLinkTopic: null });
                   if (pendingAt) {
                     // ?at= time travel: fetch AROUND the moment once the join
                     // replay has had a beat to land (the sorted merge tolerates

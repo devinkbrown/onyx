@@ -1,6 +1,6 @@
 import './landing.css';
 import './data-pages.css';
-import { createEffect, createMemo, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, Show } from 'solid-js';
 import { Mascot } from '@/components/brand/Mascot';
 import { buildInviteCard, inviteDescription, inviteTitle } from '@/lib/invite/inviteCard';
 import { setPageMeta } from './pageMeta';
@@ -35,6 +35,7 @@ function formatMoment(at: Date): string {
 }
 
 export default function InviteRoute() {
+  const [copyState, setCopyState] = createSignal<'idle' | 'copied' | 'failed'>('idle');
   const card = createMemo(() => buildInviteCard(currentParams(), {
     network: NETWORK_NAME,
     origin: currentOrigin(),
@@ -46,6 +47,15 @@ export default function InviteRoute() {
   createEffect(() => {
     setPageMeta(title(), description(), card().url);
   });
+
+  async function copyInvite(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(card().url);
+      setCopyState('copied');
+    } catch {
+      setCopyState('failed');
+    }
+  }
 
   return (
     <main class="r data-page invite-page">
@@ -82,8 +92,14 @@ export default function InviteRoute() {
         <p class="sub">{description()}</p>
         <div class="r-cta">
           <a class="r-btn primary" href={appHref()}>Open invite in Onyx</a>
+          <button type="button" class="r-btn ghost" onClick={() => void copyInvite()}>
+            {copyState() === 'copied' ? 'Copied invite' : 'Copy invite link'}
+          </button>
           <a class="r-btn ghost" href="/guides/">Read the quick guides</a>
         </div>
+        <Show when={copyState() === 'failed'}>
+          <p class="invite-copy-status" role="status">Copy failed. The canonical invite is listed below.</p>
+        </Show>
       </section>
 
       <section class="r-wrap r-section data-grid" aria-label="Invite details">
@@ -109,6 +125,18 @@ export default function InviteRoute() {
                 </div>
               )}
             </Show>
+            <Show when={card().topic}>
+              {(topic) => (
+                <div class="data-row">
+                  <div><strong>Named conversation</strong><span>{topic()}</span></div>
+                </div>
+              )}
+            </Show>
+            <Show when={card().readerMode}>
+              <div class="data-row">
+                <div><strong>Reading projection</strong><span>Reader mode opens before the room joins.</span></div>
+              </div>
+            </Show>
             <Show when={card().guestName}>
               {(guestName) => (
                 <div class="data-row">
@@ -128,6 +156,18 @@ export default function InviteRoute() {
             <div class="data-row"><div><strong>App handoff</strong><span>{appHref()}</span></div></div>
           </div>
         </aside>
+      </section>
+      <section class="r-wrap r-section invite-runway" aria-labelledby="invite-runway-heading">
+        <span class="r-eyebrow">first run</span>
+        <h2 class="r-title" id="invite-runway-heading">What Onyx keeps from this link</h2>
+        <div class="invite-runway__grid" role="list">
+          <div role="listitem"><strong>Room</strong><span>{card().channel ?? 'Home directory'}</span></div>
+          <div role="listitem"><strong>Moment</strong><span>{card().at ? formatMoment(card().at!) : 'Latest activity'}</span></div>
+          <div role="listitem"><strong>Topic</strong><span>{card().topic ?? 'Whole room'}</span></div>
+          <div role="listitem"><strong>Projection</strong><span>{card().readerMode ? 'Reader mode' : 'Standard mode'}</span></div>
+          <div role="listitem"><strong>Identity</strong><span>{card().guestName ?? 'Choose guest or account'}</span></div>
+          <div role="listitem"><strong>After claim</strong><span>Same room path, saved identity, local memory.</span></div>
+        </div>
       </section>
     </main>
   );

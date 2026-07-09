@@ -200,6 +200,50 @@
   background: color-mix(in oklab, var(--lapis) 12%, transparent);
 }
 
+.invite-copy-status {
+  margin: 14px 0 0;
+  color: var(--shu-bright);
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+}
+
+.invite-runway__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(12px, 1.8vw, 18px);
+  margin-top: 30px;
+}
+
+.invite-runway__grid div {
+  min-height: 118px;
+  padding: clamp(18px, 2vw, 24px);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 42%, transparent), color-mix(in oklab, var(--ink) 82%, transparent)),
+    color-mix(in oklab, var(--stone) 28%, var(--ink));
+}
+
+.invite-runway__grid strong,
+.invite-runway__grid span {
+  display: block;
+}
+
+.invite-runway__grid strong {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lapis-bright);
+}
+
+.invite-runway__grid span {
+  margin-top: 18px;
+  color: var(--washi);
+  font-size: clamp(1rem, 0.92rem + 0.35vw, 1.18rem);
+  line-height: 1.42;
+}
+
 .channel-spark {
   min-width: 230px;
   display: flex;
@@ -416,6 +460,10 @@
 
   .channel-spark {
     justify-content: space-between;
+  }
+
+  .invite-runway__grid {
+    grid-template-columns: 1fr;
   }
 
   .peer-table,

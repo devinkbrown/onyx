@@ -2,11 +2,13 @@
  * inviteCard.ts — pure model helpers for rich invite link previews.
  */
 
-import { parseAtParam, parseJoinParam } from '@/lib/deeplink';
+import { parseAtParam, parseJoinParam, parseReaderParam, parseTopicParam } from '@/lib/deeplink';
 
 export interface InviteCard {
   channel: string | null;
   at: Date | null;
+  topic: string | null;
+  readerMode: boolean;
   guestName: string | null;
   network: string;
   url: string;
@@ -21,6 +23,8 @@ function canonicalInviteUrl(origin: string, card: Omit<InviteCard, 'network' | '
   const canonicalParams = new URLSearchParams();
   if (card.channel !== null) canonicalParams.set('join', card.channel);
   if (card.at !== null) canonicalParams.set('at', card.at.toISOString());
+  if (card.topic !== null) canonicalParams.set('topic', card.topic);
+  if (card.readerMode) canonicalParams.set('reader', '1');
   if (card.guestName !== null) canonicalParams.set('as', card.guestName);
 
   const query = canonicalParams.toString();
@@ -33,12 +37,16 @@ export function buildInviteCard(
 ): InviteCard {
   const channel = parseJoinParam(params.get('join'));
   const at = parseAtParam(params.get('at'));
+  const topic = parseTopicParam(params.get('topic'));
+  const readerMode = parseReaderParam(params.get('reader'));
   const guestName = trimmedParam(params.get('as'));
-  const partialCard = { channel, at, guestName };
+  const partialCard = { channel, at, topic, readerMode, guestName };
 
   return {
     channel,
     at,
+    topic,
+    readerMode,
     guestName,
     network: opts.network,
     url: canonicalInviteUrl(opts.origin, partialCard),
@@ -52,6 +60,8 @@ export function inviteTitle(card: InviteCard): string {
 export function inviteDescription(card: InviteCard): string {
   const details: string[] = [];
   if (card.at !== null) details.push(`Jump into the conversation from ${card.at.toISOString()}`);
+  if (card.topic !== null) details.push(`Open the ${card.topic} topic`);
+  if (card.readerMode) details.push('Start in reader mode');
   if (card.guestName !== null) details.push(`Continue as ${card.guestName}`);
   const target = card.channel !== null ? `${card.channel} on ${card.network}` : card.network;
   return details.length > 0 ? details.join('. ') : `Open an invite to ${target}.`;
