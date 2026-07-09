@@ -42,6 +42,7 @@ export { relTime };
 const HOME_RECAP_LIMIT = 3;
 const HOME_RECAP_VOICE_LIMIT = 2;
 const HOME_SYSTEM_TYPES = new Set(['join', 'part', 'quit', 'kick', 'mode', 'topic', 'nick', 'system', 'error']);
+const HOME_RHYTHM_LIMIT = 4;
 
 type HomeCatchUpRecap = {
   item: CatchUpItem;
@@ -50,6 +51,17 @@ type HomeCatchUpRecap = {
   preview: string;
   messageCount: number;
   mentionCount: number;
+};
+
+type HomeRhythmItem = {
+  channel: string;
+  topic: string;
+  spark: number[];
+  total: number;
+  peak: number;
+  activeUsers: number;
+  lastActive: number;
+  event: ScheduledEventItem | null;
 };
 
 function Sparkline(props: { values: number[] }): JSX.Element {
@@ -114,6 +126,13 @@ function spotlightQueryFor(item: CatchUpItem): string {
   return item.kind === 'channel' ? `goto ${item.target}` : `dm ${item.target}`;
 }
 
+function trendLabel(item: HomeRhythmItem): string {
+  if (item.activeUsers > 0) {
+    return `${item.activeUsers} chatting`;
+  }
+  return `${item.total.toLocaleString()} tracked`;
+}
+
 export function HomeView(): JSX.Element {
   const joinHistory = useStore((s) => s.joinHistory);
   const channels = useStore((s) => s.channels);
@@ -148,6 +167,11 @@ export function HomeView(): JSX.Element {
   const scheduledEvents = createMemo<ScheduledEventItem[]>(() =>
     collectScheduledEvents(channels().values(), channelProps(), nowMs()),
   );
+  const scheduledEventsByChannel = createMemo(() => {
+    const byChannel = new Map<string, ScheduledEventItem>();
+    for (const event of scheduledEvents()) byChannel.set(event.channel.toLowerCase(), event);
+    return byChannel;
+  });
   const openEvent = (event: ScheduledEventItem) =>
     getState().navigate({ kind: 'channel', channel: event.channel });
   const eventWhenLabel = (event: ScheduledEventItem) =>
@@ -228,6 +252,32 @@ export function HomeView(): JSX.Element {
     (stats()?.channels ?? []).reduce((sum, c) => sum + c.active_users, 0),
   );
   const isJoined = (name: string) => channels().has(name.toLowerCase());
+  const roomRhythm = createMemo<HomeRhythmItem[]>(() => {
+    const data = stats();
+    if (!data) return [];
+    const joined = channels();
+    const events = scheduledEventsByChannel();
+    return data.channels
+      .filter((channel) => joined.has(channel.channel.toLowerCase()) && channel.spark.some((value) => value > 0))
+      .map((channel) => ({
+        channel: channel.channel,
+        topic: channel.topic,
+        spark: channel.spark.slice(-14),
+        total: channel.messages,
+        peak: Math.max(1, ...channel.spark),
+        activeUsers: channel.active_users,
+        lastActive: channel.last_active,
+        event: events.get(channel.channel.toLowerCase()) ?? null,
+      }))
+      .sort((a, b) =>
+        Number(!!b.event?.live) - Number(!!a.event?.live) ||
+        Number(!!b.event) - Number(!!a.event) ||
+        b.activeUsers - a.activeUsers ||
+        b.lastActive - a.lastActive ||
+        a.channel.localeCompare(b.channel),
+      )
+      .slice(0, HOME_RHYTHM_LIMIT);
+  });
 
   return (
     <div class="home" role="main" aria-label="Network home">
@@ -418,6 +468,60 @@ export function HomeView(): JSX.Element {
             Shortcuts
           </button>
         </div>
+
+        <Show when={connectionStatus() === 'connected' && roomRhythm().length > 0}>
+          <section class="home-rhythm" aria-label="Room rhythm">
+            <div class="home-rhythm-head">
+              <h3 class="home-section-label">Room rhythm</h3>
+              <span class="home-rhythm-summary">chanstats heatlines</span>
+            </div>
+            <div class="home-rhythm-list">
+              <For each={roomRhythm()}>
+                {(item) => (
+                  <button
+                    type="button"
+                    class={`home-rhythm-item${item.event?.live ? ' is-live' : ''}`}
+                    onClick={() => getState().navigate({ kind: 'channel', channel: item.channel })}
+                    aria-label={`Open ${item.channel}, ${trendLabel(item)}${item.event ? `, ${item.event.title} ${eventCountdown(item.event, nowMs())}` : ''}`}
+                  >
+                    <span class="home-rhythm-main">
+                      <span class="home-rhythm-title">
+                        <span>{item.channel}</span>
+                        <span>{trendLabel(item)}</span>
+                      </span>
+                      <span class={`home-rhythm-topic${item.topic ? '' : ' is-empty'}`}>
+                        {item.topic || 'No topic set'}
+                      </span>
+                    </span>
+                    <span class="home-rhythm-heat" aria-hidden="true">
+                      <For each={item.spark}>
+                        {(value) => (
+                          <span
+                            class={`home-rhythm-bar${value > 0 ? ' is-active' : ''}`}
+                            style={{ '--heat': (value / item.peak).toFixed(3) }}
+                          />
+                        )}
+                      </For>
+                    </span>
+                    <span class="home-rhythm-event">
+                      <Show
+                        when={item.event}
+                        fallback={<span>{relTime(item.lastActive, nowMs())}</span>}
+                      >
+                        {(event) => (
+                          <>
+                            <b>{event().live ? 'live' : eventCountdown(event(), nowMs())}</b>
+                            <span>{event().title}</span>
+                          </>
+                        )}
+                      </Show>
+                    </span>
+                  </button>
+                )}
+              </For>
+            </div>
+          </section>
+        </Show>
 
         <Show when={preferences().localHistory && rememberedRooms().length > 0}>
           <section class="home-memory" aria-label="Remembered rooms on this device">

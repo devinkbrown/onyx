@@ -105,6 +105,7 @@ describe('AppShell', () => {
 
   afterEach(() => {
     cleanup();
+    vi.unstubAllGlobals();
   });
 
   describe('sidebar channel rendering', () => {
@@ -708,6 +709,56 @@ describe('AppShell', () => {
         expect(screen.getByRole('dialog', { name: 'Command palette' })).toBeInTheDocument();
         expect(screen.getByRole('combobox', { name: 'Command search' })).toHaveValue('goto #general');
       });
+    });
+
+    it('shows joined-room chanstats rhythm with scheduled event context', async () => {
+      const eventAt = Math.floor(Date.now() / 1000) + 3600;
+      vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+        generated_at: Math.floor(Date.now() / 1000),
+        network: 'IRCXNet',
+        node: 'eshmaki.me',
+        users_online: 8,
+        network_days: [],
+        channels: [
+          {
+            channel: '#general',
+            messages: 42,
+            active_users: 2,
+            present: 3,
+            last_active: Math.floor(Date.now() / 1000) - 120,
+            topic: 'Planning call',
+            spark: [0, 2, 4, 1, 8, 3],
+          },
+          {
+            channel: '#outside',
+            messages: 99,
+            active_users: 4,
+            present: 5,
+            last_active: Math.floor(Date.now() / 1000),
+            topic: 'Not joined',
+            spark: [9, 9, 9],
+          },
+        ],
+      }), { status: 200 })));
+      const channels = new Map<string, Channel>();
+      channels.set('#general', makeChannel('#general', [makeMessage('m1', 'alice', 'hello', '#general')], [makeUser('alice')]));
+      store.setState({
+        ...initialState,
+        channels,
+        activeView: { kind: 'home' },
+        connectionStatus: 'connected',
+        networkName: 'IRCXNet',
+        channelProps: new Map([['#general', { 'ocean.event': `${eventAt}|Office hours` }]]),
+      }, true);
+
+      render(() => <AppShell />);
+
+      const rhythm = await screen.findByLabelText('Room rhythm');
+      expect(within(rhythm).getByText('#general')).toBeInTheDocument();
+      expect(within(rhythm).getByText('2 chatting')).toBeInTheDocument();
+      expect(within(rhythm).getByText('Planning call')).toBeInTheDocument();
+      expect(within(rhythm).getByText('Office hours')).toBeInTheDocument();
+      expect(within(rhythm).queryByText('#outside')).not.toBeInTheDocument();
     });
   });
 });
