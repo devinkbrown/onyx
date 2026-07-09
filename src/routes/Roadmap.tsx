@@ -124,7 +124,7 @@ const phases: Phase[] = [
     state: 'active',
     date: '2026-07-09',
     summary: 'Generalize offline-first behavior into read, compose, search, PWA install clarity, moderation drafts, desktop packaging, and portable local-state transfer.',
-    items: ['TravelTo vault fallback', 'Active-target vault search', 'Immediate vault-result navigation', 'Offline reviewed recall', 'Offline search gating', 'Local-memory mode status', 'Outbox count status', 'Offline topic drafts', 'Installable manifest', 'PWA shortcuts', 'Install screenshots', 'Launch handler', 'Wrapper readiness matrix', 'Wrapper contract', 'Portable vault export', 'Portable vault import', 'Reviewed catch-up transfer', 'Room draft transfer', 'Full offline-first UX', 'Desktop packaging path'],
+    items: ['TravelTo vault fallback', 'Active-target vault search', 'Immediate vault-result navigation', 'Offline reviewed recall', 'Offline search gating', 'Local-memory mode status', 'Outbox count status', 'Offline topic drafts', 'Installable manifest', 'PWA shortcuts', 'Install screenshots', 'Launch handler', 'Wrapper readiness matrix', 'Wrapper contract', 'Portable vault export', 'Portable vault import', 'Reviewed catch-up transfer', 'Room draft transfer', 'Topic draft transfer', 'Full offline-first UX', 'Desktop packaging path'],
   },
 ];
 

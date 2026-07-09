@@ -547,6 +547,9 @@ client or public site needs to expose the result.
     sanitized room composer drafts, excludes DM draft plaintext, previews draft
     counts before import, and merges imported room drafts into the live composer
     state after confirmation.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Portable transfer now carries
+    sanitized channel topic drafts separately from room composer drafts, previews
+    their count before import, and merges them back into local moderation state.
 
 *Sequencing logic: 1–3 need no server deploys (ship fastest), 4–5 are one
 focused server feature each, 6+ are compound. Every phase lands something

@@ -128,6 +128,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Portable vault import')).toBeInTheDocument();
     expect(screen.getByText('Reviewed catch-up transfer')).toBeInTheDocument();
     expect(screen.getByText('Room draft transfer')).toBeInTheDocument();
+    expect(screen.getByText('Topic draft transfer')).toBeInTheDocument();
     expect(screen.getByText(/time is active/i)).toBeInTheDocument();
     expect(screen.getByText('complete phases').closest('.data-metric')).toHaveTextContent('4');
     expect(screen.getByRole('heading', { name: 'Washi' })).toBeInTheDocument();

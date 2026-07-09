@@ -127,6 +127,10 @@ describe('PreferencesPanel', () => {
         '#root': 'draft handoff',
         alice: 'dm draft should be ignored',
       },
+      channelTopicDrafts: {
+        '#root': 'topic handoff',
+        alice: 'ignored non-channel topic draft',
+      },
     };
 
     const input = screen.getByLabelText('Import portable JSON') as HTMLInputElement;
@@ -136,7 +140,7 @@ describe('PreferencesPanel', () => {
     await fireEvent.change(input, { target: { files: [file] } });
 
     expect(await screen.findByRole('heading', { name: 'Review import' })).toBeInTheDocument();
-    expect(screen.getByText(/onyx-portable\.json: 2 messages, 1 target, 1 review, and 1 room draft/i)).toBeInTheDocument();
+    expect(screen.getByText(/onyx-portable\.json: 2 messages, 1 target, 1 review, 1 room draft, and 1 topic draft/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Import reviewed file' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cancel import' })).toBeInTheDocument();
   });

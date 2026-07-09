@@ -35,6 +35,10 @@ import {
   selectChannelModeState,
   selectIsChannelOp,
 } from '@/lib/store';
+import {
+  readChannelTopicDraft,
+  saveChannelTopicDraft,
+} from '@/lib/channel/topicDrafts';
 import { Button, FormField, Sheet } from '@/primitives/index';
 
 // Common simple channel flags exposed as toggles. Letters match Orochi's
@@ -54,45 +58,6 @@ const EPHEMERAL_PRESETS: ReadonlyArray<{ seconds: number; label: string }> = [
   { seconds: 604_800, label: '7 days' },
   { seconds: 2_592_000, label: '30 days' },
 ];
-
-const CHANNEL_TOPIC_DRAFTS_KEY = 'onyx:channel-topic-drafts';
-
-function channelTopicDraftKey(channel: string): string {
-  return channel.trim().toLowerCase();
-}
-
-function readTopicDrafts(): Record<string, string> {
-  try {
-    const raw = localStorage.getItem(CHANNEL_TOPIC_DRAFTS_KEY);
-    const parsed = raw ? JSON.parse(raw) : {};
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? Object.fromEntries(
-          Object.entries(parsed).filter(([, value]) => typeof value === 'string'),
-        ) as Record<string, string>
-      : {};
-  } catch {
-    return {};
-  }
-}
-
-function readTopicDraft(channel: string): string | null {
-  const key = channelTopicDraftKey(channel);
-  return readTopicDrafts()[key] ?? null;
-}
-
-function saveTopicDraft(channel: string, draft: string, serverTopic: string): void {
-  const key = channelTopicDraftKey(channel);
-  if (!key) return;
-  try {
-    const drafts = readTopicDrafts();
-    if (draft === serverTopic) delete drafts[key];
-    else drafts[key] = draft;
-    if (Object.keys(drafts).length === 0) localStorage.removeItem(CHANNEL_TOPIC_DRAFTS_KEY);
-    else localStorage.setItem(CHANNEL_TOPIC_DRAFTS_KEY, JSON.stringify(drafts));
-  } catch {
-    /* best-effort local draft */
-  }
-}
 
 function formatEphemeral(seconds: number | null): string {
   if (!seconds) return 'Full history';
@@ -134,7 +99,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
   // (and we're not mid-edit). Keeps the field in sync without clobbering typing.
   createEffect(() => {
     if (local.open) {
-      setTopicDraft(readTopicDraft(local.channel) ?? serverTopic());
+      setTopicDraft(readChannelTopicDraft(local.channel) ?? serverTopic());
     }
   });
 
@@ -147,7 +112,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
     event.preventDefault();
     if (!canEditTopic() || !topicDirty() || !isConnected()) return;
     getState().setTopic(channel()?.name ?? local.channel, topicDraft());
-    saveTopicDraft(local.channel, serverTopic(), serverTopic());
+    saveChannelTopicDraft(local.channel, serverTopic(), serverTopic());
   }
 
   // ── Mode toggles (op-only) ───────────────────────────────────────────────
@@ -287,7 +252,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                 value={topicDraft()}
                 onInput={(e) => {
                   setTopicDraft(e.currentTarget.value);
-                  saveTopicDraft(local.channel, e.currentTarget.value, serverTopic());
+                  saveChannelTopicDraft(local.channel, e.currentTarget.value, serverTopic());
                 }}
                 rows={3}
                 aria-describedby="chset-topic-hint"
