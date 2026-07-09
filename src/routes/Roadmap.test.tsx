@@ -36,6 +36,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Vault anchor jumps')).toBeInTheDocument();
     expect(screen.getByText('Client access audit')).toBeInTheDocument();
     expect(screen.getByText('Dense-panel evidence')).toBeInTheDocument();
+    expect(screen.getByText('Home access evidence')).toBeInTheDocument();
     expect(screen.getByText(/time is active/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Washi' })).toBeInTheDocument();
   });

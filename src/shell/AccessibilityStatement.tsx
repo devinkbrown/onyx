@@ -63,6 +63,7 @@ const ACCESSIBILITY_TOPICS: readonly AccessibilityTopic[] = [
       'Channel settings uses a labelled Sheet, labelled forms, switch-mode flags, and read-only non-op fallbacks.',
       'Voice controls use a toolbar, grouped labelled controls, aria-pressed media state, and a live call timer.',
       'Appearance uses radio groups for themes and backgrounds with labelled swatches and modal focus handling.',
+      'Home catch-up exposes recaps, reviewed ranges, and the channel directory as labelled card lists with direct action buttons.',
     ],
   },
 ];

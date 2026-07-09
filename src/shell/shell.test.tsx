@@ -803,11 +803,12 @@ describe('AppShell', () => {
 
       render(() => <AppShell />);
 
-      const recaps = screen.getByLabelText('Since you left recaps');
+      const recaps = screen.getByRole('list', { name: 'Since you left recaps' });
       expect(within(recaps).getByText('#general')).toBeInTheDocument();
       expect(within(recaps).getByText('2 lines, 1 mention')).toBeInTheDocument();
       expect(within(recaps).getByText('bob, carol')).toBeInTheDocument();
       expect(within(recaps).getByText('New handoff note two')).toBeInTheDocument();
+      expect(within(recaps).getAllByRole('listitem')).toHaveLength(1);
 
       fireEvent.click(within(recaps).getByRole('button', { name: 'Find related actions for #general' }));
 
@@ -827,10 +828,12 @@ describe('AppShell', () => {
       store.getState().navigate({ kind: 'home' });
 
       const reviewHistory = await screen.findByLabelText('Recent catch-up reviews');
+      const reviewCards = screen.getByRole('list', { name: 'Recent catch-up review cards' });
       expect(within(reviewHistory).getByText('Reviewed recently')).toBeInTheDocument();
       expect(within(reviewHistory).getByText('#general')).toBeInTheDocument();
       expect(within(reviewHistory).getByText('2 lines, 1 mention')).toBeInTheDocument();
       expect(within(reviewHistory).getByText('New handoff note two')).toBeInTheDocument();
+      expect(within(reviewCards).getAllByRole('listitem')).toHaveLength(1);
 
       fireEvent.click(within(reviewHistory).getByRole('button', {
         name: 'Find related actions for reviewed #general',
@@ -910,6 +913,8 @@ describe('AppShell', () => {
       render(() => <AppShell />);
 
       const rhythm = await screen.findByLabelText('Room rhythm');
+      const directory = screen.getByRole('list', { name: 'Active channel directory' });
+      expect(within(directory).getAllByRole('listitem')).toHaveLength(2);
       expect(within(rhythm).getByText('#general')).toBeInTheDocument();
       expect(within(rhythm).getByText('2 chatting')).toBeInTheDocument();
       expect(within(rhythm).getByText('Planning call')).toBeInTheDocument();

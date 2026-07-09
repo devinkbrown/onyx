@@ -247,6 +247,9 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Channel settings, voice controls,
     and Appearance now carry pass evidence in the client audit ledger and the
     public accessibility statement.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home catch-up, reviewed ranges, and
+    channel directory cards now expose labelled list semantics and carry pass
+    evidence in both the client and public audit ledgers.
     ⏭️ **CLIENT NEXT** — continue remaining dense-surface audit rows until every
     app panel has pass/fix evidence.
 

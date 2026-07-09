@@ -78,6 +78,11 @@ const ACCESS_AUDIT_ROWS = [
     note: 'Theme and background radio groups, labelled swatches, Sheet focus trap.',
   },
   {
+    surface: 'Home catch-up',
+    status: 'checked',
+    note: 'Catch-up recaps, reviewed ranges, and channel directory cards expose list semantics and labelled actions.',
+  },
+  {
     surface: 'Modals',
     status: 'checked',
     note: 'Sheet focus trap, Escape close, labelled close buttons.',

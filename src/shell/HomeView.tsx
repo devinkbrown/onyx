@@ -397,10 +397,10 @@ export function HomeView(): JSX.Element {
               </ul>
             </Show>
             <Show when={catchUpRecaps().length > 0}>
-              <div class="home-recap-strip" aria-label="Since you left recaps">
+              <div class="home-recap-strip" role="list" aria-label="Since you left recaps">
                 <For each={catchUpRecaps()}>
                   {(recap) => (
-                    <article class="home-recap-card">
+                    <article class="home-recap-card" role="listitem">
                       <div class="home-recap-card__head">
                         <span class="home-recap-card__target">
                           {recap.item.kind === 'dm' ? `@${recap.item.name}` : recap.item.name}
@@ -448,10 +448,10 @@ export function HomeView(): JSX.Element {
               <h3 class="home-section-label">Reviewed recently</h3>
               <span class="home-review-history__summary">catch-up ranges</span>
             </div>
-            <div class="home-review-history__list">
+            <div class="home-review-history__list" role="list" aria-label="Recent catch-up review cards">
               <For each={reviewHistory()}>
                 {(entry) => (
-                  <article class="home-review-history__item">
+                  <article class="home-review-history__item" role="listitem">
                     <div class="home-review-history__meta">
                       <span class="home-review-history__target">
                         {entry.kind === 'dm' ? `@${entry.name}` : entry.name}
@@ -697,10 +697,10 @@ export function HomeView(): JSX.Element {
         <Show when={directory().length > 0}>
           <section class="home-directory" aria-label="Active channels">
             <h3 class="home-section-label">The halls</h3>
-            <div class="home-grid">
+            <div class="home-grid" role="list" aria-label="Active channel directory">
               <For each={directory()}>
                 {(c) => (
-                  <article class="home-card">
+                  <article class="home-card" role="listitem">
                     <header class="home-card-head">
                       <h4 class="home-card-name">{c.channel}</h4>
                       <span class="home-card-when">
