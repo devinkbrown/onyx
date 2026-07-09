@@ -2149,6 +2149,58 @@
   margin: var(--space-4) auto;
 }
 
+.shell-reader-memory {
+  display: grid;
+  gap: var(--space-2);
+  max-width: min(var(--shell-measure), calc(100% - var(--space-6)));
+  margin: var(--space-3) auto var(--space-4);
+  padding: var(--space-3) 0;
+  border-block: 1px solid color-mix(in oklab, var(--seam) 62%, transparent);
+  color: var(--washi-dim);
+}
+
+.shell-reader-memory__kicker {
+  color: var(--lapis-bright);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.shell-reader-memory__body,
+.shell-reader-memory__voices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.7rem;
+}
+
+.shell-reader-memory__body {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.shell-reader-memory__body strong {
+  color: var(--washi);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+}
+
+.shell-reader-memory__body span:not(:first-of-type)::before {
+  content: '/';
+  margin-right: 0.7rem;
+  color: var(--washi-mute);
+}
+
+.shell-reader-memory__voices span {
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
+  color: var(--washi);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+}
+
 /* Highlight — a message that names you. Bioluminescent azure crest, never
    alarm-coral: it should feel like being gently called to, not warned. */
 .shell-msg-group--highlight,

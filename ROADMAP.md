@@ -188,8 +188,11 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Message actions now copy shareable
     moment links using the same `/app?join=...&at=...` time-travel path as the
     scrubber, giving reader mode stable anchors into remembered rooms.
-    ⏭️ **NEXT** — deepen vault-backed reading context over existing message
-    buffers and hydration.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Reader mode now surfaces a
+    device-memory context band for hydrated channel buffers, summarizing
+    readable lines, voices, topics, and the visible transcript span.
+    ⏭️ **NEXT** — deepen moment-to-search handoff over existing message buffers
+    and hydration.
 17. **Accessibility conformance ledger** *(main site + client)* — publish the
     public WCAG 2.2 / EN 301 549 audit path and keep it linked from the front
     door while app panels are audited.

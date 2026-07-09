@@ -18,6 +18,7 @@ import { store } from '@/lib/store/store';
 import type { Channel } from '@/lib/irc/types';
 import type { ChatMessage, ChannelUser } from '@/lib/irc/types';
 import { followed, isFollowed, unfollow } from '@/lib/notifications/followed';
+import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
 import { AppShell } from './AppShell';
 
 // ── Shared fixture helpers ────────────────────────────────────────────────────
@@ -99,6 +100,7 @@ describe('AppShell', () => {
     store.setState(initialState, true);
     for (const key of followed()) unfollow(key);
     localStorage.clear();
+    resetPreferences();
   });
 
   afterEach(() => {
@@ -330,6 +332,40 @@ describe('AppShell', () => {
       expect(within(digest).getByText('Read from here: bob and carol added 2 lines.')).toBeInTheDocument();
       expect(within(digest).getByText('bob')).toBeInTheDocument();
       expect(within(digest).getByText('carol')).toBeInTheDocument();
+    });
+
+    it('shows device-memory context in reader mode', () => {
+      setPreference('readerMode', true);
+      setPreference('localHistory', true);
+      const channel = makeChannel(
+        '#general',
+        [
+          makeMessage('msg-memory-a', 'alice', 'Old remembered note', '#general', 'roadmap'),
+          makeMessage('msg-memory-b', 'bob', 'Hydrated note one', '#general', 'roadmap'),
+          makeMessage('msg-memory-c', 'alice', 'Hydrated note two', '#general', 'roadmap'),
+        ],
+        [makeUser('alice'), makeUser('bob')],
+      );
+      const channels = new Map<string, Channel>();
+      channels.set('#general', channel);
+      store.setState({
+        ...initialState,
+        channels,
+        activeView: { kind: 'channel', channel: '#general' },
+        connectionStatus: 'connected',
+        ourNick: 'testuser',
+      }, true);
+
+      render(() => <AppShell />);
+
+      const memory = screen.getByRole('region', { name: 'Device memory context' });
+      expect(within(memory).getByText('Device memory')).toBeInTheDocument();
+      expect(within(memory).getByText('#general')).toBeInTheDocument();
+      expect(within(memory).getByText('3 readable lines')).toBeInTheDocument();
+      expect(within(memory).getByText('2 voices')).toBeInTheDocument();
+      expect(within(memory).getByText('1 topic')).toBeInTheDocument();
+      expect(within(memory).getByText('alice')).toBeInTheDocument();
+      expect(within(memory).getByText('bob')).toBeInTheDocument();
     });
 
     it('follows the room or selected topic from the topic strip', () => {

@@ -50,6 +50,17 @@ export type MessageViewProps = {
 };
 
 const SYSTEM_TYPES = new Set(['join', 'part', 'quit', 'kick', 'mode', 'topic', 'nick', 'system', 'error']);
+const READER_MEMORY_PARTICIPANTS = 4;
+
+export type ReaderMemoryContext = {
+  target: string;
+  lineCount: number;
+  voiceCount: number;
+  topicCount: number;
+  participants: string[];
+  firstAt: Date;
+  lastAt: Date;
+};
 
 /** Body-line counts per skeleton row — varied so the loading state reads as
  *  real message groups rather than a uniform grid. */
@@ -102,6 +113,96 @@ function sameAuthorGroup(a: ChatMessage, b: ChatMessage): boolean {
   if (isSystemMsg(a) || isSystemMsg(b)) return false;
   // Group consecutive messages within 5 minutes
   return Math.abs(b.time.getTime() - a.time.getTime()) < 5 * 60 * 1000;
+}
+
+export function buildReaderMemoryContext(
+  target: string,
+  sourceMessages: readonly ChatMessage[],
+): ReaderMemoryContext | null {
+  if (!target.startsWith('#')) return null;
+
+  const readable = sourceMessages.filter((message) => {
+    const text = message.plaintext ?? message.text;
+    return !isSystemMsg(message)
+      && !message.deleted
+      && !message.redacted
+      && text.trim().length > 0;
+  });
+  if (readable.length === 0) return null;
+
+  const voices: string[] = [];
+  const seenVoices = new Set<string>();
+  const topics = new Set<string>();
+  for (const message of readable) {
+    const nickKey = message.from.toLowerCase();
+    if (!seenVoices.has(nickKey)) {
+      seenVoices.add(nickKey);
+      voices.push(message.from);
+    }
+    const topic = message.topic?.trim();
+    if (topic) topics.add(topic.toLowerCase());
+  }
+
+  return {
+    target,
+    lineCount: readable.length,
+    voiceCount: voices.length,
+    topicCount: topics.size,
+    participants: voices.slice(0, READER_MEMORY_PARTICIPANTS),
+    firstAt: readable[0]!.time,
+    lastAt: readable[readable.length - 1]!.time,
+  };
+}
+
+function plural(count: number, singular: string, pluralLabel = `${singular}s`): string {
+  return `${count.toLocaleString()} ${count === 1 ? singular : pluralLabel}`;
+}
+
+function formatReaderMemoryRange(context: ReaderMemoryContext): string {
+  const sameDay = context.firstAt.toDateString() === context.lastAt.toDateString();
+  const first = context.firstAt.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+  const last = context.lastAt.toLocaleString(undefined, sameDay
+    ? { hour: 'numeric', minute: '2-digit' }
+    : { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  return `${first}-${last}`;
+}
+
+function ReaderMemoryStrip(props: { context: ReaderMemoryContext }): JSX.Element {
+  const overflow = createMemo(() =>
+    Math.max(props.context.voiceCount - props.context.participants.length, 0),
+  );
+
+  return (
+    <section class="shell-reader-memory" aria-label="Device memory context">
+      <span class="shell-reader-memory__kicker">Device memory</span>
+      <div class="shell-reader-memory__body">
+        <strong>{props.context.target}</strong>
+        <span>{plural(props.context.lineCount, 'readable line')}</span>
+        <span>{plural(props.context.voiceCount, 'voice')}</span>
+        <span>
+          {props.context.topicCount > 0
+            ? plural(props.context.topicCount, 'topic')
+            : 'untagged transcript'}
+        </span>
+        <span>{formatReaderMemoryRange(props.context)}</span>
+      </div>
+      <Show when={props.context.participants.length > 0}>
+        <div class="shell-reader-memory__voices" aria-label="Remembered voices">
+          <For each={props.context.participants}>
+            {(participant) => <span>{participant}</span>}
+          </For>
+          <Show when={overflow() > 0}>
+            <span>+{overflow()}</span>
+          </Show>
+        </div>
+      </Show>
+    </section>
+  );
 }
 
 // ── Quiet boosts ─────────────────────────────────────────────────────────────
@@ -422,6 +523,12 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     return digest.totalMessages > 0 ? digest : null;
   });
 
+  const readerMemoryContext = createMemo(() => {
+    const prefs = preferences();
+    if (!prefs.readerMode || !prefs.localHistory) return null;
+    return buildReaderMemoryContext(activeTarget(), messages());
+  });
+
   // ── scroll state ──
   let feedEl!: HTMLDivElement;
   const [atBottom, setAtBottom] = createSignal(true);
@@ -740,6 +847,9 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                 <SinceDigestCard digest={digest()} />
               </div>
             )}
+          </Show>
+          <Show when={readerMemoryContext()}>
+            {(context) => <ReaderMemoryStrip context={context()} />}
           </Show>
           <For each={messages()}>
             {(msg, index) => {
