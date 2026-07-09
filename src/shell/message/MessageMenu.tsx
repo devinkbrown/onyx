@@ -174,6 +174,7 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
   // ── emoji search ──
   const [emojiQuery, setEmojiQuery] = createSignal('');
   const emojiMatches = createMemo(() => searchEmojis(emojiQuery(), EMOJI_PICKER_LIMIT));
+  const messageActionTarget = createMemo(() => `message from ${local.msg.from}`);
 
   // ── actions ──
   function react(emoji: string): void {
@@ -336,13 +337,15 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
             open={reactOpen()}
             onOpenChange={guardedSetReactOpen}
             placement="top"
+            panelLabel={`Choose reaction for ${messageActionTarget()}`}
             trigger={
-              <span class="msg-menu-btn" aria-hidden="true">
+              <span class="msg-menu-btn">
                 <ReactIcon class="msg-menu-icon" />
+                <span class="sr-only">Choose reaction for {messageActionTarget()}</span>
               </span>
             }
           >
-            <div class="msg-menu-emoji" role="dialog" aria-label="Add reaction">
+            <div class="msg-menu-emoji" aria-label={`Reaction picker for ${messageActionTarget()}`}>
               <label class="sr-only" for={`msg-emoji-search-${local.msg.id}`}>
                 Search emoji
               </label>
@@ -367,7 +370,7 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
                       type="button"
                       class="msg-menu-emoji-choice"
                       role="option"
-                      aria-label={`React with ${entry.shortcode}`}
+                      aria-label={`React to ${messageActionTarget()} with ${entry.shortcode}`}
                       onClick={() => react(entry.emoji)}
                     >
                       {entry.emoji}
@@ -399,51 +402,95 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
           open={menuOpen()}
           onOpenChange={guardedSetMenuOpen}
           placement="top"
+          panelLabel={`More actions for ${messageActionTarget()}`}
           trigger={
-            <span class="msg-menu-btn" aria-hidden="true">
+            <span class="msg-menu-btn">
               <OverflowIcon class="msg-menu-icon" />
+              <span class="sr-only">More actions for {messageActionTarget()}</span>
             </span>
           }
         >
-          <div class="msg-menu-list" role="menu" aria-label="More message actions">
+          <div class="msg-menu-list" role="menu" aria-label={`More actions for ${messageActionTarget()}`}>
             <Show when={caps().canCopy}>
-              <button type="button" class="msg-menu-item" role="menuitem" onClick={() => void copyText()}>
+              <button
+                type="button"
+                class="msg-menu-item"
+                role="menuitem"
+                aria-label={`Copy text from ${messageActionTarget()}`}
+                onClick={() => void copyText()}
+              >
                 <CopyIcon class="msg-menu-item-icon" />
                 <span>Copy text</span>
               </button>
             </Show>
             <Show when={caps().canCopyMoment}>
-              <button type="button" class="msg-menu-item" role="menuitem" onClick={() => void copyMomentLink()}>
+              <button
+                type="button"
+                class="msg-menu-item"
+                role="menuitem"
+                aria-label={`Copy moment link for ${messageActionTarget()}`}
+                onClick={() => void copyMomentLink()}
+              >
                 <CopyIcon class="msg-menu-item-icon" />
                 <span>Copy moment link</span>
               </button>
             </Show>
             <Show when={caps().canSearchText}>
-              <button type="button" class="msg-menu-item" role="menuitem" onClick={searchText}>
+              <button
+                type="button"
+                class="msg-menu-item"
+                role="menuitem"
+                aria-label={`Search text from ${messageActionTarget()}`}
+                onClick={searchText}
+              >
                 <SearchIcon class="msg-menu-item-icon" />
                 <span>Search this text</span>
               </button>
             </Show>
             <Show when={caps().canReply}>
-              <button type="button" class="msg-menu-item" role="menuitem" onClick={reply}>
+              <button
+                type="button"
+                class="msg-menu-item"
+                role="menuitem"
+                aria-label={`Reply to ${messageActionTarget()}`}
+                onClick={reply}
+              >
                 <ReplyIcon class="msg-menu-item-icon" />
                 <span>Reply</span>
               </button>
             </Show>
             <Show when={caps().canStartTopic}>
-              <button type="button" class="msg-menu-item" role="menuitem" onClick={startTopic}>
+              <button
+                type="button"
+                class="msg-menu-item"
+                role="menuitem"
+                aria-label={`Start topic from ${messageActionTarget()}`}
+                onClick={startTopic}
+              >
                 <TopicIcon class="msg-menu-item-icon" />
                 <span>Start topic from here</span>
               </button>
             </Show>
             <Show when={caps().canEdit}>
-              <button type="button" class="msg-menu-item" role="menuitem" onClick={edit}>
+              <button
+                type="button"
+                class="msg-menu-item"
+                role="menuitem"
+                aria-label={`Edit ${messageActionTarget()}`}
+                onClick={edit}
+              >
                 <EditIcon class="msg-menu-item-icon" />
                 <span>Edit</span>
               </button>
             </Show>
             <Show when={canPin()}>
-              <button type="button" class="msg-menu-item" role="menuitem" onClick={togglePin}>
+              <button
+                type="button"
+                class="msg-menu-item"
+                role="menuitem"
+                aria-label={`${isPinned() ? 'Unpin' : 'Pin'} ${messageActionTarget()}`}
+                onClick={togglePin}
+              >
                 <PinIcon class="msg-menu-item-icon" />
                 <span>{isPinned() ? 'Unpin message' : 'Pin message'}</span>
               </button>
@@ -453,6 +500,7 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
                 type="button"
                 class="msg-menu-item msg-menu-item--danger"
                 role="menuitem"
+                aria-label={`Delete ${messageActionTarget()}`}
                 onClick={remove}
               >
                 <TrashIcon class="msg-menu-item-icon" />

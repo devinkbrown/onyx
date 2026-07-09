@@ -48,6 +48,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Thread access evidence')).toBeInTheDocument();
     expect(screen.getByText('Voice settings evidence')).toBeInTheDocument();
     expect(screen.getByText('Call overlay evidence')).toBeInTheDocument();
+    expect(screen.getByText('Message action evidence')).toBeInTheDocument();
     expect(screen.getByText(/time is active/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Washi' })).toBeInTheDocument();
   });

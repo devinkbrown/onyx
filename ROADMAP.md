@@ -283,6 +283,9 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Call overlays now carry pass
     evidence for named incoming/outgoing dialogs with target-specific accept,
     decline, and cancel actions.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Message actions now carry pass
+    evidence for per-message action groups, named reaction/overflow triggers,
+    labelled menus, and row-specific action names.
     ⏭️ **CLIENT NEXT** — continue remaining dense-surface audit rows until every
     app panel has pass/fix evidence.
 

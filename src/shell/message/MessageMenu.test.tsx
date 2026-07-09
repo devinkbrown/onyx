@@ -262,7 +262,7 @@ describe('<MessageMenu>', () => {
       />
     ));
 
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy moment link' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy moment link for message from alice' }));
 
     await waitFor(() => {
       expect(writeText).toHaveBeenCalledWith(
@@ -299,7 +299,7 @@ describe('<MessageMenu>', () => {
         />
       ));
 
-      fireEvent.click(screen.getByRole('menuitem', { name: 'Search this text' }));
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Search text from message from alice' }));
 
       expect(search.isOpen()).toBe(true);
       expect(search.query()).toBe('Release blockers for mobile onboarding today');
@@ -327,9 +327,40 @@ describe('<MessageMenu>', () => {
       />
     ));
 
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Start topic from here' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Start topic from message from alice' }));
 
     expect(store.getState().activeChannelTopics.get('#general')).toBe('Release blockers for mobile onboarding today');
     expect(store.getState().replyingTo).toMatchObject({ id: 'm-topic', from: 'alice' });
+  });
+
+  it('labels repeated message controls and menus with the message author', () => {
+    const msg: ChatMessage = {
+      id: 'm-access',
+      from: 'alice',
+      text: 'Release blockers for mobile onboarding today',
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    };
+
+    render(() => (
+      <MessageMenu
+        msg={msg}
+        target="#general"
+        selfNick="alice"
+        canEdit
+        menuOpen
+      />
+    ));
+
+    expect(screen.getByRole('group', { name: 'Actions for message from alice' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Choose reaction for message from alice' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'More actions for message from alice' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'More actions for message from alice' })).toBeInTheDocument();
+    expect(screen.getByRole('menu', { name: 'More actions for message from alice' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Copy text from message from alice' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Reply to message from alice' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Edit message from alice' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Delete message from alice' })).toBeInTheDocument();
   });
 });

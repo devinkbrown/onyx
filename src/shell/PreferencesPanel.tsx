@@ -138,6 +138,11 @@ const ACCESS_AUDIT_ROWS = [
     note: 'Named incoming/outgoing call dialogs with target-specific accept, decline, and cancel actions.',
   },
   {
+    surface: 'Message actions',
+    status: 'checked',
+    note: 'Per-message action groups, named reaction/overflow triggers, labelled menus, and row-specific action names.',
+  },
+  {
     surface: 'Modals',
     status: 'checked',
     note: 'Sheet focus trap, Escape close, labelled close buttons.',

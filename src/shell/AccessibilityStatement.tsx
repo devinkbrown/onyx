@@ -75,6 +75,7 @@ const ACCESSIBILITY_TOPICS: readonly AccessibilityTopic[] = [
       'Thread panel uses a named Sheet dialog, labelled parent and reply articles, and a reply log scoped to the source message.',
       'Voice settings uses a named Sheet dialog, labelled device/processing/push-to-talk regions, described selects, and target-specific push-to-talk key actions.',
       'Call overlays use named incoming/outgoing dialogs with target-specific accept, decline, and cancel actions.',
+      'Message actions use per-row action groups, named reaction and overflow triggers, labelled menus, and row-specific action names.',
     ],
   },
 ];
