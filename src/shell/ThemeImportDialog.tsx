@@ -50,10 +50,14 @@ export function ThemeImportDialog(props: {
   const importedTheme = createMemo(() => parseThemeParam(extractCode(importInput())));
   const hasImportInput = createMemo(() => importInput().trim().length > 0);
   const importInvalid = createMemo(() => hasImportInput() && importedTheme() === null);
+  const importDescription = createMemo(() => (
+    importInvalid() ? 'theme-import-help theme-import-error' : 'theme-import-help'
+  ));
   const shareUrl = createMemo(() => {
     const theme = props.shareTheme;
     return theme ? themeShareUrl(theme, locationOrigin()) : '';
   });
+  const shareThemeName = createMemo(() => props.shareTheme?.name ?? 'current theme');
   const canCopyShareUrl = createMemo(() => shareUrl().length > 0 && clipboardAvailable());
 
   const clearCopyTimer = (): void => {
@@ -103,6 +107,9 @@ export function ThemeImportDialog(props: {
           <label class="theme-import-dialog__label" for="theme-import-code">
             Theme code or link
           </label>
+          <p class="theme-import-dialog__hint" id="theme-import-help">
+            Paste a shared Onyx theme code or a link that contains one.
+          </p>
           <textarea
             id="theme-import-code"
             class="theme-import-dialog__textarea"
@@ -111,7 +118,7 @@ export function ThemeImportDialog(props: {
             rows={5}
             spellcheck={false}
             aria-invalid={importInvalid() ? 'true' : undefined}
-            aria-describedby={importInvalid() ? 'theme-import-error' : undefined}
+            aria-describedby={importDescription()}
           />
           <Show when={importedTheme()} keyed>
             {(theme) => (
@@ -121,6 +128,7 @@ export function ThemeImportDialog(props: {
                 <button
                   class="theme-import-dialog__button theme-import-dialog__button--primary"
                   type="button"
+                  aria-label={`Import theme ${theme.name}`}
                   onClick={() => importTheme(theme)}
                 >
                   Import theme
@@ -155,6 +163,7 @@ export function ThemeImportDialog(props: {
                 class="theme-import-dialog__button theme-import-dialog__button--secondary"
                 type="button"
                 disabled={!canCopyShareUrl()}
+                aria-label={`Copy share link for ${shareThemeName()}`}
                 onClick={() => void copyShareLink()}
               >
                 {copied() ? 'Copied' : 'Copy link'}

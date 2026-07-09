@@ -41,6 +41,13 @@
   line-height: 1.35;
 }
 
+.theme-import-dialog__hint {
+  margin: calc(var(--space-1) * -1) 0 0;
+  color: var(--washi-dim);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
 .theme-import-dialog__textarea,
 .theme-import-dialog__input {
   width: 100%;

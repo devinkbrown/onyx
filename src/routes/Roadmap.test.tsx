@@ -44,6 +44,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Sidebar access evidence')).toBeInTheDocument();
     expect(screen.getByText('Shortcuts access evidence')).toBeInTheDocument();
     expect(screen.getByText('Pins access evidence')).toBeInTheDocument();
+    expect(screen.getByText('Theme import evidence')).toBeInTheDocument();
     expect(screen.getByText(/time is active/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Washi' })).toBeInTheDocument();
   });

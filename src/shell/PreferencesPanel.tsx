@@ -118,6 +118,11 @@ const ACCESS_AUDIT_ROWS = [
     note: 'Named pins dialog, channel-specific pins list, target-specific jump buttons, and real unpin controls.',
   },
   {
+    surface: 'Theme import',
+    status: 'checked',
+    note: 'Named import/share dialog, described theme-code input, target-specific import and copy actions, and invalid-code feedback.',
+  },
+  {
     surface: 'Modals',
     status: 'checked',
     note: 'Sheet focus trap, Escape close, labelled close buttons.',

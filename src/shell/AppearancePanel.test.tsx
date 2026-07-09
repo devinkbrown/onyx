@@ -69,7 +69,7 @@ describe('AppearancePanel', () => {
     fireEvent.input(screen.getByLabelText('Theme code or link'), {
       target: { value: encodeTheme(imported) },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Import theme' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Import theme Shared Theme' }));
 
     expect(screen.queryByTestId('theme-import-dialog')).not.toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Shared Theme theme' })).toHaveAttribute('aria-checked', 'true');
