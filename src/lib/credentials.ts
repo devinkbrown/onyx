@@ -41,11 +41,21 @@ export interface SavedCredentials {
   savedAt: string;
 }
 
+export interface AccountHandoff {
+  nick: string;
+  server: string;
+  savedAt?: string;
+  active?: boolean;
+}
+
 interface CredentialsStore {
   version: 2;
   activeKey?: string;
   entries: Record<string, SavedCredentials>;
 }
+
+const MAX_HANDOFFS = 12;
+const MAX_HANDOFF_FIELD = 256;
 
 function normalizeServer(server: string): string {
   const trimmed = server.trim();
@@ -70,6 +80,23 @@ function isSavedCredentials(value: unknown): value is SavedCredentials {
     && candidate.nick.length > 0
     && typeof candidate.server === 'string'
     && candidate.server.length > 0;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function sanitizeHandoff(value: unknown): AccountHandoff | null {
+  if (!isRecord(value)) return null;
+  const nick = typeof value.nick === 'string' ? value.nick.trim().slice(0, MAX_HANDOFF_FIELD) : '';
+  const server = typeof value.server === 'string' ? value.server.trim().slice(0, MAX_HANDOFF_FIELD) : '';
+  if (!nick || !server) return null;
+  return {
+    nick,
+    server,
+    ...(typeof value.savedAt === 'string' ? { savedAt: value.savedAt.slice(0, MAX_HANDOFF_FIELD) } : {}),
+    ...(value.active === true ? { active: true } : {}),
+  };
 }
 
 function readStore(): CredentialsStore | null {
@@ -252,6 +279,75 @@ export function clearCredentials(): void {
     localStorage.removeItem(KEY);
     localStorage.removeItem('onyx:saved-nick');
   } catch { /* ignore */ }
+}
+
+export function exportAccountHandoffs(): AccountHandoff[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const store = readStore();
+    if (!store) return [];
+    if (purgeExpiredTokens(store)) writeStore(store);
+    return Object.entries(store.entries)
+      .slice(0, MAX_HANDOFFS)
+      .map(([key, creds]) => ({
+        nick: creds.nick,
+        server: creds.server,
+        savedAt: creds.savedAt,
+        ...(key === store.activeKey ? { active: true } : {}),
+      }))
+      .map(sanitizeHandoff)
+      .filter((handoff): handoff is AccountHandoff => handoff !== null);
+  } catch {
+    return [];
+  }
+}
+
+export function parseAccountHandoffs(value: unknown): AccountHandoff[] {
+  if (!Array.isArray(value)) return [];
+  const handoffs: AccountHandoff[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    const handoff = sanitizeHandoff(item);
+    if (!handoff) continue;
+    const key = credentialKey(handoff.server, handoff.nick);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    handoffs.push(handoff);
+    if (handoffs.length >= MAX_HANDOFFS) break;
+  }
+  return handoffs;
+}
+
+export function importAccountHandoffs(handoffs: readonly AccountHandoff[]): { imported: number; total: number } {
+  if (typeof window === 'undefined') return { imported: 0, total: 0 };
+  try {
+    const store: CredentialsStore = readStore() ?? { version: 2, entries: {} };
+    purgeExpiredTokens(store);
+    let imported = 0;
+    let preferredKey: string | undefined;
+    for (const handoff of parseAccountHandoffs(handoffs)) {
+      const key = credentialKey(handoff.server, handoff.nick);
+      const existing = store.entries[key];
+      store.entries[key] = {
+        ...(existing ?? {}),
+        nick: handoff.nick,
+        server: handoff.server,
+        savedAt: handoff.savedAt ?? existing?.savedAt ?? new Date().toISOString(),
+      };
+      imported += 1;
+      if (handoff.active) preferredKey = key;
+      if (!store.activeKey) store.activeKey = key;
+    }
+    if (preferredKey) store.activeKey = preferredKey;
+    if (imported > 0) {
+      writeStore(store);
+      const active = store.activeKey ? store.entries[store.activeKey] : Object.values(store.entries)[0];
+      if (active) localStorage.setItem('onyx:saved-nick', active.nick);
+    }
+    return { imported, total: Object.keys(store.entries).length };
+  } catch {
+    return { imported: 0, total: 0 };
+  }
 }
 
 /**

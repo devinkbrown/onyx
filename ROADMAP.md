@@ -605,6 +605,10 @@ client or public site needs to expose the result.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Portable transfer now carries
     sanitized channel topic drafts separately from room composer drafts, previews
     their count before import, and merges them back into local moderation state.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Portable transfer now carries
+    sanitized account handoff targets, preserving saved server/nick launch
+    context while excluding passwords, session tokens, mesh tokens, and encrypted
+    DM plaintext from the exported JSON.
 
 *Sequencing logic: 1–3 need no server deploys (ship fastest), 4–5 are one
 focused server feature each, 6+ are compound. Every phase lands something

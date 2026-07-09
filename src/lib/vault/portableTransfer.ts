@@ -22,6 +22,12 @@ import {
   saveChannelTopicDrafts,
   type ChannelTopicDrafts,
 } from '@/lib/channel/topicDrafts';
+import {
+  exportAccountHandoffs,
+  importAccountHandoffs,
+  parseAccountHandoffs,
+  type AccountHandoff,
+} from '@/lib/credentials';
 
 export interface PortableTransferSnapshot extends VaultExportSnapshot {
   /** Home catch-up checkpoints the user explicitly reviewed on this device. */
@@ -30,6 +36,8 @@ export interface PortableTransferSnapshot extends VaultExportSnapshot {
   composerDrafts: ComposerDrafts;
   /** Channel topic moderation drafts only. */
   channelTopicDrafts: ChannelTopicDrafts;
+  /** Saved sign-in targets only; passwords and session tokens are never exported. */
+  accountHandoffs: AccountHandoff[];
 }
 
 export interface PortableTransferImportResult {
@@ -38,6 +46,7 @@ export interface PortableTransferImportResult {
   reviews: number;
   drafts: number;
   topicDrafts: number;
+  accountHandoffs: number;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -58,6 +67,7 @@ export async function exportPortableTransfer(): Promise<PortableTransferSnapshot
     reviewHistory: readReviewHistory(),
     composerDrafts: portableComposerDrafts(loadComposerDrafts()),
     channelTopicDrafts: sanitizeChannelTopicDrafts(loadChannelTopicDrafts()),
+    accountHandoffs: exportAccountHandoffs(),
   };
 }
 
@@ -73,11 +83,15 @@ export function parsePortableTransfer(raw: unknown): PortableTransferSnapshot | 
   const channelTopicDrafts = isRecord(raw)
     ? sanitizeChannelTopicDrafts(raw.channelTopicDrafts ?? {})
     : {};
+  const accountHandoffs = isRecord(raw)
+    ? parseAccountHandoffs(raw.accountHandoffs ?? [])
+    : [];
   return {
     ...vault,
     reviewHistory,
     composerDrafts,
     channelTopicDrafts,
+    accountHandoffs,
   };
 }
 
@@ -96,11 +110,13 @@ export async function importPortableTransfer(
     ...loadChannelTopicDrafts(),
     ...topicDrafts,
   });
+  const accountHandoffs = importAccountHandoffs(snapshot.accountHandoffs);
   return {
     targets: vault.targets,
     messages: vault.messages,
     reviews: reviews.imported,
     drafts: Object.keys(drafts).length,
     topicDrafts: Object.keys(topicDrafts).length,
+    accountHandoffs: accountHandoffs.imported,
   };
 }

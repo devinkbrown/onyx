@@ -315,6 +315,7 @@ function PortableVaultControls(): JSX.Element {
     messages: number;
     drafts: number;
     topicDrafts: number;
+    accountHandoffs: number;
   } | null>(null);
 
   async function handleExport(): Promise<void> {
@@ -331,7 +332,7 @@ function PortableVaultControls(): JSX.Element {
       const messageCount = snapshot.targets.reduce((sum, target) => sum + target.messages.length, 0);
       const draftCount = Object.keys(snapshot.composerDrafts).length;
       const topicDraftCount = Object.keys(snapshot.channelTopicDrafts).length;
-      setStatus(`Exported ${countLabel(messageCount, 'message')}, ${countLabel(snapshot.targets.length, 'target')}, ${countLabel(snapshot.reviewHistory.length, 'review')}, ${countLabel(draftCount, 'room draft')}, and ${countLabel(topicDraftCount, 'topic draft')}.`);
+      setStatus(`Exported ${countLabel(messageCount, 'message')}, ${countLabel(snapshot.targets.length, 'target')}, ${countLabel(snapshot.reviewHistory.length, 'review')}, ${countLabel(draftCount, 'room draft')}, ${countLabel(topicDraftCount, 'topic draft')}, and ${countLabel(snapshot.accountHandoffs.length, 'account handoff')}.`);
     } catch {
       setStatus('Export failed. Try again after closing private browsing or freeing storage.');
     } finally {
@@ -355,8 +356,9 @@ function PortableVaultControls(): JSX.Element {
       const messages = parsed.targets.reduce((sum, target) => sum + target.messages.length, 0);
       const drafts = Object.keys(parsed.composerDrafts).length;
       const topicDrafts = Object.keys(parsed.channelTopicDrafts).length;
-      setPendingImport({ fileName: file.name, snapshot: parsed, messages, drafts, topicDrafts });
-      setStatus(`Ready to import ${countLabel(messages, 'message')}, ${countLabel(parsed.targets.length, 'target')}, ${countLabel(parsed.reviewHistory.length, 'review')}, ${countLabel(drafts, 'room draft')}, and ${countLabel(topicDrafts, 'topic draft')}.`);
+      const accountHandoffs = parsed.accountHandoffs.length;
+      setPendingImport({ fileName: file.name, snapshot: parsed, messages, drafts, topicDrafts, accountHandoffs });
+      setStatus(`Ready to import ${countLabel(messages, 'message')}, ${countLabel(parsed.targets.length, 'target')}, ${countLabel(parsed.reviewHistory.length, 'review')}, ${countLabel(drafts, 'room draft')}, ${countLabel(topicDrafts, 'topic draft')}, and ${countLabel(accountHandoffs, 'account handoff')}.`);
     } catch {
       setStatus('Import failed. Choose a readable Onyx portable JSON file.');
       setPendingImport(null);
@@ -375,7 +377,7 @@ function PortableVaultControls(): JSX.Element {
         getState().setComposerDraft(target, draft);
       }
       setPendingImport(null);
-      setStatus(`Imported ${countLabel(result.messages, 'message')}, ${countLabel(result.targets, 'target')}, ${countLabel(result.reviews, 'review')}, ${countLabel(result.drafts, 'room draft')}, and ${countLabel(result.topicDrafts, 'topic draft')}.`);
+      setStatus(`Imported ${countLabel(result.messages, 'message')}, ${countLabel(result.targets, 'target')}, ${countLabel(result.reviews, 'review')}, ${countLabel(result.drafts, 'room draft')}, ${countLabel(result.topicDrafts, 'topic draft')}, and ${countLabel(result.accountHandoffs, 'account handoff')}.`);
     } catch {
       setStatus('Import failed while merging this portable vault.');
     } finally {
@@ -389,7 +391,7 @@ function PortableVaultControls(): JSX.Element {
         <h3 id="pref-vault-portable-title" class="pref-label">Portable vault</h3>
       </div>
       <p class="pref-desc">
-        Export or merge this device's local history, reviewed catch-up state, room composer drafts, and channel topic drafts; encrypted DM plaintext is not included.
+        Export or merge this device's local history, reviewed catch-up state, room composer drafts, channel topic drafts, and saved sign-in targets. Passwords, session tokens, mesh tokens, and encrypted DM plaintext are not included.
       </p>
       <div class="pref-vault-actions">
         <button type="button" class="pref-reset" disabled={busy()} onClick={() => void handleExport()}>
@@ -413,8 +415,9 @@ function PortableVaultControls(): JSX.Element {
               {pending().fileName}: {countLabel(pending().messages, 'message')},
               {' '}{countLabel(pending().snapshot.targets.length, 'target')},
               {' '}{countLabel(pending().snapshot.reviewHistory.length, 'review')},
-              {' '}{countLabel(pending().drafts, 'room draft')}, and
-              {' '}{countLabel(pending().topicDrafts, 'topic draft')}. Existing local history is merged, not replaced.
+              {' '}{countLabel(pending().drafts, 'room draft')},
+              {' '}{countLabel(pending().topicDrafts, 'topic draft')}, and
+              {' '}{countLabel(pending().accountHandoffs, 'account handoff')}. Existing local history and saved sign-in targets are merged, not replaced.
             </p>
             <div class="pref-import-review__actions">
               <button type="button" class="pref-reset" disabled={busy()} onClick={() => void confirmImport()}>

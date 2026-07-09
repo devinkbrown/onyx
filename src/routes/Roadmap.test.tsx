@@ -116,6 +116,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Spatial audio availability state')).toBeInTheDocument();
     expect(screen.getByText('Watch-together surface')).toBeInTheDocument();
     expect(screen.getByText('Watch-together room activity')).toBeInTheDocument();
+    expect(screen.getByText('Account handoff transfer')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Apps' })).toBeInTheDocument();
     expect(screen.getByText('Block-Kit-lite renderer')).toBeInTheDocument();
     expect(screen.getByText('Block-Kit-lite message controls')).toBeInTheDocument();

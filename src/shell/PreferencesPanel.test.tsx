@@ -35,6 +35,7 @@ describe('PreferencesPanel', () => {
     expect(screen.getByRole('switch', { name: /Show topic, forum, and follow controls/i })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('switch', { name: /Show shared watch activity/i })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('heading', { name: 'Portable vault' })).toBeInTheDocument();
+    expect(screen.getByText(/Passwords, session tokens, mesh tokens, and encrypted DM plaintext are not included/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Export vault' })).toBeInTheDocument();
     expect(screen.getByLabelText('Import portable JSON')).toHaveAttribute('type', 'file');
     expect(screen.getByRole('heading', { name: 'Installed app readiness' })).toBeInTheDocument();
@@ -167,6 +168,17 @@ describe('PreferencesPanel', () => {
         '#root': 'topic handoff',
         alice: 'ignored non-channel topic draft',
       },
+      accountHandoffs: [
+        {
+          nick: 'kain',
+          server: 'wss://eshmaki.me',
+          savedAt: '2026-07-09T00:00:00.000Z',
+          active: true,
+          password: 'must not be trusted',
+          sessionToken: 'must not import',
+          meshToken: 'must not import',
+        },
+      ],
     };
 
     const input = screen.getByLabelText('Import portable JSON') as HTMLInputElement;
@@ -176,7 +188,7 @@ describe('PreferencesPanel', () => {
     await fireEvent.change(input, { target: { files: [file] } });
 
     expect(await screen.findByRole('heading', { name: 'Review import' })).toBeInTheDocument();
-    expect(screen.getByText(/onyx-portable\.json: 2 messages, 1 target, 1 review, 1 room draft, and 1 topic draft/i)).toBeInTheDocument();
+    expect(screen.getByText(/onyx-portable\.json: 2 messages, 1 target, 1 review, 1 room draft, 1 topic draft, and 1 account handoff/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Import reviewed file' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cancel import' })).toBeInTheDocument();
   });

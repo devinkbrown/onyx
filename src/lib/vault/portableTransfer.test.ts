@@ -10,6 +10,7 @@ import {
 } from '@/lib/notifications/reviewHistory';
 import { loadComposerDrafts, saveComposerDrafts } from '@/lib/composer/drafts';
 import { loadChannelTopicDrafts, saveChannelTopicDrafts } from '@/lib/channel/topicDrafts';
+import { loadCredentials, saveCredentials, storeMeshToken, storeSessionToken } from '@/lib/credentials';
 import { _resetVaultForTests, clearVault, loadRecent, saveMessages } from './historyVault';
 import {
   exportPortableTransfer,
@@ -50,9 +51,12 @@ describe('portableTransfer', () => {
     localStorage.clear();
   });
 
-  it('round-trips vault rows, reviewed checkpoints, channel drafts, and topic drafts', async () => {
+  it('round-trips vault rows, reviewed checkpoints, channel drafts, topic drafts, and account handoffs', async () => {
     await saveMessages('#alpha', [msg('a1', 1000, { target: '#alpha' })]);
     recordReviewHistory(review('#alpha'));
+    saveCredentials({ nick: 'kain', server: 'wss://eshmaki.me', password: 'secret' });
+    storeSessionToken('local-session-token', 1783500000);
+    storeMeshToken('mesh-session-token');
     saveComposerDrafts({
       '#alpha': 'room draft',
       alice: 'dm draft should stay local',
@@ -67,6 +71,17 @@ describe('portableTransfer', () => {
     expect(exported.reviewHistory.map((entry) => entry.target)).toEqual(['#alpha']);
     expect(exported.composerDrafts).toEqual({ '#alpha': 'room draft' });
     expect(exported.channelTopicDrafts).toEqual({ '#alpha': 'topic moderation draft' });
+    expect(exported.accountHandoffs).toEqual([
+      {
+        nick: 'kain',
+        server: 'wss://eshmaki.me',
+        savedAt: expect.any(String),
+        active: true,
+      },
+    ]);
+    expect(JSON.stringify(exported)).not.toContain('secret');
+    expect(JSON.stringify(exported)).not.toContain('local-session-token');
+    expect(JSON.stringify(exported)).not.toContain('mesh-session-token');
 
     const parsed = parsePortableTransfer(JSON.parse(JSON.stringify(exported)));
     expect(parsed).not.toBeNull();
@@ -75,11 +90,18 @@ describe('portableTransfer', () => {
     localStorage.clear();
     const result = await importPortableTransfer(parsed!);
 
-    expect(result).toEqual({ targets: 1, messages: 1, reviews: 1, drafts: 1, topicDrafts: 1 });
+    expect(result).toEqual({ targets: 1, messages: 1, reviews: 1, drafts: 1, topicDrafts: 1, accountHandoffs: 1 });
     expect((await loadRecent('#alpha')).map((message) => message.id)).toEqual(['a1']);
     expect(readReviewHistory().map((entry) => entry.target)).toEqual(['#alpha']);
     expect(loadComposerDrafts()).toEqual({ '#alpha': 'room draft' });
     expect(loadChannelTopicDrafts()).toEqual({ '#alpha': 'topic moderation draft' });
+    expect(loadCredentials()).toMatchObject({
+      nick: 'kain',
+      server: 'wss://eshmaki.me',
+    });
+    expect(loadCredentials()?.password).toBeUndefined();
+    expect(loadCredentials()?.sessionToken).toBeUndefined();
+    expect(loadCredentials()?.meshToken).toBeUndefined();
   });
 
   it('rejects non-Onyx portable transfer files', () => {
