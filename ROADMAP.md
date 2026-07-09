@@ -350,6 +350,10 @@ client or public site needs to expose the result.
     topic tags into a softer Zulip-style model with topic-aware unread state,
     one-tap split/follow actions, and a durable forum projection for long-lived
     room knowledge.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Topic forum cards now include
+    one-tap follow/unfollow controls for named conversations, and channels can
+    pin their forum projection so long-lived topics reopen as a durable room
+    knowledge surface.
 22. **Calm notifications and quiet boosts** *(client)* — formalize calm,
     regular, and power notification presets; keep followed conversations and
     mentions prominent while quiet reactions and ambient movement collect into

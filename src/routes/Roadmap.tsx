@@ -84,7 +84,7 @@ const phases: Phase[] = [
     state: 'active',
     date: '2026-07-09',
     summary: 'Keep building the time-native venue: named conversations, calm notifications, quiet boost collection, presence-as-place, and one responsive information model across desktop and mobile.',
-    items: ['Named conversations', 'Forum projection', 'Calm notification presets', 'Quiet boosts', 'Quiet boost Home digest', 'Presence-as-place header', 'One-canvas responsive projection', 'Mobile Home tab', 'Touch-sized Home review cards'],
+    items: ['Named conversations', 'Forum projection', 'Forum topic follow controls', 'Pinned forum projection', 'Calm notification presets', 'Quiet boosts', 'Quiet boost Home digest', 'Presence-as-place header', 'One-canvas responsive projection', 'Mobile Home tab', 'Touch-sized Home review cards'],
   },
   {
     phase: 'Phase 10',

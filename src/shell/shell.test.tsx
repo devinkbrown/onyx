@@ -270,16 +270,58 @@ describe('AppShell', () => {
       render(() => <AppShell />);
 
       fireEvent.click(screen.getByRole('button', { name: 'Forum' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Pin forum' }));
 
       const forum = screen.getByLabelText('Topic forum');
       expect(forum).toBeInTheDocument();
+      expect(store.getState().forumChannels.has('#general')).toBe(true);
+      expect(screen.getByRole('button', { name: 'Forum pinned' })).toHaveAttribute('aria-pressed', 'true');
       expect(within(forum).getByText('2 messages')).toBeInTheDocument();
       expect(within(forum).getByText('Another roadmap item')).toBeInTheDocument();
+
+      const followRoadmap = within(forum).getByRole('button', { name: 'Follow topic roadmap' });
+      fireEvent.click(followRoadmap);
+
+      expect(isFollowed('#general', 'roadmap')).toBe(true);
+      expect(within(forum).getByRole('button', { name: 'Unfollow topic roadmap' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+
+      fireEvent.click(within(forum).getByRole('button', { name: 'Unfollow topic roadmap' }));
+
+      expect(isFollowed('#general', 'roadmap')).toBe(false);
 
       fireEvent.click(within(forum).getByRole('button', { name: /#roadmap/i }));
 
       expect(store.getState().activeChannelTopics.get('#general')).toBe('roadmap');
       expect(screen.queryByLabelText('Topic forum')).not.toBeInTheDocument();
+    });
+
+    it('opens pinned forum channels directly', () => {
+      const channel = makeChannel(
+        '#general',
+        [
+          makeMessage('msg-topic-a', 'alice', 'Roadmap item', '#general', 'roadmap'),
+          makeMessage('msg-topic-b', 'bob', 'Release item', '#general', 'release'),
+        ],
+        [makeUser('alice'), makeUser('bob')],
+      );
+      const channels = new Map<string, Channel>();
+      channels.set('#general', channel);
+      store.setState({
+        ...initialState,
+        channels,
+        activeView: { kind: 'channel', channel: '#general' },
+        connectionStatus: 'connected',
+        forumChannels: new Set(['#general']),
+        ourNick: 'testuser',
+      }, true);
+
+      render(() => <AppShell />);
+
+      expect(screen.getByLabelText('Topic forum')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Forum pinned' })).toHaveAttribute('aria-pressed', 'true');
     });
 
     it('renders reactions as quiet boosts and toggles them without notifications', () => {

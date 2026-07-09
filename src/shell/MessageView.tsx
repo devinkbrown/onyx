@@ -549,6 +549,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   const canEditMessages = useStore((s) => s.canEditMessages);
   const historyLoading = useStore((s) => s.historyLoading);
   const historyExhausted = useStore((s) => s.historyExhausted);
+  const forumChannels = useStore((s) => s.forumChannels);
 
   const selfNick = createMemo(() => local.selfNick ?? ourNick() ?? '');
 
@@ -633,6 +634,30 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     const target = followTarget();
     if (!target) return;
     toggleFollow(target.channel, target.topic);
+  }
+
+  const forumPinned = createMemo(() => {
+    const view = activeView();
+    return view.kind === 'channel' && forumChannels().has(view.channel.toLowerCase());
+  });
+
+  function toggleForumPinned(): void {
+    const view = activeView();
+    if (view.kind !== 'channel') return;
+    getState().toggleForumChannel(view.channel);
+    setForumView(true);
+  }
+
+  function followTopic(topic: string): void {
+    const view = activeView();
+    if (view.kind !== 'channel') return;
+    toggleFollow(view.channel, topic);
+  }
+
+  function topicFollowed(topic: string): boolean {
+    followed();
+    const view = activeView();
+    return view.kind === 'channel' && isFollowed(view.channel, topic);
   }
 
   // ── active target for reactions/sends ──
@@ -936,6 +961,17 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     })),
   ));
 
+  createEffect(() => {
+    const view = activeView();
+    if (view.kind !== 'channel') {
+      setForumView(false);
+      return;
+    }
+    if (forumPinned() && topicSummaries().length > 0) {
+      setForumView(true);
+    }
+  });
+
   function latestTopicMessage(topic: string): ChatMessage | null {
     const key = topic.toLowerCase();
     return allMessages()
@@ -1020,6 +1056,15 @@ export function MessageView(props: MessageViewProps): JSX.Element {
               >
                 Forum
               </button>
+              <button
+                type="button"
+                class="shell-topic-action"
+                classList={{ 'is-active': forumPinned() }}
+                aria-pressed={forumPinned()}
+                onClick={toggleForumPinned}
+              >
+                {forumPinned() ? 'Forum pinned' : 'Pin forum'}
+              </button>
             </Show>
             <button
               type="button"
@@ -1064,6 +1109,16 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                           </span>
                         )}
                       </Show>
+                    </button>
+                    <button
+                      type="button"
+                      class="shell-topic-card-follow"
+                      classList={{ 'is-active': topicFollowed(summary.topic) }}
+                      aria-pressed={topicFollowed(summary.topic)}
+                      onClick={() => followTopic(summary.topic)}
+                      aria-label={`${topicFollowed(summary.topic) ? 'Unfollow' : 'Follow'} topic ${summary.topic}`}
+                    >
+                      {topicFollowed(summary.topic) ? 'Following' : 'Follow'}
                     </button>
                   </article>
                 );

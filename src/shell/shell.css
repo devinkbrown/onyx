@@ -1703,6 +1703,36 @@
   background: color-mix(in oklab, var(--lapis-deep) 16%, transparent);
 }
 
+.shell-topic-card-follow {
+  width: calc(100% - (var(--space-3) * 2));
+  min-height: 2rem;
+  margin: 0 var(--space-3) var(--space-3);
+  padding: 0 var(--space-2);
+  border: 1px solid color-mix(in oklab, var(--lapis) 30%, transparent);
+  border-radius: var(--r-sm);
+  appearance: none;
+  background: color-mix(in oklab, var(--lapis-deep) 10%, transparent);
+  color: var(--lapis-bright);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.shell-topic-card-follow:hover,
+.shell-topic-card-follow:focus-visible {
+  outline: none;
+  border-color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis-deep) 20%, transparent);
+  color: var(--washi);
+}
+
+.shell-topic-card-follow.is-active {
+  border-color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis-bright) 84%, var(--stone));
+  color: var(--ink);
+}
+
 .shell-topic-card-title {
   min-width: 0;
   overflow: hidden;

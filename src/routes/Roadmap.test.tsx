@@ -75,6 +75,8 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Native onboarding forms')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Venue model' })).toBeInTheDocument();
     expect(screen.getByText('Named conversations')).toBeInTheDocument();
+    expect(screen.getByText('Forum topic follow controls')).toBeInTheDocument();
+    expect(screen.getByText('Pinned forum projection')).toBeInTheDocument();
     expect(screen.getByText('Mobile Home tab')).toBeInTheDocument();
     expect(screen.getByText('Touch-sized Home review cards')).toBeInTheDocument();
     expect(screen.getByText('Quiet boost Home digest')).toBeInTheDocument();
