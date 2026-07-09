@@ -39,6 +39,7 @@ import {
 import { preferences } from '@/lib/prefs/preferences';
 import { buildQuietBoostDigest, type QuietBoostDigestItem } from '@/lib/reactions/quietBoosts';
 import { fetchStatsIndex, relTime } from '@/lib/stats/networkIndex';
+import { loadChannelTopicDrafts } from '@/lib/channel/topicDrafts';
 import { loadOutbox, loadRecent } from '@/lib/vault/historyVault';
 import type { ChatMessage } from '@/lib/irc/types';
 import { openSpotlight } from '@/chat/spotlight/useSpotlight';
@@ -146,12 +147,21 @@ function trendLabel(item: HomeRhythmItem): string {
   return `${item.total.toLocaleString()} tracked`;
 }
 
+function channelDraftCount(drafts: Record<string, string>): number {
+  return Object.keys(drafts).filter((target) => target.startsWith('#') || target.startsWith('&')).length;
+}
+
+function countLabel(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
 export function HomeView(): JSX.Element {
   const joinHistory = useStore((s) => s.joinHistory);
   const channels = useStore((s) => s.channels);
   const dms = useStore((s) => s.dms);
   const channelLastActivity = useStore((s) => s.channelLastActivity);
   const channelProps = useStore((s) => s.channelProps);
+  const composerDrafts = useStore((s) => s.composerDrafts);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const networkName = useStore((s) => s.networkName);
   const ourNick = useStore((s) => s.ourNick);
@@ -162,12 +172,18 @@ export function HomeView(): JSX.Element {
     connectionStatus() === 'connected' ? 'catch-up ranges' : 'offline recall',
   );
   const [outboxEntries] = createResource(connectionStatus, () => loadOutbox());
+  const [topicDrafts] = createResource(connectionStatus, () => loadChannelTopicDrafts());
   const queuedSendCount = createMemo(() => outboxEntries()?.length ?? 0);
+  const roomDraftCount = createMemo(() => channelDraftCount(composerDrafts()));
+  const topicDraftCount = createMemo(() => Object.keys(topicDrafts() ?? {}).length);
   const localMemoryStatus = createMemo(() => {
-    const count = queuedSendCount();
-    if (count > 0) {
-      const label = count === 1 ? 'queued send' : 'queued sends';
-      return `Local-memory mode: ${count} ${label} waiting on this device. Remembered rooms, reviewed spans, and drafts stay available until reconnect.`;
+    const waiting = [
+      queuedSendCount() > 0 ? countLabel(queuedSendCount(), 'queued send') : null,
+      roomDraftCount() > 0 ? countLabel(roomDraftCount(), 'room draft') : null,
+      topicDraftCount() > 0 ? countLabel(topicDraftCount(), 'topic draft') : null,
+    ].filter(Boolean);
+    if (waiting.length > 0) {
+      return `Local-memory mode: ${waiting.join(', ')} waiting on this device. Remembered rooms and reviewed spans stay available until reconnect.`;
     }
     return 'Local-memory mode: remembered rooms, reviewed spans, drafts, and queued sends stay available until reconnect.';
   });

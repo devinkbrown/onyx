@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { store } from '@/lib/store/store';
 import type { Channel } from '@/lib/irc/types';
 import type { ChatMessage, ChannelUser } from '@/lib/irc/types';
+import { saveChannelTopicDrafts } from '@/lib/channel/topicDrafts';
 import { followed, isFollowed, unfollow } from '@/lib/notifications/followed';
 import { readReviewHistory, recordReviewHistory } from '@/lib/notifications/reviewHistory';
 import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
@@ -1071,15 +1072,19 @@ describe('AppShell', () => {
       store.setState({
         ...initialState,
         activeView: { kind: 'home' },
+        composerDrafts: { '#general': 'room draft', alice: 'private draft' },
         connectionStatus: 'disconnected',
         networkName: 'IRCXNet',
       }, true);
+      saveChannelTopicDrafts({ '#general': 'topic draft', alice: 'ignored non-channel draft' });
 
       await queueOutbox('#general', 'queued while offline');
 
       render(() => <AppShell />);
 
       await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('1 queued send'));
+      expect(screen.getByRole('status')).toHaveTextContent('1 room draft');
+      expect(screen.getByRole('status')).toHaveTextContent('1 topic draft');
       const reviewHistory = await screen.findByLabelText('Recent catch-up reviews');
       expect(within(reviewHistory).getByText('Reviewed recently')).toBeInTheDocument();
       expect(within(reviewHistory).getByText('offline recall')).toBeInTheDocument();
