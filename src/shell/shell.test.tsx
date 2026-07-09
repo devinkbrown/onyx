@@ -394,8 +394,9 @@ describe('AppShell', () => {
       expect(within(memory).getByText('3 readable lines')).toBeInTheDocument();
       expect(within(memory).getByText('2 voices')).toBeInTheDocument();
       expect(within(memory).getByText('1 topic')).toBeInTheDocument();
-      expect(within(memory).getByText('alice')).toBeInTheDocument();
-      expect(within(memory).getByText('bob')).toBeInTheDocument();
+      const voices = within(memory).getByLabelText('Remembered voices');
+      expect(within(voices).getByText('alice')).toBeInTheDocument();
+      expect(within(voices).getByText('bob')).toBeInTheDocument();
       expect(within(memory).getByRole('button', { name: 'Start' })).toBeInTheDocument();
       expect(within(memory).getByRole('button', { name: 'New' })).toBeInTheDocument();
       expect(within(memory).getByRole('button', { name: 'Latest' })).toBeInTheDocument();
@@ -406,9 +407,21 @@ describe('AppShell', () => {
       expect(within(memory).getByText('Hydrated note one')).toBeInTheDocument();
       expect(within(memory).getByRole('button', { name: 'Jump to reviewed span for #general' })).toBeInTheDocument();
       expect(within(memory).getByRole('button', { name: 'Search reviewed text for #general' })).toBeInTheDocument();
+      expect(within(memory).getByRole('group', { name: 'Reviewed context trail' })).toBeInTheDocument();
+      expect(within(memory).getByText('Context trail')).toBeInTheDocument();
+      expect(within(memory).getByText('Old remembered note')).toBeInTheDocument();
+      expect(within(memory).getByText('Hydrated note two')).toBeInTheDocument();
+      expect(within(memory).getByRole('button', { name: 'Jump to before reviewed context' })).toBeInTheDocument();
+      expect(within(memory).getByRole('button', { name: 'Jump to after reviewed context' })).toBeInTheDocument();
 
       fireEvent.click(within(memory).getByRole('button', { name: 'Start' }));
       expect(scrollIntoView).toHaveBeenCalled();
+
+      fireEvent.click(within(memory).getByRole('button', { name: 'Jump to before reviewed context' }));
+      expect(store.getState().timeTravelLandingId).toBe('msg-memory-a');
+
+      fireEvent.click(within(memory).getByRole('button', { name: 'Jump to after reviewed context' }));
+      expect(store.getState().timeTravelLandingId).toBe('msg-memory-c');
 
       fireEvent.click(within(memory).getByRole('button', { name: 'Jump to reviewed span for #general' }));
       expect(store.getState().timeTravelLandingId).toBe('msg-memory-b');

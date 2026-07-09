@@ -221,8 +221,11 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Reader mode now recalls the latest
     Home-reviewed catch-up span for the open transcript, with direct jump and
     message-search handoffs over the reviewed preview.
-    ⏭️ **NEXT** — continue hydration trails from reviewed catch-up spans into
-    neighboring transcript context.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Reviewed catch-up spans in reader
+    mode now expose hydrated before/after context trails with direct jump
+    controls into neighboring transcript lines.
+    ⏭️ **NEXT** — extend reviewed-span trails into local-vault context when the
+    neighboring lines are not currently hydrated.
 17. **Accessibility conformance ledger** *(main site + client)* — publish the
     public WCAG 2.2 / EN 301 549 audit path and keep it linked from the front
     door while app panels are audited.

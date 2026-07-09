@@ -67,6 +67,18 @@ export type ReaderMemoryContext = {
   lastAt: Date;
 };
 
+export type ReviewedContextTrailItem = {
+  id: string;
+  label: 'Before' | 'After';
+  from: string;
+  preview: string;
+};
+
+export type ReviewedContextTrail = {
+  before: ReviewedContextTrailItem | null;
+  after: ReviewedContextTrailItem | null;
+};
+
 /** Body-line counts per skeleton row — varied so the loading state reads as
  *  real message groups rather than a uniform grid. */
 const SKELETON_ROWS = [2, 1, 3, 2, 1] as const;
@@ -113,6 +125,17 @@ function isSystemMsg(msg: ChatMessage): boolean {
   return SYSTEM_TYPES.has(msg.type);
 }
 
+function readableMessageText(message: ChatMessage): string {
+  return (message.plaintext ?? message.text).trim();
+}
+
+function isReadableMessage(message: ChatMessage): boolean {
+  return !isSystemMsg(message)
+    && !message.deleted
+    && !message.redacted
+    && readableMessageText(message).length > 0;
+}
+
 function sameAuthorGroup(a: ChatMessage, b: ChatMessage): boolean {
   if (a.from !== b.from) return false;
   if (isSystemMsg(a) || isSystemMsg(b)) return false;
@@ -126,13 +149,7 @@ export function buildReaderMemoryContext(
 ): ReaderMemoryContext | null {
   if (!target.startsWith('#')) return null;
 
-  const readable = sourceMessages.filter((message) => {
-    const text = message.plaintext ?? message.text;
-    return !isSystemMsg(message)
-      && !message.deleted
-      && !message.redacted
-      && text.trim().length > 0;
-  });
+  const readable = sourceMessages.filter(isReadableMessage);
   if (readable.length === 0) return null;
 
   const voices: string[] = [];
@@ -157,6 +174,39 @@ export function buildReaderMemoryContext(
     firstAt: readable[0]!.time,
     lastAt: readable[readable.length - 1]!.time,
   };
+}
+
+function reviewedContextItem(
+  message: ChatMessage | undefined,
+  label: ReviewedContextTrailItem['label'],
+): ReviewedContextTrailItem | null {
+  if (!message || !isReadableMessage(message)) return null;
+  return {
+    id: message.id,
+    label,
+    from: message.from,
+    preview: clipped(readableMessageText(message), 72),
+  };
+}
+
+export function buildReviewedContextTrail(
+  entry: ReviewHistoryEntry,
+  sourceMessages: readonly ChatMessage[],
+): ReviewedContextTrail | null {
+  const anchorIndex = sourceMessages.findIndex((message) => message.id === entry.firstMessageId);
+  if (anchorIndex < 0) return null;
+
+  const before = reviewedContextItem(
+    [...sourceMessages.slice(0, anchorIndex)].reverse().find(isReadableMessage),
+    'Before',
+  );
+  const after = reviewedContextItem(
+    sourceMessages.slice(anchorIndex + 1).find(isReadableMessage),
+    'After',
+  );
+
+  if (!before && !after) return null;
+  return { before, after };
 }
 
 function plural(count: number, singular: string, pluralLabel = `${singular}s`): string {
@@ -198,17 +248,23 @@ function formatReviewedAt(entry: ReviewHistoryEntry): string {
 function ReaderMemoryStrip(props: {
   context: ReaderMemoryContext;
   reviewedSpan: ReviewHistoryEntry | null;
+  reviewedTrail: ReviewedContextTrail | null;
   hasUnreadBoundary: boolean;
   onJumpStart: () => void;
   onJumpUnread: () => void;
   onJumpLatest: () => void;
   onReturnHome: () => void;
   onJumpReviewed: (entry: ReviewHistoryEntry) => void;
+  onJumpReviewedContext: (messageId: string) => void;
   onSearchReviewed: (entry: ReviewHistoryEntry) => void;
 }): JSX.Element {
   const overflow = createMemo(() =>
     Math.max(props.context.voiceCount - props.context.participants.length, 0),
   );
+  const reviewedTrailItems = createMemo(() => {
+    const trail = props.reviewedTrail;
+    return trail ? [trail.before, trail.after].filter((item): item is ReviewedContextTrailItem => item !== null) : [];
+  });
 
   return (
     <section class="shell-reader-memory" aria-label="Device memory context">
@@ -244,6 +300,27 @@ function ReaderMemoryStrip(props: {
             <span class="shell-reader-memory__review-preview">{entry().preview}</span>
           </div>
         )}
+      </Show>
+      <Show when={reviewedTrailItems().length > 0}>
+        <div class="shell-reader-memory__trail" role="group" aria-label="Reviewed context trail">
+          <span class="shell-reader-memory__trail-label">Context trail</span>
+          <div class="shell-reader-memory__trail-list">
+            <For each={reviewedTrailItems()}>
+              {(item) => (
+                <button
+                  type="button"
+                  class="shell-reader-memory__trail-item"
+                  onClick={() => props.onJumpReviewedContext(item.id)}
+                  aria-label={`Jump to ${item.label.toLowerCase()} reviewed context`}
+                >
+                  <span class="shell-reader-memory__trail-side">{item.label}</span>
+                  <strong>{item.from}</strong>
+                  <span>{item.preview}</span>
+                </button>
+              )}
+            </For>
+          </div>
+        </div>
       </Show>
       <nav class="shell-reader-memory__nav" aria-label="Reader transcript navigation">
         <button type="button" onClick={() => props.onJumpStart()}>Start</button>
@@ -604,6 +681,10 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     const context = readerMemoryContext();
     return context ? latestReviewForTarget(context.target, 'channel') : null;
   });
+  const readerReviewedTrail = createMemo(() => {
+    const entry = readerReviewedSpan();
+    return entry ? buildReviewedContextTrail(entry, messages()) : null;
+  });
 
   // ── scroll state ──
   let feedEl!: HTMLDivElement;
@@ -662,6 +743,10 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     if (entry.kind === 'channel' && !Number.isNaN(firstAt.getTime())) {
       state.travelTo(entry.target, firstAt);
     }
+  }
+
+  function jumpToReviewedContext(messageId: string): void {
+    getState().focusMessage(messageId);
   }
 
   function searchReviewedSpan(entry: ReviewHistoryEntry): void {
@@ -965,12 +1050,14 @@ export function MessageView(props: MessageViewProps): JSX.Element {
               <ReaderMemoryStrip
                 context={context()}
                 reviewedSpan={readerReviewedSpan()}
+                reviewedTrail={readerReviewedTrail()}
                 hasUnreadBoundary={unreadDividerId() !== null}
                 onJumpStart={scrollToReaderStart}
                 onJumpUnread={scrollToUnreadBoundary}
                 onJumpLatest={() => scrollToBottom(true)}
                 onReturnHome={() => getState().navigate({ kind: 'home' })}
                 onJumpReviewed={jumpToReviewedSpan}
+                onJumpReviewedContext={jumpToReviewedContext}
                 onSearchReviewed={searchReviewedSpan}
               />
             )}
