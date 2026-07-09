@@ -50,6 +50,14 @@ export function PinnedMessages(): JSX.Element {
   const bodyOf = (m: ChatMessage): string =>
     m.type === 'action' ? `* ${m.from} ${m.text}` : m.text;
 
+  const clip = (text: string): string =>
+    text.length > 80 ? `${text.slice(0, 77)}...` : text;
+
+  const pinActionLabel = (pin: ResolvedPin): string =>
+    pin.msg
+      ? `Jump to pinned message from ${pin.msg.from}: ${clip(bodyOf(pin.msg))}`
+      : `Load pinned message ${pin.id}`;
+
   function jumpTo(pin: ResolvedPin): void {
     const ch = channel();
     if (!ch) return;
@@ -63,8 +71,7 @@ export function PinnedMessages(): JSX.Element {
     getState().closePinnedMessages();
   }
 
-  function unpin(pin: ResolvedPin, e: MouseEvent): void {
-    e.stopPropagation();
+  function unpin(pin: ResolvedPin): void {
     const ch = channel();
     if (ch) getState().unpinMessage(ch, pin.id);
   }
@@ -89,11 +96,20 @@ export function PinnedMessages(): JSX.Element {
             </p>
           }
         >
-          <ul class="pins-list" role="list">
+          <ul
+            class="pins-list"
+            role="list"
+            aria-label={channel() ? `Pinned messages in ${channel()}` : 'Pinned messages'}
+          >
             <For each={pins()}>
               {(pin) => (
-                <li>
-                  <button type="button" class="pins-item" onClick={() => jumpTo(pin)}>
+                <li class="pins-list-item">
+                  <button
+                    type="button"
+                    class="pins-item"
+                    aria-label={pinActionLabel(pin)}
+                    onClick={() => jumpTo(pin)}
+                  >
                     <PinIcon class="pins-item-ico" />
                     <Show
                       when={pin.msg}
@@ -113,18 +129,18 @@ export function PinnedMessages(): JSX.Element {
                         </span>
                       )}
                     </Show>
-                    <Show when={canManage()}>
-                      <span
-                        class="pins-item-unpin"
-                        role="button"
-                        aria-label="Unpin this message"
-                        title="Unpin"
-                        onClick={(e) => unpin(pin, e)}
-                      >
-                        ×
-                      </span>
-                    </Show>
                   </button>
+                  <Show when={canManage()}>
+                    <button
+                      type="button"
+                      class="pins-item-unpin"
+                      aria-label={`Unpin message ${pin.id}`}
+                      title="Unpin"
+                      onClick={() => unpin(pin)}
+                    >
+                      ×
+                    </button>
+                  </Show>
                 </li>
               )}
             </For>

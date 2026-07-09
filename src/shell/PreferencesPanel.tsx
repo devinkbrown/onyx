@@ -113,6 +113,11 @@ const ACCESS_AUDIT_ROWS = [
     note: 'Named shortcuts dialog, labelled close action, and grouped shortcut lists generated from live keymap descriptors.',
   },
   {
+    surface: 'Pinned messages',
+    status: 'checked',
+    note: 'Named pins dialog, channel-specific pins list, target-specific jump buttons, and real unpin controls.',
+  },
+  {
     surface: 'Modals',
     status: 'checked',
     note: 'Sheet focus trap, Escape close, labelled close buttons.',

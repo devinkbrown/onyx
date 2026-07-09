@@ -268,6 +268,9 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Keyboard shortcuts now carries pass
     evidence for its named Sheet dialog, labelled close action, and grouped
     shortcut lists generated from the live keymap descriptors.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Pinned messages now carries pass
+    evidence for its named Sheet dialog, channel-specific pins list,
+    target-specific jump buttons, and real unpin controls.
     ⏭️ **CLIENT NEXT** — continue remaining dense-surface audit rows until every
     app panel has pass/fix evidence.
 
