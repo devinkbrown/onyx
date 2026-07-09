@@ -527,6 +527,9 @@ client or public site needs to expose the result.
     ✅ **WEBSITE SLICE SHIPPED 2026-07-09** — `/install/` now publishes a wrapper
     contract for launch routes, origin storage, notification control, and
     service-worker update behavior so desktop/mobile shells do not fork Onyx.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — The web manifest now includes
+    install screenshots generated from the live app and a launch handler that
+    reuses an existing installed window before opening another shell.
 40. **Portable import/export** *(client)* — expose device-safe export/import for
     vault history, room snapshots, account handoff data, and reviewed catch-up
     state where protocol support exists.
