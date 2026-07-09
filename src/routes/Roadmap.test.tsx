@@ -67,7 +67,10 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Notification control evidence')).toBeInTheDocument();
     expect(screen.getByText('Time scrubber evidence')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Torii entry' })).toBeInTheDocument();
-    expect(screen.getByText('Rich invite entry')).toBeInTheDocument();
+    expect(screen.getByText('Rich invite route')).toBeInTheDocument();
+    expect(screen.getByText('Invite Open Graph metadata')).toBeInTheDocument();
+    expect(screen.getByText('Install guide')).toBeInTheDocument();
+    expect(screen.getByText('Generated public sitemap')).toBeInTheDocument();
     expect(screen.getByText('Native onboarding forms')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Venue model' })).toBeInTheDocument();
     expect(screen.getByText('Named conversations')).toBeInTheDocument();
@@ -85,6 +88,8 @@ describe('RoadmapRoute', () => {
     expect(screen.getByRole('heading', { name: 'Roaming' })).toBeInTheDocument();
     expect(screen.getByText('TravelTo vault fallback')).toBeInTheDocument();
     expect(screen.getAllByText('Active-target vault search').length).toBeGreaterThan(0);
+    expect(screen.getByText('Installable manifest')).toBeInTheDocument();
+    expect(screen.getByText('PWA shortcuts')).toBeInTheDocument();
     expect(screen.getByText(/time is active/i)).toBeInTheDocument();
     expect(screen.getByText('complete phases').closest('.data-metric')).toHaveTextContent('4');
     expect(screen.getByRole('heading', { name: 'Washi' })).toBeInTheDocument();
@@ -98,5 +103,6 @@ describe('RoadmapRoute', () => {
     expect(hrefs).toContain('/status');
     expect(hrefs).toContain('/app');
     expect(hrefs).toContain('/accessibility/');
+    expect(hrefs).toContain('/invite?join=%23root');
   });
 });

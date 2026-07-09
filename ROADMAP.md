@@ -324,6 +324,11 @@ client or public site needs to expose the result.
     first-run surface with Open Graph-ready public unfurls, instant guest
     identity, channel context, and a clear path from guest nick to claimed
     account.
+    ✅ **CLIENT + WEBSITE SLICE SHIPPED 2026-07-09** — Onyx now has a first-class
+    `/invite` route that reuses the invite-card model for room, moment, and
+    suggested guest metadata, then hands off to `/app` with the same params.
+    The main site now links the install/first-run path and generates sitemap
+    entries for public app, stats, invite, and documentation routes.
 19. **Native onboarding and account claim** *(client)* — remove the NickServ
     cliff from first use with registration, identify, certificate, and future
     passkey flows expressed as first-party forms over the real server commands.
@@ -418,6 +423,10 @@ client or public site needs to expose the result.
 39. **PWA and desktop packaging path** *(client + main site)* — make install,
     update, notification, and wrapped push behavior explicit for browser PWA,
     desktop shell, and future mobile wrappers.
+    ✅ **CLIENT + WEBSITE SLICE SHIPPED 2026-07-09** — The web manifest now starts
+    installed launches at `/app`, declares app shortcuts for chat/status/stats,
+    and the main site has `/install/` documenting install behavior, local memory,
+    service-worker update recovery, and the desktop/mobile wrapper path.
 40. **Portable import/export** *(client)* — expose device-safe export/import for
     vault history, room snapshots, account handoff data, and reviewed catch-up
     state where protocol support exists.

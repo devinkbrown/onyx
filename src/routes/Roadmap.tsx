@@ -73,10 +73,10 @@ const phases: Phase[] = [
   {
     phase: 'Phase 8',
     title: 'Torii entry',
-    state: 'planned',
-    date: 'planned',
-    summary: 'Fold the master roadmap product-entry work into Onyx and the main site: rich invites, native onboarding, account claim, and a stricter public glossary.',
-    items: ['Rich invite entry', 'Instant guest identity', 'Native onboarding forms', 'Account claim flow', 'Brand glossary cleanup'],
+    state: 'active',
+    date: '2026-07-09',
+    summary: 'Fold the master roadmap product-entry work into Onyx and the main site: rich invite previews, instant guest handoff, native onboarding, install guidance, and a stricter public glossary.',
+    items: ['Rich invite route', 'Invite Open Graph metadata', 'Instant guest identity', 'Invite moment handoff', 'Native onboarding forms', 'Account claim flow', 'Install guide', 'Generated public sitemap', 'Brand glossary cleanup'],
   },
   {
     phase: 'Phase 9',
@@ -121,10 +121,10 @@ const phases: Phase[] = [
   {
     phase: 'Phase 14',
     title: 'Roaming',
-    state: 'planned',
-    date: 'planned',
-    summary: 'Generalize offline-first behavior into read, compose, search, moderation drafts, PWA/desktop packaging, and portable import/export.',
-    items: ['TravelTo vault fallback', 'Active-target vault search', 'Immediate vault-result navigation', 'Full offline-first UX', 'PWA packaging path', 'Desktop packaging path', 'Portable import/export'],
+    state: 'active',
+    date: '2026-07-09',
+    summary: 'Generalize offline-first behavior into read, compose, search, PWA install clarity, moderation drafts, desktop packaging, and portable import/export.',
+    items: ['TravelTo vault fallback', 'Active-target vault search', 'Immediate vault-result navigation', 'Installable manifest', 'PWA shortcuts', 'Full offline-first UX', 'Desktop packaging path', 'Portable import/export'],
   },
 ];
 
@@ -241,7 +241,8 @@ export default function RoadmapRoute() {
             <div class="data-row"><div><strong>Catch-up Home</strong><span>Continue richer cross-room review handoffs on the return screen.</span></div></div>
             <div class="data-row"><div><strong>Reader mode</strong><span>Carry reviewed anchors into richer cross-room handoffs.</span></div></div>
             <div class="data-row"><div><strong>Accessibility conformance</strong><span><a href="/accessibility/">Continue remaining dense-surface pass/fix evidence.</a></span></div></div>
-            <div class="data-row"><div><strong>Master roadmap fold-in</strong><span>Track rich invites, onboarding, calm presets, media presence, app surfaces, local intelligence, and offline roaming here.</span></div></div>
+            <div class="data-row"><div><strong>Torii entry</strong><span><a href="/invite?join=%23root">Rich invite entry</a> and install guidance now anchor the first-run path.</span></div></div>
+            <div class="data-row"><div><strong>Master roadmap fold-in</strong><span>Track onboarding, calm presets, media presence, app surfaces, local intelligence, and offline roaming here.</span></div></div>
           </div>
         </aside>
       </section>

@@ -1,12 +1,36 @@
 {
   "name": "Onyx",
   "short_name": "Onyx",
-  "description": "Open rooms, encrypted media, and live IRCXNet network telemetry.",
-  "start_url": "/",
+  "description": "Open rooms, local-first memory, encrypted media, and live IRCXNet network telemetry.",
+  "id": "/app",
+  "start_url": "/app",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "browser"],
   "orientation": "any",
   "background_color": "#000306",
   "theme_color": "#000306",
+  "categories": ["social", "productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Open Onyx",
+      "short_name": "Chat",
+      "description": "Open the Onyx app.",
+      "url": "/app"
+    },
+    {
+      "name": "Network status",
+      "short_name": "Status",
+      "description": "View live IRCXNet node and backup status.",
+      "url": "/status"
+    },
+    {
+      "name": "Channel stats",
+      "short_name": "Stats",
+      "description": "View public channel rhythm and activity.",
+      "url": "/stats"
+    }
+  ],
   "icons": [
     {
       "src": "/icon-192.png",

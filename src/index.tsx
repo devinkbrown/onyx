@@ -39,6 +39,7 @@ const Appearance = lazy(() => import('./app/Appearance'));
 const Stats = lazy(() => import('./routes/Stats'));
 const Status = lazy(() => import('./routes/Status'));
 const Roadmap = lazy(() => import('./routes/Roadmap'));
+const Invite = lazy(() => import('./routes/Invite'));
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Onyx: #root not found');
@@ -67,6 +68,8 @@ render(
           <Route path="/status/" component={Status} />
           <Route path="/roadmap" component={Roadmap} />
           <Route path="/roadmap/" component={Roadmap} />
+          <Route path="/invite" component={Invite} />
+          <Route path="/invite/" component={Invite} />
         </Router>
         {/* Global command palette — Cmd/Ctrl+K or / opens it from any route */}
         <Spotlight />
