@@ -177,3 +177,14 @@
   .conn-stage > .cpulse { grid-column: 1; justify-self: center; width: min(540px, calc(100vw - 40px)); max-width: none; padding-top: 0; }
   .cpulse-rooms { display: none; } /* keep the narrow door light */
 }
+
+@media (max-width: 520px) {
+  .conn-stage {
+    display: block;
+    min-height: 100svh;
+  }
+
+  .conn-stage > .cpulse {
+    display: none;
+  }
+}

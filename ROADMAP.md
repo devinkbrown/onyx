@@ -386,6 +386,10 @@ client or public site needs to expose the result.
     composer/search/caption overlays respect safe-area and bottom-nav space, and
     the main site mobile menu, doc tables, hero CTAs, and install cards use
     scroll-safe touch layouts.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — The mobile `/app` Connect front
+    door now uses a full-height phone layout with a sticky mode switch, larger
+    inputs and submit controls, simplified atmosphere, and no secondary pulse
+    rail before a user connects.
 
 ## Phase 10 — Washi Atmosphere ← PLANNED
 25. **Background system consolidation** *(client)* — collapse the canvas and DOM
