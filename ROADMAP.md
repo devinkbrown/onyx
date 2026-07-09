@@ -358,6 +358,10 @@ client or public site needs to expose the result.
     regular, and power notification presets; keep followed conversations and
     mentions prominent while quiet reactions and ambient movement collect into
     Home instead of interrupting users.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — The compact sidebar notification
+    controls now expose the same Calm / Regular / Power preset model as
+    Preferences, cycling the persisted mode with accessible current/next-state
+    labels while keeping boosts non-notifying.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home now collects recent quiet
     boosts from hydrated channel and DM buffers into a non-notifying digest,
     ranking boosted messages by reaction count and opening them through the

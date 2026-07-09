@@ -322,6 +322,22 @@
   background: var(--lapis-bright);
 }
 
+.shell-notify-btn--calm {
+  letter-spacing: 0;
+}
+
+.shell-notify-btn--calm-calm {
+  color: var(--lapis-bright);
+  border-color: color-mix(in oklab, var(--lapis-bright) 55%, transparent);
+  background: color-mix(in oklab, var(--lapis-deep) 24%, transparent);
+}
+
+.shell-notify-btn--calm-power {
+  color: var(--ink);
+  border-color: transparent;
+  background: var(--gold);
+}
+
 .shell-notify-btn--dnd {
   color: var(--ink);
   border-color: transparent;

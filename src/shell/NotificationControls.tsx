@@ -6,7 +6,25 @@ import {
   requestDesktopNotificationPermission,
   type DesktopNotificationPermission,
 } from '@/lib/notifications';
+import {
+  CALM_PRESETS,
+  calmPreset,
+  setCalmPreset,
+  type CalmPreset,
+} from '@/lib/notifications/calmMode';
 import { disableWebPush, enableWebPush, webPushActive, webPushSupported } from '@/lib/notifications/webPush';
+
+const CALM_PRESET_LABELS: Record<CalmPreset, string> = {
+  calm: 'Calm',
+  regular: 'Regular',
+  power: 'Power',
+};
+
+const CALM_PRESET_HINTS: Record<CalmPreset, string> = {
+  calm: 'only mentions and direct messages notify',
+  regular: 'mentions and followed conversations notify',
+  power: 'all alertable activity notifies',
+};
 
 function permissionLabel(permission: DesktopNotificationPermission): string {
   if (permission === 'unsupported') return 'Desktop notifications are not supported';
@@ -19,6 +37,16 @@ function desktopStateLabel(active: boolean, permission: DesktopNotificationPermi
   if (permission === 'unsupported') return 'Desktop notifications unsupported';
   if (permission === 'denied') return 'Desktop notifications blocked';
   return active ? 'Desktop notifications on' : 'Desktop notifications off';
+}
+
+function nextCalmPreset(current: CalmPreset): CalmPreset {
+  const index = CALM_PRESETS.indexOf(current);
+  return CALM_PRESETS[(index + 1) % CALM_PRESETS.length] ?? 'regular';
+}
+
+function calmModeLabel(current: CalmPreset): string {
+  const next = nextCalmPreset(current);
+  return `Notification mode ${CALM_PRESET_LABELS[current]}: ${CALM_PRESET_HINTS[current]}. Switch to ${CALM_PRESET_LABELS[next]}`;
 }
 
 export function NotificationControls(): JSX.Element {
@@ -79,6 +107,10 @@ export function NotificationControls(): JSX.Element {
     getState().setSoundEnabled(!soundEnabled());
   }
 
+  function handleCalmToggle(): void {
+    setCalmPreset(nextCalmPreset(calmPreset()));
+  }
+
   function handleDndToggle(): void {
     const next = !dndActive();
     getState().setDndEnabled(next);
@@ -94,7 +126,7 @@ export function NotificationControls(): JSX.Element {
     >
       <span id="notify-controls-title" class="sr-only">Notification controls</span>
       <span id="notify-controls-state" class="sr-only">
-        {desktopStateLabel(desktopActive(), permission())}; notification sound {soundEnabled() ? 'on' : 'off'}; do not disturb {dndActive() ? 'on' : 'off'}.
+        {desktopStateLabel(desktopActive(), permission())}; notification mode {CALM_PRESET_LABELS[calmPreset()]}; notification sound {soundEnabled() ? 'on' : 'off'}; do not disturb {dndActive() ? 'on' : 'off'}.
       </span>
       <button
         type="button"
@@ -111,6 +143,17 @@ export function NotificationControls(): JSX.Element {
       >
         <span aria-hidden="true">N</span>
         <span class="sr-only">{desktopStateLabel(desktopActive(), permission())}</span>
+      </button>
+      <button
+        type="button"
+        class={`shell-notify-btn shell-notify-btn--calm shell-notify-btn--calm-${calmPreset()}`}
+        title={calmModeLabel(calmPreset())}
+        aria-label={calmModeLabel(calmPreset())}
+        aria-pressed={calmPreset() !== 'regular'}
+        onClick={handleCalmToggle}
+      >
+        <span aria-hidden="true">{CALM_PRESET_LABELS[calmPreset()].slice(0, 1)}</span>
+        <span class="sr-only">Notification mode {CALM_PRESET_LABELS[calmPreset()]}</span>
       </button>
       <button
         type="button"

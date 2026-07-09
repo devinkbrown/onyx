@@ -77,6 +77,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Named conversations')).toBeInTheDocument();
     expect(screen.getByText('Forum topic follow controls')).toBeInTheDocument();
     expect(screen.getByText('Pinned forum projection')).toBeInTheDocument();
+    expect(screen.getByText('Compact calm preset control')).toBeInTheDocument();
     expect(screen.getByText('Mobile Home tab')).toBeInTheDocument();
     expect(screen.getByText('Touch-sized Home review cards')).toBeInTheDocument();
     expect(screen.getByText('Quiet boost Home digest')).toBeInTheDocument();
