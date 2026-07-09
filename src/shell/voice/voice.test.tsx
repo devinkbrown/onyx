@@ -13,7 +13,7 @@
  * AAA structure throughout.
  */
 
-import { cleanup, fireEvent, render } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { store } from '@/lib/store/store';
 import type { Channel, ChannelUser } from '@/lib/irc/types';
@@ -536,6 +536,42 @@ describe('VoiceBar', () => {
     expect(spy).toHaveBeenCalledWith('spotlight');
     expect(btn).toHaveAttribute('aria-pressed', 'true');
     spy.mockRestore();
+  });
+
+  it('opens spatial audio status when media is available', () => {
+    // Arrange
+    seedVoiceStore([]);
+    store.setState({
+      mediaAvailable: true,
+      spatialPositions: new Map([
+        ['#media', new Map([
+          ['alice', { x: -0.5, y: 0, z: 0, t: 1 }],
+          ['bob', { x: 0.5, y: 0, z: 0, t: 2 }],
+        ])],
+      ]),
+    });
+
+    // Act
+    const { getByTestId } = render(() => <VoiceBar />);
+    fireEvent.click(getByTestId('spatial-audio-button'));
+
+    // Assert
+    expect(screen.getByRole('dialog', { name: 'Spatial audio controls' })).toBeInTheDocument();
+    expect(screen.getByText('Spatial audio')).toBeInTheDocument();
+    expect(screen.getByText('2 positioned')).toBeInTheDocument();
+  });
+
+  it('disables spatial audio controls when media is unavailable', () => {
+    // Arrange
+    seedVoiceStore([]);
+
+    // Act
+    const { getByTestId } = render(() => <VoiceBar />);
+    const btn = getByTestId('spatial-audio-unavailable-button');
+
+    // Assert
+    expect(btn).toBeDisabled();
+    expect(btn).toHaveAttribute('aria-label', 'Spatial audio unavailable');
   });
 
   it('settings button calls openVoiceSettings', () => {

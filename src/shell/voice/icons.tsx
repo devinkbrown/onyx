@@ -167,6 +167,17 @@ export function SpotlightIcon(props: IconProps): JSX.Element {
   );
 }
 
+export function SpatialAudioIcon(props: IconProps): JSX.Element {
+  return (
+    <Svg class={props.class}>
+      <circle cx="12" cy="12" r="2.2" fill="currentColor" opacity="0.22" />
+      <circle cx="12" cy="12" r="2.2" />
+      <path d="M7.5 8.5a5 5 0 0 0 0 7M16.5 8.5a5 5 0 0 1 0 7" />
+      <path d="M4.7 5.5a9 9 0 0 0 0 13M19.3 5.5a9 9 0 0 1 0 13" />
+    </Svg>
+  );
+}
+
 export function SettingsIcon(props: IconProps): JSX.Element {
   return (
     <Svg class={props.class}>

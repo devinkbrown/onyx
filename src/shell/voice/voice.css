@@ -754,6 +754,15 @@
   transform: translateY(-1px);
 }
 
+.voice-bar .onyx-icon-button:disabled {
+  color: color-mix(in oklab, var(--washi-mute) 72%, transparent);
+  border-color: color-mix(in oklab, var(--seam-faint) 72%, transparent);
+  background: color-mix(in oklab, var(--ink) 64%, transparent);
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
 .voice-bar .onyx-icon-button:focus-visible {
   outline: 2px solid var(--lapis-bright);
   outline-offset: 3px;
@@ -798,6 +807,33 @@
   background: color-mix(in oklab, var(--shu) 82%, var(--stone));
   border-color: color-mix(in oklab, var(--shu) 72%, var(--washi));
   color: var(--washi);
+}
+
+.voice-bar__spatial {
+  display: grid;
+  gap: 6px;
+  min-width: 160px;
+  padding: 8px;
+  font-family: var(--font-mono);
+}
+
+.voice-bar__spatial-title {
+  color: var(--washi);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.voice-bar__spatial-state {
+  color: var(--lapis-bright);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.voice-bar__spatial-note {
+  color: var(--washi-mute);
+  font-size: 10px;
+  text-transform: uppercase;
 }
 
 /* ── ConnectionQuality pip ──────────────────────────────────────────────────── */

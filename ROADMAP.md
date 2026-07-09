@@ -416,6 +416,11 @@ client or public site needs to expose the result.
 29. **Spatial audio and screenshare controls** *(client)* — add explicit spatial
     audio, screenshare, and watch-together controls that degrade cleanly when a
     node or browser lacks the underlying media feature.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — The voice toolbar now exposes a
+    spatial-audio control beside layout controls, opens a compact room-state
+    popover when media is available, shows positioned-peer counts from the
+    existing spatial store, and disables itself with a clear unavailable label
+    when the current media path cannot support it.
 30. **Watch-together surface** *(client)* — expose synchronized playback as a
     room activity with clear host, participant, pause, seek, and handoff states.
 

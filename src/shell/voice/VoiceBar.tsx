@@ -26,7 +26,7 @@ import { VoiceSettings } from './settings/VoiceSettings';
 import {
   MicIcon, MicOffIcon, DeafenIcon, DeafenOffIcon, CameraIcon, CameraOffIcon,
   ScreenShareIcon, ScreenShareStopIcon, CaptionsIcon, HandIcon, ReactionIcon,
-  GridIcon, SpotlightIcon, SettingsIcon, HangupIcon,
+  GridIcon, SpotlightIcon, SpatialAudioIcon, SettingsIcon, HangupIcon,
 } from './icons';
 import type { NetworkQualityTier } from '@/lib/suimyaku-media/types';
 import './voice.css';
@@ -176,8 +176,11 @@ export function VoiceBar() {
   const voice = useStore(s => s.voice);
   const ourNick = useStore(s => s.ourNick);
   const showSettings = useStore(s => s.showVoiceSettings);
+  const mediaAvailable = useStore(s => s.mediaAvailable);
+  const spatialPositions = useStore(s => s.spatialPositions);
 
   const [reactionsOpen, setReactionsOpen] = createSignal(false);
+  const [spatialOpen, setSpatialOpen] = createSignal(false);
 
   const isActive = createMemo(() =>
     voice().callState === 'in_call' || voice().callState === 'ringing_out' || voice().callState === 'ringing_in'
@@ -187,6 +190,17 @@ export function VoiceBar() {
   const selfNick = createMemo(() => ourNick() ?? '');
   const participantCount = createMemo(() => voice().peers.size + 1);
   const isSpotlight = createMemo(() => voice().callLayout === 'spotlight');
+  const spatialPositionCount = createMemo(() => {
+    const channel = channelLabel();
+    if (!channel) return 0;
+    return spatialPositions().get(channel.toLowerCase())?.size ?? 0;
+  });
+  const spatialStateLabel = createMemo(() => {
+    const count = spatialPositionCount();
+    if (count === 1) return '1 positioned';
+    if (count > 1) return `${count} positioned`;
+    return 'Balanced stereo';
+  });
 
   const handleToggleMute = () => getState().toggleMute();
   const handleToggleDeafen = () => getState().toggleDeafen();
@@ -375,6 +389,50 @@ export function VoiceBar() {
 
           {/* ── View group ── */}
           <div class="voice-bar__group" role="group" aria-label="View controls">
+            <Show
+              when={mediaAvailable()}
+              fallback={
+                <Tooltip content="Spatial audio unavailable" placement="top">
+                  <button
+                    type="button"
+                    class="onyx-icon-button onyx-icon-button--ghost onyx-icon-button--md"
+                    aria-label="Spatial audio unavailable"
+                    disabled
+                    data-testid="spatial-audio-unavailable-button"
+                  >
+                    <span class="onyx-icon-button__glyph" aria-hidden="true"><SpatialAudioIcon /></span>
+                  </button>
+                </Tooltip>
+              }
+            >
+              <Popover
+                placement="top"
+                open={spatialOpen()}
+                onOpenChange={setSpatialOpen}
+                panelLabel="Spatial audio controls"
+                trigger={
+                  <span
+                    class="onyx-icon-button onyx-icon-button--ghost onyx-icon-button--md"
+                    role="button"
+                    tabindex="0"
+                    aria-label={`Spatial audio controls, ${spatialStateLabel()}`}
+                    data-testid="spatial-audio-button"
+                    title={`Spatial audio: ${spatialStateLabel()}`}
+                  >
+                    <span class="onyx-icon-button__glyph" aria-hidden="true"><SpatialAudioIcon /></span>
+                  </span>
+                }
+              >
+                <div class="voice-bar__spatial">
+                  <span class="voice-bar__spatial-title">Spatial audio</span>
+                  <span class="voice-bar__spatial-state">{spatialStateLabel()}</span>
+                  <Show when={voice().screenshareActive}>
+                    <span class="voice-bar__spatial-note">Screen share stage</span>
+                  </Show>
+                </div>
+              </Popover>
+            </Show>
+
             <Tooltip content={isSpotlight() ? 'Switch to grid' : 'Switch to spotlight'} placement="top">
               <button
                 type="button"
