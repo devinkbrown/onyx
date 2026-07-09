@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen, within } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { parseIRCMessage } from '@/lib/irc/parser';
@@ -29,9 +29,20 @@ describe('ChannelBrowser', () => {
     render(() => <ChannelBrowser />);
 
     const dialog = screen.getByRole('dialog', { name: 'Browse channels' });
+    expect(within(dialog).getByRole('search', { name: 'Channel directory search' })).toBeInTheDocument();
+    const directory = within(dialog).getByRole('list', { name: 'Public channel directory' });
+    expect(within(directory).getAllByRole('listitem')).toHaveLength(2);
     expect(within(dialog).getAllByText('#general')).toHaveLength(1);
     expect(within(dialog).getByText('5 users')).toBeInTheDocument();
     expect(within(dialog).getByText('Launch room')).toBeInTheDocument();
+    expect(within(dialog).getByText('#random')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Join #general' })).toBeInTheDocument();
+
+    fireEvent.input(within(dialog).getByRole('searchbox', { name: 'Filter channels' }), {
+      target: { value: 'off-topic' },
+    });
+
+    expect(within(dialog).queryByText('#general')).not.toBeInTheDocument();
     expect(within(dialog).getByText('#random')).toBeInTheDocument();
   });
 });

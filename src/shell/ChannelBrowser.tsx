@@ -44,7 +44,7 @@ export default function ChannelBrowser(): JSX.Element {
       description="Every public channel on the network, live from LIST."
     >
       <div class="chb">
-        <div class="chb-toolbar">
+        <div class="chb-toolbar" role="search" aria-label="Channel directory search">
           <input
             class="chb-filter"
             type="search"
@@ -77,7 +77,7 @@ export default function ChannelBrowser(): JSX.Element {
               </div>
             }
           >
-            <ul class="chb-list" role="list">
+            <ul class="chb-list" role="list" aria-label="Public channel directory">
               <For each={filtered()}>
                 {(row) => (
                   <li class="chb-row">
@@ -90,7 +90,12 @@ export default function ChannelBrowser(): JSX.Element {
                     <p class={`chb-topic${row.topic ? '' : ' is-empty'}`}>
                       {row.topic || 'No topic set.'}
                     </p>
-                    <button type="button" class="chb-join" onClick={() => enter(row.name)}>
+                    <button
+                      type="button"
+                      class="chb-join"
+                      onClick={() => enter(row.name)}
+                      aria-label={`${joined().has(row.name.toLowerCase()) ? 'Open' : 'Join'} ${row.name}`}
+                    >
                       {joined().has(row.name.toLowerCase()) ? 'Open' : 'Join'}
                     </button>
                   </li>

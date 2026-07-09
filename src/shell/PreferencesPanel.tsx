@@ -93,6 +93,11 @@ const ACCESS_AUDIT_ROWS = [
     note: 'Named inbox dialog, labelled notification list, and row-specific open/dismiss actions.',
   },
   {
+    surface: 'Channel browser',
+    status: 'checked',
+    note: 'Sheet dialog, named directory search, labelled public-channel list, and target-specific Join/Open actions.',
+  },
+  {
     surface: 'Modals',
     status: 'checked',
     note: 'Sheet focus trap, Escape close, labelled close buttons.',

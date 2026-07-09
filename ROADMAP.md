@@ -256,6 +256,9 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Notification Center now carries pass
     evidence for its named inbox dialog, labelled notification list, and
     row-specific open/dismiss actions.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Channel Browser now carries pass
+    evidence for its Sheet dialog, named directory search, labelled public
+    channel list, and target-specific Join/Open actions.
     ⏭️ **CLIENT NEXT** — continue remaining dense-surface audit rows until every
     app panel has pass/fix evidence.
 

@@ -66,6 +66,7 @@ const ACCESSIBILITY_TOPICS: readonly AccessibilityTopic[] = [
       'Home catch-up exposes recaps, reviewed ranges, and the channel directory as labelled card lists with direct action buttons.',
       'Message search uses a search landmark, labelled match navigation, and named archived/device-memory result lists.',
       'Notification center uses a named inbox dialog, labelled notification list, and row-specific open/dismiss actions.',
+      'Channel browser uses a Sheet dialog, named directory search, labelled public-channel list, and target-specific Join/Open actions.',
     ],
   },
 ];
