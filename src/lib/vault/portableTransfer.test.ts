@@ -11,6 +11,8 @@ import {
 import { loadComposerDrafts, saveComposerDrafts } from '@/lib/composer/drafts';
 import { loadChannelTopicDrafts, saveChannelTopicDrafts } from '@/lib/channel/topicDrafts';
 import { loadCredentials, saveCredentials, storeMeshToken, storeSessionToken } from '@/lib/credentials';
+import { preferences, resetPreferences, setPreference } from '@/lib/prefs/preferences';
+import { sceneMotion, setSceneMotion } from '@/lib/prefs/sceneMotion';
 import { _resetVaultForTests, clearVault, loadRecent, saveMessages } from './historyVault';
 import {
   exportPortableTransfer,
@@ -49,14 +51,21 @@ describe('portableTransfer', () => {
     globalThis.indexedDB = new IDBFactory();
     _resetVaultForTests();
     localStorage.clear();
+    resetPreferences();
+    setSceneMotion('animated');
   });
 
-  it('round-trips vault rows, reviewed checkpoints, channel drafts, topic drafts, and account handoffs', async () => {
+  it('round-trips vault rows, reviewed checkpoints, drafts, account handoffs, and preferences', async () => {
     await saveMessages('#alpha', [msg('a1', 1000, { target: '#alpha' })]);
     recordReviewHistory(review('#alpha'));
     saveCredentials({ nick: 'kain', server: 'wss://eshmaki.me', password: 'secret' });
     storeSessionToken('local-session-token', 1783500000);
     storeMeshToken('mesh-session-token');
+    setPreference('density', 'compact');
+    setPreference('voiceEntry', false);
+    setPreference('topicTools', true);
+    setPreference('highContrast', true);
+    setSceneMotion('still');
     saveComposerDrafts({
       '#alpha': 'room draft',
       alice: 'dm draft should stay local',
@@ -71,6 +80,15 @@ describe('portableTransfer', () => {
     expect(exported.reviewHistory.map((entry) => entry.target)).toEqual(['#alpha']);
     expect(exported.composerDrafts).toEqual({ '#alpha': 'room draft' });
     expect(exported.channelTopicDrafts).toEqual({ '#alpha': 'topic moderation draft' });
+    expect(exported.preferenceHandoff).toMatchObject({
+      preferences: {
+        density: 'compact',
+        voiceEntry: false,
+        topicTools: true,
+        highContrast: true,
+      },
+      sceneMotion: 'still',
+    });
     expect(exported.accountHandoffs).toEqual([
       {
         nick: 'kain',
@@ -88,9 +106,19 @@ describe('portableTransfer', () => {
 
     await clearVault();
     localStorage.clear();
+    resetPreferences();
+    setSceneMotion('animated');
     const result = await importPortableTransfer(parsed!);
 
-    expect(result).toEqual({ targets: 1, messages: 1, reviews: 1, drafts: 1, topicDrafts: 1, accountHandoffs: 1 });
+    expect(result).toEqual({
+      targets: 1,
+      messages: 1,
+      reviews: 1,
+      drafts: 1,
+      topicDrafts: 1,
+      accountHandoffs: 1,
+      preferenceHandoffs: 1,
+    });
     expect((await loadRecent('#alpha')).map((message) => message.id)).toEqual(['a1']);
     expect(readReviewHistory().map((entry) => entry.target)).toEqual(['#alpha']);
     expect(loadComposerDrafts()).toEqual({ '#alpha': 'room draft' });
@@ -102,6 +130,13 @@ describe('portableTransfer', () => {
     expect(loadCredentials()?.password).toBeUndefined();
     expect(loadCredentials()?.sessionToken).toBeUndefined();
     expect(loadCredentials()?.meshToken).toBeUndefined();
+    expect(preferences()).toMatchObject({
+      density: 'compact',
+      voiceEntry: false,
+      topicTools: true,
+      highContrast: true,
+    });
+    expect(sceneMotion()).toBe('still');
   });
 
   it('rejects non-Onyx portable transfer files', () => {

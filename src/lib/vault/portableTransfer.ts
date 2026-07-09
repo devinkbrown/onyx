@@ -28,6 +28,23 @@ import {
   parseAccountHandoffs,
   type AccountHandoff,
 } from '@/lib/credentials';
+import {
+  applyPreferencesSnapshot,
+  parsePreferencesSnapshot,
+  preferences,
+  type Preferences,
+} from '@/lib/prefs/preferences';
+import {
+  parseSceneMotion,
+  sceneMotion,
+  setSceneMotion,
+  type SceneMotion,
+} from '@/lib/prefs/sceneMotion';
+
+export interface PortablePreferenceHandoff {
+  preferences: Preferences;
+  sceneMotion: SceneMotion;
+}
 
 export interface PortableTransferSnapshot extends VaultExportSnapshot {
   /** Home catch-up checkpoints the user explicitly reviewed on this device. */
@@ -38,6 +55,8 @@ export interface PortableTransferSnapshot extends VaultExportSnapshot {
   channelTopicDrafts: ChannelTopicDrafts;
   /** Saved sign-in targets only; passwords and session tokens are never exported. */
   accountHandoffs: AccountHandoff[];
+  /** Device preference switches and scene motion, with no account or message secrets. */
+  preferenceHandoff: PortablePreferenceHandoff | null;
 }
 
 export interface PortableTransferImportResult {
@@ -47,6 +66,7 @@ export interface PortableTransferImportResult {
   drafts: number;
   topicDrafts: number;
   accountHandoffs: number;
+  preferenceHandoffs: number;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -61,6 +81,17 @@ function portableComposerDrafts(value: ComposerDrafts): ComposerDrafts {
   return drafts;
 }
 
+function parsePreferenceHandoff(value: unknown): PortablePreferenceHandoff | null {
+  if (!isRecord(value)) return null;
+  const parsedPreferences = parsePreferencesSnapshot(value.preferences);
+  const parsedSceneMotion = parseSceneMotion(value.sceneMotion);
+  if (!parsedPreferences || !parsedSceneMotion) return null;
+  return {
+    preferences: parsedPreferences,
+    sceneMotion: parsedSceneMotion,
+  };
+}
+
 export async function exportPortableTransfer(): Promise<PortableTransferSnapshot> {
   return {
     ...(await exportVault()),
@@ -68,6 +99,10 @@ export async function exportPortableTransfer(): Promise<PortableTransferSnapshot
     composerDrafts: portableComposerDrafts(loadComposerDrafts()),
     channelTopicDrafts: sanitizeChannelTopicDrafts(loadChannelTopicDrafts()),
     accountHandoffs: exportAccountHandoffs(),
+    preferenceHandoff: {
+      preferences: preferences(),
+      sceneMotion: sceneMotion(),
+    },
   };
 }
 
@@ -86,12 +121,16 @@ export function parsePortableTransfer(raw: unknown): PortableTransferSnapshot | 
   const accountHandoffs = isRecord(raw)
     ? parseAccountHandoffs(raw.accountHandoffs ?? [])
     : [];
+  const preferenceHandoff = isRecord(raw)
+    ? parsePreferenceHandoff(raw.preferenceHandoff)
+    : null;
   return {
     ...vault,
     reviewHistory,
     composerDrafts,
     channelTopicDrafts,
     accountHandoffs,
+    preferenceHandoff,
   };
 }
 
@@ -111,6 +150,10 @@ export async function importPortableTransfer(
     ...topicDrafts,
   });
   const accountHandoffs = importAccountHandoffs(snapshot.accountHandoffs);
+  if (snapshot.preferenceHandoff) {
+    applyPreferencesSnapshot(snapshot.preferenceHandoff.preferences);
+    setSceneMotion(snapshot.preferenceHandoff.sceneMotion);
+  }
   return {
     targets: vault.targets,
     messages: vault.messages,
@@ -118,5 +161,6 @@ export async function importPortableTransfer(
     drafts: Object.keys(drafts).length,
     topicDrafts: Object.keys(topicDrafts).length,
     accountHandoffs: accountHandoffs.imported,
+    preferenceHandoffs: snapshot.preferenceHandoff ? 1 : 0,
   };
 }

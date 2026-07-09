@@ -23,6 +23,10 @@ function isSceneMotion(value: unknown): value is SceneMotion {
   return typeof value === 'string' && (SCENE_MOTIONS as readonly string[]).includes(value);
 }
 
+export function parseSceneMotion(value: unknown): SceneMotion | null {
+  return isSceneMotion(value) ? value : null;
+}
+
 export function loadSceneMotion(): SceneMotion {
   if (!hasStorage()) return DEFAULT_SCENE_MOTION;
 

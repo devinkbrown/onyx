@@ -180,6 +180,27 @@ describe('PreferencesPanel', () => {
           meshToken: 'must not import',
         },
       ],
+      preferenceHandoff: {
+        preferences: {
+          density: 'compact',
+          fontScale: 'lg',
+          hideEvents: true,
+          width: 'full',
+          readerMode: true,
+          reduceMotion: true,
+          reduceTransparency: true,
+          highContrast: true,
+          linkPreviews: false,
+          clock: '12h',
+          localHistory: true,
+          e2eeDms: true,
+          timeScrubber: false,
+          voiceEntry: false,
+          topicTools: true,
+          watchTogether: false,
+        },
+        sceneMotion: 'off',
+      },
     };
 
     const input = screen.getByLabelText('Import portable JSON') as HTMLInputElement;
@@ -189,7 +210,7 @@ describe('PreferencesPanel', () => {
     await fireEvent.change(input, { target: { files: [file] } });
 
     expect(await screen.findByRole('heading', { name: 'Review import' })).toBeInTheDocument();
-    expect(screen.getByText(/onyx-portable\.json: 2 messages, 1 target, 1 review, 1 room draft, 1 topic draft, and 1 account handoff/i)).toBeInTheDocument();
+    expect(screen.getByText(/onyx-portable\.json: 2 messages, 1 target, 1 review, 1 room draft, 1 topic draft, 1 account handoff, and 1 preference set/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Import reviewed file' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cancel import' })).toBeInTheDocument();
   });

@@ -97,6 +97,37 @@ function isOneOf<T extends string>(value: unknown, allowed: readonly T[]): value
   return typeof value === 'string' && (allowed as readonly string[]).includes(value);
 }
 
+function preferencesFromRecord(raw: Record<string, unknown>): Preferences {
+  return {
+    density: isOneOf(raw.density, DENSITIES) ? raw.density : DEFAULT_PREFERENCES.density,
+    fontScale: isOneOf(raw.fontScale, FONT_SCALES) ? raw.fontScale : DEFAULT_PREFERENCES.fontScale,
+    hideEvents: typeof raw.hideEvents === 'boolean' ? raw.hideEvents : DEFAULT_PREFERENCES.hideEvents,
+    width: isOneOf(raw.width, WIDTHS) ? raw.width : DEFAULT_PREFERENCES.width,
+    readerMode:
+      typeof raw.readerMode === 'boolean' ? raw.readerMode : DEFAULT_PREFERENCES.readerMode,
+    reduceMotion: typeof raw.reduceMotion === 'boolean' ? raw.reduceMotion : DEFAULT_PREFERENCES.reduceMotion,
+    reduceTransparency: typeof raw.reduceTransparency === 'boolean'
+      ? raw.reduceTransparency
+      : DEFAULT_PREFERENCES.reduceTransparency,
+    highContrast: typeof raw.highContrast === 'boolean'
+      ? raw.highContrast
+      : DEFAULT_PREFERENCES.highContrast,
+    linkPreviews: typeof raw.linkPreviews === 'boolean' ? raw.linkPreviews : DEFAULT_PREFERENCES.linkPreviews,
+    clock: isOneOf(raw.clock, CLOCKS) ? raw.clock : DEFAULT_PREFERENCES.clock,
+    localHistory: typeof raw.localHistory === 'boolean' ? raw.localHistory : DEFAULT_PREFERENCES.localHistory,
+    e2eeDms: typeof raw.e2eeDms === 'boolean' ? raw.e2eeDms : DEFAULT_PREFERENCES.e2eeDms,
+    timeScrubber: typeof raw.timeScrubber === 'boolean' ? raw.timeScrubber : DEFAULT_PREFERENCES.timeScrubber,
+    voiceEntry: typeof raw.voiceEntry === 'boolean' ? raw.voiceEntry : DEFAULT_PREFERENCES.voiceEntry,
+    topicTools: typeof raw.topicTools === 'boolean' ? raw.topicTools : DEFAULT_PREFERENCES.topicTools,
+    watchTogether: typeof raw.watchTogether === 'boolean' ? raw.watchTogether : DEFAULT_PREFERENCES.watchTogether,
+  };
+}
+
+export function parsePreferencesSnapshot(value: unknown): Preferences | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  return preferencesFromRecord(value as Record<string, unknown>);
+}
+
 /** Read + validate persisted prefs, falling back to defaults for any bad field. */
 export function loadPreferences(): Preferences {
   if (!hasStorage()) return { ...DEFAULT_PREFERENCES };
@@ -113,28 +144,12 @@ export function loadPreferences(): Preferences {
 
   const raw = (typeof parsed === 'object' && parsed !== null ? parsed : {}) as Record<string, unknown>;
 
+  const parsedPrefs = preferencesFromRecord(raw);
   return {
-    density: isOneOf(raw.density, DENSITIES) ? raw.density : DEFAULT_PREFERENCES.density,
-    fontScale: isOneOf(raw.fontScale, FONT_SCALES) ? raw.fontScale : DEFAULT_PREFERENCES.fontScale,
-    hideEvents: typeof raw.hideEvents === 'boolean' ? raw.hideEvents : DEFAULT_PREFERENCES.hideEvents,
-    width: isOneOf(raw.width, WIDTHS) ? raw.width : DEFAULT_PREFERENCES.width,
-    readerMode:
-      typeof raw.readerMode === 'boolean' ? raw.readerMode : DEFAULT_PREFERENCES.readerMode,
-    reduceMotion: typeof raw.reduceMotion === 'boolean' ? raw.reduceMotion : DEFAULT_PREFERENCES.reduceMotion,
-    reduceTransparency: typeof raw.reduceTransparency === 'boolean'
-      ? raw.reduceTransparency
-      : DEFAULT_PREFERENCES.reduceTransparency,
+    ...parsedPrefs,
     highContrast: typeof raw.highContrast === 'boolean'
-      ? raw.highContrast
+      ? parsedPrefs.highContrast
       : localStorage.getItem(LEGACY_HIGH_CONTRAST_KEY) === '1',
-    linkPreviews: typeof raw.linkPreviews === 'boolean' ? raw.linkPreviews : DEFAULT_PREFERENCES.linkPreviews,
-    clock: isOneOf(raw.clock, CLOCKS) ? raw.clock : DEFAULT_PREFERENCES.clock,
-    localHistory: typeof raw.localHistory === 'boolean' ? raw.localHistory : DEFAULT_PREFERENCES.localHistory,
-    e2eeDms: typeof raw.e2eeDms === 'boolean' ? raw.e2eeDms : DEFAULT_PREFERENCES.e2eeDms,
-    timeScrubber: typeof raw.timeScrubber === 'boolean' ? raw.timeScrubber : DEFAULT_PREFERENCES.timeScrubber,
-    voiceEntry: typeof raw.voiceEntry === 'boolean' ? raw.voiceEntry : DEFAULT_PREFERENCES.voiceEntry,
-    topicTools: typeof raw.topicTools === 'boolean' ? raw.topicTools : DEFAULT_PREFERENCES.topicTools,
-    watchTogether: typeof raw.watchTogether === 'boolean' ? raw.watchTogether : DEFAULT_PREFERENCES.watchTogether,
   };
 }
 
@@ -189,6 +204,13 @@ export function closePreferences(): void {
 /** Immutable field update: persists + re-applies to the DOM. */
 export function setPreference<K extends keyof Preferences>(key: K, value: Preferences[K]): void {
   const next: Preferences = { ...preferences(), [key]: value };
+  setPreferencesSignal(next);
+  persist(next);
+  applyPreferences(next);
+}
+
+export function applyPreferencesSnapshot(snapshot: Preferences): void {
+  const next: Preferences = { ...snapshot };
   setPreferencesSignal(next);
   persist(next);
   applyPreferences(next);

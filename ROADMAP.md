@@ -614,6 +614,11 @@ client or public site needs to expose the result.
     sanitized account handoff targets, preserving saved server/nick launch
     context while excluding passwords, session tokens, mesh tokens, and encrypted
     DM plaintext from the exported JSON.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Portable transfer now carries a
+    sanitized Preferences handoff for display density, feature switches,
+    contrast/transparency, and scene motion, so a device transfer can restore
+    the user's chosen shell behavior without exporting account or message
+    secrets.
 
 *Sequencing logic: 1–3 need no server deploys (ship fastest), 4–5 are one
 focused server feature each, 6+ are compound. Every phase lands something
