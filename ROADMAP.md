@@ -173,9 +173,12 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home now adds a quiet activity
     section for recently active joined rooms that are already read, keeping
     low-pressure movement visible without promoting it to catch-up urgency.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home catch-up now adds compact
+    since-you-left recaps from the existing hydrated buffers and hands each
+    target into Spotlight with a prefilled navigation query.
     ⏭️ **NEXT** — pure Onyx work. Reuse the local vault, `?at=` time travel,
-    chanstats heatlines, scheduled-event props, and Spotlight navigation before
-    adding new server surface.
+    chanstats heatlines, and scheduled-event props before adding new server
+    surface.
 16. **Reader mode** *(client)* — a calm single-pane transcript view for long
     room history, optimized for reading and sharing moments. This is the
     Sumi-e roadmap item that makes the "network that remembers" visible.

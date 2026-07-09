@@ -1,6 +1,7 @@
 import { children, createSignal, onCleanup, onMount, type Accessor, type JSX, type ParentProps } from 'solid-js';
 
 const [isSpotlightOpen, setSpotlightOpen] = createSignal(false);
+const [spotlightInitialQuery, setSpotlightInitialQuery] = createSignal('');
 
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -27,12 +28,14 @@ function handleGlobalKeyDown(event: KeyboardEvent): void {
   openSpotlight();
 }
 
-export function openSpotlight(): void {
+export function openSpotlight(query = ''): void {
+  setSpotlightInitialQuery(query);
   setSpotlightOpen(true);
 }
 
 export function closeSpotlight(): void {
   setSpotlightOpen(false);
+  setSpotlightInitialQuery('');
 }
 
 export function toggleSpotlight(): void {
@@ -41,12 +44,14 @@ export function toggleSpotlight(): void {
 
 export function useSpotlight(): {
   isOpen: Accessor<boolean>;
-  open: () => void;
+  initialQuery: Accessor<string>;
+  open: (query?: string) => void;
   close: () => void;
   toggle: () => void;
 } {
   return {
     isOpen: isSpotlightOpen,
+    initialQuery: spotlightInitialQuery,
     open: openSpotlight,
     close: closeSpotlight,
     toggle: toggleSpotlight,

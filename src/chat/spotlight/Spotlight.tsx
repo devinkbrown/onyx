@@ -140,6 +140,7 @@ export function Spotlight(props: SpotlightProps) {
     }
 
     restoreFocusTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setQuery(spotlight.initialQuery());
     queueMicrotask(() => inputRef?.focus());
   });
 

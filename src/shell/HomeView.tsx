@@ -34,8 +34,23 @@ import {
 import { preferences } from '@/lib/prefs/preferences';
 import { fetchStatsIndex, relTime } from '@/lib/stats/networkIndex';
 import { loadRecent } from '@/lib/vault/historyVault';
+import type { ChatMessage } from '@/lib/irc/types';
+import { openSpotlight } from '@/chat/spotlight/useSpotlight';
 
 export { relTime };
+
+const HOME_RECAP_LIMIT = 3;
+const HOME_RECAP_VOICE_LIMIT = 2;
+const HOME_SYSTEM_TYPES = new Set(['join', 'part', 'quit', 'kick', 'mode', 'topic', 'nick', 'system', 'error']);
+
+type HomeCatchUpRecap = {
+  item: CatchUpItem;
+  voices: string[];
+  overflowVoices: number;
+  preview: string;
+  messageCount: number;
+  mentionCount: number;
+};
 
 function Sparkline(props: { values: number[] }): JSX.Element {
   const points = createMemo(() => {
@@ -69,6 +84,36 @@ function Sparkline(props: { values: number[] }): JSX.Element {
   );
 }
 
+function isReadableHomeMessage(message: ChatMessage): boolean {
+  const text = message.plaintext ?? message.text;
+  return !HOME_SYSTEM_TYPES.has(message.type)
+    && !message.deleted
+    && !message.redacted
+    && text.trim().length > 0;
+}
+
+function clipped(text: string, max: number): string {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  return normalized.length > max ? `${normalized.slice(0, max)}...` : normalized;
+}
+
+function voiceSummary(recap: HomeCatchUpRecap): string {
+  if (recap.voices.length === 0) return 'room activity';
+  const names = recap.voices.join(', ');
+  return recap.overflowVoices > 0 ? `${names} +${recap.overflowVoices}` : names;
+}
+
+function recapSummary(recap: HomeCatchUpRecap): string {
+  const lineLabel = recap.messageCount === 1 ? 'line' : 'lines';
+  const mentionLabel = recap.mentionCount === 1 ? 'mention' : 'mentions';
+  const mentionPart = recap.mentionCount > 0 ? `, ${recap.mentionCount} ${mentionLabel}` : '';
+  return `${recap.messageCount} ${lineLabel}${mentionPart}`;
+}
+
+function spotlightQueryFor(item: CatchUpItem): string {
+  return item.kind === 'channel' ? `goto ${item.target}` : `dm ${item.target}`;
+}
+
 export function HomeView(): JSX.Element {
   const joinHistory = useStore((s) => s.joinHistory);
   const channels = useStore((s) => s.channels);
@@ -93,6 +138,7 @@ export function HomeView(): JSX.Element {
     item.kind === 'channel'
       ? getState().navigate({ kind: 'channel', channel: item.target })
       : getState().navigate({ kind: 'dm', nick: item.target });
+  const openCatchUpSpotlight = (item: CatchUpItem) => openSpotlight(spotlightQueryFor(item));
 
   // One shared clock for all relative-time labels.
   const [nowMs, setNowMs] = createSignal(Date.now());
@@ -132,6 +178,41 @@ export function HomeView(): JSX.Element {
   );
   const openQuietActivity = (item: QuietActivityItem) =>
     getState().navigate({ kind: 'channel', channel: item.name });
+  const catchUpRecaps = createMemo<HomeCatchUpRecap[]>(() =>
+    catchUp()
+      .map((item) => {
+        const targetMessages =
+          item.kind === 'channel'
+            ? channels().get(item.target.toLowerCase())?.messages ?? []
+            : dms().get(item.target.toLowerCase())?.messages ?? [];
+        const readable = targetMessages.filter(isReadableHomeMessage);
+        const unreadWindow = readable.slice(-Math.max(item.unread, item.highlights, 1));
+        if (unreadWindow.length === 0) return null;
+
+        const voices: string[] = [];
+        const seenVoices = new Set<string>();
+        for (const message of unreadWindow) {
+          const key = message.from.toLowerCase();
+          if (seenVoices.has(key)) continue;
+          seenVoices.add(key);
+          voices.push(message.from);
+        }
+
+        const latest = unreadWindow[unreadWindow.length - 1];
+        if (!latest) return null;
+
+        return {
+          item,
+          voices: voices.slice(0, HOME_RECAP_VOICE_LIMIT),
+          overflowVoices: Math.max(0, voices.length - HOME_RECAP_VOICE_LIMIT),
+          preview: clipped(latest.plaintext ?? latest.text, 92),
+          messageCount: unreadWindow.length,
+          mentionCount: Math.min(item.highlights, unreadWindow.filter((message) => message.highlight).length),
+        } satisfies HomeCatchUpRecap;
+      })
+      .filter((recap): recap is HomeCatchUpRecap => recap !== null)
+      .slice(0, HOME_RECAP_LIMIT),
+  );
 
   const directory = createMemo(() => {
     const data = stats();
@@ -219,6 +300,41 @@ export function HomeView(): JSX.Element {
                   )}
                 </For>
               </ul>
+            </Show>
+            <Show when={catchUpRecaps().length > 0}>
+              <div class="home-recap-strip" aria-label="Since you left recaps">
+                <For each={catchUpRecaps()}>
+                  {(recap) => (
+                    <article class="home-recap-card">
+                      <div class="home-recap-card__head">
+                        <span class="home-recap-card__target">
+                          {recap.item.kind === 'dm' ? `@${recap.item.name}` : recap.item.name}
+                        </span>
+                        <span class="home-recap-card__count">{recapSummary(recap)}</span>
+                      </div>
+                      <p class="home-recap-card__voice">{voiceSummary(recap)}</p>
+                      <p class="home-recap-card__preview">{recap.preview}</p>
+                      <div class="home-recap-card__actions">
+                        <button
+                          type="button"
+                          class="home-recap-card__open"
+                          onClick={() => openCatchUp(recap.item)}
+                        >
+                          Open
+                        </button>
+                        <button
+                          type="button"
+                          class="home-recap-card__spotlight"
+                          onClick={() => openCatchUpSpotlight(recap.item)}
+                          aria-label={`Find related actions for ${recap.item.name}`}
+                        >
+                          Find related
+                        </button>
+                      </div>
+                    </article>
+                  )}
+                </For>
+              </div>
             </Show>
           </section>
         </Show>

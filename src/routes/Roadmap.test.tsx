@@ -14,6 +14,8 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Scheduled events on Home')).toBeInTheDocument();
     expect(screen.getByText('Vault memory previews')).toBeInTheDocument();
     expect(screen.getByText('Quiet room activity')).toBeInTheDocument();
+    expect(screen.getByText('Home return recaps')).toBeInTheDocument();
+    expect(screen.getByText('Spotlight handoff')).toBeInTheDocument();
     expect(screen.getByText('Reader digest notes')).toBeInTheDocument();
     expect(screen.getByText('Shareable moment links')).toBeInTheDocument();
     expect(screen.getByText('Reader memory context')).toBeInTheDocument();

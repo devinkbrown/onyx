@@ -59,8 +59,8 @@ const phases: Phase[] = [
     title: 'Time-native',
     state: 'active',
     date: '2026-07-09',
-    summary: 'Home now brings followed activity, scheduled rooms, local memory, quiet rooms, reader summaries, shareable moments, reader memory, search handoff, transcript jumps, and digest review completion into view.',
-    items: ['Followed catch-up', 'Scheduled events on Home', 'Vault memory previews', 'Quiet room activity', 'Reader digest notes', 'Shareable moment links', 'Reader memory context', 'Moment search handoff', 'Reader transcript jumps', 'Digest review handoff', 'Review completion'],
+    summary: 'Home now brings followed activity, scheduled rooms, local memory, quiet rooms, return recaps, reader summaries, shareable moments, reader memory, search handoff, transcript jumps, and digest review completion into view.',
+    items: ['Followed catch-up', 'Scheduled events on Home', 'Vault memory previews', 'Quiet room activity', 'Home return recaps', 'Spotlight handoff', 'Reader digest notes', 'Shareable moment links', 'Reader memory context', 'Moment search handoff', 'Reader transcript jumps', 'Digest review handoff', 'Review completion'],
   },
   {
     phase: 'Phase 7',
@@ -168,8 +168,9 @@ export default function RoadmapRoute() {
             The site now carries `/status`, `/stats`, backup readiness, and a live
             root pulse. Onyx's current client work makes the app a time-native
             place to return to: followed catch-up, scheduled room events, local
-            memory previews, quiet room activity, reader digest notes, shareable
-            moment links, reader memory context, moment search handoff,
+            memory previews, quiet room activity, home return recaps, Spotlight
+            handoff, reader digest notes, shareable moment links, reader memory
+            context, moment search handoff,
             reader transcript jumps, digest review handoff, review completion, and
             quieter activity surfaces.
           </p>
@@ -178,7 +179,7 @@ export default function RoadmapRoute() {
           <span class="label">open surfaces</span>
           <h3>Keep tightening</h3>
           <div class="data-list data-list--compact">
-            <div class="data-row"><div><strong>Catch-up Home</strong><span>Fold richer since-you-left recaps and Spotlight handoff into the return screen.</span></div></div>
+            <div class="data-row"><div><strong>Catch-up Home</strong><span>Continue chanstats heatlines and scheduled-event context on the return screen.</span></div></div>
             <div class="data-row"><div><strong>Reader mode</strong><span>Continue catch-up review history and return-home affordances around remembered transcript context.</span></div></div>
             <div class="data-row"><div><strong>Accessibility conformance</strong><span><a href="/accessibility/">Continue channel, voice, and appearance audit evidence.</a></span></div></div>
           </div>

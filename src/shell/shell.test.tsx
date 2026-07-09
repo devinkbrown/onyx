@@ -12,7 +12,7 @@
  * AAA pattern throughout. Descriptive test names.
  */
 
-import { cleanup, fireEvent, render, screen, within } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { store } from '@/lib/store/store';
 import type { Channel } from '@/lib/irc/types';
@@ -667,6 +667,47 @@ describe('AppShell', () => {
 
       // Assert — no composer on the home screen
       expect(container.querySelector('.shell-composer-textarea')).toBeNull();
+    });
+
+    it('summarizes unread home recaps and hands them to Spotlight', async () => {
+      const channel = {
+        ...makeChannel(
+          '#general',
+          [
+            makeMessage('msg-old', 'alice', 'Old note', '#general'),
+            makeMessage('msg-new-a', 'bob', 'New handoff note one', '#general'),
+            { ...makeMessage('msg-new-b', 'carol', 'New handoff note two', '#general'), highlight: true },
+          ],
+          [makeUser('alice'), makeUser('bob'), makeUser('carol')],
+        ),
+        unread: 2,
+        highlights: 1,
+      };
+      const channels = new Map<string, Channel>();
+      channels.set('#general', channel);
+      store.setState({
+        ...initialState,
+        channels,
+        activeView: { kind: 'home' },
+        connectionStatus: 'connected',
+        networkName: 'IRCXNet',
+        channelLastActivity: new Map([['#general', new Date('2025-01-01T12:02:00Z').getTime()]]),
+      }, true);
+
+      render(() => <AppShell />);
+
+      const recaps = screen.getByLabelText('Since you left recaps');
+      expect(within(recaps).getByText('#general')).toBeInTheDocument();
+      expect(within(recaps).getByText('2 lines, 1 mention')).toBeInTheDocument();
+      expect(within(recaps).getByText('bob, carol')).toBeInTheDocument();
+      expect(within(recaps).getByText('New handoff note two')).toBeInTheDocument();
+
+      fireEvent.click(within(recaps).getByRole('button', { name: 'Find related actions for #general' }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('dialog', { name: 'Command palette' })).toBeInTheDocument();
+        expect(screen.getByRole('combobox', { name: 'Command search' })).toHaveValue('goto #general');
+      });
     });
   });
 });
