@@ -224,8 +224,11 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Reviewed catch-up spans in reader
     mode now expose hydrated before/after context trails with direct jump
     controls into neighboring transcript lines.
-    ⏭️ **NEXT** — extend reviewed-span trails into local-vault context when the
-    neighboring lines are not currently hydrated.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Reviewed-span context trails now
+    merge hydrated buffer neighbors with local-vault neighbors, filling before
+    or after gaps from device memory without adding server surface.
+    ⏭️ **NEXT** — surface vault-only reviewed anchors as hydrateable reader
+    jumps when the reviewed first line is no longer in the visible buffer.
 17. **Accessibility conformance ledger** *(main site + client)* — publish the
     public WCAG 2.2 / EN 301 549 audit path and keep it linked from the front
     door while app panels are audited.

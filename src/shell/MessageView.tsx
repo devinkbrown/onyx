@@ -27,6 +27,7 @@ import { aggregateBoosts } from '@/lib/reactions/quietBoosts';
 import {
   createEffect,
   createMemo,
+  createResource,
   createSignal,
   For,
   Show,
@@ -34,6 +35,7 @@ import {
   type JSX,
 } from 'solid-js';
 import { useStore, getState, STATUS_TARGET } from '@/lib/store';
+import { loadRecent } from '@/lib/vault/historyVault';
 import { LOCKED_PLACEHOLDER } from '@/lib/e2ee/dmCipher';
 import { ScheduledEventLine } from './ScheduledEventLine';
 import type { ChatMessage } from '@/lib/irc/types';
@@ -41,11 +43,10 @@ import { Avatar } from '@/primitives/index';
 import { Sheet } from '@/primitives/index';
 import { MessageText } from '@/shell/message/MessageText';
 import { MessageMenu } from '@/shell/message/MessageMenu';
-import { activeMessageSearchResultId } from './search/useMessageSearch';
+import { activeMessageSearchResultId, openMessageSearchWithQuery } from './search/useMessageSearch';
 import { TopicFilterBar } from './TopicChip';
 import { BoostBar } from './BoostBar';
 import { SinceDigestCard } from './SinceDigestCard';
-import { openMessageSearchWithQuery } from './search/useMessageSearch';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -207,6 +208,16 @@ export function buildReviewedContextTrail(
 
   if (!before && !after) return null;
   return { before, after };
+}
+
+export function mergeReviewedContextTrails(
+  primary: ReviewedContextTrail | null,
+  fallback: ReviewedContextTrail | null,
+): ReviewedContextTrail | null {
+  if (!primary && !fallback) return null;
+  const before = primary?.before ?? fallback?.before ?? null;
+  const after = primary?.after ?? fallback?.after ?? null;
+  return before || after ? { before, after } : null;
 }
 
 function plural(count: number, singular: string, pluralLabel = `${singular}s`): string {
@@ -681,10 +692,34 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     const context = readerMemoryContext();
     return context ? latestReviewForTarget(context.target, 'channel') : null;
   });
-  const readerReviewedTrail = createMemo(() => {
+  const [readerVaultTrail] = createResource(
+    () => {
+      const entry = readerReviewedSpan();
+      return entry ? { target: entry.target, firstMessageId: entry.firstMessageId } : null;
+    },
+    async (key): Promise<ReviewedContextTrail | null> => {
+      const localMessages = await loadRecent(key.target, 80);
+      const entry: ReviewHistoryEntry = {
+        target: key.target,
+        name: key.target,
+        kind: 'channel',
+        firstMessageId: key.firstMessageId,
+        firstAt: '',
+        reviewedAt: '',
+        messageCount: 0,
+        mentionCount: 0,
+        preview: '',
+      };
+      return buildReviewedContextTrail(entry, localMessages);
+    },
+  );
+  const readerHydratedTrail = createMemo(() => {
     const entry = readerReviewedSpan();
     return entry ? buildReviewedContextTrail(entry, messages()) : null;
   });
+  const readerReviewedTrail = createMemo(() =>
+    mergeReviewedContextTrails(readerHydratedTrail(), readerVaultTrail() ?? null),
+  );
 
   // ── scroll state ──
   let feedEl!: HTMLDivElement;

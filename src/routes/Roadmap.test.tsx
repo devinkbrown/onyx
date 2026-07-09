@@ -31,6 +31,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Reader return Home')).toBeInTheDocument();
     expect(screen.getByText('Reviewed span recall')).toBeInTheDocument();
     expect(screen.getByText('Hydrated context trails')).toBeInTheDocument();
+    expect(screen.getByText('Vault context trails')).toBeInTheDocument();
     expect(screen.getByText('Client access audit')).toBeInTheDocument();
     expect(screen.getByText('Dense-panel evidence')).toBeInTheDocument();
     expect(screen.getByText(/time is active/i)).toBeInTheDocument();
