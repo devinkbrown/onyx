@@ -11,6 +11,11 @@ import {
   type ReviewHistoryEntry,
 } from '@/lib/notifications/reviewHistory';
 import {
+  exportFollowedKeys,
+  mergeFollowedKeys,
+  parseFollowedKeys,
+} from '@/lib/notifications/followed';
+import {
   loadComposerDrafts,
   sanitizeComposerDrafts,
   saveComposerDrafts,
@@ -57,6 +62,8 @@ export interface PortableTransferSnapshot extends VaultExportSnapshot {
   accountHandoffs: AccountHandoff[];
   /** Device preference switches and scene motion, with no account or message secrets. */
   preferenceHandoff: PortablePreferenceHandoff | null;
+  /** Followed room/topic keys that drive calm notifications and catch-up ranking. */
+  followedConversations: string[];
 }
 
 export interface PortableTransferImportResult {
@@ -67,6 +74,7 @@ export interface PortableTransferImportResult {
   topicDrafts: number;
   accountHandoffs: number;
   preferenceHandoffs: number;
+  followedConversations: number;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -103,6 +111,7 @@ export async function exportPortableTransfer(): Promise<PortableTransferSnapshot
       preferences: preferences(),
       sceneMotion: sceneMotion(),
     },
+    followedConversations: exportFollowedKeys(),
   };
 }
 
@@ -124,6 +133,9 @@ export function parsePortableTransfer(raw: unknown): PortableTransferSnapshot | 
   const preferenceHandoff = isRecord(raw)
     ? parsePreferenceHandoff(raw.preferenceHandoff)
     : null;
+  const followedConversations = isRecord(raw)
+    ? parseFollowedKeys(raw.followedConversations ?? [])
+    : [];
   return {
     ...vault,
     reviewHistory,
@@ -131,6 +143,7 @@ export function parsePortableTransfer(raw: unknown): PortableTransferSnapshot | 
     channelTopicDrafts,
     accountHandoffs,
     preferenceHandoff,
+    followedConversations,
   };
 }
 
@@ -154,6 +167,7 @@ export async function importPortableTransfer(
     applyPreferencesSnapshot(snapshot.preferenceHandoff.preferences);
     setSceneMotion(snapshot.preferenceHandoff.sceneMotion);
   }
+  const followedConversations = mergeFollowedKeys(snapshot.followedConversations);
   return {
     targets: vault.targets,
     messages: vault.messages,
@@ -162,5 +176,6 @@ export async function importPortableTransfer(
     topicDrafts: Object.keys(topicDrafts).length,
     accountHandoffs: accountHandoffs.imported,
     preferenceHandoffs: snapshot.preferenceHandoff ? 1 : 0,
+    followedConversations: followedConversations.imported,
   };
 }

@@ -8,8 +8,11 @@ import {
   follow,
   followed,
   followKey,
+  exportFollowedKeys,
   isFollowed,
   loadFollowed,
+  mergeFollowedKeys,
+  parseFollowedKeys,
   toggleFollow,
   unfollow,
 } from '@/lib/notifications/followed';
@@ -81,6 +84,25 @@ describe('followed conversations', () => {
       localStorage.setItem(STORAGE_KEY, '{not json');
 
       expect(loadFollowed()).toEqual(new Set<string>());
+    });
+  });
+
+  describe('portable followed keys', () => {
+    it('exports sorted followed keys', () => {
+      follow('#Zulu');
+      follow('#Alpha', 'Topic');
+
+      expect(exportFollowedKeys()).toEqual(['#alpha/topic', '#zulu']);
+    });
+
+    it('parses and merges sanitized followed keys', () => {
+      expect(parseFollowedKeys(['  #Root/Roadmap  ', '', 7, '#root/roadmap'])).toEqual(['#root/roadmap']);
+
+      const result = mergeFollowedKeys(['#Root/Roadmap', '#Ops']);
+
+      expect(result).toEqual({ imported: 2, total: 2 });
+      expect(isFollowed('#root', 'roadmap')).toBe(true);
+      expect(isFollowed('#ops')).toBe(true);
     });
   });
 });

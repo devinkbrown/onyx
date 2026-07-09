@@ -123,8 +123,8 @@ const phases: Phase[] = [
     title: 'Roaming',
     state: 'active',
     date: '2026-07-09',
-    summary: 'Generalize offline-first behavior into read, compose, search, PWA install clarity, moderation drafts, desktop packaging, installed-app readiness, update recovery, and portable local-state/account/preference handoff transfer.',
-    items: ['TravelTo vault fallback', 'Active-target vault search', 'Immediate vault-result navigation', 'Offline reviewed recall', 'Offline search gating', 'Local-memory mode status', 'Outbox count status', 'Offline draft counts', 'Offline topic drafts', 'Installable manifest', 'PWA shortcuts', 'Install screenshots', 'Launch handler', 'Installed app readiness', 'Service worker readiness', 'App shell refresh action', 'Wrapper readiness matrix', 'Wrapper contract', 'Portable vault export', 'Portable vault import', 'Reviewed catch-up transfer', 'Room draft transfer', 'Topic draft transfer', 'Account handoff transfer', 'Preference handoff transfer', 'Full offline-first UX', 'Desktop packaging path'],
+    summary: 'Generalize offline-first behavior into read, compose, search, PWA install clarity, moderation drafts, desktop packaging, installed-app readiness, update recovery, and portable local-state/follow/preference/account handoff transfer.',
+    items: ['TravelTo vault fallback', 'Active-target vault search', 'Immediate vault-result navigation', 'Offline reviewed recall', 'Offline search gating', 'Local-memory mode status', 'Outbox count status', 'Offline draft counts', 'Offline topic drafts', 'Installable manifest', 'PWA shortcuts', 'Install screenshots', 'Launch handler', 'Installed app readiness', 'Service worker readiness', 'App shell refresh action', 'Wrapper readiness matrix', 'Wrapper contract', 'Portable vault export', 'Portable vault import', 'Reviewed catch-up transfer', 'Room draft transfer', 'Topic draft transfer', 'Followed conversation transfer', 'Account handoff transfer', 'Preference handoff transfer', 'Full offline-first UX', 'Desktop packaging path'],
   },
 ];
 

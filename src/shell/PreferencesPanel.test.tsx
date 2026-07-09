@@ -180,6 +180,7 @@ describe('PreferencesPanel', () => {
           meshToken: 'must not import',
         },
       ],
+      followedConversations: ['#root', '#root/roadmap'],
       preferenceHandoff: {
         preferences: {
           density: 'compact',
@@ -210,7 +211,7 @@ describe('PreferencesPanel', () => {
     await fireEvent.change(input, { target: { files: [file] } });
 
     expect(await screen.findByRole('heading', { name: 'Review import' })).toBeInTheDocument();
-    expect(screen.getByText(/onyx-portable\.json: 2 messages, 1 target, 1 review, 1 room draft, 1 topic draft, 1 account handoff, and 1 preference set/i)).toBeInTheDocument();
+    expect(screen.getByText(/onyx-portable\.json: 2 messages, 1 target, 1 review, 1 room draft, 1 topic draft, 2 followed conversations, 1 account handoff, and 1 preference set/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Import reviewed file' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cancel import' })).toBeInTheDocument();
   });

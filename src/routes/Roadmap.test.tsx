@@ -117,6 +117,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Watch-together surface')).toBeInTheDocument();
     expect(screen.getByText('Watch-together room activity')).toBeInTheDocument();
     expect(screen.getByText('App shell refresh action')).toBeInTheDocument();
+    expect(screen.getByText('Followed conversation transfer')).toBeInTheDocument();
     expect(screen.getByText('Account handoff transfer')).toBeInTheDocument();
     expect(screen.getByText('Preference handoff transfer')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Apps' })).toBeInTheDocument();

@@ -619,6 +619,10 @@ client or public site needs to expose the result.
     contrast/transparency, and scene motion, so a device transfer can restore
     the user's chosen shell behavior without exporting account or message
     secrets.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Portable transfer now carries
+    followed room/topic keys that power calm notifications and Home catch-up
+    ranking, merging them into the destination device without moving message
+    content or notification payloads.
 
 *Sequencing logic: 1–3 need no server deploys (ship fastest), 4–5 are one
 focused server feature each, 6+ are compound. Every phase lands something

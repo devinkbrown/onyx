@@ -8,6 +8,7 @@ import {
   recordReviewHistory,
   type ReviewHistoryEntry,
 } from '@/lib/notifications/reviewHistory';
+import { follow, followed, isFollowed, unfollow } from '@/lib/notifications/followed';
 import { loadComposerDrafts, saveComposerDrafts } from '@/lib/composer/drafts';
 import { loadChannelTopicDrafts, saveChannelTopicDrafts } from '@/lib/channel/topicDrafts';
 import { loadCredentials, saveCredentials, storeMeshToken, storeSessionToken } from '@/lib/credentials';
@@ -53,9 +54,10 @@ describe('portableTransfer', () => {
     localStorage.clear();
     resetPreferences();
     setSceneMotion('animated');
+    for (const key of followed()) unfollow(key);
   });
 
-  it('round-trips vault rows, reviewed checkpoints, drafts, account handoffs, and preferences', async () => {
+  it('round-trips vault rows, reviewed checkpoints, drafts, followed state, account handoffs, and preferences', async () => {
     await saveMessages('#alpha', [msg('a1', 1000, { target: '#alpha' })]);
     recordReviewHistory(review('#alpha'));
     saveCredentials({ nick: 'kain', server: 'wss://eshmaki.me', password: 'secret' });
@@ -66,6 +68,8 @@ describe('portableTransfer', () => {
     setPreference('topicTools', true);
     setPreference('highContrast', true);
     setSceneMotion('still');
+    follow('#alpha');
+    follow('#alpha', 'Roadmap');
     saveComposerDrafts({
       '#alpha': 'room draft',
       alice: 'dm draft should stay local',
@@ -89,6 +93,7 @@ describe('portableTransfer', () => {
       },
       sceneMotion: 'still',
     });
+    expect(exported.followedConversations).toEqual(['#alpha', '#alpha/roadmap']);
     expect(exported.accountHandoffs).toEqual([
       {
         nick: 'kain',
@@ -108,6 +113,7 @@ describe('portableTransfer', () => {
     localStorage.clear();
     resetPreferences();
     setSceneMotion('animated');
+    for (const key of followed()) unfollow(key);
     const result = await importPortableTransfer(parsed!);
 
     expect(result).toEqual({
@@ -118,6 +124,7 @@ describe('portableTransfer', () => {
       topicDrafts: 1,
       accountHandoffs: 1,
       preferenceHandoffs: 1,
+      followedConversations: 2,
     });
     expect((await loadRecent('#alpha')).map((message) => message.id)).toEqual(['a1']);
     expect(readReviewHistory().map((entry) => entry.target)).toEqual(['#alpha']);
@@ -137,6 +144,8 @@ describe('portableTransfer', () => {
       highContrast: true,
     });
     expect(sceneMotion()).toBe('still');
+    expect(isFollowed('#alpha')).toBe(true);
+    expect(isFollowed('#alpha', 'roadmap')).toBe(true);
   });
 
   it('rejects non-Onyx portable transfer files', () => {
