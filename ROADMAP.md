@@ -369,6 +369,10 @@ client or public site needs to expose the result.
 23. **Presence-as-place header** *(client)* — consolidate facepile, heatline,
     scheduled event, and voice corner into a peripheral room-presence surface
     that shows life in the room without turning presence into a summons.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — The room header now folds
+    scheduled `ocean.event` context into the existing facepile / heatline /
+    voice-corner ribbon as a compact event chip, with live countdown state and
+    one-click travel to the event moment.
 24. **One-canvas responsive projection** *(client)* — keep Reader, Standard,
     Dense, and mobile as projections of the same information model, avoiding a
     separate mobile information architecture.

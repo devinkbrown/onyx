@@ -7,9 +7,10 @@
  * SOLID IDIOMS: never destructure props; splitProps; createMemo.
  */
 
-import { createMemo, createSignal, For, Show, splitProps, type JSX } from 'solid-js';
-import { useStore, getState, selectAccount, selectChannelPins } from '@/lib/store';
+import { createMemo, createSignal, For, onCleanup, Show, splitProps, type JSX } from 'solid-js';
+import { useStore, getState, selectAccount, selectChannelEvent, selectChannelPins } from '@/lib/store';
 import type { ChannelUser } from '@/lib/irc/types';
+import { eventCountdown, scheduledEventVisible } from '@/lib/notifications/scheduledEvents';
 import { Avatar } from '@/primitives/index';
 import { ChannelSettings } from './ChannelSettings';
 import { NotificationCenter } from './NotificationCenter';
@@ -72,10 +73,17 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   const activeView = useStore((s) => s.activeView);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const channels = useStore((s) => s.channels);
+  const scheduledEvent = useStore((s) => {
+    const view = s.activeView;
+    return view.kind === 'channel' ? selectChannelEvent(view.channel)(s) : null;
+  });
   const ourNick = useStore((s) => s.ourNick);
   const account = useStore(selectAccount);
   const voice = useStore((s) => s.voice);
   const voiceChannelParticipants = useStore((s) => s.voiceChannelParticipants);
+  const [now, setNow] = createSignal(Date.now());
+  const timer = setInterval(() => setNow(Date.now()), 30_000);
+  onCleanup(() => clearInterval(timer));
 
   // ── derived ──
   const activeChannel = createMemo(() => {
@@ -163,6 +171,30 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
 
   const voiceCount = createMemo(() => voiceParticipants().length);
 
+  const ribbonEvent = createMemo(() => {
+    const event = scheduledEvent();
+    if (!event || !scheduledEventVisible(event, now())) return null;
+    return event;
+  });
+
+  const ribbonEventLive = createMemo(() => {
+    const event = ribbonEvent();
+    return !!event && now() >= event.at * 1000;
+  });
+
+  const ribbonEventLabel = createMemo(() => {
+    const event = ribbonEvent();
+    if (!event) return '';
+    return `${event.title} · ${eventCountdown(event, now())}`;
+  });
+
+  const ribbonEventAria = createMemo(() => {
+    const channel = settingsChannel();
+    const event = ribbonEvent();
+    if (!channel || !event) return 'Scheduled room event';
+    return `Scheduled room event in ${channel}: ${event.title}, ${eventCountdown(event, now())}; open event moment`;
+  });
+
   const voiceChipLabel = createMemo(() => {
     const count = voiceCount();
     return `${count} in voice`;
@@ -194,6 +226,13 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
       return;
     }
     void state.joinVoiceChannel(channel, false);
+  }
+
+  function handleEventChipClick(): void {
+    const channel = settingsChannel();
+    const event = ribbonEvent();
+    if (!channel || !event) return;
+    void getState().travelTo(channel, new Date(event.at * 1000));
   }
 
   return (
@@ -257,6 +296,19 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
         {/* Channel-scoped cluster: members + settings (channels only). */}
         <Show when={activeView().kind === 'channel'}>
           <div class="shell-ribbon-group" role="group" aria-label="Channel">
+            <Show when={ribbonEvent()}>
+              <button
+                type="button"
+                class="shell-ribbon-event-chip"
+                classList={{ 'shell-ribbon-event-chip--live': ribbonEventLive() }}
+                aria-label={ribbonEventAria()}
+                title={ribbonEventLabel()}
+                onClick={handleEventChipClick}
+              >
+                <span class="shell-ribbon-event-dot" aria-hidden="true" />
+                <span class="shell-ribbon-event-text">{ribbonEventLabel()}</span>
+              </button>
+            </Show>
             <Show when={voiceCount() > 0}>
               <button
                 type="button"

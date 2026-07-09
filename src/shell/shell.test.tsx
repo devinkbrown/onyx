@@ -789,6 +789,25 @@ describe('AppShell', () => {
       expect(chip).toHaveAttribute('data-guest', 'false');
       expect(chip.textContent).toContain('alice');
     });
+
+    it('shows scheduled room events in the presence header and opens the event moment', () => {
+      const eventAt = Math.floor(Date.now() / 1000) + 1800;
+      seedStore('#general');
+      store.setState({
+        channelProps: new Map([['#general', { 'ocean.event': `${eventAt}|Office hours` }]]),
+      });
+      const travelToSpy = vi.spyOn(store.getState(), 'travelTo').mockImplementation(() => {});
+
+      render(() => <AppShell />);
+
+      const eventChip = screen.getByRole('button', { name: /Scheduled room event in #general: Office hours/i });
+      expect(eventChip).toHaveTextContent('Office hours');
+
+      fireEvent.click(eventChip);
+
+      expect(travelToSpy).toHaveBeenLastCalledWith('#general', new Date(eventAt * 1000));
+      travelToSpy.mockRestore();
+    });
   });
 
   describe('home state', () => {

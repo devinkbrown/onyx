@@ -81,6 +81,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Mobile Home tab')).toBeInTheDocument();
     expect(screen.getByText('Touch-sized Home review cards')).toBeInTheDocument();
     expect(screen.getByText('Quiet boost Home digest')).toBeInTheDocument();
+    expect(screen.getByText('Scheduled event header chip')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Atmosphere' })).toBeInTheDocument();
     expect(screen.getByText('Mobile drawer focus management')).toBeInTheDocument();
     expect(screen.getByText('Deterministic time scrubber jumps')).toBeInTheDocument();

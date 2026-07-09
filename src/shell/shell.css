@@ -815,6 +815,68 @@
   font-variant-numeric: tabular-nums;
 }
 
+.shell-ribbon-event-chip {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 18rem;
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid color-mix(in oklab, var(--gold) 42%, var(--line));
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--gold) 12%, var(--stone) 48%);
+  color: var(--washi);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  transform: translateZ(0);
+  transition:
+    background var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    color var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+
+.shell-ribbon-event-chip:hover {
+  border-color: color-mix(in oklab, var(--gold-bright) 70%, var(--line));
+  background: color-mix(in oklab, var(--gold) 18%, var(--stone) 54%);
+  transform: translate3d(0, -1px, 0);
+}
+
+.shell-ribbon-event-chip:focus-visible {
+  outline: 2px solid var(--gold-bright);
+  outline-offset: 2px;
+}
+
+.shell-ribbon-event-chip--live {
+  border-color: color-mix(in oklab, var(--shu) 58%, var(--line));
+  background: color-mix(in oklab, var(--shu) 16%, var(--stone) 52%);
+}
+
+.shell-ribbon-event-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--gold-bright);
+  box-shadow: 0 0 10px color-mix(in oklab, var(--gold-bright) 68%, transparent);
+}
+
+.shell-ribbon-event-chip--live .shell-ribbon-event-dot {
+  background: var(--shu);
+  box-shadow: 0 0 10px color-mix(in oklab, var(--shu) 72%, transparent);
+}
+
+.shell-ribbon-event-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .shell-ribbon-voice-chip {
   appearance: none;
   display: inline-flex;
