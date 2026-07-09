@@ -27,6 +27,7 @@ import {
 } from '@/lib/vault/portableTransfer';
 import { localTranslationReadiness, preferredTranslationTarget } from '@/lib/intelligence/localLanguage';
 import { pwaReadiness } from '@/pwa/readiness';
+import { refreshInstalledAppShell } from '@/pwa/updateRecovery';
 import { CalmModeControl } from './CalmModeControl';
 import { ProvenanceBadge } from './ProvenanceBadge';
 import {
@@ -525,6 +526,18 @@ function LocalLanguageTools(): JSX.Element {
 
 function PwaReadinessPanel(): JSX.Element {
   const items = createMemo(() => pwaReadiness());
+  const [updateStatus, setUpdateStatus] = createSignal<string | null>(null);
+  const [updateBusy, setUpdateBusy] = createSignal(false);
+
+  async function recoverUpdate(): Promise<void> {
+    setUpdateBusy(true);
+    try {
+      const result = await refreshInstalledAppShell();
+      setUpdateStatus(result.detail);
+    } finally {
+      setUpdateBusy(false);
+    }
+  }
 
   return (
     <section class="pref-group pref-pwa-readiness" aria-labelledby="pref-pwa-readiness-title">
@@ -536,6 +549,14 @@ function PwaReadinessPanel(): JSX.Element {
         Browser PWA and wrapper health on this device. Desktop shells should
         reuse these same routes, storage, update, and notification contracts.
       </p>
+      <div class="pref-pwa-readiness__actions">
+        <button type="button" class="pref-reset" disabled={updateBusy()} onClick={() => void recoverUpdate()}>
+          Refresh app shell
+        </button>
+      </div>
+      <Show when={updateStatus()}>
+        <p class="pref-status" role="status">{updateStatus()}</p>
+      </Show>
       <div class="pref-pwa-readiness__rows" role="list" aria-label="Installed app readiness checks">
         <For each={items()}>
           {(item) => (

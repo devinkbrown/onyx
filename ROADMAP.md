@@ -591,6 +591,11 @@ client or public site needs to expose the result.
     service-worker control, notification permission, and local storage support.
     The install page now names that in-app readiness panel as the first wrapper
     smoke test before desktop or mobile shell release.
+    ✅ **CLIENT + WEBSITE SLICE SHIPPED 2026-07-09** — Preferences now includes
+    a Refresh app shell recovery action that asks the service worker for an
+    update, activates a waiting worker when present, and reloads the stamped
+    shell on demand. The install page now names this as the stale-wrapper
+    recovery path.
 40. **Portable import/export** *(client)* — expose device-safe export/import for
     vault history, room snapshots, account handoff data, and reviewed catch-up
     state where protocol support exists.

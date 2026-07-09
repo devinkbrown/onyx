@@ -43,6 +43,11 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+// ── Manual update recovery from Preferences ──────────────────────────────────
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'ONYX_SKIP_WAITING') self.skipWaiting();
+});
+
 // ── Fetch: network-first for API/WS, cache-first for shell assets ─────────────
 self.addEventListener('fetch', (event) => {
   const { request } = event;

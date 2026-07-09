@@ -40,6 +40,7 @@ describe('PreferencesPanel', () => {
     expect(screen.getByLabelText('Import portable JSON')).toHaveAttribute('type', 'file');
     expect(screen.getByRole('heading', { name: 'Installed app readiness' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Install guide' })).toHaveAttribute('href', '/install/');
+    expect(screen.getByRole('button', { name: 'Refresh app shell' })).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'Installed app readiness checks' })).toBeInTheDocument();
     expect(screen.getByText('App window')).toBeInTheDocument();
     expect(screen.getByText('Service worker')).toBeInTheDocument();
