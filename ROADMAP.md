@@ -511,6 +511,10 @@ client or public site needs to expose the result.
     installed launches at `/app`, declares app shortcuts for chat/status/stats,
     and the main site has `/install/` documenting install behavior, local memory,
     service-worker update recovery, and the desktop/mobile wrapper path.
+    ✅ **WEBSITE SLICE SHIPPED 2026-07-09** — `/install/` now includes a
+    packaging readiness matrix for the browser PWA, desktop wrapper, and future
+    mobile wrapper so release lanes reuse the same route, cache, notification,
+    and local-state contracts.
 40. **Portable import/export** *(client)* — expose device-safe export/import for
     vault history, room snapshots, account handoff data, and reviewed catch-up
     state where protocol support exists.

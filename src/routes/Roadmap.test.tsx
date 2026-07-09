@@ -115,6 +115,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Offline search gating')).toBeInTheDocument();
     expect(screen.getByText('Installable manifest')).toBeInTheDocument();
     expect(screen.getByText('PWA shortcuts')).toBeInTheDocument();
+    expect(screen.getByText('Wrapper readiness matrix')).toBeInTheDocument();
     expect(screen.getByText('Portable vault export')).toBeInTheDocument();
     expect(screen.getByText('Portable vault import')).toBeInTheDocument();
     expect(screen.getByText('Reviewed catch-up transfer')).toBeInTheDocument();
