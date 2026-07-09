@@ -43,6 +43,9 @@ describe('VoiceSettings', () => {
   it('lists media devices and writes setting changes to the voice store', async () => {
     render(() => <VoiceSettings />);
 
+    expect(screen.getByRole('region', { name: 'Devices' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Processing' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Push to talk' })).toBeTruthy();
     expect(await screen.findByRole('option', { name: 'Studio Mic' })).toBeTruthy();
     expect(screen.getByRole('option', { name: 'Headset Out' })).toBeTruthy();
     expect(screen.getByRole('option', { name: 'Desk Camera' })).toBeTruthy();
@@ -57,5 +60,7 @@ describe('VoiceSettings', () => {
     fireEvent.click(noiseToggle);
 
     expect(store.getState().voice.noiseSuppression).toBe(false);
+    expect(screen.getByRole('button', { name: 'Capture push-to-talk key' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Clear push-to-talk key' })).toBeTruthy();
   });
 });

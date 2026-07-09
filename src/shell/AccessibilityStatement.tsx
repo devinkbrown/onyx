@@ -72,6 +72,9 @@ const ACCESSIBILITY_TOPICS: readonly AccessibilityTopic[] = [
       'Keyboard shortcuts uses a named Sheet dialog, labelled close action, and grouped shortcut lists generated from the live keymap.',
       'Pinned messages uses a named Sheet dialog, channel-specific pins list, target-specific jump buttons, and real unpin controls.',
       'Theme import uses a named Sheet dialog, described theme-code input, target-specific import and copy actions, and invalid-code feedback.',
+      'Thread panel uses a named Sheet dialog, labelled parent and reply articles, and a reply log scoped to the source message.',
+      'Voice settings uses a named Sheet dialog, labelled device/processing/push-to-talk regions, described selects, and target-specific push-to-talk key actions.',
+      'Call overlays use named incoming/outgoing dialogs with target-specific accept, decline, and cancel actions.',
     ],
   },
 ];

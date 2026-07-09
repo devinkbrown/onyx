@@ -22,5 +22,8 @@ describe('AccessibilityStatement', () => {
     expect(screen.getByText(/Keyboard shortcuts uses a named Sheet dialog/i)).toBeInTheDocument();
     expect(screen.getByText(/Pinned messages uses a named Sheet dialog/i)).toBeInTheDocument();
     expect(screen.getByText(/Theme import uses a named Sheet dialog/i)).toBeInTheDocument();
+    expect(screen.getByText(/Thread panel uses a named Sheet dialog/i)).toBeInTheDocument();
+    expect(screen.getByText(/Voice settings uses a named Sheet dialog/i)).toBeInTheDocument();
+    expect(screen.getByText(/Call overlays use named incoming\/outgoing dialogs/i)).toBeInTheDocument();
   });
 });

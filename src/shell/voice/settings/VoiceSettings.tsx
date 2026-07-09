@@ -276,10 +276,20 @@ function VoiceSettingsContent() {
               </Show>
             </span>
           </div>
-          <Button variant="ghost" onClick={() => setCapturingKey(true)} aria-pressed={capturingKey() ? 'true' : 'false'}>
+          <Button
+            variant="ghost"
+            onClick={() => setCapturingKey(true)}
+            aria-label="Capture push-to-talk key"
+            aria-pressed={capturingKey() ? 'true' : 'false'}
+          >
             Capture key
           </Button>
-          <Button variant="danger" onClick={() => updateVoice({ pushToTalkKey: null })} disabled={!voice().pushToTalkKey}>
+          <Button
+            variant="danger"
+            onClick={() => updateVoice({ pushToTalkKey: null })}
+            disabled={!voice().pushToTalkKey}
+            aria-label="Clear push-to-talk key"
+          >
             Clear
           </Button>
         </div>

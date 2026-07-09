@@ -5,6 +5,7 @@ import { store } from '@/lib/store/store';
 import type { SuimyakuPeerState } from '@/lib/suimyaku-media/types';
 import { CaptionsOverlay } from './CaptionsOverlay';
 import { IncomingCallOverlay } from './IncomingCallOverlay';
+import { OutgoingCallOverlay } from './OutgoingCallOverlay';
 import { VoicePip } from '../VoicePip';
 
 const initialState = store.getInitialState();
@@ -44,6 +45,20 @@ describe('voice overlays', () => {
     fireEvent.click(screen.getByRole('button', { name: /accept call from lapis/i }));
 
     expect(acceptSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows an outgoing call and cancels through the store action', () => {
+    store.getState().setVoiceCallState({ callState: 'ringing_out', callWith: 'Mina' });
+    const endSpy = vi.spyOn(store.getState(), 'endDmCall');
+
+    render(() => <OutgoingCallOverlay />);
+
+    expect(screen.getByRole('dialog', { name: 'Calling' })).toBeTruthy();
+    expect(screen.getByText('Mina')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /cancel call to mina/i }));
+
+    expect(endSpy).toHaveBeenCalledTimes(1);
   });
 
   it('renders seeded live captions for the current voice channel', () => {

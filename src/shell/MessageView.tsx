@@ -421,7 +421,7 @@ function ThreadIndicator(props: ThreadIndicatorProps): JSX.Element {
     <button
       type="button"
       class="shell-thread-indicator"
-      aria-label="Open thread"
+      aria-label={`Open thread for message ${local.messageId}`}
       onClick={() => local.onOpenThread(local.messageId)}
     >
       <span aria-hidden="true">⌥</span>
@@ -483,7 +483,7 @@ type ThreadPanelProps = {
   messages: ChatMessage[];
 };
 
-function ThreadPanel(props: ThreadPanelProps): JSX.Element {
+export function ThreadPanel(props: ThreadPanelProps): JSX.Element {
   const [local] = splitProps(props, ['parentId', 'messages']);
 
   const threadMessages = createMemo(() =>
@@ -493,22 +493,22 @@ function ThreadPanel(props: ThreadPanelProps): JSX.Element {
   const parent = createMemo(() => local.messages.find((m) => m.id === local.parentId));
 
   return (
-    <div>
+    <div class="shell-thread-panel">
       {/* Parent message */}
       <Show when={parent()}>
         {(p) => (
-          <div class="shell-thread-msg" style={{ 'margin-bottom': '12px' }}>
+          <article class="shell-thread-msg" aria-label={`Thread parent from ${p().from}`} style={{ 'margin-bottom': '12px' }}>
             <div class="shell-thread-msg-meta">
               <span class="shell-thread-msg-from">{p().from}</span>
               <span>{fmtTime(p().time)}</span>
             </div>
             <p class="shell-thread-msg-text">{p().text}</p>
-          </div>
+          </article>
         )}
       </Show>
 
       {/* Thread replies */}
-      <div role="log" aria-label="Thread replies">
+      <div role="log" aria-label={`Thread replies to message ${local.parentId}`}>
         <Show
           when={threadMessages().length > 0}
           fallback={
@@ -519,13 +519,13 @@ function ThreadPanel(props: ThreadPanelProps): JSX.Element {
         >
           <For each={threadMessages()}>
             {(msg) => (
-              <div class="shell-thread-msg">
+              <article class="shell-thread-msg" aria-label={`Thread reply from ${msg.from}`}>
                 <div class="shell-thread-msg-meta">
                   <span class="shell-thread-msg-from">{msg.from}</span>
                   <span>{fmtTime(msg.time)}</span>
                 </div>
                 <p class="shell-thread-msg-text">{msg.text}</p>
-              </div>
+              </article>
             )}
           </For>
         </Show>

@@ -274,6 +274,15 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Theme import now carries pass
     evidence for its named import/share dialog, described theme-code input,
     target-specific import/copy actions, and invalid-code feedback.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Thread panel now carries pass
+    evidence for its named Sheet dialog, labelled parent/reply articles, and
+    reply log scoped to the source message.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Voice settings now carries pass
+    evidence for its named Sheet dialog, labelled device/processing/PTT regions,
+    described selects, and target-specific PTT key actions.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Call overlays now carry pass
+    evidence for named incoming/outgoing dialogs with target-specific accept,
+    decline, and cancel actions.
     ⏭️ **CLIENT NEXT** — continue remaining dense-surface audit rows until every
     app panel has pass/fix evidence.
 

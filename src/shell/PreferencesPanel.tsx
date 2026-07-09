@@ -123,6 +123,21 @@ const ACCESS_AUDIT_ROWS = [
     note: 'Named import/share dialog, described theme-code input, target-specific import and copy actions, and invalid-code feedback.',
   },
   {
+    surface: 'Thread panel',
+    status: 'checked',
+    note: 'Named thread Sheet, labelled parent/reply articles, and reply log scoped to the source message.',
+  },
+  {
+    surface: 'Voice settings',
+    status: 'checked',
+    note: 'Named settings Sheet, labelled device/processing/PTT regions, described selects, and target-specific PTT key actions.',
+  },
+  {
+    surface: 'Call overlays',
+    status: 'checked',
+    note: 'Named incoming/outgoing call dialogs with target-specific accept, decline, and cancel actions.',
+  },
+  {
     surface: 'Modals',
     status: 'checked',
     note: 'Sheet focus trap, Escape close, labelled close buttons.',

@@ -35,6 +35,9 @@ describe('PreferencesPanel', () => {
     expect(screen.getByText('Keyboard shortcuts')).toBeInTheDocument();
     expect(screen.getByText('Pinned messages')).toBeInTheDocument();
     expect(screen.getByText('Theme import')).toBeInTheDocument();
+    expect(screen.getByText('Thread panel')).toBeInTheDocument();
+    expect(screen.getByText('Voice settings')).toBeInTheDocument();
+    expect(screen.getByText('Call overlays')).toBeInTheDocument();
     expect(screen.getByText('Labelled Sheet, topic form, switch-mode flags, read-only non-op fallbacks.')).toBeInTheDocument();
     expect(screen.getByText('Toolbar groups, labelled icon buttons, aria-pressed media states, live timer.')).toBeInTheDocument();
     expect(screen.getByText('Theme and background radio groups, labelled swatches, Sheet focus trap.')).toBeInTheDocument();
@@ -47,6 +50,9 @@ describe('PreferencesPanel', () => {
     expect(screen.getByText('Named shortcuts dialog, labelled close action, and grouped shortcut lists generated from live keymap descriptors.')).toBeInTheDocument();
     expect(screen.getByText('Named pins dialog, channel-specific pins list, target-specific jump buttons, and real unpin controls.')).toBeInTheDocument();
     expect(screen.getByText('Named import/share dialog, described theme-code input, target-specific import and copy actions, and invalid-code feedback.')).toBeInTheDocument();
+    expect(screen.getByText('Named thread Sheet, labelled parent/reply articles, and reply log scoped to the source message.')).toBeInTheDocument();
+    expect(screen.getByText('Named settings Sheet, labelled device/processing/PTT regions, described selects, and target-specific PTT key actions.')).toBeInTheDocument();
+    expect(screen.getByText('Named incoming/outgoing call dialogs with target-specific accept, decline, and cancel actions.')).toBeInTheDocument();
     expect(screen.queryByText(/still need a pass/i)).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Public ledger' })).toHaveAttribute(
       'href',
