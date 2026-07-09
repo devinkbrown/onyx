@@ -18,6 +18,10 @@ import { preferences } from '@/lib/prefs/preferences';
 import { listTopics, summarizeTopics } from '@/lib/search/topicFilter';
 import { bucketUnreadByTopic, isValidTopicLabel, parseTopicRegistry, TOPIC_PROP } from '@/lib/topics/topics';
 import { followed, isFollowed, toggleFollow } from '@/lib/notifications/followed';
+import {
+  latestReviewForTarget,
+  type ReviewHistoryEntry,
+} from '@/lib/notifications/reviewHistory';
 import { buildSinceDigest } from '@/lib/notifications/sinceDigest';
 import { aggregateBoosts } from '@/lib/reactions/quietBoosts';
 import {
@@ -41,6 +45,7 @@ import { activeMessageSearchResultId } from './search/useMessageSearch';
 import { TopicFilterBar } from './TopicChip';
 import { BoostBar } from './BoostBar';
 import { SinceDigestCard } from './SinceDigestCard';
+import { openMessageSearchWithQuery } from './search/useMessageSearch';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -172,13 +177,34 @@ function formatReaderMemoryRange(context: ReaderMemoryContext): string {
   return `${first}-${last}`;
 }
 
+function reviewCountLabel(entry: ReviewHistoryEntry): string {
+  const lineLabel = entry.messageCount === 1 ? 'line' : 'lines';
+  const mentionLabel = entry.mentionCount === 1 ? 'mention' : 'mentions';
+  const mentionPart = entry.mentionCount > 0 ? `, ${entry.mentionCount} ${mentionLabel}` : '';
+  return `${entry.messageCount} ${lineLabel}${mentionPart}`;
+}
+
+function formatReviewedAt(entry: ReviewHistoryEntry): string {
+  const date = new Date(entry.reviewedAt);
+  if (Number.isNaN(date.getTime())) return 'reviewed';
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 function ReaderMemoryStrip(props: {
   context: ReaderMemoryContext;
+  reviewedSpan: ReviewHistoryEntry | null;
   hasUnreadBoundary: boolean;
   onJumpStart: () => void;
   onJumpUnread: () => void;
   onJumpLatest: () => void;
   onReturnHome: () => void;
+  onJumpReviewed: (entry: ReviewHistoryEntry) => void;
+  onSearchReviewed: (entry: ReviewHistoryEntry) => void;
 }): JSX.Element {
   const overflow = createMemo(() =>
     Math.max(props.context.voiceCount - props.context.participants.length, 0),
@@ -208,6 +234,17 @@ function ReaderMemoryStrip(props: {
           </Show>
         </div>
       </Show>
+      <Show when={props.reviewedSpan}>
+        {(entry) => (
+          <div class="shell-reader-memory__review" role="group" aria-label="Reviewed catch-up span">
+            <span class="shell-reader-memory__review-label">Reviewed span</span>
+            <span class="shell-reader-memory__review-meta">
+              {reviewCountLabel(entry())} / {formatReviewedAt(entry())}
+            </span>
+            <span class="shell-reader-memory__review-preview">{entry().preview}</span>
+          </div>
+        )}
+      </Show>
       <nav class="shell-reader-memory__nav" aria-label="Reader transcript navigation">
         <button type="button" onClick={() => props.onJumpStart()}>Start</button>
         <Show when={props.hasUnreadBoundary}>
@@ -215,6 +252,26 @@ function ReaderMemoryStrip(props: {
         </Show>
         <button type="button" onClick={() => props.onJumpLatest()}>Latest</button>
         <button type="button" onClick={() => props.onReturnHome()}>Home</button>
+        <Show when={props.reviewedSpan}>
+          {(entry) => (
+            <>
+              <button
+                type="button"
+                onClick={() => props.onJumpReviewed(entry())}
+                aria-label={`Jump to reviewed span for ${entry().target}`}
+              >
+                Reviewed
+              </button>
+              <button
+                type="button"
+                onClick={() => props.onSearchReviewed(entry())}
+                aria-label={`Search reviewed text for ${entry().target}`}
+              >
+                Find text
+              </button>
+            </>
+          )}
+        </Show>
       </nav>
     </section>
   );
@@ -543,6 +600,10 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     if (!prefs.readerMode || !prefs.localHistory) return null;
     return buildReaderMemoryContext(activeTarget(), messages());
   });
+  const readerReviewedSpan = createMemo(() => {
+    const context = readerMemoryContext();
+    return context ? latestReviewForTarget(context.target, 'channel') : null;
+  });
 
   // ── scroll state ──
   let feedEl!: HTMLDivElement;
@@ -592,6 +653,19 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     if (!target) return;
     scrollToUnreadBoundary();
     getState().clearViewUnreadDivider(target);
+  }
+
+  function jumpToReviewedSpan(entry: ReviewHistoryEntry): void {
+    const state = getState();
+    state.focusMessage(entry.firstMessageId);
+    const firstAt = new Date(entry.firstAt);
+    if (entry.kind === 'channel' && !Number.isNaN(firstAt.getTime())) {
+      state.travelTo(entry.target, firstAt);
+    }
+  }
+
+  function searchReviewedSpan(entry: ReviewHistoryEntry): void {
+    openMessageSearchWithQuery(entry.preview);
   }
 
   // Autoscroll when new messages arrive and we're already at bottom
@@ -890,11 +964,14 @@ export function MessageView(props: MessageViewProps): JSX.Element {
             {(context) => (
               <ReaderMemoryStrip
                 context={context()}
+                reviewedSpan={readerReviewedSpan()}
                 hasUnreadBoundary={unreadDividerId() !== null}
                 onJumpStart={scrollToReaderStart}
                 onJumpUnread={scrollToUnreadBoundary}
                 onJumpLatest={() => scrollToBottom(true)}
                 onReturnHome={() => getState().navigate({ kind: 'home' })}
+                onJumpReviewed={jumpToReviewedSpan}
+                onSearchReviewed={searchReviewedSpan}
               />
             )}
           </Show>

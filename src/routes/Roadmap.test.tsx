@@ -29,6 +29,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Digest review handoff')).toBeInTheDocument();
     expect(screen.getByText('Review completion')).toBeInTheDocument();
     expect(screen.getByText('Reader return Home')).toBeInTheDocument();
+    expect(screen.getByText('Reviewed span recall')).toBeInTheDocument();
     expect(screen.getByText('Client access audit')).toBeInTheDocument();
     expect(screen.getByText('Dense-panel evidence')).toBeInTheDocument();
     expect(screen.getByText(/time is active/i)).toBeInTheDocument();

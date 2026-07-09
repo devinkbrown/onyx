@@ -59,8 +59,8 @@ const phases: Phase[] = [
     title: 'Time-native',
     state: 'active',
     date: '2026-07-09',
-    summary: 'Home now brings followed activity, scheduled rooms, local memory, quiet rooms, return recaps, room rhythm, review-from-start handoffs, review history, channel directory dedupe, reader summaries, shareable moments, reader memory, search handoff, transcript jumps, digest review completion, and reader return-home affordances into view.',
-    items: ['Followed catch-up', 'Scheduled events on Home', 'Vault memory previews', 'Quiet room activity', 'Home return recaps', 'Spotlight handoff', 'Room rhythm heatlines', 'Event context', 'Review from start', 'Catch-up review history', 'Channel directory dedupe', 'Reader digest notes', 'Shareable moment links', 'Reader memory context', 'Moment search handoff', 'Reader transcript jumps', 'Digest review handoff', 'Review completion', 'Reader return Home'],
+    summary: 'Home now brings followed activity, scheduled rooms, local memory, quiet rooms, return recaps, room rhythm, review-from-start handoffs, review history, channel directory dedupe, reader summaries, shareable moments, reader memory, search handoff, transcript jumps, digest review completion, reader return-home affordances, and reviewed-span recall into view.',
+    items: ['Followed catch-up', 'Scheduled events on Home', 'Vault memory previews', 'Quiet room activity', 'Home return recaps', 'Spotlight handoff', 'Room rhythm heatlines', 'Event context', 'Review from start', 'Catch-up review history', 'Channel directory dedupe', 'Reader digest notes', 'Shareable moment links', 'Reader memory context', 'Moment search handoff', 'Reader transcript jumps', 'Digest review handoff', 'Review completion', 'Reader return Home', 'Reviewed span recall'],
   },
   {
     phase: 'Phase 7',
@@ -171,7 +171,7 @@ export default function RoadmapRoute() {
             memory previews, quiet room activity, home return recaps, Spotlight
             handoff, room rhythm heatlines, event context, review-from-start
             handoffs, review history, channel directory dedupe, reader digest notes, shareable moment links, reader memory context, moment search handoff,
-            reader transcript jumps, digest review handoff, review completion, reader return-home affordances, and
+            reader transcript jumps, digest review handoff, review completion, reader return-home affordances, reviewed-span recall, and
             quieter activity surfaces.
           </p>
         </article>
@@ -180,7 +180,7 @@ export default function RoadmapRoute() {
           <h3>Keep tightening</h3>
           <div class="data-list data-list--compact">
             <div class="data-row"><div><strong>Catch-up Home</strong><span>Continue richer cross-room review handoffs on the return screen.</span></div></div>
-            <div class="data-row"><div><strong>Reader mode</strong><span>Continue reader-side recall links from reviewed catch-up spans.</span></div></div>
+            <div class="data-row"><div><strong>Reader mode</strong><span>Continue hydration trails from reviewed spans into neighboring transcript context.</span></div></div>
             <div class="data-row"><div><strong>Accessibility conformance</strong><span><a href="/accessibility/">Continue remaining dense-surface pass/fix evidence.</a></span></div></div>
           </div>
         </aside>

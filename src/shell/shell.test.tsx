@@ -18,6 +18,7 @@ import { store } from '@/lib/store/store';
 import type { Channel } from '@/lib/irc/types';
 import type { ChatMessage, ChannelUser } from '@/lib/irc/types';
 import { followed, isFollowed, unfollow } from '@/lib/notifications/followed';
+import { recordReviewHistory } from '@/lib/notifications/reviewHistory';
 import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
 import { AppShell } from './AppShell';
 
@@ -347,6 +348,7 @@ describe('AppShell', () => {
 
     it('shows device-memory context in reader mode', () => {
       const scrollIntoView = vi.fn();
+      const travelToSpy = vi.spyOn(store.getState(), 'travelTo');
       Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
         value: scrollIntoView,
         configurable: true,
@@ -372,6 +374,17 @@ describe('AppShell', () => {
         ourNick: 'testuser',
         viewUnreadDividerId: new Map([['#general', 'msg-memory-b']]),
       }, true);
+      recordReviewHistory({
+        target: '#general',
+        name: '#general',
+        kind: 'channel',
+        firstMessageId: 'msg-memory-b',
+        firstAt: '2025-01-01T12:00:00.000Z',
+        reviewedAt: '2026-07-09T00:05:00.000Z',
+        messageCount: 2,
+        mentionCount: 1,
+        preview: 'Hydrated note one',
+      });
 
       render(() => <AppShell />);
 
@@ -387,12 +400,27 @@ describe('AppShell', () => {
       expect(within(memory).getByRole('button', { name: 'New' })).toBeInTheDocument();
       expect(within(memory).getByRole('button', { name: 'Latest' })).toBeInTheDocument();
       expect(within(memory).getByRole('button', { name: 'Home' })).toBeInTheDocument();
+      expect(within(memory).getByRole('group', { name: 'Reviewed catch-up span' })).toBeInTheDocument();
+      expect(within(memory).getByText('Reviewed span')).toBeInTheDocument();
+      expect(within(memory).getByText('2 lines, 1 mention', { exact: false })).toBeInTheDocument();
+      expect(within(memory).getByText('Hydrated note one')).toBeInTheDocument();
+      expect(within(memory).getByRole('button', { name: 'Jump to reviewed span for #general' })).toBeInTheDocument();
+      expect(within(memory).getByRole('button', { name: 'Search reviewed text for #general' })).toBeInTheDocument();
 
       fireEvent.click(within(memory).getByRole('button', { name: 'Start' }));
       expect(scrollIntoView).toHaveBeenCalled();
 
+      fireEvent.click(within(memory).getByRole('button', { name: 'Jump to reviewed span for #general' }));
+      expect(store.getState().timeTravelLandingId).toBe('msg-memory-b');
+      expect(travelToSpy).toHaveBeenCalledWith('#general', new Date('2025-01-01T12:00:00.000Z'));
+
+      fireEvent.click(within(memory).getByRole('button', { name: 'Search reviewed text for #general' }));
+      expect(screen.getByRole('search', { name: 'Message search' })).toBeInTheDocument();
+      expect(screen.getByRole('searchbox', { name: 'Search messages' })).toHaveValue('Hydrated note one');
+
       fireEvent.click(within(memory).getByRole('button', { name: 'Home' }));
       expect(store.getState().activeView).toEqual({ kind: 'home' });
+      travelToSpy.mockRestore();
     });
 
     it('follows the room or selected topic from the topic strip', () => {

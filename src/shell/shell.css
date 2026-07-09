@@ -2201,6 +2201,44 @@
   font-size: 0.66rem;
 }
 
+.shell-reader-memory__review {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.45rem 0.7rem;
+  padding: 7px 9px;
+  border: 1px solid color-mix(in oklab, var(--gold) 32%, var(--seam));
+  border-left: 2px solid var(--gold-bright);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--gold) 8%, transparent);
+}
+
+.shell-reader-memory__review-label,
+.shell-reader-memory__review-meta {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+}
+
+.shell-reader-memory__review-label {
+  color: var(--gold-bright);
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.shell-reader-memory__review-meta {
+  color: var(--washi-mute);
+}
+
+.shell-reader-memory__review-preview {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--washi-dim);
+  font-size: 0.74rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .shell-reader-memory__nav {
   display: flex;
   flex-wrap: wrap;
@@ -2224,6 +2262,12 @@
 .shell-reader-memory__nav button:focus-visible {
   border-color: color-mix(in oklab, var(--lapis-bright) 52%, transparent);
   color: var(--washi);
+}
+
+@media (max-width: 720px) {
+  .shell-reader-memory__review {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Highlight — a message that names you. Bioluminescent azure crest, never

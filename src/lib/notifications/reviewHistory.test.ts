@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from 'vitest';
 import {
+  latestReviewForTarget,
   readReviewHistory,
   recordReviewHistory,
   REVIEW_HISTORY_KEY,
@@ -52,5 +53,15 @@ describe('reviewHistory', () => {
       '#room-2',
     ]);
     expect(readReviewHistory()).toHaveLength(5);
+  });
+
+  test('returns the latest review for a target and optional kind', () => {
+    recordReviewHistory(entry('#General', '2026-07-09T00:00:00.000Z', 'old'));
+    recordReviewHistory(entry('#general', '2026-07-09T00:05:00.000Z', 'new'));
+    recordReviewHistory({ ...entry('Kai', '2026-07-09T00:06:00.000Z'), kind: 'dm' });
+
+    expect(latestReviewForTarget('#GENERAL', 'channel')?.firstMessageId).toBe('new');
+    expect(latestReviewForTarget('#general', 'dm')).toBeNull();
+    expect(latestReviewForTarget('kai')?.kind).toBe('dm');
   });
 });

@@ -218,8 +218,11 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — The reader memory strip now includes
     a direct Home return handoff, so long transcript review can land back on the
     catch-up surface without losing the remembered context.
-    ⏭️ **NEXT** — continue reader-side recall and hydration links from reviewed
-    catch-up spans.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Reader mode now recalls the latest
+    Home-reviewed catch-up span for the open transcript, with direct jump and
+    message-search handoffs over the reviewed preview.
+    ⏭️ **NEXT** — continue hydration trails from reviewed catch-up spans into
+    neighboring transcript context.
 17. **Accessibility conformance ledger** *(main site + client)* — publish the
     public WCAG 2.2 / EN 301 549 audit path and keep it linked from the front
     door while app panels are audited.

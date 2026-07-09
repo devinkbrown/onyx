@@ -49,6 +49,16 @@ export function readReviewHistory(): ReviewHistoryEntry[] {
   }
 }
 
+export function latestReviewForTarget(
+  target: string,
+  kind?: ReviewHistoryKind,
+): ReviewHistoryEntry | null {
+  const key = target.toLowerCase();
+  return readReviewHistory().find((entry) =>
+    entry.target.toLowerCase() === key && (kind === undefined || entry.kind === kind),
+  ) ?? null;
+}
+
 export function recordReviewHistory(entry: ReviewHistoryEntry): ReviewHistoryEntry[] {
   const store = storage();
   if (!store) return [entry];
