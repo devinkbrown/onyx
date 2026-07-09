@@ -98,6 +98,19 @@ function seedStore(channelName: string): void {
   }, true);
 }
 
+function stubMobileViewport(matches = true): void {
+  vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+    matches: query.includes('max-width') ? matches : false,
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })));
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('AppShell', () => {
@@ -850,6 +863,45 @@ describe('AppShell', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Open Home' }));
       expect(store.getState().activeView).toEqual({ kind: 'home' });
       expect(screen.getByRole('button', { name: 'Open Home' })).toHaveAttribute('aria-current', 'page');
+    });
+
+    it('moves focus into the mobile channel drawer and restores it on Escape', async () => {
+      stubMobileViewport();
+      seedStore('#general');
+
+      render(() => <AppShell />);
+
+      const roomsButton = screen.getByRole('button', { name: 'Toggle channel list' });
+      roomsButton.focus();
+      fireEvent.click(roomsButton);
+
+      const drawer = screen.getByRole('dialog', { name: 'Channel drawer' });
+      await waitFor(() => expect(drawer.contains(document.activeElement)).toBe(true));
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Channel drawer' })).not.toBeInTheDocument());
+      expect(roomsButton).toHaveFocus();
+    });
+
+    it('moves focus into the mobile member drawer and restores it on Escape', async () => {
+      stubMobileViewport();
+      seedStore('#general');
+
+      render(() => <AppShell />);
+
+      const membersButton = screen.getByRole('button', { name: 'Toggle member list' });
+      membersButton.focus();
+      fireEvent.click(membersButton);
+
+      await waitFor(() => {
+        const members = screen.getByRole('region', { name: 'Channel members in #general' });
+        expect(members.contains(document.activeElement)).toBe(true);
+      });
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+
+      await waitFor(() => expect(membersButton).toHaveFocus());
     });
 
     it('summarizes unread home recaps and hands them to Spotlight', async () => {

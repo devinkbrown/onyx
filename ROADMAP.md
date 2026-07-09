@@ -397,6 +397,10 @@ client or public site needs to expose the result.
     explicit reduced-transparency control that persists to the app preference
     model, reflects as `data-reduce-transparency`, and shares the same solid
     panel/chrome rules as the OS `prefers-reduced-transparency` path.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Mobile channel/member drawers now
+    manage focus as drawers: opening records the bottom-nav trigger, moves
+    focus inside, traps `Tab`, closes on `Escape`, and restores focus to the
+    trigger on close.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Time scrubber hourly bars now
     activate exactly at the announced `HH:00 UTC` moment for pointer and
     keyboard users.

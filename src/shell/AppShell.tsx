@@ -77,6 +77,21 @@ export type AppShellProps = {
   selfNick?: string;
 };
 
+const MOBILE_DRAWER_FOCUSABLE = [
+  'button:not([disabled])',
+  '[href]',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',');
+
+function focusableIn(root: HTMLElement | null | undefined): HTMLElement[] {
+  if (!root) return [];
+  return Array.from(root.querySelectorAll<HTMLElement>(MOBILE_DRAWER_FOCUSABLE))
+    .filter((node) => !node.hasAttribute('disabled') && node.getAttribute('aria-hidden') !== 'true');
+}
+
 // ── Disconnected banner ──────────────────────────────────────────────────────
 
 function DisconnectedBanner(): JSX.Element {
@@ -213,6 +228,75 @@ export function AppShell(props: AppShellProps): JSX.Element {
   // so on narrow viewports it gets its own open state.
   const [isMobile, setIsMobile] = createSignal(false);
   const [mobileMembersOpen, setMobileMembersOpen] = createSignal(false);
+  let sidebarDrawerRef: HTMLDivElement | undefined;
+  let mobileRoomsButtonRef: HTMLButtonElement | undefined;
+  let mobileMembersButtonRef: HTMLButtonElement | undefined;
+  let mobileDrawerRestoreTarget: HTMLElement | null = null;
+
+  function rememberMobileDrawerTrigger(): void {
+    mobileDrawerRestoreTarget = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+  }
+
+  function restoreMobileDrawerFocus(): void {
+    const target = mobileDrawerRestoreTarget;
+    mobileDrawerRestoreTarget = null;
+    if (target?.isConnected) {
+      queueMicrotask(() => target.focus());
+    }
+  }
+
+  function membersDrawerElement(): HTMLElement | null {
+    return document.querySelector<HTMLElement>('.shell-members:not(.shell-members--hidden)');
+  }
+
+  function activeMobileDrawerElement(): HTMLElement | null {
+    if (!isMobile()) return null;
+    if (mobileSidebarOpen()) return sidebarDrawerRef ?? null;
+    if (mobileMembersOpen()) return membersDrawerElement();
+    return null;
+  }
+
+  function focusFirstInMobileDrawer(root: HTMLElement | null | undefined): void {
+    queueMicrotask(() => {
+      const first = focusableIn(root)[0];
+      first?.focus();
+    });
+  }
+
+  function trapMobileDrawerTab(event: KeyboardEvent, root: HTMLElement): void {
+    const focusables = focusableIn(root);
+    if (focusables.length === 0) {
+      event.preventDefault();
+      root.focus();
+      return;
+    }
+
+    const first = focusables[0]!;
+    const last = focusables[focusables.length - 1]!;
+    const active = document.activeElement;
+
+    if (!root.contains(active)) {
+      event.preventDefault();
+      first.focus();
+      return;
+    }
+
+    if (event.shiftKey && active === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  function closeActiveMobileDrawer(restoreFocus = true): void {
+    if (mobileSidebarOpen()) getState().closeMobileSidebar();
+    if (mobileMembersOpen()) setMobileMembersOpen(false);
+    if (restoreFocus) restoreMobileDrawerFocus();
+  }
 
   onMount(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return;
@@ -220,25 +304,57 @@ export function AppShell(props: AppShellProps): JSX.Element {
     setIsMobile(mq.matches);
     const onChange = (e: MediaQueryListEvent): void => {
       setIsMobile(e.matches);
-      if (!e.matches) setMobileMembersOpen(false);
+      if (!e.matches) closeActiveMobileDrawer(false);
     };
     mq.addEventListener('change', onChange);
     onCleanup(() => mq.removeEventListener('change', onChange));
   });
 
+  onMount(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      const drawer = activeMobileDrawerElement();
+      if (!drawer) return;
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeActiveMobileDrawer();
+        return;
+      }
+
+      if (event.key === 'Tab') trapMobileDrawerTab(event, drawer);
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    onCleanup(() => document.removeEventListener('keydown', onKeyDown));
+  });
+
   // ── mobile sidebar handlers ──
   function openMobileSidebar(): void {
+    rememberMobileDrawerTrigger();
+    mobileDrawerRestoreTarget ||= mobileRoomsButtonRef ?? null;
     setMobileMembersOpen(false); // never both drawers at once
     getState().openMobileSidebar();
+    focusFirstInMobileDrawer(sidebarDrawerRef);
   }
 
   function closeMobileSidebar(): void {
     getState().closeMobileSidebar();
+    restoreMobileDrawerFocus();
   }
 
   function handleToggleMembers(): void {
     if (isMobile()) {
-      setMobileMembersOpen((v) => !v);
+      if (mobileMembersOpen()) {
+        setMobileMembersOpen(false);
+        restoreMobileDrawerFocus();
+        return;
+      }
+
+      rememberMobileDrawerTrigger();
+      mobileDrawerRestoreTarget ||= mobileMembersButtonRef ?? null;
+      getState().closeMobileSidebar();
+      setMobileMembersOpen(true);
+      queueMicrotask(() => focusFirstInMobileDrawer(membersDrawerElement()));
     } else {
       getState().toggleMemberList();
     }
@@ -246,11 +362,11 @@ export function AppShell(props: AppShellProps): JSX.Element {
 
   function closeMobileMembers(): void {
     setMobileMembersOpen(false);
+    restoreMobileDrawerFocus();
   }
 
   function openHome(): void {
-    closeMobileSidebar();
-    closeMobileMembers();
+    closeActiveMobileDrawer(false);
     getState().navigate({ kind: 'home' });
   }
 
@@ -293,7 +409,14 @@ export function AppShell(props: AppShellProps): JSX.Element {
             onClick={closeMobileSidebar}
           />
         </Show>
-        <div class={`shell-sidebar-slot${mobileSidebarOpen() ? ' shell-sidebar--mobile-open' : ''}`}>
+        <div
+          ref={sidebarDrawerRef}
+          class={`shell-sidebar-slot${mobileSidebarOpen() ? ' shell-sidebar--mobile-open' : ''}`}
+          role={isMobile() && mobileSidebarOpen() ? 'dialog' : undefined}
+          aria-modal={isMobile() && mobileSidebarOpen() ? 'true' : undefined}
+          aria-label={isMobile() && mobileSidebarOpen() ? 'Channel drawer' : undefined}
+          tabindex={isMobile() && mobileSidebarOpen() ? -1 : undefined}
+        >
           <ChannelSidebar onMobileClose={closeMobileSidebar} />
         </div>
 
@@ -379,6 +502,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
           <b aria-hidden="true">⌂</b>home
         </button>
         <button
+          ref={mobileRoomsButtonRef}
           type="button"
           class={`shell-mobile-nav-btn${mobileSidebarOpen() ? ' shell-mobile-nav-btn--active' : ''}`}
           aria-label="Toggle channel list"
@@ -389,6 +513,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
         </button>
         <Show when={hasConversation()}>
           <button
+            ref={mobileMembersButtonRef}
             type="button"
             class={`shell-mobile-nav-btn${mobileMembersOpen() ? ' shell-mobile-nav-btn--active' : ''}`}
             aria-label="Toggle member list"

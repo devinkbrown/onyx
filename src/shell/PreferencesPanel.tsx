@@ -168,6 +168,11 @@ const ACCESS_AUDIT_ROWS = [
     note: 'Channel-scoped scrubber region, labelled UTC-hour jump buttons, date jump input, and target-specific moment copy action.',
   },
   {
+    surface: 'Mobile drawers',
+    status: 'checked',
+    note: 'Bottom-nav trigger handoff, drawer-initial focus, Escape close, Tab trap, and trigger focus restore.',
+  },
+  {
     surface: 'Modals',
     status: 'checked',
     note: 'Sheet focus trap, Escape close, labelled close buttons.',

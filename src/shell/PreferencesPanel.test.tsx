@@ -46,6 +46,7 @@ describe('PreferencesPanel', () => {
     expect(screen.getByText('Member list')).toBeInTheDocument();
     expect(screen.getByText('Notification controls')).toBeInTheDocument();
     expect(screen.getByText('Time scrubber')).toBeInTheDocument();
+    expect(screen.getByText('Mobile drawers')).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /Reduce transparency/i })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByText('Flatten glassy overlays and translucent panels for stronger separation from the background.')).toBeInTheDocument();
     expect(screen.getByText('Labelled Sheet, topic form, switch-mode flags, read-only non-op fallbacks.')).toBeInTheDocument();
@@ -67,6 +68,7 @@ describe('PreferencesPanel', () => {
     expect(screen.getByText('Channel-scoped member landmark, labelled role groups, named detail dialogs, and target-specific member actions.')).toBeInTheDocument();
     expect(screen.getByText('Labelled compact control group, described calm-mode radios, and pressed-state desktop/sound/push/DND toggles.')).toBeInTheDocument();
     expect(screen.getByText('Channel-scoped scrubber region, labelled UTC-hour jump buttons, date jump input, and target-specific moment copy action.')).toBeInTheDocument();
+    expect(screen.getByText('Bottom-nav trigger handoff, drawer-initial focus, Escape close, Tab trap, and trigger focus restore.')).toBeInTheDocument();
     expect(screen.queryByText(/still need a pass/i)).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Public ledger' })).toHaveAttribute(
       'href',
