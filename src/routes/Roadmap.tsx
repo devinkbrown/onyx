@@ -57,10 +57,10 @@ const phases: Phase[] = [
   {
     phase: 'Phase 6',
     title: 'Time-native',
-    state: 'planned',
-    date: 'next',
-    summary: 'Promote the vault, heatline, and time links into a calmer way to catch up.',
-    items: ['Catch-up Home', 'Reader mode', 'Followed conversations'],
+    state: 'active',
+    date: '2026-07-09',
+    summary: 'Home now brings followed activity, scheduled rooms, and calmer reading into view.',
+    items: ['Followed catch-up', 'Scheduled events on Home', 'Reader mode'],
   },
   {
     phase: 'Phase 7',
@@ -119,7 +119,7 @@ export default function RoadmapRoute() {
           <div class="data-metric">
             <span class="label">next tranche</span>
             <span class="value">Time</span>
-            <span class="note">catch-up, reader mode, access</span>
+            <span class="note">catch-up, reader mode, quiet activity</span>
           </div>
           <div class="data-metric">
             <span class="label">site role</span>
@@ -163,21 +163,21 @@ export default function RoadmapRoute() {
       <section class="r-wrap r-section data-grid" aria-label="Roadmap next steps">
         <article class="data-card">
           <span class="label">now</span>
-          <h2>Operations are visible; time comes next</h2>
+          <h2>Operations are visible; time is active</h2>
           <p>
             The site now carries `/status`, `/stats`, backup readiness, and a live
-            root pulse. The master roadmap's next client work is to make Onyx a
-            time-native place to return to: a catch-up Home, reader-mode transcript,
-            followed conversations, and quieter notification defaults.
+            root pulse. Onyx's current client work makes the app a time-native
+            place to return to: followed catch-up, scheduled room events, a
+            reader-mode transcript, and quieter activity surfaces.
           </p>
         </article>
         <aside class="data-card">
           <span class="label">open surfaces</span>
           <h3>Keep tightening</h3>
           <div class="data-list data-list--compact">
-            <div class="data-row"><div><strong>Catch-up Home</strong><span>Make return-to-network the first screen after connection.</span></div></div>
-            <div class="data-row"><div><strong>Reader mode</strong><span>Give long room history a calm transcript view.</span></div></div>
-            <div class="data-row"><div><strong>Accessibility conformance</strong><span><a href="/accessibility/">Publish the public audit ledger.</a></span></div></div>
+            <div class="data-row"><div><strong>Catch-up Home</strong><span>Fold vault recaps and quiet room activity into the return screen.</span></div></div>
+            <div class="data-row"><div><strong>Reader mode</strong><span>Wire digest and since-you-left summaries into long transcript reading.</span></div></div>
+            <div class="data-row"><div><strong>Accessibility conformance</strong><span><a href="/accessibility/">Continue the client audit from the public ledger.</a></span></div></div>
           </div>
         </aside>
       </section>
