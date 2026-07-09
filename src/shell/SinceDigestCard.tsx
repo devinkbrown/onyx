@@ -9,6 +9,7 @@ import {
   type ChannelDigest,
   type SinceDigest,
 } from '@/lib/notifications/sinceDigest';
+import { ProvenanceBadge } from './ProvenanceBadge';
 
 const MAX_VISIBLE_PARTICIPANTS = 3;
 
@@ -22,6 +23,7 @@ export function SinceDigestCard(props: {
       <header class="since-digest-card__head">
         <p class="since-digest-card__kicker">Since you left</p>
         <h2 class="since-digest-card__title">{digestHeadline(props.digest)}</h2>
+        <ProvenanceBadge scope="device" subject="Since-you-left digest" />
         <p class="since-digest-card__reader-note">{digestReaderNote(props.digest)}</p>
         <div class="since-digest-card__handoff">
           <p class="since-digest-card__since">since {formatSince(props.digest.since)}</p>

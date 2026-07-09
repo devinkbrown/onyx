@@ -81,12 +81,15 @@ describe('MessageSearch', () => {
     expect(screen.getByRole('search', { name: 'Message search' })).toBeInTheDocument();
     expect(screen.getByRole('searchbox', { name: 'Search messages' })).toHaveValue('needle');
     expect(screen.getByRole('group', { name: 'Search result navigation' })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Visible message search provenance: This device/i)).toBeInTheDocument();
 
     const archivedList = screen.getByRole('list', { name: 'Archived message results' });
+    expect(screen.getByLabelText(/Archived message search provenance: This server/i)).toBeInTheDocument();
     expect(within(archivedList).getByText('needle from archived history')).toBeInTheDocument();
 
     const vaultList = await screen.findByRole('list', { name: 'Device-memory message results' });
     await waitFor(() => {
+      expect(screen.getByLabelText(/Device-memory message search provenance: This device/i)).toBeInTheDocument();
       expect(within(vaultList).getByText('#other')).toBeInTheDocument();
       expect(within(vaultList).getByText('needle on another device-memory target')).toBeInTheDocument();
       expect(within(vaultList).getByText('#root')).toBeInTheDocument();

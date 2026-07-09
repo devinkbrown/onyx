@@ -1,0 +1,29 @@
+.provenance-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 1.35rem;
+  padding: 0.12rem 0.45rem;
+  border: 1px solid color-mix(in oklab, var(--lapis-bright) 32%, var(--line));
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--lapis) 10%, transparent);
+  color: var(--lapis-bright);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.provenance-badge[data-scope='server'] {
+  border-color: color-mix(in oklab, var(--washi-dim) 36%, var(--line));
+  background: color-mix(in oklab, var(--stone-2) 42%, transparent);
+  color: var(--washi-dim);
+}
+
+.provenance-badge[data-scope='external'] {
+  border-color: color-mix(in oklab, var(--shu-bright) 34%, var(--line));
+  background: color-mix(in oklab, var(--shu) 10%, transparent);
+  color: var(--shu-bright);
+}

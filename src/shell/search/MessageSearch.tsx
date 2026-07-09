@@ -8,6 +8,7 @@ import {
   closeMessageSearch,
   useMessageSearch,
 } from './useMessageSearch';
+import { ProvenanceBadge } from '@/shell/ProvenanceBadge';
 import './message-search.css';
 
 export type MessageSearchProps = JSX.HTMLAttributes<HTMLDivElement>;
@@ -152,6 +153,11 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
           <output class="onyx-message-search__count" aria-live="polite">
             {countLabel()}
           </output>
+          <ProvenanceBadge
+            scope="device"
+            subject="Visible message search"
+            class="onyx-message-search__provenance"
+          />
           <div class="onyx-message-search__controls" role="group" aria-label="Search result navigation">
             <button
               type="button"
@@ -225,6 +231,7 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
         <Show when={search.canServerSearch() && search.query().trim().length > 0}>
           <div class="onyx-message-search__server" data-testid="server-search">
             <div class="onyx-message-search__server-bar">
+              <ProvenanceBadge scope="server" subject="Archived message search" />
               <button
                 type="button"
                 class="onyx-message-search__deep"
@@ -276,6 +283,7 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
         <Show when={search.vaultResults().length > 0}>
           <div class="onyx-message-search__vault" data-testid="vault-search">
             <div class="onyx-message-search__vault-bar">
+              <ProvenanceBadge scope="device" subject="Device-memory message search" />
               <span class="onyx-message-search__vault-label">Saved on this device</span>
               <span class="onyx-message-search__server-count">
                 {search.vaultResults().length} remembered

@@ -461,6 +461,10 @@ client or public site needs to expose the result.
 34. **AI provenance chrome** *(client)* — every recap, search answer,
     translation, or moderation suggestion must show where inference ran: this
     device, this server, or an external endpoint.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Since-you-left recaps and message
+    search surfaces now share typed provenance badges, labelling visible-buffer
+    and vault results as "This device" and archived full-history results as
+    "This server" with accessible descriptions for future AI-assisted outputs.
 35. **Vault RAG and semantic recall** *(client)* — add local embeddings over the
     decrypted vault for "when did we decide X?" queries that stay on the user's
     device when content is private.

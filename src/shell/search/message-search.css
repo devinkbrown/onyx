@@ -18,7 +18,7 @@
   pointer-events: auto;
   width: min(42rem, 100%);
   display: grid;
-  grid-template-columns: auto minmax(7rem, 1fr) auto auto;
+  grid-template-columns: auto minmax(7rem, 1fr) auto auto auto;
   align-items: center;
   gap: 0.65rem;
   padding: 0.45rem;
@@ -83,6 +83,10 @@
   letter-spacing: 0.1em;
   text-align: center;
   white-space: nowrap;
+}
+
+.onyx-message-search__provenance {
+  justify-self: end;
 }
 
 .onyx-message-search__controls {
@@ -187,10 +191,15 @@
   }
 
   .onyx-message-search__controls {
-    grid-column: 1 / -1;
+    grid-column: 2 / -1;
     justify-content: flex-end;
     padding-top: 0.15rem;
     border-top: 1px solid var(--seam-faint);
+  }
+
+  .onyx-message-search__provenance {
+    grid-column: 1 / 2;
+    justify-self: start;
   }
 }
 

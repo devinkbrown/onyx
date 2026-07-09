@@ -102,6 +102,8 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Integrations page')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Local intelligence' })).toBeInTheDocument();
     expect(screen.getByText('AI provenance chrome')).toBeInTheDocument();
+    expect(screen.getByText('Search provenance labels')).toBeInTheDocument();
+    expect(screen.getByText('Digest provenance labels')).toBeInTheDocument();
     expect(screen.getByText('Agent safety page')).toBeInTheDocument();
     expect(screen.getByText('Provenance labels')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Roaming' })).toBeInTheDocument();
