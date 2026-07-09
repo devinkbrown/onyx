@@ -519,6 +519,11 @@ client or public site needs to expose the result.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Reviewing a since-you-left digest
     now records the reviewed span into local review history, so Home and offline
     recall can reopen the same catch-up anchor after the boundary is cleared.
+    ✅ **CLIENT + WEBSITE SLICE SHIPPED 2026-07-09** — Preferences now exposes a
+    local language tools surface with a "This device" provenance badge, caption
+    transcript copy readiness, browser-local translator detection, and an
+    explicit no-external-translation guarantee. The public agent-safety page now
+    documents browser-local language tools under the same provenance contract.
 37. **Agent-safe public contract** *(client + main site)* — document that channel
     content is hostile input for any agent surface, exclude E2EE payloads, and
     require visible audit trails for agent actions.

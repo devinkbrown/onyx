@@ -10,7 +10,7 @@
  * SOLID IDIOMS: component runs once; never destructure props; For/Show; createMemo.
  */
 
-import { createSignal, For, Show, type JSX } from 'solid-js';
+import { createMemo, createSignal, For, Show, type JSX } from 'solid-js';
 import { Sheet } from '@/primitives';
 import { clearVault } from '@/lib/vault/historyVault';
 import {
@@ -25,7 +25,9 @@ import {
   parsePortableTransfer,
   type PortableTransferSnapshot,
 } from '@/lib/vault/portableTransfer';
+import { localTranslationReadiness, preferredTranslationTarget } from '@/lib/intelligence/localLanguage';
 import { CalmModeControl } from './CalmModeControl';
+import { ProvenanceBadge } from './ProvenanceBadge';
 import {
   SCENE_MOTIONS,
   resetSceneMotion,
@@ -483,6 +485,40 @@ function ExtensionAuditControls(): JSX.Element {
   );
 }
 
+function LocalLanguageTools(): JSX.Element {
+  const targetLanguage = createMemo(() => preferredTranslationTarget());
+  const translation = createMemo(() => localTranslationReadiness(targetLanguage()));
+
+  return (
+    <section class="pref-group pref-local-language" aria-labelledby="pref-local-language-title">
+      <div class="pref-group-head pref-local-language__head">
+        <h3 id="pref-local-language-title" class="pref-label">Local language tools</h3>
+        <ProvenanceBadge scope="device" subject="Local language tools" />
+      </div>
+      <p class="pref-desc">
+        Caption and translation handoffs stay local-first. Onyx labels what can
+        run on this device and refuses hidden external translation.
+      </p>
+      <div class="pref-local-language__rows" role="list" aria-label="Local language tool readiness">
+        <div class="pref-local-language__row" role="listitem">
+          <span class="pref-local-language__status">Ready</span>
+          <span class="pref-local-language__main">
+            <span class="pref-local-language__title">Caption transcript copy</span>
+            <span class="pref-desc">Live caption overlays can copy the current transcript from local client state.</span>
+          </span>
+        </div>
+        <div class="pref-local-language__row" role="listitem" data-state={translation().state}>
+          <span class="pref-local-language__status">{translation().state}</span>
+          <span class="pref-local-language__main">
+            <span class="pref-local-language__title">{translation().label}</span>
+            <span class="pref-desc">{translation().detail}</span>
+          </span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function PreferenceSection(props: { title: string; description: string }): JSX.Element {
   return (
     <div class="pref-section">
@@ -628,6 +664,8 @@ export function PreferencesPanel(): JSX.Element {
         <PortableVaultControls />
 
         <ExtensionAuditControls />
+
+        <LocalLanguageTools />
 
         <PreferenceSection
           title="Accessibility"

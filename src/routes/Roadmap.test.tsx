@@ -132,6 +132,9 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Caption provenance labels')).toBeInTheDocument();
     expect(screen.getByText('Caption transcript copy')).toBeInTheDocument();
     expect(screen.getByText('Extension action audit')).toBeInTheDocument();
+    expect(screen.getByText('Local language tools')).toBeInTheDocument();
+    expect(screen.getByText('Browser translator readiness')).toBeInTheDocument();
+    expect(screen.getByText('No external translation endpoint')).toBeInTheDocument();
     expect(screen.getByText('Digest recall terms')).toBeInTheDocument();
     expect(screen.getByText('Digest review history')).toBeInTheDocument();
     expect(screen.getByText('Search recall pivots')).toBeInTheDocument();

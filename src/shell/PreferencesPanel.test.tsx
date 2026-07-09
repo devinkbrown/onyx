@@ -34,6 +34,13 @@ describe('PreferencesPanel', () => {
     expect(screen.getByLabelText('Import portable JSON')).toHaveAttribute('type', 'file');
     expect(screen.getByRole('heading', { name: 'Extension action audit' })).toBeInTheDocument();
     expect(screen.getByText('No extension actions recorded on this device.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Local language tools' })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Local language tools provenance: This device/i)).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Local language tool readiness' })).toBeInTheDocument();
+    expect(screen.getByText('Caption transcript copy')).toBeInTheDocument();
+    expect(screen.getByText('Live caption overlays can copy the current transcript from local client state.')).toBeInTheDocument();
+    expect(screen.getByText(/No browser local translator detected|Browser local translator available/)).toBeInTheDocument();
+    expect(screen.getByText(/will not send message text to an external translation endpoint|on-device translator/)).toBeInTheDocument();
     expect(screen.getByText('Connect')).toBeInTheDocument();
     expect(screen.getByText('Channel settings')).toBeInTheDocument();
     expect(screen.getByText('Voice controls')).toBeInTheDocument();
