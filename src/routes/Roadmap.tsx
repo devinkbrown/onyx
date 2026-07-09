@@ -92,7 +92,7 @@ const phases: Phase[] = [
     state: 'planned',
     date: 'planned',
     summary: 'Consolidate the background system and finish mechanically derived accessibility variants, including reduced transparency, contrast, and mobile drawer focus semantics.',
-    items: ['Background consolidation', 'Theme-reactive identity', 'Contrast variants', 'Reduced-transparency variants', 'Mobile drawer focus management', 'Deterministic time scrubber jumps'],
+    items: ['Background consolidation', 'Theme-reactive identity', 'Contrast variants', 'Reduced-transparency variants', 'User reduced-transparency control', 'Mobile drawer focus management', 'Deterministic time scrubber jumps'],
   },
   {
     phase: 'Phase 11',

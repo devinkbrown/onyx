@@ -454,6 +454,14 @@ export function PreferencesPanel(): JSX.Element {
           onToggle={(value) => setPreference('reduceMotion', value)}
         />
 
+        <Toggle
+          legend="Transparency"
+          title="Reduce transparency"
+          description="Flatten glassy overlays and translucent panels for stronger separation from the background."
+          value={() => preferences().reduceTransparency}
+          onToggle={(value) => setPreference('reduceTransparency', value)}
+        />
+
         <AccessibilityAuditLedger />
 
         <button type="button" class="pref-reset" onClick={() => resetPreferences()}>

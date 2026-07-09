@@ -73,6 +73,52 @@
   scroll-behavior: auto !important;
 }
 
+/* ── Reduce transparency ─────────────────────────────────────────────────────
+   Force-solid panel/chrome surfaces for users who prefer clearer separation
+   from the animated background. Mirrors the OS media preference below. */
+
+:root[data-reduce-transparency='true'] .shell-sidebar,
+:root[data-prefers-reduced-transparency='true'] .shell-sidebar,
+:root[data-reduce-transparency='true'] .shell-ribbon,
+:root[data-prefers-reduced-transparency='true'] .shell-ribbon,
+:root[data-reduce-transparency='true'] .shell-composer,
+:root[data-prefers-reduced-transparency='true'] .shell-composer,
+:root[data-reduce-transparency='true'] .shell-members,
+:root[data-prefers-reduced-transparency='true'] .shell-members,
+:root[data-reduce-transparency='true'] .pref-segments,
+:root[data-prefers-reduced-transparency='true'] .pref-segments,
+:root[data-reduce-transparency='true'] .pref-toggle,
+:root[data-prefers-reduced-transparency='true'] .pref-toggle {
+  background: var(--stone) !important;
+  border-color: var(--seam) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+:root[data-reduce-transparency='true'] .shell-msg-group,
+:root[data-prefers-reduced-transparency='true'] .shell-msg-group,
+:root[data-reduce-transparency='true'] .home-card,
+:root[data-prefers-reduced-transparency='true'] .home-card,
+:root[data-reduce-transparency='true'] .shell-topic-card,
+:root[data-prefers-reduced-transparency='true'] .shell-topic-card {
+  background: color-mix(in oklab, var(--stone) 92%, var(--ink)) !important;
+  border-color: var(--seam) !important;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root:not([data-reduce-transparency='false']) .shell-sidebar,
+  :root:not([data-reduce-transparency='false']) .shell-ribbon,
+  :root:not([data-reduce-transparency='false']) .shell-composer,
+  :root:not([data-reduce-transparency='false']) .shell-members,
+  :root:not([data-reduce-transparency='false']) .pref-segments,
+  :root:not([data-reduce-transparency='false']) .pref-toggle {
+    background: var(--stone) !important;
+    border-color: var(--seam) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}
+
 /* ── Panel styling ───────────────────────────────────────────────────────────
    The Preferences sheet content. Theme-token colours only; designed focus +
    selected states. */

@@ -37,7 +37,14 @@ describe('preferences store', () => {
     it('restores a fully-valid stored payload', () => {
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ density: 'compact', fontScale: 'lg', hideEvents: true, width: 'full', reduceMotion: true }),
+        JSON.stringify({
+          density: 'compact',
+          fontScale: 'lg',
+          hideEvents: true,
+          width: 'full',
+          reduceMotion: true,
+          reduceTransparency: true,
+        }),
       );
       expect(loadPreferences()).toEqual({
         density: 'compact',
@@ -46,6 +53,7 @@ describe('preferences store', () => {
         width: 'full',
         readerMode: false,
         reduceMotion: true,
+        reduceTransparency: true,
         linkPreviews: true,
         clock: '24h',
         localHistory: true,
@@ -65,6 +73,7 @@ describe('preferences store', () => {
         width: DEFAULT_PREFERENCES.width,
         readerMode: DEFAULT_PREFERENCES.readerMode,
         reduceMotion: false,
+        reduceTransparency: DEFAULT_PREFERENCES.reduceTransparency,
         linkPreviews: true,
         clock: '24h',
         localHistory: true,
@@ -112,6 +121,7 @@ describe('preferences store', () => {
         width: 'full',
         readerMode: true,
         reduceMotion: true,
+        reduceTransparency: true,
         linkPreviews: false,
         clock: '12h',
         localHistory: false,
@@ -124,6 +134,7 @@ describe('preferences store', () => {
       expect(ds.hideEvents).toBe('true');
       expect(ds.width).toBe('full');
       expect(ds.reduceMotion).toBe('true');
+      expect(ds.reduceTransparency).toBe('true');
     });
 
     it('applies the live store value when called without an argument', () => {
@@ -138,10 +149,12 @@ describe('preferences store', () => {
     it('restores defaults in the signal, storage and DOM', () => {
       setPreference('density', 'compact');
       setPreference('reduceMotion', true);
+      setPreference('reduceTransparency', true);
       resetPreferences();
       expect(preferences()).toEqual(DEFAULT_PREFERENCES);
       expect(readStored()).toEqual(DEFAULT_PREFERENCES);
       expect(document.documentElement.dataset.reduceMotion).toBe('false');
+      expect(document.documentElement.dataset.reduceTransparency).toBe('false');
     });
   });
 

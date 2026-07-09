@@ -393,6 +393,10 @@ client or public site needs to expose the result.
     — mechanically derive `prefers-contrast: more`, forced-colors, and
     reduced-transparency variants from the same tokens already used by the app
     and site; finish mobile drawer focus handoff/trap/restore semantics.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Preferences now includes an
+    explicit reduced-transparency control that persists to the app preference
+    model, reflects as `data-reduce-transparency`, and shares the same solid
+    panel/chrome rules as the OS `prefers-reduced-transparency` path.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Time scrubber hourly bars now
     activate exactly at the announced `HH:00 UTC` moment for pointer and
     keyboard users.
