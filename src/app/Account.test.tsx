@@ -112,6 +112,7 @@ describe('Account panel — signed in', () => {
     expect(screen.getByRole('region', { name: 'Email' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Password' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Protection' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Device encryption keys' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Delete account' })).toBeInTheDocument();
   });
 
@@ -205,6 +206,32 @@ describe('Account panel — signed in', () => {
     fireEvent.click(screen.getByRole('button', { name: /bind this connection's certificate/i }));
     expect(addSpy).toHaveBeenCalled();
     expect(listSpy).toHaveBeenCalled();
+  });
+
+  it('lists E2EE device keys and refreshes key transparency status', () => {
+    const listSpy = vi.spyOn(getState(), 'e2eeKeyList');
+    const statusSpy = vi.spyOn(getState(), 'keyTransparencyStatus');
+    renderPanel({ account: 'alice' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'List device keys' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh transparency root' }));
+
+    expect(listSpy).toHaveBeenCalled();
+    expect(statusSpy).toHaveBeenCalled();
+  });
+
+  it('surfaces E2EEKEY and KEYTRANS account notices', () => {
+    renderPanel({ account: 'alice' });
+    store.setState({
+      serviceNotices: [
+        { source: 'Account', text: 'E2EEKEY STATUS account=alice devices=1', time: new Date() },
+        { source: 'Account', text: 'KEYTRANS STATUS enabled entries=2 root=abc', time: new Date() },
+      ],
+    });
+
+    expect(screen.getByRole('list', { name: 'E2EE device key notices' })).toBeInTheDocument();
+    expect(screen.getByText('E2EEKEY STATUS account=alice devices=1')).toBeInTheDocument();
+    expect(screen.getByText('KEYTRANS STATUS enabled entries=2 root=abc')).toBeInTheDocument();
   });
 
   it('sign out dispatches LOGOUT', () => {

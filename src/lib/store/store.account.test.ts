@@ -119,6 +119,38 @@ describe('account actions — raw command dispatch', () => {
     store.getState().dropAccount('alice', 'hunter2');
     expect(client.sendRaw).toHaveBeenCalledWith('DROP', 'alice', 'hunter2');
   });
+
+  it('E2EEKEY actions dispatch account device-key commands', () => {
+    const client = makeClient();
+    store.setState({ client: client as never });
+
+    store.getState().e2eeKeyStatus();
+    store.getState().e2eeKeyList();
+    store.getState().e2eeKeyList('alice');
+    store.getState().e2eeKeyAdd('laptop', 'mls-x25519', 'abcd+/=');
+    store.getState().e2eeKeyDelete('laptop');
+    store.getState().e2eeKeyAdd('bad device', 'mls-x25519', 'abcd+/=');
+
+    expect(client.sendRaw).toHaveBeenNthCalledWith(1, 'E2EEKEY', 'STATUS');
+    expect(client.sendRaw).toHaveBeenNthCalledWith(2, 'E2EEKEY', 'LIST');
+    expect(client.sendRaw).toHaveBeenNthCalledWith(3, 'E2EEKEY', 'LIST', 'alice');
+    expect(client.sendRaw).toHaveBeenNthCalledWith(4, 'E2EEKEY', 'ADD', 'laptop', 'mls-x25519', 'abcd+/=');
+    expect(client.sendRaw).toHaveBeenNthCalledWith(5, 'E2EEKEY', 'DEL', 'laptop');
+    expect(client.sendRaw).toHaveBeenCalledTimes(5);
+  });
+
+  it('KEYTRANS actions dispatch transparency commands', () => {
+    const client = makeClient();
+    store.setState({ client: client as never });
+
+    store.getState().keyTransparencyStatus();
+    store.getState().keyTransparencyProof(42);
+    store.getState().keyTransparencyProof(-1);
+
+    expect(client.sendRaw).toHaveBeenNthCalledWith(1, 'KEYTRANS', 'STATUS');
+    expect(client.sendRaw).toHaveBeenNthCalledWith(2, 'KEYTRANS', 'PROOF', '42');
+    expect(client.sendRaw).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('account replies — state from the message handler', () => {
@@ -161,6 +193,14 @@ describe('account replies — state from the message handler', () => {
     expect(store.getState().accountActionError).toMatchObject({
       command: 'IDENTIFY',
       code: 'TEMPORARILY_UNAVAILABLE',
+    });
+  });
+
+  it('FAIL E2EEKEY surfaces accountActionError', () => {
+    feed(':eshmaki.me FAIL E2EEKEY BAD_DEVICE :Device id must use safe characters');
+    expect(store.getState().accountActionError).toMatchObject({
+      command: 'E2EEKEY',
+      code: 'BAD_DEVICE',
     });
   });
 

@@ -772,6 +772,11 @@ export class IRCClient {
       // its own blind autojoin storm. Always request it when offered; the
       // store gates autojoin suppression on negotiatedCaps having it.
       // (Falls through to `return true` — listed here only for documentation.)
+      //
+      // orochi/e2ee: message-tag and channel-policy signaling. The store adds
+      // +orochi/e2ee only after the browser E2EE DM path has sealed the payload,
+      // and reads the channel encryption-policy PROP.
+      // (Falls through to `return true`.)
 
       return true;
     });

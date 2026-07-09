@@ -35,8 +35,8 @@ const phases: Phase[] = [
     title: 'Privacy',
     state: 'complete',
     date: '2026-07-02',
-    summary: 'DMs and short-lived rooms keep private state out of durable replay.',
-    items: ['Tsumugi-encrypted DMs', 'Ephemeral room TTL', 'Ciphertext-only vault/search'],
+    summary: 'DMs, room policies, and account key surfaces keep private state out of durable replay while exposing verifiable identity hooks.',
+    items: ['Tsumugi-encrypted DMs', 'Orochi E2EE capability', 'Encrypted message tags', 'Channel encryption policy', 'Account device-key publishing', 'Key transparency status', 'Ephemeral room TTL', 'Ciphertext-only vault/search'],
   },
   {
     phase: 'Phase 4',

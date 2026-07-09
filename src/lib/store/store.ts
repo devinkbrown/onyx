@@ -10,6 +10,17 @@ import { getMountedSuimyakuMediaEngine } from '@/lib/suimyaku-media/MediaEngine'
 import { parseActivity } from '@/lib/activity';
 import { OUTBOX_MAX_AGE_MS, deleteOutboxEntry, loadAround, loadOutbox, loadRecent, queueOutbox, type OutboxEntry } from '@/lib/vault/historyVault';
 import { deviceKeys, isEnvelope, openDm, sealDm } from '@/lib/e2ee/dmCipher';
+import {
+  ENCRYPTION_POLICY_PROP,
+  E2EE_CAP,
+  e2eeDevicePropKey,
+  e2eeDeviceValue,
+  e2eeMessageTag,
+  parseE2eeMessageTag,
+  parseEncryptionPolicy,
+  type E2eeMessageKind,
+  type EncryptionPolicy,
+} from '@/lib/e2ee/policy';
 import { preferences } from '@/lib/prefs/preferences';
 import { parseEventTime } from '@/lib/deeplink';
 import { isValidTopicLabel, parseMessageTopic, topicMessageTag } from '@/lib/topics/topics';
@@ -607,6 +618,18 @@ export interface OnyxState {
   certList(): void;
   /** `CERTDEL <fingerprint>` — unbind a fingerprint (server.zig handleCertDel). */
   certDel(fingerprint: string): void;
+  /** `E2EEKEY STATUS` — summarize E2EE device keys registered for this account. */
+  e2eeKeyStatus(): void;
+  /** `E2EEKEY LIST [account]` — list registered E2EE device keys. */
+  e2eeKeyList(account?: string): void;
+  /** `E2EEKEY ADD <device-id> <algorithm> <public-key>` — publish a device key. */
+  e2eeKeyAdd(deviceId: string, algorithm: string, publicKey: string): void;
+  /** `E2EEKEY DEL <device-id>` — remove a registered E2EE device key. */
+  e2eeKeyDelete(deviceId: string): void;
+  /** `KEYTRANS STATUS` — fetch the account credential transparency root. */
+  keyTransparencyStatus(): void;
+  /** `KEYTRANS PROOF <position>` — fetch a credential inclusion proof. */
+  keyTransparencyProof(position: number): void;
 
   // ── MONITOR ─────────────────────────────────────────────────────────
   /** Tracks which nicks we've added to the MONITOR list */
@@ -966,6 +989,7 @@ export interface OnyxState {
 
   // Ephemeral room history (IRCX EPHEMERAL channel prop; seconds, 0 = off)
   setChannelEphemeral(channel: string, seconds: number): void;
+  setChannelEncryptionPolicy(channel: string, policy: EncryptionPolicy): void;
 
   // MONITOR (presence)
   monitorAdd(nick: string): void;
@@ -2137,6 +2161,8 @@ const ACCOUNT_COMMANDS = new Set([
   'LOGOUT',
   'RECOVER',
   'DROP',
+  'E2EEKEY',
+  'KEYTRANS',
 ]);
 
 /**
@@ -3126,12 +3152,14 @@ export const store = createStore<OnyxState>()(
         const isDm = target.length > 0 && !cp.includes(target[0]!);
         const peerKey = get().peerDmKeys.get(target.toLowerCase());
         if (isDm && peerKey && preferences().e2eeDms) {
-          const replyTag = outboundTagPrefix;
+          const encryptedKind: E2eeMessageKind | null = client.negotiatedCaps.has(E2EE_CAP) ? 'mls' : null;
+          const encryptedOutboundTags = encryptedKind ? { ...outboundTags, ...e2eeMessageTag(encryptedKind) } : outboundTags;
+          const encryptedOutboundTagPrefix = formatClientTags(encryptedOutboundTags);
           void sealDm(peerKey, text).then((envelope) => {
             if (!envelope) {
               // Sealing genuinely failed — send plaintext rather than drop the
               // message, and echo it unencrypted (no lock chip, honestly).
-              client.send(`${replyTag}PRIVMSG ${target} :${text}\r\n`);
+              client.send(`${outboundTagPrefix}PRIVMSG ${target} :${text}\r\n`);
               if (!waitForServerEcho) {
                 set(s => _addMessage(s, target, {
                   id: uid(), time: new Date(), from: ourNick, text, type: 'msg', target,
@@ -3140,13 +3168,14 @@ export const store = createStore<OnyxState>()(
               }
               return;
             }
-            client.send(`${replyTag}PRIVMSG ${target} :${envelope}\r\n`);
+            client.send(`${encryptedOutboundTagPrefix}PRIVMSG ${target} :${envelope}\r\n`);
             if (!waitForServerEcho) {
               // Echo stores the ENVELOPE as text (ciphertext at rest) with the
               // plaintext held transiently for display — same shape as inbound.
               set(s => _addMessage(s, target, {
                 id: uid(), time: new Date(), from: ourNick, text: envelope, plaintext: text,
                 type: 'msg', target, encrypted: true,
+                ...(encryptedKind ? { e2ee: encryptedKind } : {}),
                 ...(replySnapshot ? { replyTo: replySnapshot } : {}),
               }));
             }
@@ -3360,6 +3389,40 @@ export const store = createStore<OnyxState>()(
       const fp = fingerprint.trim();
       if (!client || !fp) return;
       client.sendRaw('CERTDEL', fp);
+    },
+
+    e2eeKeyStatus() {
+      get().client?.sendRaw('E2EEKEY', 'STATUS');
+    },
+
+    e2eeKeyList(account) {
+      const acct = account?.trim();
+      if (acct) get().client?.sendRaw('E2EEKEY', 'LIST', acct);
+      else get().client?.sendRaw('E2EEKEY', 'LIST');
+    },
+
+    e2eeKeyAdd(deviceId, algorithm, publicKey) {
+      const id = deviceId.trim();
+      if (!e2eeDevicePropKey(id)) return;
+      const value = e2eeDeviceValue(algorithm, publicKey);
+      if (!id || !value) return;
+      const colon = value.indexOf(':');
+      get().client?.sendRaw('E2EEKEY', 'ADD', id, value.slice(0, colon), value.slice(colon + 1));
+    },
+
+    e2eeKeyDelete(deviceId) {
+      const id = deviceId.trim();
+      if (!id) return;
+      get().client?.sendRaw('E2EEKEY', 'DEL', id);
+    },
+
+    keyTransparencyStatus() {
+      get().client?.sendRaw('KEYTRANS', 'STATUS');
+    },
+
+    keyTransparencyProof(position) {
+      if (!Number.isInteger(position) || position < 0) return;
+      get().client?.sendRaw('KEYTRANS', 'PROOF', String(position));
     },
 
     // ── requestHistory ───────────────────────────────────────────────────
@@ -3861,6 +3924,10 @@ export const store = createStore<OnyxState>()(
       if (!Number.isInteger(seconds)) return;
       if (seconds !== 0 && (seconds < 60 || seconds > 30 * 24 * 60 * 60)) return;
       get()._writeChannelProp(channel, 'EPHEMERAL', String(seconds));
+    },
+
+    setChannelEncryptionPolicy(channel, policy) {
+      get()._writeChannelProp(channel, ENCRYPTION_POLICY_PROP, parseEncryptionPolicy(policy));
     },
 
     // ── IRCX PROP requests ────────────────────────────────────────────────
@@ -5446,7 +5513,7 @@ export const store = createStore<OnyxState>()(
               (/\b(MEMO|MEMOS)\b/.test(textUpper) ? 'Memo' : undefined) ??
               (/\bWEBHOOK\b/.test(textUpper) ? 'Webhook' : undefined) ??
               (/\bVHOST\b/.test(textUpper) ? 'VHost' : undefined) ??
-              (/\b(ACCESS LIST|HOST MASK|CERTIFICATE|CERTLIST|CERTADD|CERTDEL|FINGERPRINT)\b/.test(textUpper) ? 'Account' : undefined) ??
+              (/\b(ACCESS LIST|HOST MASK|CERTIFICATE|CERTLIST|CERTADD|CERTDEL|FINGERPRINT|E2EEKEY|KEYTRANS)\b/.test(textUpper) ? 'Account' : undefined) ??
               (/\b(ACCOUNT|IDENTIFIED|REGISTERED|PASSWORD|EMAIL|GHOST|RECOVER|GROUPED|UNGROUP)\b/.test(textUpper) ? 'Account' : undefined);
 
             if (serviceSource) {
@@ -5733,6 +5800,7 @@ export const store = createStore<OnyxState>()(
 
           // Use server-provided msgid when available (e.g. from CHATHISTORY batch)
           const serverMsgId = tags['msgid'] ?? tags['draft/msgid'];
+          const e2eeTag = parseE2eeMessageTag(tags);
           // E2EE: a DM carrying a Tsumugi envelope stays ciphertext in the
           // store (and thus in CHATHISTORY/vault) until decrypted in place.
           // The view shows a locked placeholder while `text` is an envelope.
@@ -5747,6 +5815,7 @@ export const store = createStore<OnyxState>()(
             target: msgTarget,
             topic: messageTopic,
             ...(isEncryptedDm ? { encrypted: true } : {}),
+            ...(e2eeTag ? { e2ee: e2eeTag } : {}),
             ...(replyTo ? { replyTo } : {}),
           };
 
@@ -9062,6 +9131,11 @@ export const selectChannelEphemeralSeconds = (channel: string) => (s: OnyxState)
   if (!Number.isInteger(seconds) || seconds <= 0) return null;
   if (seconds < 60 || seconds > 30 * 24 * 60 * 60) return null;
   return seconds;
+};
+
+export const selectChannelEncryptionPolicy = (channel: string) => (s: OnyxState): EncryptionPolicy => {
+  const props = s.channelProps.get(channel.toLowerCase());
+  return parseEncryptionPolicy(props?.[ENCRYPTION_POLICY_PROP]);
 };
 
 export const selectIsChannelOp = (channel: string) => (s: OnyxState): boolean => {

@@ -31,6 +31,7 @@ import {
 import {
   useStore,
   getState,
+  selectChannelEncryptionPolicy,
   selectChannelEphemeralSeconds,
   selectChannelModeState,
   selectIsChannelOp,
@@ -59,6 +60,12 @@ const EPHEMERAL_PRESETS: ReadonlyArray<{ seconds: number; label: string }> = [
   { seconds: 2_592_000, label: '30 days' },
 ];
 
+const ENCRYPTION_POLICIES = [
+  { value: 'off', label: 'Off', hint: 'Plaintext and encrypted messages are both accepted.' },
+  { value: 'optional', label: 'Optional', hint: 'Encrypted messages are marked when clients support Orochi E2EE.' },
+  { value: 'required', label: 'Required', hint: 'Clients should send only E2EE-tagged payloads here.' },
+] as const;
+
 function formatEphemeral(seconds: number | null): string {
   if (!seconds) return 'Full history';
   const preset = EPHEMERAL_PRESETS.find((p) => p.seconds === seconds);
@@ -82,6 +89,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
   const channels = useStore((s) => s.channels);
   const modeState = useStore((s) => selectChannelModeState(local.channel)(s));
   const ephemeralSeconds = useStore((s) => selectChannelEphemeralSeconds(local.channel)(s));
+  const encryptionPolicy = useStore((s) => selectChannelEncryptionPolicy(local.channel)(s));
   const serviceNotices = useStore((s) => s.serviceNotices);
   const isOp = useStore((s) => selectIsChannelOp(local.channel)(s));
   const connectionStatus = useStore((s) => s.connectionStatus);
@@ -176,6 +184,25 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
     if (!Number.isInteger(seconds)) return;
     if (seconds === (ephemeralSeconds() ?? 0)) return;
     getState().setChannelEphemeral(channel()?.name ?? local.channel, seconds);
+  }
+
+  // ── E2EE message policy (IRCX encryption-policy prop) ─────────────────────
+  const [encryptionDraft, setEncryptionDraft] = createSignal('off');
+  createEffect(() => {
+    if (local.open) setEncryptionDraft(encryptionPolicy());
+  });
+
+  const encryptionPolicyLabel = createMemo(() =>
+    ENCRYPTION_POLICIES.find((policy) => policy.value === encryptionPolicy())?.label ?? 'Off',
+  );
+
+  function applyEncryptionPolicy(event: Event): void {
+    event.preventDefault();
+    if (!isOp() || !isConnected()) return;
+    const next = encryptionDraft();
+    if (next === encryptionPolicy()) return;
+    if (next !== 'off' && next !== 'optional' && next !== 'required') return;
+    getState().setChannelEncryptionPolicy(channel()?.name ?? local.channel, next);
   }
 
   // ── Incoming webhooks (WEBHOOK command) ─────────────────────────────────
@@ -386,6 +413,45 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
               </p>
               <Button type="submit" variant="ghost" size="sm" disabled={!isConnected() || ephemeralDraft() === String(ephemeralSeconds() ?? 0)}>
                 Apply retention
+              </Button>
+            </form>
+          </Show>
+        </section>
+
+        {/* ── Encryption policy ── */}
+        <section class="shell-chset-section" aria-labelledby="chset-encryption-heading">
+          <h3 id="chset-encryption-heading" class="shell-chset-heading">Encryption</h3>
+
+          <Show
+            when={isOp()}
+            fallback={
+              <div class="shell-chset-readonly">
+                <p class="shell-chset-readonly-label">Message policy</p>
+                <p class="shell-chset-readonly-value shell-chset-modes-mono">
+                  {encryptionPolicyLabel()}
+                </p>
+                <p class="shell-chset-hint">Only ops can change the channel encryption policy.</p>
+              </div>
+            }
+          >
+            <form onSubmit={applyEncryptionPolicy} class="shell-chset-param shell-chset-retention">
+              <label class="shell-chset-label" for="chset-encryption">Message policy</label>
+              <select
+                id="chset-encryption"
+                class="shell-chset-select"
+                value={encryptionDraft()}
+                aria-describedby="chset-encryption-hint"
+                onChange={(e) => setEncryptionDraft(e.currentTarget.value)}
+              >
+                <For each={ENCRYPTION_POLICIES}>
+                  {(policy) => <option value={policy.value}>{policy.label}</option>}
+                </For>
+              </select>
+              <p id="chset-encryption-hint" class="shell-chset-hint">
+                {ENCRYPTION_POLICIES.find((policy) => policy.value === encryptionDraft())?.hint}
+              </p>
+              <Button type="submit" variant="ghost" size="sm" disabled={!isConnected() || encryptionDraft() === encryptionPolicy()}>
+                Apply policy
               </Button>
             </form>
           </Show>

@@ -71,6 +71,9 @@ export interface ChatMessage {
    *  ciphertext envelope (so the wire, CHATHISTORY and the vault only ever
    *  carry ciphertext). The decrypted view text lives in `plaintext`. */
   encrypted?: boolean;
+  /** Orochi `+orochi/e2ee` message tag when the sender marked the payload as
+   *  end-to-end encrypted at the protocol layer. */
+  e2ee?: 'generic' | 'mls' | 'sframe';
   /** Decrypted body of an `encrypted` DM — transient, view-only, NEVER
    *  persisted (the vault strips it). Absent = not yet / can't decrypt. */
   plaintext?: string;

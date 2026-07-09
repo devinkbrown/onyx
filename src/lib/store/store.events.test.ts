@@ -6,7 +6,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { store, selectChannelEphemeralSeconds, selectChannelEvent } from './store';
+import { store, selectChannelEncryptionPolicy, selectChannelEphemeralSeconds, selectChannelEvent } from './store';
 
 const initialState = store.getInitialState();
 
@@ -107,5 +107,25 @@ describe('ephemeral room prop', () => {
     store.getState().setChannelEphemeral('#room', 0);
     expect(sendRaw).toHaveBeenLastCalledWith('PROP', '#room', 'EPHEMERAL', '0');
     expect(selectChannelEphemeralSeconds('#room')(store.getState())).toBeNull();
+  });
+});
+
+describe('channel encryption policy prop', () => {
+  it('parses channel encryption policy values and defaults invalid values to off', () => {
+    store.setState({ channelProps: new Map([['#room', { 'encryption-policy': 'required' }]]) });
+    expect(selectChannelEncryptionPolicy('#room')(store.getState())).toBe('required');
+
+    store.setState({ channelProps: new Map([['#room', { 'encryption-policy': 'bad' }]]) });
+    expect(selectChannelEncryptionPolicy('#room')(store.getState())).toBe('off');
+  });
+
+  it('setChannelEncryptionPolicy writes the prop and updates locally', () => {
+    const sendRaw = vi.fn();
+    store.setState({ client: mockClient(sendRaw) });
+
+    store.getState().setChannelEncryptionPolicy('#room', 'optional');
+
+    expect(sendRaw).toHaveBeenCalledWith('PROP', '#room', 'encryption-policy', 'optional');
+    expect(selectChannelEncryptionPolicy('#room')(store.getState())).toBe('optional');
   });
 });

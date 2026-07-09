@@ -205,6 +205,7 @@ describe('ChannelSettings panel', () => {
     expect(screen.getByRole('group', { name: 'Channel mode flags' })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /Moderated/ })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'History' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Encryption' })).toBeInTheDocument();
   });
 
   it('shows a read-only modes view to a non-op', () => {
@@ -308,6 +309,33 @@ describe('ChannelSettings panel', () => {
     expect(screen.queryByLabelText('Ephemeral history')).toBeNull();
     expect(screen.getByText('1 hour')).toBeInTheDocument();
     expect(screen.getByText('Only ops can change history retention.')).toBeInTheDocument();
+  });
+
+  it('lets an op set the channel encryption policy', () => {
+    // Arrange — op, default policy off
+    const client = seedChannel({ ourNick: 'me', users: [makeUser('me', ['o'])] });
+
+    // Act
+    openSettings();
+    fireEvent.change(screen.getByLabelText('Message policy'), { target: { value: 'required' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply policy' }));
+
+    // Assert
+    expect(client.sendRaw).toHaveBeenCalledWith('PROP', '#general', 'encryption-policy', 'required');
+    expect(store.getState().channelProps.get('#general')?.['encryption-policy']).toBe('required');
+  });
+
+  it('shows encryption policy read-only to a non-op', () => {
+    // Arrange — plain member, encryption required
+    seedChannel({ ourNick: 'me', users: [makeUser('me', [])], props: { 'encryption-policy': 'required' } });
+
+    // Act
+    openSettings();
+
+    // Assert
+    expect(screen.queryByLabelText('Message policy')).toBeNull();
+    expect(screen.getByText('Required')).toBeInTheDocument();
+    expect(screen.getByText('Only ops can change the channel encryption policy.')).toBeInTheDocument();
   });
 
   it('lets an op create, list, and delete webhooks', () => {

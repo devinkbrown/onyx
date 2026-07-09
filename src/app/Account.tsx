@@ -37,6 +37,7 @@ import {
   type JSX,
 } from 'solid-js';
 import { useStore, getState, selectAccount } from '@/lib/store';
+import { deviceKeys } from '@/lib/e2ee/dmCipher';
 import { ModalShell } from '@/primitives/index';
 import { Button } from '@/primitives/index';
 import { FormField } from '@/primitives/index';
@@ -155,6 +156,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
   const passkeyNotice = useStore((s) => s.passkeyNotice);
   const passkeyError = useStore((s) => s.passkeyError);
   const [passkeyLabel, setPasskeyLabel] = createSignal('');
+  const [e2eeDeviceBusy, setE2eeDeviceBusy] = createSignal(false);
   const personas = useStore((s) => s.personas);
   const personaOffers = useStore((s) => s.personaOffers);
 
@@ -208,11 +210,19 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
       .slice(-4),
   );
 
+  const e2eeNotices = createMemo(() =>
+    serviceNotices()
+      .filter((n) => n.source === 'Account' && /\b(E2EEKEY|KEYTRANS)\b/i.test(n.text))
+      .slice(-6),
+  );
+
   // ── fetch fresh ACCOUNTINFO whenever the panel opens for a signed-in user ──
   createEffect(() => {
     if (local.open && account()) {
       getState().accountInfo_fetch();
       getState().totpStatus();
+      getState().e2eeKeyStatus();
+      getState().keyTransparencyStatus();
       getState().vhostList();
     }
   });
@@ -239,6 +249,18 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
     setEmailError(undefined);
     getState().accountSet('email', value, emailPassword());
     setEmailPassword('');
+  }
+
+  async function publishThisDeviceKey(): Promise<void> {
+    if (e2eeDeviceBusy()) return;
+    setE2eeDeviceBusy(true);
+    try {
+      const keys = await deviceKeys();
+      if (!keys?.publicB64) return;
+      getState().e2eeKeyAdd('browser', 'tsumugi-p256', keys.publicB64);
+    } finally {
+      setE2eeDeviceBusy(false);
+    }
   }
 
   function submitPassword(event: SubmitEvent): void {
@@ -697,6 +719,27 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
                 )}
               </Show>
             </form>
+          </Section>
+
+          <Section title="Device encryption keys" hint="Publish this browser's E2EE public key and inspect the account transparency root.">
+            <div class="acct-cert-actions">
+              <Button type="button" variant="ghost" size="sm" disabled={e2eeDeviceBusy()} onClick={() => void publishThisDeviceKey()}>
+                {e2eeDeviceBusy() ? 'Publishing…' : 'Publish this device key'}
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => getState().e2eeKeyList()}>
+                List device keys
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => getState().keyTransparencyStatus()}>
+                Refresh transparency root
+              </Button>
+            </div>
+            <Show when={e2eeNotices().length > 0}>
+              <ul class="acct-cert-list" aria-label="E2EE device key notices">
+                <For each={e2eeNotices()}>
+                  {(n) => <li class="acct-cert-item">{n.text}</li>}
+                </For>
+              </ul>
+            </Show>
           </Section>
 
           <Section title="Personas" hint="Your Guise wardrobe — change the host others see, instantly and mid-session.">
