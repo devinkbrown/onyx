@@ -29,7 +29,7 @@ const ACCESSIBILITY_TOPICS: readonly AccessibilityTopic[] = [
     summary: 'Onyx honors reduced-motion preferences and gives scene motion an explicit control.',
     points: [
       'System reduced-motion settings are respected.',
-      'Scene presentation supports Animated, Still, and Off modes.',
+      'Scene presentation supports Animated, Still, and Off modes; Still renders a static frame, while Off skips the background renderer.',
       'Decorative motion is treated as optional and never required for understanding content.',
     ],
   },

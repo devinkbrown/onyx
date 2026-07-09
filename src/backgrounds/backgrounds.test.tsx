@@ -10,10 +10,12 @@ import {
 } from './engine';
 import { allBackgroundVariants, backgroundRegistry, getBackground, sceneRegistry, type BackgroundId } from './registry';
 import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
+import { resetSceneMotion, setSceneMotion } from '@/lib/prefs/sceneMotion';
 
 afterEach(() => {
   cleanup();
   resetPreferences();
+  resetSceneMotion();
 });
 
 describe('background registry', () => {
@@ -204,6 +206,44 @@ describe('Background reduced-motion selection', () => {
     // Assert
     expect(host?.getAttribute('data-background-id')).toBe('starfield');
     expect(host?.getAttribute('data-background-kind')).toBe('solid');
+  });
+
+  it('renders animated canvas backgrounds static when scene motion is still', () => {
+    // Arrange
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+    HTMLCanvasElement.prototype.getContext = vi.fn(
+      () => create2dContext(),
+    ) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+    setSceneMotion('still');
+
+    // Act
+    const { container } = render(() => <Background id="deep-current" quality="high" />);
+    const canvas = container.querySelector('canvas');
+
+    // Assert
+    expect(canvas?.getAttribute('data-background-id')).toBe('deep-current');
+    expect(canvas?.getAttribute('data-background-kind')).toBe('solid');
+  });
+
+  it('does not mount a background renderer when scene motion is off', () => {
+    // Arrange
+    setSceneMotion('off');
+
+    // Act
+    const { container } = render(() => <Background id="deep-current" quality="high" />);
+
+    // Assert
+    expect(container.querySelector('[data-background-canvas]')).toBeNull();
+    expect(container.querySelector('canvas')).toBeNull();
   });
 });
 

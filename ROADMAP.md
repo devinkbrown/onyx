@@ -401,6 +401,10 @@ client or public site needs to expose the result.
 25. **Background system consolidation** *(client)* — collapse the canvas and DOM
     scene set into a smaller Ink-on-Living-Paper system with shared layers,
     capped motion, idle deceleration, and explicit Animated/Still/Off controls.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Background motion controls now feed
+    the renderer itself: Animated runs normally, Still starts canvas and DOM
+    scenes in static mode, Off skips mounting the background renderer entirely,
+    and Preferences reset restores the scene mode to Animated.
 26. **Theme-reactive community identity** *(client + main site)* — allow bounded
     accent, tint, banner, and wordmark expression within contrast-locked OKLCH
     tokens so rooms can feel distinct without unbounded CSS or broken access.

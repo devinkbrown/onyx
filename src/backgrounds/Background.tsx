@@ -9,6 +9,7 @@ import {
 } from './engine';
 import { getBackground, type BackgroundId } from './registry';
 import { preferences } from '@/lib/prefs/preferences';
+import { sceneMotion } from '@/lib/prefs/sceneMotion';
 import { makeMediaSignal } from '@/lib/a11y/mediaPrefs';
 
 export interface BackgroundProps {
@@ -33,7 +34,9 @@ export function selectBackgroundId(id: string | undefined, _reducedMotion: boole
 
 export function Background(props: BackgroundProps) {
   const reducedMotion = makeMediaSignal(REDUCED_MOTION_QUERY);
-  const effectiveReducedMotion = createMemo(() => reducedMotion() || preferences().reduceMotion);
+  const motion = createMemo(() => sceneMotion());
+  const sceneDisabled = createMemo(() => motion() === 'off');
+  const effectiveReducedMotion = createMemo(() => reducedMotion() || preferences().reduceMotion || motion() === 'still');
   const variant = createMemo(() => getBackground(selectBackgroundId(props.id, effectiveReducedMotion())));
 
   const scene = createMemo(() => {
@@ -47,10 +50,15 @@ export function Background(props: BackgroundProps) {
 
   return (
     <Show
-      when={scene()}
-      fallback={<CanvasBackground variant={canvasVariant()} quality={props.quality} reducedMotion={effectiveReducedMotion()} />}
+      when={!sceneDisabled()}
+      fallback={null}
     >
-      {(active) => <SceneBackground scene={active()} reducedMotion={effectiveReducedMotion()} />}
+      <Show
+        when={scene()}
+        fallback={<CanvasBackground variant={canvasVariant()} quality={props.quality} reducedMotion={effectiveReducedMotion()} />}
+      >
+        {(active) => <SceneBackground scene={active()} reducedMotion={effectiveReducedMotion()} />}
+      </Show>
     </Show>
   );
 }

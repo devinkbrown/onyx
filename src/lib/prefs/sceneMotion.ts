@@ -62,3 +62,7 @@ export function setSceneMotion(value: SceneMotion): void {
   persistSceneMotion(value);
   applySceneMotion(value);
 }
+
+export function resetSceneMotion(): void {
+  setSceneMotion(DEFAULT_SCENE_MOTION);
+}

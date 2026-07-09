@@ -95,6 +95,11 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Quiet boost Home digest')).toBeInTheDocument();
     expect(screen.getByText('Scheduled event header chip')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Atmosphere' })).toBeInTheDocument();
+    expect(screen.getByText('Renderer-level scene motion')).toBeInTheDocument();
+    expect(screen.getByText('Animated mode')).toBeInTheDocument();
+    expect(screen.getByText('Still static render')).toBeInTheDocument();
+    expect(screen.getByText('Off skips renderer')).toBeInTheDocument();
+    expect(screen.getByText('Scene reset defaults')).toBeInTheDocument();
     expect(screen.getByText('User reduced-transparency control')).toBeInTheDocument();
     expect(screen.getByText('Public high-contrast ledger')).toBeInTheDocument();
     expect(screen.getByText('Public reduced-transparency ledger')).toBeInTheDocument();

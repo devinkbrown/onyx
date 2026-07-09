@@ -8,6 +8,7 @@ import {
   DEFAULT_SCENE_MOTION,
   applySceneMotion,
   loadSceneMotion,
+  resetSceneMotion,
   sceneMotion,
   setSceneMotion,
 } from '@/lib/prefs/sceneMotion';
@@ -39,5 +40,14 @@ describe('scene motion store', () => {
     applySceneMotion('off');
 
     expect(document.documentElement.dataset.sceneMotion).toBe('off');
+  });
+
+  it('resets scene motion to animated in storage, signal, and DOM', () => {
+    setSceneMotion('off');
+    resetSceneMotion();
+
+    expect(localStorage.getItem(STORAGE_KEY)).toBe(DEFAULT_SCENE_MOTION);
+    expect(sceneMotion()).toBe(DEFAULT_SCENE_MOTION);
+    expect(document.documentElement.dataset.sceneMotion).toBe(DEFAULT_SCENE_MOTION);
   });
 });

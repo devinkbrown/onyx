@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { recordClientExtensionActionRun } from '@/lib/extensions/clientActions';
 import { closePreferences, openPreferences, resetPreferences } from '@/lib/prefs/preferences';
+import { sceneMotion, setSceneMotion } from '@/lib/prefs/sceneMotion';
 import { PreferencesPanel } from './PreferencesPanel';
 
 describe('PreferencesPanel', () => {
@@ -172,5 +173,16 @@ describe('PreferencesPanel', () => {
 
     expect(screen.queryByRole('list', { name: 'Recent extension actions' })).not.toBeInTheDocument();
     expect(screen.getByText('No extension actions recorded on this device.')).toBeInTheDocument();
+  });
+
+  it('resets background motion with the rest of preferences', () => {
+    setSceneMotion('off');
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset to defaults' }));
+
+    expect(sceneMotion()).toBe('animated');
+    expect(document.documentElement.dataset.sceneMotion).toBe('animated');
   });
 });

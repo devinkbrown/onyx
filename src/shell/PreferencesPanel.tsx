@@ -28,6 +28,7 @@ import {
 import { CalmModeControl } from './CalmModeControl';
 import {
   SCENE_MOTIONS,
+  resetSceneMotion,
   sceneMotion,
   setSceneMotion,
   type SceneMotion,
@@ -57,6 +58,11 @@ const SCENE_MOTION_LABELS: Record<SceneMotion, string> = {
   still: 'Still',
   off: 'Off',
 };
+
+function resetAllPreferences(): void {
+  resetPreferences();
+  resetSceneMotion();
+}
 
 function countLabel(count: number, singular: string): string {
   return `${count} ${singular}${count === 1 ? '' : 's'}`;
@@ -663,7 +669,7 @@ export function PreferencesPanel(): JSX.Element {
 
         <AccessibilityAuditLedger />
 
-        <button type="button" class="pref-reset" onClick={() => resetPreferences()}>
+        <button type="button" class="pref-reset" onClick={() => resetAllPreferences()}>
           Reset to defaults
         </button>
       </div>
