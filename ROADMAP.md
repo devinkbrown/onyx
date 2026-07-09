@@ -336,6 +336,10 @@ client or public site needs to expose the result.
     glossary across home, about, status, roadmap, accessibility, app chrome,
     invite unfurls, and docs. Track the master-roadmap direction to make
     protocol/engine names supporting context instead of public product clutter.
+    ✅ **WEBSITE SLICE SHIPPED 2026-07-09** — The main site now has `/glossary/`
+    as the public language contract for IRCXNet, Onyx, Orochi-as-engine,
+    invites, guest/account claim, local vault memory, privacy, and protocol
+    context, with root/footer navigation into it.
 
 ## Phase 9 — Sumi-e Venue Model ← PLANNED
 21. **Named conversations and forum projection** *(client)* — promote existing
@@ -394,6 +398,9 @@ client or public site needs to expose the result.
     and surface server-snapshot imports, incoming webhooks, Slack export import,
     IRC-log-to-vault import, and bridge status as switching-cost reducers rather
     than generic integrations.
+    ✅ **WEBSITE SLICE SHIPPED 2026-07-09** — `/integrations/` now documents
+    incoming webhooks, server snapshots, Slack exports, IRC-log-to-vault import,
+    bridge status, provenance, and review-before-publish import behavior.
 
 ## Phase 13 — Amanogawa Local Intelligence ← PLANNED
 34. **AI provenance chrome** *(client)* — every recap, search answer,
@@ -408,6 +415,10 @@ client or public site needs to expose the result.
 37. **Agent-safe public contract** *(client + main site)* — document that channel
     content is hostile input for any agent surface, exclude E2EE payloads, and
     require visible audit trails for agent actions.
+    ✅ **WEBSITE SLICE SHIPPED 2026-07-09** — `/agents/` now publishes the
+    agent-safety contract: hostile channel input, least-data defaults, E2EE
+    plaintext exclusion, this-device/this-server/external provenance labels,
+    and visible audit trails for proposed actions.
 
 ## Phase 14 — Hyoryu Local-First Roaming ← PLANNED
 38. **Full offline-first UX** *(client)* — generalize the vault and outbox so

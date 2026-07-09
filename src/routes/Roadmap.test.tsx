@@ -71,6 +71,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Invite Open Graph metadata')).toBeInTheDocument();
     expect(screen.getByText('Install guide')).toBeInTheDocument();
     expect(screen.getByText('Generated public sitemap')).toBeInTheDocument();
+    expect(screen.getByText('Public glossary')).toBeInTheDocument();
     expect(screen.getByText('Native onboarding forms')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Venue model' })).toBeInTheDocument();
     expect(screen.getByText('Named conversations')).toBeInTheDocument();
@@ -83,8 +84,13 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Watch-together surface')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Apps' })).toBeInTheDocument();
     expect(screen.getByText('Block-Kit-lite renderer')).toBeInTheDocument();
+    expect(screen.getByText('Server snapshot imports')).toBeInTheDocument();
+    expect(screen.getByText('IRC-log-to-vault import')).toBeInTheDocument();
+    expect(screen.getByText('Integrations page')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Local intelligence' })).toBeInTheDocument();
     expect(screen.getByText('AI provenance chrome')).toBeInTheDocument();
+    expect(screen.getByText('Agent safety page')).toBeInTheDocument();
+    expect(screen.getByText('Provenance labels')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Roaming' })).toBeInTheDocument();
     expect(screen.getByText('TravelTo vault fallback')).toBeInTheDocument();
     expect(screen.getAllByText('Active-target vault search').length).toBeGreaterThan(0);
@@ -104,5 +110,8 @@ describe('RoadmapRoute', () => {
     expect(hrefs).toContain('/app');
     expect(hrefs).toContain('/accessibility/');
     expect(hrefs).toContain('/invite?join=%23root');
+    expect(hrefs).toContain('/glossary/');
+    expect(hrefs).toContain('/integrations/');
+    expect(hrefs).toContain('/agents/');
   });
 });

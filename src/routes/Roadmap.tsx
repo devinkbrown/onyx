@@ -76,7 +76,7 @@ const phases: Phase[] = [
     state: 'active',
     date: '2026-07-09',
     summary: 'Fold the master roadmap product-entry work into Onyx and the main site: rich invite previews, instant guest handoff, native onboarding, install guidance, and a stricter public glossary.',
-    items: ['Rich invite route', 'Invite Open Graph metadata', 'Instant guest identity', 'Invite moment handoff', 'Native onboarding forms', 'Account claim flow', 'Install guide', 'Generated public sitemap', 'Brand glossary cleanup'],
+    items: ['Rich invite route', 'Invite Open Graph metadata', 'Instant guest identity', 'Invite moment handoff', 'Native onboarding forms', 'Account claim flow', 'Install guide', 'Generated public sitemap', 'Public glossary', 'Brand glossary cleanup'],
   },
   {
     phase: 'Phase 9',
@@ -108,7 +108,7 @@ const phases: Phase[] = [
     state: 'planned',
     date: 'planned',
     summary: 'Prepare the client and site for structured integrations: Block-Kit-lite rendering, a constrained extension surface, and migration/importer paths.',
-    items: ['Block-Kit-lite renderer', 'Client extension surface', 'Importer path', 'Incoming webhook migration', 'Bridge status surface'],
+    items: ['Block-Kit-lite renderer', 'Client extension surface', 'Importer path', 'Incoming webhook migration', 'Server snapshot imports', 'IRC-log-to-vault import', 'Bridge status surface', 'Integrations page'],
   },
   {
     phase: 'Phase 13',
@@ -116,7 +116,7 @@ const phases: Phase[] = [
     state: 'planned',
     date: 'planned',
     summary: 'Add local-first intelligence without making AI the front door: provenance chrome, vault recall, local catch-up, captions, translation, and agent-safe contracts.',
-    items: ['AI provenance chrome', 'Vault RAG', 'Semantic recall', 'Local catch-up', 'Local captions', 'Local translation', 'Agent-safe public contract'],
+    items: ['AI provenance chrome', 'Vault RAG', 'Semantic recall', 'Local catch-up', 'Local captions', 'Local translation', 'Agent-safe public contract', 'Agent safety page', 'Provenance labels'],
   },
   {
     phase: 'Phase 14',
@@ -242,6 +242,7 @@ export default function RoadmapRoute() {
             <div class="data-row"><div><strong>Reader mode</strong><span>Carry reviewed anchors into richer cross-room handoffs.</span></div></div>
             <div class="data-row"><div><strong>Accessibility conformance</strong><span><a href="/accessibility/">Continue remaining dense-surface pass/fix evidence.</a></span></div></div>
             <div class="data-row"><div><strong>Torii entry</strong><span><a href="/invite?join=%23root">Rich invite entry</a> and install guidance now anchor the first-run path.</span></div></div>
+            <div class="data-row"><div><strong>Public contracts</strong><span><a href="/glossary/">Glossary</a>, <a href="/integrations/">integrations</a>, and <a href="/agents/">agent safety</a> now carry site-level roadmap contracts.</span></div></div>
             <div class="data-row"><div><strong>Master roadmap fold-in</strong><span>Track onboarding, calm presets, media presence, app surfaces, local intelligence, and offline roaming here.</span></div></div>
           </div>
         </aside>
