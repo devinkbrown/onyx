@@ -179,8 +179,11 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home now adds joined-room rhythm
     heatlines from chanstats and folds each room's scheduled-event context into
     the return screen.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home return recaps now include a
+    review-from-start handoff that opens the room, pulses the first unread line,
+    and reuses the existing `?at=` time-travel path.
     ⏭️ **NEXT** — pure Onyx work. Reuse the local vault, `?at=` time travel,
-    and richer review handoffs before adding new server surface.
+    and richer cross-room review handoffs before adding new server surface.
 16. **Reader mode** *(client)* — a calm single-pane transcript view for long
     room history, optimized for reading and sharing moments. This is the
     Sumi-e roadmap item that makes the "network that remembers" visible.

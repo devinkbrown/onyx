@@ -825,8 +825,10 @@
 .home-recap-card__actions {
   justify-content: flex-start;
   align-self: end;
+  flex-wrap: wrap;
 }
 .home-recap-card__open,
+.home-recap-card__review,
 .home-recap-card__spotlight {
   min-height: 30px;
   border-radius: 999px;
@@ -842,26 +844,36 @@
   background: var(--gold-bright);
   border: 1px solid transparent;
 }
+.home-recap-card__review {
+  color: #04121e;
+  background: color-mix(in oklab, var(--lapis-bright) 82%, var(--gold-bright));
+  border: 1px solid transparent;
+}
 .home-recap-card__spotlight {
   color: var(--washi);
   background: color-mix(in oklab, var(--lapis) 12%, transparent);
   border: 1px solid color-mix(in oklab, var(--lapis-bright) 34%, transparent);
 }
 .home-recap-card__open:hover,
+.home-recap-card__review:hover,
 .home-recap-card__spotlight:hover,
 .home-recap-card__open:focus-visible,
+.home-recap-card__review:focus-visible,
 .home-recap-card__spotlight:focus-visible {
   transform: translateY(-1px);
 }
 @media (prefers-reduced-motion: reduce) {
   .home-catchup-item,
   .home-recap-card__open,
+  .home-recap-card__review,
   .home-recap-card__spotlight {
     transition: none;
   }
   .home-recap-card__open:hover,
+  .home-recap-card__review:hover,
   .home-recap-card__spotlight:hover,
   .home-recap-card__open:focus-visible,
+  .home-recap-card__review:focus-visible,
   .home-recap-card__spotlight:focus-visible {
     transform: none;
   }

@@ -46,6 +46,7 @@ const HOME_RHYTHM_LIMIT = 4;
 
 type HomeCatchUpRecap = {
   item: CatchUpItem;
+  firstMessage: ChatMessage;
   voices: string[];
   overflowVoices: number;
   preview: string;
@@ -158,6 +159,12 @@ export function HomeView(): JSX.Element {
       ? getState().navigate({ kind: 'channel', channel: item.target })
       : getState().navigate({ kind: 'dm', nick: item.target });
   const openCatchUpSpotlight = (item: CatchUpItem) => openSpotlight(spotlightQueryFor(item));
+  const reviewCatchUpFromStart = (recap: HomeCatchUpRecap) => {
+    const state = getState();
+    openCatchUp(recap.item);
+    state.focusMessage(recap.firstMessage.id);
+    if (recap.item.kind === 'channel') state.travelTo(recap.item.target, recap.firstMessage.time);
+  };
 
   // One shared clock for all relative-time labels.
   const [nowMs, setNowMs] = createSignal(Date.now());
@@ -227,6 +234,7 @@ export function HomeView(): JSX.Element {
 
         return {
           item,
+          firstMessage: unreadWindow[0]!,
           voices: voices.slice(0, HOME_RECAP_VOICE_LIMIT),
           overflowVoices: Math.max(0, voices.length - HOME_RECAP_VOICE_LIMIT),
           preview: clipped(latest.plaintext ?? latest.text, 92),
@@ -371,6 +379,14 @@ export function HomeView(): JSX.Element {
                           onClick={() => openCatchUp(recap.item)}
                         >
                           Open
+                        </button>
+                        <button
+                          type="button"
+                          class="home-recap-card__review"
+                          onClick={() => reviewCatchUpFromStart(recap)}
+                          aria-label={`Review ${recap.item.name} from first unread line`}
+                        >
+                          Review from start
                         </button>
                         <button
                           type="button"

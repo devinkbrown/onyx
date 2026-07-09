@@ -671,6 +671,7 @@ describe('AppShell', () => {
     });
 
     it('summarizes unread home recaps and hands them to Spotlight', async () => {
+      const travelToSpy = vi.spyOn(store.getState(), 'travelTo');
       const channel = {
         ...makeChannel(
           '#general',
@@ -709,6 +710,16 @@ describe('AppShell', () => {
         expect(screen.getByRole('dialog', { name: 'Command palette' })).toBeInTheDocument();
         expect(screen.getByRole('combobox', { name: 'Command search' })).toHaveValue('goto #general');
       });
+      fireEvent.click(screen.getByRole('button', { name: 'Close spotlight' }));
+
+      fireEvent.click(within(recaps).getByRole('button', { name: 'Review #general from first unread line' }));
+      const activeView = store.getState().activeView;
+      expect(activeView.kind).toBe('channel');
+      if (activeView.kind === 'channel') expect(activeView.channel).toBe('#general');
+      expect(store.getState().timeTravelLandingId).toBe('msg-new-a');
+      expect(travelToSpy).toHaveBeenCalledWith('#general', new Date('2025-01-01T12:00:00Z'));
+
+      travelToSpy.mockRestore();
     });
 
     it('shows joined-room chanstats rhythm with scheduled event context', async () => {
