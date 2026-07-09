@@ -25,10 +25,32 @@ const TYPE_GLYPH: Record<Notification['type'], string> = {
   error: '!',
 };
 
+function clipped(text: string, max = 72): string {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  return normalized.length > max ? `${normalized.slice(0, max)}...` : normalized;
+}
+
 function targetOf(n: Notification): { kind: 'channel'; channel: string } | { kind: 'dm'; nick: string } | null {
   if ((n.type === 'mention' || n.type === 'follow') && n.channel) return { kind: 'channel', channel: n.channel };
   if (n.type === 'dm' && n.from) return { kind: 'dm', nick: n.from };
   return null;
+}
+
+function notificationContext(n: Notification): string {
+  if (n.channel && n.from) return `${n.from} in ${n.channel}`;
+  if (n.from) return n.from;
+  if (n.channel) return n.channel;
+  return n.type;
+}
+
+function openLabel(n: Notification): string {
+  const target = targetOf(n);
+  const prefix = target ? 'Open notification from' : 'Notification from';
+  return `${prefix} ${notificationContext(n)}: ${clipped(n.text)}`;
+}
+
+function dismissLabel(n: Notification): string {
+  return `Dismiss notification from ${notificationContext(n)}: ${clipped(n.text)}`;
 }
 
 export function NotificationCenter(): JSX.Element {
@@ -53,6 +75,7 @@ export function NotificationCenter(): JSX.Element {
     <span class="shell-ribbon-inbox">
     <Popover
       placement="bottom"
+      panelLabel="Notification inbox"
       trigger={
         <span
           class="shell-ribbon-bell"
@@ -100,7 +123,7 @@ export function NotificationCenter(): JSX.Element {
             </p>
           }
         >
-          <ul class="notif-center__list" role="list">
+          <ul class="notif-center__list" role="list" aria-label="Notification inbox items">
             <For each={ordered()}>
               {(n) => {
                 const jumpable = targetOf(n) !== null;
@@ -114,6 +137,7 @@ export function NotificationCenter(): JSX.Element {
                       type="button"
                       class="notif-center__body"
                       disabled={!jumpable}
+                      aria-label={openLabel(n)}
                       onClick={() => open(n)}
                     >
                       <span class="notif-center__glyph" aria-hidden="true">{TYPE_GLYPH[n.type]}</span>
@@ -129,7 +153,7 @@ export function NotificationCenter(): JSX.Element {
                     <button
                       type="button"
                       class="notif-center__dismiss"
-                      aria-label="Dismiss notification"
+                      aria-label={dismissLabel(n)}
                       onClick={() => getState().dismissNotification(n.id)}
                     >
                       ×

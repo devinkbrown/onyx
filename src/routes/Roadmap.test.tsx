@@ -38,6 +38,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Dense-panel evidence')).toBeInTheDocument();
     expect(screen.getByText('Home access evidence')).toBeInTheDocument();
     expect(screen.getByText('Search access evidence')).toBeInTheDocument();
+    expect(screen.getByText('Inbox access evidence')).toBeInTheDocument();
     expect(screen.getByText(/time is active/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Washi' })).toBeInTheDocument();
   });

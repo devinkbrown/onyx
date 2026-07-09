@@ -65,6 +65,7 @@ const ACCESSIBILITY_TOPICS: readonly AccessibilityTopic[] = [
       'Appearance uses radio groups for themes and backgrounds with labelled swatches and modal focus handling.',
       'Home catch-up exposes recaps, reviewed ranges, and the channel directory as labelled card lists with direct action buttons.',
       'Message search uses a search landmark, labelled match navigation, and named archived/device-memory result lists.',
+      'Notification center uses a named inbox dialog, labelled notification list, and row-specific open/dismiss actions.',
     ],
   },
 ];

@@ -88,6 +88,11 @@ const ACCESS_AUDIT_ROWS = [
     note: 'Search landmark, labelled result navigation, and named archived/device-memory result lists.',
   },
   {
+    surface: 'Notification center',
+    status: 'checked',
+    note: 'Named inbox dialog, labelled notification list, and row-specific open/dismiss actions.',
+  },
+  {
     surface: 'Modals',
     status: 'checked',
     note: 'Sheet focus trap, Escape close, labelled close buttons.',

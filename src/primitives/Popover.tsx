@@ -12,12 +12,13 @@ export type PopoverProps = ParentProps<{
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   placement?: 'bottom' | 'top';
+  panelLabel?: string;
 }>;
 
 let popoverId = 0;
 
 export function Popover(props: PopoverProps) {
-  const [local, rest] = splitProps(props, ['trigger', 'id', 'open', 'defaultOpen', 'onOpenChange', 'placement', 'children']);
+  const [local, rest] = splitProps(props, ['trigger', 'id', 'open', 'defaultOpen', 'onOpenChange', 'placement', 'panelLabel', 'children']);
   const [innerOpen, setInnerOpen] = createSignal(local.defaultOpen ?? false);
   const instanceId = ++popoverId;
   const id = () => local.id ?? `onyx-popover-${instanceId}`;
@@ -128,6 +129,7 @@ export function Popover(props: PopoverProps) {
         }}
         id={id()}
         role="dialog"
+        aria-label={local.panelLabel}
         class="onyx-popover__panel"
         hidden={!isOpen()}
       >

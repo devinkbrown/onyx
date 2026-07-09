@@ -253,6 +253,9 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Message search now carries pass
     evidence for its search landmark, result navigation group, and named
     archived/device-memory result lists.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Notification Center now carries pass
+    evidence for its named inbox dialog, labelled notification list, and
+    row-specific open/dismiss actions.
     ⏭️ **CLIENT NEXT** — continue remaining dense-surface audit rows until every
     app panel has pass/fix evidence.
 

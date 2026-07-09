@@ -1,7 +1,7 @@
 /**
  * NotificationCenter tests — badge counting, list rendering, jump + mark-read.
  */
-import { cleanup, fireEvent, render } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen, within } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { store } from '@/lib/store/store';
 import type { Notification } from '@/lib/store/store';
@@ -27,6 +27,7 @@ describe('<NotificationCenter>', () => {
   it('shows the empty state when there are no notifications', () => {
     const { getByTestId, getByText } = render(() => <NotificationCenter />);
     fireEvent.click(getByTestId('ribbon-bell'));
+    expect(screen.getByRole('dialog', { name: 'Notification inbox' })).toBeInTheDocument();
     expect(getByText(/Nothing yet/)).toBeInTheDocument();
   });
 
@@ -76,8 +77,13 @@ describe('<NotificationCenter>', () => {
     });
     const { getByTestId, getByText, getAllByLabelText } = render(() => <NotificationCenter />);
     fireEvent.click(getByTestId('ribbon-bell'));
+    const list = screen.getByRole('list', { name: 'Notification inbox items' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Open notification from trev in #root: oi' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Dismiss notification from trev in #root: oi' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open notification from mizu: psst' })).toBeInTheDocument();
     // The list renders newest-first, so the first dismiss removes 'y'.
-    fireEvent.click(getAllByLabelText('Dismiss notification')[0]!);
+    fireEvent.click(getAllByLabelText('Dismiss notification from trev in #root: oi')[0]!);
     expect(store.getState().notifications.map((n) => n.id)).toEqual(['x']);
     fireEvent.click(getByText('Mark all read'));
     expect(store.getState().readNotificationIds.has('x')).toBe(true);
