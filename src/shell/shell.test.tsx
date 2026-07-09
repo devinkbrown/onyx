@@ -22,7 +22,7 @@ import type { ChatMessage, ChannelUser } from '@/lib/irc/types';
 import { followed, isFollowed, unfollow } from '@/lib/notifications/followed';
 import { recordReviewHistory } from '@/lib/notifications/reviewHistory';
 import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
-import { _resetVaultForTests, saveMessages } from '@/lib/vault/historyVault';
+import { _resetVaultForTests, queueOutbox, saveMessages } from '@/lib/vault/historyVault';
 import { Spotlight } from '@/chat/spotlight';
 import { AppShell } from './AppShell';
 
@@ -1068,9 +1068,11 @@ describe('AppShell', () => {
         networkName: 'IRCXNet',
       }, true);
 
+      await queueOutbox('#general', 'queued while offline');
+
       render(() => <AppShell />);
 
-      expect(screen.getByRole('status')).toHaveTextContent('Local-memory mode');
+      await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('1 queued send'));
       const reviewHistory = await screen.findByLabelText('Recent catch-up reviews');
       expect(within(reviewHistory).getByText('Reviewed recently')).toBeInTheDocument();
       expect(within(reviewHistory).getByText('offline recall')).toBeInTheDocument();

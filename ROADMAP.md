@@ -507,6 +507,9 @@ client or public site needs to expose the result.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home now shows a local-memory mode
     status while disconnected so offline reading, reviewed spans, drafts, and
     queued sends are presented as deliberate behavior.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home now reads the persisted offline
+    outbox and shows the exact queued-send count in local-memory mode, turning
+    reconnect reconciliation into visible device state instead of hidden queueing.
 39. **PWA and desktop packaging path** *(client + main site)* — make install,
     update, notification, and wrapped push behavior explicit for browser PWA,
     desktop shell, and future mobile wrappers.

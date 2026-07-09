@@ -39,7 +39,7 @@ import {
 import { preferences } from '@/lib/prefs/preferences';
 import { buildQuietBoostDigest, type QuietBoostDigestItem } from '@/lib/reactions/quietBoosts';
 import { fetchStatsIndex, relTime } from '@/lib/stats/networkIndex';
-import { loadRecent } from '@/lib/vault/historyVault';
+import { loadOutbox, loadRecent } from '@/lib/vault/historyVault';
 import type { ChatMessage } from '@/lib/irc/types';
 import { openSpotlight } from '@/chat/spotlight/useSpotlight';
 import { openMessageSearchWithQuery } from './search/useMessageSearch';
@@ -161,6 +161,16 @@ export function HomeView(): JSX.Element {
   const reviewHistorySummary = createMemo(() =>
     connectionStatus() === 'connected' ? 'catch-up ranges' : 'offline recall',
   );
+  const [outboxEntries] = createResource(connectionStatus, () => loadOutbox());
+  const queuedSendCount = createMemo(() => outboxEntries()?.length ?? 0);
+  const localMemoryStatus = createMemo(() => {
+    const count = queuedSendCount();
+    if (count > 0) {
+      const label = count === 1 ? 'queued send' : 'queued sends';
+      return `Local-memory mode: ${count} ${label} waiting on this device. Remembered rooms, reviewed spans, and drafts stay available until reconnect.`;
+    }
+    return 'Local-memory mode: remembered rooms, reviewed spans, drafts, and queued sends stay available until reconnect.';
+  });
 
   // "Catch up" — what you missed across every joined room + DM, ranked so
   // mentions and DMs surface and ambient chatter accumulates quietly below.
@@ -371,7 +381,7 @@ export function HomeView(): JSX.Element {
           </p>
           <Show when={connectionStatus() !== 'connected'}>
             <p class="home-offline-note" role="status">
-              Local-memory mode: remembered rooms, reviewed spans, drafts, and queued sends stay available until reconnect.
+              {localMemoryStatus()}
             </p>
           </Show>
         </header>
