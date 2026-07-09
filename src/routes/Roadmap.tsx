@@ -67,8 +67,8 @@ const phases: Phase[] = [
     title: 'Washi',
     state: 'active',
     date: '2026-07-09',
-    summary: 'Accessibility is now a public ledger and an in-client audit surface.',
-    items: ['Public accessibility ledger', 'Client access audit', 'Motion controls'],
+    summary: 'Accessibility is now a public ledger and an in-client audit surface with dense-panel pass evidence.',
+    items: ['Public accessibility ledger', 'Client access audit', 'Motion controls', 'Dense-panel evidence'],
   },
 ];
 
@@ -181,7 +181,7 @@ export default function RoadmapRoute() {
           <div class="data-list data-list--compact">
             <div class="data-row"><div><strong>Catch-up Home</strong><span>Continue local-vault and time-travel review handoffs on the return screen.</span></div></div>
             <div class="data-row"><div><strong>Reader mode</strong><span>Continue catch-up review history around remembered transcript context.</span></div></div>
-            <div class="data-row"><div><strong>Accessibility conformance</strong><span><a href="/accessibility/">Continue channel, voice, and appearance audit evidence.</a></span></div></div>
+            <div class="data-row"><div><strong>Accessibility conformance</strong><span><a href="/accessibility/">Continue remaining dense-surface pass/fix evidence.</a></span></div></div>
           </div>
         </aside>
       </section>

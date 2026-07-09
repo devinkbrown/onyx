@@ -54,6 +54,17 @@ const ACCESSIBILITY_TOPICS: readonly AccessibilityTopic[] = [
       'Headings, landmarks, lists, and button elements are used before custom roles.',
     ],
   },
+  {
+    id: 'client-surfaces',
+    heading: 'Current client audit',
+    summary:
+      'Dense app panels are tracked inside Preferences and mirrored here as pass evidence lands.',
+    points: [
+      'Channel settings uses a labelled Sheet, labelled forms, switch-mode flags, and read-only non-op fallbacks.',
+      'Voice controls use a toolbar, grouped labelled controls, aria-pressed media state, and a live call timer.',
+      'Appearance uses radio groups for themes and backgrounds with labelled swatches and modal focus handling.',
+    ],
+  },
 ];
 
 export function AccessibilityStatement(props: { class?: string }): JSX.Element {

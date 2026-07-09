@@ -64,13 +64,18 @@ const ACCESS_AUDIT_ROWS = [
   },
   {
     surface: 'Channel settings',
-    status: 'queued',
-    note: 'Mode forms and destructive actions still need a pass.',
+    status: 'checked',
+    note: 'Labelled Sheet, topic form, switch-mode flags, read-only non-op fallbacks.',
   },
   {
     surface: 'Voice controls',
-    status: 'queued',
-    note: 'Stage controls and media-device states need a pass.',
+    status: 'checked',
+    note: 'Toolbar groups, labelled icon buttons, aria-pressed media states, live timer.',
+  },
+  {
+    surface: 'Appearance',
+    status: 'checked',
+    note: 'Theme and background radio groups, labelled swatches, Sheet focus trap.',
   },
   {
     surface: 'Modals',

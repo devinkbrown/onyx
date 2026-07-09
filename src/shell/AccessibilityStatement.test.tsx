@@ -1,0 +1,17 @@
+import { cleanup, render, screen } from '@solidjs/testing-library';
+import { afterEach, describe, expect, it } from 'vitest';
+
+import { AccessibilityStatement } from './AccessibilityStatement';
+
+describe('AccessibilityStatement', () => {
+  afterEach(cleanup);
+
+  it('publishes current dense-client audit evidence', () => {
+    render(() => <AccessibilityStatement />);
+
+    expect(screen.getByRole('heading', { name: 'Current client audit' })).toBeInTheDocument();
+    expect(screen.getByText(/Channel settings uses a labelled Sheet/i)).toBeInTheDocument();
+    expect(screen.getByText(/Voice controls use a toolbar/i)).toBeInTheDocument();
+    expect(screen.getByText(/Appearance uses radio groups/i)).toBeInTheDocument();
+  });
+});
