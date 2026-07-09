@@ -182,6 +182,8 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home return recaps now include a
     review-from-start handoff that opens the room, pulses the first unread line,
     and reuses the existing `?at=` time-travel path.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Browse all channels now deduplicates
+    repeated mesh `LIST` rows by room name before rendering the Home directory.
     ⏭️ **NEXT** — pure Onyx work. Reuse the local vault, `?at=` time travel,
     and richer cross-room review handoffs before adding new server surface.
 16. **Reader mode** *(client)* — a calm single-pane transcript view for long

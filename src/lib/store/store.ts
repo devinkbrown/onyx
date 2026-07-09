@@ -61,6 +61,12 @@ export interface Server {
   connected: boolean;
 }
 
+export interface ChannelListEntry {
+  name: string;
+  count: number;
+  topic: string;
+}
+
 export interface DMConversation {
   nick: string;
   account: string | null;
@@ -700,7 +706,7 @@ export interface OnyxState {
 
   // ── Channel Browser ───────────────────────────────────────────────────
   showChannelBrowser: boolean;
-  channelList: Array<{ name: string; count: number; topic: string }>;
+  channelList: ChannelListEntry[];
   channelListLoading: boolean;
 
   // ── Onboarding ────────────────────────────────────────────────────────
@@ -1919,6 +1925,30 @@ function nearestMessageId(messages: readonly ChatMessage[], at: Date): string | 
     }
   }
   return best;
+}
+
+function mergeChannelListRow(
+  rows: readonly ChannelListEntry[],
+  next: ChannelListEntry,
+): ChannelListEntry[] {
+  const key = next.name.toLowerCase();
+  const index = rows.findIndex((row) => row.name.toLowerCase() === key);
+  const normalized = {
+    name: next.name,
+    count: Number.isFinite(next.count) ? Math.max(0, next.count) : 0,
+    topic: next.topic,
+  };
+
+  if (index === -1) return [...rows, normalized];
+
+  return rows.map((row, i) => {
+    if (i !== index) return row;
+    return {
+      name: row.name,
+      count: Math.max(row.count, normalized.count),
+      topic: row.topic.trim() ? row.topic : normalized.topic,
+    };
+  });
 }
 
 // ── NAMES accumulation (module-level) ─────────────────────────────────────────
@@ -6644,10 +6674,11 @@ export const store = createStore<OnyxState>()(
           const listTopic = params[3] ?? '';
           if (!listCh) break;
           set((s) => ({
-            channelList: [
-              ...s.channelList,
-              { name: listCh, count: listCount, topic: listTopic },
-            ],
+            channelList: mergeChannelListRow(s.channelList, {
+              name: listCh,
+              count: listCount,
+              topic: listTopic,
+            }),
           }));
           break;
         }

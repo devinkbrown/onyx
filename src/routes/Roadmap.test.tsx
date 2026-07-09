@@ -19,6 +19,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Room rhythm heatlines')).toBeInTheDocument();
     expect(screen.getByText('Event context')).toBeInTheDocument();
     expect(screen.getByText('Review from start')).toBeInTheDocument();
+    expect(screen.getByText('Channel directory dedupe')).toBeInTheDocument();
     expect(screen.getByText('Reader digest notes')).toBeInTheDocument();
     expect(screen.getByText('Shareable moment links')).toBeInTheDocument();
     expect(screen.getByText('Reader memory context')).toBeInTheDocument();

@@ -166,6 +166,22 @@ describe('channel management — raw command dispatch', () => {
     });
   });
 
+  it('deduplicates channel browser LIST rows by room name', () => {
+    seed('#general', [makeUser('me')]);
+
+    feed(':server.test 322 me #general 2 :Launch room');
+    feed(':server.test 322 me #General 5 :');
+    feed(':server.test 322 me #random 1 :Off-topic');
+    feed(':server.test 322 me #general 3 :Duplicated mesh row');
+    feed(':server.test 323 me :End of LIST');
+
+    expect(store.getState().channelList).toEqual([
+      { name: '#general', count: 5, topic: 'Launch room' },
+      { name: '#random', count: 1, topic: 'Off-topic' },
+    ]);
+    expect(store.getState().channelListLoading).toBe(false);
+  });
+
   it('tags outbound messages with the active named conversation', () => {
     const client = seed('#general', [makeUser('me', ['o'])]);
     store.getState().setActiveChannelTopic('#general', 'release train');

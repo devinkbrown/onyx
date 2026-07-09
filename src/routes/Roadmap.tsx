@@ -59,8 +59,8 @@ const phases: Phase[] = [
     title: 'Time-native',
     state: 'active',
     date: '2026-07-09',
-    summary: 'Home now brings followed activity, scheduled rooms, local memory, quiet rooms, return recaps, room rhythm, review-from-start handoffs, reader summaries, shareable moments, reader memory, search handoff, transcript jumps, digest review completion, and reader return-home affordances into view.',
-    items: ['Followed catch-up', 'Scheduled events on Home', 'Vault memory previews', 'Quiet room activity', 'Home return recaps', 'Spotlight handoff', 'Room rhythm heatlines', 'Event context', 'Review from start', 'Reader digest notes', 'Shareable moment links', 'Reader memory context', 'Moment search handoff', 'Reader transcript jumps', 'Digest review handoff', 'Review completion', 'Reader return Home'],
+    summary: 'Home now brings followed activity, scheduled rooms, local memory, quiet rooms, return recaps, room rhythm, review-from-start handoffs, channel directory dedupe, reader summaries, shareable moments, reader memory, search handoff, transcript jumps, digest review completion, and reader return-home affordances into view.',
+    items: ['Followed catch-up', 'Scheduled events on Home', 'Vault memory previews', 'Quiet room activity', 'Home return recaps', 'Spotlight handoff', 'Room rhythm heatlines', 'Event context', 'Review from start', 'Channel directory dedupe', 'Reader digest notes', 'Shareable moment links', 'Reader memory context', 'Moment search handoff', 'Reader transcript jumps', 'Digest review handoff', 'Review completion', 'Reader return Home'],
   },
   {
     phase: 'Phase 7',
@@ -170,7 +170,7 @@ export default function RoadmapRoute() {
             place to return to: followed catch-up, scheduled room events, local
             memory previews, quiet room activity, home return recaps, Spotlight
             handoff, room rhythm heatlines, event context, review-from-start
-            handoffs, reader digest notes, shareable moment links, reader memory context, moment search handoff,
+            handoffs, channel directory dedupe, reader digest notes, shareable moment links, reader memory context, moment search handoff,
             reader transcript jumps, digest review handoff, review completion, reader return-home affordances, and
             quieter activity surfaces.
           </p>
