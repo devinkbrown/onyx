@@ -70,6 +70,7 @@ const ACCESSIBILITY_TOPICS: readonly AccessibilityTopic[] = [
       'Account panel groups account management into named regions with alert/status feedback and target-specific persona actions.',
       'Channel sidebar uses a complementary navigation landmark, roving channel and DM rows, unread/mention names, and a target-specific join action.',
       'Keyboard shortcuts uses a named Sheet dialog, labelled close action, and grouped shortcut lists generated from the live keymap.',
+      'Command palette uses a named dialog, described grammar examples, live selected-command status, and literal goto/search/time/reader/mute actions.',
       'Pinned messages uses a named Sheet dialog, channel-specific pins list, target-specific jump buttons, and real unpin controls.',
       'Theme import uses a named Sheet dialog, described theme-code input, target-specific import and copy actions, and invalid-code feedback.',
       'Thread panel uses a named Sheet dialog, labelled parent and reply articles, and a reply log scoped to the source message.',

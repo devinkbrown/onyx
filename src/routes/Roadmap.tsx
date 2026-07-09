@@ -59,16 +59,16 @@ const phases: Phase[] = [
     title: 'Time-native',
     state: 'active',
     date: '2026-07-09',
-    summary: 'Home now brings followed activity, scheduled rooms, local memory, quiet rooms, return recaps, room rhythm, review-from-start handoffs, review history, channel directory dedupe, review text search, reader summaries, shareable moments, reader memory, search handoff, transcript jumps, digest review completion, reader return-home affordances, reviewed-span recall, hydrated context trails, vault context trails, and vault anchor jumps into view.',
-    items: ['Followed catch-up', 'Scheduled events on Home', 'Vault memory previews', 'Quiet room activity', 'Home return recaps', 'Spotlight handoff', 'Room rhythm heatlines', 'Event context', 'Review from start', 'Catch-up review history', 'Review text search', 'Channel directory dedupe', 'Reader digest notes', 'Shareable moment links', 'Reader memory context', 'Moment search handoff', 'Reader transcript jumps', 'Digest review handoff', 'Review completion', 'Reader return Home', 'Reviewed span recall', 'Hydrated context trails', 'Vault context trails', 'Vault anchor jumps'],
+    summary: 'Home now brings followed activity, scheduled rooms, local memory, quiet rooms, return recaps, room rhythm, review-from-start handoffs, review history, channel directory dedupe, review text search, reader summaries, shareable moments, reader memory, search handoff, transcript jumps, digest review completion, reader return-home affordances, reviewed-span recall, hydrated context trails, vault context trails, vault anchor jumps, and a 20-command palette grammar batch into view.',
+    items: ['Followed catch-up', 'Scheduled events on Home', 'Vault memory previews', 'Quiet room activity', 'Home return recaps', 'Spotlight handoff', 'Room rhythm heatlines', 'Event context', 'Review from start', 'Catch-up review history', 'Review text search', 'Channel directory dedupe', 'Reader digest notes', 'Shareable moment links', 'Reader memory context', 'Moment search handoff', 'Reader transcript jumps', 'Digest review handoff', 'Review completion', 'Reader return Home', 'Reviewed span recall', 'Hydrated context trails', 'Vault context trails', 'Vault anchor jumps', 'Command grammar examples', 'Selected-command status', 'Join/open aliases', 'Goto-at jump', 'Targeted at jump', 'Search/find grammar', 'Home command', 'Preferences command', 'Shortcuts command', 'Reader command', 'Density commands', 'Width commands', 'Motion commands', 'Timed mute', 'Quiet on/off'],
   },
   {
     phase: 'Phase 7',
     title: 'Washi',
     state: 'active',
     date: '2026-07-09',
-    summary: 'Accessibility is now a public ledger and an in-client audit surface with dense-panel, Home catch-up, message-search, notification-center, channel-browser, account-panel, channel-sidebar, keyboard-shortcuts, pinned-messages, theme-import, thread-panel, voice-settings, call-overlay, message-action, member-list, notification-control, and time-scrubber pass evidence.',
-    items: ['Public accessibility ledger', 'Client access audit', 'Motion controls', 'Dense-panel evidence', 'Home access evidence', 'Search access evidence', 'Inbox access evidence', 'Directory access evidence', 'Account access evidence', 'Sidebar access evidence', 'Shortcuts access evidence', 'Pins access evidence', 'Theme import evidence', 'Thread access evidence', 'Voice settings evidence', 'Call overlay evidence', 'Message action evidence', 'Member list evidence', 'Notification control evidence', 'Time scrubber evidence'],
+    summary: 'Accessibility is now a public ledger and an in-client audit surface with dense-panel, Home catch-up, message-search, notification-center, channel-browser, account-panel, channel-sidebar, keyboard-shortcuts, command-palette, pinned-messages, theme-import, thread-panel, voice-settings, call-overlay, message-action, member-list, notification-control, and time-scrubber pass evidence.',
+    items: ['Public accessibility ledger', 'Client access audit', 'Motion controls', 'Dense-panel evidence', 'Home access evidence', 'Search access evidence', 'Inbox access evidence', 'Directory access evidence', 'Account access evidence', 'Sidebar access evidence', 'Shortcuts access evidence', 'Command palette evidence', 'Pins access evidence', 'Theme import evidence', 'Thread access evidence', 'Voice settings evidence', 'Call overlay evidence', 'Message action evidence', 'Member list evidence', 'Notification control evidence', 'Time scrubber evidence'],
   },
 ];
 
@@ -172,7 +172,7 @@ export default function RoadmapRoute() {
             handoff, room rhythm heatlines, event context, review-from-start
             handoffs, review history, review text search, channel directory dedupe, reader digest notes, shareable moment links, reader memory context, moment search handoff,
             reader transcript jumps, digest review handoff, review completion, reader return-home affordances, reviewed-span recall, hydrated context trails, vault context trails, vault anchor jumps, and
-            quieter activity surfaces.
+            command grammar for goto, search, time jumps, reading projections, and quieter activity surfaces.
           </p>
         </article>
         <aside class="data-card">

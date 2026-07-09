@@ -37,6 +37,14 @@ const SECTION_ICON: Record<SpotlightSection, string> = {
   People: '◇',
   Actions: '→',
 };
+const GRAMMAR_EXAMPLES = [
+  'goto #root',
+  'goto #root at yesterday 21:00',
+  'at: 3h ago',
+  'search roadmap',
+  'reader on',
+  'mute 1h',
+] as const;
 
 function optionId(index: number): string {
   return `onyx-spotlight-option-${index}`;
@@ -121,6 +129,11 @@ export function Spotlight(props: SpotlightProps) {
 
   const activeCommand = createMemo(() => matches()[activeIndex()]?.command);
   const activeOptionId = createMemo(() => activeCommand() ? optionId(activeIndex()) : undefined);
+  const activeHint = createMemo(() => {
+    if (activeCommand()) return `Selected command: ${activeCommand()!.title}`;
+    if (query().trim()) return 'No matching command';
+    return 'Try goto, at, search, reader, density, motion, or mute commands';
+  });
 
   createEffect(() => {
     const count = matches().length;
@@ -271,6 +284,7 @@ export function Spotlight(props: SpotlightProps) {
               autocomplete="off"
               spellcheck={false}
               aria-label="Command search"
+              aria-describedby="onyx-spotlight-grammar-hint"
               aria-autocomplete="list"
               aria-expanded="true"
               aria-controls={LISTBOX_ID}
@@ -299,6 +313,30 @@ export function Spotlight(props: SpotlightProps) {
                 <line x1="10.5" y1="3.5" x2="3.5" y2="10.5" />
               </svg>
             </button>
+          </div>
+
+          <div class="onyx-spotlight__grammar" id="onyx-spotlight-grammar-hint">
+            <span class="onyx-spotlight__grammar-label">Time grammar</span>
+            <div class="onyx-spotlight__grammar-examples" role="group" aria-label="Command examples">
+              <For each={GRAMMAR_EXAMPLES}>
+                {(example) => (
+                  <button
+                    type="button"
+                    class="onyx-spotlight__grammar-example"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      setQuery(example);
+                      setActiveIndex(0);
+                      queueMicrotask(() => inputRef?.focus());
+                    }}
+                    aria-label={`Use command example ${example}`}
+                  >
+                    {example}
+                  </button>
+                )}
+              </For>
+            </div>
+            <span class="onyx-spotlight__grammar-status" aria-live="polite">{activeHint()}</span>
           </div>
 
           <div id={LISTBOX_ID} class="onyx-spotlight__results" role="listbox" aria-label="Commands">

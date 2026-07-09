@@ -233,6 +233,14 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Reader mode now marks vault-only
     reviewed anchors as saved on device and hydrates the transcript buffer from
     the local vault before jumping to the reviewed first line.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Command palette time grammar now
+    teaches and executes a 20-part client batch: focusable examples, live
+    selected-command status, `goto`, `join`, and `open` channel aliases,
+    `goto #chan at <time>` jumps, targeted `at #chan <time>` jumps, active
+    `at:` jumps, `search`/`find` message handoffs, `home`, `prefs`, and
+    `shortcuts` commands, reader on/off/toggle, density projections, measured
+    and full-width projections, still/animated motion controls, timed mute, and
+    quiet-mode on/off.
     ⏭️ **NEXT** — carry reviewed anchors into richer cross-room handoffs without
     adding new server surface.
 17. **Accessibility conformance ledger** *(main site + client)* — publish the
@@ -268,6 +276,9 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Keyboard shortcuts now carries pass
     evidence for its named Sheet dialog, labelled close action, and grouped
     shortcut lists generated from the live keymap descriptors.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Command palette now carries pass
+    evidence for its named dialog, described grammar examples, live
+    selected-command status, and literal goto/search/time/reader/mute actions.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Pinned messages now carries pass
     evidence for its named Sheet dialog, channel-specific pins list,
     target-specific jump buttons, and real unpin controls.

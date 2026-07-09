@@ -33,6 +33,7 @@ describe('PreferencesPanel', () => {
     expect(screen.getByText('Account panel')).toBeInTheDocument();
     expect(screen.getByText('Channel sidebar')).toBeInTheDocument();
     expect(screen.getByText('Keyboard shortcuts')).toBeInTheDocument();
+    expect(screen.getByText('Command palette')).toBeInTheDocument();
     expect(screen.getByText('Pinned messages')).toBeInTheDocument();
     expect(screen.getByText('Theme import')).toBeInTheDocument();
     expect(screen.getByText('Thread panel')).toBeInTheDocument();

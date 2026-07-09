@@ -32,7 +32,7 @@
   width: min(45rem, 100%);
   max-height: min(42rem, calc(100svh - 2rem));
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   overflow: hidden;
   isolation: isolate;
   /* Glass cut from deep water: near-surface strata at the top, fading to the
@@ -101,6 +101,68 @@
 /* Bioluminescent focus — the seam below the field lights up as you type. */
 .onyx-spotlight__search:focus-within {
   border-bottom-color: color-mix(in oklab, var(--lapis) 60%, transparent);
+}
+
+.onyx-spotlight__grammar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.55rem 0.75rem;
+  align-items: center;
+  padding: 0.65rem 1.1rem 0.8rem;
+  border-bottom: 1px solid var(--seam-faint);
+  background: color-mix(in oklab, var(--ink) 20%, transparent);
+}
+
+.onyx-spotlight__grammar-label {
+  color: var(--washi-mute);
+  font: 700 0.64rem/1 var(--font-mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.onyx-spotlight__grammar-examples {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.onyx-spotlight__grammar-example {
+  min-width: 0;
+  max-width: 15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  appearance: none;
+  border: 1px solid color-mix(in oklab, var(--lapis) 22%, transparent);
+  border-radius: var(--r-sm);
+  color: var(--washi-dim);
+  background: color-mix(in oklab, var(--lapis) 8%, transparent);
+  cursor: pointer;
+  font: 600 0.68rem/1.2 var(--font-mono);
+  padding: 0.32rem 0.48rem;
+  transition:
+    color 120ms var(--ease),
+    border-color 120ms var(--ease),
+    background-color 120ms var(--ease);
+}
+
+.onyx-spotlight__grammar-example:hover,
+.onyx-spotlight__grammar-example:focus-visible {
+  color: var(--washi);
+  border-color: color-mix(in oklab, var(--lapis-bright) 48%, transparent);
+  background: color-mix(in oklab, var(--lapis) 14%, transparent);
+  outline: none;
+}
+
+.onyx-spotlight__grammar-status {
+  grid-column: 2;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--washi-mute);
+  font: 0.7rem/1.25 var(--font-mono);
 }
 
 .onyx-spotlight__sigil {
@@ -345,6 +407,14 @@
 
   .onyx-spotlight__panel {
     max-height: calc(100svh - 1.5rem);
+  }
+
+  .onyx-spotlight__grammar {
+    grid-template-columns: 1fr;
+  }
+
+  .onyx-spotlight__grammar-status {
+    grid-column: 1;
   }
 
   .onyx-spotlight__option {

@@ -48,7 +48,7 @@ describe('Spotlight', () => {
     await waitFor(() => expect(input).toHaveFocus());
 
     fireEvent.keyDown(input, { key: 'Tab', shiftKey: true });
-    expect(screen.getByRole('button', { name: 'Close spotlight' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Use command example mute 1h' })).toHaveFocus();
   });
 
   it('opens on slash when the user is not typing in a field', () => {
@@ -57,6 +57,16 @@ describe('Spotlight', () => {
     fireEvent.keyDown(window, { key: '/' });
 
     expect(screen.getByRole('dialog', { name: 'Command palette' })).toBeInTheDocument();
+  });
+
+  it('teaches command grammar with focusable examples', () => {
+    renderSpotlight();
+
+    fireEvent.keyDown(window, { key: '/' });
+    fireEvent.click(screen.getByRole('button', { name: 'Use command example goto #root at yesterday 21:00' }));
+
+    expect(screen.getByRole('combobox', { name: 'Command search' })).toHaveValue('goto #root at yesterday 21:00');
+    expect(screen.getByText('Time grammar')).toBeInTheDocument();
   });
 
   it('does not open on slash from an input', () => {

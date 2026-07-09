@@ -4,7 +4,14 @@ import { getState, useStore } from '@/lib/store';
 import type { State } from '@/lib/store/store';
 import { applyThemeToDom, THEME_IDS, THEMES, type ThemeId } from '@/theme';
 import { saveRecent } from '@/lib/commands/registry';
-import { openPreferences } from '@/lib/prefs/preferences';
+import {
+  openPreferences,
+  preferences,
+  setPreference,
+  type Density,
+  type Width,
+} from '@/lib/prefs/preferences';
+import { openMessageSearchWithQuery } from '@/shell/search/useMessageSearch';
 import { useSpotlight } from './useSpotlight';
 import { parseTimeExpr } from './timeGrammar';
 
@@ -62,6 +69,29 @@ function commandArg(query: string, command: string): string | null {
   return trimmed.toLowerCase().startsWith(prefix) ? trimmed.slice(prefix.length).trim() : null;
 }
 
+function exactCommand(query: string, ...commands: string[]): boolean {
+  const normalized = query.trim().toLowerCase();
+  return commands.some((command) => normalized === command);
+}
+
+function splitAtKeyword(value: string): { before: string; after: string } | null {
+  const match = /^(.+?)\s+at\s+(.+)$/i.exec(value.trim());
+  if (!match) return null;
+  const before = match[1]?.trim() ?? '';
+  const after = match[2]?.trim() ?? '';
+  return before && after ? { before, after } : null;
+}
+
+function parseTargetedTimeArg(value: string): { target: string; expr: string } | null {
+  const trimmed = value.trim();
+  const match = /^([#&][^\s,]+)\s+(.+)$/i.exec(trimmed);
+  if (!match) return null;
+  return {
+    target: normalizeChannel(match[1] ?? ''),
+    expr: match[2]?.trim() ?? '',
+  };
+}
+
 function parseMuteDuration(expr: string): { ms: number; label: string } | null {
   const match = expr.trim().match(/^(\d{1,3})\s*(m|min|mins|minute|minutes|h|hr|hrs|hour|hours|d|day|days)$/i);
   if (!match) return null;
@@ -81,6 +111,21 @@ function parseMuteDuration(expr: string): { ms: number; label: string } | null {
   return { ms, label: `${value} ${noun}${value === 1 ? '' : 's'}` };
 }
 
+function parseDensityArg(value: string): Density | null {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'compact' || normalized === 'cozy' || normalized === 'roomy') return normalized;
+  if (normalized === 'dense') return 'compact';
+  if (normalized === 'reader') return 'roomy';
+  return null;
+}
+
+function parseWidthArg(value: string): Width | null {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'full' || normalized === 'wide') return 'full';
+  if (normalized === 'measured' || normalized === 'measure' || normalized === 'narrow') return 'measured';
+  return null;
+}
+
 function readSpotlightQuery(): string {
   if (typeof document === 'undefined') return '';
   const input = document.getElementById(SPOTLIGHT_INPUT_ID);
@@ -88,7 +133,30 @@ function readSpotlightQuery(): string {
 }
 
 function timeJumpCommands(state: CommandState, query: string): SpotlightCommand[] {
-  const expr = timeExprFromQuery(query);
+  const commands: SpotlightCommand[] = [];
+  const atArg = commandArg(query, 'at');
+  const targetTime = atArg ? parseTargetedTimeArg(atArg) : null;
+  if (targetTime) {
+    const at = parseTimeExpr(targetTime.expr);
+    if (!at) return [];
+
+    commands.push({
+      id: `action:time-jump:${targetTime.target.toLowerCase()}:${at.toISOString()}`,
+      section: 'Actions',
+      title: `Jump ${targetTime.target} to ${JUMP_TIME_FORMATTER.format(at)}`,
+      hint: 'time grammar',
+      keywords: [query.trim(), targetTime.target, targetTime.expr, 'at', 'jump time history'],
+      run: () => {
+        const current = getState();
+        current.joinChannel(targetTime.target);
+        current.navigate({ kind: 'channel', channel: targetTime.target });
+        current.travelTo(targetTime.target, at);
+      },
+    });
+    return commands;
+  }
+
+  const expr = atArg ?? timeExprFromQuery(query);
   if (!expr) return [];
 
   const target = activeTarget(state);
@@ -116,21 +184,28 @@ function timeJumpCommands(state: CommandState, query: string): SpotlightCommand[
 
 function grammarCommands(state: CommandState, query: string): SpotlightCommand[] {
   const commands: SpotlightCommand[] = [];
-  const gotoArg = commandArg(query, 'goto');
+  const gotoArg = commandArg(query, 'goto') ?? commandArg(query, 'join') ?? commandArg(query, 'open');
   if (gotoArg) {
-    const channel = normalizeChannel(gotoArg);
+    const timed = splitAtKeyword(gotoArg);
+    const channel = normalizeChannel(timed?.before ?? gotoArg);
     if (channel.length > 1) {
       const known = state.channels.get(channel.toLowerCase());
+      const at = timed ? parseTimeExpr(timed.after) : null;
       commands.push({
-        id: `grammar:goto:${channel.toLowerCase()}`,
+        id: at
+          ? `grammar:goto-time:${channel.toLowerCase()}:${at.toISOString()}`
+          : `grammar:goto:${channel.toLowerCase()}`,
         section: 'Actions',
-        title: known ? `Go to ${known.name}` : `Join ${channel}`,
-        hint: known ? channelHint(known) : 'channel',
-        keywords: [query.trim(), 'goto', 'go to', channel],
+        title: at
+          ? `Go to ${known?.name ?? channel} at ${JUMP_TIME_FORMATTER.format(at)}`
+          : known ? `Go to ${known.name}` : `Join ${channel}`,
+        hint: at ? 'time grammar' : known ? channelHint(known) : 'channel',
+        keywords: [query.trim(), 'goto', 'join', 'open', 'go to', channel, timed?.after ?? ''],
         run: () => {
           const current = getState();
           current.joinChannel(known?.name ?? channel);
           current.navigate({ kind: 'channel', channel: known?.name ?? channel });
+          if (at) current.travelTo(known?.name ?? channel, at);
         },
       });
     }
@@ -154,6 +229,22 @@ function grammarCommands(state: CommandState, query: string): SpotlightCommand[]
 
   const muteArg = commandArg(query, 'mute');
   if (muteArg) {
+    if (/^(off|clear|cancel)$/i.test(muteArg)) {
+      commands.push({
+        id: 'grammar:mute:off',
+        section: 'Actions',
+        title: 'Turn off do not disturb',
+        hint: 'notifications',
+        keywords: [query.trim(), 'mute', 'unmute', 'do not disturb', 'off'],
+        run: () => {
+          const current = getState();
+          current.setDndEnabled(false);
+          current.setDndUntil(null);
+        },
+      });
+      return commands;
+    }
+
     const duration = parseMuteDuration(muteArg);
     if (duration) {
       commands.push({
@@ -171,7 +262,150 @@ function grammarCommands(state: CommandState, query: string): SpotlightCommand[]
     }
   }
 
+  if (exactCommand(query, 'unmute', 'dnd off', 'quiet off')) {
+    commands.push({
+      id: 'grammar:dnd:off',
+      section: 'Actions',
+      title: 'Turn off do not disturb',
+      hint: 'notifications',
+      keywords: [query.trim(), 'unmute', 'dnd off', 'quiet off'],
+      run: () => {
+        const current = getState();
+        current.setDndEnabled(false);
+        current.setDndUntil(null);
+      },
+    });
+  }
+
+  if (exactCommand(query, 'dnd on', 'quiet on', 'do not disturb')) {
+    commands.push({
+      id: 'grammar:dnd:on',
+      section: 'Actions',
+      title: 'Turn on do not disturb',
+      hint: 'notifications',
+      keywords: [query.trim(), 'dnd on', 'quiet on', 'mute'],
+      run: () => getState().setDndEnabled(true),
+    });
+  }
+
+  if (exactCommand(query, 'home', 'go home')) {
+    commands.push({
+      id: 'grammar:home',
+      section: 'Actions',
+      title: 'Go home',
+      hint: 'catch-up',
+      keywords: [query.trim(), 'home', 'catch up'],
+      run: () => getState().navigate({ kind: 'home' }),
+    });
+  }
+
+  const searchArg = commandArg(query, 'search') ?? commandArg(query, 'find');
+  if (searchArg) {
+    commands.push({
+      id: `grammar:search:${searchArg.toLowerCase()}`,
+      section: 'Actions',
+      title: `Search messages for “${searchArg}”`,
+      hint: activeTargetLabel(state) || 'current conversation',
+      keywords: [query.trim(), 'search', 'find', searchArg],
+      run: () => openMessageSearchWithQuery(searchArg),
+    });
+  }
+
+  const readerArg = commandArg(query, 'reader');
+  if (readerArg || exactCommand(query, 'reader')) {
+    const normalized = (readerArg ?? 'toggle').trim().toLowerCase();
+    const enabled = normalized === 'on' || normalized === 'yes'
+      ? true
+      : normalized === 'off' || normalized === 'no'
+        ? false
+        : null;
+    commands.push({
+      id: `grammar:reader:${enabled === null ? 'toggle' : String(enabled)}`,
+      section: 'Actions',
+      title: enabled === null ? 'Toggle reader mode' : `${enabled ? 'Turn on' : 'Turn off'} reader mode`,
+      hint: 'reading projection',
+      keywords: [query.trim(), 'reader', 'reader mode', 'projection'],
+      run: () => setPreference('readerMode', enabled ?? !preferencesSnapshot().readerMode),
+    });
+  }
+
+  const densityArg = commandArg(query, 'density');
+  if (densityArg) {
+    const density = parseDensityArg(densityArg);
+    if (density) {
+      commands.push({
+        id: `grammar:density:${density}`,
+        section: 'Actions',
+        title: `Set density to ${density}`,
+        hint: 'projection',
+        keywords: [query.trim(), 'density', 'compact', 'cozy', 'roomy', density],
+        run: () => setPreference('density', density),
+      });
+    }
+  }
+
+  const widthArg = commandArg(query, 'width');
+  if (widthArg) {
+    const width = parseWidthArg(widthArg);
+    if (width) {
+      commands.push({
+        id: `grammar:width:${width}`,
+        section: 'Actions',
+        title: `Set conversation width to ${width}`,
+        hint: 'reading measure',
+        keywords: [query.trim(), 'width', 'measure', 'full', 'measured', width],
+        run: () => setPreference('width', width),
+      });
+    }
+  }
+
+  const motionArg = commandArg(query, 'motion');
+  if (motionArg) {
+    const normalized = motionArg.trim().toLowerCase();
+    const reduceMotion = normalized === 'still' || normalized === 'off' || normalized === 'reduced'
+      ? true
+      : normalized === 'animated' || normalized === 'on'
+        ? false
+        : null;
+    if (reduceMotion !== null) {
+      commands.push({
+        id: `grammar:motion:${reduceMotion ? 'still' : 'animated'}`,
+        section: 'Actions',
+        title: reduceMotion ? 'Use still motion mode' : 'Use animated motion mode',
+        hint: 'accessibility',
+        keywords: [query.trim(), 'motion', 'animation', 'still', 'animated'],
+        run: () => setPreference('reduceMotion', reduceMotion),
+      });
+    }
+  }
+
+  if (exactCommand(query, 'preferences', 'prefs', 'settings')) {
+    commands.push({
+      id: 'grammar:preferences',
+      section: 'Actions',
+      title: 'Open preferences',
+      hint: 'panel',
+      keywords: [query.trim(), 'preferences', 'prefs', 'settings'],
+      run: () => openPreferences(),
+    });
+  }
+
+  if (exactCommand(query, 'shortcuts', 'keyboard')) {
+    commands.push({
+      id: 'grammar:shortcuts',
+      section: 'Actions',
+      title: 'Open keyboard shortcuts',
+      hint: '?',
+      keywords: [query.trim(), 'shortcuts', 'keyboard', 'keys'],
+      run: () => getState().openKeyboardShortcuts(),
+    });
+  }
+
   return commands;
+}
+
+function preferencesSnapshot() {
+  return preferences();
 }
 
 function navigateTo(path: string): void {

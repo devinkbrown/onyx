@@ -3,6 +3,7 @@ import { backgroundOptions } from '@/backgrounds';
 import type { Channel } from '@/lib/irc/types';
 import { getState, setState } from '@/lib/store';
 import { store } from '@/lib/store/store';
+import { preferences, resetPreferences } from '@/lib/prefs/preferences';
 import type { DMConversation, Server } from '@/lib/store/store';
 import { THEME_IDS } from '@/theme';
 import { buildCommands } from './commands';
@@ -49,7 +50,9 @@ function server(): Server {
 
 describe('buildCommands', () => {
   beforeEach(() => {
+    vi.useRealTimers();
     store.setState(initialState, true);
+    resetPreferences();
     localStorage.clear();
     document.documentElement.removeAttribute('data-theme');
   });
@@ -113,6 +116,63 @@ describe('buildCommands', () => {
     expect(navigate).toHaveBeenCalledWith({ kind: 'channel', channel: '#forge' });
   });
 
+  it('builds join and open aliases for channel navigation', () => {
+    const joinChannel = vi.fn();
+    const navigate = vi.fn();
+    setState({
+      channels: new Map([['#forge', channel('#forge')]]),
+      joinChannel,
+      navigate,
+    });
+
+    const join = buildCommands(getState(), 'join forge').find((entry) => entry.id === 'grammar:goto:#forge');
+    const open = buildCommands(getState(), 'open #forge').find((entry) => entry.id === 'grammar:goto:#forge');
+
+    expect(join?.title).toBe('Go to #forge');
+    expect(open?.title).toBe('Go to #forge');
+  });
+
+  it('builds a literal goto-at command for channel time travel', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-08T12:00:00.000Z'));
+    const joinChannel = vi.fn();
+    const navigate = vi.fn();
+    const travelTo = vi.fn();
+    setState({
+      channels: new Map([['#forge', channel('#forge')]]),
+      joinChannel,
+      navigate,
+      travelTo,
+    });
+
+    const command = buildCommands(getState(), 'goto #forge at yesterday 21:00')
+      .find((entry) => entry.id.startsWith('grammar:goto-time:#forge:'));
+
+    expect(command?.title).toContain('Go to #forge at');
+    command?.run();
+    expect(joinChannel).toHaveBeenCalledWith('#forge');
+    expect(navigate).toHaveBeenCalledWith({ kind: 'channel', channel: '#forge' });
+    expect(travelTo).toHaveBeenCalledWith('#forge', new Date(2026, 6, 7, 21, 0, 0, 0));
+  });
+
+  it('builds a targeted at command for a channel timeline jump', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-08T12:00:00.000Z'));
+    const joinChannel = vi.fn();
+    const navigate = vi.fn();
+    const travelTo = vi.fn();
+    setState({ joinChannel, navigate, travelTo });
+
+    const command = buildCommands(getState(), 'at #forge 3h ago')
+      .find((entry) => entry.id.startsWith('action:time-jump:#forge:'));
+
+    expect(command?.title).toContain('Jump #forge to');
+    command?.run();
+    expect(joinChannel).toHaveBeenCalledWith('#forge');
+    expect(navigate).toHaveBeenCalledWith({ kind: 'channel', channel: '#forge' });
+    expect(travelTo).toHaveBeenCalledWith('#forge', new Date('2026-07-08T09:00:00.000Z'));
+  });
+
   it('builds a literal dm command for direct messages', () => {
     const navigate = vi.fn();
     setState({
@@ -138,6 +198,61 @@ describe('buildCommands', () => {
     expect(store.getState().dndEnabled).toBe(false);
     expect(until).toBeGreaterThanOrEqual(before + 3_600_000);
     expect(until).toBeLessThanOrEqual(Date.now() + 3_600_000);
+  });
+
+  it('builds literal commands for turning quiet mode on and off', () => {
+    const on = buildCommands(getState(), 'quiet on').find((entry) => entry.id === 'grammar:dnd:on');
+    on?.run();
+    expect(store.getState().dndEnabled).toBe(true);
+
+    store.getState().setDndUntil(Date.now() + 60_000);
+    const off = buildCommands(getState(), 'unmute').find((entry) => entry.id === 'grammar:dnd:off');
+    off?.run();
+
+    expect(store.getState().dndEnabled).toBe(false);
+    expect(store.getState().dndUntil).toBeNull();
+  });
+
+  it('builds literal home, preferences, and shortcuts commands', () => {
+    const navigate = vi.fn();
+    const openKeyboardShortcuts = vi.fn();
+    setState({ navigate, openKeyboardShortcuts });
+
+    buildCommands(getState(), 'home').find((entry) => entry.id === 'grammar:home')?.run();
+    buildCommands(getState(), 'prefs').find((entry) => entry.id === 'grammar:preferences')?.run();
+    buildCommands(getState(), 'shortcuts').find((entry) => entry.id === 'grammar:shortcuts')?.run();
+
+    expect(navigate).toHaveBeenCalledWith({ kind: 'home' });
+    expect(openKeyboardShortcuts).toHaveBeenCalled();
+  });
+
+  it('builds reader, density, width, and motion projection commands', () => {
+    buildCommands(getState(), 'reader on').find((entry) => entry.id === 'grammar:reader:true')?.run();
+    buildCommands(getState(), 'density compact').find((entry) => entry.id === 'grammar:density:compact')?.run();
+    buildCommands(getState(), 'width full').find((entry) => entry.id === 'grammar:width:full')?.run();
+    buildCommands(getState(), 'motion still').find((entry) => entry.id === 'grammar:motion:still')?.run();
+
+    expect(preferences()).toMatchObject({
+      readerMode: true,
+      density: 'compact',
+      width: 'full',
+      reduceMotion: true,
+    });
+    expect(document.documentElement.dataset.reader).toBe('true');
+    expect(document.documentElement.dataset.density).toBe('compact');
+    expect(document.documentElement.dataset.width).toBe('full');
+    expect(document.documentElement.dataset.reduceMotion).toBe('true');
+  });
+
+  it('builds message search grammar commands', () => {
+    setState({
+      activeView: { kind: 'channel', channel: '#forge' },
+      channels: new Map([['#forge', channel('#forge')]]),
+    });
+
+    const command = buildCommands(getState(), 'search roadmap').find((entry) => entry.id === 'grammar:search:roadmap');
+    expect(command?.title).toBe('Search messages for “roadmap”');
+    expect(command?.hint).toBe('#forge');
   });
 
   it('applies theme commands immediately', () => {

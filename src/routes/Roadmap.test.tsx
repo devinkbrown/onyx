@@ -34,6 +34,18 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Hydrated context trails')).toBeInTheDocument();
     expect(screen.getByText('Vault context trails')).toBeInTheDocument();
     expect(screen.getByText('Vault anchor jumps')).toBeInTheDocument();
+    expect(screen.getByText('Command grammar examples')).toBeInTheDocument();
+    expect(screen.getByText('Selected-command status')).toBeInTheDocument();
+    expect(screen.getByText('Join/open aliases')).toBeInTheDocument();
+    expect(screen.getByText('Goto-at jump')).toBeInTheDocument();
+    expect(screen.getByText('Targeted at jump')).toBeInTheDocument();
+    expect(screen.getByText('Search/find grammar')).toBeInTheDocument();
+    expect(screen.getByText('Reader command')).toBeInTheDocument();
+    expect(screen.getByText('Density commands')).toBeInTheDocument();
+    expect(screen.getByText('Width commands')).toBeInTheDocument();
+    expect(screen.getByText('Motion commands')).toBeInTheDocument();
+    expect(screen.getByText('Timed mute')).toBeInTheDocument();
+    expect(screen.getByText('Quiet on/off')).toBeInTheDocument();
     expect(screen.getByText('Client access audit')).toBeInTheDocument();
     expect(screen.getByText('Dense-panel evidence')).toBeInTheDocument();
     expect(screen.getByText('Home access evidence')).toBeInTheDocument();
@@ -43,6 +55,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Account access evidence')).toBeInTheDocument();
     expect(screen.getByText('Sidebar access evidence')).toBeInTheDocument();
     expect(screen.getByText('Shortcuts access evidence')).toBeInTheDocument();
+    expect(screen.getByText('Command palette evidence')).toBeInTheDocument();
     expect(screen.getByText('Pins access evidence')).toBeInTheDocument();
     expect(screen.getByText('Theme import evidence')).toBeInTheDocument();
     expect(screen.getByText('Thread access evidence')).toBeInTheDocument();
