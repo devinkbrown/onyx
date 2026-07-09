@@ -107,9 +107,11 @@ export class IRCClient {
   isupport: ISupport = {
     // Defaults mirror Orochi's ISUPPORT PREFIX=(YQqov)*!.@+ (founder Q/'!',
     // owner q/'.', op o/'@', voice v/'+', plus the render-only oper Y/'*').
+    // The reverse map also accepts standard IRC admin/halfop prefixes so a
+    // NAMES burst received before 005 still keeps &admin / %halfop status.
     // Overwritten verbatim from 005 PREFIX on connect.
-    PREFIX: { Y: '*', Q: '!', q: '.', o: '@', v: '+' },
-    PREFIX_MODES: { '*': 'Y', '!': 'Q', '.': 'q', '@': 'o', '+': 'v' },
+    PREFIX: { Y: '*', Q: '!', q: '.', a: '&', o: '@', h: '%', v: '+' },
+    PREFIX_MODES: { '*': 'Y', '!': 'Q', '.': 'q', '~': 'q', '&': 'a', '@': 'o', '%': 'h', '+': 'v' },
     // Orochi defaults (overwritten from 005 on connect):
     //   CHANMODES=beIZ,k,lfj,imnstCTNMSgWOA, CHANTYPES=#&, CASEMAPPING=ascii,
     //   NICKLEN=64, TOPICLEN=390, CHANLIMIT=#&:50, MONITOR=128, SILENCE=32.
@@ -128,9 +130,18 @@ export class IRCClient {
   };
 
   /** Map prefix char → mode letter, e.g. '@' → 'o'. Orochi: (YQqov)*!.@+ */
-  prefixToMode: Record<string, string> = { '*': 'Y', '!': 'Q', '.': 'q', '@': 'o', '+': 'v' };
+  prefixToMode: Record<string, string> = {
+    '*': 'Y',
+    '!': 'Q',
+    '.': 'q',
+    '~': 'q',
+    '&': 'a',
+    '@': 'o',
+    '%': 'h',
+    '+': 'v',
+  };
   /** Map mode letter → prefix char (used for display). Orochi: (YQqov)*!.@+ */
-  modeToPrefix: Record<string, string> = { Y: '*', Q: '!', q: '.', o: '@', v: '+' };
+  modeToPrefix: Record<string, string> = { Y: '*', Q: '!', q: '.', a: '&', o: '@', h: '%', v: '+' };
 
   constructor(opts: IRCClientOptions) {
     this.opts = opts;

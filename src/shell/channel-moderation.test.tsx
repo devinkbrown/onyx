@@ -20,8 +20,8 @@ function makeClient() {
     sendRaw: vi.fn(),
     isupport: { CHANTYPES: '#&', CHANMODES: ['beIZ', 'k', 'lfj', 'imnstCTNMSgWOA'] },
     negotiatedCaps: new Set<string>(),
-    modeToPrefix: { Q: '!', q: '.', o: '@', v: '+' } as Record<string, string>,
-    prefixToMode: { '!': 'Q', '.': 'q', '@': 'o', '+': 'v' } as Record<string, string>,
+    modeToPrefix: { Y: '*', Q: '!', q: '~', a: '&', o: '@', h: '%', v: '+' } as Record<string, string>,
+    prefixToMode: { '*': 'Y', '!': 'Q', '.': 'q', '~': 'q', '&': 'a', '@': 'o', '%': 'h', '+': 'v' } as Record<string, string>,
   };
 }
 
@@ -90,6 +90,27 @@ describe('MemberList moderation', () => {
     expect(screen.getByRole('region', { name: 'bob', description: 'Voice in #general' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send DM to bob' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'View profile of bob' })).toBeInTheDocument();
+  });
+
+  it('groups standard channel admins, ops, halfops, and voice in the nicklist', () => {
+    seedChannel({
+      ourNick: 'me',
+      users: [
+        makeUser('me', ['o']),
+        makeUser('ada', ['a']),
+        makeUser('opal', ['o']),
+        makeUser('hemi', ['h']),
+        makeUser('vivi', ['v']),
+      ],
+    });
+
+    render(() => <MemberList />);
+
+    expect(screen.getByRole('list', { name: /Admins/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Open member details for ada, Admin/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Open member details for opal, Op/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Open member details for hemi, Half-op/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Open member details for vivi, Voice/ })).toBeInTheDocument();
   });
 
   it('shows Kick/Ban controls to an op when targeting another member', () => {

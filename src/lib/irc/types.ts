@@ -78,16 +78,19 @@ export interface ChatMessage {
 
 /**
  * Channel member status mode letters, per Orochi's
- * `ISUPPORT PREFIX=(YQqov)*!.@+`:
+ * `ISUPPORT PREFIX=(YQqov)*!.@+`, plus standard IRC admin/halfop
+ * deployments that advertise `(qaohv)~&@%+`:
  *   Y → '*' network-operator (server-derived, render-only; never set via MODE)
  *   Q → '!' founder   (channel creator; ops/owners cannot strip)
  *   q → '.' owner
+ *   a → '&' admin
  *   o → '@' op
+ *   h → '%' half-op
  *   v → '+' voice
  * Empty string represents no status. The wire prefix map is server-driven
  * (parsed from 005 PREFIX); these letters are the authoritative defaults.
  */
-export type UserMode = 'Y' | 'Q' | 'q' | 'o' | 'v' | '';
+export type UserMode = 'Y' | 'Q' | 'q' | 'a' | 'o' | 'h' | 'v' | '';
 
 export interface ChannelUser {
   nick: string;

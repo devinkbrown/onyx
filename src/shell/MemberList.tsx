@@ -4,12 +4,14 @@
  * Role precedence (Orochi PREFIX=(YQqov)*!.@+):
  *   Y → netop   (*)  — lapis badge
  *   Q → founder (!)  — gold bright badge
- *   q → owner   (.)  — gold badge
+ *   q → owner   (. or ~) — gold badge
+ *   a → admin   (&)  — gold badge
  *   o → op      (@)  — vermilion badge
+ *   h → halfop  (%)  — muted badge
  *   v → voice   (+)  — green badge
  *   ''→ member  (no badge)
  *
- * Sorted: netop > founder > owner > op > voice > member; then alpha within group.
+ * Sorted: netop > founder > owner > admin > op > halfop > voice > member; then alpha within group.
  *
  * Click a user → Popover mini-card with nick, account, badges, and actions.
  *
@@ -29,7 +31,7 @@ import { Avatar, Popover, Button } from '@/primitives/index';
 
 // ── Role resolution ──────────────────────────────────────────────────────────
 
-type RoleKey = 'netop' | 'founder' | 'owner' | 'op' | 'voice' | 'member';
+type RoleKey = 'netop' | 'founder' | 'owner' | 'admin' | 'op' | 'halfop' | 'voice' | 'member';
 
 interface ResolvedRole {
   key: RoleKey;
@@ -42,18 +44,26 @@ const ROLE_ORDER: Record<RoleKey, number> = {
   netop: 0,
   founder: 1,
   owner: 2,
-  op: 3,
-  voice: 4,
-  member: 5,
+  admin: 3,
+  op: 4,
+  halfop: 5,
+  voice: 6,
+  member: 7,
 };
 
-function resolveRole(user: ChannelUser): ResolvedRole {
+function prefixFor(modeToPrefix: Record<string, string>, mode: string, fallback: string): string {
+  return modeToPrefix[mode] || fallback;
+}
+
+function resolveRole(user: ChannelUser, modeToPrefix: Record<string, string>): ResolvedRole {
   const modes = user.modes;
-  if (modes.has('Y')) return { key: 'netop',   label: 'Network Oper', symbol: '*', sort: ROLE_ORDER.netop };
-  if (modes.has('Q')) return { key: 'founder',  label: 'Founder',      symbol: '!', sort: ROLE_ORDER.founder };
-  if (modes.has('q')) return { key: 'owner',    label: 'Owner',        symbol: '.', sort: ROLE_ORDER.owner };
-  if (modes.has('o')) return { key: 'op',       label: 'Op',           symbol: '@', sort: ROLE_ORDER.op };
-  if (modes.has('v')) return { key: 'voice',    label: 'Voice',        symbol: '+', sort: ROLE_ORDER.voice };
+  if (modes.has('Y')) return { key: 'netop',   label: 'Network Oper', symbol: prefixFor(modeToPrefix, 'Y', '*'), sort: ROLE_ORDER.netop };
+  if (modes.has('Q')) return { key: 'founder',  label: 'Founder',      symbol: prefixFor(modeToPrefix, 'Q', '!'), sort: ROLE_ORDER.founder };
+  if (modes.has('q')) return { key: 'owner',    label: 'Owner',        symbol: prefixFor(modeToPrefix, 'q', '.'), sort: ROLE_ORDER.owner };
+  if (modes.has('a')) return { key: 'admin',    label: 'Admin',        symbol: prefixFor(modeToPrefix, 'a', '&'), sort: ROLE_ORDER.admin };
+  if (modes.has('o')) return { key: 'op',       label: 'Op',           symbol: prefixFor(modeToPrefix, 'o', '@'), sort: ROLE_ORDER.op };
+  if (modes.has('h')) return { key: 'halfop',   label: 'Half-op',      symbol: prefixFor(modeToPrefix, 'h', '%'), sort: ROLE_ORDER.halfop };
+  if (modes.has('v')) return { key: 'voice',    label: 'Voice',        symbol: prefixFor(modeToPrefix, 'v', '+'), sort: ROLE_ORDER.voice };
   return            { key: 'member',   label: 'Member',       symbol: '',  sort: ROLE_ORDER.member };
 }
 
@@ -63,7 +73,9 @@ const GROUP_LABELS: Partial<Record<RoleKey, string>> = {
   netop: 'Network Operators',
   founder: 'Founders',
   owner: 'Owners',
+  admin: 'Admins',
   op: 'Ops',
+  halfop: 'Half-ops',
   voice: 'Voice',
   member: 'Members',
 };
@@ -252,6 +264,7 @@ export function MemberList(props: MemberListProps): JSX.Element {
   const activeView = useStore((s) => s.activeView);
   const channels = useStore((s) => s.channels);
   const connectionStatus = useStore((s) => s.connectionStatus);
+  const modeToPrefix = useStore((s) => s.client?.modeToPrefix ?? s.isupportModeToPrefix);
 
   const activeChannel = createMemo(() => {
     const view = activeView();
@@ -274,7 +287,7 @@ export function MemberList(props: MemberListProps): JSX.Element {
 
     const entries: MemberEntry[] = [];
     ch.users.forEach((user) => {
-      entries.push({ user, role: resolveRole(user) });
+      entries.push({ user, role: resolveRole(user, modeToPrefix()) });
     });
 
     // Sort: by role sort order, then alphabetically
@@ -296,7 +309,7 @@ export function MemberList(props: MemberListProps): JSX.Element {
     }
 
     const result: GroupEntry[] = [];
-    const roleOrder: RoleKey[] = ['netop', 'founder', 'owner', 'op', 'voice', 'member'];
+    const roleOrder: RoleKey[] = ['netop', 'founder', 'owner', 'admin', 'op', 'halfop', 'voice', 'member'];
     for (const key of roleOrder) {
       const members = groupMap.get(key);
       if (members && members.length > 0) {

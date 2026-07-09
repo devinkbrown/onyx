@@ -4,7 +4,7 @@ import { IRCClient } from '@/lib/irc/client';
 import type { IRCMessage, Channel, ChannelUser, ChatMessage, ConnectionStatus, MessageReaction } from '@/lib/irc/types';
 import { parseMultilineLimits, planMultilineBatches, buildMultilineLines, assembleMultilineText } from '@/lib/irc/multiline';
 import { clearSessionToken, loadCredentials, storeMeshToken, storeSessionToken } from '@/lib/credentials';
-import { escapeTagValue, parseAccountInfo, parseCHANLIMIT, parseMonitorNumeric, parsePREFIX, parseSessionMeshTokenNote, parseSessionTokenNote, parseStandardReply } from '@/lib/irc/parser';
+import { escapeTagValue, parseAccountInfo, parseCHANLIMIT, parseMonitorNumeric, parseNamesPrefix, parsePREFIX, parseSessionMeshTokenNote, parseSessionTokenNote, parseStandardReply } from '@/lib/irc/parser';
 import type { SuimyakuPeerState, SuimyakuRoomStats, CallState } from '@/lib/suimyaku-media/types';
 import { getMountedSuimyakuMediaEngine } from '@/lib/suimyaku-media/MediaEngine';
 import { parseActivity } from '@/lib/activity';
@@ -1977,6 +1977,27 @@ function mergeChannelListRow(
  */
 const _namesInProgress = new Set<string>();
 
+const DEFAULT_PREFIX_TO_MODE: Record<string, string> = {
+  '*': 'Y',
+  '!': 'Q',
+  '.': 'q',
+  '~': 'q',
+  '&': 'a',
+  '@': 'o',
+  '%': 'h',
+  '+': 'v',
+};
+
+const DEFAULT_MODE_TO_PREFIX: Record<string, string> = {
+  Y: '*',
+  Q: '!',
+  q: '.',
+  a: '&',
+  o: '@',
+  h: '%',
+  v: '+',
+};
+
 // ── Active-roster reconciliation (module-level) ───────────────────────────────
 // The member list can silently drift from the server's truth: a mesh peer flap
 // emits a netsplit QUIT batch (then a netjoin JOIN batch) that a briefly-dropped
@@ -2335,8 +2356,8 @@ export const store = createStore<OnyxState>()(
     isIRCX: false,
     networkName: 'Ocean',
     serverFeatures: new Map(),
-    isupportPrefixToMode: { '.': 'q', '@': 'o', '+': 'v' },
-    isupportModeToPrefix: { q: '.', o: '@', v: '+' },
+    isupportPrefixToMode: DEFAULT_PREFIX_TO_MODE,
+    isupportModeToPrefix: DEFAULT_MODE_TO_PREFIX,
     chanLimits: {},
     caseMapping: 'ascii',
     mediaAvailable: false,
@@ -5224,7 +5245,7 @@ export const store = createStore<OnyxState>()(
             const c = channels.get(key) ?? emptyChannel(ch);
             const users = freshNames ? new Map<string, ChannelUser>() : new Map(c.users);
             for (const name of names) {
-              const { nick: n, modes } = parseNamePrefix(name, client?.prefixToMode ?? {});
+              const { nick: n, modes } = parseNamesPrefix(name, client?.prefixToMode ?? DEFAULT_PREFIX_TO_MODE);
               if (n) users.set(n.toLowerCase(), { nick: n, modes: new Set(modes), away: false });
             }
             channels.set(key, { ...c, users });
@@ -5273,7 +5294,7 @@ export const store = createStore<OnyxState>()(
             const key = ch.toLowerCase();
             const modeStr = params[2] ?? '';
             const modeArgs = params.slice(3);
-            const prefixModes = new Set(Object.keys(get().client?.modeToPrefix ?? { Q: '!', q: '.', o: '@', v: '+' }));
+            const prefixModes = new Set(Object.keys(get().client?.modeToPrefix ?? DEFAULT_MODE_TO_PREFIX));
             const chanmodes = get().client?.isupport.CHANMODES ?? [];
             set(s => {
               const channels = new Map(s.channels);
@@ -5913,7 +5934,7 @@ export const store = createStore<OnyxState>()(
               if (!c) return {};
               const modeText = params.slice(1).join(' ');
               const users = new Map(c.users);
-              const prefixModes = new Set(Object.keys(get().client?.modeToPrefix ?? { Q: '!', q: '.', o: '@', v: '+' }));
+              const prefixModes = new Set(Object.keys(get().client?.modeToPrefix ?? DEFAULT_MODE_TO_PREFIX));
               const chanmodes = get().client?.isupport.CHANMODES ?? [];
               let adding = true;
               let argIdx = 0;
@@ -5945,7 +5966,7 @@ export const store = createStore<OnyxState>()(
             });
 
             // Emit audit entries for ban/unban/other mode changes
-            const prefixModes = new Set(Object.keys(get().client?.modeToPrefix ?? { Q: '!', q: '.', o: '@', v: '+' }));
+            const prefixModes = new Set(Object.keys(get().client?.modeToPrefix ?? DEFAULT_MODE_TO_PREFIX));
             const chanmodes = get().client?.isupport.CHANMODES ?? [];
             let adding = true;
             let argIdx = 0;
@@ -8971,10 +8992,10 @@ export const selectAccount = (s: OnyxState): string | null => s.server?.account 
 
 /**
  * Status-mode rank ladder for a channel member. Higher wins:
- *   Y network-oper > Q founder > q owner > o op > v voice > '' member.
+ *   Y network-oper > Q founder > q owner > a admin > o op > h halfop > v voice > '' member.
  * Used to gate moderation affordances. Mirrors MemberList's resolveRole order.
  */
-const STATUS_RANK: Record<string, number> = { Y: 5, Q: 4, q: 3, o: 2, v: 1 };
+const STATUS_RANK: Record<string, number> = { Y: 7, Q: 6, q: 5, a: 4, o: 3, h: 2, v: 1 };
 
 function rankOfModes(modes: Set<string> | undefined): number {
   if (!modes) return 0;
@@ -9209,21 +9230,6 @@ function modeConsumesArg(
   if (argModes.includes(letter)) return true;    // group B
   if (setOnlyModes.includes(letter)) return adding; // group C
   return false;                                  // group D (or unknown flag)
-}
-
-function parseNamePrefix(
-  name: string,
-  prefixToMode: Record<string, string>,
-): { nick: string; modes: string[] } {
-  const modes: string[] = [];
-  let i = 0;
-  while (i < name.length && prefixToMode[name[i]!]) {
-    modes.push(prefixToMode[name[i]!]!);
-    i++;
-  }
-  // userhost-in-names sends nick!user@host — extract just the nick
-  const nick = name.slice(i).split('!')[0]!;
-  return { nick, modes };
 }
 
 function _addMessage(state: OnyxState, target: string, msg: ChatMessage): Partial<OnyxState> {

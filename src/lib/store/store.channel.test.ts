@@ -30,8 +30,8 @@ function makeClient() {
     isupport: { CHANTYPES: '#&', CHANMODES: ['beIZ', 'k', 'lfj', 'imnstCTNMSgWOA'] },
     negotiatedCaps: new Set<string>(),
     capValues: new Map<string, string>(),
-    modeToPrefix: { Q: '!', q: '.', o: '@', v: '+' } as Record<string, string>,
-    prefixToMode: { '!': 'Q', '.': 'q', '@': 'o', '+': 'v' } as Record<string, string>,
+    modeToPrefix: { Y: '*', Q: '!', q: '~', a: '&', o: '@', h: '%', v: '+' } as Record<string, string>,
+    prefixToMode: { '*': 'Y', '!': 'Q', '.': 'q', '~': 'q', '&': 'a', '@': 'o', '%': 'h', '+': 'v' } as Record<string, string>,
   };
 }
 
@@ -289,6 +289,13 @@ describe('selectIsChannelOp / selectOwnPrefix', () => {
     expect(selectIsChannelOp('#general')(store.getState())).toBe(true);
   });
 
+  it('treats channel admins as op+ while halfops remain below op', () => {
+    seed('#general', [makeUser('me', ['a'])]);
+    expect(selectIsChannelOp('#general')(store.getState())).toBe(true);
+    seed('#general', [makeUser('me', ['h'])]);
+    expect(selectIsChannelOp('#general')(store.getState())).toBe(false);
+  });
+
   it('voice alone does NOT grant op', () => {
     seed('#general', [makeUser('me', ['v'])]);
     expect(selectIsChannelOp('#general')(store.getState())).toBe(false);
@@ -307,6 +314,13 @@ describe('selectIsChannelOp / selectOwnPrefix', () => {
     expect(selectOwnPrefix('#general')(store.getState())).toBe('v');
     seed('#general', [makeUser('me', [])]);
     expect(selectOwnPrefix('#general')(store.getState())).toBe('');
+  });
+
+  it('selectOwnPrefix ranks standard admin between owner and op', () => {
+    seed('#general', [makeUser('me', ['o', 'a'])]);
+    expect(selectOwnPrefix('#general')(store.getState())).toBe('a');
+    seed('#general', [makeUser('me', ['h', 'v'])]);
+    expect(selectOwnPrefix('#general')(store.getState())).toBe('h');
   });
 });
 
@@ -403,6 +417,18 @@ describe('NAMES (353/366) replaces the roster', () => {
     feed(':irc 353 me = #room :bob carol');
     feed(':irc 366 me #room :End of /NAMES list.');
     expect(roster('#room')).toEqual(['alice', 'bob', 'carol', 'me']);
+  });
+
+  it('preserves standard admin, op, halfop, and voice prefixes from NAMES', () => {
+    seedEmpty('#root');
+    feed(':irc 353 me = #root :&admin @oper %halfop +voice plain');
+    feed(':irc 366 me #root :End of /NAMES list.');
+    const users = store.getState().channels.get('#root')?.users;
+    expect(users?.get('admin')?.modes.has('a')).toBe(true);
+    expect(users?.get('oper')?.modes.has('o')).toBe(true);
+    expect(users?.get('halfop')?.modes.has('h')).toBe(true);
+    expect(users?.get('voice')?.modes.has('v')).toBe(true);
+    expect(users?.get('plain')?.modes.size).toBe(0);
   });
 });
 

@@ -77,7 +77,7 @@ export function buildFacepile(users: readonly ChannelUser[], limit = FACEPILE_LI
   return {
     visible: sorted.slice(0, cappedLimit).map((user) => ({
       nick: user.nick,
-      owner: user.modes.has('Q') || user.modes.has('q'),
+      owner: user.modes.has('Q') || user.modes.has('q') || user.modes.has('a'),
       away: !!user.away,
     })),
     overflow: Math.max(0, sorted.length - cappedLimit),
