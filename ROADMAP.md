@@ -482,6 +482,10 @@ client or public site needs to expose the result.
     agent-safety contract: hostile channel input, least-data defaults, E2EE
     plaintext exclusion, this-device/this-server/external provenance labels,
     and visible audit trails for proposed actions.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Capability-scoped client extension
+    commands now record a bounded, payload-safe local audit trail and expose it
+    in Preferences with timestamps, capability labels, redacted destination/text
+    details, and a clear action.
 
 ## Phase 14 — Hyoryu Local-First Roaming ← PLANNED
 38. **Full offline-first UX** *(client)* — generalize the vault and outbox so

@@ -12,7 +12,11 @@ import {
   type Width,
 } from '@/lib/prefs/preferences';
 import { openMessageSearchWithQuery } from '@/shell/search/useMessageSearch';
-import { readClientExtensionActions, type ClientExtensionAction } from '@/lib/extensions/clientActions';
+import {
+  readClientExtensionActions,
+  recordClientExtensionActionRun,
+  type ClientExtensionAction,
+} from '@/lib/extensions/clientActions';
 import { useSpotlight } from './useSpotlight';
 import { parseTimeExpr } from './timeGrammar';
 
@@ -456,6 +460,7 @@ async function copyText(text: string): Promise<void> {
 }
 
 function runClientExtensionAction(action: ClientExtensionAction): void | Promise<void> {
+  recordClientExtensionActionRun(action);
   if (action.capability === 'open-url' && action.url) {
     if (typeof window !== 'undefined') window.open(action.url, '_blank', 'noopener,noreferrer');
     return;

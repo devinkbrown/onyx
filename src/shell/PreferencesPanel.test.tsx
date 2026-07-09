@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { recordClientExtensionActionRun } from '@/lib/extensions/clientActions';
 import { closePreferences, openPreferences, resetPreferences } from '@/lib/prefs/preferences';
 import { PreferencesPanel } from './PreferencesPanel';
 
@@ -25,6 +26,8 @@ describe('PreferencesPanel', () => {
     expect(screen.getByRole('heading', { name: 'Portable vault' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Export vault' })).toBeInTheDocument();
     expect(screen.getByLabelText('Import portable JSON')).toHaveAttribute('type', 'file');
+    expect(screen.getByRole('heading', { name: 'Extension action audit' })).toBeInTheDocument();
+    expect(screen.getByText('No extension actions recorded on this device.')).toBeInTheDocument();
     expect(screen.getByText('Connect')).toBeInTheDocument();
     expect(screen.getByText('Channel settings')).toBeInTheDocument();
     expect(screen.getByText('Voice controls')).toBeInTheDocument();
@@ -132,5 +135,27 @@ describe('PreferencesPanel', () => {
     expect(screen.getByText(/onyx-portable\.json: 2 messages, 1 target, and 1 review/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Import reviewed file' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cancel import' })).toBeInTheDocument();
+  });
+
+  it('surfaces and clears local extension action audit entries', () => {
+    recordClientExtensionActionRun({
+      id: 'open.build',
+      title: 'Open build dashboard',
+      capability: 'open-url',
+      url: 'https://example.test/build?token=secret',
+      keywords: [],
+    });
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    expect(screen.getByRole('list', { name: 'Recent extension actions' })).toBeInTheDocument();
+    expect(screen.getByText('Open build dashboard')).toBeInTheDocument();
+    expect(screen.getByText('Opened https://example.test')).toBeInTheDocument();
+    expect(screen.queryByText(/token=secret/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+
+    expect(screen.queryByRole('list', { name: 'Recent extension actions' })).not.toBeInTheDocument();
+    expect(screen.getByText('No extension actions recorded on this device.')).toBeInTheDocument();
   });
 });

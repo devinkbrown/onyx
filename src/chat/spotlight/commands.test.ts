@@ -4,7 +4,10 @@ import type { Channel } from '@/lib/irc/types';
 import { getState, setState } from '@/lib/store';
 import { store } from '@/lib/store/store';
 import { preferences, resetPreferences } from '@/lib/prefs/preferences';
-import { writeClientExtensionActionsForTests } from '@/lib/extensions/clientActions';
+import {
+  readClientExtensionAudit,
+  writeClientExtensionActionsForTests,
+} from '@/lib/extensions/clientActions';
 import type { DMConversation, Server } from '@/lib/store/store';
 import { THEME_IDS } from '@/theme';
 import { buildCommands } from './commands';
@@ -293,6 +296,11 @@ describe('buildCommands', () => {
 
     command?.run();
     expect(open).toHaveBeenCalledWith('https://example.test/build', '_blank', 'noopener,noreferrer');
+    expect(readClientExtensionAudit()[0]).toMatchObject({
+      id: 'build.open',
+      capability: 'open-url',
+      detail: 'Opened https://example.test',
+    });
     open.mockRestore();
   });
 });

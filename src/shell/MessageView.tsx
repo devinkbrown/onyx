@@ -932,7 +932,9 @@ export function MessageView(props: MessageViewProps): JSX.Element {
         node.scrollIntoView({ block: 'center' });
         setAtBottom(false);
         node.classList.add('shell-msg-search-pulse');
-        window.setTimeout(() => node.classList.remove('shell-msg-search-pulse'), 1400);
+        if (typeof window !== 'undefined') {
+          window.setTimeout(() => node.classList.remove('shell-msg-search-pulse'), 1400);
+        }
         getState().clearTimeTravelLanding();
         return;
       }

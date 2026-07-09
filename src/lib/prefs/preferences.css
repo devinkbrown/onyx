@@ -370,6 +370,63 @@
   color: var(--lapis-bright);
 }
 
+.pref-audit-clear {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.pref-extension-audit__rows {
+  display: grid;
+  gap: 6px;
+}
+
+.pref-extension-audit__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--ink) 36%, transparent);
+}
+
+.pref-extension-audit__main,
+.pref-extension-audit__meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pref-extension-audit__title {
+  color: var(--washi);
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
+.pref-extension-audit__meta {
+  align-items: end;
+  color: var(--washi-mute);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  text-align: right;
+}
+
+@media (max-width: 560px) {
+  .pref-extension-audit__row {
+    grid-template-columns: 1fr;
+  }
+
+  .pref-extension-audit__meta {
+    align-items: start;
+    text-align: left;
+  }
+}
+
 /* ── Client accessibility audit ledger ─────────────────────────────────────── */
 
 .pref-a11y-link {

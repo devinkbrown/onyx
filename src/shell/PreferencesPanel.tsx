@@ -14,6 +14,11 @@ import { createSignal, For, Show, type JSX } from 'solid-js';
 import { Sheet } from '@/primitives';
 import { clearVault } from '@/lib/vault/historyVault';
 import {
+  clearClientExtensionAudit,
+  readClientExtensionAudit,
+  type ClientExtensionAuditEntry,
+} from '@/lib/extensions/clientActions';
+import {
   exportPortableTransfer,
   importPortableTransfer,
   parsePortableTransfer,
@@ -183,6 +188,17 @@ const ACCESS_AUDIT_ROWS = [
     note: 'Sheet focus trap, Escape close, labelled close buttons.',
   },
 ] as const;
+
+function formatAuditTime(value: string): string {
+  const time = Date.parse(value);
+  if (!Number.isFinite(time)) return value;
+  return new Date(time).toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
 type SegmentedProps<T extends string> = {
   legend: string;
@@ -405,6 +421,50 @@ function PortableVaultControls(): JSX.Element {
   );
 }
 
+function ExtensionAuditControls(): JSX.Element {
+  const [entries, setEntries] = createSignal<ClientExtensionAuditEntry[]>(readClientExtensionAudit());
+
+  function clearAudit(): void {
+    clearClientExtensionAudit();
+    setEntries([]);
+  }
+
+  return (
+    <section class="pref-group pref-extension-audit" aria-labelledby="pref-extension-audit-title">
+      <div class="pref-group-head">
+        <h3 id="pref-extension-audit-title" class="pref-label">Extension action audit</h3>
+        <button type="button" class="pref-a11y-link pref-audit-clear" onClick={clearAudit}>
+          Clear
+        </button>
+      </div>
+      <p class="pref-desc">
+        Recent capability-scoped extension actions recorded on this device. Payloads are not stored.
+      </p>
+      <Show
+        when={entries().length > 0}
+        fallback={<p class="pref-status">No extension actions recorded on this device.</p>}
+      >
+        <div class="pref-extension-audit__rows" role="list" aria-label="Recent extension actions">
+          <For each={entries()}>
+            {(entry) => (
+              <div class="pref-extension-audit__row" role="listitem">
+                <span class="pref-extension-audit__main">
+                  <span class="pref-extension-audit__title">{entry.title}</span>
+                  <span class="pref-desc">{entry.detail}</span>
+                </span>
+                <span class="pref-extension-audit__meta">
+                  <span>{entry.capability}</span>
+                  <span>{formatAuditTime(entry.at)}</span>
+                </span>
+              </div>
+            )}
+          </For>
+        </div>
+      </Show>
+    </section>
+  );
+}
+
 export function PreferencesPanel(): JSX.Element {
   return (
     <Sheet
@@ -497,6 +557,8 @@ export function PreferencesPanel(): JSX.Element {
         />
 
         <PortableVaultControls />
+
+        <ExtensionAuditControls />
 
         <Segmented
           legend="Background motion"

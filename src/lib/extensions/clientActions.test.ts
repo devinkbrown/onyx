@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  clearClientExtensionAudit,
   normalizeClientExtensionAction,
+  readClientExtensionAudit,
   readClientExtensionActions,
+  recordClientExtensionActionRun,
   writeClientExtensionActionsForTests,
 } from './clientActions';
 
@@ -51,5 +54,55 @@ describe('client extension actions', () => {
       capability: 'copy-text',
       text: 'main',
     });
+  });
+
+  it('records bounded payload-safe action audit entries', () => {
+    const copy = normalizeClientExtensionAction({
+      id: 'copy.secret',
+      title: 'Copy deploy token',
+      capability: 'copy-text',
+      text: 'super-secret-token',
+    });
+    const open = normalizeClientExtensionAction({
+      id: 'open.build',
+      title: 'Open build dashboard',
+      capability: 'open-url',
+      url: 'https://example.test/build?token=secret',
+    });
+    expect(copy).not.toBeNull();
+    expect(open).not.toBeNull();
+
+    recordClientExtensionActionRun(copy!);
+    recordClientExtensionActionRun(open!);
+
+    expect(readClientExtensionAudit()).toHaveLength(2);
+    expect(readClientExtensionAudit()[0]).toMatchObject({
+      id: 'open.build',
+      title: 'Open build dashboard',
+      capability: 'open-url',
+      detail: 'Opened https://example.test',
+    });
+    expect(JSON.stringify(readClientExtensionAudit())).not.toContain('super-secret-token');
+    expect(JSON.stringify(readClientExtensionAudit())).not.toContain('token=secret');
+
+    clearClientExtensionAudit();
+    expect(readClientExtensionAudit()).toEqual([]);
+  });
+
+  it('keeps only the latest audit entries', () => {
+    for (let index = 0; index < 25; index += 1) {
+      recordClientExtensionActionRun({
+        id: `copy.${index}`,
+        title: `Copy ${index}`,
+        capability: 'copy-text',
+        text: `value-${index}`,
+        keywords: [],
+      });
+    }
+
+    const entries = readClientExtensionAudit();
+    expect(entries).toHaveLength(20);
+    expect(entries[0]?.id).toBe('copy.24');
+    expect(entries.at(-1)?.id).toBe('copy.5');
   });
 });

@@ -10,9 +10,19 @@ export type ClientExtensionAction = {
   text?: string;
 };
 
+export type ClientExtensionAuditEntry = {
+  id: string;
+  title: string;
+  capability: ClientExtensionCapability;
+  at: string;
+  detail: string;
+};
+
 const STORAGE_KEY = 'onyx:client-extension-actions';
+const AUDIT_STORAGE_KEY = 'onyx:client-extension-audit';
 const MAX_ACTIONS = 12;
 const MAX_KEYWORDS = 8;
+const MAX_AUDIT_ENTRIES = 20;
 
 function clean(value: unknown, max = 120): string | null {
   if (typeof value !== 'string') return null;
@@ -97,6 +107,80 @@ export function readClientExtensionActions(): ClientExtensionAction[] {
     return actions;
   } catch {
     return [];
+  }
+}
+
+function auditDetail(action: ClientExtensionAction): string {
+  if (action.capability === 'open-url' && action.url) {
+    try {
+      const url = new URL(action.url);
+      return `Opened ${url.origin}`;
+    } catch {
+      return 'Opened URL';
+    }
+  }
+
+  if (action.capability === 'copy-text' && action.text) {
+    return `Copied ${action.text.length} characters`;
+  }
+
+  return 'Ran extension action';
+}
+
+function parseAuditEntry(raw: unknown): ClientExtensionAuditEntry | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const source = raw as Record<string, unknown>;
+  const id = actionId(source.id);
+  const title = clean(source.title, 80);
+  const capability = source.capability;
+  const at = clean(source.at, 40);
+  const detail = clean(source.detail, 120);
+  if (!id || !title || !at || !detail || (capability !== 'open-url' && capability !== 'copy-text')) {
+    return null;
+  }
+  return { id, title, capability, at, detail };
+}
+
+export function readClientExtensionAudit(): ClientExtensionAuditEntry[] {
+  if (typeof localStorage === 'undefined') return [];
+  try {
+    const raw = JSON.parse(localStorage.getItem(AUDIT_STORAGE_KEY) ?? '[]') as unknown;
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .flatMap((entry) => {
+        const parsed = parseAuditEntry(entry);
+        return parsed ? [parsed] : [];
+      })
+      .slice(0, MAX_AUDIT_ENTRIES);
+  } catch {
+    return [];
+  }
+}
+
+export function recordClientExtensionActionRun(action: ClientExtensionAction): void {
+  if (typeof localStorage === 'undefined') return;
+  const entry: ClientExtensionAuditEntry = {
+    id: action.id,
+    title: action.title,
+    capability: action.capability,
+    at: new Date().toISOString(),
+    detail: auditDetail(action),
+  };
+  try {
+    localStorage.setItem(
+      AUDIT_STORAGE_KEY,
+      JSON.stringify([entry, ...readClientExtensionAudit()].slice(0, MAX_AUDIT_ENTRIES)),
+    );
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+export function clearClientExtensionAudit(): void {
+  try {
+    localStorage.removeItem(AUDIT_STORAGE_KEY);
+  } catch {
+    /* storage unavailable */
   }
 }
 
