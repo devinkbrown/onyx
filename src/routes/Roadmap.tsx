@@ -91,8 +91,8 @@ const phases: Phase[] = [
     title: 'Atmosphere',
     state: 'active',
     date: '2026-07-09',
-    summary: 'Consolidate the background system and finish mechanically derived accessibility variants, including renderer-level Animated/Still/Off controls, reduced transparency, contrast, forced-colors, and mobile drawer focus semantics.',
-    items: ['Background consolidation', 'Renderer-level scene motion', 'Animated mode', 'Still static render', 'Off skips renderer', 'Scene reset defaults', 'Theme-reactive identity', 'Contrast variants', 'Reduced-transparency variants', 'User reduced-transparency control', 'Public high-contrast ledger', 'Public reduced-transparency ledger', 'Forced-colors audit notes', 'Mobile drawer focus management', 'Mobile drawer focus trap', 'Deterministic time scrubber jumps'],
+    summary: 'Consolidate the background system and finish mechanically derived accessibility variants, including renderer-level Animated/Still/Off controls, bounded room identity, reduced transparency, contrast, forced-colors, and mobile drawer focus semantics.',
+    items: ['Background consolidation', 'Renderer-level scene motion', 'Animated mode', 'Still static render', 'Off skips renderer', 'Scene reset defaults', 'Theme-reactive identity', 'Bounded room accent', 'Room identity tokens', 'Contrast-locked room chrome', 'Contrast variants', 'Reduced-transparency variants', 'User reduced-transparency control', 'Public high-contrast ledger', 'Public reduced-transparency ledger', 'Forced-colors audit notes', 'Mobile drawer focus management', 'Mobile drawer focus trap', 'Deterministic time scrubber jumps'],
   },
   {
     phase: 'Phase 11',

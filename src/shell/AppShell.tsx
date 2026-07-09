@@ -64,6 +64,7 @@ import { ShortcutsSheet } from './ShortcutsSheet';
 import { useKeyboardShortcuts } from '@/lib/keyboard/useKeyboardShortcuts';
 import { MessageSearch } from './search/MessageSearch';
 import { hasMessageSearchableConversation, openMessageSearch } from './search/useMessageSearch';
+import { channelIdentityTarget, roomIdentityForTarget, type RoomIdentity } from './roomIdentity';
 import {
   forcedColors,
   prefersMoreContrast,
@@ -150,6 +151,17 @@ function applyA11yMediaAttributes(): void {
   root.dataset.forcedColors = String(forcedColors());
 }
 
+function roomIdentityStyle(identity: RoomIdentity | null): JSX.CSSProperties {
+  if (!identity) return {};
+  return {
+    '--room-accent': identity.accent,
+    '--room-accent-strong': identity.accentStrong,
+    '--room-accent-soft': identity.accentSoft,
+    '--room-accent-border': identity.border,
+    '--room-accent-wash': identity.wash,
+  } as JSX.CSSProperties;
+}
+
 // ── AppShell ─────────────────────────────────────────────────────────────────
 
 export function AppShell(props: AppShellProps): JSX.Element {
@@ -213,6 +225,8 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const bgId = useStore((s) => s.backgroundId);
   const theme = useThemeOptional();
   const effectiveBgId = createMemo(() => resolveBackgroundId(bgId(), theme.themeId()));
+  const roomIdentity = createMemo(() => roomIdentityForTarget(channelIdentityTarget(activeView())));
+  const roomIdentityVars = createMemo(() => roomIdentityStyle(roomIdentity()));
 
   // ── derived nick ──
   const displayNick = createMemo(() => local.selfNick ?? ourNick() ?? '');
@@ -395,7 +409,12 @@ export function AppShell(props: AppShellProps): JSX.Element {
       {/* Fixed background canvas behind everything */}
       <Background id={effectiveBgId()} quality="high" />
 
-      <div class={shellClass()} data-testid="app-shell">
+      <div
+        class={shellClass()}
+        data-testid="app-shell"
+        data-room-identity={roomIdentity()?.target}
+        style={roomIdentityVars()}
+      >
         {/* ── Server Rail — hidden when < 3 servers ── */}
         <Show when={showRail()}>
           <ServerRail onDisconnect={handleDisconnect} />

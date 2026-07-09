@@ -100,6 +100,9 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Still static render')).toBeInTheDocument();
     expect(screen.getByText('Off skips renderer')).toBeInTheDocument();
     expect(screen.getByText('Scene reset defaults')).toBeInTheDocument();
+    expect(screen.getByText('Bounded room accent')).toBeInTheDocument();
+    expect(screen.getByText('Room identity tokens')).toBeInTheDocument();
+    expect(screen.getByText('Contrast-locked room chrome')).toBeInTheDocument();
     expect(screen.getByText('User reduced-transparency control')).toBeInTheDocument();
     expect(screen.getByText('Public high-contrast ledger')).toBeInTheDocument();
     expect(screen.getByText('Public reduced-transparency ledger')).toBeInTheDocument();

@@ -104,6 +104,14 @@
   grid-template-columns: 0px var(--shell-sidebar-w, 224px) 1fr 0px;
 }
 
+.shell[data-room-identity] {
+  --room-accent: var(--lapis);
+  --room-accent-strong: var(--lapis-bright);
+  --room-accent-soft: color-mix(in oklab, var(--lapis) 24%, transparent);
+  --room-accent-border: color-mix(in oklab, var(--lapis) 34%, var(--seam-faint));
+  --room-accent-wash: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
+}
+
 /* ── Server rail ── */
 .shell-rail {
   grid-column: 1;
@@ -741,6 +749,18 @@
   overflow: hidden;
 }
 
+.shell[data-room-identity] .shell-ribbon {
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--stone-2) 22%, var(--ink)) 0%,
+      color-mix(in oklab, var(--ink) 76%, var(--stone)) 64%,
+      color-mix(in oklab, var(--room-accent-wash) 42%, var(--ink)) 100%
+    );
+  border-bottom-color: var(--room-accent-border);
+  box-shadow: inset 0 -1px 0 var(--room-accent-soft);
+}
+
 .shell-ribbon::after {
   content: '';
   position: absolute;
@@ -760,6 +780,19 @@
   );
   opacity: 0.7;
   pointer-events: none;
+}
+
+.shell[data-room-identity] .shell-ribbon::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklab, var(--room-accent) 30%, transparent) 18%,
+    var(--room-accent-border) 42%,
+    var(--room-accent-strong) 56%,
+    var(--room-accent-border) 72%,
+    transparent 100%
+  );
+  opacity: 0.62;
 }
 
 /* Inner row carries the reading measure; the ribbon itself stays full-bleed
@@ -796,6 +829,10 @@
   max-width: 22ch;
 }
 
+.shell[data-room-identity] .shell-ribbon-channel {
+  color: color-mix(in oklab, var(--washi) 88%, var(--room-accent-strong));
+}
+
 .shell-ribbon-sigil--status { color: var(--gold-bright); }
 
 /* The channel sigil reads in bioluminescent azure — never gold. */
@@ -803,6 +840,11 @@
   color: var(--lapis-bright);
   font-family: var(--font-mono);
   margin-right: 1px;
+}
+
+.shell[data-room-identity] .shell-ribbon-sigil {
+  color: var(--room-accent-strong);
+  text-shadow: 0 0 12px color-mix(in oklab, var(--room-accent) 36%, transparent);
 }
 
 .shell-ribbon-sigil--dm {
@@ -903,6 +945,14 @@
   line-height: 1;
   letter-spacing: 0;
   font-variant-numeric: tabular-nums;
+}
+
+.shell[data-room-identity] .shell-ribbon-face .onyx-avatar,
+.shell[data-room-identity] .shell-ribbon-face-overflow {
+  border-color: var(--room-accent-border);
+  box-shadow:
+    0 0 0 2px color-mix(in oklab, var(--stone) 72%, transparent),
+    0 10px 18px -17px var(--room-accent);
 }
 
 .shell-ribbon-event-chip {
@@ -4692,6 +4742,17 @@
   );
   pointer-events: none;
   z-index: 1;
+}
+
+.shell[data-room-identity] .shell-conversation::before {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--room-accent-soft) 16%,
+    var(--room-accent-border) 42%,
+    var(--room-accent-soft) 72%,
+    transparent 100%
+  );
 }
 
 /* ── Link preview card (OG unfurl via /linkpreview) ─────────────────────── */

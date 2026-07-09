@@ -762,6 +762,17 @@ describe('AppShell', () => {
       expect(ribbon.textContent).toContain('Welcome to #general');
     });
 
+    it('applies bounded room identity tokens for active channels', () => {
+      seedStore('#general');
+
+      const { getByTestId } = render(() => <AppShell />);
+
+      const shell = getByTestId('app-shell');
+      expect(shell).toHaveAttribute('data-room-identity', '#general');
+      expect(shell.getAttribute('style')).toContain('--room-accent: oklch(');
+      expect(shell.getAttribute('style')).toContain('--room-accent-border: oklch(');
+    });
+
     it('shows the self nick in the ribbon', () => {
       // Arrange
       seedStore('#general');

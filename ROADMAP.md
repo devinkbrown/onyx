@@ -408,6 +408,12 @@ client or public site needs to expose the result.
 26. **Theme-reactive community identity** *(client + main site)* — allow bounded
     accent, tint, banner, and wordmark expression within contrast-locked OKLCH
     tokens so rooms can feel distinct without unbounded CSS or broken access.
+    ✅ **CLIENT + WEBSITE SLICE SHIPPED 2026-07-09** — Active channels now get a
+    deterministic room identity layer: Onyx hashes the channel name into a
+    bounded OKLCH accent set, applies only contrast-locked CSS variables on the
+    shell root, and uses them for subtle ribbon/conversation chrome. The public
+    accessibility ledger now documents that room identity stays token-bounded
+    instead of accepting arbitrary community CSS.
 27. **Contrast, transparency, and drawer focus variants** *(client + main site)*
     — mechanically derive `prefers-contrast: more`, forced-colors, and
     reduced-transparency variants from the same tokens already used by the app
