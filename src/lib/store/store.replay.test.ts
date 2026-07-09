@@ -98,4 +98,17 @@ describe('event-playback replay guard', () => {
     expect(ch.users.has('kain')).toBe(true);
     expect(ch.users.has('kain2')).toBe(false);
   });
+
+  it('dedupes replayed join events when the same time-travel window is fetched twice', () => {
+    feed('BATCH +r4 chathistory #root');
+    feed('@time=2026-07-01T10:02:00.000Z;msgid=old-j1 :ghost!g@host JOIN #root');
+    feed('BATCH -r4');
+    feed('BATCH +r5 chathistory #root');
+    feed('@time=2026-07-01T10:02:00.000Z;msgid=old-j1 :ghost!g@host JOIN #root');
+    feed('BATCH -r5');
+
+    const messages = store.getState().channels.get('#root')!.messages;
+    expect(messages.filter((m) => m.text === 'ghost joined')).toHaveLength(1);
+    expect(messages.filter((m) => m.id === 'history-event:old-j1')).toHaveLength(1);
+  });
 });

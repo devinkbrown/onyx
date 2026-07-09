@@ -1800,6 +1800,17 @@ function sysMsg(text: string, target: string, time?: Date): ChatMessage {
   return { id: uid(), time: time ?? new Date(), from: '', text, type: 'system', target };
 }
 
+function replayEventId(
+  tags: Record<string, string>,
+  target: string,
+  text: string,
+  time: Date,
+): string {
+  const msgid = tags['msgid'];
+  if (msgid) return `history-event:${msgid}`;
+  return `history-event:${target.toLowerCase()}:${time.toISOString()}:${text}`;
+}
+
 /**
  * Resolve the timestamp for a system event from its IRCv3 `@time` tag. Live
  * events stamp ~now; CHATHISTORY / draft/event-playback replays carry the real
@@ -1857,7 +1868,11 @@ function _pushReplayEvent(tags: Record<string, string>, channel: string | null, 
   const ref = _openChathistoryByTarget.get(key) ?? tags['batch'];
   const collector = ref !== undefined ? _batchCollectors.get(ref) : undefined;
   if (!collector || collector.kind) return; // only plain chathistory collectors
-  collector.messages.push(sysMsg(text, collector.target, eventTime(tags)));
+  const time = eventTime(tags);
+  collector.messages.push({
+    ...sysMsg(text, collector.target, time),
+    id: replayEventId(tags, collector.target, text, time),
+  });
 }
 
 const _batchCollectors = new Map<string, {
