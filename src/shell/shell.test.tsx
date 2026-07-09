@@ -851,6 +851,19 @@ describe('AppShell', () => {
       expect(travelToSpy).toHaveBeenCalledTimes(2);
       expect(travelToSpy).toHaveBeenLastCalledWith('#general', new Date('2025-01-01T12:00:00Z'));
 
+      store.getState().navigate({ kind: 'home' });
+      const reviewHistoryAgain = await screen.findByLabelText('Recent catch-up reviews');
+      fireEvent.click(within(reviewHistoryAgain).getByRole('button', {
+        name: 'Search reviewed text for #general',
+      }));
+      await waitFor(() => {
+        expect(screen.getByRole('search', { name: 'Message search' })).toBeInTheDocument();
+        expect(screen.getByRole('searchbox', { name: 'Search messages' })).toHaveValue('New handoff note two');
+      });
+      const searchedView = store.getState().activeView;
+      expect(searchedView.kind).toBe('channel');
+      if (searchedView.kind === 'channel') expect(searchedView.channel).toBe('#general');
+
       travelToSpy.mockRestore();
     });
 

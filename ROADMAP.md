@@ -187,6 +187,9 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Home now records recent catch-up
     review ranges locally and lets the return screen reopen or search those
     reviewed spans.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Recent catch-up reviews on Home now
+    open reviewed-preview text directly in message search after navigating to
+    the reviewed target, extending the cross-room handoff beyond Spotlight.
     ⏭️ **NEXT** — pure Onyx work. Reuse the local vault, `?at=` time travel,
     and richer cross-room review handoffs before adding new server surface.
 16. **Reader mode** *(client)* — a calm single-pane transcript view for long

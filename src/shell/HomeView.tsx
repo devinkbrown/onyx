@@ -41,6 +41,7 @@ import { fetchStatsIndex, relTime } from '@/lib/stats/networkIndex';
 import { loadRecent } from '@/lib/vault/historyVault';
 import type { ChatMessage } from '@/lib/irc/types';
 import { openSpotlight } from '@/chat/spotlight/useSpotlight';
+import { openMessageSearchWithQuery } from './search/useMessageSearch';
 
 export { relTime };
 
@@ -195,6 +196,12 @@ export function HomeView(): JSX.Element {
   };
   const openReviewSpotlight = (entry: ReviewHistoryEntry) =>
     openSpotlight(entry.kind === 'channel' ? `goto ${entry.target}` : `dm ${entry.target}`);
+  const searchReviewText = (entry: ReviewHistoryEntry) => {
+    const state = getState();
+    if (entry.kind === 'channel') state.navigate({ kind: 'channel', channel: entry.target });
+    else state.navigate({ kind: 'dm', nick: entry.target });
+    openMessageSearchWithQuery(entry.preview);
+  };
 
   // One shared clock for all relative-time labels.
   const [nowMs, setNowMs] = createSignal(Date.now());
@@ -467,6 +474,13 @@ export function HomeView(): JSX.Element {
                         aria-label={`Find related actions for reviewed ${entry.name}`}
                       >
                         Find related
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => searchReviewText(entry)}
+                        aria-label={`Search reviewed text for ${entry.name}`}
+                      >
+                        Search text
                       </button>
                     </div>
                   </article>

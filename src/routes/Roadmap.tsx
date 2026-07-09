@@ -59,8 +59,8 @@ const phases: Phase[] = [
     title: 'Time-native',
     state: 'active',
     date: '2026-07-09',
-    summary: 'Home now brings followed activity, scheduled rooms, local memory, quiet rooms, return recaps, room rhythm, review-from-start handoffs, review history, channel directory dedupe, reader summaries, shareable moments, reader memory, search handoff, transcript jumps, digest review completion, reader return-home affordances, reviewed-span recall, hydrated context trails, vault context trails, and vault anchor jumps into view.',
-    items: ['Followed catch-up', 'Scheduled events on Home', 'Vault memory previews', 'Quiet room activity', 'Home return recaps', 'Spotlight handoff', 'Room rhythm heatlines', 'Event context', 'Review from start', 'Catch-up review history', 'Channel directory dedupe', 'Reader digest notes', 'Shareable moment links', 'Reader memory context', 'Moment search handoff', 'Reader transcript jumps', 'Digest review handoff', 'Review completion', 'Reader return Home', 'Reviewed span recall', 'Hydrated context trails', 'Vault context trails', 'Vault anchor jumps'],
+    summary: 'Home now brings followed activity, scheduled rooms, local memory, quiet rooms, return recaps, room rhythm, review-from-start handoffs, review history, channel directory dedupe, review text search, reader summaries, shareable moments, reader memory, search handoff, transcript jumps, digest review completion, reader return-home affordances, reviewed-span recall, hydrated context trails, vault context trails, and vault anchor jumps into view.',
+    items: ['Followed catch-up', 'Scheduled events on Home', 'Vault memory previews', 'Quiet room activity', 'Home return recaps', 'Spotlight handoff', 'Room rhythm heatlines', 'Event context', 'Review from start', 'Catch-up review history', 'Review text search', 'Channel directory dedupe', 'Reader digest notes', 'Shareable moment links', 'Reader memory context', 'Moment search handoff', 'Reader transcript jumps', 'Digest review handoff', 'Review completion', 'Reader return Home', 'Reviewed span recall', 'Hydrated context trails', 'Vault context trails', 'Vault anchor jumps'],
   },
   {
     phase: 'Phase 7',
@@ -170,7 +170,7 @@ export default function RoadmapRoute() {
             place to return to: followed catch-up, scheduled room events, local
             memory previews, quiet room activity, home return recaps, Spotlight
             handoff, room rhythm heatlines, event context, review-from-start
-            handoffs, review history, channel directory dedupe, reader digest notes, shareable moment links, reader memory context, moment search handoff,
+            handoffs, review history, review text search, channel directory dedupe, reader digest notes, shareable moment links, reader memory context, moment search handoff,
             reader transcript jumps, digest review handoff, review completion, reader return-home affordances, reviewed-span recall, hydrated context trails, vault context trails, vault anchor jumps, and
             quieter activity surfaces.
           </p>

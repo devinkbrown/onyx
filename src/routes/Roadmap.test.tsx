@@ -20,6 +20,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Event context')).toBeInTheDocument();
     expect(screen.getByText('Review from start')).toBeInTheDocument();
     expect(screen.getByText('Catch-up review history')).toBeInTheDocument();
+    expect(screen.getByText('Review text search')).toBeInTheDocument();
     expect(screen.getByText('Channel directory dedupe')).toBeInTheDocument();
     expect(screen.getByText('Reader digest notes')).toBeInTheDocument();
     expect(screen.getByText('Shareable moment links')).toBeInTheDocument();
