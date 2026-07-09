@@ -12,7 +12,9 @@
  * AAA pattern throughout. Descriptive test names.
  */
 
+import 'fake-indexeddb/auto';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
+import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { store } from '@/lib/store/store';
 import type { Channel } from '@/lib/irc/types';
@@ -20,6 +22,7 @@ import type { ChatMessage, ChannelUser } from '@/lib/irc/types';
 import { followed, isFollowed, unfollow } from '@/lib/notifications/followed';
 import { recordReviewHistory } from '@/lib/notifications/reviewHistory';
 import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
+import { _resetVaultForTests, saveMessages } from '@/lib/vault/historyVault';
 import { AppShell } from './AppShell';
 
 // ── Shared fixture helpers ────────────────────────────────────────────────────
@@ -102,6 +105,8 @@ describe('AppShell', () => {
     for (const key of followed()) unfollow(key);
     localStorage.clear();
     resetPreferences();
+    globalThis.indexedDB = new IDBFactory();
+    _resetVaultForTests();
   });
 
   afterEach(() => {
@@ -434,6 +439,61 @@ describe('AppShell', () => {
       fireEvent.click(within(memory).getByRole('button', { name: 'Home' }));
       expect(store.getState().activeView).toEqual({ kind: 'home' });
       travelToSpy.mockRestore();
+    });
+
+    it('hydrates vault-only reviewed anchors before jumping in reader mode', async () => {
+      setPreference('readerMode', true);
+      setPreference('localHistory', true);
+      const vaultMessages = [
+        makeMessage('msg-memory-a', 'alice', 'Saved line before the anchor', '#general'),
+        makeMessage('msg-memory-b', 'bob', 'Saved reviewed anchor', '#general'),
+        makeMessage('msg-memory-c', 'carol', 'Visible live tail', '#general'),
+      ];
+      await saveMessages('#general', vaultMessages);
+      const channel = makeChannel(
+        '#general',
+        [makeMessage('msg-memory-c', 'carol', 'Visible live tail', '#general')],
+        [makeUser('alice'), makeUser('bob'), makeUser('carol')],
+      );
+      const channels = new Map<string, Channel>();
+      channels.set('#general', channel);
+      store.setState({
+        ...initialState,
+        channels,
+        activeView: { kind: 'channel', channel: '#general' },
+        connectionStatus: 'connected',
+        ourNick: 'testuser',
+      }, true);
+      recordReviewHistory({
+        target: '#general',
+        name: '#general',
+        kind: 'channel',
+        firstMessageId: 'msg-memory-b',
+        firstAt: '2025-01-01T12:00:00.000Z',
+        reviewedAt: '2026-07-09T00:05:00.000Z',
+        messageCount: 1,
+        mentionCount: 0,
+        preview: 'Saved reviewed anchor',
+      });
+
+      render(() => <AppShell />);
+
+      const memory = screen.getByRole('region', { name: 'Device memory context' });
+      expect(await within(memory).findByText('saved on device')).toBeInTheDocument();
+      expect(within(memory).getByText('Saved line before the anchor')).toBeInTheDocument();
+      expect(within(memory).getByRole('button', {
+        name: 'Load reviewed span from device memory for #general',
+      })).toBeInTheDocument();
+
+      fireEvent.click(within(memory).getByRole('button', {
+        name: 'Load reviewed span from device memory for #general',
+      }));
+
+      await waitFor(() => {
+        expect(store.getState().channels.get('#general')?.messages.map((message) => message.id))
+          .toContain('msg-memory-b');
+        expect(store.getState().timeTravelLandingId).toBe('msg-memory-b');
+      });
     });
 
     it('follows the room or selected topic from the topic strip', () => {

@@ -80,6 +80,14 @@ export type ReviewedContextTrail = {
   after: ReviewedContextTrailItem | null;
 };
 
+type ReviewedAnchorSource = 'visible' | 'vault' | null;
+
+type ReviewedVaultContext = {
+  messages: ChatMessage[];
+  trail: ReviewedContextTrail | null;
+  hasAnchor: boolean;
+};
+
 /** Body-line counts per skeleton row — varied so the loading state reads as
  *  real message groups rather than a uniform grid. */
 const SKELETON_ROWS = [2, 1, 3, 2, 1] as const;
@@ -210,6 +218,24 @@ export function buildReviewedContextTrail(
   return { before, after };
 }
 
+export function hasReviewedAnchor(
+  entry: ReviewHistoryEntry,
+  sourceMessages: readonly ChatMessage[],
+): boolean {
+  return sourceMessages.some((message) => message.id === entry.firstMessageId);
+}
+
+export function reviewedAnchorSource(
+  entry: ReviewHistoryEntry | null,
+  visibleMessages: readonly ChatMessage[],
+  vaultMessages: readonly ChatMessage[] | null,
+): ReviewedAnchorSource {
+  if (!entry) return null;
+  if (hasReviewedAnchor(entry, visibleMessages)) return 'visible';
+  if (vaultMessages && hasReviewedAnchor(entry, vaultMessages)) return 'vault';
+  return null;
+}
+
 export function mergeReviewedContextTrails(
   primary: ReviewedContextTrail | null,
   fallback: ReviewedContextTrail | null,
@@ -259,6 +285,7 @@ function formatReviewedAt(entry: ReviewHistoryEntry): string {
 function ReaderMemoryStrip(props: {
   context: ReaderMemoryContext;
   reviewedSpan: ReviewHistoryEntry | null;
+  reviewedAnchorSource: ReviewedAnchorSource;
   reviewedTrail: ReviewedContextTrail | null;
   hasUnreadBoundary: boolean;
   onJumpStart: () => void;
@@ -307,6 +334,9 @@ function ReaderMemoryStrip(props: {
             <span class="shell-reader-memory__review-label">Reviewed span</span>
             <span class="shell-reader-memory__review-meta">
               {reviewCountLabel(entry())} / {formatReviewedAt(entry())}
+              <Show when={props.reviewedAnchorSource === 'vault'}>
+                <span class="shell-reader-memory__review-source">saved on device</span>
+              </Show>
             </span>
             <span class="shell-reader-memory__review-preview">{entry().preview}</span>
           </div>
@@ -346,9 +376,11 @@ function ReaderMemoryStrip(props: {
               <button
                 type="button"
                 onClick={() => props.onJumpReviewed(entry())}
-                aria-label={`Jump to reviewed span for ${entry().target}`}
+                aria-label={props.reviewedAnchorSource === 'vault'
+                  ? `Load reviewed span from device memory for ${entry().target}`
+                  : `Jump to reviewed span for ${entry().target}`}
               >
-                Reviewed
+                {props.reviewedAnchorSource === 'vault' ? 'Load reviewed' : 'Reviewed'}
               </button>
               <button
                 type="button"
@@ -692,12 +724,12 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     const context = readerMemoryContext();
     return context ? latestReviewForTarget(context.target, 'channel') : null;
   });
-  const [readerVaultTrail] = createResource(
+  const [readerVaultContext] = createResource(
     () => {
       const entry = readerReviewedSpan();
       return entry ? { target: entry.target, firstMessageId: entry.firstMessageId } : null;
     },
-    async (key): Promise<ReviewedContextTrail | null> => {
+    async (key): Promise<ReviewedVaultContext> => {
       const localMessages = await loadRecent(key.target, 80);
       const entry: ReviewHistoryEntry = {
         target: key.target,
@@ -710,15 +742,25 @@ export function MessageView(props: MessageViewProps): JSX.Element {
         mentionCount: 0,
         preview: '',
       };
-      return buildReviewedContextTrail(entry, localMessages);
+      return {
+        messages: localMessages,
+        trail: buildReviewedContextTrail(entry, localMessages),
+        hasAnchor: hasReviewedAnchor(entry, localMessages),
+      };
     },
   );
   const readerHydratedTrail = createMemo(() => {
     const entry = readerReviewedSpan();
     return entry ? buildReviewedContextTrail(entry, messages()) : null;
   });
+  const readerAnchorSource = createMemo(() => {
+    const entry = readerReviewedSpan();
+    const visibleMessages = messages();
+    if (entry && readerVaultContext()?.hasAnchor && !hasReviewedAnchor(entry, visibleMessages)) return 'vault';
+    return reviewedAnchorSource(entry, visibleMessages, null);
+  });
   const readerReviewedTrail = createMemo(() =>
-    mergeReviewedContextTrails(readerHydratedTrail(), readerVaultTrail() ?? null),
+    mergeReviewedContextTrails(readerHydratedTrail(), readerVaultContext()?.trail ?? null),
   );
 
   // ── scroll state ──
@@ -771,8 +813,16 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     getState().clearViewUnreadDivider(target);
   }
 
-  function jumpToReviewedSpan(entry: ReviewHistoryEntry): void {
+  async function jumpToReviewedSpan(entry: ReviewHistoryEntry): Promise<void> {
     const state = getState();
+    const visibleMessages = messages();
+    const cachedVault = readerVaultContext();
+    if (!hasReviewedAnchor(entry, visibleMessages)) {
+      const localMessages = cachedVault?.messages ?? await loadRecent(entry.target, 80);
+      if (hasReviewedAnchor(entry, localMessages)) {
+        state.hydrateHistory(entry.target, localMessages);
+      }
+    }
     state.focusMessage(entry.firstMessageId);
     const firstAt = new Date(entry.firstAt);
     if (entry.kind === 'channel' && !Number.isNaN(firstAt.getTime())) {
@@ -1085,6 +1135,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
               <ReaderMemoryStrip
                 context={context()}
                 reviewedSpan={readerReviewedSpan()}
+                reviewedAnchorSource={readerAnchorSource()}
                 reviewedTrail={readerReviewedTrail()}
                 hasUnreadBoundary={unreadDividerId() !== null}
                 onJumpStart={scrollToReaderStart}

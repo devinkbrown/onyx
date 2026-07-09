@@ -2230,6 +2230,19 @@
   color: var(--washi-mute);
 }
 
+.shell-reader-memory__review-source {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.45rem;
+  padding: 1px 5px;
+  border: 1px solid color-mix(in oklab, var(--gold-bright) 32%, transparent);
+  border-radius: var(--r-pill);
+  color: var(--gold-bright);
+  font-size: 0.6rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
 .shell-reader-memory__review-preview {
   min-width: 0;
   overflow: hidden;

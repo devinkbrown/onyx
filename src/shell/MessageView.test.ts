@@ -4,7 +4,9 @@ import type { ChatMessage } from '@/lib/irc/types';
 import type { ReviewHistoryEntry } from '@/lib/notifications/reviewHistory';
 import {
   buildReviewedContextTrail,
+  hasReviewedAnchor,
   mergeReviewedContextTrails,
+  reviewedAnchorSource,
 } from './MessageView';
 
 function message(id: string, from: string, text: string, offset: number): ChatMessage {
@@ -62,5 +64,20 @@ describe('reviewed reader context trails', () => {
 
     expect(merged?.before?.id).toBe('before-vault');
     expect(merged?.after?.id).toBe('after-live');
+  });
+
+  it('detects visible and vault-only reviewed anchors', () => {
+    const entry = review('anchor');
+    const visible = [message('live', 'alice', 'visible line', 1)];
+    const vaulted = [
+      message('before-vault', 'alice', 'vault before', 1),
+      message('anchor', 'bob', 'vault anchor', 2),
+    ];
+
+    expect(hasReviewedAnchor(entry, visible)).toBe(false);
+    expect(hasReviewedAnchor(entry, vaulted)).toBe(true);
+    expect(reviewedAnchorSource(entry, visible, vaulted)).toBe('vault');
+    expect(reviewedAnchorSource(entry, vaulted, null)).toBe('visible');
+    expect(reviewedAnchorSource(entry, visible, null)).toBeNull();
   });
 });
