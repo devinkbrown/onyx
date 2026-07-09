@@ -4184,6 +4184,113 @@
   max-height: 320px;
 }
 
+.shell-msg-blockkit {
+  display: grid;
+  gap: 8px;
+  max-width: min(520px, 100%);
+  margin-top: 7px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-left: 2px solid color-mix(in oklab, var(--gold-bright) 58%, transparent);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--stone-2) 46%, transparent);
+  font-family: var(--font-sans);
+}
+
+.shell-msg-blockkit-title {
+  color: var(--washi);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.shell-msg-blockkit-text {
+  color: var(--washi-dim);
+  font-size: 0.78rem;
+}
+
+.shell-msg-blockkit-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.shell-msg-blockkit-fields div {
+  min-width: 0;
+}
+
+.shell-msg-blockkit-fields dt {
+  color: var(--washi-mute);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.shell-msg-blockkit-fields dd {
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: var(--washi);
+  font-size: 0.76rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell-msg-blockkit-selects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.shell-msg-blockkit-selects label {
+  display: grid;
+  gap: 3px;
+  min-width: 148px;
+  color: var(--washi-mute);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.shell-msg-blockkit-selects select {
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--ink) 66%, var(--stone));
+  color: var(--washi);
+  font: 0.76rem var(--font-sans);
+}
+
+.shell-msg-blockkit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.shell-msg-blockkit-actions a,
+.shell-msg-blockkit-actions button {
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--lapis) 13%, var(--stone));
+  color: var(--washi);
+  font: 700 0.74rem var(--font-mono);
+  text-decoration: none;
+}
+
+.shell-msg-blockkit-actions button:disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+
+.shell-msg-blockkit-actions a:hover,
+.shell-msg-blockkit-actions a:focus-visible {
+  border-color: color-mix(in oklab, var(--lapis-bright) 64%, var(--line));
+  color: var(--lapis-bright);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .shell-msg-spoiler,
   .shell-msg-link,

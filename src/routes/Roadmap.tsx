@@ -108,7 +108,7 @@ const phases: Phase[] = [
     state: 'planned',
     date: 'planned',
     summary: 'Prepare the client and site for structured integrations: Block-Kit-lite rendering, a constrained extension surface, and migration/importer paths.',
-    items: ['Block-Kit-lite renderer', 'Client extension surface', 'Importer path', 'Incoming webhook migration', 'Server snapshot imports', 'IRC-log-to-vault import', 'Bridge status surface', 'Integrations page'],
+    items: ['Block-Kit-lite renderer', 'Block-Kit-lite message controls', 'Client extension surface', 'Importer path', 'Incoming webhook migration', 'Server snapshot imports', 'IRC-log-to-vault import', 'Bridge status surface', 'Integrations page'],
   },
   {
     phase: 'Phase 13',

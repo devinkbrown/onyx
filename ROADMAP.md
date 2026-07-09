@@ -433,6 +433,10 @@ client or public site needs to expose the result.
 31. **Block-Kit-lite renderer** *(client)* — render structured webhook/plugin
     components such as buttons, selects, and compact forms from protocol-tagged
     payloads, with text fallback for classic clients.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Message rendering now recognizes
+    `[onyx:block]` JSON payload lines, sanitizes and clamps the schema, renders
+    compact fields, selects, safe links, and disabled command buttons, and leaves
+    malformed payloads as readable text fallback for classic clients.
 32. **Client extension surface** *(client)* — prepare a capability-scoped,
     UI-safe extension surface for first-party plugins, starting with command
     palette actions and message/room cards.

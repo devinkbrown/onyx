@@ -94,6 +94,7 @@ describe('RoadmapRoute', () => {
     expect(screen.getByText('Watch-together room activity')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Apps' })).toBeInTheDocument();
     expect(screen.getByText('Block-Kit-lite renderer')).toBeInTheDocument();
+    expect(screen.getByText('Block-Kit-lite message controls')).toBeInTheDocument();
     expect(screen.getByText('Server snapshot imports')).toBeInTheDocument();
     expect(screen.getByText('IRC-log-to-vault import')).toBeInTheDocument();
     expect(screen.getByText('Integrations page')).toBeInTheDocument();

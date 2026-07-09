@@ -31,6 +31,7 @@ import { preferences } from '@/lib/prefs/preferences';
 import { pickPreviewUrl, fetchLinkPreview } from '@/lib/preview/linkPreview';
 import { parseMessage } from '@/lib/format/parseMessage';
 import { lookupEmoji } from '@/lib/format/emoji';
+import { extractBlockKitLite, type BlockKitLiteBlock } from '@/lib/integrations/blockKitLite';
 import type {
   Token,
   InlineToken,
@@ -118,6 +119,71 @@ function MediaUnfurl(props: MediaUnfurlProps): JSX.Element {
         </Switch>
       </div>
     </Show>
+  );
+}
+
+type BlockKitLiteViewProps = {
+  block: BlockKitLiteBlock;
+};
+
+function BlockKitLiteView(props: BlockKitLiteViewProps): JSX.Element {
+  const [local] = splitProps(props, ['block']);
+
+  return (
+    <div class="shell-msg-blockkit" role="group" aria-label={local.block.title ?? 'Structured message actions'}>
+      <Show when={local.block.title}>
+        {(title) => <strong class="shell-msg-blockkit-title">{title()}</strong>}
+      </Show>
+      <Show when={local.block.text}>
+        {(text) => <span class="shell-msg-blockkit-text">{text()}</span>}
+      </Show>
+      <Show when={local.block.fields.length > 0}>
+        <dl class="shell-msg-blockkit-fields">
+          <For each={local.block.fields}>
+            {(field) => (
+              <div>
+                <dt>{field.label}</dt>
+                <dd>{field.value || 'Not set'}</dd>
+              </div>
+            )}
+          </For>
+        </dl>
+      </Show>
+      <Show when={local.block.selects.length > 0}>
+        <div class="shell-msg-blockkit-selects">
+          <For each={local.block.selects}>
+            {(select) => (
+              <label>
+                <span>{select.label}</span>
+                <select aria-label={select.label}>
+                  <For each={select.options}>
+                    {(option) => <option value={option.value}>{option.label}</option>}
+                  </For>
+                </select>
+              </label>
+            )}
+          </For>
+        </div>
+      </Show>
+      <Show when={local.block.buttons.length > 0}>
+        <div class="shell-msg-blockkit-actions">
+          <For each={local.block.buttons}>
+            {(button) => (
+              <Show
+                when={button.url}
+                fallback={<button type="button" disabled title={button.value ?? undefined}>{button.label}</button>}
+              >
+                {(url) => (
+                  <a href={url()} target="_blank" rel="noopener noreferrer">
+                    {button.label}
+                  </a>
+                )}
+              </Show>
+            )}
+          </For>
+        </div>
+      </Show>
+    </div>
   );
 }
 
@@ -495,7 +561,8 @@ function LinkPreviewCard(props: { url: string }): JSX.Element {
 export function MessageText(props: MessageTextProps): JSX.Element {
   const [local] = splitProps(props, ['text', 'selfNick', 'onChannelClick', 'class']);
 
-  const tokens = createMemo(() => parseMessage(local.text));
+  const blockKit = createMemo(() => extractBlockKitLite(local.text));
+  const tokens = createMemo(() => parseMessage(blockKit().text));
 
   /** First plain web link → OG preview card (preference-gated). */
   const previewUrl = createMemo<string | null>(() => {
@@ -539,6 +606,11 @@ export function MessageText(props: MessageTextProps): JSX.Element {
       </Show>
       <Show when={previewUrl()}>
         {(url) => <LinkPreviewCard url={url()} />}
+      </Show>
+      <Show when={blockKit().blocks.length > 0}>
+        <For each={blockKit().blocks}>
+          {(block) => <BlockKitLiteView block={block} />}
+        </For>
       </Show>
     </p>
   );
