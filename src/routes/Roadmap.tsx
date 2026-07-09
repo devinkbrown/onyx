@@ -59,8 +59,8 @@ const phases: Phase[] = [
     title: 'Time-native',
     state: 'active',
     date: '2026-07-09',
-    summary: 'Home now brings followed activity, scheduled rooms, local memory, quiet rooms, reader summaries, shareable moments, reader memory, and search handoff into view.',
-    items: ['Followed catch-up', 'Scheduled events on Home', 'Vault memory previews', 'Quiet room activity', 'Reader digest notes', 'Shareable moment links', 'Reader memory context', 'Moment search handoff'],
+    summary: 'Home now brings followed activity, scheduled rooms, local memory, quiet rooms, reader summaries, shareable moments, reader memory, search handoff, and transcript jumps into view.',
+    items: ['Followed catch-up', 'Scheduled events on Home', 'Vault memory previews', 'Quiet room activity', 'Reader digest notes', 'Shareable moment links', 'Reader memory context', 'Moment search handoff', 'Reader transcript jumps'],
   },
   {
     phase: 'Phase 7',
@@ -169,7 +169,8 @@ export default function RoadmapRoute() {
             root pulse. Onyx's current client work makes the app a time-native
             place to return to: followed catch-up, scheduled room events, local
             memory previews, quiet room activity, reader digest notes, shareable
-            moment links, reader memory context, moment search handoff, and
+            moment links, reader memory context, moment search handoff,
+            reader transcript jumps, and
             quieter activity surfaces.
           </p>
         </article>
@@ -178,7 +179,7 @@ export default function RoadmapRoute() {
           <h3>Keep tightening</h3>
           <div class="data-list data-list--compact">
             <div class="data-row"><div><strong>Catch-up Home</strong><span>Fold richer since-you-left recaps and Spotlight handoff into the return screen.</span></div></div>
-            <div class="data-row"><div><strong>Reader mode</strong><span>Continue navigation polish around remembered transcript context.</span></div></div>
+            <div class="data-row"><div><strong>Reader mode</strong><span>Continue review handoff and catch-up navigation around remembered transcript context.</span></div></div>
             <div class="data-row"><div><strong>Accessibility conformance</strong><span><a href="/accessibility/">Continue channel, voice, and appearance audit evidence.</a></span></div></div>
           </div>
         </aside>

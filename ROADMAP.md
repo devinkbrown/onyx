@@ -194,8 +194,11 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Message moments now hand off into
     prefilled message search, so a remembered anchor can immediately fan out
     across hydrated buffers, vault hits, and full-history search.
-    ⏭️ **NEXT** — continue reader-mode navigation polish over existing message
-    buffers and hydration.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — The reader memory band now doubles
+    as transcript navigation with Start/New/Latest jumps for hydrated buffers
+    and unread boundaries.
+    ⏭️ **NEXT** — continue reader-mode review handoff and catch-up navigation
+    over existing message buffers and hydration.
 17. **Accessibility conformance ledger** *(main site + client)* — publish the
     public WCAG 2.2 / EN 301 549 audit path and keep it linked from the front
     door while app panels are audited.

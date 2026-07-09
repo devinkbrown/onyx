@@ -335,6 +335,11 @@ describe('AppShell', () => {
     });
 
     it('shows device-memory context in reader mode', () => {
+      const scrollIntoView = vi.fn();
+      Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
+        value: scrollIntoView,
+        configurable: true,
+      });
       setPreference('readerMode', true);
       setPreference('localHistory', true);
       const channel = makeChannel(
@@ -354,6 +359,7 @@ describe('AppShell', () => {
         activeView: { kind: 'channel', channel: '#general' },
         connectionStatus: 'connected',
         ourNick: 'testuser',
+        viewUnreadDividerId: new Map([['#general', 'msg-memory-b']]),
       }, true);
 
       render(() => <AppShell />);
@@ -366,6 +372,12 @@ describe('AppShell', () => {
       expect(within(memory).getByText('1 topic')).toBeInTheDocument();
       expect(within(memory).getByText('alice')).toBeInTheDocument();
       expect(within(memory).getByText('bob')).toBeInTheDocument();
+      expect(within(memory).getByRole('button', { name: 'Start' })).toBeInTheDocument();
+      expect(within(memory).getByRole('button', { name: 'New' })).toBeInTheDocument();
+      expect(within(memory).getByRole('button', { name: 'Latest' })).toBeInTheDocument();
+
+      fireEvent.click(within(memory).getByRole('button', { name: 'Start' }));
+      expect(scrollIntoView).toHaveBeenCalled();
     });
 
     it('follows the room or selected topic from the topic strip', () => {

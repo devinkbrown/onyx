@@ -2201,6 +2201,31 @@
   font-size: 0.66rem;
 }
 
+.shell-reader-memory__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.shell-reader-memory__nav button {
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in oklab, var(--seam) 68%, transparent);
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--ink) 18%, transparent);
+  color: var(--washi-dim);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.shell-reader-memory__nav button:hover,
+.shell-reader-memory__nav button:focus-visible {
+  border-color: color-mix(in oklab, var(--lapis-bright) 52%, transparent);
+  color: var(--washi);
+}
+
 /* Highlight — a message that names you. Bioluminescent azure crest, never
    alarm-coral: it should feel like being gently called to, not warned. */
 .shell-msg-group--highlight,

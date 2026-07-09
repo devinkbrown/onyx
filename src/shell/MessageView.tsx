@@ -172,7 +172,13 @@ function formatReaderMemoryRange(context: ReaderMemoryContext): string {
   return `${first}-${last}`;
 }
 
-function ReaderMemoryStrip(props: { context: ReaderMemoryContext }): JSX.Element {
+function ReaderMemoryStrip(props: {
+  context: ReaderMemoryContext;
+  hasUnreadBoundary: boolean;
+  onJumpStart: () => void;
+  onJumpUnread: () => void;
+  onJumpLatest: () => void;
+}): JSX.Element {
   const overflow = createMemo(() =>
     Math.max(props.context.voiceCount - props.context.participants.length, 0),
   );
@@ -201,6 +207,13 @@ function ReaderMemoryStrip(props: { context: ReaderMemoryContext }): JSX.Element
           </Show>
         </div>
       </Show>
+      <nav class="shell-reader-memory__nav" aria-label="Reader transcript navigation">
+        <button type="button" onClick={() => props.onJumpStart()}>Start</button>
+        <Show when={props.hasUnreadBoundary}>
+          <button type="button" onClick={() => props.onJumpUnread()}>New</button>
+        </Show>
+        <button type="button" onClick={() => props.onJumpLatest()}>Latest</button>
+      </nav>
     </section>
   );
 }
@@ -553,7 +566,23 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   function scrollToBottom(smooth = false): void {
     const el = feedEl;
     if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'instant' });
+    if (typeof el.scrollTo === 'function') {
+      el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'instant' });
+    } else {
+      el.scrollTop = el.scrollHeight;
+    }
+  }
+
+  function scrollToReaderStart(): void {
+    const node = feedEl?.querySelector<HTMLElement>('[data-message-search-id]');
+    node?.scrollIntoView?.({ block: 'center' });
+    setAtBottom(false);
+  }
+
+  function scrollToUnreadBoundary(): void {
+    const node = feedEl?.querySelector<HTMLElement>('.shell-unread-divider');
+    node?.scrollIntoView?.({ block: 'center' });
+    setAtBottom(false);
   }
 
   // Autoscroll when new messages arrive and we're already at bottom
@@ -849,7 +878,15 @@ export function MessageView(props: MessageViewProps): JSX.Element {
             )}
           </Show>
           <Show when={readerMemoryContext()}>
-            {(context) => <ReaderMemoryStrip context={context()} />}
+            {(context) => (
+              <ReaderMemoryStrip
+                context={context()}
+                hasUnreadBoundary={unreadDividerId() !== null}
+                onJumpStart={scrollToReaderStart}
+                onJumpUnread={scrollToUnreadBoundary}
+                onJumpLatest={() => scrollToBottom(true)}
+              />
+            )}
           </Show>
           <For each={messages()}>
             {(msg, index) => {
