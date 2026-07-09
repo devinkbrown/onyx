@@ -321,6 +321,11 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
     local.onOpenChange(false);
   }
 
+  function returnToConnect(): void {
+    getState().disconnect();
+    local.onOpenChange(false);
+  }
+
   return (
     <ModalShell
       open={local.open}
@@ -342,6 +347,14 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
               Sign in or register from the Connect screen to claim a name, keep
               your settings across the mesh, and protect your nick.
             </p>
+            <ol class="acct-guest-steps" aria-label="Account claim steps">
+              <li>Register the name you are using.</li>
+              <li>Add recovery email during registration or later here.</li>
+              <li>Bind a passkey or certificate after sign-in.</li>
+            </ol>
+            <Button type="button" variant="primary" size="sm" onClick={returnToConnect}>
+              Open Connect to claim
+            </Button>
           </div>
         </Show>
 

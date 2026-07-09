@@ -66,6 +66,9 @@ describe('Account panel — guest state', () => {
     expect(
       screen.getByRole('heading', { name: /browsing as a guest/i }),
     ).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Account claim steps' })).toBeInTheDocument();
+    expect(screen.getByText('Register the name you are using.')).toBeInTheDocument();
+    expect(screen.getByText('Bind a passkey or certificate after sign-in.')).toBeInTheDocument();
   });
 
   it('does not render management sections for a guest', () => {
@@ -77,6 +80,21 @@ describe('Account panel — guest state', () => {
   it('does not fetch ACCOUNTINFO for a guest', () => {
     const { client } = renderPanel({ account: null });
     expect(client.sendRaw).not.toHaveBeenCalledWith('ACCOUNTINFO');
+  });
+
+  it('lets a guest return to Connect to claim the account', () => {
+    const disconnectSpy = vi.spyOn(getState(), 'disconnect').mockImplementation(() => {});
+    const closeSpy = vi.fn();
+    store.setState({
+      client: makeClient() as never,
+      server: seedServer(null),
+    });
+    render(() => <AccountPanel open={true} onOpenChange={closeSpy} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Connect to claim' }));
+
+    expect(disconnectSpy).toHaveBeenCalled();
+    expect(closeSpy).toHaveBeenCalledWith(false);
   });
 });
 

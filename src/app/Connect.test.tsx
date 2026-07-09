@@ -13,7 +13,7 @@
  * never a specific one. No live WebSocket is needed (probing is stubbed).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { cleanup, render, screen, fireEvent, waitFor } from '@solidjs/testing-library';
+import { cleanup, render, screen, fireEvent, waitFor, within } from '@solidjs/testing-library';
 import { Connect } from './Connect';
 import { NODES } from './nodes';
 import { store, getState } from '@/lib/store';
@@ -87,6 +87,18 @@ describe('Connect screen rendering', () => {
     expect(screen.getByRole('tab', { name: /guest/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /sign in/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /register/i })).toBeInTheDocument();
+  });
+
+  it('surfaces the account claim path and jumps to registration', () => {
+    render(() => <Connect />);
+    const claim = screen.getByRole('region', { name: 'Claim path' });
+    expect(within(claim).getByText('Guest nick')).toBeInTheDocument();
+    expect(within(claim).getByText('Registered account')).toBeInTheDocument();
+    expect(within(claim).getByText('Recovery email')).toBeInTheDocument();
+    expect(within(claim).getByText('Device login')).toBeInTheDocument();
+
+    fireEvent.click(within(claim).getByRole('button', { name: 'Register' }));
+    expect(screen.getByRole('tab', { name: /register/i })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('defaults to Guest mode', () => {

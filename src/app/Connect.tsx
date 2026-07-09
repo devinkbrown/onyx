@@ -119,6 +119,13 @@ const MODES: ReadonlyArray<{ id: Mode; label: string }> = [
   { id: 'register', label: 'Register' },
 ];
 
+const CLAIM_STEPS = [
+  { key: 'guest', label: 'Guest nick', detail: 'Try a room without claiming the name.' },
+  { key: 'account', label: 'Registered account', detail: 'Create the account from this screen.' },
+  { key: 'recovery', label: 'Recovery email', detail: 'Optional during registration, editable later.' },
+  { key: 'device', label: 'Device login', detail: 'Add a passkey or certificate after sign-in.' },
+] as const;
+
 /** Account passwords must be at least this long to register. */
 const MIN_PASSWORD_LEN = 8;
 
@@ -229,6 +236,42 @@ function PasswordInput(props: PasswordInputProps): JSX.Element {
         <p class="onyx-field__error" id={errorId()}>{props.error}</p>
       </Show>
     </div>
+  );
+}
+
+function ClaimPath(props: { mode: Mode; onRegister: () => void }): JSX.Element {
+  const current = createMemo(() => {
+    switch (props.mode) {
+      case 'register':
+        return 'account';
+      case 'signin':
+        return 'device';
+      default:
+        return 'guest';
+    }
+  });
+  return (
+    <section class="conn-claim" aria-labelledby="conn-claim-title">
+      <div class="conn-claim-head">
+        <h2 id="conn-claim-title" class="conn-claim-title">Claim path</h2>
+        <button type="button" class="conn-claim-action" onClick={() => props.onRegister()}>
+          Register
+        </button>
+      </div>
+      <ol class="conn-claim-steps">
+        <For each={CLAIM_STEPS}>
+          {(step) => (
+            <li class="conn-claim-step" data-current={current() === step.key ? 'true' : 'false'}>
+              <span class="conn-claim-dot" aria-hidden="true" />
+              <span class="conn-claim-copy">
+                <span class="conn-claim-label">{step.label}</span>
+                <span class="conn-claim-detail">{step.detail}</span>
+              </span>
+            </li>
+          )}
+        </For>
+      </ol>
+    </section>
   );
 }
 
@@ -761,6 +804,8 @@ export function Connect(props: ConnectProps): JSX.Element {
                   </div>
                 </div>
               </Show>
+
+              <ClaimPath mode={mode()} onRegister={() => switchMode('register')} />
 
               {/* Mode switch */}
               <div

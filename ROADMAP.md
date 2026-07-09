@@ -332,6 +332,10 @@ client or public site needs to expose the result.
 19. **Native onboarding and account claim** *(client)* — remove the NickServ
     cliff from first use with registration, identify, certificate, and future
     passkey flows expressed as first-party forms over the real server commands.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Connect now exposes a first-party
+    claim path from guest nick to registered account, recovery email, and
+    device login; the guest Account panel now returns directly to Connect with
+    concrete claim steps instead of pointing users at bot-era NickServ flows.
 20. **Brand and glossary cleanup** *(main site + client)* — enforce one public
     glossary across home, about, status, roadmap, accessibility, app chrome,
     invite unfurls, and docs. Track the master-roadmap direction to make

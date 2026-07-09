@@ -399,6 +399,115 @@
 .conn-resume-dismiss:hover { color: var(--washi-dim); }
 .conn-resume-dismiss:focus-visible { outline: 2px solid var(--lapis-bright); outline-offset: 2px; border-radius: 3px; }
 
+/* ── Claim path — first-party guest → account wayfinding ── */
+.conn-claim {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 15px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--ink) 50%, var(--stone));
+}
+
+.conn-claim-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.conn-claim-title {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--washi-dim);
+}
+
+.conn-claim-action {
+  appearance: none;
+  cursor: pointer;
+  padding: 5px 8px;
+  border: 1px solid color-mix(in oklab, var(--lapis) 42%, transparent);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--lapis) 10%, transparent);
+  color: var(--lapis-bright);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.conn-claim-action:hover {
+  color: var(--washi);
+  border-color: var(--lapis-bright);
+}
+
+.conn-claim-action:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.conn-claim-steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.conn-claim-step {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+}
+
+.conn-claim-step[data-current='true'] {
+  border-color: color-mix(in oklab, var(--lapis) 40%, transparent);
+  background: color-mix(in oklab, var(--lapis) 9%, transparent);
+}
+
+.conn-claim-dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 0.33rem;
+  border-radius: var(--r-pill);
+  background: var(--stone-line);
+}
+
+.conn-claim-step[data-current='true'] .conn-claim-dot {
+  background: var(--lapis-bright);
+  box-shadow: 0 0 10px color-mix(in oklab, var(--lapis-bright) 70%, transparent);
+}
+
+.conn-claim-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.conn-claim-label {
+  color: var(--washi);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.conn-claim-detail {
+  color: var(--washi-mute);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
 /* ── Invite preview — a calm welcome when arriving via an invite link ── */
 .conn-invite {
   display: flex;
@@ -851,6 +960,7 @@
 .conn-verify,
 .conn-reclaim-form,
 .conn-resume,
+.conn-claim,
 .conn-invite {
   animation: conn-rise var(--dur) var(--ease) both;
 }
@@ -871,8 +981,15 @@
   .conn-verify,
   .conn-reclaim-form,
   .conn-resume,
+  .conn-claim,
   .conn-invite {
     animation: none !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .conn-claim-steps {
+    grid-template-columns: 1fr;
   }
 }
 
