@@ -57,6 +57,16 @@ describe('parseJoinParam', () => {
     expect(parseJoinParam('%23bad%')).toBeNull();
     expect(parseJoinParam('%E0%A4%A')).toBeNull();
   });
+
+  it('rejects NUL and other C0/DEL control chars forbidden in IRC channel names', () => {
+    // NUL can truncate/corrupt the downstream JOIN — it must never survive validation.
+    expect(parseJoinParam('#foo\x00bar')).toBeNull();
+    expect(parseJoinParam('%23foo%00bar')).toBeNull();
+    expect(parseJoinParam('#foo\x01bar')).toBeNull();
+    expect(parseJoinParam('#foo\x08bar')).toBeNull(); // backspace
+    expect(parseJoinParam('#foo\x1bbar')).toBeNull(); // ESC
+    expect(parseJoinParam('#foo\x7fbar')).toBeNull(); // DEL
+  });
 });
 
 describe('parseAtParam', () => {

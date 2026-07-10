@@ -6,12 +6,14 @@
  * against IRC channel-name rules before it is allowed anywhere near a JOIN.
  *
  * Valid shape (after decodeURIComponent): `#` followed by 1–63 chars, none of
- * which may be whitespace, a comma (JOIN list separator) or \x07 (^G, the
- * historical channel-name terminator). Anything else is ignored — a bad deep
- * link must never break the connect flow.
+ * which may be whitespace, a comma (JOIN list separator) or any C0/DEL control
+ * character (\x00–\x1f, \x7f) — this range subsumes \x07 (^G) and, critically,
+ * NUL, which IRC channel-name rules forbid and which could otherwise truncate
+ * or corrupt the downstream JOIN. Anything else is ignored — a bad deep link
+ * must never break the connect flow.
  */
 
-const JOIN_PARAM_RE = /^#[^\s,\x07]{1,63}$/;
+const JOIN_PARAM_RE = /^#[^\s\x00-\x1f\x7f,]{1,63}$/;
 const TOPIC_PARAM_CONTROL_PATTERN = /[\x00-\x1f\x7f,]/u;
 const textEncoder = new TextEncoder();
 
