@@ -10,11 +10,26 @@
  * SOLID IDIOMS: components run once; createMemo/createSignal/onCleanup; Show.
  */
 
-import { createMemo, createSignal, onCleanup, Show, type JSX } from 'solid-js';
+import { createEffect, createMemo, createSignal, onCleanup, Show, type JSX } from 'solid-js';
 import { useStore } from '@/lib/store';
 
 /** Re-tick interval so expired typers fall off without a new store update. */
 const TICK_MS = 2000;
+
+/**
+ * Furthest-future expiry timestamp among a channel's typing entries, or 0 when
+ * the map is empty. Pure so the "should we keep ticking?" decision is
+ * unit-testable without the store/DOM. Entries are pruned from the store only on
+ * the next TAGMSG, so a caller must compare this against the current time rather
+ * than trusting map size.
+ */
+export function latestTypingExpiry(map: Map<string, number>): number {
+  let max = 0;
+  for (const expiresAt of map.values()) {
+    if (expiresAt > max) max = expiresAt;
+  }
+  return max;
+}
 
 /**
  * Format the "X is typing" line from a list of nicks. Pure so the pluralization
@@ -34,14 +49,39 @@ export function TypingIndicator(): JSX.Element {
   const ourNick = useStore((s) => s.ourNick);
 
   const [now, setNow] = createSignal(Date.now());
-  const timer = setInterval(() => setNow(Date.now()), TICK_MS);
-  onCleanup(() => clearInterval(timer));
 
   const key = createMemo<string | null>(() => {
     const v = activeView();
     if (v.kind === 'channel') return v.channel.toLowerCase();
     if (v.kind === 'dm') return v.nick.toLowerCase();
     return null;
+  });
+
+  // Re-tick clock — but ONLY while a typer for the active surface is still live.
+  // The old code ran a 2s `setInterval` for the whole session, writing `now` and
+  // recomputing the `typers`/`label` memos every 2s even when nobody was typing
+  // (the overwhelmingly common case). Gating the clock on a real future expiry
+  // keeps the component fully quiescent when idle: no timer, no signal write, no
+  // wasted memo recompute. A fresh TAGMSG changes `typingUsers` (new Map ref),
+  // which re-runs this effect and restarts the clock; once the last entry's
+  // expiry passes, the self-rescheduling timeout stops on its own.
+  createEffect(() => {
+    const k = key();
+    const map = k ? typingUsers().get(k) : undefined;
+    if (!map || map.size === 0) return;
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const schedule = (): void => {
+      if (latestTypingExpiry(map) <= Date.now()) return; // all expired → stop
+      timer = setTimeout(() => {
+        setNow(Date.now());
+        schedule();
+      }, TICK_MS);
+    };
+    schedule();
+    onCleanup(() => {
+      if (timer !== undefined) clearTimeout(timer);
+    });
   });
 
   const typers = createMemo<string[]>(() => {
