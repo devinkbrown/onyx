@@ -4,7 +4,7 @@
  * with the current UTC hour marked, so a room's pulse is visible before you
  * even read a message. Hidden when the channel has no recorded activity.
  */
-import { createMemo, createResource, Index, onCleanup, Show, type JSX } from 'solid-js';
+import { createMemo, createResource, createSignal, Index, onCleanup, Show, type JSX } from 'solid-js';
 import { fetchChannelPulse } from '@/lib/stats/channelStats';
 
 type PresenceHeatlineProps = {
@@ -21,8 +21,18 @@ export function PresenceHeatline(props: PresenceHeatlineProps): JSX.Element {
     async (channel) => (channel ? fetchChannelPulse(channel) : null),
   );
 
+  // The current UTC hour must stay reactive so the "now" marker advances across
+  // hour boundaries during a long-lived session. A bare createMemo(() => new
+  // Date().getUTCHours()) has no reactive dependency, so it runs once and latches
+  // at the mount hour — the marker would silently point at the wrong bar. Tick it
+  // from the existing poll cadence (well within an hour of any boundary).
+  const [nowHour, setNowHour] = createSignal(new Date().getUTCHours());
+
   // Poll while mounted; createResource re-fetches for the active channel key.
-  const timer = setInterval(() => void refetch(), REFRESH_MS);
+  const timer = setInterval(() => {
+    setNowHour(new Date().getUTCHours());
+    void refetch();
+  }, REFRESH_MS);
   onCleanup(() => clearInterval(timer));
 
   const hours = createMemo(() => pulse()?.hours ?? null);
@@ -30,7 +40,6 @@ export function PresenceHeatline(props: PresenceHeatlineProps): JSX.Element {
     const h = hours();
     return h ? Math.max(1, ...h) : 1;
   });
-  const nowHour = createMemo(() => new Date().getUTCHours());
 
   const hasActivity = createMemo(() => {
     const h = hours();
