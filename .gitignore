@@ -52,3 +52,7 @@ playwright-report/
 
 # agent/codex worktrees
 .claude/worktrees/
+
+# Claude Code personal (uncommitted) settings
+.claude/settings.local.json
+.eslintcache
