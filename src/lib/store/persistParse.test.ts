@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseStringArray } from './persistParse';
+import { parseStringArray, parseEmojiArray } from './persistParse';
 
 describe('parseStringArray', () => {
   it('returns [] for null / empty input', () => {
@@ -36,6 +36,57 @@ describe('parseStringArray', () => {
       expect(Array.isArray(out)).toBe(true);
       // The exact call that crashed the message pipeline:
       expect(() => out.some(w => w.length > 0)).not.toThrow();
+    }
+  });
+});
+
+describe('parseEmojiArray', () => {
+  it('returns [] for null / empty input', () => {
+    expect(parseEmojiArray(null)).toEqual([]);
+    expect(parseEmojiArray('')).toEqual([]);
+  });
+
+  it('parses well-formed emoji records and preserves optional addedBy', () => {
+    expect(
+      parseEmojiArray('[{"name":"party","url":"https://x/p.png","addedBy":"kai"},{"name":"wave","url":"https://x/w.png"}]'),
+    ).toEqual([
+      { name: 'party', url: 'https://x/p.png', addedBy: 'kai' },
+      { name: 'wave', url: 'https://x/w.png' },
+    ]);
+  });
+
+  it('returns [] for valid JSON that is not an array (the add/remove crash guard)', () => {
+    // `{}` / `5` / `"x"` JSON.parse without throwing; the old `as Array<...>` cast
+    // let a non-array through, so the first addCustomEmoji/removeCustomEmoji call
+    // — `[...prev.filter(...)]` / `prev.filter(...)` — threw and crashed the handler.
+    expect(parseEmojiArray('{}')).toEqual([]);
+    expect(parseEmojiArray('"x"')).toEqual([]);
+    expect(parseEmojiArray('5')).toEqual([]);
+    expect(parseEmojiArray('null')).toEqual([]);
+    expect(parseEmojiArray('true')).toEqual([]);
+  });
+
+  it('drops elements missing a string name or url', () => {
+    expect(
+      parseEmojiArray('[{"name":"ok","url":"u"},5,null,{"name":"nourl"},{"url":"noname"},{"name":2,"url":"x"},"s"]'),
+    ).toEqual([{ name: 'ok', url: 'u' }]);
+  });
+
+  it('drops a non-string addedBy rather than propagating a bad shape', () => {
+    expect(parseEmojiArray('[{"name":"a","url":"u","addedBy":5}]')).toEqual([{ name: 'a', url: 'u' }]);
+  });
+
+  it('returns [] for malformed (non-JSON) input', () => {
+    expect(parseEmojiArray('{not json')).toEqual([]);
+    expect(parseEmojiArray('[{"name":"a"')).toEqual([]);
+  });
+
+  it('never returns a value without .filter (result is always an array)', () => {
+    for (const raw of [null, '', '{}', '"x"', '5', 'null', 'garbage', '[{"name":"a","url":"u"}]']) {
+      const out = parseEmojiArray(raw);
+      expect(Array.isArray(out)).toBe(true);
+      // The exact call that crashed the settings handler:
+      expect(() => [...out.filter(e => e.name !== 'z'), { name: 'z', url: 'u' }]).not.toThrow();
     }
   });
 });

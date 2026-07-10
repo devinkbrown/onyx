@@ -1,6 +1,6 @@
 import { createStore } from 'zustand/vanilla';
 import { subscribeWithSelector } from 'zustand/middleware';
-import { parseStringArray } from './persistParse';
+import { parseStringArray, parseEmojiArray } from './persistParse';
 import { IRCClient } from '@/lib/irc/client';
 import type { IRCMessage, Channel, ChannelUser, ChatMessage, ConnectionStatus, MessageReaction } from '@/lib/irc/types';
 import { parseMultilineLimits, planMultilineBatches, buildMultilineLines, assembleMultilineText } from '@/lib/irc/multiline';
@@ -7728,8 +7728,9 @@ export const store = createStore<OnyxState>()(
     // ── Auto-join ────────────────────────────────────────────────────────
     autoJoinChannels: (() => {
       if (typeof window === 'undefined') return [];
-      try { return JSON.parse(localStorage.getItem('onyx:autojoin') || '[]') as string[]; }
-      catch { return []; }
+      // Sanitize at the boundary: a wrong-shape persisted value (e.g. `{}`) would
+      // otherwise crash the first add/removeAutoJoin (`[...value]` / `.filter`).
+      return parseStringArray(localStorage.getItem('onyx:autojoin'));
     })(),
     addAutoJoin: (channel) => set(s => {
       const next = [...new Set([...s.autoJoinChannels, channel])];
@@ -7764,8 +7765,9 @@ export const store = createStore<OnyxState>()(
     // ── Custom emoji ──────────────────────────────────────────────────────
     customEmoji: (() => {
       if (typeof window === 'undefined') return [];
-      try { return JSON.parse(localStorage.getItem('onyx:custom-emoji') || '[]') as Array<{ name: string; url: string; addedBy?: string }>; }
-      catch { return []; }
+      // Sanitize at the boundary: a wrong-shape persisted value would otherwise
+      // crash the first add/removeCustomEmoji (spread / `.filter` on a non-array).
+      return parseEmojiArray(localStorage.getItem('onyx:custom-emoji'));
     })(),
     addCustomEmoji: (name, url) => set(s => {
       const next = [...s.customEmoji.filter(e => e.name !== name), { name, url }];
