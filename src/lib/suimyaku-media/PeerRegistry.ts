@@ -177,6 +177,10 @@ export class PeerRegistry {
     this.peers.delete(key);
     this.peerLevels.delete(key);
     this.decodeErrors.delete(key);
+    // Drop any manual spatial position too: keeping it leaks memory across peer
+    // churn and, worse, would silently re-apply this Bob's pan to a different
+    // person who later grabs the recycled nick.
+    this.spatialPositions.delete(key);
     this.updateSpatialAudio();
     this.onPeerLeft?.(stateNick);
   }

@@ -2,6 +2,15 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { PeerRegistry, type PeerMedia } from './PeerRegistry';
 import type { OpcodecWasm } from './OpcodecWasm';
+import type { SpatialAudioPosition } from './spatialAudio';
+
+type PeerRegistryInternals = {
+  spatialPositions: Map<string, SpatialAudioPosition>;
+};
+
+function spatialPositions(registry: PeerRegistry): Map<string, SpatialAudioPosition> {
+  return (registry as unknown as PeerRegistryInternals).spatialPositions;
+}
 
 function createRegistry(): PeerRegistry {
   return new PeerRegistry({
@@ -63,6 +72,24 @@ describe('PeerRegistry', () => {
     expect(registry.peerLevels.has('mika')).toBe(false);
     expect(registry.decodeErrors.has('mika')).toBe(false);
     expect(onPeerLeft).toHaveBeenCalledWith('Mika');
+  });
+
+  it('clears manual spatial position on remove so stale pan does not leak to a rejoining nick', () => {
+    const registry = createRegistry();
+    registry.getOrCreate('Bob', '#root', 'voice');
+
+    // User pans Bob hard-left on the spatial pad.
+    registry.setPositionForNick('Bob', { x: -3.5, y: 0, z: 0.5 });
+    expect(spatialPositions(registry).has('bob')).toBe(true);
+
+    // Bob leaves the call — full teardown.
+    registry.remove('Bob');
+
+    // The stale manual position must not survive teardown: a different person
+    // later grabbing the recycled nick "bob" would otherwise be silently panned
+    // to the position the user set for the previous, unrelated Bob (and the map
+    // would grow unbounded across peer churn).
+    expect(spatialPositions(registry).has('bob')).toBe(false);
   });
 
   it('does not register over-cap peers or allocate decoders for them', async () => {
