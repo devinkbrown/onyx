@@ -53,6 +53,9 @@ System events (channel pins, user joins, calls, thread notices) are **skipped by
 
 All import processing happens in your browser. Your Discord export file is never uploaded, never sent over the network, and never reaches any server. Onyx doesn't call Discord's API; it only reads the JSON file you provide. Your history is yours, fully local, fully under your control.
 
-## Coming soon
+## Other sources
 
-Slack workspace exports and IRC server logs will use the same on-device import model—no accounts, no network calls, full privacy.
+The same on-device import model — no accounts, no network calls, full privacy — also covers:
+
+- **Slack** — request your workspace export (Slack → Settings & administration → Workspace settings → Import/Export Data), unzip it, and choose the per-channel JSON files under **Import from Slack**.
+- **IRC logs** — plain-text weechat, irssi, or mIRC logs. Under **Import an IRC log**, name the channel the log belongs to, then choose the file.
