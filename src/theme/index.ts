@@ -12,7 +12,11 @@
 export { ThemeProvider, useTheme, useThemeOptional, applyThemeToDom } from './ThemeProvider';
 export type { ThemeProviderProps } from './ThemeProvider';
 
-export { ThemeStudio } from './ThemeStudio';
+// ThemeStudio is intentionally NOT re-exported here. This barrel is eagerly
+// imported by index.tsx (for ThemeProvider), and without `sideEffects: false`
+// Rollup cannot tree-shake a re-exported module out of the entry chunk — so a
+// re-export would drag the ~2k-line studio into the bundle shipped on every
+// route. Consumers import it directly: `@/theme/ThemeStudio`.
 export type { ThemeStudioProps } from './ThemeStudio';
 
 export {

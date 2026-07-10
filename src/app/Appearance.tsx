@@ -1,6 +1,12 @@
 import { createMemo, createSignal, For, Show } from 'solid-js';
 import { Background, backgroundOptions, type BackgroundId } from '@/backgrounds';
-import { useTheme, THEMES, THEME_IDS, ThemeStudio, type ThemeId } from '@/theme';
+import { useTheme, THEMES, THEME_IDS, type ThemeId } from '@/theme';
+// Import ThemeStudio from its module directly, NOT via the '@/theme' barrel.
+// index.tsx eagerly imports that barrel for ThemeProvider, so re-exporting the
+// 2k-line ThemeStudio through it hoists ThemeStudio into the eager entry chunk
+// (shipped on every route incl. the landing). The direct import keeps it in
+// this lazy /appearance chunk, where it's the sole consumer.
+import { ThemeStudio } from '@/theme/ThemeStudio';
 import { useStore, getState } from '@/lib/store';
 import { AUTO_BACKGROUND_ID, resolveBackgroundId } from '@/shell/themeBackground';
 import './appearance.css';
