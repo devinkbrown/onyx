@@ -32,6 +32,13 @@ import {
   type PortableTransferSnapshot,
 } from '@/lib/vault/portableTransfer';
 import { localTranslationReadiness, preferredTranslationTarget } from '@/lib/intelligence/localLanguage';
+import {
+  TRANSLATION_TARGETS,
+  languageLabel,
+  resolveTranslationTarget,
+  setTranslationTarget,
+  translationTarget,
+} from '@/lib/intelligence/translateMessage';
 import { pwaReadiness } from '@/pwa/readiness';
 import { refreshInstalledAppShell } from '@/pwa/updateRecovery';
 import { CalmModeControl } from './CalmModeControl';
@@ -562,8 +569,19 @@ function ExtensionActionManifestControls(): JSX.Element {
 }
 
 function LocalLanguageTools(): JSX.Element {
-  const targetLanguage = createMemo(() => preferredTranslationTarget());
-  const translation = createMemo(() => localTranslationReadiness(targetLanguage()));
+  const effectiveTarget = createMemo(() =>
+    resolveTranslationTarget(translationTarget(), preferredTranslationTarget()),
+  );
+  const translation = createMemo(() => localTranslationReadiness(effectiveTarget()));
+  // Keep the controlled <select> value honest: if the resolved target (e.g. a browser
+  // locale like `sv`) isn't in the curated list, surface it as an extra option so the
+  // shown selection always matches the language captions actually translate to.
+  const targetOptions = createMemo<readonly string[]>(() => {
+    const current = effectiveTarget();
+    return (TRANSLATION_TARGETS as readonly string[]).includes(current)
+      ? TRANSLATION_TARGETS
+      : [current, ...TRANSLATION_TARGETS];
+  });
 
   return (
     <section class="pref-group pref-local-language" aria-labelledby="pref-local-language-title">
@@ -591,6 +609,25 @@ function LocalLanguageTools(): JSX.Element {
           </span>
         </div>
       </div>
+      <Show when={translation().state === 'available'}>
+        <div class="pref-local-language__target">
+          <label class="pref-label" for="pref-translation-target">Translation language</label>
+          <select
+            id="pref-translation-target"
+            class="pref-select"
+            value={effectiveTarget()}
+            onChange={(event) => setTranslationTarget(event.currentTarget.value)}
+          >
+            <For each={targetOptions()}>
+              {(code) => <option value={code}>{languageLabel(code)}</option>}
+            </For>
+          </select>
+          <p class="pref-desc">
+            On-device target for the caption Translate action. Text is translated in this
+            browser and never sent to an external endpoint.
+          </p>
+        </div>
+      </Show>
     </section>
   );
 }

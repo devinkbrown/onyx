@@ -1,5 +1,13 @@
-import { createMemo, createSignal, For, Show } from 'solid-js';
+import { createMemo, createSignal, For, onCleanup, Show } from 'solid-js';
 
+import { localTranslationReadiness, preferredTranslationTarget } from '@/lib/intelligence/localLanguage';
+import {
+  createBrowserTranslator,
+  languageLabel,
+  resolveTranslationTarget,
+  translateMessage,
+  translationTarget,
+} from '@/lib/intelligence/translateMessage';
 import { useStore } from '@/lib/store';
 import { ProvenanceBadge } from '@/shell/ProvenanceBadge';
 
@@ -10,6 +18,17 @@ type CaptionLine = {
   text: string;
   time: Date;
 };
+
+/** Per-caption translation state, keyed by a content-stable caption key. */
+type CaptionTranslation =
+  | { status: 'pending'; lang: string }
+  | { status: 'done'; text: string; lang: string }
+  | { status: 'error'; lang: string };
+
+/** Content-stable key for a caption line (lines scroll, so index is not stable). */
+function captionKey(line: CaptionLine): string {
+  return `${line.time.getTime()}|${line.nick}|${line.text}`;
+}
 
 function nickColor(nick: string) {
   let hash = 0;
@@ -56,6 +75,34 @@ export function CaptionsOverlay() {
     }
   };
 
+  // On-device translation: gated on the browser Translator probe, target from the stored
+  // preference (falling back to the browser locale). Output is transient, never persisted.
+  const [translations, setTranslations] = createSignal<Map<string, CaptionTranslation>>(new Map());
+  const target = createMemo(() => resolveTranslationTarget(translationTarget(), preferredTranslationTarget()));
+  const canTranslate = createMemo(() => localTranslationReadiness(target()).state === 'available');
+  const translator = createBrowserTranslator();
+
+  // Component runs once; guard async completions that land after unmount.
+  let disposed = false;
+  onCleanup(() => {
+    disposed = true;
+  });
+
+  const translateLine = async (line: CaptionLine) => {
+    const key = captionKey(line);
+    const lang = target();
+    setTranslations((prev) => new Map(prev).set(key, { status: 'pending', lang }));
+    try {
+      const result = await translateMessage(translator, { text: line.text }, lang);
+      if (disposed) return;
+      const text = result.translation?.translated ?? line.text;
+      setTranslations((prev) => new Map(prev).set(key, { status: 'done', text, lang }));
+    } catch {
+      if (disposed) return;
+      setTranslations((prev) => new Map(prev).set(key, { status: 'error', lang }));
+    }
+  };
+
   return (
     <Show when={visibleLines().length > 0}>
       <section
@@ -87,6 +134,11 @@ export function CaptionsOverlay() {
         <For each={visibleLines()}>
           {(line, index) => {
             const opacity = createMemo(() => 0.58 + ((index() + 1) / visibleLines().length) * 0.42);
+            const translation = createMemo(() => translations().get(captionKey(line)));
+            const doneTranslation = createMemo(() => {
+              const state = translation();
+              return state?.status === 'done' ? state : undefined;
+            });
             return (
               <p
                 class="voice-caption-line"
@@ -97,6 +149,30 @@ export function CaptionsOverlay() {
               >
                 <span class="voice-caption-speaker">{line.nick}</span>
                 <span class="voice-caption-text">{line.text}</span>
+                <Show when={canTranslate()}>
+                  <button
+                    class="voice-captions__copy voice-caption-translate"
+                    type="button"
+                    aria-label={`Translate ${line.nick}'s caption to ${languageLabel(target())}`}
+                    disabled={translation()?.status === 'pending'}
+                    onClick={() => void translateLine(line)}
+                  >
+                    {translation()?.status === 'pending' ? 'Translating…' : 'Translate'}
+                  </button>
+                </Show>
+                <Show when={doneTranslation()}>
+                  {(done) => (
+                    <span class="voice-caption-translation" data-lang={done().lang}>
+                      <ProvenanceBadge scope="device" subject="Caption translation" />
+                      <span class="voice-caption-text">{done().text}</span>
+                    </span>
+                  )}
+                </Show>
+                <Show when={translation()?.status === 'error'}>
+                  <span class="voice-caption-translation" role="status">
+                    On-device translation unavailable.
+                  </span>
+                </Show>
               </p>
             );
           }}
