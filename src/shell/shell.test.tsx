@@ -773,7 +773,7 @@ describe('AppShell', () => {
       expect(shell.getAttribute('style')).toContain('--room-accent-border: oklch(');
     });
 
-    it('shows the self nick in the ribbon', () => {
+    it('keeps the self nick out of the channel ribbon', () => {
       // Arrange
       seedStore('#general');
 
@@ -782,7 +782,8 @@ describe('AppShell', () => {
 
       // Assert
       const ribbon = getByRole('banner', { name: 'Channel information' });
-      expect(ribbon.textContent).toContain('testuser');
+      expect(ribbon.textContent).toContain('general');
+      expect(ribbon.textContent).not.toContain('testuser');
     });
 
     it('shows a "Guest" account chip that opens the account panel', () => {

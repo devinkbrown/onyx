@@ -7,12 +7,10 @@
  * SOLID IDIOMS: never destructure props; splitProps; createMemo.
  */
 
-import { createMemo, createSignal, For, onCleanup, Show, splitProps, type JSX } from 'solid-js';
+import { createMemo, createSignal, onCleanup, Show, splitProps, type JSX } from 'solid-js';
 import { useStore, getState, selectAccount, selectChannelEvent, selectChannelPins } from '@/lib/store';
 import { openPreferences } from '@/lib/prefs/preferences';
-import type { ChannelUser } from '@/lib/irc/types';
 import { eventCountdown, scheduledEventVisible } from '@/lib/notifications/scheduledEvents';
-import { Avatar } from '@/primitives/index';
 import { ChannelSettings } from './ChannelSettings';
 import { NotificationCenter } from './NotificationCenter';
 import { PresenceHeatline } from './PresenceHeatline';
@@ -22,20 +20,6 @@ export type PresenceRibbonProps = {
   onToggleMembers?: () => void;
   showJoinVoice?: boolean;
   onJoinVoice?: (withVideo: boolean) => void;
-};
-
-const FACEPILE_LIMIT = 6;
-
-export type FacepileEntry = {
-  nick: string;
-  owner: boolean;
-  away: boolean;
-};
-
-export type FacepileModel = {
-  visible: FacepileEntry[];
-  overflow: number;
-  total: number;
 };
 
 export type VoiceRoomStatusInput = {
@@ -55,38 +39,6 @@ export type VoiceRoomStatus = {
   label: string;
   ariaStatus: string;
 };
-
-function facepileRank(user: ChannelUser): number {
-  const modes = user.modes;
-  if (modes.has('Y')) return 0;
-  if (modes.has('Q')) return 1;
-  if (modes.has('q')) return 2;
-  if (modes.has('o')) return 3;
-  if (modes.has('v')) return 4;
-  return 5;
-}
-
-export function buildFacepile(users: readonly ChannelUser[], limit = FACEPILE_LIMIT): FacepileModel {
-  const cappedLimit = Math.max(0, Math.floor(limit));
-  const sorted = users
-    .filter((user) => user.nick.trim().length > 0)
-    .slice()
-    .sort((left, right) => {
-      const rankDelta = facepileRank(left) - facepileRank(right);
-      if (rankDelta !== 0) return rankDelta;
-      return left.nick.localeCompare(right.nick, undefined, { sensitivity: 'base' });
-    });
-
-  return {
-    visible: sorted.slice(0, cappedLimit).map((user) => ({
-      nick: user.nick,
-      owner: user.modes.has('Q') || user.modes.has('q') || user.modes.has('a'),
-      away: !!user.away,
-    })),
-    overflow: Math.max(0, sorted.length - cappedLimit),
-    total: sorted.length,
-  };
-}
 
 export function buildVoiceRoomStatus(input: VoiceRoomStatusInput): VoiceRoomStatus {
   const speakers = input.participants.filter((nick) => input.speakingNicks.has(nick));
@@ -149,7 +101,6 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     const view = s.activeView;
     return view.kind === 'channel' ? selectChannelEvent(view.channel)(s) : null;
   });
-  const ourNick = useStore((s) => s.ourNick);
   const account = useStore(selectAccount);
   const voice = useStore((s) => s.voice);
   const voiceChannelParticipants = useStore((s) => s.voiceChannelParticipants);
@@ -190,32 +141,9 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     return ch ? ch.users.size : 0;
   });
 
-  const facepile = createMemo(() => {
-    const ch = activeChannel();
-    if (!ch) return buildFacepile([]);
-    return buildFacepile([...ch.users.values()]);
-  });
-
-  const facepileLabel = createMemo(() => {
-    const model = facepile();
-    const names = model.visible.map((entry) => entry.nick).join(', ');
-    if (!names) return `${model.total} present`;
-    if (model.overflow > 0) return `${model.total} present: ${names}, and ${model.overflow} more`;
-    return `${model.total} present: ${names}`;
-  });
-
-  const displayNick = createMemo(() => local.selfNick ?? ourNick() ?? '');
-
   // Active channel name for the settings panel (display-cased, e.g. "#general").
   const settingsChannel = createMemo(() => activeChannel()?.name ?? null);
   const [settingsOpen, setSettingsOpen] = createSignal(false);
-
-  const connMod = createMemo(() => {
-    const s = connectionStatus();
-    if (s === 'connected') return '--connected';
-    if (s === 'connecting' || s === 'reconnecting') return '--connecting';
-    return '--disconnected';
-  });
 
   const connLabel = createMemo(() => {
     const s = connectionStatus();
@@ -399,7 +327,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                 title={ribbonEventLabel()}
                 onClick={handleEventChipClick}
               >
-                <span class="shell-ribbon-event-dot" aria-hidden="true" />
+                <span class="shell-ribbon-event-mark" aria-hidden="true" />
                 <span class="shell-ribbon-event-text">{ribbonEventLabel()}</span>
               </button>
             </Show>
@@ -412,7 +340,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                 title={[voiceParticipants().join(', '), voiceRoomStatus().label].filter(Boolean).join(' · ')}
                 onClick={handleVoiceChipClick}
               >
-                <span class="shell-ribbon-voice-dot" aria-hidden="true" />
+                <span class="shell-ribbon-voice-mark" aria-hidden="true" />
                 <span class="shell-ribbon-voice-text">{voiceChipLabel()}</span>
               </button>
             </Show>
@@ -446,32 +374,6 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                 </svg>
                 <span class="shell-ribbon-action-label">Video</span>
               </button>
-            </Show>
-            <Show when={facepile().total > 0}>
-              <div
-                class="shell-ribbon-facepile"
-                role="img"
-                aria-label={facepileLabel()}
-                title={facepileLabel()}
-              >
-                <For each={facepile().visible}>
-                  {(entry, index) => (
-                    <span
-                      class="shell-ribbon-face"
-                      classList={{ 'shell-ribbon-face--away': entry.away }}
-                      style={{ '--face-i': String(index()) }}
-                      aria-hidden="true"
-                    >
-                      <Avatar name={entry.nick} owner={entry.owner} size="sm" />
-                    </span>
-                  )}
-                </For>
-                <Show when={facepile().overflow > 0}>
-                  <span class="shell-ribbon-face-overflow" aria-hidden="true">
-                    +{facepile().overflow}
-                  </span>
-                </Show>
-              </div>
             </Show>
             <Show when={pinCount() > 0}>
               <button
@@ -582,15 +484,9 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
             onClick={() => getState().openAccount()}
             data-testid="ribbon-account-chip"
           >
-            <span class="shell-ribbon-account-glyph" aria-hidden="true">
-              {account() ? '◆' : '◌'}
-            </span>
             <span class="shell-ribbon-account-text">
               <Show when={account()} fallback={<span class="shell-ribbon-account-name">Guest</span>}>
                 {(acct) => <span class="shell-ribbon-account-name">{acct()}</span>}
-              </Show>
-              <Show when={displayNick() && displayNick() !== account()}>
-                <span class="shell-ribbon-account-nick">{displayNick()}</span>
               </Show>
             </span>
           </button>
@@ -606,10 +502,6 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
           aria-live="polite"
           aria-atomic="true"
         >
-          <span
-            class={`shell-ribbon-conn-dot shell-ribbon-conn-dot${connMod()}`}
-            aria-hidden="true"
-          />
           <span class="shell-ribbon-conn-label" aria-hidden="true">{connLabel()}</span>
           <span class="sr-only">Connection: {connLabel()}</span>
         </span>
