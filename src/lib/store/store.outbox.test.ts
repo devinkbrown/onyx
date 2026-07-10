@@ -11,6 +11,7 @@ import { IDBFactory } from 'fake-indexeddb';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { store } from './store';
+import { setPreference } from '@/lib/prefs/preferences';
 import type { Channel } from '@/lib/irc/types';
 import {
   OUTBOX_MAX_AGE_MS,
@@ -140,5 +141,50 @@ describe('offline outbox', () => {
     await until(async () => (await loadOutbox()).length === 0);
     expect(sendRaw).not.toHaveBeenCalled();
     expect(store.getState().toasts.some((t) => t.title.includes('expired'))).toBe(true);
+  });
+});
+
+describe('offline outbox — E2EE DMs never persist plaintext', () => {
+  it('refuses to queue an E2EE DM while offline (no plaintext at rest) and errors', async () => {
+    setPreference('e2eeDms', true);
+    // Peer published a device key → this DM would be sealed on the online path.
+    store.setState({ peerDmKeys: new Map([['trev', 'peer-device-key-b64']]) });
+
+    store.getState().sendMessage('trev', 'the vault password is hunter2');
+
+    // Give any async queueOutbox a chance to (wrongly) fire before asserting.
+    await new Promise((r) => setTimeout(r, 50));
+
+    // Nothing persisted — the plaintext never reached IndexedDB.
+    expect(await loadOutbox()).toEqual([]);
+    // And no pending placeholder was shown.
+    expect(store.getState().dms.get('trev')?.messages ?? []).toEqual([]);
+    // The user is told why, honestly.
+    expect(store.getState().toasts.some((t) => t.title.includes("Can't queue encrypted DM"))).toBe(true);
+  });
+
+  it('still queues a plaintext DM to a peer with no device key', async () => {
+    setPreference('e2eeDms', true);
+    store.setState({ peerDmKeys: new Map() }); // no key → not an E2EE DM
+
+    store.getState().sendMessage('bob', 'plain hello');
+
+    await until(async () => (await loadOutbox()).length === 1);
+    const [entry] = await loadOutbox();
+    expect(entry!.target).toBe('bob');
+    expect(entry!.text).toBe('plain hello');
+  });
+
+  it('still queues a plaintext DM when e2eeDms is off, even with a peer key', async () => {
+    setPreference('e2eeDms', false);
+    store.setState({ peerDmKeys: new Map([['trev', 'peer-device-key-b64']]) });
+
+    store.getState().sendMessage('trev', 'e2ee disabled, plain send');
+
+    await until(async () => (await loadOutbox()).length === 1);
+    const [entry] = await loadOutbox();
+    expect(entry!.target).toBe('trev');
+    expect(entry!.text).toBe('e2ee disabled, plain send');
+    setPreference('e2eeDms', true); // restore default for other suites
   });
 });

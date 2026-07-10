@@ -3128,6 +3128,22 @@ export const store = createStore<OnyxState>()(
       // reconnect via flushOutbox(). Slash commands never queue — replaying a
       // stale command into a fresh session is surprising, a message isn't.
       if ((!client || get().connectionStatus !== 'connected') && !text.startsWith('/')) {
+        // SECURITY: the outbox persists to IndexedDB as plaintext, and sealing
+        // only happens on the online send path (flushOutbox → sendMessage re-
+        // seals on reconnect). Queuing an E2EE DM here would therefore write
+        // plaintext at rest, breaking the "outbox only ever sees ciphertext"
+        // invariant above. Refuse rather than leak — the user can resend once
+        // reconnected. Non-E2EE DMs and channel messages queue as before.
+        const cp = client?.isupport.CHANTYPES ?? '#&';
+        const isDm = target.length > 0 && !cp.includes(target[0]!);
+        if (isDm && preferences().e2eeDms && get().peerDmKeys.has(target.toLowerCase())) {
+          get().addToast({
+            variant: 'error',
+            title: "Can't queue encrypted DM",
+            description: "Encrypted DMs aren't stored while offline — reconnect to send this message.",
+          });
+          return;
+        }
         void queueOutbox(target, text).then((entry) => {
           if (!entry) {
             get().addToast({ variant: 'error', title: 'Offline', description: 'Message could not be queued on this device.' });
