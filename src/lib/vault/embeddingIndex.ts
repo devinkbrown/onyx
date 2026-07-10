@@ -43,9 +43,14 @@ export function tokenize(text: string): string[] {
   return out;
 }
 
+/** Default FNV-1a 32-bit offset basis. */
+const FNV_OFFSET = 0x811c9dc5;
+/** Independent basis for the sign hash so it decorrelates from the bucket. */
+const FNV_SIGN_OFFSET = 0x9e3779b1;
+
 /** FNV-1a 32-bit hash — small, fast, deterministic, no dependencies. */
-function fnv1a(input: string): number {
-  let hash = 0x811c9dc5;
+function fnv1a(input: string, seed: number = FNV_OFFSET): number {
+  let hash = seed >>> 0;
   for (let i = 0; i < input.length; i += 1) {
     hash ^= input.charCodeAt(i);
     // hash * 16777619, kept in 32-bit unsigned range via Math.imul.
@@ -60,10 +65,16 @@ function fnv1a(input: string): number {
  * always reinforcing — the standard signed hashing-trick debias.
  */
 function bucketAndSign(token: string, dim: number): { bucket: number; sign: number } {
-  const h = fnv1a(token);
-  const bucket = h % dim;
-  // Re-hash with a salt for an independent sign bit.
-  const sign = (fnv1a(`${token}`) & 1) === 0 ? 1 : -1;
+  const bucket = fnv1a(token) % dim;
+  // Two independence hazards must both be avoided or the debias silently no-ops:
+  //   1. FNV-1a's lowest bit is linear (bit 0 of the output is the parity of the
+  //      seed XOR the low bits of every input byte), so a salted re-hash still
+  //      leaves bit 0 perfectly correlated with the original. Read a high,
+  //      well-mixed bit (bit 16) for the sign, never bit 0.
+  //   2. `bucket = h % dim` consumes the low log2(dim) bits of the SAME hash, so
+  //      the sign must come from an independent hash (distinct offset basis).
+  const signHash = fnv1a(token, FNV_SIGN_OFFSET);
+  const sign = ((signHash >>> 16) & 1) === 0 ? 1 : -1;
   return { bucket, sign };
 }
 

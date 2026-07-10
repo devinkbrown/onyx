@@ -61,6 +61,34 @@ describe('embed', () => {
   it('honors a custom dimensionality', () => {
     expect(embed('sized down', 32).length).toBe(32);
   });
+
+  it('derives the bucket sign independently of the bucket (signed-trick debias)', () => {
+    // A single 2+ char token embeds to exactly one non-zero entry: its signed
+    // unit weight (tf=1 → weight=1, then L2-normalized → ±1) at the token's
+    // bucket. Recover (bucket, sign) per token and confirm at least one bucket
+    // holds tokens of BOTH signs. If the sign were a function of the same hash
+    // bits as the bucket, every token sharing a bucket would share one sign and
+    // colliding tokens could only reinforce, never cancel — defeating the
+    // documented debias. This fails when the sign bit is drawn from the bucket.
+    const signsByBucket = new Map<number, Set<number>>();
+    for (let i = 0; i < 4000; i += 1) {
+      const vec = embed(`tok${i}`);
+      let bucket = -1;
+      let sign = 0;
+      for (let j = 0; j < vec.length; j += 1) {
+        if (vec[j] !== 0) {
+          bucket = j;
+          sign = Math.sign(vec[j]!);
+          break;
+        }
+      }
+      expect(bucket).toBeGreaterThanOrEqual(0);
+      if (!signsByBucket.has(bucket)) signsByBucket.set(bucket, new Set());
+      signsByBucket.get(bucket)!.add(sign);
+    }
+    const mixed = [...signsByBucket.values()].filter((s) => s.size === 2).length;
+    expect(mixed).toBeGreaterThan(0);
+  });
 });
 
 describe('cosineSimilarity', () => {
