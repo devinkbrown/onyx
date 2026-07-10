@@ -105,13 +105,7 @@ export function CaptionsOverlay() {
 
   return (
     <Show when={visibleLines().length > 0}>
-      <section
-        class="voice-captions"
-        role="log"
-        aria-live="polite"
-        aria-label="Live captions"
-        data-testid="captions-overlay"
-      >
+      <section class="voice-captions" data-testid="captions-overlay">
         <div class="voice-captions__head">
           <span>Live captions</span>
           <div class="voice-captions__tools">
@@ -131,7 +125,11 @@ export function CaptionsOverlay() {
             </Show>
           </div>
         </div>
-        <For each={visibleLines()}>
+        {/* The live region is scoped to the caption lines only — the toolbar above
+            (Copy transcript, provenance, copy-state) stays out of the announced feed,
+            so its controls are never read as new caption activity (SC 4.1.3). */}
+        <div class="voice-captions__log" role="log" aria-live="polite" aria-label="Live captions">
+          <For each={visibleLines()}>
           {(line, index) => {
             const opacity = createMemo(() => 0.58 + ((index() + 1) / visibleLines().length) * 0.42);
             const translation = createMemo(() => translations().get(captionKey(line)));
@@ -176,7 +174,8 @@ export function CaptionsOverlay() {
               </p>
             );
           }}
-        </For>
+          </For>
+        </div>
       </section>
     </Show>
   );

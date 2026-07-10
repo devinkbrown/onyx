@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
+import { fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { store } from '@/lib/store/store';
@@ -82,6 +82,24 @@ describe('voice overlays', () => {
     expect(screen.getByText('Aki')).toBeTruthy();
     expect(screen.getByText('Signal is clean.')).toBeTruthy();
     expect(screen.getByText('Moving to the relay room.')).toBeTruthy();
+  });
+
+  it('scopes the live-caption log to caption text, keeping toolbar controls out of the announced region', () => {
+    const mediaTranscripts = new Map([
+      ['#voice', [{ nick: 'Aki', text: 'Signal is clean.', time: new Date('2026-06-19T12:00:00Z') }]],
+    ]);
+    store.setState({ mediaTranscripts });
+    store.getState().setVoiceCallState({ callState: 'in_call', callChannel: '#voice', captionsEnabled: true });
+
+    render(() => <CaptionsOverlay />);
+
+    const log = screen.getByRole('log', { name: 'Live captions' });
+    // Caption text is inside the announced region.
+    expect(within(log).getByText('Signal is clean.')).toBeTruthy();
+    // The Copy-transcript control must live OUTSIDE the live region, so activating
+    // it (or its appearance) is never announced as new caption activity.
+    expect(within(log).queryByRole('button', { name: 'Copy live caption transcript' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Copy live caption transcript' })).toBeTruthy();
   });
 
   it('copies the current live caption transcript', async () => {

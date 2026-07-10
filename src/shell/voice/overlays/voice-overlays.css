@@ -220,6 +220,11 @@
   letter-spacing: 0.08em;
 }
 
+.voice-captions__log {
+  display: grid;
+  gap: 0.35rem;
+}
+
 .voice-caption-line {
   display: grid;
   grid-template-columns: minmax(4.2rem, max-content) minmax(0, 1fr);
