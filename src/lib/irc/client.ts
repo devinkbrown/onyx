@@ -9,6 +9,11 @@ import {
   type SaslMechanism,
 } from './parser';
 import type { IRCMessage, ISupport } from './types';
+import { serializeWatchTogetherProp } from '../media/watchTogetherController';
+import type { WatchTogetherActivity } from '../media/watchTogether';
+
+/** IRCX channel PROP key carrying the watch-together activity (wire format). */
+const WATCH_PROP = 'ocean.watch';
 
 export type IRCEventHandler = (msg: IRCMessage) => void;
 export type RawHandler = (line: string, direction: 'in' | 'out') => void;
@@ -311,6 +316,17 @@ export class IRCClient {
 
   whois(nick: string) {
     this.sendRaw('WHOIS', nick);
+  }
+
+  /**
+   * Publish a watch-together activity to a channel by SETting the `ocean.watch`
+   * PROP — the same IRCX PROP-set path every other channel prop uses
+   * (`_writeChannelProp` in the store). Passing `null` clears the prop (an empty
+   * trailing value deletes it server-side). No new wire command is introduced.
+   */
+  publishWatchTogether(channel: string, activity: WatchTogetherActivity | null) {
+    const value = activity ? serializeWatchTogetherProp(activity) : '';
+    this.sendRaw('PROP', channel, WATCH_PROP, value);
   }
 
   /**
