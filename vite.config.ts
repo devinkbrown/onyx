@@ -19,11 +19,14 @@ export default defineConfig({
           if (id.includes('/node_modules/solid-js/') || id.includes('/node_modules/@solidjs/')) {
             return 'solid';
           }
-          if (
-            id.includes('/src/lib/suimyaku-media/') ||
-            id.includes('/src/media/') ||
-            id.includes('/src/lib/store/')
-          ) {
+          // The media engine (voice/video, wasm codec) is NOT needed on first
+          // paint — only inside the lazy /app route once a call starts. Keep it
+          // in its own `media` chunk so it stays out of the eager `runtime`
+          // (store) chunk that the landing page pulls in via vaultSync.
+          if (id.includes('/src/lib/suimyaku-media/') || id.includes('/src/media/')) {
+            return 'media';
+          }
+          if (id.includes('/src/lib/store/')) {
             return 'runtime';
           }
         },

@@ -35,20 +35,15 @@ function base64ToBytes(b64: string): Uint8Array {
 
 export type { CallState, VoiceCallState, MediaKind, SuimyakuPeerState, SuimyakuRoomStats, NetworkQualityTier, SuimyakuMediaCallbacks, SuimyakuChannelInfo };
 
-// The mounted engine is a cross-module singleton. It MUST live on globalThis,
-// not a module-local `let`: the store (getMounted…) and the useSuimyakuMedia hook
-// (setMounted…) can be bundled into separate chunks with separate module
-// instances, in which case a module-local leaves the store reading null forever
-// — so joinVoiceChannel no-ops and voice/video never starts.
-const MOUNTED_ENGINE_KEY = '__oceanMountedSuimyakuEngine';
-
-export function setMountedSuimyakuMediaEngine(engine: SuimyakuMediaEngine | null): void {
-  (globalThis as Record<string, unknown>)[MOUNTED_ENGINE_KEY] = engine;
-}
-
-export function getMountedSuimyakuMediaEngine(): SuimyakuMediaEngine | null {
-  return ((globalThis as Record<string, unknown>)[MOUNTED_ENGINE_KEY] as SuimyakuMediaEngine | null) ?? null;
-}
+// The mounted engine is a cross-module globalThis-backed singleton. The
+// accessors live in `@/lib/mediaEngineMount` so the eager store can read the
+// mounted engine WITHOUT statically pulling this heavy module into the initial
+// bundle. Re-exported here to preserve this module's public surface for the
+// lazy-loaded media call sites (useSuimyakuMedia, VoiceBar) and their tests.
+export {
+  getMountedSuimyakuMediaEngine,
+  setMountedSuimyakuMediaEngine,
+} from '@/lib/mediaEngineMount';
 
 // -------------------------------------------------------------------
 // Internal constants

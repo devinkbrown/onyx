@@ -6,7 +6,7 @@ import { parseMultilineLimits, planMultilineBatches, buildMultilineLines, assemb
 import { clearSessionToken, loadCredentials, storeMeshToken, storeSessionToken } from '@/lib/credentials';
 import { escapeTagValue, parseAccountInfo, parseCHANLIMIT, parseMonitorNumeric, parseNamesPrefix, parsePREFIX, parseSessionMeshTokenNote, parseSessionTokenNote, parseStandardReply } from '@/lib/irc/parser';
 import type { SuimyakuPeerState, SuimyakuRoomStats, CallState } from '@/lib/suimyaku-media/types';
-import { getMountedSuimyakuMediaEngine } from '@/lib/suimyaku-media/MediaEngine';
+import { getMountedSuimyakuMediaEngine } from '@/lib/mediaEngineMount';
 import { parseActivity } from '@/lib/activity';
 import { OUTBOX_MAX_AGE_MS, deleteOutboxEntry, loadAround, loadOutbox, loadRecent, queueOutbox, type OutboxEntry } from '@/lib/vault/historyVault';
 import { deviceKeys, isEnvelope, openDm, sealDm } from '@/lib/e2ee/dmCipher';
