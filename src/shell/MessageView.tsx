@@ -16,6 +16,7 @@
 
 import { preferences } from '@/lib/prefs/preferences';
 import { listTopics, summarizeTopics } from '@/lib/search/topicFilter';
+import { suggestTopic } from '@/lib/topics/suggestTopic';
 import { bucketUnreadByTopic, isValidTopicLabel, parseTopicRegistry, TOPIC_PROP } from '@/lib/topics/topics';
 import { followed, isFollowed, toggleFollow } from '@/lib/notifications/followed';
 import {
@@ -45,7 +46,7 @@ import { Sheet } from '@/primitives/index';
 import { MessageText } from '@/shell/message/MessageText';
 import { MessageMenu } from '@/shell/message/MessageMenu';
 import { activeMessageSearchResultId, openMessageSearchWithQuery } from './search/useMessageSearch';
-import { TopicFilterBar } from './TopicChip';
+import { TopicChip, TopicFilterBar } from './TopicChip';
 import { BoostBar } from './BoostBar';
 import { SinceDigestCard } from './SinceDigestCard';
 
@@ -479,6 +480,26 @@ function MsgBody(props: MsgBodyProps): JSX.Element {
       onChannelClick={local.onChannelClick}
       class={cls()}
     />
+  );
+}
+
+type SplitTopicActionProps = {
+  msg: ChatMessage;
+  label: string;
+  onSplit: (msg: ChatMessage, label: string) => void;
+};
+
+function SplitTopicAction(props: SplitTopicActionProps): JSX.Element {
+  const [local] = splitProps(props, ['msg', 'label', 'onSplit']);
+
+  return (
+    <Show when={!local.msg.topic && local.label.length > 0}>
+      <TopicChip
+        label={local.label}
+        onSplit={(label) => local.onSplit(local.msg, label)}
+        splitAriaLabel={`Split message from ${local.msg.from} into topic ${local.label}`}
+      />
+    </Show>
   );
 }
 
@@ -1026,6 +1047,14 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     setTopicDraft('');
   }
 
+  function splitMessageIntoThread(message: ChatMessage, label: string): void {
+    const view = activeView();
+    if (view.kind !== 'channel') return;
+    getState().splitTopicIntoThread(view.channel, message.id, label);
+    setForumView(false);
+    setRevealedId(null);
+  }
+
   // ── tap-to-reveal action bar (touch) ──
   // On touch devices there is no hover, so the per-message action bar (react /
   // reply / ⋯) stays hidden until the row is tapped — it would otherwise crowd
@@ -1301,6 +1330,11 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                 // A message has a thread if there's at least one reply to it
                 return messages().some((m) => m.replyTo?.id === msg.id);
               });
+              const splitTopicLabel = createMemo(() => {
+                const view = activeView();
+                if (view.kind !== 'channel' || !preferences().topicTools || msg.topic) return '';
+                return suggestTopic(msg);
+              });
 
               // Per-row overflow-menu open state, so a right-click anywhere on
               // the row opens the same ⋯ menu the action bar exposes.
@@ -1357,6 +1391,11 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                         )}
                       </Show>
                       <MsgBody msg={msg} selfNick={selfNick()} onChannelClick={(name) => getState().navigate({ kind: 'channel', channel: name })} />
+                      <SplitTopicAction
+                        msg={msg}
+                        label={splitTopicLabel()}
+                        onSplit={splitMessageIntoThread}
+                      />
                       <Show when={hasBoosts()}>
                         <div class="shell-boosts">
                           <BoostBar boosts={boostGroups()} onBoost={toggleBoost} />
@@ -1432,6 +1471,11 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                       )}
                     </Show>
                     <MsgBody msg={msg} selfNick={selfNick()} onChannelClick={(name) => getState().navigate({ kind: 'channel', channel: name })} />
+                    <SplitTopicAction
+                      msg={msg}
+                      label={splitTopicLabel()}
+                      onSplit={splitMessageIntoThread}
+                    />
                     <Show when={hasBoosts()}>
                       <div class="shell-boosts">
                         <BoostBar boosts={boostGroups()} onBoost={toggleBoost} />

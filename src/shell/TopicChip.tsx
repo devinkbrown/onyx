@@ -14,6 +14,8 @@ export type TopicChipProps = {
   unread?: number;
   active?: boolean;
   onClick?: (label: string) => void;
+  onSplit?: (label: string) => void;
+  splitAriaLabel?: string;
 };
 
 export type TopicFilterBarProps = {
@@ -40,24 +42,56 @@ function TopicChipContent(props: { label: string; unread?: number }): JSX.Elemen
 export function TopicChip(props: TopicChipProps): JSX.Element {
   return (
     <Show
-      when={props.onClick}
+      when={props.onSplit}
       keyed
       fallback={
-        <span class="topic-chip" classList={{ 'is-active': props.active === true }}>
-          <TopicChipContent label={props.label} unread={props.unread} />
-        </span>
+        <Show
+          when={props.onClick}
+          keyed
+          fallback={
+            <span class="topic-chip" classList={{ 'is-active': props.active === true }}>
+              <TopicChipContent label={props.label} unread={props.unread} />
+            </span>
+          }
+        >
+          {(handleClick) => (
+            <button
+              type="button"
+              class="topic-chip"
+              classList={{ 'is-active': props.active === true }}
+              aria-pressed={props.active}
+              onClick={() => handleClick(props.label)}
+            >
+              <TopicChipContent label={props.label} unread={props.unread} />
+            </button>
+          )}
+        </Show>
       }
     >
-      {(handleClick) => (
-        <button
-          type="button"
-          class="topic-chip"
-          classList={{ 'is-active': props.active === true }}
-          aria-pressed={props.active}
-          onClick={() => handleClick(props.label)}
-        >
+      {(handleSplit) => (
+        <span class="topic-chip" classList={{ 'is-active': props.active === true }}>
           <TopicChipContent label={props.label} unread={props.unread} />
-        </button>
+          <button
+            type="button"
+            class="topic-chip__split"
+            style={{
+              border: '0',
+              background: 'transparent',
+              color: 'inherit',
+              cursor: 'pointer',
+              'font-family': 'inherit',
+              'font-size': '0.68rem',
+              'font-weight': 800,
+              padding: '0',
+              'text-decoration': 'underline',
+              'text-underline-offset': '0.12rem',
+            }}
+            aria-label={props.splitAriaLabel ?? `Split into topic ${props.label}`}
+            onClick={() => handleSplit(props.label)}
+          >
+            Split
+          </button>
+        </span>
       )}
     </Show>
   );

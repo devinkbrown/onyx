@@ -24,7 +24,14 @@ import {
 import { AI_POLICY_PROP, parseAiPolicyProp, type AiPolicy } from '@/lib/irc/aiPolicyProp';
 import { preferences } from '@/lib/prefs/preferences';
 import { parseEventTime } from '@/lib/deeplink';
-import { isValidTopicLabel, parseMessageTopic, topicMessageTag } from '@/lib/topics/topics';
+import {
+  isValidTopicLabel,
+  MAX_TOPIC_REGISTRY,
+  parseMessageTopic,
+  parseTopicRegistry,
+  TOPIC_PROP,
+  topicMessageTag,
+} from '@/lib/topics/topics';
 import { isFollowed } from '@/lib/notifications/followed';
 import { parseScheduledEvent, type ScheduledEvent } from '@/lib/notifications/scheduledEvents';
 import {
@@ -752,6 +759,7 @@ export interface OnyxState {
   /** channel.toLowerCase() → selected topic; missing means the whole room */
   activeChannelTopics: Map<string, string>;
   setActiveChannelTopic(channel: string, topic: string | null): void;
+  splitTopicIntoThread(channel: string, messageId: string, label: string): void;
 
   // ── Media Gallery Panel ───────────────────────────────────────────────────
   showMediaGallery: boolean;
@@ -3650,6 +3658,44 @@ export const store = createStore<OnyxState>()(
         else if (clean) return {};
         else activeChannelTopics.delete(key);
         return { activeChannelTopics };
+      });
+    },
+
+    splitTopicIntoThread(channel, messageId, label) {
+      const key = channel.toLowerCase();
+      const clean = label.trim();
+      if (!messageId || !isValidTopicLabel(clean)) return;
+
+      const existingChannel = get().channels.get(key);
+      if (!existingChannel?.messages.some((message) => message.id === messageId)) return;
+
+      const registry = parseTopicRegistry(get().channelProps.get(key)?.[TOPIC_PROP]);
+      const registeredLabel = registry.find((topic) => topic.toLowerCase() === clean.toLowerCase());
+      const topic = registeredLabel ?? clean;
+      if (!registeredLabel) {
+        const nextRegistry = [...registry, topic].slice(-MAX_TOPIC_REGISTRY);
+        get()._writeChannelProp(channel, TOPIC_PROP, nextRegistry.join(','));
+      }
+
+      set(s => {
+        const currentChannel = s.channels.get(key);
+        if (!currentChannel) return {};
+
+        let changed = false;
+        const messages = currentChannel.messages.map((message) => {
+          if (message.id !== messageId) return message;
+          if (message.topic === topic) return message;
+          changed = true;
+          return { ...message, topic };
+        });
+        const activeChannelTopics = new Map(s.activeChannelTopics);
+        activeChannelTopics.set(key, topic);
+
+        if (!changed) return { activeChannelTopics };
+
+        const channels = new Map(s.channels);
+        channels.set(key, { ...currentChannel, messages });
+        return { channels, activeChannelTopics };
       });
     },
 
