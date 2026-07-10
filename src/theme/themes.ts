@@ -55,6 +55,7 @@ export type ThemeId =
   | 'sumi'
   | 'shu'
   | 'hisui'
+  | 'pine'
   | 'kohaku'
   | 'terracotta'
   | 'teal'
@@ -626,6 +627,71 @@ const hisuiTokens: TokenMap = {
 };
 
 // ---------------------------------------------------------------------------
+// pine — EVERGREEN: deep old-growth forest. A cool pine-green canopy leads over
+// an umber-black forest-floor ground, with a mossy lichen chartreuse as the
+// analogous second — a distinct, deeper, more coniferous green than the jade
+// (hisui) cut. No brass, no gold, no blue.
+// Seed { dark, primary 142, accent 110, depth .85, vibrancy .55, warmth -.1,
+// contrast 10 } — pure engine output (the seed IS the soul; only the chrome
+// tokens below — seams/radii/motion/fonts — are hand-set), re-run through enforceAA.
+// ---------------------------------------------------------------------------
+const pineTokens: TokenMap = {
+  // Ground — forest-floor strata: umber-black → deep pine shadow
+  '--ink':        '#000300',
+  '--ink-2':      '#010501',
+  '--stone':      '#060e05',
+  '--stone-2':    '#0e170d',
+  '--stone-3':    '#182116',
+  '--stone-line': '#1e2c1b',
+
+  // Pine — cool coniferous green primary (the namesake canopy leads)
+  '--lapis':        '#3b9f32',
+  '--lapis-bright': '#79d070',
+  '--lapis-deep':   '#065f00',
+
+  // Lichen — mossy chartreuse analogous second accent (NOT gold)
+  '--gold':        '#a5a51a',
+  '--gold-bright': '#cdcf62',
+  '--gold-deep':   '#686800',
+
+  // Shu — the hot/danger accent stays vermilion
+  '--shu':        '#e95047',
+  '--shu-bright': '#ff7f72',
+
+  // Text — pale sage over the forest floor
+  '--washi':      '#d8e1d6',
+  '--washi-dim':  '#939b91',
+  '--washi-mute': '#5c675a',
+
+  // Status
+  '--ok':      '#5bc78e',
+  '--warn':    '#e6d08c', // warnings stay WARM — decoupled from the lichen second accent
+  '--danger':  'var(--shu)',
+
+  // Seams follow the pine PRIMARY (never a hard-coded gold) + lichen bands
+  '--seam':       'color-mix(in oklab, var(--lapis) 38%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--lapis) 15%, transparent)',
+  '--line':       'color-mix(in oklab, var(--washi) 14%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--gold) 11%, transparent)',
+
+  // Radius — organic, softly rounded
+  '--r-0':    '0px',
+  '--r-sm':   '3px',
+  '--r-md':   '7px',
+  '--r-pill': '999px',
+
+  // Motion
+  '--ease': 'cubic-bezier(0.16, 1, 0.3, 1)',
+  '--dur':  '250ms',
+
+  // Typography
+  '--font-mono':    "'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace",
+  '--font-display': "'Anton', 'Arial Narrow', 'Helvetica Neue', sans-serif",
+  '--font-sans':    "'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  '--font-serif':   "'Fraunces Variable', 'Iowan Old Style', Georgia, 'Times New Roman', serif",
+};
+
+// ---------------------------------------------------------------------------
 // kohaku — AMBER resin: amber is the primary (warmer and more orange than the
 // onyx gold), honey the second. Legitimately warm, but distinct from onyx.
 // Seed { dark, primary 70, accent 62, depth .78, vibrancy .72, warmth .85,
@@ -1009,6 +1075,14 @@ export const THEMES: Record<ThemeId, ThemeMeta> = {
     scheme: 'dark',
     signatureBg: 'forest',
     tokens: hisuiTokens,
+  },
+  pine: {
+    id: 'pine',
+    label: 'Pine',
+    description: 'Deep old-growth pine — cool coniferous canopy over umber forest floor, mossy lichen second.',
+    scheme: 'dark',
+    signatureBg: 'mist',
+    tokens: pineTokens,
   },
   kohaku: {
     id: 'kohaku',

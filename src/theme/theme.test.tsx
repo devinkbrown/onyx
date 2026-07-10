@@ -470,6 +470,73 @@ describe('Terracotta theme', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 8c. Pine — the deep-forest verdant dark theme, derived through the factory
+//     from its recorded seed (no hand-picked hex that bypasses the solver).
+// ---------------------------------------------------------------------------
+
+describe('Pine theme', () => {
+  // The seed recorded in the theme's comment block in themes.ts.
+  const PINE_SEED: PaletteSeed = {
+    scheme: 'dark',
+    primaryHue: 142,
+    accentHue: 110,
+    depth: 0.85,
+    vibrancy: 0.55,
+    warmth: -0.1,
+    contrast: 10,
+  };
+
+  // Colour tokens the factory owns (chrome tokens — seams/radii/motion/fonts —
+  // are hand-set and excluded from this equality check).
+  const GENERATED_TOKENS = [
+    '--ink', '--ink-2', '--stone', '--stone-2', '--stone-3', '--stone-line',
+    '--lapis', '--lapis-bright', '--lapis-deep',
+    '--gold', '--gold-bright', '--gold-deep',
+    '--shu', '--shu-bright',
+    '--washi', '--washi-dim', '--washi-mute',
+    '--ok', '--warn',
+  ];
+
+  it('is registered as a dark built-in in the picker', () => {
+    expect(THEME_IDS).toContain('pine');
+    expect(THEMES.pine).toBeDefined();
+    expect(THEMES.pine.scheme).toBe('dark');
+    expect(THEMES.pine.label).toBe('Pine');
+  });
+
+  it('pairs with an existing background scene variant', () => {
+    expect(THEMES.pine.signatureBg).toBeTruthy();
+  });
+
+  it('every registered colour token equals the factory output for its seed', () => {
+    const generated = enforceAA(generatePalette(PINE_SEED), 'dark');
+    for (const key of GENERATED_TOKENS) {
+      expect(THEMES.pine.tokens[key], key).toBe(generated[key]);
+    }
+  });
+
+  it('passes every WCAG AA pair via auditPalette (regenerated + as-registered)', () => {
+    const regenerated = enforceAA(generatePalette(PINE_SEED), 'dark');
+    for (const tokens of [regenerated, THEMES.pine.tokens]) {
+      for (const row of auditPalette(tokens)) {
+        expect(row.pass, `${row.fg} on ${row.bg} = ${row.ratio} (min ${row.min})`).toBe(true);
+      }
+    }
+  });
+
+  it('keeps the pine primary hue in the green band, well outside the banned arc', () => {
+    const primary = hexToOklch(THEMES.pine.tokens['--lapis']!)!;
+    expect(primary.h < 258 || primary.h > 342, `lapis hue ${primary.h.toFixed(1)}`).toBe(true);
+    // A cool coniferous green: comfortably inside the 120–160° green band.
+    expect(primary.h).toBeGreaterThan(120);
+    expect(primary.h).toBeLessThan(160);
+    // And distinct from jade (hisui) — a different, deeper green hue.
+    const jade = hexToOklch(THEMES.hisui.tokens['--lapis']!)!;
+    expect(Math.abs(primary.h - jade.h)).toBeGreaterThan(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 7. Ocean family — flagship + sub-variants
 // ---------------------------------------------------------------------------
 
