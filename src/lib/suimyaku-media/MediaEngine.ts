@@ -222,6 +222,14 @@ export class SuimyakuMediaEngine {
   /* Worker-path state (Chromium: MediaStreamTrackProcessor + OffscreenCanvas) */
   private vidWorker:    Worker | null = null;
   private workerReady   = false;
+  /* Cloned video track retained on the MAIN thread in the readable-stream
+   * worker path (MediaStreamTrackProcessor consumes it here; only its
+   * `.readable` is transferred). Terminating the worker does NOT stop this
+   * clone — it is an independent handle on the camera source — so it must be
+   * stopped explicitly on teardown or the camera stays live. Null in the
+   * transferable-track path, where the clone is moved into the worker and dies
+   * with terminate(). */
+  private vidWorkerTrack: MediaStreamTrack | null = null;
 
   private speakingCtx:   AudioContext | null = null;
   private speakingTimer: ReturnType<typeof setInterval> | null = null;
@@ -704,6 +712,9 @@ export class SuimyakuMediaEngine {
           { ...initBase, readable },
           [readable] as unknown as Transferable[],
         );
+        /* The clone stays live on this thread feeding the processor; retain it
+         * so stopVideoCapture() can stop it (worker terminate alone won't). */
+        this.vidWorkerTrack = clonedTrack;
         return;
       } catch {
         /* readable transfer failed too — fall through to main-thread path. */
@@ -820,6 +831,13 @@ export class SuimyakuMediaEngine {
       this.vidWorker.terminate();
       this.vidWorker   = null;
       this.workerReady = false;
+    }
+    /* Stop the main-thread clone retained by the readable-stream path. The
+     * worker terminate above does not release it (it is an independent handle
+     * on the camera source); without this the camera light stays on. */
+    if (this.vidWorkerTrack) {
+      this.vidWorkerTrack.stop();
+      this.vidWorkerTrack = null;
     }
     /* Fallback path teardown. */
     if (this.vidFrameTimer) clearInterval(this.vidFrameTimer);
