@@ -222,7 +222,13 @@ export function WatchTogetherActivity(): JSX.Element {
 
           <Show when={safeHttpUrl(item().url)}>
             {(url) => (
-              <a class="shell-watch-together__open" href={url()} target="_blank" rel="noreferrer noopener">
+              <a
+                class="shell-watch-together__open"
+                href={url()}
+                target="_blank"
+                rel="noreferrer noopener"
+                aria-label={`Open ${item().title} in a new tab`}
+              >
                 Open
               </a>
             )}

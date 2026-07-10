@@ -50,6 +50,21 @@ const TIER_META: Record<NetworkQualityTier, { label: string; color: string; bars
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '👏', '🔥', '😮', '✋'] as const;
 const SPATIAL_PAD_SIZE_PX = 132;
 const SPATIAL_PAD_KEY_STEP = 0.125;
+const SPATIAL_PAD_HELP_ID = 'voice-spatial-pad-help';
+
+/** Human-readable readout of a spatial position, for the pad's live announcement.
+ *  Screen readers driving the pad with the arrow keys get no visual dot feedback,
+ *  so the position must be exposed as text (WCAG 4.1.2 Name, Role, Value). */
+function spatialPadDescription(pos: SpatialAudioPosition): string {
+  const pad = positionToPadPoint(pos);
+  const horizontal = pad.x < -0.05 ? 'left' : pad.x > 0.05 ? 'right' : null;
+  const depth = pad.y < -0.05 ? 'front' : pad.y > 0.05 ? 'behind' : null;
+  if (!horizontal && !depth) return 'Centered';
+  const parts: string[] = [];
+  if (horizontal) parts.push(`${horizontal} ${Math.round(Math.abs(pad.x) * 100)}%`);
+  if (depth) parts.push(`${depth} ${Math.round(Math.abs(pad.y) * 100)}%`);
+  return parts.join(', ');
+}
 
 type SpatialRegistryBridge = {
   readonly registry?: {
@@ -239,6 +254,7 @@ export function VoiceBar() {
     if (count > 1) return `${count} positioned`;
     return 'Balanced stereo';
   });
+  const spatialPositionLabel = createMemo(() => spatialPadDescription(activeSpatialPosition()));
 
   const handleToggleMute = () => getState().toggleMute();
   const handleToggleDeafen = () => getState().toggleDeafen();
@@ -568,7 +584,10 @@ export function VoiceBar() {
                           ref={spatialPadRef}
                           role="application"
                           tabindex="0"
-                          aria-label={`Spatial position for ${nick()}`}
+                          aria-roledescription="spatial audio position pad"
+                          aria-label={`Spatial position for ${nick()}: ${spatialPositionLabel()}`}
+                          aria-describedby={SPATIAL_PAD_HELP_ID}
+                          aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Home"
                           data-testid="spatial-audio-pad"
                           style={{
                             width: `${SPATIAL_PAD_SIZE_PX}px`,
@@ -621,6 +640,16 @@ export function VoiceBar() {
                             }}
                           />
                         </div>
+                        <span id={SPATIAL_PAD_HELP_ID} class="sr-only">
+                          Use the arrow keys to move {nick()} around you; Home recenters.
+                        </span>
+                        <span
+                          class="sr-only"
+                          aria-live="polite"
+                          data-testid="spatial-audio-position"
+                        >
+                          {spatialPositionLabel()}
+                        </span>
                         <div
                           role="group"
                           aria-label="Spatial audio participants"

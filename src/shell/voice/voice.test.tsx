@@ -561,6 +561,31 @@ describe('VoiceBar', () => {
     expect(screen.getByText('2 positioned')).toBeInTheDocument();
   });
 
+  it('exposes the spatial pad position to assistive tech and updates it from the keyboard', () => {
+    // Arrange — one peer to position; media available so the pad renders.
+    seedVoiceStore([makePeer('alice')]);
+    store.setState({ mediaAvailable: true });
+
+    // Act — open the popover and reach the pad.
+    const { getByTestId } = render(() => <VoiceBar />);
+    fireEvent.click(getByTestId('spatial-audio-button'));
+    const pad = getByTestId('spatial-audio-pad');
+
+    // Assert — keyboard-operable widget with an exposed value (WCAG 4.1.2).
+    expect(pad).toHaveAttribute('tabindex', '0');
+    expect(pad).toHaveAttribute('aria-describedby', 'voice-spatial-pad-help');
+    expect(pad.getAttribute('aria-label')).toMatch(/^Spatial position for alice: /);
+
+    const readout = getByTestId('spatial-audio-position');
+    expect(readout).toHaveAttribute('aria-live', 'polite');
+    expect(readout).toHaveTextContent('Centered');
+
+    // Arrow keys move the source and the readout announces the new position.
+    fireEvent.keyDown(pad, { key: 'ArrowRight' });
+    expect(readout).toHaveTextContent(/right/i);
+    expect(pad.getAttribute('aria-label')).toMatch(/right/i);
+  });
+
   it('disables spatial audio controls when media is unavailable', () => {
     // Arrange
     seedVoiceStore([]);
