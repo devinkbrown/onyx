@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   COMPOSER_DRAFTS_KEY,
+  MAX_COMPOSER_DRAFTS,
+  MAX_DRAFT_LEN,
   composerDraftKey,
   getComposerDraft,
   loadComposerDrafts,
@@ -53,5 +55,54 @@ describe('composer draft logic', () => {
     storage.setItem(COMPOSER_DRAFTS_KEY, '{"#root":"old"}');
     saveComposerDrafts({}, storage);
     expect(storage.getItem(COMPOSER_DRAFTS_KEY)).toBeNull();
+  });
+
+  it('truncates an over-long draft to MAX_DRAFT_LEN on set', () => {
+    const long = 'a'.repeat(MAX_DRAFT_LEN + 500);
+    const next = setComposerDraft({}, '#root', long);
+    expect(next['#root']).toHaveLength(MAX_DRAFT_LEN);
+    expect(getComposerDraft(next, '#root')).toBe('a'.repeat(MAX_DRAFT_LEN));
+  });
+
+  it('truncates an over-long draft to MAX_DRAFT_LEN on load', () => {
+    const storage = makeStorage();
+    const long = 'b'.repeat(MAX_DRAFT_LEN + 42);
+    storage.setItem(COMPOSER_DRAFTS_KEY, JSON.stringify({ '#root': long }));
+    expect(loadComposerDrafts(storage)['#root']).toHaveLength(MAX_DRAFT_LEN);
+  });
+
+  it('caps stored drafts at MAX_COMPOSER_DRAFTS keeping the first N by insertion order', () => {
+    const oversized: Record<string, string> = {};
+    for (let i = 0; i < MAX_COMPOSER_DRAFTS + 10; i += 1) {
+      oversized[`#chan${i}`] = `draft ${i}`;
+    }
+
+    const loaded = loadComposerDrafts(
+      (() => {
+        const storage = makeStorage();
+        storage.setItem(COMPOSER_DRAFTS_KEY, JSON.stringify(oversized));
+        return storage;
+      })(),
+    );
+    expect(Object.keys(loaded)).toHaveLength(MAX_COMPOSER_DRAFTS);
+    expect(loaded['#chan0']).toBe('draft 0');
+    expect(loaded[`#chan${MAX_COMPOSER_DRAFTS - 1}`]).toBe(`draft ${MAX_COMPOSER_DRAFTS - 1}`);
+    expect(loaded['#chan' + MAX_COMPOSER_DRAFTS]).toBeUndefined();
+  });
+
+  it('does not persist a new target once the count cap is reached, but still updates existing ones', () => {
+    let drafts: Record<string, string> = {};
+    for (let i = 0; i < MAX_COMPOSER_DRAFTS; i += 1) {
+      drafts = setComposerDraft(drafts, `#chan${i}`, `draft ${i}`);
+    }
+    expect(Object.keys(drafts)).toHaveLength(MAX_COMPOSER_DRAFTS);
+
+    const overflow = setComposerDraft(drafts, '#overflow', 'nope');
+    expect(overflow['#overflow']).toBeUndefined();
+    expect(Object.keys(overflow)).toHaveLength(MAX_COMPOSER_DRAFTS);
+
+    const updated = setComposerDraft(drafts, '#chan0', 'edited');
+    expect(updated['#chan0']).toBe('edited');
+    expect(Object.keys(updated)).toHaveLength(MAX_COMPOSER_DRAFTS);
   });
 });
