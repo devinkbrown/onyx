@@ -14,6 +14,8 @@ import { eventCountdown, scheduledEventVisible } from '@/lib/notifications/sched
 import { ChannelSettings } from './ChannelSettings';
 import { NotificationCenter } from './NotificationCenter';
 import { PresenceHeatline } from './PresenceHeatline';
+import { Facepile } from './Facepile';
+import { facepileInputsFromUsers } from './facepile';
 
 export type PresenceRibbonProps = {
   selfNick?: string;
@@ -139,6 +141,13 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   const memberCount = createMemo(() => {
     const ch = activeChannel();
     return ch ? ch.users.size : 0;
+  });
+
+  // Facepile roster — reuses the same activeChannel() read as the member count,
+  // adapting the channel's user map into the pure facepile inputs.
+  const facepileMembers = createMemo(() => {
+    const ch = activeChannel();
+    return ch ? facepileInputsFromUsers(ch.users.values()) : [];
   });
 
   // Active channel name for the settings panel (display-cased, e.g. "#general").
@@ -310,6 +319,11 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
         {/* Live 24h activity rhythm (channels only) — hides when there's none. */}
         <Show when={activeView().kind === 'channel'}>
           <PresenceHeatline channel={() => (activeView().kind === 'channel' ? channelName() : null)} />
+        </Show>
+
+        {/* Presence-as-place: who's in the room right now (channels only). */}
+        <Show when={activeView().kind === 'channel'}>
+          <Facepile members={facepileMembers} />
         </Show>
       </div>
 
