@@ -37,6 +37,7 @@ import { ChannelSidebar } from './ChannelSidebar';
 import { HomeView } from './HomeView';
 const ChannelBrowser = lazy(() => import('./ChannelBrowser'));
 import { PresenceRibbon } from './PresenceRibbon';
+import { GuestClaimPrompt } from './GuestClaimPrompt';
 import { TimeScrubber } from './TimeScrubber';
 import { WatchTogetherActivity } from './WatchTogetherActivity';
 import { MessageView } from './MessageView';
@@ -459,6 +460,8 @@ export function AppShell(props: AppShellProps): JSX.Element {
             showJoinVoice={canJoinVoice()}
             onJoinVoice={joinVoice}
           />
+          {/* Guest → claim-your-nick affordance (self-gates on guest state) */}
+          <GuestClaimPrompt />
           <Show when={preferences().timeScrubber}>
             <TimeScrubber />
           </Show>
