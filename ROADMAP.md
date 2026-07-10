@@ -490,6 +490,16 @@ client or public site needs to expose the result.
     selected Onyx JSON files in Preferences, show file name plus message,
     target, and reviewed-catch-up counts, and require an explicit "Import
     reviewed file" confirmation before merging local history.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-10** — On-device history import from
+    external platforms: **Discord** (DiscordChatExporter JSON), **Slack**
+    (workspace export channel JSON), and **IRC logs** (weechat/irssi/mIRC text)
+    all parse entirely on-device — no bot token, no upload, no third-party API —
+    and merge into the local vault via the existing `importVault` path with a
+    choose → review-summary → confirm flow. Hardened per an independent
+    GPT-5.6/Codex review (bounded memory, collision-safe ids, reaction-count
+    preservation, cross-page reply resolution). See `docs/importing.md`.
+    (`src/lib/import/{discordImport,slackImport,ircLogImport}.ts`,
+    `src/shell/HistoryImportControls.tsx`; 105 unit + 6 integration tests.)
 
 ## Phase 13 — Amanogawa Local Intelligence ← PLANNED
 34. **AI provenance chrome** *(client)* — every recap, search answer,
