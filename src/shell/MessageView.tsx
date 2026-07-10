@@ -32,6 +32,7 @@ import {
   createResource,
   createSignal,
   For,
+  onCleanup,
   Show,
   splitProps,
   type JSX,
@@ -49,6 +50,7 @@ import { activeMessageSearchResultId, openMessageSearchWithQuery } from './searc
 import { TopicChip, TopicFilterBar } from './TopicChip';
 import { BoostBar } from './BoostBar';
 import { SinceDigestCard } from './SinceDigestCard';
+import { computeMessageWindow } from './messageWindow';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -59,6 +61,16 @@ export type MessageViewProps = {
 
 const SYSTEM_TYPES = new Set(['join', 'part', 'quit', 'kick', 'mode', 'topic', 'nick', 'system', 'error']);
 const READER_MEMORY_PARTICIPANTS = 4;
+
+// Bounded-render window. The feed only builds DOM for the trailing
+// BASE_WINDOW_ROWS most-recent rows (plus any anchor an unread divider /
+// time-travel landing / search hit forces into view). "Show earlier" grows the
+// window by WINDOW_STEP_ROWS at a time. This caps DOM subtree count on large
+// channels (VAULT_KEEP=400 + live tail) without touching the store.
+const BASE_WINDOW_ROWS = 120;
+const WINDOW_STEP_ROWS = 200;
+// Delay before restoring aria-live to "polite" after a window-growth mutation.
+const LIVE_RESTORE_MS = 400;
 
 function clippedDigestPreview(text: string, max = 96): string {
   const normalized = text.replace(/\s+/g, ' ').trim();
@@ -820,6 +832,16 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   let feedEl!: HTMLDivElement;
   const [atBottom, setAtBottom] = createSignal(true);
 
+  // ── bounded render window ──
+  // windowSize is the *minimum* trailing rows to render; an anchor can extend it
+  // downward. Set to Infinity to render everything ("show all"). Reset to base
+  // on every conversation switch (in the switch effect below).
+  const [windowSize, setWindowSize] = createSignal<number>(BASE_WINDOW_ROWS);
+  // aria-live mode for the feed. Flipped to "off" while older rows enter the DOM
+  // (window growth / conversation switch / history replay) so those mutations are
+  // never re-announced, then restored to "polite" for genuine new tail arrivals.
+  const [liveMode, setLiveMode] = createSignal<'polite' | 'off'>('polite');
+
   // Tap-to-reveal action bar (touch): id of the row whose action bar is showing.
   // Declared here so the conversation-switch effect below can clear it.
   const [revealedId, setRevealedId] = createSignal<string | null>(null);
@@ -848,9 +870,35 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   }
 
   function scrollToReaderStart(): void {
+    // "Start" means the true top of the loaded transcript, so expand the window
+    // fully first. Solid's <For> reconciles synchronously on the signal write, so
+    // the top row is already in the DOM — scroll to it in the same tick (keeps the
+    // jump synchronous for callers/tests, no wasted frame).
+    setWindowSize(Number.POSITIVE_INFINITY);
     const node = feedEl?.querySelector<HTMLElement>('[data-message-search-id]');
     node?.scrollIntoView?.({ block: 'center' });
     setAtBottom(false);
+  }
+
+  // Grow the window while preserving the scroll anchor: adding older rows above
+  // the viewport would otherwise jump the scroll position. Capture height/top,
+  // mutate, then restore scrollTop by the height delta on the next frame.
+  function preserveScrollAround(mutate: () => void): void {
+    const el = feedEl;
+    const prevHeight = el?.scrollHeight ?? 0;
+    const prevTop = el?.scrollTop ?? 0;
+    mutate();
+    requestAnimationFrame(() => {
+      if (!el) return;
+      el.scrollTop = prevTop + (el.scrollHeight - prevHeight);
+      checkScroll();
+    });
+  }
+
+  function showEarlierMessages(): void {
+    preserveScrollAround(() =>
+      setWindowSize((n) => (Number.isFinite(n) ? n + WINDOW_STEP_ROWS : n)),
+    );
   }
 
   function scrollToUnreadBoundary(): void {
@@ -947,6 +995,8 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     if (!target || target === scrolledTarget) return;
     scrolledTarget = target;
     setRevealedId(null);
+    // Fresh conversation starts from the trailing window again.
+    setWindowSize(BASE_WINDOW_ROWS);
     // Reset the "new below" baseline for the channel we just opened.
     lastSeenCount = messages().length;
     setUnreadBelow(0);
@@ -1077,6 +1127,57 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     setRevealedId((current) => (current === msgId ? null : msgId));
   }
 
+  // ── bounded render window ──
+  // Any id that MUST be reachable in the DOM (so its querySelector-driven scroll
+  // works and the divider is visible) becomes an anchor; the oldest present one
+  // extends the window down far enough to render all of them.
+  const anchorIndex = createMemo((): number | null => {
+    const list = messages();
+    if (list.length === 0) return null;
+    const ids = [unreadDividerId(), timeTravelLandingId(), activeMessageSearchResultId()];
+    let min = -1;
+    for (const id of ids) {
+      if (!id) continue;
+      const idx = list.findIndex((m) => m.id === id);
+      if (idx >= 0 && (min < 0 || idx < min)) min = idx;
+    }
+    return min < 0 ? null : min;
+  });
+
+  const messageWindow = createMemo(() =>
+    computeMessageWindow({
+      total: messages().length,
+      windowSize: windowSize(),
+      anchorIndex: anchorIndex(),
+    }),
+  );
+
+  const windowedMessages = createMemo(() => messages().slice(messageWindow().start));
+
+  // Suppress aria-live announcements whenever OLDER rows enter the DOM — window
+  // growth ("show earlier"), an anchor-driven extension (time-travel landing /
+  // search hit), history replay, or a conversation switch. Those all lower (or
+  // reset) the window start; a genuine new tail arrival keeps start flat or
+  // raises it and stays announced. Restored to "polite" shortly after.
+  let prevWindowStart = Number.POSITIVE_INFINITY;
+  let prevLiveTarget: string | null = null;
+  let liveRestoreTimer: ReturnType<typeof setTimeout> | undefined;
+  createEffect(() => {
+    const start = messageWindow().start;
+    const target = activeTarget();
+    const switched = target !== prevLiveTarget;
+    if (switched || start < prevWindowStart) {
+      setLiveMode('off');
+      if (liveRestoreTimer) clearTimeout(liveRestoreTimer);
+      liveRestoreTimer = setTimeout(() => setLiveMode('polite'), LIVE_RESTORE_MS);
+    }
+    prevWindowStart = start;
+    prevLiveTarget = target;
+  });
+  onCleanup(() => {
+    if (liveRestoreTimer) clearTimeout(liveRestoreTimer);
+  });
+
   return (
     <main class="shell-messages" aria-label="Messages">
       <Show when={activeView().kind === 'channel' && preferences().topicTools}>
@@ -1145,7 +1246,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
         ref={feedEl!}
         class="shell-feed"
         role="log"
-        aria-live="polite"
+        aria-live={liveMode()}
         aria-label="Message history"
         onScroll={checkScroll}
       >
@@ -1225,6 +1326,10 @@ export function MessageView(props: MessageViewProps): JSX.Element {
           <Show when={(() => {
             const view = activeView();
             if (view.kind !== 'channel') return false;
+            // Only claim "the very beginning" when the window actually reaches
+            // the top of the loaded transcript — otherwise older rows are merely
+            // hidden behind the "earlier messages" affordance.
+            if (messageWindow().hiddenBefore > 0) return false;
             return historyExhausted().get(view.channel.toLowerCase()) === true;
           })()}>
             <div class="shell-channel-intro" data-testid="channel-intro">
@@ -1263,11 +1368,29 @@ export function MessageView(props: MessageViewProps): JSX.Element {
               />
             )}
           </Show>
-          <For each={messages()}>
+          <Show when={messageWindow().hiddenBefore > 0}>
+            <div class="shell-feed-earlier">
+              <button
+                type="button"
+                class="shell-feed-earlier-btn"
+                onClick={showEarlierMessages}
+                aria-label={`Show earlier messages (${messageWindow().hiddenBefore} not shown)`}
+              >
+                <span aria-hidden="true">↑</span>
+                earlier messages
+                <span class="shell-feed-earlier-count">{messageWindow().hiddenBefore}</span>
+              </button>
+            </div>
+          </Show>
+          <For each={windowedMessages()}>
             {(msg, index) => {
+              // index() is window-relative; recover the absolute position so
+              // continuation/day-boundary grouping stays correct across the
+              // window's top edge (the row just above the first visible one may
+              // be hidden but still governs grouping).
               const prevMsg = createMemo(() => {
-                const idx = index();
-                return idx > 0 ? messages()[idx - 1] ?? null : null;
+                const absIdx = messageWindow().start + index();
+                return absIdx > 0 ? messages()[absIdx - 1] ?? null : null;
               });
 
               const isContinuation = createMemo(() => {
