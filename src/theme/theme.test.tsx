@@ -17,7 +17,7 @@ import { applyThemeToDom, ThemeProvider, useTheme } from './ThemeProvider';
 import { THEMES, THEME_IDS, DEFAULT_THEME_ID, type ThemeId, type TokenMap } from './themes';
 import { ThemeStudio } from './ThemeStudio';
 import { ALL_STUDIO_TOKENS, EDITABLE_PROPERTIES } from './tokens';
-import { auditPalette, hexToOklch } from './paletteFactory';
+import { auditPalette, hexToOklch, generatePalette, enforceAA, type PaletteSeed } from './paletteFactory';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -407,6 +407,65 @@ describe('Palette quality (all built-in themes)', () => {
         }
       }
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 8b. Terracotta — the warm editorial earthenware theme, derived through the
+//     factory from its recorded seed (no hand-picked hex that bypasses the solver).
+// ---------------------------------------------------------------------------
+
+describe('Terracotta theme', () => {
+  // The seed recorded in the theme's comment block in themes.ts.
+  const TERRACOTTA_SEED: PaletteSeed = {
+    scheme: 'dark',
+    primaryHue: 42,
+    accentHue: 20,
+    depth: 0.8,
+    vibrancy: 0.5,
+    warmth: 0.6,
+    contrast: 10,
+  };
+
+  // Colour tokens the factory owns (chrome tokens — seams/radii/motion/fonts —
+  // are hand-set and excluded from this equality check).
+  const GENERATED_TOKENS = [
+    '--ink', '--ink-2', '--stone', '--stone-2', '--stone-3', '--stone-line',
+    '--lapis', '--lapis-bright', '--lapis-deep',
+    '--gold', '--gold-bright', '--gold-deep',
+    '--shu', '--shu-bright',
+    '--washi', '--washi-dim', '--washi-mute',
+    '--ok', '--warn',
+  ];
+
+  it('is registered as a dark built-in in the picker', () => {
+    expect(THEME_IDS).toContain('terracotta');
+    expect(THEMES.terracotta).toBeDefined();
+    expect(THEMES.terracotta.scheme).toBe('dark');
+    expect(THEMES.terracotta.label).toBe('Terracotta');
+  });
+
+  it('every registered colour token equals the factory output for its seed', () => {
+    const generated = enforceAA(generatePalette(TERRACOTTA_SEED), 'dark');
+    for (const key of GENERATED_TOKENS) {
+      expect(THEMES.terracotta.tokens[key], key).toBe(generated[key]);
+    }
+  });
+
+  it('passes every WCAG AA pair via auditPalette (regenerated + as-registered)', () => {
+    const regenerated = enforceAA(generatePalette(TERRACOTTA_SEED), 'dark');
+    for (const tokens of [regenerated, THEMES.terracotta.tokens]) {
+      for (const row of auditPalette(tokens)) {
+        expect(row.pass, `${row.fg} on ${row.bg} = ${row.ratio} (min ${row.min})`).toBe(true);
+      }
+    }
+  });
+
+  it('keeps the clay primary hue out of the banned purple/indigo band', () => {
+    const primary = hexToOklch(THEMES.terracotta.tokens['--lapis']!)!;
+    expect(primary.h < 258 || primary.h > 342, `lapis hue ${primary.h.toFixed(1)}`).toBe(true);
+    // The seed primary is a warm clay orange, well below the banned floor.
+    expect(primary.h).toBeLessThan(70);
   });
 });
 

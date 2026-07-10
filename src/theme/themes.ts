@@ -56,6 +56,7 @@ export type ThemeId =
   | 'shu'
   | 'hisui'
   | 'kohaku'
+  | 'terracotta'
   | 'teal'
   | 'slate'
   | 'frost';
@@ -674,6 +675,70 @@ const kohakuTokens: TokenMap = {
 };
 
 // ---------------------------------------------------------------------------
+// terracotta — CLAY: warm editorial earthenware. Burnt-clay orange leads over a
+// deep umber ground, with a dusty blush-rose as the complementary warm second —
+// a fired-clay-and-plaster pairing, not another glowing amber. No blue, no gold.
+// Seed { dark, primary 42, accent 20, depth .8, vibrancy .5, warmth .6,
+// contrast 10 } — pure engine output (the seed IS the soul; only the chrome
+// tokens below — seams/radii/motion/fonts — are hand-set), re-run through enforceAA.
+// ---------------------------------------------------------------------------
+const terracottaTokens: TokenMap = {
+  // Ground — fired-earth strata: umber-black → warm clay shadow
+  '--ink':        '#060100',
+  '--ink-2':      '#0a0200',
+  '--stone':      '#140904',
+  '--stone-2':    '#1f130c',
+  '--stone-3':    '#2a1d16',
+  '--stone-line': '#37241a',
+
+  // Terracotta clay — burnt-orange primary (the namesake leads)
+  '--lapis':        '#d55c27',
+  '--lapis-bright': '#ff9970',
+  '--lapis-deep':   '#832e00',
+
+  // Blush-rose — the dusty plaster second accent (complementary warm, NOT gold)
+  '--gold':        '#e8777a',
+  '--gold-bright': '#ffafae',
+  '--gold-deep':   '#9c4346',
+
+  // Shu — the hot/danger accent stays vermilion
+  '--shu':        '#e8523b',
+  '--shu-bright': '#ff8069',
+
+  // Text — warm bone / plaster over fired earth
+  '--washi':      '#e8dbd4',
+  '--washi-dim':  '#a1968f',
+  '--washi-mute': '#6f6057',
+
+  // Status
+  '--ok':      '#5bc78e',
+  '--warn':    '#e6d08c', // warnings stay WARM — in-family with the clay story
+  '--danger':  'var(--shu)',
+
+  // Seams follow the clay PRIMARY (never a hard-coded gold) + blush bands
+  '--seam':       'color-mix(in oklab, var(--lapis) 40%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--lapis) 16%, transparent)',
+  '--line':       'color-mix(in oklab, var(--washi) 14%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--gold) 12%, transparent)',
+
+  // Radius — editorial, softly rounded earthenware
+  '--r-0':    '0px',
+  '--r-sm':   '4px',
+  '--r-md':   '9px',
+  '--r-pill': '999px',
+
+  // Motion
+  '--ease': 'cubic-bezier(0.16, 1, 0.3, 1)',
+  '--dur':  '240ms',
+
+  // Typography
+  '--font-mono':    "'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace",
+  '--font-display': "'Anton', 'Arial Narrow', 'Helvetica Neue', sans-serif",
+  '--font-sans':    "'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  '--font-serif':   "'Fraunces Variable', 'Iowan Old Style', Georgia, 'Times New Roman', serif",
+};
+
+// ---------------------------------------------------------------------------
 // teal — deep teal cut; cyan-green ground, mint primary, seafoam second.
 // One cool water-green story — no brass, no gold.
 // Seed { dark, primary 175, accent 168, depth .82, vibrancy .65, warmth -.25,
@@ -952,6 +1017,14 @@ export const THEMES: Record<ThemeId, ThemeMeta> = {
     scheme: 'dark',
     signatureBg: 'resin',
     tokens: kohakuTokens,
+  },
+  terracotta: {
+    id: 'terracotta',
+    label: 'Terracotta',
+    description: 'Warm editorial earthenware — burnt-clay orange over fired umber, dusty blush second.',
+    scheme: 'dark',
+    signatureBg: 'volcanic',
+    tokens: terracottaTokens,
   },
   teal: {
     id: 'teal',
