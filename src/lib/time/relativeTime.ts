@@ -21,7 +21,7 @@ const DURATION_UNITS: readonly DurationUnit[] = [
   { label: 's', seconds: 1 },
 ];
 
-function formatRelative(amount: number, unit: string, isFuture: boolean): string {
+function agoLabel(amount: number, unit: string, isFuture: boolean): string {
   const label = `${amount}${unit}`;
   return isFuture ? `in ${label}` : `${label} ago`;
 }
@@ -42,25 +42,25 @@ export function relativeTime(then: Date, now: Date = new Date(Date.now())): stri
 
   const isFuture = deltaMs > 0;
   if (absMs < HOUR_MS) {
-    return formatRelative(Math.max(1, Math.floor(absMs / MINUTE_MS)), 'm', isFuture);
+    return agoLabel(Math.max(1, Math.floor(absMs / MINUTE_MS)), 'm', isFuture);
   }
   if (absMs < DAY_MS) {
-    return formatRelative(Math.floor(absMs / HOUR_MS), 'h', isFuture);
+    return agoLabel(Math.floor(absMs / HOUR_MS), 'h', isFuture);
   }
   if (absMs < 2 * DAY_MS) {
     return isFuture ? 'tomorrow' : 'yesterday';
   }
   if (absMs < WEEK_MS) {
-    return formatRelative(Math.floor(absMs / DAY_MS), 'd', isFuture);
+    return agoLabel(Math.floor(absMs / DAY_MS), 'd', isFuture);
   }
   if (absMs < MONTH_MS) {
-    return formatRelative(Math.floor(absMs / WEEK_MS), 'w', isFuture);
+    return agoLabel(Math.floor(absMs / WEEK_MS), 'w', isFuture);
   }
   if (absMs < YEAR_MS) {
-    return formatRelative(Math.floor(absMs / MONTH_MS), 'mo', isFuture);
+    return agoLabel(Math.floor(absMs / MONTH_MS), 'mo', isFuture);
   }
 
-  return formatRelative(Math.max(1, Math.floor(absMs / YEAR_MS)), 'y', isFuture);
+  return agoLabel(Math.max(1, Math.floor(absMs / YEAR_MS)), 'y', isFuture);
 }
 
 /**
@@ -100,4 +100,39 @@ export function calendarDay(then: Date, now: Date = new Date(Date.now())): strin
     day: 'numeric',
     ...(then.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
   });
+}
+
+function compactWithinWeek(absMs: number): string {
+  if (absMs < HOUR_MS) return `${Math.max(1, Math.floor(absMs / MINUTE_MS))}m`;
+  if (absMs < DAY_MS) return `${Math.floor(absMs / HOUR_MS)}h`;
+  return `${Math.floor(absMs / DAY_MS)}d`;
+}
+
+function absoluteDate(fromMs: number, nowMs: number): string {
+  const then = new Date(fromMs);
+  const now = new Date(nowMs);
+  return then.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    ...(then.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
+  });
+}
+
+/**
+ * Format the gap between two epoch-millisecond instants as a suffix-free compact
+ * label — `just now`, `3m`, `2h`, `5d` — falling back to an absolute calendar
+ * date at and beyond a week. Future instants are prefixed with `in ` (e.g.
+ * `in 2m`). `now` is passed in, never read internally, so the result is
+ * deterministic; non-finite input yields an empty string.
+ */
+export function formatRelative(fromMs: number, nowMs: number): string {
+  if (!Number.isFinite(fromMs) || !Number.isFinite(nowMs)) return '';
+
+  const deltaMs = fromMs - nowMs;
+  const absMs = Math.abs(deltaMs);
+  if (absMs < JUST_NOW_MS) return 'just now';
+  if (absMs >= WEEK_MS) return absoluteDate(fromMs, nowMs);
+
+  const compact = compactWithinWeek(absMs);
+  return deltaMs > 0 ? `in ${compact}` : compact;
 }

@@ -1,7 +1,7 @@
 // Relative time formatter behavior.
 
 import { describe, expect, it } from 'vitest';
-import { calendarDay, relativeTime, shortDuration } from '@/lib/time/relativeTime';
+import { calendarDay, formatRelative, relativeTime, shortDuration } from '@/lib/time/relativeTime';
 
 const SECOND_MS = 1_000;
 const MINUTE_MS = 60 * SECOND_MS;
@@ -63,6 +63,82 @@ describe('relativeTime', () => {
     const labels = cases.map(([then]) => relativeTime(then, NOW));
 
     expect(labels).toEqual(cases.map(([, expected]) => expected));
+  });
+});
+
+describe('formatRelative', () => {
+  const nowMs = NOW.getTime();
+
+  it('returns an empty label for non-finite input', () => {
+    const labels = [
+      formatRelative(Number.NaN, nowMs),
+      formatRelative(Number.POSITIVE_INFINITY, nowMs),
+      formatRelative(nowMs, Number.NaN),
+    ];
+
+    expect(labels).toEqual(['', '', '']);
+  });
+
+  it('treats moments inside the just-now boundary as current, either direction', () => {
+    const labels = [
+      formatRelative(nowMs - 44 * SECOND_MS, nowMs),
+      formatRelative(nowMs + 44 * SECOND_MS, nowMs),
+      formatRelative(nowMs, nowMs),
+    ];
+
+    expect(labels).toEqual(['just now', 'just now', 'just now']);
+  });
+
+  it('formats past durations as a compact suffix-free label', () => {
+    const cases: ReadonlyArray<[number, string]> = [
+      [45 * SECOND_MS, '1m'],
+      [3 * MINUTE_MS, '3m'],
+      [59 * MINUTE_MS, '59m'],
+      [HOUR_MS, '1h'],
+      [2 * HOUR_MS, '2h'],
+      [DAY_MS, '1d'],
+      [5 * DAY_MS, '5d'],
+    ];
+
+    const labels = cases.map(([delta]) => formatRelative(nowMs - delta, nowMs));
+
+    expect(labels).toEqual(cases.map(([, expected]) => expected));
+  });
+
+  it('prefixes future durations with "in"', () => {
+    const cases: ReadonlyArray<[number, string]> = [
+      [2 * MINUTE_MS, 'in 2m'],
+      [2 * HOUR_MS, 'in 2h'],
+      [5 * DAY_MS, 'in 5d'],
+    ];
+
+    const labels = cases.map(([delta]) => formatRelative(nowMs + delta, nowMs));
+
+    expect(labels).toEqual(cases.map(([, expected]) => expected));
+  });
+
+  it('falls back to an absolute date at and beyond a week', () => {
+    const then = new Date('2026-06-20T12:00:00Z'); // > 7 days before NOW, same year
+    const label = formatRelative(then.getTime(), nowMs);
+
+    expect(label).toBe(then.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+  });
+
+  it('includes the year in the absolute date across a year boundary', () => {
+    const then = new Date('2025-06-20T12:00:00Z');
+    const label = formatRelative(then.getTime(), nowMs);
+
+    expect(label).toBe(
+      then.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }),
+    );
+  });
+
+  it('uses the absolute date exactly at the seven-day boundary rather than a "7d" label', () => {
+    const then = new Date(nowMs - WEEK_MS);
+    const label = formatRelative(then.getTime(), nowMs);
+
+    expect(label).not.toBe('7d');
+    expect(label).toBe(then.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
   });
 });
 
