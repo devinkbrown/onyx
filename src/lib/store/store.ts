@@ -33,6 +33,7 @@ import {
   topicMessageTag,
 } from '@/lib/topics/topics';
 import { isFollowed } from '@/lib/notifications/followed';
+import { channelNotifyMode as computeChannelNotifyMode, shouldNotify as computeShouldNotify, modeToLevel, type NotifyMode } from '@/lib/notifications/channelNotifyMode';
 import { parseScheduledEvent, type ScheduledEvent } from '@/lib/notifications/scheduledEvents';
 import {
   composerDraftKey,
@@ -669,8 +670,20 @@ export interface OnyxState {
   revealMessage(msgId: string): void;
 
   // ── Per-channel notification prefs ──────────────────────────────────
-  /** Notification level per channel (key = channel.toLowerCase()) */
+  /**
+   * Notification level per channel (key = channel.toLowerCase()) — the single
+   * source of truth, persisted at `onyx:channel-notify`. Stored vocabulary is
+   * `'all' | 'mentions' | 'none'`; the public mode API below spells `'none'` as
+   * `'mute'`. Read reactively in components via
+   * `useStore(s => channelNotifyMode(s.channelNotify, chan))`.
+   */
   channelNotify: Map<string, 'all' | 'mentions' | 'none'>;
+  /** Immutably set a channel's notification mode ('all' clears the entry). */
+  setChannelNotifyMode(channel: string, mode: NotifyMode): void;
+  /** Snapshot accessor: the public mode for a channel (default 'all' when unset). */
+  channelNotifyMode(channel: string): NotifyMode;
+  /** Derived helper: should a message in `channel` fire a notification? */
+  shouldNotify(channel: string, isMention: boolean): boolean;
 
   // ── WHOIS panel ───────────────────────────────────────────────────────
   whoisData: Map<string, WhoisInfo>;
@@ -4186,6 +4199,26 @@ export const store = createStore<OnyxState>()(
         _saveChannelNotify(channelNotify);
         return { channelNotify };
       });
+    },
+    setChannelNotifyMode(channel, mode) {
+      const key = channel.toLowerCase();
+      const level = modeToLevel(mode);
+      set(s => {
+        const channelNotify = new Map(s.channelNotify);
+        if (level === 'all') {
+          channelNotify.delete(key); // 'all' is the default — no entry needed
+        } else {
+          channelNotify.set(key, level);
+        }
+        _saveChannelNotify(channelNotify);
+        return { channelNotify };
+      });
+    },
+    channelNotifyMode(channel) {
+      return computeChannelNotifyMode(get().channelNotify, channel);
+    },
+    shouldNotify(channel, isMention) {
+      return computeShouldNotify(get().channelNotify, channel, isMention);
     },
     muteChannel(channel) {
       get().setChannelNotify(channel, 'none');
