@@ -24,6 +24,7 @@
 }
 .chb-refresh:hover:not(:disabled) { color: var(--washi); border-color: var(--stone-line); }
 .chb-refresh:disabled { opacity: 0.6; cursor: default; }
+.chb-refresh:focus-visible { outline: 2px solid var(--lapis); outline-offset: 1px; }
 
 .chb-state {
   display: flex;
@@ -88,3 +89,8 @@
   transition: background 160ms var(--ease), color 160ms var(--ease);
 }
 .chb-join:hover { background: color-mix(in oklab, var(--gold) 16%, transparent); color: var(--washi); }
+.chb-join:focus-visible { outline: 2px solid var(--lapis); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .chb-join { transition: none; }
+}

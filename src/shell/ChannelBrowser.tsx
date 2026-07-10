@@ -6,7 +6,7 @@
  * Lazy-loaded from AppShell so it costs nothing until first opened.
  */
 import './channel-browser.css';
-import { createMemo, createSignal, For, Show, type JSX } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, type JSX } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
 import { Sheet } from '@/primitives/Sheet';
 import { Spinner } from '@/primitives/Spinner';
@@ -26,6 +26,32 @@ export default function ChannelBrowser(): JSX.Element {
     return rows.filter(
       (r) => r.name.toLowerCase().includes(q) || r.topic.toLowerCase().includes(q),
     );
+  });
+
+  // Advisory status for AT: what the sighted user reads in the spinner / empty
+  // states and the live result count. Kept out of the visual flow via .sr-only.
+  const statusMessage = createMemo(() => {
+    if (loading() && list().length === 0) return 'Loading channels from the network…';
+    const total = list().length;
+    if (total === 0) return 'No public channels found.';
+    const shown = filtered().length;
+    const q = query().trim();
+    if (shown === 0) return `No channels match “${q}”.`;
+    if (q) return `${shown} ${shown === 1 ? 'channel matches' : 'channels match'} “${q}”.`;
+    return `${total} ${total === 1 ? 'channel' : 'channels'} available.`;
+  });
+
+  // Debounce the announcement so per-keystroke filtering does not spam the
+  // screen reader — only the settled result is spoken.
+  const [announced, setAnnounced] = createSignal('');
+  let announceTimer: ReturnType<typeof setTimeout> | undefined;
+  createEffect(() => {
+    const message = statusMessage();
+    if (announceTimer !== undefined) clearTimeout(announceTimer);
+    announceTimer = setTimeout(() => setAnnounced(message), 250);
+  });
+  onCleanup(() => {
+    if (announceTimer !== undefined) clearTimeout(announceTimer);
   });
 
   const close = () => getState().closeChannelBrowser();
@@ -104,6 +130,8 @@ export default function ChannelBrowser(): JSX.Element {
             </ul>
           </Show>
         </Show>
+
+        <span class="sr-only" role="status">{announced()}</span>
       </div>
     </Sheet>
   );

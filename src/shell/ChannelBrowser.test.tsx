@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, within } from '@solidjs/testing-library';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { parseIRCMessage } from '@/lib/irc/parser';
 import { store } from '@/lib/store/store';
@@ -44,5 +44,47 @@ describe('ChannelBrowser', () => {
 
     expect(within(dialog).queryByText('#general')).not.toBeInTheDocument();
     expect(within(dialog).getByText('#random')).toBeInTheDocument();
+  });
+
+  it('announces the debounced result count through a polite status region', () => {
+    vi.useFakeTimers();
+    try {
+      feed(':server.test 322 me #general 2 :Launch room');
+      feed(':server.test 322 me #random 1 :Off-topic');
+      feed(':server.test 323 me :End of LIST');
+      store.setState({ showChannelBrowser: true });
+
+      render(() => <ChannelBrowser />);
+
+      const status = screen.getByRole('status');
+      expect(status).toBeInTheDocument();
+
+      // Opening the directory announces the total once the debounce settles.
+      vi.advanceTimersByTime(400);
+      expect(status).toHaveTextContent('2 channels available');
+
+      fireEvent.input(screen.getByRole('searchbox', { name: 'Filter channels' }), {
+        target: { value: 'off-topic' },
+      });
+      vi.advanceTimersByTime(400);
+      expect(status).toHaveTextContent(/1 channel matches/);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('announces the empty directory to assistive tech', () => {
+    vi.useFakeTimers();
+    try {
+      feed(':server.test 323 me :End of LIST');
+      store.setState({ showChannelBrowser: true });
+
+      render(() => <ChannelBrowser />);
+
+      vi.advanceTimersByTime(400);
+      expect(screen.getByRole('status')).toHaveTextContent(/no public channels/i);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
