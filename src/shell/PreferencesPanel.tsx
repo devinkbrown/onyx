@@ -13,7 +13,7 @@
 import { createMemo, createSignal, For, Show, type JSX } from 'solid-js';
 import { Sheet } from '@/primitives';
 import { clearVault, importVault, VAULT_KEEP } from '@/lib/vault/historyVault';
-import { parseDiscordExport, type DiscordImportSummary } from '@/lib/import/discordImport';
+import { parseDiscordExport } from '@/lib/import/discordImport';
 import {
   clearClientExtensionAudit,
   clearClientExtensionActions,
@@ -457,7 +457,23 @@ function PortableVaultControls(): JSX.Element {
   );
 }
 
-interface PendingDiscordImport {
+/** Structural shape shared by every JSON-export importer (Discord, Slack, …). */
+interface VaultImportSummaryLike {
+  channels: number;
+  messages: number;
+  skipped: number;
+  droppedOverCap: number;
+  oldest: string | null;
+  newest: string | null;
+  guild?: string | null;
+}
+
+interface VaultImportResultLike {
+  snapshot: import('@/lib/vault/historyVault').VaultExportSnapshot;
+  summary: VaultImportSummaryLike;
+}
+
+interface PendingJsonImport {
   fileNames: string[];
   snapshots: import('@/lib/vault/historyVault').VaultExportSnapshot[];
   channels: number;
@@ -475,15 +491,28 @@ function shortDate(iso: string | null): string {
   return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
 }
 
+interface JsonVaultImportProps {
+  /** Slug used to build unique aria ids (e.g. 'discord', 'slack'). */
+  id: string;
+  title: string;
+  chooseLabel: string;
+  /** Shown when no file yields a recognizable export. */
+  rejectMessage: string;
+  description: JSX.Element;
+  /** Pure transform: parsed JSON → vault snapshot, or null if unrecognized. */
+  parse: (raw: unknown) => VaultImportResultLike | null;
+}
+
 /**
- * Import a community's own Discord history (DiscordChatExporter JSON export)
- * into this device's local vault — no bot token, no Discord API, no upload.
- * Mirrors PortableVaultControls' two-step upload → review → confirm flow.
+ * Generic on-device "import history from a JSON export" control: choose one or
+ * more JSON files, preview an aggregate summary, then merge into the local
+ * vault via importVault. Discord and Slack share this body; only the parser and
+ * the surrounding copy differ. Everything runs on-device — no upload, no API.
  */
-function DiscordImportControls(): JSX.Element {
+function JsonVaultImportControls(props: JsonVaultImportProps): JSX.Element {
   const [status, setStatus] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal(false);
-  const [pending, setPending] = createSignal<PendingDiscordImport | null>(null);
+  const [pending, setPending] = createSignal<PendingJsonImport | null>(null);
 
   async function handleSelect(event: Event): Promise<void> {
     const input = event.currentTarget as HTMLInputElement;
@@ -492,7 +521,7 @@ function DiscordImportControls(): JSX.Element {
     if (files.length === 0) return;
     setBusy(true);
     try {
-      const snapshots: PendingDiscordImport['snapshots'] = [];
+      const snapshots: PendingJsonImport['snapshots'] = [];
       const fileNames: string[] = [];
       const targets = new Set<string>();
       let messages = 0;
@@ -511,12 +540,12 @@ function DiscordImportControls(): JSX.Element {
           rejected += 1;
           continue;
         }
-        const result = parseDiscordExport(raw);
+        const result = props.parse(raw);
         if (!result) {
           rejected += 1;
           continue;
         }
-        const summary: DiscordImportSummary = result.summary;
+        const summary = result.summary;
         snapshots.push(result.snapshot);
         fileNames.push(file.name);
         for (const t of result.snapshot.targets) targets.add(t.target);
@@ -530,7 +559,7 @@ function DiscordImportControls(): JSX.Element {
 
       if (snapshots.length === 0) {
         setPending(null);
-        setStatus('No Discord export recognized. Export channels from DiscordChatExporter in JSON mode, then choose those .json files.');
+        setStatus(props.rejectMessage);
         return;
       }
       setPending({ fileNames, snapshots, channels: targets.size, messages, skipped, droppedOverCap, guild, oldest, newest });
@@ -538,7 +567,7 @@ function DiscordImportControls(): JSX.Element {
       setStatus(`Ready to import ${countLabel(messages, 'message')} across ${countLabel(targets.size, 'channel')}${guild ? ` from ${guild}` : ''}.${rejectedNote}`);
     } catch {
       setPending(null);
-      setStatus('Could not read those files. Choose DiscordChatExporter JSON exports.');
+      setStatus(props.rejectMessage);
     } finally {
       setBusy(false);
     }
@@ -564,18 +593,14 @@ function DiscordImportControls(): JSX.Element {
   }
 
   return (
-    <section class="pref-group pref-vault-portable pref-discord-import" aria-labelledby="pref-discord-import-title">
+    <section class={`pref-group pref-vault-portable pref-${props.id}-import`} aria-labelledby={`pref-${props.id}-import-title`}>
       <div class="pref-group-head">
-        <h3 id="pref-discord-import-title" class="pref-label">Import from Discord</h3>
+        <h3 id={`pref-${props.id}-import-title`} class="pref-label">{props.title}</h3>
       </div>
-      <p class="pref-desc">
-        Leaving Discord? Export your channels with{' '}
-        <a href="https://github.com/Tyrrrz/DiscordChatExporter" target="_blank" rel="noreferrer noopener">DiscordChatExporter</a>{' '}
-        in <strong>JSON</strong> mode, then choose the files here. Everything happens on this device — no bot token, no upload, nothing sent to Discord. Imported history becomes searchable, time-travellable scrollback merged into this device's vault (up to the newest {VAULT_KEEP} messages per channel).
-      </p>
+      <p class="pref-desc">{props.description}</p>
       <div class="pref-vault-actions">
         <label class="pref-file">
-          <span>Choose Discord JSON</span>
+          <span>{props.chooseLabel}</span>
           <input
             type="file"
             accept="application/json,.json"
@@ -587,8 +612,8 @@ function DiscordImportControls(): JSX.Element {
       </div>
       <Show when={pending()}>
         {(job) => (
-          <div class="pref-import-review" role="group" aria-labelledby="pref-discord-review-title">
-            <h4 id="pref-discord-review-title">Review import</h4>
+          <div class="pref-import-review" role="group" aria-labelledby={`pref-${props.id}-review-title`}>
+            <h4 id={`pref-${props.id}-review-title`}>Review import</h4>
             <p>
               {countLabel(job().fileNames.length, 'file')}: {countLabel(job().messages, 'message')} across {countLabel(job().channels, 'channel')}
               {job().guild ? ` from ${job().guild}` : ''}
@@ -620,6 +645,26 @@ function DiscordImportControls(): JSX.Element {
         <p class="pref-status" role="status">{status()}</p>
       </Show>
     </section>
+  );
+}
+
+/** Import Discord history from a DiscordChatExporter JSON export. */
+function DiscordImportControls(): JSX.Element {
+  return (
+    <JsonVaultImportControls
+      id="discord"
+      title="Import from Discord"
+      chooseLabel="Choose Discord JSON"
+      rejectMessage="No Discord export recognized. Export channels from DiscordChatExporter in JSON mode, then choose those .json files."
+      parse={(raw) => parseDiscordExport(raw)}
+      description={
+        <>
+          Leaving Discord? Export your channels with{' '}
+          <a href="https://github.com/Tyrrrz/DiscordChatExporter" target="_blank" rel="noreferrer noopener">DiscordChatExporter</a>{' '}
+          in <strong>JSON</strong> mode, then choose the files here. Everything happens on this device — no bot token, no upload, nothing sent to Discord. Imported history becomes searchable, time-travellable scrollback merged into this device's vault (up to the newest {VAULT_KEEP} messages per channel).
+        </>
+      }
+    />
   );
 }
 
