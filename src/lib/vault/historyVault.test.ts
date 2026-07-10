@@ -15,6 +15,7 @@ import {
   deleteOutboxEntry,
   deserializeMessage,
   exportVault,
+  getRetentionPolicy,
   importVault,
   loadAround,
   loadOutbox,
@@ -24,6 +25,7 @@ import {
   saveMessages,
   searchVault,
   serializeMessage,
+  setRetentionPolicy,
 } from './historyVault';
 
 function msg(id: string, time: number, over: Partial<ChatMessage> = {}): ChatMessage {
@@ -265,6 +267,84 @@ describe('historyVault', () => {
       expect(await loadRecent('#beta')).toEqual([]);
       expect(await loadOutbox()).toEqual([]);
     });
+  });
+
+  describe('retention policy wiring', () => {
+    it('defaults to no policy (flat VAULT_KEEP)', () => {
+      expect(getRetentionPolicy()).toBeNull();
+    });
+
+    it('prunes at VAULT_KEEP identically when a null policy is set', async () => {
+      // Explicitly clearing to null must reproduce today's behavior exactly.
+      setRetentionPolicy(null);
+      const first = Array.from({ length: 300 }, (_, i) => msg(`p${i}`, 1000 + i));
+      const second = Array.from({ length: 200 }, (_, i) => msg(`p${300 + i}`, 1300 + i));
+      await saveMessages('#room', first);
+      await saveMessages('#room', second);
+      const kept = await until(
+        () => loadRecent('#room', 1000),
+        (v) => v.length === VAULT_KEEP,
+      );
+      expect(kept.length).toBe(VAULT_KEEP);
+      expect(kept[0]!.id).toBe('p100');
+      expect(kept[kept.length - 1]!.id).toBe('p499');
+    }, 10_000);
+
+    it('prunes at VAULT_KEEP identically when a default-count policy is set', async () => {
+      // A policy whose keep === VAULT_KEEP and no cutoff must equal the default.
+      setRetentionPolicy({ keep: VAULT_KEEP });
+      const first = Array.from({ length: 300 }, (_, i) => msg(`p${i}`, 1000 + i));
+      const second = Array.from({ length: 200 }, (_, i) => msg(`p${300 + i}`, 1300 + i));
+      await saveMessages('#room', first);
+      await saveMessages('#room', second);
+      const kept = await until(
+        () => loadRecent('#room', 1000),
+        (v) => v.length === VAULT_KEEP,
+      );
+      expect(kept.length).toBe(VAULT_KEEP);
+      expect(kept[0]!.id).toBe('p100');
+      expect(kept[kept.length - 1]!.id).toBe('p499');
+    }, 10_000);
+
+    it('honors a per-channel keep override on the real prune path', async () => {
+      // #small caps at 5; the default (VAULT_KEEP) applies to everyone else.
+      setRetentionPolicy({ keep: VAULT_KEEP, perChannel: { '#small': 5 } });
+      const msgs = Array.from({ length: 20 }, (_, i) => msg(`s${i}`, 1000 + i, { target: '#small' }));
+      await saveMessages('#small', msgs);
+      const kept = await until(
+        () => loadRecent('#small', 1000),
+        (v) => v.length === 5,
+      );
+      expect(kept.length).toBe(5);
+      // The 5 newest survive; the oldest 15 are pruned.
+      expect(kept[0]!.id).toBe('s15');
+      expect(kept[kept.length - 1]!.id).toBe('s19');
+    }, 10_000);
+
+    it('leaves non-overridden targets at the default keep', async () => {
+      setRetentionPolicy({ keep: VAULT_KEEP, perChannel: { '#small': 5 } });
+      const msgs = Array.from({ length: 12 }, (_, i) => msg(`o${i}`, 1000 + i, { target: '#other' }));
+      await saveMessages('#other', msgs);
+      const kept = await loadRecent('#other', 1000);
+      expect(kept.length).toBe(12);
+    });
+
+    it('prunes messages older than the max-age cutoff', async () => {
+      const dayMs = 24 * 60 * 60 * 1000;
+      const now = Date.now();
+      // Keep is generous; the age cutoff (2 days) is what culls the old rows.
+      setRetentionPolicy({ keep: VAULT_KEEP, maxAgeDays: 2 });
+      const fresh = Array.from({ length: 4 }, (_, i) => msg(`f${i}`, now - i * 1000));
+      const stale = Array.from({ length: 6 }, (_, i) => msg(`stale${i}`, now - (5 + i) * dayMs));
+      await saveMessages('#aged', [...stale, ...fresh]);
+      const kept = await until(
+        () => loadRecent('#aged', 1000),
+        (v) => v.length === 4,
+      );
+      expect(kept.length).toBe(4);
+      // Only the fresh (within 2 days) messages remain.
+      expect(kept.every((m) => m.id.startsWith('f'))).toBe(true);
+    }, 10_000);
   });
 
   describe('without IndexedDB', () => {

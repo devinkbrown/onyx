@@ -13,6 +13,7 @@
  *    reply metadata survive; functions/Sets never enter a ChatMessage.
  */
 import type { ChatMessage } from '@/lib/irc/types';
+import { effectiveKeep, resolvePolicyForChannel, type RetentionPolicy } from './retentionPolicy';
 
 const DB_NAME = 'onyx-vault';
 const DB_VERSION = 2;
@@ -52,6 +53,27 @@ export interface OutboxEntry {
 }
 
 let _outboxSeq = 0;
+
+const RETENTION_DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Optional retention policy consulted by the save/prune path. When `null` (the
+ * default), pruning is byte-for-byte identical to the flat VAULT_KEEP tail-slice:
+ * `keep === VAULT_KEEP`, no age cutoff. Setting a policy layers per-channel keep
+ * overrides and/or a max-age cutoff on top, without changing any key names or the
+ * E2EE-plaintext-never-persisted invariant.
+ */
+let _retentionPolicy: RetentionPolicy | null = null;
+
+/** Configure (or clear, with `null`) the vault's per-channel/max-age retention. */
+export function setRetentionPolicy(policy: RetentionPolicy | null): void {
+  _retentionPolicy = policy;
+}
+
+/** The currently configured retention policy, or `null` for flat VAULT_KEEP. */
+export function getRetentionPolicy(): RetentionPolicy | null {
+  return _retentionPolicy;
+}
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
 
@@ -103,7 +125,11 @@ export async function saveMessages(target: string, msgs: readonly ChatMessage[])
   const db = await openVault();
   if (!db) return;
   try {
-    const tail = msgs.slice(-VAULT_KEEP);
+    // Pre-trim the batch to the target's effective keep. With no policy this is
+    // exactly VAULT_KEEP (identical to before); a per-channel override widens or
+    // narrows it so a larger override isn't defeated by the batch pre-trim.
+    const keep = _retentionPolicy ? effectiveKeep(_retentionPolicy, target) : VAULT_KEEP;
+    const tail = msgs.slice(-keep);
     const tx = db.transaction(STORE, 'readwrite');
     const store = tx.objectStore(STORE);
     for (const m of tail) store.put(serializeMessage(target, m));
@@ -332,6 +358,17 @@ export function parseVaultExport(raw: unknown): VaultExportSnapshot | null {
 }
 
 async function pruneTarget(db: IDBDatabase, key: string): Promise<void> {
+  // Resolve the bound for this target. With no policy: keep === VAULT_KEEP and no
+  // cutoff, so the cursor loop below is byte-for-byte the flat tail-slice prune.
+  let keep = VAULT_KEEP;
+  let cutoffMs: number | null = null;
+  if (_retentionPolicy) {
+    const resolved = resolvePolicyForChannel(_retentionPolicy, key);
+    keep = resolved.keep;
+    if (resolved.maxAgeDays !== undefined) {
+      cutoffMs = Date.now() - resolved.maxAgeDays * RETENTION_DAY_MS;
+    }
+  }
   try {
     const tx = db.transaction(STORE, 'readwrite');
     const idx = tx.objectStore(STORE).index('by_target_time');
@@ -343,7 +380,9 @@ async function pruneTarget(db: IDBDatabase, key: string): Promise<void> {
         const cursor = cursorReq.result;
         if (!cursor) return resolve();
         seen += 1;
-        if (seen > VAULT_KEEP) cursor.delete();
+        // Stricter-wins: drop past the count cap OR older than the age cutoff.
+        const tooOld = cutoffMs !== null && (cursor.value as StoredMessage).time < cutoffMs;
+        if (seen > keep || tooOld) cursor.delete();
         cursor.continue();
       };
       cursorReq.onerror = () => resolve();
@@ -495,7 +534,8 @@ function txDone(tx: IDBTransaction): Promise<void> {
   });
 }
 
-/** Test hook — reset the module's cached connection. */
+/** Test hook — reset the module's cached connection and retention policy. */
 export function _resetVaultForTests(): void {
   dbPromise = null;
+  _retentionPolicy = null;
 }
