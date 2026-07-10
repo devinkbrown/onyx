@@ -141,6 +141,50 @@ describe('historyVault', () => {
     }, 10_000);
   });
 
+  describe('pre-epoch (negative) timestamps', () => {
+    // A pre-1970 Date carries a NEGATIVE epoch ms. Such times are reachable
+    // through parseVaultExport (which accepts any valid Date) or a bogus server
+    // @time tag. The stored index key is [target_key, time], so a lower bound of
+    // [key, 0] would silently hide every negative-time row — invisible to loads
+    // AND uncounted by the prune cursor, escaping the VAULT_KEEP bound forever.
+    const PRE_EPOCH = Date.parse('1955-05-15T00:00:00.000Z'); // < 0
+
+    it('loadRecent returns pre-1970 messages, chronological', async () => {
+      await saveMessages('#room', [
+        msg('old', PRE_EPOCH),
+        msg('now', 1_700_000_000_000),
+      ]);
+      const loaded = await loadRecent('#room');
+      expect(loaded.map((m) => m.id)).toEqual(['old', 'now']);
+      expect(loaded[0]!.time.getTime()).toBe(PRE_EPOCH);
+    });
+
+    it('loadAround surfaces a pre-1970 message near the anchor', async () => {
+      await saveMessages('#room', [
+        msg('old', PRE_EPOCH),
+        msg('now', 1_700_000_000_000),
+      ]);
+      const loaded = await loadAround('#room', new Date(PRE_EPOCH), 1);
+      expect(loaded.map((m) => m.id)).toEqual(['old']);
+    });
+
+    it('prunes negative-time targets down to VAULT_KEEP (bound still holds)', async () => {
+      // All rows pre-1970: before the fix they are invisible to both the load
+      // cursor (→ loadRecent returns []) and the prune cursor (→ unbounded).
+      const count = VAULT_KEEP + 25;
+      const msgs = Array.from({ length: count }, (_, i) => msg(`n${i}`, PRE_EPOCH + i));
+      await saveMessages('#room', msgs);
+      const kept = await until(
+        () => loadRecent('#room', 1000),
+        (v) => v.length === VAULT_KEEP,
+      );
+      expect(kept.length).toBe(VAULT_KEEP);
+      // Newest survive; the oldest 25 are pruned.
+      expect(kept[0]!.id).toBe('n25');
+      expect(kept[kept.length - 1]!.id).toBe(`n${count - 1}`);
+    }, 10_000);
+  });
+
   describe('searchVault', () => {
     beforeEach(async () => {
       await saveMessages('#alpha', [

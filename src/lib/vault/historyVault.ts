@@ -103,6 +103,21 @@ function openVault(): Promise<IDBDatabase | null> {
   return dbPromise;
 }
 
+/**
+ * All `by_target_time` index rows for one conversation key, regardless of time.
+ *
+ * The index key is `[target_key, time]`. Bounding with a numeric floor like
+ * `[key, 0]` would silently drop every NEGATIVE-epoch row (a pre-1970 `Date`,
+ * reachable via a bogus server `@time` tag or an imported message), hiding it
+ * from loads AND from the prune cursor — an unbounded-retention escape. Bracket
+ * by the key prefix instead: `[key]` sorts before any `[key, time]` (shorter
+ * arrays sort first), and `[key, []]` sorts after any `[key, <number>]` (a
+ * number key precedes an array key), so the range covers every time value.
+ */
+function targetKeyRange(key: string): IDBKeyRange {
+  return IDBKeyRange.bound([key], [key, []]);
+}
+
 export function serializeMessage(target: string, msg: ChatMessage): StoredMessage {
   // `plaintext` is the decrypted body of an E2EE DM — view-only, never at
   // rest. Drop it so the vault stores only the ciphertext envelope (`text`).
@@ -148,7 +163,7 @@ export async function loadRecent(target: string, limit = VAULT_KEEP): Promise<Ch
     const key = target.toLowerCase();
     const tx = db.transaction(STORE, 'readonly');
     const idx = tx.objectStore(STORE).index('by_target_time');
-    const range = IDBKeyRange.bound([key, 0], [key, Number.MAX_SAFE_INTEGER]);
+    const range = targetKeyRange(key);
     return await new Promise<ChatMessage[]>((resolve) => {
       const out: ChatMessage[] = [];
       // Walk newest-first, stop at limit, reverse to chronological.
@@ -178,7 +193,7 @@ export async function loadAround(target: string, at: Date, limit = 50): Promise<
     const anchor = at.getTime();
     const tx = db.transaction(STORE, 'readonly');
     const idx = tx.objectStore(STORE).index('by_target_time');
-    const range = IDBKeyRange.bound([key, 0], [key, Number.MAX_SAFE_INTEGER]);
+    const range = targetKeyRange(key);
     const rows = await new Promise<StoredMessage[]>((resolve) => {
       const out: StoredMessage[] = [];
       const cursorReq = idx.openCursor(range);
@@ -372,7 +387,7 @@ async function pruneTarget(db: IDBDatabase, key: string): Promise<void> {
   try {
     const tx = db.transaction(STORE, 'readwrite');
     const idx = tx.objectStore(STORE).index('by_target_time');
-    const range = IDBKeyRange.bound([key, 0], [key, Number.MAX_SAFE_INTEGER]);
+    const range = targetKeyRange(key);
     let seen = 0;
     await new Promise<void>((resolve) => {
       const cursorReq = idx.openCursor(range, 'prev');
