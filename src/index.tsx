@@ -21,7 +21,7 @@ if (import.meta.env.PROD && typeof navigator !== 'undefined' && 'serviceWorker' 
 import { render } from 'solid-js/web';
 import { initVaultSync } from './lib/vault/vaultSync';
 import { Router, Route } from '@solidjs/router';
-import { lazy } from 'solid-js';
+import { createEffect, createSignal, lazy, Show, type JSX } from 'solid-js';
 import '@fontsource/anton';
 import '@fontsource-variable/fraunces';
 import '@fontsource-variable/jetbrains-mono';
@@ -30,7 +30,13 @@ import './styles/global.css';
 import './styles/a11y-media.css';
 import './backgrounds/scene-motion.css';
 import { ThemeProvider } from './theme';
-import { Spotlight, SpotlightProvider } from './chat/spotlight';
+// SpotlightProvider only installs the Cmd/Ctrl+K + "/" hotkey and owns the
+// open signal — it is tiny and has no dependency on the command catalogue, so
+// it stays eager. The Spotlight PANEL (below) pulls the ~1k-line command
+// catalogue + fuzzy matcher, none of which is needed until the palette is
+// first opened, so it is lazy + gated behind the open signal to keep it off
+// the eager landing entry chunk.
+import { SpotlightProvider, useSpotlight } from './chat/spotlight/useSpotlight';
 import Landing from './routes/Landing';
 
 const About = lazy(() => import('./routes/About'));
@@ -40,6 +46,25 @@ const Stats = lazy(() => import('./routes/Stats'));
 const Status = lazy(() => import('./routes/Status'));
 const Roadmap = lazy(() => import('./routes/Roadmap'));
 const Invite = lazy(() => import('./routes/Invite'));
+const Spotlight = lazy(() => import('./chat/spotlight/Spotlight'));
+
+// Global command palette host. The panel + its command catalogue live in a
+// lazy chunk; we ARM (and permanently keep mounted) on the first open so the
+// panel's own open/close + focus-restoration lifecycle is unchanged after the
+// initial fetch. Latching-on avoids unmounting the panel on close, which would
+// race its focus-restore effect (WCAG 2.4.3).
+function GlobalSpotlight(): JSX.Element {
+  const spotlight = useSpotlight();
+  const [armed, setArmed] = createSignal(false);
+  createEffect(() => {
+    if (spotlight.isOpen()) setArmed(true);
+  });
+  return (
+    <Show when={armed()}>
+      <Spotlight />
+    </Show>
+  );
+}
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Onyx: #root not found');
@@ -71,8 +96,10 @@ render(
           <Route path="/invite" component={Invite} />
           <Route path="/invite/" component={Invite} />
         </Router>
-        {/* Global command palette — Cmd/Ctrl+K or / opens it from any route */}
-        <Spotlight />
+        {/* Global command palette — Cmd/Ctrl+K or / opens it from any route.
+            Its lazy chunk (command catalogue + fuzzy matcher) is fetched only
+            on first open, not on landing. */}
+        <GlobalSpotlight />
       </SpotlightProvider>
     </ThemeProvider>
   ),
