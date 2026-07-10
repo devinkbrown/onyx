@@ -10,7 +10,7 @@
  * SOLID IDIOMS: component runs once; never destructure props; For/Show; createMemo.
  */
 
-import { createMemo, createSignal, For, Show, type JSX } from 'solid-js';
+import { createMemo, createSignal, createUniqueId, For, Show, type JSX } from 'solid-js';
 import { Sheet } from '@/primitives';
 import { clearVault } from '@/lib/vault/historyVault';
 import { countLabel } from '@/lib/format/countLabel';
@@ -230,23 +230,69 @@ type SegmentedProps<T extends string> = {
 };
 
 function Segmented<T extends string>(props: SegmentedProps<T>): JSX.Element {
+  const descId = createUniqueId();
+  // Roving-tabindex radio group: one tab stop, arrow keys move (and select, per the
+  // ARIA radio-group pattern where selection follows focus). Refs let the key handler
+  // move DOM focus to the newly-selected radio.
+  const buttons: (HTMLButtonElement | undefined)[] = [];
+
+  function selectAt(index: number): void {
+    const option = props.options[index];
+    if (option === undefined) return;
+    props.onSelect(option);
+    buttons[index]?.focus();
+  }
+
+  function onKeyDown(event: KeyboardEvent): void {
+    const count = props.options.length;
+    if (count === 0) return;
+    const current = props.options.indexOf(props.value());
+    switch (event.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        event.preventDefault();
+        selectAt(((current < 0 ? 0 : current) + 1) % count);
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        event.preventDefault();
+        selectAt(((current < 0 ? 0 : current) - 1 + count) % count);
+        break;
+      case 'Home':
+        event.preventDefault();
+        selectAt(0);
+        break;
+      case 'End':
+        event.preventDefault();
+        selectAt(count - 1);
+        break;
+    }
+  }
+
   return (
     <section class="pref-group">
       <div class="pref-group-head">
         <h3 class="pref-label">{props.legend}</h3>
       </div>
-      <p class="pref-desc">{props.description}</p>
-      <div class="pref-segments" role="radiogroup" aria-label={props.legend}>
+      <p class="pref-desc" id={descId}>{props.description}</p>
+      <div
+        class="pref-segments"
+        role="radiogroup"
+        aria-label={props.legend}
+        aria-describedby={descId}
+        onKeyDown={onKeyDown}
+      >
         <For each={props.options}>
-          {(option) => {
+          {(option, index) => {
             const active = () => props.value() === option;
             return (
               <button
+                ref={(el) => (buttons[index()] = el)}
                 type="button"
                 class="pref-segment"
                 role="radio"
                 aria-checked={active()}
-                aria-pressed={active()}
+                tabindex={active() ? 0 : -1}
                 onClick={() => props.onSelect(option)}
               >
                 {props.labels[option]}
@@ -276,7 +322,6 @@ function Toggle(props: ToggleProps): JSX.Element {
         class="pref-toggle"
         role="switch"
         aria-checked={props.value()}
-        aria-pressed={props.value()}
         onClick={() => props.onToggle(!props.value())}
       >
         <span class="pref-toggle-text">

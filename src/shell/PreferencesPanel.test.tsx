@@ -110,6 +110,58 @@ describe('PreferencesPanel', () => {
     );
   });
 
+  it('exposes segmented settings as a valid roving-tabindex radio group', () => {
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    const group = screen.getByRole('radiogroup', { name: 'Message density' });
+    const radios = screen.getAllByRole('radio').filter((radio) => group.contains(radio));
+    expect(radios.length).toBe(3);
+
+    // aria-pressed is not a supported state on role="radio" (SC 4.1.2) — it must be gone.
+    for (const radio of radios) {
+      expect(radio).not.toHaveAttribute('aria-pressed');
+    }
+
+    // Exactly one radio is checked and it is the sole tab stop (roving tabindex).
+    const checked = radios.filter((radio) => radio.getAttribute('aria-checked') === 'true');
+    expect(checked).toHaveLength(1);
+    const cozy = screen.getByRole('radio', { name: 'Cozy' });
+    expect(cozy).toHaveAttribute('aria-checked', 'true');
+    expect(cozy).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('radio', { name: 'Compact' })).toHaveAttribute('tabindex', '-1');
+    expect(screen.getByRole('radio', { name: 'Roomy' })).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('moves radio-group selection with arrow keys', () => {
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    const group = screen.getByRole('radiogroup', { name: 'Message density' });
+    expect(screen.getByRole('radio', { name: 'Cozy' })).toHaveAttribute('aria-checked', 'true');
+
+    fireEvent.keyDown(group, { key: 'ArrowRight' });
+    expect(screen.getByRole('radio', { name: 'Roomy' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'Roomy' })).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('radio', { name: 'Cozy' })).toHaveAttribute('tabindex', '-1');
+
+    fireEvent.keyDown(group, { key: 'Home' });
+    expect(screen.getByRole('radio', { name: 'Compact' })).toHaveAttribute('aria-checked', 'true');
+
+    fireEvent.keyDown(group, { key: 'ArrowLeft' });
+    expect(screen.getByRole('radio', { name: 'Roomy' })).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('exposes toggles as switches without a conflicting aria-pressed state', () => {
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    const reduceMotion = screen.getByRole('switch', { name: /Reduce motion/i });
+    expect(reduceMotion).toHaveAttribute('aria-checked', 'false');
+    // aria-pressed is not a supported state on role="switch" (SC 4.1.2).
+    expect(reduceMotion).not.toHaveAttribute('aria-pressed');
+  });
+
   it('opens Appearance from Preferences for mobile theming discoverability', () => {
     openPreferences();
     render(() => <PreferencesPanel />);
