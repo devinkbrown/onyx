@@ -27,6 +27,10 @@ import {
   positionToStereoPan,
   type SpatialAudioPosition,
 } from '@/lib/suimyaku-media/spatialAudio';
+import {
+  createVoiceActivityState,
+  updateVoiceActivityFromSamples,
+} from '@/lib/suimyaku-media/voiceActivity';
 import { shortDuration } from '@/lib/time/relativeTime';
 import { Avatar, Popover, Tooltip } from '@/primitives';
 import {
@@ -282,6 +286,84 @@ export function VoiceBar() {
 
   onCleanup(() => {
     setSpatialDragging(false);
+  });
+
+  // Reference-stable handle on the local capture stream: voice() is replaced on
+  // every setVoiceCallState (captions toggle, peer join, …), so a createMemo is
+  // used to dedupe by identity and keep the VAD effect below from rebuilding its
+  // AudioContext on unrelated voice-state churn.
+  const localAudioStream = createMemo(() => (isActive() ? voice().localStream : null));
+
+  // ── Local voice-activity indicator ──────────────────────────────────────────
+  // While in-call with a live local audio track, tap the mic through a dedicated
+  // AnalyserNode and drive the pure voice-activity detector (RMS envelope +
+  // hysteresis + hangover) once per animation frame, reflecting the local user's
+  // speaking flag into the shared speakingNicks state via the same action the
+  // remote/server-signaled path uses. Remote peers are untouched — this only
+  // adds the LOCAL user as a speaking source. Everything the effect allocates
+  // (AudioContext, AnalyserNode, source node, rAF) is released in onCleanup, so
+  // a remount, a mic swap (camera toggle), or leaving the call leaks nothing.
+  createEffect(() => {
+    const stream = localAudioStream();
+    const nick = selfNick();
+    if (!stream || !nick) return;
+    if (typeof AudioContext === 'undefined') return;
+    if (stream.getAudioTracks().length === 0) return;
+
+    let ctx: AudioContext;
+    let analyser: AnalyserNode;
+    let source: MediaStreamAudioSourceNode;
+    try {
+      ctx = new AudioContext();
+      analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+      source = ctx.createMediaStreamSource(stream);
+      source.connect(analyser);
+    } catch {
+      // WebAudio unavailable — the remote/server speaking path still works.
+      return;
+    }
+
+    const samples = new Float32Array(analyser.fftSize);
+    let vad = createVoiceActivityState();
+    let reported = false;
+    let lastTs = 0;
+    let rafId = 0;
+    let stopped = false;
+
+    const report = (speaking: boolean) => {
+      if (speaking === reported) return;
+      reported = speaking;
+      getState().setSpeakingNick(nick, speaking);
+    };
+
+    const tick = (ts: number) => {
+      if (stopped) return;
+      const dtMs = lastTs === 0 ? 0 : ts - lastTs;
+      lastTs = ts;
+      // A muted mic is silent by contract (track.enabled = false); short-circuit
+      // to rest so the indicator drops immediately rather than coasting through
+      // the detector's hangover window.
+      if (getState().voice.muted) {
+        vad = createVoiceActivityState();
+        report(false);
+      } else {
+        analyser.getFloatTimeDomainData(samples);
+        vad = updateVoiceActivityFromSamples(vad, samples, dtMs);
+        report(vad.speaking);
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+
+    onCleanup(() => {
+      stopped = true;
+      if (rafId) cancelAnimationFrame(rafId);
+      try { source.disconnect(); } catch { /* node already detached */ }
+      try { analyser.disconnect(); } catch { /* node already detached */ }
+      void ctx.close().catch(() => {});
+      if (reported) getState().setSpeakingNick(nick, false);
+    });
   });
 
   const handleToggleScreenshare = () => {

@@ -197,6 +197,7 @@ export function VoiceStage() {
                       peer={slot.peer}
                       stream={slot.stream}
                       isSelf={slot.isSelf}
+                      speaking={slot.isSelf ? slot.speaking : undefined}
                       muted={slot.muted}
                       deafened={slot.isSelf ? voice().deafened : undefined}
                       handRaised={slot.handRaised}
@@ -219,6 +220,7 @@ export function VoiceStage() {
                     peer={slot.peer}
                     stream={slot.stream}
                     isSelf={slot.isSelf}
+                    speaking={slot.isSelf ? slot.speaking : undefined}
                     muted={slot.muted}
                     deafened={slot.isSelf ? voice().deafened : undefined}
                     handRaised={slot.handRaised}
@@ -239,6 +241,7 @@ export function VoiceStage() {
                       peer={slot.peer}
                       stream={slot.stream}
                       isSelf={slot.isSelf}
+                      speaking={slot.isSelf ? slot.speaking : undefined}
                       muted={slot.muted}
                       deafened={slot.isSelf ? voice().deafened : undefined}
                       handRaised={slot.handRaised}
@@ -276,6 +279,7 @@ export function VoiceStage() {
               peer={null}
               stream={voice().cameraStream}
               isSelf
+              speaking={speakingNicks().has(selfNick())}
               muted={voice().muted}
               deafened={voice().deafened}
               handRaised={voice().handRaised}

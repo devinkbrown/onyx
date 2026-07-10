@@ -325,6 +325,29 @@ describe('ParticipantTile', () => {
     // Assert
     expect(getByTestId('participant-tile').className).toContain('voice-tile--self');
   });
+
+  it('reflects the speaking override on the self tile (local VAD)', () => {
+    // Arrange — self tile has no per-peer flag; the local detector drives the
+    // `speaking` override so the ring can light for the local user.
+    const { getByTestId } = render(() => (
+      <ParticipantTile nick="self" peer={null} stream={null} isSelf speaking channelUser={undefined} />
+    ));
+
+    // Assert
+    const tile = getByTestId('participant-tile');
+    expect(tile.className).toContain('voice-tile--speaking');
+    expect(tile).toHaveAttribute('data-speaking', 'true');
+  });
+
+  it('keeps the self tile silent when the speaking override is false', () => {
+    // Act
+    const { getByTestId } = render(() => (
+      <ParticipantTile nick="self" peer={null} stream={null} isSelf speaking={false} channelUser={undefined} />
+    ));
+
+    // Assert
+    expect(getByTestId('participant-tile').className).not.toContain('voice-tile--speaking');
+  });
 });
 
 // ── VoiceBar ──────────────────────────────────────────────────────────────────

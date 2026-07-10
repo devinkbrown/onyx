@@ -35,6 +35,12 @@ export type ParticipantTileProps = {
   stream: MediaStream | null;
   /** True for the local self tile */
   isSelf?: boolean;
+  /**
+   * Explicit speaking override. When provided it wins over the internal
+   * derivation — used to reflect the shared speakingNicks state for the local
+   * self tile (which otherwise has no per-peer `speaking` flag to read).
+   */
+  speaking?: boolean;
   /** True if this tile shows the active screenshare */
   isScreenshare?: boolean;
   /** Channel user entry, for role badge */
@@ -89,7 +95,7 @@ function SpeakingBars(props: { active: boolean }) {
 
 export function ParticipantTile(props: ParticipantTileProps): JSX.Element {
   const [local, rest] = splitProps(props, [
-    'nick', 'peer', 'stream', 'isSelf', 'isScreenshare', 'channelUser',
+    'nick', 'peer', 'stream', 'isSelf', 'speaking', 'isScreenshare', 'channelUser',
     'muted', 'deafened', 'handRaised', 'pinned', 'onPin', 'quality', 'class',
   ]);
 
@@ -108,7 +114,7 @@ export function ParticipantTile(props: ParticipantTileProps): JSX.Element {
   });
 
   const speaking = createMemo(() =>
-    local.isSelf ? false : (local.peer?.speaking ?? false)
+    local.speaking ?? (local.isSelf ? false : (local.peer?.speaking ?? false))
   );
 
   const isMuted = createMemo(() =>
