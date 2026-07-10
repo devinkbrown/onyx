@@ -1,5 +1,6 @@
 import { createStore } from 'zustand/vanilla';
 import { subscribeWithSelector } from 'zustand/middleware';
+import { parseStringArray } from './persistParse';
 import { IRCClient } from '@/lib/irc/client';
 import type { IRCMessage, Channel, ChannelUser, ChatMessage, ConnectionStatus, MessageReaction } from '@/lib/irc/types';
 import { parseMultilineLimits, planMultilineBatches, buildMultilineLines, assembleMultilineText } from '@/lib/irc/multiline';
@@ -9588,9 +9589,11 @@ function _addDMMessage(
 function _loadHighlightWords(): string[] {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = localStorage.getItem('onyx:highlight-words');
-    if (!raw) return [];
-    return JSON.parse(raw) as string[];
+    // Sanitize the boundary: highlightWords is read via `.some()` on the
+    // per-message hot path (see _handleMessage), so a valid-but-wrong-shape
+    // persisted value (`{}`, `"x"`, `5`, `null`) must NOT slip through as a
+    // non-array — that would throw for every incoming message.
+    return parseStringArray(localStorage.getItem('onyx:highlight-words'));
   } catch { return []; }
 }
 function _saveHighlightWords(words: string[]): void {
