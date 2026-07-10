@@ -132,14 +132,33 @@ export function escapeTagValue(val: string): string {
 }
 
 /**
- * Format a raw IRC line to send.
- * Appends \r\n.
+ * Strip the bytes that terminate/segment an IRC line — CR, LF, NUL — from a
+ * single field. CR/LF/NUL are illegal inside a message per RFC 1459/2812, so
+ * removing them makes injection impossible BY CONSTRUCTION: a value carrying an
+ * embedded `\r\n` can never smuggle a second command onto the wire.
+ */
+function stripWireControl(field: string): string {
+  return field.replace(/[\r\n\x00]/g, '');
+}
+
+/**
+ * Format a raw IRC line to send. Appends \r\n.
+ *
+ * Every command and param is stripped of CR/LF/NUL first, so a single call
+ * always emits EXACTLY ONE wire line. Without this, a param sourced from
+ * untrusted input — a composer paste, a rename-dialog nick, a topic/part
+ * reason, or a server-supplied session token routed through
+ * `buildSessionResumeLine` — could embed `\r\n` and inject a second IRC
+ * command (e.g. `PRIVMSG #c :hi\r\nJOIN #evil`). The `send()` echo-strip only
+ * trims a *trailing* CRLF, so this builder is the correct choke point.
  */
 export function formatIRCLine(command: string, ...params: string[]): string {
-  const parts = [command, ...params.slice(0, -1)];
-  if (params.length > 0) {
-    const last = params[params.length - 1]!;
-    // Prefix trailing param with ':' if it contains a space or starts with ':'
+  const cmd = stripWireControl(command);
+  const clean = params.map(stripWireControl);
+  const parts = [cmd, ...clean.slice(0, -1)];
+  if (clean.length > 0) {
+    const last = clean[clean.length - 1]!;
+    // Prefix trailing param with ':' if it is empty, contains a space, or starts with ':'
     if (last === '' || last.includes(' ') || last.startsWith(':')) {
       parts.push(':' + last);
     } else {

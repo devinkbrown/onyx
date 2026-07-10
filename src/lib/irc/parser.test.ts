@@ -91,6 +91,25 @@ describe('formatIRCLine', () => {
   it('colon-prefixes an empty trailing param', () => {
     expect(formatIRCLine('PART', '#c', '')).toBe('PART #c :\r\n');
   });
+
+  // CRLF/NUL injection guard: a single formatIRCLine call must NEVER be able to
+  // emit a second IRC command. Without stripping, a param carrying an embedded
+  // \r\n (a composer paste, a rename-dialog nick, a topic/part reason, or a
+  // server-supplied session token) would let one call transmit two commands.
+  it('strips embedded CR/LF/NUL from the trailing param so it cannot inject a second command', () => {
+    const line = formatIRCLine('PRIVMSG', '#c', 'hi\r\nJOIN #evil');
+    expect(line).toBe('PRIVMSG #c :hiJOIN #evil\r\n');
+    expect(line.slice(0, -2)).not.toMatch(/[\r\n\0]/);
+  });
+  it('strips CR/LF/NUL from the command token and middle params', () => {
+    const line = formatIRCLine('NICK\r\nOPER', 'ev\x00il', 'x');
+    expect(line.slice(0, -2)).not.toMatch(/[\r\n\0]/);
+  });
+  it('buildSessionResumeLine cannot be split by a CRLF-laced token', () => {
+    const line = buildSessionResumeLine('tok\r\nPRIVMSG #x :pwned');
+    expect(line.slice(0, -2)).not.toMatch(/[\r\n\0]/);
+    expect(line.endsWith('\r\n')).toBe(true);
+  });
 });
 
 describe('parseNamesPrefix', () => {
