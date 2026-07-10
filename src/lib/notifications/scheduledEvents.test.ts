@@ -4,6 +4,7 @@ import {
   eventCountdown,
   parseScheduledEvent,
   scheduledEventVisible,
+  scheduledEventsEqual,
 } from './scheduledEvents';
 
 const channel = (name: string) => ({ name });
@@ -20,6 +21,31 @@ describe('parseScheduledEvent', () => {
     for (const raw of ['', 'notime|', '|title', 'abc|title', '123']) {
       expect(parseScheduledEvent(raw)).toBeNull();
     }
+  });
+});
+
+describe('scheduledEventsEqual', () => {
+  test('two null events are equal (both "no event")', () => {
+    expect(scheduledEventsEqual(null, null)).toBe(true);
+  });
+
+  test('a fresh object with identical fields is equal (defeats reference churn)', () => {
+    const a = parseScheduledEvent('1780000000|Community call');
+    const b = parseScheduledEvent('1780000000|Community call');
+    expect(a).not.toBe(b); // distinct references, as the store selector produces
+    expect(scheduledEventsEqual(a, b)).toBe(true);
+  });
+
+  test('differing time or title is not equal', () => {
+    const base = { at: 1780000000, title: 'Call' };
+    expect(scheduledEventsEqual(base, { at: 1780000001, title: 'Call' })).toBe(false);
+    expect(scheduledEventsEqual(base, { at: 1780000000, title: 'Sync' })).toBe(false);
+  });
+
+  test('null vs set is not equal (event appearing/clearing still updates)', () => {
+    const event = { at: 1780000000, title: 'Call' };
+    expect(scheduledEventsEqual(null, event)).toBe(false);
+    expect(scheduledEventsEqual(event, null)).toBe(false);
   });
 });
 

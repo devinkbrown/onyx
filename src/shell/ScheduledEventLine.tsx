@@ -7,12 +7,15 @@
  */
 import { createMemo, createSignal, onCleanup, Show, type JSX } from 'solid-js';
 import { useStore, getState, selectChannelEvent, selectIsChannelOp } from '@/lib/store';
-import { eventCountdown, scheduledEventVisible } from '@/lib/notifications/scheduledEvents';
+import { eventCountdown, scheduledEventVisible, scheduledEventsEqual } from '@/lib/notifications/scheduledEvents';
 
 type ScheduledEventLineProps = { channel: string };
 
 export function ScheduledEventLine(props: ScheduledEventLineProps): JSX.Element {
-  const event = useStore((s) => selectChannelEvent(props.channel)(s));
+  // Value-equality: selectChannelEvent allocates a fresh object per call, so an
+  // unguarded subscription would re-fire on every store mutation while an event
+  // is set. Comparing by value keeps the countdown memos quiet until it changes.
+  const event = useStore((s) => selectChannelEvent(props.channel)(s), scheduledEventsEqual);
   const canManage = useStore((s) => selectIsChannelOp(props.channel)(s));
   const voiceActive = useStore((s) => s.voice.callChannel?.toLowerCase() === props.channel.toLowerCase());
 

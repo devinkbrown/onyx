@@ -10,7 +10,7 @@
 import { createMemo, createSignal, onCleanup, Show, splitProps, type JSX } from 'solid-js';
 import { useStore, getState, selectAccount, selectChannelEvent, selectChannelPins } from '@/lib/store';
 import { openPreferences } from '@/lib/prefs/preferences';
-import { eventCountdown, scheduledEventVisible } from '@/lib/notifications/scheduledEvents';
+import { eventCountdown, scheduledEventVisible, scheduledEventsEqual } from '@/lib/notifications/scheduledEvents';
 import { ChannelSettings } from './ChannelSettings';
 import { NotificationCenter } from './NotificationCenter';
 import { PresenceHeatline } from './PresenceHeatline';
@@ -104,10 +104,13 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   const activeView = useStore((s) => s.activeView);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const channels = useStore((s) => s.channels);
+  // selectChannelEvent parses the prop into a fresh object each call; without a
+  // value-equality fn this signal (and its four countdown memos) would re-fire on
+  // every unrelated store mutation whenever the active channel has an event set.
   const scheduledEvent = useStore((s) => {
     const view = s.activeView;
     return view.kind === 'channel' ? selectChannelEvent(view.channel)(s) : null;
-  });
+  }, scheduledEventsEqual);
   const account = useStore(selectAccount);
   const voice = useStore((s) => s.voice);
   const voiceChannelParticipants = useStore((s) => s.voiceChannelParticipants);

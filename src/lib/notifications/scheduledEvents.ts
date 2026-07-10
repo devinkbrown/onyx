@@ -28,6 +28,23 @@ export function parseScheduledEvent(raw: string | undefined): ScheduledEvent | n
   return { at, title };
 }
 
+/**
+ * Value-equality for a parsed scheduled event, for use as a `useStore`
+ * equality function. `parseScheduledEvent` allocates a fresh object on every
+ * call, so a store selector that returns it would otherwise fire on *every*
+ * store mutation (default Object.is never matches a new object). Comparing by
+ * value keeps the subscription — and every countdown memo downstream — quiet
+ * until the event actually changes.
+ */
+export function scheduledEventsEqual(
+  a: ScheduledEvent | null,
+  b: ScheduledEvent | null,
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.at === b.at && a.title === b.title;
+}
+
 export function scheduledEventVisible(event: ScheduledEvent, nowMs: number): boolean {
   return nowMs < event.at * 1000 + EVENT_GRACE_MS;
 }
