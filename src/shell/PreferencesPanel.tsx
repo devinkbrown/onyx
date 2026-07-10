@@ -761,7 +761,7 @@ export function PreferencesPanel(): JSX.Element {
         <Toggle
           legend="Voice and video"
           title="Show join voice/video controls"
-          description="Keeps media available in the app, but removes the channel join row when off."
+          description="Keeps media available in the app, but removes the channel header voice/video controls when off."
           value={() => preferences().voiceEntry}
           onToggle={(value) => setPreference('voiceEntry', value)}
         />

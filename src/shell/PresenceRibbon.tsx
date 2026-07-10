@@ -9,6 +9,7 @@
 
 import { createMemo, createSignal, For, onCleanup, Show, splitProps, type JSX } from 'solid-js';
 import { useStore, getState, selectAccount, selectChannelEvent, selectChannelPins } from '@/lib/store';
+import { openPreferences } from '@/lib/prefs/preferences';
 import type { ChannelUser } from '@/lib/irc/types';
 import { eventCountdown, scheduledEventVisible } from '@/lib/notifications/scheduledEvents';
 import { Avatar } from '@/primitives/index';
@@ -332,8 +333,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   return (
     <header class="shell-ribbon" role="banner" aria-label="Channel information">
       {/* Inner row shares the conversation reading measure so the title and
-          controls stay aligned with the message column on ultra-wide displays;
-          the ribbon's background + underline remain full-bleed chrome. */}
+          controls stay aligned to the conversation column chrome. */}
       <div class="shell-ribbon-inner">
       {/* ── LEFT: conversation identity (what you're looking at) ── */}
       <div class="shell-ribbon-identity">
@@ -419,7 +419,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
             <Show when={local.showJoinVoice && local.onJoinVoice}>
               <button
                 type="button"
-                class="shell-ribbon-iconbtn shell-ribbon-call"
+                class="shell-ribbon-iconbtn shell-ribbon-action shell-ribbon-call"
                 aria-label="Join voice"
                 title="Join voice"
                 onClick={() => local.onJoinVoice?.(false)}
@@ -430,10 +430,11 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                   <path d="M4 14h3v6H4a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2Z" />
                   <path d="M20 14h-3v6h3a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2Z" />
                 </svg>
+                <span class="shell-ribbon-action-label">Voice</span>
               </button>
               <button
                 type="button"
-                class="shell-ribbon-iconbtn shell-ribbon-call"
+                class="shell-ribbon-iconbtn shell-ribbon-action shell-ribbon-call"
                 aria-label="Join video"
                 title="Join video"
                 onClick={() => local.onJoinVoice?.(true)}
@@ -443,6 +444,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                   <path d="M15 10 20 7v10l-5-3" />
                   <rect x="3" y="6" width="12" height="12" rx="2" />
                 </svg>
+                <span class="shell-ribbon-action-label">Video</span>
               </button>
             </Show>
             <Show when={facepile().total > 0}>
@@ -512,7 +514,11 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                 onClick={() => setSettingsOpen(true)}
                 data-testid="ribbon-settings-gear"
               >
-                <span class="shell-ribbon-settings-glyph" aria-hidden="true">⚙</span>
+                <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"
+                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1A2 2 0 1 1 7.1 4l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.1a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.6 1Z" />
+                </svg>
               </button>
             </Show>
           </div>
@@ -536,6 +542,30 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
               <circle cx="11" cy="7.5" r="1.1" fill="currentColor" stroke="none" />
               <circle cx="15.5" cy="8.5" r="1.1" fill="currentColor" stroke="none" />
             </svg>
+          </button>
+
+          <button
+            type="button"
+            class="shell-ribbon-iconbtn shell-ribbon-action shell-ribbon-preferences"
+            aria-label="Open preferences"
+            aria-haspopup="dialog"
+            title="Preferences"
+            onClick={() => openPreferences()}
+            data-testid="ribbon-preferences"
+          >
+            <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"
+              fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 21v-7" />
+              <path d="M4 10V3" />
+              <path d="M12 21v-9" />
+              <path d="M12 8V3" />
+              <path d="M20 21v-5" />
+              <path d="M20 12V3" />
+              <path d="M2 14h4" />
+              <path d="M10 8h4" />
+              <path d="M18 16h4" />
+            </svg>
+            <span class="shell-ribbon-action-label">Prefs</span>
           </button>
 
           <NotificationCenter />

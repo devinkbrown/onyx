@@ -22,7 +22,7 @@ import type { ChatMessage, ChannelUser } from '@/lib/irc/types';
 import { saveChannelTopicDrafts } from '@/lib/channel/topicDrafts';
 import { followed, isFollowed, unfollow } from '@/lib/notifications/followed';
 import { readReviewHistory, recordReviewHistory } from '@/lib/notifications/reviewHistory';
-import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
+import { isPreferencesOpen, resetPreferences, setPreference } from '@/lib/prefs/preferences';
 import { _resetVaultForTests, queueOutbox, saveMessages } from '@/lib/vault/historyVault';
 import { Spotlight } from '@/chat/spotlight';
 import { AppShell } from './AppShell';
@@ -825,6 +825,34 @@ describe('AppShell', () => {
       // Assert
       expect(chip).toHaveAttribute('data-guest', 'false');
       expect(chip.textContent).toContain('alice');
+    });
+
+    it('opens preferences from the desktop ribbon', () => {
+      // Arrange
+      seedStore('#general');
+
+      // Act
+      render(() => <AppShell />);
+      fireEvent.click(screen.getByTestId('ribbon-preferences'));
+
+      // Assert
+      expect(isPreferencesOpen()).toBe(true);
+      expect(screen.getByTestId('preferences-panel')).toBeInTheDocument();
+    });
+
+    it('opens voice settings immediately from Join video', async () => {
+      // Arrange
+      seedStore('#general');
+
+      // Act
+      render(() => <AppShell />);
+      fireEvent.click(screen.getByRole('button', { name: 'Join video' }));
+
+      // Assert
+      await waitFor(() => {
+        expect(store.getState().showVoiceSettings).toBe(true);
+        expect(screen.getByRole('dialog', { name: 'Voice settings' })).toBeInTheDocument();
+      });
     });
 
     it('shows scheduled room events in the presence header and opens the event moment', () => {

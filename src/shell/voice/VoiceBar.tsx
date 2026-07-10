@@ -22,7 +22,6 @@ import { getState, useStore } from '@/lib/store';
 import { getMountedSuimyakuMediaEngine } from '@/lib/suimyaku-media/MediaEngine';
 import { shortDuration } from '@/lib/time/relativeTime';
 import { Avatar, Popover, Tooltip } from '@/primitives';
-import { VoiceSettings } from './settings/VoiceSettings';
 import {
   MicIcon, MicOffIcon, DeafenIcon, DeafenOffIcon, CameraIcon, CameraOffIcon,
   ScreenShareIcon, ScreenShareStopIcon, CaptionsIcon, HandIcon, ReactionIcon,
@@ -484,11 +483,6 @@ export function VoiceBar() {
         </div>
       </div>
 
-      {/* In-call settings sheet (portal modal) */}
-      <VoiceSettings
-        open={showSettings()}
-        onOpenChange={(open) => (open ? getState().openVoiceSettings() : getState().closeVoiceSettings())}
-      />
     </Show>
   );
 }

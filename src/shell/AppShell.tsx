@@ -46,6 +46,7 @@ import {
   VoiceStage,
   VoiceBar,
   VoicePip,
+  VoiceSettings,
   IncomingCallOverlay,
   OutgoingCallOverlay,
   CaptionsOverlay,
@@ -200,6 +201,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
   // Boot the SUIMYAKU media engine once and wire its callbacks into the store.
   mountMedia();
   const voice = useStore((s) => s.voice);
+  const showVoiceSettings = useStore((s) => s.showVoiceSettings);
   const inCall = createMemo(() => {
     const cs = voice().callState;
     return cs !== 'idle' && cs !== 'ringing_in' && cs !== 'ringing_out';
@@ -211,7 +213,10 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const canJoinVoice = createMemo(() => preferences().voiceEntry && activeView().kind === 'channel' && !inCall());
   function joinVoice(withVideo: boolean): void {
     const v = activeView();
-    if (v.kind === 'channel') void getState().joinVoiceChannel(v.channel, withVideo);
+    if (v.kind !== 'channel') return;
+    const state = getState();
+    state.openVoiceSettings();
+    void state.joinVoiceChannel(v.channel, withVideo);
   }
 
   // ── The rail is hidden when fewer than 3 servers are present.
@@ -451,7 +456,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
           <PresenceRibbon
             selfNick={displayNick()}
             onToggleMembers={handleToggleMembers}
-            showJoinVoice={isMobile() && canJoinVoice()}
+            showJoinVoice={canJoinVoice()}
             onJoinVoice={joinVoice}
           />
           <Show when={preferences().timeScrubber}>
@@ -470,26 +475,6 @@ export function AppShell(props: AppShellProps): JSX.Element {
             {/* In-call stage when viewing the voice channel you're in */}
             <Show when={viewingCall()}>
               <VoiceStage />
-            </Show>
-            {/* Join-voice affordance for a text channel you're not yet in a call on */}
-            <Show when={canJoinVoice() && !isMobile()}>
-              <div class="shell-voice-join">
-                <button type="button" class="shell-voice-join-btn" onClick={() => joinVoice(false)}>
-                  <svg class="shell-voice-join-icon" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M3 9.5V8a5 5 0 0 1 10 0v1.5" />
-                    <rect x="2" y="9.5" width="2.6" height="4" rx="1.1" />
-                    <rect x="11.4" y="9.5" width="2.6" height="4" rx="1.1" />
-                  </svg>
-                  Join voice
-                </button>
-                <button type="button" class="shell-voice-join-btn" onClick={() => joinVoice(true)}>
-                  <svg class="shell-voice-join-icon" viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <rect x="1.5" y="4" width="9" height="8" rx="1.6" />
-                    <path d="m10.5 7 3.4-2.1a.4.4 0 0 1 .6.34v5.5a.4.4 0 0 1-.6.35L10.5 9" />
-                  </svg>
-                  Join video
-                </button>
-              </div>
             </Show>
             <MessageView selfNick={displayNick()} />
             <MessageSearch />
@@ -589,6 +574,10 @@ export function AppShell(props: AppShellProps): JSX.Element {
       <PinnedMessages />
 
       {/* Voice/video overlays — each self-gates on store.voice */}
+      <VoiceSettings
+        open={showVoiceSettings()}
+        onOpenChange={(open) => (open ? getState().openVoiceSettings() : getState().closeVoiceSettings())}
+      />
       <VoicePip />
       <IncomingCallOverlay />
       <OutgoingCallOverlay />
