@@ -1,12 +1,28 @@
+export type BlockKitLiteSendAction = {
+  type: 'send';
+  target: string;
+  value: string;
+};
+
+export type BlockKitLiteSelectNotifyAction = {
+  type: 'select-notify';
+  target: string;
+  value: string | null;
+};
+
+export type BlockKitLiteAction = BlockKitLiteSendAction | BlockKitLiteSelectNotifyAction;
+
 export type BlockKitLiteButton = {
   label: string;
   url: string | null;
   value: string | null;
+  action: BlockKitLiteAction | null;
 };
 
 export type BlockKitLiteSelect = {
   label: string;
   options: Array<{ label: string; value: string }>;
+  action: BlockKitLiteAction | null;
 };
 
 export type BlockKitLiteField = {
@@ -14,13 +30,25 @@ export type BlockKitLiteField = {
   value: string;
 };
 
-export type BlockKitLiteBlock = {
+type BlockKitLiteBaseBlock = {
   title: string | null;
   text: string | null;
   buttons: BlockKitLiteButton[];
   selects: BlockKitLiteSelect[];
   fields: BlockKitLiteField[];
 };
+
+export type BlockKitLiteMessageBlock = BlockKitLiteBaseBlock & {
+  type: 'message';
+};
+
+export type BlockKitLiteModalBlock = BlockKitLiteBaseBlock & {
+  type: 'modal';
+  title: string;
+  triggerLabel: string;
+};
+
+export type BlockKitLiteBlock = BlockKitLiteMessageBlock | BlockKitLiteModalBlock;
 
 export type BlockKitLiteExtraction = {
   text: string;
@@ -33,6 +61,8 @@ const MAX_BUTTONS = 4;
 const MAX_SELECTS = 2;
 const MAX_OPTIONS = 8;
 const MAX_FIELDS = 6;
+const MAX_ACTION_VALUE = 240;
+const MAX_TARGET = 80;
 
 function trimText(value: unknown, max = MAX_TEXT): string | null {
   if (typeof value !== 'string') return null;
@@ -53,6 +83,42 @@ function safeUrl(value: unknown): string | null {
   }
 }
 
+function safeTarget(value: unknown): string | null {
+  const target = trimText(value, MAX_TARGET);
+  if (!target || /[\s,\x00\r\n]/.test(target)) return null;
+  if (target.startsWith('#') || target.startsWith('&')) return target;
+  return /^[A-Za-z0-9_[\]\\`^{}|][A-Za-z0-9_[\]\\`^{}|.:-]*$/.test(target) ? target : null;
+}
+
+function safeActionValue(value: unknown): string | null {
+  const text = trimText(value, MAX_ACTION_VALUE);
+  if (!text) return null;
+  if (/[\r\n]/.test(text) || text.startsWith('/')) return null;
+  return text;
+}
+
+function readAction(raw: unknown): BlockKitLiteAction | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const source = raw as Record<string, unknown>;
+  const target = safeTarget(source.target);
+  if (!target) return null;
+
+  if (source.type === 'send') {
+    const value = safeActionValue(source.value);
+    return value ? { type: 'send', target, value } : null;
+  }
+
+  if (source.type === 'select-notify') {
+    return {
+      type: 'select-notify',
+      target,
+      value: safeActionValue(source.value),
+    };
+  }
+
+  return null;
+}
+
 function readButtons(raw: unknown): BlockKitLiteButton[] {
   if (!Array.isArray(raw)) return [];
   return raw.slice(0, MAX_BUTTONS).flatMap((item) => {
@@ -64,6 +130,7 @@ function readButtons(raw: unknown): BlockKitLiteButton[] {
       label,
       url: safeUrl(source.url),
       value: trimText(source.value, 80),
+      action: readAction(source.action),
     }];
   });
 }
@@ -83,7 +150,7 @@ function readSelects(raw: unknown): BlockKitLiteSelect[] {
       if (!optionLabel) return [];
       return [{ label: optionLabel, value: trimText(optionSource.value, 80) ?? optionLabel }];
     });
-    return options.length > 0 ? [{ label, options }] : [];
+    return options.length > 0 ? [{ label, options, action: readAction(source.action) }] : [];
   });
 }
 
@@ -102,16 +169,37 @@ export function parseBlockKitLitePayload(raw: string): BlockKitLiteBlock | null 
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     if (!parsed || typeof parsed !== 'object') return null;
-    const block = {
-      title: trimText(parsed.title, 80),
-      text: trimText(parsed.text),
-      buttons: readButtons(parsed.buttons),
-      selects: readSelects(parsed.selects),
-      fields: readFields(parsed.fields),
-    };
-    if (!block.title && !block.text && block.buttons.length === 0 && block.selects.length === 0 && block.fields.length === 0) {
+    const type = parsed.type === 'modal' ? 'modal' : 'message';
+    const title = trimText(parsed.title, 80);
+    const text = trimText(parsed.text);
+    const buttons = readButtons(parsed.buttons);
+    const selects = readSelects(parsed.selects);
+    const fields = readFields(parsed.fields);
+    if (!title && !text && buttons.length === 0 && selects.length === 0 && fields.length === 0) {
       return null;
     }
+    if (type === 'modal') {
+      const modalTitle = title ?? 'Details';
+      return {
+        type,
+        title: modalTitle,
+        text,
+        buttons,
+        selects,
+        fields,
+        triggerLabel: trimText(parsed.triggerLabel, 48)
+          ?? trimText(parsed.trigger_label, 48)
+          ?? `Open ${modalTitle}`,
+      };
+    }
+    const block = {
+      type,
+      title: trimText(parsed.title, 80),
+      text,
+      buttons,
+      selects,
+      fields,
+    } satisfies BlockKitLiteMessageBlock;
     return block;
   } catch {
     return null;
