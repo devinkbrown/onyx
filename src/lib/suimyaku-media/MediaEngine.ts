@@ -9,6 +9,7 @@ import { TsumugiSession } from './TsumugiSession';
 import { TsumugiGroup } from './TsumugiGroup';
 import { TsumugiIdentity } from './TsumugiIdentity';
 import { ChunkAssembler } from './ChunkAssembler';
+import { TeardownGuard } from './teardownGuard';
 import { PeerRegistry } from './PeerRegistry';
 import { KaguraCodec, type KaguraCodecTag, decodeKaguraFrame, encodeKaguraFrame } from './kaguraFrame';
 import { appendMediaMac, importMediaMacKey } from './mediaMac';
@@ -247,6 +248,9 @@ export class SuimyakuMediaEngine {
   private tsumugiSessions = new Map<string, TsumugiSession>();
   private tsumugiGroupKey: TsumugiGroup | null = null;
   private tsumugiGroupKeyPromise: Promise<TsumugiGroup> | null = null;
+  // Fences async crypto write-backs so a continuation scheduled during call A
+  // cannot resurrect/clobber E2EE key state after hangup or into a later call.
+  private readonly callGuard = new TeardownGuard();
   private tsumugiIdentity: TsumugiIdentity | null = null;
   private tsumugiIdentityPromise: Promise<TsumugiIdentity> | null = null;
   private incomingKind: MediaKind;
@@ -1484,8 +1488,15 @@ export class SuimyakuMediaEngine {
         const peerKeyBytes = Uint8Array.from(atob(payload), c => c.charCodeAt(0));
         const existing = this.tsumugiSessions.get(fromNick.toLowerCase());
         const shouldReply = !existing?.established;
+        const hsGen = this.callGuard.capture();
         (existing ? Promise.resolve(existing) : this.createTsumugiSession()).then(async vs => {
           await vs.ingestPeerKey(peerKeyBytes);
+          // Hangup (or a rejoin) happened while we were establishing — drop this
+          // session instead of resurrecting it into an idle/new call.
+          if (!this.callGuard.isCurrent(hsGen)) {
+            if (!existing) vs.destroy();
+            return;
+          }
           this.tsumugiSessions.set(fromNick.toLowerCase(), vs);
           if (shouldReply) {
             const ourPub = await this.exportTsumugiPublicKey(vs);
@@ -1540,7 +1551,11 @@ export class SuimyakuMediaEngine {
         const wrapped = Uint8Array.from(atob(wrappedB64), c => c.charCodeAt(0));
         const vs = this.tsumugiSessions.get(fromNick.toLowerCase());
         if (vs?.established) {
+          const gkGen = this.callGuard.capture();
           TsumugiGroup.importKey(wrapped, vs).then(group => {
+            // Reject a group key that arrived after teardown / into a new call.
+            if (!this.callGuard.isCurrent(gkGen)) { group.destroy(); return; }
+            this.tsumugiGroupKey?.destroy();
             this.tsumugiGroupKey = group;
           }).catch(() => {});
         }
@@ -1699,7 +1714,13 @@ export class SuimyakuMediaEngine {
     if (this.audioLevelTimer) { clearInterval(this.audioLevelTimer); this.audioLevelTimer = null; }
     this.registry.peerLevels.clear();
     this.registry.decodeErrors.clear();
+    // Invalidate any in-flight crypto continuations before dropping references
+    // so a late handshake/group-key promise can't resurrect key material into
+    // an idle engine or bleed a previous call's group key into the next call.
+    this.callGuard.bump();
+    for (const vs of this.tsumugiSessions.values()) vs.destroy();
     this.tsumugiSessions.clear();
+    this.tsumugiGroupKey?.destroy();
     this.tsumugiGroupKey = null;
     this.tsumugiGroupKeyPromise = null;
     // WS media plane teardown.
@@ -1781,6 +1802,7 @@ export class SuimyakuMediaEngine {
     if (!this.activeRoom || !this.client) return;
     const established = [...this.tsumugiSessions.entries()].filter(([, vs]) => vs.established);
     if (established.length === 0) return;
+    const gen = this.callGuard.capture();
     /* Create or reuse group key. Memoize the in-flight creation so two
      * concurrent handshakes resolving in the same tick can't each build a
      * separate group key (the second would clobber the first, making the
@@ -1789,11 +1811,18 @@ export class SuimyakuMediaEngine {
     if (!group) {
       if (!this.tsumugiGroupKeyPromise) {
         this.tsumugiGroupKeyPromise = TsumugiGroup.create()
-          .then(g => { this.tsumugiGroupKey = g; return g; })
+          .then(g => {
+            // If the call was torn down while creating, don't install the key.
+            if (!this.callGuard.isCurrent(gen)) { g.destroy(); return g; }
+            this.tsumugiGroupKey = g;
+            return g;
+          })
           .catch(err => { this.tsumugiGroupKeyPromise = null; throw err; });
       }
       group = await this.tsumugiGroupKeyPromise;
     }
+    // A hangup/rejoin during key creation invalidates this distribution pass.
+    if (!this.callGuard.isCurrent(gen)) return;
     const myNick = this.getLocalNick();
     for (const [nick, vs] of established) {
       const wrapped = await group.exportKeyFor(vs);
