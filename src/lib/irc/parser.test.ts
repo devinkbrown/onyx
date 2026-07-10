@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   parseIRCMessage,
+  escapeTagValue,
   formatIRCLine,
   parseNamesPrefix,
   parsePREFIX,
@@ -43,6 +44,34 @@ describe('parseIRCMessage', () => {
     expect(m.tags.account).toBe('bob');
     expect(m.tags.msg).toBe('a b'); // \s unescapes to a space
     expect(m.command).toBe('PRIVMSG');
+  });
+
+  it('unescapes an escaped backslash as a single left-to-right pass', () => {
+    // Wire value `\\s` = an escaped backslash followed by a literal `s`.
+    // Per IRCv3 it must decode to `\s` (backslash + s), NOT be re-interpreted
+    // as `\s` (space). A multi-pass replace collapses `\\`->`\` and then wrongly
+    // reads the trailing `s` as an escape.
+    const m = parseIRCMessage('@k=\\\\s FOO');
+    expect(m.tags.k).toBe('\\s');
+  });
+
+  it('does not resurrect escapes after collapsing a doubled backslash (\\n, \\:)', () => {
+    const mn = parseIRCMessage('@k=\\\\n FOO');
+    expect(mn.tags.k).toBe('\\n'); // backslash + n, never a newline
+    const mc = parseIRCMessage('@k=\\\\: FOO');
+    expect(mc.tags.k).toBe('\\:'); // backslash + colon, never a semicolon
+  });
+
+  it('round-trips every escaped tag value through escape/unescape', () => {
+    for (const orig of ['\\s', '\\n', '\\:', 'a\\b', 'a;b c', 'x\\\\y', 'plain']) {
+      const m = parseIRCMessage('@k=' + escapeTagValue(orig) + ' FOO');
+      expect(m.tags.k).toBe(orig);
+    }
+  });
+
+  it('drops a lone trailing backslash and passes unknown escapes through', () => {
+    expect(parseIRCMessage('@k=abc\\ FOO').tags.k).toBe('abc'); // trailing lone backslash dropped
+    expect(parseIRCMessage('@k=a\\xb FOO').tags.k).toBe('axb'); // unknown escape -> literal char
   });
 
   it('strips a trailing CRLF and null bytes', () => {

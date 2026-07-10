@@ -97,14 +97,28 @@ export function parseIRCMessage(raw: string): IRCMessage {
   return { tags, prefix, nick, host, command, params, raw: line };
 }
 
-/** Unescape IRCv3 tag value escape sequences */
+/**
+ * Unescape IRCv3 tag value escape sequences in a SINGLE left-to-right pass.
+ *
+ * Sequential global replaces are wrong: collapsing `\\`->`\` first lets a later
+ * pass reinterpret the freed backslash + following char as a fresh escape, so a
+ * wire value like `\\s` (escaped backslash + literal `s`) mis-decodes to
+ * "backslash space" instead of "backslash s". A single consuming pass with a
+ * lookup table is the only correct decode. Per spec, a lone trailing backslash
+ * is dropped and an unknown escape yields the escaped character verbatim.
+ */
 function unescapeTagValue(val: string): string {
-  return val
-    .replace(/\\:/g, ';')
-    .replace(/\\s/g, ' ')
-    .replace(/\\\\/g, '\\')
-    .replace(/\\r/g, '\r')
-    .replace(/\\n/g, '\n');
+  return val.replace(/\\([\s\S]?)/g, (_m, c: string) => {
+    switch (c) {
+      case ':': return ';';
+      case 's': return ' ';
+      case '\\': return '\\';
+      case 'r': return '\r';
+      case 'n': return '\n';
+      case '': return ''; // trailing lone backslash — dropped
+      default: return c; // unknown escape — literal escaped char
+    }
+  });
 }
 
 /** Escape a tag value per IRCv3 spec. */
