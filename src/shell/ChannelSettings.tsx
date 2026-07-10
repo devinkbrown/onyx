@@ -40,7 +40,12 @@ import {
   readChannelTopicDraft,
   saveChannelTopicDraft,
 } from '@/lib/channel/topicDrafts';
+import {
+  BRIDGE_STATUS_PROP,
+  parseBridgeStatus,
+} from '@/lib/interop/bridgeStatus';
 import { Button, FormField, Sheet } from '@/primitives/index';
+import { BridgeStatusBadge } from './BridgeStatusBadge';
 
 // Common simple channel flags exposed as toggles. Letters match Orochi's
 // CHANMODES group D (flags) — see ISUPPORT `imnstCTNMSgWOA`.
@@ -91,6 +96,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
   const ephemeralSeconds = useStore((s) => selectChannelEphemeralSeconds(local.channel)(s));
   const encryptionPolicy = useStore((s) => selectChannelEncryptionPolicy(local.channel)(s));
   const serviceNotices = useStore((s) => s.serviceNotices);
+  const channelProps = useStore((s) => s.channelProps);
   const isOp = useStore((s) => selectIsChannelOp(local.channel)(s));
   const connectionStatus = useStore((s) => s.connectionStatus);
 
@@ -213,6 +219,9 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
       .filter((notice) => notice.source === 'Webhook')
       .slice(-4)
       .reverse(),
+  );
+  const bridgeStatus = createMemo(() =>
+    parseBridgeStatus(channelProps().get(local.channel.toLowerCase())?.[BRIDGE_STATUS_PROP] ?? ''),
   );
 
   function createWebhook(event: Event): void {
@@ -460,6 +469,11 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
         {/* ── Integrations ── */}
         <section class="shell-chset-section" aria-labelledby="chset-integrations-heading">
           <h3 id="chset-integrations-heading" class="shell-chset-heading">Integrations</h3>
+
+          <div class="shell-chset-readonly">
+            <p class="shell-chset-readonly-label">Bridge status</p>
+            <BridgeStatusBadge status={bridgeStatus()} />
+          </div>
 
           <Show
             when={isOp()}
