@@ -296,11 +296,30 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
             </Show>
           </div>
         </Show>
+        <Show when={search.query().trim().length >= 2}>
+          <div class="onyx-message-search__recall" role="group" aria-label="Device recall matching mode">
+            <ProvenanceBadge scope="device" subject="Device recall matching mode" />
+            <span class="onyx-message-search__vault-label">Device recall</span>
+            <button
+              type="button"
+              class="onyx-message-search__recall-chip"
+              role="switch"
+              aria-checked={search.vaultMode() === 'semantic'}
+              data-mode={search.vaultMode()}
+              title="Toggle device recall between exact text and semantic meaning — both run entirely on this device"
+              onClick={() => search.toggleVaultMode()}
+            >
+              {search.vaultMode() === 'semantic' ? 'Semantic ⇄ exact' : 'Exact ⇄ semantic'}
+            </button>
+          </div>
+        </Show>
         <Show when={search.vaultResults().length > 0}>
           <div class="onyx-message-search__vault" data-testid="vault-search">
             <div class="onyx-message-search__vault-bar">
               <ProvenanceBadge scope="device" subject="Device-memory message search" />
-              <span class="onyx-message-search__vault-label">Saved on this device</span>
+              <span class="onyx-message-search__vault-label">
+                {search.vaultMode() === 'semantic' ? 'Recalled by meaning on this device' : 'Saved on this device'}
+              </span>
               <span class="onyx-message-search__server-count">
                 {search.vaultResults().length} remembered
               </span>

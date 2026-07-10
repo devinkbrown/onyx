@@ -393,6 +393,31 @@ export async function searchVault(query: string, limit = 80): Promise<VaultSearc
   }
 }
 
+/**
+ * Read EVERY remembered, non-tombstoned message on this device as
+ * VaultSearchHits (Roadmap v3.0 — semantic search reuses this scan). A full
+ * getAll is fine at vault scale (≤ VAULT_KEEP rows per target). Deleted and
+ * redacted rows are excluded, matching {@link searchVault}.
+ */
+export async function readAllVaultHits(): Promise<VaultSearchHit[]> {
+  const db = await openVault();
+  if (!db) return [];
+  try {
+    const tx = db.transaction(STORE, 'readonly');
+    const store = tx.objectStore(STORE);
+    const rows = await new Promise<StoredMessage[]>((resolve) => {
+      const req = store.getAll();
+      req.onsuccess = () => resolve((req.result ?? []) as StoredMessage[]);
+      req.onerror = () => resolve([]);
+    });
+    return rows
+      .filter((r) => !r.deleted && !r.redacted)
+      .map((r) => ({ target: r.target_key, message: deserializeMessage(r) }));
+  } catch {
+    return [];
+  }
+}
+
 // ── Offline outbox (Roadmap Phase 2.5) ───────────────────────────────────────
 
 /** Queue a message composed while offline; it sends on reconnect. */

@@ -3,6 +3,10 @@ import { getState, useStore } from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
 import { preferences } from '@/lib/prefs/preferences';
 import { searchVault } from '@/lib/vault/historyVault';
+import { searchVaultSemantic } from '@/lib/vault/searchVaultSemantic';
+
+/** How the device-memory (vault) pane matches: literal substring vs meaning. */
+export type VaultSearchMode = 'exact' | 'semantic';
 
 export type MessageSearchResult = {
   id: string;
@@ -42,6 +46,10 @@ export type UseMessageSearch = {
   hasConversation: Accessor<boolean>;
   /** Device-memory (vault) hits from OTHER conversations, newest first */
   vaultResults: Accessor<VaultSearchResult[]>;
+  /** Whether the vault pane matches by literal substring or by meaning */
+  vaultMode: Accessor<VaultSearchMode>;
+  /** Flip the vault pane between exact and semantic matching */
+  toggleVaultMode: () => void;
   /** Device-only lexical pivots from visible and vault hits */
   recallSuggestions: Accessor<string[]>;
   applyRecallSuggestion: (term: string) => void;
@@ -54,6 +62,7 @@ export type UseMessageSearch = {
 };
 
 const [isMessageSearchOpen, setMessageSearchOpen] = createSignal(false);
+const [vaultSearchMode, setVaultSearchMode] = createSignal<VaultSearchMode>('exact');
 const [messageSearchQuery, setMessageSearchQuerySignal] = createSignal('');
 const [messageSearchActiveIndex, setMessageSearchActiveIndex] = createSignal(0);
 const [messageSearchActiveResultId, setMessageSearchActiveResultId] = createSignal<string | null>(null);
@@ -292,6 +301,7 @@ export function useMessageSearch(): UseMessageSearch {
     const query = messageSearchQuery().trim();
     const open = isMessageSearchOpen();
     const loadedIds = loadedMessageIds();
+    const mode = vaultSearchMode();
     if (vaultTimer !== undefined) clearTimeout(vaultTimer);
     if (!open || query.length < 2 || !preferences().localHistory) {
       setVaultHits([]);
@@ -299,7 +309,8 @@ export function useMessageSearch(): UseMessageSearch {
     }
     const seq = ++vaultSeq;
     vaultTimer = setTimeout(() => {
-      void searchVault(query).then((hits) => {
+      const run = mode === 'semantic' ? searchVaultSemantic(query) : searchVault(query);
+      void run.then((hits) => {
         if (seq !== vaultSeq) return; // a newer query superseded this one
         setVaultHits(
           hits
@@ -369,6 +380,8 @@ export function useMessageSearch(): UseMessageSearch {
     targetLabel,
     hasConversation,
     vaultResults: vaultHits,
+    vaultMode: vaultSearchMode,
+    toggleVaultMode: () => setVaultSearchMode((mode) => (mode === 'exact' ? 'semantic' : 'exact')),
     recallSuggestions,
     applyRecallSuggestion: setQuery,
     openVaultResult,
