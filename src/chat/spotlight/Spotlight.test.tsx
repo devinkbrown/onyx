@@ -131,6 +131,47 @@ describe('Spotlight', () => {
     expect(screen.queryByRole('dialog', { name: 'Command palette' })).not.toBeInTheDocument();
   });
 
+  it('restores focus to the launcher when closed', async () => {
+    renderSpotlight();
+    const launcher = screen.getByRole('button', { name: 'Before palette' });
+    launcher.focus();
+    expect(launcher).toHaveFocus();
+
+    fireEvent.keyDown(window, { key: 'k', metaKey: true });
+    const input = screen.getByRole('combobox', { name: 'Command search' });
+    await waitFor(() => expect(input).toHaveFocus());
+
+    fireEvent.keyDown(input, { key: 'Escape' });
+
+    await waitFor(() => expect(launcher).toHaveFocus());
+  });
+
+  it('announces the result count without re-announcing the active option on navigation', () => {
+    setState({
+      channels: new Map([
+        ['#forge', channel('#forge')],
+        ['#lapis', channel('#lapis')],
+      ]),
+    });
+    renderSpotlight();
+
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    const input = screen.getByRole('combobox', { name: 'Command search' });
+    const status = screen.getByRole('status');
+    const announced = status.textContent;
+
+    // The results status reflects the filtered set, not the active option.
+    expect(announced).toMatch(/command/i);
+
+    const firstActive = input.getAttribute('aria-activedescendant');
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+
+    // Arrow navigation moves activedescendant (SR announces the option there)…
+    expect(input.getAttribute('aria-activedescendant')).not.toBe(firstActive);
+    // …but the live region must NOT change, or the option is announced twice.
+    expect(status.textContent).toBe(announced);
+  });
+
   it('can run a theme command from filtered results', () => {
     renderSpotlight();
 

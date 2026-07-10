@@ -137,6 +137,15 @@ export function Spotlight(props: SpotlightProps) {
     return 'Try goto, at, search, reader, density, motion, or mute commands';
   });
 
+  // Result-set announcement for the live region. Keyed to the filtered set only
+  // (never activeIndex) so arrow navigation is announced solely by
+  // aria-activedescendant and never double-announced here (SC 4.1.3).
+  const resultsAnnouncement = createMemo(() => {
+    const count = matches().length;
+    if (count === 0) return query().trim() ? 'No matching command' : '';
+    return `${count} command${count === 1 ? '' : 's'} available`;
+  });
+
   createEffect(() => {
     const count = matches().length;
     setActiveIndex((index) => {
@@ -154,7 +163,13 @@ export function Spotlight(props: SpotlightProps) {
       return;
     }
 
-    restoreFocusTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    // Capture the launcher only on the open transition. If this effect re-runs
+    // while already open (e.g. openSpotlight(query) with a new initial query),
+    // document.activeElement is the in-dialog input — re-capturing it would
+    // strand focus on close (SC 2.4.3 Focus Order).
+    if (!restoreFocusTo) {
+      restoreFocusTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    }
     setQuery(spotlight.initialQuery());
     queueMicrotask(() => inputRef?.focus());
   });
@@ -338,7 +353,7 @@ export function Spotlight(props: SpotlightProps) {
                 )}
               </For>
             </div>
-            <span class="onyx-spotlight__grammar-status" aria-live="polite">{activeHint()}</span>
+            <span class="onyx-spotlight__grammar-status">{activeHint()}</span>
           </div>
 
           <div id={LISTBOX_ID} class="onyx-spotlight__results" role="listbox" aria-label="Commands">
@@ -390,6 +405,12 @@ export function Spotlight(props: SpotlightProps) {
               </For>
             </Show>
           </div>
+
+          {/* Polite results summary for assistive tech. Lives outside the
+              grammar-hint (aria-describedby) block and is keyed only to the
+              result set, so it never doubles the aria-activedescendant
+              announcement of the active option (SC 4.1.3 Status Messages). */}
+          <span class="sr-only" role="status">{resultsAnnouncement()}</span>
         </div>
       </div>
     </Show>
