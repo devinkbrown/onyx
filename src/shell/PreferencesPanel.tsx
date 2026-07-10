@@ -12,7 +12,8 @@
 
 import { createMemo, createSignal, For, Show, type JSX } from 'solid-js';
 import { Sheet } from '@/primitives';
-import { clearVault } from '@/lib/vault/historyVault';
+import { clearVault, importVault, VAULT_KEEP } from '@/lib/vault/historyVault';
+import { parseDiscordExport, type DiscordImportSummary } from '@/lib/import/discordImport';
 import {
   clearClientExtensionAudit,
   clearClientExtensionActions,
@@ -456,6 +457,172 @@ function PortableVaultControls(): JSX.Element {
   );
 }
 
+interface PendingDiscordImport {
+  fileNames: string[];
+  snapshots: import('@/lib/vault/historyVault').VaultExportSnapshot[];
+  channels: number;
+  messages: number;
+  skipped: number;
+  droppedOverCap: number;
+  guild: string | null;
+  oldest: string | null;
+  newest: string | null;
+}
+
+function shortDate(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+}
+
+/**
+ * Import a community's own Discord history (DiscordChatExporter JSON export)
+ * into this device's local vault — no bot token, no Discord API, no upload.
+ * Mirrors PortableVaultControls' two-step upload → review → confirm flow.
+ */
+function DiscordImportControls(): JSX.Element {
+  const [status, setStatus] = createSignal<string | null>(null);
+  const [busy, setBusy] = createSignal(false);
+  const [pending, setPending] = createSignal<PendingDiscordImport | null>(null);
+
+  async function handleSelect(event: Event): Promise<void> {
+    const input = event.currentTarget as HTMLInputElement;
+    const files = Array.from(input.files ?? []);
+    input.value = '';
+    if (files.length === 0) return;
+    setBusy(true);
+    try {
+      const snapshots: PendingDiscordImport['snapshots'] = [];
+      const fileNames: string[] = [];
+      const targets = new Set<string>();
+      let messages = 0;
+      let skipped = 0;
+      let droppedOverCap = 0;
+      let guild: string | null = null;
+      let oldest: string | null = null;
+      let newest: string | null = null;
+      let rejected = 0;
+
+      for (const file of files) {
+        let raw: unknown;
+        try {
+          raw = JSON.parse(await file.text());
+        } catch {
+          rejected += 1;
+          continue;
+        }
+        const result = parseDiscordExport(raw);
+        if (!result) {
+          rejected += 1;
+          continue;
+        }
+        const summary: DiscordImportSummary = result.summary;
+        snapshots.push(result.snapshot);
+        fileNames.push(file.name);
+        for (const t of result.snapshot.targets) targets.add(t.target);
+        messages += summary.messages;
+        skipped += summary.skipped;
+        droppedOverCap += summary.droppedOverCap;
+        if (!guild && summary.guild) guild = summary.guild;
+        if (summary.oldest && (!oldest || summary.oldest < oldest)) oldest = summary.oldest;
+        if (summary.newest && (!newest || summary.newest > newest)) newest = summary.newest;
+      }
+
+      if (snapshots.length === 0) {
+        setPending(null);
+        setStatus('No Discord export recognized. Export channels from DiscordChatExporter in JSON mode, then choose those .json files.');
+        return;
+      }
+      setPending({ fileNames, snapshots, channels: targets.size, messages, skipped, droppedOverCap, guild, oldest, newest });
+      const rejectedNote = rejected > 0 ? ` ${countLabel(rejected, 'file')} skipped as unreadable.` : '';
+      setStatus(`Ready to import ${countLabel(messages, 'message')} across ${countLabel(targets.size, 'channel')}${guild ? ` from ${guild}` : ''}.${rejectedNote}`);
+    } catch {
+      setPending(null);
+      setStatus('Could not read those files. Choose DiscordChatExporter JSON exports.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmImport(): Promise<void> {
+    const job = pending();
+    if (!job) return;
+    setBusy(true);
+    try {
+      let imported = 0;
+      for (const snapshot of job.snapshots) {
+        const result = await importVault(snapshot);
+        imported += result.messages;
+      }
+      setPending(null);
+      setStatus(`Imported ${countLabel(imported, 'message')} into ${countLabel(job.channels, 'channel')}. Open a channel to read the history, or search it from anywhere.`);
+    } catch {
+      setStatus('Import failed while merging into the local vault.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section class="pref-group pref-vault-portable pref-discord-import" aria-labelledby="pref-discord-import-title">
+      <div class="pref-group-head">
+        <h3 id="pref-discord-import-title" class="pref-label">Import from Discord</h3>
+      </div>
+      <p class="pref-desc">
+        Leaving Discord? Export your channels with{' '}
+        <a href="https://github.com/Tyrrrz/DiscordChatExporter" target="_blank" rel="noreferrer noopener">DiscordChatExporter</a>{' '}
+        in <strong>JSON</strong> mode, then choose the files here. Everything happens on this device — no bot token, no upload, nothing sent to Discord. Imported history becomes searchable, time-travellable scrollback merged into this device's vault (up to the newest {VAULT_KEEP} messages per channel).
+      </p>
+      <div class="pref-vault-actions">
+        <label class="pref-file">
+          <span>Choose Discord JSON</span>
+          <input
+            type="file"
+            accept="application/json,.json"
+            multiple
+            disabled={busy()}
+            onChange={(event) => void handleSelect(event)}
+          />
+        </label>
+      </div>
+      <Show when={pending()}>
+        {(job) => (
+          <div class="pref-import-review" role="group" aria-labelledby="pref-discord-review-title">
+            <h4 id="pref-discord-review-title">Review import</h4>
+            <p>
+              {countLabel(job().fileNames.length, 'file')}: {countLabel(job().messages, 'message')} across {countLabel(job().channels, 'channel')}
+              {job().guild ? ` from ${job().guild}` : ''}
+              {job().oldest && job().newest ? ` (${shortDate(job().oldest)} → ${shortDate(job().newest)})` : ''}.
+              {job().skipped > 0 ? ` ${countLabel(job().skipped, 'system/empty message')} skipped.` : ''}
+              {job().droppedOverCap > 0 ? ` ${countLabel(job().droppedOverCap, 'older message')} beyond the per-channel limit dropped.` : ''}
+              {' '}Existing local history is merged, not replaced.
+            </p>
+            <div class="pref-import-review__actions">
+              <button type="button" class="pref-reset" disabled={busy()} onClick={() => void confirmImport()}>
+                Import into vault
+              </button>
+              <button
+                type="button"
+                class="pref-reset"
+                disabled={busy()}
+                onClick={() => {
+                  setPending(null);
+                  setStatus('Import cancelled.');
+                }}
+              >
+                Cancel import
+              </button>
+            </div>
+          </div>
+        )}
+      </Show>
+      <Show when={status()}>
+        <p class="pref-status" role="status">{status()}</p>
+      </Show>
+    </section>
+  );
+}
+
 function ExtensionAuditControls(): JSX.Element {
   const [entries, setEntries] = createSignal<ClientExtensionAuditEntry[]>(readClientExtensionAudit());
 
@@ -818,6 +985,8 @@ export function PreferencesPanel(): JSX.Element {
         />
 
         <PortableVaultControls />
+
+        <DiscordImportControls />
 
         <PwaReadinessPanel />
 
