@@ -174,6 +174,26 @@ describe('savedSearches', () => {
       expect(byLabel.get('Mentions')!.createdAt).toBe(original.get('Mentions'));
     });
 
+    it('does not let distinct-label entries sharing an id clobber each other', async () => {
+      // A corrupt / hostile export can carry the SAME opaque id on two entries
+      // with DIFFERENT labels. Dedupe is by label, not id, so both are distinct
+      // searches — neither may silently overwrite the other in IndexedDB.
+      const snapshot: SavedSearchExport = {
+        kind: 'onyx-saved-searches',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        searches: [
+          { id: 'dup', label: 'Alpha', query: 'a', mode: 'exact', createdAt: 1 },
+          { id: 'dup', label: 'Beta', query: 'b', mode: 'exact', createdAt: 2 },
+        ],
+      };
+      await importSavedSearches(snapshot);
+      const list = await listSearches();
+      expect(list.map((s) => s.label).sort()).toEqual(['Alpha', 'Beta']);
+      // Persisted ids must be unique so neither row clobbers the other.
+      expect(new Set(list.map((s) => s.id)).size).toBe(2);
+    });
+
     it('import dedupes against existing labels', async () => {
       await saveSearch({ label: 'Mentions', query: 'old', mode: 'exact' });
       const snapshot: SavedSearchExport = {

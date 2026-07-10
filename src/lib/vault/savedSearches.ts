@@ -277,7 +277,11 @@ export async function importSavedSearches(snapshot: SavedSearchExport): Promise<
   try {
     const existing = await getAllRows(db);
     const byLabel = new Map<string, StoredSavedSearch>();
-    for (const row of existing) byLabel.set(normalizeLabel(row.label), row);
+    const usedIds = new Set<string>();
+    for (const row of existing) {
+      byLabel.set(normalizeLabel(row.label), row);
+      usedIds.add(row.id);
+    }
 
     const tx = db.transaction(STORE, 'readwrite');
     const store = tx.objectStore(STORE);
@@ -285,8 +289,19 @@ export async function importSavedSearches(snapshot: SavedSearchExport): Promise<
     for (const entry of snapshot.searches) {
       const norm = normalizeLabel(entry.label);
       const prior = byLabel.get(norm);
+      // Reuse the prior id on a label match (stable, idempotent re-import). For a
+      // NEW label, keep the incoming id only when no other label has already
+      // claimed it — otherwise a corrupt/hostile export sharing one id across
+      // distinct labels would silently overwrite an unrelated row (data loss).
+      let id = prior?.id ?? entry.id ?? genId();
+      if (!prior && usedIds.has(id)) {
+        do {
+          id = genId();
+        } while (usedIds.has(id));
+      }
+      usedIds.add(id);
       const record: StoredSavedSearch = {
-        id: prior?.id ?? entry.id ?? genId(),
+        id,
         label: entry.label,
         query: entry.query,
         mode: entry.mode,
