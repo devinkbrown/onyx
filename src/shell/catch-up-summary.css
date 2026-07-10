@@ -1,0 +1,134 @@
+/* CatchUpSummary — unread-ranked "where do I have activity" card. */
+
+.catchup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.catchup-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.catchup-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+
+.catchup-totals {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--washi-mute);
+}
+
+.catchup-mentions {
+  color: var(--gold-bright);
+  font-weight: 600;
+}
+
+.catchup-empty {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--washi-mute);
+}
+
+.catchup-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.catchup-item {
+  margin: 0;
+}
+
+.catchup-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--stone);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  color: var(--washi);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-fast, 150ms) var(--ease, ease),
+    border-color var(--duration-fast, 150ms) var(--ease, ease);
+}
+
+.catchup-row:hover {
+  background: var(--stone-line);
+  border-color: var(--gold-deep);
+}
+
+.catchup-row:focus-visible {
+  outline: 2px solid var(--gold-bright);
+  outline-offset: 2px;
+}
+
+.catchup-row--mention {
+  border-color: var(--gold-deep);
+}
+
+.catchup-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.catchup-when {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  color: var(--washi-mute);
+  font-variant-numeric: tabular-nums;
+}
+
+.catchup-badges {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.catchup-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4rem;
+  padding: 0 0.4rem;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.catchup-badge--unread {
+  background: var(--lapis);
+  color: var(--washi);
+}
+
+.catchup-badge--mention {
+  background: var(--gold-bright);
+  color: var(--stone);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .catchup-row {
+    transition: none;
+  }
+}
