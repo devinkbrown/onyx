@@ -85,7 +85,7 @@ describe('About page — source structure', () => {
 
   it('has a <main> root carrying the shared "r" atmosphere class', () => {
     // Root is <main class="r ab-ocean"> — "r" wires the shared atmosphere,
-    // "ab-ocean" scopes the Ocean re-tint.
+    // "ab-ocean" scopes the azure re-tint.
     expect(/<main class="r(\s|")/.test(src)).toBe(true);
   });
 
@@ -225,7 +225,7 @@ describe('About page — source structure', () => {
   });
 
   it('frames the gate as the open network entrance — no devil/Aēšma lore', () => {
-    // Ocean reframe: the middle stack card is "the gate · where you enter".
+    // Onyx reframe: the middle stack card is "the gate · where you enter".
     expect(srcContains('the gate · where you enter')).toBe(true);
     // Devil/Zoroastrian lore must be fully removed.
     expect(srcContains('Aēšma')).toBe(false);
@@ -315,12 +315,12 @@ describe('About page — source structure', () => {
     expect(/Zoroastrian|Avesta|daeva|\bwrath\b/i.test(src)).toBe(false);
   });
 
-  it('imports the Ocean brand Mascot and uses it', () => {
+  it('imports the Onyx brand Mascot and uses it', () => {
     expect(srcContains("import { Mascot } from '@/components/brand/Mascot'")).toBe(true);
     expect(/<Mascot\b/.test(src)).toBe(true);
   });
 
-  it('roots the page in the Ocean aesthetic (ab-ocean root class)', () => {
+  it('roots the page in the deep-water aesthetic (ab-ocean root class)', () => {
     expect(srcContains('class="r ab-ocean"')).toBe(true);
   });
 });
@@ -400,7 +400,7 @@ describe('About page — CSS source', () => {
     expect(css.includes('@media (max-width')).toBe(true);
   });
 
-  it('re-tints the shared atmosphere to ocean bioluminescence (.ab-ocean scope)', () => {
+  it('re-tints the shared atmosphere to azure bioluminescence (.ab-ocean scope)', () => {
     expect(css.includes('.ab-ocean')).toBe(true);
     expect(css.includes('.ab-ocean .r-veins path')).toBe(true);
   });
@@ -410,7 +410,7 @@ describe('About page — CSS source', () => {
     expect(css.includes('.ab-myth.devil')).toBe(false);
   });
 
-  it('uses fluid radii tokens (var(--r-md) / var(--r-sm)) for the ocean cut', () => {
+  it('uses fluid radii tokens (var(--r-md) / var(--r-sm)) for the deep-water cut', () => {
     expect(css.includes('var(--r-md)') || css.includes('var(--r-sm)')).toBe(true);
   });
 });

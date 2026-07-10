@@ -1,12 +1,12 @@
 /**
- * Mascot — the Ocean water-dragon.
+ * Mascot — the Onyx water-dragon.
  *
  * Orochi is 水蛟 (a water-dragon), and this is its friendly companion: a sleek,
  * coiled serpent-dragon with a smooth onyx body, an azure underglow, a
  * bioluminescent dorsal line, and a single champagne-gold eye. Calm and refined,
  * not fierce, not demonic — the face of the network you belong to.
  *
- * Pure inline SVG, no external assets. It themes itself from the Ocean CSS
+ * Pure inline SVG, no external assets. It themes itself from the Onyx CSS
  * custom properties (--ink, --lapis, --lapis-bright, --gold-bright, --washi),
  * so it follows whatever theme the document is set to. Crisp at any size and
  * accessible (role="img" + <title>).

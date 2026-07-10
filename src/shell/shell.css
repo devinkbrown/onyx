@@ -1,4 +1,4 @@
-/* ── Onyx AppShell — Ocean × Bioluminescence × Terminal ───────────────────────
+/* ── Onyx AppShell — Bioluminescence × Terminal ──────────────────────────────
    Layout: CSS grid — [ ServerRail | ChannelSidebar | ConversationColumn | MemberList ]
    PresenceRibbon spans the top of the conversation column.
    Background canvas is fixed behind everything (z-index: -1).

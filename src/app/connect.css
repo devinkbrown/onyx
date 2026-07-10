@@ -1,11 +1,11 @@
-/* ── Onyx connect screen — OCEAN dark-luxury ─────────────────────────────────
+/* ── Onyx connect screen — deep-water dark-luxury ────────────────────────────
    The elegant front door to the network: deep-water atmosphere (depth gradient,
    azure currents, sparse bioluminescent motes, faint caustics + grain), a
    refined surface card with sea-foam text and azure accents, fluid radii and
    designed focus / hover / active states.
 
    All atmosphere is self-contained here (.conn-sea-*) so the connect screen
-   carries its own ocean motifs. Every animation freezes under reduced-motion.
+   carries its own depth motifs. Every animation freezes under reduced-motion.
    Tokens only — no raw hex (SVG/gradient stops reference the theme vars).
    ─────────────────────────────────────────────────────────────────────────── */
 
@@ -24,7 +24,7 @@
   padding-bottom: max(clamp(40px, 10vw, 96px), calc(env(safe-area-inset-bottom, 0px) + 28px));
 }
 
-/* ── Ocean atmosphere ──────────────────────────────────────────────────────── */
+/* ── Deep-water atmosphere ────────────────────────────────────────────────── */
 
 /* Depth gradient — abyss at the bottom, light filtering down from the surface. */
 .conn-sea-depth {

@@ -139,7 +139,7 @@ function dayLabel(date: Date): string {
 }
 
 /** Per-nick tint inside the water: hue walks the cyan→azure→ice band, so every
-    speaker is distinct yet the palette never leaves the ocean. */
+    speaker is distinct while staying inside the active palette. */
 export function nickTint(nick: string): string {
   let hash = 0;
   for (let i = 0; i < nick.length; i += 1) hash = (hash * 31 + nick.charCodeAt(i)) >>> 0;

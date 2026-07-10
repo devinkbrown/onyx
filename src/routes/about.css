@@ -1,4 +1,4 @@
-/* Onyx /about — Ocean dark-luxury: deep-water depth, azure currents, bioluminescence.
+/* Onyx /about — deep-water dark-luxury: depth, azure currents, bioluminescence.
    Banished: purple, glassmorphism/backdrop-blur cards, neon glow, AI gradient text, Inter.
    Present: abyssal depth gradients, flowing azure current seams, sea-foam text,
    champagne gold as a sparing second accent, fluid radii, calm human voice. */
@@ -9,7 +9,7 @@
    The .ab-ocean overrides below re-tint that shared atmosphere from gold-leaf
    into bioluminescent azure currents without touching landing.css. */
 
-/* Re-tint the shared gold atmosphere to ocean bioluminescence (scoped to /about) */
+/* Re-tint the shared gold atmosphere to azure bioluminescence (scoped to /about) */
 .ab-ocean .r-veins path { stroke: var(--lapis); }
 .ab-ocean .r-veins .node { fill: var(--lapis-bright); }
 .ab-ocean .r-flecks {

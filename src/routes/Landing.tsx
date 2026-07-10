@@ -5,9 +5,9 @@ import { fetchStatsIndex } from '@/lib/stats/networkIndex';
 import { fetchNetworkStatus, formatDuration } from '@/lib/stats/status';
 import { setPageMeta } from './pageMeta';
 
-/** Onyx launch site — Ocean: deep-water dark luxury, community-first.
+/** Onyx launch site — deep-water dark luxury, community-first.
  *  Leads with people and place: a real IRC network you join, not a product you buy.
- *  Atmosphere is ocean depth + flowing azure currents + drifting bioluminescence,
+ *  Atmosphere is deep-water depth + flowing azure currents + drifting bioluminescence,
  *  all reduced-motion safe. The friendly water-dragon Mascot is the brand face. */
 export default function Landing() {
   setPageMeta(
@@ -67,7 +67,7 @@ export default function Landing() {
       <section class="r-wrap r-hero" aria-labelledby="hero-heading">
         <div class="r-hero-grid">
           <div class="r-hero-copy">
-            <p class="r-kicker">a home on the open IRC ocean</p>
+            <p class="r-kicker">a home on the open IRC mesh</p>
             <h1 id="hero-heading">Come live<br /><span class="gold">on the water</span></h1>
             <p class="serif-sub">A real network of real people — rooms that stay open, names that are yours, and a place no one can quietly take away.</p>
             <p class="sub">
@@ -264,7 +264,7 @@ export default function Landing() {
           <div>
             <span class="r-eyebrow">run your own</span>
             <h2 class="r-title" id="sovereign-heading">Or raise<br />your own shore</h2>
-            <p class="r-lede">Sovereignty is the whole point. Stand up your own Orochi node, peer it into the network, and own a slice of the ocean outright — your rooms, your rules, still part of the wider tide.</p>
+            <p class="r-lede">Sovereignty is the whole point. Stand up your own Orochi node, peer it into the network, and own a slice of the mesh outright — your rooms, your rules, still part of the wider tide.</p>
             <div class="r-cta"><a class="r-btn ghost" href="/about">How to run a node &rarr;</a></div>
           </div>
           <svg class="r-meshvis" viewBox="0 0 600 360" role="img" aria-label="Several nodes joined by azure currents into one connected network">
@@ -298,7 +298,7 @@ export default function Landing() {
           <div class="r-spec"><span class="t">self-healing network</span><p>The client finds the nearest node by latency; when one drops, the rest close over the gap. You never pick a server.</p></div>
           <div class="r-spec"><span class="t">media the server can't read</span><p>Voice and video are end-to-end encrypted. The server forwards opaque frames and never decodes them — the keys are yours.</p></div>
           <div class="r-spec"><span class="t">real services, not bots</span><p>Register, ghost a stale session, manage a room — all real server commands, not a puppet sitting in your DMs.</p></div>
-          <div class="r-spec"><span class="t">a client you can theme</span><p>A live Theme Studio and ocean-deep backgrounds, synced to your account across every device you sign in from.</p></div>
+          <div class="r-spec"><span class="t">a client you can theme</span><p>A live Theme Studio and deep-water backgrounds, synced to your account across every device you sign in from.</p></div>
         </div>
       </section>
 

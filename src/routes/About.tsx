@@ -6,7 +6,7 @@ import { setPageMeta } from './pageMeta';
 
 /**
  * Onyx /about — full editorial deep-dive.
- * Ocean dark-luxury identity; deep-water depth, azure currents,
+ * Deep-water dark-luxury identity; depth, azure currents,
  * bioluminescent crests. Continuous with landing.
  *
  * Technical claims grounded in:
@@ -24,7 +24,7 @@ export default function About() {
   );
   return (
     <main class="r ab-ocean">
-      {/* ── Living atmosphere (shared with landing, ocean-tinted here) ── */}
+      {/* ── Living atmosphere (shared with landing, blue-tinted here) ── */}
       <div class="r-ground" aria-hidden="true" />
       <div class="r-flecks" aria-hidden="true" />
       <svg

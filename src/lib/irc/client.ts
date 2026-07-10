@@ -749,7 +749,7 @@ export class IRCClient {
   private _wantedCaps(caps: string[]) {
     return [...new Set(caps)].filter(cap => {
       // ── Always-off caps ──────────────────────────────────────────────────
-      // STARTTLS upgrade: Ocean already uses WSS; requesting this is wrong.
+      // STARTTLS upgrade: Onyx already uses WSS; requesting this is wrong.
       if (cap === 'tls') return false;
       // sts (Strict Transport Security): an informational cap whose value is the
       // transport policy. It is advertised, not negotiated — Orochi NAKs a REQ
@@ -757,7 +757,7 @@ export class IRCClient {
       if (cap === 'sts') return false;
       // SASL: only request when we have credentials to send.
       if (cap === 'sasl') return Boolean(this.opts.password || this.opts.hasClientCert);
-      // no-implicit-names: Ocean relies on the automatic 353 NAMREPLY on
+      // no-implicit-names: Onyx relies on the automatic 353 NAMREPLY on
       // JOIN to populate the member list; opting in would suppress it.
       if (cap === 'no-implicit-names') return false;
 
@@ -771,15 +771,15 @@ export class IRCClient {
       // the server-side SEARCH command (results replay as a chathistory-shaped
       // batch, diverted into serverSearch.results); the MessageSearch bar
       // exposes it as "Search full history".
-      // labeled-response: no @label= request/response correlation in Ocean.
+      // labeled-response: no @label= request/response correlation in Onyx.
       if (cap === 'labeled-response') return false;
       // draft/channel-rename: requested — the store handles the native
       // `:renamer RENAME #old #new [:reason]` line and migrates channel state
       // (messages, membership, unread, active view) under the new key.
-      // draft/file-upload: Ocean uses HTTP POST to a media server;
+      // draft/file-upload: Onyx uses HTTP POST to a media server;
       // the IRC-level file-upload protocol is not implemented.
       if (cap === 'draft/file-upload') return false;
-      // bot: Ocean is a human client, not a bot.
+      // bot: Onyx is a human client, not a bot.
       if (cap === 'bot') return false;
 
       // orochi/session-sync: server-driven session reclaim. When ACKed, the

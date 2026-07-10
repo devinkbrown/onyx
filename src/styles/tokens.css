@@ -1,7 +1,7 @@
 /* ─────────────────────────────────────────────────────────────
    Onyx — design tokens.  Flagship theme: "ocean" (deep-water dark luxury).
 
-   Identity = Ocean × Bioluminescence × Champagne:
+   Identity = Onyx × Bioluminescence × Champagne:
    · deep water    — abyssal trench → mid-depth strata → near-surface crests,
                      a true vertical depth gradient with real layering
    · azure current — electric sky-blue, the living primary; bioluminescent
@@ -10,7 +10,7 @@
    · sea-foam text — aqua-tinted ivory over deep water, calm and legible
    Soft, fluid radii and unhurried motion — elegant, not brutalist.
 
-   The :root declaration is the canonical default (Ocean flagship).
+   The :root declaration is the canonical default (deep-water flagship).
    All themes in src/theme/themes.ts override these values via ThemeProvider,
    which writes CSS-custom-property overrides onto document.documentElement and
    sets the data-theme attribute.  [data-theme='onyx'] restores the older Onyx
@@ -41,7 +41,7 @@
   --gold-bright: #a2edf7;
   --gold-deep: #35818b;
 
-  /* Coral — the single hot accent (danger / badges; ocean coral, sparingly) */
+  /* Coral — the single hot accent (danger / badges, sparingly) */
   --shu: #ff6f61;
   --shu-bright: #ff9484;
 
@@ -61,7 +61,7 @@
   --line: color-mix(in oklab, var(--washi) 14%, transparent);
   --line-faint: color-mix(in oklab, var(--washi) 7%, transparent);
 
-  /* Radius — fluid, elegant (Ocean is softer than the brutalist Onyx cut) */
+  /* Radius — fluid and elegant for the deep-water cut. */
   --r-0: 0px;
   --r-sm: 5px;
   --r-md: 11px;

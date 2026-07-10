@@ -2428,7 +2428,7 @@ export const store = createStore<OnyxState>()(
     showCustomStatus: false,
     userActivities: {},
     isIRCX: false,
-    networkName: 'Ocean',
+    networkName: 'Onyx',
     serverFeatures: new Map(),
     isupportPrefixToMode: DEFAULT_PREFIX_TO_MODE,
     isupportModeToPrefix: DEFAULT_MODE_TO_PREFIX,
@@ -3298,7 +3298,7 @@ export const store = createStore<OnyxState>()(
       if (!client) return;
       set({ registerPending: true, registerError: null, verifyRequired: false });
       client.sendRaw('REGISTER', account, email?.trim() || '*', password);
-      // OCEAN-UI: RegisterForm should call registerAccount() and render
+      // ONYX-UI: RegisterForm should call registerAccount() and render
       // registerPending/registerError/verifyRequired instead of parsing NOTICE text.
     },
 
@@ -3307,7 +3307,7 @@ export const store = createStore<OnyxState>()(
       if (!client) return;
       set({ registerPending: true, registerError: null });
       client.sendRaw('VERIFY', account, code);
-      // OCEAN-UI: verification UI should call verifyAccount(account, code).
+      // ONYX-UI: verification UI should call verifyAccount(account, code).
     },
 
     // ── Account identity / management ────────────────────────────────────
@@ -9005,7 +9005,7 @@ export const store = createStore<OnyxState>()(
       get().setVoiceCallState({ callState: 'ringing_out', callWith: nick, callChannel: null });
 
       void getMountedSuimyakuMediaEngine()?.startCall(nick, withVideo ? 'video' : 'voice');
-      // OCEAN-UI: DM call affordances need an Orochi-backed room/channel flow;
+      // ONYX-UI: DM call affordances need an Orochi-backed room/channel flow;
       // do not emit legacy CTCP call messages.
 
       setTimeout(() => {
@@ -9142,14 +9142,14 @@ export const store = createStore<OnyxState>()(
       };
       set(s => ({ streamPolls: new Map(s.streamPolls).set(channel.toLowerCase(), poll) }));
       void client;
-      // OCEAN-UI: stream polls need a new Orochi-backed transport; no legacy CTCP.
+      // ONYX-UI: stream polls need a new Orochi-backed transport; no legacy CTCP.
     },
 
     voteStreamPoll: (channel, optionIndex) => {
       const { client } = get();
       if (!client) return;
       void client;
-      // OCEAN-UI: stream poll votes need a new Orochi-backed transport; no legacy CTCP.
+      // ONYX-UI: stream poll votes need a new Orochi-backed transport; no legacy CTCP.
       set(s => {
         const key = channel.toLowerCase();
         const poll = s.streamPolls.get(key);
@@ -9162,7 +9162,7 @@ export const store = createStore<OnyxState>()(
   }))
 );
 
-// ── OCEAN-INTEGRATION: window event bridge (UI intent → live server action) ──
+// ── ONYX-INTEGRATION: window event bridge (UI intent → live server action) ──
 // UI packages dispatch CustomEvents; the store owns the protocol side.
 if (typeof window !== 'undefined') {
   window.addEventListener('ocean:channel-rename', (e: Event) => {
@@ -9776,12 +9776,12 @@ const CTCP_CONFIG_KEY = 'onyx:ctcp-config';
 interface CTCPConfig { versionReply: string; timeEnabled: boolean; }
 
 function _loadCTCPConfig(): CTCPConfig {
-  if (typeof window === 'undefined') return { versionReply: 'Ocean IRC Client', timeEnabled: true };
+  if (typeof window === 'undefined') return { versionReply: 'Onyx IRC Client', timeEnabled: true };
   try {
     const raw = localStorage.getItem(CTCP_CONFIG_KEY);
-    if (!raw) return { versionReply: 'Ocean IRC Client', timeEnabled: true };
+    if (!raw) return { versionReply: 'Onyx IRC Client', timeEnabled: true };
     return JSON.parse(raw) as CTCPConfig;
-  } catch { return { versionReply: 'Ocean IRC Client', timeEnabled: true }; }
+  } catch { return { versionReply: 'Onyx IRC Client', timeEnabled: true }; }
 }
 function _saveCTCPConfig(cfg: CTCPConfig): void {
   if (typeof window === 'undefined') return;

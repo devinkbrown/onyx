@@ -1,8 +1,8 @@
 /**
- * Connect.tsx — Onyx connect screen (Ocean dark-luxury).
+ * Connect.tsx — Onyx connect screen (deep-water dark-luxury).
  *
  * The front door to the Orochi mesh. A segmented mode switch routes between
- * three auth surfaces, all on the same Ocean atmosphere:
+ * three auth surfaces, all on the same deep-water atmosphere:
  *
  *   • Guest    — nick only; drifts in anonymously (or with a saved SESSION).
  *   • Sign in  — nick + account password → SASL login.
@@ -52,9 +52,9 @@ import { Mascot } from '@/components/brand/Mascot';
 import { loadCredentials, type SavedCredentials } from '@/lib/credentials';
 import { initialNode, selectBestNode, type IrcNode } from './nodes';
 
-// ── Ocean atmosphere — deep-water depth, azure currents, bioluminescence ─────
+// ── Deep-water atmosphere — depth, azure currents, bioluminescence ───────────
 // Self-contained to the connect screen (namespaced .conn-sea-*) so it carries
-// its own ocean motifs rather than borrowing the landing layer. Every moving
+// its own depth motifs rather than borrowing the landing layer. Every moving
 // part is paused under prefers-reduced-motion (see connect.css).
 
 /** Sparse drifting bioluminescent motes — deterministic layout, no randomness. */

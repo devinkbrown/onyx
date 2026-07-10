@@ -1,5 +1,5 @@
 /**
- * Account.tsx — Onyx account panel (Ocean dark-luxury).
+ * Account.tsx — Onyx account panel (deep-water dark-luxury).
  *
  * The in-app home for a signed-in identity. Where Connect is the front door,
  * this is the room you manage your account from once inside:
