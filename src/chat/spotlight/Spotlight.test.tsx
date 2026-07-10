@@ -69,6 +69,21 @@ describe('Spotlight', () => {
     expect(screen.getByText('Time grammar')).toBeInTheDocument();
   });
 
+  it('surfaces the grammar command produced by a clicked teaching example', async () => {
+    renderSpotlight();
+
+    fireEvent.keyDown(window, { key: '/' });
+    fireEvent.click(screen.getByRole('button', { name: 'Use command example goto #root at yesterday 21:00' }));
+
+    // Clicking a teaching chip must do more than fill the input box: the command
+    // layer parses the query it sees into a grammar command, so populating the
+    // input has to reach that layer (via a real input event). Otherwise the
+    // taught command never appears and the chip teaches a dead end.
+    await waitFor(() => {
+      expect(screen.getByRole('listbox').textContent).toContain('Go to #root');
+    });
+  });
+
   it('does not open on slash from an input', () => {
     render(() => (
       <SpotlightProvider>

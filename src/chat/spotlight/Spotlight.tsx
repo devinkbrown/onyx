@@ -342,8 +342,14 @@ export function Spotlight(props: SpotlightProps) {
                     class="onyx-spotlight__grammar-example"
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => {
-                      setQuery(example);
-                      setActiveIndex(0);
+                      if (!inputRef) return;
+                      // Drive the real input so BOTH the local mirror (onInput)
+                      // and the command layer's document-level 'input' bridge see
+                      // the query. Setting the signal alone leaves useCommands
+                      // stale, so the grammar command the chip teaches never
+                      // surfaces (the DOM input is the single source of truth).
+                      inputRef.value = example;
+                      inputRef.dispatchEvent(new Event('input', { bubbles: true }));
                       queueMicrotask(() => inputRef?.focus());
                     }}
                     aria-label={`Use command example ${example}`}
