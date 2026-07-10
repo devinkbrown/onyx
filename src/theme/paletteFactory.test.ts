@@ -77,6 +77,31 @@ describe('generatePalette', () => {
     }
   });
 
+  it('never emits a purple/indigo GROUND or TEXT hue, even with warmth near the band edge', () => {
+    // The primary/accent snap to the band edge (254 / 346), but the ground and
+    // text hues are derived by adding a warmth shift (±12° ground, ±18° text)
+    // AFTER the snap — so they must be re-checked against the ban, or a warm
+    // seed near the edge drags the neutral grounds/text back into the arc.
+    const keys = ['--ink', '--stone', '--stone-2', '--stone-3', '--stone-line', '--washi', '--washi-dim', '--washi-mute'];
+    // Worst cases: primary snaps to the band edge, then a strong warmth nudge
+    // (±12° ground / ±18° text) would otherwise carry the derived hues 3–11°
+    // INTO the arc at chroma well past the 0.03 "meaningful colour" line.
+    const seeds: PaletteSeed[] = [
+      { ...DEFAULT_SEED, primaryHue: 260, warmth: 1, vibrancy: 1 },
+      { ...DEFAULT_SEED, primaryHue: 262, warmth: 0.4, vibrancy: 1 },
+      { ...DEFAULT_SEED, primaryHue: 338, warmth: -1, vibrancy: 1 },
+      { ...DEFAULT_SEED, primaryHue: 344, warmth: -0.4, vibrancy: 1 },
+    ];
+    for (const seed of seeds) {
+      const t = generatePalette(seed);
+      for (const k of keys) {
+        const ok = hexToOklch(t[k]!)!;
+        const banned = ok.h >= 258 && ok.h <= 342 && ok.c > 0.03;
+        expect(banned, `${k} hue ${ok.h.toFixed(1)} c ${ok.c.toFixed(3)}`).toBe(false);
+      }
+    }
+  });
+
   it('dark scheme grounds are dark, light scheme grounds are light', () => {
     const dark = hexToOklch(generatePalette({ ...DEFAULT_SEED, scheme: 'dark' })['--ink']!)!;
     const light = hexToOklch(generatePalette({ ...DEFAULT_SEED, scheme: 'light' })['--ink']!)!;

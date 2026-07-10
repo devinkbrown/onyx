@@ -183,7 +183,10 @@ export function generatePalette(seedInput: PaletteSeed): TokenMap {
   const pHue = seed.primaryHue;
   const aHue = seed.accentHue;
   const warmHueShift = seed.warmth * 12; // nudge grounds/text warm(+)/cool(−)
-  const groundHue = ((pHue + warmHueShift) % 360 + 360) % 360;
+  // The warmth nudge is applied AFTER the primary snap, so a warm seed whose
+  // primary sits on the band edge (254/346) would drag the neutral grounds back
+  // into the arc — re-ban the derived ground hue too.
+  const groundHue = avoidBannedHue(pHue + warmHueShift);
   const groundChroma = 0.014 + 0.02 * seed.vibrancy; // faint tint in the grounds
 
   // Ground lightness ramp — deepest → highest surface.
@@ -200,7 +203,7 @@ export function generatePalette(seedInput: PaletteSeed): TokenMap {
 
   // Text placed for the contrast target on the ink ground.
   const inkRgb = parseHex(ground(0))!;
-  const textHue = ((pHue + warmHueShift * 1.5) % 360 + 360) % 360;
+  const textHue = avoidBannedHue(pHue + warmHueShift * 1.5);
   const textChroma = 0.012 + 0.01 * seed.vibrancy;
   const washiL = solveTextLightness(inkRgb, textHue, textChroma, seed.contrast, dark);
 
