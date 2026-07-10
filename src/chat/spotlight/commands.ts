@@ -231,6 +231,114 @@ function timeJumpCommands(state: CommandState, query: string): SpotlightCommand[
   ];
 }
 
+type ChannelSnapshot = CommandState['channels'] extends Map<string, infer C> ? C : never;
+
+/** Choose the channel to catch up on: the active room if it has unread, else the busiest. */
+function pickCatchUpChannel(state: CommandState): ChannelSnapshot | null {
+  const unread = Array.from(state.channels.values()).filter((channel) => channel.unread > 0);
+  if (unread.length === 0) return null;
+
+  const view = state.activeView;
+  if (view.kind === 'channel') {
+    const active = state.channels.get(view.channel.toLowerCase());
+    if (active && active.unread > 0) return active;
+  }
+
+  return unread
+    .slice()
+    .sort((a, b) => b.unread - a.unread || a.name.localeCompare(b.name))[0]!;
+}
+
+function countUnread(state: CommandState): { channels: number; dms: number; total: number } {
+  let channels = 0;
+  let dms = 0;
+  for (const channel of state.channels.values()) {
+    if (channel.unread > 0 || channel.highlights > 0) channels += 1;
+  }
+  for (const conversation of state.dms.values()) {
+    if (conversation.unread > 0 || conversation.highlights > 0) dms += 1;
+  }
+  return { channels, dms, total: channels + dms };
+}
+
+/**
+ * Catch-up family: a contextual "jump to first unread" for the busiest room and a
+ * "mark all read" sweep. Both surface only when there is something to do and dispatch
+ * exclusively through existing store actions.
+ *
+ * Gaps (no new store action added):
+ *  - There is no dedicated "scroll to the first-unread message" action. `navigate`
+ *    calls `captureUnreadDivider` before it marks the room read, so the rendered
+ *    "new messages" divider is preserved — that divider is the catch-up landing spot.
+ *  - There is no atomic `markAllRead`/`clearAllUnread`. Mark-all-read loops the
+ *    existing per-target `markRead` (+ `markChannelRead` for the badge maps).
+ */
+function catchUpCommands(state: CommandState, query: string): SpotlightCommand[] {
+  const commands: SpotlightCommand[] = [];
+  const target = pickCatchUpChannel(state);
+
+  if (target) {
+    const name = target.name;
+    commands.push({
+      id: `action:catch-up:${name.toLowerCase()}`,
+      section: 'Actions',
+      title: `Catch up — jump to first unread in ${name}`,
+      hint: `${target.unread} unread`,
+      keywords: [
+        query.trim(),
+        'catch up',
+        'catchup',
+        'unread',
+        'first unread',
+        'new messages',
+        'jump',
+        name,
+      ],
+      run: () => {
+        const current = getState();
+        current.joinChannel(name);
+        current.navigate({ kind: 'channel', channel: name });
+      },
+    });
+  }
+
+  const unread = countUnread(state);
+  if (unread.total > 0) {
+    const conversations = `${unread.total} conversation${unread.total === 1 ? '' : 's'}`;
+    commands.push({
+      id: 'action:mark-all-read',
+      section: 'Actions',
+      title: 'Mark all read',
+      hint: `Clear unread in ${conversations}`,
+      keywords: [
+        query.trim(),
+        'mark all read',
+        'mark read',
+        'clear unread',
+        'read all',
+        'dismiss unread',
+        'catch up',
+      ],
+      run: () => {
+        const current = getState();
+        for (const channel of current.channels.values()) {
+          if (channel.unread > 0 || channel.highlights > 0) {
+            current.markRead(channel.name);
+            current.markChannelRead(channel.name);
+          }
+        }
+        for (const conversation of current.dms.values()) {
+          if (conversation.unread > 0 || conversation.highlights > 0) {
+            current.markRead(conversation.nick);
+          }
+        }
+      },
+    });
+  }
+
+  return commands;
+}
+
 function vaultToggleCommand(query: string): SpotlightCommand {
   const current = vaultSearchMode();
   const next: VaultSearchMode = current === 'exact' ? 'semantic' : 'exact';
@@ -833,6 +941,7 @@ export function buildCommands(state: CommandState = getState(), query = ''): Spo
   return [
     ...grammarCommands(state, query),
     ...timeJumpCommands(state, query),
+    ...catchUpCommands(state, query),
     ...channels,
     ...dms,
     ...peopleCommands(state),

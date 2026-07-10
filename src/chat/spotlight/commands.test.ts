@@ -360,6 +360,100 @@ describe('buildCommands', () => {
     expect(localStorage.getItem('onyx:bg')).toBe('obsidian');
   });
 
+  it('surfaces a catch-up command for the channel with the most unread', () => {
+    const navigate = vi.fn();
+    const joinChannel = vi.fn();
+    setState({
+      channels: new Map([
+        ['#quiet', { ...channel('#quiet'), unread: 0, highlights: 0 }],
+        ['#busy', { ...channel('#busy'), unread: 9, highlights: 0 }],
+        ['#lapis', { ...channel('#lapis'), unread: 3, highlights: 0 }],
+      ]),
+      navigate,
+      joinChannel,
+    });
+
+    const command = buildCommands(getState()).find((entry) => entry.id === 'action:catch-up:#busy');
+    expect(command?.section).toBe('Actions');
+    expect(command?.title).toBe('Catch up — jump to first unread in #busy');
+    expect(command?.hint).toContain('9 unread');
+    expect(command?.keywords).toContain('catch up');
+    expect(command?.keywords).toContain('unread');
+
+    command?.run();
+    expect(navigate).toHaveBeenCalledWith({ kind: 'channel', channel: '#busy' });
+    // Only one catch-up command is produced, and it targets the busiest room.
+    expect(buildCommands(getState()).filter((entry) => entry.id.startsWith('action:catch-up:'))).toHaveLength(1);
+  });
+
+  it('prefers the active channel for catch-up when it has unread', () => {
+    setState({
+      activeView: { kind: 'channel', channel: '#lapis' },
+      channels: new Map([
+        ['#busy', { ...channel('#busy'), unread: 9, highlights: 0 }],
+        ['#lapis', { ...channel('#lapis'), unread: 2, highlights: 0 }],
+      ]),
+    });
+
+    const active = buildCommands(getState()).find((entry) => entry.id === 'action:catch-up:#lapis');
+    expect(active?.title).toBe('Catch up — jump to first unread in #lapis');
+    // The busier room is not surfaced separately when the active room is chosen.
+    expect(buildCommands(getState()).some((entry) => entry.id === 'action:catch-up:#busy')).toBe(false);
+  });
+
+  it('omits the catch-up command when no channel has unread', () => {
+    setState({
+      channels: new Map([['#lapis', { ...channel('#lapis'), unread: 0, highlights: 0 }]]),
+    });
+
+    const command = buildCommands(getState()).find((entry) => entry.id.startsWith('action:catch-up:'));
+    expect(command).toBeUndefined();
+  });
+
+  it('surfaces mark-all-read and dispatches through existing per-target actions', () => {
+    const markRead = vi.fn();
+    const markChannelRead = vi.fn();
+    setState({
+      channels: new Map([
+        ['#busy', { ...channel('#busy'), unread: 4, highlights: 0 }],
+        ['#read', { ...channel('#read'), unread: 0, highlights: 0 }],
+      ]),
+      dms: new Map([
+        ['aoi', { ...dm('aoi'), unread: 2 }],
+        ['sora', { ...dm('sora'), unread: 0 }],
+      ]),
+      markRead,
+      markChannelRead,
+    });
+
+    const command = buildCommands(getState()).find((entry) => entry.id === 'action:mark-all-read');
+    expect(command?.section).toBe('Actions');
+    expect(command?.title).toBe('Mark all read');
+    expect(command?.keywords).toContain('mark all read');
+
+    command?.run();
+
+    // Unread channel: both the count and the badge map get cleared.
+    expect(markRead).toHaveBeenCalledWith('#busy');
+    expect(markChannelRead).toHaveBeenCalledWith('#busy');
+    // Unread DM: the count is cleared.
+    expect(markRead).toHaveBeenCalledWith('aoi');
+    // Already-read conversations are left untouched.
+    expect(markRead).not.toHaveBeenCalledWith('#read');
+    expect(markRead).not.toHaveBeenCalledWith('sora');
+    expect(markChannelRead).not.toHaveBeenCalledWith('#read');
+  });
+
+  it('omits mark-all-read when nothing is unread', () => {
+    setState({
+      channels: new Map([['#lapis', { ...channel('#lapis'), unread: 0, highlights: 0 }]]),
+      dms: new Map([['aoi', { ...dm('aoi'), unread: 0 }]]),
+    });
+
+    const command = buildCommands(getState()).find((entry) => entry.id === 'action:mark-all-read');
+    expect(command).toBeUndefined();
+  });
+
   it('builds capability-scoped client extension actions', () => {
     const open = vi.spyOn(window, 'open').mockImplementation(() => null);
     writeClientExtensionActionsForTests([
