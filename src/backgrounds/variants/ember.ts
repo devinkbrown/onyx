@@ -1,4 +1,5 @@
 import type { BackgroundFrameContext, BackgroundVariant } from '../engine';
+import { ambientRms, breathe, rmsToBloom, timeOfDayWarmth, warmthShift } from '../reactivity';
 import type { BackgroundTheme } from './utils';
 import { clearCanvas, drawGrain, mix, readBackgroundTheme, rgba, seeded } from './utils';
 
@@ -65,6 +66,12 @@ function drawGlowPools(ctx: BackgroundFrameContext, theme: BackgroundTheme, time
   const c = ctx.context;
   const pools = 3;
 
+  // Time-of-day warmth drift: the banked fire glows a touch warmer at midday,
+  // cooler in the small hours. Hue-only shift — luminance is untouched, so the
+  // legibility contract holds.
+  const warmth = timeOfDayWarmth(Date.now());
+  const shu = warmthShift(theme.shu, warmth, 5);
+
   c.save();
   c.globalCompositeOperation = 'screen';
 
@@ -72,12 +79,15 @@ function drawGlowPools(ctx: BackgroundFrameContext, theme: BackgroundTheme, time
     const seed = i * 47 + 13;
     const x = ctx.width * (0.14 + seeded(seed) * 0.72) + Math.sin(time * 0.00004 + i * 2.2) * 26;
     const y = ctx.height * (0.9 + seeded(seed + 1) * 0.08);
-    const breathe = 0.62 + Math.sin(time * 0.00021 + seeded(seed + 2) * TAU) * 0.38;
-    const radius = ctx.width * (0.1 + seeded(seed + 3) * 0.12) * (0.86 + breathe * 0.2);
+    const pulse = breathe(time, { freq: 0.00021, phase: seeded(seed + 2) * TAU, base: 0.62, depth: 0.38 });
+    // Voice-RMS bloom, capped at 1 so a loud channel can only reach — never
+    // exceed — the original hand-tuned brightness.
+    const bloom = rmsToBloom({ rms: ambientRms(time, seed), base: 0.88, gain: 0.12, cap: 1 });
+    const radius = ctx.width * (0.1 + seeded(seed + 3) * 0.12) * (0.86 + pulse * 0.2);
 
     const pool = c.createRadialGradient(x, y, 0, x, y, radius);
-    pool.addColorStop(0, rgba(theme.shu, 0.075 * breathe));
-    pool.addColorStop(0.5, rgba(mix(theme.shu, theme.ink, 0.4), 0.035 * breathe));
+    pool.addColorStop(0, rgba(shu, 0.075 * pulse * bloom));
+    pool.addColorStop(0.5, rgba(mix(shu, theme.ink, 0.4), 0.035 * pulse * bloom));
     pool.addColorStop(1, rgba(theme.ink, 0));
     c.fillStyle = pool;
     c.fillRect(x - radius, y - radius, radius * 2, radius * 2);

@@ -917,7 +917,10 @@ describe('AppShell', () => {
       expect(watch).toHaveTextContent('Demo Night');
       expect(watch).toHaveTextContent('1:30 / 5:00');
       expect(watch).toHaveTextContent('Host alice');
-      expect(screen.getByRole('link', { name: 'Open' })).toHaveAttribute('href', 'https://example.test/v');
+      expect(screen.getByRole('link', { name: /Open Demo Night in a new tab/i })).toHaveAttribute(
+        'href',
+        'https://example.test/v',
+      );
     });
   });
 

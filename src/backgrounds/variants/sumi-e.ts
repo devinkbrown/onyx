@@ -1,4 +1,5 @@
 import type { BackgroundFrameContext, BackgroundVariant } from '../engine';
+import { breathe } from '../reactivity';
 import type { BackgroundTheme } from './utils';
 import { clearCanvas, readBackgroundTheme, rgba, seeded } from './utils';
 
@@ -51,15 +52,16 @@ function drawInkBlooms(ctx: BackgroundFrameContext, theme: BackgroundTheme, time
     const y =
       ctx.height * (0.16 + seeded(seed + 2) * 0.6) +
       Math.cos(time * 0.000029 + seeded(seed + 3) * 6.28) * ctx.height * 0.05;
-    const breathe = 0.6 + Math.sin(time * 0.0001 + i * 2.4) * 0.4;
+    // Shared reactive oscillator (drop-in for the old base + sin·depth pulse).
+    const pulse = breathe(time, { freq: 0.0001, phase: i * 2.4, base: 0.6, depth: 0.4 });
     const radius = Math.max(ctx.width, ctx.height) * (0.16 + seeded(seed + 4) * 0.14);
 
     // Bloom: a soft grey heart with a slightly denser inner ring, the way
     // wet ink feathers outward on paper.
     const bloom = c.createRadialGradient(x, y, 0, x, y, radius);
-    bloom.addColorStop(0, rgba(theme.washi, 0.026 * breathe));
-    bloom.addColorStop(0.32, rgba(theme.washi, 0.018 * breathe));
-    bloom.addColorStop(0.7, rgba(theme.washiDim, 0.008 * breathe));
+    bloom.addColorStop(0, rgba(theme.washi, 0.026 * pulse));
+    bloom.addColorStop(0.32, rgba(theme.washi, 0.018 * pulse));
+    bloom.addColorStop(0.7, rgba(theme.washiDim, 0.008 * pulse));
     bloom.addColorStop(1, rgba(theme.ink, 0));
     c.fillStyle = bloom;
     c.fillRect(x - radius, y - radius, radius * 2, radius * 2);

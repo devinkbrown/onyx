@@ -1,4 +1,5 @@
 import type { BackgroundFrameContext, BackgroundVariant } from '../engine';
+import { ambientRms, breathe, rmsToBloom, timeOfDayWarmth, warmthShift } from '../reactivity';
 import type { BackgroundTheme } from './utils';
 import { clearCanvas, drawGrain, mix, readBackgroundTheme, rgba, seeded } from './utils';
 
@@ -65,19 +66,27 @@ function drawAmberPools(ctx: BackgroundFrameContext, theme: BackgroundTheme, tim
     { x: 0.72, y: 0.64, phase: 3.4 },
   ];
 
+  // Warmth drift: the amber reads a hair warmer by day, cooler by night. Hue
+  // only, so the pools never brighten past their tuned envelope.
+  const warmth = timeOfDayWarmth(Date.now());
+  const gold = warmthShift(theme.gold, warmth, 5);
+  const goldDeep = warmthShift(theme.goldDeep, warmth, 5);
+
   c.save();
   c.globalCompositeOperation = 'screen';
 
   for (let i = 0; i < anchors.length; i += 1) {
     const anchor = anchors[i]!;
-    const breathe = 0.6 + Math.sin(time * 0.00013 + anchor.phase) * 0.4;
+    const pulse = breathe(time, { freq: 0.00013, phase: anchor.phase, base: 0.6, depth: 0.4 });
+    // Capped voice-RMS bloom — reaches, but never exceeds, the original alpha.
+    const bloom = rmsToBloom({ rms: ambientRms(time, anchor.phase), base: 0.9, gain: 0.1, cap: 1 });
     const x = ctx.width * anchor.x + Math.sin(time * 0.00003 + anchor.phase) * ctx.width * 0.03;
     const y = ctx.height * anchor.y + Math.cos(time * 0.000024 + anchor.phase) * ctx.height * 0.03;
-    const radius = Math.max(ctx.width, ctx.height) * (0.24 + i * 0.06) * (0.88 + breathe * 0.16);
+    const radius = Math.max(ctx.width, ctx.height) * (0.24 + i * 0.06) * (0.88 + pulse * 0.16);
 
     const pool = c.createRadialGradient(x, y, 0, x, y, radius);
-    pool.addColorStop(0, rgba(theme.gold, 0.06 * breathe));
-    pool.addColorStop(0.45, rgba(mix(theme.gold, theme.goldDeep, 0.5), 0.032 * breathe));
+    pool.addColorStop(0, rgba(gold, 0.06 * pulse * bloom));
+    pool.addColorStop(0.45, rgba(mix(gold, goldDeep, 0.5), 0.032 * pulse * bloom));
     pool.addColorStop(1, rgba(theme.ink, 0));
     c.fillStyle = pool;
     c.fillRect(x - radius, y - radius, radius * 2, radius * 2);

@@ -1,4 +1,5 @@
 import type { BackgroundFrameContext, BackgroundVariant } from '../engine';
+import { ambientRms, breathe, rmsToBloom, timeOfDayWarmth, warmthShift } from '../reactivity';
 import type { BackgroundTheme } from './utils';
 import { clearCanvas, mix, readBackgroundTheme, rgba, seeded } from './utils';
 
@@ -54,7 +55,11 @@ function drawMistBands(ctx: BackgroundFrameContext, theme: BackgroundTheme, time
     const band = bands[bandIndex]!;
     const travel = ctx.width * 1.6;
     const drift = time * band.speed * band.direction;
-    const swell = 0.72 + Math.sin(time * 0.00007 + band.phase) * 0.28;
+    // Shared oscillator + capped voice-RMS bloom. `bloom` ∈ [0.9, 1] so the fog
+    // can thicken with a busy channel but never past its tuned opacity.
+    const pulse = breathe(time, { freq: 0.00007, phase: band.phase, base: 0.72, depth: 0.28 });
+    const bloom = rmsToBloom({ rms: ambientRms(time, band.phase), base: 0.9, gain: 0.1, cap: 1 });
+    const swell = pulse * bloom;
 
     for (let i = 0; i < blobsPerBand; i += 1) {
       const seed = bandIndex * 97 + i * 31 + 11;
@@ -86,6 +91,9 @@ function drawMineralFlecks(ctx: BackgroundFrameContext, theme: BackgroundTheme, 
   const c = ctx.context;
   const count = Math.max(16, Math.floor(44 * ctx.qualityScale));
 
+  // The lone warm fleck drifts warmer/cooler with the hour (hue only).
+  const bronzeColour = warmthShift(theme.gold, timeOfDayWarmth(Date.now()), 5);
+
   c.save();
 
   for (let i = 0; i < count; i += 1) {
@@ -97,7 +105,7 @@ function drawMineralFlecks(ctx: BackgroundFrameContext, theme: BackgroundTheme, 
     const radius = 0.4 + seeded(seed + 2) * 0.85;
 
     c.globalAlpha = bronze ? 0.05 + glimmer * 0.05 : 0.05 + glimmer * 0.075;
-    c.fillStyle = bronze ? theme.gold : theme.washiDim;
+    c.fillStyle = bronze ? bronzeColour : theme.washiDim;
     c.beginPath();
     c.arc(x, y, radius, 0, TAU);
     c.fill();
