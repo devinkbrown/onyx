@@ -299,6 +299,55 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
     onReactOpenChange(next);
   };
 
+  // ── Overflow-menu keyboard pattern (WAI-ARIA menu) ──
+  // The overflow list is role="menu" + role="menuitem"; that role sets an AT
+  // expectation of arrow-key traversal and focus moving into the menu on open.
+  // Implement it here (the shared Popover only owns Escape + dialog framing).
+  let overflowMenuRef: HTMLDivElement | undefined;
+
+  const overflowItems = (): HTMLButtonElement[] => {
+    if (!overflowMenuRef) return [];
+    return Array.from(
+      overflowMenuRef.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'),
+    );
+  };
+
+  // Roving tabindex: only the active item stays in the Tab sequence, so Tab
+  // exits the menu (per the menu pattern) while arrows move within it.
+  const focusMenuItem = (index: number): void => {
+    const items = overflowItems();
+    if (items.length === 0) return;
+    const clamped = ((index % items.length) + items.length) % items.length;
+    items.forEach((item, i) => {
+      item.tabIndex = i === clamped ? 0 : -1;
+    });
+    items[clamped]?.focus();
+  };
+
+  const onMenuKeyDown = (event: KeyboardEvent): void => {
+    const items = overflowItems();
+    if (items.length === 0) return;
+    const current = items.findIndex((item) => item === document.activeElement);
+    switch (event.key) {
+      case 'ArrowDown':
+        event.preventDefault();
+        focusMenuItem(current < 0 ? 0 : current + 1);
+        break;
+      case 'ArrowUp':
+        event.preventDefault();
+        focusMenuItem(current < 0 ? items.length - 1 : current - 1);
+        break;
+      case 'Home':
+        event.preventDefault();
+        focusMenuItem(0);
+        break;
+      case 'End':
+        event.preventDefault();
+        focusMenuItem(items.length - 1);
+        break;
+    }
+  };
+
   onCleanup(() => {
     setReactOpen(false);
     setInnerMenuOpen(false);
@@ -410,7 +459,20 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
             </span>
           }
         >
-          <div class="msg-menu-list" role="menu" aria-label={`More actions for ${messageActionTarget()}`}>
+          <div
+            ref={(element) => {
+              overflowMenuRef = element;
+              // This element only mounts while the Popover is open, so moving
+              // focus into the menu on mount == focus-into-menu on open (menu
+              // pattern). Deferred so the conditional <Show> menuitems exist
+              // before we focus the first one.
+              queueMicrotask(() => focusMenuItem(0));
+            }}
+            class="msg-menu-list"
+            role="menu"
+            aria-label={`More actions for ${messageActionTarget()}`}
+            onKeyDown={onMenuKeyDown}
+          >
             <Show when={caps().canCopy}>
               <button
                 type="button"

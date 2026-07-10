@@ -333,6 +333,70 @@ describe('<MessageMenu>', () => {
     expect(store.getState().replyingTo).toMatchObject({ id: 'm-topic', from: 'alice' });
   });
 
+  it('moves focus into the menu (first item) when the overflow menu opens', async () => {
+    const msg: ChatMessage = {
+      id: 'm-focus',
+      from: 'alice',
+      text: 'Release blockers for mobile onboarding today',
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    };
+
+    render(() => (
+      <MessageMenu msg={msg} target="#general" selfNick="alice" canEdit menuOpen />
+    ));
+
+    const firstItem = screen.getByRole('menuitem', { name: 'Copy text from message from alice' });
+    // Focus is moved on open (queueMicrotask), so wait for it to settle.
+    await waitFor(() => expect(document.activeElement).toBe(firstItem));
+    // Roving tabindex: only the focused item is in the Tab sequence.
+    expect(firstItem).toHaveAttribute('tabindex', '0');
+    expect(
+      screen.getByRole('menuitem', { name: 'Copy moment link for message from alice' }),
+    ).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('navigates menu items with Arrow, Home and End keys (roving focus)', async () => {
+    const msg: ChatMessage = {
+      id: 'm-arrows',
+      from: 'alice',
+      text: 'Release blockers for mobile onboarding today',
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    };
+
+    render(() => (
+      <MessageMenu msg={msg} target="#general" selfNick="alice" canEdit menuOpen />
+    ));
+
+    const menu = screen.getByRole('menu', { name: 'More actions for message from alice' });
+    const first = screen.getByRole('menuitem', { name: 'Copy text from message from alice' });
+    const second = screen.getByRole('menuitem', { name: 'Copy moment link for message from alice' });
+    const last = screen.getByRole('menuitem', { name: 'Delete message from alice' });
+
+    await waitFor(() => expect(document.activeElement).toBe(first));
+
+    fireEvent.keyDown(menu, { key: 'ArrowDown' });
+    expect(document.activeElement).toBe(second);
+    expect(second).toHaveAttribute('tabindex', '0');
+    expect(first).toHaveAttribute('tabindex', '-1');
+
+    fireEvent.keyDown(menu, { key: 'ArrowUp' });
+    expect(document.activeElement).toBe(first);
+
+    // Wrap: ArrowUp from the first item lands on the last.
+    fireEvent.keyDown(menu, { key: 'ArrowUp' });
+    expect(document.activeElement).toBe(last);
+
+    fireEvent.keyDown(menu, { key: 'Home' });
+    expect(document.activeElement).toBe(first);
+
+    fireEvent.keyDown(menu, { key: 'End' });
+    expect(document.activeElement).toBe(last);
+  });
+
   it('labels repeated message controls and menus with the message author', () => {
     const msg: ChatMessage = {
       id: 'm-access',
