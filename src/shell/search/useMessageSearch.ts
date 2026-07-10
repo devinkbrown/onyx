@@ -163,6 +163,19 @@ export function activeMessageSearchResultId(): string | null {
   return messageSearchActiveResultId();
 }
 
+/** Current shared vault-pane matching mode ('exact' | 'semantic'). */
+export { vaultSearchMode };
+
+/** Set the shared vault-pane matching mode explicitly. */
+export function setVaultMode(mode: VaultSearchMode): void {
+  setVaultSearchMode(mode);
+}
+
+/** Flip the shared vault-pane matching between exact and semantic. */
+export function toggleVaultMode(): void {
+  setVaultSearchMode((mode) => (mode === 'exact' ? 'semantic' : 'exact'));
+}
+
 export function useMessageSearch(): UseMessageSearch {
   const activeView = useStore((s) => s.activeView);
   const channels = useStore((s) => s.channels);
@@ -381,7 +394,7 @@ export function useMessageSearch(): UseMessageSearch {
     hasConversation,
     vaultResults: vaultHits,
     vaultMode: vaultSearchMode,
-    toggleVaultMode: () => setVaultSearchMode((mode) => (mode === 'exact' ? 'semantic' : 'exact')),
+    toggleVaultMode,
     recallSuggestions,
     applyRecallSuggestion: setQuery,
     openVaultResult,

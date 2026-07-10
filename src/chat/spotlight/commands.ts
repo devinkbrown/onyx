@@ -11,7 +11,20 @@ import {
   type Density,
   type Width,
 } from '@/lib/prefs/preferences';
-import { openMessageSearchWithQuery } from '@/shell/search/useMessageSearch';
+import {
+  openMessageSearchWithQuery,
+  setVaultMode,
+  toggleVaultMode,
+  vaultSearchMode,
+  type VaultSearchMode,
+} from '@/shell/search/useMessageSearch';
+import {
+  languageLabel,
+  setTranslationTarget,
+  TRANSLATION_TARGETS,
+} from '@/lib/intelligence/translateMessage';
+import { aiPolicyBadgeText } from '@/shell/AiPolicyBadge';
+import type { AiPolicy } from '@/lib/irc/aiPolicyProp';
 import {
   readClientExtensionActions,
   recordClientExtensionActionRun,
@@ -124,6 +137,37 @@ function parseDensityArg(value: string): Density | null {
   return null;
 }
 
+function parseVaultMode(value: string): VaultSearchMode | null {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'semantic' || normalized === 'meaning' || normalized === 'smart' || normalized === 'rag') {
+    return 'semantic';
+  }
+  if (normalized === 'exact' || normalized === 'literal' || normalized === 'text' || normalized === 'substring') {
+    return 'exact';
+  }
+  return null;
+}
+
+const TRANSLATE_CLEAR_WORDS = new Set(['off', 'none', 'clear', 'reset', 'browser', 'default', 'stop']);
+
+function resolveTranslateTarget(value: string): { code: string; clear: boolean } | null {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return null;
+  if (TRANSLATE_CLEAR_WORDS.has(normalized)) return { code: '', clear: true };
+
+  for (const code of TRANSLATION_TARGETS) {
+    if (code === normalized || languageLabel(code).toLowerCase() === normalized) {
+      return { code, clear: false };
+    }
+  }
+  if (normalized.length >= 3) {
+    for (const code of TRANSLATION_TARGETS) {
+      if (languageLabel(code).toLowerCase().startsWith(normalized)) return { code, clear: false };
+    }
+  }
+  return null;
+}
+
 function parseWidthArg(value: string): Width | null {
   const normalized = value.trim().toLowerCase();
   if (normalized === 'full' || normalized === 'wide') return 'full';
@@ -185,6 +229,23 @@ function timeJumpCommands(state: CommandState, query: string): SpotlightCommand[
       },
     },
   ];
+}
+
+function vaultToggleCommand(query: string): SpotlightCommand {
+  const current = vaultSearchMode();
+  const next: VaultSearchMode = current === 'exact' ? 'semantic' : 'exact';
+  return {
+    id: 'grammar:vault:toggle',
+    section: 'Actions',
+    title: next === 'semantic' ? 'Switch vault search to meaning (semantic)' : 'Switch vault search to exact text',
+    hint: `vault search · now ${current}`,
+    keywords: [query.trim(), 'vault', 'search mode', 'semantic', 'exact', 'toggle', 'meaning', 'recall'],
+    run: () => toggleVaultMode(),
+  };
+}
+
+function channelAiPolicy(channel: unknown): AiPolicy {
+  return (channel as { aiPolicy?: AiPolicy } | null | undefined)?.aiPolicy ?? 'open';
 }
 
 function grammarCommands(state: CommandState, query: string): SpotlightCommand[] {
@@ -314,6 +375,51 @@ function grammarCommands(state: CommandState, query: string): SpotlightCommand[]
       keywords: [query.trim(), 'search', 'find', searchArg],
       run: () => openMessageSearchWithQuery(searchArg),
     });
+  }
+
+  const vaultArg = commandArg(query, 'vault');
+  if (vaultArg !== null) {
+    const mode = parseVaultMode(vaultArg);
+    if (mode) {
+      commands.push({
+        id: `grammar:vault:${mode}`,
+        section: 'Actions',
+        title: mode === 'semantic' ? 'Search device memory by meaning' : 'Search device memory by exact text',
+        hint: 'vault search',
+        keywords: [query.trim(), 'vault', 'search mode', 'semantic', 'exact', 'meaning', 'literal', 'rag', 'recall', 'device memory', mode],
+        run: () => setVaultMode(mode),
+      });
+    } else {
+      commands.push(vaultToggleCommand(query));
+    }
+  } else if (exactCommand(query, 'vault', 'vault search', 'vault mode', 'semantic search')) {
+    commands.push(vaultToggleCommand(query));
+  }
+
+  const translateArg =
+    commandArg(query, 'translate') ?? commandArg(query, 'translation') ?? commandArg(query, 'language');
+  if (translateArg !== null) {
+    const resolved = resolveTranslateTarget(translateArg);
+    if (resolved?.clear) {
+      commands.push({
+        id: 'grammar:translate:clear',
+        section: 'Actions',
+        title: 'Clear translation — use browser default',
+        hint: 'on-device translation',
+        keywords: [query.trim(), 'translate', 'translation', 'language', 'off', 'clear', 'reset', 'default'],
+        run: () => setTranslationTarget(''),
+      });
+    } else if (resolved) {
+      const label = languageLabel(resolved.code);
+      commands.push({
+        id: `grammar:translate:${resolved.code}`,
+        section: 'Actions',
+        title: `Translate messages to ${label}`,
+        hint: 'on-device translation',
+        keywords: [query.trim(), 'translate', 'translation', 'language', 'lang', resolved.code, label],
+        run: () => setTranslationTarget(resolved.code),
+      });
+    }
   }
 
   const readerArg = commandArg(query, 'reader');
@@ -500,6 +606,7 @@ function baseActionCommands(state: CommandState): SpotlightCommand[] {
   const nodeAddress = state.server?.url ?? '';
   const inVoice = state.voice.callState !== 'idle';
   const activeChannel = state.activeView.kind === 'channel' ? state.activeView.channel : null;
+  const aiPolicy = activeChannel ? channelAiPolicy(state.channels.get(activeChannel)) : 'open';
 
   return [
     {
@@ -575,6 +682,18 @@ function baseActionCommands(state: CommandState): SpotlightCommand[] {
         el?.focus();
       },
     },
+    ...(activeChannel && aiPolicy !== 'open'
+      ? [
+          {
+            id: 'action:ai-policy',
+            section: 'Actions' as SpotlightSection,
+            title: `AI policy: ${aiPolicyBadgeText(aiPolicy).label} · ${activeChannel}`,
+            hint: aiPolicyBadgeText(aiPolicy).description,
+            keywords: ['ai', 'ai policy', 'policy', 'no-ai', 'local only', 'local-only', 'assistant', 'model', 'privacy', activeChannel],
+            run: () => openPreferences(),
+          },
+        ]
+      : []),
     ...(!inVoice && activeChannel
       ? [
           {

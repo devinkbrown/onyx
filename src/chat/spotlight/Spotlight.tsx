@@ -42,6 +42,8 @@ const GRAMMAR_EXAMPLES = [
   'goto #root at yesterday 21:00',
   'at: 3h ago',
   'search roadmap',
+  'vault semantic',
+  'translate spanish',
   'reader on',
   'mute 1h',
 ] as const;

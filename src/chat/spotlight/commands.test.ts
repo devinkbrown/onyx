@@ -3,11 +3,18 @@ import { backgroundOptions } from '@/backgrounds';
 import type { Channel } from '@/lib/irc/types';
 import { getState, setState } from '@/lib/store';
 import { store } from '@/lib/store/store';
-import { preferences, resetPreferences } from '@/lib/prefs/preferences';
+import {
+  closePreferences,
+  isPreferencesOpen,
+  preferences,
+  resetPreferences,
+} from '@/lib/prefs/preferences';
 import {
   readClientExtensionAudit,
   writeClientExtensionActionsForTests,
 } from '@/lib/extensions/clientActions';
+import { setVaultMode, vaultSearchMode } from '@/shell/search/useMessageSearch';
+import { setTranslationTarget, translationTarget } from '@/lib/intelligence/translateMessage';
 import type { DMConversation, Server } from '@/lib/store/store';
 import { THEME_IDS } from '@/theme';
 import { buildCommands } from './commands';
@@ -57,6 +64,9 @@ describe('buildCommands', () => {
     vi.useRealTimers();
     store.setState(initialState, true);
     resetPreferences();
+    closePreferences();
+    setVaultMode('exact');
+    setTranslationTarget('');
     localStorage.clear();
     document.documentElement.removeAttribute('data-theme');
   });
@@ -257,6 +267,79 @@ describe('buildCommands', () => {
     const command = buildCommands(getState(), 'search roadmap').find((entry) => entry.id === 'grammar:search:roadmap');
     expect(command?.title).toBe('Search messages for “roadmap”');
     expect(command?.hint).toBe('#forge');
+  });
+
+  it('sets the vault search mode to semantic and exact', () => {
+    const semantic = buildCommands(getState(), 'vault semantic').find((entry) => entry.id === 'grammar:vault:semantic');
+    expect(semantic?.title).toBe('Search device memory by meaning');
+    expect(semantic?.keywords).toContain('semantic');
+    semantic?.run();
+    expect(vaultSearchMode()).toBe('semantic');
+
+    const exact = buildCommands(getState(), 'vault exact').find((entry) => entry.id === 'grammar:vault:exact');
+    expect(exact?.title).toBe('Search device memory by exact text');
+    exact?.run();
+    expect(vaultSearchMode()).toBe('exact');
+  });
+
+  it('toggles the vault search mode from the bare vault verb', () => {
+    setVaultMode('exact');
+    const command = buildCommands(getState(), 'vault').find((entry) => entry.id === 'grammar:vault:toggle');
+    expect(command?.title).toContain('semantic');
+    command?.run();
+    expect(vaultSearchMode()).toBe('semantic');
+
+    const back = buildCommands(getState(), 'vault mode').find((entry) => entry.id === 'grammar:vault:toggle');
+    back?.run();
+    expect(vaultSearchMode()).toBe('exact');
+  });
+
+  it('sets the on-device translation target by language name and code', () => {
+    const spanish = buildCommands(getState(), 'translate spanish').find((entry) => entry.id === 'grammar:translate:es');
+    expect(spanish?.title).toBe('Translate messages to Spanish');
+    expect(spanish?.keywords).toContain('translation');
+    spanish?.run();
+    expect(translationTarget()).toBe('es');
+    expect(localStorage.getItem('onyx:translation-target')).toBe('es');
+
+    const japanese = buildCommands(getState(), 'translate ja').find((entry) => entry.id === 'grammar:translate:ja');
+    expect(japanese?.title).toBe('Translate messages to Japanese');
+    japanese?.run();
+    expect(translationTarget()).toBe('ja');
+  });
+
+  it('clears the translation target back to the browser default', () => {
+    setTranslationTarget('es');
+    const command = buildCommands(getState(), 'translate off').find((entry) => entry.id === 'grammar:translate:clear');
+    expect(command?.title).toContain('browser default');
+    command?.run();
+    expect(translationTarget()).toBe('');
+  });
+
+  it('surfaces the active channel AI policy and opens preferences', () => {
+    setState({
+      activeView: { kind: 'channel', channel: '#forge' },
+      channels: new Map([['#forge', { ...channel('#forge'), aiPolicy: 'no-ai' } as Channel]]),
+    });
+
+    const command = buildCommands(getState()).find((entry) => entry.id === 'action:ai-policy');
+    expect(command?.title).toContain('No AI');
+    expect(command?.title).toContain('#forge');
+    expect(command?.keywords).toContain('ai policy');
+
+    expect(isPreferencesOpen()).toBe(false);
+    command?.run();
+    expect(isPreferencesOpen()).toBe(true);
+  });
+
+  it('omits the AI policy command when the room policy is open', () => {
+    setState({
+      activeView: { kind: 'channel', channel: '#forge' },
+      channels: new Map([['#forge', channel('#forge')]]),
+    });
+
+    const command = buildCommands(getState()).find((entry) => entry.id === 'action:ai-policy');
+    expect(command).toBeUndefined();
   });
 
   it('applies theme commands immediately', () => {
