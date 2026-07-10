@@ -14,6 +14,8 @@ import { createMemo, createSignal, For, Show, type JSX } from 'solid-js';
 import { Sheet } from '@/primitives';
 import { clearVault, importVault, VAULT_KEEP } from '@/lib/vault/historyVault';
 import { parseDiscordExport } from '@/lib/import/discordImport';
+import { parseSlackExport } from '@/lib/import/slackImport';
+import { parseIrcLog } from '@/lib/import/ircLogImport';
 import {
   clearClientExtensionAudit,
   clearClientExtensionActions,
@@ -668,6 +670,161 @@ function DiscordImportControls(): JSX.Element {
   );
 }
 
+/** Import Slack history from an unzipped workspace export (channel JSON). */
+function SlackImportControls(): JSX.Element {
+  return (
+    <JsonVaultImportControls
+      id="slack"
+      title="Import from Slack"
+      chooseLabel="Choose Slack JSON"
+      rejectMessage="No Slack export recognized. Unzip your Slack workspace export and choose its per-channel .json files."
+      parse={(raw) => {
+        const result = parseSlackExport(raw);
+        if (!result) return null;
+        // The generic control speaks `guild`; Slack calls it a workspace.
+        return { snapshot: result.snapshot, summary: { ...result.summary, guild: result.summary.workspace } };
+      }}
+      description={
+        <>
+          Leaving Slack? Request your workspace export (Slack → Settings & administration → Workspace settings → Import/Export Data), unzip it, and choose the per-channel <strong>JSON</strong> files here. Everything happens on this device — nothing is uploaded. Imported history merges into this device's vault (up to the newest {VAULT_KEEP} messages per channel).
+        </>
+      }
+    />
+  );
+}
+
+interface PendingIrcLogImport {
+  fileName: string;
+  snapshot: import('@/lib/vault/historyVault').VaultExportSnapshot;
+  channel: string;
+  messages: number;
+  skipped: number;
+  droppedOverCap: number;
+  oldest: string | null;
+  newest: string | null;
+}
+
+/**
+ * Import a plain-text IRC log (weechat / irssi / mIRC) into one channel. Unlike
+ * the JSON importers, a raw log names no channel, so the operator supplies it.
+ */
+function IrcLogImportControls(): JSX.Element {
+  const [status, setStatus] = createSignal<string | null>(null);
+  const [busy, setBusy] = createSignal(false);
+  const [channel, setChannel] = createSignal('');
+  const [pending, setPending] = createSignal<PendingIrcLogImport | null>(null);
+
+  async function handleSelect(event: Event): Promise<void> {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+    input.value = '';
+    if (!file) return;
+    const chan = channel().trim();
+    if (!chan) {
+      setStatus('Enter the channel these logs belong to first (e.g. #dev).');
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = parseIrcLog(await file.text(), { channel: chan });
+      if (!result || result.summary.messages === 0) {
+        setPending(null);
+        setStatus('No recognizable log lines found. Supported: weechat, irssi, and mIRC text logs.');
+        return;
+      }
+      const s = result.summary;
+      setPending({ fileName: file.name, snapshot: result.snapshot, channel: chan, messages: s.messages, skipped: s.skipped, droppedOverCap: s.droppedOverCap, oldest: s.oldest, newest: s.newest });
+      setStatus(`Ready to import ${countLabel(s.messages, 'message')} into ${chan}.`);
+    } catch {
+      setPending(null);
+      setStatus('Could not read that log file.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmImport(): Promise<void> {
+    const job = pending();
+    if (!job) return;
+    setBusy(true);
+    try {
+      const result = await importVault(job.snapshot);
+      setPending(null);
+      setStatus(`Imported ${countLabel(result.messages, 'message')} into ${job.channel}. Open it to read the history, or search from anywhere.`);
+    } catch {
+      setStatus('Import failed while merging into the local vault.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section class="pref-group pref-vault-portable pref-irclog-import" aria-labelledby="pref-irclog-import-title">
+      <div class="pref-group-head">
+        <h3 id="pref-irclog-import-title" class="pref-label">Import an IRC log</h3>
+      </div>
+      <p class="pref-desc">
+        Have a plain-text log from another client (weechat, irssi, mIRC)? Name the channel it belongs to, then choose the log file. It's parsed on-device and merged into this device's vault (up to the newest {VAULT_KEEP} messages).
+      </p>
+      <div class="pref-vault-actions">
+        <label class="pref-file pref-irclog-channel">
+          <span>Channel</span>
+          <input
+            type="text"
+            inputmode="text"
+            placeholder="#dev"
+            value={channel()}
+            disabled={busy()}
+            onInput={(event) => setChannel(event.currentTarget.value)}
+          />
+        </label>
+        <label class="pref-file">
+          <span>Choose log file</span>
+          <input
+            type="file"
+            accept="text/plain,.log,.txt,.weechatlog"
+            disabled={busy()}
+            onChange={(event) => void handleSelect(event)}
+          />
+        </label>
+      </div>
+      <Show when={pending()}>
+        {(job) => (
+          <div class="pref-import-review" role="group" aria-labelledby="pref-irclog-review-title">
+            <h4 id="pref-irclog-review-title">Review import</h4>
+            <p>
+              {job().fileName}: {countLabel(job().messages, 'message')} into {job().channel}
+              {job().oldest && job().newest ? ` (${shortDate(job().oldest)} → ${shortDate(job().newest)})` : ''}.
+              {job().skipped > 0 ? ` ${countLabel(job().skipped, 'unparseable/filtered line')} skipped.` : ''}
+              {job().droppedOverCap > 0 ? ` ${countLabel(job().droppedOverCap, 'older message')} beyond the per-channel limit dropped.` : ''}
+              {' '}Existing local history is merged, not replaced.
+            </p>
+            <div class="pref-import-review__actions">
+              <button type="button" class="pref-reset" disabled={busy()} onClick={() => void confirmImport()}>
+                Import into vault
+              </button>
+              <button
+                type="button"
+                class="pref-reset"
+                disabled={busy()}
+                onClick={() => {
+                  setPending(null);
+                  setStatus('Import cancelled.');
+                }}
+              >
+                Cancel import
+              </button>
+            </div>
+          </div>
+        )}
+      </Show>
+      <Show when={status()}>
+        <p class="pref-status" role="status">{status()}</p>
+      </Show>
+    </section>
+  );
+}
+
 function ExtensionAuditControls(): JSX.Element {
   const [entries, setEntries] = createSignal<ClientExtensionAuditEntry[]>(readClientExtensionAudit());
 
@@ -1032,6 +1189,10 @@ export function PreferencesPanel(): JSX.Element {
         <PortableVaultControls />
 
         <DiscordImportControls />
+
+        <SlackImportControls />
+
+        <IrcLogImportControls />
 
         <PwaReadinessPanel />
 
