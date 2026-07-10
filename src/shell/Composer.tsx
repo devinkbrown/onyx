@@ -612,8 +612,10 @@ export function Composer(props: ComposerProps): JSX.Element {
               {(command, index) => (
                 <button
                   type="button"
+                  id={`shell-command-option-${index()}`}
                   class={`shell-command-item${index() === slashIndex() ? ' shell-command-item--active' : ''}`}
                   role="option"
+                  tabindex={-1}
                   aria-selected={index() === slashIndex()}
                   onMouseEnter={() => setSlashIndex(index())}
                   onClick={() => completeCommand(command)}
@@ -722,6 +724,9 @@ export function Composer(props: ComposerProps): JSX.Element {
           aria-multiline="true"
           aria-controls={slashVisible() ? 'shell-command-menu' : undefined}
           aria-autocomplete={slashVisible() ? 'list' : undefined}
+          aria-activedescendant={
+            slashVisible() ? `shell-command-option-${slashIndex()}` : undefined
+          }
         />
         <button
           type="button"
