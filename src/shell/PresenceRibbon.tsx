@@ -16,6 +16,9 @@ import { NotificationCenter } from './NotificationCenter';
 import { PresenceHeatline } from './PresenceHeatline';
 import { Facepile } from './Facepile';
 import { facepileInputsFromUsers } from './facepile';
+import { AiPolicyBadge } from './AiPolicyBadge';
+import type { AiPolicy } from '@/lib/irc/aiPolicyProp';
+import type { Channel } from '@/lib/irc/types';
 
 export type PresenceRibbonProps = {
   selfNick?: string;
@@ -41,6 +44,8 @@ export type VoiceRoomStatus = {
   label: string;
   ariaStatus: string;
 };
+
+type ChannelWithAiPolicy = Channel & { aiPolicy?: AiPolicy };
 
 export function buildVoiceRoomStatus(input: VoiceRoomStatusInput): VoiceRoomStatus {
   const speakers = input.participants.filter((nick) => input.speakingNicks.has(nick));
@@ -136,6 +141,11 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     const ch = activeChannel();
     if (ch) return ch.topic || null;
     return null;
+  });
+
+  const aiPolicy = createMemo(() => {
+    const ch = activeChannel() as ChannelWithAiPolicy | null;
+    return ch?.aiPolicy ?? 'open';
   });
 
   const memberCount = createMemo(() => {
@@ -345,6 +355,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                 <span class="shell-ribbon-event-text">{ribbonEventLabel()}</span>
               </button>
             </Show>
+            <AiPolicyBadge policy={aiPolicy()} channel={settingsChannel() ?? channelName() ?? 'channel'} />
             <Show when={voiceCount() > 0}>
               <button
                 type="button"

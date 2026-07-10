@@ -21,6 +21,7 @@ import {
   type E2eeMessageKind,
   type EncryptionPolicy,
 } from '@/lib/e2ee/policy';
+import { AI_POLICY_PROP, parseAiPolicyProp, type AiPolicy } from '@/lib/irc/aiPolicyProp';
 import { preferences } from '@/lib/prefs/preferences';
 import { parseEventTime } from '@/lib/deeplink';
 import { isValidTopicLabel, parseMessageTopic, topicMessageTag } from '@/lib/topics/topics';
@@ -1782,6 +1783,27 @@ function formatClientTags(tags: Record<string, string>): string {
 
 const HISTORY_PAGE_SIZE = 50;
 const SERVICE_BOTS = new Set(['nickserv', 'chanserv', 'hostserv', 'memoserv']);
+type ChannelWithAiPolicy = Channel & { aiPolicy?: AiPolicy };
+
+function getChannelAiPolicy(channel: Channel): AiPolicy {
+  return (channel as ChannelWithAiPolicy).aiPolicy ?? 'open';
+}
+
+function projectChannelAiPolicy(
+  channels: Map<string, Channel>,
+  channelKey: string,
+  propName: string,
+  propVal: string,
+): Map<string, Channel> | null {
+  if (propName.toLowerCase() !== AI_POLICY_PROP) return null;
+  const channel = channels.get(channelKey);
+  if (!channel) return null;
+  const aiPolicy = propVal ? parseAiPolicyProp(propVal) : 'open';
+  if (getChannelAiPolicy(channel) === aiPolicy) return null;
+  const nextChannels = new Map(channels);
+  nextChannels.set(channelKey, { ...channel, aiPolicy } as Channel);
+  return nextChannels;
+}
 
 function hasChatHistoryCap(client: IRCClient | null | undefined): boolean {
   return Boolean(
@@ -1814,7 +1836,8 @@ function emptyChannel(name: string): Channel {
     highlights: 0,
     createdAt: null,
     messages: [],
-  };
+    aiPolicy: 'open',
+  } as Channel;
 }
 
 function mentionsMe(text: string, nick: string): boolean {
@@ -3905,7 +3928,8 @@ export const store = createStore<OnyxState>()(
         if (value) existing[key] = value;
         else delete existing[key];
         channelProps.set(k, existing);
-        return { channelProps };
+        const channels = projectChannelAiPolicy(s.channels, k, key, value);
+        return channels ? { channelProps, channels } : { channelProps };
       });
     },
 
@@ -5275,7 +5299,8 @@ export const store = createStore<OnyxState>()(
               const channelProps = new Map(s.channelProps);
               const existing = channelProps.get(propKey) ?? {};
               channelProps.set(propKey, { ...existing, [propName]: propVal });
-              return { channelProps };
+              const channels = projectChannelAiPolicy(s.channels, propKey, propName, propVal);
+              return channels ? { channelProps, channels } : { channelProps };
             } else {
               const userProps = new Map(s.userProps);
               const existing = userProps.get(propKey) ?? {};
@@ -6143,7 +6168,8 @@ export const store = createStore<OnyxState>()(
               const channelProps = new Map(s.channelProps);
               const existing = channelProps.get(key) ?? {};
               channelProps.set(key, { ...existing, [propName]: propVal });
-              return { channelProps };
+              const channels = projectChannelAiPolicy(s.channels, key, propName, propVal);
+              return channels ? { channelProps, channels } : { channelProps };
             } else {
               const userProps = new Map(s.userProps);
               const existing = userProps.get(key) ?? {};
