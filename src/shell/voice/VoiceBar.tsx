@@ -20,6 +20,13 @@
 import { For, createEffect, createMemo, createSignal, onCleanup, Show } from 'solid-js';
 import { getState, useStore } from '@/lib/store';
 import { getMountedSuimyakuMediaEngine } from '@/lib/suimyaku-media/MediaEngine';
+import {
+  DEFAULT_SPATIAL_POSITION,
+  padToPosition,
+  positionToPadPoint,
+  positionToStereoPan,
+  type SpatialAudioPosition,
+} from '@/lib/suimyaku-media/spatialAudio';
 import { shortDuration } from '@/lib/time/relativeTime';
 import { Avatar, Popover, Tooltip } from '@/primitives';
 import {
@@ -41,6 +48,14 @@ const TIER_META: Record<NetworkQualityTier, { label: string; color: string; bars
 
 /** Quick-reaction emoji set surfaced in the reactions popover. */
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '👏', '🔥', '😮', '✋'] as const;
+const SPATIAL_PAD_SIZE_PX = 132;
+const SPATIAL_PAD_KEY_STEP = 0.125;
+
+type SpatialRegistryBridge = {
+  readonly registry?: {
+    setPositionForNick: (nick: string, pos: SpatialAudioPosition) => void;
+  };
+};
 
 function formatBitrate(bps: number): string {
   if (bps <= 0) return '';
@@ -180,6 +195,11 @@ export function VoiceBar() {
 
   const [reactionsOpen, setReactionsOpen] = createSignal(false);
   const [spatialOpen, setSpatialOpen] = createSignal(false);
+  const [spatialDragging, setSpatialDragging] = createSignal(false);
+  const [selectedSpatialNick, setSelectedSpatialNick] = createSignal<string | null>(null);
+  const [localSpatialPosition, setLocalSpatialPosition] = createSignal<SpatialAudioPosition | null>(null);
+
+  let spatialPadRef: HTMLDivElement | undefined;
 
   const isActive = createMemo(() =>
     voice().callState === 'in_call' || voice().callState === 'ringing_out' || voice().callState === 'ringing_in'
@@ -193,6 +213,25 @@ export function VoiceBar() {
     const channel = channelLabel();
     if (!channel) return 0;
     return spatialPositions().get(channel.toLowerCase())?.size ?? 0;
+  });
+  const spatialPeers = createMemo(() => Array.from(voice().peers.values()).filter(peer => peer.nick !== selfNick()));
+  const currentSpatialNick = createMemo(() => selectedSpatialNick() ?? spatialPeers()[0]?.nick ?? '');
+  const storedSpatialPosition = createMemo<SpatialAudioPosition | null>(() => {
+    const channel = channelLabel();
+    const nick = currentSpatialNick();
+    if (!channel || !nick) return null;
+    return spatialPositions().get(channel.toLowerCase())?.get(nick.toLowerCase()) ?? null;
+  });
+  const activeSpatialPosition = createMemo(() =>
+    localSpatialPosition() ?? storedSpatialPosition() ?? DEFAULT_SPATIAL_POSITION
+  );
+  const spatialDotStyle = createMemo(() => {
+    const pad = positionToPadPoint(activeSpatialPosition());
+    return {
+      left: `${((pad.x + 1) / 2) * 100}%`,
+      top: `${((pad.y + 1) / 2) * 100}%`,
+      transform: 'translate(-50%, -50%)',
+    };
   });
   const spatialStateLabel = createMemo(() => {
     const count = spatialPositionCount();
@@ -209,6 +248,26 @@ export function VoiceBar() {
   const handleToggleLayout = () => getState().setCallLayout(isSpotlight() ? 'grid' : 'spotlight');
   const handleOpenSettings = () => getState().openVoiceSettings();
 
+  createEffect(() => {
+    const peers = spatialPeers();
+    const selected = selectedSpatialNick();
+    if (selected && peers.some(peer => peer.nick === selected)) return;
+    setSelectedSpatialNick(peers[0]?.nick ?? null);
+    setLocalSpatialPosition(null);
+  });
+
+  createEffect(() => {
+    const channel = channelLabel();
+    if (!channel) return;
+    const positions = spatialPositions().get(channel.toLowerCase());
+    if (!positions) return;
+    for (const [nick, pos] of positions.entries()) setPositionForSpatialNick(nick, pos);
+  });
+
+  onCleanup(() => {
+    setSpatialDragging(false);
+  });
+
   const handleToggleScreenshare = () => {
     if (voice().screenshareActive) {
       voice().stopScreenshare();
@@ -219,9 +278,86 @@ export function VoiceBar() {
 
   const handleLeave = () => getState().leaveVoiceChannel();
 
+  function setPositionForSpatialNick(nick: string, pos: SpatialAudioPosition): void {
+    const engine = getMountedSuimyakuMediaEngine();
+    if (!engine) return;
+    const bridge = engine as unknown as SpatialRegistryBridge;
+    const setter = bridge.registry?.setPositionForNick;
+    if (setter) {
+      setter(nick, pos);
+      return;
+    }
+    engine.setPeerPan(nick, positionToStereoPan(pos));
+  }
+
   const sendReaction = (emoji: string) => {
     getState().sendCallReaction(emoji);
     setReactionsOpen(false);
+  };
+
+  const spatialPointFromEvent = (event: PointerEvent) => {
+    if (!spatialPadRef) return null;
+    const rect = spatialPadRef.getBoundingClientRect();
+    const width = Math.max(1, rect.width);
+    const height = Math.max(1, rect.height);
+    return {
+      x: ((event.clientX - rect.left) / width) * 2 - 1,
+      y: ((event.clientY - rect.top) / height) * 2 - 1,
+    };
+  };
+
+  const applySpatialPadPoint = (point: { x: number; y: number }) => {
+    const nick = currentSpatialNick();
+    if (!nick) return;
+    const pos = padToPosition(point);
+    setLocalSpatialPosition(pos);
+    setPositionForSpatialNick(nick, pos);
+  };
+
+  const handleSpatialPointerDown = (event: PointerEvent) => {
+    if (event.button !== 0) return;
+    const point = spatialPointFromEvent(event);
+    if (!point) return;
+    event.preventDefault();
+    setSpatialDragging(true);
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    applySpatialPadPoint(point);
+  };
+
+  const handleSpatialPointerMove = (event: PointerEvent) => {
+    if (!spatialDragging()) return;
+    const point = spatialPointFromEvent(event);
+    if (!point) return;
+    event.preventDefault();
+    applySpatialPadPoint(point);
+  };
+
+  const handleSpatialPointerUp = (event: PointerEvent) => {
+    if (!spatialDragging()) return;
+    setSpatialDragging(false);
+    try {
+      (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
+    } catch {}
+  };
+
+  const handleSpatialKeyDown = (event: KeyboardEvent) => {
+    const pad = positionToPadPoint(activeSpatialPosition());
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      applySpatialPadPoint({ x: pad.x - SPATIAL_PAD_KEY_STEP, y: pad.y });
+    } else if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      applySpatialPadPoint({ x: pad.x + SPATIAL_PAD_KEY_STEP, y: pad.y });
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      applySpatialPadPoint({ x: pad.x, y: pad.y - SPATIAL_PAD_KEY_STEP });
+    } else if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      applySpatialPadPoint({ x: pad.x, y: pad.y + SPATIAL_PAD_KEY_STEP });
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      applySpatialPadPoint({ x: 0, y: 0 });
+    }
   };
 
   return (
@@ -425,6 +561,98 @@ export function VoiceBar() {
                 <div class="voice-bar__spatial">
                   <span class="voice-bar__spatial-title">Spatial audio</span>
                   <span class="voice-bar__spatial-state">{spatialStateLabel()}</span>
+                  <Show when={currentSpatialNick()}>
+                    {(nick) => (
+                      <>
+                        <div
+                          ref={spatialPadRef}
+                          role="application"
+                          tabindex="0"
+                          aria-label={`Spatial position for ${nick()}`}
+                          data-testid="spatial-audio-pad"
+                          style={{
+                            width: `${SPATIAL_PAD_SIZE_PX}px`,
+                            height: `${SPATIAL_PAD_SIZE_PX}px`,
+                            position: 'relative',
+                            'touch-action': 'none',
+                            cursor: spatialDragging() ? 'grabbing' : 'crosshair',
+                            border: '1px solid color-mix(in oklab, var(--lapis-bright) 42%, transparent)',
+                            'border-radius': '8px',
+                            background: 'color-mix(in oklab, var(--ink) 72%, var(--lapis) 10%)',
+                          }}
+                          onPointerDown={handleSpatialPointerDown}
+                          onPointerMove={handleSpatialPointerMove}
+                          onPointerUp={handleSpatialPointerUp}
+                          onPointerCancel={handleSpatialPointerUp}
+                          onKeyDown={handleSpatialKeyDown}
+                        >
+                          <span
+                            aria-hidden="true"
+                            style={{
+                              position: 'absolute',
+                              left: '50%',
+                              top: '0',
+                              bottom: '0',
+                              width: '1px',
+                              background: 'color-mix(in oklab, var(--washi) 16%, transparent)',
+                            }}
+                          />
+                          <span
+                            aria-hidden="true"
+                            style={{
+                              position: 'absolute',
+                              left: '0',
+                              right: '0',
+                              top: '50%',
+                              height: '1px',
+                              background: 'color-mix(in oklab, var(--washi) 16%, transparent)',
+                            }}
+                          />
+                          <span
+                            aria-hidden="true"
+                            style={{
+                              position: 'absolute',
+                              width: '12px',
+                              height: '12px',
+                              'border-radius': '999px',
+                              background: 'var(--lapis-bright)',
+                              'box-shadow': '0 0 0 3px color-mix(in oklab, var(--lapis-bright) 28%, transparent)',
+                              ...spatialDotStyle(),
+                            }}
+                          />
+                        </div>
+                        <div
+                          role="group"
+                          aria-label="Spatial audio participants"
+                          style={{ display: 'flex', gap: '4px', 'flex-wrap': 'wrap' }}
+                        >
+                          <For each={spatialPeers()}>{(peer) => (
+                            <button
+                              type="button"
+                              aria-pressed={peer.nick === nick()}
+                              onClick={() => {
+                                setSelectedSpatialNick(peer.nick);
+                                setLocalSpatialPosition(null);
+                              }}
+                              style={{
+                                padding: '3px 6px',
+                                'border-radius': '6px',
+                                border: peer.nick === nick()
+                                  ? '1px solid var(--lapis-bright)'
+                                  : '1px solid color-mix(in oklab, var(--washi) 18%, transparent)',
+                                color: peer.nick === nick() ? 'var(--washi)' : 'var(--washi-mute)',
+                                background: 'transparent',
+                                'font-size': '10px',
+                                'font-weight': '800',
+                              }}
+                            >
+                              {peer.nick}
+                            </button>
+                          )}</For>
+                        </div>
+                      </>
+                    )}
+                  </Show>
                   <Show when={voice().screenshareActive}>
                     <span class="voice-bar__spatial-note">Screen share stage</span>
                   </Show>

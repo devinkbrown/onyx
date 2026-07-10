@@ -5,6 +5,16 @@ import {
   KAGURAVOX_FRAME_48K,
   type KaguraVoxQuality,
 } from './OpcodecWasm';
+import {
+  DEFAULT_SPATIAL_POSITION,
+  SPATIAL_ROOM_RADIUS,
+  applyListenerOrientation,
+  applyToPanner,
+  padToPosition,
+  positionToStereoPan,
+  supportsHrtf,
+  type SpatialAudioPosition,
+} from './spatialAudio';
 import type { SuimyakuPeerState, MediaKind } from './types';
 
 // -------------------------------------------------------------------
@@ -20,7 +30,7 @@ export interface PeerMedia {
   vidCanvas:      HTMLCanvasElement | null;
   screenCanvas:   HTMLCanvasElement | null;
   screenStream:   MediaStream | null;
-  panner:         StereoPannerNode | null;
+  panner:         PeerPannerNode | null;
   outputGain:     GainNode | null;
   lastKeyW:       number;
   lastKeyH:       number;
@@ -38,9 +48,13 @@ export interface PeerMedia {
   screenImageData: ImageData | null;
 }
 
+type PeerPannerNode = PannerNode | StereoPannerNode;
+
 // Max concurrent peers tracked before we start refusing new entries.
 // Bounds memory growth from a flood of spurious MEDIA commands.
 const MAX_PEERS = 64;
+const SPATIAL_FALLBACK_SPREAD = 0.6;
+const SPATIAL_ROLLOFF_FACTOR = 1;
 
 // -------------------------------------------------------------------
 // Registry — creates, tracks, and tears down per-peer state
@@ -49,6 +63,8 @@ const MAX_PEERS = 64;
 export class PeerRegistry {
   private peers = new Map<string, PeerMedia>();
   private detachedPeers = new WeakSet<PeerMedia>();
+  private spatialPositions = new Map<string, SpatialAudioPosition>();
+  private listenerConfigured = new WeakSet<AudioContext>();
 
   /** Accumulated inter-arrival jitter (EMA) */
   lastJitterMs = 0;
@@ -314,7 +330,7 @@ export class PeerRegistry {
 
     const src = ctx.createBufferSource();
     src.buffer = buf;
-    if (!pm.panner) pm.panner = ctx.createStereoPanner();
+    if (!pm.panner) pm.panner = this.createPeerPanner(ctx);
     if (!pm.outputGain) {
       pm.outputGain = ctx.createGain();
       pm.outputGain.gain.value = this.deafened ? 0 : this.outputVolume;
@@ -429,8 +445,58 @@ export class PeerRegistry {
   }
 
   // ----------------------------------------------------------------
-  // Spatial audio (stereo panning spread across peers)
+  // Spatial audio (HRTF panning with stereo fallback)
   // ----------------------------------------------------------------
+
+  private isHrtfPanner(node: PeerPannerNode): node is PannerNode {
+    return 'positionX' in node && 'positionY' in node && 'positionZ' in node;
+  }
+
+  private isStereoPanner(node: PeerPannerNode): node is StereoPannerNode {
+    return 'pan' in node;
+  }
+
+  private configureListener(ctx: AudioContext): void {
+    if (this.listenerConfigured.has(ctx)) return;
+    applyListenerOrientation(ctx.listener);
+    this.listenerConfigured.add(ctx);
+  }
+
+  private createPeerPanner(ctx: AudioContext): PeerPannerNode {
+    if (supportsHrtf()) {
+      try {
+        this.configureListener(ctx);
+        const panner = ctx.createPanner();
+        panner.panningModel = 'HRTF';
+        panner.distanceModel = 'inverse';
+        panner.refDistance = SPATIAL_ROOM_RADIUS;
+        panner.maxDistance = SPATIAL_ROOM_RADIUS * MAX_PEERS;
+        panner.rolloffFactor = SPATIAL_ROLLOFF_FACTOR;
+        return panner;
+      } catch {
+        return ctx.createStereoPanner();
+      }
+    }
+    return ctx.createStereoPanner();
+  }
+
+  private ensurePanner(pm: PeerMedia): PeerPannerNode | null {
+    if (!pm.audCtx) return null;
+    if (!pm.panner) pm.panner = this.createPeerPanner(pm.audCtx);
+    return pm.panner;
+  }
+
+  private applyPositionToPeer(pm: PeerMedia, pos: SpatialAudioPosition, stereoPan: number): void {
+    const panner = this.ensurePanner(pm);
+    if (!panner) return;
+    if (this.isHrtfPanner(panner)) {
+      applyToPanner(panner, pos);
+      return;
+    }
+    if (this.isStereoPanner(panner)) {
+      panner.pan.value = stereoPan;
+    }
+  }
 
   /**
    * Apply a manual stereo pan (-1..+1) for a specific nick.
@@ -439,11 +505,22 @@ export class PeerRegistry {
    */
   setPanForNick(nick: string, pan: number): void {
     const key = nick.toLowerCase();
+    const clampedPan = Math.max(-1, Math.min(1, pan));
+    const pos = padToPosition({ x: clampedPan, y: 0 });
+    this.spatialPositions.set(key, pos);
     for (const pm of this.peers.values()) {
       if (pm.state.nick.toLowerCase() !== key) continue;
-      if (!pm.audCtx) return;
-      if (!pm.panner) pm.panner = pm.audCtx.createStereoPanner();
-      pm.panner.pan.value = Math.max(-1, Math.min(1, pan));
+      this.applyPositionToPeer(pm, pos, clampedPan);
+      return;
+    }
+  }
+
+  setPositionForNick(nick: string, pos: SpatialAudioPosition): void {
+    const key = nick.toLowerCase();
+    this.spatialPositions.set(key, pos);
+    for (const pm of this.peers.values()) {
+      if (pm.state.nick.toLowerCase() !== key) continue;
+      this.applyPositionToPeer(pm, pos, positionToStereoPan(pos));
       return;
     }
   }
@@ -454,9 +531,10 @@ export class PeerRegistry {
       if (!pm.audCtx) return;
       const panValue = list.length <= 1
         ? 0
-        : ((idx / Math.max(1, list.length - 1)) * 2 - 1) * 0.6;
-      if (!pm.panner) pm.panner = pm.audCtx.createStereoPanner();
-      pm.panner.pan.value = panValue;
+        : ((idx / Math.max(1, list.length - 1)) * 2 - 1) * SPATIAL_FALLBACK_SPREAD;
+      const explicitPosition = this.spatialPositions.get(pm.state.nick.toLowerCase());
+      const pos = explicitPosition ?? DEFAULT_SPATIAL_POSITION;
+      this.applyPositionToPeer(pm, pos, explicitPosition ? positionToStereoPan(explicitPosition) : panValue);
     });
   }
 }
