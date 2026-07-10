@@ -41,6 +41,10 @@ import {
   saveChannelTopicDraft,
 } from '@/lib/channel/topicDrafts';
 import {
+  channelNotifyMode,
+  type NotifyMode,
+} from '@/lib/notifications/channelNotifyMode';
+import {
   BRIDGE_STATUS_PROP,
   parseBridgeStatus,
 } from '@/lib/interop/bridgeStatus';
@@ -63,6 +67,15 @@ const EPHEMERAL_PRESETS: ReadonlyArray<{ seconds: number; label: string }> = [
   { seconds: 86_400, label: '1 day' },
   { seconds: 604_800, label: '7 days' },
   { seconds: 2_592_000, label: '30 days' },
+];
+
+// Personal (per-device) notification preference for this channel. Unlike the
+// op-only channel modes below, every member sets their own; the store is the
+// single source of truth, so changes apply immediately (no server round-trip).
+const NOTIFY_OPTIONS: ReadonlyArray<{ value: NotifyMode; label: string }> = [
+  { value: 'all', label: 'All messages' },
+  { value: 'mentions', label: 'Mentions only' },
+  { value: 'mute', label: 'Mute' },
 ];
 
 const ENCRYPTION_POLICIES = [
@@ -127,6 +140,17 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
     if (!canEditTopic() || !topicDirty() || !isConnected()) return;
     getState().setTopic(channel()?.name ?? local.channel, topicDraft());
     saveChannelTopicDraft(local.channel, serverTopic(), serverTopic());
+  }
+
+  // ── Notifications (personal, per-channel; available to every member) ──────
+  // Reactive read straight from the store's single source of truth via the pure
+  // helper — no local draft, since a change lands in the store synchronously.
+  const notifyMode = useStore((s) => channelNotifyMode(s.channelNotify, local.channel));
+
+  function changeNotify(event: Event & { currentTarget: HTMLSelectElement }): void {
+    const value = event.currentTarget.value;
+    if (value !== 'all' && value !== 'mentions' && value !== 'mute') return;
+    getState().setChannelNotifyMode(channel()?.name ?? local.channel, value);
   }
 
   // ── Mode toggles (op-only) ───────────────────────────────────────────────
@@ -310,6 +334,31 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
               </div>
             </form>
           </Show>
+        </section>
+
+        {/* ── Notifications (personal) ── */}
+        <section class="shell-chset-section" aria-labelledby="chset-notify-heading">
+          <h3 id="chset-notify-heading" class="shell-chset-heading">Notifications</h3>
+          <form class="shell-chset-param shell-chset-retention" onSubmit={(e) => e.preventDefault()}>
+            <label class="shell-chset-label" for="chset-notify">
+              Notifications for {channel()?.name ?? local.channel}
+            </label>
+            <select
+              id="chset-notify"
+              class="shell-chset-select"
+              value={notifyMode()}
+              aria-describedby="chset-notify-hint"
+              onChange={changeNotify}
+            >
+              <For each={NOTIFY_OPTIONS}>
+                {(option) => <option value={option.value}>{option.label}</option>}
+              </For>
+            </select>
+            <p id="chset-notify-hint" class="shell-chset-hint">
+              Your own alerts for this channel on this device. All messages notify, Mentions only
+              alerts when someone @-mentions you, and Mute silences it.
+            </p>
+          </form>
         </section>
 
         {/* ── Modes ── */}
