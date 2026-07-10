@@ -1,8 +1,8 @@
-# Orochi Protocol — Client Integration Reference (for Ocean)
+# Orochi Protocol — Client Integration Reference (for Onyx)
 
 Everything a client needs to talk to **Orochi**, the pure-Zig clean-room
 sovereign-mesh IRC daemon (modern-only successor to C "Ophion"). This is the
-authoritative surface for refactoring Ocean's IRC layer (`lib/irc/`).
+authoritative surface for refactoring Onyx's IRC layer (`src/lib/irc/`).
 
 Orochi is **modern-only**: there is **no STARTTLS**, **no WEBIRC**, **no identd /
 RFC1413**, **no DCC proxy/filehost**, **no `OPER` command** (operator status is
@@ -10,7 +10,7 @@ granted at SASL login), and **no pseudo-clients** — services are real server
 commands (`REGISTER`, `CHANNEL`, `TEGAMI`, …), never ChanServ/NickServ fake users.
 
 > Source of truth lives in the open Orochi repo under `docs/reference/` and
-> `docs/architecture/`. This file consolidates it for Ocean. When something here
+> `docs/architecture/`. This file consolidates it for Onyx. When something here
 > conflicts with a live server, trust the server and the Orochi docs.
 
 ---
@@ -24,14 +24,14 @@ Live network is **IRCXNet**, two nodes: `eshmaki.me` and `ircx.us`. Listeners ar
 |---|---|---|
 | `6667` | Plaintext TCP | Plain IRC (dev/local only) |
 | `6697` | Implicit TLS | TLS IRC (TLS 1.3 + hardened 1.2 profile) |
-| `8080` | **Secure WebSocket (wss)** | **Browser clients — Ocean uses this** |
+| `8080` | **Secure WebSocket (wss)** | **Browser clients — Onyx uses this** |
 | `6900` | Mesh S2S (Tsumugi PQ) | Server↔server only — **not for clients** |
 
 TLS is **1.3 plus a hardened 1.2 profile** (AEAD/ECDHE-only; no RSA key exchange,
 CBC, compression, or renegotiation). There is no plaintext→TLS upgrade; pick a TLS
 port up front.
 
-### 1.1 WebSocket framing (CRITICAL — this bit Ocean before)
+### 1.1 WebSocket framing (CRITICAL — this bit Onyx before)
 
 Orochi's wss listener sends **one IRC message per WebSocket frame, with NO trailing
 CRLF** (per the IRCv3 WebSocket sub-protocol). A frame is exactly
@@ -139,7 +139,7 @@ sts=<runtime policy>   (only if STS configured)
 orochi/session-sync    orochi/bouncer        (vendor — see §6)
 ```
 
-Notes for Ocean:
+Notes for Onyx:
 - **`draft/event-playback`** — when negotiated, CHATHISTORY/bouncer replay includes
   channel events (JOIN/PART/MODE/TOPIC/KICK/NICK/QUIT) as `:sender CMD <body>`;
   without it you get messages only.
@@ -149,7 +149,7 @@ Notes for Ocean:
 - **`echo-message`** — your own sent messages are echoed back (use for optimistic
   UI confirmation / msgid capture).
 - **`labeled-response`** — echo `@label=` on a command to correlate replies.
-- The live CAP registry namespace is `orochi/*`. There is **no `ocean/*` cap**.
+- The live CAP registry namespace is `orochi/*`. There is **no `onyx/*` cap**.
 
 CAP subcommands: `LS [302]`, `REQ`, `ACK`/`NAK`, `LIST`, `END`, plus `NEW`/`DEL`
 (cap-notify; not fired for the static set).
@@ -180,9 +180,9 @@ account→oper class) — there is no `OPER` command (`491` says so).
 
 ---
 
-## 6. Sessions, Reconnect Reclaim & Bouncer (Ocean-critical)
+## 6. Sessions, Reconnect Reclaim & Bouncer (Onyx-critical)
 
-Ocean should reconnect instantly into its live session instead of a JOIN storm.
+Onyx should reconnect instantly into its live session instead of a JOIN storm.
 
 - **`SESSION`** command: `SESSION LIST` (live sessions for your account),
   `SESSION TOKEN` (reveals this session's local reclaim token, plus an optional
@@ -195,7 +195,7 @@ Ocean should reconnect instantly into its live session instead of a JOIN storm.
   server syncs the new connection into the same channels as your other same-account
   sessions. **Gate your `001` autojoin storm behind `!sessionSyncActive`** — the
   server drives the JOINs when the cap is present (this is already the pattern in
-  Ocean's `lib/store`).
+  Onyx's `src/lib/store`).
 - **`orochi/bouncer` cap**: automatic history rewind on join/rejoin. Combine with
   CHATHISTORY; **dedup by `msgid`** on reconnect (auto-reconnect preserves channel
   state, so replayed history would otherwise duplicate).
@@ -307,7 +307,7 @@ user's mode → `502`.
 
 **CTCP** is parsed for policy (`+C` blocks); standard CTCP replies apply. **DCC is
 parser-only** — no server-mediated DCC/filehost; do not rely on a server DCC surface.
-For file sharing use the external upload service (Ocean already integrates one).
+For file sharing use the external upload service (Onyx already integrates one).
 
 Message tags you'll see/use: `time=` (server-time), `msgid=`, `account=`,
 `batch=`, `label=`, and client-only `+typing`/`+react`/`+reply`/`+draft/…`.
@@ -336,7 +336,7 @@ list `818`, end `819`; built-ins `NAME/OID/CREATION/MEMBERCOUNT/MEMBERLIMIT/MEMB
 ## 11. Network-Wide Operator Events (Event Spine & OBSERVE)
 
 Two parallel **network-wide** oper surfaces — an event raised on any node fans to
-every node, rendered with the **originating** server name. (Relevant if Ocean has an
+every node, rendered with the **originating** server name. (Relevant if Onyx has an
 operator/admin view.)
 
 - **Category feed:** `EVENT ADD <category>` / `EVENT DEL <category>` /
@@ -376,7 +376,7 @@ Subcommands: `JOIN <kind>` · `LEAVE` · `OFFER <codecs> [transport=webrtc]` ·
   and a **native KAGURAVOX/KAGURAVIS UDP leg** (`kagura_frame` datagrams). SFU forwarding,
   simulcast, ABR; room cap 64 participants.
 - **Browser codec:** Orochi ships WASM codec exports (`kagura_wasm.zig`: KAGURAVOX
-  audio + KAGURAVIS video encode/decode for `wasm32-freestanding`) — Ocean can use these
+  audio + KAGURAVIS video encode/decode for `wasm32-freestanding`) — Onyx can use these
   for the native leg, or use standard WebRTC for the RTP leg.
 - **`ACTIVITY <target> <state> [text]`** — presence/activity broadcast (rich presence).
 
@@ -467,15 +467,15 @@ Orochi is a CRDT **mesh** (not a TS6 tree). What a client sees:
   external upload service for files.
 - **No pseudo-clients** — all services are real commands.
 - **No `+w` user-mode WALLOPS** — use `EVENT BROADCAST`.
-- **No `ocean/*` vendor cap** in the live registry — use `orochi/session-sync` and
+- **No `onyx/*` vendor cap** in the live registry — use `orochi/session-sync` and
   `orochi/bouncer`.
 
 ---
 
-## 17. Ocean Refactor Checklist
+## 17. Onyx Refactor Checklist
 
 - [ ] WebSocket reader splits on `/\r?\n/`, no cross-frame remainder (§1.1).
-- [ ] CAP LS 302 → REQ the caps Ocean uses (echo-message, server-time, message-tags,
+- [ ] CAP LS 302 → REQ the caps Onyx uses (echo-message, server-time, message-tags,
       batch, labeled-response, account-notify, away-notify, chghost, extended-join,
       multi-prefix, draft/chathistory, draft/event-playback, draft/typing,
       draft/react, draft/reply, draft/message-redaction, orochi/session-sync,
