@@ -43,4 +43,46 @@ describe('fetchLinkPreview', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('nope', { status: 502 })));
     expect(await fetchLinkPreview('https://down.example')).toBeNull();
   });
+
+  it('does not permanently cache transient failures — retries after a network error', async () => {
+    const good = { title: 'Later', description: '', image: '', site: '' };
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(async () => {
+        throw new TypeError('network down');
+      })
+      .mockImplementationOnce(async () => new Response(JSON.stringify(good), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(await fetchLinkPreview('https://flaky.example')).toBeNull();
+    expect(await fetchLinkPreview('https://flaky.example')).toEqual({
+      url: 'https://flaky.example',
+      title: 'Later',
+      description: '',
+      image: '',
+      site: '',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries after a non-ok (5xx) response instead of caching it', async () => {
+    const good = { title: 'Recovered', description: '', image: '', site: '' };
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(async () => new Response('nope', { status: 503 }))
+      .mockImplementationOnce(async () => new Response(JSON.stringify(good), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(await fetchLinkPreview('https://blip.example')).toBeNull();
+    expect(await fetchLinkPreview('https://blip.example')).toMatchObject({ title: 'Recovered' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('caches a legitimate empty-metadata result — no retry storm', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({}), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    expect(await fetchLinkPreview('https://empty2.example')).toBeNull();
+    expect(await fetchLinkPreview('https://empty2.example')).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });

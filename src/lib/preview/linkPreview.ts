@@ -64,17 +64,33 @@ export function fetchLinkPreview(url: string): Promise<LinkPreview | null> {
   const cached = cache.get(url);
   if (cached) return cached;
 
+  // `transient` flags a network error / non-ok response (as opposed to a
+  // legitimate empty-metadata result). Transient failures are evicted from the
+  // cache after they settle, so a single endpoint blip doesn't permanently
+  // suppress a link's preview for the rest of the session; a stable
+  // empty-metadata answer stays cached to avoid a retry storm.
+  let transient = false;
   const promise = (async (): Promise<LinkPreview | null> => {
     try {
       const res = await fetch(`/linkpreview?url=${encodeURIComponent(url)}`, {
         headers: { Accept: 'application/json' },
       });
-      if (!res.ok) return null;
+      if (!res.ok) {
+        transient = true;
+        return null;
+      }
       return normalize(await res.json(), url);
     } catch {
+      transient = true;
       return null;
     }
   })();
+
+  // Evict only if this exact promise is still cached, so a newer in-flight
+  // fetch for the same URL is never clobbered.
+  void promise.then(() => {
+    if (transient && cache.get(url) === promise) cache.delete(url);
+  });
 
   if (cache.size >= CACHE_CAP) {
     const oldest = cache.keys().next().value;
