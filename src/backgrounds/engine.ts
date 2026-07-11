@@ -86,6 +86,29 @@ function isDocumentHidden(): boolean {
   return typeof document !== 'undefined' && document.hidden;
 }
 
+/**
+ * Attributes on `document.documentElement` that a theme switch mutates.
+ * `ThemeProvider` writes token overrides via `style.setProperty` and flips
+ * `data-theme` (+ `class`), so any of these changing means the live tokens a
+ * canvas variant reads have moved.
+ */
+const THEME_MUTATION_ATTRIBUTES = ['style', 'class', 'data-theme'] as const;
+
+/** Pure: does a mutated attribute name signal a theme change worth repainting? */
+export function isThemeMutation(attributeName: string | null): boolean {
+  return attributeName !== null && (THEME_MUTATION_ATTRIBUTES as readonly string[]).includes(attributeName);
+}
+
+/**
+ * Pure: does this engine paint a single frozen frame (and therefore need an
+ * explicit repaint when the theme changes) rather than a live loop that already
+ * re-reads tokens every frame? True for `staticMode` (reduced motion / low
+ * power) and for `solid` variants.
+ */
+export function rendersSingleFrame(staticMode: boolean, kind: CanvasBackgroundKind): boolean {
+  return staticMode || kind === 'solid';
+}
+
 export class BackgroundEngine {
   readonly canvas: HTMLCanvasElement;
   readonly variant: BackgroundVariant;
@@ -102,6 +125,8 @@ export class BackgroundEngine {
   private lastFrameAt: number | null = null;
   private lowFpsFrames = 0;
   private resizeObserver: ResizeObserver | null = null;
+  private themeObserver: MutationObserver | null = null;
+  private pendingStaticRefresh = false;
   private listenersAttached = false;
 
   constructor(options: BackgroundEngineOptions) {
@@ -275,6 +300,21 @@ export class BackgroundEngine {
       this.resizeObserver.observe(this.canvas);
       if (this.canvas.parentElement) this.resizeObserver.observe(this.canvas.parentElement);
     }
+
+    // A frozen static/solid frame does not loop, so it never re-reads the theme
+    // tokens on its own. Watch documentElement for theme switches and repaint
+    // that single frame; live animated loops already refresh every frame.
+    if (
+      rendersSingleFrame(this.staticMode, this.variant.kind) &&
+      typeof MutationObserver !== 'undefined' &&
+      typeof document !== 'undefined'
+    ) {
+      this.themeObserver = new MutationObserver(this.handleThemeMutation);
+      this.themeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: [...THEME_MUTATION_ATTRIBUTES],
+      });
+    }
   }
 
   private detachListeners(): void {
@@ -285,10 +325,33 @@ export class BackgroundEngine {
     document.removeEventListener('visibilitychange', this.handleVisibilityChange);
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
+    this.themeObserver?.disconnect();
+    this.themeObserver = null;
+    this.pendingStaticRefresh = false;
+  }
+
+  /**
+   * Repaint the single static/solid frame after a theme change. Deferred while
+   * the document is hidden — `handleVisibilityChange` flushes it on return so a
+   * frozen background never resumes with the previous theme's colours.
+   */
+  private refreshStaticFrame(): void {
+    if (!this.running || !this.initialized) return;
+    if (isDocumentHidden()) {
+      this.pendingStaticRefresh = true;
+      return;
+    }
+    const now = typeof performance === 'undefined' ? 0 : performance.now();
+    this.renderFrame(now);
   }
 
   private readonly handleResize = (): void => {
     this.resize();
+  };
+
+  private readonly handleThemeMutation = (records: MutationRecord[]): void => {
+    if (!records.some((record) => isThemeMutation(record.attributeName))) return;
+    this.refreshStaticFrame();
   };
 
   private readonly handleVisibilityChange = (): void => {
@@ -296,6 +359,11 @@ export class BackgroundEngine {
       this.cancelFrame();
       this.lastFrameAt = null;
       return;
+    }
+
+    if (this.pendingStaticRefresh) {
+      this.pendingStaticRefresh = false;
+      this.refreshStaticFrame();
     }
 
     this.scheduleNextFrame();

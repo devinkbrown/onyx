@@ -4,9 +4,12 @@ import { Dynamic } from 'solid-js/web';
 import { Background, selectBackgroundId } from './Background';
 import {
   BackgroundEngine,
+  isThemeMutation,
+  rendersSingleFrame,
   type BackgroundFrameContext,
   type BackgroundKind,
   type BackgroundVariant,
+  type CanvasBackgroundKind,
 } from './engine';
 import { allBackgroundVariants, backgroundRegistry, getBackground, sceneRegistry, type BackgroundId } from './registry';
 import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
@@ -120,6 +123,59 @@ describe('BackgroundEngine FPS guard', () => {
     expect(variant.frame).toHaveBeenCalledTimes(4);
 
     engine.dispose();
+  });
+});
+
+describe('static-frame theme refresh', () => {
+  it('rendersSingleFrame is true only for static or solid renderers', () => {
+    // Arrange / Act / Assert — the two cases that never loop and so must be
+    // explicitly repainted when the theme changes.
+    expect(rendersSingleFrame(true, 'animated')).toBe(true);
+    expect(rendersSingleFrame(false, 'solid')).toBe(true);
+    expect(rendersSingleFrame(true, 'solid')).toBe(true);
+    // A live animated loop re-reads tokens every frame, so it needs no observer.
+    expect(rendersSingleFrame(false, 'animated')).toBe(false);
+  });
+
+  it('isThemeMutation matches only the documentElement attributes a theme switch touches', () => {
+    // Arrange
+    const kinds: CanvasBackgroundKind[] = ['animated', 'solid'];
+
+    // Act / Assert
+    expect(isThemeMutation('style')).toBe(true);
+    expect(isThemeMutation('class')).toBe(true);
+    expect(isThemeMutation('data-theme')).toBe(true);
+    expect(isThemeMutation('id')).toBe(false);
+    expect(isThemeMutation('aria-hidden')).toBe(false);
+    expect(isThemeMutation(null)).toBe(false);
+    // Every solid variant must be caught by rendersSingleFrame.
+    expect(kinds.filter((k) => rendersSingleFrame(false, k))).toEqual(['solid']);
+  });
+
+  it('repaints a solid background when the theme attribute changes', async () => {
+    // Arrange — a solid variant renders one frame and never loops.
+    const canvas = createCanvas();
+    const variant: BackgroundVariant = {
+      id: 'test-solid',
+      label: 'Test Solid',
+      kind: 'solid',
+      init: vi.fn(),
+      frame: vi.fn(),
+      dispose: vi.fn(),
+    };
+    const engine = new BackgroundEngine({ canvas, variant });
+    engine.start();
+    const framesAfterStart = (variant.frame as ReturnType<typeof vi.fn>).mock.calls.length;
+
+    // Act — simulate ThemeProvider flipping the active theme.
+    document.documentElement.setAttribute('data-theme', 'pearl');
+    await Promise.resolve(); // MutationObserver callbacks flush on the microtask queue.
+
+    // Assert — the frozen frame was repainted so it picks up the new tokens.
+    expect((variant.frame as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(framesAfterStart);
+
+    engine.dispose();
+    document.documentElement.removeAttribute('data-theme');
   });
 });
 
