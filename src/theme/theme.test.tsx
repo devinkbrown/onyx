@@ -621,6 +621,78 @@ describe('Vermillion theme (Ink & Vermillion house identity)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 8e. Sapphire — the monochrome royal-blue jewel dark theme, derived through the
+//     factory from its recorded seed (no hand-picked hex that bypasses the solver).
+// ---------------------------------------------------------------------------
+
+describe('Sapphire theme', () => {
+  // The seed recorded in the theme's comment block in themes.ts.
+  const SAPPHIRE_SEED: PaletteSeed = {
+    scheme: 'dark',
+    primaryHue: 250,
+    accentHue: 238,
+    depth: 0.9,
+    vibrancy: 0.85,
+    warmth: -0.12,
+    contrast: 11,
+  };
+
+  // Colour tokens the factory owns (chrome tokens — seams/radii/motion/fonts —
+  // are hand-set and excluded from this equality check).
+  const GENERATED_TOKENS = [
+    '--ink', '--ink-2', '--stone', '--stone-2', '--stone-3', '--stone-line',
+    '--lapis', '--lapis-bright', '--lapis-deep',
+    '--gold', '--gold-bright', '--gold-deep',
+    '--shu', '--shu-bright',
+    '--washi', '--washi-dim', '--washi-mute',
+    '--ok', '--warn',
+  ];
+
+  it('is registered as a dark built-in in the picker', () => {
+    expect(THEME_IDS).toContain('sapphire');
+    expect(THEMES.sapphire).toBeDefined();
+    expect(THEMES.sapphire.scheme).toBe('dark');
+    expect(THEMES.sapphire.label).toBe('Sapphire');
+  });
+
+  it('every registered colour token equals the factory output for its seed', () => {
+    const generated = enforceAA(generatePalette(SAPPHIRE_SEED), 'dark');
+    for (const key of GENERATED_TOKENS) {
+      expect(THEMES.sapphire.tokens[key], key).toBe(generated[key]);
+    }
+  });
+
+  it('passes every WCAG AA pair via auditPalette (regenerated + as-registered)', () => {
+    const regenerated = enforceAA(generatePalette(SAPPHIRE_SEED), 'dark');
+    for (const tokens of [regenerated, THEMES.sapphire.tokens]) {
+      for (const row of auditPalette(tokens)) {
+        expect(row.pass, `${row.fg} on ${row.bg} = ${row.ratio} (min ${row.min})`).toBe(true);
+      }
+    }
+  });
+
+  it('keeps both royal-blue accents just under the banned indigo floor (deepest safe blue)', () => {
+    for (const token of ['--lapis', '--gold']) {
+      const o = hexToOklch(THEMES.sapphire.tokens[token]!)!;
+      expect(o.h < 258 || o.h > 342, `${token} hue ${o.h.toFixed(1)}`).toBe(true);
+      // A true royal blue, not the teal-azure of the ocean cuts.
+      expect(o.h, `${token} should read deep blue`).toBeGreaterThan(215);
+      expect(o.h, `${token} must stay below the banned floor`).toBeLessThan(258);
+    }
+  });
+
+  it('is cut monochrome — bluer and more indigo than the flagship ocean current', () => {
+    const sapphire = hexToOklch(THEMES.sapphire.tokens['--lapis']!)!;
+    const ocean = hexToOklch(THEMES.ocean.tokens['--lapis']!)!;
+    // Sapphire's primary sits at a higher (more indigo) hue than ocean's azure.
+    expect(sapphire.h).toBeGreaterThan(ocean.h);
+    // The second accent stays in the royal family — no cyan glacier contrast.
+    const sapphireGold = hexToOklch(THEMES.sapphire.tokens['--gold']!)!;
+    expect(sapphireGold.h).toBeGreaterThan(ocean.h);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 7. Ocean family — flagship + sub-variants
 // ---------------------------------------------------------------------------
 

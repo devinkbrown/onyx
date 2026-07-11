@@ -60,6 +60,7 @@ export type ThemeId =
   | 'kohaku'
   | 'terracotta'
   | 'vermillion'
+  | 'sapphire'
   | 'teal'
   | 'slate'
   | 'frost';
@@ -1061,6 +1062,73 @@ const frostTokens: TokenMap = {
 };
 
 // ---------------------------------------------------------------------------
+// sapphire — SAPPHIRE: a single deep royal-blue jewel, cut monochrome. Where the
+// ocean cuts play an azure/cyan current against an icy glacier second, Sapphire
+// pushes the primary to the deepest safe blue (OKLCH 250°, just under the banned
+// indigo floor) over an indigo-navy ground, with the second accent kept in the
+// SAME royal-blue family (no glacier contrast, no gold) — one regal stone from
+// the darkest facet to the brightest periwinkle glint.
+// Seed { dark, primary 250, accent 238, depth .9, vibrancy .85, warmth -.12,
+// contrast 11 } — pure engine output (the seed IS the soul; only the chrome
+// tokens below — seams/radii/motion/fonts — are hand-set), re-run through enforceAA.
+// ---------------------------------------------------------------------------
+const sapphireTokens: TokenMap = {
+  // Ground — indigo-navy facets: near-black sapphire → deep royal shadow
+  '--ink':        '#000208',
+  '--ink-2':      '#00040d',
+  '--stone':      '#020b16',
+  '--stone-2':    '#071420',
+  '--stone-3':    '#111e2b',
+  '--stone-line': '#132739',
+
+  // Royal sapphire — the deepest safe blue leads as the primary current
+  '--lapis':        '#0089ea',
+  '--lapis-bright': '#7cbdff',
+  '--lapis-deep':   '#004f8b',
+
+  // Periwinkle — the second accent stays in the SAME royal family (NOT gold/glacier)
+  '--gold':        '#00aaf3',
+  '--gold-bright': '#8ad1ff',
+  '--gold-deep':   '#006b9b',
+
+  // Shu — the hot/danger accent stays vermilion, the one warm spark in the stone
+  '--shu':        '#e95047',
+  '--shu-bright': '#ff7f72',
+
+  // Text — cool sea-glass ivory over the navy
+  '--washi':      '#d4e0eb',
+  '--washi-dim':  '#8f9aa5',
+  '--washi-mute': '#576573',
+
+  // Status
+  '--ok':      '#5bc78e',
+  '--warn':    '#e6d08c', // warnings stay WARM — decoupled from the royal-blue story
+  '--danger':  'var(--shu)',
+
+  // Seams follow the sapphire PRIMARY (never a hard-coded gold) + periwinkle bands
+  '--seam':       'color-mix(in oklab, var(--lapis) 40%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--lapis) 16%, transparent)',
+  '--line':       'color-mix(in oklab, var(--washi) 14%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--gold) 12%, transparent)',
+
+  // Radius — taut, faceted jewel
+  '--r-0':    '0px',
+  '--r-sm':   '2px',
+  '--r-md':   '5px',
+  '--r-pill': '999px',
+
+  // Motion
+  '--ease': 'cubic-bezier(0.16, 1, 0.3, 1)',
+  '--dur':  '240ms',
+
+  // Typography
+  '--font-mono':    "'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace",
+  '--font-display': "'Anton', 'Arial Narrow', 'Helvetica Neue', sans-serif",
+  '--font-sans':    "'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  '--font-serif':   "'Fraunces Variable', 'Iowan Old Style', Georgia, 'Times New Roman', serif",
+};
+
+// ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 
@@ -1176,6 +1244,14 @@ export const THEMES: Record<ThemeId, ThemeMeta> = {
     scheme: 'dark',
     signatureBg: 'ember',
     tokens: vermillionTokens,
+  },
+  sapphire: {
+    id: 'sapphire',
+    label: 'Sapphire',
+    description: 'A single deep royal-blue jewel — indigo-navy ground, periwinkle current, cut monochrome.',
+    scheme: 'dark',
+    signatureBg: 'bioluminescence',
+    tokens: sapphireTokens,
   },
   teal: {
     id: 'teal',
