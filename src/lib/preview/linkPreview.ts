@@ -8,6 +8,12 @@
  *
  * Module-level cache + in-flight dedupe so a busy channel doesn't stampede
  * the endpoint with one request per rendered message.
+ *
+ * SECURITY: every URL is validated (`isPreviewableUrl`) before it is enqueued —
+ * only plain http(s) web targets with no credentials and no internal/private
+ * host reach the fetcher. The same-origin `/linkpreview` endpoint is the real
+ * SSRF boundary; this client-side gate is defense in depth and keeps obviously
+ * hostile URLs (javascript:/data:, localhost, 169.254.169.254, …) off the wire.
  */
 
 export interface LinkPreview {
@@ -21,19 +27,100 @@ export interface LinkPreview {
 /** Hosts whose links never get an OG card (our own media already unfurls). */
 const SKIP_HOSTS = new Set(['eshmaki.me', 'www.eshmaki.me']);
 
+/** Non-routable / internal host names that must never reach the fetcher. */
+const BLOCKED_HOSTNAMES = new Set([
+  'localhost',
+  'ip6-localhost',
+  'ip6-loopback',
+  'broadcasthost',
+]);
+
+/**
+ * True when a bare IPv4 dotted-quad falls in a private / loopback / link-local /
+ * CGNAT / unspecified range (defense in depth vs SSRF — the server guards too).
+ */
+function isPrivateIPv4(host: string): boolean {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (!m) return false;
+  const a = Number(m[1]);
+  const b = Number(m[2]);
+  const c = Number(m[3]);
+  const d = Number(m[4]);
+  if (a > 255 || b > 255 || c > 255 || d > 255) return true; // malformed quad → reject
+  return (
+    a === 0 || // 0.0.0.0/8 unspecified
+    a === 10 || // 10.0.0.0/8 private
+    a === 127 || // 127.0.0.0/8 loopback
+    (a === 169 && b === 254) || // 169.254.0.0/16 link-local (incl. cloud metadata)
+    (a === 172 && b >= 16 && b <= 31) || // 172.16.0.0/12 private
+    (a === 192 && b === 168) || // 192.168.0.0/16 private
+    (a === 100 && b >= 64 && b <= 127) // 100.64.0.0/10 CGNAT
+  );
+}
+
+/**
+ * True when an IPv6 literal (URL.hostname keeps the brackets) is loopback,
+ * unspecified, unique-local (fc00::/7), link-local (fe80::/10), or an
+ * IPv4-mapped address pointing at a private IPv4.
+ */
+function isPrivateIPv6(host: string): boolean {
+  if (!host.startsWith('[') || !host.endsWith(']')) return false;
+  const inner = host.slice(1, -1).toLowerCase();
+  if (inner === '::1' || inner === '::') return true;
+  if (/^f[cd][0-9a-f]{2}:/.test(inner)) return true; // fc00::/7 unique-local
+  if (/^fe[89ab][0-9a-f]:/.test(inner)) return true; // fe80::/10 link-local
+  // IPv4-mapped (::ffff:a.b.c.d) — the URL parser may normalize the trailing
+  // octets to hex (::ffff:7f00:1), so accept both spellings.
+  const mappedDotted = /::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(inner);
+  if (mappedDotted && isPrivateIPv4(mappedDotted[1] ?? '')) return true;
+  const mappedHex = /::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(inner);
+  if (mappedHex) {
+    const hi = parseInt(mappedHex[1] ?? '', 16);
+    const lo = parseInt(mappedHex[2] ?? '', 16);
+    const dotted = `${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`;
+    if (isPrivateIPv4(dotted)) return true;
+  }
+  return false;
+}
+
+/**
+ * Validate an href as a safe preview TARGET before it is ever enqueued for the
+ * fetcher. Rejects anything that isn't a plain http(s) web URL: non-http(s)
+ * schemes (javascript:/data:/file:/…), embedded credentials, and hosts that
+ * look internal (localhost, `.local`/`.internal`, private/loopback/link-local
+ * IP literals). This is defense in depth — the server endpoint is the real
+ * SSRF boundary — but it keeps obviously-hostile URLs off the wire entirely.
+ */
+export function isPreviewableUrl(href: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(href);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+  // Credentials in the authority are a classic SSRF/parser-confusion vector.
+  if (parsed.username !== '' || parsed.password !== '') return false;
+  const host = parsed.hostname.toLowerCase();
+  if (host === '') return false;
+  if (BLOCKED_HOSTNAMES.has(host)) return false;
+  if (host.endsWith('.local') || host.endsWith('.internal') || host.endsWith('.localhost')) {
+    return false;
+  }
+  if (isPrivateIPv4(host)) return false;
+  if (isPrivateIPv6(host)) return false;
+  return true;
+}
+
 /**
  * Pick the URL to preview from a message's link hrefs: the first plain http(s)
- * web link that is not one of our own uploads (those render as inline media).
+ * web link that is not one of our own uploads (those render as inline media)
+ * and is not an internal / non-routable target.
  */
 export function pickPreviewUrl(hrefs: readonly string[]): string | null {
   for (const href of hrefs) {
-    let parsed: URL;
-    try {
-      parsed = new URL(href);
-    } catch {
-      continue;
-    }
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') continue;
+    if (!isPreviewableUrl(href)) continue;
+    const parsed = new URL(href);
     if (SKIP_HOSTS.has(parsed.hostname) && parsed.pathname.startsWith('/uploads/')) continue;
     return href;
   }
@@ -62,6 +149,10 @@ const CACHE_CAP = 300;
 
 /** Fetch (or replay) the preview for a URL. Resolves null on any failure. */
 export function fetchLinkPreview(url: string): Promise<LinkPreview | null> {
+  // Fail closed: an unsafe target never reaches the network. Not cached — a
+  // rejected URL is cheap to re-validate and we don't want it holding a slot.
+  if (!isPreviewableUrl(url)) return Promise.resolve(null);
+
   const cached = cache.get(url);
   if (cached) return cached;
 

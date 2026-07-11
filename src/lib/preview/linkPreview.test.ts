@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { pickPreviewUrl, fetchLinkPreview, _clearPreviewCache } from './linkPreview';
+import {
+  pickPreviewUrl,
+  fetchLinkPreview,
+  isPreviewableUrl,
+  _clearPreviewCache,
+} from './linkPreview';
 
 afterEach(() => {
   _clearPreviewCache();
@@ -23,7 +28,107 @@ describe('pickPreviewUrl', () => {
   });
 });
 
+describe('isPreviewableUrl (SSRF defense in depth)', () => {
+  it('accepts plain http(s) public web URLs', () => {
+    expect(isPreviewableUrl('https://example.com/page')).toBe(true);
+    expect(isPreviewableUrl('http://example.com')).toBe(true);
+    expect(isPreviewableUrl('https://github.com/orochi/onyx?tab=readme')).toBe(true);
+  });
+
+  it('rejects dangerous / non-http(s) schemes', () => {
+    for (const href of [
+      'javascript:alert(1)',
+      'data:text/html,<script>alert(1)</script>',
+      'file:///etc/passwd',
+      'vbscript:msgbox(1)',
+      'ftp://example.com/x',
+      'ircs://eshmaki.me:6697',
+      'not a url',
+      '',
+    ]) {
+      expect(isPreviewableUrl(href)).toBe(false);
+    }
+  });
+
+  it('rejects embedded credentials in the authority', () => {
+    expect(isPreviewableUrl('https://user:pass@example.com')).toBe(false);
+    expect(isPreviewableUrl('https://admin@169.254.169.254')).toBe(false);
+  });
+
+  it('rejects internal / loopback host names', () => {
+    for (const href of [
+      'http://localhost/',
+      'http://localhost:8080/admin',
+      'http://printer.local/',
+      'http://vault.internal/',
+      'http://foo.localhost/',
+    ]) {
+      expect(isPreviewableUrl(href)).toBe(false);
+    }
+  });
+
+  it('rejects private / loopback / link-local IPv4 literals', () => {
+    for (const href of [
+      'http://127.0.0.1/',
+      'http://10.0.0.5/',
+      'http://172.16.31.1/',
+      'http://192.168.1.1/',
+      'http://169.254.169.254/latest/meta-data/', // cloud metadata
+      'http://100.64.0.1/',
+      'http://0.0.0.0/',
+    ]) {
+      expect(isPreviewableUrl(href)).toBe(false);
+    }
+    expect(isPreviewableUrl('http://8.8.8.8/')).toBe(true); // public IP is fine
+  });
+
+  it('rejects loopback / ULA / link-local IPv6 literals and mapped privates', () => {
+    for (const href of [
+      'http://[::1]/',
+      'http://[::]/',
+      'http://[fc00::1]/',
+      'http://[fd12:3456::1]/',
+      'http://[fe80::1]/',
+      'http://[::ffff:127.0.0.1]/',
+    ]) {
+      expect(isPreviewableUrl(href)).toBe(false);
+    }
+  });
+});
+
 describe('fetchLinkPreview', () => {
+  it('NEVER issues a fetch for an unsafe / non-same-origin target', async () => {
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    for (const href of [
+      'javascript:alert(1)',
+      'data:text/html,x',
+      'http://127.0.0.1/',
+      'http://169.254.169.254/latest/meta-data/',
+      'http://localhost:9200/',
+      'https://user:pass@example.com/',
+      'http://[::1]/',
+    ]) {
+      expect(await fetchLinkPreview(href)).toBeNull();
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('only ever fetches the same-origin /linkpreview endpoint', async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL) =>
+      new Response(JSON.stringify({ title: 'ok' }), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    await fetchLinkPreview('https://example.com/page?x=1&y=2');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const requested = String(fetchMock.mock.calls[0]?.[0]);
+    expect(requested).toBe(`/linkpreview?url=${encodeURIComponent('https://example.com/page?x=1&y=2')}`);
+    // No absolute/cross-origin URL is ever passed to fetch.
+    expect(requested.startsWith('/linkpreview?')).toBe(true);
+    expect(/^https?:\/\//.test(requested)).toBe(false);
+  });
+
+
   it('normalizes a good payload and dedupes concurrent fetches', async () => {
     const fetchMock = vi.fn(async () =>
       new Response(JSON.stringify({ title: 'Orochi', description: 'a daemon', image: '', site: 'GitHub' }), { status: 200 }),
