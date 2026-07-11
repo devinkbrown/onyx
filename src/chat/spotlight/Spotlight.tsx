@@ -48,6 +48,9 @@ const GRAMMAR_EXAMPLES = [
   'vault semantic',
   'translate spanish',
   'reader on',
+  'star #root',
+  'away lunch',
+  'focus',
   'mute 1h',
 ] as const;
 

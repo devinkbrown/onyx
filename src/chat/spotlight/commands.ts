@@ -149,6 +149,8 @@ function parseVaultMode(value: string): VaultSearchMode | null {
   return null;
 }
 
+const AWAY_CLEAR_WORDS = new Set(['off', 'clear', 'back', 'none', 'reset', 'here', 'available']);
+
 const TRANSLATE_CLEAR_WORDS = new Set(['off', 'none', 'clear', 'reset', 'browser', 'default', 'stop']);
 
 function resolveTranslateTarget(value: string): { code: string; clear: boolean } | null {
@@ -441,6 +443,38 @@ function grammarCommands(state: CommandState, query: string): SpotlightCommand[]
     }
   }
 
+  const starArg = commandArg(query, 'star') ?? commandArg(query, 'favorite') ?? commandArg(query, 'favourite');
+  if (starArg) {
+    const channel = normalizeChannel(starArg);
+    if (channel.length > 1) {
+      const name = state.channels.get(channel.toLowerCase())?.name ?? channel;
+      commands.push({
+        id: `grammar:star:${channel.toLowerCase()}`,
+        section: 'Actions',
+        title: `Star ${name}`,
+        hint: 'favorite channel',
+        keywords: [query.trim(), 'star', 'favorite', 'favourite', 'pin channel', 'bookmark', name],
+        run: () => getState().starChannel(name),
+      });
+    }
+  }
+
+  const unstarArg = commandArg(query, 'unstar') ?? commandArg(query, 'unfavorite') ?? commandArg(query, 'unfavourite');
+  if (unstarArg) {
+    const channel = normalizeChannel(unstarArg);
+    if (channel.length > 1) {
+      const name = state.channels.get(channel.toLowerCase())?.name ?? channel;
+      commands.push({
+        id: `grammar:unstar:${channel.toLowerCase()}`,
+        section: 'Actions',
+        title: `Unstar ${name}`,
+        hint: 'favorite channel',
+        keywords: [query.trim(), 'unstar', 'unfavorite', 'unfavourite', 'remove star', name],
+        run: () => getState().unstarChannel(name),
+      });
+    }
+  }
+
   const dmArg = commandArg(query, 'dm');
   if (dmArg) {
     const nick = dmArg.replace(/^@/, '').trim();
@@ -515,6 +549,41 @@ function grammarCommands(state: CommandState, query: string): SpotlightCommand[]
       hint: 'notifications',
       keywords: [query.trim(), 'dnd on', 'quiet on', 'mute'],
       run: () => getState().setDndEnabled(true),
+    });
+  }
+
+  const awayArg = commandArg(query, 'away');
+  if (awayArg !== null && !AWAY_CLEAR_WORDS.has(awayArg.toLowerCase())) {
+    commands.push({
+      id: 'grammar:away:set',
+      section: 'Actions',
+      title: `Set away — ${awayArg}`,
+      hint: 'presence',
+      keywords: [query.trim(), 'away', 'afk', 'brb', 'status', awayArg],
+      run: () => getState().setAway(awayArg),
+    });
+  } else if (
+    exactCommand(query, 'back', 'unaway') ||
+    (awayArg !== null && AWAY_CLEAR_WORDS.has(awayArg.toLowerCase()))
+  ) {
+    commands.push({
+      id: 'grammar:away:clear',
+      section: 'Actions',
+      title: 'Clear away status',
+      hint: 'presence',
+      keywords: [query.trim(), 'away off', 'back', 'here', 'available', 'unaway', 'afk'],
+      run: () => getState().unsetAway(),
+    });
+  }
+
+  if (exactCommand(query, 'focus', 'focus mode', 'zen')) {
+    commands.push({
+      id: 'grammar:focus:toggle',
+      section: 'Actions',
+      title: 'Toggle focus mode',
+      hint: 'distraction-free',
+      keywords: [query.trim(), 'focus', 'focus mode', 'distraction free', 'zen', 'minimize'],
+      run: () => getState().toggleFocusMode(),
     });
   }
 

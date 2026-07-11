@@ -517,6 +517,73 @@ describe('buildCommands', () => {
     expect(command).toBeUndefined();
   });
 
+  it('sets an away status with a message through setAway', () => {
+    const setAway = vi.fn();
+    setState({ setAway });
+
+    const command = buildCommands(getState(), 'away lunch break').find((entry) => entry.id === 'grammar:away:set');
+    expect(command?.section).toBe('Actions');
+    expect(command?.title).toBe('Set away — lunch break');
+    expect(command?.keywords).toContain('afk');
+    command?.run();
+
+    expect(setAway).toHaveBeenCalledWith('lunch break');
+  });
+
+  it('clears the away status from the away-off verb and the bare back verb', () => {
+    const unsetAway = vi.fn();
+    setState({ unsetAway });
+
+    const off = buildCommands(getState(), 'away off').find((entry) => entry.id === 'grammar:away:clear');
+    expect(off?.title).toBe('Clear away status');
+    off?.run();
+
+    const back = buildCommands(getState(), 'back').find((entry) => entry.id === 'grammar:away:clear');
+    expect(back?.title).toBe('Clear away status');
+    back?.run();
+
+    expect(unsetAway).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not surface an away-set command for the clear keywords', () => {
+    const command = buildCommands(getState(), 'away clear').find((entry) => entry.id === 'grammar:away:set');
+    expect(command).toBeUndefined();
+  });
+
+  it('toggles focus mode from the focus verb', () => {
+    const toggleFocusMode = vi.fn();
+    setState({ toggleFocusMode });
+
+    const command = buildCommands(getState(), 'focus').find((entry) => entry.id === 'grammar:focus:toggle');
+    expect(command?.section).toBe('Actions');
+    expect(command?.title).toBe('Toggle focus mode');
+    expect(command?.keywords).toContain('distraction free');
+    command?.run();
+
+    expect(toggleFocusMode).toHaveBeenCalledTimes(1);
+  });
+
+  it('stars and unstars a channel through the star grammar verbs', () => {
+    const starChannel = vi.fn();
+    const unstarChannel = vi.fn();
+    setState({
+      channels: new Map([['#forge', channel('#forge')]]),
+      starChannel,
+      unstarChannel,
+    });
+
+    const star = buildCommands(getState(), 'star forge').find((entry) => entry.id === 'grammar:star:#forge');
+    expect(star?.title).toBe('Star #forge');
+    expect(star?.keywords).toContain('favorite');
+    star?.run();
+    expect(starChannel).toHaveBeenCalledWith('#forge');
+
+    const unstar = buildCommands(getState(), 'unstar #forge').find((entry) => entry.id === 'grammar:unstar:#forge');
+    expect(unstar?.title).toBe('Unstar #forge');
+    unstar?.run();
+    expect(unstarChannel).toHaveBeenCalledWith('#forge');
+  });
+
   it('builds capability-scoped client extension actions', () => {
     const open = vi.spyOn(window, 'open').mockImplementation(() => null);
     writeClientExtensionActionsForTests([
