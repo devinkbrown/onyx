@@ -37,6 +37,15 @@ function trapFocus(event: KeyboardEvent, panel: HTMLElement) {
   const last = focusable[focusable.length - 1];
   if (!first || !last) return;
 
+  // Focus may have drifted outside the panel — e.g. the focused control was
+  // removed or disabled and the browser reset activeElement to <body>. Pull it
+  // back in so Tab can never traverse the background page. (WCAG 2.4.3)
+  if (!panel.contains(document.activeElement)) {
+    event.preventDefault();
+    (event.shiftKey ? last : first).focus();
+    return;
+  }
+
   if (event.shiftKey && document.activeElement === first) {
     event.preventDefault();
     last.focus();

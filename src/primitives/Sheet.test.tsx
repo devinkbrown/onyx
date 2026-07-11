@@ -55,4 +55,31 @@ describe('Sheet', () => {
 
     expect(document.activeElement).toBe(close);
   });
+
+  it('recaptures focus that has drifted outside the sheet on Tab', async () => {
+    // A control inside the panel that is later removed/disabled leaves the
+    // browser with focus on <body> (or a background element). A Tab from there
+    // must be pulled back into the panel, never allowed to traverse the
+    // background page. (SC 2.4.3)
+    const stray = document.createElement('button');
+    stray.textContent = 'Background';
+    document.body.appendChild(stray);
+
+    render(() => (
+      <Sheet open title="Escape trap" onOpenChange={() => undefined}>
+        <button type="button">Inside</button>
+      </Sheet>
+    ));
+    await tick();
+
+    stray.focus();
+    expect(document.activeElement).toBe(stray);
+
+    fireEvent.keyDown(document.body, { key: 'Tab' });
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.contains(document.activeElement)).toBe(true);
+
+    stray.remove();
+  });
 });
