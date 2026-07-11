@@ -15,9 +15,22 @@ export interface InviteCard {
   url: string;
 }
 
-function trimmedParam(raw: string | null): string | null {
+/**
+ * IRC nick rules — mirror Connect.validateNick, the downstream consumer of a
+ * suggested guest name: start with a letter or IRC special char, then letters,
+ * digits, `-`, or the special chars, capped at 64. The `?as=` value is
+ * untrusted input like every other invite param, so it is validated at THIS
+ * boundary rather than trusted raw: whitespace, commas, and — critically —
+ * control characters (NUL, CR/LF) are rejected, so a crafted invite can never
+ * seat a corrupt nick, garble the Open Graph meta, or bloat the canonical URL.
+ */
+const GUEST_NICK_RE = /^[A-Za-z[\]\\`_^{|}][A-Za-z0-9[\]\\`_^{|}-]*$/;
+const GUEST_NICK_MAX = 64;
+
+function parseGuestName(raw: string | null): string | null {
   const trimmed = raw?.trim() ?? '';
-  return trimmed.length > 0 ? trimmed : null;
+  if (trimmed.length === 0 || trimmed.length > GUEST_NICK_MAX) return null;
+  return GUEST_NICK_RE.test(trimmed) ? trimmed : null;
 }
 
 function canonicalInviteUrl(origin: string, card: Omit<InviteCard, 'network' | 'url'>): string {
@@ -40,7 +53,7 @@ export function buildInviteCard(
   const at = parseAtParam(params.get('at'));
   const topic = parseTopicParam(params.get('topic'));
   const readerMode = parseReaderParam(params.get('reader'));
-  const guestName = trimmedParam(params.get('as'));
+  const guestName = parseGuestName(params.get('as'));
   const partialCard = { channel, at, topic, readerMode, guestName };
 
   return {

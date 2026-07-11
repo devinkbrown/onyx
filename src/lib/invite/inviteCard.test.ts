@@ -77,13 +77,47 @@ describe('buildInviteCard', () => {
 
   it('encodes a # channel and keeps canonical params in stable order', () => {
     const card = buildInviteCard(
-      new URLSearchParams({ as: 'guest nick', join: '%23space', at: '1751000000' }),
+      new URLSearchParams({ as: 'guestnick', join: '%23space', at: '1751000000' }),
       { network: NETWORK, origin: ORIGIN },
     );
 
     expect(card.url).toBe(
-      `${ORIGIN}?join=%23space&at=2025-06-27T04%3A53%3A20.000Z&as=guest+nick`,
+      `${ORIGIN}?join=%23space&at=2025-06-27T04%3A53%3A20.000Z&as=guestnick`,
     );
+  });
+
+  it('keeps a valid suggested nick, trimming surrounding whitespace', () => {
+    const card = buildInviteCard(new URLSearchParams({ join: '#general', as: '  Yuki_42  ' }), {
+      network: NETWORK,
+      origin: ORIGIN,
+    });
+
+    expect(card.guestName).toBe('Yuki_42');
+    expect(card.url).toBe(`${ORIGIN}?join=%23general&as=Yuki_42`);
+  });
+
+  it('drops a suggested guest name that is not a valid IRC nick', () => {
+    // A space is invalid in a nick — the value is seated downstream as one.
+    const card = buildInviteCard(new URLSearchParams({ join: '#general', as: 'guest nick' }), {
+      network: NETWORK,
+      origin: ORIGIN,
+    });
+
+    expect(card.guestName).toBeNull();
+    expect(card.url).toBe(`${ORIGIN}?join=%23general`);
+  });
+
+  it('rejects control characters, commas and over-long values in the guest name', () => {
+    const opts = { network: NETWORK, origin: ORIGIN };
+
+    expect(buildInviteCard(new URLSearchParams({ join: '#general', as: 'yu\x00ki' }), opts).guestName).toBeNull();
+    expect(
+      buildInviteCard(new URLSearchParams({ join: '#general', as: 'yuki\r\nJOIN #evil' }), opts).guestName,
+    ).toBeNull();
+    expect(buildInviteCard(new URLSearchParams({ join: '#general', as: 'a,b' }), opts).guestName).toBeNull();
+    expect(
+      buildInviteCard(new URLSearchParams({ join: '#general', as: 'a'.repeat(65) }), opts).guestName,
+    ).toBeNull();
   });
 
   it('drops malformed topic and reader params from the canonical URL', () => {
