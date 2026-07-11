@@ -18,6 +18,7 @@ transport. This is the documentation hub; each entry is labelled by audience.
 
 | Doc | Audience | What it covers |
 |---|---|---|
+| [`features.md`](features.md) | end-user | Passkeys (passwordless sign-in: add/list/rename/remove) and the Home "since you were away" catch-up digest (Needs you / Followed / Quiet tiers, calm presets). |
 | [`search-and-history.md`](search-and-history.md) | end-user | The on-device history vault, message search (exact + on-device semantic), time travel (`?at=`), and the encrypted-DM privacy invariant. |
 | [`importing.md`](importing.md) | end-user | Import Discord (DiscordChatExporter) history into your on-device vault. |
 
