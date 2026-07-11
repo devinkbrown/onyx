@@ -1,0 +1,72 @@
+/* MarkAllCaughtUp — one-tap "clear my whole backlog" affordance. */
+
+.mark-caught-up {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.mark-caught-up__button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  align-self: flex-start;
+  padding: var(--space-1) var(--space-3);
+  background: var(--stone);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  color: var(--washi);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--duration-fast, 150ms) var(--ease, ease),
+    border-color var(--duration-fast, 150ms) var(--ease, ease);
+}
+
+.mark-caught-up__button:hover {
+  background: var(--stone-line);
+  border-color: var(--gold-deep);
+}
+
+.mark-caught-up__button:focus-visible {
+  outline: 2px solid var(--gold-bright);
+  outline-offset: 2px;
+}
+
+.mark-caught-up__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4rem;
+  padding: 0 0.4rem;
+  border-radius: var(--r-pill);
+  background: var(--lapis);
+  color: var(--washi);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.mark-caught-up__status {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--washi-mute);
+}
+
+.mark-caught-up__status:empty {
+  display: none;
+}
+
+.mark-caught-up__status:focus-visible {
+  outline: 2px solid var(--gold-bright);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mark-caught-up__button {
+    transition: none;
+  }
+}
