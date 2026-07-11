@@ -140,6 +140,15 @@ function parseDensityArg(value: string): Density | null {
 
 function parseVaultMode(value: string): VaultSearchMode | null {
   const normalized = value.trim().toLowerCase();
+  if (
+    normalized === 'hybrid' ||
+    normalized === 'combined' ||
+    normalized === 'both' ||
+    normalized === 'blend' ||
+    normalized === 'mixed'
+  ) {
+    return 'hybrid';
+  }
   if (normalized === 'semantic' || normalized === 'meaning' || normalized === 'smart' || normalized === 'rag') {
     return 'semantic';
   }
@@ -147,6 +156,26 @@ function parseVaultMode(value: string): VaultSearchMode | null {
     return 'exact';
   }
   return null;
+}
+
+/** Human-facing label per vault mode; also the order the bare `vault` verb cycles. */
+const VAULT_MODE_LABEL: Record<VaultSearchMode, string> = {
+  hybrid: 'hybrid (text, then meaning)',
+  exact: 'exact text',
+  semantic: 'meaning (semantic)',
+};
+
+/** Mirrors the hook's VAULT_MODE_CYCLE (hybrid → exact → semantic) so the toggle title names the next step. */
+const NEXT_VAULT_MODE: Record<VaultSearchMode, VaultSearchMode> = {
+  hybrid: 'exact',
+  exact: 'semantic',
+  semantic: 'hybrid',
+};
+
+function vaultModeTitle(mode: VaultSearchMode): string {
+  if (mode === 'hybrid') return 'Search device memory by text, then meaning';
+  if (mode === 'semantic') return 'Search device memory by meaning';
+  return 'Search device memory by exact text';
 }
 
 const AWAY_CLEAR_WORDS = new Set(['off', 'clear', 'back', 'none', 'reset', 'here', 'available']);
@@ -344,13 +373,24 @@ function catchUpCommands(state: CommandState, query: string): SpotlightCommand[]
 
 function vaultToggleCommand(query: string): SpotlightCommand {
   const current = vaultSearchMode();
-  const next: VaultSearchMode = current === 'exact' ? 'semantic' : 'exact';
+  const next = NEXT_VAULT_MODE[current];
   return {
     id: 'grammar:vault:toggle',
     section: 'Actions',
-    title: next === 'semantic' ? 'Switch vault search to meaning (semantic)' : 'Switch vault search to exact text',
+    title: `Switch vault search to ${VAULT_MODE_LABEL[next]}`,
     hint: `vault search · now ${current}`,
-    keywords: [query.trim(), 'vault', 'search mode', 'semantic', 'exact', 'toggle', 'meaning', 'recall'],
+    keywords: [
+      query.trim(),
+      'vault',
+      'search mode',
+      'hybrid',
+      'semantic',
+      'exact',
+      'toggle',
+      'cycle',
+      'meaning',
+      'recall',
+    ],
     run: () => toggleVaultMode(),
   };
 }
@@ -617,9 +657,23 @@ function grammarCommands(state: CommandState, query: string): SpotlightCommand[]
       commands.push({
         id: `grammar:vault:${mode}`,
         section: 'Actions',
-        title: mode === 'semantic' ? 'Search device memory by meaning' : 'Search device memory by exact text',
+        title: vaultModeTitle(mode),
         hint: 'vault search',
-        keywords: [query.trim(), 'vault', 'search mode', 'semantic', 'exact', 'meaning', 'literal', 'rag', 'recall', 'device memory', mode],
+        keywords: [
+          query.trim(),
+          'vault',
+          'search mode',
+          'hybrid',
+          'combined',
+          'semantic',
+          'exact',
+          'meaning',
+          'literal',
+          'rag',
+          'recall',
+          'device memory',
+          mode,
+        ],
         run: () => setVaultMode(mode),
       });
     } else {

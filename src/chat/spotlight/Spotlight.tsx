@@ -45,6 +45,7 @@ const GRAMMAR_EXAMPLES = [
   'unread #root',
   'leave #root',
   'search roadmap',
+  'vault hybrid',
   'vault semantic',
   'translate spanish',
   'reader on',

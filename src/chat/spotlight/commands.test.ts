@@ -332,7 +332,7 @@ describe('buildCommands', () => {
     expect(command?.hint).toBe('#forge');
   });
 
-  it('sets the vault search mode to semantic and exact', () => {
+  it('sets the vault search mode to semantic, exact, and hybrid', () => {
     const semantic = buildCommands(getState(), 'vault semantic').find((entry) => entry.id === 'grammar:vault:semantic');
     expect(semantic?.title).toBe('Search device memory by meaning');
     expect(semantic?.keywords).toContain('semantic');
@@ -343,18 +343,37 @@ describe('buildCommands', () => {
     expect(exact?.title).toBe('Search device memory by exact text');
     exact?.run();
     expect(vaultSearchMode()).toBe('exact');
+
+    const hybrid = buildCommands(getState(), 'vault hybrid').find((entry) => entry.id === 'grammar:vault:hybrid');
+    expect(hybrid?.title).toBe('Search device memory by text, then meaning');
+    expect(hybrid?.keywords).toContain('hybrid');
+    hybrid?.run();
+    expect(vaultSearchMode()).toBe('hybrid');
   });
 
-  it('toggles the vault search mode from the bare vault verb', () => {
-    setVaultMode('exact');
-    const command = buildCommands(getState(), 'vault').find((entry) => entry.id === 'grammar:vault:toggle');
-    expect(command?.title).toContain('semantic');
-    command?.run();
+  it('recognizes hybrid aliases in the vault grammar', () => {
+    const combined = buildCommands(getState(), 'vault combined').find((entry) => entry.id === 'grammar:vault:hybrid');
+    expect(combined?.title).toBe('Search device memory by text, then meaning');
+    combined?.run();
+    expect(vaultSearchMode()).toBe('hybrid');
+  });
+
+  it('cycles the vault search mode through all three from the bare vault verb', () => {
+    setVaultMode('hybrid');
+    const fromHybrid = buildCommands(getState(), 'vault').find((entry) => entry.id === 'grammar:vault:toggle');
+    expect(fromHybrid?.title).toContain('exact');
+    fromHybrid?.run();
+    expect(vaultSearchMode()).toBe('exact');
+
+    const fromExact = buildCommands(getState(), 'vault mode').find((entry) => entry.id === 'grammar:vault:toggle');
+    expect(fromExact?.title).toContain('semantic');
+    fromExact?.run();
     expect(vaultSearchMode()).toBe('semantic');
 
-    const back = buildCommands(getState(), 'vault mode').find((entry) => entry.id === 'grammar:vault:toggle');
-    back?.run();
-    expect(vaultSearchMode()).toBe('exact');
+    const fromSemantic = buildCommands(getState(), 'vault mode').find((entry) => entry.id === 'grammar:vault:toggle');
+    expect(fromSemantic?.title).toContain('hybrid');
+    fromSemantic?.run();
+    expect(vaultSearchMode()).toBe('hybrid');
   });
 
   it('sets the on-device translation target by language name and code', () => {
