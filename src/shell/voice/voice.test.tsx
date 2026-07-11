@@ -201,6 +201,25 @@ describe('ParticipantTile', () => {
     expect(tile).toHaveAttribute('data-speaking', 'true');
   });
 
+  it('suppresses the speaking ring, data-speaking, and aria for a muted peer', () => {
+    // Arrange — a muted peer whose (stale/independent) speaking flag is set.
+    // A muted mic transmits nothing, so the tile must not glow "speaking" nor
+    // announce it: ring + aria must agree with the bars, which already suppress
+    // on mute (speaking && !muted).
+    const peer = makePeer('alice', { speaking: true, muted: true });
+
+    // Act
+    const { getByTestId } = render(() => (
+      <ParticipantTile nick="alice" peer={peer} stream={null} channelUser={undefined} />
+    ));
+
+    // Assert
+    const tile = getByTestId('participant-tile');
+    expect(tile.className).not.toContain('voice-tile--speaking');
+    expect(tile).not.toHaveAttribute('data-speaking');
+    expect(tile.getAttribute('aria-label')).not.toContain('speaking');
+  });
+
   it('does not have the speaking class when peer is not speaking', () => {
     // Arrange
     const peer = makePeer('alice', { speaking: false });

@@ -122,6 +122,12 @@ export function ParticipantTile(props: ParticipantTileProps): JSX.Element {
     local.muted ?? local.peer?.muted ?? false
   );
 
+  // A muted mic transmits nothing, so it can never be "actively speaking".
+  // The ring, data-attr, aria-label, and the audio bars all derive from this so
+  // they never contradict each other (peer.speaking and peer.muted are
+  // independent server signals and can momentarily disagree).
+  const speakingVisible = createMemo(() => speaking() && !isMuted());
+
   const isDeafened = createMemo(() => local.deafened ?? false);
 
   const hasVideo = createMemo(() => !!local.stream);
@@ -138,7 +144,7 @@ export function ParticipantTile(props: ParticipantTileProps): JSX.Element {
 
   const tileClass = createMemo(() => [
     'voice-tile',
-    speaking() ? 'voice-tile--speaking' : '',
+    speakingVisible() ? 'voice-tile--speaking' : '',
     local.isSelf ? 'voice-tile--self' : '',
     local.isScreenshare ? 'voice-tile--screenshare' : '',
     local.pinned ? 'voice-tile--pinned' : '',
@@ -152,7 +158,7 @@ export function ParticipantTile(props: ParticipantTileProps): JSX.Element {
     const parts: string[] = [displayNick()];
     if (local.isSelf) parts.push('(you)');
     if (handRaised()) parts.push('hand raised');
-    if (speaking()) parts.push('speaking');
+    if (speakingVisible()) parts.push('speaking');
     if (isMuted()) parts.push('muted');
     if (cameraOff()) parts.push('camera off');
     if (local.quality !== undefined) parts.push(`${QUALITY_META[local.quality].label} connection`);
@@ -172,7 +178,7 @@ export function ParticipantTile(props: ParticipantTileProps): JSX.Element {
       aria-label={ariaLabel()}
       data-testid="participant-tile"
       data-nick={local.nick}
-      data-speaking={speaking() ? 'true' : undefined}
+      data-speaking={speakingVisible() ? 'true' : undefined}
       data-pinned={local.pinned ? 'true' : undefined}
       data-hand-raised={handRaised() ? 'true' : undefined}
     >
@@ -250,7 +256,7 @@ export function ParticipantTile(props: ParticipantTileProps): JSX.Element {
       {/* Bottom info bar */}
       <div class="voice-tile__bar" aria-hidden="true">
         {/* Speaking bars */}
-        <SpeakingBars active={speaking() && !isMuted()} />
+        <SpeakingBars active={speakingVisible()} />
 
         {/* Nick */}
         <span class="voice-tile__nick">
