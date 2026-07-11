@@ -15,6 +15,8 @@ import {
   selectOwnPrefix,
   selectChannelModeState,
   parseChannelModeString,
+  _beginNamesBurstForTests,
+  _resetNamesBurstsForTests,
 } from './store';
 import type { Channel, ChannelUser } from '@/lib/irc/types';
 import { parseIRCMessage } from '@/lib/irc/parser';
@@ -79,6 +81,9 @@ function feed(line: string): void {
 
 beforeEach(() => {
   store.setState(initialState, true);
+  // NAMES-burst + roster-refresh tracking is module-level state that survives a
+  // setState reset; clear it so an armed 'expect' can't leak across tests.
+  _resetNamesBurstsForTests();
   for (const key of followed()) unfollow(key);
   localStorage.clear();
 });
@@ -400,16 +405,37 @@ describe('NAMES (353/366) replaces the roster', () => {
     return c ? [...c.users.keys()].sort() : [];
   }
 
-  it('drops departed members when a fresh NAMES burst arrives', () => {
+  it('drops departed members when a client-initiated NAMES burst arrives', () => {
     seedEmpty('#room');
+    // A self-JOIN / reconcile arms the burst ('expect') before the server's 353,
+    // authorizing its first line to REPLACE the roster. Mirror that intent.
+    _beginNamesBurstForTests('#room');
     feed(':irc 353 me = #room :me alice bob');
     feed(':irc 366 me #room :End of /NAMES list.');
     expect(roster('#room')).toEqual(['alice', 'bob', 'me']);
 
-    // Rejoin/reconnect: NAMES no longer lists alice/bob — they must not linger.
+    // Reconnect: the reconcile re-arms the burst, so the fresh 353 REPLACES —
+    // alice/bob who left during the gap must not linger.
+    _beginNamesBurstForTests('#room');
     feed(':irc 353 me = #room :me charlie');
     feed(':irc 366 me #room :End of /NAMES list.');
     expect(roster('#room')).toEqual(['charlie', 'me']);
+  });
+
+  it('a late cross-node 353 (no client intent) APPENDS and never collapses the roster', () => {
+    seedEmpty('#room');
+    // Full authoritative snapshot from a client-initiated burst.
+    _beginNamesBurstForTests('#room');
+    feed(':irc 353 me = #room :me alice bob');
+    feed(':irc 366 me #room :End of /NAMES list.');
+    expect(roster('#room')).toEqual(['alice', 'bob', 'me']);
+
+    // Post-netsplit resync: a straggler cross-node 353 arrives AFTER the 366 with
+    // NO client-initiated burst arming it (the daemon only sends 353 in reply to
+    // OUR JOIN/NAMES, so an un-armed line is definitionally a late partial). It
+    // must APPEND — replacing here would collapse the roster to this 1-nick subset.
+    feed(':irc 353 me = #room :charlie');
+    expect(roster('#room')).toEqual(['alice', 'bob', 'charlie', 'me']);
   });
 
   it('accumulates multiple 353 lines within a single burst', () => {

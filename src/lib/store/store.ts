@@ -2152,6 +2152,24 @@ function _namesBurstActive(key: string): boolean {
   return b !== undefined && _now() - b.at < _NAMES_BURST_TTL_MS;
 }
 
+/**
+ * Test-only: arm a client-initiated NAMES burst for `channel`, exactly as a
+ * self-JOIN (via _refreshChannelRoster), a reconnect, or a navigate/poll
+ * reconcile does in production before the server's 353 lands. This is the intent
+ * signal that authorizes the burst's first 353 to REPLACE the roster (dropping
+ * departed members). Slice tests use it to reproduce a real reconnect; a 353
+ * with no such intent must only APPEND (mesh straggler-collapse protection).
+ */
+export function _beginNamesBurstForTests(channel: string): void {
+  _beginNamesBurst(channel.toLowerCase());
+}
+
+/** Test-only: clear all NAMES-burst + roster-refresh tracking between tests. */
+export function _resetNamesBurstsForTests(): void {
+  _namesBursts.clear();
+  _lastRosterRefresh.clear();
+}
+
 const DEFAULT_PREFIX_TO_MODE: Record<string, string> = {
   '*': 'Y',
   '!': 'Q',
