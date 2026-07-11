@@ -188,6 +188,68 @@ describe('buildCommands', () => {
     expect(travelTo).toHaveBeenCalledWith('#forge', new Date('2026-07-08T09:00:00.000Z'));
   });
 
+  it('builds a leave command that parts a named channel through partChannel', () => {
+    const partChannel = vi.fn();
+    setState({
+      channels: new Map([['#forge', channel('#forge')]]),
+      partChannel,
+    });
+
+    const command = buildCommands(getState(), 'leave forge').find((entry) => entry.id === 'grammar:part:#forge');
+    expect(command?.title).toBe('Leave #forge');
+    expect(command?.keywords).toContain('part');
+    command?.run();
+
+    expect(partChannel).toHaveBeenCalledWith('#forge');
+  });
+
+  it('parts the active channel from the bare leave verb', () => {
+    const partChannel = vi.fn();
+    setState({
+      activeView: { kind: 'channel', channel: '#lapis' },
+      channels: new Map([['#lapis', channel('#lapis')]]),
+      partChannel,
+    });
+
+    const command = buildCommands(getState(), 'part').find((entry) => entry.id === 'grammar:part:#lapis');
+    expect(command?.title).toBe('Leave #lapis');
+    command?.run();
+    expect(partChannel).toHaveBeenCalledWith('#lapis');
+  });
+
+  it('omits the bare leave verb when no channel is active', () => {
+    setState({ activeView: { kind: 'home' } });
+    const command = buildCommands(getState(), 'leave').find((entry) => entry.id.startsWith('grammar:part:'));
+    expect(command).toBeUndefined();
+  });
+
+  it('jumps to the first unread in a named channel via navigate', () => {
+    const joinChannel = vi.fn();
+    const navigate = vi.fn();
+    setState({
+      channels: new Map([['#busy', { ...channel('#busy'), unread: 7, highlights: 0 }]]),
+      joinChannel,
+      navigate,
+    });
+
+    const command = buildCommands(getState(), 'unread busy').find((entry) => entry.id === 'grammar:unread:#busy');
+    expect(command?.title).toBe('Jump to first unread in #busy');
+    expect(command?.hint).toBe('7 unread');
+    expect(command?.keywords).toContain('first unread');
+    command?.run();
+
+    expect(joinChannel).toHaveBeenCalledWith('#busy');
+    expect(navigate).toHaveBeenCalledWith({ kind: 'channel', channel: '#busy' });
+  });
+
+  it('omits the unread jump when the named channel has nothing unread', () => {
+    setState({
+      channels: new Map([['#quiet', { ...channel('#quiet'), unread: 0, highlights: 0 }]]),
+    });
+    const command = buildCommands(getState(), 'unread quiet').find((entry) => entry.id.startsWith('grammar:unread:'));
+    expect(command).toBeUndefined();
+  });
+
   it('builds a literal dm command for direct messages', () => {
     const navigate = vi.fn();
     setState({

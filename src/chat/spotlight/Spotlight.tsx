@@ -41,7 +41,9 @@ const SECTION_ICON: Record<SpotlightSection, string> = {
 const GRAMMAR_EXAMPLES = [
   'goto #root',
   'goto #root at yesterday 21:00',
-  'at: 3h ago',
+  'at: last friday 18:00',
+  'unread #root',
+  'leave #root',
   'search roadmap',
   'vault semantic',
   'translate spanish',

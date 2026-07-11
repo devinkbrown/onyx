@@ -63,6 +63,7 @@ describe('parseTimeExpr', () => {
     expectParsed('last wednesday', new Date(2026, 6, 1, 0, 0, 0, 0)); // strictly before today
     expectParsed('last friday', new Date(2026, 6, 3, 0, 0, 0, 0));
     expectParsed('last tuesday noon', new Date(2026, 6, 7, 12, 0, 0, 0));
+    expectParsed('last friday 18:00', new Date(2026, 6, 3, 18, 0, 0, 0)); // palette chip phrasing
     expectParsed('fri 08:30', new Date(2026, 6, 3, 8, 30, 0, 0));
   });
 

@@ -386,6 +386,61 @@ function grammarCommands(state: CommandState, query: string): SpotlightCommand[]
     }
   }
 
+  const partArg = commandArg(query, 'part') ?? commandArg(query, 'leave');
+  if (partArg) {
+    const channel = normalizeChannel(partArg);
+    if (channel.length > 1) {
+      const name = state.channels.get(channel.toLowerCase())?.name ?? channel;
+      commands.push({
+        id: `grammar:part:${channel.toLowerCase()}`,
+        section: 'Actions',
+        title: `Leave ${name}`,
+        hint: 'part channel',
+        keywords: [query.trim(), 'part', 'leave', 'close channel', 'exit channel', name],
+        run: () => getState().partChannel(name),
+      });
+    }
+  } else if (exactCommand(query, 'part', 'leave')) {
+    const active = state.activeView.kind === 'channel' ? state.activeView.channel : null;
+    if (active) {
+      commands.push({
+        id: `grammar:part:${active.toLowerCase()}`,
+        section: 'Actions',
+        title: `Leave ${active}`,
+        hint: 'part current channel',
+        keywords: [query.trim(), 'part', 'leave', 'close channel', 'exit channel', active],
+        run: () => {
+          const current = getState();
+          const view = current.activeView;
+          if (view.kind === 'channel') current.partChannel(view.channel);
+        },
+      });
+    }
+  }
+
+  const unreadArg = commandArg(query, 'unread');
+  if (unreadArg) {
+    const channel = normalizeChannel(unreadArg);
+    if (channel.length > 1) {
+      const known = state.channels.get(channel.toLowerCase());
+      if (known && known.unread > 0) {
+        const name = known.name;
+        commands.push({
+          id: `grammar:unread:${channel.toLowerCase()}`,
+          section: 'Actions',
+          title: `Jump to first unread in ${name}`,
+          hint: `${known.unread} unread`,
+          keywords: [query.trim(), 'unread', 'first unread', 'new messages', 'catch up', 'jump', name],
+          run: () => {
+            const current = getState();
+            current.joinChannel(name);
+            current.navigate({ kind: 'channel', channel: name });
+          },
+        });
+      }
+    }
+  }
+
   const dmArg = commandArg(query, 'dm');
   if (dmArg) {
     const nick = dmArg.replace(/^@/, '').trim();
