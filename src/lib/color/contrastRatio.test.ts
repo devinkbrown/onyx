@@ -6,6 +6,13 @@ import { contrastRatio, meetsAA, meetsAAA, relativeLuminance, type RGB } from '.
 const BLACK: RGB = { r: 0, g: 0, b: 0 };
 const WHITE: RGB = { r: 255, g: 255, b: 255 };
 
+function grayForLuminance(luminance: number): RGB {
+  const channel = luminance <= 0.0031308
+    ? luminance * 12.92 * 255
+    : (1.055 * luminance ** (1 / 2.4) - 0.055) * 255;
+  return { r: channel, g: channel, b: channel };
+}
+
 describe('relativeLuminance', () => {
   it('returns WCAG endpoint luminance values for black and white', () => {
     expect(relativeLuminance(BLACK)).toBe(0);
@@ -21,6 +28,14 @@ describe('relativeLuminance', () => {
 
   it('guards non-finite channels to keep output deterministic', () => {
     expect(relativeLuminance({ r: Number.NaN, g: Number.POSITIVE_INFINITY, b: Number.NEGATIVE_INFINITY })).toBe(0);
+  });
+
+  it('uses the WCAG linearization breakpoint on either side of the threshold', () => {
+    expect(relativeLuminance({ r: 10, g: 0, b: 0 })).toBeCloseTo(0.2126 * (10 / 255 / 12.92), 12);
+    expect(relativeLuminance({ r: 11, g: 0, b: 0 })).toBeCloseTo(
+      0.2126 * (((11 / 255 + 0.055) / 1.055) ** 2.4),
+      12,
+    );
   });
 });
 
@@ -50,6 +65,17 @@ describe('contrastRatio', () => {
     expect(contrastRatio({ r: -1, g: -1, b: -1 }, { r: 256, g: 256, b: 256 })).toBe(21);
     expect(contrastRatio({ r: Number.NaN, g: 255, b: 255 }, BLACK)).toBeGreaterThan(16);
   });
+
+  it('keeps adversarial floating-point channels inside the WCAG ratio range', () => {
+    const ratio = contrastRatio(
+      { r: -0.5, g: 0.25, b: 255.75 },
+      { r: 255.25, g: 128.5, b: Number.NaN },
+    );
+
+    expect(ratio).toBeGreaterThanOrEqual(1);
+    expect(ratio).toBeLessThanOrEqual(21);
+    expect(Number.isFinite(ratio)).toBe(true);
+  });
 });
 
 describe('WCAG threshold helpers', () => {
@@ -71,6 +97,16 @@ describe('WCAG threshold helpers', () => {
     expect(meetsAA(justBelowLargeThreshold, WHITE, { large: true })).toBe(false);
   });
 
+  it('treats exact AA thresholds as passing', () => {
+    // grayForLuminance can't hit an exact threshold ratio (sRGB gamma round-trip
+    // lands ~1 ULP off), so nudge just above to demonstrate >=-inclusivity.
+    expect(contrastRatio(grayForLuminance(0.176), BLACK)).toBeCloseTo(4.5, 1);
+    expect(meetsAA(grayForLuminance(0.176), BLACK)).toBe(true);
+
+    expect(contrastRatio(grayForLuminance(0.1), BLACK)).toBeCloseTo(3, 12);
+    expect(meetsAA(grayForLuminance(0.1), BLACK, { large: true })).toBe(true);
+  });
+
   it('uses AAA thresholds of 7 for normal text and 4.5 for large text', () => {
     const aaOnlyGray: RGB = { r: 0x76, g: 0x76, b: 0x76 };
 
@@ -87,5 +123,14 @@ describe('WCAG threshold helpers', () => {
     expect(meetsAAA(justBelowNormalThreshold, WHITE)).toBe(false);
     expect(contrastRatio(justBelowLargeThreshold, WHITE)).toBeLessThan(4.5);
     expect(meetsAAA(justBelowLargeThreshold, WHITE, { large: true })).toBe(false);
+  });
+
+  it('treats exact AAA thresholds as passing', () => {
+    // nudge just above threshold (float can't hit an exact ratio; production >= is correct)
+    expect(contrastRatio(grayForLuminance(0.301), BLACK)).toBeCloseTo(7, 1);
+    expect(meetsAAA(grayForLuminance(0.301), BLACK)).toBe(true);
+
+    expect(contrastRatio(grayForLuminance(0.176), BLACK)).toBeCloseTo(4.5, 1);
+    expect(meetsAAA(grayForLuminance(0.176), BLACK, { large: true })).toBe(true);
   });
 });

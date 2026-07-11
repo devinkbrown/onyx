@@ -292,6 +292,35 @@ describe('SHORTCUTS descriptor', () => {
     dispose();
   });
 
+  it.skip('cancels a pending G sequence when a modified key intervenes', () => {
+    // FIXME: handleKeyDown leaves the pending "g" prefix armed after modified
+    // non-sequence chords, so Ctrl+H followed by plain H still navigates home.
+    const dispose = mountKeyboardHarness();
+    store.setState({ activeView: { kind: 'channel', channel: '#general' } });
+
+    fireEvent.keyDown(window, { key: 'g' });
+    fireEvent.keyDown(window, { key: 'h', ctrlKey: true });
+    fireEvent.keyDown(window, { key: 'h' });
+
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#general' });
+    dispose();
+  });
+
+  it('clears a pending G sequence when a global preference chord runs', () => {
+    const dispose = mountKeyboardHarness();
+    store.setState({ activeView: { kind: 'channel', channel: '#general' } });
+    closePreferences();
+
+    fireEvent.keyDown(window, { key: 'g' });
+    fireEvent.keyDown(window, { key: ',', ctrlKey: true });
+    fireEvent.keyDown(window, { key: 'h' });
+
+    expect(isPreferencesOpen()).toBe(true);
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#general' });
+    closePreferences();
+    dispose();
+  });
+
   it('expires a pending G sequence before accepting the second chord', () => {
     vi.useFakeTimers();
     const dispose = mountKeyboardHarness();
@@ -313,6 +342,20 @@ describe('SHORTCUTS descriptor', () => {
 
     fireEvent.keyDown(window, { key: 'g' });
     fireEvent.keyDown(input, { key: 'a' });
+    fireEvent.keyDown(window, { key: 'h' });
+
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#general' });
+    input.remove();
+    dispose();
+  });
+
+  it('does not arm G sequences from editable targets', () => {
+    const dispose = mountKeyboardHarness();
+    const input = document.createElement('input');
+    document.body.append(input);
+    store.setState({ activeView: { kind: 'channel', channel: '#general' } });
+
+    fireEvent.keyDown(input, { key: 'g' });
     fireEvent.keyDown(window, { key: 'h' });
 
     expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#general' });
@@ -389,6 +432,24 @@ describe('SHORTCUTS descriptor', () => {
 
     expect(document.activeElement).toBe(button);
     button.remove();
+    textarea.remove();
+    dispose();
+  });
+
+  it('does not steal Enter from controls that advertise aria-controls', () => {
+    const dispose = mountKeyboardHarness();
+    const trigger = document.createElement('div');
+    trigger.tabIndex = 0;
+    trigger.setAttribute('aria-controls', 'menu');
+    const textarea = document.createElement('textarea');
+    textarea.setAttribute('data-composer-input', '');
+    document.body.append(trigger, textarea);
+    trigger.focus();
+
+    fireEvent.keyDown(trigger, { key: 'Enter' });
+
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
     textarea.remove();
     dispose();
   });

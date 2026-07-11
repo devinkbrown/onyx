@@ -89,6 +89,11 @@ describe('parseActivity', () => {
     expect(activity).toEqual({ emoji: '🎵', typeLabel: 'LISTENING TO MUSIC', text: 'playing Quake' });
   });
 
+  it('requires text after known emoji prefixes', () => {
+    expect(parseActivity('💻')).toBeNull();
+    expect(parseActivity('📚 \t ')).toBeNull();
+  });
+
   it('parses playing activity from a keyword case-insensitively', () => {
     const status = 'PLAYING Quake';
 
@@ -100,6 +105,12 @@ describe('parseActivity', () => {
   it('does not match activity keywords embedded later in the status', () => {
     expect(parseActivity('now playing Quake')).toBeNull();
     expect(parseActivity('status: coding Onyx')).toBeNull();
+  });
+
+  it('does not match keywords with leading whitespace or embedded in longer words', () => {
+    expect(parseActivity(' playing Quake')).toBeNull();
+    expect(parseActivity('replaying Quake')).toBeNull();
+    expect(parseActivity('decoding Onyx')).toBeNull();
   });
 
   it('returns null for keywords without a payload', () => {
@@ -118,6 +129,26 @@ describe('parseActivity', () => {
     const activity = parseActivity(status);
 
     expect(activity).toEqual({ emoji: '🎵', typeLabel: 'LISTENING TO MUSIC', text: 'Blue Monday — New Order' });
+  });
+
+  it('keeps the full artist tail when listening text contains another by', () => {
+    const status = 'listening Blue Monday by New Order by way of Manchester';
+
+    const activity = parseActivity(status);
+
+    expect(activity).toEqual({
+      emoji: '🎵',
+      typeLabel: 'LISTENING TO MUSIC',
+      text: 'Blue Monday — New Order by way of Manchester',
+    });
+  });
+
+  it('falls back to plain listening text when by has no artist payload', () => {
+    expect(parseActivity('listening Blue Monday by ')).toEqual({
+      emoji: '🎵',
+      typeLabel: 'LISTENING TO MUSIC',
+      text: 'Blue Monday by ',
+    });
   });
 
   it('parses listening-to activity without an artist', () => {
@@ -182,6 +213,14 @@ describe('parseActivity', () => {
 
     expect(activity).toEqual({ emoji: '🎮', typeLabel: 'PLAYING A GAME', text: 'spaced title  ' });
   });
+
+  it('accepts tabs as keyword separators', () => {
+    expect(parseActivity('playing\tQuake')).toEqual({
+      emoji: '🎮',
+      typeLabel: 'PLAYING A GAME',
+      text: 'Quake',
+    });
+  });
 });
 
 describe('activityShort', () => {
@@ -215,6 +254,14 @@ describe('activityShort', () => {
     const label = activityShort(activity);
 
     expect(label).toBe('Blue Monday');
+  });
+
+  it('treats newlines as word separators when shortening activity text', () => {
+    const activity = { emoji: '💻', typeLabel: 'CODING', text: 'build\nrelease\tchecklist' };
+
+    const label = activityShort(activity);
+
+    expect(label).toBe('build release…');
   });
 
   it('returns an empty short label for empty activity text', () => {

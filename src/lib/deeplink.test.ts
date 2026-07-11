@@ -38,6 +38,11 @@ describe('parseJoinParam', () => {
     expect(parseJoinParam(['#first', '#second'])).toBe('#first');
   });
 
+  it('fails closed when the first repeated join value is invalid', () => {
+    expect(parseJoinParam(['root', '#second'])).toBeNull();
+    expect(parseJoinParam(['%23bad%2Cchan', '#second'])).toBeNull();
+  });
+
   it('rejects a missing or empty value', () => {
     expect(parseJoinParam(null)).toBeNull();
     expect(parseJoinParam(undefined)).toBeNull();
@@ -63,6 +68,12 @@ describe('parseJoinParam', () => {
     expect(parseJoinParam(`%23${'x'.repeat(64)}`)).toBeNull();
   });
 
+  it('applies the channel length limit after decoding multibyte names', () => {
+    expect(parseJoinParam(`#${'é'.repeat(63)}`)).toBe(`#${'é'.repeat(63)}`);
+    expect(parseJoinParam(`#${'🎮'.repeat(32)}`)).toBeNull();
+    expect(parseJoinParam(`%23${'%C3%A9'.repeat(64)}`)).toBeNull();
+  });
+
   it('rejects interior whitespace, commas and \\x07', () => {
     expect(parseJoinParam('#two words')).toBeNull();
     expect(parseJoinParam('%23two%20words')).toBeNull();
@@ -74,6 +85,12 @@ describe('parseJoinParam', () => {
   it('rejects malformed percent-encoding instead of throwing', () => {
     expect(parseJoinParam('%23bad%')).toBeNull();
     expect(parseJoinParam('%E0%A4%A')).toBeNull();
+  });
+
+  it('rejects double-encoded sigils and encoded separators', () => {
+    expect(parseJoinParam('%2523root')).toBeNull();
+    expect(parseJoinParam('%23ops%2Cdev')).toBeNull();
+    expect(parseJoinParam('%23ops%0Ddev')).toBeNull();
   });
 
   it('rejects NUL and other C0/DEL control chars forbidden in IRC channel names', () => {
@@ -113,8 +130,18 @@ describe('parseAtParam', () => {
     expect(at?.toISOString()).toBe('2026-07-09T12:00:00.000Z');
   });
 
+  it('accepts the exact lower sanity bound', () => {
+    expect(parseAtParam('2020-01-01T00:00:00.000Z')?.toISOString()).toBe('2020-01-01T00:00:00.000Z');
+    expect(parseAtParam('1577836800')?.toISOString()).toBe('2020-01-01T00:00:00.000Z');
+  });
+
   it('takes the first value when the router surfaces an array', () => {
     expect(parseAtParam(['1751000000', '9'])?.getTime()).toBe(1_751_000_000_000);
+  });
+
+  it('fails closed when the first repeated at value is invalid', () => {
+    expect(parseAtParam(['yesterday', '1751000000'])).toBeNull();
+    expect(parseAtParam(['2019-12-31T23:59:59Z', '1751000000'])).toBeNull();
   });
 
   it('rejects missing, empty and malformed values', () => {
@@ -126,10 +153,27 @@ describe('parseAtParam', () => {
     expect(parseAtParam('999999999999999')).toBeNull();
   });
 
+  it('rejects numeric signs decimals and overlong numeric timestamps', () => {
+    expect(parseAtParam('-1751000000')).toBeNull();
+    expect(parseAtParam('+1751000000')).toBeNull();
+    expect(parseAtParam('1751000000.5')).toBeNull();
+    expect(parseAtParam('0017510000000000')).toBeNull();
+  });
+
   it('rejects instants before 2020 and far-future instants', () => {
     expect(parseAtParam('2019-12-31T23:59:59Z')).toBeNull();
     expect(parseAtParam('946684800')).toBeNull(); // 2000-01-01 epoch s
     expect(parseAtParam(String(FIXED_NOW.getTime() + 3 * DAY_MS))).toBeNull();
+  });
+
+  it('rejects instants one millisecond past the future-slack boundary', () => {
+    expect(parseAtParam(String(FIXED_NOW.getTime() + DAY_MS + 1))).toBeNull();
+  });
+
+  it('decodes ISO offsets before parsing', () => {
+    expect(parseAtParam('2026-06-30T14%3A00%3A00%2B02%3A00')?.toISOString()).toBe(
+      '2026-06-30T12:00:00.000Z',
+    );
   });
 });
 

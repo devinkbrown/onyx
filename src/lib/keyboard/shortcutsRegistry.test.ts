@@ -37,9 +37,11 @@ describe('matchShortcut', () => {
   it('matches command palette with control or meta modifier', () => {
     const controlMatch = matchShortcut(makeEvent({ key: 'k', ctrlKey: true }));
     const metaMatch = matchShortcut(makeEvent({ key: 'k', metaKey: true }));
+    const bothModKeysMatch = matchShortcut(makeEvent({ key: 'k', ctrlKey: true, metaKey: true }));
 
     expect(controlMatch?.id).toBe('command.palette');
     expect(metaMatch?.id).toBe('command.palette');
+    expect(bothModKeysMatch?.id).toBe('command.palette');
   });
 
   it('matches plain Enter for composer focus only when no modifiers are held', () => {
@@ -111,6 +113,17 @@ describe('matchShortcut', () => {
     }
   });
 
+  it('matches case-insensitive conflicting registry entries in first-match order', () => {
+    const registry: readonly Shortcut[] = [
+      { id: 'lower', chord: { key: 'k', mod: true }, label: 'Lower', group: 'Test' },
+      { id: 'upper', chord: { key: 'K', mod: true, shift: false }, label: 'Upper', group: 'Test' },
+      { id: 'plain', chord: { key: 'k' }, label: 'Plain', group: 'Test' },
+    ];
+
+    expect(matchShortcut(makeEvent({ key: 'K', ctrlKey: true }), registry)?.id).toBe('lower');
+    expect(matchShortcut(makeEvent({ key: 'K' }), registry)?.id).toBe('plain');
+  });
+
   it('matches the first shortcut when a caller supplies an intentionally conflicting registry', () => {
     const registry: readonly Shortcut[] = [
       { id: 'first', chord: { key: 'x', mod: true }, label: 'First', group: 'Test' },
@@ -142,6 +155,15 @@ describe('isTypingTarget', () => {
     expect(isTypingTarget(target)).toBe(true);
   });
 
+  it('treats an empty contenteditable attribute as editable', () => {
+    const target = {
+      tagName: 'section',
+      getAttribute: (name: string) => (name === 'contenteditable' ? '' : null),
+    } as unknown as FakeElement;
+
+    expect(isTypingTarget(target)).toBe(true);
+  });
+
   it('treats plaintext-only contenteditable targets as typing targets', () => {
     const target = {
       tagName: 'section',
@@ -149,5 +171,28 @@ describe('isTypingTarget', () => {
     } as unknown as FakeElement;
 
     expect(isTypingTarget(target)).toBe(true);
+  });
+
+  it('does not treat false or inherit contenteditable attributes as editable', () => {
+    const falseTarget = {
+      tagName: 'section',
+      getAttribute: (name: string) => (name === 'contenteditable' ? 'false' : null),
+    } as unknown as FakeElement;
+    const inheritTarget = {
+      tagName: 'section',
+      getAttribute: (name: string) => (name === 'contenteditable' ? 'inherit' : null),
+    } as unknown as FakeElement;
+
+    expect(isTypingTarget(falseTarget)).toBe(false);
+    expect(isTypingTarget(inheritTarget)).toBe(false);
+  });
+
+  it('ignores non-string tag names on element-like targets without throwing', () => {
+    const target = {
+      tagName: 123,
+      getAttribute: () => null,
+    } as unknown as FakeElement;
+
+    expect(isTypingTarget(target)).toBe(false);
   });
 });
