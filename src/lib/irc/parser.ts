@@ -2,6 +2,27 @@
 import type { IRCMessage, StandardReply } from './types';
 
 /**
+ * Split a received WebSocket text frame into complete IRC lines.
+ *
+ * Orochi follows the IRCv3 WebSocket sub-protocol: every frame carries one or
+ * more COMPLETE IRC messages, and the trailing CRLF is OPTIONAL — Orochi omits
+ * it entirely (e.g. ":eshmaki.me CAP * LS :..." with no newline). Lines are
+ * separated by CR, LF, or CRLF; empty segments — including the one left by a
+ * trailing terminator or a doubled separator — are dropped.
+ *
+ * This function is deliberately PURE: it holds no state and retains NO
+ * remainder across calls. The classic registration hang came from a stateful
+ * `split('\n')` + `buffer = lines.pop()` that stashed the CRLF-less final line
+ * (the whole `CAP LS 302` response) forever, so CAP was never handled and the
+ * client appeared unable to connect. Keeping the split remainder-free here —
+ * instead of inline in the socket handler over a mutable buffer — makes that
+ * regression impossible to reintroduce without failing this unit's tests.
+ */
+export function splitWireFrame(frame: string): string[] {
+  return frame.split(/\r?\n/).filter((line) => line.length > 0);
+}
+
+/**
  * Parse a single IRC line into a structured IRCMessage.
  * Handles IRCv3 message tags (@tag=val;tag2=val2 prefix).
  *

@@ -7,6 +7,7 @@ import {
   formatIRCLine,
   parsePREFIX,
   selectSaslMechanism,
+  splitWireFrame,
   type SaslMechanism,
 } from './parser';
 import type { IRCMessage, ISupport } from './types';
@@ -102,7 +103,6 @@ export class IRCClient {
   private _capNegotiating = true;
   private _capReqPending = 0;
   private _capReqPendingNames = new Set<string>();
-  private _buffer = '';
   /** Accumulated caps across multiline CAP LS responses */
   private _capAvailable: string[] = [];
   /** Available SASL mechanisms parsed from sasl cap value */
@@ -218,7 +218,6 @@ export class IRCClient {
     this._capNegotiating = true;
     this._capReqPending = 0;
     this._capReqPendingNames = new Set();
-    this._buffer = '';
     this._capAvailable = [];
     this._saslMechs = [];
     this._saslMech = null;
@@ -470,17 +469,15 @@ export class IRCClient {
     // message(s), never a partial line. We split on optional CR/LF and process
     // every non-empty segment.
     //
-    // We must NOT retain a trailing remainder across frames: the previous
+    // We must NOT retain a trailing remainder across frames: a previous
     // `split('\n')` + `buffer = lines.pop()` stashed the CRLF-less final line
     // forever, so CAP LS was never handled and registration hung — surfacing
     // as a "WebSocket error" that made the client appear unable to connect.
-    // A single frame may still legitimately batch several CRLF-separated lines.
-    this._buffer += data;
-    const lines = this._buffer.split(/\r?\n/);
-    this._buffer = '';
-
-    for (const line of lines) {
-      if (!line) continue;
+    // `splitWireFrame` is pure and remainder-free by construction (see its
+    // doc); a single frame may still legitimately batch several CRLF-separated
+    // lines, all of which it returns. No mutable buffer lives here to tempt a
+    // reintroduction of the stash.
+    for (const line of splitWireFrame(data)) {
       this.opts.onRaw?.(redactAuthenticateForLog(line), 'in');
       try {
         const msg = parseIRCMessage(line);
