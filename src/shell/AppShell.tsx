@@ -27,7 +27,7 @@
 
 import './shell.css';
 
-import { lazy, createEffect, createMemo, createSignal, onCleanup, onMount, Show, splitProps, type JSX } from 'solid-js';
+import { lazy, createEffect, createMemo, createSignal, getOwner, onCleanup, onMount, runWithOwner, Show, splitProps, type JSX } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
 import { useThemeOptional } from '@/theme';
 import { Background } from '@/backgrounds/index';
@@ -44,17 +44,27 @@ import { WatchTogetherActivity } from './WatchTogetherActivity';
 import { MessageView } from './MessageView';
 import { TypingIndicator } from './TypingIndicator';
 import { Composer } from './Composer';
-import {
-  VoiceStage,
-  VoiceBar,
-  VoicePip,
-  VoiceSettings,
-  IncomingCallOverlay,
-  OutgoingCallOverlay,
-  CaptionsOverlay,
-  ReactionsOverlay,
-} from './voice';
-import { mountMedia } from '@/media/useSuimyakuMedia';
+// Voice/video UI is lazy: it (plus its ~76kB SUIMYAKU media/worker/wasm graph)
+// is only rendered once a call is signalled, so it stays out of the initial
+// /app payload and loads on first voice activity. Gated below by voiceUiActive.
+const VoiceStage = lazy(() => import('./voice/VoiceStage').then((m) => ({ default: m.VoiceStage })));
+const VoiceBar = lazy(() => import('./voice/VoiceBar').then((m) => ({ default: m.VoiceBar })));
+const VoicePip = lazy(() => import('./voice/VoicePip').then((m) => ({ default: m.VoicePip })));
+const VoiceSettings = lazy(() =>
+  import('./voice/settings/VoiceSettings').then((m) => ({ default: m.VoiceSettings })),
+);
+const IncomingCallOverlay = lazy(() =>
+  import('./voice/overlays/IncomingCallOverlay').then((m) => ({ default: m.IncomingCallOverlay })),
+);
+const OutgoingCallOverlay = lazy(() =>
+  import('./voice/overlays/OutgoingCallOverlay').then((m) => ({ default: m.OutgoingCallOverlay })),
+);
+const CaptionsOverlay = lazy(() =>
+  import('./voice/overlays/CaptionsOverlay').then((m) => ({ default: m.CaptionsOverlay })),
+);
+const ReactionsOverlay = lazy(() =>
+  import('./voice/overlays/ReactionsOverlay').then((m) => ({ default: m.ReactionsOverlay })),
+);
 import { MemberList } from './MemberList';
 import { AccountPanel } from '@/app/Account';
 import { AppearancePanel } from './AppearancePanel';
@@ -201,8 +211,32 @@ export function AppShell(props: AppShellProps): JSX.Element {
   });
 
   // ── voice/video ──
-  // Boot the SUIMYAKU media engine once and wire its callbacks into the store.
-  mountMedia();
+  // The SUIMYAKU media engine (and its worker/wasm codec graph) is only needed
+  // once a call is signalled — always many network round-trips away — so it is
+  // dynamically imported OFF the first-paint critical path instead of during
+  // app boot. It is mounted under AppShell's owner (so its effects/onCleanup
+  // still bind to this component's lifecycle) either at idle, or eagerly the
+  // moment the local user chooses to join, whichever comes first.
+  const mediaOwner = getOwner();
+  let mediaBooted = false;
+  let mediaDisposed = false;
+  onCleanup(() => {
+    mediaDisposed = true;
+  });
+  async function ensureMediaEngine(): Promise<void> {
+    if (mediaBooted || mediaDisposed) return;
+    mediaBooted = true;
+    const { mountMedia } = await import('@/media/useSuimyakuMedia');
+    if (mediaDisposed) return;
+    runWithOwner(mediaOwner, () => mountMedia());
+  }
+  if (typeof window !== 'undefined') {
+    const ric = (window as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => void })
+      .requestIdleCallback;
+    if (typeof ric === 'function') ric(() => void ensureMediaEngine(), { timeout: 2000 });
+    else setTimeout(() => void ensureMediaEngine(), 200);
+  }
+
   const voice = useStore((s) => s.voice);
   const showVoiceSettings = useStore((s) => s.showVoiceSettings);
   const inCall = createMemo(() => {
@@ -213,10 +247,15 @@ export function AppShell(props: AppShellProps): JSX.Element {
     const v = activeView();
     return inCall() && v.kind === 'channel' && v.channel === voice().callChannel;
   });
+  // Any voice surface (incoming/outgoing ring, active call, or the settings
+  // sheet) is only ever shown when the call is non-idle or settings are open.
+  // Gating the lazy voice cluster on this keeps its chunk off first paint.
+  const voiceUiActive = createMemo(() => voice().callState !== 'idle' || showVoiceSettings());
   const canJoinVoice = createMemo(() => preferences().voiceEntry && activeView().kind === 'channel' && !inCall());
-  function joinVoice(withVideo: boolean): void {
+  async function joinVoice(withVideo: boolean): Promise<void> {
     const v = activeView();
     if (v.kind !== 'channel') return;
+    await ensureMediaEngine();
     const state = getState();
     state.openVoiceSettings();
     void state.joinVoiceChannel(v.channel, withVideo);
@@ -581,16 +620,20 @@ export function AppShell(props: AppShellProps): JSX.Element {
       {/* Scheduled "send later" queue — gated on store.showScheduledMessages */}
       <ScheduledMessagesSheet />
 
-      {/* Voice/video overlays — each self-gates on store.voice */}
-      <VoiceSettings
-        open={showVoiceSettings()}
-        onOpenChange={(open) => (open ? getState().openVoiceSettings() : getState().closeVoiceSettings())}
-      />
-      <VoicePip />
-      <IncomingCallOverlay />
-      <OutgoingCallOverlay />
-      <CaptionsOverlay />
-      <ReactionsOverlay />
+      {/* Voice/video overlays — the whole cluster is lazy and only mounts once
+          a call is signalled or the settings sheet opens; each still self-gates
+          finer on store.voice. */}
+      <Show when={voiceUiActive()}>
+        <VoiceSettings
+          open={showVoiceSettings()}
+          onOpenChange={(open) => (open ? getState().openVoiceSettings() : getState().closeVoiceSettings())}
+        />
+        <VoicePip />
+        <IncomingCallOverlay />
+        <OutgoingCallOverlay />
+        <CaptionsOverlay />
+        <ReactionsOverlay />
+      </Show>
 
       {/* Keyboard shortcuts help overlay — opened with "?" or Home shortcuts action */}
       <ShortcutsOverlay open={showKeyboardShortcuts()} onClose={() => getState().closeKeyboardShortcuts()} />
