@@ -103,7 +103,15 @@ export function planMultilineBatches(
   text: string,
   limits: MultilineLimits = DEFAULT_MULTILINE_LIMITS,
 ): MultilineBatch[] | null {
-  const rawLines = text.split('\n').filter((l) => l.trim().length > 0);
+  // Split on every line-ending form (CRLF, lone CR, LF) so no bare `\r` can
+  // survive into a PRIVMSG payload, and strip NUL bytes — both are illegal in
+  // an IRC line and would either corrupt the frame (`...\r\r\n`) or let content
+  // inject a spurious control char. We do our own manual line assembly below,
+  // so this sanitisation cannot be delegated to formatIRCLine.
+  const rawLines = text
+    .split(/\r\n|\r|\n/)
+    .map((l) => l.replace(/\0/g, ''))
+    .filter((l) => l.trim().length > 0);
   if (rawLines.length <= 1) return null;
 
   // Explode overlong lines into concat fragments first, so limits apply to

@@ -74,6 +74,37 @@ describe('planMultilineBatches', () => {
     expect(assembleMultilineText(parts).replace(/\n/g, '').startsWith('a'.repeat(30))).toBe(true);
   });
 
+  it('strips CR from CRLF line endings (no \\r survives into a part)', () => {
+    const batches = planMultilineBatches('line one\r\nline two\r\nline three');
+    expect(batches).not.toBeNull();
+    const parts = batches!.flat();
+    expect(parts.map((p) => p.text)).toEqual(['line one', 'line two', 'line three']);
+    for (const part of parts) {
+      expect(part.text).not.toContain('\r');
+    }
+  });
+
+  it('treats a lone CR as a line break, never leaking it into payload', () => {
+    const batches = planMultilineBatches('a\rb\nc');
+    expect(batches).not.toBeNull();
+    const parts = batches!.flat();
+    for (const part of parts) {
+      expect(part.text).not.toContain('\r');
+    }
+    // "a\rb\nc" → three logical lines a, b, c
+    expect(parts.map((p) => p.text)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('strips embedded NUL bytes and drops NUL-only lines', () => {
+    const batches = planMultilineBatches('hel\0lo\n\0\nworld');
+    expect(batches).not.toBeNull();
+    const parts = batches!.flat();
+    for (const part of parts) {
+      expect(part.text).not.toContain('\0');
+    }
+    expect(parts.map((p) => p.text)).toEqual(['hello', 'world']);
+  });
+
   it('never splits inside a multi-byte code point', () => {
     const line = '€€€€'; // 3 bytes each
     const batches = planMultilineBatches(`${line}\nx`, { maxBytes: 4, maxLines: 24 });
@@ -108,6 +139,22 @@ describe('buildMultilineLines', () => {
     const { lines } = buildMultilineLines('#chan', batches, makeRef);
     expect(lines[1]).toBe('@batch=ref1 PRIVMSG #chan :aaaa\r\n');
     expect(lines[2]).toBe('@batch=ref1;draft/multiline-concat PRIVMSG #chan :bbbb\r\n');
+  });
+
+  it('emits exactly one CRLF terminator per line for CRLF-delimited input', () => {
+    const batches = planMultilineBatches('line one\r\nline two')!;
+    const { lines } = buildMultilineLines('#chan', batches, makeRef);
+    for (const line of lines) {
+      expect(line.endsWith('\r\n')).toBe(true);
+      // no embedded CR (which would produce ...\r\r\n and split into a bogus frame)
+      expect(line.slice(0, -2)).not.toContain('\r');
+    }
+    expect(lines).toEqual([
+      'BATCH +ref1 draft/multiline #chan\r\n',
+      '@batch=ref1 PRIVMSG #chan :line one\r\n',
+      '@batch=ref1 PRIVMSG #chan :line two\r\n',
+      'BATCH -ref1\r\n',
+    ]);
   });
 
   it('applies extra tags (e.g. reply) to the first BATCH command only', () => {
