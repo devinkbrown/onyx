@@ -49,7 +49,8 @@ import {
   BRIDGE_STATUS_PROP,
   parseBridgeStatus,
 } from '@/lib/interop/bridgeStatus';
-import { Button, FormField, Sheet } from '@/primitives/index';
+import { Button, FormField, Sheet, toast } from '@/primitives/index';
+import { buildInviteLink } from '@/lib/invite/inviteLink';
 import { BridgeStatusBadge } from './BridgeStatusBadge';
 
 // Common simple channel flags exposed as toggles. Letters match Orochi's
@@ -113,6 +114,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
   const channelProps = useStore((s) => s.channelProps);
   const isOp = useStore((s) => selectIsChannelOp(local.channel)(s));
   const connectionStatus = useStore((s) => s.connectionStatus);
+  const networkName = useStore((s) => s.networkName);
 
   const channel = createMemo(() =>
     channels().get(local.channel.toLowerCase()) ?? null,
@@ -141,6 +143,47 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
     if (!canEditTopic() || !topicDirty() || !isConnected()) return;
     getState().setTopic(channel()?.name ?? local.channel, topicDraft());
     saveChannelTopicDraft(local.channel, serverTopic(), serverTopic());
+  }
+
+  // ── Share invite (any member can build a rich shareable link) ─────────────
+  // The generated link carries the room (+ an optional preferred guest nick)
+  // through the same `?join=`/`?as=` deep-link contract the website and connect
+  // flow already honour. buildInviteLink re-validates every field, so a hostile
+  // nick can never corrupt the link; a preferred nick that fails validation is
+  // simply dropped and the room link still works.
+  const [invitePreferredNick, setInvitePreferredNick] = createSignal('');
+  createEffect(() => {
+    if (local.open) setInvitePreferredNick('');
+  });
+
+  const inviteOrigin = createMemo(() =>
+    typeof window !== 'undefined'
+      ? `${window.location.origin}/invite`
+      : 'https://eshmaki.me/invite',
+  );
+  const memberCount = createMemo(() => channel()?.users.size ?? 0);
+  const inviteLink = createMemo(() =>
+    buildInviteLink(
+      {
+        channel: channel()?.name ?? local.channel,
+        guestName: invitePreferredNick(),
+      },
+      { network: networkName(), origin: inviteOrigin(), appOrigin: '/app' },
+    ),
+  );
+
+  async function copyInviteLink(): Promise<void> {
+    const url = inviteLink().shareUrl;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast({ title: 'Invite link copied', description: url, intent: 'success' });
+    } catch {
+      toast({
+        title: 'Copy failed',
+        description: 'Select and copy the link shown below.',
+        intent: 'warning',
+      });
+    }
   }
 
   // ── Notifications (personal, per-channel; available to every member) ──────
@@ -335,6 +378,58 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
               </div>
             </form>
           </Show>
+        </section>
+
+        {/* ── Share invite ── */}
+        <section class="shell-chset-section" aria-labelledby="chset-invite-heading">
+          <h3 id="chset-invite-heading" class="shell-chset-heading">Share invite</h3>
+
+          <div class="shell-chset-readonly" aria-label="Invite preview">
+            <p class="shell-chset-readonly-label">This invite opens</p>
+            {/* Sourced from the RESOLVED card, never the raw channel, so the
+                preview can never claim a room the link actually dropped. */}
+            <p class="shell-chset-readonly-value">{inviteLink().card.channel ?? networkName()}</p>
+            <Show
+              when={inviteLink().hasChannel}
+              fallback={
+                <p class="shell-chset-hint">A network invite — the recipient picks a room from Home.</p>
+              }
+            >
+              <p class="shell-chset-hint">
+                {memberCount() > 0
+                  ? `${memberCount()} ${memberCount() === 1 ? 'person' : 'people'} here`
+                  : 'Membership shown once loaded'}
+                <Show when={serverTopic().trim()}>{(t) => <> · {t()}</>}</Show>
+              </p>
+            </Show>
+          </div>
+
+          <form class="shell-chset-param" onSubmit={(e) => e.preventDefault()}>
+            <FormField
+              id="chset-invite-nick"
+              label="Suggested guest name (optional)"
+              description="Pre-fills the connect form for whoever opens the link. Leave blank to let them choose."
+              type="text"
+              value={invitePreferredNick()}
+              autocomplete="off"
+              maxLength={64}
+              onInput={(e) => setInvitePreferredNick(e.currentTarget.value)}
+            />
+          </form>
+
+          <div class="shell-chset-readonly">
+            <p class="shell-chset-readonly-label">Shareable link</p>
+            <p class="shell-chset-readonly-value shell-chset-modes-mono">{inviteLink().shareUrl}</p>
+          </div>
+
+          <div class="shell-chset-inline-actions">
+            <Button type="button" variant="primary" size="sm" onClick={() => void copyInviteLink()}>
+              Copy invite link
+            </Button>
+            <a class="shell-chset-invite-open" href={inviteLink().appHref}>
+              Open invite in Onyx
+            </a>
+          </div>
         </section>
 
         {/* ── Notifications (personal) ── */}

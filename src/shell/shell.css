@@ -1591,6 +1591,18 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+  align-items: center;
+}
+
+.shell-chset-invite-open {
+  font-size: 0.85rem;
+  color: var(--lapis-bright);
+  text-decoration: none;
+}
+
+.shell-chset-invite-open:hover,
+.shell-chset-invite-open:focus-visible {
+  text-decoration: underline;
 }
 
 .shell-chset-notices {
