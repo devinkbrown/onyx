@@ -8,6 +8,7 @@ import { For, createEffect,
 import {
   closeMessageSearch,
   useMessageSearch,
+  type VaultSearchMode,
 } from './useMessageSearch';
 import { ProvenanceBadge } from '@/shell/ProvenanceBadge';
 import './message-search.css';
@@ -15,6 +16,25 @@ import './message-search.css';
 export type MessageSearchProps = JSX.HTMLAttributes<HTMLDivElement>;
 
 const INPUT_ID = 'onyx-message-search-input';
+
+/** Segmented device-recall matching modes, ordered richest-first. */
+const VAULT_MODE_OPTIONS: ReadonlyArray<{ mode: VaultSearchMode; label: string; title: string }> = [
+  {
+    mode: 'hybrid',
+    label: 'Hybrid',
+    title: 'Device recall: exact text first, then semantic meaning — all on this device',
+  },
+  {
+    mode: 'exact',
+    label: 'Exact',
+    title: 'Device recall: literal text only — all on this device',
+  },
+  {
+    mode: 'semantic',
+    label: 'Semantic',
+    title: 'Device recall: semantic meaning only — all on this device',
+  },
+];
 
 function cssEscape(value: string): string {
   if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
@@ -301,17 +321,21 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
           <div class="onyx-message-search__recall" role="group" aria-label="Device recall matching mode">
             <ProvenanceBadge scope="device" subject="Device recall matching mode" />
             <span class="onyx-message-search__vault-label">Device recall</span>
-            <button
-              type="button"
-              class="onyx-message-search__recall-chip"
-              role="switch"
-              aria-checked={search.vaultMode() === 'semantic'}
-              data-mode={search.vaultMode()}
-              title="Toggle device recall between exact text and semantic meaning — both run entirely on this device"
-              onClick={() => search.toggleVaultMode()}
-            >
-              {search.vaultMode() === 'semantic' ? 'Semantic ⇄ exact' : 'Exact ⇄ semantic'}
-            </button>
+            <For each={VAULT_MODE_OPTIONS}>
+              {(option) => (
+                <button
+                  type="button"
+                  class="onyx-message-search__recall-chip"
+                  aria-pressed={search.vaultMode() === option.mode}
+                  data-mode={option.mode}
+                  data-active={search.vaultMode() === option.mode}
+                  title={option.title}
+                  onClick={() => search.setVaultMode(option.mode)}
+                >
+                  {option.label}
+                </button>
+              )}
+            </For>
           </div>
         </Show>
         <Show when={search.vaultResults().length > 0}>
@@ -319,7 +343,11 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
             <div class="onyx-message-search__vault-bar">
               <ProvenanceBadge scope="device" subject="Device-memory message search" />
               <span class="onyx-message-search__vault-label">
-                {search.vaultMode() === 'semantic' ? 'Recalled by meaning on this device' : 'Saved on this device'}
+                {search.vaultMode() === 'semantic'
+                  ? 'Recalled by meaning on this device'
+                  : search.vaultMode() === 'hybrid'
+                    ? 'Recalled on this device'
+                    : 'Saved on this device'}
               </span>
               <span class="onyx-message-search__server-count">
                 {search.vaultResults().length} remembered

@@ -178,6 +178,13 @@
   background: color-mix(in oklab, var(--lapis) 18%, transparent);
 }
 
+.onyx-message-search__recall-chip[data-active='true'] {
+  color: var(--lapis-bright);
+  border-color: color-mix(in oklab, var(--lapis-bright) 72%, transparent);
+  background: color-mix(in oklab, var(--lapis) 28%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis-bright) 40%, transparent);
+}
+
 .onyx-message-search__recall-chip:focus-visible {
   outline: 2px solid var(--lapis-bright);
   outline-offset: 2px;

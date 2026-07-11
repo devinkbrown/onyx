@@ -5,7 +5,7 @@ import type { Channel, ChatMessage } from '@/lib/irc/types';
 import { setState } from '@/lib/store';
 import { store } from '@/lib/store/store';
 import { resetPreferences } from '@/lib/prefs/preferences';
-import { closeMessageSearch, openMessageSearch, useMessageSearch } from './useMessageSearch';
+import { closeMessageSearch, openMessageSearch, setVaultMode, useMessageSearch } from './useMessageSearch';
 
 // The vault (device-memory) search fetch is exercised through a spy so we can
 // assert *when* it runs against the fake timer, independent of IndexedDB.
@@ -52,6 +52,9 @@ describe('useMessageSearch — vault debounce isolation', () => {
     store.setState(initialState, true);
     closeMessageSearch();
     resetPreferences();
+    // Pin the lexical (exact) matcher so this suite exercises searchVault's
+    // debounce timing directly; hybrid is the default mode elsewhere.
+    setVaultMode('exact');
     searchVaultMock.mockClear();
     searchVaultSemanticMock.mockClear();
     vi.useFakeTimers();

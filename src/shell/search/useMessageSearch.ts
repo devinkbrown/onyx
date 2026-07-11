@@ -5,9 +5,18 @@ import type { ChatMessage } from '@/lib/irc/types';
 import { preferences } from '@/lib/prefs/preferences';
 import { searchVault } from '@/lib/vault/historyVault';
 import { searchVaultSemantic } from '@/lib/vault/searchVaultSemantic';
+import { searchVaultHybrid } from '@/lib/vault/searchVaultHybrid';
 
-/** How the device-memory (vault) pane matches: literal substring vs meaning. */
-export type VaultSearchMode = 'exact' | 'semantic';
+/**
+ * How the device-memory (vault) pane matches:
+ *  - 'hybrid'   — lexical substring hits first, then on-device semantic neighbours (default)
+ *  - 'exact'    — literal case-insensitive substring only
+ *  - 'semantic' — on-device cosine neighbours only
+ */
+export type VaultSearchMode = 'exact' | 'semantic' | 'hybrid';
+
+/** Discoverable cycle order the toggle walks: default first, then the two pure modes. */
+const VAULT_MODE_CYCLE: readonly VaultSearchMode[] = ['hybrid', 'exact', 'semantic'];
 
 export type MessageSearchResult = {
   id: string;
@@ -47,10 +56,12 @@ export type UseMessageSearch = {
   hasConversation: Accessor<boolean>;
   /** Device-memory (vault) hits from OTHER conversations, newest first */
   vaultResults: Accessor<VaultSearchResult[]>;
-  /** Whether the vault pane matches by literal substring or by meaning */
+  /** How the vault pane matches: 'hybrid' | 'exact' | 'semantic' */
   vaultMode: Accessor<VaultSearchMode>;
-  /** Flip the vault pane between exact and semantic matching */
+  /** Cycle the vault pane through hybrid → exact → semantic */
   toggleVaultMode: () => void;
+  /** Set the vault pane matching mode directly */
+  setVaultMode: (mode: VaultSearchMode) => void;
   /** Device-only lexical pivots from visible and vault hits */
   recallSuggestions: Accessor<string[]>;
   applyRecallSuggestion: (term: string) => void;
@@ -63,7 +74,7 @@ export type UseMessageSearch = {
 };
 
 const [isMessageSearchOpen, setMessageSearchOpen] = createSignal(false);
-const [vaultSearchMode, setVaultSearchMode] = createSignal<VaultSearchMode>('exact');
+const [vaultSearchMode, setVaultSearchMode] = createSignal<VaultSearchMode>('hybrid');
 const [messageSearchQuery, setMessageSearchQuerySignal] = createSignal('');
 const [messageSearchActiveIndex, setMessageSearchActiveIndex] = createSignal(0);
 const [messageSearchActiveResultId, setMessageSearchActiveResultId] = createSignal<string | null>(null);
@@ -172,9 +183,12 @@ export function setVaultMode(mode: VaultSearchMode): void {
   setVaultSearchMode(mode);
 }
 
-/** Flip the shared vault-pane matching between exact and semantic. */
+/** Advance the shared vault-pane matching one step: hybrid → exact → semantic → hybrid. */
 export function toggleVaultMode(): void {
-  setVaultSearchMode((mode) => (mode === 'exact' ? 'semantic' : 'exact'));
+  setVaultSearchMode((mode) => {
+    const at = VAULT_MODE_CYCLE.indexOf(mode);
+    return VAULT_MODE_CYCLE[(at + 1) % VAULT_MODE_CYCLE.length] ?? 'hybrid';
+  });
 }
 
 export function useMessageSearch(): UseMessageSearch {
@@ -330,7 +344,12 @@ export function useMessageSearch(): UseMessageSearch {
     }
     const seq = ++vaultSeq;
     vaultTimer = setTimeout(() => {
-      const run = mode === 'semantic' ? searchVaultSemantic(query) : searchVault(query);
+      const run =
+        mode === 'semantic'
+          ? searchVaultSemantic(query)
+          : mode === 'hybrid'
+            ? searchVaultHybrid(query)
+            : searchVault(query);
       void run.then((hits) => {
         if (seq !== vaultSeq) return; // a newer query superseded this one
         setVaultRawHits(
@@ -411,6 +430,7 @@ export function useMessageSearch(): UseMessageSearch {
     vaultResults: vaultHits,
     vaultMode: vaultSearchMode,
     toggleVaultMode,
+    setVaultMode,
     recallSuggestions,
     applyRecallSuggestion: setQuery,
     openVaultResult,
