@@ -37,6 +37,10 @@ import {
   eventCountdown,
   type ScheduledEventItem,
 } from '@/lib/notifications/scheduledEvents';
+import {
+  scheduledEventsListEqual,
+  quietActivityListEqual,
+} from '@/lib/notifications/digestStability';
 import { preferences } from '@/lib/prefs/preferences';
 import { buildQuietBoostDigest, type QuietBoostDigestItem } from '@/lib/reactions/quietBoosts';
 import { fetchStatsIndex, relTime } from '@/lib/stats/networkIndex';
@@ -241,8 +245,15 @@ export function HomeView(): JSX.Element {
   const clock = setInterval(() => setNowMs(Date.now()), 30_000);
   onCleanup(() => clearInterval(clock));
 
-  const scheduledEvents = createMemo<ScheduledEventItem[]>(() =>
-    collectScheduledEvents(channels().values(), channelProps(), nowMs()),
+  // The shared 30s clock is a dependency here only for the visibility/live
+  // windows; value-equality keeps the previous array (and the whole
+  // scheduledEventsByChannel → roomRhythm cascade + the Scheduled `<For>`)
+  // stable on a tick that changes nothing. Countdown chips still advance
+  // because they read `nowMs()` inline in JSX.
+  const scheduledEvents = createMemo<ScheduledEventItem[]>(
+    () => collectScheduledEvents(channels().values(), channelProps(), nowMs()),
+    [],
+    { equals: scheduledEventsListEqual },
   );
   const scheduledEventsByChannel = createMemo(() => {
     const byChannel = new Map<string, ScheduledEventItem>();
@@ -277,8 +288,10 @@ export function HomeView(): JSX.Element {
   });
   const rememberedRooms = createMemo<HomeMemoryItem[]>(() => homeMemory() ?? []);
   const openMemory = (item: HomeMemoryItem) => void getState().joinChannel(item.target);
-  const quietActivity = createMemo<QuietActivityItem[]>(() =>
-    buildQuietActivity(channels().values(), channelLastActivity(), nowMs()),
+  const quietActivity = createMemo<QuietActivityItem[]>(
+    () => buildQuietActivity(channels().values(), channelLastActivity(), nowMs()),
+    [],
+    { equals: quietActivityListEqual },
   );
   const openQuietActivity = (item: QuietActivityItem) =>
     getState().navigate({ kind: 'channel', channel: item.name });
