@@ -1,105 +1,130 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * nodes.test.ts — mesh node registry + auto-selection.
+ * nodes.test.ts — mesh node ranking + auto-selection.
  *
- * These are pure logic tests: the latency probe is the network boundary, so we
- * stub `globalThis.fetch` (never touching the real mesh) and drive the three
- * outcomes a probe can have — fast reply, hard failure, and hang-until-timeout.
- *
- * The load-bearing case is the *empty node list*: `selectBestNode` is exported
- * with a `nodes` parameter, so a caller can legitimately hand it a runtime-empty
- * array (e.g. a future region filter that matches nothing). The contract says it
- * returns an `IrcNode` and the doc promises "a connection is still attempted" —
- * it must never resolve `undefined`.
+ * Selection is pure at the public boundary here: every network probe is replaced
+ * by a fetch/performance seam, so these tests never open real sockets.
  */
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { NODES, pingNode, selectBestNode, initialNode, DEFAULT_NODE } from './nodes';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_NODE, type IrcNode, NODES, initialNode, selectBestNode } from './nodes';
 
 const NODE_SET = new Set(NODES.map((n) => n.wss));
 
+const CUSTOM_NODES = [
+  { id: 'slow', host: 'slow.example.test', wss: 'wss://slow.example.test:8080' },
+  { id: 'fast', host: 'fast.example.test', wss: 'wss://fast.example.test:8080' },
+] as const satisfies readonly IrcNode[];
+
+function stubSuccessfulProbes(...nowValues: number[]): ReturnType<typeof vi.fn> {
+  const now = vi.fn(() => nowValues.shift() ?? 0);
+  vi.stubGlobal('performance', { now });
+  const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
-  vi.useRealTimers();
-});
-
-describe('pingNode', () => {
-  it('returns a finite latency when the probe resolves', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => Promise.resolve(new Response(null, { status: 200 }))),
-    );
-    const ms = await pingNode(NODES[0]!);
-    expect(Number.isFinite(ms)).toBe(true);
-    expect(ms).toBeGreaterThanOrEqual(0);
-    vi.unstubAllGlobals();
-  });
-
-  it('resolves Infinity when the probe rejects (node unreachable)', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => Promise.reject(new Error('ECONNREFUSED'))),
-    );
-    await expect(pingNode(NODES[0]!)).resolves.toBe(Number.POSITIVE_INFINITY);
-    vi.unstubAllGlobals();
-  });
-
-  it('resolves Infinity (never hangs) when the probe never settles', async () => {
-    vi.useFakeTimers();
-    // A fetch that never resolves — the timeout/AbortController must still settle.
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => new Promise<Response>(() => {})),
-    );
-    const p = pingNode(NODES[0]!, 100);
-    vi.advanceTimersByTime(100);
-    await expect(p).resolves.toBe(Number.POSITIVE_INFINITY);
-    vi.unstubAllGlobals();
-  });
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
 });
 
 describe('selectBestNode', () => {
-  it('picks the lowest-latency reachable node', async () => {
-    // eshmaki.me answers fast, ircx.us answers slow → eshmaki.me wins.
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) =>
-        url.includes('eshmaki.me')
-          ? Promise.resolve(new Response(null, { status: 200 }))
-          : new Promise<Response>((res) =>
-              setTimeout(() => res(new Response(null, { status: 200 })), 50),
-            ),
-      ),
+  it('selects the reachable node with the lowest probe latency', async () => {
+    // Arrange
+    vi.stubEnv('VITE_IRC_WS', '');
+    const fetchMock = stubSuccessfulProbes(
+      100, // slow node probe starts
+      100, // fast node probe starts
+      180, // slow node resolves after 80ms
+      125, // fast node resolves after 25ms
     );
-    const chosen = await selectBestNode();
-    expect(chosen.host).toBe('eshmaki.me');
-    vi.unstubAllGlobals();
+
+    // Act
+    const chosen = await selectBestNode(CUSTOM_NODES);
+
+    // Assert
+    expect(chosen).toEqual(CUSTOM_NODES[1]);
+    expect(fetchMock).toHaveBeenCalledTimes(CUSTOM_NODES.length);
+  });
+
+  it('keeps input order as the tie-break when probe latencies match', async () => {
+    // Arrange
+    vi.stubEnv('VITE_IRC_WS', '');
+    stubSuccessfulProbes(
+      200, // first node probe starts
+      200, // second node probe starts
+      240, // first node resolves after 40ms
+      240, // second node resolves after 40ms
+    );
+
+    // Act
+    const chosen = await selectBestNode(CUSTOM_NODES);
+
+    // Assert
+    expect(chosen).toEqual(CUSTOM_NODES[0]);
+  });
+
+  it('falls back to a known registry node when the candidate list is empty', async () => {
+    // Arrange
+    vi.stubEnv('VITE_IRC_WS', '');
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    // Act
+    const chosen = await selectBestNode([]);
+
+    // Assert
+    expect(chosen).toEqual(NODES[0]);
   });
 
   it('falls back to a known node when every probe fails', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => Promise.reject(new Error('down'))),
-    );
+    // Arrange
+    vi.stubEnv('VITE_IRC_WS', '');
+    const fetchMock = vi.fn(async () => {
+      throw new Error('down');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    // Act
     const chosen = await selectBestNode();
-    expect(NODE_SET.has(chosen.wss)).toBe(true);
-    vi.unstubAllGlobals();
+
+    // Assert
+    expect(chosen).toEqual(NODES[0]);
+    expect(fetchMock).toHaveBeenCalledTimes(NODES.length);
   });
 
-  it('returns a valid registry node for an empty list — never undefined', async () => {
-    // No probes are issued for an empty list, so no fetch stub is needed.
-    const chosen = await selectBestNode([]);
-    expect(chosen).toBeDefined();
-    expect(NODE_SET.has(chosen.wss)).toBe(true);
+  it('returns a pinned custom endpoint without probing candidates', async () => {
+    // Arrange
+    const pinned = 'wss://local.example.test:9443';
+    vi.stubEnv('VITE_IRC_WS', pinned);
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    // Act
+    const chosen = await selectBestNode(CUSTOM_NODES);
+
+    // Assert
+    expect(chosen).toEqual({ id: 'env', host: 'custom', wss: pinned });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
 describe('initialNode / DEFAULT_NODE', () => {
   it('initialNode returns a known registry node (no env pin under test)', () => {
+    // Arrange
+    vi.stubEnv('VITE_IRC_WS', '');
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    // Act
     const n = initialNode();
-    expect(NODE_SET.has(n.wss)).toBe(true);
+
+    // Assert
+    expect(n).toEqual(NODES[0]);
   });
 
   it('DEFAULT_NODE is a defined registry node', () => {
+    // Arrange / Act / Assert
     expect(DEFAULT_NODE).toBeDefined();
     expect(NODE_SET.has(DEFAULT_NODE.wss)).toBe(true);
   });
