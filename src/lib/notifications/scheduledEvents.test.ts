@@ -63,6 +63,17 @@ describe('scheduled event timing', () => {
     expect(eventCountdown({ at: 3 * 60 * 60, title: 'Later' }, 0)).toBe('in 3h');
     expect(eventCountdown({ at: 3 * 24 * 60 * 60, title: 'Days' }, 0)).toBe('in 3d');
   });
+
+  test('a sub-minute future event never reads "in 0 min"', () => {
+    // 20s in the future: delta > 0, so the event has NOT started (not live, no
+    // Join button). Math.round(20000 / 60000) floors to 0, so the old code
+    // rendered "in 0 min" — a positive countdown that reads as "now".
+    expect(eventCountdown({ at: 100, title: 'Imminent' }, 80_000)).toBe('in 1 min');
+    // 1ms in the future is still upcoming, not "happening now".
+    expect(eventCountdown({ at: 100, title: 'Imminent' }, 99_999)).toBe('in 1 min');
+    // 0 and past deltas remain "happening now".
+    expect(eventCountdown({ at: 100, title: 'Imminent' }, 100_000)).toBe('happening now');
+  });
 });
 
 describe('collectScheduledEvents', () => {

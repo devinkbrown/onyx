@@ -54,7 +54,10 @@ export function eventCountdown(event: ScheduledEvent, nowMs: number): string {
   const delta = event.at * 1000 - nowMs;
   if (delta <= 0) return 'happening now';
 
-  const mins = Math.round(delta / 60000);
+  // Clamp to 1: any positive delta is still upcoming, so a sub-minute event
+  // (Math.round floors <30s to 0) must read "in 1 min", never "in 0 min" —
+  // the latter contradicts the not-yet-live state (no Join button shown).
+  const mins = Math.max(1, Math.round(delta / 60000));
   if (mins < 60) return `in ${mins} min`;
 
   const hrs = Math.round(mins / 60);
