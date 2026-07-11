@@ -367,6 +367,29 @@ export class IRCClient {
     return this.negotiatedCaps.has('orochi/session-sync');
   }
 
+  /**
+   * Push freshly-issued resume tokens back into the LIVE client.
+   *
+   * The server hands out a new session token after every registration (arriving
+   * as `NOTE SESSION TOKEN`, plus `NOTE SESSION MTOKEN` on a mesh), which the
+   * store parses and persists. But auto-reconnect reuses THIS same instance
+   * (`reconnectNow → connect()`), and `opts.sessionToken` / `opts.meshToken`
+   * are otherwise frozen at construction. Without this, every reconnect would
+   * replay the stale construction-time token — `undefined` for any session that
+   * began without a saved token — so the 001 resume (`SESSION RESUME <token>`)
+   * would silently fail and the session would come back as brand-new.
+   *
+   * Only the provided fields are merged, so a lone `TOKEN` note never clobbers a
+   * held `MTOKEN` (and vice versa). Immutable: a new opts object is assigned.
+   */
+  updateResumeTokens(tokens: { sessionToken?: string; meshToken?: string }): void {
+    this.opts = {
+      ...this.opts,
+      ...(tokens.sessionToken !== undefined ? { sessionToken: tokens.sessionToken } : {}),
+      ...(tokens.meshToken !== undefined ? { meshToken: tokens.meshToken } : {}),
+    };
+  }
+
   // ── Internals ───────────────────────────────────────────────────────────
 
   private _onOpen() {

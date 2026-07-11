@@ -4781,6 +4781,9 @@ export const store = createStore<OnyxState>()(
           if (token) {
             const canonicalNick = _saslAccount ?? undefined;
             storeSessionToken(token, undefined, canonicalNick);
+            // Push the freshly-issued token into the LIVE client so an auto-reconnect
+            // (same IRCClient instance) resumes with it, not the stale construction-time value.
+            get().client?.updateResumeTokens({ sessionToken: token });
           }
           return;
         }
@@ -4791,6 +4794,9 @@ export const store = createStore<OnyxState>()(
           const mtoken = parseSessionMeshTokenNote(msg);
           if (mtoken) {
             storeMeshToken(mtoken);
+            // Prefer the mesh token on the live client so a reconnect landing on a
+            // different node resumes correctly (updateResumeTokens merges, not clobbers).
+            get().client?.updateResumeTokens({ meshToken: mtoken });
           }
           return;
         }

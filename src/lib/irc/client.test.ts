@@ -93,3 +93,61 @@ describe('IRCClient binary media plane', () => {
     expect(commands).toEqual(['NOTICE']);
   });
 });
+
+// ── Session-resume token refresh ───────────────────────────────────────────
+// The server issues fresh resume tokens mid-session (NOTE SESSION TOKEN / MTOKEN);
+// auto-reconnect reuses the SAME IRCClient instance (store: reconnectNow →
+// client.connect()), so unless the refreshed token is pushed back into the live
+// client, every reconnect replays the stale construction-time token — undefined
+// for a session that began with no saved token — and resume silently fails.
+describe('IRCClient session-resume token lifecycle', () => {
+  /** Attach a fake OPEN socket that captures every outbound line, and mark the
+   *  session as logged in so the 001 handler runs the resume path. */
+  function makeLoggedInClient(opts?: { sessionToken?: string; meshToken?: string }) {
+    const sent: string[] = [];
+    const client = new IRCClient({
+      url: 'wss://ircx.us:8080/',
+      nick: 'onyx',
+      onMessage: () => {},
+      sessionToken: opts?.sessionToken,
+      meshToken: opts?.meshToken,
+    });
+    const priv = client as unknown as {
+      ws: { readyState: number; send(l: string): void };
+      _loggedIn: boolean;
+      _onMessage(ev: { data: string }): void;
+    };
+    priv.ws = { readyState: WebSocket.OPEN, send: (l: string) => sent.push(l) };
+    priv._loggedIn = true;
+    return { client, sent, feed001: () => priv._onMessage({ data: ':eshmaki.me 001 onyx :Welcome' }) };
+  }
+
+  it('sends SESSION RESUME with the construction-time mesh token on 001', () => {
+    const { sent, feed001 } = makeLoggedInClient({ sessionToken: 'local-A', meshToken: 'mesh-A' });
+    feed001();
+    // Prefers the mesh token over the local token (memory rule).
+    expect(sent).toContain('SESSION RESUME mesh-A\r\n');
+    expect(sent).not.toContain('SESSION RESUME local-A\r\n');
+  });
+
+  it('resumes with a token refreshed mid-session, not the stale construction token', () => {
+    // Session began with NO saved token — the classic first-connect case.
+    const { client, sent, feed001 } = makeLoggedInClient();
+    // Server issued fresh tokens after the first registration; the store pushes
+    // them back into the live client.
+    client.updateResumeTokens({ sessionToken: 'local-fresh' });
+    client.updateResumeTokens({ meshToken: 'mesh-fresh' });
+    feed001();
+    // The reconnect must resume with the freshest mesh token, not undefined.
+    expect(sent).toContain('SESSION RESUME mesh-fresh\r\n');
+  });
+
+  it('a TOKEN refresh never clobbers a held MTOKEN (partial merge)', () => {
+    const { client, sent, feed001 } = makeLoggedInClient({ meshToken: 'mesh-held' });
+    // A later NOTE SESSION TOKEN updates only the local token.
+    client.updateResumeTokens({ sessionToken: 'local-new' });
+    feed001();
+    // Mesh token still preferred and intact.
+    expect(sent).toContain('SESSION RESUME mesh-held\r\n');
+  });
+});
