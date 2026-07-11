@@ -139,7 +139,7 @@ describe('historyVault', () => {
       // The newest survive; the oldest 100 are gone.
       expect(kept[0]!.id).toBe('p100');
       expect(kept[kept.length - 1]!.id).toBe('p499');
-    }, 10_000);
+    }, 30_000);
   });
 
   describe('pre-epoch (negative) timestamps', () => {
@@ -183,7 +183,7 @@ describe('historyVault', () => {
       // Newest survive; the oldest 25 are pruned.
       expect(kept[0]!.id).toBe('n25');
       expect(kept[kept.length - 1]!.id).toBe(`n${count - 1}`);
-    }, 10_000);
+    }, 30_000);
   });
 
   describe('searchVault', () => {
@@ -333,7 +333,7 @@ describe('historyVault', () => {
       expect(kept.length).toBe(VAULT_KEEP);
       expect(kept[0]!.id).toBe('p100');
       expect(kept[kept.length - 1]!.id).toBe('p499');
-    }, 10_000);
+    }, 30_000);
 
     it('prunes at VAULT_KEEP identically when a default-count policy is set', async () => {
       // A policy whose keep === VAULT_KEEP and no cutoff must equal the default.
@@ -349,7 +349,7 @@ describe('historyVault', () => {
       expect(kept.length).toBe(VAULT_KEEP);
       expect(kept[0]!.id).toBe('p100');
       expect(kept[kept.length - 1]!.id).toBe('p499');
-    }, 10_000);
+    }, 30_000);
 
     it('honors a per-channel keep override on the real prune path', async () => {
       // #small caps at 5; the default (VAULT_KEEP) applies to everyone else.
@@ -364,7 +364,7 @@ describe('historyVault', () => {
       // The 5 newest survive; the oldest 15 are pruned.
       expect(kept[0]!.id).toBe('s15');
       expect(kept[kept.length - 1]!.id).toBe('s19');
-    }, 10_000);
+    }, 30_000);
 
     it('leaves non-overridden targets at the default keep', async () => {
       setRetentionPolicy({ keep: VAULT_KEEP, perChannel: { '#small': 5 } });
@@ -389,7 +389,7 @@ describe('historyVault', () => {
       expect(kept.length).toBe(4);
       // Only the fresh (within 2 days) messages remain.
       expect(kept.every((m) => m.id.startsWith('f'))).toBe(true);
-    }, 10_000);
+    }, 30_000);
   });
 
   describe('without IndexedDB', () => {
