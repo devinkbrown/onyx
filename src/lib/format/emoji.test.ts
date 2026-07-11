@@ -46,4 +46,25 @@ describe('lookupEmoji', () => {
 
     expect(emoji).toBeUndefined();
   });
+
+  it('returns null for inherited Object.prototype keys, not the inherited value', () => {
+    // parseMessage tokenizes `:constructor:`, `:toString:`, `:__proto__:` etc. as
+    // emoji shortcodes ([\w\-+], length <= 64) straight from untrusted IRC content.
+    // A naive `EMOJI_MAP[shortcode]` returns the inherited prototype member for these
+    // keys (a Function/Object, never undefined), which then renders as a non-emoji.
+    const prototypeKeys = [
+      'constructor',
+      'toString',
+      'valueOf',
+      'hasOwnProperty',
+      'isPrototypeOf',
+      'propertyIsEnumerable',
+      '__proto__',
+      '__defineGetter__',
+    ];
+
+    const results = prototypeKeys.map((shortcode) => lookupEmoji(shortcode));
+
+    expect(results).toEqual(prototypeKeys.map(() => null));
+  });
 });

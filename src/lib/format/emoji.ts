@@ -294,6 +294,9 @@ export const EMOJI_MAP: Readonly<Record<string, string>> = {
  * Look up a shortcode and return the unicode character, or null if unknown.
  */
 export function lookupEmoji(shortcode: string): string | null {
-  const result = EMOJI_MAP[shortcode];
-  return result !== undefined ? result : null;
+  // Own-property guard: shortcodes come from untrusted message content, and keys like
+  // `constructor`/`toString`/`__proto__` would otherwise resolve to inherited
+  // Object.prototype members (a Function/Object, never undefined) instead of null.
+  if (!Object.hasOwn(EMOJI_MAP, shortcode)) return null;
+  return EMOJI_MAP[shortcode] ?? null;
 }
