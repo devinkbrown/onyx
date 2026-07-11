@@ -24,6 +24,18 @@ export const VAULT_KEEP = 400;
 /** Queued sends older than this are dropped, not fired into a stale room. */
 export const OUTBOX_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Hard ceilings that keep a hostile or accidentally-oversized import blob from
+ * exhausting CPU/memory before the retention prune ever runs. A legitimate
+ * export holds at most VAULT_KEEP rows per target; the raw ceiling adds generous
+ * headroom (4x) before `parseVaultExport` stops iterating a single target's
+ * message array, and `MAX_EXPORT_TARGETS` bounds the conversation count. These
+ * bound the WORK done validating untrusted JSON — the real per-target retention
+ * cap is still enforced downstream by `saveMessages`/`pruneTarget`.
+ */
+export const MAX_EXPORT_TARGETS = 4096;
+export const MAX_EXPORT_RAW_MESSAGES = 4 * VAULT_KEEP;
+
 type StoredMessage = Omit<ChatMessage, 'time'> & { time: number; target_key: string };
 
 export interface VaultExportTarget {
@@ -346,6 +358,21 @@ function reviveExportMessage(raw: unknown, fallbackTarget: string): ChatMessage 
   return message;
 }
 
+/**
+ * Collapse duplicate ids within one target deterministically: last occurrence
+ * wins, matching the IndexedDB `put` semantics a re-import would produce (a
+ * later row for the same `['target_key','id']` overwrites the earlier one).
+ * Insertion order follows first appearance, so a clean export round-trips in
+ * place while a tampered blob with repeated ids cannot smuggle in phantom rows.
+ * A `Map` (not a plain object) is used so a literal `__proto__`/`constructor`
+ * message id is treated as an ordinary key, never a prototype write.
+ */
+function dedupMessagesById(messages: readonly ChatMessage[]): ChatMessage[] {
+  const byId = new Map<string, ChatMessage>();
+  for (const message of messages) byId.set(message.id, message);
+  return [...byId.values()];
+}
+
 /** Validate and normalize unknown JSON before it can be imported into the vault. */
 export function parseVaultExport(raw: unknown): VaultExportSnapshot | null {
   if (!isRecord(raw) || raw.kind !== 'onyx-vault' || raw.version !== 1 || !Array.isArray(raw.targets)) {
@@ -355,15 +382,23 @@ export function parseVaultExport(raw: unknown): VaultExportSnapshot | null {
     ? raw.exportedAt
     : new Date().toISOString();
   const targets: VaultExportTarget[] = [];
-  for (const targetRaw of raw.targets) {
+  // Bound the conversation count so a blob with millions of target entries can
+  // never force unbounded work before the per-target validation even begins.
+  const rawTargets = raw.targets.slice(0, MAX_EXPORT_TARGETS);
+  for (const targetRaw of rawTargets) {
     if (!isRecord(targetRaw) || typeof targetRaw.target !== 'string' || !targetRaw.target.trim() || !Array.isArray(targetRaw.messages)) {
       continue;
     }
     const target = targetRaw.target.toLowerCase();
-    const messages = targetRaw.messages
+    // Keep only the newest-tail slice of the raw rows before reviving. An export
+    // is chronological (see exportVault), so the tail is the most recent history
+    // — exactly what retention keeps — and the ceiling caps revive work per
+    // target regardless of how the untrusted array is ordered.
+    const rawMessages = targetRaw.messages.slice(-MAX_EXPORT_RAW_MESSAGES);
+    const revived = rawMessages
       .map((message) => reviveExportMessage(message, target))
       .filter((message): message is ChatMessage => message !== null);
-    targets.push({ target, messages });
+    targets.push({ target, messages: dedupMessagesById(revived) });
   }
   return {
     kind: 'onyx-vault',

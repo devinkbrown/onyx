@@ -27,6 +27,8 @@ import { describe, expect, it } from 'vitest';
 import type { ChatMessage } from '@/lib/irc/types';
 import {
   deserializeMessage,
+  MAX_EXPORT_RAW_MESSAGES,
+  MAX_EXPORT_TARGETS,
   parseVaultExport,
   serializeMessage,
   type VaultExportSnapshot,
@@ -285,5 +287,88 @@ describe('parseVaultExport — vault import validation contract', () => {
     const parsed = parseVaultExport(raw);
     expect(parsed).not.toBeNull();
     expect(parsed!.targets).toEqual([]);
+  });
+
+  it('BOUNDS an oversized per-target message array to the raw ceiling (keeps the newest tail)', () => {
+    const overBy = 250;
+    const rawCount = MAX_EXPORT_RAW_MESSAGES + overBy;
+    const base = Date.parse('2026-07-10T00:00:00.000Z');
+    const messages = Array.from({ length: rawCount }, (_, i) =>
+      jsonClone(message(`m${i}`, '#flood', base + i * 1000)),
+    );
+    const raw = { kind: 'onyx-vault', version: 1, targets: [{ target: '#flood', messages }] };
+
+    const parsed = parseVaultExport(raw);
+
+    expect(parsed).not.toBeNull();
+    const ids = parsed!.targets[0]!.messages.map((m) => m.id);
+    // Capped at the ceiling, and it is the NEWEST tail that survives (chronological
+    // export ⇒ tail == most recent), never the oldest leading rows.
+    expect(ids).toHaveLength(MAX_EXPORT_RAW_MESSAGES);
+    expect(ids[0]).toBe(`m${overBy}`);
+    expect(ids[ids.length - 1]).toBe(`m${rawCount - 1}`);
+  });
+
+  it('BOUNDS an oversized targets array to the target ceiling', () => {
+    const over = 32;
+    const targets = Array.from({ length: MAX_EXPORT_TARGETS + over }, (_, i) => ({
+      target: `#chan${i}`,
+      messages: [jsonClone(message(`m${i}`, `#chan${i}`, Date.parse('2026-07-10T00:00:00.000Z')))],
+    }));
+    const raw = { kind: 'onyx-vault', version: 1, targets };
+
+    const parsed = parseVaultExport(raw);
+
+    expect(parsed).not.toBeNull();
+    expect(parsed!.targets).toHaveLength(MAX_EXPORT_TARGETS);
+    // The tail targets beyond the ceiling are never materialized.
+    expect(parsed!.targets.at(-1)!.target).toBe(`#chan${MAX_EXPORT_TARGETS - 1}`);
+  });
+
+  it('DEDUPES duplicate message ids within a target deterministically (last occurrence wins)', () => {
+    const first = jsonClone(
+      message('dup', '#alpha', Date.parse('2026-07-10T10:00:00.000Z'), { from: 'alice', text: 'first' }),
+    );
+    const other = jsonClone(message('solo', '#alpha', Date.parse('2026-07-10T10:01:00.000Z')));
+    const last = jsonClone(
+      message('dup', '#alpha', Date.parse('2026-07-10T10:02:00.000Z'), { from: 'alice', text: 'last-wins' }),
+    );
+    const raw = {
+      kind: 'onyx-vault',
+      version: 1,
+      targets: [{ target: '#alpha', messages: [first, other, last] }],
+    };
+
+    const parsed = parseVaultExport(raw);
+
+    expect(parsed).not.toBeNull();
+    const revived = parsed!.targets[0]!.messages;
+    // One 'dup' row, not two; first-appearance order preserved, last value wins.
+    expect(revived.map((m) => m.id)).toEqual(['dup', 'solo']);
+    expect(revived[0]!.text).toBe('last-wins');
+  });
+
+  it('is idempotent across a re-import round-trip (dedup makes re-parsing stable)', () => {
+    const snapshot: VaultExportSnapshot = {
+      kind: 'onyx-vault',
+      version: 1,
+      exportedAt: '2026-07-10T10:02:00.000Z',
+      targets: [
+        {
+          target: '#alpha',
+          messages: [
+            deserializeMessage(serializeMessage('#alpha', message('a1', '#alpha', 1_000))),
+            deserializeMessage(serializeMessage('#alpha', message('a2', '#alpha', 2_000))),
+          ],
+        },
+      ],
+    };
+
+    const once = parseVaultExport(jsonClone(snapshot))!;
+    const twice = parseVaultExport(jsonClone(once))!;
+
+    expect(twice.targets[0]!.messages.map(messageDigest)).toEqual(
+      once.targets[0]!.messages.map(messageDigest),
+    );
   });
 });
