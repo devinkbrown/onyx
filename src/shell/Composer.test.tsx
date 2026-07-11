@@ -111,6 +111,10 @@ describe('Composer accessibility', () => {
 
     // Act — Enter pressed to CONFIRM the IME candidate (isComposing = true).
     fireEvent.keyDown(textarea, { key: 'Enter', isComposing: true });
+    // Flush microtasks: sendMessage dispatches behind `await uploadPendingAttachments()`,
+    // so without this an un-guarded send would not yet have drained and the negative
+    // assertion below would pass even if the IME guard were removed (false-green).
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
     // Assert — confirming a candidate must NOT send the half-composed message.
     expect(sendSpy).not.toHaveBeenCalled();
