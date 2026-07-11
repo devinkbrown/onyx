@@ -16,6 +16,39 @@ import type { WatchTogetherActivity } from '../media/watchTogether';
 /** IRCX channel PROP key carrying the watch-together activity (wire format). */
 const WATCH_PROP = 'ocean.watch';
 
+/**
+ * SASL AUTHENTICATE payloads carry credentials: the base64 PLAIN blob decodes
+ * straight back to the user's password, and the SCRAM/EXTERNAL exchange chunks
+ * are auth-exchange internals. They must never reach the raw-log sink (a 500-line
+ * in-memory buffer rendered in the raw-log UI) even though the real bytes still
+ * go on the wire. Only the two non-secret shapes stay visible so the log remains
+ * useful: the empty continuation `AUTHENTICATE +` and the bare mechanism-select
+ * line (`AUTHENTICATE PLAIN` / `SCRAM-SHA-256` / `EXTERNAL`). Anything else — any
+ * base64 chunk, in either direction — is redacted.
+ */
+function redactAuthenticateForLog(line: string): string {
+  const PREFIX = 'AUTHENTICATE ';
+  if (!line.startsWith(PREFIX)) return line;
+  const arg = line.slice(PREFIX.length);
+  // `+` continuation and uppercase mechanism tokens (A-Z/0-9/hyphen only) are
+  // not secrets; a base64 payload always falls outside that shape.
+  if (arg === '+' || /^[A-Z0-9]+(?:-[A-Z0-9]+)*$/.test(arg)) return line;
+  return `${PREFIX}<redacted>`;
+}
+
+/**
+ * Length-independent, content-constant-time comparison of two base64 strings.
+ * Used to check the SCRAM ServerSignature so a mismatch cannot be probed by
+ * timing. (For a fixed-size HMAC the two sides are always the same length on a
+ * genuine server, so the early length branch leaks nothing about the secret.)
+ */
+function constantTimeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 export type IRCEventHandler = (msg: IRCMessage) => void;
 export type RawHandler = (line: string, direction: 'in' | 'out') => void;
 
@@ -76,8 +109,14 @@ export class IRCClient {
   private _saslMechs: string[] = [];
   /** Which SASL mechanism we're using */
   private _saslMech: SaslMechanism | null = null;
-  /** SCRAM state between challenge/response steps */
-  private _scramState: { clientFirstMsgBare: string; nonce: string; hash: 'SHA-256'; bits: number } | null = null;
+  /** SCRAM state between challenge/response steps. `expectedServerSig` is set
+   *  once client-final has been sent: it is the base64 ServerSignature we expect
+   *  the server to echo in its server-final `v=`, precomputed so the discrete
+   *  server-final AUTHENTICATE line can be verified SYNCHRONOUSLY (no async race
+   *  against the 903 that immediately follows it). */
+  private _scramState:
+    | { clientFirstMsgBare: string; nonce: string; hash: 'SHA-256'; bits: number; expectedServerSig?: string }
+    | null = null;
   /** How many times we've appended _ to nick during registration */
   private _nickRetries = 0;
   /** SASL auth timeout guard */
@@ -223,7 +262,7 @@ export class IRCClient {
 
   send(line: string) {
     if (this.ws?.readyState === WebSocket.OPEN) {
-      this.opts.onRaw?.(line.replace(/\r\n$/, ''), 'out');
+      this.opts.onRaw?.(redactAuthenticateForLog(line.replace(/\r\n$/, '')), 'out');
       try {
         this.ws.send(line);
       } catch {
@@ -442,7 +481,7 @@ export class IRCClient {
 
     for (const line of lines) {
       if (!line) continue;
-      this.opts.onRaw?.(line, 'in');
+      this.opts.onRaw?.(redactAuthenticateForLog(line), 'in');
       try {
         const msg = parseIRCMessage(line);
         this._handleMessage(msg);
@@ -600,8 +639,12 @@ export class IRCClient {
           if (param === '+') {
             // Server ready — send client-first-message
             this._scramClientFirst();
+          } else if (this._scramState?.expectedServerSig !== undefined) {
+            // We already sent client-final; this discrete AUTHENTICATE carries
+            // the server-final (v=...). Verify mutual auth SYNCHRONOUSLY.
+            this._scramVerifyServerFinal(param);
           } else {
-            // Server challenge — process it
+            // Server-first challenge — process it into client-final.
             this._scramClientFinal(param).catch(e => {
               this.opts.onError?.(`SCRAM error: ${e}`);
               this._saslPending = false;
@@ -640,6 +683,10 @@ export class IRCClient {
           this._saslPending = false;
           this._saslMech = null;
           this._scramState = null;
+          // Surface the failure — otherwise CAP finishes and we register
+          // UNAUTHENTICATED with no signal, so a wrong-password user believes
+          // they are logged in. Mirrors the mechanism-selection failure path.
+          this.opts.onError?.('SASL authentication failed');
           this._finishCapIfReady();
         }
         break;
@@ -894,10 +941,60 @@ export class IRCClient {
     const clientSig = await hmac(storedKey, enc.encode(authMessage));
     const clientProof = clientKey.map((b, i) => b ^ clientSig[i]!);
 
+    // Precompute the ServerSignature = HMAC(ServerKey, AuthMessage) the server
+    // must echo in its server-final `v=`. Storing it now lets the discrete
+    // server-final line be verified with a plain constant-time string compare,
+    // with no async work racing the 903 that follows it.
+    const serverKey = await hmac(saltedPass, enc.encode('Server Key'));
+    const serverSig = await hmac(serverKey, enc.encode(authMessage));
+    const expectedServerSig = btoa(String.fromCharCode(...serverSig));
+
     const proofB64 = btoa(String.fromCharCode(...clientProof));
     const clientFinal = `${clientFinalWithoutProof},p=${proofB64}`;
+    // Retain state (do NOT null it) so _scramVerifyServerFinal can check the
+    // server-final; the exchange is only fully torn down on 903/904/905.
+    this._scramState = { ...state, expectedServerSig };
     this.sendRaw('AUTHENTICATE', btoa(clientFinal));
-    this._scramState = null;
+  }
+
+  /**
+   * Verify the SCRAM server-final (`v=<ServerSignature>`), completing mutual
+   * authentication. Orochi sends this as a discrete AUTHENTICATE line and then
+   * immediately emits 903 — it does NOT wait for a client ack, so on success we
+   * send nothing and let the 903 finish the login. On any mismatch (or a server
+   * error `e=`) we fail CLOSED: tear the exchange down and clear the SASL flags
+   * so the trailing 903 can no longer flip us to logged-in.
+   */
+  private _scramVerifyServerFinal(challengeB64: string) {
+    const expected = this._scramState?.expectedServerSig;
+    if (expected === undefined) return;
+
+    const fail = (reason: string) => {
+      if (this._saslTimer) { clearTimeout(this._saslTimer); this._saslTimer = null; }
+      this._saslPending = false;
+      this._saslMech = null;
+      this._scramState = null;
+      this.opts.onError?.(`SASL authentication failed: ${reason}`);
+      this._finishCapIfReady();
+    };
+
+    let serverFinal: string;
+    try {
+      serverFinal = atob(challengeB64);
+    } catch {
+      return fail('invalid server-final encoding');
+    }
+
+    if (serverFinal.startsWith('e=')) {
+      return fail(`server rejected proof (${serverFinal.slice(2)})`);
+    }
+
+    const received = /(?:^|,)v=([^,]*)/.exec(serverFinal)?.[1];
+    if (received === undefined || !constantTimeEqual(received, expected)) {
+      return fail('server signature mismatch');
+    }
+    // Verified — the server proved knowledge of the stored key. The 903 that
+    // follows completes the login; nothing to send here.
   }
 
   private _parseISUPPORT(params: string[]) {
