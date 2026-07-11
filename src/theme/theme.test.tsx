@@ -538,6 +538,89 @@ describe('Pine theme', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 8d. Vermillion — the "Ink & Vermillion" house-identity dark theme, derived
+//     through the factory from its recorded seed (no hand-picked hex).
+// ---------------------------------------------------------------------------
+
+describe('Vermillion theme (Ink & Vermillion house identity)', () => {
+  // The seed recorded in the theme's comment block in themes.ts.
+  const VERMILLION_SEED: PaletteSeed = {
+    scheme: 'dark',
+    primaryHue: 33,
+    accentHue: 18,
+    depth: 0.9,
+    vibrancy: 0.62,
+    warmth: 0.08,
+    contrast: 11,
+  };
+
+  // Colour tokens the factory owns (chrome tokens — seams/radii/motion/fonts —
+  // are hand-set and excluded from this equality check).
+  const GENERATED_TOKENS = [
+    '--ink', '--ink-2', '--stone', '--stone-2', '--stone-3', '--stone-line',
+    '--lapis', '--lapis-bright', '--lapis-deep',
+    '--gold', '--gold-bright', '--gold-deep',
+    '--shu', '--shu-bright',
+    '--washi', '--washi-dim', '--washi-mute',
+    '--ok', '--warn',
+  ];
+
+  it('is registered as a dark built-in in the picker', () => {
+    expect(THEME_IDS).toContain('vermillion');
+    expect(THEMES.vermillion).toBeDefined();
+    expect(THEMES.vermillion.scheme).toBe('dark');
+    expect(THEMES.vermillion.label).toBe('Vermillion');
+  });
+
+  it('pairs with an existing background scene variant', () => {
+    expect(THEMES.vermillion.signatureBg).toBeTruthy();
+  });
+
+  it('is deterministic — the same seed reproduces the same palette', () => {
+    const a = enforceAA(generatePalette(VERMILLION_SEED), 'dark');
+    const b = enforceAA(generatePalette(VERMILLION_SEED), 'dark');
+    for (const key of GENERATED_TOKENS) expect(a[key], key).toBe(b[key]);
+  });
+
+  it('every registered colour token equals the factory output for its seed', () => {
+    const generated = enforceAA(generatePalette(VERMILLION_SEED), 'dark');
+    for (const key of GENERATED_TOKENS) {
+      expect(THEMES.vermillion.tokens[key], key).toBe(generated[key]);
+    }
+  });
+
+  it('passes every WCAG AA pair via auditPalette (regenerated + as-registered)', () => {
+    const regenerated = enforceAA(generatePalette(VERMILLION_SEED), 'dark');
+    for (const tokens of [regenerated, THEMES.vermillion.tokens]) {
+      for (const row of auditPalette(tokens)) {
+        expect(row.pass, `${row.fg} on ${row.bg} = ${row.ratio} (min ${row.min})`).toBe(true);
+      }
+    }
+  });
+
+  it('leads with a true vermillion primary, outside the banned purple/indigo band', () => {
+    const primary = hexToOklch(THEMES.vermillion.tokens['--lapis']!)!;
+    expect(primary.h < 258 || primary.h > 342, `lapis hue ${primary.h.toFixed(1)}`).toBe(true);
+    // Vermillion sits in the warm red-orange band: past crimson, short of amber.
+    expect(primary.h).toBeGreaterThan(28);
+    expect(primary.h).toBeLessThan(40);
+    // Vividly chromatic — the seal is a signature, not a muted neutral.
+    expect(primary.c).toBeGreaterThan(0.14);
+  });
+
+  it('grounds the theme in the deepest warm ink (very low lightness)', () => {
+    const ink = hexToOklch(THEMES.vermillion.tokens['--ink']!)!;
+    expect(ink.l).toBeLessThan(0.12);
+  });
+
+  it('is distinct from Garnet (shu) — vermillion leads warmer than the crimson jewel', () => {
+    const vermillion = hexToOklch(THEMES.vermillion.tokens['--lapis']!)!;
+    const garnet = hexToOklch(THEMES.shu.tokens['--lapis']!)!;
+    expect(vermillion.h).toBeGreaterThan(garnet.h);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 7. Ocean family — flagship + sub-variants
 // ---------------------------------------------------------------------------
 

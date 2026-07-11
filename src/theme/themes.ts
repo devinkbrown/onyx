@@ -59,6 +59,7 @@ export type ThemeId =
   | 'pine'
   | 'kohaku'
   | 'terracotta'
+  | 'vermillion'
   | 'teal'
   | 'slate'
   | 'frost';
@@ -806,6 +807,73 @@ const terracottaTokens: TokenMap = {
 };
 
 // ---------------------------------------------------------------------------
+// vermillion — INK & VERMILLION: the Onyx house identity. A single vermillion
+// seal leads as the PRIMARY accent over the deepest warm-ink ground, with a
+// blush-red analogous second — the eshmaki.me "Ink & Vermillion / Deep Current"
+// signature made a first-class, user-selectable theme. Distinct from Garnet
+// (crimson jewel over maroon) and Terracotta (clay orange): here the accent is
+// true vermillion (OKLCH ~33°) and the ink is pushed to its darkest reserve.
+// Seed { dark, primary 33, accent 18, depth .9, vibrancy .62, warmth .08,
+// contrast 11 } — pure engine output (the seed IS the soul; only the chrome
+// tokens below — seams/radii/motion/fonts — are hand-set), re-run through enforceAA.
+// ---------------------------------------------------------------------------
+const vermillionTokens: TokenMap = {
+  // Ground — deepest warm-ink strata: near-black sumi warmed by the seal
+  '--ink':        '#060100',
+  '--ink-2':      '#0a0101',
+  '--stone':      '#140604',
+  '--stone-2':    '#1d0f0b',
+  '--stone-3':    '#281814',
+  '--stone-line': '#351e19',
+
+  // Vermillion — the house seal leads as the PRIMARY accent (replaces lapis)
+  '--lapis':        '#de5034',
+  '--lapis-bright': '#ff9781',
+  '--lapis-deep':   '#8e1900',
+
+  // Blush-red — the analogous, softer second accent (NOT gold)
+  '--gold':        '#ef7179',
+  '--gold-bright': '#ffafb0',
+  '--gold-deep':   '#a13d46',
+
+  // Shu — the hot/danger accent stays vermilion, in-family with the seal
+  '--shu':        '#e95144',
+  '--shu-bright': '#ff7f70',
+
+  // Text — warm bone / rice-paper over the ink
+  '--washi':      '#eadad6',
+  '--washi-dim':  '#a39591',
+  '--washi-mute': '#715e5a',
+
+  // Status
+  '--ok':      '#5bc78e',
+  '--warn':    '#e6d08c', // warnings stay WARM — in-family with the vermillion seal
+  '--danger':  'var(--shu)',
+
+  // Seams follow the vermillion PRIMARY (the seal's own colour) + blush bands
+  '--seam':       'color-mix(in oklab, var(--lapis) 40%, transparent)',
+  '--seam-faint': 'color-mix(in oklab, var(--lapis) 16%, transparent)',
+  '--line':       'color-mix(in oklab, var(--washi) 14%, transparent)',
+  '--line-faint': 'color-mix(in oklab, var(--gold) 12%, transparent)',
+
+  // Radius — taut, editorial ink
+  '--r-0':    '0px',
+  '--r-sm':   '3px',
+  '--r-md':   '6px',
+  '--r-pill': '999px',
+
+  // Motion
+  '--ease': 'cubic-bezier(0.16, 1, 0.3, 1)',
+  '--dur':  '240ms',
+
+  // Typography
+  '--font-mono':    "'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace",
+  '--font-display': "'Anton', 'Arial Narrow', 'Helvetica Neue', sans-serif",
+  '--font-sans':    "'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  '--font-serif':   "'Fraunces Variable', 'Iowan Old Style', Georgia, 'Times New Roman', serif",
+};
+
+// ---------------------------------------------------------------------------
 // teal — deep teal cut; cyan-green ground, mint primary, seafoam second.
 // One cool water-green story — no brass, no gold.
 // Seed { dark, primary 175, accent 168, depth .82, vibrancy .65, warmth -.25,
@@ -1100,6 +1168,14 @@ export const THEMES: Record<ThemeId, ThemeMeta> = {
     scheme: 'dark',
     signatureBg: 'volcanic',
     tokens: terracottaTokens,
+  },
+  vermillion: {
+    id: 'vermillion',
+    label: 'Vermillion',
+    description: 'Ink & Vermillion — the house seal: a single vermillion accent over the deepest warm ink.',
+    scheme: 'dark',
+    signatureBg: 'ember',
+    tokens: vermillionTokens,
   },
   teal: {
     id: 'teal',
