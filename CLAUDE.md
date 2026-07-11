@@ -1,7 +1,12 @@
 # Onyx — IRC webchat (SolidJS)
 
-Modern web client for IRCXNet. Pre-release/internal; branch `onyx-solid`.
+Modern web client for IRCXNet. Pre-release; branch `onyx-solid`.
 The brand is **Onyx** (formerly Ocean, briefly Ruri — both dead names).
+
+**License: AGPL-3.0-or-later** (see `LICENSE`). Onyx is copyleft-licensed but NOT yet
+publicly released — it lives only in the PRIVATE `github.com/devinkbrown/onyx` repo. The
+`.git/hooks/pre-push` guard still blocks any non-private GitHub remote; a public release is a
+separate, deliberate decision (the AGPL grant only takes effect on public distribution).
 
 ## Stack
 - **SolidJS 1.9** + `@solidjs/router` — SPA, no SSR
