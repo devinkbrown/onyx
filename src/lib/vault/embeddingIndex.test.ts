@@ -34,6 +34,18 @@ describe('tokenize', () => {
     expect(tokenize('日本語 test')).toEqual(['日本語', 'test']);
   });
 
+  it('case-folds unicode tokens and strips punctuation exactly', () => {
+    expect(tokenize('CAFÉ, résumé! Version_2026; naïve coöperate -- 東京99 a I')).toEqual([
+      'café',
+      'résumé',
+      'version',
+      '2026',
+      'naïve',
+      'coöperate',
+      '東京99',
+    ]);
+  });
+
   it('is deterministic across calls', () => {
     expect(tokenize('repeat this repeat')).toEqual(tokenize('repeat this repeat'));
   });
@@ -48,8 +60,18 @@ describe('embed', () => {
     expect(Array.from(embed('deploy the server'))).toEqual(Array.from(embed('deploy the server')));
   });
 
+  it('produces different vectors for different inputs', () => {
+    expect(Array.from(embed('deploy the server'))).not.toEqual(Array.from(embed('quiet weekend plans')));
+  });
+
   it('returns a zero vector for token-free text', () => {
     const vec = embed('!!! ---');
+    expect(vec.every((v) => v === 0)).toBe(true);
+  });
+
+  it('returns a zero vector for an empty string', () => {
+    const vec = embed('');
+    expect(vec).toHaveLength(EMBEDDING_DIM);
     expect(vec.every((v) => v === 0)).toBe(true);
   });
 
@@ -61,6 +83,24 @@ describe('embed', () => {
 
   it('honors a custom dimensionality', () => {
     expect(embed('sized down', 32).length).toBe(32);
+  });
+
+  it('keeps very long input bounded to the configured dimensionality', () => {
+    const longText = Array.from({ length: 5000 }, (_, i) => `vault${i % 64}`).join(' ');
+    const vec = embed(longText);
+    const norm = Math.sqrt(Array.from(vec).reduce((sum, v) => sum + v * v, 0));
+
+    expect(vec).toHaveLength(EMBEDDING_DIM);
+    expect(vec.every((v) => Number.isFinite(v))).toBe(true);
+    expect(norm).toBeCloseTo(1, 6);
+  });
+
+  it('embeds a single token as one signed unit bucket', () => {
+    const vec = embed('vault');
+    const nonZero = Array.from(vec).filter((v) => v !== 0);
+
+    expect(nonZero).toHaveLength(1);
+    expect(Math.abs(nonZero[0]!)).toBeCloseTo(1, 6);
   });
 
   it('derives the bucket sign independently of the bucket (signed-trick debias)', () => {
@@ -96,6 +136,13 @@ describe('cosineSimilarity', () => {
   it('is 1 for identical embeddings', () => {
     const v = embed('reindex the vault tonight');
     expect(cosineSimilarity(v, v)).toBeCloseTo(1, 6);
+  });
+
+  it('is 0 for exactly orthogonal vectors', () => {
+    const a = new Float32Array([1, 0, 0]);
+    const b = new Float32Array([0, 1, 0]);
+
+    expect(cosineSimilarity(a, b)).toBe(0);
   });
 
   it('is ~0 for texts sharing no tokens (orthogonal buckets)', () => {
@@ -180,6 +227,23 @@ describe('HashingEmbeddingProvider', () => {
     const provider = new HashingEmbeddingProvider(64);
     expect(provider.dim).toBe(64);
     expect(provider.embed('sized').length).toBe(64);
+  });
+
+  it('does not use fetch or any network path', () => {
+    const originalFetch = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = (() => {
+      calls += 1;
+      throw new Error('network should not be used by the hashing provider');
+    }) as typeof fetch;
+
+    try {
+      const provider = new HashingEmbeddingProvider();
+      expect(provider.embed('local deterministic embedding')).toHaveLength(EMBEDDING_DIM);
+      expect(calls).toBe(0);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });
 
