@@ -63,6 +63,20 @@ const AUDIO_EXTS = /\.(mp3|ogg|wav)(\?.*)?$/i;
 
 type MediaKind = 'image' | 'video' | 'audio' | null;
 
+/**
+ * True only for an absolute http(s) URL. This is the single gate every href/src
+ * placed by this component must pass, so a javascript:/data:/vbscript: scheme can
+ * never reach an anchor or media element even via a server-supplied preview.
+ */
+function isHttpUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' || u.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
 function detectMediaKind(url: string): MediaKind {
   try {
     // Only allow https/http
@@ -650,8 +664,18 @@ function LinkPreviewCard(props: { url: string }): JSX.Element {
   const [local] = splitProps(props, ['url']);
   const [preview] = createResource(() => local.url, fetchLinkPreview);
 
+  // Defense in depth at the sink: the card's canonical URL is extracted by the
+  // same-origin /linkpreview endpoint from the (untrusted) target page's OG
+  // metadata, so a hostile page could set og:url to a javascript: scheme. The
+  // same-origin endpoint is the real boundary; here we drop any card whose URL
+  // is not http(s) (fail closed) so a dangerous scheme never reaches the anchor.
+  const safe = createMemo(() => {
+    const p = preview();
+    return p && isHttpUrl(p.url) ? p : null;
+  });
+
   return (
-    <Show when={preview()}>
+    <Show when={safe()}>
       {(p) => (
         <a
           class="shell-msg-preview"
@@ -671,7 +695,7 @@ function LinkPreviewCard(props: { url: string }): JSX.Element {
               <span class="shell-msg-preview-desc">{p().description}</span>
             </Show>
           </span>
-          <Show when={p().image}>
+          <Show when={p().image && isHttpUrl(p().image)}>
             <img
               class="shell-msg-preview-thumb"
               src={p().image}

@@ -506,6 +506,122 @@ describe('complex real-world messages', () => {
   });
 });
 
+// ── XSS / dangerous-scheme inertness (pinned adversarial payloads) ─────────────
+//
+// The parser is the load-bearing guarantee that a `link` token's href only ever
+// starts with a literal http(s):// prefix. These tests pin that no attacker
+// payload — HTML tags, javascript:/data:/vbscript: URIs, markdown link bait, or
+// tag-breakout attempts — is ever promoted to a link/media/emoji token. The
+// hostile bytes must survive only as inert `text`.
+
+describe('adversarial: XSS payloads stay inert literal text', () => {
+  /** Concatenate every text token's content for whole-payload assertions. */
+  function textOf(tokens: Token[]): string {
+    const walk = (list: Token[] | undefined): string => {
+      if (!list) return '';
+      let out = '';
+      for (const t of list) {
+        if (t.type === 'text') out += t.text;
+        else if ('children' in t) out += walk((t as { children: Token[] }).children);
+      }
+      return out;
+    };
+    return walk(tokens);
+  }
+
+  it('an <img onerror> payload produces no link/emoji token and stays literal', () => {
+    const hostile = '<img src=x onerror=alert(1)>';
+    const tokens = parseMessage(hostile);
+    expect(only(tokens, 'link')).toHaveLength(0);
+    expect(only(tokens, 'emoji')).toHaveLength(0);
+    expect(textOf(tokens)).toBe(hostile);
+  });
+
+  it('a </p><img> tag-breakout attempt is a single inert text run', () => {
+    const hostile = '</p><img src=x onerror=alert(1)>';
+    const tokens = parseMessage(hostile);
+    expect(only(tokens, 'link')).toHaveLength(0);
+    expect(textOf(tokens)).toBe(hostile);
+  });
+
+  it('a bare <script> payload never becomes a link or emoji token', () => {
+    const hostile = '<script>alert(document.cookie)</script>';
+    const tokens = parseMessage(hostile);
+    expect(only(tokens, 'link')).toHaveLength(0);
+    expect(only(tokens, 'emoji')).toHaveLength(0);
+    expect(textOf(tokens)).toContain('<script>alert(document.cookie)</script>');
+  });
+
+  it('a javascript: URI is NOT autolinked (only http(s):// makes a link)', () => {
+    const tokens = parseMessage('click javascript:alert(1) now');
+    expect(only(tokens, 'link')).toHaveLength(0);
+    expect(textOf(tokens)).toContain('javascript:alert(1)');
+  });
+
+  it('a data: URI is NOT autolinked', () => {
+    const tokens = parseMessage('data:text/html,<script>alert(1)</script>');
+    expect(only(tokens, 'link')).toHaveLength(0);
+  });
+
+  it('a vbscript: URI is NOT autolinked', () => {
+    const tokens = parseMessage('vbscript:msgbox(1)');
+    expect(only(tokens, 'link')).toHaveLength(0);
+  });
+
+  it('markdown link bait [label](javascript:…) yields no link token', () => {
+    const tokens = parseMessage('[click me](javascript:alert(1))');
+    // No [](…) link syntax exists; the whole thing is inert text, and crucially
+    // the javascript: scheme is never lifted into a link href.
+    expect(only(tokens, 'link')).toHaveLength(0);
+    expect(textOf(tokens)).toContain('javascript:alert(1)');
+  });
+
+  it('an uppercase HTTPS:// scheme fails closed (not autolinked)', () => {
+    // Scheme matching is case-sensitive by design; anything not a literal
+    // http(s):// stays text rather than becoming a link.
+    const tokens = parseMessage('HTTPS://EXAMPLE.COM/x');
+    expect(only(tokens, 'link')).toHaveLength(0);
+  });
+
+  it('EVERY produced link href starts with a http(s):// prefix', () => {
+    const payloads = [
+      'see https://good.example/path and javascript:alert(1)',
+      'http://ok.example?q=javascript:alert(1)',
+      'mailto:a@b.com javascript:void(0) https://x.example',
+      'ftp://host/file https://y.example/z',
+    ];
+    for (const p of payloads) {
+      for (const t of parseMessage(p)) {
+        if (t.type === 'link') {
+          expect((t as { href: string }).href).toMatch(/^https?:\/\//);
+        }
+      }
+    }
+  });
+
+  it('a colon-wrapped HTML payload is at most an inert (unknown) emoji shortcode', () => {
+    // ":<img …>:" cannot form a shortcode (the inner chars aren't [\w\-+]), so
+    // no emoji token is produced and the tag survives as literal text.
+    const tokens = parseMessage(':<img src=x onerror=alert(1)>:');
+    expect(only(tokens, 'emoji')).toHaveLength(0);
+    expect(only(tokens, 'link')).toHaveLength(0);
+    expect(textOf(tokens)).toContain('<img src=x onerror=alert(1)>');
+  });
+
+  it('nested/unterminated format + colour codes do not hang and stay literal', () => {
+    // Mixed unterminated markdown markers and raw mIRC control bytes.
+    const hostile =
+      '\x03' + '**_~~||`'.repeat(80) + '\x02\x1d' + '<img onerror=x>'.repeat(40);
+    const start = Date.now();
+    const tokens = parseMessage(hostile);
+    expect(Date.now() - start).toBeLessThan(200);
+    // No control bytes survive into any token.
+    expect(JSON.stringify(tokens)).not.toMatch(/[\x02\x03\x0f\x1d\x1e\x1f]/);
+    // No dangerous link token was produced from the noise.
+    expect(only(tokens, 'link')).toHaveLength(0);
+  });
+});
+
 // ── IRC / mIRC formatting ──────────────────────────────────────────────────────
 
 describe('IRC control codes', () => {
