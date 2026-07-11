@@ -13,8 +13,14 @@
 
 import { createMemo, createSignal, createUniqueId, For, Show, type JSX } from 'solid-js';
 import { Sheet } from '@/primitives';
-import { clearVault } from '@/lib/vault/historyVault';
+import { VAULT_KEEP, clearVault } from '@/lib/vault/historyVault';
 import { countLabel } from '@/lib/format/countLabel';
+import {
+  VAULT_SEARCH_MODES,
+  defaultVaultSearchMode,
+  setDefaultVaultSearchMode,
+} from '@/lib/prefs/vaultSearchMode';
+import { setVaultMode, type VaultSearchMode } from './search/useMessageSearch';
 import { DiscordImportControls, DiscordPackageImportControls, SlackImportControls, IrcLogImportControls } from './HistoryImportControls';
 import {
   clearClientExtensionAudit,
@@ -75,6 +81,11 @@ const SCENE_MOTION_LABELS: Record<SceneMotion, string> = {
   animated: 'Animated',
   still: 'Still',
   off: 'Off',
+};
+const VAULT_SEARCH_MODE_LABELS: Record<VaultSearchMode, string> = {
+  hybrid: 'Hybrid',
+  exact: 'Exact',
+  semantic: 'Semantic',
 };
 
 function resetAllPreferences(): void {
@@ -734,6 +745,98 @@ function PwaReadinessPanel(): JSX.Element {
   );
 }
 
+function VaultRetentionCard(): JSX.Element {
+  // Read-only: the local vault keeps at most VAULT_KEEP recent messages per
+  // conversation, oldest pruned. Nothing here leaves the device.
+  return (
+    <section class="pref-group pref-vault-retention" aria-labelledby="pref-vault-retention-title">
+      <div class="pref-group-head">
+        <h3 id="pref-vault-retention-title" class="pref-label">On-device history</h3>
+        <span class="pref-count">{countLabel(VAULT_KEEP, 'message')} per room</span>
+      </div>
+      <p class="pref-desc">
+        Onyx keeps up to {countLabel(VAULT_KEEP, 'recent message')} for each conversation in this
+        browser's private storage so rooms open instantly and read offline. Older messages are
+        pruned automatically. History stays on this device — it is never uploaded, and encrypted
+        DM plaintext is never stored.
+      </p>
+    </section>
+  );
+}
+
+function ClearLocalHistoryControls(): JSX.Element {
+  const [confirming, setConfirming] = createSignal(false);
+  const [busy, setBusy] = createSignal(false);
+  const [status, setStatus] = createSignal<string | null>(null);
+
+  async function clearNow(): Promise<void> {
+    setBusy(true);
+    try {
+      await clearVault();
+      setStatus('Local history cleared on this device.');
+    } catch {
+      setStatus('Could not clear local history. Try again after freeing storage.');
+    } finally {
+      setConfirming(false);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section class="pref-group pref-clear-history" aria-labelledby="pref-clear-history-title">
+      <div class="pref-group-head">
+        <h3 id="pref-clear-history-title" class="pref-label">Clear local history</h3>
+      </div>
+      <p class="pref-desc">
+        Erase every message stored in this browser's vault and its pending outbox. This does not
+        affect other devices or the server; rooms refill as new messages arrive.
+      </p>
+      <Show
+        when={confirming()}
+        fallback={
+          <div class="pref-clear-history__actions">
+            <button
+              type="button"
+              class="pref-reset pref-reset--danger"
+              onClick={() => {
+                setStatus(null);
+                setConfirming(true);
+              }}
+            >
+              Clear local history
+            </button>
+          </div>
+        }
+      >
+        <div class="pref-clear-history__confirm" role="group" aria-label="Confirm clear local history">
+          <p class="pref-desc">This permanently erases stored history on this device.</p>
+          <div class="pref-clear-history__actions">
+            <button
+              type="button"
+              class="pref-reset pref-reset--danger"
+              disabled={busy()}
+              onClick={() => void clearNow()}
+            >
+              Erase history
+            </button>
+            <button
+              type="button"
+              class="pref-reset"
+              disabled={busy()}
+              onClick={() => setConfirming(false)}
+            >
+              Keep history
+            </button>
+          </div>
+        </div>
+      </Show>
+      <Show when={status()}>
+        <p class="pref-status" role="status">{status()}</p>
+      </Show>
+    </section>
+  );
+}
+
 function PreferenceSection(props: { title: string; description: string }): JSX.Element {
   return (
     <div class="pref-section">
@@ -905,6 +1008,27 @@ export function PreferencesPanel(): JSX.Element {
         />
 
         <PortableVaultControls />
+
+        <PreferenceSection
+          title="Search & history"
+          description="How on-device search matches, what this browser keeps, and how to erase it."
+        />
+
+        <Segmented
+          legend="Default search mode"
+          description="Which matching a device-memory search starts in: Hybrid (lexical then on-device semantic), Exact (literal substring), or Semantic (on-device meaning). All run in this browser — nothing is sent anywhere."
+          options={VAULT_SEARCH_MODES}
+          labels={VAULT_SEARCH_MODE_LABELS}
+          value={() => defaultVaultSearchMode()}
+          onSelect={(value) => {
+            setDefaultVaultSearchMode(value);
+            setVaultMode(value);
+          }}
+        />
+
+        <VaultRetentionCard />
+
+        <ClearLocalHistoryControls />
 
         <DiscordImportControls />
 

@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readClientExtensionActions, recordClientExtensionActionRun } from '@/lib/extensions/clientActions';
 import { closePreferences, openPreferences, resetPreferences } from '@/lib/prefs/preferences';
 import { sceneMotion, setSceneMotion } from '@/lib/prefs/sceneMotion';
+import { defaultVaultSearchMode, resetDefaultVaultSearchMode } from '@/lib/prefs/vaultSearchMode';
+import { setVaultMode, vaultSearchMode } from '@/shell/search/useMessageSearch';
 import { store } from '@/lib/store/store';
 import { PreferencesPanel } from './PreferencesPanel';
 
@@ -11,6 +13,8 @@ describe('PreferencesPanel', () => {
   beforeEach(() => {
     localStorage.clear();
     resetPreferences();
+    resetDefaultVaultSearchMode();
+    setVaultMode('hybrid');
     closePreferences();
     store.setState({ showAppearance: false });
   });
@@ -18,6 +22,8 @@ describe('PreferencesPanel', () => {
   afterEach(() => {
     cleanup();
     closePreferences();
+    resetDefaultVaultSearchMode();
+    setVaultMode('hybrid');
     localStorage.clear();
     store.setState({ showAppearance: false });
   });
@@ -334,6 +340,61 @@ describe('PreferencesPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Clear actions' }));
     expect(readClientExtensionActions()).toEqual([]);
+  });
+
+  it('selects a default vault search mode, persisting it and applying it live', () => {
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    const group = screen.getByRole('radiogroup', { name: 'Default search mode' });
+    const radios = screen.getAllByRole('radio').filter((radio) => group.contains(radio));
+    expect(radios.map((radio) => radio.textContent)).toEqual(['Hybrid', 'Exact', 'Semantic']);
+    expect(screen.getByRole('radio', { name: 'Hybrid' })).toHaveAttribute('aria-checked', 'true');
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Semantic' }));
+
+    // Persisted default updates and the DOM reflects the new checked radio.
+    expect(defaultVaultSearchMode()).toBe('semantic');
+    expect(localStorage.getItem('onyx:vault-search-mode')).toBe('semantic');
+    expect(screen.getByRole('radio', { name: 'Semantic' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'Hybrid' })).toHaveAttribute('aria-checked', 'false');
+    // The live in-search mode is applied immediately, not just on next load.
+    expect(vaultSearchMode()).toBe('semantic');
+  });
+
+  it('surfaces read-only on-device retention with private framing', () => {
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    expect(screen.getByRole('heading', { name: 'On-device history' })).toBeInTheDocument();
+    expect(
+      screen.getByText(/keeps up to 400 recent messages for each conversation/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/never uploaded, and encrypted\s+DM plaintext is never stored/i),
+    ).toBeInTheDocument();
+  });
+
+  it('guards clearing local history behind an explicit confirm step', async () => {
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    // First press only reveals the confirm affordance — it does not erase yet.
+    fireEvent.click(screen.getByRole('button', { name: 'Clear local history' }));
+    expect(screen.getByRole('group', { name: 'Confirm clear local history' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erase history' })).toBeInTheDocument();
+
+    // Backing out keeps history and dismisses the confirm.
+    fireEvent.click(screen.getByRole('button', { name: 'Keep history' }));
+    expect(
+      screen.queryByRole('group', { name: 'Confirm clear local history' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Clear local history' })).toBeInTheDocument();
+
+    // Confirming runs the wipe and reports it.
+    fireEvent.click(screen.getByRole('button', { name: 'Clear local history' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Erase history' }));
+    expect(await screen.findByText('Local history cleared on this device.')).toBeInTheDocument();
   });
 
   it('resets background motion with the rest of preferences', () => {

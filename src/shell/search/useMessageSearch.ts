@@ -3,6 +3,7 @@ import { createEffect, createMemo, createSignal, onCleanup, type Accessor } from
 import { getState, useStore } from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
 import { preferences } from '@/lib/prefs/preferences';
+import { VAULT_SEARCH_MODES, loadDefaultVaultSearchMode } from '@/lib/prefs/vaultSearchMode';
 import { searchVault } from '@/lib/vault/historyVault';
 import { searchVaultSemantic } from '@/lib/vault/searchVaultSemantic';
 import { searchVaultHybrid } from '@/lib/vault/searchVaultHybrid';
@@ -15,8 +16,12 @@ import { searchVaultHybrid } from '@/lib/vault/searchVaultHybrid';
  */
 export type VaultSearchMode = 'exact' | 'semantic' | 'hybrid';
 
-/** Discoverable cycle order the toggle walks: default first, then the two pure modes. */
-const VAULT_MODE_CYCLE: readonly VaultSearchMode[] = ['hybrid', 'exact', 'semantic'];
+/**
+ * Discoverable cycle order the toggle walks: default first, then the two pure
+ * modes. Single-sourced from VAULT_SEARCH_MODES so the in-search toggle and the
+ * Preferences "Default search mode" selector can never diverge on order.
+ */
+const VAULT_MODE_CYCLE: readonly VaultSearchMode[] = VAULT_SEARCH_MODES;
 
 export type MessageSearchResult = {
   id: string;
@@ -74,7 +79,11 @@ export type UseMessageSearch = {
 };
 
 const [isMessageSearchOpen, setMessageSearchOpen] = createSignal(false);
-const [vaultSearchMode, setVaultSearchMode] = createSignal<VaultSearchMode>('hybrid');
+// Seed the live in-search mode from the user's persisted DEFAULT (Preferences →
+// "Search & History"). With no stored value this is 'hybrid', so behaviour is
+// unchanged for a fresh device; the in-search toggle then walks this transient
+// session value without disturbing the persisted default.
+const [vaultSearchMode, setVaultSearchMode] = createSignal<VaultSearchMode>(loadDefaultVaultSearchMode());
 const [messageSearchQuery, setMessageSearchQuerySignal] = createSignal('');
 const [messageSearchActiveIndex, setMessageSearchActiveIndex] = createSignal(0);
 const [messageSearchActiveResultId, setMessageSearchActiveResultId] = createSignal<string | null>(null);
