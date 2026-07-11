@@ -6655,7 +6655,15 @@ export const store = createStore<OnyxState>()(
           const redactMsgId  = params[1];
           if (!redactTarget || !redactMsgId) break;
 
-          const redactKey = redactTarget.toLowerCase();
+          // For an inbound DM the wire `<target>` is OUR nick (the peer redacts
+          // a message they sent us), but DMs are keyed by the PEER's nick — the
+          // same remap the PRIVMSG / reaction fold-back does. Our own echoed
+          // REDACT keeps target = the peer, so it still lands on the right key;
+          // a channel target never equals our nick, so channels are unaffected.
+          const redactConvo = redactTarget.toLowerCase() === get().ourNick.toLowerCase()
+            ? (nick ?? redactTarget)
+            : redactTarget;
+          const redactKey = redactConvo.toLowerCase();
           const filterMsg = (msgs: ChatMessage[]): ChatMessage[] =>
             msgs.map(m => m.id === redactMsgId ? { ...m, redacted: true, text: '[Message deleted]' } : m);
 
@@ -6685,7 +6693,14 @@ export const store = createStore<OnyxState>()(
           const editText   = params[2] ?? '';
           if (!editTarget || !editOldId) break;
 
-          const editKey = editTarget.toLowerCase();
+          // Inbound DM edit: the wire `<target>` is OUR nick, but DMs are keyed
+          // by the PEER's nick (mirror of the PRIVMSG / reaction remap). A
+          // self-echoed EDIT keeps target = the peer; channel targets never
+          // equal our nick, so they are unaffected.
+          const editConvo = editTarget.toLowerCase() === get().ourNick.toLowerCase()
+            ? (nick ?? editTarget)
+            : editTarget;
+          const editKey = editConvo.toLowerCase();
           const applyEdit = (msgs: ChatMessage[]): ChatMessage[] =>
             msgs.map(m => m.id === editOldId ? { ...m, text: editText, edited: true } : m);
 
