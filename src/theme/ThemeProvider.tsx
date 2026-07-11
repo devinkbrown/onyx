@@ -121,6 +121,31 @@ function stripShareParam(params: URLSearchParams): void {
 }
 
 /**
+ * CSS custom properties written to `documentElement` by the last successful
+ * `applyThemeToDom` call. Kept at module scope (there is one documentElement)
+ * so a subsequent theme switch can CLEAR overrides the incoming theme does not
+ * define. Themes carry different key sets — e.g. `ocean` sets the `--font-*`
+ * stack while `pearl` omits it — and an uncleared inline var bleeds through,
+ * silently beating the stylesheet default. Custom overrides bleed the same way.
+ */
+let appliedTokenProps: readonly string[] = [];
+
+/**
+ * Commit `tokens` onto `root`, first removing any previously-applied property
+ * the new map omits, then writing the new values. Returns nothing; updates the
+ * module-level record of applied properties.
+ */
+function commitTokens(root: HTMLElement, tokens: TokenMap): void {
+  for (const prop of appliedTokenProps) {
+    if (!(prop in tokens)) root.style.removeProperty(prop);
+  }
+  for (const [prop, value] of Object.entries(tokens)) {
+    root.style.setProperty(prop, value);
+  }
+  appliedTokenProps = Object.keys(tokens);
+}
+
+/**
  * Writes all token overrides for `id` onto `document.documentElement` and
  * updates `data-theme` + `color-scheme`.  This is intentionally side-effectful
  * and kept outside of reactive primitives so it can also be called from tests.
@@ -134,9 +159,7 @@ export function applyThemeToDom(id: string): void {
   if (isCustomThemeId(id)) {
     const custom = getCustomTheme(id);
     if (!custom) return;
-    for (const [prop, value] of Object.entries(customThemeTokens(custom))) {
-      root.style.setProperty(prop, value);
-    }
+    commitTokens(root, customThemeTokens(custom));
     root.setAttribute('data-theme', custom.base);
     root.style.setProperty('color-scheme', customThemeScheme(custom));
     return;
@@ -145,11 +168,7 @@ export function applyThemeToDom(id: string): void {
   const theme = THEMES[id as ThemeId];
   if (!theme) return;
 
-  // Write every token override.
-  for (const [prop, value] of Object.entries(theme.tokens)) {
-    root.style.setProperty(prop, value);
-  }
-
+  commitTokens(root, theme.tokens);
   root.setAttribute('data-theme', id);
   root.style.setProperty('color-scheme', theme.scheme);
 }
