@@ -79,7 +79,7 @@ describe('_applyReadMarker — partial catch-up re-derives the mention count', (
 
     // Marker sits between t3 (3000) and t4 (4000): only m4 + m5 remain unread,
     // of which only m5 is a highlight → the correct mention count is 1.
-    feed(':server MARKREAD #chan timestamp=1970-01-01T00:00:03.500Z');
+    feed(':me MARKREAD #chan timestamp=1970-01-01T00:00:03.500Z');
 
     const s = store.getState();
     expect(s.channelUnread[key]).toBe(2);
@@ -122,7 +122,7 @@ describe('_applyReadMarker — partial catch-up re-derives the mention count', (
     } as never, true);
 
     // Marker past the last message → nothing unread.
-    feed(':server MARKREAD #chan timestamp=1970-01-01T00:00:09.000Z');
+    feed(':me MARKREAD #chan timestamp=1970-01-01T00:00:09.000Z');
 
     const s = store.getState();
     expect(s.channelUnread[key]).toBe(0);
