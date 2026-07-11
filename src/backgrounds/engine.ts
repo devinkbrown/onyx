@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { JSX } from 'solid-js';
+import { bumpThemeEpoch } from './theme-epoch';
 
 export type BackgroundQuality = 'low' | 'med' | 'high';
 
@@ -293,6 +294,11 @@ export class BackgroundEngine {
     if (this.listenersAttached) return;
     this.listenersAttached = true;
 
+    // The theme may have switched while no engine was observing (between a stop
+    // and this start), so force the first frame to re-read the live tokens
+    // instead of trusting a possibly-stale cached theme.
+    bumpThemeEpoch();
+
     window.addEventListener('resize', this.handleResize);
     document.addEventListener('visibilitychange', this.handleVisibilityChange);
 
@@ -302,14 +308,12 @@ export class BackgroundEngine {
       if (this.canvas.parentElement) this.resizeObserver.observe(this.canvas.parentElement);
     }
 
-    // A frozen static/solid frame does not loop, so it never re-reads the theme
-    // tokens on its own. Watch documentElement for theme switches and repaint
-    // that single frame; live animated loops already refresh every frame.
-    if (
-      rendersSingleFrame(this.staticMode, this.variant.kind) &&
-      typeof MutationObserver !== 'undefined' &&
-      typeof document !== 'undefined'
-    ) {
+    // Watch documentElement for theme switches. Every kind needs this: animated
+    // loops read a theme cached against the shared epoch (so they no longer pay
+    // getComputedStyle every frame) and must invalidate that cache on a switch,
+    // while a frozen static/solid frame additionally has to be repainted since
+    // it never loops on its own.
+    if (typeof MutationObserver !== 'undefined' && typeof document !== 'undefined') {
       this.themeObserver = new MutationObserver(this.handleThemeMutation);
       this.themeObserver.observe(document.documentElement, {
         attributes: true,
@@ -352,7 +356,11 @@ export class BackgroundEngine {
 
   private readonly handleThemeMutation = (records: MutationRecord[]): void => {
     if (!records.some((record) => isThemeMutation(record.attributeName))) return;
-    this.refreshStaticFrame();
+    // Invalidate the shared cached theme so every variant re-reads the new
+    // tokens; animated loops pick them up on their next frame.
+    bumpThemeEpoch();
+    // A frozen single frame won't repaint itself, so drive it explicitly.
+    if (rendersSingleFrame(this.staticMode, this.variant.kind)) this.refreshStaticFrame();
   };
 
   private readonly handleVisibilityChange = (): void => {

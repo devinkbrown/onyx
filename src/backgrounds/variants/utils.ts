@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { BackgroundFrameContext } from '../engine';
+import { createEpochMemo, themeEpoch } from '../theme-epoch';
 
 export interface BackgroundTheme {
   ink: string;
@@ -61,21 +62,47 @@ const TOKEN_MAP: Record<keyof BackgroundTheme, string> = {
   washiMute: '--washi-mute',
 };
 
-export function readBackgroundTheme(canvas?: HTMLCanvasElement): BackgroundTheme {
-  if (typeof document === 'undefined' || typeof getComputedStyle === 'undefined') {
-    return FALLBACK_THEME;
-  }
+/** A source of resolved CSS custom-property values (`--ink` → `#07090f`). */
+export type TokenReader = (name: string) => string;
 
-  const root = canvas?.ownerDocument?.documentElement ?? document.documentElement;
-  const styles = getComputedStyle(root);
+/**
+ * Pure: map the theme tokens through `read`, falling back to the built-in
+ * defaults for any token the reader returns empty. DOM-free so the token→theme
+ * projection is unit-testable without a live document.
+ */
+export function computeBackgroundTheme(read: TokenReader): BackgroundTheme {
   const theme = { ...FALLBACK_THEME };
 
   for (const key of Object.keys(TOKEN_MAP) as Array<keyof BackgroundTheme>) {
-    const value = styles.getPropertyValue(TOKEN_MAP[key]).trim();
+    const value = read(TOKEN_MAP[key]).trim();
     if (value) theme[key] = value;
   }
 
   return theme;
+}
+
+function readThemeFromDocument(): BackgroundTheme {
+  if (typeof document === 'undefined' || typeof getComputedStyle === 'undefined') {
+    return FALLBACK_THEME;
+  }
+
+  // Backgrounds always render in the main document, so tokens come from its
+  // documentElement — a single getComputedStyle per (re)read, not per frame.
+  const styles = getComputedStyle(document.documentElement);
+  return computeBackgroundTheme((name) => styles.getPropertyValue(name));
+}
+
+const cachedTheme = createEpochMemo(readThemeFromDocument, themeEpoch);
+
+/**
+ * The active background theme tokens. Cached against the shared theme epoch: the
+ * expensive `getComputedStyle` read happens once per theme switch, not once per
+ * animation frame. The engine's theme `MutationObserver` bumps the epoch when a
+ * switch mutates the tokens, so live theme changes still take effect on the next
+ * frame. The `canvas` argument is retained for call-site compatibility.
+ */
+export function readBackgroundTheme(_canvas?: HTMLCanvasElement): BackgroundTheme {
+  return cachedTheme();
 }
 
 export function clearCanvas(ctx: BackgroundFrameContext): void {
