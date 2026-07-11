@@ -4,14 +4,56 @@ const FUTURE_SLACK_MS = 24 * 60 * 60 * 1000;
 const MINUTE_MS = 60 * 1000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
+const WEEK_MS = 7 * DAY_MS;
 
 const CLOCK_RE = /^(\d{1,2}):(\d{2})$/;
-const RELATIVE_RE = /^([1-9]\d*)\s*(m|minute|minutes|min|mins|h|hour|hours|hr|hrs|d|day|days)\s+ago$/i;
+const RELATIVE_RE =
+  /^([1-9]\d*)\s*(m|minute|minutes|min|mins|h|hour|hours|hr|hrs|d|day|days|w|week|weeks)\s+ago$/i;
 const ISO_RE = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?(?:\s*(Z|[+-]\d{2}:?\d{2}))?)?$/i;
+const WEEKDAY_RE = /^(?:(last|previous|prev|this)\s+)?([a-z]+)(?:\s+(.+))?$/i;
 
 type ClockParts = {
   hour: number;
   minute: number;
+};
+
+const MIDNIGHT: ClockParts = { hour: 0, minute: 0 };
+const MORNING: ClockParts = { hour: 9, minute: 0 };
+const NOON: ClockParts = { hour: 12, minute: 0 };
+const AFTERNOON: ClockParts = { hour: 15, minute: 0 };
+const EVENING: ClockParts = { hour: 20, minute: 0 };
+const NIGHT: ClockParts = { hour: 20, minute: 0 };
+
+const NAMED_CLOCKS: Record<string, ClockParts> = {
+  noon: NOON,
+  midnight: MIDNIGHT,
+};
+
+const DAYPARTS: Record<string, ClockParts> = {
+  morning: MORNING,
+  afternoon: AFTERNOON,
+  evening: EVENING,
+  night: NIGHT,
+};
+
+const WEEKDAYS: Record<string, number> = {
+  sunday: 0,
+  sun: 0,
+  monday: 1,
+  mon: 1,
+  tuesday: 2,
+  tue: 2,
+  tues: 2,
+  wednesday: 3,
+  wed: 3,
+  thursday: 4,
+  thu: 4,
+  thur: 4,
+  thurs: 4,
+  friday: 5,
+  fri: 5,
+  saturday: 6,
+  sat: 6,
 };
 
 function validNow(now: number | undefined): number {
@@ -28,6 +70,13 @@ function parseClock(input: string): ClockParts | null {
   if (!Number.isInteger(hour) || !Number.isInteger(minute)) return null;
   if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
   return { hour, minute };
+}
+
+// Resolve a clock argument that may be a numeric HH:MM or a named time
+// ("noon" / "midnight"). Returns null on anything else so callers fail closed.
+function resolveClock(input: string): ClockParts | null {
+  const normalized = input.trim().toLowerCase();
+  return NAMED_CLOCKS[normalized] ?? parseClock(normalized);
 }
 
 function makeLocalDate(
@@ -123,11 +172,18 @@ function dateAtClock(nowMs: number, clock: ClockParts): Date | null {
   return makeLocalDate(now.getFullYear(), now.getMonth() + 1, now.getDate(), clock.hour, clock.minute);
 }
 
-function yesterdayAtClock(nowMs: number, clock: ClockParts): Date | null {
+// Shift `daysAgo` calendar days back from now and apply a wall clock. Uses
+// calendar arithmetic (setDate + makeLocalDate) rather than millisecond
+// subtraction so the requested hour is preserved across DST transitions.
+function dateDaysAgoAtClock(nowMs: number, daysAgo: number, clock: ClockParts): Date | null {
   const base = new Date(nowMs);
   base.setHours(0, 0, 0, 0);
-  base.setDate(base.getDate() - 1);
+  base.setDate(base.getDate() - daysAgo);
   return makeLocalDate(base.getFullYear(), base.getMonth() + 1, base.getDate(), clock.hour, clock.minute);
+}
+
+function yesterdayAtClock(nowMs: number, clock: ClockParts): Date | null {
+  return dateDaysAgoAtClock(nowMs, 1, clock);
 }
 
 function parseKeyword(input: string, nowMs: number): Date | null {
@@ -136,18 +192,62 @@ function parseKeyword(input: string, nowMs: number): Date | null {
 
   const today = /^today\s+(.+)$/i.exec(normalized);
   if (today) {
-    const clock = parseClock(today[1] ?? '');
+    const clock = resolveClock(today[1] ?? '');
     return clock ? dateAtClock(nowMs, clock) : null;
   }
 
   const yesterday = /^yesterday(?:\s+(.+))?$/i.exec(normalized);
   if (yesterday) {
     const clockText = yesterday[1] ?? '00:00';
-    const clock = parseClock(clockText);
+    const clock = resolveClock(clockText);
     return clock ? yesterdayAtClock(nowMs, clock) : null;
   }
 
   return null;
+}
+
+// Named single-word / daypart times: "noon", "midnight", "this morning",
+// "this evening", "tonight" (today) and "last night" (yesterday).
+function parseNamedTime(input: string, nowMs: number): Date | null {
+  const normalized = input.replace(/\s+/g, ' ').trim().toLowerCase();
+
+  const direct = NAMED_CLOCKS[normalized];
+  if (direct) return dateAtClock(nowMs, direct);
+
+  if (normalized === 'tonight') return dateAtClock(nowMs, NIGHT);
+  if (normalized === 'last night') return yesterdayAtClock(nowMs, NIGHT);
+
+  const daypart = /^this (morning|afternoon|evening|night)$/.exec(normalized)?.[1];
+  if (daypart) {
+    const clock = DAYPARTS[daypart];
+    if (clock) return dateAtClock(nowMs, clock);
+  }
+
+  return null;
+}
+
+// Weekday names: "tuesday", "fri 08:30" (most recent on-or-before today) and
+// "last tuesday", "last friday noon" (strictly before today).
+function parseWeekday(input: string, nowMs: number): Date | null {
+  const match = WEEKDAY_RE.exec(input.replace(/\s+/g, ' ').trim());
+  if (!match) return null;
+
+  const dayName = (match[2] ?? '').toLowerCase();
+  const targetDow = WEEKDAYS[dayName];
+  if (targetDow === undefined) return null;
+
+  const clockText = match[3];
+  const clock = clockText === undefined ? MIDNIGHT : resolveClock(clockText);
+  if (!clock) return null;
+
+  const qualifier = match[1]?.toLowerCase();
+  const strictlyBefore = qualifier === 'last' || qualifier === 'previous' || qualifier === 'prev';
+
+  const todayDow = new Date(nowMs).getDay();
+  let daysAgo = (todayDow - targetDow + 7) % 7;
+  if (strictlyBefore && daysAgo === 0) daysAgo = 7;
+
+  return dateDaysAgoAtClock(nowMs, daysAgo, clock);
 }
 
 function parseRelative(input: string, nowMs: number): Date | null {
@@ -158,7 +258,13 @@ function parseRelative(input: string, nowMs: number): Date | null {
   if (!Number.isSafeInteger(amount)) return null;
 
   const unit = (match[2] ?? '').toLowerCase();
-  const factor = unit.startsWith('m') ? MINUTE_MS : unit.startsWith('h') ? HOUR_MS : DAY_MS;
+  const factor = unit.startsWith('m')
+    ? MINUTE_MS
+    : unit.startsWith('h')
+      ? HOUR_MS
+      : unit.startsWith('w')
+        ? WEEK_MS
+        : DAY_MS;
   const delta = amount * factor;
   if (!Number.isSafeInteger(delta)) return null;
 
@@ -179,6 +285,8 @@ export function parseTimeExpr(input: string, now?: number): Date | null {
   const parsed =
     parseKeyword(trimmed, nowMs) ??
     parseRelative(trimmed, nowMs) ??
+    parseNamedTime(trimmed, nowMs) ??
+    parseWeekday(trimmed, nowMs) ??
     (clock ? dateAtClock(nowMs, clock) : null) ??
     parseIso(trimmed);
 
