@@ -1,0 +1,289 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+/**
+ * parseVaultExport.pure.test.ts — the authoritative import-validation contract
+ * for a VAULT EXPORT (a structured, user-controlled JSON blob imported wholesale).
+ *
+ * Contract (resolved, documents real intent — see historyVault.parseVaultExport):
+ *  - FAIL-CLOSED on a malformed/tampered TOP-LEVEL structure: a non-object, a
+ *    wrong/absent `kind`, a `version` that is not exactly 1, or a `targets` that
+ *    is not an array → return null, import NOTHING.
+ *  - REVIVE-AND-DROP within an otherwise-valid export: an individual malformed
+ *    TARGET is skipped, and an individual malformed MESSAGE is dropped, while the
+ *    rest of the valid export survives. This is deliberate resilience against a
+ *    single corrupt row nuking a user's whole imported history — NOT the Discord
+ *    importer's per-record best-effort, but the same "don't lose everything to one
+ *    bad row" principle applied to a self-produced, structurally-gated blob.
+ *  - NEVER throws on hostile/untrusted nested shapes.
+ *  - NEVER pollutes Object.prototype (the parser only builds object literals from
+ *    validated primitives; there is no untrusted-key write path).
+ *  - PRESERVES the E2EE invariant: serializeMessage strips decrypted `plaintext`;
+ *    only the ciphertext envelope (`text`) is ever persisted.
+ *
+ * Pure: parseVaultExport / serializeMessage / deserializeMessage never open the
+ * DB, so this file is DOM-free and IndexedDB-free (no fake-indexeddb needed).
+ */
+import { describe, expect, it } from 'vitest';
+
+import type { ChatMessage } from '@/lib/irc/types';
+import {
+  deserializeMessage,
+  parseVaultExport,
+  serializeMessage,
+  type VaultExportSnapshot,
+} from './historyVault';
+
+function message(id: string, target: string, timeMs: number, over: Partial<ChatMessage> = {}): ChatMessage {
+  return {
+    id,
+    target,
+    time: new Date(timeMs),
+    from: 'kain',
+    text: `ciphertext:${id}`,
+    type: 'msg',
+    ...over,
+  };
+}
+
+function jsonClone<T>(value: T): unknown {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function messageDigest(item: ChatMessage): Record<string, unknown> {
+  return {
+    id: item.id,
+    from: item.from,
+    target: item.target,
+    text: item.text,
+    type: item.type,
+    time: item.time.toISOString(),
+  };
+}
+
+describe('parseVaultExport — vault import validation contract', () => {
+  it('round-trips a well-formed exported snapshot', () => {
+    const alpha = message('a1', '#Alpha', Date.parse('2026-07-10T10:00:00.000Z'), {
+      from: 'alice',
+      text: 'hello channel',
+    });
+    const dm = message('d1', 'Trev', Date.parse('2026-07-10T10:01:00.000Z'), {
+      from: 'trev',
+      text: 'tsumugi.ciphertext',
+      encrypted: true,
+    });
+    const snapshot: VaultExportSnapshot = {
+      kind: 'onyx-vault',
+      version: 1,
+      exportedAt: '2026-07-10T10:02:00.000Z',
+      targets: [
+        { target: '#alpha', messages: [deserializeMessage(serializeMessage('#Alpha', alpha))] },
+        { target: 'trev', messages: [deserializeMessage(serializeMessage('Trev', dm))] },
+      ],
+    };
+
+    const parsed = parseVaultExport(jsonClone(snapshot));
+
+    expect(parsed).not.toBeNull();
+    expect(parsed!.kind).toBe('onyx-vault');
+    expect(parsed!.version).toBe(1);
+    expect(parsed!.exportedAt).toBe('2026-07-10T10:02:00.000Z');
+    expect(parsed!.targets.map((t) => t.target)).toEqual(['#alpha', 'trev']);
+    expect(parsed!.targets.flatMap((t) => t.messages.map(messageDigest))).toEqual([
+      messageDigest(alpha),
+      messageDigest(dm),
+    ]);
+  });
+
+  it('FAILS CLOSED on a malformed top-level export (imports nothing)', () => {
+    const malformed: unknown[] = [
+      null,
+      undefined,
+      'not json',
+      42,
+      true,
+      [],
+      () => ({ kind: 'onyx-vault', version: 1, targets: [] }),
+      {},
+      { kind: 'onyx-vault' },
+      { kind: 'onyx-vault', version: 1 },
+      { kind: 'onyx-vault', version: 1, targets: 'truncated' },
+      { kind: 'onyx-vault', version: 1, targets: {} },
+      { kind: 'onyx-vault', version: '1', targets: [] }, // version must be strictly numeric 1
+      { kind: 'onyx-vault', version: 2, targets: [] },
+      { kind: 'not-onyx', version: 1, targets: [] },
+      { kind: '', version: 1, targets: [] },
+    ];
+
+    for (const raw of malformed) {
+      expect(() => parseVaultExport(raw)).not.toThrow();
+      expect(parseVaultExport(raw)).toBeNull();
+    }
+  });
+
+  it('accepts a valid top-level but DROPS an individual malformed message (revive-and-drop, not whole-blob reject)', () => {
+    const good = message('a1', '#alpha', Date.parse('2026-07-10T10:00:00.000Z'), { from: 'alice' });
+    const raw = {
+      kind: 'onyx-vault',
+      version: 1,
+      exportedAt: '2026-07-10T10:02:00.000Z',
+      targets: [
+        {
+          target: '#Alpha',
+          messages: [
+            jsonClone(good),
+            // missing `from` → dropped, but the export as a whole survives
+            { id: 'b1', text: 'no author', type: 'msg', target: '#alpha', time: '2026-07-10T10:01:00.000Z' },
+            // disallowed type not in MESSAGE_TYPES → dropped
+            { id: 'b2', from: 'mallory', text: 'x', type: 'nuke', target: '#alpha', time: 1 },
+            // unparseable time → dropped
+            { id: 'b3', from: 'eve', text: 'y', type: 'msg', target: '#alpha', time: 'not-a-date' },
+          ],
+        },
+      ],
+    };
+
+    const parsed = parseVaultExport(raw);
+
+    expect(parsed).not.toBeNull();
+    expect(parsed!.targets).toHaveLength(1);
+    expect(parsed!.targets[0]!.target).toBe('#alpha');
+    // Only the one valid message survives; the three hostile rows are dropped.
+    expect(parsed!.targets[0]!.messages.map((m) => m.id)).toEqual(['a1']);
+  });
+
+  it('SKIPS an individual malformed target while keeping the valid ones', () => {
+    const good = message('a1', '#alpha', Date.parse('2026-07-10T10:00:00.000Z'));
+    const raw = {
+      kind: 'onyx-vault',
+      version: 1,
+      targets: [
+        null,
+        [],
+        'nope',
+        { messages: [] }, // no target string
+        { target: '   ', messages: [] }, // blank target
+        { target: '#beta', messages: 'not-an-array' }, // bad messages shape
+        { target: '#Alpha', messages: [jsonClone(good)] }, // the one valid target
+      ],
+    };
+
+    const parsed = parseVaultExport(raw);
+
+    expect(parsed).not.toBeNull();
+    expect(parsed!.targets.map((t) => t.target)).toEqual(['#alpha']);
+    expect(parsed!.targets[0]!.messages.map((m) => m.id)).toEqual(['a1']);
+  });
+
+  it('does not throw on deeply hostile nested shapes and drops every unparseable row', () => {
+    const raw = {
+      kind: 'onyx-vault',
+      version: 1,
+      exportedAt: 'not a date',
+      targets: [
+        {
+          target: '#alpha',
+          messages: [
+            null,
+            [],
+            42,
+            {
+              id: ['not', 'a', 'string'],
+              from: { nested: true },
+              text: 42,
+              time: { valueOf: 'nope' },
+              type: 'msg',
+              reactions: [{ emoji: null, users: [true, 'alice'] }],
+            },
+          ],
+        },
+      ],
+    };
+
+    let parsed: VaultExportSnapshot | null = null;
+    expect(() => {
+      parsed = parseVaultExport(raw);
+    }).not.toThrow();
+    expect(parsed).not.toBeNull();
+    // Bad exportedAt is replaced with a valid ISO stamp (never propagated raw).
+    expect(Number.isNaN(Date.parse(parsed!.exportedAt))).toBe(false);
+    expect(parsed!.targets[0]!.messages).toEqual([]);
+  });
+
+  it('does NOT pollute Object.prototype from a hostile __proto__/constructor payload', () => {
+    // A realistic tampered JSON blob: `__proto__` is an OWN enumerable key here,
+    // not a real prototype link (that is exactly how JSON.parse materializes it).
+    const raw = JSON.parse(
+      '{"kind":"onyx-vault","version":1,"__proto__":{"polluted":"yes"},' +
+        '"targets":[{"target":"__proto__","messages":[' +
+        '{"id":"x1","from":"mallory","text":"c","type":"msg","target":"__proto__","time":1,' +
+        '"__proto__":{"polluted":"yes"},"constructor":{"polluted":"yes"}}]}]}',
+    ) as unknown;
+
+    const parsed = parseVaultExport(raw);
+
+    // No global prototype pollution occurred.
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    expect((Object.prototype as Record<string, unknown>).polluted).toBeUndefined();
+    // The literal string "__proto__" target is just a value; it parses safely and
+    // is stored as an own key on a fresh object, never touching the prototype.
+    expect(parsed).not.toBeNull();
+    expect(parsed!.targets[0]!.target).toBe('__proto__');
+    expect(Object.getPrototypeOf(parsed!.targets[0]!.messages[0]!)).toBe(Object.prototype);
+    expect(parsed!.targets[0]!.messages[0]!.id).toBe('x1');
+  });
+
+  it('strips decrypted E2EE plaintext from serialized messages (never at rest)', () => {
+    const encryptedDm = message('dm1', 'Trev', Date.parse('2026-07-10T10:03:00.000Z'), {
+      encrypted: true,
+      text: 'tsumugi.ciphertext.envelope',
+      plaintext: 'this decrypted DM must never be persisted',
+    });
+
+    const stored = serializeMessage('Trev', encryptedDm);
+
+    expect(stored.text).toBe('tsumugi.ciphertext.envelope');
+    expect(stored.encrypted).toBe(true);
+    expect(stored.target_key).toBe('trev');
+    expect(Object.prototype.hasOwnProperty.call(stored, 'plaintext')).toBe(false);
+    expect(JSON.stringify(stored)).not.toContain('this decrypted DM must never be persisted');
+  });
+
+  it('does not revive plaintext back onto an imported message', () => {
+    // Even if a tampered export smuggles a `plaintext` field, the allowlisted
+    // revive path never copies it onto the ChatMessage.
+    const raw = {
+      kind: 'onyx-vault',
+      version: 1,
+      targets: [
+        {
+          target: 'trev',
+          messages: [
+            {
+              id: 'dm2',
+              from: 'trev',
+              text: 'tsumugi.ciphertext',
+              type: 'msg',
+              target: 'trev',
+              time: 1,
+              encrypted: true,
+              plaintext: 'smuggled decrypted body',
+            },
+          ],
+        },
+      ],
+    };
+
+    const parsed = parseVaultExport(raw);
+
+    expect(parsed).not.toBeNull();
+    const revived = parsed!.targets[0]!.messages[0]!;
+    expect(Object.prototype.hasOwnProperty.call(revived, 'plaintext')).toBe(false);
+    expect(JSON.stringify(parsed)).not.toContain('smuggled decrypted body');
+  });
+
+  it('returns a valid-but-empty snapshot when every target is garbage (imports nothing, still fail-safe)', () => {
+    const raw = { kind: 'onyx-vault', version: 1, targets: [null, 1, 'x', {}] };
+    const parsed = parseVaultExport(raw);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.targets).toEqual([]);
+  });
+});
