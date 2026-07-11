@@ -629,4 +629,111 @@ describe('buildCommands', () => {
     });
     open.mockRestore();
   });
+
+  describe('schedule message grammar', () => {
+    const FIXED_NOW = Date.parse('2026-07-12T12:00:00Z');
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(FIXED_NOW);
+    });
+
+    it('schedules a message to the active channel from a relative future time', () => {
+      setState({
+        channels: new Map([['#forge', channel('#forge')]]),
+        activeView: { kind: 'channel', channel: '#forge' },
+      });
+
+      const command = buildCommands(getState(), 'schedule 15m: ship the release').find((entry) =>
+        entry.id.startsWith('grammar:schedule:'),
+      );
+      expect(command).toBeDefined();
+      command?.run();
+
+      const queue = store.getState().scheduledMessages;
+      expect(queue).toHaveLength(1);
+      expect(queue[0]).toMatchObject({
+        channel: '#forge',
+        text: 'ship the release',
+        sendAt: FIXED_NOW + 15 * 60_000,
+      });
+    });
+
+    it('accepts a leading "in" and an active DM target', () => {
+      setState({
+        dms: new Map([['aoi', dm('aoi')]]),
+        activeView: { kind: 'dm', nick: 'aoi' },
+      });
+
+      const command = buildCommands(getState(), 'schedule in 2h: coffee?').find((entry) =>
+        entry.id.startsWith('grammar:schedule:'),
+      );
+      expect(command).toBeDefined();
+      command?.run();
+
+      const queue = store.getState().scheduledMessages;
+      expect(queue).toHaveLength(1);
+      expect(queue[0]).toMatchObject({
+        channel: 'aoi',
+        text: 'coffee?',
+        sendAt: FIXED_NOW + 2 * 3_600_000,
+      });
+    });
+
+    it('rejects an absolute time in the past', () => {
+      setState({
+        channels: new Map([['#forge', channel('#forge')]]),
+        activeView: { kind: 'channel', channel: '#forge' },
+      });
+
+      const command = buildCommands(getState(), 'schedule 2020-01-01T09:00: too late').find((entry) =>
+        entry.id.startsWith('grammar:schedule:'),
+      );
+      expect(command).toBeUndefined();
+      expect(store.getState().scheduledMessages).toHaveLength(0);
+    });
+
+    it('offers no schedule command without an active conversation', () => {
+      setState({ activeView: { kind: 'home' } });
+
+      const command = buildCommands(getState(), 'schedule 15m: hi').find((entry) =>
+        entry.id.startsWith('grammar:schedule:'),
+      );
+      expect(command).toBeUndefined();
+    });
+
+    it('refuses to schedule a slash command as the body', () => {
+      setState({
+        channels: new Map([['#forge', channel('#forge')]]),
+        activeView: { kind: 'channel', channel: '#forge' },
+      });
+
+      const command = buildCommands(getState(), 'schedule 15m: /part #forge').find((entry) =>
+        entry.id.startsWith('grammar:schedule:'),
+      );
+      expect(command).toBeUndefined();
+    });
+
+    it('offers no schedule command when the body is empty', () => {
+      setState({
+        channels: new Map([['#forge', channel('#forge')]]),
+        activeView: { kind: 'channel', channel: '#forge' },
+      });
+
+      const command = buildCommands(getState(), 'schedule 15m:   ').find((entry) =>
+        entry.id.startsWith('grammar:schedule:'),
+      );
+      expect(command).toBeUndefined();
+    });
+  });
+
+  it('opens the scheduled-messages queue', () => {
+    const command = buildCommands(getState(), 'scheduled').find(
+      (entry) => entry.id === 'action:scheduled-messages',
+    );
+    expect(command).toBeDefined();
+    expect(command?.keywords).toContain('send later');
+    command?.run();
+    expect(store.getState().showScheduledMessages).toBe(true);
+  });
 });

@@ -52,6 +52,7 @@ const GRAMMAR_EXAMPLES = [
   'star #root',
   'away lunch',
   'focus',
+  'schedule 15m: ping the team',
   'mute 1h',
 ] as const;
 
@@ -141,7 +142,7 @@ export function Spotlight(props: SpotlightProps) {
   const activeHint = createMemo(() => {
     if (activeCommand()) return `Selected command: ${activeCommand()!.title}`;
     if (query().trim()) return 'No matching command';
-    return 'Try goto, at, search, reader, density, motion, or mute commands';
+    return 'Try goto, at, search, schedule, reader, density, motion, or mute commands';
   });
 
   // Result-set announcement for the live region. Keyed to the filtered set only

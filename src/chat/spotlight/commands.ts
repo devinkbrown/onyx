@@ -33,6 +33,7 @@ import {
 } from '@/lib/extensions/clientActions';
 import { useSpotlight } from './useSpotlight';
 import { parseTimeExpr } from './timeGrammar';
+import { isSchedulable, parseDateTimeLocal } from '@/lib/schedule/scheduleTime';
 
 export type SpotlightSection = 'Channels' | 'DMs' | 'People' | 'Actions';
 
@@ -128,6 +129,43 @@ function parseMuteDuration(expr: string): { ms: number; label: string } | null {
     multiplier === 3_600_000 ? 'hour' :
     'day';
   return { ms, label: `${value} ${noun}${value === 1 ? '' : 's'}` };
+}
+
+type ScheduleParse = { epoch: number; text: string; label: string };
+
+/**
+ * Parse a `schedule <when>: <text>` argument into a strictly-future send time
+ * and the message body. `<when>` is either a relative duration (`15m`, `in 2h`,
+ * `2d` — reusing `parseMuteDuration`) or an absolute datetime-local string
+ * (`2026-07-12T15:00`). The split matches the FIRST colon that is followed by
+ * whitespace, so the internal colons of a clock/ISO time (never followed by
+ * whitespace) stay in `<when>`. Fails closed — returns null on an empty body or
+ * any time that `isSchedulable`/`parseDateTimeLocal` will not trust (past,
+ * too-near, or absurdly far). `now` is injected so the caller can test with a
+ * fixed clock.
+ */
+function parseScheduleArg(arg: string, now: number): ScheduleParse | null {
+  const match = /^(.+?):\s+([\s\S]+)$/.exec(arg.trim());
+  if (!match) return null;
+
+  const whenRaw = (match[1] ?? '').trim();
+  const text = (match[2] ?? '').trim();
+  // Refuse slash commands: a scheduled "/part" replayed into a future session
+  // would execute a command, not send a message (mirrors the composer's guard).
+  if (!whenRaw || !text || text.startsWith('/')) return null;
+
+  const relative = parseMuteDuration(whenRaw.replace(/^in\s+/i, '').trim());
+  if (relative) {
+    const epoch = now + relative.ms;
+    return isSchedulable(epoch, now) ? { epoch, text, label: `in ${relative.label}` } : null;
+  }
+
+  const absolute = parseDateTimeLocal(whenRaw, now);
+  if (absolute !== null) {
+    return { epoch: absolute, text, label: JUMP_TIME_FORMATTER.format(absolute) };
+  }
+
+  return null;
 }
 
 function parseDensityArg(value: string): Density | null {
@@ -527,6 +565,29 @@ function grammarCommands(state: CommandState, query: string): SpotlightCommand[]
         hint: known ? dmHint(known) : '@nick',
         keywords: [query.trim(), 'dm', 'message', nick],
         run: () => getState().navigate({ kind: 'dm', nick: known?.nick ?? nick }),
+      });
+    }
+  }
+
+  const scheduleArg = commandArg(query, 'schedule') ?? commandArg(query, 'send later');
+  if (scheduleArg) {
+    const target = activeTarget(state);
+    const parsed = target ? parseScheduleArg(scheduleArg, Date.now()) : null;
+    if (target && parsed) {
+      commands.push({
+        id: `grammar:schedule:${target.toLowerCase()}:${parsed.epoch}`,
+        section: 'Actions',
+        title: `Schedule message to ${activeTargetLabel(state)} · ${parsed.label}`,
+        hint: 'send later',
+        keywords: [query.trim(), 'schedule', 'send later', 'remind', 'queue', 'later', target],
+        run: () => {
+          const current = getState();
+          const dest = activeTarget(current);
+          // Re-validate against the wall clock at run time so a stale relative
+          // time (typed, then left sitting) can never queue a past instant.
+          if (!dest || !isSchedulable(parsed.epoch, Date.now())) return;
+          current.scheduleMessage(dest, parsed.text, parsed.epoch);
+        },
       });
     }
   }
@@ -968,6 +1029,14 @@ function baseActionCommands(state: CommandState): SpotlightCommand[] {
           : null;
         el?.focus();
       },
+    },
+    {
+      id: 'action:scheduled-messages',
+      section: 'Actions',
+      title: 'Scheduled messages',
+      hint: 'Open the send-later queue',
+      keywords: ['scheduled', 'schedule', 'send later', 'queue', 'remind', 'pending', 'later'],
+      run: () => getState().openScheduledMessages(),
     },
     ...(activeChannel && aiPolicy !== 'open'
       ? [
