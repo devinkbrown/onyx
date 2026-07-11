@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * Facepile.tsx — overlapping avatar stack for the conversation ribbon.
  *

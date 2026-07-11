@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * channelStats.ts — per-channel telemetry for the presence heatline.
  *

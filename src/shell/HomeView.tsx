@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * HomeView — the connected-but-idle surface (no active channel).
  *

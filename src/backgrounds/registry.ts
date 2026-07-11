@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import type { AnyBackgroundVariant, BackgroundKind, BackgroundVariant } from './engine';
 import { aurora } from './variants/aurora';
 import { bioluminescence } from './variants/bioluminescence';

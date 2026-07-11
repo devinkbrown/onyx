@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * retentionPolicy.ts — configurable per-room retention over the vault bound.
  *

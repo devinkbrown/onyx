@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * PreferencesPanel.tsx — display & behaviour settings, surfaced as a right-hand Sheet.
  *

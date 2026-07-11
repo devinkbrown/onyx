@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Tiny, dependency-free accessor for the mounted media-engine singleton.
 //
 // This lives OUTSIDE `src/lib/suimyaku-media/` on purpose: importing the

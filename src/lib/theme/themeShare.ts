@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * themeShare.ts — compact custom-theme share-code encoding and import guards.
  */

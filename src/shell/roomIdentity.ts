@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import type { ActiveView } from '@/lib/store';
 
 export type RoomIdentity = {

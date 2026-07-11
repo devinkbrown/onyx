@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * searchVaultSemantic.ts — vault-RAG semantic search (Roadmap v3.0 headline).
  *

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * ircFormat.ts — parse mIRC / IRC control codes into styled text runs.
  *

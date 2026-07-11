@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * Theme-reactive scene math (roadmap v1.2 "Washi").
  *

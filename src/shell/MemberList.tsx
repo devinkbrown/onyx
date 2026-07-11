@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * MemberList.tsx — channel member list with live role badges.
  *

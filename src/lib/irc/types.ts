@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // IRC protocol types
 
 export interface IRCMessage {

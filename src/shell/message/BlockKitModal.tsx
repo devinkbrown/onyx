@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { createSignal, For, Show, splitProps, type JSX } from 'solid-js';
 import { ModalShell } from '@/primitives';
 import type {

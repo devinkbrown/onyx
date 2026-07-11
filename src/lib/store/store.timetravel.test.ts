@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * store.timetravel.test.ts — the ?at= deep-link path (Roadmap Phase 1.2).
  *

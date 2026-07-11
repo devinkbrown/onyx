@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { createEffect, createMemo, onCleanup, Show } from 'solid-js';
 import { Dynamic } from 'solid-js/web';
 import {

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import type { BackgroundFrameContext, BackgroundVariant } from '../engine';
 import type { BackgroundTheme } from './utils';
 import { clearCanvas, mix, readBackgroundTheme, rgba, seeded } from './utils';

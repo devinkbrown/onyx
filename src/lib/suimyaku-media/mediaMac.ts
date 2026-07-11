@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // WS/browser media datagram MAC for Onyx Suimyaku media. Authenticates each kagura media
 // frame the browser sends over a binary WebSocket frame so the server (SFU/relay)
 // can attribute it to the issued per-stream key before fanning it out.

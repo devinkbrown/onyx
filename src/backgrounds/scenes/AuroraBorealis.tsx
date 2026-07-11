@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { For } from 'solid-js';
 import type { SceneProps, SceneVariant } from '../engine';
 import { SceneShell, seededRand } from './SceneShell';

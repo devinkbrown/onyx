@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * ShortcutsSheet.tsx - keyboard shortcut reference sheet and pure shortcut data model.
  */

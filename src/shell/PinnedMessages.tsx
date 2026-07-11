@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * PinnedMessages.tsx — the pins drawer (Roadmap Phase 4.8).
  *

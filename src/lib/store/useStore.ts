@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { createSignal, onCleanup, type Accessor } from 'solid-js';
 
 import { store, type State } from './store';

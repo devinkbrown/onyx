@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 export const E2EE_CAP = 'orochi/e2ee';
 export const E2EE_TAG = '+orochi/e2ee';
 export const ENCRYPTION_POLICY_PROP = 'encryption-policy';

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * savedSearches.test.ts — the local-first saved-search store, driven by
  * fake-indexeddb. Covers create/list ordering, cap pruning, label dedupe,

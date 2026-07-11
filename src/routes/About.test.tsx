@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * Tests for /about — Onyx's editorial deep-dive page.
  *

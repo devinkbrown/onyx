@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /*
  * TsumugiGroup.ts — Multi-party TSUMUGI group key for encrypted channel media.
  *

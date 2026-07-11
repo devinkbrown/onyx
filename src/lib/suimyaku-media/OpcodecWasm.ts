@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /*
  * OpcodecWasm.ts — TypeScript wrapper for the opcodec WASM module.
  *

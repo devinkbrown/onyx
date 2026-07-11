@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * ircLogImport.ts — local, credential-free IRC text-log import
  * (Roadmap Track 6: "IRC-log -> vault import").

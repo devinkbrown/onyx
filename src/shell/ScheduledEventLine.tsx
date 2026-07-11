@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * ScheduledEventLine.tsx — a channel's upcoming event in the channel intro
  * (Roadmap Phase 4.11, "voice rooms as places"). The event is an op-set

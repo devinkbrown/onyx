@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * AppShell.tsx — the layout spine for Onyx's connected state.
  *

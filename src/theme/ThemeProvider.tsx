@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * ThemeProvider — Solid context that manages the active theme.
  *

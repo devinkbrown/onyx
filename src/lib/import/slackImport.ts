@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * slackImport.ts — sovereign, credential-free Slack workspace export import.
  *

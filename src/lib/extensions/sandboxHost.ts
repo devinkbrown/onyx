@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import type { ExtensionManifest, ExtensionPermission } from './manifest';
 
 export const EXTENSION_SANDBOX_MESSAGE_VERSION = 1;

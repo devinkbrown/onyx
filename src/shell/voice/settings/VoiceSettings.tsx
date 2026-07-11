@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { createEffect, createMemo, createSignal, For, mergeProps, onCleanup, Show, splitProps } from 'solid-js';
 
 import { Button, FormField, Sheet } from '@/primitives';

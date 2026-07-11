@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Generation fence for async write-backs across a call teardown boundary.
 //
 // The media engine schedules crypto continuations (TSUMUGI handshake/session

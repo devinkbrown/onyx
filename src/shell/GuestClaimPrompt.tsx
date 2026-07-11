@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * GuestClaimPrompt.tsx — in-session "claim your nick" affordance.
  *

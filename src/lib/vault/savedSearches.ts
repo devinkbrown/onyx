@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * savedSearches.ts — local-first "saved searches" for the vault.
  *

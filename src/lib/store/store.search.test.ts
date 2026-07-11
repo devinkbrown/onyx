@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * store.search.test.ts — server-side SEARCH (draft/search).
  *

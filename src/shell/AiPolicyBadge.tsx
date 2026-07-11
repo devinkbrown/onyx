@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { createMemo, Show, type JSX } from 'solid-js';
 import type { AiPolicy } from '@/lib/irc/aiPolicyProp';
 import './ProvenanceBadge.css';

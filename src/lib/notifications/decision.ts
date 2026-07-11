@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 export type DesktopNotificationPermission = NotificationPermission | 'unsupported';
 
 export type NotifyKind = 'mention' | 'dm' | 'follow' | 'system' | 'error';

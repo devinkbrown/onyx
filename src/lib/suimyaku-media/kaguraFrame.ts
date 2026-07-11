@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Kagura media frame — Onyx's browser-side media datagram container.
 // One encoded media payload per frame;
 // the browser sends each frame as a binary WebSocket frame (optionally followed

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * historyVault.ts — local-first scrollback (Roadmap Phase 1.1).
  *

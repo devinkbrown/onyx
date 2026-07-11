@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { backgroundOptions } from '@/backgrounds';
 import type { Channel } from '@/lib/irc/types';

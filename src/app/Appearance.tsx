@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { createMemo, createSignal, For, Show } from 'solid-js';
 import { Background, backgroundOptions, type BackgroundId } from '@/backgrounds';
 import { useTheme, THEMES, THEME_IDS, type ThemeId } from '@/theme';

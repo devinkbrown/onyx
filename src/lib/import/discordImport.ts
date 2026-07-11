@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * discordImport.ts — sovereign, credential-free Discord history import
  * (Roadmap v1.0 "Torii": the highest-leverage switching-cost destroyer).

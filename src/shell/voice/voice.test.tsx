@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * voice.test.tsx — Unit tests for the voice/video stage components.
  *

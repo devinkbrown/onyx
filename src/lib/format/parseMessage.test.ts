@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * parseMessage.test.ts — unit tests for the message tokenizer.
  *

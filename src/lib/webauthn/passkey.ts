@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // ─────────────────────────────────────────────────────────────────────────────
 // Passkey (WebAuthn) ceremony helpers — the browser half of the passwordless
 // login flow, paired with the daemon's `WEBAUTHN` command.

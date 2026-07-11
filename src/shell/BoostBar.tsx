@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * BoostBar.tsx — quiet boost pill row for pre-aggregated reaction groups.
  */

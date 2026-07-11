@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, test } from 'vitest';
 import type { ChatMessage } from '@/lib/irc/types';
 import { buildHomeMemory, summarizeHomeMemory } from './homeMemory';

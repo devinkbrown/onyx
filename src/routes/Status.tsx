@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import './landing.css';
 import './data-pages.css';
 import { createResource, createSignal, For, onCleanup, Show } from 'solid-js';

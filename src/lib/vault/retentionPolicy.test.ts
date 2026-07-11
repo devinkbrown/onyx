@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * retentionPolicy.test.ts — pure, DOM-free tests for the retention layer.
  *

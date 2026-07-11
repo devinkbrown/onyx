@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * icons.tsx — inline SVG icons for the per-message action bar / overflow menu.
  *

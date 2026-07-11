@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * videoEncodeWorker.ts — Off-main-thread video capture/encode worker.
  *

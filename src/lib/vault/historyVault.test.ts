@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * historyVault.test.ts — the IndexedDB persistence layer, driven by
  * fake-indexeddb. Covers serialization round-trips, per-target isolation,

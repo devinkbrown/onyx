@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * CalmModeControl.tsx — segmented notification preset switch for calm mode.
  *

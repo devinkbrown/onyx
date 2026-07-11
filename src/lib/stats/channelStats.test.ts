@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * channelStats.test.ts — the slug must stay byte-faithful to the server's
  * `slugify` (chanstats.zig) or the per-channel stats file 404s. These vectors

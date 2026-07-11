@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * contrast.ts — WCAG contrast math for the Theme Studio's legibility auditor.
  *

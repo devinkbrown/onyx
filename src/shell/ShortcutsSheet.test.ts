@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * ShortcutsSheet.test.ts - DOM-free assertions for the shortcuts data model.
  */

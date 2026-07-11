@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Pure, DOM-free voice-activity / audio-level detection core.
 //
 // This is the testable heart of a "who is speaking" indicator: an

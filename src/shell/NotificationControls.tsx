@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { createSignal, onMount, Show, type JSX } from 'solid-js';
 
 import { useStore, getState, selectAccount } from '@/lib/store';

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * CatchUpSummary.tsx — "where do I have unread?" at-a-glance card.
  *

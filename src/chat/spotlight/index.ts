@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 export { Spotlight, default } from './Spotlight';
 export type { SpotlightProps } from './Spotlight';
 export {

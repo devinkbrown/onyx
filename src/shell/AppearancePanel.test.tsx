@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * AppearancePanel.test.tsx — the in-shell theme + background switcher.
  *

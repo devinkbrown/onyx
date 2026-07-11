@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * lib/migrateStorage.ts — one-time localStorage migration: 'ocean-*' → 'onyx:*'.
  *

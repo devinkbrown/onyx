@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * activity.ts — parse rich-presence activity from a custom status string.
  *

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import './landing.css';
 import { createMemo, createResource, onCleanup, Show } from 'solid-js';
 import { Mascot } from '@/components/brand/Mascot';

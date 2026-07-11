@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * contrastVariants.ts - pure OKLCH foreground contrast variant helpers.
  */

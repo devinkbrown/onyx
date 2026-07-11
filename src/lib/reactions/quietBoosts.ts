@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * quietBoosts.ts — pure aggregation and optimistic toggles for calm reactions.
  */

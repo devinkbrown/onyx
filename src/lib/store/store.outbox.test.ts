@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * store.outbox.test.ts — the offline outbox (Roadmap Phase 2).
  *

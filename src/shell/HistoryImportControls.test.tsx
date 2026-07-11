@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * HistoryImportControls.test.tsx — integration tests for the on-device history
  * import UI: choose a file → preview summary → confirm → merged into the vault.

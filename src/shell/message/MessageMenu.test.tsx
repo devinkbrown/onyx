@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * MessageMenu.test.tsx — unit tests for the pure capability-gating helper that
  * decides which per-message actions (React/Reply/Copy/Edit/Delete) apply.

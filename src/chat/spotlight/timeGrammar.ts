@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 const MIN_TIME_MS = Date.UTC(2020, 0, 1);
 const FUTURE_SLACK_MS = 24 * 60 * 60 * 1000;
 const MINUTE_MS = 60 * 1000;

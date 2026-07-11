@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * PresenceHeatline.tsx — a live 24-hour activity rhythm for the channel ribbon
  * (Roadmap Phase 4.10). 24 slim bars fed by the channel's chanstats `hours[]`,

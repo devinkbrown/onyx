@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * icons.tsx — shared inline SVG icons for the voice/video controls.
  *

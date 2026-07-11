@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Watch-together host-side state machine (roadmap v2.3 Kagura).
 //
 // This module is PURE and DOM-free: every transition is a total function that

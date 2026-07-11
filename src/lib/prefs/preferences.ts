@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * preferences.ts — display & behaviour preferences (separate from theme/account/voice).
  *

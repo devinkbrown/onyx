@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /* @refresh reload */
 // MUST stay the first import: migrates legacy 'ocean-*' localStorage keys to
 // 'onyx:*' as an import side effect, before any module-scope storage reads.

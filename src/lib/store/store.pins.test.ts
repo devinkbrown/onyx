@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * store.pins.test.ts — shared pinned messages via the IRCX PINS channel prop.
  *

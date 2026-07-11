@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * store.replay.test.ts — draft/event-playback must never mutate live state.
  *

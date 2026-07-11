@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { createMemo, splitProps, type JSX } from 'solid-js';
 
 export type AvatarProps = JSX.HTMLAttributes<HTMLDivElement> & {

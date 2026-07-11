@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * store.reactions.test.ts — emoji reactions (IRCv3 draft/react over TAGMSG).
  *

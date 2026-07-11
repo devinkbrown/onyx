@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { DEFAULT_THEME_ID, THEMES, type ThemeId } from './themes';
 import { getCustomTheme, isCustomThemeId } from './customThemes';
 

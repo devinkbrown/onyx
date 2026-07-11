@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * store.e2ee.test.ts — end-to-end-encrypted DM flow through the store.
  *

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * followed.test.ts - coverage for followed conversation key normalization and persistence.
  */

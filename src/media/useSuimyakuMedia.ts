@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { createEffect, onCleanup } from 'solid-js';
 
 import { getState, setState, useStore } from '@/lib/store';

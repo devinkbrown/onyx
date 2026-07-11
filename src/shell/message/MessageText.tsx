@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * MessageText.tsx — renders a parsed token array as safe SolidJS JSX.
  *

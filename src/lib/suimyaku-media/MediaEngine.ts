@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import type { IRCClient } from '../irc/client';
 import {
   OpcodecWasm, KaguraVoxEncoder, KaguraVisEncoder,

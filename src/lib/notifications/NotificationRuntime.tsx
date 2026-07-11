@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { onCleanup, onMount } from 'solid-js';
 
 import { getState, subscribe } from '@/lib/store';

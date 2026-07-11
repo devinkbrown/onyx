@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { createEffect, createMemo, createSignal, onCleanup, type Accessor } from 'solid-js';
 import { getState, useStore } from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';

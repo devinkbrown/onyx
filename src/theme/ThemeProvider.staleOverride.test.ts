@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * Regression: applyThemeToDom must CLEAR inline token overrides that the
  * previously-applied theme wrote but the incoming theme does not define.

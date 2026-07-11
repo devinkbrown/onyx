@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * webPush.ts — browser Web Push subscription against Orochi's WEBPUSH command
  * (Roadmap Phase 2.4: reach you with the tab closed).

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Pure sanitizers for values loaded back out of localStorage.
 //
 // localStorage is untrusted input: it can be corrupted, written by an older

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 const ELLIPSIS = '…';
 const COMBINING_MARK = /^\p{Mark}$/u;
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * nodes.test.ts — mesh node registry + auto-selection.
  *

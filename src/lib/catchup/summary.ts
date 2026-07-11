@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // ─────────────────────────────────────────────────────────────────────────────
 // Catch-up summary — "where is my unread activity, most first".
 //

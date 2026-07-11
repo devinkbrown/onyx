@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * customThemes.test.ts — user-created theme storage + token merging.
  */

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * ThemeImportDialog.tsx — local Sheet for sharing and importing theme codes.
  */

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 const DEFAULT_ORIGIN = 'https://eshmaki.me';
 
 function upsertMeta(selector: string, attrs: Record<string, string>): HTMLMetaElement {

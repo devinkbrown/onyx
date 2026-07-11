@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import type { BackgroundFrameContext, BackgroundVariant } from '../engine';
 import { ambientRms, breathe, rmsToBloom, timeOfDayWarmth, warmthShift } from '../reactivity';
 import type { BackgroundTheme } from './utils';

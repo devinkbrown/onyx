@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * ChannelSidebar.tsx — channel list + DM list + join form.
  *

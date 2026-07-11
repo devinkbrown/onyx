@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * channel-moderation.test.tsx — MemberList moderation menu + ChannelSettings.
  *

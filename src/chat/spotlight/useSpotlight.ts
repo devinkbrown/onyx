@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { children, createSignal, onCleanup, onMount, type Accessor, type JSX, type ParentProps } from 'solid-js';
 
 const [isSpotlightOpen, setSpotlightOpen] = createSignal(false);

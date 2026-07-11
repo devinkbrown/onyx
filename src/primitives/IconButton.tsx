@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { Show, splitProps, type JSX } from 'solid-js';
 import { Tooltip } from './Tooltip';
 

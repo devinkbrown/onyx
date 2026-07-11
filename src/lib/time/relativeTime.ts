@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Relative time and compact duration formatting.
 
 const SECOND_MS = 1_000;

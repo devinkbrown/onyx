@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * embeddingIndex.test.ts — the pure, model-free embedding math behind
  * vault-RAG. No DOM, no IndexedDB: all deterministic.

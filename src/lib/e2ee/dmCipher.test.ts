@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * dmCipher.test.ts — the E2EE DM cipher (Roadmap Phase 3.6).
  *

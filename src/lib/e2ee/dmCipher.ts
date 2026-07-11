@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * dmCipher.ts — end-to-end encryption for DMs (Roadmap Phase 3.6).
  *

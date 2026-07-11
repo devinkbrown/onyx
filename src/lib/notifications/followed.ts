@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * followed.ts - localStorage-backed followed conversation keys for notification calm mode.
  *

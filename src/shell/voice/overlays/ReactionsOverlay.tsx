@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { For, onCleanup, onMount, Show, createSignal } from 'solid-js';
 
 import './voice-overlays.css';

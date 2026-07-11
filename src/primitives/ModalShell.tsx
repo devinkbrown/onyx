@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { createEffect, onCleanup, Show, splitProps, type ParentProps } from 'solid-js';
 import { Portal } from 'solid-js/web';
 

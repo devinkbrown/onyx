@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * src/lib/keyboard/shortcutsRegistry.test.ts
  *

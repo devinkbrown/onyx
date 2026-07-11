@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * searchVaultSemantic.test.ts — the vault-RAG search path over a real
  * (fake-indexeddb) vault, plus its degenerate cases.

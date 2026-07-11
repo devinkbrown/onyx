@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * CatchUpSummary tests — unread-ranked rendering, navigation dispatch, the
  * pre-connect gate, the empty state, and a reactivity-updates-after-store-change

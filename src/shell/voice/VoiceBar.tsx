@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * VoiceBar — persistent control bar shown whenever callState is active.
  *

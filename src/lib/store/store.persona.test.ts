@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * store.persona.test.ts — TOTP + Guise persona notice parsing.
  * Server replies are plain NOTICEs from the server prefix (no nick); the

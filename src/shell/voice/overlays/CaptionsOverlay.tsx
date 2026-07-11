@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { createMemo, createSignal, For, onCleanup, Show } from 'solid-js';
 
 import { localTranslationReadiness, preferredTranslationTarget } from '@/lib/intelligence/localLanguage';

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * customThemes.ts — user-created themes built in the Theme Studio.
  *

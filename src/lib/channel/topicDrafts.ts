@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 export const CHANNEL_TOPIC_DRAFTS_KEY = 'onyx:channel-topic-drafts';
 
 export type ChannelTopicDrafts = Record<string, string>;

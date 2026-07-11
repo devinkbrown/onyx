@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * channelNotifyMode.ts — pure logic for per-channel notification-preference modes.
  *

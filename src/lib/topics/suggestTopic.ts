@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * suggestTopic.ts — deterministic local labels for named-conversation splits.
  */

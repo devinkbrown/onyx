@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // ─────────────────────────────────────────────────────────────────────────────
 // Since-you-left digest model for compact per-channel missed-message summaries.
 // ─────────────────────────────────────────────────────────────────────────────

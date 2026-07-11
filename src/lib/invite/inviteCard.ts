@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * inviteCard.ts — pure model helpers for rich invite link previews.
  */

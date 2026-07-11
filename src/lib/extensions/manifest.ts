@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 export const EXTENSION_MANIFEST_VERSION = 1;
 
 export const EXTENSION_PERMISSION_ALLOWLIST = [

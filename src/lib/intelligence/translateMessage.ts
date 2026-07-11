@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * translateMessage.ts — on-device, provenance-tagged translation surface.
  *

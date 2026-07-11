@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { createMemo, Show, type JSX } from 'solid-js';
 
 import type { BridgePlatform, BridgeState, BridgeStatus } from '@/lib/interop/bridgeStatus';

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { createEffect, createMemo, createSignal, onCleanup, onMount, type Accessor } from 'solid-js';
 import { backgroundOptions, type BackgroundId } from '@/backgrounds';
 import { getState, useStore } from '@/lib/store';
