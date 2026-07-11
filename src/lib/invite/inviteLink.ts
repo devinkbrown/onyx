@@ -62,7 +62,7 @@ export function buildInviteLink(spec: InviteLinkSpec, opts: InviteLinkOpts): Inv
 
   const channel = spec.channel.trim();
   if (channel.length > 0) params.set('join', channel);
-  if (spec.at) params.set('at', spec.at.toISOString());
+  if (spec.at && !Number.isNaN(spec.at.getTime())) params.set('at', spec.at.toISOString());
 
   const topic = spec.topic?.trim();
   if (topic) params.set('topic', topic);
