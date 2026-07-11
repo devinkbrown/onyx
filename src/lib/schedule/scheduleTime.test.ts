@@ -34,10 +34,29 @@ describe('parseDateTimeLocal', () => {
     expect(at).toBe(new Date(2026, 6, 12, 11, 30).getTime());
   });
 
+  it('accepts the first minute-resolution datetime-local value beyond the minimum lead', () => {
+    const boundary = NOW + 60_000;
+    const value = toDateTimeLocalValue(boundary);
+
+    expect(parseDateTimeLocal(value, NOW)).toBe(boundary);
+  });
+
+  it('trims datetime-local values before parsing', () => {
+    const at = parseDateTimeLocal('  2026-07-12T11:30  ', NOW);
+
+    expect(at).toBe(new Date(2026, 6, 12, 11, 30).getTime());
+  });
+
   it('returns null for empty, malformed, or past values', () => {
     expect(parseDateTimeLocal('', NOW)).toBeNull();
     expect(parseDateTimeLocal('not-a-date', NOW)).toBeNull();
     expect(parseDateTimeLocal('2026-07-12T09:00', NOW)).toBeNull(); // an hour ago
+  });
+
+  it('rejects a datetime-local value one minute before the minimum lead', () => {
+    const tooSoon = toDateTimeLocalValue(NOW + MIN_LEAD_MS - 1);
+
+    expect(parseDateTimeLocal(tooSoon, NOW)).toBeNull();
   });
 });
 

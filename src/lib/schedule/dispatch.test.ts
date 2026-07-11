@@ -57,4 +57,19 @@ describe('selectDueMessages', () => {
     // pending is a fresh array, not the input reference.
     expect(selectDueMessages(input, NOW, false).pending).not.toBe(input);
   });
+
+  it('returns fresh arrays without cloning message objects for idempotent retries', () => {
+    const past = msg('past', NOW - 1);
+    const future = msg('future', NOW + 1);
+    const input = [past, future] as const;
+
+    const first = selectDueMessages(input, NOW, true);
+    const second = selectDueMessages(input, NOW, true);
+
+    expect(first).toEqual(second);
+    expect(first.due).not.toBe(second.due);
+    expect(first.pending).not.toBe(second.pending);
+    expect(first.due[0]).toBe(past);
+    expect(first.pending[0]).toBe(future);
+  });
 });
