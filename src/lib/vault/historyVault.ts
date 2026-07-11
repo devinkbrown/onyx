@@ -147,11 +147,20 @@ export function deserializeMessage(row: StoredMessage): ChatMessage {
   return { ...rest, time: new Date(time) } as ChatMessage;
 }
 
-/** Persist a batch for a target (bulk put; last VAULT_KEEP retained). */
-export async function saveMessages(target: string, msgs: readonly ChatMessage[]): Promise<void> {
-  if (msgs.length === 0) return;
+/**
+ * Persist a batch for a target (bulk put; last VAULT_KEEP retained).
+ *
+ * Returns `true` only when the write transaction actually COMMITTED (an empty
+ * batch is a committed no-op), and `false` on every best-effort failure path —
+ * no IndexedDB, a rejected/aborted transaction (quota, private mode), or a
+ * synchronous `put` throw. Callers that track a persisted watermark (vaultSync)
+ * MUST gate on this so a silently-failed write is retried, never treated as
+ * durable. The vault stays best-effort: `false` degrades, it never throws.
+ */
+export async function saveMessages(target: string, msgs: readonly ChatMessage[]): Promise<boolean> {
+  if (msgs.length === 0) return true;
   const db = await openVault();
-  if (!db) return;
+  if (!db) return false;
   try {
     // Pre-trim the batch to the target's effective keep. With no policy this is
     // exactly VAULT_KEEP (identical to before); a per-channel override widens or
@@ -161,10 +170,13 @@ export async function saveMessages(target: string, msgs: readonly ChatMessage[])
     const tx = db.transaction(STORE, 'readwrite');
     const store = tx.objectStore(STORE);
     for (const m of tail) store.put(serializeMessage(target, m));
-    await txDone(tx);
+    const committed = await txDone(tx);
+    if (!committed) return false;
     void pruneTarget(db, target.toLowerCase());
+    return true;
   } catch {
     /* quota / private mode — the vault is best-effort */
+    return false;
   }
 }
 
@@ -577,11 +589,16 @@ export async function clearVault(): Promise<void> {
   }
 }
 
-function txDone(tx: IDBTransaction): Promise<void> {
+/**
+ * Resolve when a transaction settles: `true` on commit, `false` on error/abort.
+ * Never rejects — the vault swallows IndexedDB failures into a degraded return
+ * rather than throwing into the UI.
+ */
+function txDone(tx: IDBTransaction): Promise<boolean> {
   return new Promise((resolve) => {
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => resolve();
-    tx.onabort = () => resolve();
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => resolve(false);
+    tx.onabort = () => resolve(false);
   });
 }
 

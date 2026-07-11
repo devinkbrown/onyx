@@ -36,11 +36,25 @@ function scheduleFlush(target: string, messages: readonly ChatMessage[]): void {
       const buf =
         state.channels.get(key)?.messages ?? state.dms.get(key)?.messages ?? null;
       if (!buf || buf.length === 0) return;
-      _lastPersistedTail.set(key, buf[buf.length - 1]?.id ?? '');
-      // System lines (joins/quits) are noise worth remembering too — they keep
-      // the restored scrollback coherent — but skip pure-local placeholder ids?
-      // No: everything in the buffer is the conversation as seen. Store it all.
-      void saveMessages(key, buf);
+      const nextTail = buf[buf.length - 1]?.id ?? '';
+      const prevTail = _lastPersistedTail.get(key);
+      if (prevTail === nextTail) return; // already durable — nothing new to write
+
+      // Claim the watermark OPTIMISTICALLY so a burst of store updates for this
+      // target coalesces onto one in-flight write instead of stampeding the DB.
+      // If the write fails (quota / private mode / abort), roll the watermark
+      // back — but only if no newer flush has since advanced it — so the SAME
+      // tail is retried on the next store change instead of being silently and
+      // permanently dropped. System lines (joins/quits) are conversation too:
+      // everything in the buffer is stored, exactly as seen.
+      _lastPersistedTail.set(key, nextTail);
+      void saveMessages(key, buf).then((committed) => {
+        if (committed) return;
+        if (_lastPersistedTail.get(key) === nextTail) {
+          if (prevTail === undefined) _lastPersistedTail.delete(key);
+          else _lastPersistedTail.set(key, prevTail);
+        }
+      });
     }, FLUSH_MS),
   );
 }

@@ -86,6 +86,19 @@ describe('historyVault', () => {
       expect(loaded[0]!.time.getTime()).toBe(1000);
     });
 
+    it('reports commit success so callers can track a durable watermark', async () => {
+      expect(await saveMessages('#room', [msg('m1', 1000)])).toBe(true);
+      // An empty batch is a committed no-op, not a failure.
+      expect(await saveMessages('#room', [])).toBe(true);
+    });
+
+    it('returns false (never throws) when IndexedDB is unavailable', async () => {
+      // @ts-expect-error — simulate a private window with no IndexedDB
+      delete globalThis.indexedDB;
+      _resetVaultForTests();
+      await expect(saveMessages('#room', [msg('m1', 1000)])).resolves.toBe(false);
+    });
+
     it('keeps targets isolated from each other', async () => {
       await saveMessages('#alpha', [msg('a', 1000, { target: '#alpha' })]);
       await saveMessages('#beta', [msg('b', 2000, { target: '#beta' })]);
@@ -398,7 +411,9 @@ describe('historyVault', () => {
       // @ts-expect-error — deliberately removing the global
       delete globalThis.indexedDB;
       _resetVaultForTests();
-      await expect(saveMessages('#room', [msg('x', 1)])).resolves.toBeUndefined();
+      // No IndexedDB → the write cannot commit, so it reports failure (false)
+      // rather than throwing; callers treat this as a non-durable no-op.
+      await expect(saveMessages('#room', [msg('x', 1)])).resolves.toBe(false);
       await expect(loadRecent('#room')).resolves.toEqual([]);
       await expect(clearVault()).resolves.toBeUndefined();
     });

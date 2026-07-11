@@ -14,8 +14,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { store } from '@/lib/store';
 import type { Channel, ChatMessage } from '@/lib/irc/types';
 import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
-import { _resetVaultForTests, loadRecent, saveMessages } from './historyVault';
+import * as vault from './historyVault';
 import { _resetVaultSyncForTests, initVaultSync } from './vaultSync';
+
+const { _resetVaultForTests, loadRecent, saveMessages } = vault;
 
 const initialState = store.getInitialState();
 
@@ -66,6 +68,7 @@ describe('vaultSync', () => {
   afterEach(() => {
     _resetVaultSyncForTests();
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it('hydrates a fresh channel buffer from the vault', async () => {
@@ -101,6 +104,46 @@ describe('vaultSync', () => {
 
     await until(async () => (await loadRecent('#room')).length === 2);
     expect((await loadRecent('#room')).map((m) => m.id)).toEqual(['m1', 'm2']);
+  });
+
+  it('retries the tail after a failed write instead of dropping it forever', async () => {
+    // The persisted-tail watermark must NOT advance durably on a failed write.
+    // First flush fails (quota/private-mode); the identical tail must still be
+    // written on the next store change rather than being silently skipped.
+    const spy = vi.spyOn(vault, 'saveMessages').mockResolvedValueOnce(false);
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    initVaultSync();
+    setChannel('#room', [msg('m1', 1000)]);
+    await vi.advanceTimersByTimeAsync(1600); // first flush → forced failure
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(await loadRecent('#room')).toEqual([]); // nothing landed
+
+    // A later store update with the SAME tail id must re-attempt the write.
+    setChannel('#room', [msg('m1', 1000)]);
+    await vi.advanceTimersByTimeAsync(1600); // second flush → real write
+    vi.useRealTimers();
+
+    await until(async () => (await loadRecent('#room')).length === 1);
+    expect((await loadRecent('#room')).map((m) => m.id)).toEqual(['m1']);
+    expect(spy.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('coalesces an unchanged tail to a single successful write (no rewrite churn)', async () => {
+    const spy = vi.spyOn(vault, 'saveMessages');
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    initVaultSync();
+    setChannel('#room', [msg('m1', 1000)]);
+    await vi.advanceTimersByTimeAsync(1600); // one durable write
+    // Same tail arrives again (e.g. an unrelated buffer field changed).
+    setChannel('#room', [msg('m1', 1000)]);
+    await vi.advanceTimersByTimeAsync(1600);
+    vi.useRealTimers();
+
+    await until(async () => (await loadRecent('#room')).length === 1);
+    expect(spy).toHaveBeenCalledTimes(1); // the second, redundant flush is skipped
   });
 
   it('does nothing in either direction when localHistory is off', async () => {
