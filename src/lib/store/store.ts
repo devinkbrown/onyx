@@ -2040,14 +2040,54 @@ function mergeChannelListRow(
 
 // ── NAMES accumulation (module-level) ─────────────────────────────────────────
 /**
- * Lowercased channel keys with a NAMES reply in progress. A channel's roster
- * arrives across one or more RPL_NAMREPLY (353) lines terminated by
- * RPL_ENDOFNAMES (366). The FIRST 353 for a channel replaces the roster (NAMES
- * is authoritative — it must drop members who have since left); later 353s for
- * the same burst append; 366 closes the burst. Without this, NAMES only ever
- * added members, so stale nicks lingered after a rejoin/reconnect.
+ * Per-channel NAMES burst tracking. A roster arrives across one or more
+ * RPL_NAMREPLY (353) lines terminated by RPL_ENDOFNAMES (366). NAMES is
+ * authoritative, so a burst must be able to DROP members who have since left —
+ * which means the burst's first line REPLACES the roster. The hard part is
+ * deciding *which* 353 is that first line without collapsing the roster to a
+ * partial subset when bursts overlap.
+ *
+ * The collapse this guards against: right after a mesh netsplit re-sync we
+ * issue JOIN + an explicit NAMES per channel, and a focus/poll refresh can add
+ * a third — so two or three NAMES bursts for the same channel interleave on the
+ * wire (local 353s fast, cross-node 353s late, 366s in between). The previous
+ * design keyed "is this a fresh burst?" off Set membership and treated *any*
+ * 353 arriving with no in-progress entry as a fresh REPLACE. An interleaved or
+ * late 353 (e.g. a cross-node line arriving after another burst's 366 already
+ * cleared the key) then replaced the full roster with its ~2 nicks.
+ *
+ * Fix: a REPLACE is authorized ONLY by us initiating a burst (self-JOIN or a
+ * NAMES we sent) — recorded as phase 'expect'. The first 353 after that
+ * replaces and flips the burst to 'appending'; every other 353 — later lines of
+ * the same burst, an overlapping burst, or a stray/late line with no burst
+ * entry at all — only APPENDS. An absent burst entry means append, never
+ * replace, so a partial line can never collapse the roster. `at` expires a
+ * burst whose 366 was lost so a dropped terminator can't permanently suppress
+ * reconciliation.
  */
-const _namesInProgress = new Set<string>();
+type NamesBurst = { phase: 'expect' | 'appending'; at: number };
+const _namesBursts = new Map<string, NamesBurst>();
+/** A burst older than this (its 366 was lost) is treated as finished. */
+const _NAMES_BURST_TTL_MS = 15000;
+
+/**
+ * Mark that we initiated a NAMES burst for `key` (lowercased channel): the next
+ * 353 for it is authorized to REPLACE the roster. Call this immediately before
+ * sending a NAMES, or on self-JOIN before the server's automatic NAMES lands.
+ */
+function _beginNamesBurst(key: string): void {
+  _namesBursts.set(key, { phase: 'expect', at: _now() });
+}
+
+/**
+ * True while a burst we know about is still arriving (and not expired). Used to
+ * suppress a *new* NAMES send that would re-arm 'expect' mid-burst — the one
+ * thing that could let a later 353 replace with a partial.
+ */
+function _namesBurstActive(key: string): boolean {
+  const b = _namesBursts.get(key);
+  return b !== undefined && _now() - b.at < _NAMES_BURST_TTL_MS;
+}
 
 const DEFAULT_PREFIX_TO_MODE: Record<string, string> = {
   '*': 'Y',
@@ -2173,6 +2213,11 @@ function _refreshChannelRoster(get: GetFn, channel: string): void {
   if (st.connectionStatus !== 'connected' || !st.client) return;
   const chan = st.channels.get(key);
   if (!chan) return;
+  // Never stack a NAMES on top of a burst still arriving: a second request
+  // re-arms 'expect' mid-burst, which is exactly what lets an interleaved
+  // partial 353 replace the full roster. The in-flight burst already carries
+  // authoritative truth, so skipping is safe.
+  if (_namesBurstActive(key)) return;
   const now = _now();
   // _now() is a relative clock (performance.now()), so an absent entry must mean
   // "never refreshed" — not timestamp 0, which would wrongly throttle the first
@@ -2180,6 +2225,7 @@ function _refreshChannelRoster(get: GetFn, channel: string): void {
   const last = _lastRosterRefresh.get(key);
   if (last !== undefined && now - last < _ROSTER_REFRESH_MS) return;
   _lastRosterRefresh.set(key, now);
+  _beginNamesBurst(key);
   st.client.sendRaw('NAMES', chan.name);
 }
 
@@ -2604,7 +2650,7 @@ export const store = createStore<OnyxState>()(
       _batchCollectors.clear();
       _openChathistoryByTarget.clear();
       _pendingTravel = null;
-      _namesInProgress.clear();
+      _namesBursts.clear();
       _lastRosterRefresh.clear();
       _motdBuffer = '';
       // Poll the focused channel's roster so a stale member list self-heals even
@@ -2673,6 +2719,9 @@ export const store = createStore<OnyxState>()(
               if (!c) return;
               for (const ch of st.channels.values()) {
                 c.sendRaw('JOIN', ch.name);
+                // Arm the burst so the reconciling NAMES' first 353 REPLACES
+                // (dropping members lost during the gap) instead of appending.
+                _beginNamesBurst(ch.name.toLowerCase());
                 c.sendRaw('NAMES', ch.name);
               }
             }, 600);
@@ -5407,8 +5456,10 @@ export const store = createStore<OnyxState>()(
         case '366': { // RPL_ENDOFNAMES
           const ch366 = params[1];
           if (!ch366) break;
-          // Close the NAMES burst so the next 353 starts a fresh authoritative roster.
-          _namesInProgress.delete(ch366.toLowerCase());
+          // Close the burst. A later stray 353 (no burst entry) then APPENDS
+          // rather than replacing, so it can never collapse the roster; a fresh
+          // reconcile re-arms 'expect' via _beginNamesBurst before its NAMES.
+          _namesBursts.delete(ch366.toLowerCase());
           // Fetch channel PROP data if IRCX
           if (get().isIRCX) {
             get().requestChannelProps(ch366);
@@ -5474,10 +5525,15 @@ export const store = createStore<OnyxState>()(
           const key = ch.toLowerCase();
           const { client } = get();
           const names = (namesStr ?? '').split(' ').filter(Boolean);
-          // First 353 of a burst replaces the roster (NAMES is authoritative);
-          // subsequent 353s for the same channel append until 366.
-          const freshNames = !_namesInProgress.has(key);
-          if (freshNames) _namesInProgress.add(key);
+          // Only a burst WE initiated (phase 'expect') — or one whose 366 was
+          // lost (expired) — may REPLACE the roster; its first 353 does so and
+          // flips to 'appending'. Every other 353 (later lines of this burst, an
+          // overlapping burst, or a stray/late line with no entry) APPENDS, so a
+          // partial line can never collapse the full roster to a subset.
+          const burst = _namesBursts.get(key);
+          const expired = burst !== undefined && _now() - burst.at >= _NAMES_BURST_TTL_MS;
+          const freshNames = burst?.phase === 'expect' || expired;
+          _namesBursts.set(key, { phase: 'appending', at: freshNames ? _now() : (burst?.at ?? _now()) });
           set(s => {
             const channels = new Map(s.channels);
             const c = channels.get(key) ?? emptyChannel(ch);
