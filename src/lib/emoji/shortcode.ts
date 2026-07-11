@@ -10,6 +10,19 @@
  * byte of it falls through as literal `text`. The scan is a single linear pass
  * (no backtracking regex ⇒ no ReDoS) and is bounded by MAX_SHORTCODE_SCAN.
  */
+/**
+ * OWNERSHIP — this is NOT the message render sink. Rendering `:shortcode:` inside
+ * a chat message is owned end-to-end by the format pipeline: parseMessage()
+ * (src/lib/format/parseMessage.ts) emits a typed `emoji` token, and MessageText
+ * resolves it with lookupEmoji() (src/lib/format/emoji.ts). That is the single
+ * source of truth for message-content emoji, and its coverage table (EMOJI_MAP,
+ * ~290 codes) is far larger than the picker's keyword-indexed EMOJI_LIST (~28
+ * codes) used here. Do NOT wire parseEmojiShortcodes into MessageText: it would
+ * fork emoji tokenization into two competing renderers and regress recognized-
+ * shortcode coverage. This module is a standalone, DOM-free segmenter over the
+ * PICKER data model for contexts that receive a raw, non-grammar string and want
+ * inert text/emoji segments — never a render sink.
+ */
 import { EMOJI_LIST, type EmojiEntry } from './emoji';
 
 /** Upper bound on scanned input; larger strings pass through untouched as text. */
