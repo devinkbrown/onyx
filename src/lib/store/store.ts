@@ -2345,6 +2345,21 @@ function _loadSoundEnabled(): boolean {
   return legacy === null ? true : legacy === 'true';
 }
 
+/**
+ * Notification-beep volume in [0, 1]. localStorage is untrusted (corruption, an
+ * older build, another tab): a bare `parseFloat` yields `NaN` for garbage and
+ * admits out-of-range values. `NaN` in particular survives the consumer's
+ * `Math.max(0, Math.min(1, v))` clamp (min/max propagate `NaN`) and then makes
+ * `gain.gain.exponentialRampToValueAtTime(NaN, …)` throw, silently killing every
+ * beep. Sanitize + clamp at the load boundary. Default 0.5.
+ */
+export function _loadSoundVolume(): number {
+  if (typeof window === 'undefined') return 0.5;
+  const parsed = parseFloat(localStorage.getItem('onyx:sound-volume') ?? '');
+  if (!Number.isFinite(parsed)) return 0.5;
+  return Math.max(0, Math.min(1, parsed));
+}
+
 function _loadPushNotificationsEnabled(): boolean {
   if (typeof window === 'undefined') return true;
   const stored = localStorage.getItem('onyx:push-notifications');
@@ -7702,17 +7717,17 @@ export const store = createStore<OnyxState>()(
 
     // ── Sound settings ───────────────────────────────────────────────────
     soundEnabled: _loadSoundEnabled(),
-    soundVolume: (() => {
-      if (typeof window === 'undefined') return 0.5;
-      return parseFloat(localStorage.getItem('onyx:sound-volume') || '0.5');
-    })(),
+    soundVolume: _loadSoundVolume(),
     setSoundEnabled: (v) => {
       if (typeof window !== 'undefined') localStorage.setItem('onyx:sound', String(v));
       set({ soundEnabled: v });
     },
     setSoundVolume: (v) => {
-      if (typeof window !== 'undefined') localStorage.setItem('onyx:sound-volume', String(v));
-      set({ soundVolume: v });
+      // Clamp at the write boundary too so a stray out-of-range/NaN slider value
+      // never persists or reaches the Web Audio gain node.
+      const safe = Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0.5;
+      if (typeof window !== 'undefined') localStorage.setItem('onyx:sound-volume', String(safe));
+      set({ soundVolume: safe });
     },
 
     // ── Push notifications ───────────────────────────────────────────────
