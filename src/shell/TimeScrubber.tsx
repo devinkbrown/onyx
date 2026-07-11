@@ -230,6 +230,9 @@ export function TimeScrubber(): JSX.Element {
             >
               {copied() ? 'Copied' : 'Copy moment'}
             </button>
+            <span class="sr-only" role="status" aria-live="polite">
+              {copied() ? `Moment link copied for ${channel()}` : ''}
+            </span>
           </div>
         </section>
       )}

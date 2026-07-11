@@ -90,4 +90,24 @@ describe('TimeScrubber accessibility', () => {
       expect(travelToSpy).toHaveBeenLastCalledWith('#root', new Date('2026-07-09T05:00:00.000Z'));
     });
   });
+
+  it('announces copy success through a polite status region, not visual text alone', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      hours: Array.from({ length: 24 }, () => 0),
+      totals: { messages: 0 },
+    }), { status: 200 })));
+    const writeText = vi.fn(async () => {});
+    vi.stubGlobal('navigator', { clipboard: { writeText } });
+
+    render(() => <TimeScrubber />);
+
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy moment link for #root' }));
+
+    await waitFor(() => {
+      expect(status).toHaveTextContent(/copied/i);
+    });
+  });
 });
