@@ -4,16 +4,20 @@
  *
  * Passkey (WebAuthn) MANAGEMENT wiring — list / remove / rename — on top of the
  * existing register + sign-in ceremonies. Each action dispatches a raw
- * `WEBAUTHN …` line; the server's standard-reply (`NOTE WEBAUTHN <CODE> …`,
- * `FAIL WEBAUTHN …`) is folded back into state by _handleMessage.
+ * `WEBAUTHN …` line; the server's SUCCESS replies now ride the IRCX EVENT plane
+ * (`:server EVENT <me> WEBAUTHN <SUBTYPE> …`, mirroring MEDIA presence) and the
+ * EVENT handler re-dispatches them into the passkey fold-in. Errors still arrive
+ * as `FAIL WEBAUTHN …` standard replies. Both are folded into state by
+ * _handleMessage.
  *
- * The daemon's documented contract (src/lib/webauthn/passkey.ts header, matched
- * by the daemon WEBAUTHN command):
- *   LIST   → `NOTE WEBAUTHN CRED <credId> <sign_count> [<created_unix>] :<label>` (0..n)
- *            then `NOTE WEBAUTHN LIST :end (<n>)`
- *   REMOVE → `NOTE WEBAUTHN REMOVED :<target>`
- *   RENAME → `NOTE WEBAUTHN RENAMED <credId> :<label>`  (daemon gap — see report)
- *   probe failure → `FAIL WEBAUTHN TEMPORARILY_UNAVAILABLE :…`
+ * The daemon's contract — the `<SUBTYPE> <args>` BODY is unchanged from the old
+ * NOTE form; only the ENVELOPE moved from `NOTE WEBAUTHN …` to `EVENT <me>
+ * WEBAUTHN …`:
+ *   LIST   → `EVENT <me> WEBAUTHN CRED <credId> <sign_count> [<created_unix>] :<label>` (0..n)
+ *            then `EVENT <me> WEBAUTHN LIST :end (<n>)`
+ *   REMOVE → `EVENT <me> WEBAUTHN REMOVED :<target>`
+ *   RENAME → `EVENT <me> WEBAUTHN RENAMED <credId> :<label>`  (daemon gap — see report)
+ *   probe failure → `FAIL WEBAUTHN TEMPORARILY_UNAVAILABLE :…`  (still a FAIL)
  *
  * We mock the client to capture the exact raw line and feed parsed replies to
  * assert state — never a smoke "did not throw".
@@ -77,17 +81,17 @@ describe('listPasskeys()', () => {
   });
 });
 
-describe('WEBAUTHN LIST reply fold-in', () => {
+describe('WEBAUTHN LIST reply fold-in (EVENT plane)', () => {
   it('accumulates CRED rows and commits them on LIST end (supported=true)', () => {
     store.setState({ client: makeClient() as never });
     store.getState().listPasskeys();
 
-    feed(':srv NOTE WEBAUTHN CRED credAAA 7 :My laptop');
-    feed(':srv NOTE WEBAUTHN CRED credBBB 0 :');
+    feed(':srv EVENT me WEBAUTHN CRED credAAA 7 :My laptop');
+    feed(':srv EVENT me WEBAUTHN CRED credBBB 0 :');
     // Not committed until the terminating LIST line arrives.
     expect(store.getState().passkeyCreds).toHaveLength(0);
 
-    feed(':srv NOTE WEBAUTHN LIST :end (2)');
+    feed(':srv EVENT me WEBAUTHN LIST :end (2)');
 
     const creds = store.getState().passkeyCreds;
     expect(creds).toHaveLength(2);
@@ -100,8 +104,8 @@ describe('WEBAUTHN LIST reply fold-in', () => {
   it('parses an optional created_unix column when the server sends it', () => {
     store.setState({ client: makeClient() as never });
     store.getState().listPasskeys();
-    feed(':srv NOTE WEBAUTHN CRED credAAA 3 1700000000 :phone');
-    feed(':srv NOTE WEBAUTHN LIST :end (1)');
+    feed(':srv EVENT me WEBAUTHN CRED credAAA 3 1700000000 :phone');
+    feed(':srv EVENT me WEBAUTHN LIST :end (1)');
     expect(store.getState().passkeyCreds[0]).toMatchObject({
       id: 'credAAA',
       signCount: 3,
@@ -112,10 +116,35 @@ describe('WEBAUTHN LIST reply fold-in', () => {
   it('commits an empty list (no CRED rows) as supported with zero creds', () => {
     store.setState({ client: makeClient() as never });
     store.getState().listPasskeys();
-    feed(':srv NOTE WEBAUTHN LIST :end (0)');
+    feed(':srv EVENT me WEBAUTHN LIST :end (0)');
     expect(store.getState().passkeyCreds).toHaveLength(0);
     expect(store.getState().passkeySupported).toBe(true);
     expect(store.getState().passkeyListPending).toBe(false);
+  });
+});
+
+describe('EVENT-plane envelope routing', () => {
+  it('routes a WEBAUTHN EVENT into the fold-in regardless of the <me> target token', () => {
+    store.setState({ client: makeClient() as never });
+    store.getState().listPasskeys();
+    // The re-dispatch drops the target token, so a server-chosen nick still folds.
+    feed(':srv EVENT SomeNick WEBAUTHN CRED credAAA 4 :desk');
+    feed(':srv EVENT SomeNick WEBAUTHN LIST :end (1)');
+    expect(store.getState().passkeyCreds).toMatchObject([{ id: 'credAAA', signCount: 4 }]);
+  });
+
+  it('marks the feature supported on a bare STATUS event', () => {
+    store.setState({ client: makeClient() as never });
+    expect(store.getState().passkeySupported).toBeNull(); // unknown before any reply
+    feed(':srv EVENT me WEBAUTHN STATUS');
+    expect(store.getState().passkeySupported).toBe(true);
+  });
+
+  it('ignores a non-WEBAUTHN, non-MEDIA EVENT plane without touching passkey state', () => {
+    store.setState({ client: makeClient() as never });
+    feed(':srv EVENT me OTHER SOMETHING :x');
+    expect(store.getState().passkeyCreds).toHaveLength(0);
+    expect(store.getState().passkeyError).toBeNull();
   });
 });
 
@@ -134,7 +163,7 @@ describe('removePasskey()', () => {
     expect(client.sendRaw).toHaveBeenCalledWith('WEBAUTHN', 'REMOVE', 'credAAA');
     expect(store.getState().passkeyBusy).toBe(true);
 
-    feed(':srv NOTE WEBAUTHN REMOVED :credAAA');
+    feed(':srv EVENT me WEBAUTHN REMOVED :credAAA');
     const creds = store.getState().passkeyCreds;
     expect(creds.map((c) => c.id)).toEqual(['credBBB']);
     expect(store.getState().passkeyBusy).toBe(false);
@@ -160,7 +189,7 @@ describe('renamePasskey()', () => {
     store.getState().renamePasskey('credAAA', 'work laptop');
     expect(client.sendRaw).toHaveBeenCalledWith('WEBAUTHN', 'RENAME', 'credAAA', 'work laptop');
 
-    feed(':srv NOTE WEBAUTHN RENAMED credAAA :work laptop');
+    feed(':srv EVENT me WEBAUTHN RENAMED credAAA :work laptop');
     expect(store.getState().passkeyCreds[0]).toMatchObject({ id: 'credAAA', label: 'work laptop' });
     expect(store.getState().passkeyBusy).toBe(false);
   });
@@ -198,7 +227,7 @@ describe('REGISTERED refreshes the list', () => {
   it('re-lists after a successful registration so the new key appears', () => {
     const client = makeClient();
     store.setState({ client: client as never });
-    feed(':srv NOTE WEBAUTHN REGISTERED credNEW :My key');
+    feed(':srv EVENT me WEBAUTHN REGISTERED credNEW :My key');
     expect(client.sendRaw).toHaveBeenCalledWith('WEBAUTHN', 'LIST');
     expect(store.getState().passkeyNotice).toBeTruthy();
   });

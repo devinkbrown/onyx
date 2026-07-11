@@ -3483,8 +3483,8 @@ export const store = createStore<OnyxState>()(
         return;
       }
       set({ passkeyBusy: true, passkeyError: null, passkeyNotice: null });
-      // Server replies `NOTE WEBAUTHN REGISTER-CHALLENGE …`; the message handler
-      // runs the create ceremony and sends REGISTER-FINISH.
+      // Server replies `EVENT <me> WEBAUTHN REGISTER-CHALLENGE …`; the message
+      // handler runs the create ceremony and sends REGISTER-FINISH.
       client.sendRaw('WEBAUTHN', 'REGISTER', ...(label && label.trim() ? [label.trim()] : []));
     },
 
@@ -3537,7 +3537,7 @@ export const store = createStore<OnyxState>()(
       }
       _lastPasskeyAction = 'remove';
       set({ passkeyBusy: true, passkeyError: null, passkeyNotice: null });
-      // Server replies `NOTE WEBAUTHN REMOVED :<target>`; the handler drops the row.
+      // Server replies `EVENT <me> WEBAUTHN REMOVED :<target>`; the handler drops the row.
       client.sendRaw('WEBAUTHN', 'REMOVE', target);
     },
 
@@ -4895,6 +4895,12 @@ export const store = createStore<OnyxState>()(
       const standard = parseStandardReply(msg);
       if (standard) {
         if (standard.command === 'WEBAUTHN') {
+          // Two envelopes converge here: real `FAIL`/`WARN WEBAUTHN …` standard
+          // replies (errors), and the service's success replies, which the daemon
+          // now delivers on the IRCX EVENT plane (`:server EVENT <me> WEBAUTHN
+          // <SUBTYPE> …`) and the EVENT handler re-dispatches into this switch as
+          // a `WEBAUTHN <SUBTYPE> …` reply. The NOTE verb was removed daemon-side,
+          // so the success codes below no longer arrive as external NOTEs.
           const waClient = get().client;
           if (standard.kind === 'FAIL' || standard.kind === 'WARN') {
             if (_pendingPasskeyAuth?.timer) clearTimeout(_pendingPasskeyAuth.timer);
@@ -5326,19 +5332,29 @@ export const store = createStore<OnyxState>()(
 
       switch (command) {
 
-        // ── IRCX MEDIA event plane ────────────────────────────────────────
+        // ── IRCX EVENT plane (MEDIA presence + WEBAUTHN service replies) ──
         case 'EVENT': {
+          const plane = (params[1] ?? '').toUpperCase();
           // The server surfaces real-time voice/video presence on the IRCX EVENT
           // plane: `:server EVENT <me> MEDIA <verb> <#chan> <nick> [detail]`.
           // Re-shape it into the MEDIA service-reply param order and re-dispatch
           // so the single media handler processes both broadcast state and
           // caller-targeted replies (MACKEY, ROSTER, STATS, TRANSPORT, PROFILE).
-          if ((params[1] ?? '').toUpperCase() === 'MEDIA') {
+          if (plane === 'MEDIA') {
             get()._handleMessage({
               ...msg,
               command: 'NOTE',
               params: ['MEDIA', params[3] ?? '', params[2] ?? '', params[4] ?? '', ...params.slice(5)],
             });
+          } else if (plane === 'WEBAUTHN') {
+            // The WEBAUTHN service moved off the (now-removed) NOTE verb onto this
+            // EVENT plane: `:server EVENT <me> WEBAUTHN <SUBTYPE> <args...>`. The
+            // SUBTYPE + body is byte-for-byte what the passkey fold-in already
+            // parsed as a standard reply, so drop the `<me>` target and re-dispatch
+            // as `WEBAUTHN <SUBTYPE> <args...>` — the existing standard-reply
+            // handler is the single source of truth for passkey state. (Errors
+            // still arrive as real `FAIL WEBAUTHN …` standard replies.)
+            get()._handleMessage({ ...msg, command: 'NOTE', params: params.slice(1) });
           }
           return;
         }
