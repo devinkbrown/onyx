@@ -9518,19 +9518,22 @@ function _applyReadMarker(state: OnyxState, key: string, iso: string): Partial<O
   const msgs = ch?.messages ?? dm?.messages ?? [];
   const unreadMsgs = unreadAfter(msgs);
   const unread = isActive ? 0 : unreadMsgs.length;
+  // Re-derive the mention count from the messages that remain unread after the
+  // marker — a partial catch-up (unread > 0) must NOT leave the pre-marker
+  // mention count in place, or the inbox badge over-counts (and can exceed the
+  // unread count). Mirrors the per-message `highlight` flag set at delivery.
+  const mentions = isActive ? 0 : unreadMsgs.reduce((n, m) => n + (m.highlight ? 1 : 0), 0);
 
   if (ch) {
     const channels = new Map(state.channels);
-    channels.set(key, { ...ch, unread, highlights: unread === 0 ? 0 : Math.min(ch.highlights, unread) });
+    channels.set(key, { ...ch, unread, highlights: mentions });
     out.channels = channels;
     // Keep the channelUnread/channelMentions sidebar records in sync.
     const channelUnread = { ...state.channelUnread, [key]: unread };
     out.channelUnread = channelUnread;
-    if (unread === 0) {
-      const channelMentions = { ...state.channelMentions, [key]: 0 };
-      out.channelMentions = channelMentions;
-      out.totalUnreadMentions = Object.values(channelMentions).reduce((a, b) => a + b, 0);
-    }
+    const channelMentions = { ...state.channelMentions, [key]: mentions };
+    out.channelMentions = channelMentions;
+    out.totalUnreadMentions = Object.values(channelMentions).reduce((a, b) => a + b, 0);
   } else if (dm) {
     const dms = new Map(state.dms);
     dms.set(key, { ...dm, unread, highlights: unread === 0 ? 0 : Math.min(dm.highlights, unread) });
