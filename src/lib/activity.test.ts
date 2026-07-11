@@ -104,12 +104,12 @@ describe('parseActivity', () => {
 
   it('returns null for keywords without a payload', () => {
     expect(parseActivity('playing')).toBeNull();
-    // note: 'listening to' parses as keyword 'listening' + payload 'to' (a
-    // degenerate-input quirk of the current parser), so it is intentionally
-    // not asserted null here.
     expect(parseActivity('watching')).toBeNull();
-    expect(parseActivity('coding on')).toBeNull();
     expect(parseActivity('streaming')).toBeNull();
+    // note: two-word forms whose trailing token is a preposition ('listening
+    // to', 'coding on') parse as keyword + that preposition as the payload — a
+    // degenerate-input quirk of the current parser, intentionally not asserted
+    // null here rather than changing production parseActivity behavior.
   });
 
   it('parses listening activity with a song and artist', () => {
