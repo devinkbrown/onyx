@@ -17,7 +17,7 @@ import { cleanup, render, screen, fireEvent } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ThemeProvider } from './ThemeProvider';
-import { ThemeStudio } from './ThemeStudio';
+import { ThemeStudio, seedSwatches } from './ThemeStudio';
 import { THEMES, type TokenMap } from './themes';
 import {
   AA_PAIRS,
@@ -233,5 +233,41 @@ describe('Seed from current', () => {
     const source = hexToOklch(THEMES.ocean.tokens['--lapis']!)!;
     const delta = Math.abs(((generated.h - source.h + 540) % 360) - 180);
     expect(delta).toBeLessThan(12);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 7. Seed swatches are faithful to the engine (no banned-hue lie)
+// ---------------------------------------------------------------------------
+
+const BANNED = { min: 258, max: 342 };
+const inBannedBand = (h: number): boolean => h >= BANNED.min && h <= BANNED.max;
+
+describe('seedSwatches', () => {
+  it('returns the engine\'s exact --lapis / --gold for the seed', () => {
+    const seed = { ...DEFAULT_SEED, primaryHue: 210, accentHue: 40 };
+    const palette = generatePalette(seed);
+    const sw = seedSwatches(seed);
+    expect(sw.primary).toBe(palette['--lapis']);
+    expect(sw.accent).toBe(palette['--gold']);
+  });
+
+  it('never previews a banned indigo→magenta hue even when the seed asks for one', () => {
+    // A seed dialled deep into the banned arc: the picker must NOT paint the raw
+    // purple the factory would never emit — it must show the snapped result.
+    const seed = { ...DEFAULT_SEED, primaryHue: 300, accentHue: 320 };
+    const sw = seedSwatches(seed);
+
+    const primaryHue = hexToOklch(sw.primary)!.h;
+    const accentHue = hexToOklch(sw.accent)!.h;
+    expect(inBannedBand(primaryHue)).toBe(false);
+    expect(inBannedBand(accentHue)).toBe(false);
+  });
+
+  it('previews the true hue for an in-gamut, allowed seed', () => {
+    const seed = { ...DEFAULT_SEED, primaryHue: 200 };
+    const primaryHue = hexToOklch(seedSwatches(seed).primary)!.h;
+    // Allowed hue should survive within a small clamp tolerance.
+    expect(Math.abs(primaryHue - 200)).toBeLessThan(10);
   });
 });

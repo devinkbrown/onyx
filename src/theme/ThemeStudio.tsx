@@ -56,7 +56,6 @@ import {
   enforceAA,
   generatePalette,
   hexToOklch,
-  oklchToHex,
   randomSeed,
   seedFromTokens,
   type PaletteSeed,
@@ -125,6 +124,24 @@ function applyVar(property: string, value: string): void {
 
 function removeVar(property: string): void {
   document.documentElement.style.removeProperty(property);
+}
+
+/**
+ * Representative accent swatches for the seed colour pickers, taken straight
+ * from the engine's output (`--lapis` / `--gold`) so each swatch previews
+ * EXACTLY the accent the seed will produce — banned-hue snapping and gamut
+ * clamping included. Deriving the swatch by hand from `seed.primaryHue` would
+ * paint an indigo→magenta hue (258–342°) the factory never emits, so the
+ * picker would lie about the result; sourcing it from `generatePalette` keeps
+ * the preview faithful and auto-tracks any change to how the engine builds the
+ * triads.
+ */
+export function seedSwatches(seed: PaletteSeed): { primary: string; accent: string } {
+  const palette = generatePalette(seed);
+  return {
+    primary: palette['--lapis'] ?? '#000000',
+    accent: palette['--gold'] ?? '#000000',
+  };
 }
 
 function isExportBlob(value: unknown): value is ExportBlob {
@@ -793,23 +810,13 @@ export function ThemeStudio(props: ThemeStudioProps) {
     return target === 'light' ? 'pearl' : THEME_IDS[0]!;
   };
 
-  // Representative swatches for the seed colour pickers — derived from the
-  // seed the same way the engine derives --lapis / --gold, so the swatch is a
-  // faithful preview of the accent the seed will produce.
-  const primarySwatch = createMemo(() =>
-    oklchToHex({
-      l: seed().scheme === 'dark' ? 0.62 : 0.5,
-      c: 0.09 + 0.15 * seed().vibrancy,
-      h: seed().primaryHue,
-    }),
-  );
-  const accentSwatch = createMemo(() =>
-    oklchToHex({
-      l: seed().scheme === 'dark' ? 0.7 : 0.52,
-      c: 0.075 + 0.13 * seed().vibrancy,
-      h: seed().accentHue,
-    }),
-  );
+  // Representative swatches for the seed colour pickers — sourced from the
+  // engine's own --lapis / --gold output so each swatch is a faithful preview
+  // of the accent the seed will produce (banned-hue snapping + gamut clamp
+  // included), never a raw seed hue the factory would never emit.
+  const swatches = createMemo(() => seedSwatches(seed()));
+  const primarySwatch = (): string => swatches().primary;
+  const accentSwatch = (): string => swatches().accent;
 
   const handlePrimarySeedColor: JSX.EventHandlerUnion<HTMLInputElement, InputEvent> = (e) => {
     const ok = hexToOklch((e.currentTarget as HTMLInputElement).value);
