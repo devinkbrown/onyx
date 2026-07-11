@@ -6375,7 +6375,14 @@ export const store = createStore<OnyxState>()(
           const reactNick  = nick ?? '';
 
           if (reactEmoji && reactMsgId && reactNick) {
-            const reactKey = tagTarget.toLowerCase();
+            // For DMs the inbound TAGMSG target is our own nick, but the
+            // conversation is keyed by the reacting peer's nick (the same remap
+            // the typing + PRIVMSG handlers do). Our own echoed reaction keeps
+            // tagTarget = the peer, so it still lands on the right key.
+            const reactConvo = tagTarget.toLowerCase() === get().ourNick.toLowerCase()
+              ? reactNick
+              : tagTarget;
+            const reactKey = reactConvo.toLowerCase();
             const st = get();
             const channelMsgs = st.channels.get(reactKey)?.messages ?? [];
             const dmMsgs      = st.dms.get(reactKey)?.messages ?? [];
@@ -6387,7 +6394,7 @@ export const store = createStore<OnyxState>()(
             ) ?? false;
 
             if (hasReaction) {
-              get().removeReaction(tagTarget, reactMsgId, reactEmoji, reactNick);
+              get().removeReaction(reactConvo, reactMsgId, reactEmoji, reactNick);
             } else {
               const applyAdd = (messages: ChatMessage[]): ChatMessage[] =>
                 messages.map(m => {
