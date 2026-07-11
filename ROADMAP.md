@@ -197,6 +197,13 @@ down to TLS.
     through the existing per-target `markRead` action (which also syncs the IRCv3
     read marker so sibling sessions agree). Clears the full backlog, self-hides
     when nothing is unread, and parks focus on a live status line on success.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-11** — Home now has a **"Pick up where you
+    left off"** section (`src/shell/HomeView.tsx:544`). A pure `buildResumePoints`
+    (`src/lib/catchup/resumePoints.ts:71`) attaches the store's authoritative
+    `firstUnreadId` boundary to each ranked catch-up item and drops any target
+    with no genuine boundary, so one tap `navigate`s to the room/DM and
+    `focusMessage`es the *exact* first-unread message (`src/shell/HomeView.tsx:216`)
+    rather than the start of a heuristic window.
     ⏭️ **NEXT** — pure Onyx work. Reuse the local vault, `?at=` time travel,
     and richer cross-room review handoffs before adding new server surface.
 16. **Reader mode** *(client)* — a calm single-pane transcript view for long
@@ -251,6 +258,13 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — The global keyboard layer now adds
     `J`/`K` transcript navigation over rendered message rows, reusing the
     existing message landing pulse so reader-mode review can move line by line.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-11** — Command-palette time grammar broadened
+    (`src/chat/spotlight/timeGrammar.ts:279`): `parseTimeExpr` now resolves weekday
+    names (`tuesday`, `fri 08:30`, `last friday noon`), dayparts (`this
+    morning/afternoon/evening/night`), `noon`/`midnight`, and relative
+    `N weeks ago` in addition to the existing offsets. Day arithmetic adds whole
+    days rather than 24h spans so a requested wall-clock hour survives DST
+    transitions (`:177`); unparseable input returns `null` (fail closed).
     ⏭️ **NEXT** — carry reviewed anchors into richer cross-room handoffs without
     adding new server surface.
 17. **Accessibility conformance ledger** *(main site + client)* — publish the
@@ -317,6 +331,12 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Time scrubber now carries pass
     evidence for its channel-scoped scrubber region, labelled UTC-hour jump
     buttons, date jump input, and target-specific moment copy action.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-11** — Two async outcomes are now announced
+    through polite live regions (WCAG 2.2 SC 4.1.3 Status Messages): on-device
+    import progress via a `role="status"` node in the history-import controls
+    (`src/shell/HistoryImportControls.tsx:210`) and a successful invite-link copy
+    in Channel settings (`src/shell/ChannelSettings.tsx:444`) — the status node
+    pre-exists its text so screen readers reliably announce the update.
     ⏭️ **CLIENT NEXT** — continue remaining dense-surface audit rows until every
     app panel has pass/fix evidence.
 
@@ -342,6 +362,15 @@ client or public site needs to expose the result.
     app-side reader handoff, public high-contrast ledger notes, public
     reduced-transparency ledger notes, forced-colors/drawer-focus audit notes,
     and install/wrapper release checks.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-11** — The **create** side landed: a
+    **Share invite** section in Channel settings
+    (`src/shell/ChannelSettings.tsx:393`) lets any member build a rich shareable
+    link. A pure `buildInviteLink` (`src/lib/invite/inviteLink.ts:60`) emits both
+    the canonical share URL (`<origin>/invite?join=…`) and the in-app deep-link
+    (`/app?join=…`) from the active channel plus an optional preferred nick, and
+    re-validates every field through `buildInviteCard` so a comma/control-char
+    (JOIN-list / CRLF vector) is dropped and a bad channel degrades to a
+    network-only invite. Copy success is announced politely (SC 4.1.3).
 19. **Native onboarding and account claim** *(client)* — remove the NickServ
     cliff from first use with registration, identify, certificate, and future
     passkey flows expressed as first-party forms over the real server commands.
@@ -364,6 +393,12 @@ client or public site needs to expose the result.
     as the public language contract for IRCXNet, Onyx, Orochi-as-engine,
     invites, guest/account claim, local vault memory, privacy, and protocol
     context, with root/footer navigation into it.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-11** — The eshmaki.me house identity now
+    ships as a built-in theme, **"Ink & Vermillion"** (`vermillion`,
+    `src/theme/themes.ts:820`, `:1172`): a single vermillion seal accent
+    (OKLCH ~33°) over the deepest warm ink, factory-derived so its text pairs
+    stay AA. It joins the built-in theme set (now 17,
+    `src/theme/themes.ts:48`); `DEFAULT_THEME_ID` remains `ocean`.
 
 ## Phase 9 — Sumi-e Venue Model ← PLANNED
 21. **Named conversations and forum projection** *(client)* — promote existing
@@ -514,6 +549,16 @@ client or public site needs to expose the result.
     preservation, cross-page reply resolution). See `docs/importing.md`.
     (`src/lib/import/{discordImport,slackImport,ircLogImport}.ts`,
     `src/shell/HistoryImportControls.tsx`; 105 unit + 6 integration tests.)
+    ✅ **CLIENT SLICE SHIPPED 2026-07-11** — Added the **official Discord data
+    package** path (no third-party tool): `parseDiscordPackage`
+    (`src/lib/import/discordPackageImport.ts:272`) reads the folder tree from
+    Settings → Privacy & Safety → "Request all of my Data" — `account/user.json`
+    (author), `messages/index.json` (channel names), and per-channel
+    `messages.json`/`.csv` — correlates channel identity + author, then delegates
+    each channel to `parseDiscordExport`, inheriting its validation, per-channel
+    `VAULT_KEEP` bounding, and stable-id dedup. Surfaced as
+    `DiscordPackageImportControls` in Preferences
+    (`src/shell/PreferencesPanel.tsx:911`), progress announced via `role="status"`.
 
 ## Phase 13 — Amanogawa Local Intelligence ← PLANNED
 34. **AI provenance chrome** *(client)* — every recap, search answer,

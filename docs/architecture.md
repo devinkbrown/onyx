@@ -86,8 +86,12 @@ derives a full token map in OKLCH so lightness is perceptually even and text
 contrast is **AA by construction** (`src/theme/paletteFactory.ts:1`). It also
 transforms existing palettes (hue rotate, saturate, warm/cool, push contrast)
 and auto-repairs failing pairs. Contrast math is in `src/theme/contrast.ts`;
-the 14 built-in themes and `TokenMap` in `src/theme/themes.ts`
-(`DEFAULT_THEME_ID` is a *theme* name, not the brand); runtime application in
+the 17 built-in themes and `TokenMap` in `src/theme/themes.ts`
+(`DEFAULT_THEME_ID` is a *theme* name — `ocean`, not the brand;
+`src/theme/themes.ts:1207`). One of the seventeen is **Vermillion**
+("Ink & Vermillion", `src/theme/themes.ts:820`, `:1172`) — the eshmaki.me house
+identity: a single vermillion accent (OKLCH ~33°) over the deepest warm ink,
+factory-derived so its text pairs stay AA. Runtime application in
 `src/theme/ThemeProvider.tsx`; the editor in `src/theme/ThemeStudio.tsx`; custom
 themes in `src/theme/customThemes.ts`. Design tokens are emitted to CSS via
 `src/styles/tokens.css` (+ `global.css`). Animated canvas scenes live in
@@ -127,8 +131,17 @@ off first paint (`vite.config.ts:22`).
 
 The Cmd/Ctrl-K "Spotlight" palette: `useSpotlight.ts` owns the launcher hotkey
 and open signal; `Spotlight.tsx` is the dialog; `commands.ts` builds the command
-set; `timeGrammar.ts` parses the natural-language time grammar (`at: yesterday
-21:00`, relative offsets); `fuzzy.ts` is the subsequence matcher + ranking.
+set; `timeGrammar.ts` parses the natural-language time grammar; `fuzzy.ts` is the
+subsequence matcher + ranking.
+
+`timeGrammar.parseTimeExpr` (`src/chat/spotlight/timeGrammar.ts:279`) resolves a
+broad phrase set to an absolute instant: `N minutes/hours/days/weeks ago`
+(`:11`), weekday names — `tuesday`, `fri 08:30`, `last friday noon` (`:42`,
+`:229`), dayparts — `this morning/afternoon/evening/night` (`:209`), and
+`noon`/`midnight` (`:28`). Day arithmetic is done by adding whole days rather
+than 24h spans so a requested wall-clock hour survives DST transitions
+(`src/chat/spotlight/timeGrammar.ts:177`); anything it cannot parse returns
+`null` so callers fail closed.
 
 ## Home & catch-up (`src/lib/catchup/`, `src/shell/HomeView.tsx`)
 
@@ -143,6 +156,16 @@ logic behind it:
   channel + DM that still has unread activity in a deterministic order (mentions
   first, then most-unread, then name A→Z) and returns the totals
   (`src/lib/catchup/markCaughtUp.ts:72`). It never touches the store.
+- `resumePoints.ts` — `buildResumePoints(items, firstUnreadId, limit)` powers
+  the **"Pick up where you left off"** section. It takes the already-ranked
+  `catchUp` items and attaches, per target, the store's authoritative
+  `firstUnreadId` boundary (the same cursor that draws the UnreadDivider),
+  dropping any target with no genuine boundary (`src/lib/catchup/resumePoints.ts:71`).
+  A resume point therefore deep-links to the *exact* first-unread message, not
+  the start of a heuristic window. HomeView mounts it at
+  `src/shell/HomeView.tsx:544`; tapping a point calls `state.navigate(...)` then
+  `state.focusMessage(point.boundaryId)` (`src/shell/HomeView.tsx:216`). Pure and
+  unit-tested (no store, no `Date.now()`).
 
 `src/shell/MarkAllCaughtUp.tsx` (mounted at `src/shell/HomeView.tsx:444`) is the
 "Mark all caught up" affordance: it reads `channels`/`dms` reactively, computes
@@ -198,6 +221,32 @@ state). Almost every module has a co-located `*.test.ts`.
 
 - `src/shell/` — the chat application shell (AppShell, ChannelSidebar,
   MessageView, Composer, MemberList, preferences, notifications, search, voice).
+  `src/shell/threadIndex.ts` is a pure O(total) pass that collects the set of
+  message ids with replies so each rendered row answers "has replies?" in O(1)
+  via `Set.has` instead of the former O(rows×total) `messages.some(...)` rescan
+  (`src/shell/threadIndex.ts:24`).
+- `src/lib/invite/` — rich shareable invites. `inviteLink.ts` `buildInviteLink`
+  is the pure builder for the create side: from an `InviteLinkSpec` (channel +
+  optional preferred nick / moment / topic) it emits both the canonical share URL
+  (`<origin>?join=…`) and the in-app deep-link (`<appOrigin>?join=…`)
+  (`src/lib/invite/inviteLink.ts:60`). Every field is re-validated by routing the
+  spec through `inviteCard.buildInviteCard`, so a comma or control character (a
+  JOIN-list / CRLF smuggling vector) is dropped and a bad channel degrades to a
+  network-only invite rather than a broken target. The **Share invite** section in
+  `src/shell/ChannelSettings.tsx:393` is the UI; a successful copy is announced
+  through a polite live region (`src/shell/ChannelSettings.tsx:444`, WCAG 2.2
+  SC 4.1.3).
+- `src/lib/import/` — on-device history importers (see [`importing.md`](importing.md)).
+  `discordPackageImport.ts` `parseDiscordPackage` reads Discord's official
+  self-serve **"Request all of my Data"** package — a folder tree
+  (`account/user.json` author, `messages/index.json` channel names,
+  per-channel `messages.json`/`.csv`) — correlates the channel identity and
+  author, then delegates each channel to `parseDiscordExport`, inheriting its
+  validation, per-channel `VAULT_KEEP` bounding, and dedup
+  (`src/lib/import/discordPackageImport.ts:272`). `DiscordPackageImportControls`
+  in Preferences is the UI (`src/shell/PreferencesPanel.tsx:911`,
+  `src/shell/HistoryImportControls.tsx:269`), with import progress announced via a
+  `role="status"` live region (`src/shell/HistoryImportControls.tsx:210`).
 - `src/primitives/` — reusable UI building blocks.
 - `src/lib/upload/` — multipart upload to `${VITE_MEDIA_URL}/upload` (prod
   default same-origin `/upload`).

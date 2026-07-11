@@ -9,7 +9,7 @@ transport. This is the documentation hub; each entry is labelled by audience.
 | Doc | Audience | What it covers |
 |---|---|---|
 | [`../README.md`](../README.md) | everyone | Project front door: stack, commands, env vars, deploy. |
-| [`architecture.md`](architecture.md) | contributor | Map of the `src/` tree — routing, the store + `useStore` bridge, IRC-over-wss, theming, vault, media engine, build/deploy chain. |
+| [`architecture.md`](architecture.md) | contributor | Map of the `src/` tree — routing, the store + `useStore` bridge, IRC-over-wss, theming, vault, media engine, Home catch-up (incl. resume points), rich invites, on-device importers, command-palette time grammar, build/deploy chain. |
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | contributor | Setup (pnpm), test (Vitest/Playwright), typecheck/lint gates, the `dist/` vs `out/` deploy-safety rule, branch conventions. |
 | [`../AGENTS.md`](../AGENTS.md) | coding agents | Stack + conventions for AI agents working in the repo. |
 | [`../CLAUDE.md`](../CLAUDE.md) | contributor / agents | Dense working context: layout, persistence conventions, IRC↔Onyx mapping, services. |
