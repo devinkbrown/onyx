@@ -14,7 +14,7 @@
  */
 
 import { cleanup, fireEvent, render } from '@solidjs/testing-library';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { store } from '@/lib/store/store';
 import { Composer } from './Composer';
@@ -97,6 +97,31 @@ describe('Composer accessibility', () => {
     expect(textarea.getAttribute('aria-activedescendant')).toBe('shell-command-option-1');
     expect(document.getElementById('shell-command-option-1')?.getAttribute('aria-selected'))
       .toBe('true');
+  });
+
+  it('does not send while an IME composition is active, but sends once it ends', async () => {
+    // Arrange — a real message being composed via an IME.
+    seedActiveChannel();
+    const sendSpy = vi
+      .spyOn(store.getState(), 'sendMessage')
+      .mockImplementation(() => {});
+    const { getByRole } = render(() => <Composer />);
+    const textarea = getByRole('textbox', { name: /message #room/i }) as HTMLTextAreaElement;
+    fireEvent.input(textarea, { target: { value: 'こんにち' } });
+
+    // Act — Enter pressed to CONFIRM the IME candidate (isComposing = true).
+    fireEvent.keyDown(textarea, { key: 'Enter', isComposing: true });
+
+    // Assert — confirming a candidate must NOT send the half-composed message.
+    expect(sendSpy).not.toHaveBeenCalled();
+
+    // Act — a normal Enter after the composition has ended.
+    fireEvent.keyDown(textarea, { key: 'Enter' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Assert — now the finished message is sent to the active target.
+    expect(sendSpy).toHaveBeenCalledTimes(1);
+    expect(sendSpy).toHaveBeenCalledWith('#room', 'こんにち');
   });
 
   it('announces composer errors through a role="alert" live region', () => {

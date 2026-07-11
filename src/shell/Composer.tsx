@@ -2,7 +2,8 @@
 /**
  * Composer.tsx — message input for the active channel or DM.
  *
- * - Enter sends; Shift+Enter inserts newline
+ * - Enter sends; Shift+Enter inserts newline; Enter during an IME composition
+ *   confirms the candidate and never sends
  * - Textarea grows with content (up to 200px)
  * - Disabled when no active target or not connected
  * - Attachments upload to the configured media endpoint before send
@@ -241,6 +242,13 @@ export function Composer(props: ComposerProps): JSX.Element {
   }
 
   function handleKeyDown(e: KeyboardEvent): void {
+    // While an IME composition is active every key belongs to the IME —
+    // candidate navigation (arrows), confirmation (Enter) and cancel (Escape).
+    // The Enter that CONFIRMS a candidate carries isComposing=true; letting it
+    // reach the send/slash paths would fire a half-composed message and destroy
+    // the in-progress composition. Yield the whole event to the browser/IME.
+    if (e.isComposing) return;
+
     if (slashVisible()) {
       const commands = slashCommands();
       if (e.key === 'ArrowDown') {
