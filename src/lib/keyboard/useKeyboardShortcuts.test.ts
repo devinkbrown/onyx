@@ -292,14 +292,24 @@ describe('SHORTCUTS descriptor', () => {
     dispose();
   });
 
-  it.skip('cancels a pending G sequence when a modified key intervenes', () => {
-    // FIXME: handleKeyDown leaves the pending "g" prefix armed after modified
-    // non-sequence chords, so Ctrl+H followed by plain H still navigates home.
+  it('cancels a pending G sequence when a modified key intervenes', () => {
     const dispose = mountKeyboardHarness();
     store.setState({ activeView: { kind: 'channel', channel: '#general' } });
 
     fireEvent.keyDown(window, { key: 'g' });
     fireEvent.keyDown(window, { key: 'h', ctrlKey: true });
+    fireEvent.keyDown(window, { key: 'h' });
+
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#general' });
+    dispose();
+  });
+
+  it('cancels a pending G sequence when a Meta-modified continuation key intervenes', () => {
+    const dispose = mountKeyboardHarness();
+    store.setState({ activeView: { kind: 'channel', channel: '#general' } });
+
+    fireEvent.keyDown(window, { key: 'g' });
+    fireEvent.keyDown(window, { key: 'h', metaKey: true });
     fireEvent.keyDown(window, { key: 'h' });
 
     expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#general' });

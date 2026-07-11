@@ -405,20 +405,29 @@ export function useKeyboardShortcuts(): void {
       return;
     }
 
-    if (pendingPrefix === 'g' && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
-      const key = event.key.toLowerCase();
-      if (key === 'h') {
-        event.preventDefault();
-        clearPendingPrefix();
-        getState().navigate({ kind: 'home' });
-        return;
+    if (pendingPrefix === 'g') {
+      // A pending sequence only completes on an immediate, UNMODIFIED
+      // continuation key (h/d). Guard the actions on the no-modifier check…
+      if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+        const key = event.key.toLowerCase();
+        if (key === 'h') {
+          event.preventDefault();
+          clearPendingPrefix();
+          getState().navigate({ kind: 'home' });
+          return;
+        }
+        if (key === 'd') {
+          event.preventDefault();
+          clearPendingPrefix();
+          focusTimeScrubberDate();
+          return;
+        }
       }
-      if (key === 'd') {
-        event.preventDefault();
-        clearPendingPrefix();
-        focusTimeScrubberDate();
-        return;
-      }
+      // …but ANY other intervening event — a modified chord (Ctrl/Alt/Meta/
+      // Shift) or a stray key — cancels the sequence. Clear unconditionally
+      // (previously this only ran for unmodified keys, so a modified chord
+      // left the prefix armed and a later plain "h" wrongly fired). Fall
+      // through so the key can still act as its own standalone shortcut.
       clearPendingPrefix();
     }
 
