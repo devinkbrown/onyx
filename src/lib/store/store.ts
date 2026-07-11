@@ -426,6 +426,20 @@ export interface RawLogEntry {
   line: string;
 }
 
+// ── Passkey (WebAuthn) credential ─────────────────────────────────────────────
+
+/** A registered passkey, as surfaced by `WEBAUTHN LIST`. */
+export interface PasskeyCredential {
+  /** base64url credential id — the server's stable key for this passkey. */
+  id: string;
+  /** User-chosen label (may be empty — render a placeholder). */
+  label: string;
+  /** Authenticator signature counter (grows each time the key signs in). */
+  signCount: number;
+  /** Registration time (unix seconds) when the server sends it, else `null`. */
+  createdAt: number | null;
+}
+
 export interface OnyxState {
   // ── Connection ──────────────────────────────────────────────────────
   status: ConnectionStatus;
@@ -548,10 +562,28 @@ export interface OnyxState {
   passkeyError: string | null;
   /** Transient success notice, e.g. "Passkey added". */
   passkeyNotice: string | null;
+  /** Registered passkeys for the signed-in account (from `WEBAUTHN LIST`). */
+  passkeyCreds: PasskeyCredential[];
+  /** A `WEBAUTHN LIST` is in flight (drives the list spinner). */
+  passkeyListPending: boolean;
+  /**
+   * Runtime probe of server passkey support. `null` = unknown (never probed or
+   * probe still in flight); `true`/`false` once resolved. The daemon does not
+   * advertise WebAuthn in ISUPPORT, so this is discovered by probing `LIST`.
+   */
+  passkeySupported: boolean | null;
+  /** The server lacks `WEBAUTHN RENAME` — hide the rename affordance once known. */
+  passkeyRenameUnsupported: boolean;
   /** Register a new passkey for the current account (must be logged in). */
   registerPasskey(label?: string): void;
   /** Passwordless sign-in with a passkey for `account`. */
   signInWithPasskey(account: string): void;
+  /** Fetch the signed-in account's registered passkeys (`WEBAUTHN LIST`). */
+  listPasskeys(): void;
+  /** Remove a passkey by credential id or label (`WEBAUTHN REMOVE`). */
+  removePasskey(idOrLabel: string): void;
+  /** Rename a passkey by credential id (`WEBAUTHN RENAME`). */
+  renamePasskey(id: string, label: string): void;
   dismissPasskeyMessage(): void;
   registerAccount(account: string, email: string | undefined, password: string): void;
   verifyAccount(account: string, code: string): void;
@@ -1996,6 +2028,37 @@ function passkeyErrText(e: unknown): string {
   return e instanceof Error && e.message ? e.message : 'Passkey ceremony failed.';
 }
 
+/** In-flight `WEBAUTHN LIST` accumulator; committed to state on the LIST end. */
+let _pendingPasskeyList: PasskeyCredential[] | null = null;
+/** Which management action is awaiting a reply — lets a FAIL map to the right UX. */
+let _lastPasskeyAction: 'remove' | 'rename' | null = null;
+/**
+ * Probe timeout: without an ISUPPORT advertisement, a server that lacks the
+ * WEBAUTHN command answers `LIST` with a 421 (or nothing), which never reaches
+ * the standard-reply handler. Resolve `passkeySupported=false` fail-closed after
+ * this window so the UI never hangs on a spinner.
+ */
+let _passkeyListTimer: ReturnType<typeof setTimeout> | null = null;
+const PASSKEY_PROBE_TIMEOUT_MS = 4000;
+
+function clearPasskeyProbeTimer(): void {
+  if (_passkeyListTimer) {
+    clearTimeout(_passkeyListTimer);
+    _passkeyListTimer = null;
+  }
+}
+
+/**
+ * Test hook — drop the module-level passkey accumulators and the live probe
+ * timer so `store.setState(initialState, true)` fully resets passkey state
+ * between tests (these globals live outside the store snapshot).
+ */
+export function _resetPasskeyStateForTests(): void {
+  _pendingPasskeyList = null;
+  _lastPasskeyAction = null;
+  clearPasskeyProbeTimer();
+}
+
 /** flushOutbox retry budget per connection (reset on each successful connect). */
 let _outboxRetries = 0;
 
@@ -2504,6 +2567,10 @@ export const store = createStore<OnyxState>()(
     passkeyBusy: false,
     passkeyError: null,
     passkeyNotice: null,
+    passkeyCreds: [],
+    passkeyListPending: false,
+    passkeySupported: null,
+    passkeyRenameUnsupported: false,
     registerError: null,
     verifyRequired: false,
     accountInfo: null,
@@ -3415,6 +3482,59 @@ export const store = createStore<OnyxState>()(
       // Server replies AUTH-CHALLENGE + ALLOW-CRED lines; the handler collects
       // them and runs the get ceremony → AUTH-FINISH → 900 RPL_LOGGEDIN.
       client.sendRaw('WEBAUTHN', 'AUTH', acct);
+    },
+
+    listPasskeys() {
+      const { client } = get();
+      if (!client) return;
+      if (!isPasskeySupported()) {
+        // The browser cannot run any ceremony — the whole feature is inert here.
+        set({ passkeySupported: false, passkeyListPending: false });
+        return;
+      }
+      _pendingPasskeyList = [];
+      _lastPasskeyAction = null;
+      clearPasskeyProbeTimer();
+      set({ passkeyListPending: true, passkeyError: null });
+      client.sendRaw('WEBAUTHN', 'LIST');
+      // Fail closed if the server never answers (no WEBAUTHN command / no reply).
+      _passkeyListTimer = setTimeout(() => {
+        _passkeyListTimer = null;
+        if (!get().passkeyListPending) return;
+        _pendingPasskeyList = null;
+        set({
+          passkeyListPending: false,
+          passkeySupported: get().passkeySupported ?? false,
+        });
+      }, PASSKEY_PROBE_TIMEOUT_MS);
+    },
+
+    removePasskey(idOrLabel) {
+      const { client } = get();
+      const target = idOrLabel.trim();
+      if (!client || !target) return;
+      if (!isPasskeySupported()) {
+        set({ passkeyError: 'This browser does not support passkeys.', passkeyNotice: null });
+        return;
+      }
+      _lastPasskeyAction = 'remove';
+      set({ passkeyBusy: true, passkeyError: null, passkeyNotice: null });
+      // Server replies `NOTE WEBAUTHN REMOVED :<target>`; the handler drops the row.
+      client.sendRaw('WEBAUTHN', 'REMOVE', target);
+    },
+
+    renamePasskey(id, label) {
+      const { client } = get();
+      const target = id.trim();
+      if (!client || !target) return;
+      if (!isPasskeySupported()) {
+        set({ passkeyError: 'This browser does not support passkeys.', passkeyNotice: null });
+        return;
+      }
+      _lastPasskeyAction = 'rename';
+      set({ passkeyBusy: true, passkeyError: null, passkeyNotice: null });
+      // Label is the trailing param so it may contain spaces.
+      client.sendRaw('WEBAUTHN', 'RENAME', target, label.trim());
     },
 
     dismissPasskeyMessage() {
@@ -4761,7 +4881,25 @@ export const store = createStore<OnyxState>()(
           if (standard.kind === 'FAIL' || standard.kind === 'WARN') {
             if (_pendingPasskeyAuth?.timer) clearTimeout(_pendingPasskeyAuth.timer);
             _pendingPasskeyAuth = null;
-            set({ passkeyBusy: false, passkeyError: standard.description || standard.code });
+            _pendingPasskeyList = null;
+            clearPasskeyProbeTimer();
+            // The feature itself being unavailable resolves the support probe to
+            // false, so the section shows a disabled state instead of an error.
+            const featureOff = standard.code === 'TEMPORARILY_UNAVAILABLE';
+            // The server has the WEBAUTHN command but not the RENAME subcommand:
+            // remember that so the rename affordance disappears (fail closed, no
+            // repeated doomed attempts) rather than surfacing a raw error again.
+            const renameOff = _lastPasskeyAction === 'rename' && standard.code === 'INVALID_SUBCOMMAND';
+            _lastPasskeyAction = null;
+            set({
+              passkeyBusy: false,
+              passkeyListPending: false,
+              passkeyError: renameOff
+                ? 'This server does not support renaming passkeys yet.'
+                : standard.description || standard.code,
+              ...(featureOff ? { passkeySupported: false } : {}),
+              ...(renameOff ? { passkeyRenameUnsupported: true } : {}),
+            });
             return;
           }
           switch (standard.code) {
@@ -4794,8 +4932,68 @@ export const store = createStore<OnyxState>()(
               set({
                 passkeyBusy: false,
                 passkeyError: null,
+                passkeySupported: true,
                 passkeyNotice: label ? `Passkey added (${label})` : 'Passkey added',
               });
+              // Pull the fresh list so the new key appears in the manager.
+              get().listPasskeys();
+              break;
+            }
+            case 'CRED': {
+              // `CRED <credId> <sign_count> [<created_unix>] :<label>` — one row
+              // of an in-flight LIST. Tolerate the optional created column so the
+              // client is forward-compatible if the daemon starts sending it.
+              const id = standard.context[0];
+              if (!id) break;
+              const signCount = Number.parseInt(standard.context[1] ?? '', 10);
+              const createdRaw = standard.context[2];
+              const createdAt = createdRaw ? Number.parseInt(createdRaw, 10) : NaN;
+              (_pendingPasskeyList ??= []).push({
+                id,
+                label: standard.description,
+                signCount: Number.isFinite(signCount) ? signCount : 0,
+                createdAt: Number.isFinite(createdAt) ? createdAt : null,
+              });
+              break;
+            }
+            case 'LIST': {
+              // Terminating `LIST :end (n)` — commit the accumulated rows.
+              clearPasskeyProbeTimer();
+              const creds = _pendingPasskeyList ?? [];
+              _pendingPasskeyList = null;
+              set({ passkeyCreds: creds, passkeyListPending: false, passkeySupported: true });
+              break;
+            }
+            case 'REMOVED': {
+              const target = standard.description;
+              set((s) => ({
+                passkeyBusy: false,
+                passkeyError: null,
+                passkeySupported: true,
+                passkeyNotice: 'Passkey removed',
+                passkeyCreds: s.passkeyCreds.filter(
+                  (c) => c.id !== target && c.label !== target,
+                ),
+              }));
+              break;
+            }
+            case 'RENAMED': {
+              const id = standard.context[0];
+              const label = standard.description;
+              set((s) => ({
+                passkeyBusy: false,
+                passkeyError: null,
+                passkeySupported: true,
+                passkeyNotice: 'Passkey renamed',
+                passkeyCreds: s.passkeyCreds.map((c) =>
+                  c.id === id ? { ...c, label } : c,
+                ),
+              }));
+              break;
+            }
+            case 'STATUS': {
+              // A bare status probe — the command exists, so it is supported.
+              set({ passkeySupported: true });
               break;
             }
             case 'AUTH-CHALLENGE': {

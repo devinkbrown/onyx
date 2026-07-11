@@ -39,6 +39,7 @@ import {
 } from 'solid-js';
 import { useStore, getState, selectAccount } from '@/lib/store';
 import { deviceKeys } from '@/lib/e2ee/dmCipher';
+import { PasskeysSection } from '@/shell/PasskeysSection';
 import { ModalShell } from '@/primitives/index';
 import { Button } from '@/primitives/index';
 import { FormField } from '@/primitives/index';
@@ -153,10 +154,6 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
   const actionError = useStore((s) => s.accountActionError);
   const serviceNotices = useStore((s) => s.serviceNotices);
   const totp = useStore((s) => s.totp);
-  const passkeyBusy = useStore((s) => s.passkeyBusy);
-  const passkeyNotice = useStore((s) => s.passkeyNotice);
-  const passkeyError = useStore((s) => s.passkeyError);
-  const [passkeyLabel, setPasskeyLabel] = createSignal('');
   const [e2eeDeviceBusy, setE2eeDeviceBusy] = createSignal(false);
   const personas = useStore((s) => s.personas);
   const personaOffers = useStore((s) => s.personaOffers);
@@ -682,45 +679,8 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
             </div>
           </Section>
 
-          {/* Personas (Guise wardrobe) */}
-          {/* Passkeys — WebAuthn passwordless login */}
-          <Section title="Passkeys" hint="Sign in without a password using a device passkey — Face ID, fingerprint, or a security key.">
-            <form
-              class="acct-passkey"
-              noValidate
-              onSubmit={(e) => {
-                e.preventDefault();
-                getState().registerPasskey(passkeyLabel());
-                setPasskeyLabel('');
-              }}
-              aria-label="Add a passkey"
-            >
-              <FormField
-                id="acct-passkey-label"
-                label="Passkey name (optional)"
-                placeholder="e.g. My laptop"
-                value={passkeyLabel()}
-                onInput={(e) => setPasskeyLabel(e.currentTarget.value)}
-              />
-              <Button type="submit" variant="ghost" size="sm" disabled={passkeyBusy()}>
-                {passkeyBusy() ? 'Waiting for your device…' : 'Add a passkey'}
-              </Button>
-              <Show when={passkeyNotice()}>
-                {(m) => (
-                  <p class="acct-passkey-msg is-ok" role="status">
-                    {m()}
-                  </p>
-                )}
-              </Show>
-              <Show when={passkeyError()}>
-                {(m) => (
-                  <p class="acct-passkey-msg is-err" role="alert">
-                    {m()}
-                  </p>
-                )}
-              </Show>
-            </form>
-          </Section>
+          {/* Passkeys — WebAuthn passwordless login: register, list, rename, remove */}
+          <PasskeysSection account={account()} active={local.open} />
 
           <Section title="Device encryption keys" hint="Publish this browser's E2EE public key and inspect the account transparency root.">
             <div class="acct-cert-actions">

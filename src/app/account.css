@@ -503,3 +503,135 @@
 .acct-persona-offer { display: flex; gap: 10px; align-items: baseline; font-size: 0.8rem; color: var(--washi-dim); }
 .acct-persona-offer code { font-family: var(--font-mono); color: var(--gold-bright); font-size: 0.78rem; }
 .acct-persona-claim { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+
+/* ── Passkeys (WebAuthn manager) ─────────────────────────────────────────── */
+
+.acct-passkeys .acct-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.acct-passkeys-disabled {
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--stone-2) 40%, transparent);
+  color: var(--washi-dim);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.acct-passkey-msg {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+.acct-passkey-msg.is-ok { color: var(--jade-bright, var(--lapis-bright)); }
+.acct-passkey-msg.is-err { color: var(--shu-bright); }
+
+.acct-passkey-list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.acct-passkey-list-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.acct-passkey-list-title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--washi-dim);
+  text-transform: uppercase;
+}
+
+.acct-passkey-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: var(--washi-dim);
+  font-size: 0.82rem;
+}
+
+.acct-passkey-empty {
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  color: var(--washi-dim);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.acct-passkey-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.acct-passkey-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--stone-2) 55%, transparent);
+}
+
+.acct-passkey-id {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.acct-passkey-name {
+  color: var(--washi);
+  font-size: 0.86rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.acct-passkey-meta {
+  display: flex;
+  gap: 10px;
+  font-size: 0.72rem;
+  color: var(--washi-dim);
+}
+
+.acct-passkey-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.acct-passkey-confirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.acct-passkey-rename {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+.acct-passkey-rename .onyx-field { flex: 1; min-width: 140px; }
