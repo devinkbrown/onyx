@@ -14,6 +14,18 @@ describe('local language tools', () => {
     expect(preferredTranslationTarget()).toBe('de');
   });
 
+  it('falls back to navigator.languages when navigator.language is empty', () => {
+    vi.stubGlobal('navigator', { language: '', languages: ['pt-BR', 'en-US'] });
+
+    expect(preferredTranslationTarget()).toBe('pt');
+  });
+
+  it('defaults preferred translation target to English when no browser locale is exposed', () => {
+    vi.stubGlobal('navigator', {});
+
+    expect(preferredTranslationTarget()).toBe('en');
+  });
+
   it('labels browser-local translator availability without external endpoints', () => {
     vi.stubGlobal('Translator', { availability: vi.fn() });
 
@@ -21,6 +33,15 @@ describe('local language tools', () => {
       state: 'available',
       label: 'Browser local translator available',
       detail: "Onyx can hand selected text to this browser's on-device translator for ja.",
+    });
+  });
+
+  it('treats Translator.create alone as browser-local translator availability', () => {
+    vi.stubGlobal('Translator', { create: vi.fn() });
+
+    expect(localTranslationReadiness('ko')).toMatchObject({
+      state: 'available',
+      detail: expect.stringContaining('for ko'),
     });
   });
 

@@ -28,6 +28,11 @@ describe('channelToSlug (byte-faithful to the server)', () => {
     expect(channelToSlug('#café')).toBe('caf__'); // é = 2 UTF-8 bytes
   });
 
+  it('strips only one leading sigil and keeps the 128-byte server cap', () => {
+    expect(channelToSlug('##root')).toBe('_root');
+    expect(channelToSlug(`#${'A'.repeat(140)}`)).toBe('a'.repeat(128));
+  });
+
   it('returns empty for empty input', () => {
     expect(channelToSlug('')).toBe('');
   });
@@ -67,5 +72,28 @@ describe('fetchChannelPulse', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okResponse({ hours })));
     const pulse = await fetchChannelPulse('#root');
     expect(pulse?.total).toBe(48);
+  });
+
+  it('floors positive hour counts and clamps negative or non-number counts to zero', async () => {
+    const hours = Array.from({ length: 24 }, (_, i) => {
+      if (i === 0) return 3.9;
+      if (i === 1) return -1;
+      if (i === 2) return '9';
+      return 0;
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okResponse({ hours })));
+
+    const pulse = await fetchChannelPulse('#root');
+
+    expect(pulse?.hours.slice(0, 4)).toEqual([3, 0, 0, 0]);
+    expect(pulse?.total).toBe(3);
+  });
+
+  it('returns null before fetching when the channel cannot produce a slug', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(await fetchChannelPulse('#')).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

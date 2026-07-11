@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   BrowserTranslatorAdapter,
@@ -37,6 +37,11 @@ describe('normalizeLang', () => {
     expect(normalizeLang('pt-BR')).toBe('pt');
     expect(normalizeLang('EN_us')).toBe('en');
     expect(normalizeLang('  Ja  ')).toBe('ja');
+  });
+
+  it('handles separator-only and multi-part tags as fail-closed primary subtags', () => {
+    expect(normalizeLang('-US')).toBe('');
+    expect(normalizeLang('zh-Hant-TW')).toBe('zh');
   });
 
   it('returns empty string for empty input', () => {
@@ -88,6 +93,12 @@ describe('buildTranslationRequest', () => {
 
   it('does not passthrough when source language is unknown', () => {
     expect(buildTranslationRequest({ text: 'hello' }, 'ja').passthrough).toBe(false);
+  });
+
+  it('preserves source whitespace exactly while still using trimmed text for passthrough', () => {
+    const request = buildTranslationRequest({ text: '  hola  ', lang: 'es-MX' }, 'EN-US');
+
+    expect(request).toEqual({ sourceText: '  hola  ', targetLang: 'en', passthrough: false });
   });
 });
 
@@ -165,6 +176,10 @@ describe('languageLabel', () => {
     expect(languageLabel('xx')).toBe('XX');
   });
 
+  it('uses an empty fallback label for separator-only codes', () => {
+    expect(languageLabel('-US')).toBe('');
+  });
+
   it('covers every curated target', () => {
     for (const code of TRANSLATION_TARGETS) {
       expect(languageLabel(code)).not.toBe(code.toUpperCase());
@@ -192,6 +207,28 @@ describe('translation target preference store', () => {
   it('loads empty string when nothing is stored', () => {
     localStorage.clear();
     expect(loadTranslationTarget()).toBe('');
+  });
+
+  it('fails closed when localStorage reads throw', () => {
+    const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+
+    expect(loadTranslationTarget()).toBe('');
+
+    getItem.mockRestore();
+  });
+
+  it('updates the signal even when localStorage writes throw', () => {
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('quota');
+    });
+
+    setTranslationTarget('De-DE');
+
+    expect(translationTarget()).toBe('de');
+
+    setItem.mockRestore();
   });
 });
 

@@ -23,6 +23,26 @@ describe('blockKitLite', () => {
     expect(block?.buttons[0]).toEqual({ label: 'Run', url: null, value: null, action: null });
   });
 
+  it('rejects script/data URLs and keeps markup-looking text inert as plain strings', () => {
+    const block = parseBlockKitLitePayload(JSON.stringify({
+      title: '<script>alert(1)</script>',
+      text: '<img src=x onerror=alert(1)>',
+      buttons: [
+        { label: '<b>Docs</b>', url: 'data:text/html,<script>alert(1)</script>' },
+        { label: 'Relative', url: '/local/path' },
+        { label: 'Secure', url: 'https://example.test/path?q=%3Cscript%3E' },
+      ],
+    }));
+
+    expect(block?.title).toBe('<script>alert(1)</script>');
+    expect(block?.text).toBe('<img src=x onerror=alert(1)>');
+    expect(block?.buttons).toEqual([
+      { label: '<b>Docs</b>', url: null, value: null, action: null },
+      { label: 'Relative', url: null, value: null, action: null },
+      { label: 'Secure', url: 'https://example.test/path?q=%3Cscript%3E', value: null, action: null },
+    ]);
+  });
+
   it('parses only allowlisted client-local actions', () => {
     const block = parseBlockKitLitePayload(JSON.stringify({
       buttons: [
@@ -45,6 +65,54 @@ describe('blockKitLite', () => {
     expect(block?.selects[0]?.action).toEqual({ type: 'select-notify', target: '#ops', value: 'environment' });
   });
 
+  it('rejects unsafe action targets and CRLF-smuggled action values', () => {
+    const block = parseBlockKitLitePayload(JSON.stringify({
+      buttons: [
+        { label: 'Whitespace target', action: { type: 'send', target: '#ops #other', value: 'approved' } },
+        { label: 'Comma target', action: { type: 'send', target: '#ops,#other', value: 'approved' } },
+        { label: 'CRLF value', action: { type: 'send', target: '#ops', value: 'ok\r\nPRIVMSG #root :oops' } },
+        { label: 'Nick target', action: { type: 'send', target: 'OperServ', value: 'status' } },
+      ],
+    }));
+
+    expect(block?.buttons.map((button) => button.action)).toEqual([
+      null,
+      null,
+      null,
+      { type: 'send', target: 'OperServ', value: 'status' },
+    ]);
+  });
+
+  it('bounds repeated controls and options before returning renderable blocks', () => {
+    const block = parseBlockKitLitePayload(JSON.stringify({
+      buttons: Array.from({ length: 6 }, (_, i) => ({ label: `Button ${i + 1}`, value: `b${i + 1}` })),
+      selects: Array.from({ length: 3 }, (_, i) => ({
+        label: `Select ${i + 1}`,
+        options: Array.from({ length: 10 }, (_unused, j) => ({ label: `Option ${i + 1}.${j + 1}` })),
+      })),
+      fields: Array.from({ length: 8 }, (_, i) => ({ label: `Field ${i + 1}`, value: `Value ${i + 1}` })),
+    }));
+
+    expect(block?.buttons.map((button) => button.label)).toEqual(['Button 1', 'Button 2', 'Button 3', 'Button 4']);
+    expect(block?.selects).toHaveLength(2);
+    expect(block?.selects[0]?.options).toHaveLength(8);
+    expect(block?.selects[0]?.options[0]).toEqual({ label: 'Option 1.1', value: 'Option 1.1' });
+    expect(block?.fields.map((field) => field.label)).toEqual([
+      'Field 1',
+      'Field 2',
+      'Field 3',
+      'Field 4',
+      'Field 5',
+      'Field 6',
+    ]);
+  });
+
+  it('returns null for empty, array, and content-free payloads', () => {
+    expect(parseBlockKitLitePayload('null')).toBeNull();
+    expect(parseBlockKitLitePayload('[]')).toBeNull();
+    expect(parseBlockKitLitePayload('{"buttons":[{"url":"https://example.test"}],"fields":[{"value":"missing label"}]}')).toBeNull();
+  });
+
   it('parses modal blocks with bounded content and a trigger label', () => {
     const block = parseBlockKitLitePayload(JSON.stringify({
       type: 'modal',
@@ -60,6 +128,21 @@ describe('blockKitLite', () => {
       triggerLabel: 'Review release',
       text: 'Check the rollout notes.',
       fields: [{ label: 'Service', value: 'Onyx' }],
+    });
+  });
+
+  it('falls back modal titles and snake_case trigger labels safely', () => {
+    const block = parseBlockKitLitePayload(JSON.stringify({
+      type: 'modal',
+      text: 'No title was supplied.',
+      trigger_label: 'Open fallback',
+    }));
+
+    expect(block).toMatchObject({
+      type: 'modal',
+      title: 'Details',
+      triggerLabel: 'Open fallback',
+      text: 'No title was supplied.',
     });
   });
 });
