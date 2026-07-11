@@ -441,7 +441,7 @@ const pearlTokens: TokenMap = {
 
   // Lapis — ink-blue, deep enough for AA on light ground
   '--lapis':        '#0065b0',
-  '--lapis-bright': '#318adb',
+  '--lapis-bright': '#086fbe',
   '--lapis-deep':   '#003e70',
 
   // Gold — restrained warm inlay, deepened for WCAG AA on paper
@@ -1016,7 +1016,7 @@ const frostTokens: TokenMap = {
 
   // Steel-blue — cool primary, dark enough for light paper
   '--lapis':       '#036884',
-  '--lapis-bright':'#448aa5',
+  '--lapis-bright':'#2f7791',
   '--lapis-deep':  '#003c4d',
 
   // Pale steel — the second accent stays in the cold family (NOT brass)

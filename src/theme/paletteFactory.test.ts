@@ -69,6 +69,20 @@ describe('generatePalette', () => {
     }
   });
 
+  it('keeps --lapis-bright at body-AA (4.5) vs --ink so the active segment reads (dark + light)', () => {
+    // The segmented-control active segment renders --ink on a --lapis-bright
+    // fill; light schemes are the tight case (light ground, mid-tone accent).
+    for (const scheme of ['dark', 'light'] as const) {
+      for (const hue of [12, 90, 158, 205, 232, 320]) {
+        const t = generatePalette({ ...DEFAULT_SEED, scheme, primaryHue: hue, accentHue: hue + 30 });
+        const ink = parseHex(t['--ink']!)!;
+        const lapisBright = parseHex(t['--lapis-bright']!)!;
+        const ratio = contrastRatio(ink, lapisBright);
+        expect(ratio, `${scheme} hue ${hue}: ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
   it('never emits a purple/indigo primary or accent', () => {
     for (const hue of [270, 285, 300, 320, 335]) {
       const t = generatePalette({ ...DEFAULT_SEED, primaryHue: hue, accentHue: hue });

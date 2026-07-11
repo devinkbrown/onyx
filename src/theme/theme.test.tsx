@@ -16,6 +16,7 @@ import { createSignal, Show } from 'solid-js';
 
 import { applyThemeToDom, ThemeProvider, useTheme } from './ThemeProvider';
 import { THEMES, THEME_IDS, DEFAULT_THEME_ID, type ThemeId, type TokenMap } from './themes';
+import { contrastRatio, parseHex } from './contrast';
 import { ThemeStudio } from './ThemeStudio';
 import { ALL_STUDIO_TOKENS, EDITABLE_PROPERTIES } from './tokens';
 import { auditPalette, hexToOklch, generatePalette, enforceAA, type PaletteSeed } from './paletteFactory';
@@ -745,6 +746,31 @@ describe('Ocean family', () => {
       expect(THEMES[id].tokens['--lapis-bright']).toBeTruthy();
       expect(THEMES[id].tokens['--lapis-deep']).toBeTruthy();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5b. Segmented-control active-segment pair passes AA across every theme
+// ---------------------------------------------------------------------------
+
+// ChannelNotifyControl + CalmModeControl render the checked segment as --ink
+// text on a --lapis-bright fill. The label is small bold body text, so the pair
+// must clear the 4.5 body-text floor (not just the 3:1 large-text floor) in
+// every built-in theme. prefers-contrast: more overrides neither token, so
+// clearing 4.5 here also covers the high-contrast path.
+describe('segmented-control active segment (--ink on --lapis-bright)', () => {
+  const AA_BODY = 4.5;
+
+  it.each(THEME_IDS)('theme %s clears AA body contrast for the active segment', (id) => {
+    const tokens = THEMES[id].tokens;
+    const ink = parseHex(tokens['--ink']!);
+    const lapisBright = parseHex(tokens['--lapis-bright']!);
+    expect(ink, `${id} --ink`).toBeTruthy();
+    expect(lapisBright, `${id} --lapis-bright`).toBeTruthy();
+    const ratio = contrastRatio(ink!, lapisBright!);
+    expect(ratio, `${id} --ink/--lapis-bright = ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(
+      AA_BODY,
+    );
   });
 });
 

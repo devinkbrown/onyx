@@ -279,7 +279,11 @@ export const AA_PAIRS: ReadonlyArray<[string, string, number]> = [
   ['--washi', '--stone-2', 4.5],
   ['--washi-dim', '--ink', 4.5],
   ['--washi-mute', '--ink', 3],
-  ['--lapis-bright', '--ink', 3],
+  // Primary accent doubles as an interactive fill (segmented-control active
+  // segment renders --ink text on a --lapis-bright ground). That small bold
+  // label needs body-text AA, so lapis-bright holds a 4.5 floor vs the ground
+  // — stricter than the other accents' 3:1 large-text floor.
+  ['--lapis-bright', '--ink', 4.5],
   ['--gold-bright', '--ink', 3],
   ['--ok', '--ink', 3],
   ['--shu-bright', '--ink', 3],
