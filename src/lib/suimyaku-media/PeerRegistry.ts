@@ -168,6 +168,13 @@ export class PeerRegistry {
     const pm  = this.peers.get(key);
     if (!pm) return;
     const stateNick = pm.state.nick;
+    // Mark the peer detached BEFORE releasing resources. A media frame for this
+    // nick that was already in flight (decode is async) would otherwise re-enter
+    // decodeAudio/decodeVideo after teardown and lazily re-create an AudioContext
+    // and decoder on a peer no longer in the map — an unreachable context/track
+    // that nothing will ever close again (the "leaked after hangup" class). Every
+    // decode entry point no-ops on a detached peer, so this closes that hole.
+    this.detachedPeers.add(pm);
     this.safeDestroy(pm.audDec);
     this.safeDestroy(pm.vidDec);
     this.safeDestroy(pm.screenVidDec);

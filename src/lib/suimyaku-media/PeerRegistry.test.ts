@@ -93,6 +93,62 @@ describe('PeerRegistry', () => {
     expect(spatialPositions(registry).has('bob')).toBe(false);
   });
 
+  it('does not resurrect an AudioContext for a peer removed mid-flight', async () => {
+    // decodeAudio is async; a frame can already be in flight when the peer's
+    // MEDIA LEAVE arrives. After remove(), the PeerMedia is out of the map, so a
+    // late decode must NOT lazily re-create an AudioContext/decoder on it — that
+    // context would be unreachable and never closed (camera-light / leaked-ctx
+    // class). remove() marks the peer detached to guarantee the late frame no-ops.
+    const registry = createRegistry();
+    const audioDecoder = vi.fn();
+    registry.setWasm({ audioDecoder, videoDecoder: vi.fn() } as unknown as OpcodecWasm);
+
+    const pm = registry.getOrCreate('Kai', '#root', 'voice');
+    registry.remove('Kai');
+
+    await registry.decodeAudio(pm, new Uint8Array([1, 2, 3]));
+
+    expect(audioDecoder).not.toHaveBeenCalled();
+    expect(pm.audCtx).toBeNull();
+    expect(pm.audDec).toBeNull();
+  });
+
+  it('releases every peer resource when clearing the whole call', () => {
+    // setIdle() tears the call down via registry.clear(). This asserts the
+    // invariant that leaving a call releases EVERY tracked peer's AudioContext,
+    // decoders, panner/gain graph, and screen-capture tracks — not just one.
+    const registry = createRegistry();
+    const closes: ReturnType<typeof vi.fn>[] = [];
+    const stops: ReturnType<typeof vi.fn>[] = [];
+    const destroys: ReturnType<typeof vi.fn>[] = [];
+
+    for (let i = 0; i < 3; i++) {
+      const pm = registry.getOrCreate(`peer${i}`, '#root', 'voice');
+      const close = vi.fn(() => Promise.resolve());
+      const stop = vi.fn();
+      const audDec = destroyable();
+      const vidDec = destroyable();
+      closes.push(close);
+      stops.push(stop);
+      destroys.push(audDec.destroy, vidDec.destroy);
+      pm.audCtx = { close } as unknown as AudioContext;
+      pm.audDec = audDec as unknown as PeerMedia['audDec'];
+      pm.vidDec = vidDec as unknown as PeerMedia['vidDec'];
+      pm.panner = { disconnect: vi.fn() } as unknown as StereoPannerNode;
+      pm.outputGain = { disconnect: vi.fn() } as unknown as GainNode;
+      pm.screenStream = { getTracks: () => [{ stop }] } as unknown as MediaStream;
+      registry.peerLevels.set(`peer${i}`, 0.5);
+    }
+
+    registry.clear();
+
+    for (const close of closes) expect(close).toHaveBeenCalledTimes(1);
+    for (const stop of stops) expect(stop).toHaveBeenCalledTimes(1);
+    for (const destroy of destroys) expect(destroy).toHaveBeenCalledTimes(1);
+    expect(Array.from(registry.allNicks())).toHaveLength(0);
+    expect(registry.peerLevels.size).toBe(0);
+  });
+
   it('does not register over-cap peers or allocate decoders for them', async () => {
     const registry = createRegistry();
     const onPeerStateChanged = vi.fn();
