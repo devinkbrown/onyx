@@ -71,4 +71,35 @@ describe('persistence', () => {
     localStorage.setItem('onyx:custom-themes', JSON.stringify([{ id: 'nope', name: 'x' }, 42]));
     expect(loadCustomThemes()).toHaveLength(0);
   });
+
+  it('drops a theme whose overrides is an array (would seat numeric-key props)', () => {
+    localStorage.setItem(
+      'onyx:custom-themes',
+      JSON.stringify([{ id: 'custom:arr', name: 'Arr', base: 'ocean', overrides: ['#ff0000'] }]),
+    );
+    expect(loadCustomThemes()).toHaveLength(0);
+  });
+
+  it('drops a theme with a non-string override value (would corrupt CSS vars)', () => {
+    localStorage.setItem(
+      'onyx:custom-themes',
+      JSON.stringify([
+        { id: 'custom:obj', name: 'Obj', base: 'ocean', overrides: { '--lapis': { evil: 1 } } },
+        { id: 'custom:num', name: 'Num', base: 'ocean', overrides: { '--gold': 42 } },
+      ]),
+    );
+    expect(loadCustomThemes()).toHaveLength(0);
+  });
+
+  it('keeps a well-formed theme with all-string overrides', () => {
+    localStorage.setItem(
+      'onyx:custom-themes',
+      JSON.stringify([
+        { id: 'custom:good', name: 'Good', base: 'ocean', overrides: { '--lapis': '#ff0000' } },
+      ]),
+    );
+    const loaded = loadCustomThemes();
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]?.overrides['--lapis']).toBe('#ff0000');
+  });
 });

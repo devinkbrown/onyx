@@ -77,9 +77,20 @@ function isValidCustomTheme(value: unknown): value is CustomTheme {
     typeof v.name === 'string' &&
     typeof v.base === 'string' &&
     (v.base as string) in THEMES &&
-    typeof v.overrides === 'object' &&
-    v.overrides !== null
+    isValidTokenMap(v.overrides)
   );
+}
+
+/**
+ * A token map must be a plain (non-array) object whose every value is a string,
+ * so overrides seat cleanly via `setProperty`. Arrays would produce numeric-key
+ * props and non-string values (nested objects, numbers, NaN) would coerce to
+ * garbage like `"[object Object]"`, silently corrupting `var(--token)` and
+ * breaking the palette's contrast guarantee. Mirrors the `?theme=` import guard.
+ */
+function isValidTokenMap(value: unknown): value is TokenMap {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  return Object.values(value as Record<string, unknown>).every((v) => typeof v === 'string');
 }
 
 function slugify(name: string): string {
