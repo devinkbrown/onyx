@@ -9,6 +9,7 @@ import {
   importMediaMacKey,
   mediaMacEqual,
   mediaMacTag,
+  verifyMediaMac,
 } from './mediaMac';
 import vectors from './ws_media_mac.vectors.json';
 
@@ -64,5 +65,60 @@ describe('mediaMacEqual — constant-time tag comparison', () => {
     expect(mediaMacEqual(a, firstDiff)).toBe(false);
     expect(mediaMacEqual(a, lastDiff)).toBe(false);
     expect(mediaMacEqual(a, a.slice(0, a.length - 1))).toBe(false);
+  });
+});
+
+describe('verifyMediaMac — receiver-side fail-closed verification', () => {
+  it('accepts a well-formed frame || tag16 datagram and returns the frame bytes', async () => {
+    const key = await importMediaMacKey(hex(v.k32_hex));
+    const frame = hex(v.frame_hex);
+    const datagram = await appendMediaMac(key, frame);
+
+    const verified = await verifyMediaMac(key, datagram);
+    expect(verified).not.toBeNull();
+    expect(toHex(verified!)).toBe(v.frame_hex);
+  });
+
+  it('rejects a datagram whose MAC tag was tampered with (any single bit)', async () => {
+    const key = await importMediaMacKey(hex(v.k32_hex));
+    const datagram = await appendMediaMac(key, hex(v.frame_hex));
+    datagram[datagram.length - 1]! ^= 0x01; // flip a tag bit
+
+    expect(await verifyMediaMac(key, datagram)).toBeNull();
+  });
+
+  it('rejects a datagram whose frame payload was tampered with', async () => {
+    const key = await importMediaMacKey(hex(v.k32_hex));
+    const datagram = await appendMediaMac(key, hex(v.frame_hex));
+    datagram[0]! ^= 0x80; // flip a frame byte, tag now stale
+
+    expect(await verifyMediaMac(key, datagram)).toBeNull();
+  });
+
+  it('rejects a datagram verified under the wrong key (fail-closed)', async () => {
+    const goodKey = await importMediaMacKey(hex(v.k32_hex));
+    const datagram = await appendMediaMac(goodKey, hex(v.frame_hex));
+
+    const wrongRaw = hex(v.k32_hex); wrongRaw[0]! ^= 0xff;
+    const wrongKey = await importMediaMacKey(wrongRaw);
+    expect(await verifyMediaMac(wrongKey, datagram)).toBeNull();
+  });
+
+  it('rejects a datagram too short to carry a full tag', async () => {
+    const key = await importMediaMacKey(hex(v.k32_hex));
+    // Exactly tag-sized and shorter carry no frame bytes → fail-closed.
+    expect(await verifyMediaMac(key, new Uint8Array(MEDIA_MAC_TAG_BYTES))).toBeNull();
+    expect(await verifyMediaMac(key, new Uint8Array(MEDIA_MAC_TAG_BYTES - 1))).toBeNull();
+    expect(await verifyMediaMac(key, new Uint8Array(0))).toBeNull();
+  });
+
+  it('verifies against a key re-derived the way the server does', async () => {
+    const k32 = await deriveMediaMacKey(hex(v.root_hex), v.channel, v.participant);
+    const key = await importMediaMacKey(k32);
+    const datagram = hex(v.frame_hex + v.tag_hex);
+
+    const verified = await verifyMediaMac(key, datagram);
+    expect(verified).not.toBeNull();
+    expect(toHex(verified!)).toBe(v.frame_hex);
   });
 });

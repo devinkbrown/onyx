@@ -92,10 +92,32 @@ export async function appendMediaMac(key: CryptoKey, frame: Uint8Array): Promise
   return out;
 }
 
-/** Constant-time tag comparison (for receiver-side verification, if ever used). */
+/** Constant-time tag comparison. */
 export function mediaMacEqual(a: Uint8Array, b: Uint8Array): boolean {
   let diff = a.length ^ b.length;
   const n = Math.min(a.length, b.length);
   for (let i = 0; i < n; i++) diff |= a[i]! ^ b[i]!;
   return diff === 0;
+}
+
+/**
+ * Receiver-side, fail-closed verification of a `frame || tag16` datagram.
+ *
+ * Splits the trailing 16-byte tag from the frame prefix, recomputes the tag
+ * over the exact frame bytes under `key`, and constant-time compares. Returns
+ * the authenticated frame bytes (a subarray view) on success, or `null` on any
+ * failure — too-short datagram, tag mismatch, or wrong key. Never throws for a
+ * bad datagram, so callers can drop-on-null without a try/catch. This pins the
+ * client side of the KAT-shared MAC contract for any path that verifies before
+ * decode rather than trusting the relay's server-side check.
+ */
+export async function verifyMediaMac(key: CryptoKey, datagram: Uint8Array): Promise<Uint8Array | null> {
+  // A valid datagram carries at least one frame byte plus a full tag.
+  if (datagram.length <= MEDIA_MAC_TAG_BYTES) return null;
+  const split = datagram.length - MEDIA_MAC_TAG_BYTES;
+  const frame = datagram.subarray(0, split);
+  const receivedTag = datagram.subarray(split);
+  const expectedTag = await mediaMacTag(key, frame);
+  if (!mediaMacEqual(expectedTag, receivedTag)) return null;
+  return frame;
 }
