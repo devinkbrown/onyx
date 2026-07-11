@@ -28,9 +28,17 @@ function envNode(): IrcNode | null {
   return NODES.find((n) => n.wss === envWss) ?? { id: 'env', host: 'custom', wss: envWss };
 }
 
-/** Random node — the inconclusive-probe fallback so there is always a target. */
+/**
+ * Random node — the inconclusive-probe fallback so there is always a target.
+ *
+ * An empty `nodes` list (e.g. a caller-supplied filter that matched nothing) must
+ * not yield `undefined`: indexing `[]` and asserting non-null would lie about the
+ * return type and crash the connect flow downstream. Fall back to the registry so
+ * the contract ("there is always a target") holds; NODES is a non-empty const.
+ */
 function randomNode(nodes: readonly IrcNode[] = NODES): IrcNode {
-  return nodes[Math.floor(Math.random() * nodes.length)]!;
+  const pool = nodes.length > 0 ? nodes : NODES;
+  return pool[Math.floor(Math.random() * pool.length)]!;
 }
 
 /**
