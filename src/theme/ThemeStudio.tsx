@@ -60,6 +60,7 @@ import {
   seedFromTokens,
   type PaletteSeed,
 } from './paletteFactory';
+import { exportThemeSeed, parseThemeSeed } from './seedTransfer';
 import { useStore, getState } from '@/lib/store';
 import { backgroundOptions } from '@/backgrounds';
 
@@ -607,11 +608,13 @@ export function ThemeStudio(props: ThemeStudioProps) {
   const [overrides, setOverrides] = createSignal<TokenMap>({});
   const [importError, setImportError] = createSignal<string | null>(null);
   const [exportCopied, setExportCopied] = createSignal(false);
+  const [seedCopied, setSeedCopied] = createSignal(false);
   const [shareCopied, setShareCopied] = createSignal(false);
   // Inline "save theme" naming (replaces a browser prompt).
   const [saving, setSaving] = createSignal(false);
   const [saveName, setSaveName] = createSignal('');
   let copyTimer: ReturnType<typeof setTimeout> | undefined;
+  let seedTimer: ReturnType<typeof setTimeout> | undefined;
   let shareTimer: ReturnType<typeof setTimeout> | undefined;
   let saveInputRef: HTMLInputElement | undefined;
 
@@ -655,6 +658,7 @@ export function ThemeStudio(props: ThemeStudioProps) {
       removeVar(prop);
     }
     if (copyTimer !== undefined) clearTimeout(copyTimer);
+    if (seedTimer !== undefined) clearTimeout(seedTimer);
     if (shareTimer !== undefined) clearTimeout(shareTimer);
     if (regenTimer !== undefined) clearTimeout(regenTimer);
     // Restore the base theme's color-scheme if a generated palette changed it.
@@ -747,6 +751,41 @@ export function ThemeStudio(props: ThemeStudioProps) {
   /** Recover a seed from whatever palette is live so it can be riffed on. */
   const handleSeedFromCurrent = (): void => {
     setSeed(seedFromTokens(resolvedTokens(), activeScheme()));
+  };
+
+  /**
+   * Copy the current seed as a portable JSON envelope. Unlike [export], this
+   * ships only the seven-field seed — the recipient regenerates the palette
+   * locally through the factory, so it re-passes AA on their machine by
+   * construction rather than trusting baked-in hex off the wire.
+   */
+  const handleExportSeed = (): void => {
+    const json = exportThemeSeed(activeThemeMeta()?.label ?? 'Custom', seed());
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(json).catch(() => undefined);
+    }
+    setSeedCopied(true);
+    if (seedTimer !== undefined) clearTimeout(seedTimer);
+    seedTimer = setTimeout(() => setSeedCopied(false), 2200);
+  };
+
+  /**
+   * Import a portable seed envelope, fail-closed. A malformed or out-of-range
+   * seed is rejected with a message and nothing changes; a valid seed (with any
+   * banned-hue warning surfaced) is loaded and generated immediately, so the
+   * result is guaranteed AA-clean.
+   */
+  const handleImportSeed = (): void => {
+    const raw = window.prompt('Paste an Onyx theme-seed JSON to import:', '');
+    if (!raw) return;
+    const result = parseThemeSeed(raw);
+    if (!result.ok) {
+      setImportError(result.error);
+      return;
+    }
+    setImportError(result.warnings.length > 0 ? result.warnings.join(' ') : null);
+    setSeed(result.seed);
+    generateNow(result.seed);
   };
 
   /** Capture the Adjust baseline once per drag session. */
@@ -1123,6 +1162,16 @@ export function ThemeStudio(props: ThemeStudioProps) {
               <Tooltip content="Recover a seed from the palette that is live right now." placement="top">
                 <Button variant="ghost" size="sm" onClick={handleSeedFromCurrent} data-testid="ts-seed-from-current">
                   [seed from current]
+                </Button>
+              </Tooltip>
+              <Tooltip content="Copy this seed as portable JSON — the recipient regenerates it AA-clean." placement="top">
+                <Button variant="ghost" size="sm" onClick={handleExportSeed} data-testid="ts-export-seed">
+                  {seedCopied() ? '[✓ seed copied]' : '[export seed]'}
+                </Button>
+              </Tooltip>
+              <Tooltip content="Paste a portable seed JSON — validated fail-closed, then generated." placement="top">
+                <Button variant="ghost" size="sm" onClick={handleImportSeed} data-testid="ts-import-seed">
+                  [import seed]
                 </Button>
               </Tooltip>
             </div>

@@ -54,3 +54,12 @@ export {
   DEFAULT_SEED,
 } from './paletteFactory';
 export type { PaletteSeed, PaletteTransform, Oklch, AuditRow } from './paletteFactory';
+
+export {
+  exportThemeSeed,
+  parseThemeSeed,
+  paletteFromSeedExport,
+  SEED_EXPORT_KIND,
+  SEED_EXPORT_VERSION,
+} from './seedTransfer';
+export type { SeedExportEnvelope, SeedParseResult } from './seedTransfer';
