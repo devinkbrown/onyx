@@ -15,7 +15,7 @@ import { createMemo, createSignal, createUniqueId, For, Show, type JSX } from 's
 import { Sheet } from '@/primitives';
 import { clearVault } from '@/lib/vault/historyVault';
 import { countLabel } from '@/lib/format/countLabel';
-import { DiscordImportControls, SlackImportControls, IrcLogImportControls } from './HistoryImportControls';
+import { DiscordImportControls, DiscordPackageImportControls, SlackImportControls, IrcLogImportControls } from './HistoryImportControls';
 import {
   clearClientExtensionAudit,
   clearClientExtensionActions,
@@ -907,6 +907,8 @@ export function PreferencesPanel(): JSX.Element {
         <PortableVaultControls />
 
         <DiscordImportControls />
+
+        <DiscordPackageImportControls />
 
         <SlackImportControls />
 

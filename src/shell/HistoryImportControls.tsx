@@ -14,6 +14,7 @@
 import { createSignal, Show, type JSX } from 'solid-js';
 import { importVault, VAULT_KEEP } from '@/lib/vault/historyVault';
 import { parseDiscordExport } from '@/lib/import/discordImport';
+import { parseDiscordPackage, type DiscordPackageFile } from '@/lib/import/discordPackageImport';
 import { parseSlackExport } from '@/lib/import/slackImport';
 import { parseIrcLog } from '@/lib/import/ircLogImport';
 import { countLabel } from '@/lib/format/countLabel';
@@ -227,6 +228,157 @@ export function DiscordImportControls(): JSX.Element {
         </>
       }
     />
+  );
+}
+
+interface PendingPackageImport {
+  snapshot: import('@/lib/vault/historyVault').VaultExportSnapshot;
+  channels: number;
+  messages: number;
+  skipped: number;
+  droppedOverCap: number;
+  guild: string | null;
+  oldest: string | null;
+  newest: string | null;
+}
+
+/** Only these files in a Discord package carry channel identity or messages. */
+function isPackageFileName(name: string): boolean {
+  const lower = name.toLowerCase();
+  return (
+    lower === 'channel.json' ||
+    lower === 'messages.json' ||
+    lower === 'messages.csv' ||
+    lower === 'index.json' ||
+    lower === 'user.json'
+  );
+}
+
+/** A single package file larger than this is skipped rather than read into memory. */
+const MAX_PACKAGE_FILE_BYTES = 256 * 1024 * 1024;
+
+/**
+ * Import Discord's OFFICIAL self-serve data package — the export every user can
+ * request themselves (Settings → Privacy & Safety → "Request all of my Data"),
+ * with no third-party tool. The package is a folder tree, so this uses a
+ * directory picker and correlates channel.json / index.json / messages.json|csv
+ * on-device via {@link parseDiscordPackage}. Only the requesting user's own
+ * messages exist in this export — surfaced honestly in the copy and summary.
+ */
+export function DiscordPackageImportControls(): JSX.Element {
+  const [status, setStatus] = createSignal<string | null>(null);
+  const [busy, setBusy] = createSignal(false);
+  const [pending, setPending] = createSignal<PendingPackageImport | null>(null);
+
+  async function handleSelect(event: Event): Promise<void> {
+    const input = event.currentTarget as HTMLInputElement;
+    const files = Array.from(input.files ?? []);
+    input.value = '';
+    if (files.length === 0) return;
+    setBusy(true);
+    try {
+      const packageFiles: DiscordPackageFile[] = [];
+      for (const file of files) {
+        const path = file.webkitRelativePath || file.name;
+        if (!isPackageFileName(file.name) || file.size > MAX_PACKAGE_FILE_BYTES) continue;
+        packageFiles.push({ path, text: await file.text() });
+      }
+      const result = parseDiscordPackage(packageFiles);
+      if (!result || result.summary.messages === 0) {
+        setPending(null);
+        setStatus('No Discord data package found. Unzip the package Discord emails you and choose its folder (it contains a "messages" folder).');
+        return;
+      }
+      const s = result.summary;
+      setPending({
+        snapshot: result.snapshot,
+        channels: s.channels,
+        messages: s.messages,
+        skipped: s.skipped,
+        droppedOverCap: s.droppedOverCap,
+        guild: s.guild,
+        oldest: s.oldest,
+        newest: s.newest,
+      });
+      setStatus(`Ready to import ${countLabel(s.messages, 'message')} across ${countLabel(s.channels, 'channel')}${s.guild ? ` from ${s.guild}` : ''}.`);
+    } catch {
+      setPending(null);
+      setStatus('Could not read that folder as a Discord data package.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmImport(): Promise<void> {
+    const job = pending();
+    if (!job) return;
+    setBusy(true);
+    try {
+      const result = await importVault(job.snapshot);
+      setPending(null);
+      setStatus(`Imported ${countLabel(result.messages, 'message')} into ${countLabel(job.channels, 'channel')}. Open a channel to read the history, or search it from anywhere.`);
+    } catch {
+      setStatus('Import failed while merging into the local vault.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section class="pref-group pref-vault-portable pref-discord-package-import" aria-labelledby="pref-discord-package-import-title">
+      <div class="pref-group-head">
+        <h3 id="pref-discord-package-import-title" class="pref-label">Import a Discord data package</h3>
+      </div>
+      <p class="pref-desc">
+        No third-party tool? In Discord go to <strong>Settings → Privacy &amp; Safety → Request all of my Data</strong>. When the package arrives, unzip it and choose the folder here. Everything happens on this device — nothing is sent to Discord. Note that Discord's package only contains <em>your own</em> messages. Imported history merges into this device's vault (up to the newest {VAULT_KEEP} messages per channel).
+      </p>
+      <div class="pref-vault-actions">
+        <label class="pref-file">
+          <span>Choose package folder</span>
+          <input
+            type="file"
+            multiple
+            disabled={busy()}
+            ref={(el) => el.setAttribute('webkitdirectory', '')}
+            onChange={(event) => void handleSelect(event)}
+          />
+        </label>
+      </div>
+      <Show when={pending()}>
+        {(job) => (
+          <div class="pref-import-review" role="group" aria-labelledby="pref-discord-package-review-title">
+            <h4 id="pref-discord-package-review-title">Review import</h4>
+            <p>
+              {countLabel(job().messages, 'message')} across {countLabel(job().channels, 'channel')}
+              {job().guild ? ` from ${job().guild}` : ''}
+              {job().oldest && job().newest ? ` (${shortDate(job().oldest)} → ${shortDate(job().newest)})` : ''}.
+              {job().skipped > 0 ? ` ${countLabel(job().skipped, 'system/empty message')} skipped.` : ''}
+              {job().droppedOverCap > 0 ? ` ${countLabel(job().droppedOverCap, 'older message')} beyond the per-channel limit dropped.` : ''}
+              {' '}Existing local history is merged, not replaced.
+            </p>
+            <div class="pref-import-review__actions">
+              <button type="button" class="pref-reset" disabled={busy()} onClick={() => void confirmImport()}>
+                Import into vault
+              </button>
+              <button
+                type="button"
+                class="pref-reset"
+                disabled={busy()}
+                onClick={() => {
+                  setPending(null);
+                  setStatus('Import cancelled.');
+                }}
+              >
+                Cancel import
+              </button>
+            </div>
+          </div>
+        )}
+      </Show>
+      <Show when={status()}>
+        <p class="pref-status" role="status">{status()}</p>
+      </Show>
+    </section>
   );
 }
 
