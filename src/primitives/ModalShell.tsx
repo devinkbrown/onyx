@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { createEffect, onCleanup, Show, splitProps, type ParentProps } from 'solid-js';
+import { Show, splitProps, type ParentProps } from 'solid-js';
 import { Portal } from 'solid-js/web';
+import { createDialogFocus } from './focusTrap';
 
 export type ModalShellProps = ParentProps<{
   open: boolean;
@@ -10,76 +11,16 @@ export type ModalShellProps = ParentProps<{
   closeLabel?: string;
 }>;
 
-const focusableSelector = [
-  'a[href]',
-  'button:not([disabled])',
-  'textarea:not([disabled])',
-  'input:not([disabled])',
-  'select:not([disabled])',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',');
-
-function focusFirst(dialog: HTMLElement) {
-  const first = dialog.querySelector<HTMLElement>(focusableSelector);
-  (first ?? dialog).focus();
-}
-
-function trapFocus(event: KeyboardEvent, dialog: HTMLElement) {
-  const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelector))
-    .filter((element) => !element.hasAttribute('disabled') && element.tabIndex !== -1);
-
-  if (focusable.length === 0) {
-    event.preventDefault();
-    dialog.focus();
-    return;
-  }
-
-  const first = focusable[0];
-  const last = focusable[focusable.length - 1];
-  if (!first || !last) return;
-
-  // Focus may have drifted outside the dialog — e.g. the focused control was
-  // removed or disabled and the browser reset activeElement to <body>. Pull it
-  // back in so Tab can never traverse the background page. (WCAG 2.4.3)
-  if (!dialog.contains(document.activeElement)) {
-    event.preventDefault();
-    (event.shiftKey ? last : first).focus();
-    return;
-  }
-
-  if (event.shiftKey && document.activeElement === first) {
-    event.preventDefault();
-    last.focus();
-  } else if (!event.shiftKey && document.activeElement === last) {
-    event.preventDefault();
-    first.focus();
-  }
-}
-
 export function ModalShell(props: ModalShellProps) {
   const [local, rest] = splitProps(props, ['open', 'title', 'description', 'onOpenChange', 'closeLabel', 'children']);
   const titleId = () => `${local.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'modal'}-title`;
   const descriptionId = () => local.description ? `${titleId()}-description` : undefined;
   let dialogRef: HTMLElement | undefined;
 
-  createEffect(() => {
-    if (!local.open) return;
-
-    const previous = document.activeElement as HTMLElement | null;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') local.onOpenChange(false);
-      if (event.key === 'Tab' && dialogRef) trapFocus(event, dialogRef);
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    queueMicrotask(() => {
-      if (dialogRef) focusFirst(dialogRef);
-    });
-
-    onCleanup(() => {
-      document.removeEventListener('keydown', handleKeyDown);
-      previous?.focus?.();
-    });
+  createDialogFocus({
+    isOpen: () => local.open,
+    getPanel: () => dialogRef,
+    onEscape: () => local.onOpenChange(false),
   });
 
   return (

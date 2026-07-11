@@ -57,6 +57,56 @@ describe('ModalShell', () => {
     expect(document.activeElement).toBe(close);
   });
 
+  it('wraps focus backward from the close button to the last control on Shift+Tab', async () => {
+    render(() => (
+      <ModalShell open title="Keyboard trap" onOpenChange={() => undefined}>
+        <button type="button">First</button>
+        <button type="button">Last</button>
+      </ModalShell>
+    ));
+    await tick();
+
+    const close = screen.getByRole('button', { name: 'Close dialog' });
+    const last = screen.getByRole('button', { name: 'Last' });
+    close.focus();
+    fireEvent.keyDown(document.body, { key: 'Tab', shiftKey: true });
+
+    expect(document.activeElement).toBe(last);
+  });
+
+  it('restores focus to the triggering element when the dialog closes', async () => {
+    function Harness() {
+      const [open, setOpen] = createSignal(false);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            Open settings
+          </button>
+          <ModalShell open={open()} title="Settings" onOpenChange={setOpen}>
+            <button type="button">Save</button>
+          </ModalShell>
+        </>
+      );
+    }
+
+    render(() => <Harness />);
+    const trigger = screen.getByRole('button', { name: 'Open settings' });
+    trigger.focus();
+    expect(document.activeElement).toBe(trigger);
+
+    fireEvent.click(trigger);
+    await tick();
+    // Focus moved into the dialog on open.
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.contains(document.activeElement)).toBe(true);
+
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    await tick();
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
   it('recaptures focus that has drifted outside the dialog on Tab', async () => {
     // A control inside a modal that is later removed/disabled leaves the browser
     // with focus on <body> (or a background element). A Tab from there must be

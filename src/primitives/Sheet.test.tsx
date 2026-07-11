@@ -57,6 +57,55 @@ describe('Sheet', () => {
     expect(document.activeElement).toBe(close);
   });
 
+  it('wraps focus backward from the close button to the last control on Shift+Tab', async () => {
+    render(() => (
+      <Sheet open title="Members" onOpenChange={() => undefined}>
+        <button type="button">First action</button>
+        <button type="button">Last action</button>
+      </Sheet>
+    ));
+    await tick();
+
+    const close = screen.getByRole('button', { name: 'Close panel' });
+    const last = screen.getByRole('button', { name: 'Last action' });
+    close.focus();
+    fireEvent.keyDown(document.body, { key: 'Tab', shiftKey: true });
+
+    expect(document.activeElement).toBe(last);
+  });
+
+  it('restores focus to the triggering element when the sheet closes', async () => {
+    function Harness() {
+      const [open, setOpen] = createSignal(false);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            Open thread
+          </button>
+          <Sheet open={open()} title="Thread" onOpenChange={setOpen}>
+            <button type="button">Reply</button>
+          </Sheet>
+        </>
+      );
+    }
+
+    render(() => <Harness />);
+    const trigger = screen.getByRole('button', { name: 'Open thread' });
+    trigger.focus();
+    expect(document.activeElement).toBe(trigger);
+
+    fireEvent.click(trigger);
+    await tick();
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.contains(document.activeElement)).toBe(true);
+
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    await tick();
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
   it('recaptures focus that has drifted outside the sheet on Tab', async () => {
     // A control inside the panel that is later removed/disabled leaves the
     // browser with focus on <body> (or a background element). A Tab from there
