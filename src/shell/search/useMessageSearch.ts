@@ -306,19 +306,26 @@ export function useMessageSearch(): UseMessageSearch {
   }
 
   // ── device-memory (vault) search across ALL conversations ──
-  // Debounced against the query; loaded rows are de-duped by id while older
-  // same-room rows that only exist in the local vault remain searchable.
-  const [vaultHits, setVaultHits] = createSignal<VaultSearchResult[]>([]);
+  // The async fetch is debounced against ONLY the query, panel-open state, mode,
+  // and the localHistory preference — deliberately NOT the set of loaded message
+  // ids. Tracking loadedMessageIds here would re-run this effect (clearing and
+  // rescheduling the 200ms debounce, and re-hitting IndexedDB) on every incoming
+  // message in ANY conversation, since the store replaces the channels/dms Map
+  // immutably on each one — which can starve the vault search entirely on a busy
+  // network. The loaded-row de-dupe is instead applied reactively in the
+  // `vaultHits` memo below, so newly-loaded rows still drop out cheaply without
+  // disturbing the debounce.
+  const [vaultRawHits, setVaultRawHits] = createSignal<VaultSearchResult[]>([]);
   let vaultTimer: ReturnType<typeof setTimeout> | undefined;
   let vaultSeq = 0;
   createEffect(() => {
     const query = messageSearchQuery().trim();
     const open = isMessageSearchOpen();
-    const loadedIds = loadedMessageIds();
     const mode = vaultSearchMode();
+    const localHistory = preferences().localHistory;
     if (vaultTimer !== undefined) clearTimeout(vaultTimer);
-    if (!open || query.length < 2 || !preferences().localHistory) {
-      setVaultHits([]);
+    if (!open || query.length < 2 || !localHistory) {
+      setVaultRawHits([]);
       return;
     }
     const seq = ++vaultSeq;
@@ -326,23 +333,31 @@ export function useMessageSearch(): UseMessageSearch {
       const run = mode === 'semantic' ? searchVaultSemantic(query) : searchVault(query);
       void run.then((hits) => {
         if (seq !== vaultSeq) return; // a newer query superseded this one
-        setVaultHits(
-          hits
-            .filter((h) => !loadedIds.has(h.message.id))
-            .slice(0, 25)
-            .map((h) => ({
-              id: h.message.id,
-              from: h.message.from,
-              text: h.message.text,
-              time: h.message.time,
-              target: h.target,
-            })),
+        setVaultRawHits(
+          hits.map((h) => ({
+            id: h.message.id,
+            from: h.message.from,
+            text: h.message.text,
+            time: h.message.time,
+            target: h.target,
+          })),
         );
       });
     }, 200);
   });
   onCleanup(() => {
     if (vaultTimer !== undefined) clearTimeout(vaultTimer);
+  });
+
+  // De-dupe vault hits against messages already loaded in the active conversation.
+  // Reactive over loadedMessageIds so incoming messages re-filter cheaply without
+  // re-running the debounced fetch above; older same-room rows that only exist in
+  // the local vault remain searchable.
+  const vaultHits = createMemo((): VaultSearchResult[] => {
+    const loaded = loadedMessageIds();
+    return vaultRawHits()
+      .filter((hit) => !loaded.has(hit.id))
+      .slice(0, 25);
   });
 
   const recallSuggestions = createMemo(() => {
