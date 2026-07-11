@@ -32,6 +32,7 @@ import { createMemo, For, Show } from 'solid-js';
 import { getState, useStore } from '@/lib/store';
 import type { SuimyakuPeerState } from '@/lib/suimyaku-media/types';
 import { ParticipantTile } from './ParticipantTile';
+import { CallStatusAnnouncer } from './CallStatusAnnouncer';
 import './voice.css';
 
 /** A normalized participant — self or a remote peer — for layout passes. */
@@ -183,6 +184,8 @@ export function VoiceStage() {
       data-testid="voice-stage"
       data-layout={screenshareActive() ? 'screenshare' : voice().callLayout}
     >
+      {/* Polite roster announcements (joins/leaves) for screen-reader users — SC 4.1.3. */}
+      <CallStatusAnnouncer />
       <Show
         when={screenshareActive()}
         fallback={

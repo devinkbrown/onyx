@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /** Onyx voice/video surfaces — barrel. */
 export { VoiceStage } from './VoiceStage';
+export { CallStatusAnnouncer } from './CallStatusAnnouncer';
 export { VoiceBar } from './VoiceBar';
 export { VoicePip } from './VoicePip';
 export { ParticipantTile } from './ParticipantTile';

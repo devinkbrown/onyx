@@ -579,8 +579,6 @@ export function VoiceBar() {
               trigger={
                 <span
                   class="onyx-icon-button onyx-icon-button--ghost onyx-icon-button--md"
-                  role="button"
-                  tabindex="0"
                   aria-label="Send a reaction"
                   data-testid="reactions-button"
                   title="Send a reaction"
@@ -647,8 +645,6 @@ export function VoiceBar() {
                 trigger={
                   <span
                     class="onyx-icon-button onyx-icon-button--ghost onyx-icon-button--md"
-                    role="button"
-                    tabindex="0"
                     aria-label={`Spatial audio controls, ${spatialStateLabel()}`}
                     data-testid="spatial-audio-button"
                     title={`Spatial audio: ${spatialStateLabel()}`}

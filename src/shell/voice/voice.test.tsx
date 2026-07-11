@@ -22,6 +22,7 @@ import type { SuimyakuPeerState } from '@/lib/suimyaku-media/types';
 import { VoiceStage } from './VoiceStage';
 import { ParticipantTile } from './ParticipantTile';
 import { VoiceBar } from './VoiceBar';
+import { CallStatusAnnouncer } from './CallStatusAnnouncer';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -924,5 +925,124 @@ describe('ParticipantTile enhancements', () => {
 
     // Assert
     expect(getByTitle('Camera off')).toBeDefined();
+  });
+});
+
+// ── CallStatusAnnouncer (SC 4.1.3 Status Messages) ──────────────────────────────
+
+/** Replace the in-call peer set without remounting the component. */
+function setPeers(nicks: string[]) {
+  store.setState((s) => {
+    const peers = new Map<string, SuimyakuPeerState>();
+    for (const nick of nicks) peers.set(nick, makePeer(nick));
+    return { voice: { ...s.voice, peers } };
+  });
+}
+
+describe('CallStatusAnnouncer', () => {
+  beforeEach(() => {
+    store.setState(initialState, true);
+  });
+
+  afterEach(() => cleanup());
+
+  it('exposes a polite, atomic status live region', () => {
+    // Arrange
+    seedVoiceStore([makePeer('alice')], []);
+
+    // Act
+    const { getByTestId } = render(() => <CallStatusAnnouncer />);
+    const region = getByTestId('call-status-announcer');
+
+    // Assert — scoped announcement channel, not an assertive alert
+    expect(region.getAttribute('role')).toBe('status');
+    expect(region.getAttribute('aria-live')).toBe('polite');
+    expect(region.getAttribute('aria-atomic')).toBe('true');
+  });
+
+  it('does NOT announce the existing roster on first in-call render', () => {
+    // Arrange — a busy call is joined mid-stream (baseline must stay silent)
+    seedVoiceStore([makePeer('alice'), makePeer('bob'), makePeer('carol')], []);
+
+    // Act
+    const { getByTestId } = render(() => <CallStatusAnnouncer />);
+
+    // Assert — no roster read-out on mount
+    expect(getByTestId('call-status-announcer').textContent).toBe('');
+  });
+
+  it('announces only the delta when a participant joins', () => {
+    // Arrange
+    seedVoiceStore([makePeer('alice')], []);
+    const { getByTestId } = render(() => <CallStatusAnnouncer />);
+
+    // Act — bob joins the ongoing call
+    setPeers(['alice', 'bob']);
+
+    // Assert — bob is announced, the pre-existing alice is not
+    const text = getByTestId('call-status-announcer').textContent ?? '';
+    expect(text).toContain('bob');
+    expect(text).toContain('joined the call');
+    expect(text).not.toContain('alice');
+  });
+
+  it('announces a participant leaving', () => {
+    // Arrange
+    seedVoiceStore([makePeer('alice'), makePeer('bob')], []);
+    const { getByTestId } = render(() => <CallStatusAnnouncer />);
+
+    // Act — bob leaves
+    setPeers(['alice']);
+
+    // Assert
+    const text = getByTestId('call-status-announcer').textContent ?? '';
+    expect(text).toContain('bob');
+    expect(text).toContain('left the call');
+  });
+
+  it('stays silent on unrelated voice-state churn (no roster re-announcement)', () => {
+    // Arrange
+    seedVoiceStore([makePeer('alice'), makePeer('bob')], []);
+    const { getByTestId } = render(() => <CallStatusAnnouncer />);
+
+    // Act — a self-mute flip replaces the voice object but not the roster
+    store.setState((s) => ({ voice: { ...s.voice, muted: true } }));
+
+    // Assert — nothing announced; the 24-tile-roster spam trap stays shut
+    expect(getByTestId('call-status-announcer').textContent).toBe('');
+  });
+});
+
+// ── VoiceBar trigger accessible names (SC 4.1.2 Name, Role, Value) ──────────────
+
+describe('VoiceBar popover triggers', () => {
+  beforeEach(() => {
+    store.setState(initialState, true);
+  });
+
+  afterEach(() => cleanup());
+
+  it('exposes exactly one named button for the reactions trigger (no nested control)', () => {
+    // Arrange
+    seedVoiceStore([], [makeChannelUser('self')]);
+
+    // Act
+    const { getByRole } = render(() => <VoiceBar />);
+
+    // Assert — getByRole throws on a duplicate/nested button, so this proves the
+    // trigger is a single tab stop with a real accessible name.
+    expect(getByRole('button', { name: 'Send a reaction' })).toBeInTheDocument();
+  });
+
+  it('exposes a single named button for the spatial-audio trigger', () => {
+    // Arrange — mediaAvailable so the spatial popover (not the disabled fallback) renders
+    seedVoiceStore([], [makeChannelUser('self')], {});
+    store.setState((s) => ({ mediaAvailable: true, voice: { ...s.voice } }));
+
+    // Act
+    const { getByRole } = render(() => <VoiceBar />);
+
+    // Assert — name comes from the (now non-interactive) labelled child span
+    expect(getByRole('button', { name: /Spatial audio controls/ })).toBeInTheDocument();
   });
 });
