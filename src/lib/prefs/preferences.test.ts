@@ -4,13 +4,16 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   DEFAULT_PREFERENCES,
   applyPreferences,
+  applyPreferencesSnapshot,
   closePreferences,
   isPreferencesOpen,
   loadPreferences,
   openPreferences,
+  parsePreferencesSnapshot,
   preferences,
   resetPreferences,
   setPreference,
+  type Preferences,
 } from './preferences';
 
 const STORAGE_KEY = 'onyx:preferences';
@@ -102,6 +105,81 @@ describe('preferences store', () => {
       localStorage.setItem('onyx:high-contrast', '1');
       expect(loadPreferences().highContrast).toBe(true);
     });
+
+    it('prefers the current storage key over the legacy preferences key', () => {
+      localStorage.setItem('ruri:preferences', JSON.stringify({ density: 'compact' }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ density: 'roomy' }));
+
+      expect(loadPreferences().density).toBe('roomy');
+    });
+
+    it('validates every persisted preference field independently', () => {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          density: 'compact',
+          fontScale: 'sm',
+          hideEvents: true,
+          width: 'full',
+          readerMode: true,
+          reduceMotion: true,
+          reduceTransparency: true,
+          highContrast: true,
+          linkPreviews: false,
+          clock: '12h',
+          localHistory: false,
+          e2eeDms: false,
+          timeScrubber: false,
+          voiceEntry: false,
+          topicTools: true,
+          watchTogether: false,
+        }),
+      );
+
+      expect(loadPreferences()).toEqual({
+        density: 'compact',
+        fontScale: 'sm',
+        hideEvents: true,
+        width: 'full',
+        readerMode: true,
+        reduceMotion: true,
+        reduceTransparency: true,
+        highContrast: true,
+        linkPreviews: false,
+        clock: '12h',
+        localHistory: false,
+        e2eeDms: false,
+        timeScrubber: false,
+        voiceEntry: false,
+        topicTools: true,
+        watchTogether: false,
+      });
+    });
+  });
+
+  describe('parsePreferencesSnapshot', () => {
+    it('returns null for non-object snapshots', () => {
+      expect(parsePreferencesSnapshot(null)).toBeNull();
+      expect(parsePreferencesSnapshot('compact')).toBeNull();
+      expect(parsePreferencesSnapshot(['compact'])).toBeNull();
+    });
+
+    it('merges valid fields and falls back for adversarial values', () => {
+      expect(parsePreferencesSnapshot({
+        density: 'roomy',
+        fontScale: '__proto__',
+        hideEvents: 1,
+        width: 'full',
+        clock: '12h',
+        localHistory: false,
+      })).toEqual({
+        ...DEFAULT_PREFERENCES,
+        density: 'roomy',
+        width: 'full',
+        clock: '12h',
+        localHistory: false,
+      });
+    });
   });
 
   describe('setPreference', () => {
@@ -165,6 +243,25 @@ describe('preferences store', () => {
       document.documentElement.dataset.density = 'stale';
       applyPreferences();
       expect(document.documentElement.dataset.density).toBe('roomy');
+    });
+  });
+
+  describe('applyPreferencesSnapshot', () => {
+    it('clones, persists, and applies a supplied snapshot', () => {
+      const snapshot: Preferences = {
+        ...DEFAULT_PREFERENCES,
+        density: 'compact',
+        highContrast: true,
+        linkPreviews: false,
+      };
+
+      applyPreferencesSnapshot(snapshot);
+      snapshot.density = 'roomy';
+
+      expect(preferences().density).toBe('compact');
+      expect(readStored().density).toBe('compact');
+      expect(document.documentElement.dataset.density).toBe('compact');
+      expect(document.documentElement.dataset.highContrast).toBe('true');
     });
   });
 

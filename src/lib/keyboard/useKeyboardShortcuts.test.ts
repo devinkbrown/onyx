@@ -8,7 +8,7 @@
  */
 import { fireEvent } from '@solidjs/testing-library';
 import { createRoot } from 'solid-js';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Channel } from '@/lib/irc/types';
 import { closePreferences, isPreferencesOpen, preferences, resetPreferences } from '@/lib/prefs/preferences';
 import { store } from '@/lib/store/store';
@@ -37,6 +37,7 @@ describe('SHORTCUTS descriptor', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     resetPreferences();
   });
 
@@ -276,6 +277,46 @@ describe('SHORTCUTS descriptor', () => {
     fireEvent.keyDown(window, { key: 'h' });
 
     expect(store.getState().activeView).toEqual({ kind: 'home' });
+    dispose();
+  });
+
+  it('cancels a pending G sequence when the next key is not part of the sequence', () => {
+    const dispose = mountKeyboardHarness();
+    store.setState({ activeView: { kind: 'channel', channel: '#general' } });
+
+    fireEvent.keyDown(window, { key: 'g' });
+    fireEvent.keyDown(window, { key: 'x' });
+    fireEvent.keyDown(window, { key: 'h' });
+
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#general' });
+    dispose();
+  });
+
+  it('expires a pending G sequence before accepting the second chord', () => {
+    vi.useFakeTimers();
+    const dispose = mountKeyboardHarness();
+    store.setState({ activeView: { kind: 'channel', channel: '#general' } });
+
+    fireEvent.keyDown(window, { key: 'g' });
+    vi.advanceTimersByTime(1201);
+    fireEvent.keyDown(window, { key: 'h' });
+
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#general' });
+    dispose();
+  });
+
+  it('clears a pending G sequence when focus moves into an editable target', () => {
+    const dispose = mountKeyboardHarness();
+    const input = document.createElement('input');
+    document.body.append(input);
+    store.setState({ activeView: { kind: 'channel', channel: '#general' } });
+
+    fireEvent.keyDown(window, { key: 'g' });
+    fireEvent.keyDown(input, { key: 'a' });
+    fireEvent.keyDown(window, { key: 'h' });
+
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#general' });
+    input.remove();
     dispose();
   });
 

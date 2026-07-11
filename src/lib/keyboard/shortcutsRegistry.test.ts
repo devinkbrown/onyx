@@ -5,13 +5,14 @@
  * Unit tests for the pure shortcut registry matcher.
  */
 import { describe, expect, it } from 'vitest';
-import { isTypingTarget, matchShortcut } from './shortcutsRegistry';
+import { isTypingTarget, matchShortcut, SHORTCUTS, type Shortcut } from './shortcutsRegistry';
 
 type ShortcutEvent = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'>;
 
 type FakeElement = EventTarget & {
   tagName: string;
   isContentEditable?: boolean;
+  getAttribute?: (name: string) => string | null;
 };
 
 function makeEvent(overrides: Partial<ShortcutEvent>): ShortcutEvent {
@@ -84,6 +85,40 @@ describe('matchShortcut', () => {
   it('returns null for an unknown key', () => {
     expect(matchShortcut(makeEvent({ key: 'Unidentified' }))).toBeNull();
   });
+
+  it('normalizes key case but still rejects unexpected modifiers', () => {
+    expect(matchShortcut(makeEvent({ key: 'K', ctrlKey: true }))?.id).toBe('command.palette');
+    expect(matchShortcut(makeEvent({ key: 'K', ctrlKey: true, altKey: true }))).toBeNull();
+    expect(matchShortcut(makeEvent({ key: 'R', metaKey: true, shiftKey: true }))?.id).toBe(
+      'reader.mode.toggle',
+    );
+    expect(matchShortcut(makeEvent({ key: 'R', metaKey: true, shiftKey: true, altKey: true }))).toBeNull();
+  });
+
+  it('keeps the shipped shortcut registry free of chord conflicts', () => {
+    const chordKey = (shortcut: Shortcut): string => [
+      shortcut.chord.mod === true ? 'mod' : '',
+      shortcut.chord.shift === true ? 'shift' : '',
+      shortcut.chord.alt === true ? 'alt' : '',
+      shortcut.chord.key.toLowerCase(),
+    ].filter(Boolean).join('+');
+
+    const seen = new Map<string, string>();
+    for (const shortcut of SHORTCUTS) {
+      const key = chordKey(shortcut);
+      expect(seen.get(key), `${shortcut.id} conflicts with ${seen.get(key)} on ${key}`).toBeUndefined();
+      seen.set(key, shortcut.id);
+    }
+  });
+
+  it('matches the first shortcut when a caller supplies an intentionally conflicting registry', () => {
+    const registry: readonly Shortcut[] = [
+      { id: 'first', chord: { key: 'x', mod: true }, label: 'First', group: 'Test' },
+      { id: 'second', chord: { key: 'x', mod: true }, label: 'Second', group: 'Test' },
+    ];
+
+    expect(matchShortcut(makeEvent({ key: 'x', ctrlKey: true }), registry)?.id).toBe('first');
+  });
 });
 
 describe('isTypingTarget', () => {
@@ -96,5 +131,23 @@ describe('isTypingTarget', () => {
   it('returns false for div and null targets', () => {
     expect(isTypingTarget(makeElement('div'))).toBe(false);
     expect(isTypingTarget(null)).toBe(false);
+  });
+
+  it('treats contenteditable attributes as typing targets even on element-like test doubles', () => {
+    const target = {
+      tagName: 'section',
+      getAttribute: (name: string) => (name === 'contenteditable' ? 'TRUE' : null),
+    } as unknown as FakeElement;
+
+    expect(isTypingTarget(target)).toBe(true);
+  });
+
+  it('treats plaintext-only contenteditable targets as typing targets', () => {
+    const target = {
+      tagName: 'section',
+      getAttribute: (name: string) => (name === 'contenteditable' ? 'plaintext-only' : null),
+    } as unknown as FakeElement;
+
+    expect(isTypingTarget(target)).toBe(true);
   });
 });

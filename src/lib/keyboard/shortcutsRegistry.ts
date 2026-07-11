@@ -110,7 +110,8 @@ function isElementLikeTarget(target: EventTarget | null): target is ElementLikeT
 
 function hasContentEditableAttribute(target: ElementLikeTarget): boolean {
   const contentEditable = target.getAttribute?.('contenteditable') ?? null;
-  return contentEditable === '' || contentEditable?.toLowerCase() === 'true';
+  const normalized = contentEditable?.toLowerCase();
+  return contentEditable === '' || normalized === 'true' || normalized === 'plaintext-only';
 }
 
 export function matchShortcut(

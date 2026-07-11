@@ -58,4 +58,24 @@ describe('suggestTopic', () => {
     expect(suggestTopic('zeta alpha beta gamma')).toBe('zeta alpha beta');
     expect(suggestTopic('alpha zeta beta gamma')).toBe('alpha zeta beta');
   });
+
+  it('normalizes simple plural forms before scoring repeated terms', () => {
+    expect(suggestTopic([
+      { text: 'batteries backups stories' },
+      { text: 'battery backup story' },
+    ])).toBe('battery backup story');
+  });
+
+  it('keeps hyphenated terms and clips an over-long first term to a valid label', () => {
+    const longHyphenated = `${'incident-'.repeat(8)}timeline`;
+    const label = suggestTopic(longHyphenated);
+
+    expect(label).toHaveLength(MAX_TOPIC_LABEL_BYTES);
+    expect(isValidTopicLabel(label)).toBe(true);
+    expect(longHyphenated.startsWith(label)).toBe(true);
+  });
+
+  it('ignores URL-only input rather than leaking host names into suggestions', () => {
+    expect(suggestTopic('https://incident.example.test/rollback-plan')).toBe('');
+  });
 });

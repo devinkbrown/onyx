@@ -31,6 +31,16 @@ describe('topic label validation', () => {
     expect(isValidTopicLabel('ops\x7fincident')).toBe(false);
     expect(isValidTopicLabel('')).toBe(false);
   });
+
+  it('counts UTF-8 bytes rather than UTF-16 code units', () => {
+    const twelveEmoji = '🔥'.repeat(12);
+    const thirteenEmoji = '🔥'.repeat(13);
+
+    expect(new TextEncoder().encode(twelveEmoji).length).toBe(48);
+    expect(new TextEncoder().encode(thirteenEmoji).length).toBe(52);
+    expect(isValidTopicLabel(twelveEmoji)).toBe(true);
+    expect(isValidTopicLabel(thirteenEmoji)).toBe(false);
+  });
 });
 
 describe('message topic parsing', () => {
@@ -42,6 +52,10 @@ describe('message topic parsing', () => {
     expect(parseMessageTopic({})).toBeNull();
     expect(parseMessageTopic({ [TOPIC_TAG]: 'bad,label' })).toBeNull();
     expect(parseMessageTopic({ [TOPIC_TAG]: '   ' })).toBeNull();
+  });
+
+  it('rejects a tag that only becomes over-limit after trimming whitespace', () => {
+    expect(parseMessageTopic({ [TOPIC_TAG]: ` ${'界'.repeat(17)} ` })).toBeNull();
   });
 });
 
@@ -67,12 +81,29 @@ describe('topic registry parsing', () => {
     expect(parseTopicRegistry(undefined)).toEqual([]);
     expect(parseTopicRegistry('')).toEqual([]);
   });
+
+  it('does not let invalid or duplicate labels consume the registry cap', () => {
+    const invalidLabels = Array.from({ length: MAX_TOPIC_REGISTRY + 8 }, (_, index) => `bad\x01${index}`);
+    const duplicateLabels = Array.from({ length: 5 }, () => 'Release');
+    const validLabels = Array.from({ length: MAX_TOPIC_REGISTRY }, (_, index) => `topic-${index}`);
+
+    const parsed = parseTopicRegistry([...invalidLabels, ...duplicateLabels, ...validLabels].join(','));
+
+    expect(parsed).toHaveLength(MAX_TOPIC_REGISTRY);
+    expect(parsed[0]).toBe('Release');
+    expect(parsed[1]).toBe('topic-0');
+    expect(parsed[MAX_TOPIC_REGISTRY - 1]).toBe(`topic-${MAX_TOPIC_REGISTRY - 2}`);
+  });
 });
 
 describe('outbound topic tags', () => {
   it('builds a message tag for valid labels and null for invalid labels', () => {
     expect(topicMessageTag('release')).toEqual({ [TOPIC_TAG]: 'release' });
     expect(topicMessageTag('bad,label')).toBeNull();
+  });
+
+  it('preserves the outbound label exactly when it is already valid', () => {
+    expect(topicMessageTag('Release Train')).toEqual({ [TOPIC_TAG]: 'Release Train' });
   });
 });
 
@@ -91,6 +122,19 @@ describe('unread topic bucketing', () => {
       ['release', 2],
       ['triage', 1],
       ['', 2],
+    ]);
+  });
+
+  it('does not normalize topic label case while bucketing existing messages', () => {
+    const counts = bucketUnreadByTopic([
+      { topic: 'Release', unread: true },
+      { topic: 'release', unread: true },
+      { topic: 'Release', unread: true },
+    ]);
+
+    expect(Array.from(counts.entries())).toEqual([
+      ['Release', 2],
+      ['release', 1],
     ]);
   });
 });

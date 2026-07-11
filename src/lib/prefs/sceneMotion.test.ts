@@ -9,6 +9,7 @@ import {
   DEFAULT_SCENE_MOTION,
   applySceneMotion,
   loadSceneMotion,
+  parseSceneMotion,
   resetSceneMotion,
   sceneMotion,
   setSceneMotion,
@@ -27,6 +28,14 @@ describe('scene motion store', () => {
     localStorage.setItem(STORAGE_KEY, 'cinematic');
 
     expect(loadSceneMotion()).toBe(DEFAULT_SCENE_MOTION);
+  });
+
+  it('parses only known scene motion values', () => {
+    expect(parseSceneMotion('animated')).toBe('animated');
+    expect(parseSceneMotion('still')).toBe('still');
+    expect(parseSceneMotion('off')).toBe('off');
+    expect(parseSceneMotion('')).toBeNull();
+    expect(parseSceneMotion({ value: 'off' })).toBeNull();
   });
 
   it('roundtrips through localStorage and updates the signal', () => {
