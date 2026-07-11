@@ -96,6 +96,7 @@ export function Composer(props: ComposerProps): JSX.Element {
 
   let textareaRef!: HTMLTextAreaElement;
   let fileInputRef!: HTMLInputElement;
+  let emojiSearchRef: HTMLInputElement | undefined;
   const previewUrls = new Set<string>();
 
   onCleanup(() => {
@@ -152,6 +153,21 @@ export function Composer(props: ComposerProps): JSX.Element {
     slashCommands();
     setSlashIndex(0);
   });
+
+  // When the emoji dialog opens, move keyboard focus into it (to the search
+  // field) so a keyboard user is never stranded on the toggle button with an
+  // open, unreachable popup. SC 2.4.3 Focus Order / 2.1.1 Keyboard.
+  createEffect(() => {
+    if (!emojiOpen()) return;
+    queueMicrotask(() => emojiSearchRef?.focus());
+  });
+
+  // Close the emoji dialog and restore focus to the textarea (the trigger's
+  // logical origin), so dismissing it never drops focus to <body>.
+  function closeEmojiPicker(restoreFocus = true): void {
+    setEmojiOpen(false);
+    if (restoreFocus) focusTextarea();
+  }
 
   let loadedTarget: string | null = null;
   let loadedEditId: string | null = null;
@@ -638,21 +654,31 @@ export function Composer(props: ComposerProps): JSX.Element {
         </Show>
 
         <Show when={emojiOpen()}>
-          <div id="shell-emoji-picker" class="shell-emoji-picker" role="dialog" aria-label="Emoji picker">
+          <div
+            id="shell-emoji-picker"
+            class="shell-emoji-picker"
+            role="dialog"
+            aria-modal="false"
+            aria-label="Emoji picker"
+            onKeyDown={(e) => {
+              // Escape from anywhere inside the dialog (search field, an emoji
+              // choice, or the grid) closes it and returns focus to the composer.
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                closeEmojiPicker();
+              }
+            }}
+          >
             <label class="sr-only" for="shell-emoji-search">Search emoji</label>
             <input
+              ref={emojiSearchRef}
               id="shell-emoji-search"
               class="shell-emoji-search"
               value={emojiQuery()}
               placeholder="Search emoji"
+              aria-label="Search emoji"
               onInput={(e) => setEmojiQuery((e.currentTarget as HTMLInputElement).value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') {
-                  e.preventDefault();
-                  setEmojiOpen(false);
-                  focusTextarea();
-                }
-              }}
             />
             <div class="shell-emoji-grid" role="listbox" aria-label="Emoji results">
               <For each={emojiMatches()}>
@@ -742,6 +768,7 @@ export function Composer(props: ComposerProps): JSX.Element {
           class="shell-composer-send"
           disabled={!isEnabled() || !canSend()}
           aria-label={activeEditing() ? 'Save edit' : 'Send message'}
+          aria-busy={isSending()}
           onClick={() => void sendMessage()}
         >
           <Show

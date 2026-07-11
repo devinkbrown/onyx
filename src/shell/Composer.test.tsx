@@ -128,6 +128,36 @@ describe('Composer accessibility', () => {
     expect(sendSpy).toHaveBeenCalledWith('#room', 'こんにち');
   });
 
+  it('moves focus into the emoji dialog on open and restores it to the textarea on Escape', async () => {
+    // Arrange
+    seedActiveChannel();
+    const { getByRole, queryByRole } = render(() => <Composer />);
+    const textarea = getByRole('textbox', { name: /message #room/i });
+    const emojiToggle = getByRole('button', { name: 'Insert emoji' });
+
+    // Act — open the picker.
+    fireEvent.click(emojiToggle);
+
+    // Assert — dialog present, trigger advertises expanded state.
+    const dialog = getByRole('dialog', { name: 'Emoji picker' });
+    expect(dialog).toBeDefined();
+    expect(emojiToggle.getAttribute('aria-expanded')).toBe('true');
+
+    // Focus lands on the search field (queued as a microtask).
+    const search = getByRole('textbox', { name: 'Search emoji' });
+    await Promise.resolve();
+    expect(document.activeElement).toBe(search);
+
+    // Act — Escape from inside the dialog closes it and restores focus.
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+
+    // Assert — dialog gone, expanded state cleared, focus back on the composer.
+    expect(queryByRole('dialog', { name: 'Emoji picker' })).toBeNull();
+    expect(emojiToggle.getAttribute('aria-expanded')).toBe('false');
+    await Promise.resolve();
+    expect(document.activeElement).toBe(textarea);
+  });
+
   it('announces composer errors through a role="alert" live region', () => {
     // Arrange
     seedActiveChannel();
