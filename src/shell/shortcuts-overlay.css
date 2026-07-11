@@ -1,19 +1,22 @@
-/* ShortcutsSheet.css - tokenized keyboard shortcut reference sheet styling. */
+/* shortcuts-overlay.css - tokenized keyboard-shortcuts help overlay styling.
+ * Rendered inside the ModalShell body; the dialog chrome, entry animation, and
+ * prefers-reduced-motion handling all live in the primitive (primitives.css).
+ * This file styles only the grouped shortcut list and adds no motion. */
 
-.shortcuts-sheet {
+.shortcuts-overlay {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
   padding: var(--space-1) 0;
 }
 
-.shortcuts-sheet__group {
+.shortcuts-overlay__group {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
 }
 
-.shortcuts-sheet__title {
+.shortcuts-overlay__group-name {
   margin: 0;
   color: var(--washi-dim);
   font-family: var(--font-mono);
@@ -23,7 +26,7 @@
   text-transform: uppercase;
 }
 
-.shortcuts-sheet__rows {
+.shortcuts-overlay__rows {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--line);
@@ -32,7 +35,7 @@
   overflow: hidden;
 }
 
-.shortcuts-sheet__row {
+.shortcuts-overlay__row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) max-content;
   align-items: center;
@@ -41,26 +44,32 @@
   padding: var(--space-2) var(--space-3);
 }
 
-.shortcuts-sheet__row + .shortcuts-sheet__row {
+.shortcuts-overlay__row + .shortcuts-overlay__row {
   border-top: 1px solid var(--seam);
 }
 
-.shortcuts-sheet__label {
+.shortcuts-overlay__desc {
   min-width: 0;
   color: var(--washi);
   font-size: 0.88rem;
   line-height: 1.35;
 }
 
-.shortcuts-sheet__keys {
+.shortcuts-overlay__keys {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
   gap: var(--space-1);
   min-width: 0;
 }
 
-.shortcuts-sheet__key {
+.shortcuts-overlay__sep {
+  color: var(--washi-dim);
+  font-size: 0.72rem;
+}
+
+.shortcuts-overlay__kbd {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -78,17 +87,4 @@
   font-weight: 700;
   letter-spacing: 0;
   line-height: 1;
-  white-space: nowrap;
-}
-
-@media (max-width: 560px) {
-  .shortcuts-sheet__row {
-    grid-template-columns: 1fr;
-    align-items: start;
-    gap: var(--space-2);
-  }
-
-  .shortcuts-sheet__keys {
-    justify-content: flex-start;
-  }
 }

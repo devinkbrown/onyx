@@ -63,7 +63,7 @@ import { PinnedMessages } from './PinnedMessages';
 import { applyPreferences, isPreferencesOpen, openPreferences, preferences } from '@/lib/prefs/preferences';
 import { applySceneMotion } from '@/lib/prefs/sceneMotion';
 import { applyCalmPreset } from '@/lib/notifications/calmMode';
-import { ShortcutsSheet } from './ShortcutsSheet';
+import { ShortcutsOverlay } from './ShortcutsOverlay';
 import { useKeyboardShortcuts } from '@/lib/keyboard/useKeyboardShortcuts';
 import { MessageSearch } from './search/MessageSearch';
 import { hasMessageSearchableConversation, openMessageSearch } from './search/useMessageSearch';
@@ -588,8 +588,8 @@ export function AppShell(props: AppShellProps): JSX.Element {
       <CaptionsOverlay />
       <ReactionsOverlay />
 
-      {/* Keyboard shortcuts sheet — opened with "?" or Home shortcuts action */}
-      <ShortcutsSheet open={showKeyboardShortcuts()} onClose={() => getState().closeKeyboardShortcuts()} />
+      {/* Keyboard shortcuts help overlay — opened with "?" or Home shortcuts action */}
+      <ShortcutsOverlay open={showKeyboardShortcuts()} onClose={() => getState().closeKeyboardShortcuts()} />
     </>
   );
 }
