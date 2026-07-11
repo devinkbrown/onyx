@@ -318,24 +318,30 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
           </div>
         </Show>
         <Show when={search.query().trim().length >= 2}>
-          <div class="onyx-message-search__recall" role="group" aria-label="Device recall matching mode">
+          <div class="onyx-message-search__recall onyx-message-search__recall--modes">
             <ProvenanceBadge scope="device" subject="Device recall matching mode" />
             <span class="onyx-message-search__vault-label">Device recall</span>
-            <For each={VAULT_MODE_OPTIONS}>
-              {(option) => (
-                <button
-                  type="button"
-                  class="onyx-message-search__recall-chip"
-                  aria-pressed={search.vaultMode() === option.mode}
-                  data-mode={option.mode}
-                  data-active={search.vaultMode() === option.mode}
-                  title={option.title}
-                  onClick={() => search.setVaultMode(option.mode)}
-                >
-                  {option.label}
-                </button>
-              )}
-            </For>
+            <div
+              class="onyx-message-search__segmented"
+              role="group"
+              aria-label="Device recall matching mode"
+            >
+              <For each={VAULT_MODE_OPTIONS}>
+                {(option) => (
+                  <button
+                    type="button"
+                    class="onyx-message-search__segment"
+                    aria-pressed={search.vaultMode() === option.mode}
+                    data-mode={option.mode}
+                    data-active={search.vaultMode() === option.mode}
+                    title={option.title}
+                    onClick={() => search.setVaultMode(option.mode)}
+                  >
+                    {option.label}
+                  </button>
+                )}
+              </For>
+            </div>
           </div>
         </Show>
         <Show when={search.vaultResults().length > 0}>

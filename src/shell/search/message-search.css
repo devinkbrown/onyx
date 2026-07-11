@@ -190,6 +190,66 @@
   outline-offset: 2px;
 }
 
+/* ── Device-recall matching mode: a true segmented control ───────────────
+   One bonded track (not three loose chips) so a single-choice reads as a
+   single-choice. The active segment is signalled by fill AND a top accent
+   rail — never colour alone — so it survives forced-colors + colour-blind. */
+.onyx-message-search__recall--modes {
+  gap: 0.5rem;
+}
+
+.onyx-message-search__segmented {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--seam);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--ink) 60%, transparent);
+  overflow: hidden;
+}
+
+.onyx-message-search__segment {
+  appearance: none;
+  border: 0;
+  border-inline-start: 1px solid var(--seam-faint);
+  background: transparent;
+  color: var(--washi-dim);
+  min-height: 1.9rem;
+  padding: 0 0.7rem;
+  font: 720 0.66rem/1 var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    color var(--dur) var(--ease),
+    background var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+
+.onyx-message-search__segment:first-child {
+  border-inline-start: 0;
+}
+
+.onyx-message-search__segment:hover:not([data-active='true']) {
+  color: var(--washi);
+  background: color-mix(in oklab, var(--lapis) 12%, transparent);
+}
+
+.onyx-message-search__segment:active:not([data-active='true']) {
+  background: color-mix(in oklab, var(--lapis) 20%, transparent);
+}
+
+.onyx-message-search__segment[data-active='true'] {
+  color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis-deep) 30%, var(--stone));
+  /* Non-colour cue: an inset accent rail across the active segment top. */
+  box-shadow: inset 0 2px 0 var(--lapis-bright);
+}
+
+.onyx-message-search__segment:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: -2px;
+}
+
 .shell-msg-search-current {
   background:
     linear-gradient(
@@ -286,6 +346,14 @@
   .onyx-message-search__recall-chip {
     min-height: 34px;
     flex: none;
+  }
+
+  .onyx-message-search__segmented {
+    flex: none;
+  }
+
+  .onyx-message-search__segment {
+    min-height: 38px;
   }
 
   .onyx-message-search__server-bar,

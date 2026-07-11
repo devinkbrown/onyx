@@ -1164,16 +1164,25 @@ export function ThemeStudio(props: ThemeStudioProps) {
                   [seed from current]
                 </Button>
               </Tooltip>
-              <Tooltip content="Copy this seed as portable JSON — the recipient regenerates it AA-clean." placement="top">
-                <Button variant="ghost" size="sm" onClick={handleExportSeed} data-testid="ts-export-seed">
-                  {seedCopied() ? '[✓ seed copied]' : '[export seed]'}
-                </Button>
-              </Tooltip>
-              <Tooltip content="Paste a portable seed JSON — validated fail-closed, then generated." placement="top">
-                <Button variant="ghost" size="sm" onClick={handleImportSeed} data-testid="ts-import-seed">
-                  [import seed]
-                </Button>
-              </Tooltip>
+              <div class="ts-seed-transfer" role="group" aria-label="Portable seed transfer">
+                <Tooltip content="Copy this seed as portable JSON — the recipient regenerates it AA-clean." placement="top">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    class="ts-seed-btn"
+                    data-copied={seedCopied() ? 'true' : undefined}
+                    onClick={handleExportSeed}
+                    data-testid="ts-export-seed"
+                  >
+                    {seedCopied() ? '[✓ seed copied]' : '[export seed]'}
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Paste a portable seed JSON — validated fail-closed, then generated." placement="top">
+                  <Button variant="ghost" size="sm" class="ts-seed-btn" onClick={handleImportSeed} data-testid="ts-import-seed">
+                    [import seed]
+                  </Button>
+                </Tooltip>
+              </div>
             </div>
             <p class="ts-factory__hint">
               One seed → a whole coherent palette, AA-clean by construction.
@@ -1639,6 +1648,58 @@ const STUDIO_CSS = `
   gap: 0.5rem;
   flex-wrap: wrap;
   margin-top: 0.1rem;
+}
+
+/* Portable-seed pair: export/import are one artifact moving in and out, so a
+   hairline seam sets them apart from the generation actions (proximity does
+   the grouping). The copied confirm is a designed state, not a bare text swap. */
+.ts-seed-transfer {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding-inline-start: 0.6rem;
+  border-inline-start: 1px solid var(--seam-faint);
+}
+.ts-seed-btn {
+  transition:
+    color var(--dur) var(--ease),
+    background var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+.ts-seed-btn[data-copied='true'],
+.ts-seed-btn[data-copied='true']:hover:not(:disabled):not([aria-disabled='true']),
+.ts-seed-btn[data-copied='true']:active:not(:disabled):not([aria-disabled='true']) {
+  color: var(--lapis-bright);
+  border-color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis-deep) 32%, var(--stone));
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--lapis-bright) 42%, transparent) inset,
+    0 0 22px -14px var(--lapis-bright);
+  transform: none;
+  animation: ts-seed-copied-flash var(--dur) var(--ease);
+}
+@keyframes ts-seed-copied-flash {
+  0% {
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--lapis-bright) 42%, transparent) inset,
+      0 0 0 0 color-mix(in oklab, var(--lapis-bright) 55%, transparent);
+  }
+  60% {
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--lapis-bright) 42%, transparent) inset,
+      0 0 0 4px color-mix(in oklab, var(--lapis-bright) 20%, transparent);
+  }
+  100% {
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--lapis-bright) 42%, transparent) inset,
+      0 0 22px -14px var(--lapis-bright);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ts-seed-btn { transition: none; }
+  .ts-seed-btn[data-copied='true'] { animation: none; }
 }
 .ts-factory__hint {
   margin: 0;
