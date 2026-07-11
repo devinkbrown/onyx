@@ -190,6 +190,13 @@ down to TLS.
     ✅ **CLIENT SLICE SHIPPED 2026-07-09** — Recent catch-up reviews on Home now
     open reviewed-preview text directly in message search after navigating to
     the reviewed target, extending the cross-room handoff beyond Spotlight.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-11** — Home now has a one-tap "Mark all
+    caught up" affordance (`src/shell/MarkAllCaughtUp.tsx`, mounted in
+    `HomeView.tsx`): a pure `planCatchUpAll` (`src/lib/catchup/markCaughtUp.ts`)
+    enumerates every unread channel + DM deterministically and advances read-state
+    through the existing per-target `markRead` action (which also syncs the IRCv3
+    read marker so sibling sessions agree). Clears the full backlog, self-hides
+    when nothing is unread, and parks focus on a live status line on success.
     ⏭️ **NEXT** — pure Onyx work. Reuse the local vault, `?at=` time travel,
     and richer cross-room review handoffs before adding new server surface.
 16. **Reader mode** *(client)* — a calm single-pane transcript view for long
@@ -342,6 +349,13 @@ client or public site needs to expose the result.
     claim path from guest nick to registered account, recovery email, and
     device login; the guest Account panel now returns directly to Connect with
     concrete claim steps instead of pointing users at bot-era NickServ flows.
+    ✅ **CLIENT SLICE SHIPPED 2026-07-11** — Passkeys (WebAuthn) are live, no
+    longer "future": `src/lib/webauthn/passkey.ts` drives the daemon's `WEBAUTHN`
+    register/sign-in ceremony (base64url wire, ES256/EdDSA), with fail-closed
+    validation of the server challenge (host-label `rp_id`, ≥16-byte challenge)
+    before the device is ever prompted. Surfaced as **Add a passkey** in the
+    Account panel (`src/app/Account.tsx`) and **Sign in with a passkey** on
+    Connect (`src/app/Connect.tsx`, gated on `isPasskeySupported()`).
 20. **Brand and glossary cleanup** *(main site + client)* — enforce one public
     glossary across home, about, status, roadmap, accessibility, app chrome,
     invite unfurls, and docs. Track the master-roadmap direction to make

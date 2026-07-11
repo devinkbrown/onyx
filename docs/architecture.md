@@ -130,6 +130,70 @@ and open signal; `Spotlight.tsx` is the dialog; `commands.ts` builds the command
 set; `timeGrammar.ts` parses the natural-language time grammar (`at: yesterday
 21:00`, relative offsets); `fuzzy.ts` is the subsequence matcher + ranking.
 
+## Home & catch-up (`src/lib/catchup/`, `src/shell/HomeView.tsx`)
+
+The app opens on a **Home / catch-up** surface (`src/shell/HomeView.tsx`), not
+the last channel buffer. `src/lib/catchup/` holds the pure, DOM-free ranking
+logic behind it:
+
+- `summary.ts` — ranks the store's per-target unread/mention counters by unread
+  count (busiest first). A different lens from `notifications/catchUp.ts`, which
+  ranks by priority (DMs/mentions first, then recency).
+- `markCaughtUp.ts` — `planCatchUpAll(channels, dms)` enumerates every joined
+  channel + DM that still has unread activity in a deterministic order (mentions
+  first, then most-unread, then name A→Z) and returns the totals
+  (`src/lib/catchup/markCaughtUp.ts:72`). It never touches the store.
+
+`src/shell/MarkAllCaughtUp.tsx` (mounted at `src/shell/HomeView.tsx:444`) is the
+"Mark all caught up" affordance: it reads `channels`/`dms` reactively, computes
+the plan with `planCatchUpAll`, and on click advances read-state one target at a
+time through the store's per-target `markRead` action (which also syncs the
+IRCv3 read marker to the server). It captures the plan *before* the loop because
+each `markRead` mutates the store and recomputes the plan
+(`src/shell/MarkAllCaughtUp.tsx:56`), self-hides once nothing is unread, and
+moves focus to a live status line on success (WCAG 2.4.3). Both modules are
+fully unit-tested.
+
+## Passkeys / WebAuthn (`src/lib/webauthn/`)
+
+Passwordless login. `src/lib/webauthn/passkey.ts` is the browser half of the
+daemon's `WEBAUTHN` command (see [`../OROCHI_PROTOCOL.md`](../OROCHI_PROTOCOL.md)
+§5.1). It is pure ceremony plumbing — base64url (no-padding) codecs, option
+builders, and response encoders — with the two `navigator.credentials`
+create/get calls as the only browser-dependent seam. Fail-closed by design:
+
+- `b64urlToBytes` rejects any non-base64url byte, padding, or impossible length
+  rather than silently decoding to the wrong bytes
+  (`src/lib/webauthn/passkey.ts:62`).
+- `MIN_CHALLENGE_BYTES = 16` floors the server challenge to the WebAuthn L2
+  spec minimum; a shorter challenge is rejected before the device is ever
+  prompted (`src/lib/webauthn/passkey.ts:33`, `:89`).
+- `assertRpId` rejects an empty or whitespace relying-party id
+  (`src/lib/webauthn/passkey.ts:84`); `PUBKEY_CRED_PARAMS` offers only ES256
+  (-7) and EdDSA (-8) (`src/lib/webauthn/passkey.ts:21`).
+
+The store owns the ceremony state (`passkeyBusy`/`passkeyError`/`passkeyNotice`,
+`registerPasskey`/`signInWithPasskey`, `src/lib/store/store.ts:546`) and drives
+it from the `WEBAUTHN` message handler (`src/lib/store/store.ts:4710`); every
+builder call is wrapped in a guard so a fail-closed throw becomes an error state
+instead of a stranded spinner. UI seams: the **Add a passkey** form in
+`src/app/Account.tsx:686` and the **Sign in with a passkey** button in
+`src/app/Connect.tsx:997` (gated on `isPasskeySupported()`). Note:
+`src/lib/credentials.ts` is a *separate* concern — saved account/password +
+session-token persistence, not WebAuthn.
+
+## Notifications (`src/lib/notifications/`)
+
+The notification decision engine — pure, testable modules that decide *whether*
+and *how* to alert, plus the runtime that acts on them
+(`NotificationRuntime.tsx`). Highlights: `decision.ts` (per-message notify
+decision), `calmMode.ts`/`channelNotifyMode.ts` (the Calm / Regular / Power
+presets), `catchUp.ts` (priority-ranked catch-up, DMs/mentions first),
+`readState.ts` (unread/read tracking), `followed.ts` (followed rooms/topics/DMs),
+`sinceDigest.ts`/`reviewHistory.ts` (since-you-left digests + review-range
+memory), `webPush.ts` (Web Push subscription), and `homeMemory.ts` (Home recap
+state). Almost every module has a co-located `*.test.ts`.
+
 ## Other notable `src/` areas
 
 - `src/shell/` — the chat application shell (AppShell, ChannelSidebar,

@@ -17,8 +17,8 @@ transport. Live at https://eshmaki.me.
 ## Commands
 
 ```bash
-pnpm dev           # Vite dev server
-pnpm build         # production build → out/
+pnpm dev           # Vite dev server (port 3000)
+pnpm build         # production build → dist/ (NOT out/; see Deploy)
 pnpm typecheck     # tsc --noEmit
 pnpm lint          # eslint
 pnpm test          # vitest unit tests (co-located *.test.ts[x])
@@ -41,12 +41,17 @@ Vite exposes only `VITE_*` variables; see `.env.example` for full docs.
 ./deploy.sh
 ```
 
-nginx serves `out/` directly at eshmaki.me, so building **is** deploying.
-The script:
+nginx serves **`out/`** directly at eshmaki.me. `pnpm build` targets **`dist/`**
+(`vite.config.ts:13`), *not* `out/` — so a plain build (or a test run) can never
+half-replace production. **`deploy.sh` is the only writer of `out/`.** The script
+(`deploy.sh`):
 
-1. runs `pnpm build` → `out/`
-2. materialises SPA route entrypoints (`out/app|about|appearance/index.html`
-   copies) so hard loads of client routes don't 404 — keep that list in sync
-   with the `<Route>` table in `src/index.tsx`
-3. stamps the service-worker cache name (`onyx-shell-<version>`) into
-   `out/sw.js` so already-cached clients pick up the new build
+1. runs `pnpm build` → `dist/`
+2. materialises SPA route entrypoints (`dist/<route>/index.html` copies for
+   `app about appearance stats status roadmap invite`, `deploy.sh:32`) so hard
+   loads of client routes don't 404 — keep that list in sync with the `<Route>`
+   table in `src/index.tsx`
+3. stamps the service-worker cache name (`onyx-shell-<version>`) into `dist/sw.js`
+   so already-cached clients pick up the new build (`deploy.sh:38`)
+4. overlays the community site from `/home/kain/landing`, then
+   `rsync -a --delete dist/ → out/` (`deploy.sh:59`)

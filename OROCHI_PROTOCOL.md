@@ -178,6 +178,42 @@ Flow: `AUTHENTICATE <MECH>` → server `AUTHENTICATE +` (or challenge) → clien
 lowercased. **Operator status is derived from the SASL account** (config binds
 account→oper class) — there is no `OPER` command (`491` says so).
 
+### 5.1 Passkeys (WebAuthn)
+
+Passwordless login via the `WEBAUTHN` command, paired with browser
+`navigator.credentials`. This is a **standard-reply-driven** exchange, not a SASL
+mechanism: challenges/results arrive as `NOTE WEBAUTHN <SUBCODE> …` (and `FAIL
+WEBAUTHN …` / `WARN WEBAUTHN …` on error), the client answers with `WEBAUTHN
+<SUBCOMMAND> …`. All binary fields on the wire are **base64url, no padding**
+(IRC-token-safe). Onyx's half is `src/lib/webauthn/passkey.ts`; the store handler
+is `src/lib/store/store.ts:4710`.
+
+**Register a passkey** (must already be logged in):
+
+```
+→ WEBAUTHN REGISTER [label]
+← NOTE WEBAUTHN REGISTER-CHALLENGE <chal_b64url> <rp_id> :<account>
+→ WEBAUTHN REGISTER-FINISH <credId_b64url> <clientDataJSON_b64url> <authData_b64url>
+← NOTE WEBAUTHN REGISTERED <credId_b64url> :<label>
+```
+
+**Sign in with a passkey** (passwordless; no prior login):
+
+```
+→ WEBAUTHN AUTH <account>
+← NOTE WEBAUTHN AUTH-CHALLENGE <chal_b64url> <rp_id> :<account>
+← NOTE WEBAUTHN ALLOW-CRED <credId_b64url>            (0..n, one per allowed credential)
+→ WEBAUTHN AUTH-FINISH <credId_b64url> <clientDataJSON_b64url> <authData_b64url> <sig_b64url>
+← (IDENTIFY login side effects — you are now logged in)
+```
+
+Client-side fail-closed rules Onyx enforces before prompting the device: the
+`rp_id` must be a non-empty whitespace-free host label, the challenge must decode
+as valid base64url and be **≥ 16 bytes** (WebAuthn L2 §13.4.3 minimum), and the
+offered algorithms are ES256 (-7) and EdDSA (-8) only — the algorithms the
+daemon's COSE parser accepts. `ALLOW-CRED` lines follow the `AUTH-CHALLENGE` and
+are collected before the `get()` ceremony runs.
+
 ---
 
 ## 6. Sessions, Reconnect Reclaim & Bouncer (Onyx-critical)
@@ -485,6 +521,8 @@ Orochi is a CRDT **mesh** (not a TS6 tree). What a client sees:
 - [ ] Gate the `001` autojoin storm behind `!session-sync`; let the server drive JOINs.
 - [ ] On reconnect: `SESSION TOKEN` capture + `SESSION-TOKEN` SASL reclaim; dedup
       CHATHISTORY/bouncer replay by `msgid`.
+- [ ] Passkey login via `WEBAUTHN` (§5.1): validate the server challenge fail-closed
+      (base64url, ≥16 bytes, host-label `rp_id`) before calling `navigator.credentials`.
 - [ ] Parse `time=`/`msgid=`/`account=` tags; render typing/react/reply TAGMSG tags.
 - [ ] Honor `MODES` (combine modes per line per the advertised value; live = 1).
 - [ ] Map service `FAIL`/`NOTE`/`NOTICE` replies to UI (REGISTER/IDENTIFY/CHANNEL/…).
