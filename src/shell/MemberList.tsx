@@ -96,15 +96,22 @@ interface GroupEntry {
 
 type RoleBadgeProps = {
   role: ResolvedRole;
+  /**
+   * When the surrounding control already names the role for assistive tech
+   * (e.g. the roster row's sr-only summary), render the badge as a purely
+   * visual glyph so screen readers don't announce the role a second time.
+   */
+  decorative?: boolean;
 };
 
 function RoleBadge(props: RoleBadgeProps): JSX.Element {
-  const [local] = splitProps(props, ['role']);
+  const [local] = splitProps(props, ['role', 'decorative']);
   return (
     <Show when={local.role.key !== 'member'}>
     <span
       class={`shell-role-badge shell-role-badge--${local.role.key}`}
-      aria-label={local.role.label}
+      aria-label={local.decorative ? undefined : local.role.label}
+      aria-hidden={local.decorative ? 'true' : undefined}
       title={local.role.label}
     >
       {local.role.symbol}
@@ -346,10 +353,16 @@ export function MemberList(props: MemberListProps): JSX.Element {
     >
       <div class="shell-members-head">
         <span>members</span>
+        {/*
+          Not a live region: on a busy channel the count churns on every
+          join/leave (and on history replay / ?at= time-travel / roster
+          reconciliation), and announcing a bare integer each time is pure
+          screen-reader spam (SC 4.1.3). The count stays visible and carries an
+          accessible name so it reads meaningfully on demand, but membership
+          changes are announced elsewhere — never by re-reading this number.
+        */}
         <span
           class="shell-members-count"
-          aria-live="polite"
-          aria-atomic="true"
           aria-label={`${totalCount()} member${totalCount() === 1 ? '' : 's'}`}
         >
           {totalCount()}
@@ -426,7 +439,7 @@ export function MemberList(props: MemberListProps): JSX.Element {
                                   Open member details for {user.nick}, {role.label}{user.away ? ', away' : ''}
                                 </span>
                                 <Show when={role.key !== 'member'}>
-                                  <RoleBadge role={role} />
+                                  <RoleBadge role={role} decorative />
                                 </Show>
                               </div>
                             }
