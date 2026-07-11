@@ -51,4 +51,13 @@ describe('StatsRoute', () => {
       '/app?join=%23root&at=2026-07-08T12%3A00%3A00.000Z',
     );
   });
+
+  it('omits the moment (never throws) when last_active is an out-of-range outlier', () => {
+    // A garbage/mis-scaled feed value (e.g. ms or ns mistaken for seconds) pushes
+    // the Date past JS's ±8.64e15 ms bound; toISOString() would throw RangeError
+    // and crash the whole Stats render. The link must degrade to a plain join.
+    expect(() => roomDeepLink('#root', 1e17)).not.toThrow();
+    expect(roomDeepLink('#root', 1e17)).toBe('/app?join=%23root');
+    expect(roomDeepLink('#root', Number.POSITIVE_INFINITY)).toBe('/app?join=%23root');
+  });
 });

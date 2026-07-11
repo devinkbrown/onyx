@@ -43,10 +43,16 @@ function barHeight(day: NetworkDay, max: number): string {
   return String(Math.max(3, Math.round((day.messages / max) * 100)));
 }
 
+// JS Date can only represent ±8.64e15 ms; toISOString() throws RangeError past it.
+const MAX_TIME_MS = 8.64e15;
+
 export function roomDeepLink(channel: string, lastActiveUnixSec = 0): string {
   const params = new URLSearchParams({ join: channel });
-  if (lastActiveUnixSec > 0) {
-    params.set('at', new Date(lastActiveUnixSec * 1000).toISOString());
+  const ms = lastActiveUnixSec * 1000;
+  // Bound the outlier feed value before formatting so a mis-scaled/garbage
+  // last_active can never throw and crash the Stats render — degrade to a plain join.
+  if (lastActiveUnixSec > 0 && Number.isFinite(ms) && ms <= MAX_TIME_MS) {
+    params.set('at', new Date(ms).toISOString());
   }
   return `/app?${params.toString()}`;
 }
