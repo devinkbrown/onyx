@@ -4883,8 +4883,8 @@
 }
 /* The current UTC hour is marked with the hot accent so "now" reads at a glance. */
 .shell-heat-bar--now {
-  background: var(--coral, #ff6f61);
-  box-shadow: 0 0 5px color-mix(in oklab, var(--coral, #ff6f61) 60%, transparent);
+  background: var(--shu, #ff6f61);
+  box-shadow: 0 0 5px color-mix(in oklab, var(--shu, #ff6f61) 60%, transparent);
 }
 @media (max-width: 720px) {
   /* Reclaim ribbon width on phones — the count/topic matter more there. */
@@ -4904,8 +4904,8 @@
   max-width: min(38rem, 90%);
 }
 .shell-event-line--live {
-  border-color: color-mix(in oklab, var(--coral, #ff6f61) 45%, transparent);
-  background: color-mix(in oklab, var(--coral, #ff6f61) 12%, transparent);
+  border-color: color-mix(in oklab, var(--shu, #ff6f61) 45%, transparent);
+  background: color-mix(in oklab, var(--shu, #ff6f61) 12%, transparent);
 }
 .shell-event-cal { font-size: 1rem; flex: none; }
 .shell-event-main {
@@ -4928,14 +4928,14 @@
   color: var(--washi-dim, #9ab);
 }
 .shell-event-when strong { color: var(--lapis-bright, #6fc3e8); font-weight: 600; }
-.shell-event-line--live .shell-event-when strong { color: var(--coral, #ff6f61); }
+.shell-event-line--live .shell-event-when strong { color: var(--shu, #ff6f61); }
 .shell-event-actions { display: inline-flex; align-items: center; gap: 0.4rem; flex: none; }
 .shell-event-join {
   font: inherit;
   font-size: 0.76rem;
   font-weight: 600;
   color: var(--ink, #04121c);
-  background: var(--coral, #ff6f61);
+  background: var(--shu, #ff6f61);
   border: 0;
   border-radius: 999px;
   padding: 0.28rem 0.7rem;

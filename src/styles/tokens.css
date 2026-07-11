@@ -45,6 +45,16 @@
   --shu: #ff6f61;
   --shu-bright: #ff9484;
 
+  /* On-accent inks — dark text that reads AA on a bright accent fill.
+     Use these for text sitting on --lapis / --lapis-bright / --gold-bright
+     CTAs and on --shu / --danger badges instead of hand-picking a hex per
+     component, so the ink tracks the theme's accent.
+     Ocean (canonical) contrast: --on-accent 7.27 : 1 vs --lapis,
+     11.79 : 1 vs --lapis-bright, 14.40 : 1 vs --gold-bright (AAA);
+     --on-danger 7.06 : 1 vs --shu (AAA). */
+  --on-accent: #04121e;
+  --on-danger: #1c0906;
+
   /* Text — sea-foam ivory over deep water */
   --washi: #d1e1e9;
   --washi-dim: #8c9ba3;

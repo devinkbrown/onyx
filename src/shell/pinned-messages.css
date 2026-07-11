@@ -107,6 +107,6 @@
   transition: background 150ms ease, color 150ms ease;
 }
 .pins-item-unpin:hover {
-  background: color-mix(in oklab, var(--coral, #ff6f61) 22%, transparent);
+  background: color-mix(in oklab, var(--shu, #ff6f61) 22%, transparent);
   color: var(--washi, #fff);
 }

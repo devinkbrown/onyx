@@ -312,14 +312,14 @@
 }
 
 :root[data-reader='true'] .since-digest-card__title {
-  font-family: 'Iowan Old Style', 'Charter', Georgia, 'Times New Roman', serif;
+  font-family: var(--font-serif);
   font-size: 1.22rem;
   line-height: 1.28;
 }
 
 :root[data-reader='true'] .since-digest-card__reader-note {
   color: var(--washi);
-  font-family: 'Iowan Old Style', 'Charter', Georgia, 'Times New Roman', serif;
+  font-family: var(--font-serif);
   font-size: 1rem;
   line-height: 1.58;
 }

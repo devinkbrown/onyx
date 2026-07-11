@@ -194,7 +194,7 @@
 .home-cta {
   font: inherit;
   font-weight: 600;
-  color: #04121e;
+  color: var(--on-accent);
   background: linear-gradient(180deg, var(--lapis-bright), var(--lapis));
   border: 0;
   border-radius: 999px;
@@ -995,12 +995,12 @@
   cursor: pointer;
 }
 .home-recap-card__open {
-  color: #04121e;
+  color: var(--on-accent);
   background: var(--gold-bright);
   border: 1px solid transparent;
 }
 .home-recap-card__review {
-  color: #04121e;
+  color: var(--on-accent);
   background: color-mix(in oklab, var(--lapis-bright) 82%, var(--gold-bright));
   border: 1px solid transparent;
 }
