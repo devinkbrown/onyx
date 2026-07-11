@@ -906,6 +906,104 @@
 .home-catchup-when {
   color: var(--washi-mute);
 }
+.home-resume {
+  margin-top: 18px;
+}
+.home-resume-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.home-resume-head .home-section-label {
+  margin: 0;
+}
+.home-resume-summary {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--washi-mute);
+}
+.home-resume-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.home-resume-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  text-align: left;
+  background: color-mix(in oklab, var(--stone) 85%, transparent);
+  border: 1px solid var(--line);
+  border-left: 2px solid transparent;
+  border-radius: var(--r-md);
+  color: var(--washi);
+  cursor: pointer;
+  transition: border-color var(--dur, 200ms) var(--ease),
+    background var(--dur, 200ms) var(--ease);
+}
+.home-resume-item:hover {
+  border-color: var(--stone-line);
+  background: color-mix(in oklab, var(--stone) 70%, transparent);
+}
+.home-resume-item.is-mention,
+.home-resume-item.is-dm {
+  border-left-color: var(--gold-bright);
+}
+.home-resume-item.is-followed {
+  border-left-color: var(--lapis-bright);
+}
+.home-resume-name {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-resume-kind {
+  color: var(--washi-mute);
+  font-family: var(--font-mono);
+}
+.home-resume-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.home-resume-mention {
+  color: var(--gold-deep);
+  background: color-mix(in oklab, var(--gold) 18%, transparent);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+.home-resume-followed {
+  color: var(--lapis-bright);
+  background: color-mix(in oklab, var(--lapis) 16%, transparent);
+  border: 1px solid color-mix(in oklab, var(--lapis) 30%, transparent);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+.home-resume-count {
+  color: var(--washi-mute);
+}
+.home-resume-cue {
+  color: var(--gold-bright);
+  font-weight: 500;
+}
 .home-recap-strip {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
@@ -1113,6 +1211,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .home-catchup-item,
+  .home-resume-item,
   .home-recap-card__open,
   .home-recap-card__review,
   .home-recap-card__spotlight,

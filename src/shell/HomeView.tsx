@@ -24,6 +24,7 @@ import {
 } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
 import { buildCatchUp, catchUpSummary, type CatchUpItem } from '@/lib/notifications/catchUp';
+import { buildResumePoints, type ResumePoint } from '@/lib/catchup/resumePoints';
 import { followed } from '@/lib/notifications/followed';
 import { buildHomeMemory, type HomeMemoryItem } from '@/lib/notifications/homeMemory';
 import { buildQuietActivity, type QuietActivityItem } from '@/lib/notifications/quietActivity';
@@ -166,6 +167,7 @@ export function HomeView(): JSX.Element {
   const channels = useStore((s) => s.channels);
   const dms = useStore((s) => s.dms);
   const channelLastActivity = useStore((s) => s.channelLastActivity);
+  const firstUnreadId = useStore((s) => s.firstUnreadId);
   const channelProps = useStore((s) => s.channelProps);
   const composerDrafts = useStore((s) => s.composerDrafts);
   const connectionStatus = useStore((s) => s.connectionStatus);
@@ -203,6 +205,20 @@ export function HomeView(): JSX.Element {
   );
   const catchUpTotals = createMemo(() => catchUpSummary(catchUp()));
   const hasRooms = createMemo(() => channels().size > 0 || dms().size > 0);
+
+  // "Resume where you left off" — the ranked catch-up items that have an
+  // authoritative first-unread boundary, so one tap lands you at the exact
+  // message you last read up to (the store's firstUnreadId, same cursor as the
+  // UnreadDivider), not the start of a heuristic window.
+  const resumePoints = createMemo<ResumePoint[]>(() =>
+    buildResumePoints(catchUp(), firstUnreadId()),
+  );
+  const resumeAt = (point: ResumePoint) => {
+    const state = getState();
+    if (point.kind === 'channel') state.navigate({ kind: 'channel', channel: point.target });
+    else state.navigate({ kind: 'dm', nick: point.target });
+    state.focusMessage(point.boundaryId);
+  };
   const openCatchUp = (item: CatchUpItem) =>
     item.kind === 'channel'
       ? getState().navigate({ kind: 'channel', channel: item.target })
@@ -521,6 +537,46 @@ export function HomeView(): JSX.Element {
                 </For>
               </div>
             </Show>
+          </section>
+        </Show>
+
+        <Show when={connectionStatus() === 'connected' && resumePoints().length > 0}>
+          <section class="home-resume" aria-label="Resume where you left off">
+            <div class="home-resume-head">
+              <h3 class="home-section-label">Pick up where you left off</h3>
+              <span class="home-resume-summary">last-read boundary</span>
+            </div>
+            <ul class="home-resume-list">
+              <For each={resumePoints()}>
+                {(point) => (
+                  <li>
+                    <button
+                      type="button"
+                      class={`home-resume-item is-${point.tier}`}
+                      onClick={() => resumeAt(point)}
+                      aria-label={`Resume ${point.name} at your first unread message, ${point.unread} unread${point.highlights > 0 ? `, ${point.highlights} mention${point.highlights === 1 ? '' : 's'}` : ''}`}
+                    >
+                      <span class="home-resume-name">
+                        <span class="home-resume-kind" aria-hidden="true">
+                          {point.kind === 'dm' ? '@' : '#'}
+                        </span>
+                        {point.kind === 'dm' ? point.name : point.name.replace(/^#/, '')}
+                      </span>
+                      <span class="home-resume-meta">
+                        <Show when={point.highlights > 0}>
+                          <span class="home-resume-mention">{point.highlights} @you</span>
+                        </Show>
+                        <Show when={point.tier === 'followed'}>
+                          <span class="home-resume-followed">followed</span>
+                        </Show>
+                        <span class="home-resume-count">{point.unread} unread</span>
+                        <span class="home-resume-cue" aria-hidden="true">Resume →</span>
+                      </span>
+                    </button>
+                  </li>
+                )}
+              </For>
+            </ul>
           </section>
         </Show>
 
