@@ -114,6 +114,48 @@ describe('ChannelSidebar accessibility', () => {
     expect(bravo.getAttribute('aria-label')).toBe('#bravo, 3 unread, 2 mentions');
   });
 
+  it('exposes DM unread and mention counts in the accessible name', () => {
+    // Arrange — a DM with unread + mentions. State to AT must not be badge-only.
+    const channels = new Map<string, Channel>();
+    const dms = new Map<string, DMConversation>();
+    dms.set('erin', makeDm('erin', 4, 1));
+    store.setState({
+      ...initialState,
+      channels,
+      dms,
+      activeView: { kind: 'status' },
+      connectionStatus: 'connected',
+      ourNick: 'me',
+      networkName: 'IRCXNet',
+    }, true);
+
+    // Act
+    const { getByRole } = render(() => <ChannelSidebar />);
+    const erin = getByRole('button', { name: /erin/ });
+
+    // Assert — name carries the state; the visible badge is decorative only.
+    expect(erin.getAttribute('aria-label')).toBe('DM with erin, 4 unread, 1 mention');
+  });
+
+  it('does not announce unread counts through a live region', () => {
+    // Arrange — #bravo carries 3 unread / 2 mentions.
+    seed();
+
+    // Act
+    const { container } = render(() => <ChannelSidebar />);
+    const scroll = container.querySelector('.shell-sidebar-scroll')!;
+
+    // Assert — the conversation list is not a live region, so unread churn never
+    // spams the screen reader (SC 4.1.3). Only connection status is polite.
+    expect(scroll.querySelector('[aria-live]')).toBeNull();
+    // And every count badge is hidden from AT — the accessible name carries it.
+    const badges = container.querySelectorAll('.shell-channel-badge');
+    expect(badges.length).toBeGreaterThan(0);
+    badges.forEach((badge) => {
+      expect(badge.getAttribute('aria-hidden')).toBe('true');
+    });
+  });
+
   it('labels the join action with the target channel', () => {
     seed();
 

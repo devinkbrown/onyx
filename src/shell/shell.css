@@ -508,6 +508,26 @@
   box-shadow: inset 0 0 0 1px var(--seam-faint);
 }
 
+/* Forced colors: the open conversation must stay visible. In Windows High
+   Contrast, every row is flattened to ButtonFace/ButtonText and the gradient +
+   ::before accent bar are dropped, so the active row is indistinguishable from
+   the rest — aria-current alone only reaches AT. Mark it with Highlight, the
+   same treatment selected controls get in src/styles/a11y-media.css.
+   SC 1.4.1 Use of Color. */
+@media (forced-colors: active) {
+  .shell-channel-item[aria-current='page'] {
+    color: HighlightText;
+    background: Highlight;
+    border-color: Highlight;
+  }
+
+  .shell-channel-item[aria-current='page'] .shell-channel-sigil,
+  .shell-channel-item[aria-current='page'] .shell-channel-name,
+  .shell-channel-item[aria-current='page'] .shell-channel-time {
+    color: HighlightText;
+  }
+}
+
 /* join-channel input */
 .shell-join-form {
   display: flex;
