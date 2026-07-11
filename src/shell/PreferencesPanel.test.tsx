@@ -163,6 +163,24 @@ describe('PreferencesPanel', () => {
     expect(reduceMotion).not.toHaveAttribute('aria-pressed');
   });
 
+  it('names toggle switches by their title and moves help text to a description', () => {
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    // A role="switch" accessible NAME must be its concise title — the long help
+    // text belongs in the accessible description (aria-describedby), matching the
+    // Segmented radio group and CalmModeControl. Folding the description into the
+    // name (the prior bug) forced every switch query onto a regex substring and
+    // made screen readers read a paragraph as the control's name (SC 4.1.2).
+    const reduceMotion = screen.getByRole('switch', { name: 'Reduce motion' });
+    expect(reduceMotion).toHaveAccessibleName('Reduce motion');
+    expect(reduceMotion).toHaveAccessibleDescription(
+      'Force-disable animations regardless of your OS setting.',
+    );
+    // Visible label text stays in the accessible name (SC 2.5.3 Label in Name).
+    expect(reduceMotion).toHaveTextContent('Reduce motion');
+  });
+
   it('opens Appearance from Preferences for mobile theming discoverability', () => {
     openPreferences();
     render(() => <PreferencesPanel />);

@@ -315,6 +315,10 @@ type ToggleProps = {
 };
 
 function Toggle(props: ToggleProps): JSX.Element {
+  // Keep the switch's accessible name to the concise title (aria-label overrides
+  // the folded-in body text) and expose the help paragraph as a description —
+  // mirroring Segmented / CalmModeControl so ATs announce a name, not a paragraph.
+  const descId = createUniqueId();
   return (
     <section class="pref-group">
       <h3 class="pref-label">{props.legend}</h3>
@@ -323,11 +327,13 @@ function Toggle(props: ToggleProps): JSX.Element {
         class="pref-toggle"
         role="switch"
         aria-checked={props.value()}
+        aria-label={props.title}
+        aria-describedby={descId}
         onClick={() => props.onToggle(!props.value())}
       >
         <span class="pref-toggle-text">
           <span class="pref-toggle-title">{props.title}</span>
-          <span class="pref-desc">{props.description}</span>
+          <span class="pref-desc" id={descId}>{props.description}</span>
         </span>
         <span class="pref-switch" aria-hidden="true" />
       </button>
