@@ -6470,7 +6470,16 @@ export const store = createStore<OnyxState>()(
           const reactNick   = nick ?? '';
           if (!reactTarget || !reactMsgId || !reactEmoji || !reactNick) break;
 
-          const reactKey = reactTarget.toLowerCase();
+          // For an inbound DM the wire `<target>` is OUR nick (the peer reacts
+          // to a message they sent us), but DMs are keyed by the PEER's nick —
+          // the same remap the PRIVMSG / reaction TAGMSG / REDACT / EDIT paths
+          // do. Our own echoed REACT keeps target = the peer, so it still lands
+          // on the right key; a channel target never equals our nick, so
+          // channels are unaffected.
+          const reactConvo = reactTarget.toLowerCase() === get().ourNick.toLowerCase()
+            ? (nick ?? reactTarget)
+            : reactTarget;
+          const reactKey = reactConvo.toLowerCase();
           const st = get();
           const channelMsgs = st.channels.get(reactKey)?.messages ?? [];
           const dmMsgs      = st.dms.get(reactKey)?.messages ?? [];
@@ -6481,7 +6490,7 @@ export const store = createStore<OnyxState>()(
           ) ?? false;
 
           if (hasReaction) {
-            get().removeReaction(reactTarget, reactMsgId, reactEmoji, reactNick);
+            get().removeReaction(reactConvo, reactMsgId, reactEmoji, reactNick);
           } else {
             const applyAdd = (messages: ChatMessage[]): ChatMessage[] =>
               messages.map(m => {
