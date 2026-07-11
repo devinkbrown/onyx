@@ -5,6 +5,7 @@
 
 interface InboundChunk {
   ftype:    string;
+  stream:   string;   // per-stream key (nick\0ftype) — for in-flight resync eviction
   total:    number;
   received: number;
   bytes:    number;
@@ -34,6 +35,17 @@ export class ChunkAssembler {
   private static readonly MAX_PENDING_PARTS = ChunkAssembler.MAX_CHUNKS * 8;
   private static readonly MAX_PENDING_BYTES = ChunkAssembler.MAX_FRAME_BYTES * 8;
 
+  // Maximum concurrently-incomplete frames per (nick, ftype) stream. Frames
+  // arrive roughly in order; chunks within a frame may reorder. If an older
+  // frame is missing a chunk (unrecoverable gap) while this many newer frames
+  // have started, the old frame is never going to complete — so we drop the
+  // stalest one and resync to the live frames rather than hang on it until the
+  // 8 s timeout or leak memory. This is count-based (not fid-window based), so
+  // it is safe across a sender fid reset (call restart) and needs no magic
+  // reordering window. A malicious peer streaming endless distinct fids for one
+  // stream is capped here to this many live slots, not MAX_ACTIVE_SLOTS.
+  private static readonly MAX_INFLIGHT_PER_STREAM = 4;
+
   // Stale slot expiry: discard incomplete assemblies after 8 s.
   private static readonly TIMEOUT_MS = 8_000;
 
@@ -43,15 +55,43 @@ export class ChunkAssembler {
   private pendingParts = 0;
   private pendingBytes = 0;
 
+  // Count of incomplete slots per (nick, ftype) stream, for per-stream resync.
+  private streamCounts = new Map<string, number>();
+
   private key(nick: string, ftype: string, fid: number) {
-    return `${nick.toLowerCase()}\0${ftype}\0${fid}`;
+    return `${this.streamKey(nick, ftype)}\0${fid}`;
+  }
+
+  private streamKey(nick: string, ftype: string) {
+    return `${nick.toLowerCase()}\0${ftype}`;
   }
 
   private removeSlot(key: string, slot: InboundChunk | undefined = this.slots.get(key)) {
     if (!slot) return;
     this.pendingParts -= slot.total;
     this.pendingBytes -= slot.bytes;
+    const streamCount = this.streamCounts.get(slot.stream);
+    if (streamCount !== undefined) {
+      if (streamCount <= 1) this.streamCounts.delete(slot.stream);
+      else this.streamCounts.set(slot.stream, streamCount - 1);
+    }
     this.slots.delete(key);
+  }
+
+  // Drop the stalest incomplete frame(s) for a stream so a fresh frame can
+  // start. Slots iterate in insertion order, so the first slot matching the
+  // stream is the oldest — the one an unrecoverable gap has stranded.
+  private resyncStream(stream: string) {
+    while ((this.streamCounts.get(stream) ?? 0) >= ChunkAssembler.MAX_INFLIGHT_PER_STREAM) {
+      let evicted = false;
+      for (const [key, slot] of this.slots) {
+        if (slot.stream !== stream) continue;
+        this.removeSlot(key, slot);
+        evicted = true;
+        break;
+      }
+      if (!evicted) break;
+    }
   }
 
   private evictOldestUntil(extraParts: number): boolean {
@@ -112,14 +152,19 @@ export class ChunkAssembler {
 
     if (!slot) {
       this.gc(now);
+      const stream = this.streamKey(nick, ftype);
+      // Per-stream resync: strand the stalest incomplete frame(s) for this
+      // stream before opening a new one, so a lost chunk cannot pin a slot.
+      this.resyncStream(stream);
       if (!this.evictOldestUntil(total)) return null;
       slot = {
-        ftype, total, received: 0, bytes: 0,
+        ftype, stream, total, received: 0, bytes: 0,
         parts: new Array<Uint8Array | null>(total).fill(null),
         expires: now + ChunkAssembler.TIMEOUT_MS,
       };
       this.slots.set(k, slot);
       this.pendingParts += total;
+      this.streamCounts.set(stream, (this.streamCounts.get(stream) ?? 0) + 1);
     } else if (slot.total !== total || slot.ftype !== ftype) {
       // A conflicting total for the same (nick, ftype, fid) is a malformed
       // stream — drop the assembly to avoid array-bounds corruption.

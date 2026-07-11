@@ -4,7 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ChunkAssembler } from './ChunkAssembler';
 
 type ChunkAssemblerInternals = {
-  slots: Map<string, unknown>;
+  slots: Map<string, { stream: string }>;
+  streamCounts: Map<string, number>;
   pendingBytes: number;
 };
 
@@ -34,6 +35,10 @@ function pendingSlots(assembler: ChunkAssembler): number {
 
 function pendingBytes(assembler: ChunkAssembler): number {
   return (assembler as unknown as ChunkAssemblerInternals).pendingBytes;
+}
+
+function streamCount(assembler: ChunkAssembler, stream: string): number {
+  return (assembler as unknown as ChunkAssemblerInternals).streamCounts.get(stream) ?? 0;
 }
 
 describe('ChunkAssembler', () => {
@@ -104,6 +109,91 @@ describe('ChunkAssembler', () => {
 
       expect(pendingSlots(assembler)).toBe(0);
       expect(pendingBytes(assembler)).toBe(0);
+    } finally {
+      restore();
+    }
+  });
+
+  it('reassembles chunks that arrive strictly in order', () => {
+    const assembler = new ChunkAssembler();
+
+    expect(assembler.ingest('Mika', 'AUDIO', 20, 1, 3, u8([1]))).toBeNull();
+    expect(assembler.ingest('Mika', 'AUDIO', 20, 2, 3, u8([2]))).toBeNull();
+
+    const frame = assembler.ingest('Mika', 'AUDIO', 20, 3, 3, u8([3]));
+
+    expect(Array.from(frame ?? [])).toEqual([1, 2, 3]);
+    expect(pendingSlots(assembler)).toBe(0);
+  });
+
+  it('resyncs past an unrecoverable gap: a stranded frame is dropped once newer frames pile up', () => {
+    const restore = patchAssemblerStatics({ MAX_INFLIGHT_PER_STREAM: 3 });
+    const stream = 'mika\0FRAME';
+
+    try {
+      const assembler = new ChunkAssembler();
+
+      // Frame 30 is missing its 2nd chunk (an unrecoverable gap): it never completes.
+      expect(assembler.ingest('Mika', 'FRAME', 30, 1, 2, u8([1]))).toBeNull();
+      expect(streamCount(assembler, stream)).toBe(1);
+
+      // Newer frames start arriving for the same stream. Once the in-flight cap
+      // is exceeded, the stalest incomplete frame (30) is evicted — resync.
+      expect(assembler.ingest('Mika', 'FRAME', 31, 1, 2, u8([1]))).toBeNull();
+      expect(assembler.ingest('Mika', 'FRAME', 32, 1, 2, u8([1]))).toBeNull();
+      expect(assembler.ingest('Mika', 'FRAME', 33, 1, 2, u8([1]))).toBeNull();
+
+      // Never more than the per-stream cap of live incomplete frames.
+      expect(streamCount(assembler, stream)).toBe(3);
+      expect(pendingSlots(assembler)).toBe(3);
+
+      // Frame 30's slot is gone; a late straggler for it cannot complete it,
+      // and completing a *live* frame (33) still works normally.
+      expect(assembler.ingest('Mika', 'FRAME', 30, 2, 2, u8([2]))).toBeNull();
+      const frame = assembler.ingest('Mika', 'FRAME', 33, 2, 2, u8([2]));
+      expect(Array.from(frame ?? [])).toEqual([1, 2]);
+    } finally {
+      restore();
+    }
+  });
+
+  it('does not evict a live frame from another stream during resync', () => {
+    const restore = patchAssemblerStatics({ MAX_INFLIGHT_PER_STREAM: 2 });
+
+    try {
+      const assembler = new ChunkAssembler();
+
+      // A single in-flight AUDIO frame from another logical stream.
+      expect(assembler.ingest('Mika', 'AUDIO', 40, 1, 2, u8([7]))).toBeNull();
+
+      // Flood the FRAME stream past its cap; AUDIO must be untouched.
+      for (let fid = 50; fid < 56; fid++) {
+        expect(assembler.ingest('Mika', 'FRAME', fid, 1, 2, u8([fid]))).toBeNull();
+      }
+
+      expect(streamCount(assembler, 'mika\0FRAME')).toBe(2);
+      expect(streamCount(assembler, 'mika\0AUDIO')).toBe(1);
+
+      const frame = assembler.ingest('Mika', 'AUDIO', 40, 2, 2, u8([8]));
+      expect(Array.from(frame ?? [])).toEqual([7, 8]);
+    } finally {
+      restore();
+    }
+  });
+
+  it('bounds live slots under a per-stream flood of endless distinct frame ids', () => {
+    const restore = patchAssemblerStatics({ MAX_INFLIGHT_PER_STREAM: 4 });
+
+    try {
+      const assembler = new ChunkAssembler();
+
+      // Malicious peer opens 500 distinct never-completing frames on one stream.
+      for (let fid = 0; fid < 500; fid++) {
+        expect(assembler.ingest('Mallory', 'FRAME', fid, 1, 2, u8([1]))).toBeNull();
+      }
+
+      expect(streamCount(assembler, 'mallory\0FRAME')).toBe(4);
+      expect(pendingSlots(assembler)).toBe(4);
     } finally {
       restore();
     }
