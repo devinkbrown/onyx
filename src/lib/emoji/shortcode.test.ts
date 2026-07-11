@@ -19,6 +19,14 @@ describe('lookupShortcode', () => {
     expect(lookupShortcode('ROCKET')).toBeNull();
     expect(lookupShortcode('definitely_not_real')).toBeNull();
   });
+
+  it('does not resolve skin-tone modifier names as emoji entries', () => {
+    const modifier = 'skin-tone-2';
+
+    const entry = lookupShortcode(modifier);
+
+    expect(entry).toBeNull();
+  });
 });
 
 describe('parseEmojiShortcodes', () => {
@@ -48,9 +56,22 @@ describe('parseEmojiShortcodes', () => {
 
   it('handles adjacent shortcodes with no separator', () => {
     const segments = parseEmojiShortcodes(':rocket::fire:');
+
     expect(segments).toEqual([
       { kind: 'emoji', emoji: '🚀', shortcode: 'rocket' },
       { kind: 'emoji', emoji: '🔥', shortcode: 'fire' },
+    ]);
+  });
+
+  it('keeps unknown shortcodes literal while still parsing later known shortcodes', () => {
+    const input = ':missing::rocket: tail';
+
+    const segments = parseEmojiShortcodes(input);
+
+    expect(segments).toEqual([
+      { kind: 'text', value: ':missing:' },
+      { kind: 'emoji', emoji: '🚀', shortcode: 'rocket' },
+      { kind: 'text', value: ' tail' },
     ]);
   });
 
@@ -62,9 +83,24 @@ describe('parseEmojiShortcodes', () => {
 
   it('passes an unknown skin-tone modifier through as literal text', () => {
     const segments = parseEmojiShortcodes(':thumbsup::skin-tone-2:');
+
     expect(segments).toEqual([
       { kind: 'emoji', emoji: '👍', shortcode: 'thumbsup' },
       { kind: 'text', value: ':skin-tone-2:' },
+    ]);
+  });
+
+  it('keeps malformed shortcode boundaries as literal text', () => {
+    const input = 'edge :rocket and ::rocket: and :rocket::';
+
+    const segments = parseEmojiShortcodes(input);
+
+    expect(segments).toEqual([
+      { kind: 'text', value: 'edge :rocket and :' },
+      { kind: 'emoji', emoji: '🚀', shortcode: 'rocket' },
+      { kind: 'text', value: ' and ' },
+      { kind: 'emoji', emoji: '🚀', shortcode: 'rocket' },
+      { kind: 'text', value: ':' },
     ]);
   });
 
@@ -96,6 +132,13 @@ describe('parseEmojiShortcodes', () => {
 
     expect(segments.every((s) => s.kind === 'text')).toBe(true);
     expect(segments.map((s) => (s.kind === 'text' ? s.value : '')).join('')).toBe(hostile);
+  });
+
+  it('keeps shortcode-shaped hostile attributes literal instead of making emoji tokens', () => {
+    const hostile = ':img-src-x-onerror-alert-1:';
+    const segments = parseEmojiShortcodes(hostile);
+
+    expect(segments).toEqual([{ kind: 'text', value: hostile }]);
   });
 
   it('reconstructs the original string from concatenated segment values/emoji', () => {

@@ -27,6 +27,14 @@ describe('searchEmojis', () => {
     expect(results.map((entry) => entry.shortcode)).toEqual(['grinning', 'joy', 'blush']);
   });
 
+  it('treats a colon-only query as empty and still honors the limit', () => {
+    const query = ' : ';
+
+    const results = searchEmojis(query, 2);
+
+    expect(results.map((entry) => entry.shortcode)).toEqual(['grinning', 'joy']);
+  });
+
   it('trims whitespace and strips surrounding colons from shortcode queries', () => {
     const query = '  :rocket:  ';
 
@@ -41,6 +49,14 @@ describe('searchEmojis', () => {
     const results = searchEmojis(query);
 
     expect(results.map((entry) => entry.shortcode)).toEqual(['heart_eyes', 'heart', 'blue_heart']);
+  });
+
+  it('matches hyphenated skin-tone style text only when it is an inert keyword', () => {
+    const query = 'skin-tone-2';
+
+    const results = searchEmojis(query);
+
+    expect(results).toEqual([]);
   });
 
   it('matches keyword fragments when the shortcode does not match', () => {

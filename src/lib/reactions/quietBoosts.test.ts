@@ -27,6 +27,15 @@ function msg(id: string, text: string, reactions: ChatMessage['reactions'], at: 
 }
 
 describe('quiet boost aggregation', () => {
+  it('returns an empty public shape for empty boost input', () => {
+    const boosts: readonly [] = [];
+
+    const groups = aggregateBoosts(boosts, 'kai');
+
+    expect(groups).toEqual([]);
+    expect(totalBoosts(groups)).toBe(0);
+  });
+
   it('groups boosts by emoji, counts reactors, and sorts by count then emoji', () => {
     const groups = aggregateBoosts(
       [
@@ -73,6 +82,17 @@ describe('quiet boost aggregation', () => {
 });
 
 describe('quiet boost optimistic toggles', () => {
+  it('does nothing when adding a missing group without a valid emoji or actor', () => {
+    const groups: BoostGroup[] = [];
+
+    const emptyEmoji = toggleBoost(groups, '', 'kai');
+    const emptyActor = toggleBoost(groups, '🌊', '');
+
+    expect(emptyEmoji).toEqual([]);
+    expect(emptyActor).toEqual([]);
+    expect(groups).toEqual([]);
+  });
+
   it('adds you to an existing group and leaves the original array unmutated', () => {
     const groups: BoostGroup[] = [{ emoji: '🌊', count: 1, reactors: ['mio'], youBoosted: false }];
 
@@ -107,6 +127,16 @@ describe('quiet boost optimistic toggles', () => {
     const next = toggleBoost(groups, '🌊', 'kai');
 
     expect(next).toEqual([]);
+  });
+
+  it('round-trips an add/remove toggle without disturbing other reactors', () => {
+    const groups: BoostGroup[] = [{ emoji: '🌊', count: 1, reactors: ['mio'], youBoosted: false }];
+
+    const added = toggleBoost(groups, '🌊', 'kai');
+    const removed = toggleBoost(added, '🌊', 'KAI');
+
+    expect(removed).toEqual([{ emoji: '🌊', count: 1, reactors: ['mio'], youBoosted: false }]);
+    expect(groups).toEqual([{ emoji: '🌊', count: 1, reactors: ['mio'], youBoosted: false }]);
   });
 });
 
@@ -154,5 +184,40 @@ describe('quiet boost Home digest', () => {
     );
 
     expect(digest.map((item) => item.messageId)).toEqual(['visible']);
+  });
+
+  it('uses target then message id as deterministic tie-breakers and applies the limit', () => {
+    const conversations = [
+      {
+        target: '#zeta',
+        messages: [msg('b', 'same total', [{ emoji: 'a', users: ['mio'] }], 1000)],
+      },
+      {
+        target: '#alpha',
+        messages: [
+          msg('c', 'same total', [{ emoji: 'a', users: ['mio'] }], 1000),
+          msg('a', 'same total', [{ emoji: 'a', users: ['mio'] }], 1000),
+        ],
+      },
+    ];
+
+    const digest = buildQuietBoostDigest(conversations, 'ren', 2);
+
+    expect(digest.map((item) => [item.target, item.messageId])).toEqual([
+      ['#alpha', 'a'],
+      ['#alpha', 'c'],
+    ]);
+  });
+
+  it('prefers plaintext, normalizes whitespace, and leaves source messages untouched', () => {
+    const message = {
+      ...msg('plain', '<b>rendered</b>', [{ emoji: 'sparkles', users: ['mio'] }], 1000),
+      plaintext: '  rendered\n  text\tonly  ',
+    };
+
+    const digest = buildQuietBoostDigest([{ target: '#general', messages: [message] }], 'mio');
+
+    expect(digest[0]?.text).toBe('rendered text only');
+    expect(message.plaintext).toBe('  rendered\n  text\tonly  ');
   });
 });
