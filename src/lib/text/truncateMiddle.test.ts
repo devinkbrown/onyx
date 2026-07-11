@@ -72,6 +72,23 @@ describe('truncateMiddle', () => {
     expect(result).toBe('Caf…nner');
     expect(result).not.toContain('\u0301');
   });
+
+  it('keeps surrogate pairs intact when both retained sides contain emoji', () => {
+    const result = truncateMiddle('😀alpha😃omega😄', 7);
+
+    expect(result).toBe('😀a…a😄');
+    expect(result.length).toBeLessThanOrEqual(7);
+    expect(hasLoneSurrogate(result)).toBe(false);
+  });
+
+  it('drops an oversized emoji cluster instead of splitting it into the budget', () => {
+    const result = truncateMiddle('ab👍🏽cd', 6);
+
+    expect(result).toBe('ab…cd');
+    expect(result).not.toContain('👍');
+    expect(result).not.toContain('🏽');
+    expect(hasLoneSurrogate(result)).toBe(false);
+  });
 });
 
 describe('truncateEnd', () => {
@@ -100,6 +117,14 @@ describe('truncateEnd', () => {
     const result = truncateEnd('ab😀cd', 4);
 
     expect(result).toBe('ab…');
+    expect(hasLoneSurrogate(result)).toBe(false);
+  });
+
+  it('keeps emoji modifiers attached when they fit before the ellipsis', () => {
+    const result = truncateEnd('👍🏽done', 5);
+
+    expect(result).toBe('👍🏽…');
+    expect(result.length).toBeLessThanOrEqual(5);
     expect(hasLoneSurrogate(result)).toBe(false);
   });
 });

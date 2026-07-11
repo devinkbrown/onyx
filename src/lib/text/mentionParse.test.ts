@@ -115,4 +115,30 @@ describe('parseMentions', () => {
     expect(rangeValues(text, parsed.ranges)).toEqual(['@Alice', '#Root', '@BOB', '&Ops']);
     expect(parsed.ranges.map((range) => range.value)).toEqual(['Alice', '#Root', 'BOB', '&Ops']);
   });
+
+  it('rejects mentions joined to unicode word boundaries on either side', () => {
+    // Arrange
+    const text = 'café@bar snowé@cold 9@digit _@under @tailé @ok';
+
+    // Act
+    const parsed = parseMentions(text);
+
+    // Assert
+    expect(parsed.mentions).toEqual(['ok']);
+    expect(parsed.channels).toEqual([]);
+    expect(rangeValues(text, parsed.ranges)).toEqual(['@ok']);
+  });
+
+  it('accepts mentions after control and punctuation boundaries without absorbing html-looking tails', () => {
+    // Arrange
+    const text = 'ping\x00@ops, (<@bad>) path/@build\\bot<script>';
+
+    // Act
+    const parsed = parseMentions(text);
+
+    // Assert
+    expect(parsed.mentions).toEqual(['ops', 'bad', String.raw`build\bot`]);
+    expect(rangeValues(text, parsed.ranges)).toEqual(['@ops', '@bad', String.raw`@build\bot`]);
+    expect(parsed.ranges.map((range) => range.value)).toEqual(['ops', 'bad', String.raw`build\bot`]);
+  });
 });

@@ -66,6 +66,19 @@ describe('formatBytes', () => {
     expect(formatBytes(1_500, { precision: 2.9 })).toBe('1.5 KB');
   });
 
+  it('caps excessive precision and treats negative zero as zero bytes', () => {
+    // Arrange
+    const bytes = 1_234;
+
+    // Act
+    const excessivePrecision = formatBytes(bytes, { precision: 99 });
+    const negativeZero = formatBytes(-0);
+
+    // Assert
+    expect(excessivePrecision).toBe('1.234 KB');
+    expect(negativeZero).toBe('0 B');
+  });
+
   it('keeps huge values deterministic at the largest supported unit', () => {
     expect(formatBytes(1_000_000_000_000_000_000_000)).toBe('1000 EB');
     expect(formatBytes(1024 ** 7, { binary: true })).toBe('1024 EiB');

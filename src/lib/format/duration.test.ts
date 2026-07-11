@@ -56,6 +56,17 @@ describe('formatDuration', () => {
     expect(formatDuration(duration, { maxUnits: 1.9 })).toBe('1h');
   });
 
+  it('normalizes infinite maxUnits to the default unit count', () => {
+    // Arrange
+    const duration = (2 * 604_800 + 3 * 86_400 + 4 * 3_600) * 1_000;
+
+    // Act
+    const label = formatDuration(duration, { maxUnits: Number.POSITIVE_INFINITY });
+
+    // Assert
+    expect(label).toBe('2w 3d');
+  });
+
   it('formats compact and full labels', () => {
     expect(formatDuration(1_000, { compact: true })).toBe('1s');
     expect(formatDuration(1_000, { compact: false })).toBe('1 second');
@@ -67,6 +78,17 @@ describe('formatDuration', () => {
     expect(formatDuration(1_499)).toBe('1s');
     expect(formatDuration(1_999)).toBe('1s');
     expect(formatDuration(60_999)).toBe('1m');
+  });
+
+  it('renders sub-second full labels as zero seconds', () => {
+    // Arrange
+    const duration = 999;
+
+    // Act
+    const label = formatDuration(duration, { compact: false });
+
+    // Assert
+    expect(label).toBe('0 seconds');
   });
 
   it('keeps huge durations deterministic at week scale', () => {

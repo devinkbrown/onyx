@@ -28,6 +28,24 @@ function only(tokens: Token[], type: Token['type']): Token[] {
   return tokens.filter((t) => t.type === type);
 }
 
+function tokenTypes(tokens: Token[]): string[] {
+  const types: string[] = [];
+  const visit = (token: Token): void => {
+    types.push(token.type);
+    if ('children' in token) {
+      for (const child of token.children) {
+        visit(child);
+      }
+    }
+  };
+
+  for (const token of tokens) {
+    visit(token);
+  }
+
+  return types;
+}
+
 // ── Plain text ────────────────────────────────────────────────────────────────
 
 describe('plain text', () => {
@@ -620,6 +638,34 @@ describe('adversarial: XSS payloads stay inert literal text', () => {
     // No dangerous link token was produced from the noise.
     expect(only(tokens, 'link')).toHaveLength(0);
   });
+
+  it('keeps coloured hostile markup as styled text data only', () => {
+    // Arrange
+    const hostile = '<svg onload=alert(1)><a href=javascript:alert(2)>x</a>';
+
+    // Act
+    const tokens = parseMessage(`\x034,2${hostile}\x03`);
+
+    // Assert
+    expect(tokenTypes(tokens)).toEqual(['styled', 'text']);
+    expect(only(tokens, 'link')).toHaveLength(0);
+    expect(only(tokens, 'emoji')).toHaveLength(0);
+    expect(textOf(tokens)).toBe(hostile);
+    expect(JSON.stringify(tokens)).not.toMatch(/[\x02\x03\x04\x0f\x16\x1d\x1e\x1f]/);
+  });
+
+  it('keeps spoiler-wrapped hostile markup inside data tokens only', () => {
+    // Arrange
+    const hostile = '<img src=x onerror=alert(1)>';
+
+    // Act
+    const tokens = parseMessage(`||${hostile}||`);
+
+    // Assert
+    expect(tokens).toEqual([{ type: 'spoiler', children: [{ type: 'text', text: hostile }] }]);
+    expect(tokenTypes(tokens)).toEqual(['spoiler', 'text']);
+    expect(textOf(tokens)).toBe(hostile);
+  });
 });
 
 // ── IRC / mIRC formatting ──────────────────────────────────────────────────────
@@ -657,5 +703,57 @@ describe('IRC control codes', () => {
     const styled = only(tokens, 'styled') as Array<{ children: Array<{ type: string }> }>;
     expect(styled).toHaveLength(1);
     expect(styled[0]!.children.some((c) => c.type === 'link')).toBe(true);
+  });
+
+  it('carries foreground/background style through nested visible markup', () => {
+    // Arrange
+    const input = '\x034,2**hot**\x0f plain';
+
+    // Act
+    const tokens = parseMessage(input);
+
+    // Assert
+    expect(tokens).toEqual([
+      {
+        type: 'styled',
+        style: { fg: '#ff0000', bg: '#00007f' },
+        children: [{ type: 'bold', children: [{ type: 'text', text: 'hot' }] }],
+      },
+      { type: 'text', text: ' plain' },
+    ]);
+  });
+
+  it('threads unterminated IRC colour across lines until reset', () => {
+    // Arrange
+    const input = '\x034red\nstill red\x0f plain';
+
+    // Act
+    const tokens = parseMessage(input);
+
+    // Assert
+    expect(tokens).toEqual([
+      { type: 'styled', style: { fg: '#ff0000' }, children: [{ type: 'text', text: 'red' }] },
+      { type: 'text', text: '\n' },
+      { type: 'styled', style: { fg: '#ff0000' }, children: [{ type: 'text', text: 'still red' }] },
+      { type: 'text', text: ' plain' },
+    ]);
+  });
+
+  it('keeps toggle controls independent when reset terminates an unterminated run', () => {
+    // Arrange
+    const input = '\x02\x1d\x1fbold italic underline\x0f plain';
+
+    // Act
+    const tokens = parseMessage(input);
+
+    // Assert
+    expect(tokens).toEqual([
+      {
+        type: 'styled',
+        style: { bold: true, italic: true, underline: true },
+        children: [{ type: 'text', text: 'bold italic underline' }],
+      },
+      { type: 'text', text: ' plain' },
+    ]);
   });
 });

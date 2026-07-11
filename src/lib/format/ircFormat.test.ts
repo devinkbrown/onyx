@@ -133,6 +133,47 @@ describe('parseIrcRuns — colour', () => {
     expect(runs[runs.length - 1]!.style.bold).toBe(true);
     expect(runs[runs.length - 1]!.style.fg).toBeUndefined();
   });
+
+  it('parses one-digit foreground/background when the next byte is not a digit', () => {
+    // Arrange
+    const input = `${C}4,2!`;
+
+    // Act
+    const { runs } = parseIrcRuns(input);
+
+    // Assert
+    expect(runs).toEqual([{ text: '!', style: { fg: '#ff0000', bg: '#00007f' } }]);
+  });
+
+  it('keeps an unterminated comma literal when no background digit follows', () => {
+    // Arrange
+    const input = `${C}04,${B}bold`;
+
+    // Act
+    const { runs, out } = parseIrcRuns(input);
+
+    // Assert
+    expect(runs).toEqual([
+      { text: ',', style: { fg: '#ff0000' } },
+      { text: 'bold', style: { fg: '#ff0000', bold: true } },
+    ]);
+    expect(out).toEqual({ fg: '#ff0000', bold: true });
+  });
+
+  it('clears only colours for a bare colour control while preserving toggles', () => {
+    // Arrange
+    const input = `${B}${I}${U}${C}4,2hot${C}plain`;
+
+    // Act
+    const { runs, out } = parseIrcRuns(input);
+
+    // Assert
+    expect(runs).toEqual([
+      { text: 'hot', style: { bold: true, italic: true, underline: true, fg: '#ff0000', bg: '#00007f' } },
+      { text: 'plain', style: { bold: true, italic: true, underline: true, fg: undefined, bg: undefined } },
+    ]);
+    expect(out).toEqual({ bold: true, italic: true, underline: true, fg: undefined, bg: undefined });
+  });
 });
 
 describe('parseIrcRuns — hex colour', () => {

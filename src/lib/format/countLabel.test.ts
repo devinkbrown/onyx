@@ -50,4 +50,15 @@ describe('countLabel', () => {
 
     expect(label).toBe('0 s');
   });
+
+  it('pluralizes signed zero and numeric wrappers as non-singular counts', () => {
+    // Arrange
+    const counts = [-0, Number('1'), Number('1.0001')];
+
+    // Act
+    const labels = counts.map((count) => countLabel(count, 'alert'));
+
+    // Assert
+    expect(labels).toEqual(['0 alerts', '1 alert', '1.0001 alerts']);
+  });
 });

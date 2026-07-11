@@ -24,6 +24,21 @@ describe('highlightRanges', () => {
     ]);
   });
 
+  it('keeps overlapping prefix matches non-overlapping and reconstructable', () => {
+    // Arrange
+    const text = 'ababa';
+
+    // Act
+    const ranges = highlightRanges(text, 'aba');
+
+    // Assert
+    expect(ranges).toEqual([
+      { start: 0, end: 3, match: true },
+      { start: 3, end: 5, match: false },
+    ]);
+    expect(joinSegments(text, ranges)).toBe(text);
+  });
+
   it('marks a single match between non-match segments', () => {
     expect(highlightRanges('open water', 'water')).toEqual([
       { start: 0, end: 5, match: false },
@@ -80,6 +95,23 @@ describe('highlightRanges', () => {
       { start: 8, end: 15, match: false },
       { start: 15, end: 17, match: true },
     ]);
+  });
+
+  it('matches combining-mark text literally without splitting the source range', () => {
+    // Arrange
+    const text = 'Cafe\u0301 cafe\u0301';
+
+    // Act
+    const ranges = highlightRanges(text, 'e\u0301');
+
+    // Assert
+    expect(ranges).toEqual([
+      { start: 0, end: 3, match: false },
+      { start: 3, end: 5, match: true },
+      { start: 5, end: 9, match: false },
+      { start: 9, end: 11, match: true },
+    ]);
+    expect(joinSegments(text, ranges)).toBe(text);
   });
 
   it('reconstructs the original text from every segment', () => {
