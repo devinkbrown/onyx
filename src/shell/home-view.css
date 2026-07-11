@@ -823,6 +823,34 @@
   color: var(--gold-bright);
   font-weight: 500;
 }
+.home-catchup-tier {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+.home-catchup-tier:first-of-type {
+  margin-top: 0;
+}
+.home-catchup-tier-label {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--ink) 55%, transparent);
+}
+.home-catchup-quiet {
+  margin-top: 10px;
+}
+.home-catchup-quiet > summary {
+  cursor: pointer;
+  padding: 4px 0;
+  user-select: none;
+}
+.home-catchup-quiet[open] > summary {
+  margin-bottom: 6px;
+}
 .home-catchup-list {
   list-style: none;
   margin: 0;

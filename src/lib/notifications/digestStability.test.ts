@@ -7,9 +7,13 @@ import {
   quietActivityItemEqual,
   scheduledEventsListEqual,
   quietActivityListEqual,
+  catchUpItemEqual,
+  awayDigestEqual,
 } from './digestStability';
 import type { ScheduledEventItem } from './scheduledEvents';
 import type { QuietActivityItem } from './quietActivity';
+import type { CatchUpItem } from './catchUp';
+import type { AwayDigest } from './awayDigest';
 
 function event(over: Partial<ScheduledEventItem> = {}): ScheduledEventItem {
   return { channel: '#root', at: 1_000, title: 'Standup', live: false, ...over };
@@ -104,5 +108,53 @@ describe('list equality wrappers', () => {
     const prev = [quiet({ name: '#a' }), quiet({ name: '#b' })];
     const next = [quiet({ name: '#a' })];
     expect(quietActivityListEqual(prev, next)).toBe(false);
+  });
+});
+
+describe('awayDigest stability', () => {
+  const item = (over: Partial<CatchUpItem> = {}): CatchUpItem => ({
+    key: `c:${(over.name ?? '#room').toLowerCase()}`,
+    kind: 'channel',
+    name: over.name ?? '#room',
+    target: over.target ?? over.name ?? '#room',
+    unread: 3,
+    highlights: 0,
+    followed: false,
+    lastActivity: 1_000,
+    ...over,
+  });
+
+  const dig = (over: Partial<AwayDigest> = {}): AwayDigest => ({
+    attention: [],
+    followed: [],
+    quiet: [],
+    totalUnread: 0,
+    totalMentions: 0,
+    empty: true,
+    ...over,
+  });
+
+  it('catchUpItemEqual ignores name/target churn but tracks unread', () => {
+    expect(catchUpItemEqual(item(), item())).toBe(true);
+    expect(catchUpItemEqual(item(), item({ unread: 4 }))).toBe(false);
+    expect(catchUpItemEqual(item(), item({ highlights: 1 }))).toBe(false);
+  });
+
+  it('awayDigestEqual is stable when only relative-time context would change', () => {
+    const a = dig({ attention: [item({ name: '#x' })], totalUnread: 3, empty: false });
+    const b = dig({ attention: [item({ name: '#x' })], totalUnread: 3, empty: false });
+    expect(awayDigestEqual(a, b)).toBe(true);
+  });
+
+  it('awayDigestEqual flags a row moving tiers', () => {
+    const a = dig({ attention: [item({ name: '#x' })], empty: false });
+    const b = dig({ followed: [item({ name: '#x' })], empty: false });
+    expect(awayDigestEqual(a, b)).toBe(false);
+  });
+
+  it('awayDigestEqual flags an unread delta', () => {
+    const a = dig({ quiet: [item({ unread: 2 })], totalUnread: 2, empty: false });
+    const b = dig({ quiet: [item({ unread: 5 })], totalUnread: 5, empty: false });
+    expect(awayDigestEqual(a, b)).toBe(false);
   });
 });

@@ -21,6 +21,8 @@
  */
 import type { ScheduledEventItem } from './scheduledEvents';
 import type { QuietActivityItem } from './quietActivity';
+import type { CatchUpItem } from './catchUp';
+import type { AwayDigest } from './awayDigest';
 
 /** Positional list equality under a per-item comparator. Cheap short-circuits. */
 export function listEqualsBy<T>(
@@ -65,4 +67,35 @@ export function quietActivityListEqual(
   b: readonly QuietActivityItem[],
 ): boolean {
   return listEqualsBy(a, b, quietActivityItemEqual);
+}
+
+/**
+ * Value-equality for one catch-up row across the fields the digest renders.
+ * `key` encodes the lowercased name + kind prefix (`c:`/`d:`) in every current
+ * builder, so name/target/kind identity is covered transitively via `key`.
+ */
+export function catchUpItemEqual(a: CatchUpItem, b: CatchUpItem): boolean {
+  return (
+    a.key === b.key &&
+    a.unread === b.unread &&
+    a.highlights === b.highlights &&
+    a.followed === b.followed &&
+    a.lastActivity === b.lastActivity
+  );
+}
+
+/**
+ * `createMemo` equality for the tiered away digest. Keeps the previous digest
+ * reference (and every `<For>` tier below it) stable when a 30s clock tick
+ * changes only relative-time labels and not the unread/tier shape.
+ */
+export function awayDigestEqual(a: AwayDigest, b: AwayDigest): boolean {
+  return (
+    a.empty === b.empty &&
+    a.totalUnread === b.totalUnread &&
+    a.totalMentions === b.totalMentions &&
+    listEqualsBy(a.attention, b.attention, catchUpItemEqual) &&
+    listEqualsBy(a.followed, b.followed, catchUpItemEqual) &&
+    listEqualsBy(a.quiet, b.quiet, catchUpItemEqual)
+  );
 }

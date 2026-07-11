@@ -24,6 +24,8 @@ import {
 } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
 import { buildCatchUp, catchUpSummary, type CatchUpItem } from '@/lib/notifications/catchUp';
+import { buildAwayDigest, type AwayDigest } from '@/lib/notifications/awayDigest';
+import { calmPreset } from '@/lib/notifications/calmMode';
 import { buildResumePoints, type ResumePoint } from '@/lib/catchup/resumePoints';
 import { followed } from '@/lib/notifications/followed';
 import { buildHomeMemory, type HomeMemoryItem } from '@/lib/notifications/homeMemory';
@@ -41,6 +43,7 @@ import {
 import {
   scheduledEventsListEqual,
   quietActivityListEqual,
+  awayDigestEqual,
 } from '@/lib/notifications/digestStability';
 import { preferences } from '@/lib/prefs/preferences';
 import { buildQuietBoostDigest, type QuietBoostDigestItem } from '@/lib/reactions/quietBoosts';
@@ -167,6 +170,7 @@ export function HomeView(): JSX.Element {
   const channels = useStore((s) => s.channels);
   const dms = useStore((s) => s.dms);
   const channelLastActivity = useStore((s) => s.channelLastActivity);
+  const channelNotify = useStore((s) => s.channelNotify);
   const firstUnreadId = useStore((s) => s.firstUnreadId);
   const channelProps = useStore((s) => s.channelProps);
   const composerDrafts = useStore((s) => s.composerDrafts);
@@ -204,6 +208,16 @@ export function HomeView(): JSX.Element {
     }),
   );
   const catchUpTotals = createMemo(() => catchUpSummary(catchUp()));
+  // Tiered "since you were away" digest: mentions/DMs first, followed channels
+  // next, ambient chatter collapsed into a quiet tail — honouring the calm
+  // preset (followed never escalates under calm; power pulls it up top) and
+  // per-channel mute (muted channels drop out of "needs attention"). Value
+  // equality keeps the tiers stable across a no-op 30s clock tick.
+  const awayDigest = createMemo<AwayDigest>(
+    () => buildAwayDigest(catchUp(), { notifyLevels: channelNotify(), preset: calmPreset() }),
+    buildAwayDigest([], { notifyLevels: new Map(), preset: 'regular' }),
+    { equals: awayDigestEqual },
+  );
   const hasRooms = createMemo(() => channels().size > 0 || dms().size > 0);
 
   // "Resume where you left off" — the ranked catch-up items that have an
@@ -224,6 +238,40 @@ export function HomeView(): JSX.Element {
       ? getState().navigate({ kind: 'channel', channel: item.target })
       : getState().navigate({ kind: 'dm', nick: item.target });
   const openCatchUpSpotlight = (item: CatchUpItem) => openSpotlight(spotlightQueryFor(item));
+  // One row of the tiered away digest — reused across every tier so the markup
+  // (and its a11y label) stays identical whether a room is a mention, followed,
+  // or ambient. Dispatches through the existing navigate action via openCatchUp.
+  const CatchUpRow = (props: { item: CatchUpItem }) => (
+    <li>
+      <button
+        type="button"
+        class={`home-catchup-item${props.item.highlights > 0 || props.item.kind === 'dm' ? ' is-priority' : ''}${props.item.followed ? ' is-followed' : ''}`}
+        onClick={() => openCatchUp(props.item)}
+        aria-label={`Open ${props.item.name}, ${props.item.unread} unread${props.item.highlights > 0 ? `, ${props.item.highlights} mention${props.item.highlights === 1 ? '' : 's'}` : ''}${props.item.followed ? ', followed' : ''}`}
+      >
+        <span class="home-catchup-name">
+          <span class="home-catchup-kind" aria-hidden="true">
+            {props.item.kind === 'dm' ? '@' : '#'}
+          </span>
+          {props.item.kind === 'dm' ? props.item.name : props.item.name.replace(/^#/, '')}
+        </span>
+        <span class="home-catchup-meta">
+          <Show when={props.item.highlights > 0}>
+            <span class="home-catchup-mention">{props.item.highlights} @you</span>
+          </Show>
+          <Show when={props.item.followed}>
+            <span class="home-catchup-followed">followed</span>
+          </Show>
+          <span class="home-catchup-unread">{props.item.unread}</span>
+          <Show when={props.item.lastActivity > 0}>
+            <span class="home-catchup-when">
+              {relTime(Math.floor(props.item.lastActivity / 1000), nowMs())}
+            </span>
+          </Show>
+        </span>
+      </button>
+    </li>
+  );
   const reviewCatchUpFromStart = (recap: HomeCatchUpRecap) => {
     const state = getState();
     setReviewHistory(recordReviewHistory({
@@ -438,7 +486,7 @@ export function HomeView(): JSX.Element {
             <div class="home-catchup-head">
               <h3 class="home-section-label">Catch up</h3>
               <Show
-                when={catchUp().length > 0}
+                when={!awayDigest().empty}
                 fallback={<span class="home-catchup-clear">You're all caught up ✓</span>}
               >
                 <span class="home-catchup-summary">
@@ -456,43 +504,40 @@ export function HomeView(): JSX.Element {
                 </span>
               </Show>
             </div>
-            <Show when={catchUp().length > 0}>
+            <Show when={!awayDigest().empty}>
               <MarkAllCaughtUp />
-              <ul class="home-catchup-list">
-                <For each={catchUp()}>
-                  {(item) => (
-                    <li>
-                      <button
-                        type="button"
-                        class={`home-catchup-item${item.highlights > 0 || item.kind === 'dm' ? ' is-priority' : ''}${item.followed ? ' is-followed' : ''}`}
-                        onClick={() => openCatchUp(item)}
-                        aria-label={`Open ${item.name}, ${item.unread} unread${item.highlights > 0 ? `, ${item.highlights} mention${item.highlights === 1 ? '' : 's'}` : ''}${item.followed ? ', followed' : ''}`}
-                      >
-                        <span class="home-catchup-name">
-                          <span class="home-catchup-kind" aria-hidden="true">
-                            {item.kind === 'dm' ? '@' : '#'}
-                          </span>
-                          {item.kind === 'dm' ? item.name : item.name.replace(/^#/, '')}
-                        </span>
-                        <span class="home-catchup-meta">
-                          <Show when={item.highlights > 0}>
-                            <span class="home-catchup-mention">{item.highlights} @you</span>
-                          </Show>
-                          <Show when={item.followed}>
-                            <span class="home-catchup-followed">followed</span>
-                          </Show>
-                          <span class="home-catchup-unread">{item.unread}</span>
-                          <Show when={item.lastActivity > 0}>
-                            <span class="home-catchup-when">
-                              {relTime(Math.floor(item.lastActivity / 1000), nowMs())}
-                            </span>
-                          </Show>
-                        </span>
-                      </button>
-                    </li>
-                  )}
-                </For>
-              </ul>
+              <Show when={awayDigest().attention.length > 0}>
+                <div class="home-catchup-tier" role="group" aria-label="Mentions and direct messages">
+                  <h4 class="home-catchup-tier-label">Needs you</h4>
+                  <ul class="home-catchup-list">
+                    <For each={awayDigest().attention}>
+                      {(item) => <CatchUpRow item={item} />}
+                    </For>
+                  </ul>
+                </div>
+              </Show>
+              <Show when={awayDigest().followed.length > 0}>
+                <div class="home-catchup-tier" role="group" aria-label="Followed channels">
+                  <h4 class="home-catchup-tier-label">Followed</h4>
+                  <ul class="home-catchup-list">
+                    <For each={awayDigest().followed}>
+                      {(item) => <CatchUpRow item={item} />}
+                    </For>
+                  </ul>
+                </div>
+              </Show>
+              <Show when={awayDigest().quiet.length > 0}>
+                <details class="home-catchup-quiet">
+                  <summary class="home-catchup-tier-label">
+                    Quiet activity ({awayDigest().quiet.length})
+                  </summary>
+                  <ul class="home-catchup-list">
+                    <For each={awayDigest().quiet}>
+                      {(item) => <CatchUpRow item={item} />}
+                    </For>
+                  </ul>
+                </details>
+              </Show>
             </Show>
             <Show when={catchUpRecaps().length > 0}>
               <div class="home-recap-strip" role="list" aria-label="Since you left recaps">
