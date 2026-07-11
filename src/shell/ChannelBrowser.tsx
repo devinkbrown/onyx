@@ -20,9 +20,19 @@ export default function ChannelBrowser(): JSX.Element {
 
   const [query, setQuery] = createSignal('');
 
+  // Sort depends only on the directory, so keep it in its own memo — the
+  // filter below re-runs per keystroke and must not re-copy/re-sort the whole
+  // list each time. Busiest first, then name asc: the mesh streams rows from
+  // multiple nodes in an unstable order, so a count-only sort leaves tied rows
+  // in arrival order and the directory reshuffles between refreshes for
+  // identical data. The name tiebreak makes the order deterministic.
+  const sorted = createMemo(() =>
+    [...list()].sort((a, b) => b.count - a.count || a.name.toLowerCase().localeCompare(b.name.toLowerCase())),
+  );
+
   const filtered = createMemo(() => {
     const q = query().trim().toLowerCase();
-    const rows = [...list()].sort((a, b) => b.count - a.count);
+    const rows = sorted();
     if (!q) return rows;
     return rows.filter(
       (r) => r.name.toLowerCase().includes(q) || r.topic.toLowerCase().includes(q),

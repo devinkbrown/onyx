@@ -47,6 +47,26 @@ describe('ChannelBrowser', () => {
     expect(within(dialog).getByText('#random')).toBeInTheDocument();
   });
 
+  it('orders equal-count channels deterministically by name, not LIST arrival order', () => {
+    // The mesh streams rows from multiple nodes, so arrival order is not
+    // stable. Rows tied on user count must fall back to a name sort or the
+    // directory reshuffles between refreshes for identical data.
+    feed(':server.test 322 me #zebra 5 :');
+    feed(':server.test 322 me #alpha 5 :');
+    feed(':server.test 322 me #mango 5 :');
+    feed(':server.test 323 me :End of LIST');
+    store.setState({ showChannelBrowser: true });
+
+    render(() => <ChannelBrowser />);
+
+    const dialog = screen.getByRole('dialog', { name: 'Browse channels' });
+    const directory = within(dialog).getByRole('list', { name: 'Public channel directory' });
+    const names = Array.from(directory.querySelectorAll('.chb-name')).map(
+      (el) => el.textContent,
+    );
+    expect(names).toEqual(['#alpha', '#mango', '#zebra']);
+  });
+
   it('announces the debounced result count through a polite status region', () => {
     vi.useFakeTimers();
     try {
