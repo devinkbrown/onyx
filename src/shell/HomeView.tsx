@@ -49,6 +49,7 @@ import { loadOutbox, loadRecent } from '@/lib/vault/historyVault';
 import type { ChatMessage } from '@/lib/irc/types';
 import { openSpotlight } from '@/chat/spotlight/useSpotlight';
 import { openMessageSearchWithQuery } from './search/useMessageSearch';
+import { MarkAllCaughtUp } from './MarkAllCaughtUp';
 
 export { relTime };
 
@@ -440,6 +441,7 @@ export function HomeView(): JSX.Element {
               </Show>
             </div>
             <Show when={catchUp().length > 0}>
+              <MarkAllCaughtUp />
               <ul class="home-catchup-list">
                 <For each={catchUp()}>
                   {(item) => (

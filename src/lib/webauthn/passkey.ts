@@ -25,6 +25,16 @@ const PUBKEY_CRED_PARAMS: PublicKeyCredentialParameters[] = [
 
 const CEREMONY_TIMEOUT_MS = 120_000;
 
+/**
+ * WebAuthn recommends a challenge of at least 16 random bytes (WebAuthn L2
+ * §13.4.3 "Cryptographic Challenges"). A shorter challenge weakens replay
+ * resistance, so we reject it fail-closed before ever prompting the device.
+ */
+export const MIN_CHALLENGE_BYTES = 16;
+
+/** Base64url alphabet, no padding — the exact wire encoding for WEBAUTHN fields. */
+const B64URL_RE = /^[A-Za-z0-9_-]*$/;
+
 export function isPasskeySupported(): boolean {
   return (
     typeof window !== 'undefined' &&
@@ -45,7 +55,14 @@ export function bytesToB64url(input: ArrayBuffer | Uint8Array): string {
 
 // Backed by a plain ArrayBuffer (not ArrayBufferLike) so the result satisfies
 // the WebAuthn `BufferSource` option fields under strict lib.dom types.
+//
+// Strict + fail-closed: the wire is base64url with NO padding, so any '+', '/',
+// '=' or out-of-alphabet byte is a protocol violation and throws rather than
+// silently decoding to the wrong bytes (a length %4===1 is impossible base64).
 export function b64urlToBytes(s: string): Uint8Array<ArrayBuffer> {
+  if (!B64URL_RE.test(s) || s.length % 4 === 1) {
+    throw new Error('Invalid base64url input');
+  }
   const pad = s.length % 4 === 0 ? '' : '='.repeat(4 - (s.length % 4));
   const bin = atob(s.replace(/-/g, '+').replace(/_/g, '/') + pad);
   const out = new Uint8Array(new ArrayBuffer(bin.length));
@@ -60,6 +77,21 @@ function ownedBytes(src: Uint8Array): Uint8Array<ArrayBuffer> {
   return out;
 }
 
+// ── fail-closed validation of untrusted server fields ────────────────────────
+
+/** A relying-party id must be a non-empty host label with no whitespace. The
+ * browser additionally enforces it is a registrable suffix of the origin. */
+function assertRpId(rpId: string): void {
+  if (!rpId || /\s/.test(rpId)) throw new Error('Invalid relying-party id');
+}
+
+/** Decode a challenge and reject anything below the spec-minimum entropy. */
+function decodeChallenge(challengeB64url: string): Uint8Array<ArrayBuffer> {
+  const bytes = b64urlToBytes(challengeB64url); // throws on malformed base64url
+  if (bytes.length < MIN_CHALLENGE_BYTES) throw new Error('Passkey challenge too short');
+  return bytes;
+}
+
 // ── ceremony option builders ─────────────────────────────────────────────────
 
 export function buildCreateOptions(
@@ -67,8 +99,10 @@ export function buildCreateOptions(
   rpId: string,
   account: string,
 ): PublicKeyCredentialCreationOptions {
+  assertRpId(rpId);
+  if (!account) throw new Error('Missing account for passkey registration');
   return {
-    challenge: b64urlToBytes(challengeB64url),
+    challenge: decodeChallenge(challengeB64url),
     rp: { id: rpId, name: rpId },
     // The user handle binds the credential to the account. We use the account
     // name bytes — stable and non-secret (the server keys by credential id).
@@ -89,13 +123,15 @@ export function buildGetOptions(
   rpId: string,
   allowCredIdsB64url: readonly string[],
 ): PublicKeyCredentialRequestOptions {
+  assertRpId(rpId);
   return {
-    challenge: b64urlToBytes(challengeB64url),
+    challenge: decodeChallenge(challengeB64url),
     rpId,
-    allowCredentials: allowCredIdsB64url.map((id) => ({
-      type: 'public-key' as const,
-      id: b64urlToBytes(id),
-    })),
+    allowCredentials: allowCredIdsB64url.map((id) => {
+      const bytes = b64urlToBytes(id); // throws on malformed base64url
+      if (bytes.length === 0) throw new Error('Empty credential id in allow-list');
+      return { type: 'public-key' as const, id: bytes };
+    }),
     userVerification: 'preferred',
     timeout: CEREMONY_TIMEOUT_MS,
   };

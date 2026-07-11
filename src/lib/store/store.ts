@@ -4723,7 +4723,17 @@ export const store = createStore<OnyxState>()(
                 set({ passkeyBusy: false, passkeyError: 'Malformed passkey challenge.' });
                 break;
               }
-              createPasskey(buildCreateOptions(challenge, rpId, standard.description))
+              // Builders validate the untrusted server fields and throw fail-closed;
+              // do it in a guard so a throw never escapes _handleMessage and strands
+              // passkeyBusy=true (a permanently spinning "Waiting for your device…").
+              let createOpts: PublicKeyCredentialCreationOptions;
+              try {
+                createOpts = buildCreateOptions(challenge, rpId, standard.description);
+              } catch {
+                set({ passkeyBusy: false, passkeyError: 'Malformed passkey challenge.' });
+                break;
+              }
+              createPasskey(createOpts)
                 .then((f) =>
                   waClient.sendRaw('WEBAUTHN', 'REGISTER-FINISH', f.credId, f.clientDataJSON, f.authData),
                 )
@@ -4756,7 +4766,16 @@ export const store = createStore<OnyxState>()(
                   set({ passkeyBusy: false, passkeyError: 'No passkey challenge to answer.' });
                   return;
                 }
-                getPasskeyAssertion(buildGetOptions(p.challenge, p.rpId, p.allowCreds))
+                // Guard the synchronous builder: a malformed challenge/allow-cred
+                // must fail closed to an error state, never a stranded spinner.
+                let getOpts: PublicKeyCredentialRequestOptions;
+                try {
+                  getOpts = buildGetOptions(p.challenge, p.rpId, p.allowCreds);
+                } catch {
+                  set({ passkeyBusy: false, passkeyError: 'Malformed passkey challenge.' });
+                  return;
+                }
+                getPasskeyAssertion(getOpts)
                   .then((f) =>
                     c.sendRaw('WEBAUTHN', 'AUTH-FINISH', f.credId, f.clientDataJSON, f.authData, f.signature),
                   )
