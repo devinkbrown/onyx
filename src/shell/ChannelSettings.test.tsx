@@ -132,3 +132,48 @@ describe('ChannelSettings — Notifications', () => {
     expect(notifySelect()).not.toBeDisabled();
   });
 });
+
+describe('ChannelSettings — Share invite a11y', () => {
+  it('names the invite preview and copy affordances for assistive tech', () => {
+    seed();
+    renderPanel();
+
+    // Preview is a named group so its accessible name is exposed (not a bare div).
+    expect(screen.getByRole('group', { name: 'Invite preview' })).toBeInTheDocument();
+    // Copy is a real button with a text name; open is a keyboard-reachable link.
+    expect(screen.getByRole('button', { name: 'Copy invite link' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open invite in Onyx' })).toHaveAttribute('href');
+  });
+
+  it('announces a successful copy through a polite live region (SC 4.1.3)', async () => {
+    seed();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+
+    renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'Copy invite link' }));
+
+    const status = await screen.findByText('Invite link copied to clipboard.');
+    expect(status).toHaveAttribute('role', 'status');
+    expect(status).toHaveAttribute('aria-live', 'polite');
+    expect(writeText).toHaveBeenCalledTimes(1);
+  });
+
+  it('announces a copy failure in the same region', async () => {
+    seed();
+    const writeText = vi.fn().mockRejectedValue(new Error('denied'));
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+
+    renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'Copy invite link' }));
+
+    const status = await screen.findByText(/Copy failed\. Select and copy the link shown above\./);
+    expect(status).toHaveAttribute('role', 'status');
+  });
+});

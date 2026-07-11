@@ -152,8 +152,15 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
   // nick can never corrupt the link; a preferred nick that fails validation is
   // simply dropped and the room link still works.
   const [invitePreferredNick, setInvitePreferredNick] = createSignal('');
+  // Copy result announced through a co-located polite live region: the primitive
+  // toast host is not mounted in the shell, so a screen reader would otherwise
+  // never learn the clipboard write succeeded (SC 4.1.3 Status Messages).
+  const [copyStatus, setCopyStatus] = createSignal('');
   createEffect(() => {
-    if (local.open) setInvitePreferredNick('');
+    if (local.open) {
+      setInvitePreferredNick('');
+      setCopyStatus('');
+    }
   });
 
   const inviteOrigin = createMemo(() =>
@@ -176,8 +183,10 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
     const url = inviteLink().shareUrl;
     try {
       await navigator.clipboard.writeText(url);
+      setCopyStatus('Invite link copied to clipboard.');
       toast({ title: 'Invite link copied', description: url, intent: 'success' });
     } catch {
+      setCopyStatus('Copy failed. Select and copy the link shown above.');
       toast({
         title: 'Copy failed',
         description: 'Select and copy the link shown below.',
@@ -384,7 +393,7 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
         <section class="shell-chset-section" aria-labelledby="chset-invite-heading">
           <h3 id="chset-invite-heading" class="shell-chset-heading">Share invite</h3>
 
-          <div class="shell-chset-readonly" aria-label="Invite preview">
+          <div class="shell-chset-readonly" role="group" aria-label="Invite preview">
             <p class="shell-chset-readonly-label">This invite opens</p>
             {/* Sourced from the RESOLVED card, never the raw channel, so the
                 preview can never claim a room the link actually dropped. */}
@@ -430,6 +439,9 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
               Open invite in Onyx
             </a>
           </div>
+
+          {/* Always-mounted polite live region so the copy result is announced. */}
+          <span class="sr-only" role="status" aria-live="polite">{copyStatus()}</span>
         </section>
 
         {/* ── Notifications (personal) ── */}

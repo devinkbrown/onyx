@@ -204,9 +204,10 @@ export function JsonVaultImportControls(props: JsonVaultImportProps): JSX.Elemen
           </div>
         )}
       </Show>
-      <Show when={status()}>
-        <p class="pref-status" role="status">{status()}</p>
-      </Show>
+      {/* Always-present polite live region: a status node created together with
+          its text is often NOT announced (the region must pre-exist in the DOM),
+          so keep it mounted and let its text change announce import progress. */}
+      <p class="pref-status" role="status" aria-live="polite" aria-atomic="true">{status() ?? ''}</p>
     </section>
   );
 }
@@ -375,9 +376,8 @@ export function DiscordPackageImportControls(): JSX.Element {
           </div>
         )}
       </Show>
-      <Show when={status()}>
-        <p class="pref-status" role="status">{status()}</p>
-      </Show>
+      {/* Always-present polite live region (see JsonVaultImportControls). */}
+      <p class="pref-status" role="status" aria-live="polite" aria-atomic="true">{status() ?? ''}</p>
     </section>
   );
 }
@@ -530,9 +530,8 @@ export function IrcLogImportControls(): JSX.Element {
           </div>
         )}
       </Show>
-      <Show when={status()}>
-        <p class="pref-status" role="status">{status()}</p>
-      </Show>
+      {/* Always-present polite live region (see JsonVaultImportControls). */}
+      <p class="pref-status" role="status" aria-live="polite" aria-atomic="true">{status() ?? ''}</p>
     </section>
   );
 }

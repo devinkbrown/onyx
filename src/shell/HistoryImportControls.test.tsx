@@ -8,7 +8,12 @@ import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
-import { DiscordImportControls, SlackImportControls, IrcLogImportControls } from './HistoryImportControls';
+import {
+  DiscordImportControls,
+  DiscordPackageImportControls,
+  SlackImportControls,
+  IrcLogImportControls,
+} from './HistoryImportControls';
 import { loadRecent, _resetVaultForTests } from '@/lib/vault/historyVault';
 
 /** A File-like stand-in: the controls only read `.name` and `.text()`. */
@@ -121,5 +126,54 @@ describe('IrcLogImportControls', () => {
     await screen.findByText(/Imported 2 messages into #dev/);
     const stored = await loadRecent('#dev');
     expect(stored).toHaveLength(2);
+  });
+});
+
+/** A package File-like: name is the basename; webkitRelativePath is the tree path. */
+function fakePackageFile(path: string, contents: string): File {
+  const name = path.slice(path.lastIndexOf('/') + 1);
+  return { name, webkitRelativePath: path, text: async () => contents } as unknown as File;
+}
+
+const packageFiles = [
+  fakePackageFile('account/user.json', JSON.stringify({ username: 'devin', global_name: 'Devin' })),
+  fakePackageFile('messages/index.json', JSON.stringify({ '100000000000000100': 'general' })),
+  fakePackageFile(
+    'messages/c100000000000000100/channel.json',
+    JSON.stringify({ id: '100000000000000100', type: 0, name: 'general', guild: { id: '9', name: 'My Server' } }),
+  ),
+  fakePackageFile(
+    'messages/c100000000000000100/messages.json',
+    JSON.stringify([
+      { ID: 'a1', Timestamp: '2025-01-01 10:00:00', Contents: 'hello', Attachments: '' },
+      { ID: 'a2', Timestamp: '2025-01-01 10:05:00', Contents: 'world', Attachments: '' },
+    ]),
+  ),
+];
+
+describe('DiscordPackageImportControls — a11y contracts', () => {
+  it('names the directory picker so a screen reader can announce it', () => {
+    render(() => <DiscordPackageImportControls />);
+    // The wrapping <label> supplies the accessible name for the webkitdirectory input.
+    expect(screen.getByLabelText('Choose package folder')).toHaveAttribute('type', 'file');
+  });
+
+  it('keeps a polite status live region mounted before any interaction', () => {
+    render(() => <DiscordPackageImportControls />);
+    // SC 4.1.3: a status node created together with its text is not reliably
+    // announced, so the region must already exist (and be empty) on load.
+    const region = screen.getByRole('status');
+    expect(region).toHaveAttribute('aria-live', 'polite');
+    expect(region).toHaveTextContent('');
+  });
+
+  it('announces the ready-to-import preview through the same region', async () => {
+    render(() => <DiscordPackageImportControls />);
+    const input = screen.getByLabelText('Choose package folder') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: packageFiles } });
+
+    const region = await screen.findByRole('status');
+    await screen.findByText(/Ready to import 2 messages across 1 channel from My Server/);
+    expect(region).toHaveTextContent(/Ready to import 2 messages/);
   });
 });
