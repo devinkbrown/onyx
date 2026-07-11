@@ -52,6 +52,7 @@ import { TopicChip, TopicFilterBar } from './TopicChip';
 import { BoostBar } from './BoostBar';
 import { SinceDigestCard } from './SinceDigestCard';
 import { computeMessageWindow } from './messageWindow';
+import { threadParentIds } from './threadIndex';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -657,6 +658,11 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     const key = topic.toLowerCase();
     return allMessages().filter((message) => (message.topic ?? '').toLowerCase() === key);
   });
+
+  // One O(n) pass builds the set of parent ids that have at least one reply, so
+  // each rendered row answers "has a thread?" in O(1) instead of re-scanning the
+  // whole buffer per row (which is O(rows × total) and janks large channels).
+  const threadParents = createMemo(() => threadParentIds(messages()));
 
   const followTarget = createMemo(() => {
     const view = activeView();
@@ -1451,8 +1457,9 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                 getState().addReaction(activeTarget(), msg.id, emoji);
               };
               const hasThread = createMemo(() => {
-                // A message has a thread if there's at least one reply to it
-                return messages().some((m) => m.replyTo?.id === msg.id);
+                // A message has a thread if there's at least one reply to it.
+                // O(1) lookup into the prebuilt parent-id set (see threadParents).
+                return threadParents().has(msg.id);
               });
               const splitTopicLabel = createMemo(() => {
                 const view = activeView();
