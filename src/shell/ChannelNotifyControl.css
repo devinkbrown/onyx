@@ -1,0 +1,62 @@
+/**
+ * ChannelNotifyControl.css — token-only styling for the compact per-channel
+ * notification-level segmented control in the presence ribbon.
+ *
+ * Imported by ChannelNotifyControl.tsx. Active state is NOT color-only: the
+ * selected segment is distinguished by a filled surface AND heavier text weight
+ * (the label is bold when checked, normal otherwise), so the selection reads in
+ * greyscale, under forced-colors, and for low-vision users.
+ */
+
+.chan-notify {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--ink) 45%, transparent);
+}
+
+.chan-notify-seg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.9rem;
+  min-height: 1.6rem;
+  padding: 0 var(--space-2);
+  appearance: none;
+  cursor: pointer;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--washi-dim);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+.chan-notify-seg:hover {
+  color: var(--washi);
+  background: color-mix(in oklab, var(--lapis) 12%, transparent);
+}
+
+.chan-notify-seg:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.chan-notify-seg[aria-checked='true'] {
+  color: var(--ink);
+  font-weight: 800;
+  background: var(--lapis-bright);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chan-notify-seg {
+    transition: none;
+  }
+}

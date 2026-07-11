@@ -13,6 +13,7 @@ import { useStore, getState, selectAccount, selectChannelEvent, selectChannelPin
 import { openPreferences } from '@/lib/prefs/preferences';
 import { eventCountdown, scheduledEventVisible, scheduledEventsEqual } from '@/lib/notifications/scheduledEvents';
 import { ChannelSettings } from './ChannelSettings';
+import { ChannelNotifyControl } from './ChannelNotifyControl';
 import { NotificationCenter } from './NotificationCenter';
 import { PresenceHeatline } from './PresenceHeatline';
 import { Facepile } from './Facepile';
@@ -435,6 +436,9 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                 </svg>
                 <span class="shell-ribbon-count">{memberCount()}</span>
               </button>
+            </Show>
+            <Show when={settingsChannel()}>
+              {(name) => <ChannelNotifyControl channel={name()} />}
             </Show>
             <Show when={settingsChannel()}>
               <button
