@@ -67,6 +67,26 @@ describe('searchEmojis', () => {
     expect(results.map((entry) => entry.shortcode)).toEqual(['paperclip']);
   });
 
+  it('treats smile as a keyword lookup without inventing a smile shortcode', () => {
+    const query = ':smile:';
+
+    const results = searchEmojis(query, 3);
+
+    expect(results.map((entry) => [entry.shortcode, entry.emoji])).toEqual([
+      ['grinning', '😀'],
+      ['blush', '😊'],
+      ['sweat_smile', '😅'],
+    ]);
+  });
+
+  it('finds entries that publish ZWJ-related keywords only through ordinary keyword matching', () => {
+    const query = 'watch';
+
+    const results = searchEmojis(query);
+
+    expect(results.map((entry) => entry.shortcode)).toEqual(['eyes']);
+  });
+
   it('returns an empty array for an unknown shortcode or keyword', () => {
     const query = 'missing_key';
 

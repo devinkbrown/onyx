@@ -76,6 +76,40 @@ describe('quiet boost aggregation', () => {
     expect(groups).toEqual([{ emoji: '🌿', count: 2, reactors: ['Kai', 'Mio'], youBoosted: false }]);
   });
 
+  it('keeps visually distinct reaction forms in separate stable groups', () => {
+    const boosts = [
+      { emoji: '👍', from: 'kai' },
+      { emoji: '👍🏽', from: 'kai' },
+      { emoji: '👍', from: 'mio' },
+      { emoji: '👨‍👩‍👧‍👦', from: 'ren' },
+    ];
+
+    const groups = aggregateBoosts(boosts, 'KAI');
+
+    expect(groups).toEqual([
+      { emoji: '👍', count: 2, reactors: ['kai', 'mio'], youBoosted: true },
+      { emoji: '👍🏽', count: 1, reactors: ['kai'], youBoosted: true },
+      { emoji: '👨‍👩‍👧‍👦', count: 1, reactors: ['ren'], youBoosted: false },
+    ]);
+  });
+
+  it('does not mutate the input boost rows while deduplicating duplicate reactors', () => {
+    const boosts = [
+      { emoji: '✨', from: 'Kai' },
+      { emoji: '✨', from: 'kai' },
+      { emoji: '✨', from: 'Mio' },
+    ];
+
+    const groups = aggregateBoosts(boosts, 'ren');
+
+    expect(groups).toEqual([{ emoji: '✨', count: 2, reactors: ['Kai', 'Mio'], youBoosted: false }]);
+    expect(boosts).toEqual([
+      { emoji: '✨', from: 'Kai' },
+      { emoji: '✨', from: 'kai' },
+      { emoji: '✨', from: 'Mio' },
+    ]);
+  });
+
   it('documents that boosts never notify anyone', () => {
     expect(BOOST_NOTIFIES).toBe(false);
   });
@@ -137,6 +171,35 @@ describe('quiet boost optimistic toggles', () => {
 
     expect(removed).toEqual([{ emoji: '🌊', count: 1, reactors: ['mio'], youBoosted: false }]);
     expect(groups).toEqual([{ emoji: '🌊', count: 1, reactors: ['mio'], youBoosted: false }]);
+  });
+
+  it('recomputes stale public counts and self state for untouched groups', () => {
+    const groups: BoostGroup[] = [
+      { emoji: 'b', count: 99, reactors: ['mio'], youBoosted: true },
+      { emoji: 'a', count: 1, reactors: ['ren'], youBoosted: false },
+    ];
+
+    const next = toggleBoost(groups, 'a', 'kai');
+
+    expect(next).toEqual([
+      { emoji: 'a', count: 2, reactors: ['ren', 'kai'], youBoosted: true },
+      { emoji: 'b', count: 1, reactors: ['mio'], youBoosted: false },
+    ]);
+    expect(groups[0]).toEqual({ emoji: 'b', count: 99, reactors: ['mio'], youBoosted: true });
+  });
+
+  it('leaves the original nested reactor arrays untouched when toggling another emoji', () => {
+    const reactors = ['mio'];
+    const groups: BoostGroup[] = [{ emoji: '🌊', count: 1, reactors, youBoosted: false }];
+
+    const next = toggleBoost(groups, '✨', 'kai');
+
+    expect(next).toEqual([
+      { emoji: '✨', count: 1, reactors: ['kai'], youBoosted: true },
+      { emoji: '🌊', count: 1, reactors: ['mio'], youBoosted: false },
+    ]);
+    expect(reactors).toEqual(['mio']);
+    expect(next[1]?.reactors).not.toBe(reactors);
   });
 });
 
@@ -219,5 +282,35 @@ describe('quiet boost Home digest', () => {
 
     expect(digest[0]?.text).toBe('rendered text only');
     expect(message.plaintext).toBe('  rendered\n  text\tonly  ');
+  });
+
+  it('deduplicates duplicate reaction rows per emoji before counting digest totals', () => {
+    const message = msg(
+      'dupes',
+      'duplicate rows',
+      [
+        { emoji: '✨', users: ['kai', 'mio'] },
+        { emoji: '✨', users: ['KAI', 'ren'] },
+      ],
+      1000,
+    );
+
+    const digest = buildQuietBoostDigest([{ target: '#general', messages: [message] }], 'kai');
+
+    expect(digest).toHaveLength(1);
+    expect(digest[0]?.total).toBe(3);
+    expect(digest[0]?.groups).toEqual([
+      { emoji: '✨', count: 3, reactors: ['kai', 'mio', 'ren'], youBoosted: true },
+    ]);
+  });
+
+  it('honors a zero limit after filtering otherwise valid digest items', () => {
+    const digest = buildQuietBoostDigest(
+      [{ target: '#general', messages: [msg('visible', 'boosted', [{ emoji: 'a', users: ['mio'] }], 1000)] }],
+      'kai',
+      0,
+    );
+
+    expect(digest).toEqual([]);
   });
 });

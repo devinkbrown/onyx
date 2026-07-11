@@ -7,6 +7,16 @@ function kinds(segments: readonly EmojiSegment[]): string[] {
 }
 
 describe('lookupShortcode', () => {
+  it('resolves an exact picker shortcode to its glyph entry', () => {
+    const entry = lookupShortcode('grinning');
+
+    expect(entry).toEqual({
+      emoji: '😀',
+      shortcode: 'grinning',
+      keywords: ['smile', 'happy'],
+    });
+  });
+
   it('resolves a known lowercase shortcode to its entry', () => {
     expect(lookupShortcode('rocket')).toEqual({
       emoji: '🚀',
@@ -90,6 +100,36 @@ describe('parseEmojiShortcodes', () => {
     ]);
   });
 
+  it('keeps a literal Unicode skin-tone modifier attached to surrounding text', () => {
+    const input = 'manual 👍🏽 then :thumbsup:';
+
+    const segments = parseEmojiShortcodes(input);
+
+    expect(segments).toEqual([
+      { kind: 'text', value: 'manual 👍🏽 then ' },
+      { kind: 'emoji', emoji: '👍', shortcode: 'thumbsup' },
+    ]);
+  });
+
+  it('leaves literal ZWJ emoji sequences as text while parsing later shortcodes', () => {
+    const input = 'family 👨‍👩‍👧‍👦 :heart:';
+
+    const segments = parseEmojiShortcodes(input);
+
+    expect(segments).toEqual([
+      { kind: 'text', value: 'family 👨‍👩‍👧‍👦 ' },
+      { kind: 'emoji', emoji: '❤️', shortcode: 'heart' },
+    ]);
+  });
+
+  it('does not treat a colon-wrapped ZWJ sequence as a shortcode name', () => {
+    const input = ':👨‍👩‍👧‍👦:';
+
+    const segments = parseEmojiShortcodes(input);
+
+    expect(segments).toEqual([{ kind: 'text', value: input }]);
+  });
+
   it('keeps malformed shortcode boundaries as literal text', () => {
     const input = 'edge :rocket and ::rocket: and :rocket::';
 
@@ -136,6 +176,13 @@ describe('parseEmojiShortcodes', () => {
 
   it('keeps shortcode-shaped hostile attributes literal instead of making emoji tokens', () => {
     const hostile = ':img-src-x-onerror-alert-1:';
+    const segments = parseEmojiShortcodes(hostile);
+
+    expect(segments).toEqual([{ kind: 'text', value: hostile }]);
+  });
+
+  it('does not create shortcode tokens from URL and attribute-like hostile text', () => {
+    const hostile = 'href="javascript:alert(1)" data-emoji=":rocket"';
     const segments = parseEmojiShortcodes(hostile);
 
     expect(segments).toEqual([{ kind: 'text', value: hostile }]);
