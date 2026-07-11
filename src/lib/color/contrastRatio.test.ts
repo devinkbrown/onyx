@@ -29,8 +29,9 @@ describe('contrastRatio', () => {
     expect(contrastRatio(BLACK, WHITE)).toBe(21);
   });
 
-  it('returns 1 for white on white', () => {
+  it('returns 1 for identical colors', () => {
     expect(contrastRatio(WHITE, WHITE)).toBe(1);
+    expect(contrastRatio({ r: 12, g: 34, b: 56 }, { r: 12, g: 34, b: 56 })).toBe(1);
   });
 
   it('matches known WCAG reference pairs', () => {
@@ -60,11 +61,31 @@ describe('WCAG threshold helpers', () => {
     expect(meetsAA(whiteOnMidGray, WHITE, { large: true })).toBe(true);
   });
 
+  it('fails AA immediately below the normal and large thresholds', () => {
+    const justBelowNormalThreshold: RGB = { r: 0x77, g: 0x77, b: 0x77 };
+    const justBelowLargeThreshold: RGB = { r: 0x95, g: 0x95, b: 0x95 };
+
+    expect(contrastRatio(justBelowNormalThreshold, WHITE)).toBeLessThan(4.5);
+    expect(meetsAA(justBelowNormalThreshold, WHITE)).toBe(false);
+    expect(contrastRatio(justBelowLargeThreshold, WHITE)).toBeLessThan(3);
+    expect(meetsAA(justBelowLargeThreshold, WHITE, { large: true })).toBe(false);
+  });
+
   it('uses AAA thresholds of 7 for normal text and 4.5 for large text', () => {
     const aaOnlyGray: RGB = { r: 0x76, g: 0x76, b: 0x76 };
 
     expect(meetsAAA(BLACK, WHITE)).toBe(true);
     expect(meetsAAA(aaOnlyGray, WHITE)).toBe(false);
     expect(meetsAAA(aaOnlyGray, WHITE, { large: true })).toBe(true);
+  });
+
+  it('fails AAA immediately below the normal and large thresholds', () => {
+    const justBelowNormalThreshold: RGB = { r: 0x5a, g: 0x5a, b: 0x5a };
+    const justBelowLargeThreshold: RGB = { r: 0x77, g: 0x77, b: 0x77 };
+
+    expect(contrastRatio(justBelowNormalThreshold, WHITE)).toBeLessThan(7);
+    expect(meetsAAA(justBelowNormalThreshold, WHITE)).toBe(false);
+    expect(contrastRatio(justBelowLargeThreshold, WHITE)).toBeLessThan(4.5);
+    expect(meetsAAA(justBelowLargeThreshold, WHITE, { large: true })).toBe(false);
   });
 });

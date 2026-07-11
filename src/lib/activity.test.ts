@@ -11,6 +11,12 @@ describe('parseActivity', () => {
     expect(activity).toBeNull();
   });
 
+  it('returns null for a whitespace-only status', () => {
+    const activity = parseActivity(' \t\n ');
+
+    expect(activity).toBeNull();
+  });
+
   it('returns null when no emoji or keyword activity matches', () => {
     const status = 'available for chat';
 
@@ -75,12 +81,35 @@ describe('parseActivity', () => {
     expect(activity).toBeNull();
   });
 
+  it('uses the emoji prefix before considering keyword text', () => {
+    const status = '🎵 playing Quake';
+
+    const activity = parseActivity(status);
+
+    expect(activity).toEqual({ emoji: '🎵', typeLabel: 'LISTENING TO MUSIC', text: 'playing Quake' });
+  });
+
   it('parses playing activity from a keyword case-insensitively', () => {
     const status = 'PLAYING Quake';
 
     const activity = parseActivity(status);
 
     expect(activity).toEqual({ emoji: '🎮', typeLabel: 'PLAYING A GAME', text: 'Quake' });
+  });
+
+  it('does not match activity keywords embedded later in the status', () => {
+    expect(parseActivity('now playing Quake')).toBeNull();
+    expect(parseActivity('status: coding Onyx')).toBeNull();
+  });
+
+  it('returns null for keywords without a payload', () => {
+    expect(parseActivity('playing')).toBeNull();
+    // note: 'listening to' parses as keyword 'listening' + payload 'to' (a
+    // degenerate-input quirk of the current parser), so it is intentionally
+    // not asserted null here.
+    expect(parseActivity('watching')).toBeNull();
+    expect(parseActivity('coding on')).toBeNull();
+    expect(parseActivity('streaming')).toBeNull();
   });
 
   it('parses listening activity with a song and artist', () => {
@@ -131,6 +160,21 @@ describe('parseActivity', () => {
     expect(activity).toEqual({ emoji: '🔴', typeLabel: 'LIVE ON STREAM', text: 'ladder matches' });
   });
 
+  it('parses non-playing keyword forms case-insensitively', () => {
+    expect(parseActivity('LISTENING TO Blue Monday')).toEqual({
+      emoji: '🎵',
+      typeLabel: 'LISTENING TO MUSIC',
+      text: 'Blue Monday',
+    });
+    expect(parseActivity('WATCHING Foundation')).toEqual({ emoji: '📺', typeLabel: 'WATCHING', text: 'Foundation' });
+    expect(parseActivity('CODING ON Onyx')).toEqual({ emoji: '💻', typeLabel: 'CODING', text: 'Onyx' });
+    expect(parseActivity('STREAMING release review')).toEqual({
+      emoji: '🔴',
+      typeLabel: 'LIVE ON STREAM',
+      text: 'release review',
+    });
+  });
+
   it('trims leading keyword whitespace but preserves trailing text', () => {
     const status = 'playing   spaced title  ';
 
@@ -171,5 +215,13 @@ describe('activityShort', () => {
     const label = activityShort(activity);
 
     expect(label).toBe('Blue Monday');
+  });
+
+  it('returns an empty short label for empty activity text', () => {
+    const activity = { emoji: '🎵', typeLabel: 'LISTENING TO MUSIC', text: ' \t ' };
+
+    const label = activityShort(activity);
+
+    expect(label).toBe('');
   });
 });

@@ -1,7 +1,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildMomentLink, parseAtParam, parseEventTime, parseJoinParam, parseReaderParam, parseTopicParam } from './deeplink';
+
+const FIXED_NOW = new Date('2026-07-08T12:00:00.000Z');
+const DAY_MS = 24 * 60 * 60 * 1000;
+const YEARISH_MS = 366 * DAY_MS;
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(FIXED_NOW);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe('parseJoinParam', () => {
   it('accepts a plain #channel', () => {
@@ -44,6 +57,10 @@ describe('parseJoinParam', () => {
   it('rejects names longer than 63 chars after the #', () => {
     expect(parseJoinParam(`#${'a'.repeat(63)}`)).toBe(`#${'a'.repeat(63)}`);
     expect(parseJoinParam(`#${'a'.repeat(64)}`)).toBeNull();
+  });
+
+  it('rejects oversized encoded names after decoding', () => {
+    expect(parseJoinParam(`%23${'x'.repeat(64)}`)).toBeNull();
   });
 
   it('rejects interior whitespace, commas and \\x07', () => {
@@ -90,6 +107,12 @@ describe('parseAtParam', () => {
     expect(parseAtParam('2026-06-30')).toBeInstanceOf(Date);
   });
 
+  it('accepts the exact future-slack boundary', () => {
+    const at = parseAtParam(String(FIXED_NOW.getTime() + DAY_MS));
+
+    expect(at?.toISOString()).toBe('2026-07-09T12:00:00.000Z');
+  });
+
   it('takes the first value when the router surfaces an array', () => {
     expect(parseAtParam(['1751000000', '9'])?.getTime()).toBe(1_751_000_000_000);
   });
@@ -100,12 +123,13 @@ describe('parseAtParam', () => {
     expect(parseAtParam('')).toBeNull();
     expect(parseAtParam('yesterday')).toBeNull();
     expect(parseAtParam('%E0%A4%A')).toBeNull();
+    expect(parseAtParam('999999999999999')).toBeNull();
   });
 
   it('rejects instants before 2020 and far-future instants', () => {
     expect(parseAtParam('2019-12-31T23:59:59Z')).toBeNull();
     expect(parseAtParam('946684800')).toBeNull(); // 2000-01-01 epoch s
-    expect(parseAtParam(String(Date.now() + 3 * 24 * 60 * 60 * 1000))).toBeNull();
+    expect(parseAtParam(String(FIXED_NOW.getTime() + 3 * DAY_MS))).toBeNull();
   });
 });
 
@@ -121,6 +145,12 @@ describe('parseTopicParam', () => {
     expect(parseTopicParam('bad%0Aline')).toBeNull();
     expect(parseTopicParam('x'.repeat(51))).toBeNull();
   });
+
+  it('enforces the topic byte limit after decoding', () => {
+    expect(parseTopicParam('é'.repeat(25))).toBe('é'.repeat(25));
+    expect(parseTopicParam('é'.repeat(26))).toBeNull();
+    expect(parseTopicParam('%C3%A9'.repeat(26))).toBeNull();
+  });
 });
 
 describe('parseReaderParam', () => {
@@ -128,12 +158,18 @@ describe('parseReaderParam', () => {
     expect(parseReaderParam('1')).toBe(true);
     expect(parseReaderParam('true')).toBe(true);
     expect(parseReaderParam('reader')).toBe(true);
+    expect(parseReaderParam(' READER ')).toBe(true);
   });
 
   it('ignores absent or falsey reader flags', () => {
     expect(parseReaderParam(null)).toBe(false);
     expect(parseReaderParam('0')).toBe(false);
     expect(parseReaderParam('false')).toBe(false);
+  });
+
+  it('uses the first repeated reader flag value', () => {
+    expect(parseReaderParam(['reader', '0'])).toBe(true);
+    expect(parseReaderParam(['0', 'reader'])).toBe(false);
   });
 });
 
@@ -147,19 +183,43 @@ describe('buildMomentLink', () => {
       ),
     ).toBe('https://onyx.example/app?join=%23root&at=2026-07-08T18%3A30%3A00.000Z');
   });
+
+  it('round-trips the channel and moment through URL search params', () => {
+    const moment = new Date('2026-07-08T18:30:00.000Z');
+    const link = buildMomentLink('#ops-room', moment, 'https://onyx.example/app?utm=drop');
+    const params = new URL(link).searchParams;
+
+    expect(parseJoinParam(params.get('join'))).toBe('#ops-room');
+    expect(parseAtParam(params.get('at'))?.toISOString()).toBe(moment.toISOString());
+  });
+
+  it('tolerates unknown query params beside join and at', () => {
+    const params = new URLSearchParams('utm_source=newsletter&join=%23root&ignored=%25&at=2026-06-30T12%3A00%3A00Z');
+
+    expect(parseJoinParam(params.get('join'))).toBe('#root');
+    expect(parseAtParam(params.get('at'))?.toISOString()).toBe('2026-06-30T12:00:00.000Z');
+  });
 });
 
 describe('parseEventTime', () => {
   it('accepts a near-future ISO time and epoch seconds', () => {
-    const iso = new Date(Date.now() + 3 * 24 * 3600 * 1000).toISOString();
+    const iso = new Date(FIXED_NOW.getTime() + 3 * DAY_MS).toISOString();
     expect(parseEventTime(iso)?.toISOString()).toBe(iso);
-    const sec = Math.floor(Date.now() / 1000) + 3600;
+    const sec = Math.floor(FIXED_NOW.getTime() / 1000) + 3600;
     expect(parseEventTime(String(sec))?.getTime()).toBe(sec * 1000);
+  });
+
+  it('accepts exact scheduling window boundaries', () => {
+    const skewBoundary = new Date(FIXED_NOW.getTime() - 5 * 60 * 1000);
+    const maxFuture = new Date(FIXED_NOW.getTime() + YEARISH_MS);
+
+    expect(parseEventTime(skewBoundary.toISOString())?.toISOString()).toBe(skewBoundary.toISOString());
+    expect(parseEventTime(maxFuture.toISOString())?.toISOString()).toBe(maxFuture.toISOString());
   });
 
   it('rejects past instants and moments over a year out', () => {
     expect(parseEventTime('2000-01-01T00:00:00Z')).toBeNull();
-    const twoYears = new Date(Date.now() + 2 * 366 * 24 * 3600 * 1000).toISOString();
+    const twoYears = new Date(FIXED_NOW.getTime() + 2 * YEARISH_MS).toISOString();
     expect(parseEventTime(twoYears)).toBeNull();
   });
 

@@ -52,6 +52,23 @@ describe('relativeTime', () => {
     expect(labels).toEqual(cases.map(([, expected]) => expected));
   });
 
+  it('keeps exact past transitions on the documented side of each boundary', () => {
+    const cases: ReadonlyArray<[Date, string]> = [
+      [ago(45 * SECOND_MS - 1), 'just now'],
+      [ago(45 * SECOND_MS), '1m ago'],
+      [ago(HOUR_MS - 1), '59m ago'],
+      [ago(HOUR_MS), '1h ago'],
+      [ago(DAY_MS - 1), '23h ago'],
+      [ago(DAY_MS), 'yesterday'],
+      [ago(2 * DAY_MS - 1), 'yesterday'],
+      [ago(2 * DAY_MS), '2d ago'],
+    ];
+
+    const labels = cases.map(([then]) => relativeTime(then, NOW));
+
+    expect(labels).toEqual(cases.map(([, expected]) => expected));
+  });
+
   it('formats future moments symmetrically', () => {
     const cases: ReadonlyArray<[Date, string]> = [
       [ahead(44 * SECOND_MS), 'just now'],
@@ -64,6 +81,27 @@ describe('relativeTime', () => {
     const labels = cases.map(([then]) => relativeTime(then, NOW));
 
     expect(labels).toEqual(cases.map(([, expected]) => expected));
+  });
+
+  it('keeps exact future transitions on the documented side of each boundary', () => {
+    const cases: ReadonlyArray<[Date, string]> = [
+      [ahead(45 * SECOND_MS - 1), 'just now'],
+      [ahead(45 * SECOND_MS), 'in 1m'],
+      [ahead(HOUR_MS - 1), 'in 59m'],
+      [ahead(HOUR_MS), 'in 1h'],
+      [ahead(DAY_MS - 1), 'in 23h'],
+      [ahead(DAY_MS), 'tomorrow'],
+      [ahead(2 * DAY_MS - 1), 'tomorrow'],
+      [ahead(2 * DAY_MS), 'in 2d'],
+    ];
+
+    const labels = cases.map(([then]) => relativeTime(then, NOW));
+
+    expect(labels).toEqual(cases.map(([, expected]) => expected));
+  });
+
+  it('returns just now for invalid dates instead of leaking NaN labels', () => {
+    expect(relativeTime(new Date(Number.NaN), NOW)).toBe('just now');
   });
 });
 
@@ -88,6 +126,13 @@ describe('formatRelative', () => {
     ];
 
     expect(labels).toEqual(['just now', 'just now', 'just now']);
+  });
+
+  it('switches out of just-now exactly at 45 seconds', () => {
+    expect(formatRelative(nowMs - (45 * SECOND_MS - 1), nowMs)).toBe('just now');
+    expect(formatRelative(nowMs - 45 * SECOND_MS, nowMs)).toBe('1m');
+    expect(formatRelative(nowMs + (45 * SECOND_MS - 1), nowMs)).toBe('just now');
+    expect(formatRelative(nowMs + 45 * SECOND_MS, nowMs)).toBe('in 1m');
   });
 
   it('formats past durations as a compact suffix-free label', () => {
@@ -160,6 +205,12 @@ describe('shortDuration', () => {
     const label = shortDuration(45 * SECOND_MS);
 
     expect(label).toBe('45s');
+  });
+
+  it('floors sub-second and malformed durations to zero seconds', () => {
+    expect(shortDuration(SECOND_MS - 1)).toBe('0s');
+    expect(shortDuration(Number.NaN)).toBe('0s');
+    expect(shortDuration(Number.POSITIVE_INFINITY)).toBe('0s');
   });
 
   it('formats exact single-unit durations without trailing zeroes', () => {
