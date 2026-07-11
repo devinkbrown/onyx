@@ -46,6 +46,11 @@ describe('truncateMiddle', () => {
     expect(truncateMiddle('boundary', 8)).toBe('boundary');
   });
 
+  it('keeps exact-fit unicode strings unchanged', () => {
+    expect(truncateMiddle('ab😀', 4)).toBe('ab😀');
+    expect(truncateMiddle('e\u0301x', 3)).toBe('e\u0301x');
+  });
+
   it('does not split a surrogate-pair emoji', () => {
     const result = truncateMiddle('ab😀cd', 4);
 

@@ -120,6 +120,14 @@ describe('parseIrcRuns — colour', () => {
     expect(runs[1]!.text).toBe('plain');
   });
 
+  it('a lone colour control at end of input clears colour and emits no empty run', () => {
+    const { runs, out } = parseIrcRuns(C, { fg: '#ff0000', bg: '#000000' });
+
+    expect(runs).toEqual([]);
+    expect(out.fg).toBeUndefined();
+    expect(out.bg).toBeUndefined();
+  });
+
   it('keeps other attributes when colour resets', () => {
     const { runs } = parseIrcRuns(`${B}${C}4x${C}y`);
     expect(runs[runs.length - 1]!.style.bold).toBe(true);

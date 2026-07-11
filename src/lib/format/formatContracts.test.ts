@@ -130,6 +130,24 @@ describe('parseMessage tokenizer contracts', () => {
     ]);
   });
 
+  it('leaves a raw hostile image tag as one inert text token only', () => {
+    const hostile = '<img src=x onerror=alert(1)>';
+    const tokens = parseMessage(hostile);
+    const types = tokenTypes(tokens);
+
+    expect(tokens).toEqual([{ type: 'text', text: hostile }]);
+    expect(types).toEqual(['text']);
+    expect(types).not.toContain('link');
+    expect(types).not.toContain('image');
+    expect(types).not.toContain('html');
+  });
+
+  it('drops lone and truncated IRC colour controls without fabricating tokens', () => {
+    expect(parseMessage(COLOR)).toEqual([]);
+    expect(parseMessage(`${COLOR}0`)).toEqual([]);
+    expect(parseMessage(`${COLOR},not-a-bg`)).toEqual([{ type: 'text', text: ',not-a-bg' }]);
+  });
+
   it('threads reset-cleared IRC state before returning to unstyled tokens', () => {
     const tokens = parseMessage(`${BOLD}${COLOR}4hot${RESET} plain`);
 

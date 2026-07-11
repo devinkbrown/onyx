@@ -62,6 +62,21 @@ describe('parseMentions', () => {
     });
   });
 
+  it('accepts mentions surrounded by punctuation boundaries', () => {
+    const text = '@alice, (@bob); dot.@carol! slash/@dave?';
+
+    expect(parseMentions(text)).toEqual({
+      mentions: ['alice', 'bob', 'carol', 'dave'],
+      channels: [],
+      ranges: [
+        { start: 0, end: 6, kind: 'mention', value: 'alice' },
+        { start: 9, end: 13, kind: 'mention', value: 'bob' },
+        { start: 20, end: 26, kind: 'mention', value: 'carol' },
+        { start: 34, end: 39, kind: 'mention', value: 'dave' },
+      ],
+    });
+  });
+
   it('deduplicates mention and channel arrays case-insensitively', () => {
     expect(parseMentions('@Alice @alice #Root #root &Ops &ops')).toEqual({
       mentions: ['Alice'],

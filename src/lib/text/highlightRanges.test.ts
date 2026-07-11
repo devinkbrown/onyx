@@ -12,6 +12,18 @@ describe('highlightRanges', () => {
     expect(highlightRanges('open water', 'reef')).toEqual([{ start: 0, end: 10, match: false }]);
   });
 
+  it('returns empty ranges when query absent and text absent', () => {
+    expect(highlightRanges('', '')).toEqual([{ start: 0, end: 0, match: false }]);
+  });
+
+  it('returns only the first non-overlapping match for overlapping candidates', () => {
+    expect(highlightRanges('banana', 'ana')).toEqual([
+      { start: 0, end: 1, match: false },
+      { start: 1, end: 4, match: true },
+      { start: 4, end: 6, match: false },
+    ]);
+  });
+
   it('marks a single match between non-match segments', () => {
     expect(highlightRanges('open water', 'water')).toEqual([
       { start: 0, end: 5, match: false },
