@@ -201,6 +201,29 @@
   box-shadow: 0 0 12px color-mix(in oklab, var(--lapis-bright) 72%, transparent);
 }
 
+/* Forced colors: the active server entry must stay visible. In Windows High
+   Contrast the radial-gradient fill flattens to Canvas and the ::before accent
+   bar's glow is dropped by the .shell * box-shadow:none rule, so aria-current is
+   the only remaining active signal — and that reaches AT alone, not sighted
+   High-Contrast users. Mark it with Highlight, the same treatment the active
+   channel row gets above and selected controls get in src/styles/a11y-media.css.
+   SC 1.4.1 Use of Color. */
+@media (forced-colors: active) {
+  .shell-rail-entry--active {
+    color: HighlightText;
+    background: Highlight;
+    border-color: Highlight;
+  }
+
+  .shell-rail-entry--active span {
+    color: HighlightText;
+  }
+
+  .shell-rail-entry--active::before {
+    background: HighlightText;
+  }
+}
+
 .shell-rail-badge {
   position: absolute;
   right: -2px;

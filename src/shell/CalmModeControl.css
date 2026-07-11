@@ -78,8 +78,16 @@
   line-height: 1.35;
 }
 
+/*
+ * On the active segment the descriptor sits on the --lapis-bright fill. The raw
+ * color-mix(--ink 72%, --stone) it used before is not an auditable token pair
+ * and dropped below AA in light themes. --ink is the solved on-accent token the
+ * active label already uses: enforceAA holds the symmetric --lapis-bright/--ink
+ * pair at a 4.5 floor (paletteFactory AA_PAIRS), so it passes AA across every
+ * theme incl prefers-contrast:more. Emphasis is carried by size/weight, not hue.
+ */
 .calm-segment[aria-checked='true'] .calm-segment-desc {
-  color: color-mix(in oklab, var(--ink) 72%, var(--stone));
+  color: var(--ink);
 }
 
 @media (max-width: 34rem) {
