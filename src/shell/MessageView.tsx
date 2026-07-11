@@ -626,6 +626,18 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     return [...list].sort((a, b) => a.time.getTime() - b.time.getTime());
   });
 
+  // id → absolute index into allMessages(). Built in one O(n) pass whenever the
+  // list changes so the several "is this row at/after the unread divider?"
+  // checks below are O(1) lookups instead of an O(n) findIndex per candidate —
+  // which made those filters O(n²) (≈160k id-compares on a 400-line vault) on
+  // every message change while an unread divider was present.
+  const allIndexById = createMemo((): ReadonlyMap<string, number> => {
+    const list = allMessages();
+    const map = new Map<string, number>();
+    for (let i = 0; i < list.length; i += 1) map.set(list[i]!.id, i);
+    return map;
+  });
+
   const availableTopics = createMemo((): string[] => {
     const view = activeView();
     if (view.kind !== 'channel') return [];
@@ -760,16 +772,15 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   const sinceDigest = createMemo(() => {
     const dividerId = unreadDividerId();
     if (!dividerId) return null;
-    const visible = messages();
-    const divider = allMessages().find((message) => message.id === dividerId);
     const channel = activeTarget();
-    if (!divider || !channel || !channel.startsWith('#')) return null;
-    const dividerIndex = allMessages().findIndex((message) => message.id === dividerId);
+    if (!channel || !channel.startsWith('#')) return null;
+    const indexById = allIndexById();
+    const dividerIndex = indexById.get(dividerId) ?? -1;
     if (dividerIndex < 0) return null;
-    const visibleUnread = visible.filter((message) => {
-      const index = allMessages().findIndex((candidate) => candidate.id === message.id);
-      return index >= dividerIndex;
-    });
+    const divider = allMessages()[dividerIndex]!;
+    const visibleUnread = messages().filter(
+      (message) => (indexById.get(message.id) ?? -1) >= dividerIndex,
+    );
     const since = new Date(divider.time.getTime() - 1);
     const digest = buildSinceDigest(
       visibleUnread
@@ -921,11 +932,11 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     const digest = sinceDigest();
     const divider = dividerId ? allMessages().find((message) => message.id === dividerId) : null;
     if (target.startsWith('#') && dividerId && digest && divider) {
-      const dividerIndex = allMessages().findIndex((message) => message.id === dividerId);
-      const unreadMessages = messages().filter((message) => {
-        const index = allMessages().findIndex((candidate) => candidate.id === message.id);
-        return index >= dividerIndex && !isSystemMsg(message);
-      });
+      const indexById = allIndexById();
+      const dividerIndex = indexById.get(dividerId) ?? -1;
+      const unreadMessages = messages().filter(
+        (message) => (indexById.get(message.id) ?? -1) >= dividerIndex && !isSystemMsg(message),
+      );
       const latest = unreadMessages[unreadMessages.length - 1];
       recordReviewHistory({
         target,
