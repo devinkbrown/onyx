@@ -60,6 +60,7 @@ import { AccountPanel } from '@/app/Account';
 import { AppearancePanel } from './AppearancePanel';
 import { PreferencesPanel } from './PreferencesPanel';
 import { PinnedMessages } from './PinnedMessages';
+import { ScheduledMessagesSheet } from './ScheduledMessagesSheet';
 import { applyPreferences, isPreferencesOpen, openPreferences, preferences } from '@/lib/prefs/preferences';
 import { applySceneMotion } from '@/lib/prefs/sceneMotion';
 import { applyCalmPreset } from '@/lib/notifications/calmMode';
@@ -576,6 +577,9 @@ export function AppShell(props: AppShellProps): JSX.Element {
 
       {/* Pinned messages drawer — gated on store.showPinnedMessages */}
       <PinnedMessages />
+
+      {/* Scheduled "send later" queue — gated on store.showScheduledMessages */}
+      <ScheduledMessagesSheet />
 
       {/* Voice/video overlays — each self-gates on store.voice */}
       <VoiceSettings

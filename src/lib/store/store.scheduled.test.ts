@@ -1,0 +1,141 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+/**
+ * store.scheduled.test.ts
+ *
+ * Scheduled-message ("send later") dispatch. scheduleMessage queues; the
+ * dispatcher sends past-due entries via the normal sendMessage path (which
+ * calls client.sendRaw) and drops them. We mock the client to capture the raw
+ * line and drive connectionStatus to exercise the offline hold + idempotency.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { store } from './store';
+
+const initialState = store.getInitialState();
+
+function makeClient() {
+  return {
+    sendRaw: vi.fn(),
+    send: vi.fn(),
+    isupport: { CHANTYPES: '#&', CHANMODES: ['beIZ', 'k', 'lfj', 'imnstCTNMSgWOA'] },
+    negotiatedCaps: new Set<string>(),
+    capValues: new Map<string, string>(),
+    modeToPrefix: {} as Record<string, string>,
+    prefixToMode: {} as Record<string, string>,
+  };
+}
+
+/** Seed a connected session with a mock client. */
+function connect() {
+  const client = makeClient();
+  store.setState({ client: client as never, connectionStatus: 'connected', ourNick: 'me' });
+  return client;
+}
+
+beforeEach(() => {
+  localStorage.clear();
+  store.setState(initialState, true);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe('scheduleMessage', () => {
+  it('queues an entry sorted by sendAt and persists it', () => {
+    store.getState().scheduleMessage('#root', 'later', 5000);
+    store.getState().scheduleMessage('#root', 'sooner', 1000);
+    const q = store.getState().scheduledMessages;
+    expect(q.map((m) => m.text)).toEqual(['sooner', 'later']);
+    expect(JSON.parse(localStorage.getItem('onyx:scheduled') || '[]')).toHaveLength(2);
+  });
+});
+
+describe('_dispatchScheduledMessages', () => {
+  it('sends a past-due entry via sendRaw and removes it', () => {
+    const client = connect();
+    vi.spyOn(Date, 'now').mockReturnValue(10_000);
+    store.getState().scheduleMessage('#root', 'hello', 5_000); // due
+    store.getState().scheduleMessage('#root', 'wait', 50_000); // future
+
+    store.getState()._dispatchScheduledMessages();
+
+    // Only the due entry hit the wire.
+    const privmsgs = client.sendRaw.mock.calls.filter((c) => c[0] === 'PRIVMSG');
+    expect(privmsgs).toHaveLength(1);
+    expect(privmsgs[0]![1]).toBe('#root');
+    // Future entry survives; due entry is gone.
+    const q = store.getState().scheduledMessages;
+    expect(q.map((m) => m.text)).toEqual(['wait']);
+    expect(JSON.parse(localStorage.getItem('onyx:scheduled') || '[]')).toHaveLength(1);
+  });
+
+  it('holds a past-due entry while offline (does not drop it)', () => {
+    store.setState({ client: null, connectionStatus: 'disconnected' });
+    vi.spyOn(Date, 'now').mockReturnValue(10_000);
+    store.getState().scheduleMessage('#root', 'hello', 5_000);
+
+    store.getState()._dispatchScheduledMessages();
+
+    expect(store.getState().scheduledMessages).toHaveLength(1);
+  });
+
+  it('is idempotent — a second tick never re-sends', () => {
+    const client = connect();
+    vi.spyOn(Date, 'now').mockReturnValue(10_000);
+    store.getState().scheduleMessage('#root', 'hello', 5_000);
+
+    store.getState()._dispatchScheduledMessages();
+    store.getState()._dispatchScheduledMessages();
+
+    const privmsgs = client.sendRaw.mock.calls.filter((c) => c[0] === 'PRIVMSG');
+    expect(privmsgs).toHaveLength(1);
+    expect(store.getState().scheduledMessages).toHaveLength(0);
+  });
+
+  it('re-queues a due entry whose send throws, without losing its siblings', () => {
+    const client = connect();
+    vi.spyOn(Date, 'now').mockReturnValue(10_000);
+    // First send throws (racing failure), second must still go out.
+    let call = 0;
+    client.sendRaw.mockImplementation((cmd: string) => {
+      if (cmd === 'PRIVMSG') {
+        call += 1;
+        if (call === 1) throw new Error('socket closed');
+      }
+    });
+    store.getState().scheduleMessage('#bad', 'boom', 4_000);
+    store.getState().scheduleMessage('#ok', 'lands', 5_000);
+
+    store.getState()._dispatchScheduledMessages();
+
+    // The failed entry survives for a later retry; the good one is gone.
+    const q = store.getState().scheduledMessages;
+    expect(q).toHaveLength(1);
+    expect(q[0]!.channel).toBe('#bad');
+    expect(JSON.parse(localStorage.getItem('onyx:scheduled') || '[]')).toHaveLength(1);
+  });
+
+  it('leaves the queue untouched when nothing is due', () => {
+    const client = connect();
+    vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    store.getState().scheduleMessage('#root', 'future', 60_000);
+
+    store.getState()._dispatchScheduledMessages();
+
+    expect(client.sendRaw.mock.calls.filter((c) => c[0] === 'PRIVMSG')).toHaveLength(0);
+    expect(store.getState().scheduledMessages).toHaveLength(1);
+  });
+});
+
+describe('cancelScheduledMessage', () => {
+  it('removes the entry and re-persists', () => {
+    store.getState().scheduleMessage('#root', 'a', 1000);
+    store.getState().scheduleMessage('#root', 'b', 2000);
+    const id = store.getState().scheduledMessages[0]!.id;
+    store.getState().cancelScheduledMessage(id);
+    const q = store.getState().scheduledMessages;
+    expect(q).toHaveLength(1);
+    expect(q[0]!.text).toBe('b');
+    expect(JSON.parse(localStorage.getItem('onyx:scheduled') || '[]')).toHaveLength(1);
+  });
+});

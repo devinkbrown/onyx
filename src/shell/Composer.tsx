@@ -31,6 +31,12 @@ import {
   type SlashCommand,
 } from '@/lib/commands/registry';
 import { UploadError, uploadFile } from '@/lib/upload/upload';
+import {
+  SCHEDULE_PRESETS,
+  isSchedulable,
+  parseDateTimeLocal,
+  toDateTimeLocalValue,
+} from '@/lib/schedule/scheduleTime';
 
 export type ComposerProps = {
   /** Optionally override the active target; defaults to deriving from activeView */
@@ -83,6 +89,7 @@ export function Composer(props: ComposerProps): JSX.Element {
   const activeChannelTopics = useStore((s) => s.activeChannelTopics);
   const replyingTo = useStore((s) => s.replyingTo);
   const editingMessage = useStore((s) => s.editingMessage);
+  const scheduledCount = useStore((s) => s.scheduledMessages.length);
 
   const [text, setText] = createSignal('');
   const [attachments, setAttachments] = createSignal<ComposerAttachment[]>([]);
@@ -93,10 +100,14 @@ export function Composer(props: ComposerProps): JSX.Element {
   const [emojiQuery, setEmojiQuery] = createSignal('');
   const [slashDismissed, setSlashDismissed] = createSignal(false);
   const [slashIndex, setSlashIndex] = createSignal(0);
+  const [scheduleOpen, setScheduleOpen] = createSignal(false);
+  const [scheduleWhen, setScheduleWhen] = createSignal('');
+  const [scheduleError, setScheduleError] = createSignal<string | null>(null);
 
   let textareaRef!: HTMLTextAreaElement;
   let fileInputRef!: HTMLInputElement;
   let emojiSearchRef: HTMLInputElement | undefined;
+  let scheduleFirstRef: HTMLButtonElement | undefined;
   const previewUrls = new Set<string>();
 
   onCleanup(() => {
@@ -167,6 +178,59 @@ export function Composer(props: ComposerProps): JSX.Element {
   function closeEmojiPicker(restoreFocus = true): void {
     setEmojiOpen(false);
     if (restoreFocus) focusTextarea();
+  }
+
+  // ── schedule ("send later") ──
+  // Only plain, non-empty text to a real target can be scheduled: slash
+  // commands aren't queued (replaying a stale command is surprising), and
+  // attachments/edits need the network at send time. Scheduling works OFFLINE
+  // — the queue persists and the store dispatches it once connected.
+  const canSchedule = createMemo(() => {
+    if (activeEditing() || attachments().length > 0) return false;
+    const body = text().trim();
+    return !!target() && body.length > 0 && !body.startsWith('/');
+  });
+
+  // Move focus into the schedule popover when it opens (SC 2.4.3 / 2.1.1).
+  createEffect(() => {
+    if (!scheduleOpen()) return;
+    queueMicrotask(() => scheduleFirstRef?.focus());
+  });
+
+  function closeSchedule(restoreFocus = true): void {
+    setScheduleOpen(false);
+    setScheduleError(null);
+    if (restoreFocus) focusTextarea();
+  }
+
+  /** Queue the current composer text for `epoch`, then reset like a send. */
+  function scheduleAt(epoch: number): void {
+    const t = target();
+    const body = text().trim();
+    if (!t || !body || body.startsWith('/')) return;
+    if (!isSchedulable(epoch, Date.now())) {
+      setScheduleError('Pick a time at least a minute from now.');
+      return;
+    }
+    getState().scheduleMessage(t, body, epoch);
+    getState().addToast({
+      variant: 'success',
+      title: 'Message scheduled',
+      description: `Will send to ${t} at the time you picked.`,
+    });
+    setScheduleWhen('');
+    closeSchedule(false);
+    resetAfterSend(t);
+  }
+
+  /** Schedule from the custom datetime-local field. */
+  function scheduleCustom(): void {
+    const epoch = parseDateTimeLocal(scheduleWhen(), Date.now());
+    if (epoch === null) {
+      setScheduleError('Enter a valid time at least a minute from now.');
+      return;
+    }
+    scheduleAt(epoch);
   }
 
   let loadedTarget: string | null = null;
@@ -292,6 +356,12 @@ export function Composer(props: ComposerProps): JSX.Element {
     if (e.key === 'Escape' && emojiOpen()) {
       e.preventDefault();
       setEmojiOpen(false);
+      return;
+    }
+
+    if (e.key === 'Escape' && scheduleOpen()) {
+      e.preventDefault();
+      closeSchedule();
       return;
     }
 
@@ -697,6 +767,81 @@ export function Composer(props: ComposerProps): JSX.Element {
             </div>
           </div>
         </Show>
+
+        <Show when={scheduleOpen()}>
+          <div
+            id="shell-schedule-picker"
+            class="shell-schedule-picker"
+            role="dialog"
+            aria-modal="false"
+            aria-label="Schedule message"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                closeSchedule();
+              }
+            }}
+          >
+            <p class="shell-schedule-heading">Send later</p>
+            <div class="shell-schedule-presets">
+              <For each={SCHEDULE_PRESETS}>
+                {(preset, i) => (
+                  <button
+                    ref={(el) => { if (i() === 0) scheduleFirstRef = el; }}
+                    type="button"
+                    class="shell-schedule-preset"
+                    onClick={() => scheduleAt(preset.at(Date.now()))}
+                  >
+                    {preset.label}
+                  </button>
+                )}
+              </For>
+            </div>
+            <label class="shell-schedule-custom-label" for="shell-schedule-when">
+              Or pick a time
+            </label>
+            <div class="shell-schedule-custom">
+              <input
+                id="shell-schedule-when"
+                class="shell-schedule-input"
+                type="datetime-local"
+                min={toDateTimeLocalValue(Date.now())}
+                value={scheduleWhen()}
+                aria-describedby={scheduleError() ? 'shell-schedule-error' : undefined}
+                aria-invalid={scheduleError() ? 'true' : undefined}
+                onInput={(e) => {
+                  setScheduleWhen((e.currentTarget as HTMLInputElement).value);
+                  setScheduleError(null);
+                }}
+              />
+              <button
+                type="button"
+                class="shell-schedule-confirm"
+                disabled={!scheduleWhen()}
+                onClick={scheduleCustom}
+              >
+                Schedule
+              </button>
+            </div>
+            <Show when={scheduleError()}>
+              {(err) => (
+                <p id="shell-schedule-error" class="shell-schedule-error" role="alert">
+                  {err()}
+                </p>
+              )}
+            </Show>
+            <Show when={scheduledCount() > 0}>
+              <button
+                type="button"
+                class="shell-schedule-view"
+                onClick={() => { closeSchedule(false); getState().openScheduledMessages(); }}
+              >
+                View {scheduledCount()} scheduled
+              </button>
+            </Show>
+          </div>
+        </Show>
       </div>
 
       <div class="shell-composer-inner">
@@ -735,6 +880,23 @@ export function Composer(props: ComposerProps): JSX.Element {
             <path d="M5.6 9.4a3.1 3.1 0 0 0 4.8 0" />
             <circle cx="6" cy="6.4" r="0.5" fill="currentColor" stroke="none" />
             <circle cx="10" cy="6.4" r="0.5" fill="currentColor" stroke="none" />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          class="shell-composer-tool"
+          disabled={!canSchedule()}
+          aria-label="Schedule message to send later"
+          aria-haspopup="dialog"
+          aria-expanded={scheduleOpen()}
+          aria-controls={scheduleOpen() ? 'shell-schedule-picker' : undefined}
+          onClick={() => setScheduleOpen((open) => !open)}
+        >
+          <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="8" cy="8.6" r="5.2" />
+            <path d="M8 5.6v3l2 1.2" />
+            <path d="M5.4 1.8 3.2 3.4M10.6 1.8l2.2 1.6" />
           </svg>
         </button>
 

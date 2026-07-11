@@ -11,6 +11,7 @@ import type { SuimyakuPeerState, SuimyakuRoomStats, CallState } from '@/lib/suim
 import { getMountedSuimyakuMediaEngine } from '@/lib/mediaEngineMount';
 import { parseActivity } from '@/lib/activity';
 import { OUTBOX_MAX_AGE_MS, deleteOutboxEntry, loadAround, loadOutbox, loadRecent, queueOutbox, type OutboxEntry } from '@/lib/vault/historyVault';
+import { selectDueMessages } from '@/lib/schedule/dispatch';
 import { deviceKeys, isEnvelope, openDm, sealDm } from '@/lib/e2ee/dmCipher';
 import {
   ENCRYPTION_POLICY_PROP,
@@ -1257,6 +1258,8 @@ export interface OnyxState {
   showScheduledMessages: boolean;
   scheduleMessage: (channel: string, text: string, sendAt: number) => void;
   cancelScheduledMessage: (id: string) => void;
+  /** Send every past-due scheduled message (when connected) and drop it. */
+  _dispatchScheduledMessages: () => void;
   openScheduledMessages: () => void;
   closeScheduledMessages: () => void;
 
@@ -2325,6 +2328,27 @@ function _stopRosterPoll(): void {
   _lastRosterRefresh.clear();
 }
 
+/** How often to check the scheduled-message queue for due entries. */
+const _SCHED_DISPATCH_MS = 15_000;
+let _scheduledDispatchTimer: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Start the scheduled-message dispatch tick, replacing any prior timer. The
+ * decision itself (selectDueMessages) is a no-op while disconnected, so an
+ * early tick before 001 lands is harmless; entries coming due mid-session are
+ * caught on the next interval, and past-due entries from a previous run are
+ * flushed by the post-001 kick in the connect path.
+ */
+function _startScheduledDispatch(get: GetFn): void {
+  if (_scheduledDispatchTimer) clearInterval(_scheduledDispatchTimer);
+  _scheduledDispatchTimer = setInterval(() => get()._dispatchScheduledMessages(), _SCHED_DISPATCH_MS);
+}
+
+/** Stop the scheduled-message dispatch tick. */
+function _stopScheduledDispatch(): void {
+  if (_scheduledDispatchTimer) { clearInterval(_scheduledDispatchTimer); _scheduledDispatchTimer = null; }
+}
+
 // ── Account-management standard-reply commands ───────────────────────────────
 /** Commands whose FAIL/WARN/NOTE replies the account layer routes to state. */
 const ACCOUNT_COMMANDS = new Set([
@@ -2743,6 +2767,11 @@ export const store = createStore<OnyxState>()(
       // mesh flap). The throttle in _refreshChannelRoster keeps it cheap.
       _startRosterPoll(get);
 
+      // Scheduled "send later" queue: tick while connected so entries fire at
+      // their time; the queue survives across sessions in localStorage, so a
+      // reconnect resumes dispatching (and the post-001 kick flushes past-due).
+      _startScheduledDispatch(get);
+
       // Remember the desired nick before the IRC client may append '_' on collision
       _stopNickReclaim();
       _connectNick = nick;
@@ -2911,6 +2940,7 @@ export const store = createStore<OnyxState>()(
       _openChathistoryByTarget.clear();
       _pendingTravel = null;
       _stopRosterPoll();
+      _stopScheduledDispatch();
       _motdBuffer = '';
       get().client?.destroy();
       set({
@@ -5409,6 +5439,10 @@ export const store = createStore<OnyxState>()(
               // (after the session-sync join replay, so channel sends land).
               _outboxRetries = 0;
               setTimeout(() => get().flushOutbox(), 2500);
+              // Flush any scheduled messages that came due while the app was
+              // closed or offline — once, promptly, right after the session
+              // settles (so channel sends land after the join replay).
+              setTimeout(() => get()._dispatchScheduledMessages(), 2600);
             }
             {
               const pendingJoin = get().pendingDeepLinkJoin;
@@ -8036,6 +8070,10 @@ export const store = createStore<OnyxState>()(
     })(),
     showScheduledMessages: false,
     scheduleMessage: (channel, text, sendAt) => {
+      // Defense-in-depth: the composer already guards these, but the action is
+      // the state boundary — refuse an empty body or a non-finite time so a
+      // stray caller can't queue an undeliverable/never-due entry.
+      if (!channel || !text.trim() || !Number.isFinite(sendAt)) return;
       const entry = { id: `sched-${Date.now()}-${Math.random().toString(36).slice(2)}`, channel, text, sendAt };
       set(s => {
         const next = [...s.scheduledMessages, entry].sort((a, b) => a.sendAt - b.sendAt);
@@ -8048,6 +8086,45 @@ export const store = createStore<OnyxState>()(
         const next = s.scheduledMessages.filter(m => m.id !== id);
         if (typeof window !== 'undefined') localStorage.setItem('onyx:scheduled', JSON.stringify(next));
         return { scheduledMessages: next };
+      });
+    },
+    _dispatchScheduledMessages: () => {
+      const s = get();
+      const connected = s.connectionStatus === 'connected' && !!s.client;
+      const { due, pending } = selectDueMessages(s.scheduledMessages, Date.now(), connected);
+      if (due.length === 0) return;
+      // Remove the due entries BEFORE sending (and persist the shrunk queue), so
+      // idempotency never depends on the send succeeding: if sendMessage throws,
+      // or a second tick fires, the entry is already gone and can't double-send.
+      set(() => {
+        if (typeof window !== 'undefined') localStorage.setItem('onyx:scheduled', JSON.stringify(pending));
+        return { scheduledMessages: pending };
+      });
+      // Isolate each send: one entry throwing (a racing socket close, a seal
+      // failure) must not swallow its siblings. A throw means the message never
+      // reached the wire, so re-queue it for the next tick rather than lose it.
+      const failed: typeof due = [];
+      let sent = 0;
+      for (const m of due) {
+        try {
+          get().sendMessage(m.channel, m.text);
+          sent += 1;
+        } catch {
+          failed.push(m);
+        }
+      }
+      if (failed.length > 0) {
+        set(s => {
+          const next = [...s.scheduledMessages, ...failed].sort((a, b) => a.sendAt - b.sendAt);
+          if (typeof window !== 'undefined') localStorage.setItem('onyx:scheduled', JSON.stringify(next));
+          return { scheduledMessages: next };
+        });
+      }
+      if (sent === 0) return;
+      get().addToast({
+        variant: 'success',
+        title: sent === 1 ? 'Scheduled message sent' : `${sent} scheduled messages sent`,
+        description: 'Delivered at the time you picked.',
       });
     },
     openScheduledMessages: () => set({ showScheduledMessages: true }),

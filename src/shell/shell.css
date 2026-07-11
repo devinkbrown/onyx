@@ -3083,6 +3083,152 @@
   border-color: var(--seam-faint);
   background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
 }
+
+/* ── Schedule ("send later") popover ── */
+.shell-schedule-picker {
+  width: min(340px, 100%);
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+  border: 1px solid var(--seam);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--stone-2) 86%, var(--ink));
+  box-shadow: 0 16px 44px -24px color-mix(in oklab, var(--ink) 96%, transparent);
+}
+
+.shell-schedule-heading {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--washi-mute);
+}
+
+.shell-schedule-presets {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.shell-schedule-preset,
+.shell-schedule-confirm,
+.shell-schedule-view {
+  min-height: 34px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  text-align: left;
+  color: var(--washi);
+  background: color-mix(in oklab, var(--ink) 40%, var(--stone-2));
+}
+
+.shell-schedule-preset:hover,
+.shell-schedule-confirm:hover:not(:disabled),
+.shell-schedule-view:hover {
+  border-color: var(--lapis);
+  background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
+}
+
+.shell-schedule-custom-label {
+  font-size: 0.72rem;
+  color: var(--washi-dim);
+}
+
+.shell-schedule-custom {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.shell-schedule-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  color: var(--washi);
+  background: color-mix(in oklab, var(--ink) 64%, var(--stone-2));
+}
+
+.shell-schedule-confirm {
+  flex: 0 0 auto;
+  text-align: center;
+}
+
+.shell-schedule-confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.shell-schedule-view {
+  text-align: center;
+  color: var(--lapis-bright);
+}
+
+.shell-schedule-error {
+  margin: 0;
+  color: var(--danger, #e5484d);
+  font-size: 0.74rem;
+}
+
+/* ── Scheduled queue Sheet list ── */
+.shell-scheduled-empty {
+  color: var(--washi-dim);
+}
+
+.shell-scheduled-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.shell-scheduled-item {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--ink) 40%, var(--stone-2));
+}
+
+.shell-scheduled-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.shell-scheduled-channel {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--lapis-bright);
+}
+
+.shell-scheduled-text {
+  margin: 0;
+  color: var(--washi);
+  overflow-wrap: anywhere;
+}
+
+.shell-scheduled-cancel {
+  justify-self: start;
+  min-height: 30px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  color: var(--washi-dim);
+  background: transparent;
+}
+
+.shell-scheduled-cancel:hover {
+  border-color: var(--danger, #e5484d);
+  color: var(--washi);
+}
+
 .shell-typing-indicator {
   display: flex;
   align-items: center;

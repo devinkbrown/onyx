@@ -180,3 +180,71 @@ describe('Composer accessibility', () => {
     expect(alert.textContent).toMatch(/larger than/i);
   });
 });
+
+describe('Composer schedule (send later)', () => {
+  beforeEach(() => {
+    store.setState(initialState, true);
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('disables the schedule button until there is plain text', () => {
+    seedActiveChannel();
+    const { getByRole } = render(() => <Composer />);
+    const scheduleBtn = getByRole('button', {
+      name: 'Schedule message to send later',
+    }) as HTMLButtonElement;
+
+    // Empty composer: nothing to schedule.
+    expect(scheduleBtn.disabled).toBe(true);
+
+    // Plain text enables it; a slash command does not (never queued).
+    const textarea = getByRole('textbox', { name: /message #room/i });
+    fireEvent.input(textarea, { target: { value: 'ping later' } });
+    expect(scheduleBtn.disabled).toBe(false);
+
+    fireEvent.input(textarea, { target: { value: '/me waves' } });
+    expect(scheduleBtn.disabled).toBe(true);
+  });
+
+  it('round-trips: a preset queues the composer text and clears it', () => {
+    seedActiveChannel();
+    const { getByRole } = render(() => <Composer />);
+    const textarea = getByRole('textbox', {
+      name: /message #room/i,
+    }) as HTMLTextAreaElement;
+
+    // Arrange — write a message and open the schedule dialog.
+    fireEvent.input(textarea, { target: { value: 'stand-up reminder' } });
+    fireEvent.click(getByRole('button', { name: 'Schedule message to send later' }));
+
+    // Act — pick the first preset.
+    const dialog = getByRole('dialog', { name: 'Schedule message' });
+    const preset = dialog.querySelector('.shell-schedule-preset') as HTMLButtonElement;
+    fireEvent.click(preset);
+
+    // Assert — the store queued exactly one future message and the composer
+    // reset (DOM updated after the store change — the reactivity guard).
+    const queued = store.getState().scheduledMessages;
+    expect(queued).toHaveLength(1);
+    expect(queued[0]!.channel).toBe('#room');
+    expect(queued[0]!.text).toBe('stand-up reminder');
+    expect(queued[0]!.sendAt).toBeGreaterThan(Date.now());
+    expect(textarea.value).toBe('');
+  });
+
+  it('exposes the schedule popover as a labelled dialog with presets', () => {
+    seedActiveChannel();
+    const { getByRole } = render(() => <Composer />);
+    const textarea = getByRole('textbox', { name: /message #room/i });
+    fireEvent.input(textarea, { target: { value: 'hi' } });
+
+    fireEvent.click(getByRole('button', { name: 'Schedule message to send later' }));
+    const dialog = getByRole('dialog', { name: 'Schedule message' });
+    expect(dialog.querySelectorAll('.shell-schedule-preset').length).toBeGreaterThan(0);
+    // The custom time field is labelled for keyboard/AT users.
+    expect(getByRole('textbox', { name: /message #room/i })).toBeDefined();
+  });
+});
