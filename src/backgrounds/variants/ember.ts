@@ -1,16 +1,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { BackgroundFrameContext, BackgroundVariant } from '../engine';
 import { ambientRms, breathe, rmsToBloom, timeOfDayWarmth, warmthShift } from '../reactivity';
+import { composeSignature } from './layers';
 import type { BackgroundTheme } from './utils';
-import { clearCanvas, drawGrain, mix, readBackgroundTheme, rgba, seeded } from './utils';
+import { mix, rgba, seeded } from './utils';
 
 const TAU = Math.PI * 2;
 
 /**
- * Ember — for the garnet themes. A dark garnet ground with a shu-deep
- * vignette, slow-rising ember motes and the occasional brighter spark, a
- * whisper of heat-shimmer, and dim glow pools breathing along the bottom.
- * Every point of warmth is the shu accent — no gold anywhere.
+ * Ember — for the garnet themes, routed through the shared signature pipeline.
+ * Its own opaque garnet ground and per-variant grain are retired for the shared
+ * luminance-capped ground + fixed washi grain; its distinctive ink layer keeps
+ * the banked-fire shu glow rising from below, slow ember motes with the odd
+ * brighter spark, and a whisper of heat-shimmer. Every point of warmth is the
+ * shu accent — no gold anywhere — and the pipeline's single vermilion seal reads
+ * here as one more coal in the fire.
  */
 export const ember = {
   id: 'ember',
@@ -20,31 +24,25 @@ export const ember = {
     this.frame(ctx, 0);
   },
   frame(ctx, time) {
-    const theme = readBackgroundTheme(ctx.canvas);
-
-    clearCanvas(ctx);
-    drawGarnetGround(ctx, theme, time);
-    drawGlowPools(ctx, theme, time);
-    drawHeatShimmer(ctx, theme, time);
-    drawEmberMotes(ctx, theme, time);
-    drawGrain(ctx, theme, 0.4);
+    composeSignature(ctx, time, (theme, t) => {
+      drawBankedGlow(ctx, theme, t);
+      drawGlowPools(ctx, theme, t);
+      drawHeatShimmer(ctx, theme, t);
+      drawEmberMotes(ctx, theme, t);
+    });
   },
   dispose() {},
 } satisfies BackgroundVariant;
 
-function drawGarnetGround(ctx: BackgroundFrameContext, theme: BackgroundTheme, time: number): void {
+/**
+ * The banked-fire glow: a shu-deep light rising from below the frame, screen-
+ * blended so it only ever *adds* warmth over the shared capped ground. This is
+ * ember's signature — the old opaque garnet ground is gone; only its glow stays.
+ */
+function drawBankedGlow(ctx: BackgroundFrameContext, theme: BackgroundTheme, time: number): void {
   const c = ctx.context;
-  const ground = c.createLinearGradient(0, 0, 0, ctx.height);
-  ground.addColorStop(0, theme.ink2);
-  ground.addColorStop(0.46, theme.ink);
-  ground.addColorStop(0.82, mix(theme.stone, theme.ink, 0.4));
-  ground.addColorStop(1, mix(theme.shu, theme.ink, 0.86));
-  c.fillStyle = ground;
-  c.fillRect(0, 0, ctx.width, ctx.height);
-
-  // Shu-deep vignette rising from below — the light of a banked fire.
   const drift = Math.sin(time * 0.00006) * ctx.width * 0.05;
-  const vignette = c.createRadialGradient(
+  const glow = c.createRadialGradient(
     ctx.width * 0.5 + drift,
     ctx.height * 1.12,
     0,
@@ -52,13 +50,13 @@ function drawGarnetGround(ctx: BackgroundFrameContext, theme: BackgroundTheme, t
     ctx.height * 1.12,
     Math.max(ctx.width, ctx.height) * 0.95,
   );
-  vignette.addColorStop(0, rgba(mix(theme.shu, theme.ink, 0.55), 0.34));
-  vignette.addColorStop(0.55, rgba(mix(theme.shu, theme.ink, 0.75), 0.14));
-  vignette.addColorStop(1, rgba(theme.ink, 0));
+  glow.addColorStop(0, rgba(mix(theme.shu, theme.ink, 0.55), 0.34));
+  glow.addColorStop(0.55, rgba(mix(theme.shu, theme.ink, 0.75), 0.14));
+  glow.addColorStop(1, rgba(theme.ink, 0));
 
   c.save();
   c.globalCompositeOperation = 'screen';
-  c.fillStyle = vignette;
+  c.fillStyle = glow;
   c.fillRect(0, 0, ctx.width, ctx.height);
   c.restore();
 }

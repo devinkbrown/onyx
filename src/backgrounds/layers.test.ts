@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it, vi } from 'vitest';
-import type { BackgroundFrameContext } from './engine';
+import type { BackgroundFrameContext, BackgroundVariant } from './engine';
 import { hexToHsl } from './reactivity';
 import {
   applyWashiGrain,
@@ -11,7 +11,17 @@ import {
   WASHI_GRAIN_COUNT_BASE,
   washiGrainCount,
 } from './variants/layers';
-import type { BackgroundTheme } from './variants/utils';
+import { readBackgroundTheme, type BackgroundTheme } from './variants/utils';
+import { aurora } from './variants/aurora';
+import { bioluminescence } from './variants/bioluminescence';
+import { caustics } from './variants/caustics';
+import { ember } from './variants/ember';
+import { forest } from './variants/forest';
+import { kintsugiVeins } from './variants/kintsugi-veins';
+import { deepCurrent } from './variants/deep-current';
+import { mist } from './variants/mist';
+import { sumiE } from './variants/sumi-e';
+import { washi } from './variants/washi';
 
 const THEME: BackgroundTheme = {
   ink: '#07090f',
@@ -102,6 +112,99 @@ describe('composeSignature', () => {
       composeSignature(ctx, 0, () => {});
     }).not.toThrow();
   });
+
+  it('runs clear → ground → ink → grain → vignette → seal in that order', () => {
+    // The pipeline contract: the ground is laid before the ink, the ink before
+    // the grain/vignette/seal. groundLayer draws the first radial (top glow);
+    // applyVignette draws the second radial. The kintsugi seal is the last
+    // stroke. So the ink must fall between the two radials, and the seal after.
+    const ctx = createFrameContext();
+    const ink = vi.fn();
+    composeSignature(ctx, 1234, ink);
+
+    const context = ctx.context as unknown as {
+      clearRect: ReturnType<typeof vi.fn>;
+      createRadialGradient: ReturnType<typeof vi.fn>;
+      stroke: ReturnType<typeof vi.fn>;
+    };
+    const clearOrder = context.clearRect.mock.invocationCallOrder[0]!;
+    const inkOrder = ink.mock.invocationCallOrder[0]!;
+    const radialOrders = context.createRadialGradient.mock.invocationCallOrder;
+    const groundGlowOrder = radialOrders[0]!; // groundLayer's top glow
+    const vignetteOrder = radialOrders[1]!; // applyVignette
+    const strokeOrders = context.stroke.mock.invocationCallOrder;
+    const lastStrokeOrder = strokeOrders[strokeOrders.length - 1]!; // kintsugi seal
+
+    expect(clearOrder).toBeLessThan(inkOrder);
+    expect(groundGlowOrder).toBeLessThan(inkOrder);
+    expect(inkOrder).toBeLessThan(vignetteOrder);
+    expect(inkOrder).toBeLessThan(lastStrokeOrder);
+  });
+});
+
+describe('signature presets route through the shared pipeline', () => {
+  // Every preset routed onto composeSignature must delegate its ground to the
+  // shared luminance-capped groundLayer instead of painting its own. groundLayer
+  // is the FIRST linear gradient in the stack (ink layers only stroke or draw
+  // radials/later gradients), so the first linear gradient a preset produces must
+  // be exactly the capped ink2 → stone → ink ramp. This catches any bright
+  // custom ground creeping back and proves the luminance cap holds by
+  // construction for each preset.
+  const routed: Array<{ id: string; variant: BackgroundVariant }> = [
+    { id: 'kintsugi-veins', variant: kintsugiVeins },
+    { id: 'deep-current', variant: deepCurrent },
+    { id: 'sumi-e', variant: sumiE },
+    { id: 'washi', variant: washi },
+    { id: 'mist', variant: mist },
+    { id: 'ember', variant: ember },
+    { id: 'forest', variant: forest },
+    { id: 'aurora', variant: aurora },
+    { id: 'bioluminescence', variant: bioluminescence },
+    { id: 'caustics', variant: caustics },
+  ];
+
+  it.each(routed)('$id paints the shared luminance-capped ground', ({ variant }) => {
+    const theme = readBackgroundTheme();
+    const expectedGround = [
+      capLuminance(theme.ink2),
+      capLuminance(theme.stone),
+      capLuminance(theme.ink),
+    ];
+    // Sanity: with the default dark theme every ground stop already sits at or
+    // below the cap.
+    for (const stop of expectedGround) {
+      expect(hexToHsl(stop)!.l).toBeLessThanOrEqual(GROUND_MAX_L + 0.01);
+    }
+
+    const { ctx, linearStops } = createRecordingContext();
+    variant.init(ctx);
+    variant.frame(ctx, 4321);
+
+    expect(linearStops.length).toBeGreaterThan(0);
+    const groundStops = linearStops[0]!.map((s) => s.color);
+    expect(groundStops).toEqual(expectedGround);
+  });
+
+  it.each(routed)('$id renders static (a single frozen frame) without throwing', ({ variant }) => {
+    // staticMode / reduced motion renders one frame at an arbitrary timestamp —
+    // it must be a legible still, never a throw or a blank.
+    const { ctx } = createRecordingContext();
+    expect(() => {
+      variant.init(ctx);
+      variant.frame(ctx, performance.now());
+    }).not.toThrow();
+  });
+
+  it.each(routed)('$id honours the quality ladder without throwing at the low scale', ({ variant }) => {
+    // The FPS guard steps quality down to `low` (qualityScale 0.52); every
+    // element count in the ink layer must scale off it cleanly.
+    const { ctx } = createRecordingContext();
+    const lowCtx = { ...ctx, quality: 'low' as const, qualityScale: 0.52 };
+    expect(() => {
+      variant.init(lowCtx);
+      variant.frame(lowCtx, 9999);
+    }).not.toThrow();
+  });
 });
 
 function createFrameContext(): BackgroundFrameContext {
@@ -114,6 +217,74 @@ function createFrameContext(): BackgroundFrameContext {
     quality: 'high',
     qualityScale: 1,
   };
+}
+
+interface GradientStop {
+  offset: number;
+  color: string;
+}
+
+/**
+ * A frame context whose gradients each record their own stops, so a test can
+ * inspect exactly which colours a preset painted into (say) its first linear
+ * gradient — impossible with the shared single-gradient mock above.
+ */
+function createRecordingContext(): {
+  ctx: BackgroundFrameContext;
+  linearStops: GradientStop[][];
+} {
+  const linearStops: GradientStop[][] = [];
+  const makeGradient = (sink?: GradientStop[]): CanvasGradient =>
+    ({
+      addColorStop: (offset: number, color: string) => sink?.push({ offset, color }),
+    }) as unknown as CanvasGradient;
+
+  const context = {
+    fillStyle: '#000000',
+    strokeStyle: '#ffffff',
+    shadowColor: 'transparent',
+    shadowBlur: 0,
+    globalAlpha: 1,
+    globalCompositeOperation: 'source-over',
+    lineWidth: 1,
+    lineCap: 'butt',
+    lineJoin: 'miter',
+    lineDashOffset: 0,
+    clearRect: vi.fn(),
+    fillRect: vi.fn(),
+    beginPath: vi.fn(),
+    closePath: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    quadraticCurveTo: vi.fn(),
+    arc: vi.fn(),
+    fill: vi.fn(),
+    stroke: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
+    translate: vi.fn(),
+    rotate: vi.fn(),
+    scale: vi.fn(),
+    setTransform: vi.fn(),
+    setLineDash: vi.fn(),
+    createLinearGradient: vi.fn(() => {
+      const stops: GradientStop[] = [];
+      linearStops.push(stops);
+      return makeGradient(stops);
+    }),
+    createRadialGradient: vi.fn(() => makeGradient()),
+  } as unknown as CanvasRenderingContext2D;
+
+  const ctx: BackgroundFrameContext = {
+    canvas: document.createElement('canvas'),
+    context,
+    width: 640,
+    height: 360,
+    dpr: 1,
+    quality: 'high',
+    qualityScale: 1,
+  };
+  return { ctx, linearStops };
 }
 
 function create2dContext(): CanvasRenderingContext2D {

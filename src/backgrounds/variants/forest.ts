@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { BackgroundFrameContext, BackgroundVariant } from '../engine';
+import { composeSignature } from './layers';
 import type { BackgroundTheme } from './utils';
-import { clearCanvas, drawGrain, mix, readBackgroundTheme, rgba, seeded } from './utils';
+import { rgba, seeded } from './utils';
 
 const TAU = Math.PI * 2;
 
 /**
- * Grove — for the jade themes, where the lapis tokens carry the green. Deep
- * forest ground under a faint canopy-dapple, slow slanted light-shafts, and
- * drifting spores in the theme's primary accent. Calm and mineral — no gold.
+ * Grove — for the jade themes, where the lapis tokens carry the green. Routed
+ * through the shared signature pipeline: its own forest ground and per-variant
+ * grain are retired for the shared luminance-capped ground + fixed washi grain.
+ * Its distinctive ink layer keeps the faint canopy-dapple, slow slanted
+ * light-shafts, and drifting spores in the theme's primary accent. Calm and
+ * mineral — no gold beyond the pipeline's single vermilion seal.
  */
 export const forest = {
   id: 'forest',
@@ -18,28 +22,14 @@ export const forest = {
     this.frame(ctx, 0);
   },
   frame(ctx, time) {
-    const theme = readBackgroundTheme(ctx.canvas);
-
-    clearCanvas(ctx);
-    drawForestGround(ctx, theme);
-    drawCanopyDapple(ctx, theme, time);
-    drawLightShafts(ctx, theme, time);
-    drawSpores(ctx, theme, time);
-    drawGrain(ctx, theme, 0.5);
+    composeSignature(ctx, time, (theme, t) => {
+      drawCanopyDapple(ctx, theme, t);
+      drawLightShafts(ctx, theme, t);
+      drawSpores(ctx, theme, t);
+    });
   },
   dispose() {},
 } satisfies BackgroundVariant;
-
-function drawForestGround(ctx: BackgroundFrameContext, theme: BackgroundTheme): void {
-  const c = ctx.context;
-  const ground = c.createLinearGradient(0, 0, 0, ctx.height);
-  ground.addColorStop(0, mix(theme.stone2, theme.ink, 0.45));
-  ground.addColorStop(0.4, mix(theme.stone, theme.ink, 0.55));
-  ground.addColorStop(0.78, theme.ink);
-  ground.addColorStop(1, theme.ink2);
-  c.fillStyle = ground;
-  c.fillRect(0, 0, ctx.width, ctx.height);
-}
 
 function drawCanopyDapple(ctx: BackgroundFrameContext, theme: BackgroundTheme, time: number): void {
   const c = ctx.context;
