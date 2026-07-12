@@ -151,6 +151,25 @@ export function _resetDeviceKeysForTests(): void {
 
 // ── key agreement ────────────────────────────────────────────────────────────
 
+/** Length of a raw uncompressed SEC1 P-256 public point: 0x04 ‖ X(32) ‖ Y(32). */
+const SEC1_UNCOMPRESSED_BYTES = 65;
+/** SEC1 tag byte identifying an uncompressed point. */
+const SEC1_UNCOMPRESSED_TAG = 0x04;
+
+/**
+ * Structural fail-closed validation of a peer's published device key BEFORE it
+ * ever reaches importKey: it must decode to a 65-byte uncompressed SEC1 point
+ * (leading 0x04). This does NOT prove the point is on the curve — importKey /
+ * deriveBits does that — it only rejects the obviously-malformed shapes early
+ * so a bad advertisement is refused, never coerced. Note: this is a STRUCTURAL
+ * check only; it says nothing about WHOSE key it is — binding a key to a claimed
+ * peer is the job of the trust-on-first-use pin layer (keyPinning.ts).
+ */
+export function isValidPeerPublicKey(peerPublicB64: string): boolean {
+  const raw = fromB64url(peerPublicB64);
+  return raw !== null && raw.length === SEC1_UNCOMPRESSED_BYTES && raw[0] === SEC1_UNCOMPRESSED_TAG;
+}
+
 const _sharedKeyCache = new Map<string, Promise<CryptoKey | null>>();
 
 /**
@@ -166,7 +185,9 @@ export function sharedKeyWith(peerPublicB64: string): Promise<CryptoKey | null> 
       const mine = await deviceKeys();
       if (!mine) return null;
       const peerRaw = fromB64url(peerPublicB64);
-      if (!peerRaw || peerRaw.length !== 65 || peerRaw[0] !== 0x04) return null;
+      if (!peerRaw || peerRaw.length !== SEC1_UNCOMPRESSED_BYTES || peerRaw[0] !== SEC1_UNCOMPRESSED_TAG) {
+        return null;
+      }
       const peerKey = await crypto.subtle.importKey(
         'raw',
         peerRaw.buffer as ArrayBuffer,
