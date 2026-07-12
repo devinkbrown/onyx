@@ -838,7 +838,11 @@
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: color-mix(in oklab, var(--ink) 55%, transparent);
+  /* Real audited text token (secondary). --washi-dim clears 4.5:1 on the
+     Catch-up --stone/--ink surface in every theme (worst case 4.94:1); the
+     former color-mix(--ink 55% transparent) composited to ~1:1 near-black
+     text and was effectively invisible. Never alpha-fade a text foreground. */
+  color: var(--washi-dim);
 }
 .home-catchup-quiet {
   margin-top: 10px;
