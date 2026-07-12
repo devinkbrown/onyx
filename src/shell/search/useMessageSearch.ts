@@ -79,6 +79,16 @@ export type UseMessageSearch = {
 };
 
 const [isMessageSearchOpen, setMessageSearchOpen] = createSignal(false);
+// The element focused when the non-modal search overlay opened (the trigger).
+// Captured on open, replayed on close so Escape/close returns the keyboard user
+// to where they were instead of dropping focus to <body>. (WCAG SC 2.4.3)
+let messageSearchReturnFocus: HTMLElement | null = null;
+
+function captureMessageSearchTrigger(): void {
+  if (isMessageSearchOpen()) return; // already open — keep the original trigger
+  messageSearchReturnFocus =
+    typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null;
+}
 // Seed the live in-search mode from the user's persisted DEFAULT (Preferences →
 // "Search & History"). With no stored value this is 'hybrid', so behaviour is
 // unchanged for a fresh device; the in-search toggle then walks this transient
@@ -160,6 +170,7 @@ export function hasMessageSearchableConversation(): boolean {
 
 export function openMessageSearch(): void {
   if (!hasMessageSearchableConversation()) return;
+  captureMessageSearchTrigger();
   setMessageSearchOpen(true);
 }
 
@@ -167,17 +178,24 @@ export function openMessageSearchWithQuery(query: string): void {
   if (!hasMessageSearchableConversation()) return;
   const trimmed = query.trim();
   if (!trimmed) return;
+  captureMessageSearchTrigger();
   setMessageSearchQuerySignal(trimmed);
   setMessageSearchActiveIndex(0);
   setMessageSearchOpen(true);
 }
 
 export function closeMessageSearch(): void {
+  const wasOpen = isMessageSearchOpen();
   setMessageSearchOpen(false);
   setMessageSearchQuerySignal('');
   setMessageSearchActiveIndex(0);
   setMessageSearchActiveResultId(null);
   getState().clearServerSearch();
+  // Restore focus to the trigger so a keyboard user keeps their place; the
+  // search input unmounts on close and would otherwise strand focus on <body>.
+  const previous = messageSearchReturnFocus;
+  messageSearchReturnFocus = null;
+  if (wasOpen) previous?.focus?.();
 }
 
 export function activeMessageSearchResultId(): string | null {

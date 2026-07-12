@@ -920,6 +920,7 @@ export function Composer(props: ComposerProps): JSX.Element {
           aria-disabled={!isEnabled()}
           aria-multiline="true"
           aria-controls={slashVisible() ? 'shell-command-menu' : undefined}
+          aria-expanded={slashVisible()}
           aria-autocomplete={slashVisible() ? 'list' : undefined}
           aria-activedescendant={
             slashVisible() ? `shell-command-option-${slashIndex()}` : undefined

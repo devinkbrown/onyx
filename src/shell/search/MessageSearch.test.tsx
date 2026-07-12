@@ -8,7 +8,7 @@ import type { Channel, ChatMessage } from '@/lib/irc/types';
 import { resetPreferences } from '@/lib/prefs/preferences';
 import { store } from '@/lib/store/store';
 import { _resetVaultForTests, saveMessages } from '@/lib/vault/historyVault';
-import { closeMessageSearch, openMessageSearchWithQuery } from './useMessageSearch';
+import { closeMessageSearch, openMessageSearch, openMessageSearchWithQuery } from './useMessageSearch';
 import { MessageSearch } from './MessageSearch';
 
 const initialState = store.getInitialState();
@@ -98,6 +98,30 @@ describe('MessageSearch', () => {
       expect(within(vaultList).getByText('needle saved only on this device')).toBeInTheDocument();
       expect(within(vaultList).queryByText('needle in the live buffer')).not.toBeInTheDocument();
     });
+  });
+
+  it('restores focus to the pre-open trigger when the search closes (SC 2.4.3)', async () => {
+    store.setState({
+      ...initialState,
+      activeView: { kind: 'channel', channel: '#root' },
+      channels: new Map([['#root', channel('#root', [message('m1', 'Kai', 'hello there', 1)])]]),
+    }, true);
+
+    render(() => <button type="button" data-testid="search-trigger">Find in conversation</button>);
+    const trigger = screen.getByTestId('search-trigger');
+    trigger.focus();
+    expect(document.activeElement).toBe(trigger);
+
+    // Capture happens at open time, when the trigger still holds focus.
+    openMessageSearch();
+    render(() => <MessageSearch />);
+
+    const input = await screen.findByRole('searchbox', { name: 'Search messages' });
+    await waitFor(() => expect(document.activeElement).toBe(input));
+
+    fireEvent.keyDown(input, { key: 'Escape' });
+
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
   });
 
   it('offers device recall terms for local search pivots', async () => {
