@@ -39,6 +39,7 @@ import { HomeView } from './HomeView';
 const ChannelBrowser = lazy(() => import('./ChannelBrowser'));
 import { PresenceRibbon } from './PresenceRibbon';
 import { GuestClaimPrompt } from './GuestClaimPrompt';
+import { DmKeyChangeBanner } from './DmKeyChangeBanner';
 import { TimeScrubber } from './TimeScrubber';
 import { WatchTogetherActivity } from './WatchTogetherActivity';
 import { MessageView } from './MessageView';
@@ -503,6 +504,8 @@ export function AppShell(props: AppShellProps): JSX.Element {
           />
           {/* Guest → claim-your-nick affordance (self-gates on guest state) */}
           <GuestClaimPrompt />
+          {/* E2EE key-change warning (self-gates on the active DM having a pending change) */}
+          <DmKeyChangeBanner />
           <Show when={preferences().timeScrubber}>
             <TimeScrubber />
           </Show>

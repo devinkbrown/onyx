@@ -1,0 +1,204 @@
+/* DmKeyChangeBanner — E2EE key-change (anti-MITM) warning, dark-luxury.
+ *
+ * The register is "serious and specific", not a generic yellow toast: a
+ * translucent surface over the conversation with a single hot vermillion seal
+ * (--shu / --danger, spent semantically for danger), a mono kicker, a display
+ * headline, and a two-column safety-number comparison instrument in mono.
+ * All colour/space/radius/motion/type from tokens — no literals.
+ */
+
+.dm-keychange {
+  position: relative;
+  margin: var(--space-2) var(--space-3) 0;
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  border: 1px solid color-mix(in oklab, var(--shu) 38%, var(--stone-line));
+  border-radius: var(--r-md);
+  /* Depth from light + translucency over the live canvas, not an opaque veil:
+     a faint vermillion top glow fades into the deep-water body. */
+  background:
+    radial-gradient(120% 90% at 0% 0%, color-mix(in oklab, var(--shu) 14%, transparent), transparent 60%),
+    color-mix(in oklab, var(--stone) 88%, transparent);
+  overflow: hidden;
+  /* Reveal communicates arrival; collapses to 0ms under reduced-motion via --dur. */
+  animation: dm-keychange-in var(--dur) var(--ease);
+}
+
+@keyframes dm-keychange-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* The hot seal: a vermillion left rule. Shape + label carry meaning too, so the
+   warning is never conveyed by colour alone. */
+.dm-keychange__rule {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--shu-bright), var(--shu));
+  border-radius: var(--r-pill);
+}
+
+.dm-keychange__head {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.dm-keychange__lede {
+  min-width: 0;
+  flex: 1 1 22rem;
+}
+
+.dm-keychange__kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--shu-bright);
+}
+
+.dm-keychange__glyph {
+  font-size: 0.82rem;
+  line-height: 1;
+}
+
+.dm-keychange__title {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  color: var(--washi);
+}
+
+.dm-keychange__peer {
+  color: var(--shu-bright);
+}
+
+.dm-keychange__sub {
+  margin: var(--space-1) 0 0;
+  max-width: 44ch;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--washi-dim);
+}
+
+/* ── Actions ── */
+.dm-keychange__actions {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.dm-keychange__accept,
+.dm-keychange__dismiss {
+  min-height: 2.75rem; /* 44px — enhanced touch target for the primary decisions */
+  padding: 0 var(--space-3);
+  border-radius: var(--r-sm);
+  font-family: var(--font-sans);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    color var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+
+/* Accept is the forward action AFTER verification — the confident primary (azure),
+   not tinted red: the alarm is the banner chrome, not the button. */
+.dm-keychange__accept {
+  border: 1px solid var(--lapis-bright);
+  background: linear-gradient(135deg, var(--lapis-deep), var(--lapis) 60%, var(--lapis-bright));
+  color: var(--on-accent);
+}
+
+.dm-keychange__accept:hover,
+.dm-keychange__accept:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 0 24px -14px var(--lapis-bright);
+}
+
+.dm-keychange__accept:active {
+  transform: translateY(0);
+}
+
+/* Dismiss is the calm escape — a ghost that keeps us fail-closed. */
+.dm-keychange__dismiss {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--washi-dim);
+}
+
+.dm-keychange__dismiss:hover,
+.dm-keychange__dismiss:focus-visible {
+  border-color: color-mix(in oklab, var(--washi) 24%, transparent);
+  color: var(--washi);
+  background: color-mix(in oklab, var(--washi) 8%, transparent);
+}
+
+/* ── Safety-number comparison instrument ── */
+.dm-keychange__compare {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line-faint);
+}
+
+.dm-keychange__col {
+  min-width: 0;
+  padding: var(--pad-control);
+  border: 1px solid var(--line-faint);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--ink) 30%, transparent);
+}
+
+/* The unverified column wears the vermillion hairline — the one to scrutinise. */
+.dm-keychange__col[data-tone='pending'] {
+  border-color: color-mix(in oklab, var(--shu) 30%, var(--line));
+}
+
+.dm-keychange__col-label {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--washi-mute);
+}
+
+.dm-keychange__col[data-tone='pending'] .dm-keychange__col-label {
+  color: var(--shu-bright);
+}
+
+.dm-keychange__fingerprint {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-1) var(--space-2);
+}
+
+.dm-keychange__group {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  color: var(--washi);
+  font-variant-numeric: tabular-nums;
+}
+
+.dm-keychange__col-empty {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--washi-mute);
+}
