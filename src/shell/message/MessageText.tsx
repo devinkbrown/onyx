@@ -102,53 +102,63 @@ type MediaUnfurlProps = {
 function MediaUnfurl(props: MediaUnfurlProps): JSX.Element {
   const [local] = splitProps(props, ['href', 'kind']);
 
+  // Defense in depth at the sink: mirror the link/preview anchor guard so only an
+  // http(s) URL can ever reach a media src/href. detectMediaKind already enforces
+  // this today, but re-checking here means a future caller that hands MediaUnfurl a
+  // kind alongside a non-http(s) href can never place a javascript:/data: source.
+  const safeHref = createMemo(() => (isHttpUrl(local.href) ? local.href : null));
+
   return (
-    <Show when={local.kind !== null}>
-      <div class="shell-msg-media">
-        <Switch>
-          <Match when={local.kind === 'image'}>
-            <a
-              href={local.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="shell-msg-media-link"
-              aria-label="Open image in new tab"
-            >
-              <img
-                src={local.href}
-                alt=""
-                loading="lazy"
-                decoding="async"
-                class="shell-msg-media-img"
+    <Show when={local.kind !== null && safeHref()}>
+      {(href) => (
+        <div class="shell-msg-media">
+          <Switch>
+            <Match when={local.kind === 'image'}>
+              <a
+                href={href()}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="shell-msg-media-link"
+                aria-label="Open image in new tab"
+              >
+                <img
+                  src={href()}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  class="shell-msg-media-img"
+                />
+              </a>
+            </Match>
+            <Match when={local.kind === 'video'}>
+              <video
+                src={href()}
+                controls
+                preload="metadata"
+                class="shell-msg-media-video"
+                aria-label="Attached video"
               />
-            </a>
-          </Match>
-          <Match when={local.kind === 'video'}>
-            <video
-              src={local.href}
-              controls
-              preload="metadata"
-              class="shell-msg-media-video"
-              aria-label="Attached video"
-            />
-          </Match>
-          <Match when={local.kind === 'audio'}>
-            <audio
-              src={local.href}
-              controls
-              preload="metadata"
-              class="shell-msg-media-audio"
-              aria-label="Attached audio"
-            />
-          </Match>
-        </Switch>
-      </div>
+            </Match>
+            <Match when={local.kind === 'audio'}>
+              <audio
+                src={href()}
+                controls
+                preload="metadata"
+                class="shell-msg-media-audio"
+                aria-label="Attached audio"
+              />
+            </Match>
+          </Switch>
+        </div>
+      )}
     </Show>
   );
 }
 
 type BlockKitLiteViewProps = {
   block: BlockKitLiteBlock;
+  /** Conversation this block is rendered in; the only target its actions may reach. */
+  origin: string;
 };
 
 function blockKitActionText(action: BlockKitLiteAction, selectedValue?: string): string | null {
@@ -158,10 +168,21 @@ function blockKitActionText(action: BlockKitLiteAction, selectedValue?: string):
   return action.value ? `${action.value}: ${selected}` : selected;
 }
 
-function runBlockKitAction(action: BlockKitLiteAction, selectedValue?: string): void {
+/**
+ * Dispatch a Block-Kit action into the conversation it is rendered in.
+ *
+ * A Block-Kit block is attacker-authored and extractBlockKitLite runs on EVERY
+ * message body, so `action.target` is fully attacker-controlled. It must NEVER be
+ * used as a routing input: a block posted in #public could otherwise emit
+ * attacker-chosen text AS THE VIEWER into #other or a DM (a confused deputy). We
+ * therefore refuse to send unless the block's declared target matches `origin`,
+ * and always send to the trusted `origin` value — closing that identity-borrow.
+ */
+function runBlockKitAction(action: BlockKitLiteAction, origin: string, selectedValue?: string): void {
+  if (!origin || action.target !== origin) return;
   const text = blockKitActionText(action, selectedValue)?.trim();
   if (!text || text.startsWith('/')) return;
-  getState().sendMessage(action.target, text);
+  getState().sendMessage(origin, text);
 }
 
 function BlockKitLiteButtonView(props: {
@@ -247,8 +268,11 @@ function BlockKitLiteSelectView(props: {
 
 function BlockKitLiteMessageView(props: {
   block: BlockKitLiteMessageBlock;
+  origin: string;
 }): JSX.Element {
-  const [local] = splitProps(props, ['block']);
+  const [local] = splitProps(props, ['block', 'origin']);
+  const dispatch = (action: BlockKitLiteAction, selectedValue?: string): void =>
+    runBlockKitAction(action, local.origin, selectedValue);
 
   return (
     <>
@@ -273,14 +297,14 @@ function BlockKitLiteMessageView(props: {
       <Show when={local.block.selects.length > 0}>
         <div class="shell-msg-blockkit-selects">
           <For each={local.block.selects}>
-            {(select) => <BlockKitLiteSelectView select={select} onAction={runBlockKitAction} />}
+            {(select) => <BlockKitLiteSelectView select={select} onAction={dispatch} />}
           </For>
         </div>
       </Show>
       <Show when={local.block.buttons.length > 0}>
         <div class="shell-msg-blockkit-actions">
           <For each={local.block.buttons}>
-            {(button) => <BlockKitLiteButtonView button={button} onAction={runBlockKitAction} />}
+            {(button) => <BlockKitLiteButtonView button={button} onAction={dispatch} />}
           </For>
         </div>
         <span class="shell-msg-blockkit-hint" aria-live="polite">
@@ -293,8 +317,9 @@ function BlockKitLiteMessageView(props: {
 
 function BlockKitLiteModalTrigger(props: {
   block: BlockKitLiteModalBlock;
+  origin: string;
 }): JSX.Element {
-  const [local] = splitProps(props, ['block']);
+  const [local] = splitProps(props, ['block', 'origin']);
   const [modalOpen, setModalOpen] = createSignal(false);
 
   return (
@@ -306,23 +331,23 @@ function BlockKitLiteModalTrigger(props: {
         block={local.block}
         open={modalOpen()}
         onOpenChange={setModalOpen}
-        onAction={runBlockKitAction}
+        onAction={(action, selectedValue) => runBlockKitAction(action, local.origin, selectedValue)}
       />
     </>
   );
 }
 
 function BlockKitLiteView(props: BlockKitLiteViewProps): JSX.Element {
-  const [local] = splitProps(props, ['block']);
+  const [local] = splitProps(props, ['block', 'origin']);
 
   return (
     <div class="shell-msg-blockkit" role="group" aria-label={local.block.title ?? 'Structured message actions'}>
       <Switch>
         <Match when={local.block.type === 'modal'}>
-          <BlockKitLiteModalTrigger block={local.block as BlockKitLiteModalBlock} />
+          <BlockKitLiteModalTrigger block={local.block as BlockKitLiteModalBlock} origin={local.origin} />
         </Match>
         <Match when={local.block.type === 'message'}>
-          <BlockKitLiteMessageView block={local.block as BlockKitLiteMessageBlock} />
+          <BlockKitLiteMessageView block={local.block as BlockKitLiteMessageBlock} origin={local.origin} />
         </Match>
       </Switch>
     </div>
@@ -658,6 +683,12 @@ export type MessageTextProps = {
   onChannelClick?: (name: string) => void;
   /** CSS class for the outer wrapper. */
   class?: string;
+  /**
+   * The conversation (channel or DM target) this message is rendered in.
+   * Block-Kit actions may ONLY speak into this exact target; a block that names
+   * any other target is inert. Omitting it fails closed — no action dispatches.
+   */
+  origin?: string;
 };
 
 /**
@@ -717,7 +748,7 @@ function LinkPreviewCard(props: { url: string }): JSX.Element {
 }
 
 export function MessageText(props: MessageTextProps): JSX.Element {
-  const [local] = splitProps(props, ['text', 'selfNick', 'onChannelClick', 'class']);
+  const [local] = splitProps(props, ['text', 'selfNick', 'onChannelClick', 'class', 'origin']);
 
   const blockKit = createMemo(() => extractBlockKitLite(local.text));
   const tokens = createMemo(() => parseMessage(blockKit().text));
@@ -767,7 +798,7 @@ export function MessageText(props: MessageTextProps): JSX.Element {
       </Show>
       <Show when={blockKit().blocks.length > 0}>
         <For each={blockKit().blocks}>
-          {(block) => <BlockKitLiteView block={block} />}
+          {(block) => <BlockKitLiteView block={block} origin={local.origin ?? ''} />}
         </For>
       </Show>
     </p>

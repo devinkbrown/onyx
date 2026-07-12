@@ -486,6 +486,8 @@ type MsgBodyProps = {
   msg: ChatMessage;
   selfNick: string;
   onChannelClick?: (name: string) => void;
+  /** Conversation this message is rendered in — scopes Block-Kit action targets. */
+  origin: string;
 };
 
 /**
@@ -493,7 +495,7 @@ type MsgBodyProps = {
  * to the rich MessageText renderer from @/shell/message/MessageText.
  */
 function MsgBody(props: MsgBodyProps): JSX.Element {
-  const [local] = splitProps(props, ['msg', 'selfNick', 'onChannelClick']);
+  const [local] = splitProps(props, ['msg', 'selfNick', 'onChannelClick', 'origin']);
 
   // An E2EE DM with no decrypted plaintext yet (no key, or sent to a different
   // device) shows a locked placeholder; `text` is always the ciphertext.
@@ -522,6 +524,7 @@ function MsgBody(props: MsgBodyProps): JSX.Element {
       selfNick={local.selfNick}
       onChannelClick={local.onChannelClick}
       class={cls()}
+      origin={local.origin}
     />
   );
 }
@@ -1576,7 +1579,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                           </div>
                         )}
                       </Show>
-                      <MsgBody msg={msg} selfNick={selfNick()} onChannelClick={(name) => getState().navigate({ kind: 'channel', channel: name })} />
+                      <MsgBody msg={msg} selfNick={selfNick()} onChannelClick={(name) => getState().navigate({ kind: 'channel', channel: name })} origin={activeTarget()} />
                       <SplitTopicAction
                         msg={msg}
                         label={splitTopicLabel()}
@@ -1656,7 +1659,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                         </div>
                       )}
                     </Show>
-                    <MsgBody msg={msg} selfNick={selfNick()} onChannelClick={(name) => getState().navigate({ kind: 'channel', channel: name })} />
+                    <MsgBody msg={msg} selfNick={selfNick()} onChannelClick={(name) => getState().navigate({ kind: 'channel', channel: name })} origin={activeTarget()} />
                     <SplitTopicAction
                       msg={msg}
                       label={splitTopicLabel()}

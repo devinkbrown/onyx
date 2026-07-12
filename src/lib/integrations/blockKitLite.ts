@@ -149,7 +149,13 @@ function readSelects(raw: unknown): BlockKitLiteSelect[] {
       const optionSource = option as Record<string, unknown>;
       const optionLabel = trimText(optionSource.label, 48);
       if (!optionLabel) return [];
-      return [{ label: optionLabel, value: trimText(optionSource.value, 80) ?? optionLabel }];
+      // The selected option's value is emitted verbatim as message text on a
+      // select-notify, so it must clear the same guard as a send value (no CRLF
+      // smuggling, no leading-slash command) — trimText alone did not. Fall back
+      // to the label (also guarded), and drop the option if neither is safe.
+      const optionValue = safeActionValue(optionSource.value) ?? safeActionValue(optionLabel);
+      if (!optionValue) return [];
+      return [{ label: optionLabel, value: optionValue }];
     });
     return options.length > 0 ? [{ label, options, action: readAction(source.action) }] : [];
   });

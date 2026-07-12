@@ -83,6 +83,46 @@ describe('blockKitLite', () => {
     ]);
   });
 
+  it('routes select-option values through the action-value guard (CRLF/leading-slash rejected)', () => {
+    const block = parseBlockKitLitePayload(JSON.stringify({
+      selects: [{
+        label: 'Environment',
+        action: { type: 'select-notify', target: '#ops', value: null },
+        options: [
+          { label: 'Clean', value: 'clean' },
+          { label: 'CRLF', value: 'ok\r\nPRIVMSG #root :pwn' },
+          { label: 'Slash', value: '/oper root' },
+          { label: 'FallbackLabel' },
+        ],
+      }],
+    }));
+
+    const options = block?.selects[0]?.options ?? [];
+    // A clean value passes through unchanged.
+    expect(options.find((o) => o.label === 'Clean')?.value).toBe('clean');
+    // A CRLF-smuggled option value is rejected; it falls back to the (guarded) label.
+    expect(options.find((o) => o.label === 'CRLF')?.value).toBe('CRLF');
+    // A leading-slash command value is rejected; it falls back to the guarded label.
+    expect(options.find((o) => o.label === 'Slash')?.value).toBe('Slash');
+    // No value supplied → the label is used, still through the value guard.
+    expect(options.find((o) => o.label === 'FallbackLabel')?.value).toBe('FallbackLabel');
+  });
+
+  it('drops a select option whose value AND label are both unsafe', () => {
+    const block = parseBlockKitLitePayload(JSON.stringify({
+      selects: [{
+        label: 'Environment',
+        action: { type: 'select-notify', target: '#ops', value: null },
+        options: [
+          { label: '/bad', value: '/worse' },
+          { label: 'Good', value: 'good' },
+        ],
+      }],
+    }));
+
+    expect(block?.selects[0]?.options).toEqual([{ label: 'Good', value: 'good' }]);
+  });
+
   it('bounds repeated controls and options before returning renderable blocks', () => {
     const block = parseBlockKitLitePayload(JSON.stringify({
       buttons: Array.from({ length: 6 }, (_, i) => ({ label: `Button ${i + 1}`, value: `b${i + 1}` })),
