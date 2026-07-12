@@ -3390,15 +3390,30 @@ export const store = createStore<OnyxState>()(
           const encryptedOutboundTags = encryptedKind ? { ...outboundTags, ...e2eeMessageTag(encryptedKind) } : outboundTags;
           void sealDm(peerKey, text).then((envelope) => {
             if (!envelope) {
-              // Sealing genuinely failed — send plaintext rather than drop the
-              // message, and echo it unencrypted (no lock chip, honestly).
-              client.send(formatTaggedLine(outboundTags, 'PRIVMSG', target, text));
-              if (!waitForServerEcho) {
-                set(s => _addMessage(s, target, {
-                  id: uid(), time: new Date(), from: ourNick, text, type: 'msg', target,
-                  ...(replySnapshot ? { replyTo: replySnapshot } : {}),
-                }));
-              }
+              // SECURITY — FAIL CLOSED. The user designated this peer for E2EE
+              // and believes the DM is encrypted; if sealing fails (WebCrypto
+              // error, key-derivation failure, missing/invalid peer key at send
+              // time) we must NOT silently downgrade to a plaintext PRIVMSG on
+              // the wire — that is a confidentiality-relevant silent downgrade
+              // whose only prior cue was the absence of a lock chip. Refuse to
+              // transmit and warn loudly, mirroring the offline branch above
+              // which likewise refuses to leak an E2EE DM as plaintext.
+              //
+              // PRODUCT DECISION (fail-closed vs warn-and-send): this drops +
+              // warns rather than auto-sending unencrypted. Preserving the
+              // drafted text / offering an explicit "send unencrypted" retry is
+              // a UI concern owned by the caller/composer (a follow-up); if an
+              // unencrypted send is ever wanted it must be a deliberate user
+              // action, never an automatic fallback.
+              get().addToast({
+                variant: 'error',
+                title: 'Encryption unavailable',
+                description: `Your message to ${target} was NOT sent — the encrypted DM could not be sealed. Try again, or turn off encrypted DMs for this conversation to send it unencrypted.`,
+              });
+              get().addNotification({
+                type: 'error',
+                text: `Encryption unavailable — message to ${target} was not sent (the encrypted DM could not be sealed).`,
+              });
               return;
             }
             client.send(formatTaggedLine(encryptedOutboundTags, 'PRIVMSG', target, envelope));

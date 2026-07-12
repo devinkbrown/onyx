@@ -204,4 +204,37 @@ describe('E2EE DMs', () => {
     expect(sendRaw).toHaveBeenCalledWith('PRIVMSG', 'nokey', 'plain and clear');
     expect(send).not.toHaveBeenCalled();
   });
+
+  it('fails closed when sealing an E2EE DM fails — never leaks plaintext, warns loudly', async () => {
+    const send = vi.fn();
+    store.setState({ connectionStatus: 'connected', client: mockClient(vi.fn()) });
+    store.getState().client!.send = send;
+    const sendRaw = store.getState().client!.sendRaw as ReturnType<typeof vi.fn>;
+    // A peer designated for E2EE (peerDmKeys has an entry) but with a key that
+    // cannot seal — 'AAAA' decodes to 3 bytes, not the 65-byte P-256 point, so
+    // sharedKeyWith → sealDm resolves null, exercising the seal-failure branch.
+    store.setState({ peerDmKeys: new Map([['trev', 'AAAA']]) });
+
+    const notesBefore = store.getState().notifications.length;
+    store.getState().sendMessage('trev', 'meet at the quiet dock');
+
+    // The seal fails on a microtask; wait for the warning to surface.
+    await until(() => store.getState().notifications.length > notesBefore);
+
+    // Fail closed: the plaintext is NEVER transmitted, by any wire path.
+    expect(send).not.toHaveBeenCalled();
+    expect(sendRaw).not.toHaveBeenCalledWith('PRIVMSG', 'trev', 'meet at the quiet dock');
+
+    // The downgrade is non-silent: a persistent error notification and a toast.
+    const note = store.getState().notifications.at(-1)!;
+    expect(note.type).toBe('error');
+    expect(note.text).toContain('Encryption unavailable');
+    expect(note.text).toContain('trev');
+    const toast = store.getState().toasts.at(-1)!;
+    expect(toast.variant).toBe('error');
+    expect(toast.title).toBe('Encryption unavailable');
+
+    // And no plaintext echo leaked into the local DM buffer either.
+    expect(dmMsgs('trev')).toHaveLength(0);
+  });
 });
