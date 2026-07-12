@@ -214,6 +214,37 @@ describe('credentials persistence', () => {
     expect(stored?.tokenExpiry).toBeUndefined();
   });
 
+  it('records a tokenExpiry when a mesh token is stored with an expiry, and purges it', () => {
+    saveCredentials({ nick: 'Alice', server: 'irc.example', password: 'pw' });
+    // 1_800_000_000s = 2027-01-15T08:00:00Z — well after the frozen NOW.
+    storeMeshToken('mesh-token', 1_800_000_000);
+
+    expect(loadCredentials()).toMatchObject({
+      meshToken: 'mesh-token',
+      tokenExpiry: '2027-01-15T08:00:00.000Z',
+    });
+
+    // Jump past the recorded expiry — the mesh token is evicted on read.
+    vi.setSystemTime(new Date('2027-02-01T00:00:00.000Z'));
+    const purged = loadCredentials();
+    expect(purged).toMatchObject({ nick: 'Alice', password: 'pw' });
+    expect(purged?.meshToken).toBeUndefined();
+    expect(purged?.tokenExpiry).toBeUndefined();
+  });
+
+  it('leaves an existing token expiry untouched when a mesh token is stored without one', () => {
+    saveCredentials({ nick: 'Alice', server: 'irc.example', password: 'pw' });
+    storeSessionToken('session-token', 1_800_000_000);
+    // No expiry arg: must NOT clobber the session token's governing expiry.
+    storeMeshToken('mesh-token');
+
+    expect(loadCredentials()).toMatchObject({
+      sessionToken: 'session-token',
+      meshToken: 'mesh-token',
+      tokenExpiry: '2027-01-15T08:00:00.000Z',
+    });
+  });
+
   it('parses handoffs by trimming, truncating, deduplicating, and capping entries', () => {
     const oversized = 'x'.repeat(300);
     const handoffs = parseAccountHandoffs([

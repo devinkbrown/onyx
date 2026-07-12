@@ -32,6 +32,16 @@ export const LOCKED_PLACEHOLDER = '🔒 Encrypted message (sent to another devic
 const CURVE = 'P-256';
 const HKDF_SALT = new TextEncoder().encode('onyx-dm-v1');
 
+/** AES-GCM nonce (IV) length, in bytes — fresh-random per message. */
+const NONCE_BYTES = 12;
+/** AES-GCM authentication tag length, in bytes (128-bit, the WebCrypto default). */
+const GCM_TAG_BYTES = 16;
+/** Smallest possible body: a nonce plus a bare (empty-plaintext) GCM tag. */
+const MIN_BODY_BYTES = NONCE_BYTES + GCM_TAG_BYTES;
+
+/** Base64url alphabet, no padding — the exact envelope-body encoding. */
+const B64URL_RE = /^[A-Za-z0-9_-]*$/;
+
 export interface DeviceKeys {
   keyPair: CryptoKeyPair;
   /** Raw uncompressed SEC1 public key, base64url-unpadded — the METADATA value. */
@@ -47,6 +57,12 @@ export function toB64url(bytes: Uint8Array): string {
 }
 
 export function fromB64url(text: string): Uint8Array | null {
+  // Strict + fail-closed, mirroring the WebAuthn b64urlToBytes decoder: the wire
+  // is base64url with NO padding, so any '+', '/', '=' or out-of-alphabet
+  // character — or an impossible length %4===1 — is a malformed envelope. Reject
+  // to null rather than silently decoding standard-base64 or junk to the wrong
+  // bytes (which would otherwise only surface later as a GCM auth failure).
+  if (!B64URL_RE.test(text) || text.length % 4 === 1) return null;
   try {
     const b64 = text.replace(/-/g, '+').replace(/_/g, '/');
     const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
@@ -197,15 +213,15 @@ export async function sealDm(peerPublicB64: string, plaintext: string): Promise<
   const key = await sharedKeyWith(peerPublicB64);
   if (!key) return null;
   try {
-    const nonce = crypto.getRandomValues(new Uint8Array(12));
+    const nonce = crypto.getRandomValues(new Uint8Array(NONCE_BYTES));
     const ct = await crypto.subtle.encrypt(
       { name: 'AES-GCM', iv: nonce },
       key,
       new TextEncoder().encode(plaintext),
     );
-    const body = new Uint8Array(12 + ct.byteLength);
+    const body = new Uint8Array(NONCE_BYTES + ct.byteLength);
     body.set(nonce, 0);
-    body.set(new Uint8Array(ct), 12);
+    body.set(new Uint8Array(ct), NONCE_BYTES);
     return `${ENVELOPE_PREFIX}${toB64url(body)}`;
   } catch {
     return null;
@@ -218,12 +234,14 @@ export async function openDm(peerPublicB64: string, envelope: string): Promise<s
   const key = await sharedKeyWith(peerPublicB64);
   if (!key) return null;
   const body = fromB64url(envelope.slice(ENVELOPE_PREFIX.length));
-  if (!body || body.length < 13) return null;
+  // A real body is nonce(12) ‖ ciphertext ‖ tag(16); anything below 28 bytes
+  // cannot even carry an empty-plaintext GCM tag, so reject it fast fail-closed.
+  if (!body || body.length < MIN_BODY_BYTES) return null;
   try {
     const pt = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: body.slice(0, 12) },
+      { name: 'AES-GCM', iv: body.slice(0, NONCE_BYTES) },
       key,
-      body.slice(12),
+      body.slice(NONCE_BYTES),
     );
     return new TextDecoder().decode(pt);
   } catch {

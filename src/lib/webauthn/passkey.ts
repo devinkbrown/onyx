@@ -3,7 +3,9 @@
 // Passkey (WebAuthn) ceremony helpers — the browser half of the passwordless
 // login flow, paired with the daemon's `WEBAUTHN` command.
 //
-// Wire contract (server → client `NOTE WEBAUTHN …`, client → server `WEBAUTHN …`):
+// Wire contract. Client → server is the `WEBAUTHN <SUBTYPE> …` command; the
+// server's replies ride the IRCX EVENT plane (the `NOTE` verb was removed) as
+// `:server EVENT <me> WEBAUTHN <SUBTYPE> …` — store.ts consumes them there.
 //   register:  REGISTER [label]            → REGISTER-CHALLENGE <chal_b64url> <rp_id> :<account>
 //              REGISTER-FINISH <credId_b64url> <clientDataJSON_b64url> <authData_b64url>
 //                                          → REGISTERED <credId_b64url> :<label>

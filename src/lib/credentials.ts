@@ -252,13 +252,21 @@ export function clearSessionToken(server?: string, nick?: string): void {
 }
 
 /**
- * Store a mesh-sealed reclaim token received from Orochi via
- * `NOTE SESSION MTOKEN`. Unlike the local session token, this one is usable to
- * reclaim/redirect the session from ANY node in the mesh, so it survives a
- * reconnect that lands on a different node. Persisted against the active
- * credential entry; a no-op when no base credentials exist (guest sessions).
+ * Store a mesh-sealed reclaim token received from Orochi. Unlike the local
+ * session token, this one is usable to reclaim/redirect the session from ANY
+ * node in the mesh, so it survives a reconnect that lands on a different node.
+ * Persisted against the active credential entry; a no-op when no base
+ * credentials exist (guest sessions).
+ *
+ * expiresAt — a Unix timestamp (seconds). When provided, it is recorded as the
+ *   local tokenExpiry so purgeExpiredTokens evicts the token on the next
+ *   read/write once it lapses. When omitted (the current MTOKEN path, which
+ *   carries no expiry on the wire) the token has NO local expiry and lingers in
+ *   localStorage until an explicit clearSessionToken / clearCredentials — the
+ *   server still enforces its own expiry on any resume attempt, so a stale local
+ *   copy is a housekeeping concern, not an auth-lifetime one.
  */
-export function storeMeshToken(token: string): void {
+export function storeMeshToken(token: string, expiresAt?: number): void {
   if (typeof window === 'undefined') return;
   try {
     const store = readStore();
@@ -268,7 +276,15 @@ export function storeMeshToken(token: string): void {
     if (!activeKey) return;
     const existing = store.entries[activeKey];
     if (!existing) return;
-    store.entries[activeKey] = { ...existing, meshToken: token };
+    // Only set tokenExpiry when the caller supplies one; otherwise preserve any
+    // expiry already governing an existing token rather than clobbering it.
+    store.entries[activeKey] = {
+      ...existing,
+      meshToken: token,
+      ...(expiresAt !== undefined
+        ? { tokenExpiry: new Date(expiresAt * 1000).toISOString() }
+        : {}),
+    };
     writeStore(store);
   } catch { /* quota */ }
 }

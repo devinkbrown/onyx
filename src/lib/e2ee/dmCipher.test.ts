@@ -121,4 +121,37 @@ describe('dmCipher', () => {
     expect(await sealDm('short', 'x')).toBeNull();
     expect(await sealDm(toB64url(new Uint8Array(65)), 'x')).toBeNull(); // not on curve
   });
+
+  it('rejects a body shorter than nonce+tag (13–27 bytes) fail-closed', async () => {
+    const peer = await makePeer();
+    // Envelope + valid peer key, but the body is too short to be a real
+    // nonce(12) ‖ tag(16); these used to slip past the < 13 guard and only fail
+    // inside decrypt. They must all return null, never a partial plaintext.
+    for (const len of [13, 20, 27]) {
+      const short = `${ENVELOPE_PREFIX}${toB64url(new Uint8Array(len))}`;
+      expect(await openDm(peer.publicB64, short)).toBeNull();
+    }
+    // 28 bytes clears the length guard but still isn't a valid GCM ciphertext.
+    const min = `${ENVELOPE_PREFIX}${toB64url(new Uint8Array(28))}`;
+    expect(await openDm(peer.publicB64, min)).toBeNull();
+  });
+});
+
+describe('fromB64url (strict / fail-closed)', () => {
+  it('round-trips valid unpadded base64url bytes', () => {
+    const bytes = new Uint8Array([0, 1, 2, 42, 250, 255]);
+    expect(fromB64url(toB64url(bytes))).toEqual(bytes);
+  });
+
+  it('rejects out-of-alphabet input instead of decoding to wrong bytes', () => {
+    expect(fromB64url('++//')).toBeNull(); // standard-base64, not base64url
+    expect(fromB64url('AAAA=')).toBeNull(); // explicit padding is a violation
+    expect(fromB64url('a b c')).toBeNull(); // whitespace
+    expect(fromB64url('hello!')).toBeNull(); // stray symbol
+  });
+
+  it('rejects an impossible length (%4 === 1)', () => {
+    expect(fromB64url('A')).toBeNull();
+    expect(fromB64url('AAAAA')).toBeNull();
+  });
 });
