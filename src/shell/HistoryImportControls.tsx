@@ -13,12 +13,15 @@
  */
 import { createSignal, Show, type JSX } from 'solid-js';
 import { importVault, VAULT_KEEP } from '@/lib/vault/historyVault';
-import { parseDiscordExport } from '@/lib/import/discordImport';
-import { parseDiscordPackage, type DiscordPackageFile } from '@/lib/import/discordPackageImport';
-import { parseSlackExport } from '@/lib/import/slackImport';
-import { parseIrcLog } from '@/lib/import/ircLogImport';
+import type { DiscordPackageFile } from '@/lib/import/discordPackageImport';
 import { countLabel } from '@/lib/format/countLabel';
 import '@/lib/prefs/preferences.css';
+
+// The per-platform parsers (~1.6k LOC of Discord/Slack/IRC log-format logic) are
+// only ever exercised when a user actually picks a file to import, yet this panel
+// rides in the always-loaded app chunk. They're dynamically imported at file-pick
+// so their weight stays out of the initial app bundle. Type-only imports above are
+// erased at build and carry no runtime cost.
 
 /** Structural shape shared by every JSON-export importer (Discord, Slack, …). */
 interface VaultImportSummaryLike {
@@ -62,8 +65,12 @@ interface JsonVaultImportProps {
   /** Shown when no file yields a recognizable export. */
   rejectMessage: string;
   description: JSX.Element;
-  /** Pure transform: parsed JSON → vault snapshot, or null if unrecognized. */
-  parse: (raw: unknown) => VaultImportResultLike | null;
+  /**
+   * Lazily loads the pure parse transform (parsed JSON → vault snapshot, or null
+   * if unrecognized). Resolved once per file-pick so the parser module stays out
+   * of the initial bundle and only downloads when the user actually imports.
+   */
+  loadParse: () => Promise<(raw: unknown) => VaultImportResultLike | null>;
 }
 
 /**
@@ -84,6 +91,7 @@ export function JsonVaultImportControls(props: JsonVaultImportProps): JSX.Elemen
     if (files.length === 0) return;
     setBusy(true);
     try {
+      const parse = await props.loadParse();
       const snapshots: PendingJsonImport['snapshots'] = [];
       const fileNames: string[] = [];
       const targets = new Set<string>();
@@ -103,7 +111,7 @@ export function JsonVaultImportControls(props: JsonVaultImportProps): JSX.Elemen
           rejected += 1;
           continue;
         }
-        const result = props.parse(raw);
+        const result = parse(raw);
         if (!result) {
           rejected += 1;
           continue;
@@ -220,7 +228,10 @@ export function DiscordImportControls(): JSX.Element {
       title="Import from Discord"
       chooseLabel="Choose Discord JSON"
       rejectMessage="No Discord export recognized. Export channels from DiscordChatExporter in JSON mode, then choose those .json files."
-      parse={(raw) => parseDiscordExport(raw)}
+      loadParse={async () => {
+        const { parseDiscordExport } = await import('@/lib/import/discordImport');
+        return (raw) => parseDiscordExport(raw);
+      }}
       description={
         <>
           Leaving Discord? Export your channels with{' '}
@@ -284,6 +295,7 @@ export function DiscordPackageImportControls(): JSX.Element {
         if (!isPackageFileName(file.name) || file.size > MAX_PACKAGE_FILE_BYTES) continue;
         packageFiles.push({ path, text: await file.text() });
       }
+      const { parseDiscordPackage } = await import('@/lib/import/discordPackageImport');
       const result = parseDiscordPackage(packageFiles);
       if (!result || result.summary.messages === 0) {
         setPending(null);
@@ -390,11 +402,14 @@ export function SlackImportControls(): JSX.Element {
       title="Import from Slack"
       chooseLabel="Choose Slack JSON"
       rejectMessage="No Slack export recognized. Unzip your Slack workspace export and choose its per-channel .json files."
-      parse={(raw) => {
-        const result = parseSlackExport(raw);
-        if (!result) return null;
-        // The generic control speaks `guild`; Slack calls it a workspace.
-        return { snapshot: result.snapshot, summary: { ...result.summary, guild: result.summary.workspace } };
+      loadParse={async () => {
+        const { parseSlackExport } = await import('@/lib/import/slackImport');
+        return (raw) => {
+          const result = parseSlackExport(raw);
+          if (!result) return null;
+          // The generic control speaks `guild`; Slack calls it a workspace.
+          return { snapshot: result.snapshot, summary: { ...result.summary, guild: result.summary.workspace } };
+        };
       }}
       description={
         <>
@@ -438,6 +453,7 @@ export function IrcLogImportControls(): JSX.Element {
     }
     setBusy(true);
     try {
+      const { parseIrcLog } = await import('@/lib/import/ircLogImport');
       const result = parseIrcLog(await file.text(), { channel: chan });
       if (!result || result.summary.messages === 0) {
         setPending(null);

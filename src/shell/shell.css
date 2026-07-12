@@ -3482,8 +3482,14 @@
     );
   border-left: 1px solid var(--seam-faint);
   overflow: hidden;
+  /* Fill the reserved grid track (column 4). The open/close is driven by the
+     grid track collapsing (`--shell-members-w` on `.shell`), so this column need
+     not animate its own width — animating `width` here reflowed the 1fr message
+     column. Motion stays compositor-only: `transform` slides the panel within
+     its reserved track (the mobile drawer rule below reuses the same property). */
   width: var(--shell-members-w, 220px);
-  transition: width var(--dur) var(--ease);
+  transform: translateX(0);
+  transition: transform var(--dur) var(--ease);
 }
 
 .shell-members--hidden {

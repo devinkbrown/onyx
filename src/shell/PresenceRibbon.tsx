@@ -129,6 +129,13 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     return channels().get(view.channel) ?? null;
   });
 
+  // The channel object gets a fresh identity on every message (the store spreads
+  // {...c, messages:[...]} on append), but its `users` map identity is preserved
+  // across message-only updates. Roster-shaped derivations key on these two memos
+  // so they only recompute on real membership/name changes — not per chat line.
+  const activeUsers = createMemo(() => activeChannel()?.users ?? null);
+  const activeChannelName = createMemo(() => activeChannel()?.name ?? null);
+
   const channelName = createMemo(() => {
     const view = activeView();
     if (view.kind === 'channel') return view.channel;
@@ -158,11 +165,11 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     return ch ? ch.users.size : 0;
   });
 
-  // Facepile roster — reuses the same activeChannel() read as the member count,
-  // adapting the channel's user map into the pure facepile inputs.
+  // Facepile roster — adapts the channel's user map into the pure facepile inputs.
+  // Keyed on the stable users identity so it survives message-only appends.
   const facepileMembers = createMemo(() => {
-    const ch = activeChannel();
-    return ch ? facepileInputsFromUsers(ch.users.values()) : [];
+    const users = activeUsers();
+    return users ? facepileInputsFromUsers(users.values()) : [];
   });
 
   // Active channel name for the settings panel (display-cased, e.g. "#general").
@@ -178,9 +185,10 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   });
 
   const voiceParticipants = createMemo(() => {
-    const ch = activeChannel();
-    if (!ch) return [];
-    const roster = voiceChannelParticipants().get(ch.name.toLowerCase());
+    const name = activeChannelName();
+    const users = activeUsers();
+    if (!name || !users) return [];
+    const roster = voiceChannelParticipants().get(name.toLowerCase());
     if (!roster) return [];
 
     const seen = new Set<string>();
@@ -188,7 +196,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     for (const nick of roster) {
       const lower = nick.toLowerCase();
       if (seen.has(lower)) continue;
-      if (ch.users.size > 0 && !ch.users.has(lower)) continue;
+      if (users.size > 0 && !users.has(lower)) continue;
       seen.add(lower);
       present.push(nick);
     }
