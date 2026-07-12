@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   COMPOSER_DRAFTS_KEY,
+  MAX_DRAFT_LEN,
   getComposerDraft,
   loadComposerDrafts,
   saveComposerDrafts,
@@ -94,6 +95,55 @@ describe('composer draft persistence coverage', () => {
 
     // Assert
     expect(getComposerDraft(restored, '#ROOM')).toBe(multiline);
+  });
+
+  it('round-trips target normalization, truncation, and invalid entry removal through persistence', () => {
+    // Arrange
+    const storage = makeStorage();
+    const tooLong = 'x'.repeat(9000);
+
+    // Act
+    saveComposerDrafts(
+      {
+        ' #MixedCase ': 'normalized',
+        '#too-long': tooLong,
+        '#empty': '',
+        '   ': 'blank target',
+      },
+      storage,
+    );
+    const restored = loadComposerDrafts(storage);
+
+    // Assert
+    expect(restored).toEqual({
+      '#mixedcase': 'normalized',
+      '#too-long': 'x'.repeat(MAX_DRAFT_LEN),
+    });
+  });
+
+  it('removes the persisted key when sanitization drops every supplied draft', () => {
+    // Arrange
+    const storage = makeStorage({ [COMPOSER_DRAFTS_KEY]: JSON.stringify({ '#old': 'draft' }) });
+
+    // Act
+    saveComposerDrafts({ '#empty': '', '   ': 'blank target' }, storage);
+
+    // Assert
+    expect(storage.getItem(COMPOSER_DRAFTS_KEY)).toBeNull();
+  });
+
+  it('returns an empty draft for missing targets without mutating the draft map', () => {
+    // Arrange
+    const drafts = { '#root': 'kept' };
+
+    // Act
+    const missing = getComposerDraft(drafts, '#missing');
+    const blank = getComposerDraft(drafts, '   ');
+
+    // Assert
+    expect(missing).toBe('');
+    expect(blank).toBe('');
+    expect(drafts).toEqual({ '#root': 'kept' });
   });
 
   it('fails closed when stored JSON is malformed or storage throws', () => {

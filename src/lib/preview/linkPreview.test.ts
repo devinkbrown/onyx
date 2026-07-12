@@ -115,19 +115,75 @@ describe('fetchLinkPreview', () => {
   });
 
   it('only ever fetches the same-origin /linkpreview endpoint', async () => {
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL) =>
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       new Response(JSON.stringify({ title: 'ok' }), { status: 200 }),
     );
     vi.stubGlobal('fetch', fetchMock);
     await fetchLinkPreview('https://example.com/page?x=1&y=2');
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const requested = String(fetchMock.mock.calls[0]?.[0]);
-    expect(requested).toBe(`/linkpreview?url=${encodeURIComponent('https://example.com/page?x=1&y=2')}`);
+    expect(requested).toBe(
+      `/linkpreview?url=${encodeURIComponent('https://example.com/page?x=1&y=2')}`,
+    );
     // No absolute/cross-origin URL is ever passed to fetch.
     expect(requested.startsWith('/linkpreview?')).toBe(true);
     expect(/^https?:\/\//.test(requested)).toBe(false);
+    expect(fetchMock.mock.calls[0]?.[1]).toEqual({
+      headers: { Accept: 'application/json' },
+    });
   });
 
+  it('routes every public target through same-origin /linkpreview instead of target origins', async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({ title: 'ok' }), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await Promise.all([
+      fetchLinkPreview('https://news.example/path'),
+      fetchLinkPreview('http://public.example:8080/thing?x=1#frag'),
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const call of fetchMock.mock.calls) {
+      const input = String(call[0]);
+      expect(input).toMatch(/^\/linkpreview\?url=/);
+      expect(input).not.toMatch(/^https?:\/\/(?:news|public)\.example/);
+    }
+  });
+
+  it('replays the settled module cache without issuing a second endpoint request', async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ title: 'Cached', description: 'once' }), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const firstPromise = fetchLinkPreview('https://cache.example/page');
+    const first = await firstPromise;
+    const secondPromise = fetchLinkPreview('https://cache.example/page');
+    const second = await secondPromise;
+
+    expect(secondPromise).toBe(firstPromise);
+    expect(second).toBe(first);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('dedupes while the endpoint response is still in flight', async () => {
+    let resolveResponse: ((response: Response) => void) | undefined;
+    const pendingResponse = new Promise<Response>((resolve) => {
+      resolveResponse = resolve;
+    });
+    const fetchMock = vi.fn(() => pendingResponse);
+    vi.stubGlobal('fetch', fetchMock);
+
+    const first = fetchLinkPreview('https://inflight.example/page');
+    const second = fetchLinkPreview('https://inflight.example/page');
+
+    expect(second).toBe(first);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    resolveResponse?.(new Response(JSON.stringify({ title: 'Inflight' }), { status: 200 }));
+    await expect(first).resolves.toMatchObject({ title: 'Inflight' });
+  });
 
   it('normalizes a good payload and dedupes concurrent fetches', async () => {
     const fetchMock = vi.fn(async () =>
