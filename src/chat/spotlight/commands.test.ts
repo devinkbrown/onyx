@@ -727,6 +727,42 @@ describe('buildCommands', () => {
     });
   });
 
+  it('copies an irc link to the active channel through the server URL', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    setState({
+      server: server(),
+      activeView: { kind: 'channel', channel: '#lapis' },
+      channels: new Map([['#lapis', channel('#lapis')]]),
+    });
+
+    const command = buildCommands(getState()).find((entry) => entry.id === 'action:copy-channel-link');
+    expect(command?.section).toBe('Actions');
+    expect(command?.title).toBe('Copy channel link');
+    // The channel sigil is percent-encoded so the link round-trips unambiguously.
+    expect(command?.hint).toBe('ircs://ircx.us:6697/%23lapis');
+    expect(command?.keywords).toContain('share');
+
+    await command?.run();
+    expect(writeText).toHaveBeenCalledWith('ircs://ircx.us:6697/%23lapis');
+  });
+
+  it('omits copy-channel-link when not viewing a channel', () => {
+    setState({ server: server(), activeView: { kind: 'home' } });
+    const command = buildCommands(getState()).find((entry) => entry.id === 'action:copy-channel-link');
+    expect(command).toBeUndefined();
+  });
+
+  it('omits copy-channel-link when no node is connected', () => {
+    setState({
+      server: null,
+      activeView: { kind: 'channel', channel: '#lapis' },
+      channels: new Map([['#lapis', channel('#lapis')]]),
+    });
+    const command = buildCommands(getState()).find((entry) => entry.id === 'action:copy-channel-link');
+    expect(command).toBeUndefined();
+  });
+
   it('opens the scheduled-messages queue', () => {
     const command = buildCommands(getState(), 'scheduled').find(
       (entry) => entry.id === 'action:scheduled-messages',

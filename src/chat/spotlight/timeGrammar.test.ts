@@ -39,6 +39,23 @@ describe('parseTimeExpr', () => {
     expectParsed('3 week ago', new Date(NOW - 21 * 24 * 60 * 60 * 1000));
   });
 
+  it('parses "N days ago" including the spelled-out unit', () => {
+    expectParsed('5 days ago', new Date(NOW - 5 * 24 * 60 * 60 * 1000));
+    expectParsed('1 day ago', new Date(NOW - 24 * 60 * 60 * 1000));
+  });
+
+  it('parses "last week" and "past week" as seven days ago at midnight', () => {
+    // NOW is 2026-07-08; seven calendar days back at local midnight is 2026-07-01.
+    expectParsed('last week', new Date(2026, 6, 1, 0, 0, 0, 0));
+    expectParsed('past week', new Date(2026, 6, 1, 0, 0, 0, 0));
+  });
+
+  it('rejects unsupported week phrasings', () => {
+    expect(parseTimeExpr('next week', NOW)).toBeNull();
+    expect(parseTimeExpr('this week', NOW)).toBeNull();
+    expect(parseTimeExpr('last weekend', NOW)).toBeNull();
+  });
+
   it('parses noon and midnight as named clocks', () => {
     expectParsed('noon', new Date(2026, 6, 8, 12, 0, 0, 0));
     expectParsed('midnight', new Date(2026, 6, 8, 0, 0, 0, 0));

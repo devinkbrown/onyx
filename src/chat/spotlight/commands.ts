@@ -898,6 +898,19 @@ function applyBackground(id: BackgroundId): void {
   }
 }
 
+/**
+ * Build a shareable IRC URL to a channel from the connected node's own URL
+ * (`ircs://host:port`). The channel — including its `#`/`&` sigil — is
+ * percent-encoded so the sigil cannot be mistaken for a URL fragment and the
+ * link round-trips unambiguously (`ircs://host:port/%23channel`). Returns null
+ * when there is no node URL or channel to build from, so callers fail closed.
+ */
+function channelLink(serverUrl: string | undefined, channel: string): string | null {
+  if (!serverUrl || !channel) return null;
+  const base = serverUrl.replace(/\/+$/, '');
+  return `${base}/${encodeURIComponent(channel)}`;
+}
+
 async function copyText(text: string): Promise<void> {
   if (!text) return;
 
@@ -955,6 +968,7 @@ function baseActionCommands(state: CommandState): SpotlightCommand[] {
   const inVoice = state.voice.callState !== 'idle';
   const activeChannel = state.activeView.kind === 'channel' ? state.activeView.channel : null;
   const aiPolicy = activeChannel ? channelAiPolicy(state.channels.get(activeChannel)) : 'open';
+  const activeChannelLink = activeChannel ? channelLink(state.server?.url, activeChannel) : null;
 
   return [
     {
@@ -1098,6 +1112,24 @@ function baseActionCommands(state: CommandState): SpotlightCommand[] {
       keywords: ['copy', 'server', 'url', 'address', 'node'],
       run: () => copyText(getState().server?.url ?? ''),
     },
+    ...(activeChannel && activeChannelLink
+      ? [
+          {
+            id: 'action:copy-channel-link',
+            section: 'Actions' as SpotlightSection,
+            title: 'Copy channel link',
+            hint: activeChannelLink,
+            keywords: ['copy', 'link', 'channel', 'share', 'invite', 'url', activeChannel],
+            run: () => {
+              const current = getState();
+              const view = current.activeView;
+              if (view.kind !== 'channel') return;
+              const link = channelLink(current.server?.url, view.channel);
+              if (link) return copyText(link);
+            },
+          },
+        ]
+      : []),
   ];
 }
 

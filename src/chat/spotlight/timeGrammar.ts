@@ -5,6 +5,7 @@ const MINUTE_MS = 60 * 1000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 const WEEK_MS = 7 * DAY_MS;
+const DAYS_IN_WEEK = 7;
 
 const CLOCK_RE = /^(\d{1,2}):(\d{2})$/;
 const RELATIVE_RE =
@@ -216,6 +217,12 @@ function parseNamedTime(input: string, nowMs: number): Date | null {
 
   if (normalized === 'tonight') return dateAtClock(nowMs, NIGHT);
   if (normalized === 'last night') return yesterdayAtClock(nowMs, NIGHT);
+
+  // "last week" / "past week": seven calendar days back at local midnight,
+  // using the same DST-safe calendar arithmetic as the weekday branch.
+  if (normalized === 'last week' || normalized === 'past week') {
+    return dateDaysAgoAtClock(nowMs, DAYS_IN_WEEK, MIDNIGHT);
+  }
 
   const daypart = /^this (morning|afternoon|evening|night)$/.exec(normalized)?.[1];
   if (daypart) {
