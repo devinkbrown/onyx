@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { cleanup, render } from '@solidjs/testing-library';
+import { cleanup, render, waitFor } from '@solidjs/testing-library';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Dynamic } from 'solid-js/web';
 import { Background, selectBackgroundId } from './Background';
@@ -13,6 +13,8 @@ import {
   type CanvasBackgroundKind,
 } from './engine';
 import { allBackgroundVariants, backgroundRegistry, getBackground, sceneRegistry, type BackgroundId } from './registry';
+import { backgroundOptions } from './catalogue';
+import { loadBackgroundVariant } from './loader';
 import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
 import { resetSceneMotion, setSceneMotion } from '@/lib/prefs/sceneMotion';
 
@@ -97,6 +99,27 @@ describe('background registry', () => {
 
     // Assert
     expect(variant?.label).toBe('Deep Current');
+  });
+
+  it('keeps the metadata catalogue in exact sync with the eager registry', () => {
+    // The picker reads the lightweight catalogue (no render code); the eager
+    // registry is the source of truth for id/label/kind/order. They must match
+    // one-for-one or the lazy loader could point at a stale/missing id.
+    const fromRegistry = allBackgroundVariants.map(({ id, label, kind }) => ({ id, label, kind }));
+    expect(backgroundOptions).toEqual(fromRegistry);
+  });
+
+  it('lazily loads the concrete variant for every catalogued id', async () => {
+    // Every catalogue id must resolve to its eager counterpart via the loader,
+    // so no background can be selected but fail to render.
+    for (const meta of backgroundOptions) {
+      const loaded = await loadBackgroundVariant(meta.id);
+      expect(loaded, `loader missing for ${meta.id}`).toBeDefined();
+      expect(loaded?.id).toBe(meta.id);
+      expect(loaded?.kind).toBe(meta.kind);
+    }
+    // An unknown id resolves to undefined rather than throwing.
+    expect(await loadBackgroundVariant('does-not-exist')).toBeUndefined();
   });
 });
 
@@ -189,7 +212,7 @@ describe('Background reduced-motion selection', () => {
     HTMLCanvasElement.prototype.getContext = originalGetContext;
   });
 
-  it('keeps the theme scene but renders it static under reduced motion', () => {
+  it('keeps the theme scene but renders it static under reduced motion', async () => {
     // Arrange
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
       matches: query === '(prefers-reduced-motion: reduce)',
@@ -205,9 +228,14 @@ describe('Background reduced-motion selection', () => {
       () => create2dContext(),
     ) as unknown as typeof HTMLCanvasElement.prototype.getContext;
 
-    // Act
+    // Act — the variant render module is fetched on demand, so wait for the
+    // canvas to replace the static placeholder.
     const { container } = render(() => <Background id="deep-current" quality="high" />);
-    const canvas = container.querySelector('canvas');
+    const canvas = await waitFor(() => {
+      const el = container.querySelector('canvas');
+      expect(el).not.toBeNull();
+      return el;
+    });
 
     // Assert: the requested (animated) variant is kept — NOT swapped for a
     // generic solid — but reported/rendered as a still frame.
@@ -216,7 +244,7 @@ describe('Background reduced-motion selection', () => {
     expect(canvas?.getAttribute('data-background-kind')).toBe('solid');
   });
 
-  it('renders animated canvas backgrounds static when the user forces reduced motion', () => {
+  it('renders animated canvas backgrounds static when the user forces reduced motion', async () => {
     // Arrange
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
       matches: false,
@@ -235,14 +263,18 @@ describe('Background reduced-motion selection', () => {
 
     // Act
     const { container } = render(() => <Background id="deep-current" quality="high" />);
-    const canvas = container.querySelector('canvas');
+    const canvas = await waitFor(() => {
+      const el = container.querySelector('canvas');
+      expect(el).not.toBeNull();
+      return el;
+    });
 
     // Assert
     expect(canvas?.getAttribute('data-background-id')).toBe('deep-current');
     expect(canvas?.getAttribute('data-background-kind')).toBe('solid');
   });
 
-  it('renders DOM scenes static when the user forces reduced motion', () => {
+  it('renders DOM scenes static when the user forces reduced motion', async () => {
     // Arrange
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
       matches: false,
@@ -258,14 +290,18 @@ describe('Background reduced-motion selection', () => {
 
     // Act
     const { container } = render(() => <Background id="starfield" quality="high" />);
-    const host = container.querySelector('[data-background-canvas]');
+    const host = await waitFor(() => {
+      const el = container.querySelector('[data-background-id="starfield"]');
+      expect(el).not.toBeNull();
+      return el;
+    });
 
     // Assert
     expect(host?.getAttribute('data-background-id')).toBe('starfield');
     expect(host?.getAttribute('data-background-kind')).toBe('solid');
   });
 
-  it('renders animated canvas backgrounds static when scene motion is still', () => {
+  it('renders animated canvas backgrounds static when scene motion is still', async () => {
     // Arrange
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
       matches: false,
@@ -284,7 +320,11 @@ describe('Background reduced-motion selection', () => {
 
     // Act
     const { container } = render(() => <Background id="deep-current" quality="high" />);
-    const canvas = container.querySelector('canvas');
+    const canvas = await waitFor(() => {
+      const el = container.querySelector('canvas');
+      expect(el).not.toBeNull();
+      return el;
+    });
 
     // Assert
     expect(canvas?.getAttribute('data-background-id')).toBe('deep-current');
@@ -401,10 +441,14 @@ describe('scene variants', () => {
 });
 
 describe('Background scene rendering', () => {
-  it('renders a scene variant in a fixed DOM container instead of a canvas', () => {
-    // Act
+  it('renders a scene variant in a fixed DOM container instead of a canvas', async () => {
+    // Act — scene render module loads on demand.
     const { container } = render(() => <Background id="starfield" />);
-    const host = container.querySelector('[data-background-canvas]');
+    const host = await waitFor(() => {
+      const el = container.querySelector('[data-background-id="starfield"]');
+      expect(el).not.toBeNull();
+      return el;
+    });
 
     // Assert
     expect(container.querySelector('canvas')).toBeNull();
@@ -413,7 +457,7 @@ describe('Background scene rendering', () => {
     expect(host?.querySelector('.onyx-scene')).not.toBeNull();
   });
 
-  it('keeps the canvas engine path for canvas variants', () => {
+  it('keeps the canvas engine path for canvas variants', async () => {
     // Arrange
     const originalGetContext = HTMLCanvasElement.prototype.getContext;
     HTMLCanvasElement.prototype.getContext = vi.fn(
@@ -425,7 +469,9 @@ describe('Background scene rendering', () => {
       const { container } = render(() => <Background id="deep-current" />);
 
       // Assert
-      expect(container.querySelector('canvas')).not.toBeNull();
+      await waitFor(() => {
+        expect(container.querySelector('canvas')).not.toBeNull();
+      });
     } finally {
       HTMLCanvasElement.prototype.getContext = originalGetContext;
     }

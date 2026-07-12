@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { createEffect, createMemo, onCleanup, Show } from 'solid-js';
+import { createEffect, createMemo, createResource, onCleanup, Show } from 'solid-js';
 import { Dynamic } from 'solid-js/web';
 import {
   BackgroundEngine,
@@ -8,7 +8,8 @@ import {
   type BackgroundVariant,
   type SceneVariant,
 } from './engine';
-import { getBackground, type BackgroundId } from './registry';
+import { isBackgroundId, type BackgroundId } from './catalogue';
+import { loadBackgroundVariant } from './loader';
 import { preferences } from '@/lib/prefs/preferences';
 import { sceneMotion } from '@/lib/prefs/sceneMotion';
 import { makeMediaSignal } from '@/lib/a11y/mediaPrefs';
@@ -23,14 +24,15 @@ export const REDUCED_MOTION_BACKGROUND_ID: BackgroundId = 'lapis-gradient';
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
 /**
- * Resolve the concrete variant to render. Reduced motion NO LONGER swaps to a
- * generic solid — the engine renders the theme's own scene as a still frame
+ * Resolve the id of the background to render. Reduced motion NO LONGER swaps to
+ * a generic solid — the engine renders the theme's own scene as a still frame
  * (see `staticMode`), so a reduced-motion / low-power device still gets its
- * theme-coloured background, just frozen. Only a missing variant falls back.
+ * theme-coloured background, just frozen. Only an unknown id falls back. This is
+ * metadata-only (no render code loaded), so the picker stays lightweight.
  */
 export function selectBackgroundId(id: string | undefined, _reducedMotion: boolean): BackgroundId {
-  const requested = getBackground(id) ?? getBackground(DEFAULT_BACKGROUND_ID);
-  return (requested?.id ?? REDUCED_MOTION_BACKGROUND_ID) as BackgroundId;
+  if (isBackgroundId(id)) return id;
+  return DEFAULT_BACKGROUND_ID;
 }
 
 export function Background(props: BackgroundProps) {
@@ -38,7 +40,11 @@ export function Background(props: BackgroundProps) {
   const motion = createMemo(() => sceneMotion());
   const sceneDisabled = createMemo(() => motion() === 'off');
   const effectiveReducedMotion = createMemo(() => reducedMotion() || preferences().reduceMotion || motion() === 'still');
-  const variant = createMemo(() => getBackground(selectBackgroundId(props.id, effectiveReducedMotion())));
+
+  // Metadata (id + kind) resolves synchronously from the catalogue; the heavy
+  // render module is fetched on demand so only the ACTIVE variant's chunk loads.
+  const activeId = createMemo(() => selectBackgroundId(props.id, effectiveReducedMotion()));
+  const [variant] = createResource(activeId, loadBackgroundVariant);
 
   const scene = createMemo(() => {
     const active = variant();
@@ -50,17 +56,44 @@ export function Background(props: BackgroundProps) {
   });
 
   return (
-    <Show
-      when={!sceneDisabled()}
-      fallback={null}
-    >
+    <Show when={!sceneDisabled()} fallback={null}>
       <Show
-        when={scene()}
-        fallback={<CanvasBackground variant={canvasVariant()} quality={props.quality} reducedMotion={effectiveReducedMotion()} />}
+        when={variant()}
+        // First paint isn't blocked on the variant chunk: show a frozen themed
+        // frame (matching the reduced-motion still) until it resolves.
+        fallback={<BackgroundPlaceholder />}
       >
-        {(active) => <SceneBackground scene={active()} reducedMotion={effectiveReducedMotion()} />}
+        <Show
+          when={scene()}
+          fallback={<CanvasBackground variant={canvasVariant()} quality={props.quality} reducedMotion={effectiveReducedMotion()} />}
+        >
+          {(active) => <SceneBackground scene={active()} reducedMotion={effectiveReducedMotion()} />}
+        </Show>
       </Show>
     </Show>
+  );
+}
+
+/**
+ * Static themed frame shown for the one tick between mount and the active
+ * variant's chunk resolving. Matches the app's base surface so there's no flash
+ * and no layout work — a fixed, non-interactive, painter-only layer.
+ */
+function BackgroundPlaceholder() {
+  return (
+    <div
+      aria-hidden="true"
+      data-background-canvas="true"
+      data-background-placeholder="true"
+      style={{
+        position: 'fixed',
+        inset: '0',
+        'z-index': '-1',
+        'pointer-events': 'none',
+        background:
+          'radial-gradient(120% 120% at 50% 0%, color-mix(in oklab, var(--lapis) 22%, var(--ink)) 0%, var(--ink) 60%)',
+      }}
+    />
   );
 }
 

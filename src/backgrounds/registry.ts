@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import type { AnyBackgroundVariant, BackgroundKind, BackgroundVariant } from './engine';
+import type { AnyBackgroundVariant, BackgroundVariant } from './engine';
 import { aurora } from './variants/aurora';
 import { bioluminescence } from './variants/bioluminescence';
 import { caustics } from './variants/caustics';
@@ -38,25 +38,31 @@ export const backgroundRegistry = [
 
 export { sceneRegistry };
 
-/** Every selectable background: canvas variants first, then DOM scenes. */
+/**
+ * Every selectable background as EAGER variant objects (with init/frame/dispose
+ * or a scene component). This pulls in all render code, so ONLY tests and the
+ * catalogue-sync guard import it — the app renders via the metadata catalogue
+ * (./catalogue) + on-demand loader (./loader) instead, keeping variant code out
+ * of the eager app chunk.
+ */
 export const allBackgroundVariants = [
   ...backgroundRegistry,
   ...sceneRegistry,
 ] as const satisfies readonly AnyBackgroundVariant[];
 
-export type BackgroundId = (typeof allBackgroundVariants)[number]['id'];
+// Picker metadata + id types now live in ./catalogue (single source of truth,
+// no render code). Re-exported here so existing test imports keep resolving.
+export {
+  backgroundOptions,
+  backgroundIds,
+  backgroundLabels,
+  backgroundKinds,
+  getBackgroundMeta,
+  isBackgroundId,
+  type BackgroundId,
+} from './catalogue';
 
-export const backgroundOptions = allBackgroundVariants.map(({ id, label, kind }) => ({ id, label, kind }));
-
-export const backgroundIds = allBackgroundVariants.map(({ id }) => id) as BackgroundId[];
-
-export const backgroundLabels = allBackgroundVariants.map(({ id, label }) => ({ id, label }));
-
-export const backgroundKinds = allBackgroundVariants.reduce<Record<BackgroundId, BackgroundKind>>(
-  (kinds, variant) => ({ ...kinds, [variant.id]: variant.kind }),
-  {} as Record<BackgroundId, BackgroundKind>,
-);
-
+/** Eager lookup by id — test-only; the app uses `loadBackgroundVariant`. */
 export function getBackground(id: string | null | undefined): AnyBackgroundVariant | undefined {
   return allBackgroundVariants.find((variant) => variant.id === id);
 }

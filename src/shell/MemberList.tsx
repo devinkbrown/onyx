@@ -28,69 +28,12 @@ import {
 } from 'solid-js';
 import { useStore, getState, selectIsChannelOp } from '@/lib/store';
 import type { ChannelUser } from '@/lib/irc/types';
+import { createGroupReconciler, type ResolvedRole } from '@/lib/memberGroups';
 import { Avatar, Popover, Button } from '@/primitives/index';
 
-// ── Role resolution ──────────────────────────────────────────────────────────
-
-type RoleKey = 'netop' | 'founder' | 'owner' | 'admin' | 'op' | 'halfop' | 'voice' | 'member';
-
-interface ResolvedRole {
-  key: RoleKey;
-  label: string;
-  symbol: string;
-  sort: number;
-}
-
-const ROLE_ORDER: Record<RoleKey, number> = {
-  netop: 0,
-  founder: 1,
-  owner: 2,
-  admin: 3,
-  op: 4,
-  halfop: 5,
-  voice: 6,
-  member: 7,
-};
-
-function prefixFor(modeToPrefix: Record<string, string>, mode: string, fallback: string): string {
-  return modeToPrefix[mode] || fallback;
-}
-
-function resolveRole(user: ChannelUser, modeToPrefix: Record<string, string>): ResolvedRole {
-  const modes = user.modes;
-  if (modes.has('Y')) return { key: 'netop',   label: 'Network Oper', symbol: prefixFor(modeToPrefix, 'Y', '*'), sort: ROLE_ORDER.netop };
-  if (modes.has('Q')) return { key: 'founder',  label: 'Founder',      symbol: prefixFor(modeToPrefix, 'Q', '!'), sort: ROLE_ORDER.founder };
-  if (modes.has('q')) return { key: 'owner',    label: 'Owner',        symbol: prefixFor(modeToPrefix, 'q', '.'), sort: ROLE_ORDER.owner };
-  if (modes.has('a')) return { key: 'admin',    label: 'Admin',        symbol: prefixFor(modeToPrefix, 'a', '&'), sort: ROLE_ORDER.admin };
-  if (modes.has('o')) return { key: 'op',       label: 'Op',           symbol: prefixFor(modeToPrefix, 'o', '@'), sort: ROLE_ORDER.op };
-  if (modes.has('h')) return { key: 'halfop',   label: 'Half-op',      symbol: prefixFor(modeToPrefix, 'h', '%'), sort: ROLE_ORDER.halfop };
-  if (modes.has('v')) return { key: 'voice',    label: 'Voice',        symbol: prefixFor(modeToPrefix, 'v', '+'), sort: ROLE_ORDER.voice };
-  return            { key: 'member',   label: 'Member',       symbol: '',  sort: ROLE_ORDER.member };
-}
-
-// ── Group labels ─────────────────────────────────────────────────────────────
-
-const GROUP_LABELS: Partial<Record<RoleKey, string>> = {
-  netop: 'Network Operators',
-  founder: 'Founders',
-  owner: 'Owners',
-  admin: 'Admins',
-  op: 'Ops',
-  halfop: 'Half-ops',
-  voice: 'Voice',
-  member: 'Members',
-};
-
-interface MemberEntry {
-  user: ChannelUser;
-  role: ResolvedRole;
-}
-
-interface GroupEntry {
-  key: RoleKey;
-  label: string;
-  members: MemberEntry[];
-}
+// Role resolution, grouping, and identity-stable reconciliation live in
+// `@/lib/memberGroups` (unit-tested there). See that module for why entry/group
+// objects keep reference identity across roster events.
 
 // ── Role Badge ───────────────────────────────────────────────────────────────
 
@@ -288,47 +231,15 @@ export function MemberList(props: MemberListProps): JSX.Element {
     return !!ch && ch.users.size === 0 && connectionStatus() === 'connected';
   });
 
-  // Build sorted, grouped member list
-  const groups = createMemo((): GroupEntry[] => {
+  // Identity-stable grouping: unchanged members keep their entry/group object
+  // references across roster events, so a single join/part/mode change patches
+  // one row instead of rebuilding the whole roster. The reconciler is created
+  // once per component instance and retains its cache across recomputes.
+  const reconciler = createGroupReconciler();
+  const groups = createMemo(() => {
     const ch = activeChannel();
     if (!ch) return [];
-
-    const entries: MemberEntry[] = [];
-    ch.users.forEach((user) => {
-      entries.push({ user, role: resolveRole(user, modeToPrefix()) });
-    });
-
-    // Sort: by role sort order, then alphabetically
-    entries.sort((a, b) => {
-      const roleDiff = a.role.sort - b.role.sort;
-      if (roleDiff !== 0) return roleDiff;
-      return a.user.nick.localeCompare(b.user.nick);
-    });
-
-    // Group by role key
-    const groupMap = new Map<RoleKey, MemberEntry[]>();
-    for (const entry of entries) {
-      const existing = groupMap.get(entry.role.key);
-      if (existing) {
-        existing.push(entry);
-      } else {
-        groupMap.set(entry.role.key, [entry]);
-      }
-    }
-
-    const result: GroupEntry[] = [];
-    const roleOrder: RoleKey[] = ['netop', 'founder', 'owner', 'admin', 'op', 'halfop', 'voice', 'member'];
-    for (const key of roleOrder) {
-      const members = groupMap.get(key);
-      if (members && members.length > 0) {
-        result.push({
-          key,
-          label: GROUP_LABELS[key] ?? key,
-          members,
-        });
-      }
-    }
-    return result;
+    return reconciler.reconcile(ch.users, modeToPrefix());
   });
 
   const totalCount = createMemo(() => {

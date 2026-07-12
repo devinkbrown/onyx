@@ -13,14 +13,18 @@ export type {
   SceneProps,
   SceneVariant,
 } from './engine';
+// Picker metadata + on-demand loader only — NO eager variant render code. The
+// eager registry (allBackgroundVariants / backgroundRegistry / getBackground)
+// is test-only and imported directly from './registry', so it never reaches the
+// app chunk through this barrel.
 export {
-  allBackgroundVariants,
   backgroundIds,
   backgroundKinds,
   backgroundLabels,
   backgroundOptions,
-  backgroundRegistry,
-  getBackground,
-  sceneRegistry,
-} from './registry';
-export type { BackgroundId } from './registry';
+  getBackgroundMeta,
+  isBackgroundId,
+  isSceneId,
+} from './catalogue';
+export type { BackgroundId, BackgroundMeta } from './catalogue';
+export { loadBackgroundVariant } from './loader';
