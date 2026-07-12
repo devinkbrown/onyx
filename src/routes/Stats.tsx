@@ -86,8 +86,8 @@ function ChannelRow(props: { channel: StatsChannel; nowMs: number }) {
 
 export default function StatsRoute() {
   setPageMeta(
-    'Onyx stats — live IRCXNet room activity',
-    'See public IRCXNet room activity, network message trends, people online, and channel sparklines.',
+    'Onyx stats — live room activity',
+    'See public Onyx room activity, network message trends, people online, and channel sparklines.',
     '/stats',
   );
   const [stats, { refetch: refetchStats }] = createResource(fetchStatsIndex);

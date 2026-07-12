@@ -19,7 +19,7 @@ describe('StatsRoute', () => {
   it('includes the recent activity graph surface for room rows', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       generated_at: 1783500000,
-      network: 'IRCXNet',
+      network: 'Onyx',
       node: 'eshmaki.me',
       users_online: 8,
       network_days: [{ date: '2026-07-08', messages: 24 }],

@@ -545,7 +545,7 @@ describe('View gating on connectionStatus', () => {
       ...initialState,
       connectionStatus: 'connected',
       ourNick: 'kain',
-      networkName: 'IRCXNet',
+      networkName: 'Onyx',
       channels: new Map(),
       activeView: { kind: 'home' },
     }, true);
@@ -561,7 +561,7 @@ describe('View gating on connectionStatus', () => {
       ...initialState,
       connectionStatus: 'connected',
       ourNick: 'kain',
-      networkName: 'IRCXNet',
+      networkName: 'Onyx',
       channels: new Map(),
       activeView: { kind: 'home' },
     }, true);

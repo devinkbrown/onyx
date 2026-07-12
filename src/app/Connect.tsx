@@ -132,7 +132,7 @@ const CLAIM_STEPS = [
 const MIN_PASSWORD_LEN = 8;
 
 /** Network name — used in the invite preview built from a `?join=` deep link. */
-const NETWORK_NAME = 'IRCXNet';
+const NETWORK_NAME = 'Onyx';
 
 // ── Validation helpers (pure) ────────────────────────────────────────────────
 
@@ -768,7 +768,7 @@ export function Connect(props: ConnectProps): JSX.Element {
                 <span class="conn-brand" aria-hidden="true">
                   <Mascot variant="mark" class="conn-brand-mark" />
                 </span>
-                <span class="conn-eyebrow">IRCXNet</span>
+                <span class="conn-eyebrow">Onyx</span>
                 <h1 class="conn-title">Connect</h1>
                 <p class="conn-sub">
                   Choose how you arrive. Onyx finds the nearest node by latency
@@ -1185,7 +1185,7 @@ export function Connect(props: ConnectProps): JSX.Element {
 
             {/* Footer */}
             <footer class="conn-foot">
-              <b>IRCXNet</b> · encrypted · auto-routed
+              <b>Onyx</b> · encrypted · auto-routed
             </footer>
           </div>
 
@@ -1206,8 +1206,8 @@ export function Connect(props: ConnectProps): JSX.Element {
 // ── Submit copy ───────────────────────────────────────────────────────────────
 
 const SUBMIT_ARIA: Record<Mode, string> = {
-  guest:    'Connect to IRCXNet as a guest',
-  signin:   'Sign in to IRCXNet',
+  guest:    'Connect to Onyx as a guest',
+  signin:   'Sign in to Onyx',
   register: 'Register a new account',
 };
 
