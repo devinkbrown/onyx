@@ -15,6 +15,15 @@ function at(iso: string): Date {
 }
 
 describe('filterByTopic', () => {
+  it('returns an empty copy for null topic when there are no messages', () => {
+    const messages: readonly TestMessage[] = [];
+
+    const result = filterByTopic(messages, null);
+
+    expect(result).toEqual([]);
+    expect(result).not.toBe(messages);
+  });
+
   it('returns all messages as a copy when the topic is null', () => {
     const messages: readonly TestMessage[] = [
       { id: 'm1', topic: 'Roadmap', at: at('2026-01-01T10:00:00.000Z'), body: 'first' },
@@ -39,9 +48,37 @@ describe('filterByTopic', () => {
 
     expect(result.map((message) => message.id)).toEqual(['m1', 'm2']);
   });
+
+  it('treats whitespace as part of the topic instead of trimming it', () => {
+    const messages: readonly TestMessage[] = [
+      { id: 'm1', topic: 'Roadmap', at: at('2026-01-01T10:00:00.000Z'), body: 'plain' },
+      { id: 'm2', topic: ' Roadmap ', at: at('2026-01-01T11:00:00.000Z'), body: 'padded' },
+    ];
+
+    expect(filterByTopic(messages, 'Roadmap').map((message) => message.id)).toEqual(['m1']);
+    expect(filterByTopic(messages, ' roadmap ').map((message) => message.id)).toEqual(['m2']);
+  });
+
+  it('can match an empty-string topic without including null-topic messages', () => {
+    const messages: readonly TestMessage[] = [
+      { id: 'm1', topic: '', at: at('2026-01-01T10:00:00.000Z'), body: 'empty' },
+      { id: 'm2', topic: null, at: at('2026-01-01T11:00:00.000Z'), body: 'loose' },
+    ];
+
+    expect(filterByTopic(messages, '').map((message) => message.id)).toEqual(['m1']);
+  });
 });
 
 describe('listTopics', () => {
+  it('returns an empty list when every message is topicless', () => {
+    const messages: readonly TestMessage[] = [
+      { id: 'm1', topic: null, at: at('2026-01-01T10:00:00.000Z'), body: 'loose' },
+      { id: 'm2', topic: null, at: at('2026-01-01T11:00:00.000Z'), body: 'also loose' },
+    ];
+
+    expect(listTopics(messages)).toEqual([]);
+  });
+
   it('dedupes case-insensitively, preserves first casing, and orders by recency then alphabetically', () => {
     const messages: readonly TestMessage[] = [
       { id: 'm1', topic: 'Roadmap', at: at('2026-01-01T10:00:00.000Z'), body: 'first' },
@@ -55,9 +92,23 @@ describe('listTopics', () => {
 
     expect(result).toEqual(['Roadmap', 'alpha', 'bug']);
   });
+
+  it('keeps empty-string and markup-looking topics as ordinary topic labels', () => {
+    const messages: readonly TestMessage[] = [
+      { id: 'm1', topic: '<img src=x onerror=alert(1)>', at: at('2026-01-01T10:00:00.000Z'), body: 'markup' },
+      { id: 'm2', topic: '', at: at('2026-01-02T10:00:00.000Z'), body: 'empty' },
+      { id: 'm3', topic: null, at: at('2026-01-03T10:00:00.000Z'), body: 'loose' },
+    ];
+
+    expect(listTopics(messages)).toEqual(['', '<img src=x onerror=alert(1)>']);
+  });
 });
 
 describe('summarizeTopics', () => {
+  it('returns an empty summary for an empty message list', () => {
+    expect(summarizeTopics([])).toEqual([]);
+  });
+
   it('counts messages, keeps the latest activity, orders summaries, and excludes null topics', () => {
     const messages: readonly TestMessage[] = [
       { id: 'm1', topic: 'Sumi', at: at('2026-01-01T10:00:00.000Z'), body: 'first' },
@@ -80,5 +131,28 @@ describe('summarizeTopics', () => {
       { topic: 'Alpha', count: 1, lastAt: '2026-01-04T10:00:00.000Z' },
       { topic: 'beta', count: 1, lastAt: '2026-01-04T10:00:00.000Z' },
     ]);
+  });
+
+  it('clones lastAt instead of exposing the message Date instance', () => {
+    const latest = at('2026-01-05T10:00:00.000Z');
+    const messages: readonly TestMessage[] = [
+      { id: 'm1', topic: 'Sumi', at: at('2026-01-01T10:00:00.000Z'), body: 'first' },
+      { id: 'm2', topic: 'sumi', at: latest, body: 'latest' },
+    ];
+
+    const result = summarizeTopics(messages);
+
+    expect(result[0]!.lastAt.toISOString()).toBe('2026-01-05T10:00:00.000Z');
+    expect(result[0]!.lastAt).not.toBe(latest);
+  });
+
+  it('preserves first casing and counts later differently-cased duplicates', () => {
+    const messages: readonly TestMessage[] = [
+      { id: 'm1', topic: 'Topic', at: at('2026-01-01T10:00:00.000Z'), body: 'first' },
+      { id: 'm2', topic: 'topic', at: at('2026-01-02T10:00:00.000Z'), body: 'second' },
+      { id: 'm3', topic: 'TOPIC', at: at('2026-01-03T10:00:00.000Z'), body: 'third' },
+    ];
+
+    expect(summarizeTopics(messages)).toMatchObject([{ topic: 'Topic', count: 3 }]);
   });
 });

@@ -95,6 +95,60 @@ describe('preferences store', () => {
       });
     });
 
+    it('falls back per-field across every persisted preference without discarding valid neighbors', () => {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          density: 'cinematic',
+          fontScale: 'lg',
+          hideEvents: 'true',
+          width: 'full',
+          readerMode: 1,
+          reduceMotion: true,
+          reduceTransparency: 'false',
+          highContrast: false,
+          linkPreviews: 'false',
+          clock: '12h',
+          localHistory: 'no',
+          e2eeDms: false,
+          timeScrubber: null,
+          voiceEntry: true,
+          topicTools: 'yes',
+          watchTogether: false,
+        }),
+      );
+
+      expect(loadPreferences()).toEqual({
+        ...DEFAULT_PREFERENCES,
+        fontScale: 'lg',
+        width: 'full',
+        reduceMotion: true,
+        highContrast: false,
+        clock: '12h',
+        e2eeDms: false,
+        voiceEntry: true,
+        watchTogether: false,
+      });
+    });
+
+    it('uses the legacy high-contrast fallback when the stored highContrast field is malformed', () => {
+      localStorage.setItem('onyx:high-contrast', '1');
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ density: 'compact', highContrast: 'yes' }));
+
+      expect(loadPreferences()).toEqual({
+        ...DEFAULT_PREFERENCES,
+        density: 'compact',
+        highContrast: true,
+      });
+    });
+
+    it('returns defaults for malformed non-record JSON payloads', () => {
+      for (const serialized of ['null', '[]', '42', '"compact"', 'true']) {
+        localStorage.setItem(STORAGE_KEY, serialized);
+        expect(loadPreferences()).toEqual(DEFAULT_PREFERENCES);
+      }
+    });
+
     it('returns defaults for corrupt JSON', () => {
       localStorage.setItem(STORAGE_KEY, '{not json');
       expect(loadPreferences()).toEqual(DEFAULT_PREFERENCES);

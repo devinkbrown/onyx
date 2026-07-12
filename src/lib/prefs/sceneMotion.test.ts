@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_SCENE_MOTION,
+  SCENE_MOTIONS,
   applySceneMotion,
   loadSceneMotion,
   parseSceneMotion,
@@ -30,6 +31,13 @@ describe('scene motion store', () => {
     expect(loadSceneMotion()).toBe(DEFAULT_SCENE_MOTION);
   });
 
+  it('falls back to the default for malformed serialized input', () => {
+    for (const stored of ['', 'null', '"off"', 'OFF', JSON.stringify({ value: 'off' })]) {
+      localStorage.setItem(STORAGE_KEY, stored);
+      expect(loadSceneMotion()).toBe(DEFAULT_SCENE_MOTION);
+    }
+  });
+
   it('parses only known scene motion values', () => {
     expect(parseSceneMotion('animated')).toBe('animated');
     expect(parseSceneMotion('still')).toBe('still');
@@ -44,6 +52,16 @@ describe('scene motion store', () => {
     expect(localStorage.getItem(STORAGE_KEY)).toBe('still');
     expect(loadSceneMotion()).toBe('still');
     expect(sceneMotion()).toBe('still');
+  });
+
+  it('serializes each scene motion as the raw storage value and loads it back', () => {
+    for (const value of SCENE_MOTIONS) {
+      setSceneMotion(value);
+
+      expect(localStorage.getItem(STORAGE_KEY)).toBe(value);
+      expect(loadSceneMotion()).toBe(value);
+      expect(sceneMotion()).toBe(value);
+    }
   });
 
   it('writes the scene motion dataset attribute', () => {

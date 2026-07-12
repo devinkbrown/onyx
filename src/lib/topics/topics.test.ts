@@ -57,6 +57,19 @@ describe('message topic parsing', () => {
   it('rejects a tag that only becomes over-limit after trimming whitespace', () => {
     expect(parseMessageTopic({ [TOPIC_TAG]: ` ${'界'.repeat(17)} ` })).toBeNull();
   });
+
+  it('accepts trimmed unicode labels at the byte boundary', () => {
+    const label = `${'🔥'.repeat(12)}ab`;
+
+    expect(new TextEncoder().encode(label).length).toBe(MAX_TOPIC_LABEL_BYTES);
+    expect(parseMessageTopic({ [TOPIC_TAG]: `\t${label}\n` })).toBe(label);
+  });
+
+  it('rejects adversarial labels after trimming inbound message tags', () => {
+    expect(parseMessageTopic({ [TOPIC_TAG]: 'release\x00train' })).toBeNull();
+    expect(parseMessageTopic({ [TOPIC_TAG]: 'release,train' })).toBeNull();
+    expect(parseMessageTopic({ [TOPIC_TAG]: '\u2003' })).toBeNull();
+  });
 });
 
 describe('topic registry parsing', () => {
@@ -105,9 +118,31 @@ describe('outbound topic tags', () => {
   it('preserves the outbound label exactly when it is already valid', () => {
     expect(topicMessageTag('Release Train')).toEqual({ [TOPIC_TAG]: 'Release Train' });
   });
+
+  it('does not trim outbound labels before validating or emitting them', () => {
+    expect(topicMessageTag(' Release Train ')).toEqual({ [TOPIC_TAG]: ' Release Train ' });
+    expect(topicMessageTag(' ')).toEqual({ [TOPIC_TAG]: ' ' });
+  });
+
+  it('accepts unicode outbound labels within the shared byte limit', () => {
+    const label = '🔥'.repeat(12);
+
+    expect(topicMessageTag(label)).toEqual({ [TOPIC_TAG]: label });
+  });
+
+  it('rejects empty and adversarial outbound labels', () => {
+    expect(topicMessageTag('')).toBeNull();
+    expect(topicMessageTag('release\x1ftrain')).toBeNull();
+    expect(topicMessageTag('release,train')).toBeNull();
+    expect(topicMessageTag('🔥'.repeat(13))).toBeNull();
+  });
 });
 
 describe('unread topic bucketing', () => {
+  it('returns an empty map when there are no messages', () => {
+    expect(Array.from(bucketUnreadByTopic([]).entries())).toEqual([]);
+  });
+
   it('counts unread messages by topic and uses an empty key for no-topic messages', () => {
     const counts = bucketUnreadByTopic([
       { topic: 'release', unread: true },
@@ -135,6 +170,31 @@ describe('unread topic bucketing', () => {
     expect(Array.from(counts.entries())).toEqual([
       ['Release', 2],
       ['release', 1],
+    ]);
+  });
+
+  it('collapses explicit empty-topic strings with null no-topic messages', () => {
+    const counts = bucketUnreadByTopic([
+      { topic: '', unread: true },
+      { topic: null, unread: true },
+      { topic: '', unread: false },
+    ]);
+
+    expect(Array.from(counts.entries())).toEqual([['', 2]]);
+  });
+
+  it('preserves unicode and adversarial topic strings already present on messages', () => {
+    const counts = bucketUnreadByTopic([
+      { topic: '🔥 incident', unread: true },
+      { topic: 'bad,label', unread: true },
+      { topic: 'bad,label', unread: true },
+      { topic: 'control\x01topic', unread: true },
+    ]);
+
+    expect(Array.from(counts.entries())).toEqual([
+      ['🔥 incident', 1],
+      ['bad,label', 2],
+      ['control\x01topic', 1],
     ]);
   });
 });

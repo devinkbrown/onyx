@@ -6,7 +6,7 @@
  */
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   SAVED_SEARCH_CAP,
@@ -42,6 +42,10 @@ describe('savedSearches', () => {
     _resetSavedSearchesForTests();
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   describe('validateSearchInput (pure)', () => {
     it('accepts and trims a valid input', () => {
       expect(validateSearchInput({ label: '  Mentions  ', query: '  hello  ', mode: 'exact' })).toEqual({
@@ -66,6 +70,22 @@ describe('savedSearches', () => {
     it('rejects over-length label and query', () => {
       expect(validateSearchInput({ label: 'a'.repeat(MAX_LABEL_LEN + 1), query: 'y', mode: 'exact' })).toBeNull();
       expect(validateSearchInput({ label: 'x', query: 'q'.repeat(MAX_QUERY_LEN + 1), mode: 'exact' })).toBeNull();
+    });
+
+    it('accepts label and query values exactly at their length limits after trimming', () => {
+      const label = 'a'.repeat(MAX_LABEL_LEN);
+      const query = 'q'.repeat(MAX_QUERY_LEN);
+
+      expect(validateSearchInput({ label: ` ${label} `, query: ` ${query} `, mode: 'semantic' })).toEqual({
+        label,
+        query,
+        mode: 'semantic',
+      });
+    });
+
+    it('rejects object-shaped inputs with non-string label or query fields', () => {
+      expect(validateSearchInput({ label: 123, query: 'q', mode: 'exact' })).toBeNull();
+      expect(validateSearchInput({ label: 'label', query: { text: 'q' }, mode: 'exact' })).toBeNull();
     });
 
     it('rejects non-object input', () => {
@@ -105,6 +125,16 @@ describe('savedSearches', () => {
       await saveSearch({ label: 'third', query: 'c', mode: 'exact' });
       const labels = (await listSearches()).map((s) => s.label);
       expect(labels).toEqual(['third', 'second', 'first']);
+    });
+
+    it('uses insertion sequence as the newest-first tiebreaker for same-ms saves', async () => {
+      vi.spyOn(Date, 'now').mockReturnValue(1_800_000_000_000);
+
+      await saveSearch({ label: 'first', query: 'a', mode: 'exact' });
+      await saveSearch({ label: 'second', query: 'b', mode: 'semantic' });
+      await saveSearch({ label: 'third', query: 'c', mode: 'exact' });
+
+      expect((await listSearches()).map((s) => s.label)).toEqual(['third', 'second', 'first']);
     });
   });
 
@@ -195,6 +225,26 @@ describe('savedSearches', () => {
       expect(new Set(list.map((s) => s.id)).size).toBe(2);
     });
 
+    it('regenerates an incoming id that collides with an existing different label', async () => {
+      const existing = await saveSearch({ label: 'Alpha', query: 'a', mode: 'exact' });
+      const snapshot: SavedSearchExport = {
+        kind: 'onyx-saved-searches',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        searches: [
+          { id: existing!.id, label: 'Beta', query: 'b', mode: 'semantic', createdAt: 2 },
+        ],
+      };
+
+      expect(await importSavedSearches(snapshot)).toEqual({ imported: 1 });
+
+      const list = await listSearches();
+      const byLabel = new Map(list.map((s) => [s.label, s]));
+      expect(byLabel.get('Alpha')!.id).toBe(existing!.id);
+      expect(byLabel.get('Beta')!.id).not.toBe(existing!.id);
+      expect(new Set(list.map((s) => s.id)).size).toBe(2);
+    });
+
     it('import dedupes against existing labels', async () => {
       await saveSearch({ label: 'Mentions', query: 'old', mode: 'exact' });
       const snapshot: SavedSearchExport = {
@@ -246,6 +296,40 @@ describe('savedSearches', () => {
         searches: [{ label: 'ok', query: 'q', mode: 'semantic', createdAt: iso }],
       });
       expect(parsed!.searches[0]!.createdAt).toBe(Date.parse(iso));
+    });
+
+    it('fills missing ids and non-date createdAt values while preserving safe rows', () => {
+      const before = Date.now();
+      const parsed = parseSavedSearchExport({
+        kind: 'onyx-saved-searches',
+        version: 1,
+        exportedAt: '2026-07-10T00:00:00.000Z',
+        searches: [{ id: '   ', label: 'ok', query: 'q', mode: 'exact', createdAt: 'not-a-date' }],
+      });
+      const after = Date.now();
+
+      expect(parsed).not.toBeNull();
+      expect(parsed!.searches[0]!.id).toMatch(/^ss-/);
+      expect(parsed!.searches[0]!.createdAt).toBeGreaterThanOrEqual(before);
+      expect(parsed!.searches[0]!.createdAt).toBeLessThanOrEqual(after);
+    });
+
+    it('keeps exact-limit rows and drops rows beyond label or query limits', () => {
+      const label = 'a'.repeat(MAX_LABEL_LEN);
+      const query = 'q'.repeat(MAX_QUERY_LEN);
+
+      const parsed = parseSavedSearchExport({
+        kind: 'onyx-saved-searches',
+        version: 1,
+        searches: [
+          { id: 'ok', label, query, mode: 'exact', createdAt: 1 },
+          { id: 'long-label', label: `${label}x`, query: 'q', mode: 'exact', createdAt: 2 },
+          { id: 'long-query', label: 'label', query: `${query}x`, mode: 'semantic', createdAt: 3 },
+        ],
+      });
+
+      expect(parsed!.searches.map((s) => s.id)).toEqual(['ok']);
+      expect(parsed!.searches[0]).toMatchObject({ label, query });
     });
   });
 
