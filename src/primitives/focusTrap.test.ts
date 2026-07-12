@@ -63,4 +63,44 @@ describe('focusTrap pure helpers', () => {
     expect(backward.defaultPrevented).toBe(true);
     expect(document.activeElement).toBe(last);
   });
+
+  it('wraps keyboard focus at the first and last tabbable controls', () => {
+    const panel = document.createElement('section');
+    const first = document.createElement('button');
+    const middle = document.createElement('button');
+    const last = document.createElement('button');
+    panel.append(first, middle, last);
+    document.body.append(panel);
+
+    last.focus();
+    const forward = tabEvent();
+    trapFocus(forward, panel);
+    expect(forward.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(first);
+
+    first.focus();
+    const backward = tabEvent(true);
+    trapFocus(backward, panel);
+    expect(backward.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(last);
+  });
+
+  it('skips disabled controls and tabindex -1 elements when wrapping', () => {
+    const panel = document.createElement('section');
+    const skippedByTabIndex = document.createElement('button');
+    skippedByTabIndex.tabIndex = -1;
+    const first = document.createElement('button');
+    const disabled = document.createElement('button');
+    disabled.disabled = true;
+    const last = document.createElement('button');
+    panel.append(skippedByTabIndex, first, disabled, last);
+    document.body.append(panel);
+
+    last.focus();
+    const event = tabEvent();
+    trapFocus(event, panel);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(first);
+  });
 });

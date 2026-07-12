@@ -51,7 +51,9 @@ function baseOrigin(mediaUrl: string): string | null {
 }
 
 export function buildUploadEndpoint(mediaUrl: string | undefined): string {
-  const base = mediaUrl?.trim();
+  if (mediaUrl === undefined) return '/upload';
+
+  const base = mediaUrl.trim();
   if (!base) {
     throw new UploadError('Media upload URL is not configured.', 'config');
   }
@@ -162,10 +164,11 @@ function uploadWithXhr(file: File, endpoint: string, mediaUrl: string, options: 
 
 export async function uploadFile(file: File, options: UploadOptions = {}): Promise<UploadResult> {
   const mediaUrl = options.mediaUrl?.trim();
-  const endpoint = buildUploadEndpoint(mediaUrl);
+  const endpoint = buildUploadEndpoint(options.mediaUrl);
+  const responseBaseUrl = mediaUrl || endpoint;
 
   if (options.onProgress && typeof XMLHttpRequest !== 'undefined') {
-    return uploadWithXhr(file, endpoint, mediaUrl!, options);
+    return uploadWithXhr(file, endpoint, responseBaseUrl, options);
   }
 
   const form = new FormData();
@@ -190,5 +193,5 @@ export async function uploadFile(file: File, options: UploadOptions = {}): Promi
     throw new UploadError(message, 'response', response.status);
   }
 
-  return parseUploadResponse(mediaUrl!, body, response.headers.get('content-type'));
+  return parseUploadResponse(responseBaseUrl, body, response.headers.get('content-type'));
 }

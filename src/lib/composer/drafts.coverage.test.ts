@@ -63,6 +63,59 @@ describe('composer draft persistence coverage', () => {
     expect(Object.keys(restored).sort()).toEqual(['#general', 'general']);
   });
 
+  it('round-trips independent per-channel drafts through storage', () => {
+    // Arrange
+    let drafts = setComposerDraft({}, '#alpha', 'alpha draft');
+    drafts = setComposerDraft(drafts, '#bravo', 'bravo draft');
+    drafts = setComposerDraft(drafts, '#ALPHA', 'edited alpha draft');
+    const storage = makeStorage();
+
+    // Act
+    saveComposerDrafts(drafts, storage);
+    const restored = loadComposerDrafts(storage);
+
+    // Assert
+    expect(restored).toEqual({
+      '#alpha': 'edited alpha draft',
+      '#bravo': 'bravo draft',
+    });
+    expect(getComposerDraft(restored, '#Alpha')).toBe('edited alpha draft');
+    expect(getComposerDraft(restored, '#Bravo')).toBe('bravo draft');
+  });
+
+  it('persists clear-on-send for one channel without dropping other drafts', () => {
+    // Arrange
+    let drafts = setComposerDraft({}, '#alpha', 'queued send');
+    drafts = setComposerDraft(drafts, '#bravo', 'keep editing');
+    const storage = makeStorage();
+    saveComposerDrafts(drafts, storage);
+
+    // Act
+    const afterSend = setComposerDraft(loadComposerDrafts(storage), '#ALPHA', '');
+    saveComposerDrafts(afterSend, storage);
+    const restored = loadComposerDrafts(storage);
+
+    // Assert
+    expect(restored).toEqual({ '#bravo': 'keep editing' });
+    expect(getComposerDraft(restored, '#alpha')).toBe('');
+    expect(getComposerDraft(restored, '#bravo')).toBe('keep editing');
+  });
+
+  it('removes the persisted key when clear-on-send empties the final draft', () => {
+    // Arrange
+    let drafts = setComposerDraft({}, '#alpha', 'queued send');
+    const storage = makeStorage();
+    saveComposerDrafts(drafts, storage);
+
+    // Act
+    drafts = setComposerDraft(loadComposerDrafts(storage), '#alpha', '');
+    saveComposerDrafts(drafts, storage);
+
+    // Assert
+    expect(storage.getItem(COMPOSER_DRAFTS_KEY)).toBeNull();
+    expect(loadComposerDrafts(storage)).toEqual({});
+  });
+
   it('treats a whitespace target as absent but preserves whitespace draft text', () => {
     // Arrange
     const original = { '#root': 'kept' };
@@ -95,6 +148,25 @@ describe('composer draft persistence coverage', () => {
 
     // Assert
     expect(getComposerDraft(restored, '#ROOM')).toBe(multiline);
+  });
+
+  it('preserves unicode targets and draft bodies while rejecting empty unicode targets', () => {
+    // Arrange
+    const unicodeDraft = 'naive cafe\u0301\nemoji: \u{1F512}\u{1F4AC}\nrtl: \u05E9\u05DC\u05D5\u05DD';
+    let drafts = setComposerDraft({}, ' #CAFÉ ', unicodeDraft);
+    drafts = setComposerDraft(drafts, '\u3000\u3000', 'blank target');
+    drafts = setComposerDraft(drafts, '#empty-unicode', '');
+    const storage = makeStorage();
+
+    // Act
+    saveComposerDrafts(drafts, storage);
+    const restored = loadComposerDrafts(storage);
+
+    // Assert
+    expect(restored).toEqual({ '#café': unicodeDraft });
+    expect(getComposerDraft(restored, '#café')).toBe(unicodeDraft);
+    expect(getComposerDraft(restored, '\u3000')).toBe('');
+    expect(getComposerDraft(restored, '#empty-unicode')).toBe('');
   });
 
   it('round-trips target normalization, truncation, and invalid entry removal through persistence', () => {

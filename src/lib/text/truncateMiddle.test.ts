@@ -42,6 +42,13 @@ describe('truncateMiddle', () => {
     expect(truncateMiddle('', 8)).toBe('');
   });
 
+  it('keeps empty strings unchanged across adversarial max values', () => {
+    expect(truncateMiddle('', Number.NEGATIVE_INFINITY)).toBe('');
+    expect(truncateMiddle('', Number.NaN)).toBe('');
+    expect(truncateMiddle('', 0.9)).toBe('');
+    expect(truncateMiddle('', Number.POSITIVE_INFINITY)).toBe('');
+  });
+
   it('returns exact-boundary strings unchanged', () => {
     expect(truncateMiddle('boundary', 8)).toBe('boundary');
   });
@@ -73,6 +80,14 @@ describe('truncateMiddle', () => {
   it('keeps exact-fit unicode strings unchanged', () => {
     expect(truncateMiddle('ab😀', 4)).toBe('ab😀');
     expect(truncateMiddle('e\u0301x', 3)).toBe('e\u0301x');
+  });
+
+  it('does not split unicode clusters at exact retained-side boundaries', () => {
+    const value = 'a\u0301bcde\u0301f';
+    const result = truncateMiddle(value, 6);
+
+    expect(result).toBe('a\u0301…e\u0301f');
+    expect(result.length).toBe(6);
   });
 
   it('does not split a surrogate-pair emoji', () => {
@@ -146,6 +161,19 @@ describe('truncateMiddle', () => {
       expect(result).toContain('…');
       expect(result.length).toBeLessThanOrEqual(max);
       expect(hasLoneSurrogate(result)).toBe(false);
+    }
+  });
+
+  it('keeps outputs within boundary budgets for leading and trailing oversized clusters', () => {
+    const values = ['👩‍💻abcdef', 'abcdef👩‍💻', '👩‍💻abc👍🏽'];
+
+    for (const value of values) {
+      for (let max = 1; max < value.length; max++) {
+        const result = truncateMiddle(value, max);
+
+        expect(result.length).toBeLessThanOrEqual(max);
+        expect(hasLoneSurrogate(result)).toBe(false);
+      }
     }
   });
 });

@@ -40,6 +40,18 @@ describe('countLabel', () => {
     expect(labels).toEqual(['2 events', '-1 events', '-1.5 events', '1.5 events']);
   });
 
+  it('does not round fractional counts into singular or plural boundaries', () => {
+    expect(countLabel(0.9999999999999999, 'retry')).toBe('0.9999999999999999 retrys');
+    expect(countLabel(1.0000000000000004, 'retry')).toBe('1.0000000000000004 retrys');
+    expect(countLabel(1.9999999999999998, 'retry')).toBe('1.9999999999999998 retrys');
+  });
+
+  it('keeps adversarial negative fractional counts plural', () => {
+    expect(countLabel(-0.0000001, 'packet')).toBe('-1e-7 packets');
+    expect(countLabel(-1.0000000000000002, 'packet')).toBe('-1.0000000000000002 packets');
+    expect(countLabel(-Number.MAX_VALUE, 'packet')).toBe('-1.7976931348623157e+308 packets');
+  });
+
   it('keeps large numbers intact while pluralizing', () => {
     const count = 1_000_000;
 
@@ -53,6 +65,7 @@ describe('countLabel', () => {
   it('stringifies huge exponential counts before adding the suffix', () => {
     expect(countLabel(1e21, 'packet')).toBe('1e+21 packets');
     expect(countLabel(-1e21, 'packet')).toBe('-1e+21 packets');
+    expect(countLabel(Number.MAX_VALUE, 'packet')).toBe('1.7976931348623157e+308 packets');
   });
 
   it('stringifies non-finite counts and pluralizes them', () => {

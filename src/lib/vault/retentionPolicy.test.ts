@@ -91,6 +91,54 @@ describe('effectiveKeep / resolvePolicyForChannel', () => {
   });
 });
 
+describe('per-channel retention pruning', () => {
+  it('uses the default keep bound when a channel has no override', () => {
+    const msgs = timeline(VAULT_KEEP + 2);
+    const policy: RetentionPolicy = { keep: VAULT_KEEP, perChannel: { '#tiny': 1 } };
+
+    expect(effectiveKeep(policy, '#general')).toBe(VAULT_KEEP);
+    expect(selectMessagesToPrune(msgs, resolvePolicyForChannel(policy, '#general'), NOW)).toEqual([
+      `m${VAULT_KEEP + 1}`,
+      `m${VAULT_KEEP}`,
+    ]);
+  });
+
+  it('uses a per-channel override case-insensitively before selecting prunes', () => {
+    const msgs = timeline(5);
+    const policy: RetentionPolicy = { keep: 5, perChannel: { '#ops': 2 } };
+
+    expect(effectiveKeep(policy, '#OPS')).toBe(2);
+    expect(selectMessagesToPrune(msgs, resolvePolicyForChannel(policy, '#OPS'), NOW)).toEqual([
+      'm4',
+      'm3',
+      'm2',
+    ]);
+  });
+
+  it('selects the oldest messages even when input order is adversarial', () => {
+    const msgs = [
+      { id: 'newest', time: NOW },
+      { id: 'oldest', time: NOW - 4 * DAY_MS },
+      { id: 'middle', time: NOW - 2 * DAY_MS },
+      { id: 'second-oldest', time: NOW - 3 * DAY_MS },
+      { id: 'second-newest', time: NOW - DAY_MS },
+    ] satisfies RetentionCandidate[];
+
+    expect(selectMessagesToPrune(msgs, { keep: 2 }, NOW)).toEqual([
+      'oldest',
+      'second-oldest',
+      'middle',
+    ]);
+  });
+
+  it('returns no prunes for an empty channel regardless of override', () => {
+    const policy: RetentionPolicy = { keep: 100, perChannel: { '#empty': 0 } };
+
+    expect(effectiveKeep(policy, '#empty')).toBe(0);
+    expect(selectMessagesToPrune([], resolvePolicyForChannel(policy, '#empty'), NOW)).toEqual([]);
+  });
+});
+
 describe('selectMessagesToPrune — count-only', () => {
   it('drops nothing when at or below the bound', () => {
     const msgs = timeline(10);

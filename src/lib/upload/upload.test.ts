@@ -89,6 +89,7 @@ afterEach(() => {
 describe('upload helper', () => {
   it('builds the POST /upload endpoint from the configured media URL', () => {
     // Arrange / Act / Assert
+    expect(buildUploadEndpoint(undefined)).toBe('/upload');
     expect(buildUploadEndpoint('https://media.example.test')).toBe('https://media.example.test/upload');
     expect(buildUploadEndpoint('https://media.example.test/')).toBe('https://media.example.test/upload');
     expect(buildUploadEndpoint('https://media.example.test/upload')).toBe('https://media.example.test/upload');
@@ -101,9 +102,7 @@ describe('upload helper', () => {
     expect(() => buildUploadEndpoint('   ')).toThrow('Media upload URL is not configured.');
   });
 
-  it.skip('defaults to same-origin /upload when no media URL is configured', async () => {
-    // FIXME: uploadFile currently rejects a missing mediaUrl before it can post
-    // to the documented same-origin /upload endpoint.
+  it('defaults to same-origin /upload when no media URL is configured', async () => {
     // Arrange
     const fetchMock = vi.fn(async () => new Response('/uploads/a.png', { status: 201 }));
     vi.stubGlobal('fetch', fetchMock);
@@ -213,6 +212,58 @@ describe('upload helper', () => {
     expect((uploaded as File).size).toBe('image-bytes'.length);
     expect((uploaded as File).type).toBe('image/jpeg');
     expect(uploadedFetchInit(fetchMock).headers).toBeUndefined();
+  });
+
+  it('keeps the default multipart field name as file for misleading file names', async () => {
+    // Arrange
+    const fetchMock = vi.fn(async () => new Response('/uploads/attachment', { status: 201 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const file = new File(['payload'], 'attachment', { type: 'text/plain' });
+
+    // Act
+    const result = await uploadFile(file, { mediaUrl: 'https://media.example.test' });
+
+    // Assert
+    const form = uploadedFormData(fetchMock);
+    expect(result).toEqual({ url: 'https://media.example.test/uploads/attachment' });
+    expect(form.get('file')).toBe(file);
+    expect(form.get('attachment')).toBeNull();
+  });
+
+  it('posts zero-byte files without inventing size or content type metadata', async () => {
+    // Arrange
+    const fetchMock = vi.fn(async () => new Response('/uploads/empty.bin', { status: 201 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const file = new File([], 'empty.bin');
+
+    // Act
+    await uploadFile(file, { mediaUrl: 'https://media.example.test' });
+
+    // Assert
+    const uploaded = uploadedFormData(fetchMock).get('file');
+    expect(uploaded).toBe(file);
+    expect(uploaded).toBeInstanceOf(File);
+    expect((uploaded as File).name).toBe('empty.bin');
+    expect((uploaded as File).size).toBe(0);
+    expect((uploaded as File).type).toBe('');
+  });
+
+  it('posts large binary payloads to fetch without client-side size filtering', async () => {
+    // Arrange
+    const fetchMock = vi.fn(async () => new Response('/uploads/archive.bin', { status: 201 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const bytes = new Uint8Array(1024 * 1024 + 1);
+    const file = new File([bytes], 'archive.bin', { type: 'application/octet-stream' });
+
+    // Act
+    await uploadFile(file, { mediaUrl: 'https://media.example.test' });
+
+    // Assert
+    const uploaded = uploadedFormData(fetchMock).get('file');
+    expect(uploaded).toBe(file);
+    expect(uploaded).toBeInstanceOf(File);
+    expect((uploaded as File).size).toBe(bytes.byteLength);
+    expect((uploaded as File).type).toBe('application/octet-stream');
   });
 
   it('uses injected fetch, custom field names, and abort signals for multipart posts', async () => {

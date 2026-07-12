@@ -108,6 +108,20 @@ describe('parseMentions', () => {
     });
   });
 
+  it('uses code-unit offsets for unicode text before and inside ranges', () => {
+    const text = '🌊 @ops #波 @end';
+
+    expect(parseMentions(text)).toEqual({
+      mentions: ['ops', 'end'],
+      channels: ['#波'],
+      ranges: [
+        { start: 3, end: 7, kind: 'mention', value: 'ops' },
+        { start: 8, end: 10, kind: 'channel', value: '#波' },
+        { start: 11, end: 15, kind: 'mention', value: 'end' },
+      ],
+    });
+  });
+
   it('returns empty collections when only bare markers are present', () => {
     expect(parseMentions('@ # &, trailing @')).toEqual({
       mentions: [],
@@ -160,6 +174,32 @@ describe('parseMentions', () => {
       { start: 18, end: 24, kind: 'mention', value: 'alice' },
     ]);
     expect(rangeValues(text, parsed.ranges)).toEqual(['@ops', '#日本-team', '&ops', '@alice']);
+  });
+
+  it('does not parse mention markers inside an already accepted channel range', () => {
+    const text = '#room@alice @bob';
+
+    const parsed = parseMentions(text);
+
+    expect(parsed.mentions).toEqual(['bob']);
+    expect(parsed.channels).toEqual(['#room@alice']);
+    expect(parsed.ranges).toEqual([
+      { start: 0, end: 11, kind: 'channel', value: '#room@alice' },
+      { start: 12, end: 16, kind: 'mention', value: 'bob' },
+    ]);
+    expect(rangeValues(text, parsed.ranges)).toEqual(['#room@alice', '@bob']);
+  });
+
+  it('keeps boundary markers exact at the start and end of text', () => {
+    const text = '@start middle #end';
+
+    const parsed = parseMentions(text);
+
+    expect(parsed.ranges).toEqual([
+      { start: 0, end: 6, kind: 'mention', value: 'start' },
+      { start: 14, end: 18, kind: 'channel', value: '#end' },
+    ]);
+    expect(rangeValues(text, parsed.ranges)).toEqual(['@start', '#end']);
   });
 
   it('accepts mentions after control and punctuation boundaries without absorbing html-looking tails', () => {

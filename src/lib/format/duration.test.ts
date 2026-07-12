@@ -127,6 +127,21 @@ describe('formatDuration', () => {
     expect(formatDuration(60_999)).toBe('1m');
   });
 
+  it('floors fractional milliseconds before unit-boundary carries', () => {
+    expect(formatDuration(60_000 - 0.001, { maxUnits: 5 })).toBe('59s');
+    expect(formatDuration(3_600_000 - 0.5, { maxUnits: 5 })).toBe('59m 59s');
+    expect(formatDuration(86_400_000 - 0.5, { maxUnits: 5 })).toBe('23h 59m 59s');
+    expect(formatDuration(604_800_000 - 0.5, { maxUnits: 5 })).toBe('6d 23h 59m 59s');
+    expect(formatDuration(604_800_000 + 999.999, { maxUnits: 5 })).toBe('1w');
+    expect(formatDuration(604_801_000, { maxUnits: 5 })).toBe('1w 1s');
+  });
+
+  it('clamps adversarial negative fractions before formatting full labels', () => {
+    expect(formatDuration(-0.001, { compact: false, maxUnits: 5 })).toBe('0 seconds');
+    expect(formatDuration(-999.999, { compact: false, maxUnits: 5 })).toBe('0 seconds');
+    expect(formatDuration(-604_800_000.5, { compact: false, maxUnits: 5 })).toBe('0 seconds');
+  });
+
   it('skips zero-value middle units while still honoring maxUnits', () => {
     const duration = (604_800 + 60 + 1) * 1_000;
 
@@ -153,5 +168,6 @@ describe('formatDuration', () => {
       maxUnits: 5,
     })).toBe('1000w 6d 23h 59m 59s');
     expect(formatDuration((10_000_000 * 604_800 + 1) * 1_000)).toBe('10000000w 1s');
+    expect(formatDuration(Number.MAX_SAFE_INTEGER, { maxUnits: 5 })).toBe('14892855w 6d 8h 59m');
   });
 });

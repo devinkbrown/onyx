@@ -7,6 +7,22 @@ function joinSegments(text: string, segments: ReturnType<typeof highlightRanges>
   return segments.map((segment) => text.slice(segment.start, segment.end)).join('');
 }
 
+function expectMonotonicSegments(
+  text: string,
+  segments: ReturnType<typeof highlightRanges>,
+): void {
+  let cursor = 0;
+
+  for (const segment of segments) {
+    expect(segment.start).toBe(cursor);
+    expect(segment.end).toBeGreaterThanOrEqual(segment.start);
+    cursor = segment.end;
+  }
+
+  expect(cursor).toBe(text.length);
+  expect(joinSegments(text, segments)).toBe(text);
+}
+
 describe('highlightRanges', () => {
   it('returns one non-match segment when there is no match', () => {
     expect(highlightRanges('open water', 'reef')).toEqual([{ start: 0, end: 10, match: false }]);
@@ -14,6 +30,18 @@ describe('highlightRanges', () => {
 
   it('returns empty ranges when query absent and text absent', () => {
     expect(highlightRanges('', '')).toEqual([{ start: 0, end: 0, match: false }]);
+  });
+
+  it('keeps boundary matches exact at the first and last code-unit offsets', () => {
+    const text = 'reef middle reef';
+    const ranges = highlightRanges(text, 'reef');
+
+    expect(ranges).toEqual([
+      { start: 0, end: 4, match: true },
+      { start: 4, end: 12, match: false },
+      { start: 12, end: 16, match: true },
+    ]);
+    expectMonotonicSegments(text, ranges);
   });
 
   it('returns only the first non-overlapping match for overlapping candidates', () => {
@@ -107,6 +135,19 @@ describe('highlightRanges', () => {
       { start: 8, end: 15, match: false },
       { start: 15, end: 17, match: true },
     ]);
+  });
+
+  it('keeps unicode matches monotonic when surrounded by overlapping ascii candidates', () => {
+    const text = 'aa🌊aaa🌊aa';
+    const ranges = highlightRanges(text, 'aa🌊');
+
+    expect(ranges).toEqual([
+      { start: 0, end: 4, match: true },
+      { start: 4, end: 5, match: false },
+      { start: 5, end: 9, match: true },
+      { start: 9, end: 11, match: false },
+    ]);
+    expectMonotonicSegments(text, ranges);
   });
 
   it('matches combining-mark text literally without splitting the source range', () => {
@@ -228,6 +269,22 @@ describe('highlightRanges', () => {
 
   it('returns a single full-match range when the query covers the whole text', () => {
     expect(highlightRanges('needle', 'needle')).toEqual([{ start: 0, end: 6, match: true }]);
+  });
+
+  it('keeps adversarial empty, unicode, and overlapping cases contiguous', () => {
+    const cases: ReadonlyArray<readonly [string, string]> = [
+      ['', ''],
+      ['', 'x'],
+      ['x', ''],
+      ['aaaaa', 'aa'],
+      ['🌊aa🌊aa', 'aa'],
+      ['Cafe\u0301Cafe\u0301', 'e\u0301C'],
+      ['.*.*', '.*'],
+    ];
+
+    for (const [text, query] of cases) {
+      expectMonotonicSegments(text, highlightRanges(text, query));
+    }
   });
 
   it('reconstructs the original text from every segment', () => {

@@ -176,6 +176,7 @@ export function parseBlockKitLitePayload(raw: string): BlockKitLiteBlock | null 
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     if (!parsed || typeof parsed !== 'object') return null;
+    if (parsed.type !== undefined && parsed.type !== 'message' && parsed.type !== 'modal') return null;
     const type = parsed.type === 'modal' ? 'modal' : 'message';
     const title = trimText(parsed.title, 80);
     const text = trimText(parsed.text);

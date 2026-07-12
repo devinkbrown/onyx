@@ -97,6 +97,27 @@ describe('isPreviewableUrl (SSRF defense in depth)', () => {
 });
 
 describe('fetchLinkPreview', () => {
+  it('encodes adversarial absolute targets inside the same-origin preview endpoint', async () => {
+    const target =
+      'https://preview.example/path?redirect=http://169.254.169.254/latest/meta-data/#frag';
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const requested = String(input);
+      expect(requested).toMatch(/^\/linkpreview\?url=/);
+      expect(requested).not.toMatch(/^https?:\/\//);
+
+      const parsed = new URL(requested, 'https://onyx.example');
+      expect(parsed.origin).toBe('https://onyx.example');
+      expect(parsed.pathname).toBe('/linkpreview');
+      expect(parsed.searchParams.get('url')).toBe(target);
+
+      return new Response(JSON.stringify({ title: 'safe proxy' }), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(fetchLinkPreview(target)).resolves.toMatchObject({ title: 'safe proxy' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('NEVER issues a fetch for an unsafe / non-same-origin target', async () => {
     const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
@@ -112,6 +133,21 @@ describe('fetchLinkPreview', () => {
       expect(await fetchLinkPreview(href)).toBeNull();
     }
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('never fetches a rejected non-same-origin target directly after a cached preview exists', async () => {
+    const safeTarget = 'https://public.example/page';
+    const unsafeTarget = 'http://169.254.169.254/latest/meta-data/';
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      expect(String(input)).toBe(`/linkpreview?url=${encodeURIComponent(safeTarget)}`);
+      return new Response(JSON.stringify({ title: 'public' }), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(fetchLinkPreview(safeTarget)).resolves.toMatchObject({ title: 'public' });
+    await expect(fetchLinkPreview(unsafeTarget)).resolves.toBeNull();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('only ever fetches the same-origin /linkpreview endpoint', async () => {
@@ -183,6 +219,32 @@ describe('fetchLinkPreview', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     resolveResponse?.(new Response(JSON.stringify({ title: 'Inflight' }), { status: 200 }));
     await expect(first).resolves.toMatchObject({ title: 'Inflight' });
+  });
+
+  it('keeps in-flight dedupe and settled module cache on the same promise object', async () => {
+    let resolveResponse: ((response: Response) => void) | undefined;
+    const pendingResponse = new Promise<Response>((resolve) => {
+      resolveResponse = resolve;
+    });
+    const fetchMock = vi.fn(() => pendingResponse);
+    vi.stubGlobal('fetch', fetchMock);
+
+    const url = 'https://identity-cache.example/page';
+    const first = fetchLinkPreview(url);
+    const second = fetchLinkPreview(url);
+
+    expect(second).toBe(first);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    resolveResponse?.(
+      new Response(JSON.stringify({ title: 'Identity', description: 'cached' }), { status: 200 }),
+    );
+    await expect(first).resolves.toMatchObject({ title: 'Identity' });
+
+    const third = fetchLinkPreview(url);
+    expect(third).toBe(first);
+    await expect(third).resolves.toMatchObject({ description: 'cached' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('normalizes a good payload and dedupes concurrent fetches', async () => {

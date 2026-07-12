@@ -2,7 +2,7 @@
 /**
  * customThemes.test.ts — user-created theme storage + token merging.
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   addCustomTheme,
   customThemeScheme,
@@ -15,7 +15,10 @@ import {
 import { THEMES } from './themes';
 
 beforeEach(() => localStorage.clear());
-afterEach(() => localStorage.clear());
+afterEach(() => {
+  vi.restoreAllMocks();
+  localStorage.clear();
+});
 
 describe('isCustomThemeId', () => {
   it('distinguishes custom ids from built-ins', () => {
@@ -73,6 +76,24 @@ describe('persistence', () => {
     expect(loadCustomThemes()).toHaveLength(0);
   });
 
+  it('rejects malformed themes without dropping valid stored themes', () => {
+    localStorage.setItem(
+      'onyx:custom-themes',
+      JSON.stringify([
+        { id: 'custom:good', name: 'Good', base: 'ocean', overrides: { '--lapis': '#00ace9' } },
+        { id: 'ocean', name: 'Built-in collision', base: 'ocean', overrides: {} },
+        { id: 'custom:missing-base', name: 'Missing base', overrides: {} },
+        { id: 'custom:bad-base', name: 'Bad base', base: 'does-not-exist', overrides: {} },
+        { id: 'custom:bad-name', name: 12, base: 'ocean', overrides: {} },
+        { id: 'custom:bad-overrides', name: 'Bad overrides', base: 'ocean', overrides: null },
+      ]),
+    );
+
+    expect(loadCustomThemes()).toEqual([
+      { id: 'custom:good', name: 'Good', base: 'ocean', overrides: { '--lapis': '#00ace9' } },
+    ]);
+  });
+
   it('drops a theme whose overrides is an array (would seat numeric-key props)', () => {
     localStorage.setItem(
       'onyx:custom-themes',
@@ -102,5 +123,41 @@ describe('persistence', () => {
     const loaded = loadCustomThemes();
     expect(loaded).toHaveLength(1);
     expect(loaded[0]?.overrides['--lapis']).toBe('#ff0000');
+  });
+
+  it('round-trips saved themes through the onyx custom theme key', () => {
+    const saved = addCustomTheme('Cyan Wake', 'reef', {
+      '--lapis': '#00b8ed',
+      '--gold': 'color-mix(in oklab, #5dcbd1 80%, white)',
+    });
+
+    const stored = JSON.parse(localStorage.getItem('onyx:custom-themes') ?? 'null');
+
+    expect(stored).toEqual([
+      {
+        id: 'custom:cyan-wake',
+        name: 'Cyan Wake',
+        base: 'reef',
+        overrides: {
+          '--lapis': '#00b8ed',
+          '--gold': 'color-mix(in oklab, #5dcbd1 80%, white)',
+        },
+      },
+    ]);
+    expect(loadCustomThemes()).toEqual([saved]);
+  });
+
+  it('does not throw when localStorage rejects persistence writes', () => {
+    const setItem = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+      throw new DOMException('Quota exceeded', 'QuotaExceededError');
+    });
+
+    expect(() => addCustomTheme('Quota Safe', 'ocean', { '--lapis': '#ff0000' })).not.toThrow();
+    expect(setItem).toHaveBeenCalledWith(
+      'onyx:custom-themes',
+      JSON.stringify([
+        { id: 'custom:quota-safe', name: 'Quota Safe', base: 'ocean', overrides: { '--lapis': '#ff0000' } },
+      ]),
+    );
   });
 });

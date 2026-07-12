@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { extractBlockKitLite, parseBlockKitLitePayload } from './blockKitLite';
+
+const blockKitLiteSourcePath = join(dirname(fileURLToPath(import.meta.url)), 'blockKitLite.ts');
 
 describe('blockKitLite', () => {
   it('extracts valid protocol-tagged blocks and leaves readable fallback text', () => {
@@ -23,6 +28,87 @@ describe('blockKitLite', () => {
     expect(block?.buttons[0]).toEqual({ label: 'Run', url: null, value: null, action: null });
   });
 
+  it('keeps malformed block lines as fallback text while extracting later valid blocks', () => {
+    const result = extractBlockKitLite([
+      'Incident update',
+      '[onyx:block] {"title":"unterminated"',
+      '[onyx:block] {"type":"message","text":"still parse the next block"}',
+      '[onyx:block] true',
+      'Tail note',
+    ].join('\n'));
+
+    expect(result.text).toBe([
+      'Incident update',
+      '[onyx:block] {"title":"unterminated"',
+      '[onyx:block] true',
+      'Tail note',
+    ].join('\n'));
+    expect(result.blocks).toEqual([{
+      type: 'message',
+      title: null,
+      text: 'still parse the next block',
+      buttons: [],
+      selects: [],
+      fields: [],
+    }]);
+  });
+
+  it('ignores unknown explicit block types instead of rendering them as messages', () => {
+    expect(parseBlockKitLitePayload(JSON.stringify({
+      type: 'section',
+      title: 'Slack-style section',
+      text: 'This schema is not supported by Block Kit Lite.',
+    }))).toBeNull();
+
+    const result = extractBlockKitLite([
+      'Before',
+      '[onyx:block] {"type":"context","text":"unsupported context"}',
+      '[onyx:block] {"type":"message","text":"supported message"}',
+    ].join('\n'));
+
+    expect(result.text).toBe('Before\n[onyx:block] {"type":"context","text":"unsupported context"}');
+    expect(result.blocks.map((block) => block.text)).toEqual(['supported message']);
+  });
+
+  it('ignores unknown nested action/control shapes without dropping safe siblings', () => {
+    const block = parseBlockKitLitePayload(JSON.stringify({
+      type: 'message',
+      title: 'Mixed controls',
+      buttons: [
+        { label: 'Unknown action', action: { type: 'open-url', target: '#ops', value: 'https://example.test' } },
+        { type: 'image', label: 'Unknown control type', url: 'https://example.test/image.png' },
+        { label: 'Valid action', action: { type: 'send', target: '#ops', value: 'ack' } },
+      ],
+      selects: [
+        {
+          label: 'Bad options',
+          options: [
+            { type: 'divider' },
+            { label: '', value: 'empty label' },
+            { label: 'Safe', value: 'safe' },
+          ],
+          action: { type: 'modal-open', target: '#ops', value: 'details' },
+        },
+      ],
+      fields: [
+        { type: 'mrkdwn', value: 'missing label' },
+        { label: 'Safe field', value: 'plain text' },
+      ],
+    }));
+
+    expect(block?.buttons).toEqual([
+      { label: 'Unknown action', url: null, value: null, action: null },
+      { label: 'Unknown control type', url: 'https://example.test/image.png', value: null, action: null },
+      { label: 'Valid action', url: null, value: null, action: { type: 'send', target: '#ops', value: 'ack' } },
+    ]);
+    expect(block?.selects).toEqual([{
+      label: 'Bad options',
+      options: [{ label: 'Safe', value: 'safe' }],
+      action: null,
+    }]);
+    expect(block?.fields).toEqual([{ label: 'Safe field', value: 'plain text' }]);
+  });
+
   it('rejects script/data URLs and keeps markup-looking text inert as plain strings', () => {
     const block = parseBlockKitLitePayload(JSON.stringify({
       title: '<script>alert(1)</script>',
@@ -41,6 +127,12 @@ describe('blockKitLite', () => {
       { label: 'Relative', url: null, value: null, action: null },
       { label: 'Secure', url: 'https://example.test/path?q=%3Cscript%3E', value: null, action: null },
     ]);
+  });
+
+  it('does not introduce HTML sink APIs in the parser module', () => {
+    const source = readFileSync(blockKitLiteSourcePath, 'utf8');
+
+    expect(source).not.toMatch(/\b(?:innerHTML|dangerouslySetInnerHTML|__html)\b/);
   });
 
   it('parses only allowlisted client-local actions', () => {
