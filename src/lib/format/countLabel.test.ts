@@ -9,6 +9,7 @@ describe('countLabel', () => {
     const label = countLabel(count, 'message');
 
     expect(label).toBe('1 message');
+    expect(countLabel(1.0, 'channel')).toBe('1 channel');
   });
 
   it('uses the plural noun for zero items', () => {
@@ -17,14 +18,15 @@ describe('countLabel', () => {
     const label = countLabel(count, 'reply');
 
     expect(label).toBe('0 replys');
+    expect(countLabel(-0, 'reply')).toBe('0 replys');
   });
 
   it('uses the plural noun for counts other than one', () => {
-    const counts = [2, -1, 1.5];
+    const counts = [2, -1, -1.5, 1.5];
 
     const labels = counts.map((count) => countLabel(count, 'event'));
 
-    expect(labels).toEqual(['2 events', '-1 events', '1.5 events']);
+    expect(labels).toEqual(['2 events', '-1 events', '-1.5 events', '1.5 events']);
   });
 
   it('keeps large numbers intact while pluralizing', () => {
@@ -33,6 +35,8 @@ describe('countLabel', () => {
     const label = countLabel(count, 'member');
 
     expect(label).toBe('1000000 members');
+    expect(countLabel(Number.MAX_SAFE_INTEGER, 'member')).toBe('9007199254740991 members');
+    expect(countLabel(Number.MIN_SAFE_INTEGER, 'member')).toBe('-9007199254740991 members');
   });
 
   it('stringifies non-finite counts and pluralizes them', () => {
@@ -49,6 +53,11 @@ describe('countLabel', () => {
     const label = countLabel(count, '');
 
     expect(label).toBe('0 s');
+  });
+
+  it('appends a simple s even when the singular already has a suffix', () => {
+    expect(countLabel(2, 'class')).toBe('2 classs');
+    expect(countLabel(0, 'status')).toBe('0 statuss');
   });
 
   it('pluralizes signed zero and numeric wrappers as non-singular counts', () => {

@@ -110,6 +110,25 @@ describe('quiet boost aggregation', () => {
     ]);
   });
 
+  it('deduplicates a reactor per emoji but lets the same nick boost different emojis', () => {
+    const groups = aggregateBoosts(
+      [
+        { emoji: 'a', from: 'Kai' },
+        { emoji: 'a', from: 'kai' },
+        { emoji: 'b', from: 'kai' },
+        { emoji: 'b', from: 'Mio' },
+        { emoji: 'b', from: 'mio' },
+      ],
+      'KAI',
+    );
+
+    expect(groups).toEqual([
+      { emoji: 'b', count: 2, reactors: ['kai', 'Mio'], youBoosted: true },
+      { emoji: 'a', count: 1, reactors: ['Kai'], youBoosted: true },
+    ]);
+    expect(totalBoosts(groups)).toBe(3);
+  });
+
   it('documents that boosts never notify anyone', () => {
     expect(BOOST_NOTIFIES).toBe(false);
   });
@@ -200,6 +219,14 @@ describe('quiet boost optimistic toggles', () => {
     ]);
     expect(reactors).toEqual(['mio']);
     expect(next[1]?.reactors).not.toBe(reactors);
+  });
+
+  it('removes every case variant of you from a stale reconciled group', () => {
+    const groups: BoostGroup[] = [{ emoji: '🌊', count: 3, reactors: ['Kai', 'kai', 'mio'], youBoosted: false }];
+
+    const next = toggleBoost(groups, '🌊', 'KAI');
+
+    expect(next).toEqual([{ emoji: '🌊', count: 1, reactors: ['mio'], youBoosted: false }]);
   });
 });
 
@@ -312,5 +339,78 @@ describe('quiet boost Home digest', () => {
     );
 
     expect(digest).toEqual([]);
+  });
+
+  it('reconciles malformed TAGMSG reaction rows before computing digest totals', () => {
+    const message = msg(
+      'tagmsg-reconcile',
+      '  reaction\tfold-back\nsummary  ',
+      [
+        { emoji: '', users: ['kai'] },
+        { emoji: '✨', users: ['Ren'] },
+        { emoji: '✨', users: ['ren', 'Aya'] },
+        { emoji: '🌊', users: ['', 'Kai', 'kai', 'Mio', 'Ren'] },
+      ],
+      1000,
+    );
+
+    const digest = buildQuietBoostDigest([{ target: '#general', messages: [message] }], 'kai');
+
+    expect(digest).toEqual([
+      {
+        target: '#general',
+        messageId: 'tagmsg-reconcile',
+        at: new Date(1000),
+        from: 'alice',
+        text: 'reaction fold-back summary',
+        total: 5,
+        groups: [
+          { emoji: '🌊', count: 3, reactors: ['Kai', 'Mio', 'Ren'], youBoosted: true },
+          { emoji: '✨', count: 2, reactors: ['Ren', 'Aya'], youBoosted: false },
+        ],
+      },
+    ]);
+  });
+
+  it('sorts digest items by deduped totals, not raw repeated TAGMSG rows', () => {
+    const digest = buildQuietBoostDigest(
+      [{
+        target: '#general',
+        messages: [
+          msg(
+            'raw-dupes',
+            'many repeated rows',
+            [
+              { emoji: 'a', users: ['Kai', 'kai'] },
+              { emoji: 'a', users: ['KAI'] },
+            ],
+            3000,
+          ),
+          msg('unique-two', 'two real boosts', [{ emoji: 'b', users: ['mio', 'ren'] }], 1000),
+        ],
+      }],
+      'kai',
+    );
+
+    expect(digest.map((item) => [item.messageId, item.total])).toEqual([
+      ['unique-two', 2],
+      ['raw-dupes', 1],
+    ]);
+  });
+
+  it('skips messages whose reconciled TAGMSG reactions have no valid emoji or reactor', () => {
+    const digest = buildQuietBoostDigest(
+      [{
+        target: '#general',
+        messages: [
+          msg('empty-emoji', 'invalid emoji', [{ emoji: '', users: ['mio'] }], 1000),
+          msg('empty-user', 'invalid user', [{ emoji: '🌊', users: ['', ''] }], 2000),
+          msg('valid', 'visible', [{ emoji: '🌊', users: ['mio'] }], 3000),
+        ],
+      }],
+      'kai',
+    );
+
+    expect(digest.map((item) => item.messageId)).toEqual(['valid']);
   });
 });

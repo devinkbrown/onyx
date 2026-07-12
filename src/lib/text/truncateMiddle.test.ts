@@ -46,9 +46,24 @@ describe('truncateMiddle', () => {
     expect(truncateMiddle('boundary', 8)).toBe('boundary');
   });
 
+  it('handles the smallest truncating budgets with the ellipsis anchored in the middle', () => {
+    expect(truncateMiddle('abcdef', 1)).toBe('…');
+    expect(truncateMiddle('abcdef', 2)).toBe('…f');
+    expect(truncateMiddle('abcdef', 3)).toBe('a…f');
+  });
+
+  it('does not replace an exact one-code-unit string with an ellipsis', () => {
+    expect(truncateMiddle('a', 1)).toBe('a');
+  });
+
   it('splits odd and even boundary budgets deterministically around the ellipsis', () => {
     expect(truncateMiddle('abcdef', 4)).toBe('a…ef');
     expect(truncateMiddle('abcdef', 5)).toBe('ab…ef');
+  });
+
+  it('places the ellipsis after the floored head budget and before the larger tail budget', () => {
+    expect(truncateMiddle('abcdefghi', 6)).toBe('ab…ghi');
+    expect(truncateMiddle('abcdefghi', 7)).toBe('abc…ghi');
   });
 
   it('floors fractional max values before middle truncation', () => {
@@ -112,6 +127,26 @@ describe('truncateMiddle', () => {
     expect(result).toBe('…👍🏽');
     expect(result.length).toBeLessThanOrEqual(8);
     expect(hasLoneSurrogate(result)).toBe(false);
+  });
+
+  it('keeps variation selectors attached when a styled symbol fits at the tail boundary', () => {
+    const result = truncateMiddle('abcd✈️', 4);
+
+    expect(result).toBe('a…✈️');
+    expect(result.length).toBe(4);
+    expect(hasLoneSurrogate(result)).toBe(false);
+  });
+
+  it('never emits lone surrogates while sweeping every truncating max over mixed unicode', () => {
+    const value = 'ab😀cd👩‍💻ef👍🏽gh😄ij';
+
+    for (let max = 1; max < value.length; max++) {
+      const result = truncateMiddle(value, max);
+
+      expect(result).toContain('…');
+      expect(result.length).toBeLessThanOrEqual(max);
+      expect(hasLoneSurrogate(result)).toBe(false);
+    }
   });
 });
 

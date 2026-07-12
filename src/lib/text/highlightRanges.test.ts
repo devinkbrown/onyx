@@ -137,6 +137,17 @@ describe('highlightRanges', () => {
     expect(joinSegments(text, ranges)).toBe(text);
   });
 
+  it('chooses the earliest nested candidate and does not emit inner matches', () => {
+    const text = 'aaaaaa';
+    const ranges = highlightRanges(text, 'aaaa');
+
+    expect(ranges).toEqual([
+      { start: 0, end: 4, match: true },
+      { start: 4, end: 6, match: false },
+    ]);
+    expect(joinSegments(text, ranges)).toBe(text);
+  });
+
   it('skips overlapping candidates and resumes matching after the accepted range', () => {
     const text = 'ababaaba';
     const ranges = highlightRanges(text, 'aba');
@@ -157,6 +168,47 @@ describe('highlightRanges', () => {
       { start: 0, end: 6, match: true },
       { start: 6, end: 12, match: true },
     ]);
+    expect(joinSegments(text, ranges)).toBe(text);
+  });
+
+  it('emits every adjacent literal match without inserting empty gaps', () => {
+    const text = 'ababab';
+    const ranges = highlightRanges(text, 'ab');
+
+    expect(ranges).toEqual([
+      { start: 0, end: 2, match: true },
+      { start: 2, end: 4, match: true },
+      { start: 4, end: 6, match: true },
+    ]);
+    expect(joinSegments(text, ranges)).toBe(text);
+  });
+
+  it('uses JS code-unit offsets for adjacent emoji ZWJ sequence matches', () => {
+    const query = '👩🏽‍💻';
+    const text = `${query}${query}`;
+    const width = query.length;
+    const ranges = highlightRanges(text, query);
+
+    expect(ranges).toEqual([
+      { start: 0, end: width, match: true },
+      { start: width, end: width * 2, match: true },
+    ]);
+    expect(joinSegments(text, ranges)).toBe(text);
+  });
+
+  it('keeps an empty query inert even when text contains regex metacharacters and unicode', () => {
+    const text = '^start$ [🌊] (reef)?';
+    const ranges = highlightRanges(text, '');
+
+    expect(ranges).toEqual([{ start: 0, end: text.length, match: false }]);
+    expect(joinSegments(text, ranges)).toBe(text);
+  });
+
+  it('returns the full text as non-match when a unicode query is longer than the text', () => {
+    const text = '🌊';
+    const ranges = highlightRanges(text, '🌊🌊');
+
+    expect(ranges).toEqual([{ start: 0, end: text.length, match: false }]);
     expect(joinSegments(text, ranges)).toBe(text);
   });
 
@@ -186,10 +238,15 @@ describe('highlightRanges', () => {
       ['Ocean ocean OCEAN', 'oCeAn'],
       ['hello 🌊 hello 🌊', '🌊'],
       ['ababaaba', 'aba'],
+      ['aaaaaa', 'aaaa'],
+      ['ababab', 'ab'],
       ['🌊reef🌊reef', '🌊reef'],
+      ['👩🏽‍💻👩🏽‍💻', '👩🏽‍💻'],
       ['mañana MAÑANA mañana', 'ÑANA'],
       ['', 'reef'],
       ['open water', ''],
+      ['^start$ [🌊] (reef)?', ''],
+      ['🌊', '🌊🌊'],
     ];
 
     for (const [text, query] of cases) {

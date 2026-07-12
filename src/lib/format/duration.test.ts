@@ -5,7 +5,9 @@ import { formatDuration } from './duration';
 describe('formatDuration', () => {
   it('clamps zero, negative, and sub-second durations to zero seconds', () => {
     expect(formatDuration(0)).toBe('0s');
+    expect(formatDuration(-0)).toBe('0s');
     expect(formatDuration(-1)).toBe('0s');
+    expect(formatDuration(-999.9)).toBe('0s');
     expect(formatDuration(-60_000)).toBe('0s');
     expect(formatDuration(999)).toBe('0s');
   });
@@ -22,6 +24,14 @@ describe('formatDuration', () => {
     expect(formatDuration(60_000)).toBe('1m');
     expect(formatDuration(3_599_000)).toBe('59m 59s');
     expect(formatDuration(3_600_000)).toBe('1h');
+  });
+
+  it('rolls over day and week boundaries without rounding up early', () => {
+    expect(formatDuration(86_399_000)).toBe('23h 59m');
+    expect(formatDuration(86_400_000)).toBe('1d');
+    expect(formatDuration(604_799_000)).toBe('6d 23h');
+    expect(formatDuration(604_800_000)).toBe('1w');
+    expect(formatDuration(604_801_000)).toBe('1w 1s');
   });
 
   it('formats each supported unit', () => {
@@ -53,6 +63,7 @@ describe('formatDuration', () => {
     expect(formatDuration(duration, { maxUnits: 0 })).toBe('1h');
     expect(formatDuration(duration, { maxUnits: -2 })).toBe('1h');
     expect(formatDuration(duration, { maxUnits: Number.NaN })).toBe('1h 30m');
+    expect(formatDuration(duration, { maxUnits: Number.NEGATIVE_INFINITY })).toBe('1h 30m');
     expect(formatDuration(duration, { maxUnits: 1.9 })).toBe('1h');
   });
 
@@ -72,6 +83,17 @@ describe('formatDuration', () => {
     expect(formatDuration(1_000, { compact: false })).toBe('1 second');
     expect(formatDuration(2_000, { compact: false })).toBe('2 seconds');
     expect(formatDuration(62_000, { compact: false })).toBe('1 minute 2 seconds');
+  });
+
+  it('pluralizes every full duration unit independently', () => {
+    expect(formatDuration((604_800 + 86_400 + 3_600 + 60 + 1) * 1_000, {
+      compact: false,
+      maxUnits: 5,
+    })).toBe('1 week 1 day 1 hour 1 minute 1 second');
+    expect(formatDuration((2 * 604_800 + 2 * 86_400 + 2 * 3_600 + 2 * 60 + 2) * 1_000, {
+      compact: false,
+      maxUnits: 5,
+    })).toBe('2 weeks 2 days 2 hours 2 minutes 2 seconds');
   });
 
   it('floors fractional seconds deterministically', () => {
@@ -96,5 +118,6 @@ describe('formatDuration', () => {
     expect(formatDuration((1_000 * 604_800 + 6 * 86_400 + 23 * 3_600 + 59 * 60 + 59) * 1_000, {
       maxUnits: 5,
     })).toBe('1000w 6d 23h 59m 59s');
+    expect(formatDuration((10_000_000 * 604_800 + 1) * 1_000)).toBe('10000000w 1s');
   });
 });
