@@ -1205,20 +1205,36 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   // search hit), history replay, or a conversation switch. Those all lower (or
   // reset) the window start; a genuine new tail arrival keeps start flat or
   // raises it and stays announced. Restored to "polite" shortly after.
+  //
+  // A topic-filter change is a conversation switch on a SECOND axis: activeTarget()
+  // is unchanged, but messages() becomes a different filtered set (see the memo
+  // above) and <For> swaps the whole trailing window. For small sets the window
+  // start stays flat (0) or even RISES when a filter is cleared, so the start-
+  // decrease branch alone never catches it — leaving the log "polite" while every
+  // swapped-in row is read aloud (SC 4.1.3 transcript-replay spam). Fold
+  // activeTopic() into the guard's identity so a topic switch suppresses the log
+  // and resets the trailing window exactly like a channel switch.
   let prevWindowStart = Number.POSITIVE_INFINITY;
   let prevLiveTarget: string | null = null;
+  let prevLiveTopic: string | null = null;
   let liveRestoreTimer: ReturnType<typeof setTimeout> | undefined;
   createEffect(() => {
     const start = messageWindow().start;
     const target = activeTarget();
-    const switched = target !== prevLiveTarget;
+    const topic = activeTopic();
+    const switched = target !== prevLiveTarget || topic !== prevLiveTopic;
     if (switched || start < prevWindowStart) {
+      // A switch (channel or topic) starts the new view from the trailing window
+      // again; a pure window-growth ("show earlier") must NOT — that would undo
+      // the user's own "show earlier", so only reset on an identity change.
+      if (switched) setWindowSize(BASE_WINDOW_ROWS);
       setLiveMode('off');
       if (liveRestoreTimer) clearTimeout(liveRestoreTimer);
       liveRestoreTimer = setTimeout(() => setLiveMode('polite'), LIVE_RESTORE_MS);
     }
     prevWindowStart = start;
     prevLiveTarget = target;
+    prevLiveTopic = topic;
   });
   onCleanup(() => {
     if (liveRestoreTimer) clearTimeout(liveRestoreTimer);
