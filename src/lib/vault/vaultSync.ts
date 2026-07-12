@@ -18,14 +18,67 @@ import { loadRecent, saveMessages } from './historyVault';
 const FLUSH_MS = 1500;
 
 const _pendingFlush = new Map<string, ReturnType<typeof setTimeout>>();
-const _lastPersistedTail = new Map<string, string>();
+/** Per-target signature of the last set of rows durably written (see
+ *  `bufferSignature`). Replaces a plain tail-id watermark so an in-place
+ *  edit/redact/delete/reaction on an EXISTING message re-triggers a flush. */
+const _lastPersistedSig = new Map<string, string>();
 const _hydrated = new Set<string>();
 let _unsubscribers: Array<() => void> = [];
 
+/**
+ * Rows we actually persist: everything EXCEPT the optimistic offline outbox
+ * placeholder (`pending`, id `outbox:<id>`). That placeholder is dropped from
+ * the store the instant flushOutbox delivers the real message under a fresh
+ * uid; persisting it would leave a permanent stuck-`pending` ghost plus a
+ * duplicate of the delivered line on the next hydrate. Optimistic rows never
+ * go to disk — only settled conversation does.
+ */
+function persistableRows(messages: readonly ChatMessage[]): ChatMessage[] {
+  return messages.filter((m) => !m.pending && !m.id.startsWith('outbox:'));
+}
+
+/** FNV-1a 32-bit string mix — cheap, allocation-free, deterministic. */
+function mix(h: number, s: string): number {
+  let acc = h;
+  for (let i = 0; i < s.length; i++) {
+    acc ^= s.charCodeAt(i);
+    acc = Math.imul(acc, 0x01000193);
+  }
+  return acc >>> 0;
+}
+
+/**
+ * Cheap content signature over the mutation-relevant fields of the persistable
+ * rows. A tail-id watermark alone misses in-place mutations — a redact/edit/
+ * delete/reaction changes an EXISTING message (same id, often same length) but
+ * not the tail id, so the un-redacted row would survive at rest and keep
+ * surfacing in search/time-travel. Hashing id + text + flags + reactions makes
+ * those mutations dirty the watermark and become durable. One linear pass over
+ * ≤ VAULT_KEEP rows, no allocation, no re-serialize — safe on the store hot path.
+ */
+function bufferSignature(rows: readonly ChatMessage[]): string {
+  let h = 0x811c9dc5;
+  for (const m of rows) {
+    h = mix(h, m.id);
+    h = mix(h, m.text);
+    let flags = 0;
+    if (m.edited) flags |= 1;
+    if (m.deleted) flags |= 2;
+    if (m.redacted) flags |= 4;
+    h = (Math.imul(h, 0x01000193) ^ flags) >>> 0;
+    if (m.reactions) {
+      for (const r of m.reactions) {
+        h = mix(h, r.emoji);
+        for (const u of r.users) h = mix(h, u);
+      }
+    }
+  }
+  return `${rows.length}:${h.toString(36)}`;
+}
+
 function scheduleFlush(target: string, messages: readonly ChatMessage[]): void {
   const key = target.toLowerCase();
-  const tailId = messages[messages.length - 1]?.id ?? '';
-  if (_lastPersistedTail.get(key) === tailId) return;
+  if (_lastPersistedSig.get(key) === bufferSignature(persistableRows(messages))) return;
   const existing = _pendingFlush.get(key);
   if (existing) clearTimeout(existing);
   _pendingFlush.set(
@@ -36,23 +89,26 @@ function scheduleFlush(target: string, messages: readonly ChatMessage[]): void {
       const buf =
         state.channels.get(key)?.messages ?? state.dms.get(key)?.messages ?? null;
       if (!buf || buf.length === 0) return;
-      const nextTail = buf[buf.length - 1]?.id ?? '';
-      const prevTail = _lastPersistedTail.get(key);
-      if (prevTail === nextTail) return; // already durable — nothing new to write
+      const rows = persistableRows(buf);
+      const nextSig = bufferSignature(rows);
+      const prevSig = _lastPersistedSig.get(key);
+      if (prevSig === nextSig) return; // already durable — nothing new to write
 
       // Claim the watermark OPTIMISTICALLY so a burst of store updates for this
       // target coalesces onto one in-flight write instead of stampeding the DB.
+      // The watermark is a content SIGNATURE, not just a tail id, so in-place
+      // edits/redactions/reactions re-flush and become durable at rest.
       // If the write fails (quota / private mode / abort), roll the watermark
       // back — but only if no newer flush has since advanced it — so the SAME
-      // tail is retried on the next store change instead of being silently and
-      // permanently dropped. System lines (joins/quits) are conversation too:
-      // everything in the buffer is stored, exactly as seen.
-      _lastPersistedTail.set(key, nextTail);
-      void saveMessages(key, buf).then((committed) => {
+      // rows are retried on the next store change instead of being silently and
+      // permanently dropped. System lines (joins/quits) are conversation too;
+      // only optimistic outbox placeholders are held back (persistableRows).
+      _lastPersistedSig.set(key, nextSig);
+      void saveMessages(key, rows).then((committed) => {
         if (committed) return;
-        if (_lastPersistedTail.get(key) === nextTail) {
-          if (prevTail === undefined) _lastPersistedTail.delete(key);
-          else _lastPersistedTail.set(key, prevTail);
+        if (_lastPersistedSig.get(key) === nextSig) {
+          if (prevSig === undefined) _lastPersistedSig.delete(key);
+          else _lastPersistedSig.set(key, prevSig);
         }
       });
     }, FLUSH_MS),
@@ -103,6 +159,6 @@ export function _resetVaultSyncForTests(): void {
   _unsubscribers = [];
   for (const t of _pendingFlush.values()) clearTimeout(t);
   _pendingFlush.clear();
-  _lastPersistedTail.clear();
+  _lastPersistedSig.clear();
   _hydrated.clear();
 }

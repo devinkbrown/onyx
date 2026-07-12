@@ -17,7 +17,7 @@ import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
 import * as vault from './historyVault';
 import { _resetVaultSyncForTests, initVaultSync } from './vaultSync';
 
-const { _resetVaultForTests, loadRecent, saveMessages } = vault;
+const { _resetVaultForTests, loadRecent, saveMessages, searchVault } = vault;
 
 const initialState = store.getInitialState();
 
@@ -161,6 +161,69 @@ describe('vaultSync', () => {
     expect(store.getState().channels.get('#room')!.messages.map((m) => m.id)).toEqual(['m1']);
     // ...and no persistence out.
     expect((await loadRecent('#room')).map((m) => m.id)).toEqual(['v1']);
+  });
+
+  it('never persists an optimistic outbox placeholder — no stuck-pending ghost', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    initVaultSync();
+
+    // Offline: the store holds an optimistic outbox placeholder.
+    const placeholder: ChatMessage = {
+      id: 'outbox:42',
+      time: new Date(1000),
+      from: 'kain',
+      text: 'sent while offline',
+      type: 'msg',
+      target: '#room',
+      pending: true,
+    };
+    setChannel('#room', [placeholder]);
+    await vi.advanceTimersByTimeAsync(1600);
+
+    // The placeholder must NOT have landed in the vault.
+    expect(await loadRecent('#room')).toEqual([]);
+
+    // Reconnect: flushOutbox drops the placeholder and the real message arrives
+    // under a fresh server uid.
+    const delivered = msg('srv-99', 1000);
+    delivered.text = 'sent while offline';
+    setChannel('#room', [delivered]);
+    await vi.advanceTimersByTimeAsync(1600);
+    vi.useRealTimers();
+
+    await until(async () => (await loadRecent('#room')).length === 1);
+    const rows = await loadRecent('#room');
+    // Exactly one row — the delivered message — and no `outbox:` ghost.
+    expect(rows.map((m) => m.id)).toEqual(['srv-99']);
+    expect(rows.some((m) => m.id.startsWith('outbox:') || m.pending)).toBe(false);
+  });
+
+  it('makes an in-place redaction durable so search no longer surfaces it', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    initVaultSync();
+
+    const original = msg('m1', 1000);
+    original.text = 'secret plans at dawn';
+    setChannel('#room', [original]);
+    await vi.advanceTimersByTimeAsync(1600); // durable un-redacted row
+
+    // The un-redacted content is searchable at this point.
+    expect((await searchVault('secret plans')).length).toBe(1);
+
+    // Redact IN PLACE: same id, new object, redacted text — the tail id is
+    // unchanged, so only a content-signature watermark re-flushes it.
+    const redacted: ChatMessage = { ...original, text: '[Message deleted]', redacted: true };
+    setChannel('#room', [redacted]);
+    await vi.advanceTimersByTimeAsync(1600);
+    vi.useRealTimers();
+
+    // The stored row is now the redacted one, and search skips it entirely.
+    await until(async () => (await searchVault('secret plans')).length === 0);
+    expect(await searchVault('secret plans')).toEqual([]);
+    const rows = await loadRecent('#room');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.redacted).toBe(true);
+    expect(rows[0]!.text).toBe('[Message deleted]');
   });
 
   it('hydrates DM buffers too', async () => {
