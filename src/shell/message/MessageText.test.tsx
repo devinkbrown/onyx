@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
 import { describe, expect, it, vi } from 'vitest';
-import { MessageText } from './MessageText';
+import { MessageText, RenderInlineTokens } from './MessageText';
+import type { LinkToken } from '@/lib/format/parseMessage';
 
 describe('MessageText Block-Kit-lite', () => {
   it('renders structured webhook controls and hides the protocol payload line', async () => {
@@ -85,5 +86,61 @@ describe('MessageText emoji rendering (live parseMessage → emoji token → loo
     expect(container.querySelector('a')).toBeNull();
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
     expect(container.textContent).toContain('<script>alert(1)</script>');
+  });
+});
+
+// --- defense-in-depth: the anchor sink re-checks the scheme itself ---
+// parseMessage today only produces a link token for a literal http(s):// prefix,
+// so a dangerous-scheme href cannot reach this branch via the public API. These
+// tests construct a link token DIRECTLY to simulate a FUTURE second token source
+// (a markdown [text](url) branch, or a server-supplied token) that might lack the
+// parse-time guarantee — the sink must still fail closed.
+describe('MessageText link anchor scheme guard (self-defending sink)', () => {
+  it('renders a javascript: link token as inert text with no live href', () => {
+    const hostile: LinkToken = {
+      type: 'link',
+      href: 'javascript:alert(1)',
+      text: 'click me',
+    };
+    const { container } = render(() => (
+      <RenderInlineTokens tokens={[hostile]} selfNick="" onChannelClick={undefined} />
+    ));
+
+    const anchor = container.querySelector('a');
+    // The visible label still renders — content is never dropped.
+    expect(container.textContent).toContain('click me');
+    // But the dangerous scheme never reaches the DOM as a navigable href.
+    expect(anchor?.getAttribute('href')).toBeNull();
+  });
+
+  it('renders a data: link token as inert text with no live href', () => {
+    const hostile: LinkToken = {
+      type: 'link',
+      href: 'data:text/html,<script>alert(1)</script>',
+      text: 'preview',
+    };
+    const { container } = render(() => (
+      <RenderInlineTokens tokens={[hostile]} selfNick="" onChannelClick={undefined} />
+    ));
+
+    expect(container.textContent).toContain('preview');
+    expect(container.querySelector('a')?.getAttribute('href')).toBeNull();
+  });
+
+  it('leaves a valid http(s) link token byte-identical (href + rel preserved)', () => {
+    const ok: LinkToken = {
+      type: 'link',
+      href: 'https://example.test/path',
+      text: 'example',
+    };
+    const { container } = render(() => (
+      <RenderInlineTokens tokens={[ok]} selfNick="" onChannelClick={undefined} />
+    ));
+
+    const anchor = container.querySelector('a');
+    expect(anchor?.getAttribute('href')).toBe('https://example.test/path');
+    expect(anchor?.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(anchor?.getAttribute('target')).toBe('_blank');
+    expect(anchor?.textContent).toBe('example');
   });
 });

@@ -436,7 +436,7 @@ type InlineProps = {
   onChannelClick: ((name: string) => void) | undefined;
 };
 
-function RenderInlineTokens(props: InlineProps): JSX.Element {
+export function RenderInlineTokens(props: InlineProps): JSX.Element {
   const [local] = splitProps(props, ['tokens', 'selfNick', 'onChannelClick']);
   return (
     <For each={local.tokens}>
@@ -529,9 +529,15 @@ function RenderInlineToken(props: SingleInlineProps): JSX.Element {
       <Match when={local.token.type === 'link'}>
         {(() => {
           const t = local.token as { href: string; text: string };
+          // Defense in depth at the sink: parseMessage only mints a link token on a
+          // literal http(s):// prefix, so t.href is provably safe today. Re-check it
+          // through the same isHttpUrl gate the media/preview sinks use so a future
+          // second token source (a markdown [text](url) branch, a server-supplied
+          // token) that lacks that guarantee can never place a javascript:/data:
+          // href on the anchor — a bad scheme renders as inert text, no live href.
           return (
             <a
-              href={t.href}
+              href={isHttpUrl(t.href) ? t.href : undefined}
               target="_blank"
               rel="noopener noreferrer"
               class="shell-msg-link"
