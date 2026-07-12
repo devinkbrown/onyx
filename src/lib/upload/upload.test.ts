@@ -18,15 +18,32 @@ function uploadedFormData(fetchMock: ReturnType<typeof vi.fn>): FormData {
   return body;
 }
 
+function uploadedFetchInit(fetchMock: ReturnType<typeof vi.fn>): RequestInit {
+  const call = fetchMock.mock.calls.at(0);
+  if (!call) throw new Error('fetch was not called');
+  const [, init] = call;
+  if (!init) throw new Error('fetch init was not provided');
+  return init;
+}
+
 class FakeXMLHttpRequest {
   static instances: FakeXMLHttpRequest[] = [];
+  static autoLoad = true;
+  static progressEvent: ProgressEvent | null = {
+    lengthComputable: true,
+    loaded: 25,
+    total: 100,
+  } as ProgressEvent;
+  static responseStatus = 201;
+  static responseText = JSON.stringify({ path: '/uploads/xhr-file.jpg' });
+  static responseContentType: string | null = 'application/json';
 
   readonly upload: { onprogress: ((event: ProgressEvent) => void) | null } = { onprogress: null };
   method: string | null = null;
   endpoint: string | null = null;
   body: FormData | null = null;
-  status = 201;
-  responseText = JSON.stringify({ path: '/uploads/xhr-file.jpg' });
+  status = FakeXMLHttpRequest.responseStatus;
+  responseText = FakeXMLHttpRequest.responseText;
   onerror: (() => void) | null = null;
   onabort: (() => void) | null = null;
   onload: (() => void) | null = null;
@@ -41,7 +58,7 @@ class FakeXMLHttpRequest {
   }
 
   getResponseHeader(name: string): string | null {
-    return name.toLowerCase() === 'content-type' ? 'application/json' : null;
+    return name.toLowerCase() === 'content-type' ? FakeXMLHttpRequest.responseContentType : null;
   }
 
   abort(): void {
@@ -50,17 +67,22 @@ class FakeXMLHttpRequest {
 
   send(body: FormData): void {
     this.body = body;
-    this.upload.onprogress?.({
-      lengthComputable: true,
-      loaded: 25,
-      total: 100,
-    } as ProgressEvent);
-    this.onload?.();
+    if (FakeXMLHttpRequest.progressEvent) this.upload.onprogress?.(FakeXMLHttpRequest.progressEvent);
+    if (FakeXMLHttpRequest.autoLoad) this.onload?.();
   }
 }
 
 afterEach(() => {
   FakeXMLHttpRequest.instances = [];
+  FakeXMLHttpRequest.autoLoad = true;
+  FakeXMLHttpRequest.progressEvent = {
+    lengthComputable: true,
+    loaded: 25,
+    total: 100,
+  } as ProgressEvent;
+  FakeXMLHttpRequest.responseStatus = 201;
+  FakeXMLHttpRequest.responseText = JSON.stringify({ path: '/uploads/xhr-file.jpg' });
+  FakeXMLHttpRequest.responseContentType = 'application/json';
   vi.unstubAllGlobals();
 });
 
@@ -70,6 +92,7 @@ describe('upload helper', () => {
     expect(buildUploadEndpoint('https://media.example.test')).toBe('https://media.example.test/upload');
     expect(buildUploadEndpoint('https://media.example.test/')).toBe('https://media.example.test/upload');
     expect(buildUploadEndpoint('https://media.example.test/upload')).toBe('https://media.example.test/upload');
+    expect(buildUploadEndpoint('  https://media.example.test/api///  ')).toBe('https://media.example.test/api/upload');
   });
 
   it('rejects an explicitly blank media URL', () => {
@@ -183,7 +206,13 @@ describe('upload helper', () => {
       'https://media.example.test/upload',
       expect.objectContaining({ method: 'POST' }),
     );
-    expect(uploadedFormData(fetchMock).get('file')).toBe(file);
+    const uploaded = uploadedFormData(fetchMock).get('file');
+    expect(uploaded).toBe(file);
+    expect(uploaded).toBeInstanceOf(File);
+    expect((uploaded as File).name).toBe('file.jpg');
+    expect((uploaded as File).size).toBe('image-bytes'.length);
+    expect((uploaded as File).type).toBe('image/jpeg');
+    expect(uploadedFetchInit(fetchMock).headers).toBeUndefined();
   });
 
   it('uses injected fetch, custom field names, and abort signals for multipart posts', async () => {
@@ -234,6 +263,107 @@ describe('upload helper', () => {
     expect(xhr?.body?.get('asset')).toBe(file);
     expect(onProgress).toHaveBeenCalledWith({ loaded: 25, total: 100, percent: 25 });
     expect(result).toEqual({ url: 'https://media.example.test/uploads/xhr-file.jpg' });
+  });
+
+  it('reports XHR progress without total or percent when the browser cannot compute length', async () => {
+    // Arrange
+    FakeXMLHttpRequest.progressEvent = {
+      lengthComputable: false,
+      loaded: 512,
+      total: 0,
+    } as ProgressEvent;
+    vi.stubGlobal('XMLHttpRequest', FakeXMLHttpRequest);
+    const onProgress = vi.fn();
+    const file = new File(['x'], 'unknown.bin', { type: 'application/octet-stream' });
+
+    // Act
+    await uploadFile(file, {
+      mediaUrl: 'https://media.example.test',
+      onProgress,
+    });
+
+    // Assert
+    expect(onProgress).toHaveBeenCalledWith({ loaded: 512, total: null, percent: null });
+  });
+
+  it('registers abort on the XHR path as a once listener and cancels the request', async () => {
+    // Arrange
+    FakeXMLHttpRequest.autoLoad = false;
+    vi.stubGlobal('XMLHttpRequest', FakeXMLHttpRequest);
+    const abortListeners: EventListener[] = [];
+    const addEventListener = vi.fn((
+      type: string,
+      listener: EventListenerOrEventListenerObject,
+      _options?: boolean | AddEventListenerOptions,
+    ) => {
+      if (type === 'abort' && typeof listener === 'function') abortListeners.push(listener);
+    });
+    const signal = {
+      aborted: false,
+      addEventListener,
+    } as unknown as AbortSignal;
+    const file = new File(['x'], 'abort.bin', { type: 'application/octet-stream' });
+
+    // Act
+    const upload = uploadFile(file, {
+      mediaUrl: 'https://media.example.test',
+      signal,
+      onProgress: vi.fn(),
+    });
+    const xhr = FakeXMLHttpRequest.instances[0]!;
+    abortListeners[0]!(new Event('abort'));
+
+    // Assert
+    expect(addEventListener).toHaveBeenCalledWith('abort', expect.any(Function), { once: true });
+    expect(xhr.body?.get('file')).toBe(file);
+    await expect(upload).rejects.toMatchObject({
+      name: 'UploadError',
+      code: 'network',
+      message: 'Upload was cancelled.',
+    });
+  });
+
+  it('aborts an already-cancelled XHR upload before sending form data', async () => {
+    // Arrange
+    vi.stubGlobal('XMLHttpRequest', FakeXMLHttpRequest);
+    const addEventListener = vi.fn();
+    const signal = {
+      aborted: true,
+      addEventListener,
+    } as unknown as AbortSignal;
+    const file = new File(['x'], 'pre-abort.bin', { type: 'application/octet-stream' });
+
+    // Act / Assert
+    await expect(uploadFile(file, {
+      mediaUrl: 'https://media.example.test',
+      signal,
+      onProgress: vi.fn(),
+    })).rejects.toMatchObject({
+      name: 'UploadError',
+      code: 'network',
+      message: 'Upload was cancelled.',
+    });
+    expect(addEventListener).not.toHaveBeenCalled();
+    expect(FakeXMLHttpRequest.instances[0]?.body).toBeNull();
+  });
+
+  it('surfaces XHR HTTP failures with typed response status', async () => {
+    // Arrange
+    FakeXMLHttpRequest.responseStatus = 422;
+    FakeXMLHttpRequest.responseText = 'invalid upload';
+    vi.stubGlobal('XMLHttpRequest', FakeXMLHttpRequest);
+    const file = new File(['x'], 'bad.bin', { type: 'application/octet-stream' });
+
+    // Act / Assert
+    await expect(uploadFile(file, {
+      mediaUrl: 'https://media.example.test',
+      onProgress: vi.fn(),
+    })).rejects.toMatchObject({
+      name: 'UploadError',
+      code: 'response',
+      status: 422,
+      message: 'Upload failed with HTTP 422.',
+    });
   });
 
   it('throws a typed error when fetch returns an error response', async () => {

@@ -237,6 +237,40 @@ describe('buildMomentLink', () => {
     expect(parseAtParam(params.get('at'))?.toISOString()).toBe(moment.toISOString());
   });
 
+  it('round-trips allowed channel shapes through serialized URLSearchParams', () => {
+    const moment = new Date('2026-07-08T12:00:00.000Z');
+    const channels = ['#root', '#café', '#dev-ops.chat', '#room+plus', `#${'z'.repeat(63)}`];
+
+    for (const channel of channels) {
+      const params = new URL(buildMomentLink(channel, moment, 'https://onyx.example/old?join=%23stale')).searchParams;
+
+      expect(parseJoinParam(params.get('join'))).toBe(channel);
+      expect(parseAtParam(params.get('at'))?.toISOString()).toBe(moment.toISOString());
+    }
+  });
+
+  it('round-trips the exact latest parseAtParam future boundary', () => {
+    const boundary = new Date(FIXED_NOW.getTime() + DAY_MS);
+    const params = new URL(buildMomentLink('#root', boundary, 'https://onyx.example/app')).searchParams;
+
+    expect(parseAtParam(params.get('at'))?.toISOString()).toBe(boundary.toISOString());
+  });
+
+  it('strips stale deep-link params and fragments before serializing a moment link', () => {
+    const link = buildMomentLink(
+      '#fresh',
+      new Date('2026-07-08T18:30:00.000Z'),
+      'https://onyx.example/reader?join=%23stale&at=2020-01-01T00%3A00%3A00.000Z#old',
+    );
+    const url = new URL(link);
+
+    expect(url.pathname).toBe('/app');
+    expect(url.hash).toBe('');
+    expect([...url.searchParams.keys()]).toEqual(['join', 'at']);
+    expect(parseJoinParam(url.searchParams.get('join'))).toBe('#fresh');
+    expect(parseAtParam(url.searchParams.get('at'))?.toISOString()).toBe('2026-07-08T18:30:00.000Z');
+  });
+
   it('tolerates unknown query params beside join and at', () => {
     const params = new URLSearchParams('utm_source=newsletter&join=%23root&ignored=%25&at=2026-06-30T12%3A00%3A00Z');
 
