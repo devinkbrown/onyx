@@ -37,6 +37,17 @@ describe('Button', () => {
     expect(onClick).toHaveBeenCalledTimes(2);
   });
 
+  it('ignores non-activation keyboard input', () => {
+    const onClick = vi.fn();
+    render(() => <Button onClick={onClick}>Open</Button>);
+
+    const button = screen.getByRole('button', { name: 'Open' });
+    fireEvent.keyDown(button, { key: 'ArrowDown' });
+    fireEvent.keyDown(button, { key: 'Escape' });
+
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
   it('marks disabled anchor buttons as unavailable', () => {
     render(() => <Button href="/danger" disabled>Disabled link</Button>);
 
@@ -45,5 +56,21 @@ describe('Button', () => {
     expect(link.getAttribute('aria-disabled')).toBe('true');
     expect(link.getAttribute('href')).toBeNull();
     expect(link.getAttribute('tabindex')).toBe('-1');
+  });
+
+  it('blocks click and keyboard activation for disabled anchor buttons', () => {
+    const onClick = vi.fn();
+    render(() => (
+      <Button href="/danger" disabled onClick={onClick}>
+        Disabled link
+      </Button>
+    ));
+
+    const link = screen.getByText('Disabled link');
+    fireEvent.click(link);
+    fireEvent.keyDown(link, { key: 'Enter' });
+    fireEvent.keyDown(link, { key: ' ' });
+
+    expect(onClick).not.toHaveBeenCalled();
   });
 });

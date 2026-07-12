@@ -40,6 +40,26 @@ describe('ModalShell', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('closes from the inert backdrop click target', async () => {
+    function Harness() {
+      const [open, setOpen] = createSignal(true);
+      return (
+        <ModalShell open={open()} title="Settings" onOpenChange={setOpen}>
+          <button type="button">Save</button>
+        </ModalShell>
+      );
+    }
+
+    render(() => <Harness />);
+    const backdrop = document.querySelector<HTMLElement>('.onyx-modal__backdrop');
+    expect(backdrop?.getAttribute('aria-hidden')).toBe('true');
+
+    fireEvent.click(backdrop!);
+    await tick();
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it('wraps focus from the last focusable control back to the close button', async () => {
     render(() => (
       <ModalShell open title="Keyboard trap" onOpenChange={() => undefined}>

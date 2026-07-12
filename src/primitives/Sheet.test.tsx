@@ -40,6 +40,26 @@ describe('Sheet', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('closes from the inert backdrop click target', async () => {
+    function Harness() {
+      const [open, setOpen] = createSignal(true);
+      return (
+        <Sheet open={open()} title="Thread" onOpenChange={setOpen}>
+          <button type="button">Reply</button>
+        </Sheet>
+      );
+    }
+
+    render(() => <Harness />);
+    const backdrop = document.querySelector<HTMLElement>('.onyx-sheet__backdrop');
+    expect(backdrop?.getAttribute('aria-hidden')).toBe('true');
+
+    fireEvent.click(backdrop!);
+    await tick();
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it('traps Tab focus inside the panel', async () => {
     render(() => (
       <Sheet open title="Members" onOpenChange={() => undefined}>
