@@ -13,6 +13,7 @@ import {
 } from './variants/layers';
 import { readBackgroundTheme, type BackgroundTheme } from './variants/utils';
 import { aurora } from './variants/aurora';
+import { auroraRibbons } from './variants/aurora-ribbons';
 import { bioluminescence } from './variants/bioluminescence';
 import { caustics } from './variants/caustics';
 import { ember } from './variants/ember';
@@ -23,6 +24,7 @@ import { mist } from './variants/mist';
 import { pyriteField } from './variants/pyrite-field';
 import { resin } from './variants/resin';
 import { sumiE } from './variants/sumi-e';
+import { tideBands } from './variants/tide-bands';
 import { washi } from './variants/washi';
 
 const THEME: BackgroundTheme = {
@@ -165,6 +167,8 @@ describe('signature presets route through the shared pipeline', () => {
     { id: 'caustics', variant: caustics },
     { id: 'resin', variant: resin },
     { id: 'pyrite-field', variant: pyriteField },
+    { id: 'aurora-ribbons', variant: auroraRibbons },
+    { id: 'tide-bands', variant: tideBands },
   ];
 
   it.each(routed)('$id paints the shared luminance-capped ground', ({ variant }) => {
@@ -208,6 +212,35 @@ describe('signature presets route through the shared pipeline', () => {
       variant.init(lowCtx);
       variant.frame(lowCtx, 9999);
     }).not.toThrow();
+  });
+});
+
+describe('drifting scenes thin their element counts by qualityScale', () => {
+  // The FPS-guard contract: stepping quality down to `low` (0.52) must genuinely
+  // reduce the drawn element count, not just detail — otherwise a starved `low`
+  // loop keeps thrashing the guard. Each new scene's sole element loop (ribbons /
+  // bands) must scale off qualityScale, so `low` paints strictly fewer.
+
+  it('aurora-ribbons strokes strictly fewer ribbons at low quality', () => {
+    const high = createRecordingContext();
+    auroraRibbons.frame(high.ctx, 1000);
+    const low = createRecordingContext();
+    auroraRibbons.frame({ ...low.ctx, quality: 'low', qualityScale: 0.52 }, 1000);
+
+    const highStrokes = (high.ctx.context.stroke as unknown as ReturnType<typeof vi.fn>).mock.calls.length;
+    const lowStrokes = (low.ctx.context.stroke as unknown as ReturnType<typeof vi.fn>).mock.calls.length;
+    expect(lowStrokes).toBeLessThan(highStrokes);
+  });
+
+  it('tide-bands draws strictly fewer bands at low quality', () => {
+    // Each band paints two linear gradients (body + sheen); groundLayer paints
+    // one. Fewer bands ⇒ fewer linear gradients recorded.
+    const high = createRecordingContext();
+    tideBands.frame(high.ctx, 1000);
+    const low = createRecordingContext();
+    tideBands.frame({ ...low.ctx, quality: 'low', qualityScale: 0.52 }, 1000);
+
+    expect(low.linearStops.length).toBeLessThan(high.linearStops.length);
   });
 });
 

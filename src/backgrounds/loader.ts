@@ -26,6 +26,8 @@ const CANVAS_LOADERS: Record<string, VariantLoader> = {
   'sumi-e': () => import('./variants/sumi-e').then((m) => m.sumiE),
   mist: () => import('./variants/mist').then((m) => m.mist),
   frost: () => import('./variants/frost').then((m) => m.frost),
+  'aurora-ribbons': () => import('./variants/aurora-ribbons').then((m) => m.auroraRibbons),
+  'tide-bands': () => import('./variants/tide-bands').then((m) => m.tideBands),
   obsidian: () => import('./variants/obsidian').then((m) => m.obsidian),
   'lapis-gradient': () => import('./variants/lapis-gradient').then((m) => m.lapisGradient),
   washi: () => import('./variants/washi').then((m) => m.washi),

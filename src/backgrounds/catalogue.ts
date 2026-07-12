@@ -35,6 +35,8 @@ const CANVAS_META: readonly BackgroundMeta[] = [
   { id: 'sumi-e',         label: 'Sumi-e',         kind: 'animated' },
   { id: 'mist',           label: 'Mist',           kind: 'animated' },
   { id: 'frost',          label: 'Frost',          kind: 'animated' },
+  { id: 'aurora-ribbons', label: 'Aurora Ribbons', kind: 'animated' },
+  { id: 'tide-bands',     label: 'Tide Bands',     kind: 'animated' },
   { id: 'obsidian',       label: 'Obsidian',       kind: 'solid' },
   { id: 'lapis-gradient', label: 'Lapis Gradient', kind: 'solid' },
   { id: 'washi',          label: 'Paper Grain',    kind: 'solid' },

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { AnyBackgroundVariant, BackgroundVariant } from './engine';
 import { aurora } from './variants/aurora';
+import { auroraRibbons } from './variants/aurora-ribbons';
 import { bioluminescence } from './variants/bioluminescence';
 import { caustics } from './variants/caustics';
 import { deepCurrent } from './variants/deep-current';
@@ -14,6 +15,7 @@ import { obsidian } from './variants/obsidian';
 import { pyriteField } from './variants/pyrite-field';
 import { resin } from './variants/resin';
 import { sumiE } from './variants/sumi-e';
+import { tideBands } from './variants/tide-bands';
 import { washi } from './variants/washi';
 import { sceneRegistry } from './scenes';
 
@@ -31,6 +33,8 @@ export const backgroundRegistry = [
   sumiE,
   mist,
   frost,
+  auroraRibbons,
+  tideBands,
   obsidian,
   lapisGradient,
   washi,

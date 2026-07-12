@@ -67,6 +67,8 @@ describe('background registry', () => {
       'sumi-e': 'animated',
       mist: 'animated',
       frost: 'animated',
+      'aurora-ribbons': 'animated',
+      'tide-bands': 'animated',
       obsidian: 'solid',
       'lapis-gradient': 'solid',
       washi: 'solid',
