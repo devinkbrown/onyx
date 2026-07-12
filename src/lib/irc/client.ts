@@ -163,7 +163,7 @@ export class IRCClient {
     CHANMODES: ['beIZ', 'k', 'lfj', 'imnstCTNMSgWOA'],
     CHANTYPES: '#&',
     CHANLIMITS: {},
-    NETWORK: 'IRCXNet',
+    NETWORK: 'Onyx',
     CASEMAPPING: 'ascii',
     MODES: 4,
     MAXCHANNELS: 50,

@@ -297,7 +297,7 @@ describe('About page — source structure', () => {
   });
 
   it('footer has the Onyx brand and year 2026, no kanji', () => {
-    expect(srcContains('Onyx — IRCXNet')).toBe(true);
+    expect(srcContains('aria-label="Onyx" /> Onyx</span>')).toBe(true);
     expect(srcContains('2026')).toBe(true);
     expect(srcContains('瑠璃')).toBe(false);
   });

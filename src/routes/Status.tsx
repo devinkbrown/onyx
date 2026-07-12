@@ -14,8 +14,8 @@ function statusState(quorum: boolean, partitioned: boolean): 'up' | 'degraded' {
 
 export default function StatusRoute() {
   setPageMeta(
-    'Onyx status — IRCXNet mesh health',
-    'Public IRCXNet mesh health, node uptime, peer latency, users online, and backup readiness.',
+    'Onyx status — mesh health',
+    'Public Onyx mesh health, node uptime, peer latency, users online, and backup readiness.',
     '/status',
   );
   const [status, { refetch: refetchStatus }] = createResource(fetchNetworkStatus);

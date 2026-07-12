@@ -12,8 +12,8 @@ import { setPageMeta } from './pageMeta';
  *  all reduced-motion safe. The friendly water-dragon Mascot is the brand face. */
 export default function Landing() {
   setPageMeta(
-    'Onyx — open rooms and encrypted media on IRCXNet',
-    'Onyx is the public front door to IRCXNet: open rooms, encrypted media, live network stats, and a name that is yours.',
+    'Onyx — open rooms and encrypted media',
+    'Onyx is the public front door to the mesh: open rooms, encrypted media, live network stats, and a name that is yours.',
     '/',
   );
   const [stats, { refetch: refetchStats }] = createResource(fetchStatsIndex);
@@ -72,7 +72,7 @@ export default function Landing() {
             <h1 id="hero-heading">Come live<br /><span class="gold">on the water</span></h1>
             <p class="serif-sub">A real network of real people — rooms that stay open, names that are yours, and a place no one can quietly take away.</p>
             <p class="sub">
-              Onyx is the warm front door to IRCXNet: drop into a channel,
+              Onyx is the warm front door to the mesh: drop into a channel,
               find your people, talk in text or hop into encrypted voice and video.
               It's open, it's yours, and there's no account to rent and no ads to dodge.
             </p>
@@ -162,7 +162,7 @@ export default function Landing() {
       <section id="community" class="r-wrap r-section r-community" aria-labelledby="community-heading">
         <span class="r-eyebrow">who's here</span>
         <h2 class="r-title" id="community-heading">People, not<br />a product</h2>
-        <p class="r-lede">IRC was always a place — a town square that belonged to the people in it. IRCXNet keeps it that way. You're not a user in someone's database; you're a regular in a room.</p>
+        <p class="r-lede">IRC was always a place — a town square that belonged to the people in it. Onyx keeps it that way. You're not a user in someone's database; you're a regular in a room.</p>
         <div class="r-stats">
           <div class="r-stat"><span class="n">#root</span><span class="l">the build channel — say hello, we're around</span></div>
           <div class="r-stat"><span class="n">always-on</span><span class="l">rooms stay open between visits, history and all</span></div>
@@ -308,13 +308,13 @@ export default function Landing() {
         <div class="cols">
           <div class="sig">
             <div class="logo"><Mascot variant="mark" />ONYX</div>
-            <p>A warm, open home on the IRCXNet mesh — real rooms, real people, encrypted media, and a name that's yours to keep. Built in the open.</p>
+            <p>A warm, open home on the Onyx mesh — real rooms, real people, encrypted media, and a name that's yours to keep. Built in the open.</p>
           </div>
           <div class="col"><h5>Community</h5><a href="#community">Who's here</a><a href="#rooms">Rooms</a><a href="#join">Join</a><a href="/app">Open Onyx</a></div>
           <div class="col"><h5>Network</h5><a href="/about">The network</a><a href="/stats">Channel stats</a><a href="/status">Mesh status</a><a href="/roadmap">Roadmap</a></div>
           <div class="col"><h5>Get in</h5><a href="/app">Drop into #root</a><a href="/app">Browse rooms</a><a href="/about">Build a client</a><a href="/about">Read more</a></div>
         </div>
-        <div class="base"><span><Mascot variant="mark" /> Onyx — on the IRCXNet mesh</span><span>Open IRC · made for people · 2026</span></div>
+        <div class="base"><span><Mascot variant="mark" /> Onyx — on the open mesh</span><span>Open IRC · made for people · 2026</span></div>
       </footer>
     </main>
   );

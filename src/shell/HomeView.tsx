@@ -468,7 +468,7 @@ export function HomeView(): JSX.Element {
     <div class="home" role="main" aria-label="Network home">
       <div class="home-inner">
         <header class="home-masthead">
-          <p class="home-kicker">{networkName() || 'IRCXNet'}</p>
+          <p class="home-kicker">{networkName() || 'Onyx'}</p>
           <h2 class="home-title">You're in the current.</h2>
           <p class="home-sub">
             Pick a hall below, or press <b>/</b> to search rooms, people and commands —{' '}

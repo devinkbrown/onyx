@@ -62,7 +62,7 @@ describe('<ServerRail>', () => {
     seed({ channels: [channel({ name: '#root' })] });
     render(() => <ServerRail />);
 
-    const active = screen.getByRole('img', { name: /IRCXNet — active server/i });
+    const active = screen.getByRole('img', { name: /Onyx — active server/i });
     // aria-current is the signal the forced-colors Highlight styling backstops:
     // it must be present so the active selection reaches AT even when the visual
     // gradient/accent bar is flattened by Windows High Contrast.
@@ -78,7 +78,7 @@ describe('<ServerRail>', () => {
 
     // 4 + 3 unread, 2 + 1 mentions across rooms and DMs.
     expect(
-      screen.getByRole('img', { name: 'IRCXNet — active server, 7 unread, 3 mentions' }),
+      screen.getByRole('img', { name: 'Onyx — active server, 7 unread, 3 mentions' }),
     ).toBeInTheDocument();
   });
 
@@ -86,6 +86,6 @@ describe('<ServerRail>', () => {
     seed({ channels: [channel({ name: '#root', unread: 0, highlights: 0 })] });
     render(() => <ServerRail />);
 
-    expect(screen.getByRole('img', { name: 'IRCXNet — active server' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Onyx — active server' })).toBeInTheDocument();
   });
 });

@@ -11,7 +11,7 @@ describe('InviteRoute', () => {
     render(() => <InviteRoute />);
 
     expect(screen.getByRole('heading', { name: /join\s+#general/i })).toBeInTheDocument();
-    expect(screen.getByText('IRCXNet')).toBeInTheDocument();
+    expect(screen.getByText('Onyx')).toBeInTheDocument();
     expect(screen.getAllByText('#general').length).toBeGreaterThan(1);
     expect(screen.getAllByText('release train').length).toBeGreaterThan(0);
     expect(screen.getByText('Reader mode opens before the room joins.')).toBeInTheDocument();
@@ -29,9 +29,9 @@ describe('InviteRoute', () => {
 
     render(() => <InviteRoute />);
 
-    expect(document.title).toBe('Join #root on IRCXNet');
+    expect(document.title).toBe('Join #root on Onyx');
     expect(document.querySelector('meta[property="og:title"]')?.getAttribute('content')).toBe(
-      'Join #root on IRCXNet',
+      'Join #root on Onyx',
     );
     expect(document.querySelector('meta[property="og:url"]')?.getAttribute('content')).toContain(
       '/invite?join=%23root',

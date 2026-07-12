@@ -299,7 +299,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
       <div class="shell-ribbon-identity">
         <Show when={channelName()} fallback={
           <span class="shell-ribbon-channel" aria-label="No active channel">
-            IRCXNet
+            Onyx
           </span>
         }>
           {(name) => (

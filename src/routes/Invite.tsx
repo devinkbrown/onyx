@@ -6,7 +6,7 @@ import { Mascot } from '@/components/brand/Mascot';
 import { buildInviteCard, inviteDescription, inviteTitle } from '@/lib/invite/inviteCard';
 import { setPageMeta } from './pageMeta';
 
-const NETWORK_NAME = 'IRCXNet';
+const NETWORK_NAME = 'Onyx';
 
 function currentParams(): URLSearchParams {
   if (typeof window === 'undefined') return new URLSearchParams();

@@ -245,7 +245,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
             class={`shell-sidebar-dot shell-sidebar-dot${statusMod()}`}
             aria-hidden="true"
           />
-          {networkName() || 'IRCXNet'}
+          {networkName() || 'Onyx'}
           <span class="sr-only" aria-live="polite" aria-atomic="true">
             {`Connection ${statusLabel()}`}
           </span>

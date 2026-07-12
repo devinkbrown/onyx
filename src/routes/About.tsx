@@ -20,7 +20,7 @@ import { setPageMeta } from './pageMeta';
 export default function About() {
   setPageMeta(
     'About Onyx — open protocol, sovereign mesh',
-    'Learn how Onyx, Suimyaku media, and the IRCXNet mesh work together without closed-platform lock-in.',
+    'Learn how Onyx, Suimyaku media, and the open mesh work together without closed-platform lock-in.',
     '/about',
   );
   return (
@@ -759,7 +759,7 @@ export default function About() {
           <div class="sig">
             <div class="logo"><Mascot variant="mark" aria-label="Onyx" />ONYX</div>
             <p>
-              A mesh-native client for IRCXNet — end-to-end-encrypted
+              A mesh-native client for the open network — end-to-end-encrypted
               media, real services, and a home you own. Built in the open with Claude and Codex.
             </p>
           </div>
@@ -789,7 +789,7 @@ export default function About() {
           </div>
         </div>
         <div class="base">
-          <span><Mascot variant="mark" aria-label="Onyx" /> Onyx — IRCXNet</span>
+          <span><Mascot variant="mark" aria-label="Onyx" /> Onyx</span>
           <span>Orochi · the open mesh · 2026</span>
         </div>
       </footer>
