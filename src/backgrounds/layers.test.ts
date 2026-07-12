@@ -20,6 +20,8 @@ import { forest } from './variants/forest';
 import { kintsugiVeins } from './variants/kintsugi-veins';
 import { deepCurrent } from './variants/deep-current';
 import { mist } from './variants/mist';
+import { pyriteField } from './variants/pyrite-field';
+import { resin } from './variants/resin';
 import { sumiE } from './variants/sumi-e';
 import { washi } from './variants/washi';
 
@@ -161,6 +163,8 @@ describe('signature presets route through the shared pipeline', () => {
     { id: 'aurora', variant: aurora },
     { id: 'bioluminescence', variant: bioluminescence },
     { id: 'caustics', variant: caustics },
+    { id: 'resin', variant: resin },
+    { id: 'pyrite-field', variant: pyriteField },
   ];
 
   it.each(routed)('$id paints the shared luminance-capped ground', ({ variant }) => {

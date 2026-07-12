@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { BackgroundFrameContext, BackgroundVariant } from '../engine';
 import { ambientRms, breathe, rmsToBloom, timeOfDayWarmth, warmthShift } from '../reactivity';
+import { composeSignature } from './layers';
 import type { BackgroundTheme } from './utils';
-import { clearCanvas, drawGrain, mix, readBackgroundTheme, rgba, seeded } from './utils';
+import { mix, rgba, seeded } from './utils';
 
 const TAU = Math.PI * 2;
 
 /**
- * Resin — for the amber themes, where gold is legitimately the primary
- * warmth. Fossilized amber: motes hang suspended in the depth, circling
- * their anchors almost imperceptibly, while two large light-pools breathe
- * through the resin. Slow, warm, luxurious.
+ * Resin — for the amber themes, where gold is legitimately the primary warmth.
+ * Routed through the shared signature pipeline: its own amber-depth ground and
+ * per-variant grain are retired for the luminance-capped shared ground + washi
+ * grain, and its distinctive ink layer — two breathing amber light-pools and the
+ * motes suspended in the depth — is composited (in `screen`) over that ground so
+ * the warm, luxurious character survives without lifting the legibility floor.
  */
 export const resin = {
   id: 'resin',
@@ -20,45 +23,13 @@ export const resin = {
     this.frame(ctx, 0);
   },
   frame(ctx, time) {
-    const theme = readBackgroundTheme(ctx.canvas);
-
-    clearCanvas(ctx);
-    drawAmberDepth(ctx, theme);
-    drawAmberPools(ctx, theme, time);
-    drawSuspendedMotes(ctx, theme, time);
-    drawGrain(ctx, theme, 0.85);
+    composeSignature(ctx, time, (theme, t) => {
+      drawAmberPools(ctx, theme, t);
+      drawSuspendedMotes(ctx, theme, t);
+    });
   },
   dispose() {},
 } satisfies BackgroundVariant;
-
-function drawAmberDepth(ctx: BackgroundFrameContext, theme: BackgroundTheme): void {
-  const c = ctx.context;
-  const ground = c.createLinearGradient(0, 0, 0, ctx.height);
-  ground.addColorStop(0, theme.ink2);
-  ground.addColorStop(0.42, mix(theme.stone, theme.ink, 0.4));
-  ground.addColorStop(0.8, theme.ink);
-  ground.addColorStop(1, mix(theme.goldDeep, theme.ink, 0.88));
-  c.fillStyle = ground;
-  c.fillRect(0, 0, ctx.width, ctx.height);
-
-  const warmth = c.createRadialGradient(
-    ctx.width * 0.5,
-    ctx.height * 0.52,
-    0,
-    ctx.width * 0.5,
-    ctx.height * 0.52,
-    Math.max(ctx.width, ctx.height) * 0.85,
-  );
-  warmth.addColorStop(0, rgba(theme.goldDeep, 0.1));
-  warmth.addColorStop(0.6, rgba(theme.goldDeep, 0.04));
-  warmth.addColorStop(1, rgba(theme.ink, 0));
-
-  c.save();
-  c.globalCompositeOperation = 'screen';
-  c.fillStyle = warmth;
-  c.fillRect(0, 0, ctx.width, ctx.height);
-  c.restore();
-}
 
 function drawAmberPools(ctx: BackgroundFrameContext, theme: BackgroundTheme, time: number): void {
   const c = ctx.context;
