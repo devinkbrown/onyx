@@ -3,15 +3,22 @@
 /* More contrast: tokens from src/styles/tokens.css; focus selectors from
    src/styles/global.css, src/shell/shell.css, src/primitives/primitives.css,
    src/chat/spotlight/spotlight.css, src/shell/keyboard-help.css, and
-   src/shell/search/message-search.css. */
+   src/shell/search/message-search.css.
+
+   The foreground colour tokens (--washi, --washi-dim, --washi-mute, and the
+   bright accents) are NOT boosted here: ThemeProvider derives a per-theme,
+   OKLCH-solved high-contrast variant of each theme's OWN palette and writes it
+   as inline custom properties (src/theme/highContrastTheme.ts), so the boost
+   follows the active theme's hue instead of one shared static override. These
+   seam/line tokens stay static because they are color-mix() expressions that
+   reference var(--washi)/var(--lapis-bright); they automatically pick up the
+   boosted inline values above. */
 @media (prefers-contrast: more) {
   :root {
     --line: color-mix(in oklab, var(--washi) 42%, transparent);
     --line-faint: color-mix(in oklab, var(--washi) 26%, transparent);
     --seam: color-mix(in oklab, var(--lapis-bright) 72%, var(--washi) 28%);
     --seam-faint: color-mix(in oklab, var(--lapis-bright) 46%, var(--washi) 54%);
-    --washi-dim: color-mix(in oklab, var(--washi) 82%, var(--lapis-bright) 18%);
-    --washi-mute: color-mix(in oklab, var(--washi) 68%, var(--stone-3) 32%);
   }
 
   :focus-visible {

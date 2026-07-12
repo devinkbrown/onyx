@@ -36,6 +36,8 @@ import {
 } from './customThemes';
 import { parseThemeParam } from '@/lib/theme/themeShare';
 import { persistThemeId, readThemeId } from './themeStorage';
+import { highContrastOverrides } from './highContrastTheme';
+import { prefersMoreContrast } from '@/lib/a11y/mediaPrefs';
 
 type ThemeContextValue = {
   /** The currently active theme ID (a built-in ThemeId or a `custom:` id). */
@@ -146,32 +148,60 @@ function commitTokens(root: HTMLElement, tokens: TokenMap): void {
   appliedTokenProps = Object.keys(tokens);
 }
 
+type ResolvedTheme = {
+  /** The theme's base token map (built-in tokens, or custom base + overrides). */
+  tokens: TokenMap;
+  /** Value written to `data-theme` (a built-in id — custom themes use their base). */
+  dataTheme: string;
+  /** Colour scheme written to the `color-scheme` property. */
+  scheme: 'light' | 'dark';
+};
+
+/**
+ * Resolve the base token map + metadata for a theme id, or null when the id is
+ * unknown / a missing custom theme. Custom themes resolve to their base tokens
+ * overlaid with the saved overrides, inheriting the base's colour scheme.
+ */
+function resolveTheme(id: string): ResolvedTheme | null {
+  if (isCustomThemeId(id)) {
+    const custom = getCustomTheme(id);
+    if (!custom) return null;
+    return {
+      tokens: customThemeTokens(custom),
+      dataTheme: custom.base,
+      scheme: customThemeScheme(custom),
+    };
+  }
+  const theme = THEMES[id as ThemeId];
+  if (!theme) return null;
+  return { tokens: theme.tokens, dataTheme: id, scheme: theme.scheme };
+}
+
 /**
  * Writes all token overrides for `id` onto `document.documentElement` and
  * updates `data-theme` + `color-scheme`.  This is intentionally side-effectful
  * and kept outside of reactive primitives so it can also be called from tests.
  * Accepts both built-in ThemeIds and `custom:` ids (base tokens + overrides).
+ *
+ * When `highContrast` is set (default: the live `prefers-contrast: more`
+ * signal) the theme's OWN foreground tokens are boosted through the OKLCH
+ * contrast solver and merged over the base — a per-theme, mechanically-derived
+ * high-contrast variant rather than one shared static override. Boosted keys
+ * reuse the base keys, so toggling the preference off simply restores the base
+ * values on the next apply. Inline vars win over any [data-theme] CSS.
  */
-export function applyThemeToDom(id: string): void {
+export function applyThemeToDom(id: string, highContrast: boolean = prefersMoreContrast()): void {
+  const resolved = resolveTheme(id);
+  if (!resolved) return;
+
+  const tokens = highContrast
+    ? { ...resolved.tokens, ...highContrastOverrides(resolved.tokens) }
+    : resolved.tokens;
+
   const root = document.documentElement;
-
-  // Custom theme: apply its base's tokens overlaid with the saved overrides,
-  // inheriting the base's colour scheme. Inline vars win over any [data-theme] CSS.
-  if (isCustomThemeId(id)) {
-    const custom = getCustomTheme(id);
-    if (!custom) return;
-    commitTokens(root, customThemeTokens(custom));
-    root.setAttribute('data-theme', custom.base);
-    root.style.setProperty('color-scheme', customThemeScheme(custom));
-    return;
-  }
-
-  const theme = THEMES[id as ThemeId];
-  if (!theme) return;
-
-  commitTokens(root, theme.tokens);
-  root.setAttribute('data-theme', id);
-  root.style.setProperty('color-scheme', theme.scheme);
+  commitTokens(root, tokens);
+  root.setAttribute('data-theme', resolved.dataTheme);
+  root.style.setProperty('color-scheme', resolved.scheme);
 }
 
 // ---------------------------------------------------------------------------
@@ -235,10 +265,12 @@ export function ThemeProvider(props: ThemeProviderProps) {
 
   importSharedThemeFromUrl();
 
-  // Apply CSS variables whenever the active theme (or its custom overrides) change.
+  // Apply CSS variables whenever the active theme (or its custom overrides)
+  // change, or the OS `prefers-contrast: more` signal flips — so enabling the
+  // preference re-derives the current theme's high-contrast variant live.
   createEffect(() => {
     customThemes(); // re-apply if the active custom theme was edited
-    applyThemeToDom(themeId());
+    applyThemeToDom(themeId(), prefersMoreContrast());
   });
 
   // On unmount, remove the data-theme attribute so tests stay isolated.

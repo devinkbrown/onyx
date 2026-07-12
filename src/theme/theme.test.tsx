@@ -756,8 +756,10 @@ describe('Ocean family', () => {
 // ChannelNotifyControl + CalmModeControl render the checked segment as --ink
 // text on a --lapis-bright fill. The label is small bold body text, so the pair
 // must clear the 4.5 body-text floor (not just the 3:1 large-text floor) in
-// every built-in theme. prefers-contrast: more overrides neither token, so
-// clearing 4.5 here also covers the high-contrast path.
+// every built-in theme. Under prefers-contrast: more the high-contrast path
+// only boosts --lapis-bright (toward its AAA target vs --ink) and leaves --ink
+// untouched; since contrast is symmetric that boost can only RAISE this pair's
+// ratio, so clearing 4.5 on the base tokens here also covers the boosted path.
 describe('segmented-control active segment (--ink on --lapis-bright)', () => {
   const AA_BODY = 4.5;
 
@@ -771,6 +773,65 @@ describe('segmented-control active segment (--ink on --lapis-bright)', () => {
     expect(ratio, `${id} --ink/--lapis-bright = ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(
       AA_BODY,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5c. High-contrast path — applyThemeToDom(id, true) writes a per-theme,
+// mechanically-derived boost, not one shared static override.
+// ---------------------------------------------------------------------------
+
+describe('applyThemeToDom high-contrast variant', () => {
+  it('boosts the current theme foreground when highContrast is set', () => {
+    applyThemeToDom('ocean', false);
+    const base = getVar('--washi-dim');
+    applyThemeToDom('ocean', true);
+    const boosted = getVar('--washi-dim');
+
+    expect(base).toBeTruthy();
+    expect(boosted).toBeTruthy();
+    expect(boosted).not.toBe(base);
+
+    // Boosting only raises contrast: the derived --washi-dim reads better on --ink.
+    const ink = parseHex(getVar('--ink'))!;
+    expect(contrastRatio(parseHex(boosted)!, ink)).toBeGreaterThanOrEqual(
+      contrastRatio(parseHex(base)!, ink),
+    );
+  });
+
+  it('derives DIFFERENT boosted foregrounds for different themes', () => {
+    applyThemeToDom('ocean', true);
+    const oceanWashiDim = getVar('--washi-dim');
+    applyThemeToDom('kohaku', true);
+    const kohakuWashiDim = getVar('--washi-dim');
+
+    expect(oceanWashiDim).toBeTruthy();
+    expect(kohakuWashiDim).toBeTruthy();
+    expect(oceanWashiDim).not.toBe(kohakuWashiDim);
+  });
+
+  it('every boosted built-in theme still passes the base AA audit', () => {
+    for (const id of THEME_IDS) {
+      applyThemeToDom(id, true);
+      const resolved: TokenMap = {};
+      // Read the boosted fg tokens back off the DOM, falling back to the theme's
+      // base value for any ground/seam the boost does not touch.
+      for (const prop of Object.keys(THEMES[id].tokens)) {
+        resolved[prop] = getVar(prop) || THEMES[id].tokens[prop]!;
+      }
+      for (const row of auditPalette(resolved)) {
+        expect(row.pass, `${id} ${row.fg}/${row.bg} = ${row.ratio} (min ${row.min})`).toBe(true);
+      }
+    }
+  });
+
+  it('toggling highContrast off restores the base foreground values', () => {
+    applyThemeToDom('ocean', false);
+    const base = getVar('--washi-dim');
+    applyThemeToDom('ocean', true);
+    expect(getVar('--washi-dim')).not.toBe(base);
+    applyThemeToDom('ocean', false);
+    expect(getVar('--washi-dim')).toBe(base);
   });
 });
 
