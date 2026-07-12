@@ -52,6 +52,23 @@ const DISCORD_EPOCH_MS = 1420070400000n;
 /** REST page size ceiling for GET /channels/{id}/messages. */
 const PAGE_LIMIT = 100;
 
+/** Page size ceiling for GET /channels/{id}/messages/pins (Discord caps at 50). */
+const PIN_PAGE_LIMIT = 50;
+
+/** Hard ceilings on the pins pull so a hostile `has_more` can't loop forever. */
+const MAX_PINS_PER_CHANNEL = 500;
+const MAX_PIN_PAGES = 20;
+
+/** Discord guild channel `type` numerics that hold a message scrollback. */
+const GUILD_TEXT_CHANNEL_TYPES = new Set<number>([
+  0, // GUILD_TEXT
+  5, // GUILD_ANNOUNCEMENT
+  15, // GUILD_FORUM
+]);
+
+/** Discord guild channel `type` for a category (a container, not a chat). */
+const GUILD_CATEGORY_TYPE = 4;
+
 /** Default floor between requests (ms) — comfortably under Discord's budget. */
 const DEFAULT_MIN_INTERVAL_MS = 320;
 
@@ -115,6 +132,18 @@ export function snowflakeToMs(id: string): number {
 
 // ── REST → DiscordChatExporter normalization ────────────────────────────────
 
+/** `<:name:id>` / `<a:name:id>` custom-emoji mentions in message content. */
+const CUSTOM_EMOJI_RE = /<a?:([A-Za-z0-9_]{2,32}):\d{1,20}>/g;
+
+/**
+ * Replace Discord custom-emoji mentions (`<:fire:123>`, animated `<a:wave:456>`)
+ * with the readable `:name:` shortcode. The numeric id is meaningless off-Discord
+ * and would otherwise render as literal noise in the archived text.
+ */
+export function replaceCustomEmoji(text: string): string {
+  return text.replace(CUSTOM_EMOJI_RE, ':$1:');
+}
+
 /** Discord REST message `type` numerics we treat as chat (0 default, 19 reply). */
 function restTypeToDce(rawType: unknown): 'Default' | 'Reply' | 'System' {
   if (rawType === 19) return 'Reply';
@@ -159,7 +188,7 @@ export function normalizeRestMessage(raw: unknown): Record<string, unknown> | nu
     id: asString(raw.id),
     type: restTypeToDce(raw.type),
     timestamp: asString(raw.timestamp),
-    content: asString(raw.content),
+    content: replaceCustomEmoji(asString(raw.content)),
     attachments: restAttachments(raw.attachments),
     author: { name },
   };
@@ -289,7 +318,55 @@ export class DiscordRestClient {
     if (before) params.set('before', before);
     const res = await this.#request(`channels/${channelId}/messages?${params.toString()}`);
     const data: unknown = await res.json().catch(() => []);
+    // Bound a single (hostile or oversized) page by construction, not just the loop.
+    return Array.isArray(data) ? data.slice(0, PAGE_LIMIT) : [];
+  }
+
+  /** Enumerate a guild's channels (GET /guilds/{id}/channels). */
+  async getGuildChannels(guildId: string): Promise<unknown[]> {
+    return this.#getGuildArray(guildId, 'channels');
+  }
+
+  /** Fetch a guild's roles (GET /guilds/{id}/roles) — counted, then dropped. */
+  async getGuildRoles(guildId: string): Promise<unknown[]> {
+    return this.#getGuildArray(guildId, 'roles');
+  }
+
+  /** Fetch a guild's custom emojis (GET /guilds/{id}/emojis) — counted, then dropped. */
+  async getGuildEmojis(guildId: string): Promise<unknown[]> {
+    return this.#getGuildArray(guildId, 'emojis');
+  }
+
+  async #getGuildArray(guildId: string, resource: 'channels' | 'roles' | 'emojis'): Promise<unknown[]> {
+    if (!isSnowflake(guildId)) {
+      throw new DiscordImportError('Invalid Discord server id.', 'network');
+    }
+    const res = await this.#request(`guilds/${guildId}/${resource}`);
+    const data: unknown = await res.json().catch(() => []);
     return Array.isArray(data) ? data : [];
+  }
+
+  /**
+   * Fetch one page of the NEW paginated pins endpoint
+   * (GET /channels/{id}/messages/pins). The response is
+   * `{ items: [{ pinned_at, message }], has_more }`; the cursor `before` is the
+   * ISO8601 `pinned_at` of the last item (NOT a snowflake).
+   */
+  async getChannelPins(
+    channelId: string,
+    before?: string,
+  ): Promise<{ items: unknown[]; hasMore: boolean }> {
+    if (!isSnowflake(channelId)) {
+      throw new DiscordImportError('Invalid Discord channel id.', 'network');
+    }
+    const params = new URLSearchParams({ limit: String(PIN_PAGE_LIMIT) });
+    if (before) params.set('before', before);
+    const res = await this.#request(`channels/${channelId}/messages/pins?${params.toString()}`);
+    const data: unknown = await res.json().catch(() => ({}));
+    // Bound a single (hostile or oversized) page by construction, not just the loop.
+    const items = isRecord(data) && Array.isArray(data.items) ? data.items.slice(0, PIN_PAGE_LIMIT) : [];
+    const hasMore = isRecord(data) && data.has_more === true;
+    return { items, hasMore };
   }
 
   /** Serialize a request through the FIFO chain (single-flight, global pause). */
@@ -401,6 +478,107 @@ export interface DiscordChannelImportResult {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+interface PaginateOptions {
+  /** Stop paging once the oldest fetched message is older than this ms, or null. */
+  cutoffMs: number | null;
+  /** Stop once this many raw messages have been collected for this channel. */
+  budget: number;
+  signal?: AbortSignal;
+  /** Called with the running per-channel collected count after each page. */
+  onCount?: (running: number) => void;
+  /** Run the missing-MESSAGE-CONTENT-intent probe on the first non-empty page. */
+  checkIntent: boolean;
+}
+
+/**
+ * Walk one channel's scrollback newest→oldest over the proxy, page by page.
+ * Returns the raw REST messages in the order Discord served them (newest-first)
+ * plus whether pagination reached the start of the channel. Throws
+ * {@link DiscordImportError} on cancellation, a missing MESSAGE CONTENT intent
+ * (when `checkIntent`), auth failure, or a network error — the shared engine
+ * behind both the single-channel and full-guild importers.
+ */
+async function paginateChannelMessages(
+  client: DiscordRestClient,
+  channelId: string,
+  opts: PaginateOptions,
+): Promise<{ collected: unknown[]; reachedStart: boolean }> {
+  const collected: unknown[] = [];
+  let before: string | undefined;
+  let firstPageChecked = false;
+  let reachedStart = false;
+
+  for (;;) {
+    if (opts.signal?.aborted) throw new DiscordImportError(DISCORD_CANCELLED_MESSAGE, 'aborted');
+
+    const batch = await client.getChannelMessages(channelId, before);
+
+    if (opts.checkIntent && !firstPageChecked && batch.length > 0) {
+      firstPageChecked = true;
+      if (looksLikeMissingContentIntent(batch)) {
+        throw new DiscordImportError(DISCORD_MISSING_CONTENT_INTENT_MESSAGE, 'empty-content');
+      }
+    }
+
+    for (const m of batch) collected.push(m);
+    opts.onCount?.(collected.length);
+
+    if (batch.length < PAGE_LIMIT) {
+      reachedStart = true;
+      break;
+    }
+    // Messages arrive newest-first, so the LAST element is the oldest; page
+    // further back with before=<that id>.
+    const oldest = batch[batch.length - 1];
+    const oldestId = isRecord(oldest) ? asString(oldest.id).trim() : '';
+    if (!oldestId) {
+      reachedStart = true;
+      break;
+    }
+    before = oldestId;
+
+    if (opts.cutoffMs !== null && snowflakeToMs(oldestId) < opts.cutoffMs) break;
+    if (collected.length >= opts.budget) break;
+  }
+
+  return { collected, reachedStart };
+}
+
+/**
+ * Pull every pinned message of a channel via the paginated pins endpoint,
+ * following the ISO8601 `pinned_at` cursor. Returns the underlying message
+ * objects (unwrapped from each `{ pinned_at, message }` item), bounded so a
+ * hostile `has_more` cannot loop or grow without limit.
+ */
+async function pullChannelPins(
+  client: DiscordRestClient,
+  channelId: string,
+  signal?: AbortSignal,
+): Promise<unknown[]> {
+  const messages: unknown[] = [];
+  let before: string | undefined;
+
+  for (let page = 0; page < MAX_PIN_PAGES; page += 1) {
+    if (signal?.aborted) throw new DiscordImportError(DISCORD_CANCELLED_MESSAGE, 'aborted');
+
+    const { items, hasMore } = await client.getChannelPins(channelId, before);
+    if (items.length === 0) break;
+
+    let lastPinnedAt = '';
+    for (const item of items) {
+      if (!isRecord(item)) continue;
+      if (isRecord(item.message)) messages.push(item.message);
+      const pinnedAt = asString(item.pinned_at).trim();
+      if (pinnedAt) lastPinnedAt = pinnedAt;
+    }
+
+    if (!hasMore || !lastPinnedAt || messages.length >= MAX_PINS_PER_CHANNEL) break;
+    before = lastPinnedAt;
+  }
+
+  return messages;
+}
+
 /**
  * Pull one channel's scrollback over the proxy, normalize it, and transform it
  * into a vault snapshot via {@link parseDiscordExport}. Throws
@@ -418,65 +596,303 @@ export async function runDiscordChannelImport(
   const cutoffMs =
     options.sinceDays && options.sinceDays > 0 ? Date.now() - options.sinceDays * DAY_MS : null;
 
-  const collected: unknown[] = [];
-  let before: string | undefined;
-  let firstPageChecked = false;
-  let reachedStart = false;
-
   try {
-    for (;;) {
-      if (options.signal?.aborted) throw new DiscordImportError(DISCORD_CANCELLED_MESSAGE, 'aborted');
+    const { collected, reachedStart } = await paginateChannelMessages(client, options.channelId, {
+      cutoffMs,
+      budget: MAX_TOTAL_MESSAGES,
+      signal: options.signal,
+      onCount: (n) => options.onProgress?.(n),
+      checkIntent: true,
+    });
 
-      const batch = await client.getChannelMessages(options.channelId, before);
-
-      if (!firstPageChecked && batch.length > 0) {
-        firstPageChecked = true;
-        if (looksLikeMissingContentIntent(batch)) {
-          throw new DiscordImportError(DISCORD_MISSING_CONTENT_INTENT_MESSAGE, 'empty-content');
-        }
-      }
-
-      for (const m of batch) collected.push(m);
-      options.onProgress?.(collected.length);
-
-      if (batch.length < PAGE_LIMIT) {
-        reachedStart = true;
-        break;
-      }
-      // Messages arrive newest-first, so the LAST element is the oldest; page
-      // further back with before=<that id>.
-      const oldest = batch[batch.length - 1];
-      const oldestId = isRecord(oldest) ? asString(oldest.id).trim() : '';
-      if (!oldestId) {
-        reachedStart = true;
-        break;
-      }
-      before = oldestId;
-
-      if (cutoffMs !== null && snowflakeToMs(oldestId) < cutoffMs) break;
-      if (collected.length >= MAX_TOTAL_MESSAGES) break;
+    // Pages arrive newest-first (and we walk newest→oldest), so `collected` is
+    // globally newest→oldest. parseDiscordExport resolves reply quotes in
+    // array order — a reply only finds its parent if the parent was seen
+    // EARLIER — so it must receive oldest→newest. Reverse before normalizing.
+    const channelExport = normalizeDiscordChannelExport(
+      options.channelId,
+      options.channelName ?? '',
+      [...collected].reverse(),
+    );
+    const parseOptions: DiscordImportOptions = {};
+    if (options.sinceDays && options.sinceDays > 0) parseOptions.sinceDays = options.sinceDays;
+    // parseDiscordExport returns null only when there is no recognizable channel
+    // export at all; a `{channel, messages}` object (even empty) always parses.
+    const result = parseDiscordExport(channelExport, parseOptions);
+    if (!result) {
+      throw new DiscordImportError('Discord returned no importable messages for that channel.', 'network');
     }
+    return { result, fetched: collected.length, reachedStart };
   } finally {
     client.dispose();
   }
+}
 
-  // Pages arrive newest-first (and we walk newest→oldest), so `collected` is
-  // globally newest→oldest. parseDiscordExport resolves reply quotes in
-  // array order — a reply only finds its parent if the parent was seen
-  // EARLIER — so it must receive oldest→newest. Reverse before normalizing.
-  const channelExport = normalizeDiscordChannelExport(
-    options.channelId,
-    options.channelName ?? '',
-    [...collected].reverse(),
-  );
-  const parseOptions: DiscordImportOptions = {};
-  if (options.sinceDays && options.sinceDays > 0) parseOptions.sinceDays = options.sinceDays;
-  // parseDiscordExport returns null only when there is no recognizable channel
-  // export at all; a `{channel, messages}` object (even empty) always parses.
-  const result = parseDiscordExport(channelExport, parseOptions);
-  if (!result) {
-    throw new DiscordImportError('Discord returned no importable messages for that channel.', 'network');
+// ── Full-guild snapshot: enumerate channels → per-channel messages + pins ─────
+
+/** Progress tick for a guild import — drives the UI's "channel N of M" line. */
+export interface DiscordGuildProgress {
+  /** 1-based index of the channel currently being pulled. */
+  channelIndex: number;
+  /** Total text/announcement/forum channels to walk. */
+  channelCount: number;
+  /** Friendly name of the channel currently being pulled. */
+  channelName: string;
+  /** Running raw-message count across the whole guild so far. */
+  fetched: number;
+}
+
+export interface DiscordGuildImportOptions {
+  /** Bot token (session-only). */
+  token: string;
+  /** Numeric guild (server) id to snapshot. */
+  guildId: string;
+  /** Per-channel: stop paginating once the oldest message is older than this. */
+  sinceDays?: number;
+  /** Cancels the run. */
+  signal?: AbortSignal;
+  /** Progress callback (channel N of M + running message count). */
+  onProgress?: (progress: DiscordGuildProgress) => void;
+  /** Injectables (forwarded to the client) for deterministic tests. */
+  fetchImpl?: typeof fetch;
+  minIntervalMs?: number;
+  now?: () => number;
+  sleep?: (ms: number) => Promise<void>;
+  random?: () => number;
+}
+
+export interface DiscordGuildImportResult {
+  /** Combined snapshot + honest summary from {@link parseDiscordExport}. */
+  result: DiscordImportResult;
+  /** Text/announcement/forum channels enumerated (categories excluded). */
+  channelsScanned: number;
+  /** Channels that produced at least one importable message. */
+  channelsImported: number;
+  /** Channels skipped because a per-channel read failed (e.g. no access). */
+  channelsFailed: number;
+  /** Category channels dropped (no vault home). */
+  categoriesSkipped: number;
+  /** Guild roles fetched then dropped (no vault home). */
+  rolesSkipped: number;
+  /** Guild custom emojis fetched then dropped (no vault home). */
+  emojisSkipped: number;
+  /** Pinned messages merged in (deduped against the scrollback). */
+  pinsImported: number;
+  /** Raw messages pulled across the guild before normalization/bounding. */
+  fetched: number;
+}
+
+/** A guild channel record narrowed to the fields the walk needs. */
+interface GuildChannel {
+  id: string;
+  name: string;
+  type: number;
+  position: number;
+}
+
+function readGuildChannel(raw: unknown): GuildChannel | null {
+  if (!isRecord(raw)) return null;
+  const id = asString(raw.id).trim();
+  if (!id) return null;
+  const type = typeof raw.type === 'number' ? raw.type : -1;
+  const name = asString(raw.name).trim() || id;
+  const position = typeof raw.position === 'number' && Number.isFinite(raw.position) ? raw.position : 0;
+  return { id, name, type, position };
+}
+
+/**
+ * Sort raw REST messages oldest→newest so parseDiscordExport resolves reply
+ * quotes in array order. Snowflake ids are monotonic by creation time and exact,
+ * so they order same-millisecond messages correctly (a reply and its parent can
+ * share a timestamp); fall back to the ISO timestamp only when an id is missing.
+ */
+function sortRawChronologically(raw: readonly unknown[]): unknown[] {
+  return [...raw].sort((a, b) => {
+    const idA = isRecord(a) ? asString(a.id).trim() : '';
+    const idB = isRecord(b) ? asString(b.id).trim() : '';
+    if (isSnowflake(idA) && isSnowflake(idB)) {
+      const bigA = BigInt(idA);
+      const bigB = BigInt(idB);
+      return bigA < bigB ? -1 : bigA > bigB ? 1 : 0;
+    }
+    const timeA = isRecord(a) ? Date.parse(asString(a.timestamp)) : Number.NaN;
+    const timeB = isRecord(b) ? Date.parse(asString(b.timestamp)) : Number.NaN;
+    return (Number.isNaN(timeA) ? 0 : timeA) - (Number.isNaN(timeB) ? 0 : timeB);
+  });
+}
+
+/** Count a decoration resource, swallowing a per-resource failure (still aborts). */
+async function safeCount(fetcher: () => Promise<unknown[]>): Promise<number> {
+  try {
+    return (await fetcher()).length;
+  } catch (err) {
+    if (err instanceof DiscordImportError && err.kind === 'aborted') throw err;
+    return 0;
   }
+}
 
-  return { result, fetched: collected.length, reachedStart };
+function emptyGuildResult(): DiscordImportResult {
+  return {
+    snapshot: { kind: 'onyx-vault', version: 1, exportedAt: new Date().toISOString(), targets: [] },
+    summary: { guild: null, channels: 0, messages: 0, skipped: 0, droppedOverCap: 0, oldest: null, newest: null },
+  };
+}
+
+/**
+ * Snapshot a WHOLE Discord guild over the proxy: enumerate its channels, then
+ * for each text/announcement/forum channel pull the scrollback + its pins,
+ * normalize every channel into the DiscordChatExporter shape, and transform the
+ * lot through {@link parseDiscordExport} in ONE call (reusing its per-channel
+ * VAULT_KEEP bounding, dedup, reply resolution, and summary).
+ *
+ * Failure model (fail-loud where it matters, resilient where it doesn't):
+ *  - The channel enumeration validates the token; an auth/network error there
+ *    aborts the whole run.
+ *  - A missing MESSAGE CONTENT intent (detected on the first non-empty page of
+ *    the first readable channel) and cancellation are guild-wide → they abort.
+ *  - A per-channel read error AFTER enumeration (e.g. a permission overwrite on
+ *    one channel) skips that channel and continues — the token was already
+ *    proven, so one unreadable channel must not sink the whole import.
+ *
+ * Roles and categories have no vault home: they are fetched/enumerated only to
+ * be counted honestly in the summary. Custom emoji become `:name:` in text and
+ * pins become ordinary messages (deduped by id) via normalization.
+ */
+export async function runDiscordGuildImport(
+  options: DiscordGuildImportOptions,
+): Promise<DiscordGuildImportResult> {
+  if (!isSnowflake(options.guildId)) {
+    throw new DiscordImportError('Invalid Discord server id — copy the numeric Server ID.', 'network');
+  }
+  const client = new DiscordRestClient(options);
+  const cutoffMs =
+    options.sinceDays && options.sinceDays > 0 ? Date.now() - options.sinceDays * DAY_MS : null;
+
+  let categoriesSkipped = 0;
+  let channelsImported = 0;
+  let channelsFailed = 0;
+  let pinsImported = 0;
+  let totalFetched = 0;
+  const channelExports: Record<string, unknown>[] = [];
+  const channels: GuildChannel[] = [];
+
+  try {
+    // Enumeration first: this proves the token and the bot's guild membership.
+    // An auth/network error here is fatal (nothing to walk).
+    const rawChannels = await client.getGuildChannels(options.guildId);
+
+    // Roles + emojis are decoration with no vault home; count them for an honest
+    // summary but never let their failure sink a guild we can already read.
+    const rolesSkipped = await safeCount(() => client.getGuildRoles(options.guildId));
+    const emojisSkipped = await safeCount(() => client.getGuildEmojis(options.guildId));
+
+    for (const raw of rawChannels) {
+      const channel = readGuildChannel(raw);
+      if (!channel) continue;
+      if (channel.type === GUILD_CATEGORY_TYPE) {
+        categoriesSkipped += 1;
+        continue;
+      }
+      if (!GUILD_TEXT_CHANNEL_TYPES.has(channel.type)) continue;
+      channels.push(channel);
+    }
+    channels.sort((a, b) => a.position - b.position || a.id.localeCompare(b.id));
+
+    let intentChecked = false;
+    for (let i = 0; i < channels.length; i += 1) {
+      const channel = channels[i]!;
+      if (options.signal?.aborted) throw new DiscordImportError(DISCORD_CANCELLED_MESSAGE, 'aborted');
+
+      const budget = MAX_TOTAL_MESSAGES - totalFetched;
+      if (budget <= 0) break;
+
+      const emitProgress = (fetched: number): void =>
+        options.onProgress?.({
+          channelIndex: i + 1,
+          channelCount: channels.length,
+          channelName: channel.name,
+          fetched,
+        });
+      emitProgress(totalFetched);
+
+      const collected: unknown[] = [];
+      try {
+        const page = await paginateChannelMessages(client, channel.id, {
+          cutoffMs,
+          budget,
+          signal: options.signal,
+          onCount: (n) => emitProgress(totalFetched + n),
+          // Probe the MESSAGE CONTENT intent once, on the first channel that
+          // actually returns messages — it's a bot-wide config, not per-channel.
+          checkIntent: !intentChecked,
+        });
+        if (!intentChecked && page.collected.length > 0) intentChecked = true;
+        for (const m of page.collected) collected.push(m);
+      } catch (err) {
+        // Guild-wide failures propagate; a per-channel read error is skipped.
+        if (err instanceof DiscordImportError && (err.kind === 'empty-content' || err.kind === 'aborted')) {
+          throw err;
+        }
+        channelsFailed += 1;
+        continue;
+      }
+
+      totalFetched += collected.length;
+
+      // Pins are decoration: a pins-endpoint failure must NOT drop this channel's
+      // already-fetched scrollback. Isolate it and degrade to "no pins" on any
+      // non-abort error (mirrors how roles/emojis are wrapped in safeCount).
+      let pins: unknown[] = [];
+      try {
+        pins = await pullChannelPins(client, channel.id, options.signal);
+      } catch (err) {
+        if (err instanceof DiscordImportError && err.kind === 'aborted') throw err;
+        pins = [];
+      }
+
+      // Merge pins as ordinary messages, deduped by id against the scrollback
+      // (a pin is just a flagged message that also appears in the scrollback).
+      const seen = new Set<string>();
+      for (const m of collected) {
+        const id = isRecord(m) ? asString(m.id).trim() : '';
+        if (id) seen.add(id);
+      }
+      for (const pin of pins) {
+        const id = isRecord(pin) ? asString(pin.id).trim() : '';
+        // An id-less pin can neither dedup nor be honestly counted — skip it.
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        collected.push(pin);
+        pinsImported += 1;
+      }
+
+      if (collected.length === 0) continue;
+
+      // Feed oldest→newest so parseDiscordExport resolves reply quotes; pins may
+      // have been appended out of order, so sort chronologically rather than reverse.
+      channelExports.push(normalizeDiscordChannelExport(channel.id, channel.name, sortRawChronologically(collected)));
+      channelsImported += 1;
+    }
+
+    const parseOptions: DiscordImportOptions = {};
+    if (options.sinceDays && options.sinceDays > 0) parseOptions.sinceDays = options.sinceDays;
+    // An array of channel exports parses in one pass; an empty array yields null,
+    // in which case we still return an honest zero-message result.
+    const result =
+      (channelExports.length > 0 ? parseDiscordExport(channelExports, parseOptions) : null) ?? emptyGuildResult();
+
+    return {
+      result,
+      channelsScanned: channels.length,
+      channelsImported,
+      channelsFailed,
+      categoriesSkipped,
+      rolesSkipped,
+      emojisSkipped,
+      pinsImported,
+      fetched: totalFetched,
+    };
+  } finally {
+    client.dispose();
+  }
 }

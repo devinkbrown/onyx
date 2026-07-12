@@ -404,16 +404,21 @@ interface PendingBotImport {
   oldest: string | null;
   newest: string | null;
   fetched: number;
+  pins: number;
+  rolesSkipped: number;
+  categoriesSkipped: number;
+  channelsFailed: number;
 }
 
 /** Only pull messages newer than this many days over the bot-token path. */
 const BOT_IMPORT_SINCE_DAYS = 365;
 
 /**
- * Import a Discord SERVER's history over a bot token (Roadmap v1.0 "Torii").
- * Unlike the file-based Discord importers, this pulls a channel's scrollback
- * LIVE via the same-origin read-only proxy (`/discord-import/…` →
- * discord.com/api/v10). The bot token is SESSION-ONLY: it lives in a Solid
+ * Import a whole Discord SERVER's history over a bot token (Roadmap v1.0
+ * "Torii"). Unlike the file-based Discord importers, this walks the guild LIVE
+ * via the same-origin read-only proxy (`/discord-import/…` → discord.com/api/v10):
+ * it enumerates the server's text/announcement/forum channels and pulls each
+ * one's scrollback + pins. The bot token is SESSION-ONLY: it lives in a Solid
  * signal for the run and is zeroed at end-of-run and on unmount — never
  * persisted, never logged, never placed in the exported snapshot.
  */
@@ -421,7 +426,7 @@ export function DiscordBotImportControls(): JSX.Element {
   const [status, setStatus] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal(false);
   const [token, setToken] = createSignal('');
-  const [channelId, setChannelId] = createSignal('');
+  const [guildId, setGuildId] = createSignal('');
   const [pending, setPending] = createSignal<PendingBotImport | null>(null);
   const [abort, setAbort] = createSignal<AbortController | null>(null);
 
@@ -435,13 +440,13 @@ export function DiscordBotImportControls(): JSX.Element {
 
   async function handleFetch(): Promise<void> {
     const tok = token().trim();
-    const chan = channelId().trim();
+    const guild = guildId().trim();
     if (!tok) {
       setStatus('Paste your bot token first.');
       return;
     }
-    if (!/^\d{1,20}$/.test(chan)) {
-      setStatus('Enter the numeric channel id (turn on Developer Mode, then right-click the channel → Copy Channel ID).');
+    if (!/^\d{1,20}$/.test(guild)) {
+      setStatus('Enter the numeric Server ID (turn on Developer Mode, then right-click the server icon → Copy Server ID).');
       return;
     }
     const controller = new AbortController();
@@ -450,13 +455,16 @@ export function DiscordBotImportControls(): JSX.Element {
     setBusy(true);
     setStatus('Connecting to Discord…');
     try {
-      const { runDiscordChannelImport } = await import('@/lib/import/discordSnapshotImport');
-      const res = await runDiscordChannelImport({
+      const { runDiscordGuildImport } = await import('@/lib/import/discordSnapshotImport');
+      const res = await runDiscordGuildImport({
         token: tok,
-        channelId: chan,
+        guildId: guild,
         sinceDays: BOT_IMPORT_SINCE_DAYS,
         signal: controller.signal,
-        onProgress: (n) => setStatus(`Fetched ${countLabel(n, 'message')} so far…`),
+        onProgress: (p) =>
+          setStatus(
+            `Importing ${p.channelName} (channel ${p.channelIndex} of ${p.channelCount})… ${countLabel(p.fetched, 'message')} so far.`,
+          ),
       });
       const s = res.result.summary;
       setPending({
@@ -469,8 +477,14 @@ export function DiscordBotImportControls(): JSX.Element {
         oldest: s.oldest,
         newest: s.newest,
         fetched: res.fetched,
+        pins: res.pinsImported,
+        rolesSkipped: res.rolesSkipped,
+        categoriesSkipped: res.categoriesSkipped,
+        channelsFailed: res.channelsFailed,
       });
-      setStatus(`Ready to import ${countLabel(s.messages, 'message')}${s.guild ? ` from ${s.guild}` : ''}.`);
+      setStatus(
+        `Ready to import ${countLabel(s.messages, 'message')} across ${countLabel(s.channels, 'channel')}${s.guild ? ` from ${s.guild}` : ''}.`,
+      );
     } catch (err) {
       setPending(null);
       // DiscordImportError.message is already user-safe and never contains the token.
@@ -491,7 +505,7 @@ export function DiscordBotImportControls(): JSX.Element {
     try {
       const result = await importVault(job.snapshot);
       setPending(null);
-      setStatus(`Imported ${countLabel(result.messages, 'message')} into ${countLabel(job.channels, 'channel')}. Open the channel to read the history, or search it from anywhere.`);
+      setStatus(`Imported ${countLabel(result.messages, 'message')} into ${countLabel(job.channels, 'channel')}. Open a channel to read the history, or search it from anywhere.`);
     } catch {
       setStatus('Import failed while merging into the local vault.');
     } finally {
@@ -505,14 +519,14 @@ export function DiscordBotImportControls(): JSX.Element {
         <h3 id="pref-discord-bot-import-title" class="pref-label">Import from a Discord server (bot token)</h3>
       </div>
       <p class="pref-desc">
-        Own a Discord server? Create a bot, invite it, and pull a channel's history straight in. The token and channel id you enter below are used only for this import — they are never saved to this device, never uploaded anywhere but Discord's own API, and never written to the imported history. All calls go through this site's read-only Discord proxy.
+        Own a Discord server? Create a bot, invite it, and pull the <strong>whole server's</strong> history straight in — every text, announcement, and forum channel, plus pins. The token and Server ID you enter below are used only for this import — they are never saved to this device, never uploaded anywhere but Discord's own API, and never written to the imported history. All calls go through this site's read-only Discord proxy.
       </p>
       <ol class="pref-discord-bot-steps">
         <li>Create an application at <a href="https://discord.com/developers/applications" target="_blank" rel="noreferrer noopener">discord.com/developers</a>, then add a <strong>Bot</strong> to it.</li>
         <li><strong>Enable the “MESSAGE CONTENT INTENT” toggle</strong> under Bot → Privileged Gateway Intents. Without it, Discord returns messages with no text.</li>
         <li>Under Bot, <strong>Reset Token</strong> and copy the token.</li>
         <li>Invite the bot to your server (OAuth2 → URL Generator) with the <strong>View Channels</strong> and <strong>Read Message History</strong> permissions.</li>
-        <li>Paste the token and the numeric channel id below, then fetch.</li>
+        <li>Paste the token and the numeric Server ID below, then fetch. Categories and roles have no home here and are skipped.</li>
       </ol>
       <div class="pref-vault-actions pref-discord-bot-inputs">
         <label class="pref-file pref-discord-bot-token">
@@ -529,15 +543,15 @@ export function DiscordBotImportControls(): JSX.Element {
           />
         </label>
         <label class="pref-file pref-discord-bot-channel">
-          <span>Channel id</span>
+          <span>Server ID</span>
           <input
             type="text"
             inputmode="numeric"
             autocomplete="off"
             placeholder="123456789012345678"
-            value={channelId()}
+            value={guildId()}
             disabled={busy()}
-            onInput={(event) => setChannelId(event.currentTarget.value)}
+            onInput={(event) => setGuildId(event.currentTarget.value)}
           />
         </label>
         <button type="button" class="pref-reset" disabled={busy()} onClick={() => void handleFetch()}>
@@ -564,8 +578,13 @@ export function DiscordBotImportControls(): JSX.Element {
               {countLabel(job().messages, 'message')} across {countLabel(job().channels, 'channel')}
               {job().guild ? ` from ${job().guild}` : ''}
               {job().oldest && job().newest ? ` (${shortDate(job().oldest)} → ${shortDate(job().newest)})` : ''}.
+              {job().pins > 0 ? ` ${countLabel(job().pins, 'pinned message')} included.` : ''}
               {job().skipped > 0 ? ` ${countLabel(job().skipped, 'system/empty message')} skipped.` : ''}
               {job().droppedOverCap > 0 ? ` ${countLabel(job().droppedOverCap, 'older message')} beyond the per-channel limit dropped.` : ''}
+              {job().rolesSkipped > 0 || job().categoriesSkipped > 0
+                ? ` ${countLabel(job().rolesSkipped, 'role')} and ${countLabel(job().categoriesSkipped, 'category')} have no home here and were skipped.`
+                : ''}
+              {job().channelsFailed > 0 ? ` ${countLabel(job().channelsFailed, 'channel')} could not be read and was skipped.` : ''}
               {' '}Existing local history is merged, not replaced.
             </p>
             <div class="pref-import-review__actions">
