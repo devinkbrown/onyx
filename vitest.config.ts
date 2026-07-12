@@ -5,6 +5,7 @@ import { fileURLToPath, URL } from 'node:url';
 // Onyx test harness — vitest + SolidJS (vite-plugin-solid + jsdom).
 export default defineConfig({
   plugins: [solid()],
+  server: { fs: { allow: ['.', '/home/kain/onyx'] } },
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
     // Critical for Solid reactivity under test.
