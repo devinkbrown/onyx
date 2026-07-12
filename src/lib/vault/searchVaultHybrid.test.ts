@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * searchVaultHybrid.test.ts — hybrid lexical+semantic ranking over a real
- * (fake-indexeddb) vault. Pins the invariant that exact-substring matches
- * always rank ahead of purely-semantic neighbors, with stable ordering.
+ * (fake-indexeddb) vault, fused with Reciprocal Rank Fusion. Pins that an
+ * exact-substring hit surfaces at the top, that a doc ranked highly by BOTH
+ * legs wins, and that fusion stays deterministic and bounded. The pure RRF
+ * math is pinned separately in searchVaultHybrid.rrf.test.ts.
  */
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { ChatMessage } from '@/lib/irc/types';
+import type { EmbeddingProvider } from './embeddingIndex';
 import { _resetVaultForTests, saveMessages } from './historyVault';
 import { searchVaultHybrid } from './searchVaultHybrid';
 
@@ -58,15 +61,17 @@ describe('searchVaultHybrid', () => {
     expect(ids).not.toContain('m3');
   });
 
-  it('orders multiple lexical hits newest-first', async () => {
+  it('returns every lexical match when several share the query token', async () => {
+    // All three contain 'deploy', so all are lexical hits and every one must
+    // surface. Their internal order is set by RRF (lexical rank fused with
+    // semantic rank), not a bare newest-first sort — see the RRF unit tests.
     await saveMessages('#ops', [
       msg('m1', 'deploy step one'),
       msg('m2', 'deploy step two'),
       msg('m3', 'deploy step three'),
     ]);
     const hits = await searchVaultHybrid('deploy');
-    // m3 has the largest time (id digits drive the timestamp offset).
-    expect(hits.map((h) => h.message.id)).toEqual(['m3', 'm2', 'm1']);
+    expect(new Set(hits.map((h) => h.message.id))).toEqual(new Set(['m1', 'm2', 'm3']));
   });
 
   it('matches on the sender field as well as the body', async () => {
@@ -120,5 +125,45 @@ describe('searchVaultHybrid', () => {
     ]);
     const hits = await searchVaultHybrid('réunion');
     expect(hits[0]!.message.id).toBe('m1');
+  });
+
+  // A controlled provider maps recognizable keywords to fixed vectors so the
+  // semantic ranking is fully deterministic — isolating RRF's fusion wiring
+  // from the hashing vectorizer's specifics. cosineSimilarity self-normalizes,
+  // so raw (non-unit) vectors are fine, and a zero vector scores 0 (dropped).
+  const keywordProvider: EmbeddingProvider = {
+    dim: 2,
+    embed(text: string): Float32Array {
+      const lower = text.toLocaleLowerCase();
+      if (lower.includes('apple')) return new Float32Array([1, 0]); // aligned w/ query
+      if (lower.includes('banana')) return new Float32Array([0.8, 0.2]); // near query
+      return new Float32Array([0, 1]); // orthogonal to query → cosine 0 → dropped
+    },
+  };
+
+  it('lets a doc ranked by BOTH legs beat a semantic-only neighbor', async () => {
+    // Query 'apple': m1 is the sole lexical hit AND the top semantic hit
+    // (aligned vector); m2 is semantic-only (near); m3 is orthogonal (dropped).
+    // RRF: m1 = 1/61 + 1/61 (both legs) beats m2 = 1/62 (semantic only).
+    await saveMessages('#fruit', [
+      msg('m1', 'apple crumble recipe'),
+      msg('m2', 'banana bread rising'),
+      msg('m3', 'sour cherry compote'),
+    ]);
+    const hits = await searchVaultHybrid('apple', { provider: keywordProvider });
+    expect(hits.map((h) => h.message.id)).toEqual(['m1', 'm2']);
+  });
+
+  it('surfaces a semantic neighbor that shares no substring with the query', async () => {
+    // 'banana' has no lexical overlap with query 'apple', but its near-aligned
+    // vector clears minScore, so the semantic leg still surfaces it.
+    await saveMessages('#fruit', [
+      msg('m1', 'banana bread rising'),
+      msg('m2', 'sour cherry compote'),
+    ]);
+    const hits = await searchVaultHybrid('apple', { provider: keywordProvider });
+    const ids = hits.map((h) => h.message.id);
+    expect(ids).toContain('m1');
+    expect(ids).not.toContain('m2'); // orthogonal → cosine 0 → below minScore
   });
 });
