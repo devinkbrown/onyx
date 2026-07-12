@@ -21,7 +21,7 @@ import {
   setDefaultVaultSearchMode,
 } from '@/lib/prefs/vaultSearchMode';
 import { setVaultMode, type VaultSearchMode } from './search/useMessageSearch';
-import { DiscordImportControls, DiscordPackageImportControls, SlackImportControls, IrcLogImportControls } from './HistoryImportControls';
+import { DiscordImportControls, DiscordPackageImportControls, DiscordBotImportControls, SlackImportControls, IrcLogImportControls } from './HistoryImportControls';
 import {
   clearClientExtensionAudit,
   clearClientExtensionActions,
@@ -1033,6 +1033,8 @@ export function PreferencesPanel(): JSX.Element {
         <DiscordImportControls />
 
         <DiscordPackageImportControls />
+
+        <DiscordBotImportControls />
 
         <SlackImportControls />
 

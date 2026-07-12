@@ -11,7 +11,7 @@
  *
  * SOLID IDIOMS: component runs once; never destructure props; For/Show.
  */
-import { createSignal, Show, type JSX } from 'solid-js';
+import { createSignal, onCleanup, Show, type JSX } from 'solid-js';
 import { importVault, VAULT_KEEP } from '@/lib/vault/historyVault';
 import type { DiscordPackageFile } from '@/lib/import/discordPackageImport';
 import { countLabel } from '@/lib/format/countLabel';
@@ -361,6 +361,205 @@ export function DiscordPackageImportControls(): JSX.Element {
         {(job) => (
           <div class="pref-import-review" role="group" aria-labelledby="pref-discord-package-review-title">
             <h4 id="pref-discord-package-review-title">Review import</h4>
+            <p>
+              {countLabel(job().messages, 'message')} across {countLabel(job().channels, 'channel')}
+              {job().guild ? ` from ${job().guild}` : ''}
+              {job().oldest && job().newest ? ` (${shortDate(job().oldest)} → ${shortDate(job().newest)})` : ''}.
+              {job().skipped > 0 ? ` ${countLabel(job().skipped, 'system/empty message')} skipped.` : ''}
+              {job().droppedOverCap > 0 ? ` ${countLabel(job().droppedOverCap, 'older message')} beyond the per-channel limit dropped.` : ''}
+              {' '}Existing local history is merged, not replaced.
+            </p>
+            <div class="pref-import-review__actions">
+              <button type="button" class="pref-reset" disabled={busy()} onClick={() => void confirmImport()}>
+                Import into vault
+              </button>
+              <button
+                type="button"
+                class="pref-reset"
+                disabled={busy()}
+                onClick={() => {
+                  setPending(null);
+                  setStatus('Import cancelled.');
+                }}
+              >
+                Cancel import
+              </button>
+            </div>
+          </div>
+        )}
+      </Show>
+      {/* Always-present polite live region (see JsonVaultImportControls). */}
+      <p class="pref-status" role="status" aria-live="polite" aria-atomic="true">{status() ?? ''}</p>
+    </section>
+  );
+}
+
+interface PendingBotImport {
+  snapshot: import('@/lib/vault/historyVault').VaultExportSnapshot;
+  channels: number;
+  messages: number;
+  skipped: number;
+  droppedOverCap: number;
+  guild: string | null;
+  oldest: string | null;
+  newest: string | null;
+  fetched: number;
+}
+
+/** Only pull messages newer than this many days over the bot-token path. */
+const BOT_IMPORT_SINCE_DAYS = 365;
+
+/**
+ * Import a Discord SERVER's history over a bot token (Roadmap v1.0 "Torii").
+ * Unlike the file-based Discord importers, this pulls a channel's scrollback
+ * LIVE via the same-origin read-only proxy (`/discord-import/…` →
+ * discord.com/api/v10). The bot token is SESSION-ONLY: it lives in a Solid
+ * signal for the run and is zeroed at end-of-run and on unmount — never
+ * persisted, never logged, never placed in the exported snapshot.
+ */
+export function DiscordBotImportControls(): JSX.Element {
+  const [status, setStatus] = createSignal<string | null>(null);
+  const [busy, setBusy] = createSignal(false);
+  const [token, setToken] = createSignal('');
+  const [channelId, setChannelId] = createSignal('');
+  const [pending, setPending] = createSignal<PendingBotImport | null>(null);
+  const [abort, setAbort] = createSignal<AbortController | null>(null);
+
+  // Token contract: on unmount, abort any in-flight fetch (so the run's
+  // finally disposes the client and releases its token copy immediately) and
+  // zero the signal — the only two retained handles to the token.
+  onCleanup(() => {
+    abort()?.abort();
+    setToken('');
+  });
+
+  async function handleFetch(): Promise<void> {
+    const tok = token().trim();
+    const chan = channelId().trim();
+    if (!tok) {
+      setStatus('Paste your bot token first.');
+      return;
+    }
+    if (!/^\d{1,20}$/.test(chan)) {
+      setStatus('Enter the numeric channel id (turn on Developer Mode, then right-click the channel → Copy Channel ID).');
+      return;
+    }
+    const controller = new AbortController();
+    setAbort(controller);
+    setPending(null);
+    setBusy(true);
+    setStatus('Connecting to Discord…');
+    try {
+      const { runDiscordChannelImport } = await import('@/lib/import/discordSnapshotImport');
+      const res = await runDiscordChannelImport({
+        token: tok,
+        channelId: chan,
+        sinceDays: BOT_IMPORT_SINCE_DAYS,
+        signal: controller.signal,
+        onProgress: (n) => setStatus(`Fetched ${countLabel(n, 'message')} so far…`),
+      });
+      const s = res.result.summary;
+      setPending({
+        snapshot: res.result.snapshot,
+        channels: s.channels,
+        messages: s.messages,
+        skipped: s.skipped,
+        droppedOverCap: s.droppedOverCap,
+        guild: s.guild,
+        oldest: s.oldest,
+        newest: s.newest,
+        fetched: res.fetched,
+      });
+      setStatus(`Ready to import ${countLabel(s.messages, 'message')}${s.guild ? ` from ${s.guild}` : ''}.`);
+    } catch (err) {
+      setPending(null);
+      // DiscordImportError.message is already user-safe and never contains the token.
+      setStatus(err instanceof Error && err.message ? err.message : 'Discord import failed.');
+    } finally {
+      // Zero the token at end-of-run: fetching is done, the vault merge below
+      // never needs it. A retry re-pastes.
+      setToken('');
+      setAbort(null);
+      setBusy(false);
+    }
+  }
+
+  async function confirmImport(): Promise<void> {
+    const job = pending();
+    if (!job) return;
+    setBusy(true);
+    try {
+      const result = await importVault(job.snapshot);
+      setPending(null);
+      setStatus(`Imported ${countLabel(result.messages, 'message')} into ${countLabel(job.channels, 'channel')}. Open the channel to read the history, or search it from anywhere.`);
+    } catch {
+      setStatus('Import failed while merging into the local vault.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section class="pref-group pref-vault-portable pref-discord-bot-import" aria-labelledby="pref-discord-bot-import-title">
+      <div class="pref-group-head">
+        <h3 id="pref-discord-bot-import-title" class="pref-label">Import from a Discord server (bot token)</h3>
+      </div>
+      <p class="pref-desc">
+        Own a Discord server? Create a bot, invite it, and pull a channel's history straight in. The token and channel id you enter below are used only for this import — they are never saved to this device, never uploaded anywhere but Discord's own API, and never written to the imported history. All calls go through this site's read-only Discord proxy.
+      </p>
+      <ol class="pref-discord-bot-steps">
+        <li>Create an application at <a href="https://discord.com/developers/applications" target="_blank" rel="noreferrer noopener">discord.com/developers</a>, then add a <strong>Bot</strong> to it.</li>
+        <li><strong>Enable the “MESSAGE CONTENT INTENT” toggle</strong> under Bot → Privileged Gateway Intents. Without it, Discord returns messages with no text.</li>
+        <li>Under Bot, <strong>Reset Token</strong> and copy the token.</li>
+        <li>Invite the bot to your server (OAuth2 → URL Generator) with the <strong>View Channels</strong> and <strong>Read Message History</strong> permissions.</li>
+        <li>Paste the token and the numeric channel id below, then fetch.</li>
+      </ol>
+      <div class="pref-vault-actions pref-discord-bot-inputs">
+        <label class="pref-file pref-discord-bot-token">
+          <span>Bot token</span>
+          <input
+            type="password"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck={false}
+            placeholder="Bot token (used once, never saved)"
+            value={token()}
+            disabled={busy()}
+            onInput={(event) => setToken(event.currentTarget.value)}
+          />
+        </label>
+        <label class="pref-file pref-discord-bot-channel">
+          <span>Channel id</span>
+          <input
+            type="text"
+            inputmode="numeric"
+            autocomplete="off"
+            placeholder="123456789012345678"
+            value={channelId()}
+            disabled={busy()}
+            onInput={(event) => setChannelId(event.currentTarget.value)}
+          />
+        </label>
+        <button type="button" class="pref-reset" disabled={busy()} onClick={() => void handleFetch()}>
+          Fetch history
+        </button>
+        <Show when={busy() && abort()}>
+          <button
+            type="button"
+            class="pref-reset"
+            onClick={() => {
+              abort()?.abort();
+              setStatus('Cancelling…');
+            }}
+          >
+            Cancel
+          </button>
+        </Show>
+      </div>
+      <Show when={pending()}>
+        {(job) => (
+          <div class="pref-import-review" role="group" aria-labelledby="pref-discord-bot-review-title">
+            <h4 id="pref-discord-bot-review-title">Review import</h4>
             <p>
               {countLabel(job().messages, 'message')} across {countLabel(job().channels, 'channel')}
               {job().guild ? ` from ${job().guild}` : ''}
