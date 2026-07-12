@@ -191,6 +191,34 @@ export function formatIRCLine(command: string, ...params: string[]): string {
 }
 
 /**
+ * Format a client-tagged IRC line: `@k1=v1;k2 <command> <params...>\r\n`.
+ *
+ * The command and params flow through {@link formatIRCLine}, so CR/LF/NUL are
+ * stripped from every field by construction (the outbound choke point). Tag
+ * VALUES are IRCv3-escaped (a `\r`/`\n` becomes `\r`/`\n`, never a raw control
+ * byte) and tag KEYS are stripped of wire-control bytes, so neither half of a
+ * tag can ever smuggle a second wire command. An empty `tags` yields exactly
+ * `formatIRCLine(...)`. Insertion order of `tags` is preserved.
+ *
+ * This is the safe replacement for hand-built template strings such as
+ * `` `${prefix}PRIVMSG ${target} :${body}\r\n` ``, where a lone `\r` (the
+ * composer splits only on `\n`) could otherwise survive into the raw send.
+ */
+export function formatTaggedLine(
+  tags: Record<string, string>,
+  command: string,
+  ...params: string[]
+): string {
+  const line = formatIRCLine(command, ...params);
+  const tagStr = Object.entries(tags)
+    .map(([key, value]) =>
+      value ? `${stripWireControl(key)}=${escapeTagValue(value)}` : stripWireControl(key),
+    )
+    .join(';');
+  return tagStr ? `@${tagStr} ${line}` : line;
+}
+
+/**
  * Parse NAMES list prefix characters into a Set of mode letters.
  * Prefix map: { '~': 'q', '@': 'o', '+': 'v', '%': 'h', '&': 'a' }
  */

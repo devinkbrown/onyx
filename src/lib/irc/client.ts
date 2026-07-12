@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import {
   buildSessionResumeLine,
-  escapeTagValue,
   parseCHANLIMIT,
   parseIRCMessage,
   formatIRCLine,
+  formatTaggedLine,
   parsePREFIX,
   selectSaslMechanism,
   splitWireFrame,
@@ -313,8 +313,7 @@ export class IRCClient {
   }
 
   tagmsg(target: string, tags: Record<string, string>) {
-    const tagStr = Object.entries(tags).map(([k, v]) => v ? `${k}=${escapeTagValue(v)}` : k).join(';');
-    this.send(`@${tagStr} TAGMSG ${target}\r\n`);
+    this.send(formatTaggedLine(tags, 'TAGMSG', target));
   }
 
   part(channel: string, reason = 'Leaving') {

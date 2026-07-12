@@ -6,7 +6,7 @@ import { IRCClient } from '@/lib/irc/client';
 import type { IRCMessage, Channel, ChannelUser, ChatMessage, ConnectionStatus, MessageReaction } from '@/lib/irc/types';
 import { parseMultilineLimits, planMultilineBatches, buildMultilineLines, assembleMultilineText } from '@/lib/irc/multiline';
 import { clearSessionToken, loadCredentials, storeMeshToken, storeSessionToken } from '@/lib/credentials';
-import { escapeTagValue, parseAccountInfo, parseCHANLIMIT, parseMonitorNumeric, parseNamesPrefix, parsePREFIX, parseSessionMeshTokenNote, parseSessionTokenNote, parseStandardReply } from '@/lib/irc/parser';
+import { formatTaggedLine, parseAccountInfo, parseCHANLIMIT, parseMonitorNumeric, parseNamesPrefix, parsePREFIX, parseSessionMeshTokenNote, parseSessionTokenNote, parseStandardReply } from '@/lib/irc/parser';
 import type { SuimyakuPeerState, SuimyakuRoomStats, CallState } from '@/lib/suimyaku-media/types';
 import { getMountedSuimyakuMediaEngine } from '@/lib/mediaEngineMount';
 import { parseActivity } from '@/lib/activity';
@@ -1832,13 +1832,6 @@ export interface StreamPollInfo {
 let _uidCounter = 0;
 const uid = () => `onyx-${Date.now()}-${++_uidCounter}`;
 
-function formatClientTags(tags: Record<string, string>): string {
-  const tagStr = Object.entries(tags)
-    .map(([key, value]) => (value ? `${key}=${escapeTagValue(value)}` : key))
-    .join(';');
-  return tagStr ? `@${tagStr} ` : '';
-}
-
 const HISTORY_PAGE_SIZE = 50;
 const SERVICE_BOTS = new Set(['nickserv', 'chanserv', 'hostserv', 'memoserv']);
 type ChannelWithAiPolicy = Channel & { aiPolicy?: AiPolicy };
@@ -3380,7 +3373,7 @@ export const store = createStore<OnyxState>()(
       const outboundTags = replyingTo
         ? { ...topicTags, '+draft/reply': replyingTo.id }
         : topicTags;
-      const outboundTagPrefix = formatClientTags(outboundTags);
+      const hasOutboundTags = Object.keys(outboundTags).length > 0;
       const replySnapshot = replyingTo ? { id: replyingTo.id, from: replyingTo.from, text: replyingTo.text } : null;
 
       // ── E2EE DM path ──────────────────────────────────────────────────────
@@ -3395,12 +3388,11 @@ export const store = createStore<OnyxState>()(
         if (isDm && peerKey && preferences().e2eeDms) {
           const encryptedKind: E2eeMessageKind | null = client.negotiatedCaps.has(E2EE_CAP) ? 'mls' : null;
           const encryptedOutboundTags = encryptedKind ? { ...outboundTags, ...e2eeMessageTag(encryptedKind) } : outboundTags;
-          const encryptedOutboundTagPrefix = formatClientTags(encryptedOutboundTags);
           void sealDm(peerKey, text).then((envelope) => {
             if (!envelope) {
               // Sealing genuinely failed — send plaintext rather than drop the
               // message, and echo it unencrypted (no lock chip, honestly).
-              client.send(`${outboundTagPrefix}PRIVMSG ${target} :${text}\r\n`);
+              client.send(formatTaggedLine(outboundTags, 'PRIVMSG', target, text));
               if (!waitForServerEcho) {
                 set(s => _addMessage(s, target, {
                   id: uid(), time: new Date(), from: ourNick, text, type: 'msg', target,
@@ -3409,7 +3401,7 @@ export const store = createStore<OnyxState>()(
               }
               return;
             }
-            client.send(`${encryptedOutboundTagPrefix}PRIVMSG ${target} :${envelope}\r\n`);
+            client.send(formatTaggedLine(encryptedOutboundTags, 'PRIVMSG', target, envelope));
             if (!waitForServerEcho) {
               // Echo stores the ENVELOPE as text (ciphertext at rest) with the
               // plaintext held transiently for display — same shape as inbound.
@@ -3440,8 +3432,8 @@ export const store = createStore<OnyxState>()(
         const lines = text.split('\n').filter(l => l.trim());
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i]!;
-          if (i === 0 && outboundTagPrefix) {
-            client.send(`${outboundTagPrefix}PRIVMSG ${target} :${line}\r\n`);
+          if (i === 0 && hasOutboundTags) {
+            client.send(formatTaggedLine(outboundTags, 'PRIVMSG', target, line));
           } else {
             client.sendRaw('PRIVMSG', target, line);
           }

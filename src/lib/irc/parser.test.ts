@@ -4,6 +4,7 @@ import {
   parseIRCMessage,
   escapeTagValue,
   formatIRCLine,
+  formatTaggedLine,
   parseNamesPrefix,
   parsePREFIX,
   parseCHANLIMIT,
@@ -110,6 +111,48 @@ describe('formatIRCLine', () => {
     const line = buildSessionResumeLine('tok\r\nPRIVMSG #x :pwned');
     expect(line.slice(0, -2)).not.toMatch(/[\r\n\0]/);
     expect(line.endsWith('\r\n')).toBe(true);
+  });
+});
+
+describe('formatTaggedLine', () => {
+  it('emits a plain formatIRCLine when there are no tags', () => {
+    expect(formatTaggedLine({}, 'PRIVMSG', '#c', 'hello world')).toBe(
+      'PRIVMSG #c :hello world\r\n',
+    );
+  });
+  it('prepends an escaped @tag prefix and one space before the command', () => {
+    expect(formatTaggedLine({ '+draft/reply': 'abc123' }, 'PRIVMSG', '#c', 'hi there')).toBe(
+      '@+draft/reply=abc123 PRIVMSG #c :hi there\r\n',
+    );
+  });
+  it('serialises a valueless tag as a bare key', () => {
+    expect(formatTaggedLine({ 'draft/bot': '' }, 'TAGMSG', '#c')).toBe(
+      '@draft/bot TAGMSG #c\r\n',
+    );
+  });
+  it('joins multiple tags with a semicolon in insertion order', () => {
+    const line = formatTaggedLine({ a: '1', b: '2' }, 'TAGMSG', '#c');
+    expect(line).toBe('@a=1;b=2 TAGMSG #c\r\n');
+  });
+
+  // Injection guard — the outbound choke point the store now routes through.
+  // A lone \r or \n in the message body (the store splits only on \n) must be
+  // stripped by construction so it can never smuggle a second wire command.
+  it('strips a lone CR from the trailing body so it cannot inject a second command', () => {
+    const line = formatTaggedLine({ '+draft/reply': 'r1' }, 'PRIVMSG', '#c', 'hi there\rQUIT');
+    expect(line).toBe('@+draft/reply=r1 PRIVMSG #c :hi thereQUIT\r\n');
+    expect(line.slice(0, -2)).not.toMatch(/[\r\n\0]/);
+  });
+  it('strips embedded CR/LF/NUL from the body and target', () => {
+    const line = formatTaggedLine({ x: 'y' }, 'PRIVMSG', '#c\r\nJOIN #evil', 'a\nb\x00c');
+    expect(line.slice(0, -2)).not.toMatch(/[\r\n\0]/);
+    expect(line.endsWith('\r\n')).toBe(true);
+  });
+  it('neutralises CR/LF hidden inside a tag value via IRCv3 escaping', () => {
+    const line = formatTaggedLine({ '+draft/reply': 'a\r\nb' }, 'PRIVMSG', '#c', 'hello');
+    // \r → \r, \n → \n escape sequences — literal control bytes never reach the wire.
+    expect(line).toBe('@+draft/reply=a\\r\\nb PRIVMSG #c hello\r\n');
+    expect(line.slice(0, -2)).not.toMatch(/[\r\n\0]/);
   });
 });
 
