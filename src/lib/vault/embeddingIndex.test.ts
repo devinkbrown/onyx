@@ -46,6 +46,18 @@ describe('tokenize', () => {
     ]);
   });
 
+  it('keeps accented and multilingual tokens while treating symbols as boundaries', () => {
+    expect(tokenize('mañana🙂добро пожаловать; Ελληνικά/東京99 crème-brûlée')).toEqual([
+      'mañana',
+      'добро',
+      'пожаловать',
+      'ελληνικά',
+      '東京99',
+      'crème',
+      'brûlée',
+    ]);
+  });
+
   it('is deterministic across calls', () => {
     expect(tokenize('repeat this repeat')).toEqual(tokenize('repeat this repeat'));
   });
@@ -58,6 +70,16 @@ describe('embed', () => {
 
   it('is deterministic for identical input', () => {
     expect(Array.from(embed('deploy the server'))).toEqual(Array.from(embed('deploy the server')));
+  });
+
+  it('is deterministic for adversarial unicode input and custom dimensions', () => {
+    const text = 'CAFÉ café Ελληνικά 東京99 dobro добро emoji🙂boundary';
+    const first = embed(text, 64);
+    const second = embed(text, 64);
+
+    expect(Array.from(first)).toEqual(Array.from(second));
+    expect(first).toHaveLength(64);
+    expect(first.every((v) => Number.isFinite(v))).toBe(true);
   });
 
   it('produces different vectors for different inputs', () => {
@@ -73,6 +95,12 @@ describe('embed', () => {
     const vec = embed('');
     expect(vec).toHaveLength(EMBEDDING_DIM);
     expect(vec.every((v) => v === 0)).toBe(true);
+  });
+
+  it('returns a custom-dimension zero vector for empty text', () => {
+    const vec = embed('', 16);
+    expect(vec).toHaveLength(16);
+    expect(Array.from(vec)).toEqual(Array.from(new Float32Array(16)));
   });
 
   it('L2-normalizes non-empty vectors to unit length', () => {
@@ -138,6 +166,11 @@ describe('cosineSimilarity', () => {
     expect(cosineSimilarity(v, v)).toBeCloseTo(1, 6);
   });
 
+  it('is 1 for a non-zero vector compared with itself', () => {
+    const v = new Float32Array([0.25, -0.5, 0.75, 1]);
+    expect(cosineSimilarity(v, v)).toBeCloseTo(1, 6);
+  });
+
   it('is 0 for exactly orthogonal vectors', () => {
     const a = new Float32Array([1, 0, 0]);
     const b = new Float32Array([0, 1, 0]);
@@ -160,6 +193,10 @@ describe('cosineSimilarity', () => {
 
   it('returns 0 when either vector is a zero vector', () => {
     expect(cosineSimilarity(embed('hello world'), embed('!!!'))).toBe(0);
+  });
+
+  it('returns 0 for two empty-text embeddings', () => {
+    expect(cosineSimilarity(embed(''), embed(''))).toBe(0);
   });
 
   it('returns 0 for mismatched or empty lengths', () => {
@@ -221,6 +258,14 @@ describe('HashingEmbeddingProvider', () => {
     const provider = new HashingEmbeddingProvider();
     expect(provider.dim).toBe(EMBEDDING_DIM);
     expect(Array.from(provider.embed('parity check'))).toEqual(Array.from(embed('parity check')));
+  });
+
+  it('emits deterministic vectors across provider instances', () => {
+    const text = 'unicode café 東京99 deterministic hashing';
+    const a = new HashingEmbeddingProvider(32).embed(text);
+    const b = new HashingEmbeddingProvider(32).embed(text);
+
+    expect(Array.from(a)).toEqual(Array.from(b));
   });
 
   it('respects a custom dimensionality', () => {

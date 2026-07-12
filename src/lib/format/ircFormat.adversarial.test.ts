@@ -135,4 +135,31 @@ describe('parseIrcRuns adversarial mIRC formatting', () => {
     expect(styleText).not.toContain('javascript');
     expect(styleText).not.toContain('background-image');
   });
+
+  it('keeps malformed decimal colour tails as text after clearing incoming colours', () => {
+    const { runs, out } = parseIrcRuns(`${C},12${C}04,tail`, { fg: '#ff0000', bg: '#000000' });
+
+    expect(runs).toEqual([
+      { text: ',12', style: { fg: undefined, bg: undefined } },
+      { text: ',tail', style: { fg: '#ff0000', bg: undefined } },
+    ]);
+    expect(out).toEqual({ fg: '#ff0000', bg: undefined });
+  });
+
+  it('does not let truncated hex digits or hostile markup become style values', () => {
+    const hostile = '</span><img src=x onerror=alert(1)>';
+    const { runs, out } = parseIrcRuns(`${B}${H}fff${hostile}`);
+    const styles = runs.map((run) => run.style);
+
+    expect(runs).toEqual([
+      {
+        text: hostile,
+        style: { bold: true, fg: undefined, bg: undefined },
+      },
+    ]);
+    expect(out).toEqual({ bold: true, fg: undefined, bg: undefined });
+    expect(styleValues(styles)).toEqual([]);
+    expect(JSON.stringify(styles)).not.toContain('onerror');
+    expect(JSON.stringify(styles)).not.toContain('<img');
+  });
 });
