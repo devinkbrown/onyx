@@ -12,7 +12,8 @@ import { getMountedSuimyakuMediaEngine } from '@/lib/mediaEngineMount';
 import { parseActivity } from '@/lib/activity';
 import { OUTBOX_MAX_AGE_MS, deleteOutboxEntry, loadAround, loadOutbox, loadRecent, queueOutbox, type OutboxEntry } from '@/lib/vault/historyVault';
 import { selectDueMessages } from '@/lib/schedule/dispatch';
-import { deviceKeys, isEnvelope, openDm, sealDm } from '@/lib/e2ee/dmCipher';
+import { deviceKeys, isEnvelope } from '@/lib/e2ee/dmCipher';
+import { openDmTrusted, peerSafetyNumber, pinnedPeerKey, pinPeerKey, safetyNumber, sealDmTrusted } from '@/lib/e2ee/keyPinning';
 import {
   ENCRYPTION_POLICY_PROP,
   E2EE_CAP,
@@ -439,6 +440,19 @@ export interface PasskeyCredential {
   signCount: number;
   /** Registration time (unix seconds) when the server sends it, else `null`. */
   createdAt: number | null;
+}
+
+/**
+ * A DETECTED E2EE device-key change for a DM peer — the TOFU anti-MITM signal.
+ * The peer now advertises a key different from the one we pinned on first use;
+ * until the user verifies out-of-band (safety number) and explicitly accepts,
+ * we fail CLOSED (no send under the new key, inbound stays LOCKED).
+ */
+export interface PeerKeyChange {
+  /** The device key we previously pinned and trusted for this peer. */
+  pinnedKey: string;
+  /** The newly-advertised key — unverified, awaiting explicit accept. */
+  newKey: string;
 }
 
 export interface OnyxState {
@@ -1716,6 +1730,45 @@ export interface OnyxState {
   publishDeviceKey(): void;
   /** Decrypt an in-store encrypted DM in place (async; no-op if not ours) */
   _decryptDm(target: string, id: string): void;
+  /**
+   * nick.toLowerCase() → a DETECTED E2EE device-key change (possible MITM): the
+   * peer now advertises a key different from the one we pinned. We fail CLOSED —
+   * no send under the new key, inbound stays LOCKED — until it is accepted.
+   */
+  peerKeyChanges: Map<string, PeerKeyChange>;
+  /**
+   * nick.toLowerCase() → the out-of-band SAFETY NUMBER binding our device key to
+   * the peer's PINNED key, cached for the DM UI. Populated by loadSafetyNumber.
+   */
+  peerSafetyNumbers: Map<string, string>;
+  /** Internal: flag a peer's silently-changed key + raise the visible warning (once). */
+  _flagPeerKeyChange(peer: string, newKey: string): Promise<void>;
+  /**
+   * Explicitly accept a peer's changed device key: re-pin the newly-advertised
+   * key (having verified out-of-band), clear the warning, and re-decrypt any
+   * messages held locked by the change.
+   */
+  acceptPeerKeyChange(peer: string): void;
+  /** Forget a pending key-change warning WITHOUT accepting the new key (stays fail-closed). */
+  dismissPeerKeyChange(peer: string): void;
+  /**
+   * Compute + cache the peer's safety number for out-of-band verification.
+   * Deterministic (stable across calls); resolves null until both our device
+   * key exists and the peer is pinned.
+   */
+  loadSafetyNumber(peer: string): Promise<string | null>;
+  /**
+   * nick.toLowerCase() → the safety number binding our device key to the peer's
+   * PENDING new key (the one a key-change is asking us to accept). Cached for the
+   * accept UI; distinct from peerSafetyNumbers (which binds the OLD pinned key).
+   */
+  pendingKeySafetyNumbers: Map<string, string>;
+  /**
+   * Compute + cache the safety number for a peer's PENDING new key, so the accept
+   * UI can verify the key it is about to trust out-of-band. Resolves null when
+   * there is no pending change or we have no device key.
+   */
+  loadPendingKeySafetyNumber(peer: string): Promise<string | null>;
   /** channel.toLowerCase() → rolling caption transcript for the live media session */
   mediaTranscripts: Map<string, Array<{ nick: string; text: string; time: Date }>>;
   /** sender.toLowerCase() → offline (TEGAMI) delivery aggregate */
@@ -3393,16 +3446,27 @@ export const store = createStore<OnyxState>()(
         if (isDm && peerKey && preferences().e2eeDms) {
           const encryptedKind: E2eeMessageKind | null = client.negotiatedCaps.has(E2EE_CAP) ? 'mls' : null;
           const encryptedOutboundTags = encryptedKind ? { ...outboundTags, ...e2eeMessageTag(encryptedKind) } : outboundTags;
-          void sealDm(peerKey, text).then((envelope) => {
-            if (!envelope) {
-              // SECURITY — FAIL CLOSED. The user designated this peer for E2EE
-              // and believes the DM is encrypted; if sealing fails (WebCrypto
-              // error, key-derivation failure, missing/invalid peer key at send
-              // time) we must NOT silently downgrade to a plaintext PRIVMSG on
-              // the wire — that is a confidentiality-relevant silent downgrade
-              // whose only prior cue was the absence of a lock chip. Refuse to
-              // transmit and warn loudly, mirroring the offline branch above
-              // which likewise refuses to leak an E2EE DM as plaintext.
+          // TOFU-gated seal (keyPinning.sealDmTrusted): pin-then-seal on first
+          // use, seal on an unchanged key, and BLOCK on a silently-changed key —
+          // the anti-MITM enforcement point. Never emits plaintext on any path.
+          void sealDmTrusted(target, peerKey, text).then((outcome) => {
+            if (outcome.status === 'key-changed') {
+              // SECURITY — FAIL CLOSED on a possible machine-in-the-middle. The
+              // peer's pinned key changed under us; send NOTHING and surface a
+              // visible, persistent warning the user must resolve by verifying
+              // the safety number out-of-band and explicitly accepting the key.
+              void get()._flagPeerKeyChange(target, peerKey);
+              return;
+            }
+            if (outcome.status !== 'sealed') {
+              // 'unavailable' — WebCrypto error, key-derivation failure, or an
+              // invalid peer key at send time. SECURITY — FAIL CLOSED: the user
+              // designated this peer for E2EE and believes the DM is encrypted;
+              // we must NOT silently downgrade to a plaintext PRIVMSG on the wire
+              // (a confidentiality-relevant silent downgrade whose only prior cue
+              // was the absence of a lock chip). Refuse to transmit and warn
+              // loudly, mirroring the offline branch above which likewise refuses
+              // to leak an E2EE DM as plaintext.
               //
               // PRODUCT DECISION (fail-closed vs warn-and-send): this drops +
               // warns rather than auto-sending unencrypted. Preserving the
@@ -3421,6 +3485,7 @@ export const store = createStore<OnyxState>()(
               });
               return;
             }
+            const envelope = outcome.envelope;
             client.send(formatTaggedLine(encryptedOutboundTags, 'PRIVMSG', target, envelope));
             if (!waitForServerEcho) {
               // Echo stores the ENVELOPE as text (ciphertext at rest) with the
@@ -9081,6 +9146,9 @@ export const store = createStore<OnyxState>()(
     // ── Orochi integration (serial integration pass) ──────────────────────────
     userMetadata: new Map(),
     peerDmKeys: new Map(),
+    peerKeyChanges: new Map(),
+    peerSafetyNumbers: new Map(),
+    pendingKeySafetyNumbers: new Map(),
     mediaTranscripts: new Map(),
     tegami: new Map(),
     readMarkers: new Map(),
@@ -9180,8 +9248,18 @@ export const store = createStore<OnyxState>()(
       const msg = dm?.messages.find(m => m.id === id);
       if (!msg || !msg.encrypted || msg.plaintext !== undefined || !isEnvelope(msg.text)) return;
       const envelope = msg.text;
-      void openDm(peerKey, envelope).then((plain) => {
-        if (plain == null) return; // wrong device / rotated key — stays locked
+      // TOFU-gated open (keyPinning.openDmTrusted): pin-on-first-successful-open,
+      // decrypt on an unchanged key, and stay LOCKED on a silently-changed sender
+      // key — never a plaintext fallback. A key-change additionally raises the
+      // visible warning (vs the benign wrong-device/rotated-key locked case).
+      void openDmTrusted(target, peerKey, envelope).then((outcome) => {
+        if (outcome.status !== 'opened') {
+          // Ciphertext stays LOCKED (LOCKED_PLACEHOLDER in the view) — no
+          // plaintext ever leaks on a decrypt/verify failure. Fail closed.
+          if (outcome.reason === 'key-changed') void get()._flagPeerKeyChange(target, peerKey);
+          return;
+        }
+        const plain = outcome.plaintext;
         set(s => {
           const dms = new Map(s.dms);
           const cur = dms.get(key);
@@ -9198,6 +9276,104 @@ export const store = createStore<OnyxState>()(
         if (sender && sender.toLowerCase() !== get().ourNick.toLowerCase() && !get().isDMMuted(sender)) {
           get().addNotification({ type: 'dm', text: plain, from: sender });
         }
+      });
+    },
+
+    _flagPeerKeyChange(peer, newKey) {
+      const key = peer.toLowerCase();
+      // Fetch the previously-pinned key for the warning display / safety compare.
+      // The pinnedPeerKey read is best-effort; an unreadable pin store still
+      // raises the warning (fail closed) with an empty pinnedKey.
+      return pinnedPeerKey(peer).then((pinned) => {
+        const already = get().peerKeyChanges.has(key);
+        set(s => {
+          const peerKeyChanges = new Map(s.peerKeyChanges);
+          peerKeyChanges.set(key, { pinnedKey: pinned ?? '', newKey });
+          return { peerKeyChanges };
+        });
+        // Warn once per detected change so repeated sends/receives don't spam.
+        if (already) return;
+        get().addToast({
+          variant: 'error',
+          title: 'Encryption key changed',
+          description: `${peer}'s encryption key changed — verify before continuing.`,
+        });
+        get().addNotification({
+          type: 'error',
+          text: `${peer}'s encryption key changed — verify before continuing.`,
+        });
+      });
+    },
+
+    acceptPeerKeyChange(peer) {
+      const key = peer.toLowerCase();
+      // Re-pin the newly-advertised key (from the pending change, or whatever the
+      // directory currently advertises). No new key to trust → nothing to accept.
+      const newKey = get().peerKeyChanges.get(key)?.newKey ?? get().peerDmKeys.get(key);
+      if (!newKey) return;
+      void pinPeerKey(peer, newKey).then((ok) => {
+        // Could not persist the new pin → stay fail-closed, keep the warning.
+        if (!ok) return;
+        set(s => {
+          const peerKeyChanges = new Map(s.peerKeyChanges);
+          peerKeyChanges.delete(key);
+          const pendingKeySafetyNumbers = new Map(s.pendingKeySafetyNumbers);
+          pendingKeySafetyNumbers.delete(key);
+          return { peerKeyChanges, pendingKeySafetyNumbers };
+        });
+        // Re-decrypt anything held locked while the key was unverified (messages
+        // sealed to the now-accepted key will open; older ones stay locked).
+        const dm = get().dms.get(key);
+        if (dm) for (const m of dm.messages) {
+          if (m.encrypted && m.plaintext === undefined) get()._decryptDm(key, m.id);
+        }
+        // Refresh the cached safety number — it now binds to the accepted key.
+        void get().loadSafetyNumber(peer);
+      });
+    },
+
+    dismissPeerKeyChange(peer) {
+      const key = peer.toLowerCase();
+      if (!get().peerKeyChanges.has(key)) return;
+      set(s => {
+        const peerKeyChanges = new Map(s.peerKeyChanges);
+        peerKeyChanges.delete(key);
+        const pendingKeySafetyNumbers = new Map(s.pendingKeySafetyNumbers);
+        pendingKeySafetyNumbers.delete(key);
+        return { peerKeyChanges, pendingKeySafetyNumbers };
+      });
+    },
+
+    loadSafetyNumber(peer) {
+      const key = peer.toLowerCase();
+      return peerSafetyNumber(peer).then((sn) => {
+        if (sn == null) return null;
+        set(s => {
+          const peerSafetyNumbers = new Map(s.peerSafetyNumbers);
+          peerSafetyNumbers.set(key, sn);
+          return { peerSafetyNumbers };
+        });
+        return sn;
+      });
+    },
+
+    loadPendingKeySafetyNumber(peer) {
+      const key = peer.toLowerCase();
+      const newKey = get().peerKeyChanges.get(key)?.newKey;
+      if (!newKey) return Promise.resolve(null);
+      return deviceKeys().then((mine) => {
+        if (!mine) return null;
+        return safetyNumber(mine.publicB64, newKey).then((sn) => {
+          // Guard against a race: only cache if the pending change still names
+          // this exact key (an accept/dismiss/new-change may have intervened).
+          if (sn == null || get().peerKeyChanges.get(key)?.newKey !== newKey) return sn;
+          set(s => {
+            const pendingKeySafetyNumbers = new Map(s.pendingKeySafetyNumbers);
+            pendingKeySafetyNumbers.set(key, sn);
+            return { pendingKeySafetyNumbers };
+          });
+          return sn;
+        });
       });
     },
 
