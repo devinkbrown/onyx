@@ -46,6 +46,16 @@ describe('setChannelNotifyMode', () => {
     expect(store.getState().channelNotify.has('#room')).toBe(false);
     expect(store.getState().channelNotifyMode('#room')).toBe('all');
   });
+
+  it('clears a normalized entry even when the reset target uses different case', () => {
+    store.getState().setChannelNotifyMode('#Mixed', 'mentions');
+    expect(store.getState().channelNotify.get('#mixed')).toBe('mentions');
+
+    store.getState().setChannelNotifyMode('#MIXED', 'all');
+
+    expect(store.getState().channelNotify.has('#mixed')).toBe(false);
+    expect(store.getState().channelNotifyMode('#mixed')).toBe('all');
+  });
 });
 
 describe('persistence round-trip', () => {
@@ -85,5 +95,11 @@ describe('shouldNotify derived helper', () => {
   it('all (the default when unset) always notifies', () => {
     expect(store.getState().shouldNotify('#anything', true)).toBe(true);
     expect(store.getState().shouldNotify('#anything', false)).toBe(true);
+  });
+
+  it('uses the normalized channel key when making the notification decision', () => {
+    expect(store.getState().shouldNotify('#MUTED', true)).toBe(false);
+    expect(store.getState().shouldNotify('#MENTIONS', true)).toBe(true);
+    expect(store.getState().shouldNotify('#MENTIONS', false)).toBe(false);
   });
 });

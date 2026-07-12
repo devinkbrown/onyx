@@ -129,6 +129,24 @@ describe('quiet boost aggregation', () => {
     expect(totalBoosts(groups)).toBe(3);
   });
 
+  it('deduplicates case variants without normalizing away the first-seen reactor spelling', () => {
+    const groups = aggregateBoosts(
+      [
+        { emoji: 'b', from: 'MIO' },
+        { emoji: 'b', from: 'mio' },
+        { emoji: 'b', from: 'Mio' },
+        { emoji: 'b', from: 'ren' },
+        { emoji: 'a', from: 'mio' },
+      ],
+      'mIo',
+    );
+
+    expect(groups).toEqual([
+      { emoji: 'b', count: 2, reactors: ['MIO', 'ren'], youBoosted: true },
+      { emoji: 'a', count: 1, reactors: ['mio'], youBoosted: true },
+    ]);
+  });
+
   it('documents that boosts never notify anyone', () => {
     expect(BOOST_NOTIFIES).toBe(false);
   });
@@ -395,6 +413,74 @@ describe('quiet boost Home digest', () => {
     expect(digest.map((item) => [item.messageId, item.total])).toEqual([
       ['unique-two', 2],
       ['raw-dupes', 1],
+    ]);
+  });
+
+  it('deduplicates noisy TAGMSG rows before applying the digest limit', () => {
+    const digest = buildQuietBoostDigest(
+      [{
+        target: '#general',
+        messages: [
+          msg(
+            'raw-louder',
+            'one unique reactor repeated many times',
+            [
+              { emoji: 'a', users: ['Kai', 'kai', 'KAI'] },
+              { emoji: 'a', users: ['kAi'] },
+            ],
+            9000,
+          ),
+          msg('real-top', 'two unique reactors', [{ emoji: 'b', users: ['mio', 'ren'] }], 1000),
+        ],
+      }],
+      'kai',
+      1,
+    );
+
+    expect(digest.map((item) => [item.messageId, item.total])).toEqual([
+      ['real-top', 2],
+    ]);
+  });
+
+  it('reconciles split TAGMSG rows per emoji, not per whole message', () => {
+    const message = msg(
+      'same-reactor-multiple-emojis',
+      'same nick reacted with different emoji',
+      [
+        { emoji: 'a', users: ['Kai', 'kai'] },
+        { emoji: 'b', users: ['KAI'] },
+        { emoji: 'b', users: ['kai'] },
+      ],
+      1000,
+    );
+
+    const digest = buildQuietBoostDigest([{ target: '#general', messages: [message] }], 'kai');
+
+    expect(digest[0]?.total).toBe(2);
+    expect(digest[0]?.groups).toEqual([
+      { emoji: 'a', count: 1, reactors: ['Kai'], youBoosted: true },
+      { emoji: 'b', count: 1, reactors: ['KAI'], youBoosted: true },
+    ]);
+  });
+
+  it('preserves first-seen reactor spellings while reconciling interleaved TAGMSG rows', () => {
+    const message = msg(
+      'interleaved-reactions',
+      'interleaved rows',
+      [
+        { emoji: 'b', users: ['Kai', 'MIO'] },
+        { emoji: 'a', users: ['Ren', 'ren'] },
+        { emoji: 'b', users: ['kai', 'mio', 'Zed'] },
+      ],
+      1000,
+    );
+
+    const digest = buildQuietBoostDigest([{ target: '#general', messages: [message] }], 'mio');
+
+    expect(digest[0]?.total).toBe(4);
+    expect(digest[0]?.groups).toEqual([
+      { emoji: 'b', count: 3, reactors: ['Kai', 'MIO', 'Zed'], youBoosted: true },
+      { emoji: 'a', count: 1, reactors: ['Ren'], youBoosted: false },
     ]);
   });
 

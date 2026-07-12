@@ -7,7 +7,10 @@ const B = '\x02';
 const C = '\x03';
 const H = '\x04';
 const O = '\x0f';
+const M = '\x11';
+const R = '\x16';
 const I = '\x1d';
+const S = '\x1e';
 const U = '\x1f';
 
 function styleValues(styles: readonly IrcStyle[]): string[] {
@@ -44,6 +47,33 @@ describe('parseIrcRuns adversarial mIRC formatting', () => {
     expect(out).toEqual({ bold: true, italic: true, underline: true, fg: '#0000fc', bg: '#ffff00' });
   });
 
+  it('carries unterminated nested formatting state to EOF', () => {
+    const { runs, out } = parseIrcRuns(`${B}bold ${I}italic ${U}under ${S}strike ${M}mono ${R}reverse`);
+
+    expect(runs).toEqual([
+      { text: 'bold ', style: { bold: true } },
+      { text: 'italic ', style: { bold: true, italic: true } },
+      { text: 'under ', style: { bold: true, italic: true, underline: true } },
+      { text: 'strike ', style: { bold: true, italic: true, underline: true, strike: true } },
+      { text: 'mono ', style: { bold: true, italic: true, underline: true, strike: true, monospace: true } },
+      {
+        text: 'reverse',
+        style: { bold: true, italic: true, underline: true, strike: true, monospace: true, reverse: true },
+      },
+    ]);
+    expect(out).toEqual({ bold: true, italic: true, underline: true, strike: true, monospace: true, reverse: true });
+  });
+
+  it('limits decimal colour fields to two digits and leaves overflow as inert text', () => {
+    const { runs, out } = parseIrcRuns(`${C}123${C}04,567`);
+
+    expect(runs).toEqual([
+      { text: '3', style: { fg: '#0000fc' } },
+      { text: '7', style: { fg: '#ff0000', bg: '#00ff00' } },
+    ]);
+    expect(out).toEqual({ fg: '#ff0000', bg: '#00ff00' });
+  });
+
   it('keeps unterminated decimal background separators as visible text under the foreground style', () => {
     const { runs, out } = parseIrcRuns(`${C}04,`);
 
@@ -66,7 +96,7 @@ describe('parseIrcRuns adversarial mIRC formatting', () => {
   });
 
   it('preserves hostile non-format C0 bytes as inert text and does not count them as IRC formatting', () => {
-    const hostileControls = '\x00\x01\x07\x08\x1b[31m';
+    const hostileControls = '\x00\x01\x05\x06\x07\x08\x0e\x1b[31m\x7f';
 
     expect(hasIrcFormatting(hostileControls)).toBe(false);
     expect(parseIrcRuns(`a${hostileControls}${B}b${hostileControls}${B}c`).runs).toEqual([
@@ -92,5 +122,17 @@ describe('parseIrcRuns adversarial mIRC formatting', () => {
     expect(styleValues(styles).every((value) => /^#[0-9a-f]{6}$/.test(value))).toBe(true);
     expect(styleValues(styles).join(' ')).not.toContain('javascript');
     expect(styleValues(styles).join(' ')).not.toContain('onerror');
+  });
+
+  it('keeps CSS-looking colour injection attempts in text after the validated hex foreground', () => {
+    const payload = ';background-image:url(javascript:alert(1));color:red';
+    const { runs, out } = parseIrcRuns(`${H}fF00Aa${payload}`);
+    const styleText = styleValues(runs.map((run) => run.style)).join(' ');
+
+    expect(runs).toEqual([{ text: payload, style: { fg: '#ff00aa' } }]);
+    expect(out).toEqual({ fg: '#ff00aa' });
+    expect(styleText).toBe('#ff00aa');
+    expect(styleText).not.toContain('javascript');
+    expect(styleText).not.toContain('background-image');
   });
 });
