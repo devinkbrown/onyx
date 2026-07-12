@@ -102,6 +102,17 @@ describe('DmKeyChangeBanner', () => {
     expect(pending).toHaveTextContent('43434');
   });
 
+  it('silences the async safety-number outputs so they do not re-announce', () => {
+    seed({ peer: 'Trev', pinnedSn: PINNED_SN, pendingSn: PENDING_SN });
+    // <output> is an implicit role=status / aria-live=polite live region; the
+    // fingerprints fill in asynchronously, so without silencing they announce
+    // ~60 digits (twice) over the one-shot alert and re-fire on peer switch.
+    const pinned = screen.getByLabelText(/Current \(trusted\) safety number/i);
+    const pending = screen.getByLabelText(/New \(unverified\) safety number/i);
+    expect(pinned).toHaveAttribute('aria-live', 'off');
+    expect(pending).toHaveAttribute('aria-live', 'off');
+  });
+
   it('shows a computing state while a safety number is still loading', () => {
     seed({ peer: 'Trev', pinnedSn: PINNED_SN, pendingSn: null });
     // Pending SN absent → its column shows the in-flight note, not a blank.

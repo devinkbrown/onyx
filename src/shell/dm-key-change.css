@@ -175,7 +175,10 @@
   font-size: 0.64rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--washi-mute);
+  /* This label ("Current (trusted)" / "New (unverified)") is the PROGRAMMATIC
+     pinned-vs-pending distinction, so it must clear AA — --washi-mute lands at
+     3.36:1 on the column ground, --washi-dim at 6.95:1. */
+  color: var(--washi-dim);
 }
 
 .dm-keychange__col[data-tone='pending'] .dm-keychange__col-label {
@@ -200,5 +203,24 @@
   margin: 0;
   font-family: var(--font-mono);
   font-size: 0.76rem;
-  color: var(--washi-mute);
+  /* Status text ("Computing…" / "unavailable") — AA on the column ground. */
+  color: var(--washi-dim);
+}
+
+/* ── Forced colors (Windows High Contrast) ──
+   Tokens already remap --shu → Mark globally (src/styles/a11y-media.css), so the
+   vermillion danger cue survives as a highlighted system colour and the meaning
+   is also carried in text ("⚠ Encryption key changed", "New (unverified)").
+   Two spots need pinning: the seal is a gradient (a background-image the UA may
+   drop), and the pending column's border is a color-mix() that forced colours
+   can flatten to a single system colour — losing the "scrutinise this one" cue
+   and the two-column distinction. Pin both to Mark. */
+@media (forced-colors: active) {
+  .dm-keychange__rule {
+    background: Mark;
+  }
+
+  .dm-keychange__col[data-tone='pending'] {
+    border-color: Mark;
+  }
 }

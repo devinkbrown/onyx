@@ -171,7 +171,18 @@ function SafetyColumn(props: SafetyColumnProps): JSX.Element {
           </p>
         }
       >
-        <output class="dm-keychange__fingerprint" aria-label={`${props.label} safety number`}>
+        {/*
+          <output> carries an implicit role="status" + aria-live="polite": the
+          fingerprints populate asynchronously, so left live they would announce
+          ~60 digits (twice) over the top of the one-shot alert, and re-announce
+          on every peer switch. Silence the live channel — the alert already
+          carries the call to action; AT reaches the digits on demand via the
+          accessible name. */}
+        <output
+          class="dm-keychange__fingerprint"
+          aria-label={`${props.label} safety number`}
+          aria-live="off"
+        >
           <For each={props.groups}>
             {(group) => <span class="dm-keychange__group">{group}</span>}
           </For>
