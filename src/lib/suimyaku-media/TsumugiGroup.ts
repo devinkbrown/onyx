@@ -21,6 +21,8 @@
  *   const pt = await group.decrypt(ct);
  */
 
+import { ReplayGuard } from './replayWindow';
+
 const GCM_ALG = 'AES-GCM';
 const GCM_LEN = 256;
 const GCM_TAG = 128;
@@ -31,7 +33,14 @@ export class TsumugiGroup {
   private groupKey: CryptoKey | null;
   private readonly sendIvPrefix = crypto.getRandomValues(new Uint8Array(IV_PREFIX_LEN));
   private sendIvCounter = 0;
-  private readonly seenReceiveIvs = new Set<string>();
+  /*
+   * Bounded per-sender sliding-window replay guard. Group media has many
+   * senders sharing one key and (unlike TsumugiSession) never ratchets, so a
+   * grow-forever Set of received IVs would leak memory for the whole call.
+   * Sender IV counters are monotonic per 8-byte prefix, so a windowed guard
+   * gives O(senders) memory while preserving replay rejection.
+   */
+  private readonly replayGuard = new ReplayGuard();
   private destroyed = false;
 
   private constructor(groupKey: CryptoKey) {
@@ -111,21 +120,23 @@ export class TsumugiGroup {
     const key = this.requireKey();
     if (frame.length < IV_LEN + 16) throw new Error('TsumugiGroup: frame too short');
     const iv = frame.slice(0, IV_LEN);
-    if (this.seenReceiveIvs.has(ivKey(iv))) throw new Error('TsumugiGroup: replayed frame');
+    if (!this.replayGuard.mayAccept(iv)) throw new Error('TsumugiGroup: replayed frame');
     const ct = frame.slice(IV_LEN);
     const pt = await crypto.subtle.decrypt(
       { name: GCM_ALG, iv: toArrayBuffer(iv), tagLength: GCM_TAG },
       key,
       toArrayBuffer(ct),
     );
-    this.seenReceiveIvs.add(ivKey(iv));
+    // Only remember the IV AFTER successful authentication, so a forged IV
+    // whose GCM tag fails can never poison the replay window.
+    this.replayGuard.commit(iv);
     return new Uint8Array(pt);
   }
 
   /** Clear group key material and reject future use of this object. */
   destroy(): void {
     this.groupKey = null;
-    this.seenReceiveIvs.clear();
+    this.replayGuard.clear();
     this.destroyed = true;
   }
 
@@ -143,12 +154,6 @@ export class TsumugiGroup {
     new DataView(iv.buffer).setUint32(IV_PREFIX_LEN, this.sendIvCounter++, false);
     return iv;
   }
-}
-
-function ivKey(iv: Uint8Array): string {
-  let out = '';
-  for (let i = 0; i < IV_LEN; i++) out += iv[i]!.toString(16).padStart(2, '0');
-  return out;
 }
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
