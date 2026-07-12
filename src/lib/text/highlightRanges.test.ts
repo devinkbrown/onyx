@@ -137,6 +137,47 @@ describe('highlightRanges', () => {
     expect(joinSegments(text, ranges)).toBe(text);
   });
 
+  it('skips overlapping candidates and resumes matching after the accepted range', () => {
+    const text = 'ababaaba';
+    const ranges = highlightRanges(text, 'aba');
+
+    expect(ranges).toEqual([
+      { start: 0, end: 3, match: true },
+      { start: 3, end: 5, match: false },
+      { start: 5, end: 8, match: true },
+    ]);
+    expect(joinSegments(text, ranges)).toBe(text);
+  });
+
+  it('emits adjacent unicode matches at code-unit boundaries', () => {
+    const text = '🌊reef🌊reef';
+    const ranges = highlightRanges(text, '🌊reef');
+
+    expect(ranges).toEqual([
+      { start: 0, end: 6, match: true },
+      { start: 6, end: 12, match: true },
+    ]);
+    expect(joinSegments(text, ranges)).toBe(text);
+  });
+
+  it('matches unicode case-insensitively without normalizing decomposed text', () => {
+    const text = 'mañana MAÑANA mañana';
+    const ranges = highlightRanges(text, 'ÑANA');
+
+    expect(ranges).toEqual([
+      { start: 0, end: 2, match: false },
+      { start: 2, end: 6, match: true },
+      { start: 6, end: 9, match: false },
+      { start: 9, end: 13, match: true },
+      { start: 13, end: 21, match: false },
+    ]);
+    expect(joinSegments(text, ranges)).toBe(text);
+  });
+
+  it('returns a single full-match range when the query covers the whole text', () => {
+    expect(highlightRanges('needle', 'needle')).toEqual([{ start: 0, end: 6, match: true }]);
+  });
+
   it('reconstructs the original text from every segment', () => {
     const cases: ReadonlyArray<readonly [string, string]> = [
       ['open water', 'water'],
@@ -144,6 +185,9 @@ describe('highlightRanges', () => {
       ['Find a+b? and aab', 'a+b?'],
       ['Ocean ocean OCEAN', 'oCeAn'],
       ['hello 🌊 hello 🌊', '🌊'],
+      ['ababaaba', 'aba'],
+      ['🌊reef🌊reef', '🌊reef'],
+      ['mañana MAÑANA mañana', 'ÑANA'],
       ['', 'reef'],
       ['open water', ''],
     ];

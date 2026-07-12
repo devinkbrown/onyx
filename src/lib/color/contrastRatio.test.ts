@@ -19,6 +19,12 @@ describe('relativeLuminance', () => {
     expect(relativeLuminance(WHITE)).toBe(1);
   });
 
+  it('returns the WCAG luminance coefficients for saturated RGB primaries', () => {
+    expect(relativeLuminance({ r: 255, g: 0, b: 0 })).toBeCloseTo(0.2126, 12);
+    expect(relativeLuminance({ r: 0, g: 255, b: 0 })).toBeCloseTo(0.7152, 12);
+    expect(relativeLuminance({ r: 0, g: 0, b: 255 })).toBeCloseTo(0.0722, 12);
+  });
+
   it('clamps out-of-range channels before linearization', () => {
     expect(relativeLuminance({ r: -12, g: 300, b: 0 })).toBeCloseTo(
       relativeLuminance({ r: 0, g: 255, b: 0 }),
@@ -36,6 +42,12 @@ describe('relativeLuminance', () => {
       0.2126 * (((11 / 255 + 0.055) / 1.055) ** 2.4),
       12,
     );
+  });
+
+  it('preserves fractional in-gamut channels instead of rounding to byte values', () => {
+    expect(relativeLuminance({ r: 0.5, g: 0, b: 0 })).toBeCloseTo(0.2126 * (0.5 / 255 / 12.92), 14);
+    expect(relativeLuminance({ r: 254.5, g: 254.5, b: 254.5 })).toBeLessThan(1);
+    expect(relativeLuminance({ r: 254.5, g: 254.5, b: 254.5 })).toBeGreaterThan(0.99);
   });
 });
 
@@ -66,6 +78,14 @@ describe('contrastRatio', () => {
     expect(contrastRatio({ r: Number.NaN, g: 255, b: 255 }, BLACK)).toBeGreaterThan(16);
   });
 
+  it('clamps extreme finite channels to the same ratio as their sRGB endpoints', () => {
+    expect(contrastRatio({ r: -1e9, g: 127.5, b: 1e9 }, WHITE)).toBeCloseTo(
+      contrastRatio({ r: 0, g: 127.5, b: 255 }, WHITE),
+      12,
+    );
+    expect(contrastRatio({ r: 1e9, g: 1e9, b: 1e9 }, { r: -1e9, g: -1e9, b: -1e9 })).toBe(21);
+  });
+
   it('keeps adversarial floating-point channels inside the WCAG ratio range', () => {
     const ratio = contrastRatio(
       { r: -0.5, g: 0.25, b: 255.75 },
@@ -76,6 +96,16 @@ describe('contrastRatio', () => {
     expect(ratio).toBeLessThanOrEqual(21);
     expect(Number.isFinite(ratio)).toBe(true);
   });
+
+  it('does not mutate input colors while normalizing channels', () => {
+    const foreground: RGB = { r: -12, g: 128.5, b: Number.NaN };
+    const background: RGB = { r: 300, g: 255, b: Number.POSITIVE_INFINITY };
+
+    contrastRatio(foreground, background);
+
+    expect(foreground).toEqual({ r: -12, g: 128.5, b: Number.NaN });
+    expect(background).toEqual({ r: 300, g: 255, b: Number.POSITIVE_INFINITY });
+  });
 });
 
 describe('WCAG threshold helpers', () => {
@@ -85,6 +115,14 @@ describe('WCAG threshold helpers', () => {
     expect(meetsAA(BLACK, WHITE)).toBe(true);
     expect(meetsAA(whiteOnMidGray, WHITE)).toBe(false);
     expect(meetsAA(whiteOnMidGray, WHITE, { large: true })).toBe(true);
+  });
+
+  it('treats explicit non-large options the same as the default AA threshold', () => {
+    const largeOnlyGray: RGB = { r: 0x94, g: 0x94, b: 0x94 };
+
+    expect(contrastRatio(largeOnlyGray, WHITE)).toBeGreaterThanOrEqual(3);
+    expect(meetsAA(largeOnlyGray, WHITE, { large: false })).toBe(false);
+    expect(meetsAA(largeOnlyGray, WHITE, { large: undefined })).toBe(false);
   });
 
   it('fails AA immediately below the normal and large thresholds', () => {
@@ -113,6 +151,14 @@ describe('WCAG threshold helpers', () => {
     expect(meetsAAA(BLACK, WHITE)).toBe(true);
     expect(meetsAAA(aaOnlyGray, WHITE)).toBe(false);
     expect(meetsAAA(aaOnlyGray, WHITE, { large: true })).toBe(true);
+  });
+
+  it('treats explicit non-large options the same as the default AAA threshold', () => {
+    const largeOnlyGray: RGB = { r: 0x76, g: 0x76, b: 0x76 };
+
+    expect(contrastRatio(largeOnlyGray, WHITE)).toBeGreaterThanOrEqual(4.5);
+    expect(meetsAAA(largeOnlyGray, WHITE, { large: false })).toBe(false);
+    expect(meetsAAA(largeOnlyGray, WHITE, { large: undefined })).toBe(false);
   });
 
   it('fails AAA immediately below the normal and large thresholds', () => {

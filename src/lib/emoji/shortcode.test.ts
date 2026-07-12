@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from 'vitest';
-import { lookupShortcode, parseEmojiShortcodes, type EmojiSegment } from './shortcode';
+import {
+  MAX_SHORTCODE_SCAN,
+  lookupShortcode,
+  parseEmojiShortcodes,
+  type EmojiSegment,
+} from './shortcode';
 
 function kinds(segments: readonly EmojiSegment[]): string[] {
   return segments.map((segment) => segment.kind);
@@ -22,6 +27,15 @@ describe('lookupShortcode', () => {
       emoji: '🚀',
       shortcode: 'rocket',
       keywords: ['ship', 'launch'],
+    });
+  });
+
+  it('preserves exact unicode glyphs for multi-codepoint picker shortcodes', () => {
+    expect(lookupShortcode('heart')).toMatchObject({ emoji: '❤️', shortcode: 'heart' });
+    expect(lookupShortcode('warning')).toMatchObject({ emoji: '⚠️', shortcode: 'warning' });
+    expect(lookupShortcode('saluting_face')).toMatchObject({
+      emoji: '🫡',
+      shortcode: 'saluting_face',
     });
   });
 
@@ -58,6 +72,16 @@ describe('parseEmojiShortcodes', () => {
     ]);
   });
 
+  it('emits shortcode and unicode together for each known token in a mixed string', () => {
+    expect(parseEmojiShortcodes(':heart:/:warning:/:saluting_face:')).toEqual([
+      { kind: 'emoji', emoji: '❤️', shortcode: 'heart' },
+      { kind: 'text', value: '/' },
+      { kind: 'emoji', emoji: '⚠️', shortcode: 'warning' },
+      { kind: 'text', value: '/' },
+      { kind: 'emoji', emoji: '🫡', shortcode: 'saluting_face' },
+    ]);
+  });
+
   it('resolves a shortcode at the very start and end', () => {
     expect(parseEmojiShortcodes(':fire:')).toEqual([
       { kind: 'emoji', emoji: '🔥', shortcode: 'fire' },
@@ -70,6 +94,17 @@ describe('parseEmojiShortcodes', () => {
     expect(segments).toEqual([
       { kind: 'emoji', emoji: '🚀', shortcode: 'rocket' },
       { kind: 'emoji', emoji: '🔥', shortcode: 'fire' },
+    ]);
+  });
+
+  it('keeps punctuation adjacency out of emoji tokens while parsing neighbors', () => {
+    expect(parseEmojiShortcodes('(:rocket:),:fire::sparkles:!')).toEqual([
+      { kind: 'text', value: '(' },
+      { kind: 'emoji', emoji: '🚀', shortcode: 'rocket' },
+      { kind: 'text', value: '),' },
+      { kind: 'emoji', emoji: '🔥', shortcode: 'fire' },
+      { kind: 'emoji', emoji: '✨', shortcode: 'sparkles' },
+      { kind: 'text', value: '!' },
     ]);
   });
 
@@ -91,12 +126,28 @@ describe('parseEmojiShortcodes', () => {
     ]);
   });
 
+  it('does not partially resolve an unknown allowed-name extension of a real shortcode', () => {
+    expect(parseEmojiShortcodes(':rocket-::rocket_1::rocket+: :rocket:')).toEqual([
+      { kind: 'text', value: ':rocket-::rocket_1::rocket+: ' },
+      { kind: 'emoji', emoji: '🚀', shortcode: 'rocket' },
+    ]);
+  });
+
   it('passes an unknown skin-tone modifier through as literal text', () => {
     const segments = parseEmojiShortcodes(':thumbsup::skin-tone-2:');
 
     expect(segments).toEqual([
       { kind: 'emoji', emoji: '👍', shortcode: 'thumbsup' },
       { kind: 'text', value: ':skin-tone-2:' },
+    ]);
+  });
+
+  it('keeps leading and repeated skin-tone modifier names literal before a known shortcode', () => {
+    const segments = parseEmojiShortcodes(':skin-tone-2::skin-tone-6::thumbsup:');
+
+    expect(segments).toEqual([
+      { kind: 'text', value: ':skin-tone-2::skin-tone-6:' },
+      { kind: 'emoji', emoji: '👍', shortcode: 'thumbsup' },
     ]);
   });
 
@@ -245,5 +296,15 @@ describe('parseEmojiShortcodes', () => {
     const huge = `:rocket: ${'a'.repeat(9000)}`;
     const segments = parseEmojiShortcodes(huge);
     expect(segments).toEqual([{ kind: 'text', value: huge }]);
+  });
+
+  it('still scans input exactly at the scan cap', () => {
+    const input = `${'a'.repeat(MAX_SHORTCODE_SCAN - ':rocket:'.length)}:rocket:`;
+
+    expect(input).toHaveLength(MAX_SHORTCODE_SCAN);
+    expect(parseEmojiShortcodes(input)).toEqual([
+      { kind: 'text', value: 'a'.repeat(MAX_SHORTCODE_SCAN - ':rocket:'.length) },
+      { kind: 'emoji', emoji: '🚀', shortcode: 'rocket' },
+    ]);
   });
 });
