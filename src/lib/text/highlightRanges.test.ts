@@ -66,6 +66,12 @@ describe('highlightRanges', () => {
     expect(highlightRanges('open water', '')).toEqual([{ start: 0, end: 10, match: false }]);
   });
 
+  it('returns the whole unicode text as one non-match segment for an empty query', () => {
+    const text = '👩‍💻';
+
+    expect(highlightRanges(text, '')).toEqual([{ start: 0, end: text.length, match: false }]);
+  });
+
   it('returns no segments for empty text with a non-empty query', () => {
     expect(highlightRanges('', 'reef')).toEqual([]);
   });
@@ -76,6 +82,12 @@ describe('highlightRanges', () => {
       { start: 5, end: 9, match: true },
       { start: 9, end: 17, match: false },
     ]);
+  });
+
+  it('does not normalize distinct unicode spellings into a match', () => {
+    const text = 'Cafe\u0301 au lait';
+
+    expect(highlightRanges(text, 'é')).toEqual([{ start: 0, end: text.length, match: false }]);
   });
 
   it('matches case-insensitively while preserving original ranges', () => {
@@ -110,6 +122,17 @@ describe('highlightRanges', () => {
       { start: 3, end: 5, match: true },
       { start: 5, end: 9, match: false },
       { start: 9, end: 11, match: true },
+    ]);
+    expect(joinSegments(text, ranges)).toBe(text);
+  });
+
+  it('keeps dense overlapping candidates to non-overlapping regex matches', () => {
+    const text = 'aaaaa';
+    const ranges = highlightRanges(text, 'aaa');
+
+    expect(ranges).toEqual([
+      { start: 0, end: 3, match: true },
+      { start: 3, end: 5, match: false },
     ]);
     expect(joinSegments(text, ranges)).toBe(text);
   });

@@ -108,6 +108,14 @@ describe('parseMentions', () => {
     });
   });
 
+  it('returns empty collections when only bare markers are present', () => {
+    expect(parseMentions('@ # &, trailing @')).toEqual({
+      mentions: [],
+      channels: [],
+      ranges: [],
+    });
+  });
+
   it('ranges reconstruct the highlighted token text', () => {
     const text = 'ping @Alice in #Root, @BOB in &Ops';
     const parsed = parseMentions(text);
@@ -127,6 +135,31 @@ describe('parseMentions', () => {
     expect(parsed.mentions).toEqual(['ok']);
     expect(parsed.channels).toEqual([]);
     expect(rangeValues(text, parsed.ranges)).toEqual(['@ok']);
+  });
+
+  it('rejects ascii nick prefixes followed by unicode word characters', () => {
+    const text = '@bobé @alice中 @good-name';
+
+    const parsed = parseMentions(text);
+
+    expect(parsed.mentions).toEqual(['good-name']);
+    expect(rangeValues(text, parsed.ranges)).toEqual(['@good-name']);
+  });
+
+  it('keeps adjacent mention and channel ranges non-overlapping', () => {
+    const text = '@ops#日本-team &ops @alice';
+
+    const parsed = parseMentions(text);
+
+    expect(parsed.mentions).toEqual(['ops', 'alice']);
+    expect(parsed.channels).toEqual(['#日本-team', '&ops']);
+    expect(parsed.ranges).toEqual([
+      { start: 0, end: 4, kind: 'mention', value: 'ops' },
+      { start: 4, end: 12, kind: 'channel', value: '#日本-team' },
+      { start: 13, end: 17, kind: 'channel', value: '&ops' },
+      { start: 18, end: 24, kind: 'mention', value: 'alice' },
+    ]);
+    expect(rangeValues(text, parsed.ranges)).toEqual(['@ops', '#日本-team', '&ops', '@alice']);
   });
 
   it('accepts mentions after control and punctuation boundaries without absorbing html-looking tails', () => {

@@ -35,6 +35,14 @@ describe('searchEmojis', () => {
     expect(results.map((entry) => entry.shortcode)).toEqual(['grinning', 'joy']);
   });
 
+  it('does not unwrap malformed nested colon queries into a known shortcode', () => {
+    const query = '::rocket::';
+
+    const results = searchEmojis(query);
+
+    expect(results).toEqual([]);
+  });
+
   it('trims whitespace and strips surrounding colons from shortcode queries', () => {
     const query = '  :rocket:  ';
 
@@ -89,6 +97,22 @@ describe('searchEmojis', () => {
 
   it('returns an empty array for an unknown shortcode or keyword', () => {
     const query = 'missing_key';
+
+    const results = searchEmojis(query);
+
+    expect(results).toEqual([]);
+  });
+
+  it('returns an empty array for literal unicode emoji queries', () => {
+    const query = '🚀';
+
+    const results = searchEmojis(query);
+
+    expect(results).toEqual([]);
+  });
+
+  it('treats hostile markup-shaped text as an ordinary unmatched query', () => {
+    const query = ':<img src=x onerror=alert(1)>:';
 
     const results = searchEmojis(query);
 

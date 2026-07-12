@@ -1,11 +1,24 @@
 import { defineConfig } from 'vitest/config';
+import { searchForWorkspaceRoot } from 'vite';
 import solid from 'vite-plugin-solid';
 import { fileURLToPath, URL } from 'node:url';
 
 // Onyx test harness — vitest + SolidJS (vite-plugin-solid + jsdom).
+// fs.allow is computed (not hardcoded to /home/kain/onyx) so vitest runs INSIDE a fleet
+// worktree too: the worktree root + the resolved workspace root + the shared pnpm store are
+// all served, so jest-dom's realpath resolves within the allow-list wherever the checkout lives.
+// This unblocks parallel test-gating across worktrees instead of serializing in the main tree.
 export default defineConfig({
   plugins: [solid()],
-  server: { fs: { allow: ['.', '/home/kain/onyx'] } },
+  server: {
+    fs: {
+      allow: [
+        searchForWorkspaceRoot(process.cwd()),
+        process.cwd(),
+        '/home/kain/.local/share/pnpm/store',
+      ],
+    },
+  },
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
     // Critical for Solid reactivity under test.

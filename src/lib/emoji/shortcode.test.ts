@@ -150,10 +150,54 @@ describe('parseEmojiShortcodes', () => {
     ]);
   });
 
+  it('keeps empty shortcode delimiters literal between known shortcodes', () => {
+    const input = ':rocket::::fire:';
+
+    const segments = parseEmojiShortcodes(input);
+
+    expect(segments).toEqual([
+      { kind: 'emoji', emoji: '🚀', shortcode: 'rocket' },
+      { kind: 'text', value: '::' },
+      { kind: 'emoji', emoji: '🔥', shortcode: 'fire' },
+    ]);
+  });
+
   it('does not resolve an uppercase shortcode', () => {
     expect(parseEmojiShortcodes(':ROCKET:')).toEqual([
       { kind: 'text', value: ':ROCKET:' },
     ]);
+  });
+
+  it('preserves an unknown shortcode with every allowed name character', () => {
+    const input = ':abc_123+-: :rocket:';
+
+    const segments = parseEmojiShortcodes(input);
+
+    expect(segments).toEqual([
+      { kind: 'text', value: ':abc_123+-: ' },
+      { kind: 'emoji', emoji: '🚀', shortcode: 'rocket' },
+    ]);
+  });
+
+  it('does not let a missing close colon consume following unicode text', () => {
+    const input = 'start :rocket then 🌊';
+
+    const segments = parseEmojiShortcodes(input);
+
+    expect(segments).toEqual([{ kind: 'text', value: input }]);
+  });
+
+  it('does not promote hostile text adjacent to a real shortcode into unsafe tokens', () => {
+    const hostile = '<img src=x onerror=alert(1)>';
+    const input = `${hostile}:rocket:${hostile}`;
+    const segments = parseEmojiShortcodes(input);
+
+    expect(segments).toEqual([
+      { kind: 'text', value: hostile },
+      { kind: 'emoji', emoji: '🚀', shortcode: 'rocket' },
+      { kind: 'text', value: hostile },
+    ]);
+    expect(kinds(segments)).toEqual(['text', 'emoji', 'text']);
   });
 
   // --- adversarial: hostile input must yield ONLY inert text, never markup ---

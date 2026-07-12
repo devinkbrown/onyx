@@ -46,6 +46,15 @@ describe('truncateMiddle', () => {
     expect(truncateMiddle('boundary', 8)).toBe('boundary');
   });
 
+  it('splits odd and even boundary budgets deterministically around the ellipsis', () => {
+    expect(truncateMiddle('abcdef', 4)).toBe('a…ef');
+    expect(truncateMiddle('abcdef', 5)).toBe('ab…ef');
+  });
+
+  it('floors fractional max values before middle truncation', () => {
+    expect(truncateMiddle('abcdef', 4.9)).toBe('a…ef');
+  });
+
   it('keeps exact-fit unicode strings unchanged', () => {
     expect(truncateMiddle('ab😀', 4)).toBe('ab😀');
     expect(truncateMiddle('e\u0301x', 3)).toBe('e\u0301x');
@@ -87,6 +96,21 @@ describe('truncateMiddle', () => {
     expect(result).toBe('ab…cd');
     expect(result).not.toContain('👍');
     expect(result).not.toContain('🏽');
+    expect(hasLoneSurrogate(result)).toBe(false);
+  });
+
+  it('returns only the ellipsis when oversized edge clusters cannot fit retained sides', () => {
+    const result = truncateMiddle('👩‍💻abc👍🏽', 5);
+
+    expect(result).toBe('…');
+    expect(hasLoneSurrogate(result)).toBe(false);
+  });
+
+  it('keeps a fitting emoji modifier cluster at the retained tail boundary', () => {
+    const result = truncateMiddle('👩‍💻abc👍🏽', 8);
+
+    expect(result).toBe('…👍🏽');
+    expect(result.length).toBeLessThanOrEqual(8);
     expect(hasLoneSurrogate(result)).toBe(false);
   });
 });
