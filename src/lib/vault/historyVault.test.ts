@@ -9,7 +9,9 @@ import { IDBFactory } from 'fake-indexeddb';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { ChatMessage } from '@/lib/irc/types';
+import type { VaultExportSnapshot } from './historyVault';
 import {
+  OMIT_AT_REST,
   VAULT_KEEP,
   _resetVaultForTests,
   clearVault,
@@ -28,6 +30,38 @@ import {
   serializeMessage,
   setRetentionPolicy,
 } from './historyVault';
+
+// ── Compile-time plaintext-at-rest partition guard ───────────────────────────
+// Every ChatMessage field must be consciously classified as either PERSISTED
+// (safe at rest) or omitted (OMIT_AT_REST). PersistedKey is an explicit ledger,
+// NOT `Exclude<keyof ChatMessage, ...>`, so adding a NEW field to ChatMessage
+// (e.g. a decrypted attachment) makes `keyof ChatMessage` no longer equal the
+// classified union below — a TYPE ERROR here that `pnpm typecheck` catches. That
+// forces a deliberate persist-or-omit decision instead of letting a transient
+// field silently ride the serialize spread onto disk.
+type PersistedKey =
+  | 'id'
+  | 'time'
+  | 'from'
+  | 'text'
+  | 'type'
+  | 'highlight'
+  | 'target'
+  | 'topic'
+  | 'reactions'
+  | 'replyTo'
+  | 'edited'
+  | 'deleted'
+  | 'redacted'
+  | 'pending'
+  | 'encrypted'
+  | 'e2ee';
+type ClassifiedKey = PersistedKey | (typeof OMIT_AT_REST)[number];
+type AssertMutualExtends<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never;
+// If this line errors, a ChatMessage field is unclassified: add it to
+// PersistedKey (safe at rest) or to OMIT_AT_REST (decrypted/transient).
+const _classifiedCoversChatMessage: AssertMutualExtends<ClassifiedKey, keyof ChatMessage> = true;
+void _classifiedCoversChatMessage;
 
 function msg(id: string, time: number, over: Partial<ChatMessage> = {}): ChatMessage {
   return {
@@ -74,6 +108,31 @@ describe('historyVault', () => {
       expect(back.time.getTime()).toBe(1_700_000_000_000);
       expect(back).toEqual(original);
       expect('target_key' in back).toBe(false);
+    });
+
+    it('strips every OMIT_AT_REST field, and the set includes plaintext', () => {
+      // plaintext is the load-bearing case today; assert the allowlist covers it
+      // so a future rename/removal of the constant fails loudly here.
+      expect([...OMIT_AT_REST]).toContain('plaintext');
+
+      // Build a message carrying a value for every omit-at-rest key, then prove
+      // none survive serialization — the plaintext-at-rest invariant, enforced by
+      // the allowlist rather than by an exclusion destructure.
+      const withTransient = msg('e1', 1000, {
+        encrypted: true,
+        text: 'tsumugi.ciphertext',
+      }) as ChatMessage & Record<string, unknown>;
+      for (const key of OMIT_AT_REST) withTransient[key] = `secret-${key}`;
+
+      const stored = serializeMessage('Trev', withTransient) as Record<string, unknown>;
+      for (const key of OMIT_AT_REST) {
+        expect(key in stored).toBe(false);
+      }
+      // The ciphertext envelope still persists; only the decrypted view is gone.
+      expect(stored.text).toBe('tsumugi.ciphertext');
+      expect(stored.encrypted).toBe(true);
+      // The input message is not mutated by the strip.
+      expect((withTransient as Record<string, unknown>).plaintext).toBe('secret-plaintext');
     });
   });
 
@@ -288,6 +347,45 @@ describe('historyVault', () => {
       expect(parseVaultExport({ kind: 'not-onyx', version: 1, targets: [] })).toBeNull();
       expect(parseVaultExport({ kind: 'onyx-vault', version: 2, targets: [] })).toBeNull();
       expect(parseVaultExport({ kind: 'onyx-vault', version: 1, targets: 'nope' })).toBeNull();
+    });
+
+    it('degrades to an empty result instead of throwing on a non-array targets', async () => {
+      // Importers that bypass parseVaultExport (Discord/Slack/IRC-log converters)
+      // can hand importVault an unvalidated shape. A missing/wrong `targets` must
+      // NOT throw a TypeError into the UI — the vault is best-effort.
+      const bad = [
+        { targets: undefined },
+        { targets: null },
+        { targets: 'nope' },
+        { targets: 42 },
+        {},
+        null,
+        undefined,
+      ] as unknown as VaultExportSnapshot[];
+      for (const snapshot of bad) {
+        await expect(importVault(snapshot)).resolves.toEqual({ targets: 0, messages: 0 });
+      }
+      expect(await loadRecent('#room')).toEqual([]);
+    });
+
+    it('skips malformed entries without throwing and still imports valid ones', async () => {
+      // A hand-built snapshot with junk entries interleaved must not throw on the
+      // `entry.messages.length` read; valid entries still land.
+      const snapshot = {
+        kind: 'onyx-vault',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        targets: [
+          null,
+          { target: '#bad' },
+          { target: '#bad2', messages: 'nope' },
+          { target: '#good', messages: [msg('g1', 1000, { target: '#good' })] },
+        ],
+      } as unknown as VaultExportSnapshot;
+
+      const result = await importVault(snapshot);
+      expect(result).toEqual({ targets: 1, messages: 1 });
+      expect((await loadRecent('#good')).map((m) => m.id)).toEqual(['g1']);
     });
   });
 

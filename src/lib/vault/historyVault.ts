@@ -36,7 +36,22 @@ export const OUTBOX_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 export const MAX_EXPORT_TARGETS = 4096;
 export const MAX_EXPORT_RAW_MESSAGES = 4 * VAULT_KEEP;
 
-type StoredMessage = Omit<ChatMessage, 'time'> & { time: number; target_key: string };
+/**
+ * Fields that hold a DECRYPTED or otherwise transient view of a message and must
+ * NEVER reach disk. `plaintext` is the decrypted body of an E2EE DM — view-only.
+ *
+ * This is an explicit OMIT-at-rest allowlist rather than a strip-by-exclusion
+ * destructure: a FUTURE transient field added to `ChatMessage` (e.g. a decrypted
+ * attachment) would otherwise ride the `...rest` spread onto disk with no vault
+ * change, silently regressing the plaintext-at-rest invariant. Listing the omit
+ * set here — plus the compile-time partition guard in the test that forces every
+ * `ChatMessage` key to be consciously classified persist-or-omit — makes adding
+ * such a field a deliberate decision instead of a silent leak.
+ */
+export const OMIT_AT_REST = ['plaintext'] as const;
+type OmitAtRestKey = (typeof OMIT_AT_REST)[number];
+
+type StoredMessage = Omit<ChatMessage, 'time' | OmitAtRestKey> & { time: number; target_key: string };
 
 export interface VaultExportTarget {
   /** Lowercase conversation key stored in this device vault. */
@@ -132,14 +147,14 @@ function targetKeyRange(key: string): IDBKeyRange {
 }
 
 export function serializeMessage(target: string, msg: ChatMessage): StoredMessage {
-  // `plaintext` is the decrypted body of an E2EE DM — view-only, never at
-  // rest. Drop it so the vault stores only the ciphertext envelope (`text`).
-  const { plaintext: _plaintext, ...rest } = msg;
-  return {
-    ...rest,
-    time: msg.time instanceof Date ? msg.time.getTime() : Number(msg.time) || 0,
-    target_key: target.toLowerCase(),
-  };
+  // Copy the message, then strip every omit-at-rest (decrypted/transient) field
+  // so the vault stores only the ciphertext envelope (`text`), never a decrypted
+  // body. Mutating the fresh copy — not `msg` — keeps the input immutable.
+  const row: Record<string, unknown> = { ...msg };
+  for (const key of OMIT_AT_REST) delete row[key];
+  row.time = msg.time instanceof Date ? msg.time.getTime() : Number(msg.time) || 0;
+  row.target_key = target.toLowerCase();
+  return row as StoredMessage;
 }
 
 export function deserializeMessage(row: StoredMessage): ChatMessage {
@@ -285,12 +300,23 @@ export async function exportVault(): Promise<VaultExportSnapshot> {
   }
 }
 
-/** Merge a validated portable vault snapshot into the local IndexedDB vault. */
+/**
+ * Merge a portable vault snapshot into the local IndexedDB vault.
+ *
+ * Callers SHOULD pass a `parseVaultExport`-validated snapshot; some importers
+ * (Discord/Slack/IRC-log conversions) construct the shape directly. To uphold
+ * the vault's never-throw contract this defends the one field it iterates: a
+ * missing or non-array `targets` degrades to an honest empty result rather than
+ * throwing a `TypeError` into the UI. Per-entry shape is still trusted here, but
+ * `serializeMessage` strips `plaintext`, so no decrypted body can leak even from
+ * an unvalidated blob.
+ */
 export async function importVault(snapshot: VaultExportSnapshot): Promise<{ targets: number; messages: number }> {
   let targetCount = 0;
   let messageCount = 0;
+  if (!Array.isArray(snapshot?.targets)) return { targets: 0, messages: 0 };
   for (const entry of snapshot.targets) {
-    if (entry.messages.length === 0) continue;
+    if (!Array.isArray(entry?.messages) || entry.messages.length === 0) continue;
     await saveMessages(entry.target, entry.messages);
     targetCount += 1;
     messageCount += entry.messages.length;
