@@ -1,8 +1,16 @@
 # Onyx documentation
 
-Onyx is a **SolidJS 1.9 + Vite 7** web client for IRCXNet — text chat plus
-realtime voice/video (the Suimyaku media engine) over IRC/IRCX with WebSocket
-transport. This is the documentation hub; each entry is labelled by audience.
+Onyx is the network people join — the consumer-facing brand — delivered as a
+**SolidJS 1.9 + Vite 7** web client: text chat plus realtime voice/video (the
+Suimyaku media engine) over IRC/IRCX with WebSocket transport. This is the
+documentation hub; each entry is labelled by audience.
+
+**Naming (branded house):** **Onyx** is the network/product/client; **Orochi**
+is the engine — the pure-Zig mesh daemon you self-host and the `orochi/*`
+protocol namespace (canonical glossary: `docs/reference/glossary.md` in the
+Orochi repo). "IRCXNet" is a **retired** public identity, kept only as a
+legacy/wire token (e.g. the `.users.ircxnet` cloak suffix). "IRCX" is the wire
+protocol, unrelated to that retired name.
 
 ## Start here
 

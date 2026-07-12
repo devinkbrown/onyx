@@ -17,8 +17,10 @@ commands (`REGISTER`, `CHANNEL`, `TEGAMI`, …), never ChanServ/NickServ fake us
 
 ## 1. Transport & Endpoints
 
-Live network is **IRCXNet**, two nodes: `eshmaki.me` and `ircx.us`. Listeners are
-**dual-stack IPv6** (`[listen] host = "::"`).
+The live network is **Onyx** (the consumer brand; the daemon behind it is
+**Orochi**), two nodes: `eshmaki.me` and `ircx.us`. Listeners are **dual-stack
+IPv6** (`[listen] host = "::"`). The wire `NETWORK` name is operator-set via
+`[network] name` (default `Orochi`); see §3.
 
 | Port | Transport | Use |
 |---|---|---|
@@ -64,7 +66,7 @@ On success the server emits the welcome burst:
 
 | Numeric | Name | Notes |
 |---|---|---|
-| `001` | RPL_WELCOME | `Welcome to the IRCXNet network, <nick> — you are <nick!user@host>` |
+| `001` | RPL_WELCOME | `Welcome to the <NETWORK> network, <nick> — you are <nick!user@host>` (`<NETWORK>` = the `[network] name`, live: `Onyx`) |
 | `002` | RPL_YOURHOST | `Your host is <server> (node N), running orochi-<hash>` |
 | `003` | RPL_CREATED | uptime/创建 line |
 | `004` | RPL_MYINFO | `<server> orochi-<hash> <usermodes> <chanmodes> <chanmodes-with-param>` |
@@ -87,7 +89,7 @@ Errors during registration: `432` erroneous nick, `433` nick in use, `437` nick 
 
 | Token | Default | Meaning |
 |---|---|---|
-| `NETWORK` | `Orochi` (live: `IRCXNet`) | Network name |
+| `NETWORK` | `Orochi` (live: `Onyx`) | Network name (operator-set via `[network] name`) |
 | `CHANTYPES` | `#&` | Channel prefixes |
 | `PREFIX` | `(YQqov)*!.@+` | Status modes → prefix chars (see §8) |
 | `CHANMODES` | `beIZ,k,lfj,imnstCTNMSgWOAVUFD` | 4 classes: list, param-always, param-on-set, flag |

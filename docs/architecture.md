@@ -73,9 +73,9 @@ SASL `password`, and Orochi reclaim tokens `sessionToken` (local node) and
   CHANLIMIT parsers); wire types in `src/lib/irc/types.ts`; multiline batch
   planning in `src/lib/irc/multiline.ts`.
 
-**Node selection:** `src/app/nodes.ts` lists the IRCXNet nodes (`ircx.us`,
-`eshmaki.me`; `src/app/nodes.ts:19`) and attaches to the fastest by connect
-latency. `VITE_IRC_WS` pins an endpoint and disables probing
+**Node selection:** `src/app/nodes.ts` lists the Onyx network's Orochi nodes
+(`ircx.us`, `eshmaki.me`; `src/app/nodes.ts:19`) and attaches to the fastest by
+connect latency. `VITE_IRC_WS` pins an endpoint and disables probing
 (`src/app/nodes.ts:25`) — the path for dev and self-host against your own Orochi.
 
 ## Theming (`src/theme/`)

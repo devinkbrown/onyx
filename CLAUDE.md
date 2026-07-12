@@ -1,7 +1,10 @@
 # Onyx — IRC webchat (SolidJS)
 
-Modern web client for IRCXNet. Pre-release; branch `onyx-solid`.
+Modern web client for the **Onyx** network, running on the **Orochi** engine
+(pure-Zig mesh daemon). Pre-release; branch `onyx-solid`.
 The brand is **Onyx** (formerly Ocean, briefly Ruri — both dead names).
+Branded house: **Onyx** = network/product/client; **Orochi** = engine/daemon/
+protocol; "IRCXNet" = retired public identity, legacy/wire token only.
 
 **License: AGPL-3.0-or-later** (see `LICENSE`). Onyx is copyleft-licensed but NOT yet
 publicly released — it lives only in the PRIVATE `github.com/devinkbrown/onyx` repo. The
