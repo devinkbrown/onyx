@@ -3078,9 +3078,14 @@ export const store = createStore<OnyxState>()(
       const key = target.toLowerCase();
       const s = get();
       const channel = s.channels.get(key);
+      // Classify against the server-advertised CHANTYPES, not a hardcoded '#':
+      // a '&'-channel would otherwise fall through to the DM branch and be
+      // inserted into `dms` as a phantom conversation.
+      const chantypes = s.client?.isupport.CHANTYPES ?? '#&';
+      const isChannel = key.length > 0 && chantypes.includes(key[0]!);
       if (channel) {
         get().navigate({ kind: 'channel', channel: channel.name });
-      } else if (key.startsWith('#')) {
+      } else if (isChannel) {
         const channels = new Map(s.channels);
         channels.set(key, emptyChannel(target));
         set({ channels, activeView: { kind: 'channel', channel: target } });
@@ -9572,8 +9577,12 @@ export const store = createStore<OnyxState>()(
     raidChannel: (channel, target) => {
       const { client } = get();
       if (!client) return;
-      const t = target.startsWith('#') ? target : `#${target}`;
-      client.sendRaw('MEDIA', 'BREAKOUT', channel, t.replace(/^#/, ''));
+      // BREAKOUT wants the bare room name. Strip whichever channel sigil the
+      // server advertises via CHANTYPES ('#', '&', …) rather than only '#', so
+      // a '&'-channel isn't sent with its prefix still attached.
+      const chantypes = client.isupport.CHANTYPES ?? '#&';
+      const bare = target.length > 0 && chantypes.includes(target[0]!) ? target.slice(1) : target;
+      client.sendRaw('MEDIA', 'BREAKOUT', channel, bare);
     },
 
     createStreamPoll: (channel, question, options, durationSec = 60) => {
