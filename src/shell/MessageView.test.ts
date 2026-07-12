@@ -7,6 +7,7 @@ import {
   buildReviewedContextTrail,
   hasReviewedAnchor,
   mergeReviewedContextTrails,
+  orderChronologically,
   reviewedAnchorSource,
 } from './MessageView';
 
@@ -80,5 +81,75 @@ describe('reviewed reader context trails', () => {
     expect(reviewedAnchorSource(entry, visible, vaulted)).toBe('vault');
     expect(reviewedAnchorSource(entry, vaulted, null)).toBe('visible');
     expect(reviewedAnchorSource(entry, visible, null)).toBeNull();
+  });
+});
+
+describe('orderChronologically', () => {
+  it('returns an already in-order buffer untouched (no reorder, no copy)', () => {
+    // Common live-append case: buffer is non-decreasing by time. A stable sort
+    // is a no-op here, so the fast-path must skip the copy+sort and hand back
+    // the SAME array reference (lets dependent memos short-circuit).
+    const list = [
+      message('a', 'alice', 'first', 0),
+      message('b', 'bob', 'second', 1),
+      message('c', 'carol', 'third', 2),
+    ];
+    const result = orderChronologically(list);
+
+    expect(result).toBe(list); // same reference — not copied
+    expect(result.map((m) => m.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('treats a live append at the tail as in-order (no reorder)', () => {
+    const list = [
+      message('a', 'alice', 'first', 0),
+      message('b', 'bob', 'second', 1),
+    ];
+    list.push(message('c', 'carol', 'appended', 2));
+    const result = orderChronologically(list);
+
+    expect(result).toBe(list);
+    expect(result.map((m) => m.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('keeps equal timestamps in insertion order (stable, preserves grouping)', () => {
+    const list = [
+      message('a', 'alice', 'same-time-1', 5),
+      message('b', 'alice', 'same-time-2', 5),
+      message('c', 'alice', 'same-time-3', 5),
+    ];
+    const result = orderChronologically(list);
+
+    expect(result).toBe(list); // equal timestamps are non-decreasing → untouched
+    expect(result.map((m) => m.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('stable-sorts an out-of-order buffer (CHATHISTORY / vault replay)', () => {
+    // A replayed/hydrated line lands after the live tail with an older time,
+    // and an unsorted seam sits mid-list — must be defensively sorted.
+    const list = [
+      message('live-1', 'alice', 'live', 10),
+      message('replay-old', 'bob', 'older replay', 3),
+      message('live-2', 'carol', 'live later', 20),
+    ];
+    const result = orderChronologically(list);
+
+    expect(result).not.toBe(list); // copied, not mutating the store buffer
+    expect(list.map((m) => m.id)).toEqual(['live-1', 'replay-old', 'live-2']); // input untouched
+    expect(result.map((m) => m.id)).toEqual(['replay-old', 'live-1', 'live-2']);
+  });
+
+  it('detects an out-of-order seam that is not at the tail', () => {
+    // The tail (b→c) is in order, but the head (a after the prepend) is not —
+    // a last-two-only check would wrongly skip the sort. Full scan catches it.
+    const list = [
+      message('prepended', 'alice', 'newer prepended', 9),
+      message('b', 'bob', 'older', 1),
+      message('c', 'carol', 'oldest+1', 2),
+    ];
+    const result = orderChronologically(list);
+
+    expect(result).not.toBe(list);
+    expect(result.map((m) => m.id)).toEqual(['b', 'c', 'prepended']);
   });
 });

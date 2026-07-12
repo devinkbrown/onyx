@@ -26,6 +26,21 @@ export default defineConfig({
           if (id.includes('/src/lib/suimyaku-media/') || id.includes('/src/media/')) {
             return 'media';
           }
+          // Theme token data (themes/customThemes/themeStorage) is a small, pure
+          // leaf cluster the eager ThemeProvider needs on first paint. store.ts
+          // ALSO imports themes.ts (DEFAULT_THEME_ID/THEME_IDS), so without an
+          // explicit split Rollup folds the trio INTO the ~58kB `runtime` (store
+          // + irc + e2ee + notifications) chunk — which then becomes a static
+          // dependency of the marketing landing entry purely to read theme
+          // tokens. Give it its own tiny `theme` chunk so the landing entry pulls
+          // only that; `runtime` re-imports it (cheap) and stays lazy to /app.
+          if (
+            id.includes('/src/theme/themes') ||
+            id.includes('/src/theme/customThemes') ||
+            id.includes('/src/theme/themeStorage')
+          ) {
+            return 'theme';
+          }
           if (id.includes('/src/lib/store/')) {
             return 'runtime';
           }

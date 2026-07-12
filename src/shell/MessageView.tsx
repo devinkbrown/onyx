@@ -173,6 +173,35 @@ function sameAuthorGroup(a: ChatMessage, b: ChatMessage): boolean {
   return Math.abs(b.time.getTime() - a.time.getTime()) < 5 * 60 * 1000;
 }
 
+/** True when `list` is already in non-decreasing server-time order. A stable
+ *  sort is a fixed point on such a list, so we can return it untouched. We scan
+ *  the whole list, not just the tail, because the store buffer is not globally
+ *  sorted: hydrateHistory PREPENDS vault rows without sorting (store.ts
+ *  `[...fresh, ...existing]`), so an out-of-order seam can sit anywhere. */
+function isChronological(list: readonly ChatMessage[]): boolean {
+  for (let i = 1; i < list.length; i += 1) {
+    if (list[i]!.time.getTime() < list[i - 1]!.time.getTime()) return false;
+  }
+  return true;
+}
+
+/**
+ * Order a message buffer chronologically for rendering. Live lines append in
+ * arrival order (already non-decreasing), but replayed CHATHISTORY and hydrated
+ * vault lines can land out of order. Fast-path the common in-order case: since a
+ * stable sort is a no-op on an already-sorted list, skip the O(n log n) sort AND
+ * the copy and hand back the store's own array (safe — store buffers are treated
+ * as immutable, so downstream never mutates it, and returning the same reference
+ * lets dependent memos short-circuit). Only when a seam is out of order do we pay
+ * for a defensive stable sort — Array.sort is stable, so equal timestamps keep
+ * insertion order, preserving consecutive-author grouping.
+ */
+export function orderChronologically(list: ChatMessage[]): ChatMessage[] {
+  return isChronological(list)
+    ? list
+    : [...list].sort((a, b) => a.time.getTime() - b.time.getTime());
+}
+
 export function buildReaderMemoryContext(
   target: string,
   sourceMessages: readonly ChatMessage[],
@@ -618,12 +647,11 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     } else if (view.kind === 'status') {
       list = serverLog();
     }
-    // Render chronologically. Live lines append in arrival order, but replayed
-    // CHATHISTORY / event-playback lines (joins, parts, topics) can land after
-    // the live tail — a stable sort by server time puts every event where it
-    // actually happened. Array.sort is stable, so equal timestamps keep their
-    // insertion order (preserving author grouping).
-    return [...list].sort((a, b) => a.time.getTime() - b.time.getTime());
+    // Render chronologically. Live lines append in arrival order (already
+    // sorted), but replayed CHATHISTORY / hydrated vault lines can land out of
+    // order; orderChronologically stable-sorts only when a seam is out of place
+    // and otherwise hands back the buffer untouched (see its doc comment).
+    return orderChronologically(list);
   });
 
   // id → absolute index into allMessages(). Built in one O(n) pass whenever the

@@ -341,25 +341,30 @@
 .voice-tile__speaking-bars span {
   display: block;
   width: 2px;
+  height: 100%;
   border-radius: var(--r-pill);
   background: var(--lapis-bright);
   box-shadow: 0 0 8px color-mix(in oklab, var(--lapis-bright) 52%, transparent);
   transform-origin: bottom;
-  transition: height 80ms ease;
+  /* Animate scaleY (compositor-only) instead of height (layout) so the
+     per-participant equalizer never triggers layout/paint. transform-origin
+     is bottom so bars grow up from the baseline, matching the old height fill. */
+  transform: scaleY(0.25);
+  transition: transform 80ms ease;
 }
 
-.voice-tile__speaking-bars--active span:nth-child(1) { height: 40%; animation: vtile-bar 0.9s ease-in-out infinite; }
-.voice-tile__speaking-bars--active span:nth-child(2) { height: 80%; animation: vtile-bar 0.9s ease-in-out infinite 0.15s; }
-.voice-tile__speaking-bars--active span:nth-child(3) { height: 55%; animation: vtile-bar 0.9s ease-in-out infinite 0.3s; }
+.voice-tile__speaking-bars--active span:nth-child(1) { transform: scaleY(0.4); animation: vtile-bar 0.9s ease-in-out infinite; }
+.voice-tile__speaking-bars--active span:nth-child(2) { transform: scaleY(0.8); animation: vtile-bar 0.9s ease-in-out infinite 0.15s; }
+.voice-tile__speaking-bars--active span:nth-child(3) { transform: scaleY(0.55); animation: vtile-bar 0.9s ease-in-out infinite 0.3s; }
 .voice-tile__speaking-bars:not(.voice-tile__speaking-bars--active) span {
-  height: 25%;
+  transform: scaleY(0.25);
   background: var(--washi-mute);
   box-shadow: none;
 }
 
 @keyframes vtile-bar {
-  0%, 100% { height: 30%; }
-  50%       { height: 100%; }
+  0%, 100% { transform: scaleY(0.3); }
+  50%       { transform: scaleY(1); }
 }
 
 @media (prefers-reduced-motion: reduce) {
