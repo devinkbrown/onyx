@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { BackgroundVariant } from '../engine';
-import {
-  clearCanvas,
-  drawGrain,
-  drawLapisGround,
-  drawPyriteFlecks,
-  readBackgroundTheme,
-  strokeKintsugiVein,
-} from './utils';
+import { composeSignature } from './layers';
+import { drawPyriteFlecks, strokeKintsugiVein } from './utils';
 
+/**
+ * Gold Veins — the default background, now routed through the shared "Ink on
+ * Living Paper" signature pipeline (capped ground → ink layer → washi grain →
+ * vignette → the single vermilion seal). Its ink layer is the gold kintsugi
+ * vein tracery + pyrite flecks; the ground, grain, vignette, and the one hot
+ * vermilion accent are contributed by the shared pipeline.
+ */
 export const kintsugiVeins = {
   id: 'kintsugi-veins',
   label: 'Gold Veins',
@@ -17,18 +18,13 @@ export const kintsugiVeins = {
     this.frame(ctx, 0);
   },
   frame(ctx, time) {
-    const theme = readBackgroundTheme(ctx.canvas);
-    const veinCount = Math.max(4, Math.floor(9 * ctx.qualityScale));
-
-    clearCanvas(ctx);
-    drawLapisGround(ctx, theme, time);
-
-    for (let i = 0; i < veinCount; i += 1) {
-      strokeKintsugiVein(ctx, theme, i + 1, time, i < 3 ? 1 : 0.58);
-    }
-
-    drawPyriteFlecks(ctx, theme, time, 110);
-    drawGrain(ctx, theme, 0.9);
+    composeSignature(ctx, time, (theme, t) => {
+      const veinCount = Math.max(4, Math.floor(9 * ctx.qualityScale));
+      for (let i = 0; i < veinCount; i += 1) {
+        strokeKintsugiVein(ctx, theme, i + 1, t, i < 3 ? 1 : 0.58);
+      }
+      drawPyriteFlecks(ctx, theme, t, 110);
+    });
   },
   dispose() {},
 } satisfies BackgroundVariant;

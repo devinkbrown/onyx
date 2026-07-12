@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { BackgroundFrameContext, BackgroundVariant } from '../engine';
 import { breathe } from '../reactivity';
+import { composeSignature } from './layers';
 import type { BackgroundTheme } from './utils';
-import { clearCanvas, readBackgroundTheme, rgba, seeded } from './utils';
+import { rgba, seeded } from './utils';
 
 /**
- * Sumi-e — for the ink themes. Pure monochrome ink-wash: a near-black ground,
- * slow diagonal ink-rain, and a couple of soft ink-bloom clouds — everything
- * drawn in washi greys at low alpha. No colour at all; minimal and refined.
+ * Sumi-e — the ink-wash, routed through the shared signature pipeline. Its own
+ * near-black ground is retired for the shared luminance-capped ground; its ink
+ * layer is the ink blooms, diagonal ink-rain, and paper flecks. The pipeline's
+ * single vermilion seal reads here as the artist's hanko stamp on the sheet.
  */
 export const sumiE = {
   id: 'sumi-e',
@@ -17,26 +19,14 @@ export const sumiE = {
     this.frame(ctx, 0);
   },
   frame(ctx, time) {
-    const theme = readBackgroundTheme(ctx.canvas);
-
-    clearCanvas(ctx);
-    drawInkGround(ctx, theme);
-    drawInkBlooms(ctx, theme, time);
-    drawInkRain(ctx, theme, time);
-    drawPaperFlecks(ctx, theme, time);
+    composeSignature(ctx, time, (theme, t) => {
+      drawInkBlooms(ctx, theme, t);
+      drawInkRain(ctx, theme, t);
+      drawPaperFlecks(ctx, theme, t);
+    });
   },
   dispose() {},
 } satisfies BackgroundVariant;
-
-function drawInkGround(ctx: BackgroundFrameContext, theme: BackgroundTheme): void {
-  const c = ctx.context;
-  const ground = c.createLinearGradient(0, 0, 0, ctx.height);
-  ground.addColorStop(0, theme.ink2);
-  ground.addColorStop(0.6, theme.ink);
-  ground.addColorStop(1, theme.ink);
-  c.fillStyle = ground;
-  c.fillRect(0, 0, ctx.width, ctx.height);
-}
 
 function drawInkBlooms(ctx: BackgroundFrameContext, theme: BackgroundTheme, time: number): void {
   const c = ctx.context;

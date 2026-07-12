@@ -59,11 +59,59 @@ export interface BackgroundEngineOptions {
   targetFps?: number;
   fpsGuardFrames?: number;
   /**
+   * Ceiling on the animation render cadence, in fps. The rAF loop paints at
+   * most this often (default 30) instead of every vsync — half the frames, half
+   * the battery, no visible change for a slow ambient background. Idle
+   * deceleration steps this down further (see `deceleratedFrameCap`).
+   */
+  frameCapFps?: number;
+  /**
    * Render a single still frame and never loop, regardless of the variant's
    * kind. Used to honour `prefers-reduced-motion` while still showing the
    * theme's own scene (frozen), instead of swapping to a generic solid.
    */
   staticMode?: boolean;
+}
+
+/** Default animation render-cadence ceiling — a calm 30fps, not 60. */
+export const DEFAULT_FRAME_CAP_FPS = 30;
+/** Idle window before the cadence begins to decelerate. */
+export const IDLE_DECEL_AFTER_MS = 8000;
+/** How long the deceleration ramp takes to reach `IDLE_MIN_FPS`. */
+export const IDLE_DECEL_RAMP_MS = 12000;
+/** The floor the idle cadence decelerates to — still alive, barely moving. */
+export const IDLE_MIN_FPS = 12;
+/** FPS-guard starvation threshold as a fraction of the cap (so a healthy capped
+ * loop never trips it, but genuine starvation below the cap still does). */
+const GUARD_FPS_RATIO = 0.8;
+/** Render when at least this fraction of the target interval has elapsed — a
+ * little slack so rAF jitter around the boundary doesn't halve the real fps. */
+const FRAME_CAP_TOLERANCE = 0.9;
+
+/** Pure: milliseconds between frames at `fps` (guarded against div-by-~0). */
+export function frameInterval(fps: number): number {
+  return 1000 / Math.max(1, fps);
+}
+
+export interface DecelOptions {
+  afterMs?: number;
+  rampMs?: number;
+  minFps?: number;
+}
+
+/**
+ * Pure: the effective cadence cap after `idleMs` of no interaction. Full
+ * `baseFps` until `afterMs`, then a linear ramp down to `minFps` over `rampMs`,
+ * floored there. Gentle, monotone, and exhaustively testable without a clock.
+ */
+export function deceleratedFrameCap(baseFps: number, idleMs: number, options: DecelOptions = {}): number {
+  const afterMs = options.afterMs ?? IDLE_DECEL_AFTER_MS;
+  const rampMs = options.rampMs ?? IDLE_DECEL_RAMP_MS;
+  const minFps = options.minFps ?? IDLE_MIN_FPS;
+  if (!(idleMs > afterMs)) return baseFps;
+  const progress = Math.min(1, (idleMs - afterMs) / Math.max(1, rampMs));
+  const decelerated = baseFps + (minFps - baseFps) * progress;
+  return Math.max(minFps, Math.round(decelerated));
 }
 
 const QUALITY_ORDER: BackgroundQuality[] = ['low', 'med', 'high'];
@@ -116,6 +164,7 @@ export class BackgroundEngine {
   readonly variant: BackgroundVariant;
   readonly targetFps: number;
   readonly fpsGuardFrames: number;
+  readonly frameCapFps: number;
   readonly staticMode: boolean;
 
   private context: CanvasRenderingContext2D | null = null;
@@ -126,6 +175,14 @@ export class BackgroundEngine {
   private initialized = false;
   private lastFrameAt: number | null = null;
   private lowFpsFrames = 0;
+  /** Timestamp of the last painted animation frame — drives the cadence cap. */
+  private lastRenderAt: number | null = null;
+  /** When the current active (visible, interacted) window began — drives idle
+   * deceleration. Reset on start, visibility-return, resize, and theme change. */
+  private activeSince: number | null = null;
+  /** True while the cadence is idle-decelerated below its cap; the FPS guard
+   * ignores these frames so intentional throttling never drops quality. */
+  private throttled = false;
   private resizeObserver: ResizeObserver | null = null;
   private themeObserver: MutationObserver | null = null;
   private pendingStaticRefresh = false;
@@ -135,7 +192,10 @@ export class BackgroundEngine {
     this.canvas = options.canvas;
     this.variant = options.variant;
     this.currentQuality = options.quality ?? 'high';
-    this.targetFps = options.targetFps ?? 50;
+    this.frameCapFps = options.frameCapFps ?? DEFAULT_FRAME_CAP_FPS;
+    // Guard threshold sits below the cap so a healthy capped loop never trips
+    // it, while genuine starvation (rendering well under the cap) still does.
+    this.targetFps = options.targetFps ?? Math.round(this.frameCapFps * GUARD_FPS_RATIO);
     this.fpsGuardFrames = options.fpsGuardFrames ?? 42;
     this.staticMode = options.staticMode ?? false;
   }
@@ -157,6 +217,10 @@ export class BackgroundEngine {
 
     const now = typeof performance === 'undefined' ? 0 : performance.now();
     this.renderFrame(now);
+    // Seed the cadence clocks off the first painted frame so the cap and idle
+    // deceleration are measured from an active start.
+    this.lastRenderAt = now;
+    this.activeSince = now;
     this.scheduleNextFrame();
   }
 
@@ -165,6 +229,9 @@ export class BackgroundEngine {
     this.cancelFrame();
     this.detachListeners();
     this.lastFrameAt = null;
+    this.lastRenderAt = null;
+    this.activeSince = null;
+    this.throttled = false;
     this.lowFpsFrames = 0;
   }
 
@@ -244,7 +311,9 @@ export class BackgroundEngine {
   }
 
   private applyFpsGuard(time: number): void {
-    if (this.staticMode || this.variant.kind !== 'animated') {
+    // A throttled (idle-decelerated) loop paints intentionally-sparse frames, so
+    // its low fps is by design, not starvation — never judge quality on those.
+    if (this.staticMode || this.variant.kind !== 'animated' || this.throttled) {
       this.lastFrameAt = time;
       return;
     }
@@ -279,9 +348,28 @@ export class BackgroundEngine {
 
     this.rafId = requestAnimationFrame((time) => {
       this.rafId = null;
-      this.renderFrame(time);
+      // rAF fires at vsync (~60fps); only actually paint when the cadence cap's
+      // interval has elapsed. Cheaply skipped frames just reschedule.
+      if (this.shouldRenderNow(time)) {
+        this.lastRenderAt = time;
+        this.renderFrame(time);
+      }
       this.scheduleNextFrame();
     });
+  }
+
+  /** Effective cadence cap right now, after any idle deceleration. */
+  private effectiveFrameCap(time: number): number {
+    const idleMs = this.activeSince === null ? 0 : Math.max(0, time - this.activeSince);
+    return deceleratedFrameCap(this.frameCapFps, idleMs);
+  }
+
+  /** Whether enough of the current cadence interval has elapsed to paint. */
+  private shouldRenderNow(time: number): boolean {
+    const cap = this.effectiveFrameCap(time);
+    this.throttled = cap < this.frameCapFps;
+    if (this.lastRenderAt === null) return true;
+    return time - this.lastRenderAt >= frameInterval(cap) * FRAME_CAP_TOLERANCE;
   }
 
   private cancelFrame(): void {
@@ -351,6 +439,10 @@ export class BackgroundEngine {
   }
 
   private readonly handleResize = (): void => {
+    // A resize is user activity — restore full cadence and paint promptly.
+    this.activeSince = typeof performance === 'undefined' ? 0 : performance.now();
+    this.lastRenderAt = null;
+    this.throttled = false;
     this.resize();
   };
 
@@ -367,8 +459,13 @@ export class BackgroundEngine {
     if (isDocumentHidden()) {
       this.cancelFrame();
       this.lastFrameAt = null;
+      this.lastRenderAt = null;
       return;
     }
+
+    // Returning to the tab is activity — reset the idle window to full cadence.
+    this.activeSince = typeof performance === 'undefined' ? 0 : performance.now();
+    this.throttled = false;
 
     if (this.pendingStaticRefresh) {
       this.pendingStaticRefresh = false;

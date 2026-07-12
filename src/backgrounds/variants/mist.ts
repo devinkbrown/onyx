@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { BackgroundFrameContext, BackgroundVariant } from '../engine';
 import { ambientRms, breathe, rmsToBloom, timeOfDayWarmth, warmthShift } from '../reactivity';
+import { composeSignature } from './layers';
 import type { BackgroundTheme } from './utils';
-import { clearCanvas, mix, readBackgroundTheme, rgba, seeded } from './utils';
+import { rgba, seeded } from './utils';
 
 const TAU = Math.PI * 2;
 
 /**
- * Mist — for the slate themes. Warm graphite fog: a near-solid ground with
- * two or three very soft mist bands counter-drifting across it, and a scatter
- * of faint mineral flecks. Almost still, but alive. The only warmth is an
- * occasional bronze fleck — never more.
+ * Mist — the warm graphite fog, routed through the shared signature pipeline.
+ * Its own graphite ground is retired for the shared luminance-capped ground;
+ * its ink layer is the counter-drifting mist bands and the scatter of faint
+ * mineral flecks (the lone bronze fleck kept), over the shared vermilion seal.
  */
 export const mist = {
   id: 'mist',
@@ -20,25 +21,13 @@ export const mist = {
     this.frame(ctx, 0);
   },
   frame(ctx, time) {
-    const theme = readBackgroundTheme(ctx.canvas);
-
-    clearCanvas(ctx);
-    drawGraphiteGround(ctx, theme);
-    drawMistBands(ctx, theme, time);
-    drawMineralFlecks(ctx, theme, time);
+    composeSignature(ctx, time, (theme, t) => {
+      drawMistBands(ctx, theme, t);
+      drawMineralFlecks(ctx, theme, t);
+    });
   },
   dispose() {},
 } satisfies BackgroundVariant;
-
-function drawGraphiteGround(ctx: BackgroundFrameContext, theme: BackgroundTheme): void {
-  const c = ctx.context;
-  const ground = c.createLinearGradient(0, 0, 0, ctx.height);
-  ground.addColorStop(0, mix(theme.stone, theme.ink, 0.5));
-  ground.addColorStop(0.5, theme.ink2);
-  ground.addColorStop(1, theme.ink);
-  c.fillStyle = ground;
-  c.fillRect(0, 0, ctx.width, ctx.height);
-}
 
 function drawMistBands(ctx: BackgroundFrameContext, theme: BackgroundTheme, time: number): void {
   const c = ctx.context;

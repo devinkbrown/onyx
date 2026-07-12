@@ -5,6 +5,11 @@ import { Dynamic } from 'solid-js/web';
 import { Background, selectBackgroundId } from './Background';
 import {
   BackgroundEngine,
+  DEFAULT_FRAME_CAP_FPS,
+  deceleratedFrameCap,
+  frameInterval,
+  IDLE_DECEL_AFTER_MS,
+  IDLE_MIN_FPS,
   isThemeMutation,
   rendersSingleFrame,
   type BackgroundFrameContext,
@@ -146,6 +151,47 @@ describe('BackgroundEngine FPS guard', () => {
     expect(engine.quality).toBe('med');
     expect(variant.frame).toHaveBeenCalledTimes(4);
 
+    engine.dispose();
+  });
+});
+
+describe('frame cadence cap', () => {
+  it('frameInterval is the millisecond gap for a target fps', () => {
+    expect(frameInterval(30)).toBeCloseTo(1000 / 30, 6);
+    expect(frameInterval(60)).toBeCloseTo(1000 / 60, 6);
+    // Guards against a divide-by-~zero blowup.
+    expect(frameInterval(0)).toBe(1000);
+  });
+
+  it('holds the base cadence until the idle window, then ramps to the floor', () => {
+    const base = DEFAULT_FRAME_CAP_FPS;
+    // Full cadence while active and through the idle threshold.
+    expect(deceleratedFrameCap(base, 0)).toBe(base);
+    expect(deceleratedFrameCap(base, IDLE_DECEL_AFTER_MS)).toBe(base);
+    // Decelerating: strictly between floor and base partway through the ramp.
+    const midway = deceleratedFrameCap(base, IDLE_DECEL_AFTER_MS + 6000);
+    expect(midway).toBeLessThan(base);
+    expect(midway).toBeGreaterThan(IDLE_MIN_FPS);
+    // Fully idle: floored, and never below the floor.
+    expect(deceleratedFrameCap(base, IDLE_DECEL_AFTER_MS + 1_000_000)).toBe(IDLE_MIN_FPS);
+  });
+
+  it('decelerates monotonically as idle time grows', () => {
+    const base = DEFAULT_FRAME_CAP_FPS;
+    let previous = base + 1;
+    for (const idle of [0, 8000, 11000, 14000, 17000, 20000, 40000]) {
+      const cap = deceleratedFrameCap(base, idle);
+      expect(cap).toBeLessThanOrEqual(previous);
+      previous = cap;
+    }
+  });
+
+  it('defaults the frame cap to 30fps and derives a guard target below it', () => {
+    // The FPS guard must sit under the cap, or a healthy capped loop would look
+    // like starvation and needlessly drop quality.
+    const engine = new BackgroundEngine({ canvas: createCanvas(), variant: createVariant() });
+    expect(engine.frameCapFps).toBe(DEFAULT_FRAME_CAP_FPS);
+    expect(engine.targetFps).toBeLessThan(engine.frameCapFps);
     engine.dispose();
   });
 });

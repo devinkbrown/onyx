@@ -1,7 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import type { BackgroundVariant } from '../engine';
-import { clearCanvas, readBackgroundTheme, rgba, seeded } from './utils';
+import type { BackgroundFrameContext, BackgroundVariant } from '../engine';
+import { composeSignature } from './layers';
+import type { BackgroundTheme } from './utils';
+import { rgba, seeded } from './utils';
 
+/**
+ * Paper Grain — the ink-on-paper still, routed through the shared signature
+ * pipeline. Its old light-paper wash is retired (a bright ground fought the
+ * legibility contract); the ground now comes from the shared luminance-capped
+ * tokens, and the ink layer is the drifting gold paper fibres. Solid: one frame.
+ */
 export const washi = {
   id: 'washi',
   label: 'Paper Grain',
@@ -10,29 +18,25 @@ export const washi = {
     this.frame(ctx, 0);
   },
   frame(ctx) {
-    const theme = readBackgroundTheme(ctx.canvas);
-    const c = ctx.context;
-    const paper = c.createLinearGradient(0, 0, ctx.width, ctx.height);
-    paper.addColorStop(0, theme.washi);
-    paper.addColorStop(0.56, rgba(theme.goldBright, 0.42));
-    paper.addColorStop(1, theme.washiDim);
-
-    clearCanvas(ctx);
-    c.fillStyle = paper;
-    c.fillRect(0, 0, ctx.width, ctx.height);
-
-    c.save();
-    c.strokeStyle = rgba(theme.goldDeep, 0.24);
-    c.lineWidth = 0.8;
-    for (let i = 0; i < Math.floor(24 * ctx.qualityScale); i += 1) {
-      const y = seeded(i + 650) * ctx.height;
-      c.globalAlpha = 0.14 + seeded(i + 651) * 0.18;
-      c.beginPath();
-      c.moveTo(0, y);
-      c.lineTo(ctx.width, y + (seeded(i + 652) - 0.5) * 24);
-      c.stroke();
-    }
-    c.restore();
+    composeSignature(ctx, 0, (theme) => {
+      drawFibres(ctx, theme);
+    });
   },
   dispose() {},
 } satisfies BackgroundVariant;
+
+function drawFibres(ctx: BackgroundFrameContext, theme: BackgroundTheme): void {
+  const c = ctx.context;
+  c.save();
+  c.strokeStyle = rgba(theme.goldDeep, 0.24);
+  c.lineWidth = 0.8;
+  for (let i = 0; i < Math.floor(24 * ctx.qualityScale); i += 1) {
+    const y = seeded(i + 650) * ctx.height;
+    c.globalAlpha = 0.14 + seeded(i + 651) * 0.18;
+    c.beginPath();
+    c.moveTo(0, y);
+    c.lineTo(ctx.width, y + (seeded(i + 652) - 0.5) * 24);
+    c.stroke();
+  }
+  c.restore();
+}

@@ -1,10 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { BackgroundFrameContext, BackgroundVariant } from '../engine';
+import { composeSignature } from './layers';
 import type { BackgroundTheme } from './utils';
-import { clearCanvas, drawGrain, mix, readBackgroundTheme, rgba, seeded } from './utils';
+import { mix, rgba, seeded } from './utils';
 
 const TAU = Math.PI * 2;
 
+/**
+ * Deep Current — the deep-water current field, routed through the shared
+ * signature pipeline. Its own depth-field ground is retired in favour of the
+ * shared luminance-capped ground; its ink layer is the caustic bands, current
+ * paths, and bioluminescence. Reduced motion still zeroes its internal time so
+ * a frozen frame holds a calm still.
+ */
 export const deepCurrent = {
   id: 'deep-current',
   label: 'Deep Current',
@@ -13,73 +21,15 @@ export const deepCurrent = {
     this.frame(ctx, 0);
   },
   frame(ctx, time) {
-    const theme = readBackgroundTheme(ctx.canvas);
     const currentTime = prefersReducedMotion() ? 0 : time;
-
-    clearCanvas(ctx);
-    drawDepthField(ctx, theme, currentTime);
-    drawCausticBands(ctx, theme, currentTime);
-    drawCurrentPaths(ctx, theme, currentTime);
-    drawBioluminescence(ctx, theme, currentTime);
-    drawGrain(ctx, theme, 0.72);
+    composeSignature(ctx, currentTime, (theme, t) => {
+      drawCausticBands(ctx, theme, t);
+      drawCurrentPaths(ctx, theme, t);
+      drawBioluminescence(ctx, theme, t);
+    });
   },
   dispose() {},
 } satisfies BackgroundVariant;
-
-function drawDepthField(ctx: BackgroundFrameContext, theme: BackgroundTheme, time: number): void {
-  const c = ctx.context;
-  const slowDrift = Math.sin(time * 0.000055) * ctx.width * 0.04;
-  const depth = c.createLinearGradient(0, 0, 0, ctx.height);
-  depth.addColorStop(0, theme.stone3);
-  depth.addColorStop(0.16, theme.stone2);
-  depth.addColorStop(0.46, theme.stone);
-  depth.addColorStop(0.76, theme.ink2);
-  depth.addColorStop(1, theme.ink);
-
-  c.fillStyle = depth;
-  c.fillRect(0, 0, ctx.width, ctx.height);
-
-  c.save();
-  c.globalCompositeOperation = 'screen';
-
-  const surfaceGlow = c.createRadialGradient(
-    ctx.width * 0.5 + slowDrift,
-    -ctx.height * 0.18,
-    0,
-    ctx.width * 0.5 + slowDrift,
-    ctx.height * 0.04,
-    Math.max(ctx.width, ctx.height) * 0.92,
-  );
-  surfaceGlow.addColorStop(0, rgba(theme.lapisBright, 0.2));
-  surfaceGlow.addColorStop(0.26, rgba(theme.lapisDeep, 0.15));
-  surfaceGlow.addColorStop(0.62, rgba(theme.stone2, 0.08));
-  surfaceGlow.addColorStop(1, rgba(theme.ink, 0));
-  c.fillStyle = surfaceGlow;
-  c.fillRect(0, 0, ctx.width, ctx.height);
-
-  const leftBloom = c.createRadialGradient(
-    ctx.width * 0.1 - slowDrift * 0.4,
-    ctx.height * 0.34,
-    0,
-    ctx.width * 0.1 - slowDrift * 0.4,
-    ctx.height * 0.34,
-    Math.max(ctx.width, ctx.height) * 0.62,
-  );
-  leftBloom.addColorStop(0, rgba(theme.lapisDeep, 0.12));
-  leftBloom.addColorStop(0.48, rgba(theme.stoneLine, 0.06));
-  leftBloom.addColorStop(1, rgba(theme.ink, 0));
-  c.fillStyle = leftBloom;
-  c.fillRect(0, 0, ctx.width, ctx.height);
-
-  c.restore();
-
-  const abyss = c.createLinearGradient(0, ctx.height * 0.48, 0, ctx.height);
-  abyss.addColorStop(0, rgba(theme.ink, 0));
-  abyss.addColorStop(0.66, rgba(theme.ink, 0.28));
-  abyss.addColorStop(1, rgba(theme.ink, 0.68));
-  c.fillStyle = abyss;
-  c.fillRect(0, 0, ctx.width, ctx.height);
-}
 
 function drawCausticBands(ctx: BackgroundFrameContext, theme: BackgroundTheme, time: number): void {
   const c = ctx.context;
