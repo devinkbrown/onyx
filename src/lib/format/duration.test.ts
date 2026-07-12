@@ -67,6 +67,22 @@ describe('formatDuration', () => {
     expect(formatDuration(duration, { maxUnits: 1.9 })).toBe('1h');
   });
 
+  it('defaults runtime-invalid maxUnits shapes instead of coercing them', () => {
+    const duration = (604_800 + 86_400 + 3_600 + 60 + 1) * 1_000;
+
+    expect(formatDuration(duration, { maxUnits: '5' as unknown as number })).toBe('1w 1d');
+    expect(formatDuration(duration, { maxUnits: null as unknown as number })).toBe('1w 1d');
+    expect(formatDuration(duration, { maxUnits: true as unknown as number })).toBe('1w 1d');
+  });
+
+  it('floors fractional maxUnits before capping emitted parts', () => {
+    const duration = (604_800 + 86_400 + 3_600 + 60 + 1) * 1_000;
+
+    expect(formatDuration(duration, { maxUnits: 2.999 })).toBe('1w 1d');
+    expect(formatDuration(duration, { maxUnits: 4.999 })).toBe('1w 1d 1h 1m');
+    expect(formatDuration(duration, { maxUnits: 5.001 })).toBe('1w 1d 1h 1m 1s');
+  });
+
   it('normalizes infinite maxUnits to the default unit count', () => {
     // Arrange
     const duration = (2 * 604_800 + 3 * 86_400 + 4 * 3_600) * 1_000;
@@ -85,6 +101,15 @@ describe('formatDuration', () => {
     expect(formatDuration(62_000, { compact: false })).toBe('1 minute 2 seconds');
   });
 
+  it('only treats literal false as the compact opt-out', () => {
+    const duration = 62_000;
+
+    expect(formatDuration(duration, { compact: undefined })).toBe('1m 2s');
+    expect(formatDuration(duration, { compact: null as unknown as boolean })).toBe('1m 2s');
+    expect(formatDuration(duration, { compact: 0 as unknown as boolean })).toBe('1m 2s');
+    expect(formatDuration(duration, { compact: false })).toBe('1 minute 2 seconds');
+  });
+
   it('pluralizes every full duration unit independently', () => {
     expect(formatDuration((604_800 + 86_400 + 3_600 + 60 + 1) * 1_000, {
       compact: false,
@@ -100,6 +125,15 @@ describe('formatDuration', () => {
     expect(formatDuration(1_499)).toBe('1s');
     expect(formatDuration(1_999)).toBe('1s');
     expect(formatDuration(60_999)).toBe('1m');
+  });
+
+  it('skips zero-value middle units while still honoring maxUnits', () => {
+    const duration = (604_800 + 60 + 1) * 1_000;
+
+    expect(formatDuration(duration)).toBe('1w 1m');
+    expect(formatDuration(duration, { maxUnits: 1 })).toBe('1w');
+    expect(formatDuration(duration, { maxUnits: 5 })).toBe('1w 1m 1s');
+    expect(formatDuration(duration, { compact: false, maxUnits: 5 })).toBe('1 week 1 minute 1 second');
   });
 
   it('renders sub-second full labels as zero seconds', () => {

@@ -279,6 +279,44 @@ describe('buildMomentLink', () => {
   });
 });
 
+describe('deeplink URLSearchParams round-trips', () => {
+  it('serializes and parses join, at, and reader query params together', () => {
+    const moment = new Date('2026-07-08T10:15:30.000Z');
+    const params = new URLSearchParams();
+    params.set('join', '#café-room');
+    params.set('at', moment.toISOString());
+    params.set('reader', 'reader');
+
+    const reparsed = new URLSearchParams(`?${params.toString()}`);
+
+    expect(parseJoinParam(reparsed.get('join'))).toBe('#café-room');
+    expect(parseAtParam(reparsed.get('at'))?.toISOString()).toBe(moment.toISOString());
+    expect(parseReaderParam(reparsed.get('reader'))).toBe(true);
+  });
+
+  it('fails closed for malformed serialized params without poisoning valid neighbors', () => {
+    const params = new URLSearchParams('join=%23root&at=%E0%A4%A&reader=definitely');
+
+    expect(parseJoinParam(params.get('join'))).toBe('#root');
+    expect(parseAtParam(params.get('at'))).toBeNull();
+    expect(parseReaderParam(params.get('reader'))).toBe(false);
+  });
+
+  it('rejects malformed join in a serialized handoff while keeping valid at and reader values', () => {
+    const moment = new Date('2026-07-08T10:15:30.000Z');
+    const params = new URLSearchParams();
+    params.set('join', '#bad,room');
+    params.set('at', moment.toISOString());
+    params.set('reader', '1');
+
+    const reparsed = new URLSearchParams(params.toString());
+
+    expect(parseJoinParam(reparsed.get('join'))).toBeNull();
+    expect(parseAtParam(reparsed.get('at'))?.toISOString()).toBe(moment.toISOString());
+    expect(parseReaderParam(reparsed.get('reader'))).toBe(true);
+  });
+});
+
 describe('parseEventTime', () => {
   it('accepts a near-future ISO time and epoch seconds', () => {
     const iso = new Date(FIXED_NOW.getTime() + 3 * DAY_MS).toISOString();

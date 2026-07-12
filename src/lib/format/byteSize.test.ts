@@ -18,16 +18,25 @@ describe('formatBytes', () => {
   });
 
   it('uses decimal units by default at 1000-byte boundaries', () => {
+    expect(formatBytes(999)).toBe('999 B');
     expect(formatBytes(1000)).toBe('1 KB');
+    expect(formatBytes(1001)).toBe('1 KB');
     expect(formatBytes(1024)).toBe('1 KB');
     expect(formatBytes(1_500)).toBe('1.5 KB');
+    expect(formatBytes(999_949)).toBe('999.9 KB');
+    expect(formatBytes(999_950)).toBe('1 MB');
+    expect(formatBytes(999_999)).toBe('1 MB');
     expect(formatBytes(1_000_000)).toBe('1 MB');
   });
 
   it('uses binary units at 1024-byte boundaries when requested', () => {
     expect(formatBytes(1000, { binary: true })).toBe('1000 B');
+    expect(formatBytes(1023, { binary: true })).toBe('1023 B');
     expect(formatBytes(1024, { binary: true })).toBe('1 KiB');
+    expect(formatBytes(1025, { binary: true })).toBe('1 KiB');
     expect(formatBytes(1536, { binary: true })).toBe('1.5 KiB');
+    expect(formatBytes(1024 ** 2 - 52, { binary: true })).toBe('1023.9 KiB');
+    expect(formatBytes(1024 ** 2 - 51, { binary: true })).toBe('1 MiB');
     expect(formatBytes(1_048_576, { binary: true })).toBe('1 MiB');
   });
 
@@ -82,5 +91,7 @@ describe('formatBytes', () => {
   it('keeps huge values deterministic at the largest supported unit', () => {
     expect(formatBytes(1_000_000_000_000_000_000_000)).toBe('1000 EB');
     expect(formatBytes(1024 ** 7, { binary: true })).toBe('1024 EiB');
+    expect(formatBytes(Number.MAX_SAFE_INTEGER)).toBe('9 PB');
+    expect(formatBytes(Number.MAX_SAFE_INTEGER, { binary: true })).toBe('8 PiB');
   });
 });

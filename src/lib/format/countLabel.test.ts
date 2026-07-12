@@ -12,6 +12,12 @@ describe('countLabel', () => {
     expect(countLabel(1.0, 'channel')).toBe('1 channel');
   });
 
+  it('only treats positive numeric one as singular', () => {
+    expect(countLabel(-1, 'message')).toBe('-1 messages');
+    expect(countLabel(1 + Number.EPSILON, 'message')).toBe('1.0000000000000002 messages');
+    expect(countLabel(1 - Number.EPSILON, 'message')).toBe('0.9999999999999998 messages');
+  });
+
   it('uses the plural noun for zero items', () => {
     const count = 0;
 
@@ -19,6 +25,11 @@ describe('countLabel', () => {
 
     expect(label).toBe('0 replys');
     expect(countLabel(-0, 'reply')).toBe('0 replys');
+  });
+
+  it('keeps very small zero-adjacent counts plural', () => {
+    expect(countLabel(Number.MIN_VALUE, 'sample')).toBe('5e-324 samples');
+    expect(countLabel(-Number.MIN_VALUE, 'sample')).toBe('-5e-324 samples');
   });
 
   it('uses the plural noun for counts other than one', () => {
@@ -37,6 +48,11 @@ describe('countLabel', () => {
     expect(label).toBe('1000000 members');
     expect(countLabel(Number.MAX_SAFE_INTEGER, 'member')).toBe('9007199254740991 members');
     expect(countLabel(Number.MIN_SAFE_INTEGER, 'member')).toBe('-9007199254740991 members');
+  });
+
+  it('stringifies huge exponential counts before adding the suffix', () => {
+    expect(countLabel(1e21, 'packet')).toBe('1e+21 packets');
+    expect(countLabel(-1e21, 'packet')).toBe('-1e+21 packets');
   });
 
   it('stringifies non-finite counts and pluralizes them', () => {
