@@ -32,6 +32,12 @@ import {
   createVoiceActivityState,
   updateVoiceActivityFromSamples,
 } from '@/lib/suimyaku-media/voiceActivity';
+import {
+  advanceActiveSpeaker,
+  createActiveSpeakerState,
+  energySamplesFromSpeaking,
+  type ActiveSpeakerState,
+} from '@/lib/suimyaku-media/activeSpeaker';
 import { shortDuration } from '@/lib/time/relativeTime';
 import { Avatar, Popover, Tooltip } from '@/primitives';
 import {
@@ -56,6 +62,16 @@ const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '👏', '🔥', '😮
 const SPATIAL_PAD_SIZE_PX = 132;
 const SPATIAL_PAD_KEY_STEP = 0.125;
 const SPATIAL_PAD_HELP_ID = 'voice-spatial-pad-help';
+
+/** Cadence (ms) at which the dominant-speaker tracker is advanced. The store's
+ *  who-is-speaking set is boolean, so ~12 Hz is ample resolution for the
+ *  hold/release hysteresis and far lighter than a 60 fps rAF loop. */
+const ACTIVE_SPEAKER_TICK_MS = 80;
+
+/** Strip IRC status-prefix sigils for a human-readable nick. */
+function displayNick(nick: string): string {
+  return nick.replace(/^[~@+.%]+/, '');
+}
 
 /** Human-readable readout of a spatial position, for the pad's live announcement.
  *  Screen readers driving the pad with the arrow keys get no visual dot feedback,
@@ -218,6 +234,12 @@ export function VoiceBar() {
   const [spatialDragging, setSpatialDragging] = createSignal(false);
   const [selectedSpatialNick, setSelectedSpatialNick] = createSignal<string | null>(null);
   const [localSpatialPosition, setLocalSpatialPosition] = createSignal<SpatialAudioPosition | null>(null);
+  // Sticky dominant speaker (proper-case nick) driven by the pure active-speaker
+  // tracker below. null = nobody is holding the spotlight.
+  const [activeSpeaker, setActiveSpeaker] = createSignal<string | null>(null);
+  // Tracks the OS "reduce motion" preference so the active-speaker chip only
+  // animates its focus pulse when motion is welcome.
+  const [reducedMotion, setReducedMotion] = createSignal(false);
 
   let spatialPadRef: HTMLDivElement | undefined;
 
@@ -367,6 +389,71 @@ export function VoiceBar() {
     });
   });
 
+  // ── Reduced-motion preference ──────────────────────────────────────────────
+  // Mirror prefers-reduced-motion into a signal so the focus pulse below can be
+  // suppressed. matchMedia is stubbed in jsdom (matches:false), so tests treat
+  // motion as allowed unless a fixture overrides it.
+  createEffect(() => {
+    if (typeof matchMedia !== 'function') return;
+    const mql = matchMedia('(prefers-reduced-motion: reduce)');
+    setReducedMotion(mql.matches);
+    const onChange = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mql.addEventListener?.('change', onChange);
+    onCleanup(() => mql.removeEventListener?.('change', onChange));
+  });
+
+  // ── Active-speaker (auto-focus) tracker ─────────────────────────────────────
+  // While in-call, advance the pure dominant-speaker tracker on a light timer,
+  // feeding it the current who-is-speaking set (self + media peers). The tracker
+  // supplies the sticky, flicker-free "who has the floor" decision that a naive
+  // "first speaking peer" pick cannot. Everything (timer + tracker state) is
+  // local to the effect and torn down on cleanup, so nothing leaks across calls.
+  createEffect(() => {
+    if (!isActive()) {
+      setActiveSpeaker(null);
+      return;
+    }
+    let tracker: ActiveSpeakerState = createActiveSpeakerState();
+    let last = 0;
+
+    const tick = () => {
+      const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      const dt = last === 0 ? ACTIVE_SPEAKER_TICK_MS : now - last;
+      last = now;
+
+      const state = getState();
+      const v = state.voice;
+      const speaking = state.speakingNicks;
+      // Present participants in proper case: self + the local media peers. The
+      // store's speaking set is lowercased, so energySamplesFromSpeaking matches
+      // case-insensitively while keeping display case for the readout.
+      const present: string[] = [];
+      const self = state.ourNick;
+      if (self) present.push(self);
+      for (const peer of v.peers.values()) present.push(peer.nick);
+
+      tracker = advanceActiveSpeaker(tracker, energySamplesFromSpeaking(present, speaking), dt);
+      setActiveSpeaker(tracker.dominant);
+    };
+
+    const timer = setInterval(tick, ACTIVE_SPEAKER_TICK_MS);
+    tick();
+    onCleanup(() => {
+      clearInterval(timer);
+      setActiveSpeaker(null);
+    });
+  });
+
+  // Label for the active-speaker chip: distinguishes the local user ("You") from
+  // remote participants. null when nobody holds the floor.
+  const activeSpeakerLabel = createMemo(() => {
+    const nick = activeSpeaker();
+    if (!nick) return null;
+    const self = selfNick();
+    if (self && nick.toLowerCase() === self.toLowerCase()) return 'You';
+    return displayNick(nick);
+  });
+
   const handleToggleScreenshare = () => {
     if (voice().screenshareActive) {
       voice().stopScreenshare();
@@ -484,6 +571,40 @@ export function VoiceBar() {
               >
                 <span aria-hidden="true">◇ {participantCount()}</span>
               </span>
+              {/* Active-speaker (auto-focus) chip. Visual-only promotion of the
+                  participant currently holding the floor; the roster announcer
+                  covers screen-reader presence, so this is aria-hidden to avoid
+                  flooding SR users with per-utterance chatter. Motion is limited
+                  to transform/opacity and suppressed under reduced-motion. */}
+              <Show when={activeSpeakerLabel()} keyed>
+                {(label) => (
+                  <span
+                    class="voice-bar__active-speaker"
+                    data-testid="active-speaker"
+                    data-nick={activeSpeaker() ?? undefined}
+                    aria-hidden="true"
+                    style={{
+                      display: 'inline-flex',
+                      'align-items': 'center',
+                      gap: '0.3em',
+                      'margin-left': '0.5em',
+                      padding: '0.05em 0.5em',
+                      'border-radius': '999px',
+                      'font-size': '0.82em',
+                      'font-weight': '600',
+                      color: 'var(--ok, #4ade80)',
+                      background: 'color-mix(in oklab, var(--ok, #4ade80) 16%, transparent)',
+                      'box-shadow': '0 0 0 1px color-mix(in oklab, var(--ok, #4ade80) 40%, transparent)',
+                      transform: reducedMotion() ? 'none' : 'translateZ(0)',
+                      transition: reducedMotion() ? 'none' : 'opacity 160ms ease, transform 160ms ease',
+                      opacity: '1',
+                    }}
+                  >
+                    <span aria-hidden="true">🎙</span>
+                    <span class="voice-bar__active-speaker-name">{label}</span>
+                  </span>
+                )}
+              </Show>
             </span>
           </div>
         </div>
