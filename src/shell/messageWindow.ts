@@ -45,14 +45,24 @@ export interface MessageWindow {
 }
 
 export function computeMessageWindow(input: MessageWindowInput): MessageWindow {
-  const total = Math.max(0, Math.floor(input.total));
+  // Fail closed on a non-finite length (NaN/Infinity): render nothing rather
+  // than propagate NaN through the boundary math into `slice()`.
+  const total = Number.isFinite(input.total) ? Math.max(0, Math.floor(input.total)) : 0;
+  // A finite non-negative window, or Infinity for explicit show-all. Anything
+  // else (negative / NaN) collapses to the tail-safe minimum.
   const windowSize = input.windowSize >= 0 ? input.windowSize : 0;
-  const anchorContext = input.anchorContext ?? DEFAULT_ANCHOR_CONTEXT;
+  // Context must never be negative: a negative context would push `desired`
+  // ABOVE the anchor, so the anchor row could fall outside the window — the one
+  // thing the anchor path exists to prevent. Clamp to keep the invariant below.
+  const rawContext = input.anchorContext ?? DEFAULT_ANCHOR_CONTEXT;
+  const anchorContext = Number.isFinite(rawContext) ? Math.max(0, rawContext) : DEFAULT_ANCHOR_CONTEXT;
 
   // Base trailing window.
   let start = total <= windowSize ? 0 : total - windowSize;
 
   // Extend downward to keep a required anchor row (and some context) rendered.
+  // Invariant: after this block, when the anchor is in range, start <= anchorIndex
+  // so the anchor row is always present in the [start, total) slice.
   const anchorIndex = input.anchorIndex;
   if (anchorIndex != null && anchorIndex >= 0 && anchorIndex < total) {
     const desired = Math.max(0, anchorIndex - anchorContext);

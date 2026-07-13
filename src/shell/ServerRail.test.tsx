@@ -88,4 +88,28 @@ describe('<ServerRail>', () => {
 
     expect(screen.getByRole('img', { name: 'Onyx — active server' })).toBeInTheDocument();
   });
+
+  // The forced-colors focus ring (shell.css .shell-rail-entry:focus-visible →
+  // 3px Highlight) only reaches these controls if they stay natively focusable
+  // interactive elements. A <div onClick> swap would look identical but strand
+  // keyboard + High-Contrast users, so lock the element semantics here.
+  it('exposes the Appearance affordance as a real link, not a fake button', () => {
+    seed({ channels: [channel({ name: '#root' })] });
+    render(() => <ServerRail />);
+
+    const appearance = screen.getByRole('link', { name: 'Appearance settings' });
+    expect(appearance.tagName).toBe('A');
+    expect(appearance).toHaveClass('shell-rail-entry');
+    // A native href keeps it in the tab order (SC 2.1.1) so the focus ring lands.
+    expect(appearance).toHaveAttribute('href', '/appearance');
+  });
+
+  it('exposes Disconnect as a native button with an accessible name', () => {
+    seed({ channels: [channel({ name: '#root' })] });
+    render(() => <ServerRail />);
+
+    const disconnect = screen.getByRole('button', { name: 'Disconnect from network' });
+    expect(disconnect.tagName).toBe('BUTTON');
+    expect(disconnect).toHaveClass('shell-rail-entry');
+  });
 });

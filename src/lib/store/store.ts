@@ -703,6 +703,16 @@ export interface OnyxState {
   openFriendsPanel(): void;
   closeFriendsPanel(): void;
 
+  // ── Pinned / followed channels ───────────────────────────────────────
+  /** Channels pinned to the top of their server group (persisted 'onyx:pinned-channels'). Keys lower-cased. */
+  pinnedChannels: Set<string>;
+  /** Channels the user follows for Home digests / softer notify tier (persisted 'onyx:followed-channels'). Keys lower-cased. */
+  followedChannels: Set<string>;
+  /** Toggle a channel's pinned state, replacing the Set immutably and persisting. */
+  togglePinChannel(channel: string): void;
+  /** Toggle a channel's followed state, replacing the Set immutably and persisting. */
+  toggleFollowChannel(channel: string): void;
+
   // ── Ignored users ────────────────────────────────────────────────────
   /** Nicks the local user has chosen to ignore (case-insensitive) */
   ignoredUsers: Set<string>;
@@ -2622,6 +2632,8 @@ export const store = createStore<OnyxState>()(
     monitoredNicks: new Set(),
     friends: _loadFriends(),
     showFriendsPanel: false,
+    pinnedChannels: _loadPinnedChannels(),
+    followedChannels: _loadFollowedChannels(),
     ignoredUsers: _loadIgnoredUsers(),
     showIgnoreList: false,
     softIgnoreList: _loadSoftIgnoreList(),
@@ -4921,6 +4933,28 @@ export const store = createStore<OnyxState>()(
     },
     clearServerLog() {
       set({ serverLog: [] });
+    },
+
+    // ── Pinned / followed channels ────────────────────────────────────────
+    togglePinChannel(channel) {
+      const key = channel.toLowerCase();
+      set(s => {
+        const pinnedChannels = new Set(s.pinnedChannels);
+        if (pinnedChannels.has(key)) pinnedChannels.delete(key);
+        else pinnedChannels.add(key);
+        _savePinnedChannels(pinnedChannels);
+        return { pinnedChannels };
+      });
+    },
+    toggleFollowChannel(channel) {
+      const key = channel.toLowerCase();
+      set(s => {
+        const followedChannels = new Set(s.followedChannels);
+        if (followedChannels.has(key)) followedChannels.delete(key);
+        else followedChannels.add(key);
+        _saveFollowedChannels(followedChannels);
+        return { followedChannels };
+      });
     },
 
     // ── Ignore list ───────────────────────────────────────────────────────
@@ -9858,6 +9892,14 @@ export const selectOwnPrefix = (channel: string) => (s: OnyxState): string => {
  * higher (owner q, founder Q, network-oper Y). Network opers (Y) are always
  * treated as privileged. Used to gate Op/Kick/Ban/Mode controls in the UI.
  */
+/** Whether the channel is pinned to the top of its server group (case-insensitive). */
+export const selectIsChannelPinned = (channel: string) => (s: OnyxState): boolean =>
+  s.pinnedChannels.has(channel.toLowerCase());
+
+/** Whether the channel is followed for Home digests / softer notify tier (case-insensitive). */
+export const selectIsChannelFollowed = (channel: string) => (s: OnyxState): boolean =>
+  s.followedChannels.has(channel.toLowerCase());
+
 /** Pinned msgids for a channel, parsed from its IRCX PINS prop (oldest→newest). */
 export const selectChannelPins = (channel: string) => (s: OnyxState): string[] => {
   const raw = s.channelProps.get(channel.toLowerCase())?.PINS ?? '';
@@ -10283,6 +10325,48 @@ function _saveBookmarks(bookmarks: ChatMessage[]): void {
   } catch {
     // Storage quota exceeded or unavailable — silently degrade
   }
+}
+
+// ── Pinned / followed channels persistence ────────────────────────────────────
+// Storage keys are inlined (not module consts) so the load-on-init calls in the
+// store initializer are not blocked by a const still in its temporal dead zone.
+
+function _loadChannelSet(storageKey: string): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((c): c is string => typeof c === 'string').map(c => c.toLowerCase()));
+  } catch {
+    return new Set();
+  }
+}
+
+function _saveChannelSet(storageKey: string, channels: Set<string>): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(storageKey, JSON.stringify([...channels]));
+  } catch {
+    // Storage quota exceeded or unavailable — silently degrade
+  }
+}
+
+export function _loadPinnedChannels(): Set<string> {
+  return _loadChannelSet('onyx:pinned-channels');
+}
+
+export function _loadFollowedChannels(): Set<string> {
+  return _loadChannelSet('onyx:followed-channels');
+}
+
+function _savePinnedChannels(channels: Set<string>): void {
+  _saveChannelSet('onyx:pinned-channels', channels);
+}
+
+function _saveFollowedChannels(channels: Set<string>): void {
+  _saveChannelSet('onyx:followed-channels', channels);
 }
 
 // ── Ignore list persistence ───────────────────────────────────────────────────

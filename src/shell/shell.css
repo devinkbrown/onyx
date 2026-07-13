@@ -222,6 +222,21 @@
   .shell-rail-entry--active::before {
     background: HighlightText;
   }
+
+  /* The base .shell-rail-entry:focus-visible rule (a 2px var(--lapis-bright)
+     outline + a box-shadow halo) out-specifies the generic forced-colors
+     :focus-visible in src/styles/a11y-media.css, and its halo is dropped by the
+     forced-colors box-shadow reset — so the icon-only Appearance link and
+     Disconnect button would otherwise keep a 2px LinkText ring while every other
+     shell control shows the 3px Highlight focus indicator. Restate the ring with
+     the system focus colour so keyboard focus on the rail is consistent and does
+     not lean on the (removed) box-shadow. SC 2.4.7 Focus Visible / 1.4.11
+     Non-text Contrast. */
+  .shell-rail-entry:focus-visible {
+    outline: 3px solid Highlight;
+    outline-offset: 2px;
+    box-shadow: none;
+  }
 }
 
 .shell-rail-badge {
