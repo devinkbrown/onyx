@@ -11,6 +11,7 @@ import {
   type SaslMechanism,
 } from './parser';
 import type { IRCMessage, ISupport } from './types';
+import { AccountAttribution } from './attribution';
 import { serializeWatchTogetherProp } from '../media/watchTogetherController';
 import type { WatchTogetherActivity } from '../media/watchTogether';
 
@@ -121,6 +122,13 @@ export class IRCClient {
   private _nickRetries = 0;
   /** SASL auth timeout guard */
   private _saslTimer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * Account-attribution controller (enroll device signing key + publish the
+   * login-time residence proof). Purely additive: it acts only when the
+   * server advertises `ISUPPORT ACCOUNTRESIDENCE=` AND 900 RPL_LOGGEDIN named
+   * the account; otherwise it never sends a byte (conservative UID path).
+   */
+  private _attribution = new AccountAttribution(this);
   /** In-flight LIST collection (see list()). */
   private _listPending: {
     rows: ChannelListRow[];
@@ -225,6 +233,9 @@ export class IRCClient {
     this._nickRetries = 0;
     this.negotiatedCaps = new Set();
     this.capValues = new Map();
+    // Fresh connection: forget the previous connection's attribution state
+    // (the account and home node are re-learned from 900 + ISUPPORT).
+    this._attribution.reset();
     // Resolve any LIST left hanging by the previous connection.
     this._finishList();
     if (this._saslTimer) { clearTimeout(this._saslTimer); this._saslTimer = null; }
@@ -248,6 +259,7 @@ export class IRCClient {
 
   destroy() {
     this._destroyed = true;
+    this._attribution.stop();
     this._clearTimers();
     if (this.ws) {
       // Null handlers first so _onClose cannot fire onDisconnected after destroy.
@@ -489,6 +501,7 @@ export class IRCClient {
   }
 
   private _onClose(ev: CloseEvent) {
+    this._attribution.stop(); // no residence refresh on a dead socket
     this._clearPingTimers();
     const reason = ev.reason || `code ${ev.code}`;
     console.error('[nexus] ws closed — code:', ev.code, 'reason:', ev.reason || '(none)', 'wasClean:', ev.wasClean);
@@ -759,6 +772,10 @@ export class IRCClient {
         this.opts.onError?.(msg.params[0] ?? 'Server error');
         break;
     }
+
+    // Account attribution observes every line (900 account, IDENTITY
+    // confirmations, FAIL STALE_EPOCH) — cheap switch, never throws.
+    this._attribution.observe(msg);
 
     // Always forward to store handler
     this.opts.onMessage(msg);
@@ -1045,6 +1062,12 @@ export class IRCClient {
           break;
         case 'VAPID':
           this.isupport.VAPID = val;
+          break;
+        case 'ACCOUNTRESIDENCE':
+          // The daemon accepts IDENTITY RESIDENCE and this is the node
+          // shortId a proof must bind. Absent token ⇒ the whole attribution
+          // path stays off (old-server compatible, purely additive).
+          this._attribution.setNode(val);
           break;
       }
     }

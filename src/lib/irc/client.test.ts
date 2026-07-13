@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { describe, it, expect } from 'vitest';
+import 'fake-indexeddb/auto';
+import { IDBFactory } from 'fake-indexeddb';
+import { describe, it, expect, vi } from 'vitest';
 import { IRCClient } from './client';
+import { _resetDeviceSigningForTests } from '../e2ee/deviceSign';
 import type { IRCMessage } from './types';
 
 // Regression tests for the WebSocket framing gotcha (memory: Orochi wss sends one IRC
@@ -149,5 +152,54 @@ describe('IRCClient session-resume token lifecycle', () => {
     feed001();
     // Mesh token still preferred and intact.
     expect(sent).toContain('SESSION RESUME mesh-held\r\n');
+  });
+});
+
+describe('IRCClient account-attribution wiring (ACCOUNTRESIDENCE)', () => {
+  // The controller itself is exercised in attribution.test.ts; these prove the
+  // CLIENT feeds it: 900 → account, 005 ACCOUNTRESIDENCE → node, and that an
+  // old server (no token) never triggers a single IDENTITY command.
+  async function drive(lines: string[]): Promise<string[][]> {
+    globalThis.indexedDB = new IDBFactory();
+    _resetDeviceSigningForTests();
+    localStorage.clear();
+
+    const client = new IRCClient({ url: 'wss://x/', nick: 'kain', onMessage: () => {} });
+    const sent: string[][] = [];
+    const origSendRaw = client.sendRaw.bind(client);
+    client.sendRaw = (command: string, ...params: string[]) => {
+      if (command === 'IDENTITY') sent.push([command, ...params]);
+      else origSendRaw(command, ...params);
+    };
+    for (const line of lines) feed(client, line);
+    return sent;
+  }
+
+  it('sends IDENTITY ADD + RESIDENCE after 900 login + advertised token', async () => {
+    const sent = await drive([
+      ':srv.example 900 kain kain!u@h kain :You are now logged in as kain',
+      ':srv.example 005 kain ACCOUNTRESIDENCE=a1b2c3d4e5f60718 NICKLEN=64 :are supported by this server',
+    ]);
+    await vi.waitFor(() => expect(sent.length).toBe(2));
+    expect(sent[0]![1]).toBe('ADD');
+    expect(sent[1]![1]).toBe('RESIDENCE');
+    expect(sent[1]![2]).toBe('a1b2c3d4e5f60718');
+  });
+
+  it('never sends IDENTITY when the server does not advertise ACCOUNTRESIDENCE', async () => {
+    const sent = await drive([
+      ':srv.example 900 kain kain!u@h kain :You are now logged in as kain',
+      ':srv.example 005 kain NICKLEN=64 TOPICLEN=390 :are supported by this server',
+    ]);
+    await new Promise((r) => setTimeout(r, 60));
+    expect(sent).toEqual([]);
+  });
+
+  it('never sends IDENTITY for an unauthenticated (guest) connection', async () => {
+    const sent = await drive([
+      ':srv.example 005 kain ACCOUNTRESIDENCE=a1b2c3d4e5f60718 :are supported by this server',
+    ]);
+    await new Promise((r) => setTimeout(r, 60));
+    expect(sent).toEqual([]);
   });
 });
