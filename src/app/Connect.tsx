@@ -595,6 +595,10 @@ export function Connect(props: ConnectProps): JSX.Element {
   // dedicated flag marks "a request is in flight" — transitions then key off the
   // server's verdict (registerPending falling edge), never on signal ordering.
   const [registerInFlight, setRegisterInFlight] = createSignal(false);
+  let registrationDisposed = false;
+  onCleanup(() => {
+    registrationDisposed = true;
+  });
 
   // submitting → verifying: the server asked for a verification code.
   createEffect(() => {
@@ -613,13 +617,24 @@ export function Connect(props: ConnectProps): JSX.Element {
     const phase = registerPhase();
     const inFlight = registerInFlight();
     const pending = registerPending();
+    const authenticatedAccount = passkeyServerIdentity().account;
+    if ((phase === 'submitting' || phase === 'verifying') && inFlight && authenticatedAccount) {
+      setRegisterInFlight(false);
+      setRegisterPhase('idle');
+      return;
+    }
     if ((phase === 'submitting' || phase === 'verifying') && inFlight && !pending) {
       // Deliberately untracked: the microtask samples the LATEST signal values
       // once, after the store batch settles — tracking here would re-arm the
       // effect on every read and defeat the settle-then-decide design above.
       // eslint-disable-next-line solid/reactivity
       queueMicrotask(() => {
-        if (!registerInFlight()) return;
+        if (registrationDisposed || !registerInFlight()) return;
+        if (getState().server?.account) {
+          setRegisterInFlight(false);
+          setRegisterPhase('idle');
+          return;
+        }
         if (registerError()) {
           setRegisterInFlight(false);
           return; // surfaced inline; user can retry
@@ -644,6 +659,11 @@ export function Connect(props: ConnectProps): JSX.Element {
   });
 
   function finishRegistration(): void {
+    if (getState().server?.account) {
+      setRegisterInFlight(false);
+      setRegisterPhase('idle');
+      return;
+    }
     setRegisterPhase('completing');
     if (connectionStatus() === 'connected') {
       // Drop the anonymous connection used to run REGISTER so the next connect

@@ -610,6 +610,46 @@ describe('Register → verify → done flow', () => {
     registerSpy.mockRestore();
   });
 
+  it('does not finish an Alice registration after Bob logs in', async () => {
+    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {
+      store.setState({ connectionStatus: 'connected' });
+    });
+    vi.spyOn(getState(), 'registerAccount').mockImplementation(() => {
+      store.setState({ registerPending: true, registerError: null, verifyRequired: false });
+    });
+    const disconnectSpy = vi.spyOn(getState(), 'disconnect').mockImplementation(() => {});
+
+    render(() => <Connect />);
+    clickMode(/register/i);
+    fireEvent.input(nickField(), { target: { value: 'alice' } });
+    fireEvent.input(screen.getByLabelText(/email/i), { target: { value: 'alice@example.com' } });
+    fireEvent.input(screen.getByLabelText(/^password$/i), { target: { value: 'longenough1' } });
+    fireEvent.input(screen.getByLabelText(/confirm password/i), { target: { value: 'longenough1' } });
+    fireEvent.submit(document.querySelector('form')!);
+    await waitFor(() => expect(getState().registerAccount).toHaveBeenCalledOnce());
+
+    store.setState({
+      server: {
+        id: 'bob-session',
+        name: 'Onyx',
+        network: 'Onyx',
+        url: NODES[0]!.wss,
+        icon: '',
+        nick: 'bob',
+        account: 'bob',
+        connected: true,
+      },
+      registerPending: false,
+      registerError: null,
+      verifyRequired: false,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(disconnectSpy).not.toHaveBeenCalled();
+    expect(connectSpy).toHaveBeenCalledOnce();
+  });
+
   it('shows a spinner while registerPending is true', async () => {
     render(() => <Connect />);
     clickMode(/register/i);
