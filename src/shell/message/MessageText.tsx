@@ -31,7 +31,7 @@ import {
 } from 'solid-js';
 import { createResource } from 'solid-js';
 import { preferences } from '@/lib/prefs/preferences';
-import { pickPreviewUrl, fetchLinkPreview } from '@/lib/preview/linkPreview';
+import { fetchLinkPreview, isPreviewableUrl, pickPreviewUrl } from '@/lib/preview/linkPreview';
 import { parseMessage } from '@/lib/format/parseMessage';
 import { lookupEmoji } from '@/lib/format/emoji';
 import {
@@ -85,22 +85,14 @@ function isHttpUrl(url: string): boolean {
 
 /**
  * Automatic subresource loads get a stricter boundary than user-activated
- * links: embedded URL credentials must never be sent merely because a message
- * entered the viewport. Ordinary credential-free http(s) attachments remain
- * direct browser loads; using `crossorigin="anonymous"` here would CORS-block
- * many otherwise valid user attachments, so it is deliberately not imposed.
+ * links: credentials and internal/private hosts must never be contacted merely
+ * because a message entered the viewport. Ordinary public credential-free
+ * http(s) attachments remain direct browser loads; using
+ * `crossorigin="anonymous"` here would CORS-block many otherwise valid user
+ * attachments, so it is deliberately not imposed.
  */
 function isAutoLoadableHttpUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return (
-      (parsed.protocol === 'https:' || parsed.protocol === 'http:')
-      && parsed.username === ''
-      && parsed.password === ''
-    );
-  } catch {
-    return false;
-  }
+  return isPreviewableUrl(url);
 }
 
 function detectMediaKind(url: string): MediaKind {
@@ -129,7 +121,9 @@ function MediaUnfurl(props: MediaUnfurlProps): JSX.Element {
   const [local] = splitProps(props, ['href', 'kind']);
   const [failed, setFailed] = createSignal(false);
 
-  // Defense in depth at the sink: only credential-free http(s) may auto-load.
+  // Defense in depth at the sink: only public credential-free http(s) may
+  // auto-load. A message must never probe the viewer's localhost/LAN merely by
+  // entering the viewport.
   // detectMediaKind already enforces the scheme today, but re-checking here
   // protects future callers and prevents ambient loads from URL userinfo.
   const safeHref = createMemo(() => (isAutoLoadableHttpUrl(local.href) ? local.href : null));
@@ -883,8 +877,8 @@ function LinkPreviewCard(props: { url: string }): JSX.Element {
   // same-origin /linkpreview endpoint from the (untrusted) target page's OG
   // metadata, so a hostile page could set og:url to a javascript: scheme. The
   // same-origin endpoint is the real boundary; here we drop any card whose URL
-  // is not credential-free http(s), so a dangerous scheme or URL userinfo never
-  // reaches the anchor.
+  // is not public credential-free http(s), so a dangerous scheme, URL userinfo,
+  // or internal/private host never reaches the anchor.
   const safe = createMemo(() => {
     const p = preview.latest;
     return p && isAutoLoadableHttpUrl(p.url) ? p : null;

@@ -17,10 +17,14 @@ const fetchLinkPreview = vi.fn<(url: string) => Promise<LinkPreview | null>>();
 
 // Deterministic preview plumbing: always offer the first href to the card and
 // return whatever the test stages, bypassing the real network/SSRF fetcher.
-vi.mock('@/lib/preview/linkPreview', () => ({
-  pickPreviewUrl: (hrefs: string[]): string | null => hrefs[0] ?? null,
-  fetchLinkPreview: (url: string) => fetchLinkPreview(url),
-}));
+vi.mock('@/lib/preview/linkPreview', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/preview/linkPreview')>();
+  return {
+    ...actual,
+    pickPreviewUrl: (hrefs: string[]): string | null => hrefs[0] ?? null,
+    fetchLinkPreview: (url: string) => fetchLinkPreview(url),
+  };
+});
 
 import { MessageText } from './MessageText';
 
@@ -113,6 +117,38 @@ describe('MessageText link-preview scheme guard', () => {
         url: 'https://ok.example/page',
         title: 'Safe card',
         image: 'https://alice:secret@cdn.example/i.png',
+      }),
+    );
+
+    const { container } = render(() => (
+      <MessageText text="look at https://ok.example/page please" />
+    ));
+
+    await waitFor(() => expect(screen.getByText('Safe card')).toBeInTheDocument());
+    expect(container.querySelector('a.shell-msg-preview')).not.toBeNull();
+    expect(container.querySelector('img.shell-msg-preview-thumb')).toBeNull();
+  });
+
+  it('drops an internal canonical URL instead of seating it in a card', async () => {
+    fetchLinkPreview.mockResolvedValue(
+      preview({ url: 'http://127.0.0.1/admin', title: 'Local service' }),
+    );
+
+    const { container } = render(() => (
+      <MessageText text="look at https://ok.example/page please" />
+    ));
+
+    await waitFor(() => expect(fetchLinkPreview).toHaveBeenCalled());
+    expect(container.querySelector('a.shell-msg-preview')).toBeNull();
+    expect(container.querySelector('[href*="127.0.0.1"]')).toBeNull();
+  });
+
+  it('suppresses an internal preview thumbnail subresource', async () => {
+    fetchLinkPreview.mockResolvedValue(
+      preview({
+        url: 'https://ok.example/page',
+        title: 'Safe card',
+        image: 'http://192.168.1.1/internal.png',
       }),
     );
 

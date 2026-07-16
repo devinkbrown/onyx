@@ -69,4 +69,18 @@ describe('MessageText external media hardening', () => {
     const explicitLink = screen.getByRole('link', { name: href });
     expect(explicitLink).toHaveAttribute('href', href);
   });
+
+  it.each([
+    'http://127.0.0.1/private.png',
+    'http://localhost/private.mp4',
+    'http://192.168.1.1/private.wav',
+    'http://[::1]/private.webp',
+  ])('never auto-loads an internal URL as a message subresource: %s', (href) => {
+    const { container } = render(() => <MessageText text={href} />);
+
+    expect(container.querySelector('.shell-msg-media')).toBeNull();
+    expect(container.querySelector('img, video, audio')).toBeNull();
+    const explicitLink = screen.getByRole('link', { name: href });
+    expect(explicitLink).toHaveAttribute('href', href);
+  });
 });
