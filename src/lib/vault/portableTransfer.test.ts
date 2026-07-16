@@ -15,6 +15,7 @@ import { loadChannelTopicDrafts, saveChannelTopicDrafts } from '@/lib/channel/to
 import { loadCredentials, saveCredentials, storeMeshToken, storeSessionToken } from '@/lib/credentials';
 import { preferences, resetPreferences, setPreference } from '@/lib/prefs/preferences';
 import { loadDMPins, saveDMPins } from '@/lib/dmPins';
+import { loadBookmarks, saveBookmarks } from '@/lib/bookmarks';
 import {
   loadFriends,
   loadWatchList,
@@ -504,6 +505,27 @@ describe('portableTransfer', () => {
     expect(await clearVault()).toBe(true);
     expect(loadTopicHistory(alice)).toEqual({});
     expect(loadTopicHistory(bob)).toEqual({});
+  });
+
+  it('keeps bookmarked message text out of portable transfer and clears every owner with local history', async () => {
+    const alice = { serverUrl: 'wss://portable.example/ws', identity: 'alice' } as const;
+    const bob = { serverUrl: 'wss://portable.example/ws', identity: 'bob' } as const;
+    saveBookmarks([msg('alice-bookmark', 1_000, {
+      target: '#alice-private',
+      text: 'Alice bookmarked confidential text',
+    })], alice);
+    saveBookmarks([msg('bob-bookmark', 2_000, {
+      target: '#bob-private',
+      text: 'Bob bookmarked confidential text',
+    })], bob);
+
+    const serialized = JSON.stringify(await exportPortableTransfer(alice));
+    expect(serialized).not.toContain('Alice bookmarked confidential text');
+    expect(serialized).not.toContain('Bob bookmarked confidential text');
+
+    expect(await clearVault()).toBe(true);
+    expect(loadBookmarks(alice)).toEqual([]);
+    expect(loadBookmarks(bob)).toEqual([]);
   });
 
   it('keeps channel navigation device-only and retains it across clear local history', async () => {

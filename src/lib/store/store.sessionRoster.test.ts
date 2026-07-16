@@ -6,6 +6,7 @@ import { loadCredentials, saveCredentials, storeMeshToken, storeSessionToken } f
 import { saveFriends, saveWatchList } from '@/lib/contactPresenceMemory';
 import { emptyIdentityProfileMemory, saveIdentityProfileMemory } from '@/lib/identityProfileMemory';
 import { saveUserNotes } from '@/lib/userNotes';
+import { saveBookmarks } from '@/lib/bookmarks';
 import { _resetSessionRestoreForTests, store } from './store';
 
 const initialState = store.getInitialState();
@@ -76,6 +77,34 @@ describe('remembered session roster restoration', () => {
     receive(':example.test 366 kain_ #staff :End of NAMES list');
 
     expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#root' });
+  });
+
+  it('hydrates bookmarks only after a collision alias establishes its account owner', () => {
+    const owner = { serverUrl: 'wss://example.test', identity: 'kain' } as const;
+    saveBookmarks([{
+      id: 'kain-private-bookmark',
+      time: new Date('2026-07-16T12:00:00.000Z'),
+      from: 'trev',
+      text: 'Kain private bookmark',
+      type: 'msg',
+      target: '#private',
+    }], owner);
+
+    store.getState().connect({
+      url: owner.serverUrl,
+      nick: owner.identity,
+      password: 'remembered-secret',
+    });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+
+    receive(':example.test 433 * kain :Nickname is already in use');
+    expect(store.getState().bookmarks).toEqual([]);
+
+    receive(':example.test 900 kain_ kain_!webchat@example kain :You are now logged in as kain');
+    expect(store.getState().bookmarks).toEqual([]);
+
+    receive(':example.test 001 kain_ :Welcome to IRCXNet');
+    expect(store.getState().bookmarks.map((message) => message.id)).toEqual(['kain-private-bookmark']);
   });
 
   it('hydrates and restores only the registered owner MONITOR contacts on 001', () => {

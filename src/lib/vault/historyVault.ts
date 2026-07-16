@@ -24,6 +24,7 @@ import {
 import { clearDeviceTopicReads } from '@/lib/topics/topicReadLedger';
 import { clearDeviceTopicHistory } from '@/lib/topics/topicHistory';
 import { clearDeviceDMPins } from '@/lib/dmPins';
+import { clearDeviceBookmarks } from '@/lib/bookmarks';
 import { effectiveKeep, resolvePolicyForChannel, type RetentionPolicy } from './retentionPolicy';
 import { boundedSearchField, boundedSearchQuery } from './searchBounds';
 import {
@@ -194,8 +195,30 @@ export type OutboxChange =
 
 export type OutboxListener = (change: OutboxChange) => void;
 
+/** Fired only after clearVault physically verifies every history surface empty. */
+export type VerifiedDeviceHistoryClearListener = () => void;
+
 let _outboxSeq = 0;
 const _outboxListeners = new Set<OutboxListener>();
+const _verifiedDeviceHistoryClearListeners = new Set<VerifiedDeviceHistoryClearListener>();
+
+/** Observe a verified whole-device history wipe without coupling the vault to UI state. */
+export function subscribeVerifiedDeviceHistoryClear(
+  listener: VerifiedDeviceHistoryClearListener,
+): () => void {
+  _verifiedDeviceHistoryClearListeners.add(listener);
+  return () => _verifiedDeviceHistoryClearListeners.delete(listener);
+}
+
+function notifyVerifiedDeviceHistoryClear(): void {
+  for (const listener of _verifiedDeviceHistoryClearListeners) {
+    try {
+      listener();
+    } catch {
+      // A presentation listener cannot roll back an already-verified wipe.
+    }
+  }
+}
 
 const RETENTION_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -1214,13 +1237,14 @@ export async function clearVault(): Promise<boolean> {
   // SEARCH must fail closed for the entire clear/verification window. Only a
   // physically verified empty store promotes every target back to plain.
   const privacyGeneration = beginVaultDmPrivacyClear();
-  // Topic cursors, topic text history, and pinned DMs are device-local
+  // Topic cursors, topic text history, pinned DMs, and bookmarks are device-local
   // transcript memory too. Clear
   // them even when IndexedDB is unavailable so "forget this device" has one
   // consistent privacy boundary across the vault and localStorage.
   const topicReadsCleared = clearDeviceTopicReads();
   const topicHistoryCleared = clearDeviceTopicHistory();
   const dmPinsCleared = clearDeviceDMPins();
+  const bookmarksCleared = clearDeviceBookmarks();
   const indexedDbAvailable = typeof indexedDB !== 'undefined';
   const db = await openVault();
   // An unavailable/blocked IndexedDB handle is not evidence that persisted
@@ -1228,8 +1252,13 @@ export async function clearVault(): Promise<boolean> {
   // vault to wipe and remains a successful no-op; an implementation that was
   // present but failed to open cannot be verified.
   if (!db) {
-    const cleared = !indexedDbAvailable && topicReadsCleared && topicHistoryCleared && dmPinsCleared;
+    const cleared = !indexedDbAvailable
+      && topicReadsCleared
+      && topicHistoryCleared
+      && dmPinsCleared
+      && bookmarksCleared;
     finishVaultDmPrivacyClear(privacyGeneration, cleared);
+    if (cleared) notifyVerifiedDeviceHistoryClear();
     return cleared;
   }
   try {
@@ -1258,8 +1287,10 @@ export async function clearVault(): Promise<boolean> {
       && outboxVerified
       && topicReadsCleared
       && topicHistoryCleared
-      && dmPinsCleared;
+      && dmPinsCleared
+      && bookmarksCleared;
     finishVaultDmPrivacyClear(privacyGeneration, cleared);
+    if (cleared) notifyVerifiedDeviceHistoryClear();
     return cleared;
   } catch {
     finishVaultDmPrivacyClear(privacyGeneration, false);

@@ -32,7 +32,7 @@ import { formatTaggedLine, parseAccountInfo, parseCHANLIMIT, parseMonitorNumeric
 import type { SuimyakuPeerState, SuimyakuRoomStats, CallState } from '@/lib/suimyaku-media/types';
 import { getMountedSuimyakuMediaEngine } from '@/lib/mediaEngineMount';
 import { parseActivity } from '@/lib/activity';
-import { OUTBOX_MAX_AGE_MS, classifyVaultDmSearchPrivacy, deleteOutboxEntry, deviceMemoryPrivacyTarget, loadAround, loadOutbox, loadRecent, queueOutbox, type DeviceMemoryOwner, type OutboxEntry, type OutboxOwner } from '@/lib/vault/historyVault';
+import { OUTBOX_MAX_AGE_MS, classifyVaultDmSearchPrivacy, deleteOutboxEntry, deviceMemoryPrivacyTarget, loadAround, loadOutbox, loadRecent, queueOutbox, subscribeVerifiedDeviceHistoryClear, type DeviceMemoryOwner, type OutboxEntry, type OutboxOwner } from '@/lib/vault/historyVault';
 import { getVaultDmSearchPrivacy } from '@/lib/vault/dmSearchPrivacy';
 import { boundedSearchField, boundedSearchQuery } from '@/lib/vault/searchBounds';
 import {
@@ -100,6 +100,7 @@ import {
   type ComposerDrafts,
 } from '@/lib/composer/drafts';
 import { loadDMPins, sanitizeDMPins, saveDMPins } from '@/lib/dmPins';
+import { loadBookmarks, saveBookmarks } from '@/lib/bookmarks';
 import { loadIgnoredUsers, parseIgnoredUsers, saveIgnoredUsers } from '@/lib/ignoredUsers';
 import { loadMutedDMs, parseMutedDMs, saveMutedDMs } from '@/lib/mutedDMs';
 import {
@@ -2768,6 +2769,8 @@ function _resetAccountBoundState(
       dmPinnedMessages: new Map(),
       showDMPins: false,
       dmPinsNick: null,
+      bookmarks: [],
+      showBookmarks: false,
       channelNotify: new Map(),
       highlightWords: [],
       ignoredUsers: new Set(),
@@ -3512,6 +3515,13 @@ function _loadOwnedDMPins(
   return owner ? loadDMPins(owner) : new Map();
 }
 
+function _loadOwnedBookmarks(
+  state: Pick<OnyxState, 'server' | 'ourNick'>,
+): ChatMessage[] {
+  const owner = selectDeviceMemoryOwner(state);
+  return owner ? loadBookmarks(owner) : loadBookmarks();
+}
+
 function _loadOwnedChannelNotify(
   state: Pick<OnyxState, 'server' | 'ourNick'>,
 ): Map<string, 'mentions' | 'none'> {
@@ -4007,7 +4017,9 @@ export const store = createStore<OnyxState>()(
     activeThreads: new Set(),
     threadAutoArchiveMinutes: 1440,
     forwardingMessage: null,
-    bookmarks: _loadBookmarks(),
+    // Full message snapshots are private history. Hydrate only after a server
+    // and account/guest identity establish the device-memory owner.
+    bookmarks: [],
     showBookmarks: false,
     showSearchOverlay: false,
     showKeyboardShortcuts: false,
@@ -4303,6 +4315,7 @@ export const store = createStore<OnyxState>()(
               server,
               composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: newNick }),
               dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: newNick }),
+              bookmarks: _loadOwnedBookmarks({ server, ourNick: newNick }),
               channelNotify: _loadOwnedChannelNotify({ server, ourNick: newNick }),
               highlightWords: _loadOwnedHighlightWords({ server, ourNick: newNick }),
               ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: newNick }),
@@ -4391,6 +4404,7 @@ export const store = createStore<OnyxState>()(
               server: srv,
               composerDrafts: _loadOwnedComposerDrafts({ server: srv, ourNick: get().ourNick }),
               dmPinnedMessages: _loadOwnedDMPins({ server: srv, ourNick: get().ourNick }),
+              bookmarks: _loadOwnedBookmarks({ server: srv, ourNick: get().ourNick }),
               channelNotify: _loadOwnedChannelNotify({ server: srv, ourNick: get().ourNick }),
               highlightWords: _loadOwnedHighlightWords({ server: srv, ourNick: get().ourNick }),
               ignoredUsers: _loadOwnedIgnoredUsers({ server: srv, ourNick: get().ourNick }),
@@ -6346,16 +6360,23 @@ export const store = createStore<OnyxState>()(
     // ── bookmarks ─────────────────────────────────────────────────────────
     addBookmark(msg) {
       set(s => {
+        const owner = selectDeviceMemoryOwner(s);
+        if (!owner) return {};
         if (s.bookmarks.some(b => b.id === msg.id)) return {};
-        const bookmarks = [...s.bookmarks, msg];
-        _saveBookmarks(bookmarks);
+        const bookmarks = saveBookmarks([...s.bookmarks, msg], owner);
+        if (!bookmarks) return {};
         return { bookmarks };
       });
     },
     removeBookmark(messageId) {
       set(s => {
-        const bookmarks = s.bookmarks.filter(b => b.id !== messageId);
-        _saveBookmarks(bookmarks);
+        const owner = selectDeviceMemoryOwner(s);
+        if (!owner) return {};
+        const bookmarks = saveBookmarks(
+          s.bookmarks.filter(b => b.id !== messageId),
+          owner,
+        );
+        if (!bookmarks) return {};
         return { bookmarks };
       });
     },
@@ -7499,6 +7520,7 @@ export const store = createStore<OnyxState>()(
               server,
               composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: s.ourNick }),
               dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: s.ourNick }),
+              bookmarks: _loadOwnedBookmarks({ server, ourNick: s.ourNick }),
               channelNotify: _loadOwnedChannelNotify({ server, ourNick: s.ourNick }),
               highlightWords: _loadOwnedHighlightWords({ server, ourNick: s.ourNick }),
               ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: s.ourNick }),
@@ -8712,6 +8734,7 @@ export const store = createStore<OnyxState>()(
                 server,
                 composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: newNick }),
                 dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: newNick }),
+                bookmarks: _loadOwnedBookmarks({ server, ourNick: newNick }),
                 channelNotify: _loadOwnedChannelNotify({ server, ourNick: newNick }),
                 highlightWords: _loadOwnedHighlightWords({ server, ourNick: newNick }),
                 ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: newNick }),
@@ -9923,6 +9946,7 @@ export const store = createStore<OnyxState>()(
                 server,
                 composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: s.ourNick }),
                 dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: s.ourNick }),
+                bookmarks: _loadOwnedBookmarks({ server, ourNick: s.ourNick }),
                 channelNotify: _loadOwnedChannelNotify({ server, ourNick: s.ourNick }),
                 highlightWords: _loadOwnedHighlightWords({ server, ourNick: s.ourNick }),
                 ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: s.ourNick }),
@@ -9965,6 +9989,7 @@ export const store = createStore<OnyxState>()(
               server,
               composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: s.ourNick }),
               dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: s.ourNick }),
+              bookmarks: _loadOwnedBookmarks({ server, ourNick: s.ourNick }),
               channelNotify: _loadOwnedChannelNotify({ server, ourNick: s.ourNick }),
               highlightWords: _loadOwnedHighlightWords({ server, ourNick: s.ourNick }),
               ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: s.ourNick }),
@@ -12385,6 +12410,19 @@ export const store = createStore<OnyxState>()(
   }))
 );
 
+// A verified "clear local history" must evict the same private transcript
+// snapshots from live memory immediately, not leave them visible until reload.
+subscribeVerifiedDeviceHistoryClear(() => {
+  store.setState({
+    bookmarks: [],
+    showBookmarks: false,
+    dmPinnedMessages: new Map(),
+    showDMPins: false,
+    dmPinsNick: null,
+    topicHistory: {},
+  });
+});
+
 // ── ONYX-INTEGRATION: window event bridge (UI intent → live server action) ──
 // UI packages dispatch CustomEvents; the store owns the protocol side.
 if (typeof window !== 'undefined') {
@@ -13019,31 +13057,6 @@ function _addDMMessage(
   }
 
   return { dms };
-}
-
-// ── Bookmark persistence ──────────────────────────────────────────────────────
-
-const BOOKMARK_KEY = 'onyx:bookmarks';
-
-function _loadBookmarks(): ChatMessage[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(BOOKMARK_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as Array<ChatMessage & { time: string }>;
-    return parsed.map(b => ({ ...b, time: new Date(b.time) }));
-  } catch {
-    return [];
-  }
-}
-
-function _saveBookmarks(bookmarks: ChatMessage[]): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(BOOKMARK_KEY, JSON.stringify(bookmarks));
-  } catch {
-    // Storage quota exceeded or unavailable — silently degrade
-  }
 }
 
 // ── Nick color overrides persistence ─────────────────────────────────────────
