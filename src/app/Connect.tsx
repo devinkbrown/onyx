@@ -403,6 +403,15 @@ export function Connect(props: ConnectProps): JSX.Element {
   const [chosenNode, setChosenNode] = createSignal<IrcNode>(initialNode());
   const [routing, setRouting] = createSignal(true);
 
+  type PasskeySignInAttempt = {
+    account: string;
+    transportStarted: boolean;
+    dispatched: boolean;
+  };
+  const [passkeySignInAttempt, setPasskeySignInAttempt] =
+    createSignal<PasskeySignInAttempt | null>(null);
+  let passkeyButtonRef: HTMLButtonElement | undefined;
+
   onMount(() => {
     onCleanup(installConnectPageLifecycle(getState));
     void selectBestNode().then((node) => {
@@ -445,6 +454,11 @@ export function Connect(props: ConnectProps): JSX.Element {
   const verifyRequired = useStore((s) => s.verifyRequired);
   const passkeyBusy = useStore((s) => s.passkeyBusy);
   const passkeyError = useStore((s) => s.passkeyError);
+  const passkeyServerIdentity = useStore(
+    (s) => ({ connected: s.server?.connected ?? false, account: s.server?.account ?? null }),
+    (previous, next) =>
+      previous.connected === next.connected && previous.account === next.account,
+  );
   const currentNickIsAlias = useStore((s) => s.currentNickIsAlias);
   const notifications = useStore((s) => s.notifications);
 
@@ -525,6 +539,7 @@ export function Connect(props: ConnectProps): JSX.Element {
   });
 
   const isFormReady = createMemo(() => {
+    if (passkeySignInAttempt()) return false;
     const s = connectionStatus();
     if (s === 'connecting' || s === 'connected' || s === 'reconnecting') return false;
     return !registerPending();
@@ -615,6 +630,11 @@ export function Connect(props: ConnectProps): JSX.Element {
   // ── Mode switching ──────────────────────────────────────────────────────────
   function switchMode(next: Mode): void {
     if (next === mode()) return;
+    // Once the native device prompt owns the ceremony, fields/modes stay fixed
+    // until it settles. This prevents a credential for account A completing in
+    // a form that now claims to be signing in account B.
+    if (passkeySignInAttempt()?.dispatched) return;
+    cancelPasskeySignIn();
     setMode(next);
     // Clear transient errors so a stale message from another mode never lingers.
     setNickError(undefined);
@@ -787,14 +807,87 @@ export function Connect(props: ConnectProps): JSX.Element {
     getState().verifyAccount(nickTrimmed(), code);
   }
 
+  function cancelPasskeySignIn(restoreFocus = false): void {
+    if (!passkeySignInAttempt()) return;
+    const state = getState();
+    // A passkey prompt may settle after this component changes mode/unmounts.
+    // Destroying the anonymous client makes its captured AUTH-FINISH send inert.
+    if (state.connectionStatus !== 'disconnected') state.disconnect();
+    setPasskeySignInAttempt(null);
+    if (restoreFocus) queueMicrotask(() => passkeyButtonRef?.focus());
+  }
+
   function handlePasskeySignIn(): void {
+    if (!isFormReady() || passkeySignInAttempt()) return;
     const account = nickTrimmed();
     const err = validateNick(account);
     setNickError(err);
     setPasswordError(undefined);
     if (err) return;
-    getState().signInWithPasskey(account);
+
+    getState().dismissPasskeyMessage();
+    setAttempted(true);
+    setReclaimOpen(false);
+    setPasskeySignInAttempt({ account, transportStarted: false, dispatched: false });
+
+    // WEBAUTHN AUTH is an IRC command, so Connect must establish the anonymous
+    // transport first. This deliberately bypasses doConnect: passkey sign-in
+    // must not delete or rewrite a remembered identity just to open transport.
+    const node = chosenNode();
+    getState().connect({
+      url: node.wss,
+      nick: account,
+      realname: `${account} (Onyx)`,
+    });
+    setPasskeySignInAttempt((current) =>
+      current?.account === account ? { ...current, transportStarted: true } : current,
+    );
   }
+
+  createEffect(() => {
+    const attempt = passkeySignInAttempt();
+    if (!attempt) return;
+
+    if (mode() !== 'signin' || nickTrimmed().toLowerCase() !== attempt.account.toLowerCase()) {
+      cancelPasskeySignIn();
+      return;
+    }
+
+    const status = connectionStatus();
+    if (status === 'disconnected' && attempt.transportStarted) {
+      // WebSocket construction can fail synchronously. Release the local guard
+      // so the form remains actionable instead of becoming permanently inert.
+      setPasskeySignInAttempt(null);
+      return;
+    }
+    // onConnected publishes the connection status immediately before the
+    // store constructs its Server record. Wait for that record so a resumed
+    // account can suppress a redundant device ceremony without a race.
+    const serverIdentity = passkeyServerIdentity();
+    if (status !== 'connected' || !serverIdentity.connected) return;
+
+    // A remembered SESSION may already have restored this account during the
+    // transport handshake. Do not stack a redundant WebAuthn ceremony on it.
+    if (serverIdentity.account?.toLowerCase() === attempt.account.toLowerCase()) {
+      setPasskeySignInAttempt(null);
+      return;
+    }
+    if (attempt.dispatched) return;
+
+    setPasskeySignInAttempt({ ...attempt, dispatched: true });
+    getState().signInWithPasskey(attempt.account);
+  });
+
+  createEffect(() => {
+    const attempt = passkeySignInAttempt();
+    if (!attempt?.dispatched || passkeyBusy() || !passkeyError()) return;
+    // Return from the anonymous transport to the sign-in form, keep the
+    // store-provided cancellation/error text visible, and restore keyboard
+    // focus to the action that launched the device prompt.
+    cancelPasskeySignIn(true);
+  });
+
+  onCleanup(() => cancelPasskeySignIn());
 
   // ── GHOST reclaim ───────────────────────────────────────────────────────────
   function handleReclaim(event: SubmitEvent): void {
@@ -910,7 +1003,9 @@ export function Connect(props: ConnectProps): JSX.Element {
       // after a successful connect (and false again on deliberate disconnect
       // or when retries give up), so a network blip shows the reconnect
       // banner + offline composer instead of bouncing to this form.
-      when={(connectionStatus() === 'connected' || autoReconnect()) && registerPhase() === 'idle'}
+      when={(connectionStatus() === 'connected' || autoReconnect())
+        && registerPhase() === 'idle'
+        && !passkeySignInAttempt()}
       fallback={
         <div class="conn" data-testid="connect-screen" data-mode={mode()}>
           <Atmosphere />
@@ -1209,9 +1304,14 @@ export function Connect(props: ConnectProps): JSX.Element {
                           variant="ghost"
                           disabled={!isFormReady() || passkeyBusy()}
                           onClick={handlePasskeySignIn}
+                          ref={(element: HTMLButtonElement) => (passkeyButtonRef = element)}
                           data-testid="conn-passkey-submit"
                         >
-                          {passkeyBusy() ? 'Waiting for your device…' : 'Sign in with a passkey'}
+                          {passkeyBusy()
+                            ? 'Waiting for your device…'
+                            : passkeySignInAttempt()
+                              ? 'Connecting securely…'
+                              : 'Sign in with a passkey'}
                         </Button>
                         <Show when={passkeyError()}>
                           {(message) => (

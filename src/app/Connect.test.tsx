@@ -39,6 +39,32 @@ const NODE_URLS = new Set(NODES.map((n) => n.wss));
 // ── Store reset ────────────────────────────────────────────────────────────────
 
 const initialState = store.getInitialState();
+let restorePasskeyEnvironment: (() => void) | undefined;
+
+function enablePasskeys(): void {
+  const secureDescriptor = Object.getOwnPropertyDescriptor(window, 'isSecureContext');
+  const publicKeyDescriptor = Object.getOwnPropertyDescriptor(window, 'PublicKeyCredential');
+  const credentialsDescriptor = Object.getOwnPropertyDescriptor(navigator, 'credentials');
+
+  Object.defineProperty(window, 'isSecureContext', { configurable: true, value: true });
+  Object.defineProperty(window, 'PublicKeyCredential', {
+    configurable: true,
+    value: class TestPublicKeyCredential {},
+  });
+  Object.defineProperty(navigator, 'credentials', {
+    configurable: true,
+    value: { create: vi.fn(), get: vi.fn() },
+  });
+
+  restorePasskeyEnvironment = () => {
+    if (secureDescriptor) Object.defineProperty(window, 'isSecureContext', secureDescriptor);
+    else Reflect.deleteProperty(window, 'isSecureContext');
+    if (publicKeyDescriptor) Object.defineProperty(window, 'PublicKeyCredential', publicKeyDescriptor);
+    else Reflect.deleteProperty(window, 'PublicKeyCredential');
+    if (credentialsDescriptor) Object.defineProperty(navigator, 'credentials', credentialsDescriptor);
+    else Reflect.deleteProperty(navigator, 'credentials');
+  };
+}
 
 beforeEach(() => {
   store.setState(initialState, true);
@@ -53,6 +79,8 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  restorePasskeyEnvironment?.();
+  restorePasskeyEnvironment = undefined;
   vi.restoreAllMocks();
 });
 
@@ -174,6 +202,144 @@ describe('Mode switching', () => {
     expect(screen.getByTestId('conn-submit')).toHaveTextContent(/sign in/i);
     clickMode(/register/i);
     expect(screen.getByTestId('conn-submit')).toHaveTextContent(/create account/i);
+  });
+});
+
+// ── Passkey sign-in ─────────────────────────────────────────────────────────
+
+describe('Passkey sign-in', () => {
+  function connectedServer(account: string | null = null) {
+    return {
+      id: 'passkey-test',
+      name: 'Onyx',
+      network: 'Onyx',
+      url: NODES[0]!.wss,
+      icon: '',
+      nick: 'alice',
+      account,
+      connected: true,
+    };
+  }
+
+  function openPasskeySignIn(): HTMLElement {
+    enablePasskeys();
+    render(() => <Connect />);
+    clickMode(/sign in/i);
+    fireEvent.input(nickField(), { target: { value: 'alice' } });
+    return screen.getByTestId('conn-passkey-submit');
+  }
+
+  it('opens IRC transport once before dispatching WEBAUTHN AUTH', async () => {
+    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {
+      store.setState({ status: 'connecting', connectionStatus: 'connecting' });
+    });
+    const signInSpy = vi.spyOn(getState(), 'signInWithPasskey').mockImplementation(() => {
+      store.setState({ passkeyBusy: true, passkeyError: null });
+    });
+    const button = openPasskeySignIn();
+
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    expect(connectSpy).toHaveBeenCalledTimes(1);
+    expect(connectSpy).toHaveBeenCalledWith(expect.objectContaining({ nick: 'alice' }));
+    expect(signInSpy).not.toHaveBeenCalled();
+
+    store.setState({
+      status: 'connected',
+      connectionStatus: 'connected',
+      autoReconnect: true,
+      server: connectedServer(),
+    });
+
+    await waitFor(() => expect(signInSpy).toHaveBeenCalledTimes(1));
+    expect(signInSpy).toHaveBeenCalledWith('alice');
+    expect(screen.getByTestId('connect-screen')).toBeInTheDocument();
+    expect(screen.getByTestId('conn-passkey-submit')).toHaveTextContent(/waiting for your device/i);
+  });
+
+  it('returns a dismissed prompt to a focused, actionable sign-in form', async () => {
+    vi.spyOn(getState(), 'connect').mockImplementation(() => {
+      store.setState({ status: 'connecting', connectionStatus: 'connecting' });
+    });
+    vi.spyOn(getState(), 'signInWithPasskey').mockImplementation(() => {
+      store.setState({ passkeyBusy: true, passkeyError: null });
+    });
+    const disconnectSpy = vi.spyOn(getState(), 'disconnect');
+    const button = openPasskeySignIn();
+
+    fireEvent.click(button);
+    store.setState({
+      status: 'connected',
+      connectionStatus: 'connected',
+      autoReconnect: true,
+      server: connectedServer(),
+    });
+    await waitFor(() => expect(getState().signInWithPasskey).toHaveBeenCalledWith('alice'));
+
+    store.setState({ passkeyBusy: false, passkeyError: 'Passkey prompt was dismissed.' });
+
+    await waitFor(() => expect(disconnectSpy).toHaveBeenCalledTimes(1));
+    const restoredButton = screen.getByTestId('conn-passkey-submit');
+    expect(screen.getByRole('alert')).toHaveTextContent('Passkey prompt was dismissed.');
+    await waitFor(() => expect(restoredButton).toHaveFocus());
+  });
+
+  it('cancels the anonymous transport when mode changes before the challenge', async () => {
+    vi.spyOn(getState(), 'connect').mockImplementation(() => {
+      store.setState({ status: 'connecting', connectionStatus: 'connecting' });
+    });
+    const signInSpy = vi.spyOn(getState(), 'signInWithPasskey').mockImplementation(() => {});
+    const disconnectSpy = vi.spyOn(getState(), 'disconnect');
+    const button = openPasskeySignIn();
+
+    fireEvent.click(button);
+    const claim = screen.getByRole('region', { name: 'Claim path' });
+    fireEvent.click(within(claim).getByRole('button', { name: 'Register' }));
+
+    expect(disconnectSpy).toHaveBeenCalledTimes(1);
+    store.setState({ status: 'connected', connectionStatus: 'connected' });
+    await Promise.resolve();
+    expect(signInSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not prompt again when SESSION already restored the requested account', async () => {
+    vi.spyOn(getState(), 'connect').mockImplementation(() => {
+      store.setState({ status: 'connecting', connectionStatus: 'connecting' });
+    });
+    const signInSpy = vi.spyOn(getState(), 'signInWithPasskey').mockImplementation(() => {});
+    const button = openPasskeySignIn();
+
+    fireEvent.click(button);
+    store.setState({
+      status: 'connected',
+      connectionStatus: 'connected',
+      autoReconnect: true,
+      server: connectedServer('alice'),
+    });
+
+    await waitFor(() => expect(screen.getByTestId('app-shell')).toBeInTheDocument());
+    expect(signInSpy).not.toHaveBeenCalled();
+  });
+
+  it('destroys the anonymous transport on unmount before dispatch', async () => {
+    enablePasskeys();
+    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {
+      store.setState({ status: 'connecting', connectionStatus: 'connecting' });
+    });
+    const signInSpy = vi.spyOn(getState(), 'signInWithPasskey').mockImplementation(() => {});
+    const disconnectSpy = vi.spyOn(getState(), 'disconnect');
+    const view = render(() => <Connect />);
+    clickMode(/sign in/i);
+    fireEvent.input(nickField(), { target: { value: 'alice' } });
+    fireEvent.click(screen.getByTestId('conn-passkey-submit'));
+    expect(connectSpy).toHaveBeenCalledTimes(1);
+
+    view.unmount();
+    expect(disconnectSpy).toHaveBeenCalledTimes(1);
+    store.setState({ status: 'connected', connectionStatus: 'connected' });
+    await Promise.resolve();
+    expect(signInSpy).not.toHaveBeenCalled();
   });
 });
 

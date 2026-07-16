@@ -38,11 +38,13 @@ export const MIN_CHALLENGE_BYTES = 16;
 const B64URL_RE = /^[A-Za-z0-9_-]*$/;
 
 export function isPasskeySupported(): boolean {
+  const credentials = typeof navigator !== 'undefined' ? navigator.credentials : undefined;
   return (
     typeof window !== 'undefined' &&
+    window.isSecureContext === true &&
     typeof window.PublicKeyCredential === 'function' &&
-    typeof navigator !== 'undefined' &&
-    !!navigator.credentials
+    typeof credentials?.create === 'function' &&
+    typeof credentials.get === 'function'
   );
 }
 
