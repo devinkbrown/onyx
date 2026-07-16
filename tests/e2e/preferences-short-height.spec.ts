@@ -49,7 +49,7 @@ test('keeps the Preferences close action and body usable at 400% short reflow', 
     });
   });
 
-  const openPreferences = page.getByRole('button', { name: 'Open preferences' });
+  const openPreferences = page.getByTestId('ribbon-preferences');
   await expect(openPreferences).toBeVisible();
   await openPreferences.click();
 
@@ -62,11 +62,16 @@ test('keeps the Preferences close action and body usable at 400% short reflow', 
     const header = panel.querySelector<HTMLElement>('.onyx-sheet__header')!;
     const body = panel.querySelector<HTMLElement>('.onyx-sheet__body')!;
     const closeButton = panel.querySelector<HTMLElement>('.onyx-sheet__close')!;
+    const categoryNav = panel.querySelector<HTMLElement>('.pref-category-nav')!;
     const tabs = panel.querySelector<HTMLElement>('.pref-category-tabs')!;
+    const tabButtons = Array.from(tabs.querySelectorAll<HTMLElement>('[role="tab"]'));
+    const reset = panel.querySelector<HTMLElement>('.pref-reset-all')!;
+    const content = panel.querySelector<HTMLElement>('.pref-category-content')!;
     const panelRect = panel.getBoundingClientRect();
     const headerRect = header.getBoundingClientRect();
     const bodyRect = body.getBoundingClientRect();
     const closeRect = closeButton.getBoundingClientRect();
+    const contentRect = content.getBoundingClientRect();
     return {
       panelScrollTop: panel.scrollTop,
       panelTop: panelRect.top,
@@ -79,24 +84,53 @@ test('keeps the Preferences close action and body usable at 400% short reflow', 
       bodyBottom: bodyRect.bottom,
       bodyClientHeight: body.clientHeight,
       bodyScrollHeight: body.scrollHeight,
+      bodyClientWidth: body.clientWidth,
+      bodyScrollWidth: body.scrollWidth,
       closeTop: closeRect.top,
       closeBottom: closeRect.bottom,
+      closeHeight: closeRect.height,
+      categoryNavHeight: categoryNav.getBoundingClientRect().height,
+      categoryNavPosition: getComputedStyle(categoryNav).position,
       tabsClientWidth: tabs.clientWidth,
       tabsScrollWidth: tabs.scrollWidth,
+      tabHeights: tabButtons.map((tab) => tab.getBoundingClientRect().height),
+      tabFontSizes: tabButtons.map((tab) => Number.parseFloat(getComputedStyle(tab).fontSize)),
+      resetHeight: reset.getBoundingClientRect().height,
+      resetFontSize: Number.parseFloat(getComputedStyle(reset).fontSize),
+      contentTop: contentRect.top,
+      contentBottom: contentRect.bottom,
     };
   });
 
   expect(openingGeometry.panelScrollTop).toBe(0);
-  expect(openingGeometry.headerOverflowY).toBe('auto');
-  expect(openingGeometry.headerClientHeight).toBeLessThanOrEqual(Math.ceil(256 * 0.6));
-  expect(openingGeometry.headerScrollHeight).toBeGreaterThan(openingGeometry.headerClientHeight);
+  expect(openingGeometry.headerOverflowY).not.toBe('auto');
+  expect(openingGeometry.headerClientHeight).toBeLessThanOrEqual(64);
+  expect(openingGeometry.headerScrollHeight).toBe(openingGeometry.headerClientHeight);
   expect(openingGeometry.closeTop).toBeGreaterThanOrEqual(openingGeometry.panelTop);
   expect(openingGeometry.closeBottom).toBeLessThanOrEqual(openingGeometry.panelBottom);
+  expect(openingGeometry.closeHeight).toBeGreaterThanOrEqual(44);
   expect(openingGeometry.bodyTop).toBeGreaterThanOrEqual(openingGeometry.headerBottom - 1);
   expect(openingGeometry.bodyBottom).toBeLessThanOrEqual(openingGeometry.panelBottom + 1);
-  expect(openingGeometry.bodyClientHeight).toBeGreaterThan(0);
+  expect(openingGeometry.bodyClientHeight).toBeGreaterThanOrEqual(192);
   expect(openingGeometry.bodyScrollHeight).toBeGreaterThan(openingGeometry.bodyClientHeight);
+  expect(openingGeometry.bodyScrollWidth).toBe(openingGeometry.bodyClientWidth);
+  expect(openingGeometry.categoryNavPosition).toBe('sticky');
+  expect(openingGeometry.categoryNavHeight).toBeLessThanOrEqual(56);
   expect(openingGeometry.tabsScrollWidth).toBeGreaterThan(openingGeometry.tabsClientWidth);
+  for (const height of openingGeometry.tabHeights) {
+    expect(height).toBeGreaterThanOrEqual(44);
+    expect(height).toBeLessThanOrEqual(48);
+  }
+  for (const fontSize of openingGeometry.tabFontSizes) {
+    expect(fontSize).toBeGreaterThanOrEqual(14);
+    expect(fontSize).toBeLessThanOrEqual(16);
+  }
+  expect(openingGeometry.resetHeight).toBeGreaterThanOrEqual(44);
+  expect(openingGeometry.resetHeight).toBeLessThanOrEqual(48);
+  expect(openingGeometry.resetFontSize).toBeGreaterThanOrEqual(12);
+  expect(openingGeometry.resetFontSize).toBeLessThanOrEqual(14);
+  expect(openingGeometry.contentTop).toBeLessThan(openingGeometry.bodyBottom);
+  expect(openingGeometry.contentBottom).toBeGreaterThan(openingGeometry.bodyTop);
 
   await page.keyboard.press('Tab');
   await expect(page.getByRole('tab', { name: /^Display/ })).toBeFocused();

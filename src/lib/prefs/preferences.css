@@ -625,6 +625,80 @@
   }
 }
 
+/* A short 400%-zoom viewport cannot afford a scrollable title region above a
+   rem-scaled category strip. Collapse Preferences chrome into one fixed-size
+   header and one 44px category rail; the sheet body remains the sole vertical
+   settings scroller while the categories keep their own horizontal overflow. */
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .onyx-sheet:has(.pref-panel) .onyx-sheet__header {
+    flex: none;
+    align-items: center;
+    gap: 8px;
+    max-height: none;
+    padding:
+      max(8px, env(safe-area-inset-top, 0px))
+      max(8px, env(safe-area-inset-right, 0px))
+      8px
+      max(8px, env(safe-area-inset-left, 0px));
+    overflow: visible;
+  }
+
+  .onyx-sheet:has(.pref-panel) .onyx-sheet__header h2 {
+    font-size: 16px;
+    line-height: 1.1;
+  }
+
+  .onyx-sheet:has(.pref-panel) .onyx-sheet__close {
+    width: 44px;
+    height: 44px;
+    font-size: 24px;
+  }
+
+  .onyx-sheet:has(.pref-panel) .onyx-sheet__body {
+    padding:
+      8px
+      max(8px, env(safe-area-inset-right, 0px))
+      max(8px, env(safe-area-inset-bottom, 0px))
+      max(8px, env(safe-area-inset-left, 0px));
+  }
+
+  .pref-panel {
+    gap: 8px;
+  }
+
+  .pref-category-nav {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px;
+    margin-inline: 0;
+    padding: 4px;
+  }
+
+  .pref-category-tabs {
+    align-items: stretch;
+    gap: 4px;
+    padding: 0;
+    scroll-padding-inline: 4px;
+  }
+
+  .pref-category-tab {
+    min-height: 44px;
+    padding: 6px 10px;
+    font-size: 14px;
+  }
+
+  .pref-category-tab__label {
+    font-size: 14px;
+  }
+
+  .pref-category-nav .pref-reset-all {
+    min-height: 44px;
+    padding: 6px 10px;
+    font-size: 12px;
+    overflow-wrap: normal;
+    white-space: nowrap;
+  }
+}
+
 /* The selected category's gradient is removed by Windows High Contrast, and
    its accent rail is intentionally hidden in the mobile strip. Restate the
    semantic aria-selected state with system colors after the mobile cascade so
