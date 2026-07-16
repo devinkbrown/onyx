@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { store } from '@/lib/store/store';
@@ -123,7 +123,7 @@ describe('TimeScrubber accessibility', () => {
     render(() => <TimeScrubber />);
 
     expect(screen.getByRole('region', { name: 'Time scrubber for #root' })).toBeInTheDocument();
-    expect(screen.getByRole('group', { name: 'Activity by UTC hour for #root' })).toBeInTheDocument();
+    expect(screen.getByRole('toolbar', { name: 'Activity by UTC hour for #root' })).toBeInTheDocument();
     const hour = await screen.findByRole('button', { name: /05:00 UTC, 9 messages/i });
     expect(screen.getByLabelText('Jump to date at 12:00 UTC')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Copy moment link for #root' })).toBeInTheDocument();
@@ -136,6 +136,56 @@ describe('TimeScrubber accessibility', () => {
     await waitFor(() => {
       expect(travelToSpy).toHaveBeenLastCalledWith('#root', new Date('2026-07-09T05:00:00.000Z'));
     });
+  });
+
+  it('uses one roving tab stop and moves focus without travelling until activation', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-16T05:30:00.000Z'));
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      hours: Array.from({ length: 24 }, () => 0),
+      totals: { messages: 0 },
+    }), { status: 200 })));
+    const travelToSpy = vi.spyOn(store.getState(), 'travelTo').mockImplementation(() => {});
+
+    render(() => <TimeScrubber />);
+
+    const toolbar = screen.getByRole('toolbar', { name: 'Activity by UTC hour for #root' });
+    const hourButtons = within(toolbar).getAllByRole('button');
+    const hour05 = within(toolbar).getByRole('button', { name: /05:00 UTC/i });
+    const hour06 = within(toolbar).getByRole('button', { name: /06:00 UTC/i });
+    const hour07 = within(toolbar).getByRole('button', { name: /07:00 UTC/i });
+    const hour00 = within(toolbar).getByRole('button', { name: /00:00 UTC/i });
+    const hour23 = within(toolbar).getByRole('button', { name: /23:00 UTC/i });
+
+    expect(hourButtons.filter((button) => button.tabIndex === 0)).toEqual([hour05]);
+    hour05.focus();
+
+    fireEvent.keyDown(hour05, { key: 'ArrowRight' });
+    expect(hour06).toHaveFocus();
+    expect(hour05).toHaveAttribute('tabindex', '-1');
+    expect(hour06).toHaveAttribute('tabindex', '0');
+    expect(travelToSpy).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(hour06, { key: 'ArrowDown' });
+    expect(hour07).toHaveFocus();
+    fireEvent.keyDown(hour07, { key: 'ArrowUp' });
+    expect(hour06).toHaveFocus();
+    fireEvent.keyDown(hour06, { key: 'End' });
+    expect(hour23).toHaveFocus();
+    fireEvent.keyDown(hour23, { key: 'ArrowRight' });
+    expect(hour00).toHaveFocus();
+    fireEvent.keyDown(hour00, { key: 'ArrowLeft' });
+    expect(hour23).toHaveFocus();
+    fireEvent.keyDown(hour23, { key: 'Home' });
+    expect(hour00).toHaveFocus();
+    expect(travelToSpy).not.toHaveBeenCalled();
+
+    hour23.focus();
+    const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    hour23.dispatchEvent(enter);
+    expect(enter.defaultPrevented).toBe(false);
+    fireEvent.click(hour23);
+    expect(travelToSpy).toHaveBeenCalledWith('#root', new Date('2026-07-16T23:00:00.000Z'));
   });
 
   it('announces copy success through a polite status region, not visual text alone', async () => {

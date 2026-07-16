@@ -90,10 +90,13 @@ export { buildMomentLink };
 export function TimeScrubber(): JSX.Element {
   const activeView = useStore((s) => s.activeView);
   const travelTo = useStore((s) => s.travelTo);
-  const [selectedDate, setSelectedDate] = createSignal(formatUtcDate(new Date()));
-  const [selectedMoment, setSelectedMoment] = createSignal(new Date());
+  const initialNowMs = Date.now();
+  const [selectedDate, setSelectedDate] = createSignal(formatUtcDate(new Date(initialNowMs)));
+  const [selectedMoment, setSelectedMoment] = createSignal(new Date(initialNowMs));
   const [copyState, setCopyState] = createSignal<CopyState>('idle');
-  const [nowMs, setNowMs] = createSignal(Date.now());
+  const [nowMs, setNowMs] = createSignal(initialNowMs);
+  const [rovingHour, setRovingHour] = createSignal(new Date(initialNowMs).getUTCHours());
+  const hourButtons: (HTMLButtonElement | undefined)[] = [];
   let copyResetTimer: ReturnType<typeof setTimeout> | null = null;
   let followsCurrentUtcDay = true;
 
@@ -143,6 +146,35 @@ export function TimeScrubber(): JSX.Element {
   function handleBarClick(hour: number): void {
     followsCurrentUtcDay = false;
     jumpTo(hour, 0);
+  }
+
+  function focusHour(hour: number): void {
+    const next = ((hour % HOUR_COUNT) + HOUR_COUNT) % HOUR_COUNT;
+    setRovingHour(next);
+    hourButtons[next]?.focus({ preventScroll: true });
+  }
+
+  function handleHourKeyDown(event: KeyboardEvent, hour: number): void {
+    switch (event.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        event.preventDefault();
+        focusHour(hour + 1);
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        event.preventDefault();
+        focusHour(hour - 1);
+        break;
+      case 'Home':
+        event.preventDefault();
+        focusHour(0);
+        break;
+      case 'End':
+        event.preventDefault();
+        focusHour(HOUR_COUNT - 1);
+        break;
+    }
   }
 
   function handleDateInput(event: InputEvent & { currentTarget: HTMLInputElement }): void {
@@ -195,12 +227,13 @@ export function TimeScrubber(): JSX.Element {
               </div>
               <div
                 class="time-scrubber__track"
-                role="group"
+                role="toolbar"
                 aria-label={`Activity by UTC hour for ${channel()}`}
               >
                 <For each={bars()}>
                   {(bar) => (
                     <button
+                      ref={(element) => (hourButtons[bar.hour] = element)}
                       type="button"
                       class="time-scrubber__bar"
                       classList={{
@@ -210,6 +243,9 @@ export function TimeScrubber(): JSX.Element {
                       style={{ '--scrub-heat': bar.heat.toFixed(3) }}
                       aria-label={barLabel(bar, selectedDate())}
                       title={`${pad2(bar.hour)}:00 UTC - ${bar.count} msgs`}
+                      tabindex={rovingHour() === bar.hour ? 0 : -1}
+                      onFocus={() => setRovingHour(bar.hour)}
+                      onKeyDown={(event) => handleHourKeyDown(event, bar.hour)}
                       onClick={() => handleBarClick(bar.hour)}
                     >
                       <span class="time-scrubber__bar-fill" aria-hidden="true" />
