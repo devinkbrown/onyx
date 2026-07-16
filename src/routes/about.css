@@ -1006,3 +1006,116 @@
   margin-top: 24px;
   filter: drop-shadow(0 0 8px color-mix(in oklab, var(--lapis) 50%, transparent));
 }
+
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .ab-ocean .r-wrap {
+    min-width: 0;
+    padding-inline: 12px;
+  }
+
+  .ab-hero {
+    padding-block: 40px 32px;
+  }
+
+  .ab-section {
+    padding-block: 40px;
+  }
+
+  .ab-hero h1 {
+    font-size: 56px;
+    overflow-wrap: anywhere;
+  }
+
+  .ab-hero .serif-pull {
+    font-size: 24px;
+  }
+
+  .ab-hero p.sub,
+  .ab-ocean p,
+  .ab-ocean li {
+    font-size: 18px;
+    overflow-wrap: anywhere;
+  }
+
+  .ab-ocean .r-title {
+    font-size: 44px;
+    overflow-wrap: anywhere;
+  }
+
+  .ab-ocean .r-lede {
+    font-size: 20px;
+  }
+
+  .ab-ocean h3 {
+    font-size: 30px;
+    overflow-wrap: anywhere;
+  }
+
+  .ab-ocean h4 {
+    font-size: 24px;
+    overflow-wrap: anywhere;
+  }
+
+  .ab-cap-list {
+    font-size: 16px;
+  }
+
+  .ab-cap-row .key,
+  .ab-cap-row .val {
+    min-width: 0;
+    flex: 1 1 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .ab-prop .pv,
+  .ab-node .host,
+  .ab-node .role,
+  .ab-crdt-item .v {
+    min-width: 0;
+    font-size: 16px;
+    overflow-wrap: anywhere;
+  }
+
+  .ab-svc .cmd {
+    font-size: 22px;
+    overflow-wrap: anywhere;
+  }
+
+  .ab-nobot {
+    font-size: 22px;
+  }
+
+  .ab-myth .ideograph {
+    font-size: 48px;
+  }
+
+  .ab-dev-card .code-snip {
+    max-width: 100%;
+    font-size: 14px;
+  }
+
+  .ab-ocean .r-footer .cols {
+    grid-template-columns: 1fr;
+  }
+
+  .ab-ocean .r-footer .sig .logo {
+    font-size: 32px;
+  }
+
+  .ab-ocean .r-footer .sig p,
+  .ab-ocean .r-footer .col a {
+    font-size: 18px;
+  }
+
+  .ab-proto-grid > *,
+  .ab-media-header > *,
+  .ab-transport-row > *,
+  .ab-e2ee-split > *,
+  .ab-mesh-body > *,
+  .ab-crdt-row > *,
+  .ab-svc-grid > *,
+  .ab-mythos-grid > *,
+  .ab-dev-grid > * {
+    min-width: 0;
+  }
+}
