@@ -69,7 +69,7 @@ export type MessageMenuCapabilities = {
 };
 
 export type CapabilityInput = {
-  msg: Pick<ChatMessage, 'from' | 'text' | 'type' | 'deleted' | 'redacted'>;
+  msg: Pick<ChatMessage, 'from' | 'text' | 'plaintext' | 'encrypted' | 'type' | 'deleted' | 'redacted'>;
   selfNick: string;
   /** server/account permits editing (store.canEditMessages) */
   editingEnabled: boolean;
@@ -80,6 +80,19 @@ export type CapabilityInput = {
 };
 
 /**
+ * Return only text already readable in this loaded row. Encrypted rows use
+ * transient plaintext exclusively; a locked row's ciphertext is never treated
+ * as user-visible action text.
+ */
+export function loadedMessageActionText(
+  msg: Pick<ChatMessage, 'text' | 'plaintext' | 'encrypted' | 'deleted' | 'redacted'>,
+): string | null {
+  if (msg.deleted || msg.redacted) return null;
+  const text = msg.encrypted ? msg.plaintext : msg.text;
+  return typeof text === 'string' && text.trim().length > 0 ? text : null;
+}
+
+/**
  * Derive which menu items apply to a message. Pure — no store, no DOM — so the
  * gating rules can be unit-tested in isolation.
  */
@@ -87,7 +100,7 @@ export function messageMenuCapabilities(input: CapabilityInput): MessageMenuCapa
   const { msg, selfNick, editingEnabled, deleteSupported } = input;
   const gone = !!msg.deleted || !!msg.redacted;
   const isOwn = !!selfNick && msg.from.toLowerCase() === selfNick.toLowerCase();
-  const hasText = !gone && msg.text.trim().length > 0;
+  const hasText = loadedMessageActionText(msg) !== null;
 
   return {
     canReply: !gone,
@@ -159,19 +172,6 @@ type VisibleMessageTranslation = Exclude<MessageTranslationState, { status: 'idl
 
 type TranslationCopyState = 'idle' | 'pending' | 'copied' | 'failed';
 
-/**
- * Return only text already readable in this loaded row. Encrypted rows are
- * translatable exclusively from transient plaintext; a locked row's ciphertext
- * is never treated as language input.
- */
-export function loadedMessageTranslationSource(
-  msg: Pick<ChatMessage, 'text' | 'plaintext' | 'encrypted' | 'deleted' | 'redacted'>,
-): string | null {
-  if (msg.deleted || msg.redacted) return null;
-  const text = msg.encrypted ? msg.plaintext : msg.text;
-  return typeof text === 'string' && text.trim().length > 0 ? text : null;
-}
-
 export function MessageMenu(props: MessageMenuProps): JSX.Element {
   const [local] = splitProps(props, [
     'msg',
@@ -220,7 +220,7 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
   const [emojiQuery, setEmojiQuery] = createSignal('');
   const emojiMatches = createMemo(() => searchEmojis(emojiQuery(), EMOJI_PICKER_LIMIT));
   const messageActionTarget = createMemo(() => `message from ${local.msg.from}`);
-  const translationSource = createMemo(() => loadedMessageTranslationSource(local.msg));
+  const actionText = createMemo(() => loadedMessageActionText(local.msg));
   const translationLang = createMemo(() => (
     resolveTranslationTarget(translationTarget(), preferredTranslationTarget())
   ));
@@ -245,7 +245,7 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
   // can update props in place. Invalidate any old completion before it can land.
   createEffect(() => {
     const messageId = local.msg.id;
-    const source = translationSource();
+    const source = actionText();
     const lang = translationLang();
     if (!observedTranslationInput) {
       observedTranslationInput = true;
@@ -305,7 +305,9 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
 
   function startTopic(): void {
     if (!caps().canStartTopic) return;
-    const topic = suggestTopicLabelFromMessage(local.msg.plaintext ?? local.msg.text);
+    const source = actionText();
+    if (source === null) return;
+    const topic = suggestTopicLabelFromMessage(source);
     if (!topic) {
       getState().addToast({
         variant: 'warning',
@@ -327,7 +329,7 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
   }
 
   async function translateOnDevice(): Promise<void> {
-    const source = translationSource();
+    const source = actionText();
     const lang = translationLang();
     const messageId = local.msg.id;
     if (source === null || !localTranslatorAvailable() || activeTranslation !== undefined) return;
@@ -346,7 +348,7 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
         disposed
         || activeTranslation !== request
         || local.msg.id !== messageId
-        || translationSource() !== source
+        || actionText() !== source
         || translationLang() !== lang
       ) return;
       const translated = result.translation?.translated;
@@ -358,7 +360,7 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
         disposed
         || activeTranslation !== request
         || local.msg.id !== messageId
-        || translationSource() !== source
+        || actionText() !== source
         || translationLang() !== lang
       ) return;
       activeTranslation = undefined;
@@ -422,7 +424,9 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
 
   async function copyText(): Promise<void> {
     if (!caps().canCopy) return;
-    const copied = await writeClipboardText(local.msg.text);
+    const source = actionText();
+    if (source === null) return;
+    const copied = await writeClipboardText(source);
     reportClipboardResult(copied, 'message');
     setMenuOpen(false);
   }
@@ -439,7 +443,9 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
 
   function searchText(): void {
     if (!caps().canSearchText) return;
-    const query = suggestSearchQueryFromMessage(local.msg.plaintext ?? local.msg.text);
+    const source = actionText();
+    if (source === null) return;
+    const query = suggestSearchQueryFromMessage(source);
     if (!query) return;
     openMessageSearchWithQuery(query);
     setMenuOpen(false);
@@ -693,7 +699,7 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
                 <span>Search this text</span>
               </button>
             </Show>
-            <Show when={translationSource() !== null && localTranslatorAvailable()}>
+            <Show when={actionText() !== null && localTranslatorAvailable()}>
               <button
                 type="button"
                 class="msg-menu-item"
@@ -767,7 +773,7 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
               </button>
             </Show>
             </div>
-            <Show when={translationSource() !== null && !localTranslatorAvailable()}>
+            <Show when={actionText() !== null && !localTranslatorAvailable()}>
               <p class="msg-menu-translation-note" role="note">
                 On-device translation is unavailable in this browser.
               </p>

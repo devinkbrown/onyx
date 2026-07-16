@@ -16,7 +16,7 @@ import { store } from '@/lib/store/store';
 import { closeMessageSearch, useMessageSearch } from '@/shell/search/useMessageSearch';
 import {
   MessageMenu,
-  loadedMessageTranslationSource,
+  loadedMessageActionText,
   messageMenuCapabilities,
   suggestSearchQueryFromMessage,
   suggestTopicLabelFromMessage,
@@ -252,9 +252,9 @@ describe('suggestSearchQueryFromMessage', () => {
   });
 });
 
-describe('loadedMessageTranslationSource', () => {
+describe('loadedMessageActionText', () => {
   it('uses transient plaintext for a loaded E2EE row', () => {
-    expect(loadedMessageTranslationSource({
+    expect(loadedMessageActionText({
       text: 'e2ee:v1:ciphertext-envelope',
       plaintext: 'private hello',
       encrypted: true,
@@ -262,16 +262,20 @@ describe('loadedMessageTranslationSource', () => {
   });
 
   it('never returns ciphertext for a locked E2EE row', () => {
-    expect(loadedMessageTranslationSource({
+    expect(loadedMessageActionText({
       text: 'e2ee:v1:ciphertext-envelope',
       encrypted: true,
     })).toBeNull();
   });
 
   it('rejects deleted, redacted, and empty rows', () => {
-    expect(loadedMessageTranslationSource({ text: 'gone', deleted: true })).toBeNull();
-    expect(loadedMessageTranslationSource({ text: 'gone', redacted: true })).toBeNull();
-    expect(loadedMessageTranslationSource({ text: '   ' })).toBeNull();
+    expect(loadedMessageActionText({ text: 'gone', deleted: true })).toBeNull();
+    expect(loadedMessageActionText({ text: 'gone', redacted: true })).toBeNull();
+    expect(loadedMessageActionText({ text: '   ' })).toBeNull();
+  });
+
+  it('keeps ordinary visible text unchanged', () => {
+    expect(loadedMessageActionText({ text: 'ordinary hello' })).toBe('ordinary hello');
   });
 });
 
@@ -776,6 +780,58 @@ describe('<MessageMenu>', () => {
     });
   });
 
+  it('copies transient plaintext from an unlocked E2EE row and never its envelope', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    const msg: ChatMessage = {
+      id: 'm-copy-e2ee',
+      from: 'alice',
+      text: 'e2ee:v1:ciphertext-envelope',
+      plaintext: 'private hello',
+      encrypted: true,
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: 'alice',
+    };
+
+    render(() => (
+      <MessageMenu msg={msg} target="alice" selfNick="bob" canEdit={false} menuOpen />
+    ));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy text from message from alice' }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledOnce());
+    expect(writeText).toHaveBeenCalledWith('private hello');
+    expect(writeText).not.toHaveBeenCalledWith('e2ee:v1:ciphertext-envelope');
+  });
+
+  it('does not expose text-derived actions or write ciphertext for a locked E2EE row', () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    const msg: ChatMessage = {
+      id: 'm-copy-e2ee-locked',
+      from: 'alice',
+      text: 'e2ee:v1:locked-ciphertext-envelope',
+      encrypted: true,
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: 'alice',
+    };
+
+    render(() => (
+      <MessageMenu msg={msg} target="alice" selfNick="bob" canEdit={false} menuOpen />
+    ));
+
+    expect(screen.queryByRole('menuitem', { name: /Copy text from message from alice/i })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: /Search text from message from alice/i })).toBeNull();
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
   it('reports rejected clipboard writes without a persistence fallback', async () => {
     const writeText = vi.fn().mockRejectedValue(new DOMException('denied'));
     Object.defineProperty(navigator, 'clipboard', {
@@ -863,6 +919,39 @@ describe('<MessageMenu>', () => {
 
       expect(search.isOpen()).toBe(true);
       expect(search.query()).toBe('Release blockers for mobile onboarding today');
+    });
+    dispose();
+  });
+
+  it('searches transient plaintext from an unlocked E2EE row and never its envelope', () => {
+    store.setState({
+      ...initialState,
+      activeView: { kind: 'dm', nick: 'alice' },
+    }, true);
+    let dispose!: () => void;
+    createRoot((cleanup) => {
+      dispose = cleanup;
+      const search = useMessageSearch();
+      const msg: ChatMessage = {
+        id: 'm-search-e2ee',
+        from: 'alice',
+        text: 'e2ee:v1:ciphertext-envelope',
+        plaintext: 'private release blockers',
+        encrypted: true,
+        time: new Date('2026-07-08T12:00:00Z'),
+        type: 'msg',
+        target: 'alice',
+      };
+
+      render(() => (
+        <MessageMenu msg={msg} target="alice" selfNick="bob" canEdit={false} menuOpen />
+      ));
+
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Search text from message from alice' }));
+
+      expect(search.isOpen()).toBe(true);
+      expect(search.query()).toBe('private release blockers');
+      expect(search.query()).not.toContain('e2ee:v1');
     });
     dispose();
   });
