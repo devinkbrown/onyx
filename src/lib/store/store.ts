@@ -2119,6 +2119,12 @@ function serverIcon(network: string): string {
 // ── Typing rate-limit tracker (module-level, not in store) ───────────────────
 /** target.toLowerCase() → timestamp of last sendTypingStart */
 const _typingLastSent = new Map<string, number>();
+export const MAX_TYPING_TARGETS = 64;
+export const MAX_TYPERS_PER_TARGET = 64;
+export const MAX_TYPING_TARGET_LENGTH = 512;
+export const MAX_TYPING_NICK_LENGTH = 128;
+const TYPING_EXPIRY_MS = 6_000;
+const TYPING_RATE_LIMIT_MS = 4_000;
 
 // ── CHATHISTORY batch collectors (module-level) ───────────────────────────────
 export const SERVER_SEARCH_RESULT_MAX = 200;
@@ -2349,6 +2355,57 @@ function _validInboundWireToken(value: string, maxLength: number, allowEmpty = f
   return (allowEmpty || value.length > 0)
     && value.length <= maxLength
     && !/[\u0000-\u0020\u007f]/u.test(value);
+}
+
+function _normalizeTypingToken(value: string, maxLength: number): string | null {
+  if (
+    !_validInboundWireToken(value, maxLength)
+    || value.startsWith(':')
+    || value.includes(',')
+  ) return null;
+  return value;
+}
+
+/**
+ * Rebuild transient typing state through fixed work/storage ceilings. Old
+ * entries used to survive forever for inactive rooms because only another
+ * TAGMSG for the same target pruned them. Rebuilding on every typing event
+ * drops expired rows globally and also sanitizes any pre-hardening state.
+ */
+function _pruneTypingUsers(
+  source: Map<string, Map<string, number>>,
+  now: number,
+): Map<string, Map<string, number>> {
+  const next = new Map<string, Map<string, number>>();
+  for (const [rawTarget, rawUsers] of source) {
+    if (next.size >= MAX_TYPING_TARGETS) break;
+    const target = _normalizeTypingToken(rawTarget, MAX_TYPING_TARGET_LENGTH);
+    if (!target) continue;
+
+    const users = new Map<string, number>();
+    const seen = new Set<string>();
+    let scanned = 0;
+    for (const [rawNick, expiresAt] of rawUsers) {
+      // Bound repair work as well as retained output if a caller injected a
+      // legacy/invalid map directly into the vanilla store.
+      if (scanned >= MAX_TYPERS_PER_TARGET * 4) break;
+      scanned += 1;
+      const nick = _normalizeTypingToken(rawNick, MAX_TYPING_NICK_LENGTH);
+      const nickKey = nick?.toLowerCase();
+      if (
+        !nick
+        || !nickKey
+        || seen.has(nickKey)
+        || !Number.isFinite(expiresAt)
+        || expiresAt <= now
+      ) continue;
+      seen.add(nickKey);
+      users.set(nick, expiresAt);
+      if (users.size >= MAX_TYPERS_PER_TARGET) break;
+    }
+    if (users.size > 0) next.set(target.toLowerCase(), users);
+  }
+  return next;
 }
 
 /**
@@ -4410,6 +4467,7 @@ export const store = createStore<OnyxState>()(
       _clearPendingDeepLinkTopicResolution();
       _namesBursts.clear();
       _lastRosterRefresh.clear();
+      _typingLastSent.clear();
       _motdBuffer = '';
       // Poll the focused channel's roster so a stale member list self-heals even
       // without a manual channel switch (e.g. while sitting in #root through a
@@ -4443,6 +4501,7 @@ export const store = createStore<OnyxState>()(
         channels: new Map(),
         dms: new Map(),
         composerDrafts: {},
+        typingUsers: new Map(),
         rosterSyncing: new Set(),
         activeView: { kind: 'home' },
         firstUnreadId: new Map(),
@@ -4524,6 +4583,7 @@ export const store = createStore<OnyxState>()(
           _openChathistoryByTarget.clear();
           _stopLatencyPing();
           _clearBanListTransport();
+          _typingLastSent.clear();
           _pendingTravel = null;
           _resetServerSearchTransport();
           set(s => ({
@@ -4531,6 +4591,7 @@ export const store = createStore<OnyxState>()(
             server: s.server ? { ...s.server, connected: false } : null,
             connectedAt: null,
             activeChannelTopics: new Map(),
+            typingUsers: new Map(),
             ...(searchWasPending
               ? {
                   serverSearch: {
@@ -4722,6 +4783,7 @@ export const store = createStore<OnyxState>()(
       _clearPendingDeepLinkTopicResolution();
       _stopRosterPoll();
       _stopScheduledDispatch();
+      _typingLastSent.clear();
       _motdBuffer = '';
       get().client?.destroy();
       _resetAccountBoundState(set, true, true);
@@ -4734,6 +4796,7 @@ export const store = createStore<OnyxState>()(
         channels: new Map(),
         dms: new Map(),
         composerDrafts: {},
+        typingUsers: new Map(),
         rosterSyncing: new Set(),
         server: null,
         activeView: { kind: 'home' },
@@ -6224,20 +6287,34 @@ export const store = createStore<OnyxState>()(
     },
 
     setTyping(target, nick, active) {
-      const key = target.toLowerCase();
+      const safeTarget = _normalizeTypingToken(target, MAX_TYPING_TARGET_LENGTH);
+      const safeNick = _normalizeTypingToken(nick, MAX_TYPING_NICK_LENGTH);
+      if (!safeTarget || !safeNick) return;
+      const key = safeTarget.toLowerCase();
+      const nickKey = safeNick.toLowerCase();
       const now = Date.now();
       set(s => {
-        const typingUsers = new Map(s.typingUsers);
-        const nickMap = new Map(typingUsers.get(key) ?? []);
-        if (active) {
-          nickMap.set(nick, now + 6000);
-        } else {
-          nickMap.delete(nick);
+        const typingUsers = _pruneTypingUsers(s.typingUsers, now);
+        const existing = typingUsers.get(key);
+        const nickMap = new Map(existing ?? []);
+        const existingNick = [...nickMap.keys()].find(
+          (candidate) => candidate.toLowerCase() === nickKey,
+        );
+
+        if (!active) {
+          if (existingNick) nickMap.delete(existingNick);
+          if (nickMap.size === 0) typingUsers.delete(key);
+          else typingUsers.set(key, nickMap);
+          return { typingUsers };
         }
-        // Prune expired entries
-        for (const [n, expiresAt] of nickMap) {
-          if (expiresAt <= now) nickMap.delete(n);
+
+        if (!existing && typingUsers.size >= MAX_TYPING_TARGETS) {
+          return { typingUsers };
         }
+        if (!existingNick && nickMap.size >= MAX_TYPERS_PER_TARGET) {
+          return { typingUsers };
+        }
+        nickMap.set(existingNick ?? safeNick, now + TYPING_EXPIRY_MS);
         typingUsers.set(key, nickMap);
         return { typingUsers };
       });
@@ -6247,21 +6324,29 @@ export const store = createStore<OnyxState>()(
       const { client } = get();
       if (!client) return;
       if (!client.negotiatedCaps.has('draft/typing')) return;
-      const key = target.toLowerCase();
+      const safeTarget = _normalizeTypingToken(target, MAX_TYPING_TARGET_LENGTH);
+      if (!safeTarget) return;
+      const key = safeTarget.toLowerCase();
       const now = Date.now();
+      for (const [candidate, lastSentAt] of _typingLastSent) {
+        if (now - lastSentAt >= TYPING_RATE_LIMIT_MS) _typingLastSent.delete(candidate);
+      }
       const lastSent = _typingLastSent.get(key) ?? 0;
-      if (now - lastSent < 4000) return; // rate limit: at most once per 4s
+      if (now - lastSent < TYPING_RATE_LIMIT_MS) return;
+      if (!_typingLastSent.has(key) && _typingLastSent.size >= MAX_TYPING_TARGETS) return;
       _typingLastSent.set(key, now);
       // Orochi inspects the spec client tag `+typing` (cap name draft/typing).
-      client.tagmsg(target, { '+typing': 'active' });
+      client.tagmsg(safeTarget, { '+typing': 'active' });
     },
 
     sendTypingStop(target) {
       const { client } = get();
       if (!client) return;
       if (!client.negotiatedCaps.has('draft/typing')) return;
-      _typingLastSent.delete(target.toLowerCase()); // reset rate limit so next start fires immediately
-      client.tagmsg(target, { '+typing': 'done' });
+      const safeTarget = _normalizeTypingToken(target, MAX_TYPING_TARGET_LENGTH);
+      if (!safeTarget) return;
+      _typingLastSent.delete(safeTarget.toLowerCase()); // next start fires immediately
+      client.tagmsg(safeTarget, { '+typing': 'done' });
     },
 
     // ── channel info ──────────────────────────────────────────────────────

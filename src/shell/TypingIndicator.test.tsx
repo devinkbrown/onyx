@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { cleanup, render, screen } from '@solidjs/testing-library';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { store } from '@/lib/store/store';
+import {
+  MAX_TYPERS_PER_TARGET,
+  MAX_TYPING_NICK_LENGTH,
+  MAX_TYPING_TARGET_LENGTH,
+  MAX_TYPING_TARGETS,
+  store,
+} from '@/lib/store/store';
 import { formatTypingLabel, latestTypingExpiry, TypingIndicator } from './TypingIndicator';
 
 const initialState = store.getInitialState();
@@ -58,6 +64,53 @@ describe('latestTypingExpiry', () => {
 });
 
 describe('<TypingIndicator>', () => {
+  it('bounds and validates transient typing state', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-16T12:00:00.000Z'));
+    store.setState({ ...initialState, typingUsers: new Map() }, true);
+
+    for (let index = 0; index < MAX_TYPERS_PER_TARGET + 8; index += 1) {
+      store.getState().setTyping('#root', `nick-${index}`, true);
+    }
+    expect(store.getState().typingUsers.get('#root')?.size).toBe(MAX_TYPERS_PER_TARGET);
+
+    // IRC identities are case-insensitive for this transient display state.
+    store.getState().setTyping('#root', 'NICK-0', true);
+    expect(store.getState().typingUsers.get('#root')?.size).toBe(MAX_TYPERS_PER_TARGET);
+
+    store.getState().setTyping(`#${'x'.repeat(MAX_TYPING_TARGET_LENGTH)}`, 'valid', true);
+    store.getState().setTyping('#valid', 'x'.repeat(MAX_TYPING_NICK_LENGTH + 1), true);
+    store.getState().setTyping('#bad target', 'valid', true);
+    expect(store.getState().typingUsers.size).toBe(1);
+  });
+
+  it('globally prunes expired targets and never retains more than the target cap', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-16T12:00:00.000Z'));
+    store.setState({ ...initialState, typingUsers: new Map() }, true);
+
+    for (let index = 0; index < MAX_TYPING_TARGETS + 8; index += 1) {
+      store.getState().setTyping(`#room-${index}`, `nick-${index}`, true);
+    }
+    expect(store.getState().typingUsers.size).toBe(MAX_TYPING_TARGETS);
+
+    vi.advanceTimersByTime(7_000);
+    store.getState().setTyping('#fresh', 'new-typer', true);
+    expect([...store.getState().typingUsers.keys()]).toEqual(['#fresh']);
+
+    store.getState().setTyping('#fresh', 'NEW-TYPER', false);
+    expect(store.getState().typingUsers.size).toBe(0);
+  });
+
+  it('clears typing state at the explicit session boundary', () => {
+    store.setState({ ...initialState, typingUsers: new Map() }, true);
+    store.getState().setTyping('#root', 'alice', true);
+    expect(store.getState().typingUsers.size).toBe(1);
+
+    store.getState().disconnect();
+    expect(store.getState().typingUsers.size).toBe(0);
+  });
+
   it('does not revive an inactive room typing entry that expired before navigation', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-16T12:00:00.000Z'));
