@@ -444,7 +444,13 @@
   margin: 0;
   font-size: 0.78rem;
   line-height: 1.4;
+  overflow-wrap: anywhere;
   color: var(--washi-mute);
+}
+
+.pref-discord-bot-steps {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .pref-action-card {

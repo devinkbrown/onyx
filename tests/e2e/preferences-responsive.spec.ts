@@ -6,8 +6,13 @@ const preferencesCss = readFileSync(
   'utf8',
 );
 
-async function renderNarrowPreferences(page: import('@playwright/test').Page): Promise<void> {
-  await page.setViewportSize({ width: 240, height: 568 });
+async function renderNarrowPreferences(
+  page: import('@playwright/test').Page,
+  options: { width?: number; rootFontSize?: number } = {},
+): Promise<void> {
+  const width = options.width ?? 240;
+  const rootFontSize = options.rootFontSize ?? 24;
+  await page.setViewportSize({ width, height: 568 });
   await page.setContent(`
     <!doctype html>
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -40,6 +45,12 @@ async function renderNarrowPreferences(page: import('@playwright/test').Page): P
                 <button class="pref-segment" role="radio" aria-checked="false">Roomy</button>
               </div>
             </section>
+            <section class="pref-group pref-discord-bot-import">
+              <p class="pref-desc">Leaving Discord? Export channels with DiscordChatExporter in JSON mode.</p>
+              <ol class="pref-discord-bot-steps">
+                <li>Create an application at <a href="https://discord.com/developers/applications">discord.com/developers</a>, then add a Bot to it.</li>
+              </ol>
+            </section>
           </section>
         </div>
       </div>
@@ -49,7 +60,7 @@ async function renderNarrowPreferences(page: import('@playwright/test').Page): P
     content: `
       *, *::before, *::after { box-sizing: border-box; }
       :root {
-        font-size: 24px;
+        font-size: ${rootFontSize}px;
         --space-1: 0.25rem;
         --space-2: 0.5rem;
         --space-3: 0.75rem;
@@ -101,4 +112,16 @@ test('contains enlarged preference controls and leaves a usable mobile tab strip
   expect(geometry.bodyScrollWidth).toBe(geometry.bodyClientWidth);
   expect(geometry.tabsClientWidth).toBeGreaterThanOrEqual(geometry.widestTab);
   expect(geometry.segmentsScrollWidth).toBe(geometry.segmentsClientWidth);
+});
+
+test('wraps import instructions at 200% text without horizontal sheet scrolling', async ({ page }) => {
+  await renderNarrowPreferences(page, { width: 320, rootFontSize: 32 });
+
+  const body = page.locator('.onyx-sheet__body');
+  const geometry = await body.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+
+  expect(geometry.scrollWidth).toBe(geometry.clientWidth);
 });
