@@ -5,6 +5,7 @@ export const MAX_IRCV3_MESSAGE_TAGS = 256;
 export const MAX_IRCV3_TAG_KEY_LENGTH = 256;
 export const MAX_IRCV3_TAG_VALUE_LENGTH = 64 * 1024;
 const MAX_IRCV3_TAG_BLOCK_LENGTH = 128 * 1024;
+export const MAX_WIRE_FRAME_LINES = 512;
 
 /**
  * Split a received WebSocket text frame into complete IRC lines.
@@ -24,7 +25,23 @@ const MAX_IRCV3_TAG_BLOCK_LENGTH = 128 * 1024;
  * regression impossible to reintroduce without failing this unit's tests.
  */
 export function splitWireFrame(frame: string): string[] {
-  return frame.split(/\r?\n/).filter((line) => line.length > 0);
+  const lines: string[] = [];
+  let start = 0;
+  for (let index = 0; index < frame.length; index += 1) {
+    if (frame.charCodeAt(index) !== 0x0a) continue;
+    const end = index > start && frame.charCodeAt(index - 1) === 0x0d
+      ? index - 1
+      : index;
+    if (end > start) {
+      lines.push(frame.slice(start, end));
+      if (lines.length >= MAX_WIRE_FRAME_LINES) return lines;
+    }
+    start = index + 1;
+  }
+  if (start < frame.length && lines.length < MAX_WIRE_FRAME_LINES) {
+    lines.push(frame.slice(start));
+  }
+  return lines;
 }
 
 /**

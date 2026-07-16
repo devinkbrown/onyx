@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from 'vitest';
-import { escapeTagValue, parseIRCMessage, splitWireFrame } from './parser';
+import {
+  escapeTagValue,
+  MAX_WIRE_FRAME_LINES,
+  parseIRCMessage,
+  splitWireFrame,
+} from './parser';
 
 /**
  * Pure framing + tag-escape robustness contract. No live socket: these pin the
@@ -44,6 +49,18 @@ describe('splitWireFrame — stateless, remainder-free frame splitting', () => {
     expect(splitWireFrame('')).toEqual([]);
     expect(splitWireFrame('\r\n')).toEqual([]);
     expect(splitWireFrame('\n\n')).toEqual([]);
+  });
+
+  it('bounds non-empty lines without allocating delimiter storms', () => {
+    const lines = Array.from(
+      { length: MAX_WIRE_FRAME_LINES + 32 },
+      (_, index) => `:srv NOTICE me :line-${index}`,
+    );
+    const bounded = splitWireFrame(lines.join('\r\n'));
+    expect(bounded).toHaveLength(MAX_WIRE_FRAME_LINES);
+    expect(bounded[0]).toBe(lines[0]);
+    expect(bounded[MAX_WIRE_FRAME_LINES - 1]).toBe(lines[MAX_WIRE_FRAME_LINES - 1]);
+    expect(splitWireFrame('\n'.repeat(1024))).toEqual([]);
   });
 
   it('is a pure function: repeated calls retain no cross-frame remainder', () => {
