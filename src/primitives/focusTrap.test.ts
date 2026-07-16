@@ -43,6 +43,25 @@ describe('focusTrap pure helpers', () => {
     expect(document.activeElement).toBe(panel);
   });
 
+  it('does not move focus for claimed or composing Tab events', () => {
+    const outside = document.createElement('button');
+    const panel = document.createElement('section');
+    const inside = document.createElement('button');
+    panel.append(inside);
+    document.body.append(outside, panel);
+    outside.focus();
+
+    const claimed = tabEvent();
+    claimed.preventDefault();
+    trapFocus(claimed, panel);
+    expect(document.activeElement).toBe(outside);
+
+    const composing = tabEvent();
+    Object.defineProperty(composing, 'isComposing', { value: true });
+    trapFocus(composing, panel);
+    expect(document.activeElement).toBe(outside);
+  });
+
   it('recaptures focus from outside the panel using tab direction', () => {
     const outside = document.createElement('button');
     const panel = document.createElement('section');

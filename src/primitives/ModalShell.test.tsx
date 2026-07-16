@@ -41,6 +41,27 @@ describe('ModalShell', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('leaves claimed and composing Escape events with their keyboard owner', async () => {
+    function Harness() {
+      const [open, setOpen] = createSignal(true);
+      return (
+        <ModalShell open={open()} title="Settings" onOpenChange={setOpen}>
+          <button type="button">Save</button>
+        </ModalShell>
+      );
+    }
+
+    render(() => <Harness />);
+    fireEvent.keyDown(document.body, { key: 'Escape', isComposing: true });
+    expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument();
+
+    const claimed = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    claimed.preventDefault();
+    document.body.dispatchEvent(claimed);
+    await tick();
+    expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument();
+  });
+
   it('lets only the topmost dialog handle Escape and restores focus to its underlying trigger', async () => {
     function Harness() {
       const [sheetOpen, setSheetOpen] = createSignal(true);

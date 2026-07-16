@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { createEffect, createSignal, onCleanup, Show, splitProps, untrack, type JSX, type ParentProps } from 'solid-js';
+import { keyboardEventIsClaimed } from './focusTrap';
 
 type PopoverElement = HTMLDivElement & {
   showPopover?: () => void;
@@ -140,6 +141,7 @@ export function Popover(props: PopoverProps) {
     if (!isOpen()) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (keyboardEventIsClaimed(event)) return;
       if (event.key !== 'Escape' || openPopoverStack.at(-1) !== stackToken) return;
       event.preventDefault();
       event.stopImmediatePropagation();

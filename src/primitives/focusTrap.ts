@@ -26,6 +26,11 @@ const focusableSelector = [
 // reaches every open dialog and closes the entire stack.
 const dialogFocusStack: symbol[] = [];
 
+/** True when keyboard ownership belongs to an earlier handler or input method. */
+export function keyboardEventIsClaimed(event: KeyboardEvent): boolean {
+  return event.defaultPrevented || event.isComposing || event.keyCode === 229;
+}
+
 function isTopDialog(owner: symbol): boolean {
   return dialogFocusStack[dialogFocusStack.length - 1] === owner;
 }
@@ -55,6 +60,7 @@ export function focusFirst(panel: HTMLElement): void {
  * activeElement to <body>). (WCAG 2.4.3)
  */
 export function trapFocus(event: KeyboardEvent, panel: HTMLElement): void {
+  if (keyboardEventIsClaimed(event)) return;
   const focusable = focusableElements(panel);
 
   if (focusable.length === 0) {
@@ -108,7 +114,7 @@ export function createDialogFocus(options: DialogFocusOptions): void {
     const previous = document.activeElement as HTMLElement | null;
     dialogFocusStack.push(owner);
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!isTopDialog(owner)) return;
+      if (!isTopDialog(owner) || keyboardEventIsClaimed(event)) return;
       if (event.key === 'Escape') {
         event.preventDefault();
         event.stopImmediatePropagation();

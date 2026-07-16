@@ -145,6 +145,26 @@ describe('Tooltip', () => {
     expect(screen.getByRole('tooltip')).toBeInTheDocument();
   });
 
+  it('stays open when an input method or earlier handler owns Escape', () => {
+    vi.useFakeTimers();
+    render(() => (
+      <Tooltip content="Owned help" openDelay={0}>
+        <button type="button">Owned trigger</button>
+      </Tooltip>
+    ));
+    const trigger = screen.getByRole('button', { name: 'Owned trigger' });
+    fireEvent.focusIn(trigger);
+    vi.runAllTimers();
+
+    fireEvent.keyDown(trigger, { key: 'Escape', isComposing: true });
+    expect(screen.getByRole('tooltip')).toBeInTheDocument();
+
+    const claimed = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    claimed.preventDefault();
+    trigger.dispatchEvent(claimed);
+    expect(screen.getByRole('tooltip')).toBeInTheDocument();
+  });
+
   it('ignores touch hover and describes a nested interactive trigger', () => {
     vi.useFakeTimers();
     render(() => (

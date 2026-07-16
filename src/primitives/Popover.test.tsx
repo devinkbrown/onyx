@@ -62,6 +62,22 @@ describe('Popover', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it('stays open when an input method or earlier handler owns Escape', () => {
+    render(() => (
+      <Popover trigger="Status" defaultOpen>
+        Mesh online
+      </Popover>
+    ));
+
+    fireEvent.keyDown(document.body, { key: 'Escape', isComposing: true });
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    const claimed = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    claimed.preventDefault();
+    document.body.dispatchEvent(claimed);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
   it('restores the trigger after Escape even when the opener was not browser-focused', async () => {
     render(() => (
       <Popover trigger="Open actions">

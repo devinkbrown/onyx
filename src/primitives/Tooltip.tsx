@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { createEffect, createSignal, onCleanup, Show, splitProps, untrack, type JSX, type ParentProps } from 'solid-js';
+import { keyboardEventIsClaimed } from './focusTrap';
 
 export type TooltipProps = ParentProps<{
   content: JSX.Element;
@@ -125,6 +126,7 @@ export function Tooltip(props: TooltipProps) {
   createEffect(() => {
     if (!open()) return;
     const handleEscape = (event: KeyboardEvent): void => {
+      if (keyboardEventIsClaimed(event)) return;
       if (event.key === 'Escape') dismissWithEscape();
     };
     document.addEventListener('keydown', handleEscape);
