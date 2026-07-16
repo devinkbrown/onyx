@@ -748,6 +748,56 @@
 .onyx-toast strong { font-family: var(--font-mono); font-size: 0.82rem; letter-spacing: 0.05em; text-transform: uppercase; }
 .onyx-toast p { margin: 0; color: var(--washi-dim); font-size: 0.9rem; line-height: 1.45; }
 
+/* Stacked notifications share the short mobile viewport with the navigation
+   rail. Bound the host as one announcement scroller and keep each dismiss
+   action usable without rem-scaled padding widening the fixed layer. */
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .onyx-toaster {
+    top: max(8px, env(safe-area-inset-top, 0px));
+    right: max(8px, env(safe-area-inset-right, 0px));
+    bottom: calc(
+      var(--mnav-h, 56px)
+      + env(safe-area-inset-bottom, 0px)
+      + 8px
+    );
+    left: max(8px, env(safe-area-inset-left, 0px));
+    width: auto;
+    gap: 4px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+
+  .onyx-toast {
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .onyx-toast__body {
+    min-width: 0;
+    gap: 4px;
+  }
+
+  .onyx-toast strong {
+    font-size: 14px;
+    overflow-wrap: anywhere;
+  }
+
+  .onyx-toast p {
+    font-size: 16px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+
+  .onyx-toast button {
+    width: 44px;
+    height: 44px;
+    flex: none;
+    font-size: 24px;
+  }
+}
+
 .onyx-field {
   display: grid;
   gap: 0.42rem;
