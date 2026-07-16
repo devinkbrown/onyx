@@ -58,7 +58,7 @@ export function loadCustomThemes(): CustomTheme[] {
     const seen = new Set<string>();
     for (const candidate of raw.slice(0, MAX_CUSTOM_THEME_CANDIDATES)) {
       if (themes.length >= MAX_CUSTOM_THEMES) break;
-      const theme = parseCustomTheme(migrateCustomThemeBase(candidate));
+      const theme = parseCustomThemeValue(migrateCustomThemeBase(candidate));
       if (!theme || seen.has(theme.id)) continue;
       seen.add(theme.id);
       themes.push(theme);
@@ -90,7 +90,7 @@ function persist(list: CustomTheme[]): void {
   }
 }
 
-function parseCustomTheme(value: unknown): CustomTheme | null {
+export function parseCustomThemeValue(value: unknown): CustomTheme | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
   const v = value as Record<string, unknown>;
   if (
@@ -105,7 +105,7 @@ function parseCustomTheme(value: unknown): CustomTheme | null {
     || typeof v.base !== 'string'
     || !Object.hasOwn(THEMES, v.base)
   ) return null;
-  const overrides = parseTokenMap(v.overrides);
+  const overrides = parseCustomThemeTokenMap(v.overrides);
   if (!overrides) return null;
   return { id: v.id, name: v.name, base: v.base as ThemeId, overrides };
 }
@@ -117,7 +117,7 @@ function parseCustomTheme(value: unknown): CustomTheme | null {
  * garbage like `"[object Object]"`, silently corrupting `var(--token)` and
  * breaking the palette's contrast guarantee. Mirrors the `?theme=` import guard.
  */
-function parseTokenMap(value: unknown): TokenMap | null {
+export function parseCustomThemeTokenMap(value: unknown): TokenMap | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
   const entries = Object.entries(value as Record<string, unknown>);
   if (entries.length > MAX_CUSTOM_THEME_TOKEN_ENTRIES) return null;
@@ -150,7 +150,7 @@ export function addCustomTheme(name: string, base: ThemeId, overrides: TokenMap)
     ? name.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, MAX_CUSTOM_THEME_NAME_LENGTH) || 'Custom'
     : 'Custom';
   const safeBase = Object.hasOwn(THEMES, base) ? base : 'onyx';
-  const safeOverrides = parseTokenMap(overrides) ?? {};
+  const safeOverrides = parseCustomThemeTokenMap(overrides) ?? {};
   const slug = slugify(safeName);
   let id = `${CUSTOM_PREFIX}${slug}`;
   let n = 2;

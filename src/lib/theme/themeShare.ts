@@ -3,19 +3,20 @@
  * themeShare.ts — compact custom-theme share-code encoding and import guards.
  */
 
-import { THEMES } from '@/theme/themes';
-import type { CustomTheme, ThemeId } from '@/theme';
+import { parseCustomThemeValue } from '@/theme/customThemes';
+import type { CustomTheme } from '@/theme';
 
 const BASE64URL_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 const BASE64URL_RE = /^[A-Za-z0-9_-]*$/;
-const CUSTOM_PREFIX = 'custom:';
+const MAX_THEME_SHARE_CODE_LENGTH = 65_536;
 
 export function encodeTheme(theme: CustomTheme): string {
-  return encodeBase64urlUtf8(JSON.stringify(theme));
+  const parsed = parseCustomThemeValue(theme);
+  return parsed ? encodeBase64urlUtf8(JSON.stringify(parsed)) : '';
 }
 
 export function decodeTheme(code: string): CustomTheme | null {
-  if (typeof code !== 'string') return null;
+  if (typeof code !== 'string' || code.length > MAX_THEME_SHARE_CODE_LENGTH) return null;
 
   const json = decodeBase64urlUtf8(code);
   if (json === null) return null;
@@ -27,7 +28,7 @@ export function decodeTheme(code: string): CustomTheme | null {
     return null;
   }
 
-  return parseCustomTheme(parsed);
+  return parseCustomThemeValue(parsed);
 }
 
 export function themeShareUrl(theme: CustomTheme, origin: string): string {
@@ -92,37 +93,4 @@ function decodeBase64urlBytes(value: string): Uint8Array | null {
 
   if (bits > 0 && accumulator !== 0) return null;
   return new Uint8Array(bytes);
-}
-
-function parseCustomTheme(value: unknown): CustomTheme | null {
-  if (!isRecord(value)) return null;
-
-  const id = value.id;
-  const name = value.name;
-  const base = value.base;
-  const overrides = parseTokenMap(value.overrides);
-
-  if (typeof id !== 'string' || !id.startsWith(CUSTOM_PREFIX)) return null;
-  if (typeof name !== 'string') return null;
-  if (typeof base !== 'string' || !isThemeId(base)) return null;
-  if (overrides === null) return null;
-
-  return { id, name, base, overrides };
-}
-
-function parseTokenMap(value: unknown): Record<string, string> | null {
-  if (!isRecord(value) || Array.isArray(value)) return null;
-
-  const entries = Object.entries(value);
-  if (entries.some(([, tokenValue]) => typeof tokenValue !== 'string')) return null;
-
-  return Object.fromEntries(entries) as Record<string, string>;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function isThemeId(value: string): value is ThemeId {
-  return Object.prototype.hasOwnProperty.call(THEMES, value);
 }

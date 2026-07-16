@@ -28,6 +28,7 @@ export const SEED_EXPORT_VERSION = 1 as const;
 
 /** Max label length accepted on import; longer labels are trimmed on export. */
 const MAX_LABEL_LENGTH = 80;
+const MAX_SEED_EXPORT_BYTES = 16 * 1024;
 
 /** Banned indigo→violet→purple→magenta arc — mirrors `paletteFactory`. */
 const BANNED_HUE = { min: 258, max: 342 } as const;
@@ -99,6 +100,9 @@ function inRange(value: unknown, min: number, max: number): value is number {
  * valid seed (typically feed it to {@link paletteFromSeedExport}).
  */
 export function parseThemeSeed(json: string): SeedParseResult {
+  if (typeof json !== 'string' || json.length > MAX_SEED_EXPORT_BYTES) {
+    return { ok: false, error: 'Theme-seed export is too large.' };
+  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);

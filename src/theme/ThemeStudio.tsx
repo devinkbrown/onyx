@@ -66,17 +66,13 @@ import { pickScreenColor, supportsEyeDropper } from './eyeDropper';
 import { useStore, getState } from '@/lib/store';
 import { backgroundOptions } from '@/backgrounds';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
+import { parseThemeExport, type ThemeExportBlob } from './themeImport';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type ExportBlob = {
-  __onyx_theme_export__: true;
-  base: ThemeId;
-  overrides: TokenMap;
-  exported: string; // ISO timestamp
-};
+type ExportBlob = ThemeExportBlob;
 
 /** The Adjust panel's transform state — identity means "no change". */
 type AdjustState = {
@@ -146,14 +142,6 @@ export function seedSwatches(seed: PaletteSeed): { primary: string; accent: stri
     primary: palette['--lapis'] ?? '#000000',
     accent: palette['--gold'] ?? '#000000',
   };
-}
-
-function isExportBlob(value: unknown): value is ExportBlob {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    (value as Record<string, unknown>).__onyx_theme_export__ === true
-  );
 }
 
 function sampledAccentSeed(value: unknown): { hex: string; hue: number } | null {
@@ -1098,33 +1086,18 @@ export function ThemeStudio(props: ThemeStudioProps) {
     );
     if (!raw) return;
 
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      setImportError('Invalid JSON — could not parse.');
+    const result = parseThemeExport(raw);
+    if (!result.ok) {
+      setImportError(result.error);
       return;
     }
-
-    if (!isExportBlob(parsed)) {
-      setImportError('Not a valid Onyx theme export.');
-      return;
-    }
-
-    if (!(parsed.base in THEMES)) {
-      setImportError(`Unknown base theme "${parsed.base}".`);
-      return;
-    }
+    const parsed = result.value;
 
     setImportError(null);
     setTheme(parsed.base);
     // Apply overrides after a micro-task so the base theme finishes writing.
     queueMicrotask(() => {
-      const safeOverrides: TokenMap = {};
-      for (const [k, v] of Object.entries(parsed.overrides)) {
-        if (typeof v === 'string') safeOverrides[k] = v;
-      }
-      setOverrides(safeOverrides);
+      setOverrides(parsed.overrides);
     });
   };
 

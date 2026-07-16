@@ -50,6 +50,25 @@ describe('encodeTheme and decodeTheme', () => {
       ),
     ).toBeNull();
   });
+
+  it('rejects oversized codes and unsafe token maps before seating them', () => {
+    expect(decodeTheme('a'.repeat(65_537))).toBeNull();
+    expect(decodeTheme(encodeJson({
+      ...MINIMAL_THEME,
+      overrides: { color: 'red' },
+    }))).toBeNull();
+    expect(decodeTheme(encodeJson({
+      ...MINIMAL_THEME,
+      base: 'toString',
+    }))).toBeNull();
+  });
+
+  it('does not encode a runtime-invalid theme', () => {
+    expect(encodeTheme({
+      ...MINIMAL_THEME,
+      name: 'x'.repeat(81),
+    })).toBe('');
+  });
 });
 
 describe('parseThemeParam', () => {

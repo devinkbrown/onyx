@@ -64,6 +64,13 @@ describe('seedTransfer — fail-closed parsing', () => {
     expect(r).toEqual({ ok: false, error: expect.stringContaining('Invalid JSON') });
   });
 
+  it('rejects an oversized seed export before parsing', () => {
+    expect(parseThemeSeed(' '.repeat((16 * 1024) + 1))).toEqual({
+      ok: false,
+      error: 'Theme-seed export is too large.',
+    });
+  });
+
   it('rejects a JSON array', () => {
     expect(parseThemeSeed('[]').ok).toBe(false);
   });
