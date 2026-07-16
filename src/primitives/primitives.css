@@ -423,6 +423,18 @@
   border-bottom: 1px solid var(--seam-faint);
 }
 
+/* Full-bleed Sheets sit directly on viewport edges. Preserve the existing
+   panel padding on ordinary displays, but keep header controls outside a
+   notched/status-bar inset when viewport-fit=cover is active. Centered modal
+   dialogs already have their own viewport margin and retain their geometry. */
+.onyx-sheet__header {
+  padding:
+    max(var(--pad-panel-lg), env(safe-area-inset-top, 0px))
+    max(var(--pad-panel-lg), env(safe-area-inset-right, 0px))
+    var(--pad-panel-lg)
+    max(var(--pad-panel-lg), env(safe-area-inset-left, 0px));
+}
+
 .onyx-sheet__kicker,
 .onyx-modal__kicker {
   margin: 0 0 var(--space-1);
@@ -490,6 +502,16 @@
   padding: var(--pad-panel-lg);
   color: var(--washi-dim);
   line-height: 1.6;
+}
+
+/* The Sheet body owns scrolling, so its final action—not the fixed panel—must
+   reserve the home-indicator inset. max() leaves desktop padding unchanged. */
+.onyx-sheet__body {
+  padding:
+    var(--pad-panel-lg)
+    max(var(--pad-panel-lg), env(safe-area-inset-right, 0px))
+    max(var(--pad-panel-lg), env(safe-area-inset-bottom, 0px))
+    max(var(--pad-panel-lg), env(safe-area-inset-left, 0px));
 }
 
 .onyx-avatar {
