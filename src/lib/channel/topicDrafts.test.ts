@@ -8,6 +8,7 @@ import {
   channelTopicDraftKey,
   clearChannelTopicDrafts,
   loadChannelTopicDrafts,
+  purgeLegacyChannelTopicDrafts,
   readChannelTopicDraft,
   sanitizeChannelTopicDrafts,
   saveChannelTopicDraft,
@@ -17,7 +18,7 @@ import {
 describe('channel topic drafts', () => {
   beforeEach(() => localStorage.clear());
 
-  it('isolates Alice and Bob while quarantining ownerless legacy topic drafts', () => {
+  it('isolates Alice and Bob while purging ownerless legacy topic drafts', () => {
     const alice = { serverUrl: 'wss://example.test', identity: 'Alice' };
     const bob = { serverUrl: 'wss://example.test', identity: 'bob' };
     localStorage.setItem(CHANNEL_TOPIC_DRAFTS_KEY, JSON.stringify({ '#legacy': 'legacy topic' }));
@@ -27,7 +28,8 @@ describe('channel topic drafts', () => {
 
     expect(loadChannelTopicDrafts(undefined, alice)).toEqual({ '#alice': 'Alice topic' });
     expect(loadChannelTopicDrafts(undefined, bob)).toEqual({ '#bob': 'Bob topic' });
-    expect(loadChannelTopicDrafts()).toEqual({ '#legacy': 'legacy topic' });
+    expect(loadChannelTopicDrafts()).toEqual({});
+    expect(localStorage.getItem(CHANNEL_TOPIC_DRAFTS_KEY)).toBeNull();
   });
 
   it('normalizes only channel targets', () => {
@@ -115,6 +117,7 @@ describe('channel topic drafts', () => {
     expect(loadChannelTopicDrafts(throwingStorage)).toEqual({});
     expect(() => saveChannelTopicDrafts({ '#root': 'draft' }, throwingStorage)).not.toThrow();
     expect(() => saveChannelTopicDrafts({}, throwingStorage)).not.toThrow();
+    expect(purgeLegacyChannelTopicDrafts(throwingStorage)).toBe(false);
   });
 
   it('does not persist a single blank channel draft', () => {

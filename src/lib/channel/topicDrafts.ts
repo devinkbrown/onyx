@@ -16,6 +16,18 @@ function storageOrDefault(storage?: TopicDraftStorage): TopicDraftStorage | null
   return window.localStorage;
 }
 
+/** Remove unsafe ownerless drafts instead of assigning their room text to a login. */
+export function purgeLegacyChannelTopicDrafts(storage?: TopicDraftStorage): boolean {
+  const resolved = storageOrDefault(storage);
+  if (!resolved) return false;
+  try {
+    resolved.removeItem(CHANNEL_TOPIC_DRAFTS_KEY);
+    return resolved.getItem(CHANNEL_TOPIC_DRAFTS_KEY) === null;
+  } catch {
+    return false;
+  }
+}
+
 export function channelTopicDraftKey(channel: string): string {
   return channel.trim().toLowerCase();
 }
@@ -46,6 +58,7 @@ export function loadChannelTopicDrafts(
   if (!resolved) return {};
   const storageKey = deviceMemoryStorageKey(CHANNEL_TOPIC_DRAFTS_KEY, owner);
   if (!storageKey) return {};
+  if (owner !== undefined) purgeLegacyChannelTopicDrafts(resolved);
   try {
     const raw = resolved.getItem(storageKey);
     return raw ? sanitizeChannelTopicDrafts(JSON.parse(raw)) : {};
@@ -63,6 +76,7 @@ export function saveChannelTopicDrafts(
   if (!resolved) return;
   const storageKey = deviceMemoryStorageKey(CHANNEL_TOPIC_DRAFTS_KEY, owner);
   if (!storageKey) return;
+  if (owner !== undefined) purgeLegacyChannelTopicDrafts(resolved);
 
   const sanitized = sanitizeChannelTopicDrafts(drafts);
   try {
