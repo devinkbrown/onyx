@@ -24,6 +24,17 @@ describe('ModalShell', () => {
     expect(dialog.textContent).toContain('Leave the current room');
   });
 
+  it('moves initial focus to the labelled close control', async () => {
+    render(() => (
+      <ModalShell open title="Account" closeLabel="Close account panel" onOpenChange={() => undefined}>
+        <button type="button">Sign in</button>
+      </ModalShell>
+    ));
+    await tick();
+
+    expect(screen.getByRole('button', { name: 'Close account panel' })).toHaveFocus();
+  });
+
   it('closes from Escape through the controlled open signal', async () => {
     function Harness() {
       const [open, setOpen] = createSignal(true);

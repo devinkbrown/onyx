@@ -412,6 +412,7 @@
     0 0 34px -26px var(--lapis-bright);
   animation: onyx-modal-in var(--dur) var(--ease);
   overflow: hidden;
+  overflow: clip;
 }
 
 @keyframes onyx-modal-in {
@@ -576,6 +577,75 @@
     clip: rect(0 0 0 0);
     white-space: nowrap;
     border: 0;
+  }
+}
+
+/* At 400% zoom a desktop-height viewport can reflow below 30rem. A centered
+   modal must keep its chrome and body as separate bounded regions instead of
+   letting the rem-scaled header push the body thousands of pixels offscreen. */
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .onyx-modal__dialog {
+    --onyx-modal-edge-top: max(8px, env(safe-area-inset-top, 0px));
+    --onyx-modal-edge-right: max(8px, env(safe-area-inset-right, 0px));
+    --onyx-modal-edge-bottom: max(8px, env(safe-area-inset-bottom, 0px));
+    --onyx-modal-edge-left: max(8px, env(safe-area-inset-left, 0px));
+
+    width: auto;
+    max-width: none;
+    max-height: calc(
+      100svh
+      - var(--onyx-modal-edge-top)
+      - var(--onyx-modal-edge-bottom)
+    );
+    margin:
+      var(--onyx-modal-edge-top)
+      var(--onyx-modal-edge-right)
+      var(--onyx-modal-edge-bottom)
+      var(--onyx-modal-edge-left);
+  }
+
+  .onyx-modal__header {
+    align-items: flex-start;
+    min-height: 0;
+    max-height: 60svh;
+    flex: 0 1 auto;
+    gap: 8px;
+    padding: 8px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+
+  .onyx-modal__kicker,
+  .onyx-modal__header p:last-child {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .onyx-modal__header h2 {
+    font-size: 1rem;
+    line-height: 1.1;
+  }
+
+  .onyx-modal__close {
+    width: 44px;
+    height: 44px;
+    font-size: 24px;
+  }
+
+  .onyx-modal__body {
+    min-height: 0;
+    padding: 8px;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
   }
 }
 
