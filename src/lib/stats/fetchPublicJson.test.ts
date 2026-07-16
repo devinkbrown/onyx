@@ -38,6 +38,30 @@ describe('fetchPublicJson', () => {
     await expect(fetchPublicJson('/hanging.json', { fetchImpl, timeoutMs: 5 })).resolves.toBeNull();
   });
 
+  it('bounds a stalled response body even when AbortController is unavailable', async () => {
+    const read = vi.fn(() => new Promise<ReadableStreamReadResult<Uint8Array>>(() => {}));
+    const cancel = vi.fn(async () => undefined);
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      headers: new Headers(),
+      body: { getReader: () => ({ read, cancel }) },
+    }) as unknown as Response);
+    const originalAbortController = globalThis.AbortController;
+    vi.stubGlobal('AbortController', undefined);
+
+    try {
+      await expect(fetchPublicJson('/stalled-body.json', { fetchImpl, timeoutMs: 5 }))
+        .resolves.toBeNull();
+      expect(read).toHaveBeenCalledOnce();
+      expect(cancel).toHaveBeenCalledOnce();
+      expect(fetchImpl).toHaveBeenCalledWith('/stalled-body.json', {
+        headers: { Accept: 'application/json' },
+      });
+    } finally {
+      vi.stubGlobal('AbortController', originalAbortController);
+    }
+  });
+
   it('rejects malformed JSON without throwing into a route', async () => {
     const fetchImpl = vi.fn(async () => new Response('{broken', { status: 200 }));
 

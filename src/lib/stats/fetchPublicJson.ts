@@ -22,13 +22,23 @@ export async function fetchPublicJson(
   if (!fetchImpl) return null;
   const maxBytes = Math.max(1, Math.floor(options.maxBytes ?? PUBLIC_FEED_MAX_BYTES));
   const timeoutMs = Math.max(1, Math.floor(options.timeoutMs ?? PUBLIC_FEED_TIMEOUT_MS));
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetchImpl(path, {
-      headers: { Accept: 'application/json' },
-      signal: controller.signal,
-    });
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+  const timedOut = Symbol('public-feed-timeout');
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+
+  const deadline = new Promise<typeof timedOut>((resolve) => {
+    timeout = setTimeout(() => {
+      controller?.abort();
+      void reader?.cancel().catch(() => {});
+      resolve(timedOut);
+    }, timeoutMs);
+  });
+
+  const operation = async (): Promise<unknown | null> => {
+    const init: RequestInit = { headers: { Accept: 'application/json' } };
+    if (controller) init.signal = controller.signal;
+    const response = await fetchImpl(path, init);
     if (!response.ok) return null;
     const rawLength = response.headers.get('content-length');
     if (rawLength !== null) {
@@ -42,7 +52,7 @@ export async function fetchPublicJson(
       return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
     }
 
-    const reader = response.body.getReader();
+    reader = response.body.getReader();
     const chunks: Uint8Array[] = [];
     let total = 0;
     while (true) {
@@ -51,7 +61,7 @@ export async function fetchPublicJson(
       if (!value) continue;
       total += value.byteLength;
       if (total > maxBytes) {
-        controller.abort();
+        controller?.abort();
         void reader.cancel().catch(() => {});
         return null;
       }
@@ -64,9 +74,14 @@ export async function fetchPublicJson(
       offset += chunk.byteLength;
     }
     return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+  };
+
+  try {
+    const result = await Promise.race([operation(), deadline]);
+    return result === timedOut ? null : result;
   } catch {
     return null;
   } finally {
-    clearTimeout(timeout);
+    if (timeout) clearTimeout(timeout);
   }
 }
