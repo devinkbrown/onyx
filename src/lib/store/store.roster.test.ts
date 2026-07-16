@@ -192,6 +192,23 @@ describe('NAMES roster reconcile — interleaved / late bursts never collapse', 
     expect(store.getState().channels.has('#self-part-race')).toBe(false);
   });
 
+  it('returns home and clears channel UI state after a self-KICK', () => {
+    connect('me');
+    feed(':me!u@h JOIN #self-kick');
+    store.setState({
+      channelFolders: [{ id: 'work', name: 'Work', channels: ['#self-kick'], collapsed: false }],
+      activeChannelTopics: new Map([['#self-kick', 'release train']]),
+    });
+
+    feed(':op!u@h KICK #self-kick me :policy');
+    feed(':server 353 me = #self-kick :me alice');
+
+    expect(store.getState().channels.has('#self-kick')).toBe(false);
+    expect(store.getState().activeView).toEqual({ kind: 'home' });
+    expect(store.getState().channelFolders[0]?.channels).toEqual([]);
+    expect(store.getState().activeChannelTopics.has('#self-kick')).toBe(false);
+  });
+
   it('an expired burst cannot promote a late partial 353 to roster replacement', () => {
     const now = vi.spyOn(performance, 'now').mockReturnValue(0);
     try {

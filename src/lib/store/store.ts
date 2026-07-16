@@ -7377,6 +7377,18 @@ export const store = createStore<OnyxState>()(
             const channels = new Map(s.channels);
             if (isSelf) {
               channels.delete(key);
+              const channelFolders = s.channelFolders.map(folder => ({
+                ...folder,
+                channels: folder.channels.filter(channel => channel.toLowerCase() !== key),
+              }));
+              _saveChannelFolders(channelFolders);
+              const activeChannelTopics = new Map(s.activeChannelTopics);
+              activeChannelTopics.delete(key);
+              const activeView = s.activeView.kind === 'channel'
+                && s.activeView.channel.toLowerCase() === key
+                ? { kind: 'home' as const }
+                : s.activeView;
+              return { channels, channelFolders, activeChannelTopics, activeView };
             } else {
               const c = channels.get(key);
               if (c) {
