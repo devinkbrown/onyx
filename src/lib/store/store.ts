@@ -9105,7 +9105,7 @@ export const store = createStore<OnyxState>()(
     // ── Starred channels ──────────────────────────────────────────────────
     starredChannels: (() => {
       if (typeof window === 'undefined') return new Set<string>();
-      try { return new Set<string>(JSON.parse(localStorage.getItem('onyx:starred') || '[]') as string[]); }
+      try { return new Set(parseStringArray(localStorage.getItem('onyx:starred'))); }
       catch { return new Set<string>(); }
     })(),
     starChannel: (ch) => set(s => {
@@ -11344,11 +11344,7 @@ function _saveBookmarks(bookmarks: ChatMessage[]): void {
 function _loadChannelSet(storageKey: string): Set<string> {
   if (typeof window === 'undefined') return new Set();
   try {
-    const raw = localStorage.getItem(storageKey);
-    if (!raw) return new Set();
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return new Set();
-    return new Set(parsed.filter((c): c is string => typeof c === 'string').map(c => c.toLowerCase()));
+    return new Set(parseStringArray(localStorage.getItem(storageKey)).map((channel) => channel.toLowerCase()));
   } catch {
     return new Set();
   }
@@ -11386,10 +11382,7 @@ const IGNORED_USERS_KEY = 'onyx:ignored-users';
 function _loadIgnoredUsers(): Set<string> {
   if (typeof window === 'undefined') return new Set();
   try {
-    const raw = localStorage.getItem(IGNORED_USERS_KEY);
-    if (!raw) return new Set();
-    const parsed = JSON.parse(raw) as string[];
-    return new Set(Array.isArray(parsed) ? parsed : []);
+    return new Set(parseStringArray(localStorage.getItem(IGNORED_USERS_KEY)));
   } catch {
     return new Set();
   }
@@ -11596,8 +11589,7 @@ function _loadChatBackground(): OnyxState['chatBackground'] {
 function _loadRecentEmojis(): string[] {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = localStorage.getItem('onyx:recent-emoji');
-    return raw ? (JSON.parse(raw) as string[]) : [];
+    return parseStringArray(localStorage.getItem('onyx:recent-emoji'));
   } catch { return []; }
 }
 
@@ -11612,8 +11604,7 @@ function _loadEmojiUsage(): Record<string, number> {
 function _loadMutedDMs(): Set<string> {
   if (typeof window === 'undefined') return new Set();
   try {
-    const raw = localStorage.getItem('onyx:muted-dms');
-    return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
+    return new Set(parseStringArray(localStorage.getItem('onyx:muted-dms')));
   } catch { return new Set(); }
 }
 
@@ -11626,7 +11617,7 @@ function _loadFavoriteEmojis(): string[] {
   if (typeof window === 'undefined') return ['👍','❤️','😂','😮','😢','🙏'];
   try {
     const raw = localStorage.getItem('onyx:fav-emojis');
-    return raw ? JSON.parse(raw) as string[] : ['👍','❤️','😂','😮','😢','🙏'];
+    return raw ? parseStringArray(raw) : ['👍','❤️','😂','😮','😢','🙏'];
   } catch { return ['👍','❤️','😂','😮','😢','🙏']; }
 }
 
@@ -11682,7 +11673,7 @@ function _loadGlassSidebar(): boolean { return typeof window !== 'undefined' && 
 // ── Nick aliases persistence ──────────────────────────────────────────────────
 function _loadNickAliases(): string[] {
   if (typeof window === 'undefined') return [];
-  try { return JSON.parse(localStorage.getItem('onyx:nick-aliases') ?? '[]') as string[]; } catch { return []; }
+  try { return parseStringArray(localStorage.getItem('onyx:nick-aliases')); } catch { return []; }
 }
 function _saveNickAliases(aliases: string[]): void {
   if (typeof window === 'undefined') return;
@@ -11725,8 +11716,7 @@ function _loadHighContrast(): boolean { return typeof window !== 'undefined' && 
 function _loadForumChannels(): Set<string> {
   if (typeof window === 'undefined') return new Set();
   try {
-    const saved = localStorage.getItem('onyx:forum-channels');
-    return new Set(JSON.parse(saved ?? '[]') as string[]);
+    return new Set(parseStringArray(localStorage.getItem('onyx:forum-channels')));
   } catch {
     return new Set();
   }
@@ -11736,8 +11726,7 @@ function _loadForumChannels(): Set<string> {
 function _loadSoftIgnoreList(): Set<string> {
   if (typeof window === 'undefined') return new Set();
   try {
-    const raw = localStorage.getItem('onyx:soft-ignore');
-    return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
+    return new Set(parseStringArray(localStorage.getItem('onyx:soft-ignore')));
   } catch { return new Set(); }
 }
 function _saveSoftIgnoreList(list: Set<string>): void {
@@ -11785,8 +11774,7 @@ function _loadDisplayFontSize(): number {
 function _loadChannelOrder(): string[] {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = localStorage.getItem('onyx:channel-order');
-    return raw ? (JSON.parse(raw) as string[]) : [];
+    return parseStringArray(localStorage.getItem('onyx:channel-order'));
   } catch {
     return [];
   }
@@ -11796,8 +11784,7 @@ function _loadChannelOrder(): string[] {
 function _loadNsfwChannels(): Set<string> {
   if (typeof window === 'undefined') return new Set();
   try {
-    const raw = localStorage.getItem('onyx:nsfw-channels');
-    return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
+    return new Set(parseStringArray(localStorage.getItem('onyx:nsfw-channels')));
   } catch {
     return new Set();
   }
