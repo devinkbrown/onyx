@@ -18,7 +18,7 @@
  * bar is a role="toolbar". Reduced-motion is handled in voice.css.
  */
 
-import { For, createEffect, createMemo, createSignal, onCleanup, Show } from 'solid-js';
+import { For, createEffect, createMemo, createSignal, onCleanup, Show, untrack } from 'solid-js';
 import { getState, useStore } from '@/lib/store';
 import { getMountedSuimyakuMediaEngine } from '@/lib/suimyaku-media/MediaEngine';
 import {
@@ -247,6 +247,7 @@ export function VoiceBar() {
   });
 
   const [reactionsOpen, setReactionsOpen] = createSignal(false);
+  const [reactionIndex, setReactionIndex] = createSignal(0);
   const [spatialOpen, setSpatialOpen] = createSignal(false);
   const [spatialDragging, setSpatialDragging] = createSignal(false);
   const [selectedSpatialNick, setSelectedSpatialNick] = createSignal<string | null>(null);
@@ -264,6 +265,7 @@ export function VoiceBar() {
   const [screenshareStatus, setScreenshareStatus] = createSignal('');
 
   let spatialPadRef: HTMLDivElement | undefined;
+  const reactionButtons: (HTMLButtonElement | undefined)[] = [];
   let screenshareOperationEpoch = 0;
   let disposed = false;
 
@@ -561,6 +563,50 @@ export function VoiceBar() {
     setReactionsOpen(false);
   };
 
+  const setReactionPickerOpen = (open: boolean): void => {
+    if (open) setReactionIndex(0);
+    setReactionsOpen(open);
+  };
+
+  createEffect(() => {
+    if (!reactionsOpen()) return;
+    queueMicrotask(() => {
+      const first = reactionButtons[0];
+      if (untrack(reactionsOpen) && first?.isConnected) first.focus({ preventScroll: true });
+    });
+  });
+
+  function focusReaction(index: number): void {
+    const count = QUICK_REACTIONS.length;
+    const next = ((index % count) + count) % count;
+    setReactionIndex(next);
+    reactionButtons[next]?.focus({ preventScroll: true });
+  }
+
+  function handleReactionKeyDown(event: KeyboardEvent, index: number): void {
+    let next: number;
+    switch (event.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        next = index + 1;
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        next = index - 1;
+        break;
+      case 'Home':
+        next = 0;
+        break;
+      case 'End':
+        next = QUICK_REACTIONS.length - 1;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    focusReaction(next);
+  }
+
   const spatialPointFromEvent = (event: PointerEvent) => {
     if (!spatialPadRef) return null;
     const rect = spatialPadRef.getBoundingClientRect();
@@ -788,7 +834,8 @@ export function VoiceBar() {
             <Popover
               placement="top"
               open={reactionsOpen()}
-              onOpenChange={setReactionsOpen}
+              onOpenChange={setReactionPickerOpen}
+              panelLabel="Send a reaction"
               trigger={
                 <span
                   class="onyx-icon-button onyx-icon-button--ghost onyx-icon-button--md"
@@ -801,13 +848,17 @@ export function VoiceBar() {
               }
             >
               <div class="voice-bar__reactions" role="menu" aria-label="Send a reaction">
-                <For each={QUICK_REACTIONS}>{(emoji) => (
+                <For each={QUICK_REACTIONS}>{(emoji, index) => (
                   <button
+                    ref={(element) => (reactionButtons[index()] = element)}
                     type="button"
                     class="voice-bar__reaction"
                     role="menuitem"
+                    tabindex={reactionIndex() === index() ? 0 : -1}
                     aria-label={`React with ${emoji}`}
                     data-testid={`reaction-${emoji}`}
+                    onFocus={() => setReactionIndex(index())}
+                    onKeyDown={(event) => handleReactionKeyDown(event, index())}
                     onClick={() => sendReaction(emoji)}
                   >
                     <span aria-hidden="true">{emoji}</span>

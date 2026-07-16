@@ -14,7 +14,7 @@
  * AAA structure throughout.
  */
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { store } from '@/lib/store/store';
@@ -1182,6 +1182,84 @@ describe('VoiceBar', () => {
 
     // Assert
     expect(spy).toHaveBeenCalledWith('🎉');
+    spy.mockRestore();
+  });
+
+  it('opens a named reaction dialog, focuses the first item, and roves with every menu navigation key', async () => {
+    seedVoiceStore([]);
+
+    const { getByRole } = render(() => <VoiceBar />);
+    const trigger = getByRole('button', { name: 'Send a reaction' });
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    const dialog = getByRole('dialog', { name: 'Send a reaction' });
+    const items = within(dialog).getAllByRole('menuitem');
+    await waitFor(() => expect(items[0]).toHaveFocus());
+    expect(items[0]).toHaveAttribute('tabindex', '0');
+    expect(items[1]).toHaveAttribute('tabindex', '-1');
+
+    fireEvent.keyDown(items[0]!, { key: 'ArrowRight' });
+    expect(items[1]).toHaveFocus();
+    fireEvent.keyDown(items[1]!, { key: 'ArrowDown' });
+    expect(items[2]).toHaveFocus();
+    fireEvent.keyDown(items[2]!, { key: 'ArrowLeft' });
+    expect(items[1]).toHaveFocus();
+    fireEvent.keyDown(items[1]!, { key: 'ArrowUp' });
+    expect(items[0]).toHaveFocus();
+    fireEvent.keyDown(items[0]!, { key: 'End' });
+    expect(items.at(-1)).toHaveFocus();
+    fireEvent.keyDown(items.at(-1)!, { key: 'Home' });
+    expect(items[0]).toHaveFocus();
+  });
+
+  it('activates reactions exactly once with Enter and Space and restores the trigger', async () => {
+    seedVoiceStore([]);
+    const spy = vi.spyOn(store.getState(), 'sendCallReaction').mockImplementation(() => {});
+
+    const { getByRole } = render(() => <VoiceBar />);
+    const trigger = getByRole('button', { name: 'Send a reaction' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const enterItem = getByRole('menuitem', { name: 'React with 👍' });
+    await waitFor(() => expect(enterItem).toHaveFocus());
+
+    fireEvent.keyDown(enterItem, { key: 'Enter' });
+    fireEvent.keyUp(enterItem, { key: 'Enter' });
+    fireEvent.click(enterItem);
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenLastCalledWith('👍');
+    await waitFor(() => expect(trigger).toHaveFocus());
+
+    fireEvent.click(trigger);
+    const spaceItem = getByRole('menuitem', { name: 'React with 👍' });
+    await waitFor(() => expect(spaceItem).toHaveFocus());
+    fireEvent.keyDown(spaceItem, { key: ' ' });
+    fireEvent.keyUp(spaceItem, { key: ' ' });
+    fireEvent.click(spaceItem);
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(spy).toHaveBeenLastCalledWith('👍');
+    await waitFor(() => expect(trigger).toHaveFocus());
+
+    spy.mockRestore();
+  });
+
+  it('closes the reaction picker with Escape and restores focus without sending', async () => {
+    seedVoiceStore([]);
+    const spy = vi.spyOn(store.getState(), 'sendCallReaction').mockImplementation(() => {});
+
+    const { getByRole, queryByRole } = render(() => <VoiceBar />);
+    const trigger = getByRole('button', { name: 'Send a reaction' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const item = getByRole('menuitem', { name: 'React with 👍' });
+    await waitFor(() => expect(item).toHaveFocus());
+
+    fireEvent.keyDown(item, { key: 'Escape' });
+
+    await waitFor(() => expect(queryByRole('dialog', { name: 'Send a reaction' })).not.toBeInTheDocument());
+    expect(trigger).toHaveFocus();
+    expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
   });
 });
