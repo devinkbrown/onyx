@@ -57,14 +57,14 @@ async function makePeer(myPublicB64: string) {
   return { publicB64, seal };
 }
 
-function mockClient(sendRaw = vi.fn()) {
+function mockClient(sendRaw: (...args: string[]) => boolean = vi.fn((..._args: string[]) => true)) {
   return {
     negotiatedCaps: new Set<string>(),
     capValues: new Map<string, string>(),
     isupport: { CHANTYPES: '#&' },
     prefixToMode: {},
     sendRaw,
-    send: vi.fn(),
+    send: vi.fn((_line: string) => true),
   } as never;
 }
 
@@ -109,8 +109,8 @@ describe('E2EE DMs', () => {
   it('seals an outgoing DM — the wire carries only ciphertext', async () => {
     const mine = await deviceKeys();
     const peer = await makePeer(mine!.publicB64);
-    const send = vi.fn();
-    store.setState({ connectionStatus: 'connected', client: mockClient(vi.fn()) });
+    const send = vi.fn((_line: string) => true);
+    store.setState({ connectionStatus: 'connected', client: mockClient() });
     store.getState().client!.send = send;
     store.setState({ peerDmKeys: new Map([['trev', peer.publicB64]]) });
 
@@ -133,8 +133,8 @@ describe('E2EE DMs', () => {
   it('marks sealed outgoing DMs with Orochi E2EE tag when negotiated', async () => {
     const mine = await deviceKeys();
     const peer = await makePeer(mine!.publicB64);
-    const send = vi.fn();
-    store.setState({ connectionStatus: 'connected', client: mockClient(vi.fn()) });
+    const send = vi.fn((_line: string) => true);
+    store.setState({ connectionStatus: 'connected', client: mockClient() });
     store.getState().client!.send = send;
     store.getState().client!.negotiatedCaps.add('orochi/e2ee');
     store.setState({ peerDmKeys: new Map([['trev', peer.publicB64]]) });
@@ -178,7 +178,7 @@ describe('E2EE DMs', () => {
   it('leaves an envelope locked when we have no key for the sender', async () => {
     const mine = await deviceKeys();
     const peer = await makePeer(mine!.publicB64);
-    const sendRaw = vi.fn();
+    const sendRaw = vi.fn((..._args: string[]) => true);
     store.setState({ connectionStatus: 'connected', client: mockClient(sendRaw) }); // no peerDmKeys
 
     const envelope = await peer.seal('sealed to a stranger');
@@ -193,7 +193,7 @@ describe('E2EE DMs', () => {
   });
 
   it('a plaintext DM to a keyless peer is sent unencrypted', async () => {
-    const send = vi.fn();
+    const send = vi.fn((_line: string) => true);
     store.setState({ connectionStatus: 'connected', client: mockClient() });
     store.getState().client!.send = send;
     const sendRaw = store.getState().client!.sendRaw as ReturnType<typeof vi.fn>;
@@ -206,8 +206,8 @@ describe('E2EE DMs', () => {
   });
 
   it('fails closed when sealing an E2EE DM fails — never leaks plaintext, warns loudly', async () => {
-    const send = vi.fn();
-    store.setState({ connectionStatus: 'connected', client: mockClient(vi.fn()) });
+    const send = vi.fn((_line: string) => true);
+    store.setState({ connectionStatus: 'connected', client: mockClient() });
     store.getState().client!.send = send;
     const sendRaw = store.getState().client!.sendRaw as ReturnType<typeof vi.fn>;
     // A peer designated for E2EE (peerDmKeys has an entry) but with a key that

@@ -36,15 +36,25 @@ const channel = (name: string): Channel => ({
   messages: [],
 });
 
-function mockClient(sendRaw = vi.fn()) {
+function mockClient(
+  sendRaw: (...args: unknown[]) => boolean = vi.fn(() => true),
+  send: (line: string) => boolean = vi.fn(() => true),
+) {
   return {
     negotiatedCaps: new Set<string>(),
     capValues: new Map<string, string>(),
     isupport: { CHANTYPES: '#&' },
     prefixToMode: {},
     sendRaw,
-    send: () => {},
+    send,
   } as never;
+}
+
+function messagesFor(target: string) {
+  const key = target.toLowerCase();
+  return target.startsWith('#')
+    ? store.getState().channels.get(key)?.messages ?? []
+    : store.getState().dms.get(key)?.messages ?? [];
 }
 
 async function until(ok: () => boolean | Promise<boolean>, ms = 2000): Promise<void> {
@@ -97,7 +107,7 @@ describe('offline outbox', () => {
     await until(async () => (await loadOutbox()).length === 1);
     await until(() => (store.getState().channels.get('#room')?.messages.length ?? 0) === 1);
 
-    const sendRaw = vi.fn();
+    const sendRaw = vi.fn(() => true);
     store.setState({ connectionStatus: 'connected', client: mockClient(sendRaw) });
     store.getState().flushOutbox();
 
@@ -107,6 +117,31 @@ describe('offline outbox', () => {
     const msgs = store.getState().channels.get('#room')!.messages;
     expect(msgs.some((m) => m.pending)).toBe(false);
     expect(store.getState().toasts.some((t) => t.title.includes('sent'))).toBe(true);
+  });
+
+  it.each([
+    ['channel', '#room', 'channel message held'],
+    ['DM', 'bob', 'direct message held'],
+    ['action', '#room', '\x01ACTION waits patiently\x01'],
+  ])('keeps a queued %s and its exact placeholder when socket admission fails', async (_kind, target, text) => {
+    store.getState().sendMessage(target, text);
+    await until(async () => (await loadOutbox()).length === 1);
+    await until(() => messagesFor(target).some((message) => message.pending));
+
+    const [entryBefore] = await loadOutbox();
+    const placeholderBefore = messagesFor(target).find((message) => message.pending);
+    const sendRaw = vi.fn(() => false);
+    store.setState({ connectionStatus: 'connected', client: mockClient(sendRaw) });
+
+    store.getState().flushOutbox();
+    await until(() => sendRaw.mock.calls.length > 0);
+
+    expect(sendRaw).toHaveBeenCalledWith('PRIVMSG', target, text);
+    expect(await loadOutbox()).toEqual([entryBefore]);
+    expect(messagesFor(target)).toHaveLength(1);
+    expect(messagesFor(target)[0]).toBe(placeholderBefore);
+    expect(messagesFor(target)[0]?.pending).toBe(true);
+    expect(store.getState().toasts.some((toast) => toast.title.includes('sent'))).toBe(false);
   });
 
   it('reopens a persisted queued send and restores its placeholder after reload', async () => {
@@ -218,5 +253,32 @@ describe('offline outbox — E2EE DMs never persist plaintext', () => {
     expect(entry!.target).toBe('trev');
     expect(entry!.text).toBe('e2ee disabled, plain send');
     setPreference('e2eeDms', true); // restore default for other suites
+  });
+
+  it('keeps a queued DM when a newly discovered E2EE key cannot be sealed', async () => {
+    setPreference('e2eeDms', true);
+    store.getState().sendMessage('trev', 'keep this secret queued');
+    await until(async () => (await loadOutbox()).length === 1);
+    await until(() => messagesFor('trev').some((message) => message.pending));
+
+    const [entryBefore] = await loadOutbox();
+    const placeholderBefore = messagesFor('trev').find((message) => message.pending);
+    const send = vi.fn(() => true);
+    store.setState({
+      connectionStatus: 'connected',
+      client: mockClient(vi.fn(() => true), send),
+      // Invalid P-256 point: sealing resolves asynchronously as unavailable.
+      peerDmKeys: new Map([['trev', 'AAAA']]),
+    });
+
+    store.getState().flushOutbox();
+    await until(() => store.getState().toasts.some((toast) => toast.title === 'Encryption unavailable'));
+
+    expect(send).not.toHaveBeenCalled();
+    expect(await loadOutbox()).toEqual([entryBefore]);
+    expect(messagesFor('trev')).toHaveLength(1);
+    expect(messagesFor('trev')[0]).toBe(placeholderBefore);
+    expect(messagesFor('trev')[0]?.pending).toBe(true);
+    expect(store.getState().toasts.some((toast) => toast.title.includes('Queued message sent'))).toBe(false);
   });
 });

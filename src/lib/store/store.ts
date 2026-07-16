@@ -2279,6 +2279,8 @@ export function _resetPasskeyStateForTests(): void {
 
 /** flushOutbox retry budget per connection (reset on each successful connect). */
 let _outboxRetries = 0;
+/** Serialize async outbox flushes so one durable row cannot be admitted twice. */
+let _outboxFlushActive = false;
 
 /** The message whose timestamp is closest to `at` (buffer is time-sorted). */
 function nearestMessageId(messages: readonly ChatMessage[], at: Date): string | null {
@@ -2940,6 +2942,117 @@ type ActionKey = {
 
 export type Actions = Pick<State, ActionKey>;
 
+/**
+ * Attempt one ordinary chat delivery without offline queuing. The boolean is
+ * socket admission, not a server acknowledgement: callers may discard durable
+ * state only after `true`. Direct composer sends intentionally remain
+ * fire-and-forget through `sendMessage`; the outbox awaits this result.
+ */
+function deliverChatMessage(
+  set: SetFn,
+  get: GetFn,
+  client: IRCClient,
+  target: string,
+  text: string,
+): boolean | Promise<boolean> {
+  const { ourNick, replyingTo } = get();
+  const waitForServerEcho = client.negotiatedCaps.has('echo-message');
+  const targetIsChannel = target.length > 0 && (client.isupport.CHANTYPES ?? '#&').includes(target[0]!);
+  const activeTopic = targetIsChannel ? get().activeChannelTopics.get(target.toLowerCase()) ?? null : null;
+  const topicTags = activeTopic ? topicMessageTag(activeTopic) ?? {} : {};
+  const outboundTags = replyingTo
+    ? { ...topicTags, '+draft/reply': replyingTo.id }
+    : topicTags;
+  const hasOutboundTags = Object.keys(outboundTags).length > 0;
+  const replySnapshot = replyingTo ? { id: replyingTo.id, from: replyingTo.from, text: replyingTo.text } : null;
+
+  // A DM to a peer who published a device key (and with E2EE on) is sealed
+  // before socket admission. A seal or admission failure must not create an
+  // optimistic echo; the offline caller also keeps its durable row untouched.
+  const cp = client.isupport.CHANTYPES ?? '#&';
+  const isDm = target.length > 0 && !cp.includes(target[0]!);
+  const peerKey = get().peerDmKeys.get(target.toLowerCase());
+  if (isDm && peerKey && preferences().e2eeDms) {
+    const encryptedKind: E2eeMessageKind | null = client.negotiatedCaps.has(E2EE_CAP) ? 'mls' : null;
+    const encryptedOutboundTags = encryptedKind ? { ...outboundTags, ...e2eeMessageTag(encryptedKind) } : outboundTags;
+    return sealDmTrusted(target, peerKey, text).then((outcome) => {
+      if (outcome.status === 'key-changed') {
+        // SECURITY — fail closed on a possible machine-in-the-middle.
+        void get()._flagPeerKeyChange(target, peerKey);
+        return false;
+      }
+      if (outcome.status !== 'sealed') {
+        // SECURITY — never silently downgrade a designated E2EE DM to plaintext.
+        get().addToast({
+          variant: 'error',
+          title: 'Encryption unavailable',
+          description: `Your message to ${target} was NOT sent — the encrypted DM could not be sealed. Try again, or turn off encrypted DMs for this conversation to send it unencrypted.`,
+        });
+        get().addNotification({
+          type: 'error',
+          text: `Encryption unavailable — message to ${target} was not sent (the encrypted DM could not be sealed).`,
+        });
+        return false;
+      }
+
+      const envelope = outcome.envelope;
+      if (!client.send(formatTaggedLine(encryptedOutboundTags, 'PRIVMSG', target, envelope))) return false;
+      if (!waitForServerEcho) {
+        // Ciphertext remains the persisted text; plaintext is transient display.
+        set(s => _addMessage(s, target, {
+          id: uid(), time: new Date(), from: ourNick, text: envelope, plaintext: text,
+          type: 'msg', target, encrypted: true,
+          ...(encryptedKind ? { e2ee: encryptedKind } : {}),
+          ...(replySnapshot ? { replyTo: replySnapshot } : {}),
+        }));
+      }
+      if (replyingTo) set({ replyingTo: null });
+      return true;
+    });
+  }
+
+  // Multiline is admitted frame-by-frame. Stop at the first rejection and only
+  // report success when every frame for the logical message was accepted.
+  const multilinePlan = client.negotiatedCaps.has('draft/multiline')
+    ? planMultilineBatches(text, parseMultilineLimits(client.capValues.get('draft/multiline')))
+    : null;
+  let admittedFrames = 0;
+  if (multilinePlan) {
+    for (const rawLine of buildMultilineLines(target, multilinePlan, undefined, outboundTags).lines) {
+      if (!client.send(rawLine)) return false;
+      admittedFrames += 1;
+    }
+  } else {
+    const lines = text.split('\n').filter(l => l.trim());
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]!;
+      const admitted = i === 0 && hasOutboundTags
+        ? client.send(formatTaggedLine(outboundTags, 'PRIVMSG', target, line))
+        : client.sendRaw('PRIVMSG', target, line);
+      if (!admitted) return false;
+      admittedFrames += 1;
+    }
+  }
+  if (admittedFrames === 0) return false;
+
+  if (!waitForServerEcho) {
+    const msg: ChatMessage = {
+      id: uid(),
+      time: new Date(),
+      from: ourNick,
+      text,
+      type: 'msg',
+      target,
+      ...(activeTopic ? { topic: activeTopic } : {}),
+      ...(replySnapshot ? { replyTo: replySnapshot } : {}),
+    };
+    set(s => _addMessage(s, target, msg));
+    if (targetIsChannel) get().updateChannelActivity(target);
+  }
+  if (replyingTo) set({ replyingTo: null });
+  return true;
+}
+
 // ── Store ─────────────────────────────────────────────────────────────────────
 
 export const store = createStore<OnyxState>()(
@@ -3488,75 +3601,87 @@ export const store = createStore<OnyxState>()(
     },
 
     flushOutbox() {
+      if (_outboxFlushActive) return;
+      _outboxFlushActive = true;
       void (async () => {
-        const entries = await loadOutbox();
-        if (entries.length === 0) return;
-        const dropPlaceholder = (e: OutboxEntry): void => {
-          set(s => {
-            const strip = (msgs: ChatMessage[]) => msgs.filter(m => m.id !== `outbox:${e.id}`);
-            const channels = new Map(s.channels);
-            const c = channels.get(e.target_key);
-            if (c) {
-              channels.set(e.target_key, { ...c, messages: strip(c.messages) });
-              return { channels };
-            }
-            const dms = new Map(s.dms);
-            const dm = dms.get(e.target_key);
-            if (dm) {
-              dms.set(e.target_key, { ...dm, messages: strip(dm.messages) });
-              return { dms };
-            }
-            return {};
-          });
-        };
+        try {
+          const entries = await loadOutbox();
+          if (entries.length === 0) return;
+          const dropPlaceholder = (e: OutboxEntry): void => {
+            set(s => {
+              const strip = (msgs: ChatMessage[]) => msgs.filter(m => m.id !== `outbox:${e.id}`);
+              const channels = new Map(s.channels);
+              const c = channels.get(e.target_key);
+              if (c) {
+                channels.set(e.target_key, { ...c, messages: strip(c.messages) });
+                return { channels };
+              }
+              const dms = new Map(s.dms);
+              const dm = dms.get(e.target_key);
+              if (dm) {
+                dms.set(e.target_key, { ...dm, messages: strip(dm.messages) });
+                return { dms };
+              }
+              return {};
+            });
+          };
 
-        let sent = 0;
-        let expired = 0;
-        let waiting = 0;
-        for (const e of entries) {
-          const st = get();
-          if (st.connectionStatus !== 'connected' || !st.client) {
-            waiting += 1;
-            continue;
-          }
-          if (Date.now() - e.queued_at > OUTBOX_MAX_AGE_MS) {
+          let sent = 0;
+          let expired = 0;
+          let waiting = 0;
+          for (const e of entries) {
+            const st = get();
+            if (st.connectionStatus !== 'connected' || !st.client) {
+              waiting += 1;
+              continue;
+            }
+            if (Date.now() - e.queued_at > OUTBOX_MAX_AGE_MS) {
+              await deleteOutboxEntry(e.id);
+              dropPlaceholder(e);
+              expired += 1;
+              continue;
+            }
+            // A channel message can only send once the join has landed; DMs go
+            // straight away. Not-yet-joined entries stay queued for the retry.
+            const chantypes = st.client.isupport.CHANTYPES ?? '#&';
+            const isChannel = e.target.length > 0 && chantypes.includes(e.target[0]!);
+            if (isChannel && !st.channels.has(e.target_key)) {
+              waiting += 1;
+              continue;
+            }
+
+            // Keep both durable and UI state byte-for-byte intact until the
+            // client explicitly admits every frame for this logical message.
+            const admitted = await deliverChatMessage(set, get, st.client, e.target, e.text);
+            if (!admitted) {
+              waiting += 1;
+              continue;
+            }
             await deleteOutboxEntry(e.id);
             dropPlaceholder(e);
-            expired += 1;
-            continue;
+            sent += 1;
           }
-          // A channel message can only send once the join has landed; DMs go
-          // straight away. Not-yet-joined entries stay queued for the retry.
-          const chantypes = st.client.isupport.CHANTYPES ?? '#&';
-          const isChannel = e.target.length > 0 && chantypes.includes(e.target[0]!);
-          if (isChannel && !st.channels.has(e.target_key)) {
-            waiting += 1;
-            continue;
-          }
-          // Placeholder out first — the send's echo appends the real message.
-          dropPlaceholder(e);
-          await deleteOutboxEntry(e.id);
-          get().sendMessage(e.target, e.text);
-          sent += 1;
-        }
 
-        if (sent > 0) {
-          get().addToast({
-            variant: 'success',
-            title: sent === 1 ? 'Queued message sent' : `${sent} queued messages sent`,
-            description: 'Written while offline, delivered now.',
-          });
-        }
-        if (expired > 0) {
-          get().addToast({
-            variant: 'warning',
-            title: expired === 1 ? 'Queued message expired' : `${expired} queued messages expired`,
-            description: 'Older than a day — dropped instead of sent.',
-          });
-        }
-        if (waiting > 0 && _outboxRetries < 5) {
-          _outboxRetries += 1;
-          setTimeout(() => get().flushOutbox(), 4000);
+          if (sent > 0) {
+            get().addToast({
+              variant: 'success',
+              title: sent === 1 ? 'Queued message sent' : `${sent} queued messages sent`,
+              description: 'Written while offline, delivered now.',
+            });
+          }
+          if (expired > 0) {
+            get().addToast({
+              variant: 'warning',
+              title: expired === 1 ? 'Queued message expired' : `${expired} queued messages expired`,
+              description: 'Older than a day — dropped instead of sent.',
+            });
+          }
+          if (waiting > 0 && _outboxRetries < 5) {
+            _outboxRetries += 1;
+            setTimeout(() => get().flushOutbox(), 4000);
+          }
+        } finally {
+          _outboxFlushActive = false;
         }
       })();
     },
@@ -3988,7 +4113,7 @@ export const store = createStore<OnyxState>()(
 
     // ── sendMessage ──────────────────────────────────────────────────────
     sendMessage(target, text) {
-      const { client, ourNick } = get();
+      const { client } = get();
 
       // Offline outbox (Roadmap Phase 2): composing while disconnected queues
       // the message in the vault and shows a pending placeholder; it fires on
@@ -4058,126 +4183,7 @@ export const store = createStore<OnyxState>()(
         return;
       }
 
-      const { replyingTo } = get();
-      const waitForServerEcho = client.negotiatedCaps.has('echo-message');
-      const targetIsChannel = target.length > 0 && (client.isupport.CHANTYPES ?? '#&').includes(target[0]!);
-      const activeTopic = targetIsChannel ? get().activeChannelTopics.get(target.toLowerCase()) ?? null : null;
-      const topicTags = activeTopic ? topicMessageTag(activeTopic) ?? {} : {};
-      const outboundTags = replyingTo
-        ? { ...topicTags, '+draft/reply': replyingTo.id }
-        : topicTags;
-      const hasOutboundTags = Object.keys(outboundTags).length > 0;
-      const replySnapshot = replyingTo ? { id: replyingTo.id, from: replyingTo.from, text: replyingTo.text } : null;
-
-      // ── E2EE DM path ──────────────────────────────────────────────────────
-      // A DM to a peer who published a device key (and with E2EE on) is sealed
-      // into a single Tsumugi envelope PRIVMSG. The wire, CHATHISTORY, search
-      // index and outbox only ever see ciphertext. Local echo (echo-message
-      // off) shows plaintext immediately, flagged encrypted for the lock chip.
-      {
-        const cp = client.isupport.CHANTYPES ?? '#&';
-        const isDm = target.length > 0 && !cp.includes(target[0]!);
-        const peerKey = get().peerDmKeys.get(target.toLowerCase());
-        if (isDm && peerKey && preferences().e2eeDms) {
-          const encryptedKind: E2eeMessageKind | null = client.negotiatedCaps.has(E2EE_CAP) ? 'mls' : null;
-          const encryptedOutboundTags = encryptedKind ? { ...outboundTags, ...e2eeMessageTag(encryptedKind) } : outboundTags;
-          // TOFU-gated seal (keyPinning.sealDmTrusted): pin-then-seal on first
-          // use, seal on an unchanged key, and BLOCK on a silently-changed key —
-          // the anti-MITM enforcement point. Never emits plaintext on any path.
-          void sealDmTrusted(target, peerKey, text).then((outcome) => {
-            if (outcome.status === 'key-changed') {
-              // SECURITY — FAIL CLOSED on a possible machine-in-the-middle. The
-              // peer's pinned key changed under us; send NOTHING and surface a
-              // visible, persistent warning the user must resolve by verifying
-              // the safety number out-of-band and explicitly accepting the key.
-              void get()._flagPeerKeyChange(target, peerKey);
-              return;
-            }
-            if (outcome.status !== 'sealed') {
-              // 'unavailable' — WebCrypto error, key-derivation failure, or an
-              // invalid peer key at send time. SECURITY — FAIL CLOSED: the user
-              // designated this peer for E2EE and believes the DM is encrypted;
-              // we must NOT silently downgrade to a plaintext PRIVMSG on the wire
-              // (a confidentiality-relevant silent downgrade whose only prior cue
-              // was the absence of a lock chip). Refuse to transmit and warn
-              // loudly, mirroring the offline branch above which likewise refuses
-              // to leak an E2EE DM as plaintext.
-              //
-              // PRODUCT DECISION (fail-closed vs warn-and-send): this drops +
-              // warns rather than auto-sending unencrypted. Preserving the
-              // drafted text / offering an explicit "send unencrypted" retry is
-              // a UI concern owned by the caller/composer (a follow-up); if an
-              // unencrypted send is ever wanted it must be a deliberate user
-              // action, never an automatic fallback.
-              get().addToast({
-                variant: 'error',
-                title: 'Encryption unavailable',
-                description: `Your message to ${target} was NOT sent — the encrypted DM could not be sealed. Try again, or turn off encrypted DMs for this conversation to send it unencrypted.`,
-              });
-              get().addNotification({
-                type: 'error',
-                text: `Encryption unavailable — message to ${target} was not sent (the encrypted DM could not be sealed).`,
-              });
-              return;
-            }
-            const envelope = outcome.envelope;
-            client.send(formatTaggedLine(encryptedOutboundTags, 'PRIVMSG', target, envelope));
-            if (!waitForServerEcho) {
-              // Echo stores the ENVELOPE as text (ciphertext at rest) with the
-              // plaintext held transiently for display — same shape as inbound.
-              set(s => _addMessage(s, target, {
-                id: uid(), time: new Date(), from: ourNick, text: envelope, plaintext: text,
-                type: 'msg', target, encrypted: true,
-                ...(encryptedKind ? { e2ee: encryptedKind } : {}),
-                ...(replySnapshot ? { replyTo: replySnapshot } : {}),
-              }));
-            }
-          });
-          if (replyingTo) set({ replyingTo: null });
-          return;
-        }
-      }
-
-      // Multiline: prefer a draft/multiline batch when the server ACKed the
-      // cap, so the network delivers ONE logical message. Falls back to the
-      // historical one-PRIVMSG-per-line behaviour otherwise.
-      const multilinePlan = client.negotiatedCaps.has('draft/multiline')
-        ? planMultilineBatches(text, parseMultilineLimits(client.capValues.get('draft/multiline')))
-        : null;
-      if (multilinePlan) {
-        for (const rawLine of buildMultilineLines(target, multilinePlan, undefined, outboundTags).lines) {
-          client.send(rawLine);
-        }
-      } else {
-        const lines = text.split('\n').filter(l => l.trim());
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i]!;
-          if (i === 0 && hasOutboundTags) {
-            client.send(formatTaggedLine(outboundTags, 'PRIVMSG', target, line));
-          } else {
-            client.sendRaw('PRIVMSG', target, line);
-          }
-        }
-      }
-
-      if (!waitForServerEcho) {
-        const msg: ChatMessage = {
-          id: uid(),
-          time: new Date(),
-          from: ourNick,
-          text,
-          type: 'msg',
-          target,
-          ...(activeTopic ? { topic: activeTopic } : {}),
-          ...(replySnapshot ? { replyTo: replySnapshot } : {}),
-        };
-        set(s => _addMessage(s, target, msg));
-        {
-          const _cp = get().client?.isupport.CHANTYPES ?? '#&';
-          if (target.length > 0 && _cp.includes(target[0]!)) get().updateChannelActivity(target);
-        }
-      }
-      if (replyingTo) set({ replyingTo: null });
+      void deliverChatMessage(set, get, client, target, text);
     },
 
     // ── sendRaw ──────────────────────────────────────────────────────────

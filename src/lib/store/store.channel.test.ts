@@ -28,8 +28,8 @@ const initialState = store.getInitialState();
 /** Minimal IRCClient stand-in — assert on sendRaw, satisfy handler reads. */
 function makeClient() {
   return {
-    sendRaw: vi.fn(),
-    send: vi.fn(),
+    sendRaw: vi.fn((..._args: string[]) => true),
+    send: vi.fn((_line: string) => true),
     isupport: { CHANTYPES: '#&', CHANMODES: ['beIZ', 'k', 'lfj', 'imnstCTNMSgWOA'] },
     negotiatedCaps: new Set<string>(),
     capValues: new Map<string, string>(),
