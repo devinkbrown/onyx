@@ -556,8 +556,13 @@
   transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
 
-.pref-toggle:hover {
+.pref-toggle:not(:disabled):hover {
   border-color: var(--seam);
+}
+
+.pref-toggle:disabled {
+  cursor: wait;
+  opacity: 0.62;
 }
 
 .pref-toggle:focus-visible {

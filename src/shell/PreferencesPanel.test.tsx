@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@solidjs/te
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readClientExtensionActions, recordClientExtensionActionRun } from '@/lib/extensions/clientActions';
-import { closePreferences, openPreferences, resetPreferences } from '@/lib/prefs/preferences';
+import { closePreferences, openPreferences, preferences, resetPreferences } from '@/lib/prefs/preferences';
 import { sceneMotion, setSceneMotion } from '@/lib/prefs/sceneMotion';
 import { defaultVaultSearchMode, resetDefaultVaultSearchMode } from '@/lib/prefs/vaultSearchMode';
 import { setVaultMode, vaultSearchMode } from '@/shell/search/useMessageSearch';
@@ -18,6 +18,7 @@ import {
   saveMessages,
   setRetentionPolicy,
 } from '@/lib/vault/historyVault';
+import * as historyVault from '@/lib/vault/historyVault';
 import {
   _resetSavedSearchesForTests,
   deleteSearch,
@@ -1437,6 +1438,99 @@ describe('PreferencesPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Clear local history' }));
     fireEvent.click(screen.getByRole('button', { name: 'Erase history' }));
     expect(await screen.findByText('Local history cleared on this device.')).toBeInTheDocument();
+  });
+
+  it('keeps history disabled and discloses retained rows when toggle erasure cannot be verified', async () => {
+    globalThis.indexedDB = new IDBFactory();
+    _resetVaultForTests();
+    const target = '#retained-after-toggle';
+    await saveMessages(target, [{
+      id: 'retained-row',
+      time: new Date(1000),
+      from: 'kain',
+      text: 'must be disclosed after a failed wipe',
+      type: 'msg',
+      target,
+    } as ChatMessage]);
+    const realClear = IDBObjectStore.prototype.clear;
+    vi.spyOn(IDBObjectStore.prototype, 'clear').mockImplementation(function (
+      this: IDBObjectStore,
+    ): IDBRequest<undefined> {
+      const request = realClear.call(this);
+      if (this.name === 'outbox') this.transaction.abort();
+      return request;
+    });
+    renderPreferences('History & data');
+
+    const toggle = screen.getByRole('switch', { name: 'Remember conversations on this device' });
+    fireEvent.click(toggle);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Stored conversations may still remain on this device because erasure could not be verified',
+    );
+    expect(preferences().localHistory).toBe(false);
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('button', { name: 'Retry erasing stored conversations' })).toBeInTheDocument();
+    expect((await loadRecent(target)).map((message) => message.id)).toEqual(['retained-row']);
+  });
+
+  it('guards a rejected toggle wipe and lets the user retry it to verified completion', async () => {
+    let resolveRetry: (cleared: boolean) => void = () => {};
+    const retry = new Promise<boolean>((resolve) => {
+      resolveRetry = resolve;
+    });
+    const clearVault = vi.spyOn(historyVault, 'clearVault')
+      .mockRejectedValueOnce(new Error('storage unavailable'))
+      .mockReturnValueOnce(retry);
+    renderPreferences('History & data');
+
+    const toggle = screen.getByRole('switch', { name: 'Remember conversations on this device' });
+    fireEvent.click(toggle);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Onyx will not save new conversations');
+    expect(screen.queryByText(/were erased from this device/i)).not.toBeInTheDocument();
+
+    const retryButton = screen.getByRole('button', { name: 'Retry erasing stored conversations' });
+    fireEvent.click(retryButton);
+    fireEvent.click(retryButton);
+
+    expect(clearVault).toHaveBeenCalledTimes(2);
+    expect(toggle).toBeDisabled();
+    expect(toggle).toHaveAttribute('aria-busy', 'true');
+    expect(retryButton).toBeDisabled();
+    expect(screen.getByText('Erasing stored conversations from this device…')).toHaveAttribute('role', 'status');
+    expect(preferences().localHistory).toBe(false);
+
+    resolveRetry(true);
+
+    expect(await screen.findByText('Local history is off. Stored conversations were erased from this device.')).toHaveAttribute('role', 'status');
+    expect(toggle).not.toBeDisabled();
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry erasing stored conversations' })).not.toBeInTheDocument();
+  });
+
+  it('announces verified toggle erasure only after stored rows are gone', async () => {
+    globalThis.indexedDB = new IDBFactory();
+    _resetVaultForTests();
+    const target = '#verified-toggle-clear';
+    await saveMessages(target, [{
+      id: 'erase-me',
+      time: new Date(1000),
+      from: 'kain',
+      text: 'erase after disabling history',
+      type: 'msg',
+      target,
+    } as ChatMessage]);
+    renderPreferences('History & data');
+
+    const toggle = screen.getByRole('switch', { name: 'Remember conversations on this device' });
+    fireEvent.click(toggle);
+
+    expect(await screen.findByText('Local history is off. Stored conversations were erased from this device.')).toHaveAttribute('role', 'status');
+    expect(await loadRecent(target)).toEqual([]);
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry erasing stored conversations' })).not.toBeInTheDocument();
   });
 
   it('confirms or cancels reviewed-anchor clearing without touching other local data', async () => {

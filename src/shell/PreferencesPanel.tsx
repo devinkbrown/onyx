@@ -437,6 +437,9 @@ type ToggleProps = {
   description: string;
   value: () => boolean;
   onToggle: (value: boolean) => void;
+  disabled?: () => boolean;
+  busy?: () => boolean;
+  children?: JSX.Element;
 };
 
 function Toggle(props: ToggleProps): JSX.Element {
@@ -454,6 +457,8 @@ function Toggle(props: ToggleProps): JSX.Element {
         aria-checked={props.value()}
         aria-label={props.title}
         aria-describedby={descId}
+        aria-busy={props.busy?.()}
+        disabled={props.disabled?.()}
         onClick={() => props.onToggle(!props.value())}
       >
         <span class="pref-toggle-text">
@@ -462,7 +467,87 @@ function Toggle(props: ToggleProps): JSX.Element {
         </span>
         <span class="pref-switch" aria-hidden="true" />
       </button>
+      {props.children}
     </section>
+  );
+}
+
+type LocalHistoryEraseState = 'idle' | 'busy' | 'retrying' | 'verified' | 'failed';
+
+function LocalHistoryToggle(): JSX.Element {
+  const [eraseState, setEraseState] = createSignal<LocalHistoryEraseState>('idle');
+  let mounted = true;
+
+  onCleanup(() => {
+    mounted = false;
+  });
+
+  const isErasing = () => eraseState() === 'busy' || eraseState() === 'retrying';
+
+  async function eraseStoredHistory(): Promise<void> {
+    if (isErasing()) return;
+    setEraseState(eraseState() === 'failed' ? 'retrying' : 'busy');
+    try {
+      const cleared = await clearVault();
+      if (!mounted) return;
+      // Reset-to-defaults can re-enable history while this async wipe is in
+      // flight. In that case the result no longer describes the current switch.
+      setEraseState(preferences().localHistory ? 'idle' : cleared ? 'verified' : 'failed');
+    } catch {
+      if (mounted) {
+        setEraseState(preferences().localHistory ? 'idle' : 'failed');
+      }
+    }
+  }
+
+  function toggleLocalHistory(value: boolean): void {
+    if (isErasing()) return;
+    // Stop vaultSync writes before attempting the fallible wipe. A failed wipe
+    // must not silently resume persistence or undo the user's privacy choice.
+    setPreference('localHistory', value);
+    if (value) {
+      setEraseState('idle');
+      return;
+    }
+    void eraseStoredHistory();
+  }
+
+  return (
+    <Toggle
+      legend="Local history"
+      title="Remember conversations on this device"
+      description="Keeps recent scrollback in this browser so rooms open instantly and read offline. Turning it off erases what's stored here."
+      value={() => preferences().localHistory}
+      disabled={isErasing}
+      busy={isErasing}
+      onToggle={toggleLocalHistory}
+    >
+      <Show when={!preferences().localHistory && isErasing()}>
+        <p class="pref-status" role="status">Erasing stored conversations from this device…</p>
+      </Show>
+      <Show when={!preferences().localHistory && (eraseState() === 'failed' || eraseState() === 'retrying')}>
+        <p class="pref-status pref-status--error" role="alert">
+          Local history is off, so Onyx will not save new conversations. Stored conversations may
+          still remain on this device because erasure could not be verified. Retry after checking
+          browser storage.
+        </p>
+        <div class="pref-clear-history__actions">
+          <button
+            type="button"
+            class="pref-reset"
+            disabled={isErasing()}
+            onClick={() => void eraseStoredHistory()}
+          >
+            Retry erasing stored conversations
+          </button>
+        </div>
+      </Show>
+      <Show when={!preferences().localHistory && eraseState() === 'verified'}>
+        <p class="pref-status" role="status">
+          Local history is off. Stored conversations were erased from this device.
+        </p>
+      </Show>
+    </Toggle>
   );
 }
 
@@ -2649,16 +2734,7 @@ export function PreferencesPanel(): JSX.Element {
               title="History & data"
               description="How this browser remembers, finds, moves, and erases local conversation data."
             />
-            <Toggle
-              legend="Local history"
-              title="Remember conversations on this device"
-              description="Keeps recent scrollback in this browser so rooms open instantly and read offline. Turning it off erases what's stored here."
-              value={() => preferences().localHistory}
-              onToggle={(value) => {
-                setPreference('localHistory', value);
-                if (!value) void clearVault();
-              }}
-            />
+            <LocalHistoryToggle />
             <PortableVaultControls />
             <ClearReviewedAnchorsControls />
             <Segmented
