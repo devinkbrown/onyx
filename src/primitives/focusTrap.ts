@@ -37,7 +37,9 @@ function removeDialog(owner: symbol): void {
 
 function focusableElements(panel: HTMLElement): HTMLElement[] {
   return Array.from(panel.querySelectorAll<HTMLElement>(focusableSelector))
-    .filter((element) => !element.hasAttribute('disabled') && element.tabIndex !== -1);
+    .filter((element) => !element.hasAttribute('disabled')
+      && element.tabIndex !== -1
+      && element.closest('[hidden], [inert]') === null);
 }
 
 /** Move focus into the panel on open — first focusable, else the panel itself. */

@@ -103,4 +103,31 @@ describe('focusTrap pure helpers', () => {
     expect(event.defaultPrevented).toBe(true);
     expect(document.activeElement).toBe(first);
   });
+
+  it('wraps in both directions without counting controls in hidden or inert subtrees', () => {
+    const panel = document.createElement('section');
+    const first = document.createElement('button');
+    first.textContent = 'First visible';
+    const last = document.createElement('button');
+    last.textContent = 'Last visible';
+    const hiddenGroup = document.createElement('section');
+    hiddenGroup.hidden = true;
+    hiddenGroup.append(document.createElement('button'));
+    const inertGroup = document.createElement('section');
+    inertGroup.setAttribute('inert', '');
+    inertGroup.append(document.createElement('button'));
+    panel.append(first, last, hiddenGroup, inertGroup);
+    document.body.append(panel);
+
+    last.focus();
+    const forward = tabEvent();
+    trapFocus(forward, panel);
+    expect(forward.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(first);
+
+    const backward = tabEvent(true);
+    trapFocus(backward, panel);
+    expect(backward.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(last);
+  });
 });

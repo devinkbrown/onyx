@@ -407,6 +407,19 @@ describe('PreferencesPanel', () => {
     expect(screen.getByRole('group', { name: 'Confirm clear local history' })).toBe(confirmation);
   });
 
+  it('traps focus around visible controls while inactive category panes stay mounted', () => {
+    renderPreferences();
+    const close = screen.getByRole('button', { name: 'Close preferences' });
+    const lastVisible = screen.getByRole('radio', { name: '24-hour' });
+
+    lastVisible.focus();
+    fireEvent.keyDown(lastVisible, { key: 'Tab' });
+    expect(close).toHaveFocus();
+
+    fireEvent.keyDown(close, { key: 'Tab', shiftKey: true });
+    expect(lastVisible).toHaveFocus();
+  });
+
   it('surfaces the client accessibility audit ledger', () => {
     renderPreferences();
 
