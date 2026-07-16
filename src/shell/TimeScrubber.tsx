@@ -95,6 +95,7 @@ export function TimeScrubber(): JSX.Element {
   const [copyState, setCopyState] = createSignal<CopyState>('idle');
   const [nowMs, setNowMs] = createSignal(Date.now());
   let copyResetTimer: ReturnType<typeof setTimeout> | null = null;
+  let followsCurrentUtcDay = true;
 
   const activeChannel = createMemo(() => {
     const view = activeView();
@@ -107,7 +108,11 @@ export function TimeScrubber(): JSX.Element {
   );
 
   const timer = setInterval(() => {
-    setNowMs(Date.now());
+    const nextNowMs = Date.now();
+    setNowMs(nextNowMs);
+    if (followsCurrentUtcDay) {
+      setSelectedDate(formatUtcDate(new Date(nextNowMs)));
+    }
     void refetch();
   }, REFRESH_MS);
   onCleanup(() => {
@@ -136,11 +141,13 @@ export function TimeScrubber(): JSX.Element {
   }
 
   function handleBarClick(hour: number): void {
+    followsCurrentUtcDay = false;
     jumpTo(hour, 0);
   }
 
   function handleDateInput(event: InputEvent & { currentTarget: HTMLInputElement }): void {
     const next = event.currentTarget.value;
+    followsCurrentUtcDay = false;
     setSelectedDate(next);
     const channel = activeChannel();
     const at = dateAtUtc(next, 12, 0);

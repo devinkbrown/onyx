@@ -18,6 +18,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   store.setState(initialState, true);
@@ -67,6 +68,51 @@ describe('buildMomentLink', () => {
 });
 
 describe('TimeScrubber accessibility', () => {
+  it('rolls the untouched UTC date forward and jumps the current-hour bar to the new day', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-16T23:59:30.000Z'));
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      hours: Array.from({ length: 24 }, () => 0),
+      totals: { messages: 0 },
+    }), { status: 200 })));
+    const travelToSpy = vi.spyOn(store.getState(), 'travelTo').mockImplementation(() => {});
+
+    render(() => <TimeScrubber />);
+    const dateInput = screen.getByLabelText('Jump to date at 12:00 UTC');
+    expect(dateInput).toHaveValue('2026-07-16');
+
+    vi.advanceTimersByTime(60_000);
+
+    expect(dateInput).toHaveValue('2026-07-17');
+    const midnight = screen.getByRole('button', {
+      name: 'Jump to 2026-07-17 00:00 UTC, 0 messages',
+    });
+    expect(midnight).toHaveClass('time-scrubber__bar--now');
+    fireEvent.click(midnight);
+    expect(travelToSpy).toHaveBeenLastCalledWith('#root', new Date('2026-07-17T00:00:00.000Z'));
+  });
+
+  it('preserves an explicit historical date across UTC midnight', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-16T23:59:30.000Z'));
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      hours: Array.from({ length: 24 }, () => 0),
+      totals: { messages: 0 },
+    }), { status: 200 })));
+    vi.spyOn(store.getState(), 'travelTo').mockImplementation(() => {});
+
+    render(() => <TimeScrubber />);
+    const dateInput = screen.getByLabelText('Jump to date at 12:00 UTC');
+    fireEvent.input(dateInput, { target: { value: '2026-06-30' } });
+
+    vi.advanceTimersByTime(60_000);
+
+    expect(dateInput).toHaveValue('2026-06-30');
+    expect(screen.getByRole('button', {
+      name: 'Jump to 2026-06-30 00:00 UTC, 0 messages',
+    })).toHaveClass('time-scrubber__bar--now');
+  });
+
   it('labels the channel scrubber, hourly buttons, date jump, and copy action', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       hours: Array.from({ length: 24 }, (_, hour) => (hour === 5 ? 9 : 0)),
