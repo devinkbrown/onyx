@@ -45,12 +45,17 @@ function isSameOriginClient(client) {
 }
 
 function navigationFallbackPath(pathname) {
-  return pathname === '/app' || pathname.startsWith('/app/') ? '/app' : '/';
+  if (pathname === '/app' || pathname.startsWith('/app/')) return '/app';
+  if (pathname === '/') return '/';
+  return null;
 }
 
 function offlineNavigationFallback(pathname) {
-  return caches.match(navigationFallbackPath(pathname)).then((cached) => cached ?? new Response(
-    'Onyx is unavailable offline because its app shell was not cached. Reconnect and reload once to make offline access available.',
+  const fallbackPath = navigationFallbackPath(pathname);
+  const unavailable = () => new Response(
+    fallbackPath === '/app'
+      ? 'Onyx is unavailable offline because its app shell was not cached. Reconnect and reload once to make offline access available.'
+      : 'This Onyx page is unavailable offline. Reconnect and reload to open it.',
     {
       status: 503,
       headers: {
@@ -58,7 +63,9 @@ function offlineNavigationFallback(pathname) {
         'Cache-Control': 'no-store',
       },
     },
-  ));
+  );
+  if (fallbackPath === null) return Promise.resolve(unavailable());
+  return caches.match(fallbackPath).then((cached) => cached ?? unavailable());
 }
 
 function enableNavigationPreload() {

@@ -141,7 +141,7 @@ describe('PWA manifest', () => {
     expect(openWindow).toHaveBeenCalledWith('/app');
   });
 
-  it('keeps install and activation work alive and uses the cached app for offline app routes', async () => {
+  it('keeps install and activation alive without substituting shells for offline document routes', async () => {
     const listeners = new Map<string, (event: Record<string, unknown>) => void>();
     const add = vi.fn<(url: string) => Promise<void>>(async () => undefined);
     const put = vi.fn(async () => undefined);
@@ -226,13 +226,27 @@ describe('PWA manifest', () => {
     expect(match).toHaveBeenLastCalledWith('/app');
 
     listeners.get('fetch')?.({
-      request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/install/' },
+      request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/' },
       respondWith: (work: Promise<unknown>) => {
         navigationWork = work;
       },
     });
     await expect(navigationWork).resolves.toEqual({ fallback: '/' });
     expect(match).toHaveBeenLastCalledWith('/');
+
+    const matchCallsBeforeDocument = match.mock.calls.length;
+    listeners.get('fetch')?.({
+      request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/guides/' },
+      respondWith: (work: Promise<unknown>) => {
+        navigationWork = work;
+      },
+    });
+    const unavailableDocument = await navigationWork as Response;
+    expect(unavailableDocument).toBeInstanceOf(Response);
+    expect(unavailableDocument.status).toBe(503);
+    expect(unavailableDocument.headers.get('Cache-Control')).toBe('no-store');
+    await expect(unavailableDocument.text()).resolves.toContain('page is unavailable offline');
+    expect(match).toHaveBeenCalledTimes(matchCallsBeforeDocument);
 
     match.mockResolvedValueOnce(undefined);
     listeners.get('fetch')?.({
