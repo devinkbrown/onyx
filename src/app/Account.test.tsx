@@ -15,6 +15,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { cleanup, render, screen, fireEvent, waitFor } from '@solidjs/testing-library';
+import { createSignal } from 'solid-js';
 import { AccountPanel } from './Account';
 import { store, getState, type Server } from '@/lib/store';
 import * as dmCipher from '@/lib/e2ee/dmCipher';
@@ -119,6 +120,74 @@ describe('Account panel — signed in', () => {
     const { client } = renderPanel({ account: 'alice' });
     expect(screen.getAllByText('alice').length).toBeGreaterThan(0);
     expect(client.sendRaw).toHaveBeenCalledWith('ACCOUNTINFO');
+  });
+
+  it('clears local secrets and an armed account deletion when closed', async () => {
+    const client = makeClient();
+    const [open, setOpen] = createSignal(true);
+    store.setState({ client: client as never, server: seedServer('alice') });
+    render(() => <AccountPanel open={open()} onOpenChange={setOpen} />);
+
+    fireEvent.input(screen.getByLabelText(/confirm email change/i), {
+      target: { value: 'alice-password' },
+    });
+    fireEvent.input(screen.getByLabelText(/account password \(to change protection\)/i), {
+      target: { value: 'alice-password' },
+    });
+    fireEvent.click(screen.getByTestId('account-drop-arm'));
+    fireEvent.input(screen.getByLabelText(/type "alice" to confirm/i), {
+      target: { value: 'alice' },
+    });
+    fireEvent.input(screen.getByLabelText('Account password'), {
+      target: { value: 'alice-password' },
+    });
+
+    setOpen(false);
+    setOpen(true);
+
+    await waitFor(() => expect(screen.getByTestId('account-drop-arm')).toBeInTheDocument());
+    expect(screen.getByLabelText(/confirm email change/i)).toHaveValue('');
+    expect(screen.getByLabelText(/account password \(to change protection\)/i)).toHaveValue('');
+    expect(screen.queryByLabelText('Confirm account deletion')).not.toBeInTheDocument();
+  });
+
+  it('clears Alice form state before presenting Bob account details', async () => {
+    store.setState({
+      accountInfo: {
+        account: 'alice',
+        email: 'alice@example.net',
+        fetchedAt: new Date(),
+      },
+    });
+    renderPanel({ account: 'alice' });
+    expect(screen.getByLabelText('Email address')).toHaveValue('alice@example.net');
+
+    fireEvent.input(screen.getByLabelText(/account password \(to change protection\)/i), {
+      target: { value: 'alice-password' },
+    });
+    fireEvent.click(screen.getByTestId('account-drop-arm'));
+    fireEvent.input(screen.getByLabelText(/type "alice" to confirm/i), {
+      target: { value: 'alice' },
+    });
+    fireEvent.input(screen.getByLabelText('Account password'), {
+      target: { value: 'alice-password' },
+    });
+
+    store.setState({ server: seedServer('bob'), accountInfo: null });
+
+    await waitFor(() => expect(screen.getByTestId('account-drop-arm')).toBeInTheDocument());
+    expect(screen.getByLabelText('Email address')).toHaveValue('');
+    expect(screen.getByLabelText(/account password \(to change protection\)/i)).toHaveValue('');
+    expect(screen.queryByLabelText('Confirm account deletion')).not.toBeInTheDocument();
+
+    store.setState({
+      accountInfo: {
+        account: 'bob',
+        email: 'bob@example.net',
+        fetchedAt: new Date(),
+      },
+    });
+    await waitFor(() => expect(screen.getByLabelText('Email address')).toHaveValue('bob@example.net'));
   });
 
   it('reports authenticator copy success only after the shared write resolves', async () => {

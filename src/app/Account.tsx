@@ -234,15 +234,6 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
     }, 1400);
   };
 
-  createEffect(() => {
-    if (local.open) return;
-    copyEpoch += 1;
-    clearCopyTimer();
-    setCopiedField(null);
-    setCopyingField(null);
-    setCopyFeedback(null);
-  });
-
   onCleanup(() => {
     disposed = true;
     copyEpoch += 1;
@@ -253,6 +244,42 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
   const [dropConfirm, setDropConfirm] = createSignal('');
   const [dropPassword, setDropPassword] = createSignal('');
   const [dropArmed, setDropArmed] = createSignal(false);
+
+  const clearLocalAccountState = (): void => {
+    setEmailValue('');
+    setEmailPassword('');
+    setEmailError(undefined);
+    setNewPassword('');
+    setConfirmPassword('');
+    setCurrentPassword('');
+    setPasswordError(undefined);
+    setProtectPassword('');
+    setRecoverNick('');
+    setRecoverPassword('');
+    setCertFingerprint('');
+    setTotpCode('');
+    setClaimHost('');
+    setE2eeDeviceBusy(false);
+    setDropConfirm('');
+    setDropPassword('');
+    setDropArmed(false);
+    copyEpoch += 1;
+    clearCopyTimer();
+    setCopiedField(null);
+    setCopyingField(null);
+    setCopyFeedback(null);
+  };
+
+  let accountBoundaryInitialized = false;
+  let previousAccount: string | null = null;
+  createEffect(() => {
+    const open = local.open;
+    const currentAccount = account();
+    const accountChanged = accountBoundaryInitialized && currentAccount !== previousAccount;
+    previousAccount = currentAccount;
+    accountBoundaryInitialized = true;
+    if (!open || accountChanged) clearLocalAccountState();
+  });
 
   // ── derived ──
   const flagBits = createMemo(() => {
@@ -289,6 +316,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
   // Seed the email field from the latest info (only when empty, so we never
   // clobber an in-progress edit).
   createEffect(() => {
+    if (!local.open) return;
     const e = info()?.email;
     if (e && !emailValue()) setEmailValue(e);
   });
