@@ -2158,6 +2158,40 @@ describe('PreferencesPanel', () => {
     });
   });
 
+  it('does not let an older retention prune overwrite the latest policy result', async () => {
+    let resolveOlderPrune: (pruned: boolean) => void = () => {};
+    const olderPrune = new Promise<boolean>((resolve) => {
+      resolveOlderPrune = resolve;
+    });
+    const apply = vi.spyOn(historyVault, 'applyRetentionPolicy')
+      .mockReturnValueOnce(olderPrune)
+      .mockResolvedValueOnce(true);
+    renderPreferences('History & data');
+    const card = screen.getByRole('heading', { name: 'On-device history' }).closest('section');
+    const controls = within(card!);
+
+    fireEvent.click(controls.getByRole('radio', { name: '1,000' }));
+    fireEvent.click(controls.getByRole('radio', { name: '5,000' }));
+
+    await waitFor(() => {
+      expect(apply).toHaveBeenCalledTimes(2);
+      expect(controls.getByRole('status')).toHaveTextContent(
+        'Local history limit saved and existing messages pruned for this device.',
+      );
+    });
+    resolveOlderPrune(false);
+    await olderPrune;
+    await Promise.resolve();
+
+    expect(controls.getByRole('status')).toHaveTextContent(
+      'Local history limit saved and existing messages pruned for this device.',
+    );
+    expect(controls.getByRole('status')).not.toHaveTextContent('vault is unavailable');
+    expect(JSON.parse(localStorage.getItem(RETENTION_POLICY_STORAGE_KEY) ?? '')).toEqual({
+      keep: 5000,
+    });
+  });
+
   it('restores the persisted retention policy when the panel mounts', () => {
     localStorage.setItem(
       RETENTION_POLICY_STORAGE_KEY,

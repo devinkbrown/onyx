@@ -2707,8 +2707,15 @@ function VaultRetentionCard(): JSX.Element {
   setRetentionPolicy(initial);
   const [policy, setPolicy] = createSignal<RetentionPolicy>(initial);
   const [status, setStatus] = createSignal<string | null>(null);
+  let applyEpoch = 0;
+  let disposed = false;
 
-  onCleanup(subscribeRetentionPolicy((next) => setPolicy(next)));
+  const unsubscribeRetention = subscribeRetentionPolicy((next) => setPolicy(next));
+  onCleanup(() => {
+    disposed = true;
+    applyEpoch += 1;
+    unsubscribeRetention();
+  });
 
   function keepOption(): VaultKeepOption {
     const value = String(policy().keep);
@@ -2726,10 +2733,12 @@ function VaultRetentionCard(): JSX.Element {
 
   function applyPolicy(next: RetentionPolicy): void {
     const safe = sanitizeRetentionPolicy(next);
+    const epoch = ++applyEpoch;
     setPolicy(safe);
     const saved = writeRetentionPolicy(safe);
     setStatus('Applying local history limit…');
     void applyRetentionPolicy(safe).then((pruned) => {
+      if (disposed || epoch !== applyEpoch) return;
       setStatus(
         saved && pruned
           ? 'Local history limit saved and existing messages pruned for this device.'
@@ -2737,6 +2746,11 @@ function VaultRetentionCard(): JSX.Element {
             ? 'Local history limit saved; the vault is unavailable in this browser session.'
             : 'Limit applied for this session, but this browser could not save it.',
       );
+    }).catch(() => {
+      if (disposed || epoch !== applyEpoch) return;
+      setStatus(saved
+        ? 'Local history limit saved; the vault is unavailable in this browser session.'
+        : 'Limit applied for this session, but this browser could not save it.');
     });
   }
 
