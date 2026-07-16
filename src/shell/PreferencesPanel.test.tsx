@@ -62,6 +62,7 @@ import {
   storeSessionToken,
 } from '@/lib/credentials';
 import { PreferencesPanel } from './PreferencesPanel';
+import { AppearancePanel } from './AppearancePanel';
 import { PORTABLE_JSON_MAX_FILE_BYTES } from './importFileLimits';
 import * as portableTransfer from '@/lib/vault/portableTransfer';
 import type { PortableTransferSnapshot } from '@/lib/vault/portableTransfer';
@@ -1264,6 +1265,32 @@ describe('PreferencesPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: /Theme and background/i }));
 
     expect(store.getState().showAppearance).toBe(true);
+  });
+
+  it('returns from Appearance to the Preferences launcher without losing the panel', async () => {
+    openPreferences();
+    render(() => (
+      <>
+        <AppearancePanel />
+        <PreferencesPanel />
+      </>
+    ));
+    const launcher = screen.getByRole('button', { name: /Theme and background/i });
+    launcher.focus();
+
+    fireEvent.click(launcher);
+
+    expect(screen.getByRole('dialog', { name: 'Preferences' })).toBeInTheDocument();
+    const appearance = screen.getByRole('dialog', { name: 'Appearance' });
+    await waitFor(() => expect(within(appearance).getByRole('button', { name: 'Close appearance' })).toHaveFocus());
+
+    fireEvent.click(within(appearance).getByRole('button', { name: 'Close appearance' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Appearance' })).toBeNull();
+      expect(screen.getByRole('dialog', { name: 'Preferences' })).toBeInTheDocument();
+      expect(launcher).toHaveFocus();
+    });
   });
 
   it('reviews portable vault imports before merging them', async () => {

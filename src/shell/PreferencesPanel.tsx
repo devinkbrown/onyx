@@ -2882,7 +2882,9 @@ function PreferenceCategoryNavigation(props: {
 
 function AppearanceLauncher(): JSX.Element {
   function openAppearanceFromPreferences(): void {
-    closePreferences();
+    // Keep Preferences mounted beneath the nested Appearance Sheet. The shared
+    // dialog-focus stack gives Appearance keyboard ownership while open, then
+    // restores focus to this launcher and the user's exact Preferences place.
     getState().openAppearance();
   }
 
