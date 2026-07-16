@@ -4121,11 +4121,25 @@
   background: color-mix(in oklab, var(--gold-deep) 24%, transparent);
 }
 
+/* Admin — a quieter steward tier between owner and room op. */
+.shell-role-badge--admin {
+  color: var(--gold);
+  border-color: color-mix(in oklab, var(--gold) 64%, var(--seam));
+  background: color-mix(in oklab, var(--gold-deep) 18%, transparent);
+}
+
 /* Op — deep-current azure, distinct from the brighter netop crest. */
 .shell-role-badge--op {
   color: var(--lapis-bright);
   border-color: color-mix(in oklab, var(--lapis-deep) 78%, var(--lapis));
   background: color-mix(in oklab, var(--lapis-deep) 30%, transparent);
+}
+
+/* Half-op — deliberately muted, but still distinct from an unbadged member. */
+.shell-role-badge--halfop {
+  color: var(--washi-mute);
+  border-color: var(--seam);
+  background: color-mix(in oklab, var(--stone-2) 38%, transparent);
 }
 
 /* Voice — sea-green, the gift of being heard. */
