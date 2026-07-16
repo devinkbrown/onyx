@@ -4147,15 +4147,21 @@
 .shell-member-card {
   display: grid;
   gap: var(--space-3);
-  min-width: 210px;
+  width: 100%;
+  min-width: 0;
 }
 
 .shell-member-card-head {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  min-width: 0;
   padding-bottom: var(--space-3);
   border-bottom: 1px solid var(--seam-faint);
+}
+
+.shell-member-card-head > div:last-child {
+  min-width: 0;
 }
 
 .shell-member-card-nick {
@@ -4164,12 +4170,14 @@
   font-weight: 700;
   color: var(--washi);
   letter-spacing: 0.06em;
+  overflow-wrap: anywhere;
 }
 
 .shell-member-card-account {
   font-family: var(--font-mono);
   font-size: 0.68rem;
   color: var(--washi-mute);
+  overflow-wrap: anywhere;
 }
 
 .shell-member-card-role {
@@ -4178,6 +4186,7 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--lapis-bright);
+  overflow-wrap: anywhere;
 }
 
 .shell-member-card-badges {
@@ -4188,7 +4197,9 @@
 
 .shell-member-card-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
+  min-width: 0;
 }
 
 /* Moderation cluster — op-gated row of grant/kick/ban controls. */
