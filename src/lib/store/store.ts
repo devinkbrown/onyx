@@ -90,6 +90,7 @@ import {
   type ComposerDrafts,
 } from '@/lib/composer/drafts';
 import { loadDMPins, sanitizeDMPins, saveDMPins } from '@/lib/dmPins';
+import { loadIgnoredUsers, parseIgnoredUsers, saveIgnoredUsers } from '@/lib/ignoredUsers';
 import { markViewedRead, normalizeTargetKey, totalMentions } from '@/lib/notifications/readState';
 import {
   buildCreateOptions,
@@ -2718,6 +2719,8 @@ function _resetAccountBoundState(
     dmPinsNick: null,
     channelNotify: new Map(),
     highlightWords: [],
+    ignoredUsers: new Set(),
+    showIgnoreList: false,
     serviceNotices: s.serviceNotices.filter(notice => notice.source !== 'Account'),
   }));
 }
@@ -3451,6 +3454,13 @@ function _loadOwnedHighlightWords(
   return owner ? loadHighlightWords(owner) : [];
 }
 
+function _loadOwnedIgnoredUsers(
+  state: Pick<OnyxState, 'server' | 'ourNick'>,
+): Set<string> {
+  const owner = selectDeviceMemoryOwner(state);
+  return owner ? loadIgnoredUsers(owner) : new Set();
+}
+
 export interface DeviceMemoryContext {
   readonly owner: DeviceMemoryOwner;
   readonly client: IRCClient | null;
@@ -3666,7 +3676,9 @@ export const store = createStore<OnyxState>()(
     showFriendsPanel: false,
     pinnedChannels: _loadPinnedChannels(),
     followedChannels: _loadFollowedChannels(),
-    ignoredUsers: _loadIgnoredUsers(),
+    // Contact moderation is private per identity and loads only after the
+    // active server owner exists.
+    ignoredUsers: new Set(),
     showIgnoreList: false,
     softIgnoreList: _loadSoftIgnoreList(),
     revealedMessages: new Set<string>(),
@@ -4030,6 +4042,7 @@ export const store = createStore<OnyxState>()(
               dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: newNick }),
               channelNotify: _loadOwnedChannelNotify({ server, ourNick: newNick }),
               highlightWords: _loadOwnedHighlightWords({ server, ourNick: newNick }),
+              ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: newNick }),
             };
           });
         },
@@ -4106,6 +4119,7 @@ export const store = createStore<OnyxState>()(
               dmPinnedMessages: _loadOwnedDMPins({ server: srv, ourNick: get().ourNick }),
               channelNotify: _loadOwnedChannelNotify({ server: srv, ourNick: get().ourNick }),
               highlightWords: _loadOwnedHighlightWords({ server: srv, ourNick: get().ourNick }),
+              ignoredUsers: _loadOwnedIgnoredUsers({ server: srv, ourNick: get().ourNick }),
               isIRCX: client.isupport.IRCX,
               networkName: net,
               serverCapabilities: caps,
@@ -6387,20 +6401,22 @@ export const store = createStore<OnyxState>()(
 
     // ── Ignore list ───────────────────────────────────────────────────────
     ignoreUser(nick) {
-      const key = nick.toLowerCase();
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
       set(s => {
-        const ignoredUsers = new Set(s.ignoredUsers);
-        ignoredUsers.add(key);
-        _saveIgnoredUsers(ignoredUsers);
+        const ignoredUsers = parseIgnoredUsers([...s.ignoredUsers, nick]);
+        saveIgnoredUsers(ignoredUsers, owner);
         return { ignoredUsers };
       });
     },
     unignoreUser(nick) {
-      const key = nick.toLowerCase();
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
+      const key = nick.trim().toLowerCase();
       set(s => {
         const ignoredUsers = new Set(s.ignoredUsers);
         ignoredUsers.delete(key);
-        _saveIgnoredUsers(ignoredUsers);
+        saveIgnoredUsers(ignoredUsers, owner);
         return { ignoredUsers };
       });
     },
@@ -7202,6 +7218,7 @@ export const store = createStore<OnyxState>()(
               dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: s.ourNick }),
               channelNotify: _loadOwnedChannelNotify({ server, ourNick: s.ourNick }),
               highlightWords: _loadOwnedHighlightWords({ server, ourNick: s.ourNick }),
+              ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: s.ourNick }),
             };
           });
           break;
@@ -9581,6 +9598,7 @@ export const store = createStore<OnyxState>()(
                 dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: s.ourNick }),
                 channelNotify: _loadOwnedChannelNotify({ server, ourNick: s.ourNick }),
                 highlightWords: _loadOwnedHighlightWords({ server, ourNick: s.ourNick }),
+                ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: s.ourNick }),
                 passkeyBusy: false,
                 passkeyError: null,
               };
@@ -9612,6 +9630,7 @@ export const store = createStore<OnyxState>()(
               dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: s.ourNick }),
               channelNotify: _loadOwnedChannelNotify({ server, ourNick: s.ourNick }),
               highlightWords: _loadOwnedHighlightWords({ server, ourNick: s.ourNick }),
+              ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: s.ourNick }),
             };
           });
           break;
@@ -12649,28 +12668,6 @@ function _savePinnedChannels(channels: Set<string>): void {
 
 function _saveFollowedChannels(channels: Set<string>): void {
   _saveChannelSet('onyx:followed-channels', channels);
-}
-
-// ── Ignore list persistence ───────────────────────────────────────────────────
-
-const IGNORED_USERS_KEY = 'onyx:ignored-users';
-
-function _loadIgnoredUsers(): Set<string> {
-  if (typeof window === 'undefined') return new Set();
-  try {
-    return new Set(parseStringArray(localStorage.getItem(IGNORED_USERS_KEY)));
-  } catch {
-    return new Set();
-  }
-}
-
-function _saveIgnoredUsers(ignoredUsers: Set<string>): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(IGNORED_USERS_KEY, JSON.stringify([...ignoredUsers]));
-  } catch {
-    // Storage quota exceeded or unavailable — silently degrade
-  }
 }
 
 // ── Friends persistence ───────────────────────────────────────────────────────

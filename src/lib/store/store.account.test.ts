@@ -22,6 +22,7 @@ import { loadCredentials, saveCredentials } from '@/lib/credentials';
 import { saveComposerDrafts } from '@/lib/composer/drafts';
 import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
 import { DM_PINS_STORAGE_KEY, saveDMPins } from '@/lib/dmPins';
+import { saveIgnoredUsers } from '@/lib/ignoredUsers';
 import { saveChannelNotify } from '@/lib/notifications/channelNotifyMemory';
 import { saveHighlightWords } from '@/lib/notifications/highlightMemory';
 
@@ -820,6 +821,21 @@ describe('account replies — state from the message handler', () => {
 
     expect(store.getState().highlightWords).toEqual(['bob incident term']);
     expect(store.getState().highlightWords).not.toContain('alice confidential codename');
+  });
+
+  it('does not carry Alice ignored users into Bob on 900', () => {
+    const bob = { serverUrl: seedServer('bob').url, identity: 'bob' } as const;
+    saveIgnoredUsers(new Set(['bob-contact']), bob);
+    store.setState({
+      server: seedServer('alice'),
+      ourNick: 'alice',
+      ignoredUsers: new Set(['alice-private-contact']),
+    });
+
+    feed(':eshmaki.me 900 alice alice!u@h bob :You are now logged in as bob');
+
+    expect(store.getState().ignoredUsers).toEqual(new Set(['bob-contact']));
+    expect(store.getState().ignoredUsers).not.toContain('alice-private-contact');
   });
 
   it('ignores an Alice ACCOUNTINFO reply after the live account switches to Bob', () => {
