@@ -357,7 +357,9 @@ describe('PWA manifest', () => {
     const put = vi.fn(async () => undefined);
     const cache = { add, put };
     const match = vi.fn<(key: unknown) => Promise<unknown>>(async (key) => ({ fallback: key }));
-    const deleteCache = vi.fn(async () => true);
+    const deleteCache = vi.fn(async () => {
+      throw new Error('stale cache is unavailable');
+    });
     const caches = {
       open: vi.fn(async () => cache),
       keys: vi.fn(async () => [
@@ -430,7 +432,7 @@ describe('PWA manifest', () => {
         activateWork = work;
       },
     });
-    await activateWork;
+    await expect(activateWork).resolves.toBeUndefined();
     expect(deleteCache).toHaveBeenCalledOnce();
     expect(deleteCache).toHaveBeenCalledWith('onyx-shell-old-build');
     expect(deleteCache).not.toHaveBeenCalledWith('public-site-cache');

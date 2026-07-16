@@ -128,6 +128,20 @@ function enableNavigationPreload() {
   }
 }
 
+function clearStaleShellCaches() {
+  return caches.keys()
+    .then((keys) => Promise.all(
+      keys
+        // This worker shares an origin with public and operational surfaces.
+        // Never erase caches owned by another application.
+        .filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
+        .map((key) => Promise.resolve(caches.delete(key)).catch(() => false))
+    ))
+    // Cache Storage can be unavailable or partially corrupted. Cleanup must
+    // not brick activation of a worker whose fresh shell already installed.
+    .catch(() => undefined);
+}
+
 // ── Install: precache shell ────────────────────────────────────────────────────
 // CRITICAL: precache failures must NEVER abort install. cache.addAll rejects
 // wholesale if any single URL 404s, which bricks the update pipeline — every
@@ -149,15 +163,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     Promise.all([
-      caches.keys().then((keys) =>
-        Promise.all(
-          keys
-            // This worker shares an origin with public and operational
-            // surfaces. Never erase caches owned by another application.
-            .filter((k) => k.startsWith(CACHE_PREFIX) && k !== CACHE_NAME)
-            .map((k) => caches.delete(k))
-        )
-      ),
+      clearStaleShellCaches(),
       enableNavigationPreload(),
     ]).then(() => self.clients.claim())
   );
