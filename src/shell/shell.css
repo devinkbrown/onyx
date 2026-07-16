@@ -5080,6 +5080,81 @@
     scroll-margin-inline: 4px;
   }
 
+  /* At extreme zoom the action rail is the only direct route to several
+     channel/workspace capabilities. Keep the mobile shedding rules from
+     removing them; the rail already owns horizontal overflow. */
+  .shell-ribbon-event-chip,
+  .shell-ribbon-voice-chip,
+  .shell-ribbon-account {
+    display: inline-flex;
+    flex: none;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    padding: 0 8px;
+    font-size: 14px;
+    scroll-margin-inline: 4px;
+  }
+
+  .shell-ribbon-event-chip,
+  .shell-ribbon-voice-chip {
+    max-width: 160px;
+  }
+
+  .shell-ribbon-event-text,
+  .shell-ribbon-voice-text {
+    min-width: 0;
+    max-width: 120px;
+  }
+
+  .shell-ribbon-event-mark,
+  .shell-ribbon-voice-mark {
+    height: 20px;
+  }
+
+  .shell-ribbon-appearance,
+  .shell-ribbon-preferences {
+    display: inline-flex;
+  }
+
+  .shell-ribbon-account {
+    max-width: 140px;
+  }
+
+  .shell-ribbon-account-text {
+    gap: 4px;
+  }
+
+  .shell-ribbon-account-name,
+  .shell-ribbon-count {
+    font-size: 14px;
+  }
+
+  .shell-ribbon-conn {
+    display: inline-flex;
+    flex: none;
+    min-height: 44px;
+    padding: 6px 8px;
+    font-size: 14px;
+    letter-spacing: 0.06em;
+    scroll-margin-inline: 4px;
+  }
+
+  .shell-ribbon-conn-label {
+    display: inline;
+  }
+
+  .shell-ribbon-divider {
+    display: block;
+    flex: none;
+    height: 32px;
+  }
+
+  .shell-ribbon-ico {
+    width: 24px;
+    height: 24px;
+  }
+
   .shell-mobile-nav-btn {
     flex-direction: row;
     justify-content: flex-start;
