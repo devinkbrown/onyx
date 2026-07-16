@@ -196,6 +196,7 @@ const PREFERENCE_CATEGORIES = [
   { id: 'display', label: 'Display', summary: 'Reading and rhythm' },
   { id: 'conversation', label: 'Conversation', summary: 'Channel surfaces' },
   { id: 'history', label: 'History & data', summary: 'Local vault' },
+  { id: 'transfer', label: 'Import & export', summary: 'Move conversation data' },
   { id: 'tools', label: 'App & tools', summary: 'Install and extensions' },
   { id: 'accessibility', label: 'Accessibility', summary: 'Motion and access' },
 ] as const;
@@ -2809,10 +2810,9 @@ export function PreferencesPanel(): JSX.Element {
           >
             <PreferenceSection
               title="History & data"
-              description="How this browser remembers, finds, moves, and erases local conversation data."
+              description="How this browser remembers, finds, retains, and erases local conversation data."
             />
             <LocalHistoryToggle />
-            <PortableVaultControls />
             <ClearReviewedAnchorsControls />
             <Segmented
               legend="Default search mode"
@@ -2832,6 +2832,20 @@ export function PreferencesPanel(): JSX.Element {
             <ClearTopicReadPositionsControls />
             <VaultRetentionCard />
             <ClearLocalHistoryControls />
+          </section>
+
+          <section
+            class="pref-category-panel"
+            id="pref-category-panel-transfer"
+            role="tabpanel"
+            aria-labelledby="pref-category-tab-transfer"
+            hidden={activeCategory() !== 'transfer'}
+          >
+            <PreferenceSection
+              title="Import & export"
+              description="Move portable conversation data into or out of this browser."
+            />
+            <PortableVaultControls />
             <DiscordImportControls />
             <DiscordPackageImportControls />
             <DiscordBotImportControls />

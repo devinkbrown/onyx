@@ -107,7 +107,13 @@ async function stageEmptyPortableImport(): Promise<void> {
   await screen.findByRole('heading', { name: 'Review import' });
 }
 
-type PreferenceCategoryLabel = 'Display' | 'Conversation' | 'History & data' | 'App & tools' | 'Accessibility';
+type PreferenceCategoryLabel =
+  | 'Display'
+  | 'Conversation'
+  | 'History & data'
+  | 'Import & export'
+  | 'App & tools'
+  | 'Accessibility';
 
 function selectPreferenceCategory(category: PreferenceCategoryLabel): HTMLElement {
   const tab = screen.getByRole('tab', { name: new RegExp(`^${category}`) });
@@ -152,7 +158,7 @@ describe('PreferencesPanel', () => {
 
     const tabs = screen.getAllByRole('tab');
     const categoryNav = screen.getByRole('navigation', { name: 'Preference categories' });
-    expect(tabs).toHaveLength(5);
+    expect(tabs).toHaveLength(6);
     expect(screen.getByRole('tablist', { name: 'Preference categories' })).toHaveAttribute('aria-orientation', 'vertical');
     expect(categoryNav).toBeInTheDocument();
     expect(within(categoryNav).queryByRole('button', { name: 'Reset to defaults' })).not.toBeInTheDocument();
@@ -160,7 +166,7 @@ describe('PreferencesPanel', () => {
     expect(screen.getByRole('tab', { name: /^Display/ })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tab', { name: /^Display/ })).toHaveAttribute('tabindex', '0');
     expect(screen.getByRole('tabpanel')).toHaveAccessibleName('Display');
-    expect(screen.getAllByRole('tabpanel', { hidden: true })).toHaveLength(5);
+    expect(screen.getAllByRole('tabpanel', { hidden: true })).toHaveLength(6);
     expect(screen.getByRole('button', { name: /Theme and background/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Export vault' })).not.toBeInTheDocument();
 
@@ -170,8 +176,32 @@ describe('PreferencesPanel', () => {
     expect(screen.getByRole('tab', { name: /^History & data/ })).toHaveAttribute('tabindex', '0');
     expect(screen.getByRole('tab', { name: /^Display/ })).toHaveAttribute('aria-selected', 'false');
     expect(screen.getByRole('tabpanel')).toHaveAccessibleName('History & data');
-    expect(screen.getByRole('button', { name: 'Export vault' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Export vault' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Theme and background/i })).not.toBeInTheDocument();
+
+    selectPreferenceCategory('Import & export');
+
+    expect(screen.getByRole('tab', { name: /^Import & export/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tabpanel')).toHaveAccessibleName('Import & export');
+    expect(screen.getByRole('button', { name: 'Export vault' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Import portable JSON')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Clear local history' })).not.toBeInTheDocument();
+  });
+
+  it('preserves a staged portable import while navigating through mounted categories', async () => {
+    renderPreferences('Import & export');
+    await stageEmptyPortableImport();
+    const review = screen.getByRole('group', { name: 'Review import' });
+
+    selectPreferenceCategory('History & data');
+    expect(screen.queryByRole('group', { name: 'Review import' })).not.toBeInTheDocument();
+    expect(within(document.getElementById('pref-category-panel-transfer')!).getByRole('group', {
+      name: 'Review import',
+      hidden: true,
+    })).toBe(review);
+
+    selectPreferenceCategory('Import & export');
+    expect(screen.getByRole('group', { name: 'Review import' })).toBe(review);
   });
 
   it('moves category selection and focus with tab-list navigation keys', () => {
@@ -197,6 +227,13 @@ describe('PreferencesPanel', () => {
     fireEvent.keyDown(accessibility, { key: 'Home' });
     expect(display).toHaveFocus();
     expect(display).toHaveAttribute('aria-selected', 'true');
+
+    const history = selectPreferenceCategory('History & data');
+    history.focus();
+    fireEvent.keyDown(history, { key: 'ArrowDown' });
+    const transfer = screen.getByRole('tab', { name: /^Import & export/ });
+    expect(transfer).toHaveFocus();
+    expect(transfer).toHaveAttribute('aria-selected', 'true');
   });
 
   it('uses horizontal arrow keys on mobile and disposes its responsive listener', () => {
@@ -324,13 +361,14 @@ describe('PreferencesPanel', () => {
     expect(screen.getByRole('switch', { name: /Show join voice\/video controls/i })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('switch', { name: /Show topic, forum, and follow controls/i })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('switch', { name: /Show shared watch activity/i })).toHaveAttribute('aria-checked', 'true');
-    selectPreferenceCategory('History & data');
+    selectPreferenceCategory('Import & export');
     expect(screen.getByRole('heading', { name: 'Portable vault' })).toBeInTheDocument();
     expect(screen.getByText(/Saved query text is included/i)).toBeInTheDocument();
     expect(screen.getByText(/Read cursors contain only room\/topic, message ID, and timestamp metadata/i)).toBeInTheDocument();
     expect(screen.getByText(/decrypted DM plaintext are not exported automatically/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Export vault' })).toBeInTheDocument();
     expect(screen.getByLabelText('Import portable JSON')).toHaveAttribute('type', 'file');
+    selectPreferenceCategory('History & data');
     const reviewedAnchors = screen.getByRole('heading', { name: 'Reviewed catch-up anchors' }).closest('section');
     expect(reviewedAnchors).not.toBeNull();
     expect(within(reviewedAnchors!).getByText('0 reviewed anchors')).toBeInTheDocument();
@@ -424,7 +462,7 @@ describe('PreferencesPanel', () => {
       activatedAnchors.push(this);
       expect(this.isConnected).toBe(true);
     });
-    renderPreferences('History & data');
+    renderPreferences('Import & export');
 
     const exportButton = screen.getByRole('button', { name: 'Export vault' });
     fireEvent.click(exportButton);
@@ -455,7 +493,7 @@ describe('PreferencesPanel', () => {
       activatedAnchors.push(this);
       throw new Error('downloads blocked');
     });
-    renderPreferences('History & data');
+    renderPreferences('Import & export');
 
     fireEvent.click(screen.getByRole('button', { name: 'Export vault' }));
 
@@ -474,7 +512,7 @@ describe('PreferencesPanel', () => {
     vi.spyOn(portableTransfer, 'exportPortableTransfer').mockReturnValue(pendingExport);
     const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:stale-portable');
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
-    const view = renderPreferences('History & data');
+    const view = renderPreferences('Import & export');
 
     fireEvent.click(screen.getByRole('button', { name: 'Export vault' }));
     expect(screen.getByText('Preparing portable vault export…')).toHaveAttribute('role', 'status');
@@ -500,7 +538,7 @@ describe('PreferencesPanel', () => {
       activatedAnchors.push(this);
       expect(this.isConnected).toBe(true);
     });
-    renderPreferences('History & data');
+    renderPreferences('Import & export');
 
     fireEvent.click(screen.getByRole('button', { name: 'Export compressed vault' }));
 
@@ -517,7 +555,7 @@ describe('PreferencesPanel', () => {
 
   it('keeps ordinary JSON available when Compression Streams are unsupported', () => {
     vi.spyOn(portableCompression, 'supportsPortableGzip').mockReturnValue(false);
-    renderPreferences('History & data');
+    renderPreferences('Import & export');
 
     expect(screen.getByRole('button', { name: 'Export vault' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Export compressed vault' })).not.toBeInTheDocument();
@@ -535,7 +573,7 @@ describe('PreferencesPanel', () => {
         return { state: 'saved', detail: 'Portable vault saved.' };
       });
     const createObjectURL = vi.spyOn(URL, 'createObjectURL');
-    renderPreferences('History & data');
+    renderPreferences('Import & export');
 
     const saveButton = screen.getByRole('button', { name: 'Save vault to file' });
     expect(screen.getByRole('button', { name: 'Export vault' })).toBeInTheDocument();
@@ -555,7 +593,7 @@ describe('PreferencesPanel', () => {
 
   it('keeps the object-URL download controls unchanged when direct file saving is unsupported', () => {
     vi.spyOn(portableFileSave, 'supportsPortableFileSave').mockReturnValue(false);
-    renderPreferences('History & data');
+    renderPreferences('Import & export');
 
     expect(screen.getByRole('button', { name: 'Export vault' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Save vault to file' })).not.toBeInTheDocument();
@@ -575,7 +613,7 @@ describe('PreferencesPanel', () => {
         return { state: 'saved', detail: 'Portable vault saved.' };
       });
     const createObjectURL = vi.spyOn(URL, 'createObjectURL');
-    renderPreferences('History & data');
+    renderPreferences('Import & export');
 
     fireEvent.click(screen.getByRole('button', { name: 'Save compressed vault to file' }));
 
@@ -595,7 +633,7 @@ describe('PreferencesPanel', () => {
       state: 'cancelled',
       detail: 'Portable vault save cancelled. No file was changed.',
     });
-    renderPreferences('History & data');
+    renderPreferences('Import & export');
 
     fireEvent.click(screen.getByRole('button', { name: 'Save vault to file' }));
 
@@ -616,7 +654,7 @@ describe('PreferencesPanel', () => {
         await saveRequest.createBlob();
         return { state: 'saved', detail: 'Portable vault saved.' };
       });
-    renderPreferences('History & data');
+    renderPreferences('Import & export');
 
     fireEvent.click(screen.getByRole('button', { name: 'Save vault to file' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('download export remains available');
@@ -630,7 +668,7 @@ describe('PreferencesPanel', () => {
   it('decompresses a bounded portable gzip before staging the ordinary import review', async () => {
     const decompressPortableJson = vi.spyOn(portableCompression, 'decompressPortableJson')
       .mockResolvedValue(JSON.stringify(emptyPortableSnapshot()));
-    renderPreferences('History & data');
+    renderPreferences('Import & export');
     const file = new File(['gzip bytes'], 'onyx-portable.json.gz', { type: 'application/gzip' });
 
     fireEvent.change(screen.getByLabelText('Import portable JSON'), { target: { files: [file] } });
@@ -650,7 +688,7 @@ describe('PreferencesPanel', () => {
       size: portableCompression.PORTABLE_GZIP_MAX_COMPRESSED_BYTES + 1,
       stream,
     } as unknown as File;
-    renderPreferences('History & data');
+    renderPreferences('Import & export');
 
     fireEvent.change(screen.getByLabelText('Import portable JSON'), { target: { files: [file] } });
 
@@ -667,7 +705,7 @@ describe('PreferencesPanel', () => {
       resolveDecompression = resolve;
     });
     vi.spyOn(portableCompression, 'decompressPortableJson').mockReturnValue(pendingDecompression);
-    const view = renderPreferences('History & data');
+    const view = renderPreferences('Import & export');
     const file = new File(['gzip bytes'], 'onyx-portable.json.gz', { type: 'application/gzip' });
 
     fireEvent.change(screen.getByLabelText('Import portable JSON'), { target: { files: [file] } });
@@ -691,7 +729,7 @@ describe('PreferencesPanel', () => {
     const sharePortableVaultJson = vi.spyOn(portableShare, 'sharePortableVaultJson')
       .mockResolvedValue({ state: 'shared', detail: 'Portable vault file shared.' });
     const createObjectURL = vi.spyOn(URL, 'createObjectURL');
-    renderPreferences('History & data');
+    renderPreferences('Import & export');
 
     const share = screen.getByRole('button', { name: 'Share vault file' });
     fireEvent.click(share);
@@ -714,7 +752,7 @@ describe('PreferencesPanel', () => {
 
   it('keeps JSON export first and visible when file sharing is unavailable', () => {
     vi.spyOn(portableShare, 'supportsPortableFileShare').mockReturnValue(false);
-    renderPreferences('History & data');
+    renderPreferences('Import & export');
 
     expect(screen.getByRole('button', { name: 'Export vault' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Share vault file' })).not.toBeInTheDocument();
@@ -727,7 +765,7 @@ describe('PreferencesPanel', () => {
     const sharePortableVaultJson = vi.spyOn(portableShare, 'sharePortableVaultJson')
       .mockResolvedValueOnce({ state: 'cancelled', detail: 'Portable vault sharing cancelled.' })
       .mockResolvedValueOnce({ state: 'rejected', detail: 'The browser rejected portable vault sharing. Export ordinary JSON instead.' });
-    renderPreferences('History & data');
+    renderPreferences('Import & export');
 
     fireEvent.click(screen.getByRole('button', { name: 'Share vault file' }));
     expect(await screen.findByText('Portable vault sharing cancelled.')).toHaveAttribute('role', 'status');
@@ -746,7 +784,7 @@ describe('PreferencesPanel', () => {
     vi.spyOn(portableTransfer, 'exportPortableTransfer').mockResolvedValue(emptyPortableSnapshot());
     const sharePortableVaultJson = vi.spyOn(portableShare, 'sharePortableVaultJson')
       .mockReturnValue(pendingShare);
-    const view = renderPreferences('History & data');
+    const view = renderPreferences('Import & export');
 
     fireEvent.click(screen.getByRole('button', { name: 'Share vault file' }));
     await waitFor(() => expect(sharePortableVaultJson).toHaveBeenCalledOnce());
@@ -1020,7 +1058,7 @@ describe('PreferencesPanel', () => {
   });
 
   it('reviews portable vault imports before merging them', async () => {
-    renderPreferences('History & data');
+    renderPreferences('Import & export');
 
     const snapshot = {
       kind: 'onyx-vault',
@@ -1147,6 +1185,7 @@ describe('PreferencesPanel', () => {
     expect(await screen.findByText(/Imported .*2 topic read cursors.*1 preference set/i)).toBeInTheDocument();
     expect(readTopicReadMarker('#root', 'roadmap')?.lastReadMessageId).toBe('m1');
     expect(readTopicReadMarker('#root', 'release train')?.lastReadMessageId).toBe('m2');
+    selectPreferenceCategory('History & data');
     expect(screen.getByRole('radio', { name: '1,000' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('radio', { name: '30 days' })).toHaveAttribute('aria-checked', 'true');
 
@@ -1155,7 +1194,7 @@ describe('PreferencesPanel', () => {
   });
 
   it('rejects an oversized portable JSON file before reading it', async () => {
-    renderPreferences('History & data');
+    renderPreferences('Import & export');
     const text = vi.fn(async () => '{"kind":"onyx-vault"}');
     const file = {
       name: 'huge-portable.json',
@@ -1178,7 +1217,7 @@ describe('PreferencesPanel', () => {
     ) => callback(null));
     vi.stubGlobal('navigator', { locks: { request } });
     const importPortableTransfer = vi.spyOn(portableTransfer, 'importPortableTransfer');
-    renderPreferences('History & data');
+    renderPreferences('Import & export');
     await stageEmptyPortableImport();
 
     fireEvent.click(screen.getByRole('button', { name: 'Import reviewed file' }));
@@ -1208,7 +1247,7 @@ describe('PreferencesPanel', () => {
     vi.stubGlobal('navigator', { locks: { request } });
     const importPortableTransfer = vi.spyOn(portableTransfer, 'importPortableTransfer')
       .mockReturnValue(pendingImport);
-    renderPreferences('History & data');
+    renderPreferences('Import & export');
     await stageEmptyPortableImport();
 
     const confirm = screen.getByRole('button', { name: 'Import reviewed file' });
@@ -1229,7 +1268,7 @@ describe('PreferencesPanel', () => {
     const request = vi.fn().mockRejectedValue(new Error('locks disabled'));
     vi.stubGlobal('navigator', { locks: { request } });
     const importPortableTransfer = vi.spyOn(portableTransfer, 'importPortableTransfer');
-    renderPreferences('History & data');
+    renderPreferences('Import & export');
     await stageEmptyPortableImport();
 
     fireEvent.click(screen.getByRole('button', { name: 'Import reviewed file' }));
@@ -1252,7 +1291,7 @@ describe('PreferencesPanel', () => {
     vi.stubGlobal('navigator', { locks: { request } });
     const importPortableTransfer = vi.spyOn(portableTransfer, 'importPortableTransfer')
       .mockReturnValue(pendingImport);
-    const view = renderPreferences('History & data');
+    const view = renderPreferences('Import & export');
     await stageEmptyPortableImport();
 
     fireEvent.click(screen.getByRole('button', { name: 'Import reviewed file' }));
