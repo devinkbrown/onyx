@@ -3873,6 +3873,7 @@
     );
   border-left: 1px solid var(--seam-faint);
   overflow: hidden;
+  overflow: clip;
   /* Fill the reserved grid track (column 4). The open/close is driven by the
      grid track collapsing (`--shell-members-w` on `.shell`), so this column need
      not animate its own width — animating `width` here reflowed the 1fr message
@@ -3947,6 +3948,7 @@
 
 .shell-members-scroll {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
@@ -4980,6 +4982,65 @@
   .shell-msg-system {
     padding-left: 46px;
     padding-right: 8px;
+  }
+}
+
+/* A 400% zoomed phone can expose less than 30rem of CSS height. Keep visible
+   labels enlarged, but put their decorative glyphs beside them so the bottom
+   rail does not consume the member/channel drawer's entire working area. */
+@media (max-width: 900px) and (max-height: 30rem) {
+  .shell,
+  .shell-mobile-nav {
+    --mnav-h: 56px;
+  }
+
+  .shell-mobile-nav-btn {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 4px;
+    padding: 4px 10px;
+  }
+
+  .shell-mobile-nav-btn b {
+    width: 32px;
+    height: 32px;
+    flex: none;
+    font-size: 24px;
+  }
+
+  .shell-members-head {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 8px 12px;
+    letter-spacing: 0.08em;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+
+  .shell-members-title {
+    flex: none;
+    max-width: none;
+    white-space: nowrap;
+  }
+
+  .shell-members-head-actions,
+  .shell-members-head-meta {
+    flex: none;
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+
+  .shell-members-head-actions {
+    margin-left: 0;
+  }
+
+  .shell-members-close {
+    width: 44px;
+    height: 44px;
+    font-size: 24px;
   }
 }
 
