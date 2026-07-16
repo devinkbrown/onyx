@@ -119,7 +119,9 @@ function offlineNavigationFallback(pathname) {
     },
   );
   if (fallbackPath === null) return Promise.resolve(unavailable());
-  return caches.match(fallbackPath).then((cached) => cached ?? unavailable());
+  return caches.match(fallbackPath)
+    .then((cached) => cached ?? unavailable())
+    .catch(() => unavailable());
 }
 
 function cacheSuccessfulShellNavigation(pathname, response) {

@@ -560,7 +560,7 @@ describe('PWA manifest', () => {
     await expect(unavailableDocument.text()).resolves.toContain('page is unavailable offline');
     expect(match).toHaveBeenCalledTimes(matchCallsBeforeDocument);
 
-    match.mockResolvedValueOnce(undefined);
+    match.mockRejectedValueOnce(new Error('offline fallback cache unavailable'));
     listeners.get('fetch')?.({
       request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/app/offline' },
       respondWith: (work: Promise<unknown>) => {
