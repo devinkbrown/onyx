@@ -1124,6 +1124,63 @@
   }
 }
 
+/* Short desktop/laptop viewports keep the complete front door readable inside
+   the card while pinning the primary action to the card's visible edge. The
+   body, not the document, scrolls; wider/taller desktops keep the atmospheric
+   centered composition and phones retain their dedicated safe-area layout. */
+@media (min-width: 521px) and (max-height: 1000px) {
+  .conn {
+    height: 100svh;
+    min-height: 100svh;
+    padding-block: 24px;
+  }
+
+  .conn-stage {
+    height: 100%;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .conn-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
+  }
+
+  .conn-body {
+    min-height: 0;
+    gap: 20px;
+    padding: 28px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+
+  .conn-foot {
+    flex: none;
+  }
+
+  .conn-actions {
+    position: sticky;
+    z-index: 2;
+    bottom: 0;
+    padding: 12px 0 2px;
+    background: linear-gradient(
+      180deg,
+      transparent,
+      color-mix(in oklab, var(--stone) 94%, var(--ink)) 28%
+    );
+  }
+}
+
+@media (min-width: 521px) and (max-width: 1180px) and (max-height: 1000px) {
+  .conn-stage > .cpulse {
+    display: none;
+  }
+}
+
 @media (max-width: 520px) {
   .conn {
     align-items: stretch;
