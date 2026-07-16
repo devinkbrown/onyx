@@ -1352,6 +1352,34 @@ describe('PreferencesPanel', () => {
     );
   });
 
+  it('retires a pending app-shell recovery completion when Preferences unmounts', async () => {
+    let resolveRegistration: (registration: ServiceWorkerRegistration | undefined) => void = () => {};
+    const pendingRegistration = new Promise<ServiceWorkerRegistration | undefined>((resolve) => {
+      resolveRegistration = resolve;
+    });
+    const getRegistration = vi.fn(() => pendingRegistration);
+    vi.stubGlobal('navigator', {
+      serviceWorker: {
+        controller: {},
+        getRegistration,
+      },
+    });
+    const view = renderPreferences('App & tools');
+    const refresh = screen.getByRole('button', { name: 'Refresh app shell' });
+
+    fireEvent.click(refresh);
+    fireEvent.click(refresh);
+    expect(getRegistration).toHaveBeenCalledOnce();
+    expect(refresh).toBeDisabled();
+
+    view.unmount();
+    resolveRegistration(undefined);
+    await pendingRegistration;
+    await Promise.resolve();
+
+    expect(screen.queryByText('No Onyx service worker is registered for this page yet.')).not.toBeInTheDocument();
+  });
+
   it('requests persistent vault storage only from the explicit button and guards rapid clicks', async () => {
     let resolvePersistence: (granted: boolean) => void = () => {};
     const pendingPersistence = new Promise<boolean>((resolve) => {

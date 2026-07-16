@@ -2526,12 +2526,14 @@ function PwaReadinessPanel(): JSX.Element {
   const [persistenceBusy, setPersistenceBusy] = createSignal(false);
   const [storageEstimate, setStorageEstimate] = createSignal<OriginStorageEstimateResult | null>(null);
   const [estimateBusy, setEstimateBusy] = createSignal(false);
+  let updateEpoch = 0;
   let persistenceEpoch = 0;
   let estimateEpoch = 0;
   let disposed = false;
 
   onCleanup(() => {
     disposed = true;
+    updateEpoch += 1;
     persistenceEpoch += 1;
     estimateEpoch += 1;
   });
@@ -2572,12 +2574,15 @@ function PwaReadinessPanel(): JSX.Element {
   }
 
   async function recoverUpdate(): Promise<void> {
+    if (updateBusy()) return;
+    const epoch = ++updateEpoch;
     setUpdateBusy(true);
     try {
       const result = await refreshInstalledAppShell();
+      if (disposed || epoch !== updateEpoch) return;
       setUpdateResult(result);
     } finally {
-      setUpdateBusy(false);
+      if (!disposed && epoch === updateEpoch) setUpdateBusy(false);
     }
   }
 
