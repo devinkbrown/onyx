@@ -399,6 +399,23 @@ describe('VoiceSettings', () => {
     document.removeEventListener('keydown', applicationShortcut);
   });
 
+  it('keeps key capture armed while an input method owns the keyboard', async () => {
+    render(() => <VoiceSettings />);
+    fireEvent.click(screen.getByRole('button', { name: 'Capture push-to-talk key' }));
+
+    fireEvent.keyDown(document.body, { key: 'Process', keyCode: 229, isComposing: true });
+
+    expect(screen.getByRole('button', { name: 'Cancel push-to-talk key capture' })).toHaveAttribute('aria-pressed', 'true');
+    expect(store.getState().voice.pushToTalkKey).toBeNull();
+
+    fireEvent.keyDown(document.body, { key: 'v' });
+
+    expect(store.getState().voice.pushToTalkKey).toBe('v');
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Capture push-to-talk key' })).toBe(document.activeElement);
+    });
+  });
+
   it('cancels capture on Escape without closing the sheet or changing the configured key', async () => {
     store.getState().setVoiceCallState({ pushToTalk: false, pushToTalkKey: 'V' });
 

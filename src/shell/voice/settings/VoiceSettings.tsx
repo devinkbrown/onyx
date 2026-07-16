@@ -3,6 +3,7 @@ import { createEffect, createMemo, createSignal, For, mergeProps, onCleanup, Sho
 
 import { Button, FormField, Sheet } from '@/primitives';
 import { getState, useStore, type VoiceState } from '@/lib/store';
+import { keyboardEventIsClaimed } from '@/primitives/focusTrap';
 
 import './voice-settings.css';
 
@@ -268,6 +269,9 @@ function VoiceSettingsContent() {
     if (!capturingKey()) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
+      // Candidate-window keys belong to the input method, not the push-to-talk
+      // binding UI. Keep listening so the next real key still completes capture.
+      if (keyboardEventIsClaimed(event)) return;
       event.preventDefault();
       event.stopPropagation();
       setCapturingKey(false);
@@ -279,7 +283,7 @@ function VoiceSettingsContent() {
       updateVoice({ pushToTalkKey: key, pushToTalk: true });
     };
 
-    window.addEventListener('keydown', onKeyDown, { capture: true, once: true });
+    window.addEventListener('keydown', onKeyDown, { capture: true });
     onCleanup(() => window.removeEventListener('keydown', onKeyDown, true));
   });
 
