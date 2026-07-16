@@ -4,7 +4,7 @@ import { backgroundOptions, type BackgroundId } from '@/backgrounds';
 import { getState, selectDeviceMemoryOwner, useStore } from '@/lib/store';
 import type { State } from '@/lib/store/store';
 import { applyThemeToDom, THEME_IDS, THEMES, type ThemeId } from '@/theme';
-import { saveRecent } from '@/lib/commands/registry';
+import { saveRecent, type RecentTarget } from '@/lib/commands/registry';
 import {
   openPreferences,
   preferences,
@@ -76,6 +76,19 @@ function activeTarget(state: Pick<State, 'activeView'>): string | null {
   if (view.kind === 'channel') return view.channel;
   if (view.kind === 'dm') return view.nick;
   return null;
+}
+
+function saveRecentForCapturedOwner(
+  target: Omit<RecentTarget, 'at'>,
+  capturedOwner: DeviceMemoryOwner | null,
+): void {
+  const currentOwner = selectDeviceMemoryOwner(getState());
+  if (
+    !capturedOwner
+    || !currentOwner
+    || deviceMemoryOwnerKey(capturedOwner) !== deviceMemoryOwnerKey(currentOwner)
+  ) return;
+  saveRecent(target, capturedOwner);
 }
 
 function activeTargetLabel(state: Pick<State, 'activeView'>): string {
@@ -1199,7 +1212,10 @@ function baseActionCommands(state: CommandState): SpotlightCommand[] {
  * Build "People" commands — members of the active channel who aren't already
  * in the DMs list. Provides a fast way to jump to a DM with anyone you can see.
  */
-function peopleCommands(state: CommandState): SpotlightCommand[] {
+function peopleCommands(
+  state: CommandState,
+  memoryOwner: DeviceMemoryOwner | null,
+): SpotlightCommand[] {
   const view = state.activeView;
   if (view.kind !== 'channel') return [];
 
@@ -1218,7 +1234,10 @@ function peopleCommands(state: CommandState): SpotlightCommand[] {
       hint: user.account ? `@${user.account}` : undefined,
       keywords: [user.nick, user.account ?? '', 'dm', 'message', 'people'],
       run: () => {
-        saveRecent({ id: `people:${user.nick.toLowerCase()}`, label: `Message ${user.nick}`, section: 'People' });
+        saveRecentForCapturedOwner(
+          { id: `people:${user.nick.toLowerCase()}`, label: `Message ${user.nick}`, section: 'People' },
+          memoryOwner,
+        );
         getState().navigate({ kind: 'dm', nick: user.nick });
       },
     }));
@@ -1243,7 +1262,10 @@ export function buildCommands(state: CommandState = getState(), query = ''): Spo
       keywords: [channel.name, channel.name.replace(/^#/, ''), channel.topic],
       run: () => {
         const current = getState();
-        saveRecent({ id: `channel:${channel.name.toLowerCase()}`, label: `Go to ${channel.name}`, section: 'Channels' });
+        saveRecentForCapturedOwner(
+          { id: `channel:${channel.name.toLowerCase()}`, label: `Go to ${channel.name}`, section: 'Channels' },
+          memoryOwner,
+        );
         current.joinChannel(channel.name);
         current.navigate({ kind: 'channel', channel: channel.name });
       },
@@ -1258,7 +1280,10 @@ export function buildCommands(state: CommandState = getState(), query = ''): Spo
       hint: dmHint(dm),
       keywords: [dm.nick, dm.account ?? '', 'direct message', 'dm'],
       run: () => {
-        saveRecent({ id: `dm:${dm.nick.toLowerCase()}`, label: `Open DM with ${dm.nick}`, section: 'DMs' });
+        saveRecentForCapturedOwner(
+          { id: `dm:${dm.nick.toLowerCase()}`, label: `Open DM with ${dm.nick}`, section: 'DMs' },
+          memoryOwner,
+        );
         getState().navigate({ kind: 'dm', nick: dm.nick });
       },
     }));
@@ -1288,7 +1313,7 @@ export function buildCommands(state: CommandState = getState(), query = ''): Spo
     ...catchUpCommands(state, query),
     ...channels,
     ...dms,
-    ...peopleCommands(state),
+    ...peopleCommands(state, memoryOwner),
     ...baseActionCommands(state),
     ...clientExtensionCommands(memoryOwner),
     ...themeCommands,

@@ -10,6 +10,11 @@
  * can be imported by tests and by non-component code alike.
  */
 
+import {
+  deviceMemoryStorageKey,
+  type DeviceMemoryOwner,
+} from '@/lib/deviceMemoryOwner';
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type CommandSection = 'Channels' | 'DMs' | 'People' | 'Actions';
@@ -77,10 +82,14 @@ export function clearCommands(): void {
 
 // ── Recent targets ────────────────────────────────────────────────────────────
 
-const RECENTS_KEY = 'onyx:palette-recents';
+export const PALETTE_RECENTS_STORAGE_KEY = 'onyx:palette-recents';
 /** Legacy key from the previous brand name; read-only for one-time migration. */
 const LEGACY_RECENTS_KEY = 'ruri:palette-recents';
 const MAX_RECENTS = 6;
+const MAX_RECENT_ID_LENGTH = 256;
+const MAX_RECENT_LABEL_LENGTH = 256;
+const MAX_RECENT_TIMESTAMP_LENGTH = 40;
+const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
 
 export type RecentTarget = {
   id: string;
@@ -90,19 +99,53 @@ export type RecentTarget = {
   at: string;
 };
 
+function recentStorageKey(owner?: DeviceMemoryOwner): string | null {
+  return owner ? deviceMemoryStorageKey(PALETTE_RECENTS_STORAGE_KEY, owner) : null;
+}
+
+function purgeOwnerlessRecents(): void {
+  localStorage.removeItem(PALETTE_RECENTS_STORAGE_KEY);
+  localStorage.removeItem(LEGACY_RECENTS_KEY);
+}
+
+function parseRecentTarget(value: unknown): RecentTarget | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const { id, label, section, at } = value as Record<string, unknown>;
+  if (
+    typeof id !== 'string'
+    || id.length === 0
+    || id.length > MAX_RECENT_ID_LENGTH
+    || CONTROL_CHARACTERS.test(id)
+    || typeof label !== 'string'
+    || label.length === 0
+    || label.length > MAX_RECENT_LABEL_LENGTH
+    || CONTROL_CHARACTERS.test(label)
+    || (section !== 'Channels' && section !== 'DMs' && section !== 'People' && section !== 'Actions')
+    || typeof at !== 'string'
+    || at.length === 0
+    || at.length > MAX_RECENT_TIMESTAMP_LENGTH
+    || !Number.isFinite(Date.parse(at))
+  ) return null;
+  return { id, label, section, at };
+}
+
 /**
  * Load recent targets from localStorage. Returns newest-first.
  */
-export function loadRecents(): RecentTarget[] {
+export function loadRecents(owner?: DeviceMemoryOwner): RecentTarget[] {
   if (typeof localStorage === 'undefined') return [];
   try {
-    // Current key first, then fall back to the legacy key (read-old-write-new)
-    // so recent palette targets survive one load after the rebrand.
-    const raw = localStorage.getItem(RECENTS_KEY) ?? localStorage.getItem(LEGACY_RECENTS_KEY);
+    purgeOwnerlessRecents();
+    const key = recentStorageKey(owner);
+    if (!key) return [];
+    const raw = localStorage.getItem(key);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return (parsed as RecentTarget[]).slice(0, MAX_RECENTS);
+    return parsed.slice(0, MAX_RECENTS).flatMap((entry) => {
+      const recent = parseRecentTarget(entry);
+      return recent ? [recent] : [];
+    });
   } catch {
     return [];
   }
@@ -112,15 +155,23 @@ export function loadRecents(): RecentTarget[] {
  * Persist a recently-used command id + label. The entry is moved to the front
  * if it already exists.
  */
-export function saveRecent(target: Omit<RecentTarget, 'at'>): void {
+export function saveRecent(
+  target: Omit<RecentTarget, 'at'>,
+  owner?: DeviceMemoryOwner,
+): void {
   if (typeof localStorage === 'undefined') return;
   try {
-    const existing = loadRecents().filter((r) => r.id !== target.id);
+    purgeOwnerlessRecents();
+    const key = recentStorageKey(owner);
+    if (!key) return;
+    const nextTarget = parseRecentTarget({ ...target, at: new Date().toISOString() });
+    if (!nextTarget) return;
+    const existing = loadRecents(owner).filter((r) => r.id !== target.id);
     const next: RecentTarget[] = [
-      { ...target, at: new Date().toISOString() },
+      nextTarget,
       ...existing,
     ].slice(0, MAX_RECENTS);
-    localStorage.setItem(RECENTS_KEY, JSON.stringify(next));
+    localStorage.setItem(key, JSON.stringify(next));
   } catch {
     /* storage unavailable */
   }
@@ -129,10 +180,12 @@ export function saveRecent(target: Omit<RecentTarget, 'at'>): void {
 /**
  * Remove all recents. Primarily for tests.
  */
-export function clearRecents(): void {
+export function clearRecents(owner?: DeviceMemoryOwner): void {
   if (typeof localStorage === 'undefined') return;
   try {
-    localStorage.removeItem(RECENTS_KEY);
+    purgeOwnerlessRecents();
+    const key = recentStorageKey(owner);
+    if (key) localStorage.removeItem(key);
   } catch {
     /* storage unavailable */
   }

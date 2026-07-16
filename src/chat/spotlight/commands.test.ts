@@ -16,6 +16,7 @@ import {
 } from '@/lib/extensions/clientActions';
 import { setVaultMode, vaultSearchMode } from '@/shell/search/useMessageSearch';
 import { setTranslationTarget, translationTarget } from '@/lib/intelligence/translateMessage';
+import { loadRecents } from '@/lib/commands/registry';
 import {
   readReviewHistory,
   recordReviewHistory,
@@ -140,6 +141,8 @@ describe('buildCommands', () => {
     const navigate = vi.fn();
     setState({
       channels: new Map([['#forge', channel('#forge')]]),
+      server: server(),
+      ourNick: 'kain',
       joinChannel,
       navigate,
     });
@@ -149,6 +152,29 @@ describe('buildCommands', () => {
 
     expect(joinChannel).toHaveBeenCalledWith('#forge');
     expect(navigate).toHaveBeenCalledWith({ kind: 'channel', channel: '#forge' });
+    expect(loadRecents(MEMORY_OWNER).map((entry) => entry.id)).toEqual(['channel:#forge']);
+  });
+
+  it('does not write a stale channel command into a newly switched owner', () => {
+    const joinChannel = vi.fn();
+    const navigate = vi.fn();
+    setState({
+      channels: new Map([['#alice-private', channel('#alice-private')]]),
+      server: server(),
+      ourNick: 'kain',
+      joinChannel,
+      navigate,
+    });
+    const command = buildCommands(getState()).find((entry) => entry.id === 'channel:#alice-private');
+
+    setState({
+      server: { ...server(), account: 'bob', nick: 'bob' },
+      ourNick: 'bob',
+    });
+    command?.run();
+
+    expect(loadRecents(MEMORY_OWNER)).toEqual([]);
+    expect(loadRecents({ serverUrl: MEMORY_OWNER.serverUrl, identity: 'bob' })).toEqual([]);
   });
 
   it('builds a literal goto command for channel navigation', () => {
