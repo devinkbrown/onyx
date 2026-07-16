@@ -151,6 +151,14 @@ down to TLS.
     room handoff links into `/app?join=...&at=...`. The root page also surfaces
     the live public pulse. Server Prometheus remains the richer metrics source;
     this closes the public website graph surface from the chanstats/status feeds.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — The Onyx `/stats` and `/status`
+    feed boundary now caps channels, days, spark points, peers, backup entries,
+    strings, counters, and timestamps before sorting or rendering. Non-finite,
+    negative, control-bearing, and out-of-range feed values fail safely instead
+    of driving unbounded work or invalid relative-time/date output. Responses
+    also have an eight-second timeout and 256 KiB streaming ceiling before JSON
+    parsing, so a hanging or oversized same-origin feed never materializes into
+    the app first.
 14. **Nightly vault-safe backups** of accounts.db + chanstats snapshots.
     ✅ **SERVER SHIPPED 2026-07-08** — Orochi `[backup]` emits timestamped
     account-store snapshots and chanstats snapshots plus `latest.json` on a
@@ -603,6 +611,11 @@ client or public site needs to expose the result.
     reports active speaker or listener state, raised-hand fallback, muted peer
     fallback, and local device health such as muted, deafened, sharing, camera,
     and captions while preserving the join-current-room action.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — The off-room mini voice view
+    keeps its avatar DOM bounded to five while deriving participant, hidden, and
+    speaking counts from the complete case-insensitive local/peer/mesh roster.
+    Large calls therefore retain truthful count and active-speaker summaries
+    without expanding the compact overlay.
 29. **Spatial audio and screenshare controls** *(client)* — add explicit spatial
     audio, screenshare, and watch-together controls that degrade cleanly when a
     node or browser lacks the underlying media feature.
@@ -908,7 +921,12 @@ client or public site needs to expose the result.
     a Refresh app shell recovery action that asks the service worker for an
     update, activates a waiting worker when present, and reloads the stamped
     shell on demand. The install page now names this as the stale-wrapper
-    recovery path.
+    recovery path. Recovery failures now surface as alerts instead of successful
+    checks, and the readiness storage probe restores any pre-existing value at
+    its test key even when browser storage fails midway.
+    Push payload title/body/tag work is bounded, and notification clicks now
+    revalidate a same-origin path before focusing or opening the app, including
+    notifications authored by an older worker.
 40. **Portable import/export** *(client)* — expose device-safe export/import for
     vault history, room snapshots, account handoff data, and reviewed catch-up
     state where protocol support exists.
