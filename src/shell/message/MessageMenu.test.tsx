@@ -1127,4 +1127,25 @@ describe('<MessageMenu>', () => {
     expect(screen.getByRole('menuitem', { name: 'Edit message from alice' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Delete message from alice' })).toBeInTheDocument();
   });
+
+  it('keeps the reaction picker open while an input method owns Escape', () => {
+    const msg: ChatMessage = {
+      id: 'm-reaction-ime',
+      from: 'alice',
+      text: 'React after composition',
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    };
+    render(() => <MessageMenu msg={msg} target="#general" selfNick="alice" canEdit />);
+    fireEvent.click(screen.getByRole('button', { name: 'Choose reaction for message from alice' }));
+    const search = screen.getByRole('textbox', { name: 'Search emoji' });
+
+    fireEvent.keyDown(search, { key: 'Escape', keyCode: 229, isComposing: true });
+
+    expect(screen.getByRole('dialog', { name: 'Choose reaction for message from alice' })).toBeInTheDocument();
+
+    fireEvent.keyDown(search, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Choose reaction for message from alice' })).toBeNull();
+  });
 });

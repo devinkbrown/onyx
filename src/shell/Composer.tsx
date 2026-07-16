@@ -41,6 +41,7 @@ import {
   activeReplyPreviewText,
   hasEncryptedMessageBoundary,
 } from '@/lib/e2ee/replyPrivacy';
+import { keyboardEventIsClaimed } from '@/primitives/focusTrap';
 
 export type ComposerProps = {
   /** Optionally override the active target; defaults to deriving from activeView */
@@ -761,6 +762,7 @@ export function Composer(props: ComposerProps): JSX.Element {
             aria-modal="false"
             aria-label="Emoji picker"
             onKeyDown={(e) => {
+              if (keyboardEventIsClaimed(e)) return;
               // Escape from anywhere inside the dialog (search field, an emoji
               // choice, or the grid) closes it and returns focus to the composer.
               if (e.key === 'Escape') {
@@ -806,6 +808,7 @@ export function Composer(props: ComposerProps): JSX.Element {
             aria-modal="false"
             aria-label="Schedule message"
             onKeyDown={(e) => {
+              if (keyboardEventIsClaimed(e)) return;
               if (e.key === 'Escape') {
                 e.preventDefault();
                 e.stopPropagation();

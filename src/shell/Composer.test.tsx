@@ -222,6 +222,11 @@ describe('Composer accessibility', () => {
     await Promise.resolve();
     expect(document.activeElement).toBe(search);
 
+    // Candidate-window Escape belongs to the input method and must not dismiss
+    // the picker from under an in-progress emoji search.
+    fireEvent.keyDown(search, { key: 'Escape', keyCode: 229, isComposing: true });
+    expect(getByRole('dialog', { name: 'Emoji picker' })).toBeDefined();
+
     // Act — Escape from inside the dialog closes it and restores focus.
     fireEvent.keyDown(dialog, { key: 'Escape' });
 

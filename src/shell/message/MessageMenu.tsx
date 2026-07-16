@@ -45,6 +45,7 @@ import { isValidTopicLabel } from '@/lib/topics/topics';
 import { openMessageSearchWithQuery } from '@/shell/search/useMessageSearch';
 import { hasEncryptedMessageBoundary } from '@/lib/e2ee/replyPrivacy';
 import { ProvenanceBadge } from '@/shell/ProvenanceBadge';
+import { keyboardEventIsClaimed } from '@/primitives/focusTrap';
 import { CopyIcon, EditIcon, OverflowIcon, PinIcon, ReactIcon, ReplyIcon, SearchIcon, TopicIcon, TranslateIcon, TrashIcon } from './icons';
 
 import './message-menu.css';
@@ -600,6 +601,7 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
                 autocomplete="off"
                 onInput={(e) => setEmojiQuery((e.currentTarget as HTMLInputElement).value)}
                 onKeyDown={(e) => {
+                  if (keyboardEventIsClaimed(e)) return;
                   if (e.key === 'Escape') {
                     e.preventDefault();
                     guardedSetReactOpen(false);
