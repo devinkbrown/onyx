@@ -152,6 +152,33 @@ describe('Spotlight', () => {
     expect(screen.getByRole('dialog', { name: 'Command palette' })).toBeInTheDocument();
   });
 
+  it('defers result and live-region updates until composition ends', () => {
+    setState({
+      channels: new Map([
+        ['#forge', channel('#forge')],
+        ['#lapis', channel('#lapis')],
+      ]),
+    });
+    renderSpotlight();
+
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    const input = screen.getByRole('combobox', { name: 'Command search' });
+    const status = screen.getByRole('status');
+    const initialAnnouncement = status.textContent;
+
+    fireEvent.input(input, { target: { value: 'forge' }, isComposing: true });
+
+    expect(screen.getByText('Go to #forge')).toBeInTheDocument();
+    expect(screen.getByText('Go to #lapis')).toBeInTheDocument();
+    expect(status.textContent).toBe(initialAnnouncement);
+
+    fireEvent.compositionEnd(input, { data: 'forge' });
+
+    expect(screen.getByText('Go to #forge')).toBeInTheDocument();
+    expect(screen.queryByText('Go to #lapis')).not.toBeInTheDocument();
+    expect(status.textContent).not.toBe(initialAnnouncement);
+  });
+
   it('honors a command-input key claimed by an earlier integration', () => {
     setState({
       channels: new Map([

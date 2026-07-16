@@ -292,9 +292,21 @@ export function Spotlight(props: SpotlightProps) {
     trapTab(event);
   };
 
-  const handleInput: JSX.EventHandlerUnion<HTMLInputElement, InputEvent> = (event) => {
-    setQuery((event.currentTarget as HTMLInputElement).value);
+  const commitInputQuery = (value: string): void => {
+    setQuery(value);
     setActiveIndex(0);
+  };
+
+  const handleInput: JSX.EventHandlerUnion<HTMLInputElement, InputEvent> = (event) => {
+    // Interim composition input is not a committed search query. Re-ranking
+    // the listbox and its live-region count while the candidate window is open
+    // makes both the visual result set and screen-reader feedback churn.
+    if (event.isComposing) return;
+    commitInputQuery(event.currentTarget.value);
+  };
+
+  const handleCompositionEnd: JSX.EventHandlerUnion<HTMLInputElement, CompositionEvent> = (event) => {
+    commitInputQuery(event.currentTarget.value);
   };
 
   return (
@@ -345,6 +357,7 @@ export function Spotlight(props: SpotlightProps) {
               aria-activedescendant={activeOptionId()}
               placeholder="Search channels, people, and actions"
               onInput={handleInput}
+              onCompositionEnd={handleCompositionEnd}
               onKeyDown={handleKeyDown}
             />
             <button
