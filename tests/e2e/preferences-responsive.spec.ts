@@ -8,9 +8,10 @@ const preferencesCss = readFileSync(
 
 async function renderNarrowPreferences(
   page: import('@playwright/test').Page,
-  options: { width?: number; rootFontSize?: number; longImportFeedback?: boolean } = {},
+  options: { width?: number; height?: number; rootFontSize?: number; longImportFeedback?: boolean } = {},
 ): Promise<void> {
   const width = options.width ?? 240;
+  const height = options.height ?? 568;
   const rootFontSize = options.rootFontSize ?? 24;
   const longFilename = `portable-${'x'.repeat(180)}.json`;
   const longImportFeedback = options.longImportFeedback
@@ -23,7 +24,7 @@ async function renderNarrowPreferences(
       </p>
     `
     : '';
-  await page.setViewportSize({ width, height: 568 });
+  await page.setViewportSize({ width, height });
   await page.setContent(`
     <!doctype html>
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -72,6 +73,7 @@ async function renderNarrowPreferences(
               </ol>
             </section>
             ${longImportFeedback}
+            <button type="button" data-last-preference>Final preference action</button>
           </section>
         </div>
       </div>
@@ -104,7 +106,7 @@ async function renderNarrowPreferences(
         --lapis-bright: #55baff;
       }
       html, body { margin: 0; width: 100%; }
-      .onyx-sheet__body { width: 100%; padding: 1.25rem; overflow: auto; }
+      .onyx-sheet__body { width: 100%; height: 100vh; padding: 1.25rem; overflow: auto; }
       ${preferencesCss}
     `,
   });
@@ -156,4 +158,63 @@ test('wraps import guidance, long filenames, and validation alerts at 200% text'
 
   expect(geometry.scrollWidth).toBe(geometry.clientWidth);
   expect(appearanceAction.scrollWidth).toBe(appearanceAction.clientWidth);
+});
+
+test('keeps categories and final controls reachable in a short 200% text split', async ({ page }) => {
+  await renderNarrowPreferences(page, {
+    width: 320,
+    height: 320,
+    rootFontSize: 32,
+  });
+
+  const body = page.locator('.onyx-sheet__body');
+  const tabs = page.locator('.pref-category-tabs');
+  const accessibility = page.getByRole('tab', { name: 'Accessibility' });
+  const finalPreference = page.locator('[data-last-preference]');
+
+  const initialGeometry = await page.evaluate(() => {
+    const sheetBody = document.querySelector<HTMLElement>('.onyx-sheet__body')!;
+    const categoryTabs = document.querySelector<HTMLElement>('.pref-category-tabs')!;
+    return {
+      bodyClientHeight: sheetBody.clientHeight,
+      bodyScrollHeight: sheetBody.scrollHeight,
+      bodyClientWidth: sheetBody.clientWidth,
+      bodyScrollWidth: sheetBody.scrollWidth,
+      tabsClientWidth: categoryTabs.clientWidth,
+      tabsScrollWidth: categoryTabs.scrollWidth,
+    };
+  });
+
+  expect(initialGeometry.bodyScrollHeight).toBeGreaterThan(initialGeometry.bodyClientHeight);
+  expect(initialGeometry.bodyScrollWidth).toBe(initialGeometry.bodyClientWidth);
+  expect(initialGeometry.tabsScrollWidth).toBeGreaterThan(initialGeometry.tabsClientWidth);
+
+  await accessibility.evaluate((element) => {
+    element.scrollIntoView({ block: 'nearest', inline: 'end' });
+    (element as HTMLElement).focus();
+  });
+  await expect(accessibility).toBeFocused();
+
+  const tabStripGeometry = await tabs.evaluate((element) => {
+    const lastTab = element.lastElementChild as HTMLElement;
+    const stripRect = element.getBoundingClientRect();
+    const tabRect = lastTab.getBoundingClientRect();
+    return {
+      stripLeft: stripRect.left,
+      stripRight: stripRect.right,
+      tabLeft: tabRect.left,
+      tabRight: tabRect.right,
+    };
+  });
+  expect(tabStripGeometry.tabLeft).toBeGreaterThanOrEqual(tabStripGeometry.stripLeft);
+  expect(tabStripGeometry.tabRight).toBeLessThanOrEqual(tabStripGeometry.stripRight);
+
+  await body.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  const finalBox = await finalPreference.boundingBox();
+  const bodyBox = await body.boundingBox();
+  expect(finalBox).not.toBeNull();
+  expect(bodyBox).not.toBeNull();
+  expect(finalBox!.y + finalBox!.height).toBeLessThanOrEqual(bodyBox!.y + bodyBox!.height);
 });
