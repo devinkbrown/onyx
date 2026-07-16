@@ -2830,6 +2830,29 @@ function PreferenceSection(props: { title: string; description: string }): JSX.E
   );
 }
 
+/** Reveal a rail item without letting scrollIntoView move vertical ancestors. */
+function revealInHorizontalScroller(
+  scroller: HTMLElement | undefined,
+  control: HTMLElement | undefined,
+): void {
+  if (!scroller?.isConnected || !control?.isConnected) return;
+
+  const scrollerRect = scroller.getBoundingClientRect();
+  const controlRect = control.getBoundingClientRect();
+  const desiredLeft = scroller.scrollLeft
+    + controlRect.left
+    - scrollerRect.left
+    - ((scroller.clientWidth - controlRect.width) / 2);
+  const maxLeft = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
+  const left = Math.min(maxLeft, Math.max(0, desiredLeft));
+
+  if (typeof scroller.scrollTo === 'function') {
+    scroller.scrollTo({ left, behavior: 'auto' });
+  } else {
+    scroller.scrollLeft = left;
+  }
+}
+
 function PreferenceCategoryNavigation(props: {
   active: () => PreferenceCategory;
   onSelect: (category: PreferenceCategory) => void;
@@ -2837,16 +2860,14 @@ function PreferenceCategoryNavigation(props: {
   const buttons: (HTMLButtonElement | undefined)[] = [];
   const [horizontalTabs, setHorizontalTabs] = createSignal(false);
   const [resetAnnouncement, setResetAnnouncement] = createSignal('');
+  let categoryTabsRef: HTMLDivElement | undefined;
   let categoryTabsQuery: MediaQueryList | undefined;
 
   function revealCategoryTabAfterRender(categoryId: PreferenceCategory): void {
     queueMicrotask(() => {
       const index = PREFERENCE_CATEGORIES.findIndex((category) => category.id === categoryId);
       if (index < 0) return;
-      const button = buttons[index];
-      if (button?.isConnected) {
-        button.scrollIntoView?.({ block: 'nearest', inline: 'center' });
-      }
+      revealInHorizontalScroller(categoryTabsRef, buttons[index]);
     });
   }
 
@@ -2927,6 +2948,7 @@ function PreferenceCategoryNavigation(props: {
       <nav class="pref-category-nav__landmark" aria-label="Preference categories">
         <p class="pref-category-nav__eyebrow">Browse</p>
         <div
+          ref={categoryTabsRef}
           class="pref-category-tabs"
           role="tablist"
           aria-label="Preference categories"
@@ -2979,6 +3001,7 @@ function TransferToolWorkspace(): JSX.Element {
   const [activeTool, setActiveTool] = createSignal<TransferTool>('portable');
   const [horizontalTools, setHorizontalTools] = createSignal(false);
   const buttons: (HTMLButtonElement | undefined)[] = [];
+  let toolsListRef: HTMLDivElement | undefined;
   let toolsQuery: MediaQueryList | undefined;
 
   const handleToolsQueryChange = (event: MediaQueryListEvent): void => {
@@ -2989,7 +3012,7 @@ function TransferToolWorkspace(): JSX.Element {
     if (!horizontalTools()) return;
     queueMicrotask(() => {
       const index = TRANSFER_TOOLS.findIndex((candidate) => candidate.id === tool);
-      buttons[index]?.scrollIntoView?.({ block: 'nearest', inline: 'center' });
+      revealInHorizontalScroller(toolsListRef, buttons[index]);
     });
   }
 
@@ -3054,7 +3077,7 @@ function TransferToolWorkspace(): JSX.Element {
     <div class="pref-transfer-workspace">
       <nav class="pref-transfer-tools" aria-label="Import and export tools">
         <p class="pref-transfer-tools__eyebrow">Choose a route</p>
-        <div class="pref-transfer-tools__list">
+        <div ref={toolsListRef} class="pref-transfer-tools__list">
           <For each={TRANSFER_TOOLS}>
             {(tool, index) => {
               const selected = () => activeTool() === tool.id;

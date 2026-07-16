@@ -510,13 +510,17 @@ describe('PreferencesPanel', () => {
       dispatchEvent: vi.fn(),
     }) as MediaQueryList));
     const revealed: string[] = [];
-    const originalScrollIntoView = Object.getOwnPropertyDescriptor(
+    const originalScrollTo = Object.getOwnPropertyDescriptor(
       window.HTMLElement.prototype,
-      'scrollIntoView',
+      'scrollTo',
     );
-    Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
+    Object.defineProperty(window.HTMLElement.prototype, 'scrollTo', {
       value(this: HTMLElement) {
-        revealed.push(this.getAttribute('aria-label') ?? '');
+        if (!this.classList.contains('pref-category-tabs')) return;
+        revealed.push(
+          this.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
+            ?.getAttribute('aria-label') ?? '',
+        );
       },
       configurable: true,
     });
@@ -537,10 +541,10 @@ describe('PreferencesPanel', () => {
 
       await waitFor(() => expect(revealed).toEqual(['Accessibility']));
     } finally {
-      if (originalScrollIntoView) {
-        Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', originalScrollIntoView);
+      if (originalScrollTo) {
+        Object.defineProperty(window.HTMLElement.prototype, 'scrollTo', originalScrollTo);
       } else {
-        delete (window.HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView;
+        delete (window.HTMLElement.prototype as Partial<HTMLElement>).scrollTo;
       }
     }
   });
@@ -556,13 +560,13 @@ describe('PreferencesPanel', () => {
       removeListener: vi.fn(),
       dispatchEvent: vi.fn(),
     }) as MediaQueryList));
-    const scrollIntoView = vi.fn();
-    const originalScrollIntoView = Object.getOwnPropertyDescriptor(
+    const scrollTo = vi.fn();
+    const originalScrollTo = Object.getOwnPropertyDescriptor(
       window.HTMLElement.prototype,
-      'scrollIntoView',
+      'scrollTo',
     );
-    Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
-      value: scrollIntoView,
+    Object.defineProperty(window.HTMLElement.prototype, 'scrollTo', {
+      value: scrollTo,
       configurable: true,
     });
 
@@ -571,20 +575,20 @@ describe('PreferencesPanel', () => {
       selectPreferenceCategory('Accessibility');
       closePreferences();
       expect(screen.queryByRole('dialog', { name: 'Preferences' })).not.toBeInTheDocument();
-      scrollIntoView.mockClear();
+      scrollTo.mockClear();
 
       openPreferences();
 
       await waitFor(() => {
         expect(screen.getByRole('tab', { name: /^Accessibility/ })).toHaveAttribute('aria-selected', 'true');
-        expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'center' });
+        expect(scrollTo).toHaveBeenCalledWith({ left: expect.any(Number), behavior: 'auto' });
         expect(screen.getByRole('button', { name: 'Close preferences' })).toHaveFocus();
       });
     } finally {
-      if (originalScrollIntoView) {
-        Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', originalScrollIntoView);
+      if (originalScrollTo) {
+        Object.defineProperty(window.HTMLElement.prototype, 'scrollTo', originalScrollTo);
       } else {
-        delete (window.HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView;
+        delete (window.HTMLElement.prototype as Partial<HTMLElement>).scrollTo;
       }
     }
   });

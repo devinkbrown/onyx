@@ -544,6 +544,12 @@
   .onyx-sheet__header {
     align-items: flex-start;
     gap: var(--space-2);
+    min-height: 0;
+    max-height: 60svh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
     padding:
       max(var(--space-3), env(safe-area-inset-top, 0px))
       max(var(--space-3), env(safe-area-inset-right, 0px))
