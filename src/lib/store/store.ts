@@ -2152,6 +2152,11 @@ export const MAX_MOTD_TEXT_LENGTH = 64 * 1024;
 export const MAX_SERVER_RULE_LINES = 256;
 export const MAX_NOTIFICATION_ENTRIES = 50;
 export const MAX_TOAST_ENTRIES = 20;
+/** Management and authentication replies are server-controlled streams. */
+export const MAX_PASSKEY_CREDENTIALS = 64;
+/** WebAuthn credential ids are at most 1023 bytes (1364 base64url characters). */
+export const MAX_PASSKEY_CREDENTIAL_ID_LENGTH = 1_364;
+export const MAX_PASSKEY_LABEL_LENGTH = 256;
 const MAX_SYSTEM_EVENT_TEXT_LENGTH = MAX_SERVER_AUX_TEXT_LENGTH;
 export const MAX_LIVE_MEDIA_CHANNELS = 32;
 export const MAX_LIVE_MEDIA_PARTICIPANTS = 256;
@@ -2675,6 +2680,7 @@ let _pendingPasskeyAuth: {
   challenge: string;
   rpId: string;
   allowCreds: string[];
+  malformedAllowCreds: boolean;
   timer: ReturnType<typeof setTimeout> | null;
 } | null = null;
 
@@ -2709,6 +2715,26 @@ function passkeyErrText(e: unknown): string {
   return e instanceof Error && e.message ? e.message : 'Passkey ceremony failed.';
 }
 
+function validPasskeyCredentialId(value: string): boolean {
+  return value.length > 0
+    && value.length <= MAX_PASSKEY_CREDENTIAL_ID_LENGTH
+    && value.length % 4 !== 1
+    && /^[A-Za-z0-9_-]+$/u.test(value);
+}
+
+function boundedPasskeyLabel(value: string): string {
+  let label = value.replace(/[\u0000-\u001f\u007f]/gu, '').slice(0, MAX_PASSKEY_LABEL_LENGTH);
+  const finalCodeUnit = label.charCodeAt(label.length - 1);
+  if (finalCodeUnit >= 0xd800 && finalCodeUnit <= 0xdbff) label = label.slice(0, -1);
+  return label;
+}
+
+function boundedUnsignedInteger(value: string | undefined, max: number): number | null {
+  if (!value || !/^(?:0|[1-9]\d*)$/u.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed <= max ? parsed : null;
+}
+
 /** In-flight `WEBAUTHN LIST` accumulator; committed to state on the LIST end. */
 let _pendingPasskeyList: PasskeyCredential[] | null = null;
 /** Which management action is awaiting a reply — lets a FAIL map to the right UX. */
@@ -2735,6 +2761,8 @@ function clearPasskeyProbeTimer(): void {
  * between tests (these globals live outside the store snapshot).
  */
 export function _resetPasskeyStateForTests(): void {
+  if (_pendingPasskeyAuth?.timer) clearTimeout(_pendingPasskeyAuth.timer);
+  _pendingPasskeyAuth = null;
   _pendingPasskeyList = null;
   _lastPasskeyAction = null;
   _passkeyListReplyContext = null;
@@ -5807,6 +5835,11 @@ export const store = createStore<OnyxState>()(
         set({ passkeyError: 'This browser does not support passkeys.', passkeyNotice: null });
         return;
       }
+      // A second explicit attempt supersedes any challenge/allow-list still
+      // settling from the first. There is no request id on these replies, so
+      // retaining both would let the older timer answer with the newer owner.
+      if (_pendingPasskeyAuth?.timer) clearTimeout(_pendingPasskeyAuth.timer);
+      _pendingPasskeyAuth = null;
       _passkeyAuthReplyContext = _captureAccountReplyContext(get, acct);
       set({ passkeyBusy: true, passkeyError: null, passkeyNotice: null });
       _credentialTokenCanonicalOnly = true;
@@ -7568,15 +7601,24 @@ export const store = createStore<OnyxState>()(
               // of an in-flight LIST. Tolerate the optional created column so the
               // client is forward-compatible if the daemon starts sending it.
               const id = standard.context[0];
-              if (!id) break;
-              const signCount = Number.parseInt(standard.context[1] ?? '', 10);
-              const createdRaw = standard.context[2];
-              const createdAt = createdRaw ? Number.parseInt(createdRaw, 10) : NaN;
-              (_pendingPasskeyList ??= []).push({
+              const rows = _pendingPasskeyList;
+              if (
+                !rows
+                || !id
+                || !validPasskeyCredentialId(id)
+                || rows.length >= MAX_PASSKEY_CREDENTIALS
+                || rows.some((credential) => credential.id === id)
+              ) break;
+              const signCount = boundedUnsignedInteger(standard.context[1], 0xffff_ffff);
+              const createdAt = boundedUnsignedInteger(
+                standard.context[2],
+                253_402_300_799, // 9999-12-31T23:59:59Z
+              );
+              rows.push({
                 id,
-                label: standard.description,
-                signCount: Number.isFinite(signCount) ? signCount : 0,
-                createdAt: Number.isFinite(createdAt) ? createdAt : null,
+                label: boundedPasskeyLabel(standard.description),
+                signCount: signCount ?? 0,
+                createdAt,
               });
               break;
             }
@@ -7635,12 +7677,13 @@ export const store = createStore<OnyxState>()(
               break;
             }
             case 'AUTH-CHALLENGE': {
-              if (!_replyTransportIsCurrent(_passkeyAuthReplyContext, get)) break;
-              if (_pendingPasskeyAuth?.timer) clearTimeout(_pendingPasskeyAuth.timer);
+              const authContext = _passkeyAuthReplyContext;
+              if (!_replyTransportIsCurrent(authContext, get) || _pendingPasskeyAuth) break;
               _pendingPasskeyAuth = {
                 challenge: standard.context[0] ?? '',
                 rpId: standard.context[1] ?? '',
                 allowCreds: [],
+                malformedAllowCreds: false,
                 timer: null,
               };
               // ALLOW-CRED lines arrive right after; run once they've settled.
@@ -7648,9 +7691,18 @@ export const store = createStore<OnyxState>()(
                 const p = _pendingPasskeyAuth;
                 _pendingPasskeyAuth = null;
                 const c = get().client;
-                if (!_replyTransportIsCurrent(_passkeyAuthReplyContext, get)) return;
-                if (!p || !c || !p.challenge || !p.rpId) {
-                  set({ passkeyBusy: false, passkeyError: 'No passkey challenge to answer.' });
+                if (
+                  _passkeyAuthReplyContext !== authContext
+                  || !_replyTransportIsCurrent(authContext, get)
+                ) return;
+                if (!p || !c || !p.challenge || !p.rpId || p.malformedAllowCreds) {
+                  _passkeyAuthReplyContext = null;
+                  set({
+                    passkeyBusy: false,
+                    passkeyError: p?.malformedAllowCreds
+                      ? 'Malformed passkey challenge.'
+                      : 'No passkey challenge to answer.',
+                  });
                   return;
                 }
                 // Guard the synchronous builder: a malformed challenge/allow-cred
@@ -7659,16 +7711,25 @@ export const store = createStore<OnyxState>()(
                 try {
                   getOpts = buildGetOptions(p.challenge, p.rpId, p.allowCreds);
                 } catch {
+                  _passkeyAuthReplyContext = null;
                   set({ passkeyBusy: false, passkeyError: 'Malformed passkey challenge.' });
                   return;
                 }
                 getPasskeyAssertion(getOpts)
                   .then((f) => {
-                    if (!_replyTransportIsCurrent(_passkeyAuthReplyContext, get)) return;
+                    if (
+                      _passkeyAuthReplyContext !== authContext
+                      || !_replyTransportIsCurrent(authContext, get)
+                    ) return;
+                    _passkeyAuthReplyContext = null;
                     c.sendRaw('WEBAUTHN', 'AUTH-FINISH', f.credId, f.clientDataJSON, f.authData, f.signature);
                   })
                   .catch((e) => {
-                    if (_replyTransportIsCurrent(_passkeyAuthReplyContext, get)) {
+                    if (
+                      _passkeyAuthReplyContext === authContext
+                      && _replyTransportIsCurrent(authContext, get)
+                    ) {
+                      _passkeyAuthReplyContext = null;
                       set({ passkeyBusy: false, passkeyError: passkeyErrText(e) });
                     }
                   });
@@ -7681,7 +7742,19 @@ export const store = createStore<OnyxState>()(
                 && standard.description
                 && _replyTransportIsCurrent(_passkeyAuthReplyContext, get)
               ) {
-                _pendingPasskeyAuth.allowCreds.push(standard.description);
+                const id = standard.description;
+                if (!validPasskeyCredentialId(id)) {
+                  // Truncating an authentication allow-list would change which
+                  // credentials the server authorized. Mark it malformed and
+                  // fail the whole ceremony instead.
+                  _pendingPasskeyAuth.malformedAllowCreds = true;
+                } else if (_pendingPasskeyAuth.allowCreds.includes(id)) {
+                  break;
+                } else if (_pendingPasskeyAuth.allowCreds.length >= MAX_PASSKEY_CREDENTIALS) {
+                  _pendingPasskeyAuth.malformedAllowCreds = true;
+                } else {
+                  _pendingPasskeyAuth.allowCreds.push(id);
+                }
               }
               break;
             }

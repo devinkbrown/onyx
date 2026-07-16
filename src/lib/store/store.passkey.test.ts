@@ -24,7 +24,14 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { store, _resetPasskeyStateForTests, type Server } from './store';
+import {
+  MAX_PASSKEY_CREDENTIAL_ID_LENGTH,
+  MAX_PASSKEY_CREDENTIALS,
+  MAX_PASSKEY_LABEL_LENGTH,
+  store,
+  _resetPasskeyStateForTests,
+  type Server,
+} from './store';
 import { parseIRCMessage } from '@/lib/irc/parser';
 
 // navigator.credentials must look present so isPasskeySupported() is true in the
@@ -36,6 +43,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -131,6 +139,45 @@ describe('WEBAUTHN LIST reply fold-in (EVENT plane)', () => {
     });
   });
 
+  it('bounds, validates, and deduplicates the untrusted credential stream', () => {
+    store.setState({ client: makeClient() as never });
+    store.getState().listPasskeys();
+
+    for (let index = 0; index < MAX_PASSKEY_CREDENTIALS + 8; index += 1) {
+      const id = `cred${index.toString().padStart(4, '0')}`;
+      feed(`:srv EVENT me WEBAUTHN CRED ${id} ${index} :key ${index}`);
+    }
+    feed(':srv EVENT me WEBAUTHN CRED cred0000 999 :duplicate');
+    feed(':srv EVENT me WEBAUTHN CRED bad+id 4 :invalid alphabet');
+    feed(`:srv EVENT me WEBAUTHN CRED ${'a'.repeat(MAX_PASSKEY_CREDENTIAL_ID_LENGTH + 1)} 4 :too long`);
+    feed(`:srv EVENT me WEBAUTHN LIST :end (${MAX_PASSKEY_CREDENTIALS + 11})`);
+
+    const creds = store.getState().passkeyCreds;
+    expect(creds).toHaveLength(MAX_PASSKEY_CREDENTIALS);
+    expect(new Set(creds.map((credential) => credential.id))).toHaveProperty(
+      'size',
+      MAX_PASSKEY_CREDENTIALS,
+    );
+    expect(creds[0]).toMatchObject({ id: 'cred0000', label: 'key 0', signCount: 0 });
+    expect(creds.at(-1)?.id).toBe(`cred${(MAX_PASSKEY_CREDENTIALS - 1).toString().padStart(4, '0')}`);
+  });
+
+  it('normalizes malformed counters and bounds labels without splitting UTF-16', () => {
+    store.setState({ client: makeClient() as never });
+    store.getState().listPasskeys();
+    const label = `${'x'.repeat(MAX_PASSKEY_LABEL_LENGTH - 2)}\u0007AB\ud800`;
+
+    feed(`:srv EVENT me WEBAUTHN CRED credAAA 7junk -1 :${label}`);
+    feed(':srv EVENT me WEBAUTHN LIST :end (1)');
+
+    expect(store.getState().passkeyCreds).toEqual([{
+      id: 'credAAA',
+      label: `${'x'.repeat(MAX_PASSKEY_LABEL_LENGTH - 2)}AB`,
+      signCount: 0,
+      createdAt: null,
+    }]);
+  });
+
   it('commits an empty list (no CRED rows) as supported with zero creds', () => {
     store.setState({ client: makeClient() as never });
     store.getState().listPasskeys();
@@ -172,6 +219,62 @@ describe('WEBAUTHN LIST reply fold-in (EVENT plane)', () => {
     expect(store.getState().server?.account).toBe('bob');
     expect(store.getState().passkeyNotice).toBeNull();
     expect(client.sendRaw).not.toHaveBeenCalledWith('WEBAUTHN', 'LIST');
+  });
+});
+
+describe('WEBAUTHN AUTH reply bounds', () => {
+  const challenge = 'AAECAwQFBgcICQoLDA0ODw';
+
+  it('fails closed when the server exceeds the credential allow-list cap', () => {
+    vi.useFakeTimers();
+    const client = makeClient();
+    store.setState({ client: client as never });
+    store.getState().signInWithPasskey('alice');
+    feed(`:srv EVENT me WEBAUTHN AUTH-CHALLENGE ${challenge} example.test :alice`);
+
+    for (let index = 0; index <= MAX_PASSKEY_CREDENTIALS; index += 1) {
+      feed(`:srv EVENT me WEBAUTHN ALLOW-CRED :id${index.toString().padStart(4, '0')}`);
+    }
+    vi.advanceTimersByTime(100);
+
+    expect(navigator.credentials.get).not.toHaveBeenCalled();
+    expect(store.getState().passkeyBusy).toBe(false);
+    expect(store.getState().passkeyError).toBeTruthy();
+  });
+
+  it('deduplicates an allow-list at the cap without rejecting the ceremony', () => {
+    vi.useFakeTimers();
+    const getCredential = vi.fn((_options?: CredentialRequestOptions) => (
+      new Promise<Credential | null>(() => {})
+    ));
+    vi.stubGlobal('navigator', {
+      credentials: { create: vi.fn(), get: getCredential },
+    } as unknown);
+    store.setState({ client: makeClient() as never });
+    store.getState().signInWithPasskey('alice');
+    feed(`:srv EVENT me WEBAUTHN AUTH-CHALLENGE ${challenge} example.test :alice`);
+
+    for (let index = 0; index < MAX_PASSKEY_CREDENTIALS; index += 1) {
+      feed(`:srv EVENT me WEBAUTHN ALLOW-CRED :id${index.toString().padStart(4, '0')}`);
+    }
+    feed(':srv EVENT me WEBAUTHN ALLOW-CRED :id0000');
+    vi.advanceTimersByTime(100);
+
+    expect(getCredential).toHaveBeenCalledOnce();
+    const options = getCredential.mock.calls[0]?.[0] as CredentialRequestOptions | undefined;
+    expect(options?.publicKey?.allowCredentials).toHaveLength(MAX_PASSKEY_CREDENTIALS);
+  });
+
+  it('cancels the authentication timer when passkey state is reset', () => {
+    vi.useFakeTimers();
+    store.setState({ client: makeClient() as never });
+    store.getState().signInWithPasskey('alice');
+    feed(`:srv EVENT me WEBAUTHN AUTH-CHALLENGE ${challenge} example.test :alice`);
+
+    _resetPasskeyStateForTests();
+    vi.advanceTimersByTime(100);
+
+    expect(navigator.credentials.get).not.toHaveBeenCalled();
   });
 });
 
