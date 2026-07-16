@@ -2125,6 +2125,9 @@ export const MAX_TYPING_TARGET_LENGTH = 512;
 export const MAX_TYPING_NICK_LENGTH = 128;
 const TYPING_EXPIRY_MS = 6_000;
 const TYPING_RATE_LIMIT_MS = 4_000;
+export const MAX_LIVE_DM_CONVERSATIONS = 256;
+export const MAX_TEGAMI_CONVERSATIONS = MAX_LIVE_DM_CONVERSATIONS;
+export const MAX_TEGAMI_COUNT = 9_999;
 
 // ── CHATHISTORY batch collectors (module-level) ───────────────────────────────
 export const SERVER_SEARCH_RESULT_MAX = 200;
@@ -7523,11 +7526,18 @@ export const store = createStore<OnyxState>()(
           const tegamiMatch = body.match(/^from (\S+) :([\s\S]*)$/) ?? body.match(/^from (\S+) ([\s\S]*)$/);
           if (tegamiMatch) {
             const tegamiFrom = tegamiMatch[1]!;
-            const tegamiText = tegamiMatch[2]!;
+            if (
+              !_validInboundWireToken(tegamiFrom, MAX_VAULT_SENDER_LENGTH)
+              || tegamiFrom.startsWith(':')
+              || tegamiFrom.includes(',')
+            ) return;
+            const tegamiText = _boundedInboundMessageText(tegamiMatch[2]!);
             const tegamiKey = tegamiFrom.toLowerCase();
             const tegamiMsg: ChatMessage = {
-              id: tags['msgid'] ?? uid(),
-              time: tags['time'] ? new Date(tags['time']) : new Date(),
+              id: _validInboundWireToken(tags['msgid'] ?? '', MAX_VAULT_MESSAGE_ID_LENGTH)
+                ? tags['msgid']!
+                : uid(),
+              time: eventTime(tags),
               from: tegamiFrom,
               text: tegamiText,
               type: 'msg',
@@ -7535,12 +7545,28 @@ export const store = createStore<OnyxState>()(
               highlight: true,
             };
             set(s => _addDMMessage(s, tegamiFrom, tegamiMsg));
+            // A saturated live DM working set refuses a new unsolicited
+            // conversation rather than evicting an unread one. Keep the
+            // offline-message aggregate aligned with what the user can open.
+            if (!get().dms.has(tegamiKey)) return;
             const prev = get().tegami.get(tegamiKey);
             const agg = {
-              count: (prev?.count ?? 0) + 1,
+              count: Math.min((prev?.count ?? 0) + 1, MAX_TEGAMI_COUNT),
               firstMsgId: prev?.firstMsgId ?? tegamiMsg.id,
             };
-            set(s => ({ tegami: new Map(s.tegami).set(tegamiKey, agg) }));
+            set(s => {
+              const tegami = new Map(s.tegami);
+              // Refresh insertion order so a bounded overflow forgets the
+              // least recently updated aggregate, never the new notice.
+              tegami.delete(tegamiKey);
+              tegami.set(tegamiKey, agg);
+              while (tegami.size > MAX_TEGAMI_CONVERSATIONS) {
+                const oldest = tegami.keys().next().value;
+                if (oldest === undefined) break;
+                tegami.delete(oldest);
+              }
+              return { tegami };
+            });
             if (typeof window !== 'undefined') {
               window.dispatchEvent(new CustomEvent('ocean:tegami', {
                 detail: { channel: tegamiFrom, count: agg.count, firstMsgId: agg.firstMsgId },
@@ -13542,9 +13568,43 @@ function _addDMMessage(
   msg: ChatMessage,
   skipUnread = false,
 ): Partial<OnyxState> {
+  if (
+    !_validInboundWireToken(sender, MAX_VAULT_SENDER_LENGTH)
+    || sender.startsWith(':')
+    || sender.includes(',')
+  ) return {};
   const key = sender.toLowerCase();
   const dms = new Map(state.dms);
-  const existing = dms.get(key) ?? {
+  const existing = dms.get(key);
+  let firstUnreadId: Map<string, string | null> | null = null;
+
+  if (!existing && dms.size >= MAX_LIVE_DM_CONVERSATIONS) {
+    // Preserve every unread and currently open conversation. When the bounded
+    // working set is full, only a read inactive DM is eligible for eviction;
+    // otherwise the new unsolicited conversation is refused. Server history
+    // can recover it later without allowing an inbound memory flood now.
+    const activeKey = state.activeView.kind === 'dm'
+      ? state.activeView.nick.toLowerCase()
+      : null;
+    let evictKey: string | null = null;
+    let evictTime = Number.POSITIVE_INFINITY;
+    for (const [candidateKey, conversation] of dms) {
+      if (candidateKey === activeKey || conversation.unread > 0) continue;
+      const lastTime = conversation.messages.at(-1)?.time.getTime() ?? 0;
+      const comparable = Number.isFinite(lastTime) ? lastTime : 0;
+      if (comparable < evictTime) {
+        evictKey = candidateKey;
+        evictTime = comparable;
+      }
+    }
+    if (!evictKey) return {};
+    dms.delete(evictKey);
+    const nextFirstUnreadId = new Map(state.firstUnreadId);
+    nextFirstUnreadId.delete(evictKey);
+    firstUnreadId = nextFirstUnreadId;
+  }
+
+  const conversation = existing ?? {
     nick: sender,
     account: null,
     unread: 0,
@@ -13563,21 +13623,24 @@ function _addDMMessage(
     ? { ...msg, text: 'Message from ignored user', type: 'system' }
     : msg;
 
+  // Refresh insertion order for the bounded working set without affecting the
+  // alphabetical UI projection.
+  dms.delete(key);
   dms.set(key, {
-    ...existing,
-    messages: [...existing.messages.slice(-499), effectiveMsg],
-    unread: isActive ? 0 : skipUnread ? existing.unread : (isIgnoredSender || isMuted) ? existing.unread : existing.unread + 1,
-    highlights: isActive ? 0 : skipUnread ? existing.highlights : (isIgnoredSender || isMuted) ? existing.highlights : existing.highlights + 1,
+    ...conversation,
+    messages: [...conversation.messages.slice(-499), effectiveMsg],
+    unread: isActive ? 0 : skipUnread ? conversation.unread : (isIgnoredSender || isMuted) ? conversation.unread : conversation.unread + 1,
+    highlights: isActive ? 0 : skipUnread ? conversation.highlights : (isIgnoredSender || isMuted) ? conversation.highlights : conversation.highlights + 1,
   });
 
   // Track first unread DM message id (only when not active)
   if (!isActive && !skipUnread && !state.firstUnreadId.has(key)) {
-    const firstUnreadId = new Map(state.firstUnreadId);
-    firstUnreadId.set(key, msg.id);
-    return { dms, firstUnreadId };
+    const nextFirstUnreadId = firstUnreadId ?? new Map(state.firstUnreadId);
+    nextFirstUnreadId.set(key, msg.id);
+    firstUnreadId = nextFirstUnreadId;
   }
 
-  return { dms };
+  return firstUnreadId ? { dms, firstUnreadId } : { dms };
 }
 
 // ── Time format persistence ────────────────────────────────────────────────────

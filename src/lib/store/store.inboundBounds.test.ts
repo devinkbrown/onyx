@@ -9,7 +9,12 @@ import {
   MAX_VAULT_SENDER_LENGTH,
   MAX_VAULT_TARGET_LENGTH,
 } from '@/lib/vault/historyVault';
-import { store } from './store';
+import {
+  MAX_LIVE_DM_CONVERSATIONS,
+  MAX_TEGAMI_CONVERSATIONS,
+  MAX_TEGAMI_COUNT,
+  store,
+} from './store';
 
 const initialState = store.getInitialState();
 
@@ -83,5 +88,57 @@ describe('live inbound message bounds', () => {
     const stored = store.getState().channels.get('#root')?.messages[0];
     expect(stored?.text).toBe('safe reply text');
     expect(stored?.replyTo).toBeUndefined();
+  });
+
+  it('applies vault field bounds to offline TEGAMI delivery', () => {
+    feed(`@msgid=${'m'.repeat(MAX_VAULT_MESSAGE_ID_LENGTH + 1)} :eshmaki.me NOTE TEGAMI :from alice :${'x'.repeat(MAX_VAULT_MESSAGE_TEXT_LENGTH + 8)}`);
+
+    const stored = store.getState().dms.get('alice')?.messages[0];
+    expect(stored?.text).toHaveLength(MAX_VAULT_MESSAGE_TEXT_LENGTH);
+    expect(stored?.id).toBeTruthy();
+    expect(stored?.id.length).toBeLessThanOrEqual(MAX_VAULT_MESSAGE_ID_LENGTH);
+    expect(store.getState().tegami.get('alice')).toEqual({ count: 1, firstMsgId: stored?.id });
+
+    feed(`:eshmaki.me NOTE TEGAMI :from ${'a'.repeat(MAX_VAULT_SENDER_LENGTH + 1)} :rejected`);
+    expect(store.getState().dms.size).toBe(1);
+    expect(store.getState().tegami.size).toBe(1);
+  });
+
+  it('caps offline aggregates and repairs an oversized legacy aggregate map', () => {
+    feed(':eshmaki.me NOTE TEGAMI :from alice :first');
+    store.setState({
+      tegami: new Map([
+        ...Array.from(
+          { length: MAX_TEGAMI_CONVERSATIONS + 8 },
+          (_, index) => [`legacy-${index}`, { count: 1, firstMsgId: `old-${index}` }] as const,
+        ),
+        ['alice', { count: MAX_TEGAMI_COUNT, firstMsgId: 'first' }],
+      ]),
+    });
+
+    feed(':eshmaki.me NOTE TEGAMI :from alice :again');
+    expect(store.getState().tegami.size).toBe(MAX_TEGAMI_CONVERSATIONS);
+    expect(store.getState().tegami.get('alice')?.count).toBe(MAX_TEGAMI_COUNT);
+  });
+
+  it('bounds unsolicited DM conversations without evicting unread rows', () => {
+    for (let index = 0; index < MAX_LIVE_DM_CONVERSATIONS + 1; index += 1) {
+      feed(`:user-${index}!u@host PRIVMSG me :message ${index}`);
+    }
+
+    expect(store.getState().dms.size).toBe(MAX_LIVE_DM_CONVERSATIONS);
+    expect(store.getState().dms.has(`user-${MAX_LIVE_DM_CONVERSATIONS}`)).toBe(false);
+
+    const dms = new Map(store.getState().dms);
+    const oldest = dms.get('user-0');
+    expect(oldest).toBeDefined();
+    dms.set('user-0', { ...oldest!, unread: 0, highlights: 0 });
+    store.setState({ dms });
+
+    feed(`:user-${MAX_LIVE_DM_CONVERSATIONS}!u@host PRIVMSG me :retry`);
+    expect(store.getState().dms.size).toBe(MAX_LIVE_DM_CONVERSATIONS);
+    expect(store.getState().dms.has('user-0')).toBe(false);
+    expect(store.getState().dms.has(`user-${MAX_LIVE_DM_CONVERSATIONS}`)).toBe(true);
+    expect(store.getState().firstUnreadId.has('user-0')).toBe(false);
   });
 });
