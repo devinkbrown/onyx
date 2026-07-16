@@ -2134,6 +2134,10 @@ export const MAX_USER_METADATA_KEY_LENGTH = 128;
 export const MAX_USER_METADATA_VALUE_LENGTH = 8 * 1024;
 const MAX_PROFILE_LINKS = 8;
 const UNSAFE_METADATA_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
+export const MAX_LIVE_PROP_TARGETS = 256;
+export const MAX_LIVE_PROP_KEYS = 64;
+export const MAX_LIVE_PROP_KEY_LENGTH = 128;
+export const MAX_LIVE_PROP_VALUE_LENGTH = 16 * 1024;
 
 // ── CHATHISTORY batch collectors (module-level) ───────────────────────────────
 export const SERVER_SEARCH_RESULT_MAX = 200;
@@ -2395,6 +2399,54 @@ function _boundedMetadataValue(value: string): string {
   const finalCodeUnit = bounded.charCodeAt(bounded.length - 1);
   if (finalCodeUnit >= 0xd800 && finalCodeUnit <= 0xdbff) bounded = bounded.slice(0, -1);
   return bounded;
+}
+
+function _normalizePropertyTarget(value: string): string | null {
+  if (
+    !_validInboundWireToken(value, MAX_VAULT_TARGET_LENGTH)
+    || value.startsWith(':')
+    || value.includes(',')
+  ) return null;
+  const key = value.toLowerCase();
+  return UNSAFE_METADATA_KEYS.has(key) ? null : value;
+}
+
+function _normalizePropertyName(value: string): string | null {
+  if (!_validInboundWireToken(value, MAX_LIVE_PROP_KEY_LENGTH)) return null;
+  return UNSAFE_METADATA_KEYS.has(value.toLowerCase()) ? null : value;
+}
+
+function _boundedPropertyValue(value: string): string {
+  let bounded = value.slice(0, MAX_LIVE_PROP_VALUE_LENGTH);
+  const finalCodeUnit = bounded.charCodeAt(bounded.length - 1);
+  if (finalCodeUnit >= 0xd800 && finalCodeUnit <= 0xdbff) bounded = bounded.slice(0, -1);
+  return bounded;
+}
+
+function _updateBoundedProperties(
+  source: Map<string, Record<string, string>>,
+  targetKey: string,
+  propertyName: string,
+  value: string,
+): Map<string, Record<string, string>> | null {
+  const existing = source.get(targetKey);
+  if (value === '') {
+    if (!existing || !Object.hasOwn(existing, propertyName)) return source;
+    const entry = { ...existing };
+    delete entry[propertyName];
+    const next = new Map(source);
+    if (Object.keys(entry).length === 0) next.delete(targetKey);
+    else next.set(targetKey, entry);
+    return next;
+  }
+  if (!existing && source.size >= MAX_LIVE_PROP_TARGETS) return null;
+  if (
+    !Object.hasOwn(existing ?? {}, propertyName)
+    && Object.keys(existing ?? {}).length >= MAX_LIVE_PROP_KEYS
+  ) return null;
+  const next = new Map(source);
+  next.set(targetKey, { ...(existing ?? {}), [propertyName]: value });
+  return next;
 }
 
 /**
@@ -6434,18 +6486,30 @@ export const store = createStore<OnyxState>()(
     },
 
     _writeChannelProp(channel, key, value) {
+      const safeChannel = _normalizePropertyTarget(channel);
+      const safeKey = _normalizePropertyName(key);
+      if (!safeChannel || !safeKey || value.length > MAX_LIVE_PROP_VALUE_LENGTH) return;
+      const safeValue = _boundedPropertyValue(value);
+      const safeChannelKey = safeChannel.toLowerCase();
+      if (!_updateBoundedProperties(get().channelProps, safeChannelKey, safeKey, safeValue)) return;
       // PROP SET with an empty trailing value deletes the prop server-side.
-      get().client?.sendRaw('PROP', channel, key, value);
+      get().client?.sendRaw('PROP', safeChannel, safeKey, safeValue);
       // Optimistic local update (the delete path emits no 818 with an empty
       // value, so a clear wouldn't otherwise reflect until a re-fetch).
       set(s => {
-        const channelProps = new Map(s.channelProps);
-        const k = channel.toLowerCase();
-        const existing = { ...(channelProps.get(k) ?? {}) };
-        if (value) existing[key] = value;
-        else delete existing[key];
-        channelProps.set(k, existing);
-        const channels = projectChannelAiPolicy(s.channels, k, key, value);
+        const channelProps = _updateBoundedProperties(
+          s.channelProps,
+          safeChannelKey,
+          safeKey,
+          safeValue,
+        );
+        if (!channelProps) return {};
+        const channels = projectChannelAiPolicy(
+          s.channels,
+          safeChannelKey,
+          safeKey,
+          safeValue,
+        );
         return channels ? { channelProps, channels } : { channelProps };
       });
     },
@@ -8286,22 +8350,28 @@ export const store = createStore<OnyxState>()(
         // ── PROP list numerics (IRCX) ─────────────────────────────────────
         case '818': { // RPL_PROPLIST
           // :server 818 ournick target propname :propvalue
-          const propTarget = params[1];
-          const propName   = params[2];
-          const propVal    = params[3] ?? '';
+          const propTarget = _normalizePropertyTarget(params[1] ?? '');
+          const propName = _normalizePropertyName(params[2] ?? '');
+          const propVal = _boundedPropertyValue(params[3] ?? '');
           if (!propTarget || !propName) break;
           const propKey = propTarget.toLowerCase();
+          let accepted = false;
           set(s => {
             if (isChan(propTarget)) {
-              const channelProps = new Map(s.channelProps);
-              const existing = channelProps.get(propKey) ?? {};
-              channelProps.set(propKey, { ...existing, [propName]: propVal });
+              const channelProps = _updateBoundedProperties(
+                s.channelProps,
+                propKey,
+                propName,
+                propVal,
+              );
+              if (!channelProps) return {};
+              accepted = true;
               const channels = projectChannelAiPolicy(s.channels, propKey, propName, propVal);
               return channels ? { channelProps, channels } : { channelProps };
             } else {
-              const userProps = new Map(s.userProps);
-              const existing = userProps.get(propKey) ?? {};
-              userProps.set(propKey, { ...existing, [propName]: propVal });
+              const userProps = _updateBoundedProperties(s.userProps, propKey, propName, propVal);
+              if (!userProps) return {};
+              accepted = true;
               // Parse activity from STATUS or ACTIVITY prop
               if (propName === 'STATUS' || propName === 'ACTIVITY') {
                 const parsed = parseActivity(propVal);
@@ -8316,14 +8386,14 @@ export const store = createStore<OnyxState>()(
               return { userProps };
             }
           });
-          if (isChan(propTarget)) {
+          if (accepted && isChan(propTarget)) {
             _tryPendingDeepLinkTopicResolution(get, set, propTarget);
           }
           break;
         }
 
         case '819': { // RPL_PROPEND — the requested registry snapshot is complete
-          const propTarget = params[1];
+          const propTarget = _normalizePropertyTarget(params[1] ?? '');
           if (propTarget && isChan(propTarget)) {
             _tryPendingDeepLinkTopicResolution(get, set, propTarget, { registryComplete: true });
           }
@@ -9404,21 +9474,25 @@ export const store = createStore<OnyxState>()(
 
         // ── PROP (IRCX) ───────────────────────────────────────────────────
         case 'PROP': {
-          const target = params[0]!;
-          const propName = params[1]!;
-          const propVal = params[2] ?? '';
+          const target = _normalizePropertyTarget(params[0] ?? '');
+          const propName = _normalizePropertyName(params[1] ?? '');
+          const propVal = _boundedPropertyValue(params[2] ?? '');
+          if (!target || !propName) break;
           const key = target.toLowerCase();
           set(s => {
             if (isChan(target)) {
-              const channelProps = new Map(s.channelProps);
-              const existing = channelProps.get(key) ?? {};
-              channelProps.set(key, { ...existing, [propName]: propVal });
+              const channelProps = _updateBoundedProperties(
+                s.channelProps,
+                key,
+                propName,
+                propVal,
+              );
+              if (!channelProps) return {};
               const channels = projectChannelAiPolicy(s.channels, key, propName, propVal);
               return channels ? { channelProps, channels } : { channelProps };
             } else {
-              const userProps = new Map(s.userProps);
-              const existing = userProps.get(key) ?? {};
-              userProps.set(key, { ...existing, [propName]: propVal });
+              const userProps = _updateBoundedProperties(s.userProps, key, propName, propVal);
+              if (!userProps) return {};
               // Parse activity from STATUS or ACTIVITY prop
               if (propName === 'STATUS' || propName === 'ACTIVITY') {
                 const parsed = parseActivity(propVal);

@@ -11,6 +11,9 @@ import {
 } from '@/lib/vault/historyVault';
 import {
   MAX_LIVE_DM_CONVERSATIONS,
+  MAX_LIVE_PROP_KEYS,
+  MAX_LIVE_PROP_TARGETS,
+  MAX_LIVE_PROP_VALUE_LENGTH,
   MAX_TEGAMI_CONVERSATIONS,
   MAX_TEGAMI_COUNT,
   store,
@@ -140,5 +143,39 @@ describe('live inbound message bounds', () => {
     expect(store.getState().dms.has('user-0')).toBe(false);
     expect(store.getState().dms.has(`user-${MAX_LIVE_DM_CONVERSATIONS}`)).toBe(true);
     expect(store.getState().firstUnreadId.has('user-0')).toBe(false);
+  });
+
+  it('bounds and validates live PROP broadcasts and 818 snapshots', () => {
+    feed(':server PROP');
+    feed(':server PROP #root __proto__ :poison');
+    feed(':server PROP __proto__ safe :poison');
+    expect(store.getState().channelProps.size).toBe(0);
+    expect(store.getState().userProps.size).toBe(0);
+
+    feed(`:server PROP #root large :${'x'.repeat(MAX_LIVE_PROP_VALUE_LENGTH)}😀tail`);
+    feed(':server 818 me #root from-list :listed');
+    expect(store.getState().channelProps.get('#root')?.['large'])
+      .toBe('x'.repeat(MAX_LIVE_PROP_VALUE_LENGTH));
+    expect(store.getState().channelProps.get('#root')?.['from-list']).toBe('listed');
+
+    for (let index = 0; index < MAX_LIVE_PROP_KEYS + 8; index += 1) {
+      feed(`:server PROP #root prop-${index} :bounded`);
+    }
+    expect(Object.keys(store.getState().channelProps.get('#root') ?? {}))
+      .toHaveLength(MAX_LIVE_PROP_KEYS);
+
+    feed(':server PROP #root large :');
+    expect(store.getState().channelProps.get('#root')).not.toHaveProperty('large');
+  });
+
+  it('caps property targets and the derived activity record together', () => {
+    for (let index = 0; index < MAX_LIVE_PROP_TARGETS + 8; index += 1) {
+      feed(`:server PROP user-${index} STATUS :coding project-${index}`);
+    }
+
+    expect(store.getState().userProps.size).toBe(MAX_LIVE_PROP_TARGETS);
+    expect(Object.keys(store.getState().userActivities)).toHaveLength(MAX_LIVE_PROP_TARGETS);
+    expect(store.getState().userProps.has(`user-${MAX_LIVE_PROP_TARGETS}`)).toBe(false);
+    expect(store.getState().userActivities[`user-${MAX_LIVE_PROP_TARGETS}`]).toBeUndefined();
   });
 });
