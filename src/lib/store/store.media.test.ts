@@ -8,7 +8,13 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { store } from './store';
+import {
+  MAX_LIVE_MEDIA_CHANNELS,
+  MAX_LIVE_MEDIA_PARTICIPANTS,
+  MAX_MEDIA_TRANSCRIPT_ENTRIES,
+  MAX_MEDIA_TRANSCRIPT_TEXT_LENGTH,
+  store,
+} from './store';
 import type { Channel, ChannelUser } from '@/lib/irc/types';
 import { parseIRCMessage } from '@/lib/irc/parser';
 
@@ -142,5 +148,74 @@ describe('MEDIA live state (speaking / mute / hand / react) — drives the call 
     expect(st.mutedNicks.has('alice')).toBe(false);
     expect(st.voice.raisedHands.has('alice')).toBe(false);
     expect(callRoster('#root')?.has('alice') ?? false).toBe(false);
+  });
+
+  it('matches participant state case-insensitively when peers change casing', () => {
+    seedChannel('#root');
+    feed(':eshmaki.me EVENT me MEDIA JOIN #root Alice voice');
+    feed(':eshmaki.me EVENT me MEDIA SPEAKING #root aLiCe voice');
+    feed(':eshmaki.me EVENT me MEDIA MUTE #root ALICE voice');
+    feed(':eshmaki.me EVENT me MEDIA HAND #root alice up');
+
+    expect(store.getState().speakingNicks.has('alice')).toBe(true);
+    expect(store.getState().mutedNicks.has('alice')).toBe(true);
+    expect(store.getState().voice.raisedHands.has('alice')).toBe(true);
+
+    feed(':eshmaki.me EVENT me MEDIA LEAVE #root aLiCe');
+    expect(callRoster('#root')).toBeUndefined();
+    expect(store.getState().speakingNicks.has('alice')).toBe(false);
+    expect(store.getState().mutedNicks.has('alice')).toBe(false);
+    expect(store.getState().voice.raisedHands.has('alice')).toBe(false);
+  });
+
+  it('bounds server-controlled media rosters and their channel map', () => {
+    seedChannel('#root');
+    for (let index = 0; index < MAX_LIVE_MEDIA_PARTICIPANTS + 8; index += 1) {
+      feed(`:eshmaki.me EVENT me MEDIA JOIN #root peer-${index} voice`);
+    }
+    expect(callRoster('#root')?.size).toBe(MAX_LIVE_MEDIA_PARTICIPANTS);
+    expect(callRoster('#root')?.has(`peer-${MAX_LIVE_MEDIA_PARTICIPANTS}`)).toBe(false);
+
+    for (let index = 1; index < MAX_LIVE_MEDIA_CHANNELS + 8; index += 1) {
+      feed(`:eshmaki.me EVENT me MEDIA JOIN #room-${index} alice voice`);
+    }
+    expect(store.getState().voiceChannelParticipants.size).toBe(MAX_LIVE_MEDIA_CHANNELS);
+    expect(store.getState().voiceChannelParticipants.has(`#room-${MAX_LIVE_MEDIA_CHANNELS}`)).toBe(false);
+  });
+
+  it('requires roster membership before accepting transient presence or reactions', () => {
+    seedChannel('#root');
+    const got: Array<{ emoji: string; nick: string }> = [];
+    const handler = (event: Event) => got.push((event as CustomEvent).detail);
+    window.addEventListener('ocean:voice-reaction', handler);
+
+    feed(':eshmaki.me EVENT me MEDIA SPEAKING #root stranger voice');
+    feed(':eshmaki.me EVENT me MEDIA MUTE #root stranger voice');
+    feed(':eshmaki.me EVENT me MEDIA HAND #root stranger up');
+    feed(':eshmaki.me EVENT me MEDIA REACT #root stranger wave');
+
+    window.removeEventListener('ocean:voice-reaction', handler);
+    expect(store.getState().speakingNicks).toEqual(new Set());
+    expect(store.getState().mutedNicks).toEqual(new Set());
+    expect(store.getState().voice.raisedHands).toEqual(new Set());
+    expect(got).toEqual([]);
+  });
+
+  it('bounds transcript channels, entries, and text', () => {
+    seedChannel('#root');
+    for (let index = 0; index < MAX_MEDIA_TRANSCRIPT_ENTRIES + 8; index += 1) {
+      feed(`:eshmaki.me EVENT me MEDIA CAPTION #root alice :caption ${index}`);
+    }
+    expect(store.getState().mediaTranscripts.get('#root')).toHaveLength(MAX_MEDIA_TRANSCRIPT_ENTRIES);
+
+    feed(`:eshmaki.me EVENT me MEDIA CAPTION #root alice :${'x'.repeat(MAX_MEDIA_TRANSCRIPT_TEXT_LENGTH + 1)}`);
+    expect(store.getState().mediaTranscripts.get('#root')).toHaveLength(MAX_MEDIA_TRANSCRIPT_ENTRIES);
+    expect(store.getState().mediaTranscripts.get('#root')?.at(-1)?.text).toBe('caption 207');
+
+    for (let index = 1; index < MAX_LIVE_MEDIA_CHANNELS + 8; index += 1) {
+      feed(`:eshmaki.me EVENT me MEDIA TRANSCRIPT #room-${index} alice :saved`);
+    }
+    expect(store.getState().mediaTranscripts.size).toBe(MAX_LIVE_MEDIA_CHANNELS);
+    expect(store.getState().mediaTranscripts.has(`#room-${MAX_LIVE_MEDIA_CHANNELS}`)).toBe(false);
   });
 });

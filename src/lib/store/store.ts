@@ -2144,6 +2144,11 @@ export const MAX_NAMES_TOKENS_PER_LINE = MAX_LIVE_CHANNEL_USERS;
 const MAX_NAMES_SCAN_CHARS = 256 * 1024;
 const MAX_NAMES_TOKEN_LENGTH = 512;
 const MAX_SYSTEM_EVENT_TEXT_LENGTH = 4 * 1024;
+export const MAX_LIVE_MEDIA_CHANNELS = 32;
+export const MAX_LIVE_MEDIA_PARTICIPANTS = 256;
+export const MAX_MEDIA_TRANSCRIPT_ENTRIES = 200;
+export const MAX_MEDIA_TRANSCRIPT_TEXT_LENGTH = 4 * 1024;
+const MAX_MEDIA_REACTION_LENGTH = 64;
 
 // ── CHATHISTORY batch collectors (module-level) ───────────────────────────────
 export const SERVER_SEARCH_RESULT_MAX = 200;
@@ -2397,6 +2402,23 @@ function _normalizeTypingToken(value: string, maxLength: number): string | null 
     || value.includes(',')
   ) return null;
   return value;
+}
+
+function _deleteCaseInsensitive(source: Set<string>, value: string): Set<string> {
+  const key = value.toLowerCase();
+  for (const candidate of source) {
+    if (candidate.toLowerCase() === key) source.delete(candidate);
+  }
+  return source;
+}
+
+function _hasCaseInsensitive(source: ReadonlySet<string> | undefined, value: string): boolean {
+  if (!source) return false;
+  const key = value.toLowerCase();
+  for (const candidate of source) {
+    if (candidate.toLowerCase() === key) return true;
+  }
+  return false;
 }
 
 function _normalizeMetadataTarget(value: string): string | null {
@@ -7769,13 +7791,23 @@ export const store = createStore<OnyxState>()(
           if (mediaVerb === 'CAPTION' || mediaVerb === 'TRANSCRIPT') {
             const capChannel = mediaChannel;
             const capNick = mediaActor;
-            const capText = mediaParams.slice(4).join(' ');
-            if (capChannel && capNick && capText) {
+            const rawCapText = mediaParams.slice(4).join(' ');
+            const capText = _boundedSystemEventText(rawCapText);
+            const validCaption = isChan(capChannel)
+              && _validInboundWireToken(capChannel, MAX_VAULT_TARGET_LENGTH)
+              && !capChannel.includes(',')
+              && _normalizeTypingToken(capNick, MAX_VAULT_SENDER_LENGTH) !== null
+              && rawCapText.length <= MAX_MEDIA_TRANSCRIPT_TEXT_LENGTH
+              && capText.length > 0;
+            if (validCaption) {
               set(s => {
                 const mediaTranscripts = new Map(s.mediaTranscripts);
                 const tKey = capChannel.toLowerCase();
+                if (!mediaTranscripts.has(tKey) && mediaTranscripts.size >= MAX_LIVE_MEDIA_CHANNELS) {
+                  return {};
+                }
                 const entries = [
-                  ...(mediaTranscripts.get(tKey) ?? []).slice(-199),
+                  ...(mediaTranscripts.get(tKey) ?? []).slice(-(MAX_MEDIA_TRANSCRIPT_ENTRIES - 1)),
                   { nick: capNick, text: capText, time: tags['time'] ? new Date(tags['time']) : new Date() },
                 ];
                 mediaTranscripts.set(tKey, entries);
@@ -7804,7 +7836,12 @@ export const store = createStore<OnyxState>()(
           // per-verb signaling payloads itself.
           const detail = mediaParams.slice(3).join(' ');
 
-          if (channel) {
+          const validMediaChannel = isChan(channel)
+            && _validInboundWireToken(channel, MAX_VAULT_TARGET_LENGTH)
+            && !channel.includes(',');
+          const validMediaActor = !isPresenceVerb
+            || _normalizeTypingToken(actor, MAX_VAULT_SENDER_LENGTH) !== null;
+          if (validMediaChannel && validMediaActor) {
             const chKey = channel.toLowerCase();
             // The token after the actor: kind (JOIN/SPEAKING), up|down (HAND),
             // or the emoji (REACT).
@@ -7812,7 +7849,12 @@ export const store = createStore<OnyxState>()(
             if ((verb === 'JOIN' || verb === 'ROSTER') && actor) {
               set(s => {
                 const map = new Map(s.voiceChannelParticipants);
+                if (!map.has(chKey) && map.size >= MAX_LIVE_MEDIA_CHANNELS) return {};
                 const pSet = new Set(map.get(chKey) ?? []);
+                if (
+                  !_hasCaseInsensitive(pSet, actor)
+                  && pSet.size >= MAX_LIVE_MEDIA_PARTICIPANTS
+                ) return {};
                 pSet.add(actor);
                 map.set(chKey, pSet);
                 return { voiceChannelParticipants: map, mediaAvailable: true };
@@ -7821,13 +7863,17 @@ export const store = createStore<OnyxState>()(
               set(s => {
                 const map = new Map(s.voiceChannelParticipants);
                 const pSet = new Set(map.get(chKey) ?? []);
-                pSet.delete(actor);
-                map.set(chKey, pSet);
+                _deleteCaseInsensitive(pSet, actor);
+                if (pSet.size === 0) map.delete(chKey);
+                else map.set(chKey, pSet);
                 // A departed participant carries no live speaking/mute/hand state.
-                const speakingNicks = new Set(s.speakingNicks); speakingNicks.delete(actor);
-                const mutedNicks = new Set(s.mutedNicks); mutedNicks.delete(actor);
-                const raisedHands = new Set(s.voice.raisedHands); raisedHands.delete(actor);
-                const peers = new Map(s.voice.peers); peers.delete(actor);
+                const speakingNicks = _deleteCaseInsensitive(new Set(s.speakingNicks), actor);
+                const mutedNicks = _deleteCaseInsensitive(new Set(s.mutedNicks), actor);
+                const raisedHands = _deleteCaseInsensitive(new Set(s.voice.raisedHands), actor);
+                const peers = new Map(s.voice.peers);
+                for (const peerNick of peers.keys()) {
+                  if (peerNick.toLowerCase() === actor.toLowerCase()) peers.delete(peerNick);
+                }
                 return {
                   voiceChannelParticipants: map,
                   speakingNicks,
@@ -7840,26 +7886,42 @@ export const store = createStore<OnyxState>()(
               // Authoritative speaking signal — the ONLY one for cross-node peers
               // (their audio never reaches this client's local VAD).
               const on = verb === 'SPEAKING';
-              get().setVoiceParticipantSpeaking(actor, on);
-              get().setSpeakingNick(actor, on);
+              if (!on || _hasCaseInsensitive(get().voiceChannelParticipants.get(chKey), actor)) {
+                get().setVoiceParticipantSpeaking(actor, on);
+                get().setSpeakingNick(actor, on);
+              }
               set({ mediaAvailable: true });
             } else if ((verb === 'MUTE' || verb === 'UNMUTE') && actor) {
               const m = verb === 'MUTE';
               get().setVoiceParticipantMuted(actor, m); // same-node peers w/ a peer entry
               set(s => {
                 const mutedNicks = new Set(s.mutedNicks);
-                if (m) mutedNicks.add(actor); else mutedNicks.delete(actor);
+                if (
+                  m
+                  && _hasCaseInsensitive(s.voiceChannelParticipants.get(chKey), actor)
+                  && (mutedNicks.size < MAX_LIVE_MEDIA_PARTICIPANTS || mutedNicks.has(actor.toLowerCase()))
+                ) mutedNicks.add(actor.toLowerCase());
+                else if (!m) _deleteCaseInsensitive(mutedNicks, actor);
                 return { mutedNicks, mediaAvailable: true };
               });
             } else if (verb === 'HAND' && actor) {
               const up = arg.toLowerCase() === 'up';
               set(s => {
                 const raisedHands = new Set(s.voice.raisedHands);
-                if (up) raisedHands.add(actor); else raisedHands.delete(actor);
+                if (
+                  up
+                  && _hasCaseInsensitive(s.voiceChannelParticipants.get(chKey), actor)
+                  && (raisedHands.size < MAX_LIVE_MEDIA_PARTICIPANTS || raisedHands.has(actor.toLowerCase()))
+                ) raisedHands.add(actor.toLowerCase());
+                else if (!up) _deleteCaseInsensitive(raisedHands, actor);
                 return { voice: { ...s.voice, raisedHands }, mediaAvailable: true };
               });
             } else if (verb === 'REACT' && actor) {
-              if (arg && typeof window !== 'undefined') {
+              if (
+                _normalizeTypingToken(arg, MAX_MEDIA_REACTION_LENGTH)
+                && _hasCaseInsensitive(get().voiceChannelParticipants.get(chKey), actor)
+                && typeof window !== 'undefined'
+              ) {
                 window.dispatchEvent(new CustomEvent('ocean:voice-reaction', {
                   detail: { emoji: arg, nick: actor },
                 }));
@@ -12170,18 +12232,24 @@ export const store = createStore<OnyxState>()(
     speakingNicks: new Set<string>(),
     mutedNicks: new Set<string>(),
     setSpeakingNick: (nick, speaking) => set(s => {
+      const safeNick = _normalizeTypingToken(nick, MAX_VAULT_SENDER_LENGTH);
+      if (!safeNick) return {};
+      const key = safeNick.toLowerCase();
       const next = new Set(s.speakingNicks);
       if (speaking) {
-        next.add(nick.toLowerCase());
+        if (!next.has(key) && next.size >= MAX_LIVE_MEDIA_PARTICIPANTS) return {};
+        next.add(key);
       } else {
-        next.delete(nick.toLowerCase());
+        _deleteCaseInsensitive(next, key);
       }
       return { speakingNicks: next };
     }),
     voiceChannels: [],
     addVoiceChannel: (channel) => set(s => {
-      const lower = channel.toLowerCase();
+      const lower = normalizeNavigationChannel(channel);
+      if (!lower) return {};
       if (s.voiceChannels.includes(lower)) return {};
+      if (s.voiceChannels.length >= MAX_LIVE_MEDIA_CHANNELS) return {};
       return { voiceChannels: [...s.voiceChannels, lower] };
     }),
     removeVoiceChannel: (channel) => set(s => ({
@@ -12918,9 +12986,15 @@ export const store = createStore<OnyxState>()(
       const { ourNick } = get();
       set(s => {
         const map = new Map(s.voiceChannelParticipants);
-        const pSet = new Set(map.get(channel.toLowerCase()) ?? []);
+        const key = channel.toLowerCase();
+        if (!map.has(key) && map.size >= MAX_LIVE_MEDIA_CHANNELS) return {};
+        const pSet = new Set(map.get(key) ?? []);
+        if (
+          !_hasCaseInsensitive(pSet, ourNick)
+          && pSet.size >= MAX_LIVE_MEDIA_PARTICIPANTS
+        ) return {};
         pSet.add(ourNick);
-        map.set(channel.toLowerCase(), pSet);
+        map.set(key, pSet);
         return { voiceChannelParticipants: map };
       });
     },
@@ -12955,8 +13029,9 @@ export const store = createStore<OnyxState>()(
         set(s => {
           const map = new Map(s.voiceChannelParticipants);
           const pSet = new Set(map.get(ch.toLowerCase()) ?? []);
-          pSet.delete(ourNick);
-          map.set(ch.toLowerCase(), pSet);
+          _deleteCaseInsensitive(pSet, ourNick);
+          if (pSet.size === 0) map.delete(ch.toLowerCase());
+          else map.set(ch.toLowerCase(), pSet);
           return { voiceChannelParticipants: map };
         });
       }
@@ -13037,9 +13112,16 @@ export const store = createStore<OnyxState>()(
 
     setPeerHandRaised(nick, raised) {
       set(prev => {
+        const safeNick = _normalizeTypingToken(nick, MAX_VAULT_SENDER_LENGTH);
+        if (!safeNick) return {};
+        const key = safeNick.toLowerCase();
         const next = new Set(prev.voice.raisedHands);
-        if (raised) next.add(nick);
-        else next.delete(nick);
+        if (raised) {
+          if (!next.has(key) && next.size >= MAX_LIVE_MEDIA_PARTICIPANTS) return {};
+          next.add(key);
+        } else {
+          _deleteCaseInsensitive(next, key);
+        }
         return { voice: { ...prev.voice, raisedHands: next } };
       });
     },
