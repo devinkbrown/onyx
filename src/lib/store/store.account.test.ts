@@ -22,6 +22,7 @@ import { loadCredentials, saveCredentials } from '@/lib/credentials';
 import { saveComposerDrafts } from '@/lib/composer/drafts';
 import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
 import { DM_PINS_STORAGE_KEY, saveDMPins } from '@/lib/dmPins';
+import { saveChannelNotify } from '@/lib/notifications/channelNotifyMemory';
 
 const initialState = store.getInitialState();
 
@@ -786,6 +787,23 @@ describe('account replies — state from the message handler', () => {
     expect(visible.map((message) => message.id)).toEqual(['bob-pin']);
     expect(JSON.stringify(visible)).not.toContain('Alice private decrypted note');
     expect(JSON.stringify(visible)).not.toContain('Bob private body');
+  });
+
+  it('does not carry Alice private-room notification policy into Bob on 900', () => {
+    const bob = { serverUrl: seedServer('bob').url, identity: 'bob' } as const;
+    saveChannelNotify(new Map([['#bob-ops', 'mentions']]), bob);
+    store.setState({
+      server: seedServer('alice'),
+      ourNick: 'alice',
+      channelNotify: new Map([['#alice-private', 'none']]),
+    });
+
+    feed(':eshmaki.me 900 alice alice!u@h bob :You are now logged in as bob');
+
+    expect(Object.fromEntries(store.getState().channelNotify)).toEqual({ '#bob-ops': 'mentions' });
+    expect(store.getState().shouldNotify('#alice-private', false)).toBe(true);
+    expect(store.getState().shouldNotify('#bob-ops', false)).toBe(false);
+    expect(store.getState().shouldNotify('#bob-ops', true)).toBe(true);
   });
 
   it('ignores an Alice ACCOUNTINFO reply after the live account switches to Bob', () => {

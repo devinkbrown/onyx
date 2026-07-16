@@ -73,6 +73,7 @@ import {
   readTopicReadLedger,
 } from '@/lib/topics/topicReadLedger';
 import { isFollowed } from '@/lib/notifications/followed';
+import { loadChannelNotify, saveChannelNotify } from '@/lib/notifications/channelNotifyMemory';
 import { channelNotifyMode as computeChannelNotifyMode, shouldNotify as computeShouldNotify, modeToLevel, type NotifyMode } from '@/lib/notifications/channelNotifyMode';
 import { parseScheduledEvent, type ScheduledEvent } from '@/lib/notifications/scheduledEvents';
 import {
@@ -2710,6 +2711,7 @@ function _resetAccountBoundState(
     dmPinnedMessages: new Map(),
     showDMPins: false,
     dmPinsNick: null,
+    channelNotify: new Map(),
     serviceNotices: s.serviceNotices.filter(notice => notice.source !== 'Account'),
   }));
 }
@@ -3277,27 +3279,6 @@ function _saveChannelColors(colors: Map<string, string>): void {
   } catch {}
 }
 
-function _loadChannelNotify(): Map<string, 'all' | 'mentions' | 'none'> {
-  if (typeof window === 'undefined') return new Map();
-  try {
-    const raw = localStorage.getItem('onyx:channel-notify');
-    if (!raw) return new Map();
-    const notify = new Map<string, 'all' | 'mentions' | 'none'>();
-    for (const [channel, level] of Object.entries(parseStringRecord(raw))) {
-      if (level === 'mentions' || level === 'none') notify.set(channel.toLowerCase(), level);
-    }
-    return notify;
-  } catch { return new Map(); }
-}
-
-function _saveChannelNotify(notify: Map<string, 'all' | 'mentions' | 'none'>): void {
-  if (typeof window === 'undefined') return;
-  try {
-    const persisted = [...notify].filter(([, level]) => level !== 'all');
-    localStorage.setItem('onyx:channel-notify', JSON.stringify(Object.fromEntries(persisted)));
-  } catch {}
-}
-
 function _loadCompactSidebar(): boolean {
   return typeof window !== 'undefined' && localStorage.getItem('onyx:compact-sidebar') === '1';
 }
@@ -3448,6 +3429,13 @@ function _loadOwnedDMPins(
 ): Map<string, ChatMessage[]> {
   const owner = selectDeviceMemoryOwner(state);
   return owner ? loadDMPins(owner) : new Map();
+}
+
+function _loadOwnedChannelNotify(
+  state: Pick<OnyxState, 'server' | 'ourNick'>,
+): Map<string, 'mentions' | 'none'> {
+  const owner = selectDeviceMemoryOwner(state);
+  return owner ? loadChannelNotify(owner) : new Map();
 }
 
 export interface DeviceMemoryContext {
@@ -3670,7 +3658,9 @@ export const store = createStore<OnyxState>()(
     softIgnoreList: _loadSoftIgnoreList(),
     revealedMessages: new Set<string>(),
     collapsedNicks: new Set<string>(),
-    channelNotify: _loadChannelNotify(),
+    // Private room names and notification policy load only after a server
+    // identity exists; ownerless legacy state is never claimed by a new login.
+    channelNotify: new Map(),
     whoisData: new Map(),
     showWhois: false,
     whoisNick: null,
@@ -4025,6 +4015,7 @@ export const store = createStore<OnyxState>()(
               server,
               composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: newNick }),
               dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: newNick }),
+              channelNotify: _loadOwnedChannelNotify({ server, ourNick: newNick }),
             };
           });
         },
@@ -4099,6 +4090,7 @@ export const store = createStore<OnyxState>()(
               server: srv,
               composerDrafts: _loadOwnedComposerDrafts({ server: srv, ourNick: get().ourNick }),
               dmPinnedMessages: _loadOwnedDMPins({ server: srv, ourNick: get().ourNick }),
+              channelNotify: _loadOwnedChannelNotify({ server: srv, ourNick: get().ourNick }),
               isIRCX: client.isupport.IRCX,
               networkName: net,
               serverCapabilities: caps,
@@ -5943,6 +5935,8 @@ export const store = createStore<OnyxState>()(
 
     // ── per-channel notification prefs ───────────────────────────────────
     setChannelNotify(target, level) {
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
       const key = target.toLowerCase();
       set(s => {
         const channelNotify = new Map(s.channelNotify);
@@ -5951,11 +5945,13 @@ export const store = createStore<OnyxState>()(
         } else {
           channelNotify.set(key, level);
         }
-        _saveChannelNotify(channelNotify);
+        saveChannelNotify(channelNotify, owner);
         return { channelNotify };
       });
     },
     setChannelNotifyMode(channel, mode) {
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
       const key = channel.toLowerCase();
       const level = modeToLevel(mode);
       set(s => {
@@ -5965,7 +5961,7 @@ export const store = createStore<OnyxState>()(
         } else {
           channelNotify.set(key, level);
         }
-        _saveChannelNotify(channelNotify);
+        saveChannelNotify(channelNotify, owner);
         return { channelNotify };
       });
     },
@@ -7189,6 +7185,7 @@ export const store = createStore<OnyxState>()(
               server,
               composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: s.ourNick }),
               dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: s.ourNick }),
+              channelNotify: _loadOwnedChannelNotify({ server, ourNick: s.ourNick }),
             };
           });
           break;
@@ -8863,12 +8860,15 @@ export const store = createStore<OnyxState>()(
               s.activeView.kind === 'channel' && s.activeView.channel.toLowerCase() === oldKey
                 ? { kind: 'channel' as const, channel: newKey }
                 : s.activeView;
+            const channelNotify = moveKey(s.channelNotify);
+            const owner = selectDeviceMemoryOwner(s);
+            if (owner) saveChannelNotify(channelNotify, owner);
 
             return {
               channels,
               activeView,
               firstUnreadId: moveKey(s.firstUnreadId),
-              channelNotify: moveKey(s.channelNotify),
+              channelNotify,
               channelProps: moveKey(s.channelProps),
               historyLoading: moveKey(s.historyLoading),
               historyExhausted: moveKey(s.historyExhausted),
@@ -9563,6 +9563,7 @@ export const store = createStore<OnyxState>()(
                 server,
                 composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: s.ourNick }),
                 dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: s.ourNick }),
+                channelNotify: _loadOwnedChannelNotify({ server, ourNick: s.ourNick }),
                 passkeyBusy: false,
                 passkeyError: null,
               };
@@ -9592,6 +9593,7 @@ export const store = createStore<OnyxState>()(
               server,
               composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: s.ourNick }),
               dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: s.ourNick }),
+              channelNotify: _loadOwnedChannelNotify({ server, ourNick: s.ourNick }),
             };
           });
           break;

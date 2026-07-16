@@ -11,13 +11,26 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { store } from './store';
+import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
+import { CHANNEL_NOTIFY_STORAGE_KEY } from '@/lib/notifications/channelNotifyMemory';
+import { store, type Server } from './store';
 
 const initialState = store.getInitialState();
-const NOTIFY_KEY = 'onyx:channel-notify';
+const MEMORY_OWNER = { serverUrl: 'wss://notify.test', identity: 'me' } as const;
+const memoryServer: Server = {
+  id: 'channel-notify',
+  name: 'Notify',
+  network: 'Notify',
+  url: MEMORY_OWNER.serverUrl,
+  icon: '',
+  nick: MEMORY_OWNER.identity,
+  account: MEMORY_OWNER.identity,
+  connected: true,
+};
+const NOTIFY_KEY = deviceMemoryStorageKey(CHANNEL_NOTIFY_STORAGE_KEY, MEMORY_OWNER)!;
 
 beforeEach(() => {
-  store.setState(initialState, true);
+  store.setState({ ...initialState, server: memoryServer, ourNick: MEMORY_OWNER.identity }, true);
   localStorage.clear();
 });
 
