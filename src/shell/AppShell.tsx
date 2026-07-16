@@ -92,6 +92,7 @@ import {
 import { makeReducedDataSignal } from '@/lib/a11y/reducedData';
 import { scheduleBackgroundTask, type CancelBackgroundTask } from '@/lib/backgroundTask';
 import { createVirtualKeyboardOverlayController } from '@/lib/mobile/virtualKeyboardOverlay';
+import { keyboardEventIsClaimed } from '@/primitives/focusTrap';
 
 // ── AppShell props ───────────────────────────────────────────────────────────
 
@@ -401,7 +402,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
   onMount(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       const drawer = activeMobileDrawerElement();
-      if (!drawer) return;
+      if (!drawer || keyboardEventIsClaimed(event)) return;
 
       if (event.key === 'Escape') {
         if (drawer.querySelector('[role="dialog"]:not([hidden])')) return;

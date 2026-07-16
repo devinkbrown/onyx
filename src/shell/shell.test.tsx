@@ -26,7 +26,7 @@ import { saveChannelTopicDrafts } from '@/lib/channel/topicDrafts';
 import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
 import { followed, isFollowed, unfollow } from '@/lib/notifications/followed';
 import { readReviewHistory, recordReviewHistory } from '@/lib/notifications/reviewHistory';
-import { isPreferencesOpen, resetPreferences, setPreference } from '@/lib/prefs/preferences';
+import { closePreferences, isPreferencesOpen, resetPreferences, setPreference } from '@/lib/prefs/preferences';
 import { readTopicReadMarker, TOPIC_READ_LEDGER_KEY } from '@/lib/topics/topicReadLedger';
 import { _resetVaultForTests, queueOutbox, saveMessages } from '@/lib/vault/historyVault';
 import { Spotlight } from '@/chat/spotlight';
@@ -137,6 +137,7 @@ describe('AppShell', () => {
     _resetNamesBurstsForTests();
     for (const key of followed()) unfollow(key);
     localStorage.clear();
+    closePreferences();
     resetPreferences();
     globalThis.indexedDB = new IDBFactory();
     _resetVaultForTests();
@@ -1270,6 +1271,29 @@ describe('AppShell', () => {
 
       await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Channel drawer' })).not.toBeInTheDocument());
       expect(roomsButton).toHaveFocus();
+    });
+
+    it('keeps the mobile channel drawer open for claimed or composing keys', async () => {
+      stubMobileViewport();
+      seedStore('#general');
+
+      render(() => <AppShell />);
+      fireEvent.click(screen.getByRole('button', { name: 'Toggle channel list' }));
+      const drawer = screen.getByRole('dialog', { name: 'Channel drawer' });
+      await waitFor(() => expect(drawer.contains(document.activeElement)).toBe(true));
+
+      fireEvent.keyDown(document, { key: 'Escape', isComposing: true });
+      expect(screen.getByRole('dialog', { name: 'Channel drawer' })).toBeInTheDocument();
+
+      const claimed = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+      claimed.preventDefault();
+      document.dispatchEvent(claimed);
+      expect(screen.getByRole('dialog', { name: 'Channel drawer' })).toBeInTheDocument();
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: 'Channel drawer' })).not.toBeInTheDocument();
+      });
     });
 
     it('keeps the closed mobile member drawer inert, then restores its trigger after Escape', async () => {
