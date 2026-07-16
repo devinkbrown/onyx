@@ -491,6 +491,12 @@ describe('PreferencesPanel', () => {
       expect(historyTab).toHaveFocus();
       expect(reduceMotion.closest('[role="tabpanel"]')).toHaveAttribute('hidden');
     });
+
+    const localHistory = screen.getByRole('switch', { name: 'Remember conversations on this device' });
+    localHistory.focus();
+    openPreferences('history');
+
+    await waitFor(() => expect(historyTab).toHaveFocus());
   });
 
   it('resets category scroll while preserving tab focus and mounted pane state', () => {

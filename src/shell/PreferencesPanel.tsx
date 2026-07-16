@@ -2914,10 +2914,10 @@ export function PreferencesPanel(): JSX.Element {
   const [activeCategory, setActiveCategory] = createSignal<PreferenceCategory>('display');
   let panelRef: HTMLDivElement | undefined;
 
-  function selectCategory(category: PreferenceCategory): void {
+  function selectCategory(category: PreferenceCategory, routed = false): void {
     const previousCategory = activeCategory();
     const activeElement = document.activeElement;
-    const focusDestinationTab = previousCategory !== category
+    const focusDestinationTab = (previousCategory !== category || routed)
       && activeElement instanceof HTMLElement
       && panelRef?.contains(activeElement) === true
       && activeElement.closest(`#pref-category-panel-${previousCategory}`) !== null;
@@ -2937,7 +2937,7 @@ export function PreferencesPanel(): JSX.Element {
   createEffect(() => {
     const request = preferenceOpenRequest();
     if (!isPreferencesOpen()) return;
-    if (request.category !== null) selectCategory(request.category);
+    if (request.category !== null) selectCategory(request.category, true);
   });
 
   return (
