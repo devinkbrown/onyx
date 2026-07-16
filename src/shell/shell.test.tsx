@@ -1312,6 +1312,19 @@ describe('AppShell', () => {
       });
     });
 
+    it('does not expose an empty channel nicklist inside a direct message', () => {
+      stubMobileViewport(false);
+      seedStore('#general');
+      store.setState({ activeView: { kind: 'dm', nick: 'alice' } });
+
+      const { container } = render(() => <AppShell />);
+
+      expect(container.querySelector('[data-testid="app-shell"]')).toHaveClass('shell--members-hidden');
+      expect(container.querySelector('aside.shell-members')).toHaveAttribute('inert');
+      expect(screen.queryByRole('region', { name: /Channel members/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Toggle member list' })).not.toBeInTheDocument();
+    });
+
     it('summarizes unread home recaps and hands them to Spotlight', async () => {
       const travelToSpy = vi.spyOn(store.getState(), 'travelTo');
       const channel = {
@@ -1440,7 +1453,11 @@ describe('AppShell', () => {
           account: 'testuser', connected: false,
         },
       }, true);
-      saveChannelTopicDrafts({ '#general': 'topic draft', alice: 'ignored non-channel draft' });
+      saveChannelTopicDrafts(
+        { '#general': 'topic draft', alice: 'ignored non-channel draft' },
+        undefined,
+        MEMORY_OWNER,
+      );
 
       await queueOutbox('#general', 'queued while offline', {
         serverUrl: 'wss://example.test',

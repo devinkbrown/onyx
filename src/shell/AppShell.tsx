@@ -293,6 +293,12 @@ export function AppShell(props: AppShellProps): JSX.Element {
     return view.kind === 'channel' || view.kind === 'dm';
   });
 
+  // A direct-message conversation has no channel membership roster. Keeping
+  // the member column/drawer available there opened a real but empty nicklist,
+  // which looked like the channel roster had disappeared after switching to a
+  // DM. Only channel views own the member surface.
+  const hasMemberRoster = createMemo(() => activeView().kind === 'channel');
+
   // ── mobile viewport tracking ──
   // The member list is a column on desktop (driven by showMemberList) but a
   // right-hand drawer on mobile that must default CLOSED and open only on tap —
@@ -449,7 +455,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
 
   // ── is the member surface visible (column on desktop, drawer on mobile)? ──
   const membersVisible = createMemo(() =>
-    hasConversation() && (isMobile() ? mobileMembersOpen() : showMemberList()),
+    hasMemberRoster() && (isMobile() ? mobileMembersOpen() : showMemberList()),
   );
 
   function handleDisconnect(): void {
@@ -460,7 +466,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const shellClass = createMemo(() => {
     const classes = ['shell'];
     if (!showRail()) classes.push('shell--no-rail');
-    if (!showMemberList() || !hasConversation()) classes.push('shell--members-hidden');
+    if (!showMemberList() || !hasMemberRoster()) classes.push('shell--members-hidden');
     return classes.join(' ');
   });
 
@@ -587,7 +593,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
         >
           <b aria-hidden="true">≡</b>rooms
         </button>
-        <Show when={hasConversation()}>
+        <Show when={hasMemberRoster()}>
           <button
             ref={mobileMembersButtonRef}
             type="button"
