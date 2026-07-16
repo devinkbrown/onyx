@@ -744,6 +744,7 @@
   color: var(--washi-mute);
   font-size: 0.78rem;
   line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .pref-import-review__actions {
@@ -756,6 +757,7 @@
   margin: 0;
   font-size: 0.76rem;
   line-height: 1.35;
+  overflow-wrap: anywhere;
   color: var(--lapis-bright);
 }
 

@@ -612,6 +612,8 @@ function PortableVaultControls(): JSX.Element {
   let shareEpoch = 0;
   let applyEpoch = 0;
   let disposed = false;
+  let importInput: HTMLInputElement | undefined;
+  let importReviewHeading: HTMLHeadingElement | undefined;
 
   const reportStatus = (message: string, failure = false) => {
     setStatus({ message, failure });
@@ -803,6 +805,7 @@ function PortableVaultControls(): JSX.Element {
       const savedSearches = parsed.savedSearches.length;
       setPendingImport({ fileName: file.name, snapshot: parsed, messages, drafts, topicDrafts, accountHandoffs, preferenceHandoffs, followedConversations, topicReadCursors, savedSearches });
       reportStatus(`Ready to import ${countLabel(messages, 'message')}, ${countLabel(parsed.targets.length, 'target')}, ${countLabel(parsed.reviewHistory.length, 'review')}, ${countLabel(drafts, 'room draft')}, ${countLabel(topicDrafts, 'topic draft')}, ${countLabel(followedConversations, 'followed conversation')}, ${countLabel(topicReadCursors, 'topic read cursor')}, ${countLabel(savedSearches, 'saved search', 'saved searches')}, ${countLabel(accountHandoffs, 'account handoff')}, and ${countLabel(preferenceHandoffs, 'preference set')}.`);
+      focusConnectedAfterRender(() => importReviewHeading);
     } catch (error) {
       if (!disposed && epoch === importEpoch) {
         if (compressed && error instanceof PortableGzipError) {
@@ -878,6 +881,7 @@ function PortableVaultControls(): JSX.Element {
       }
       setPendingImport(null);
       reportStatus(`Imported ${countLabel(locked.value.messages, 'message')}, ${countLabel(locked.value.targets, 'target')}, ${countLabel(locked.value.reviews, 'review')}, ${countLabel(locked.value.drafts, 'room draft')}, ${countLabel(locked.value.topicDrafts, 'topic draft')}, ${countLabel(locked.value.followedConversations, 'followed conversation')}, ${countLabel(locked.value.topicReadCursors, 'topic read cursor')}, ${countLabel(locked.value.savedSearches, 'saved search', 'saved searches')}, ${countLabel(locked.value.accountHandoffs, 'account handoff')}, and ${countLabel(locked.value.preferenceHandoffs, 'preference set')}.`);
+      focusConnectedAfterRender(() => importInput);
     } catch (error) {
       if (!disposed && epoch === applyEpoch) {
         reportStatus(
@@ -963,6 +967,7 @@ function PortableVaultControls(): JSX.Element {
         <label class="pref-file">
           <span>Import portable JSON</span>
           <input
+            ref={importInput}
             type="file"
             accept="application/json,application/gzip,application/x-gzip,.json,.json.gz"
             disabled={busy()}
@@ -973,7 +978,7 @@ function PortableVaultControls(): JSX.Element {
       <Show when={pendingImport()}>
         {(pending) => (
           <div class="pref-import-review" role="group" aria-labelledby="pref-import-review-title">
-            <h4 id="pref-import-review-title">Review import</h4>
+            <h4 id="pref-import-review-title" tabindex={-1} ref={importReviewHeading}>Review import</h4>
             <p>
               {pending().fileName}: {countLabel(pending().messages, 'message')},
               {' '}{countLabel(pending().snapshot.targets.length, 'target')},
@@ -997,6 +1002,7 @@ function PortableVaultControls(): JSX.Element {
                 onClick={() => {
                   setPendingImport(null);
                   reportStatus('Import cancelled.');
+                  focusConnectedAfterRender(() => importInput);
                 }}
               >
                 Cancel import
@@ -1023,7 +1029,7 @@ function PortableVaultControls(): JSX.Element {
   );
 }
 
-function focusConnectedAfterRender(getElement: () => HTMLButtonElement | undefined): void {
+function focusConnectedAfterRender(getElement: () => HTMLElement | undefined): void {
   queueMicrotask(() => {
     const element = getElement();
     if (element?.isConnected) element.focus();

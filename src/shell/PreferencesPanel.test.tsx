@@ -204,6 +204,22 @@ describe('PreferencesPanel', () => {
     expect(screen.getByRole('group', { name: 'Review import' })).toBe(review);
   });
 
+  it('moves focus into a portable import review and returns it after cancellation', async () => {
+    renderPreferences('Import & export');
+    const input = screen.getByLabelText('Import portable JSON');
+    input.focus();
+
+    await stageEmptyPortableImport();
+
+    const reviewHeading = screen.getByRole('heading', { name: 'Review import' });
+    await waitFor(() => expect(reviewHeading).toHaveFocus());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel import' }));
+
+    await waitFor(() => expect(input).toHaveFocus());
+    expect(screen.getByText('Import cancelled.')).toHaveAttribute('role', 'status');
+  });
+
   it('moves category selection and focus with tab-list navigation keys', () => {
     renderPreferences();
     const display = screen.getByRole('tab', { name: /^Display/ });
@@ -1258,9 +1274,13 @@ describe('PreferencesPanel', () => {
       text,
     } as unknown as File;
 
-    fireEvent.change(screen.getByLabelText('Import portable JSON'), { target: { files: [file] } });
+    const input = screen.getByLabelText('Import portable JSON');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Close preferences' })).toHaveFocus());
+    input.focus();
+    fireEvent.change(input, { target: { files: [file] } });
 
-    expect(await screen.findByText('huge-portable.json exceeds the 64 MiB portable JSON limit. Choose a smaller portable vault file.')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('huge-portable.json exceeds the 64 MiB portable JSON limit. Choose a smaller portable vault file.');
+    expect(input).toHaveFocus();
     expect(text).not.toHaveBeenCalled();
     expect(screen.queryByRole('heading', { name: 'Review import' })).not.toBeInTheDocument();
   });

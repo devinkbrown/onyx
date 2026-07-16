@@ -8,10 +8,21 @@ const preferencesCss = readFileSync(
 
 async function renderNarrowPreferences(
   page: import('@playwright/test').Page,
-  options: { width?: number; rootFontSize?: number } = {},
+  options: { width?: number; rootFontSize?: number; longImportFeedback?: boolean } = {},
 ): Promise<void> {
   const width = options.width ?? 240;
   const rootFontSize = options.rootFontSize ?? 24;
+  const longFilename = `portable-${'x'.repeat(180)}.json`;
+  const longImportFeedback = options.longImportFeedback
+    ? `
+      <div class="pref-import-review" role="group" aria-label="Review import">
+        <p>${longFilename}: 0 messages, 0 targets, and 0 preference sets.</p>
+      </div>
+      <p class="pref-status pref-status--error" role="alert">
+        ${longFilename} exceeds the portable JSON limit. Choose a smaller portable vault file.
+      </p>
+    `
+    : '';
   await page.setViewportSize({ width, height: 568 });
   await page.setContent(`
     <!doctype html>
@@ -51,6 +62,7 @@ async function renderNarrowPreferences(
                 <li>Create an application at <a href="https://discord.com/developers/applications">discord.com/developers</a>, then add a Bot to it.</li>
               </ol>
             </section>
+            ${longImportFeedback}
           </section>
         </div>
       </div>
@@ -114,8 +126,12 @@ test('contains enlarged preference controls and leaves a usable mobile tab strip
   expect(geometry.segmentsScrollWidth).toBe(geometry.segmentsClientWidth);
 });
 
-test('wraps import instructions at 200% text without horizontal sheet scrolling', async ({ page }) => {
-  await renderNarrowPreferences(page, { width: 320, rootFontSize: 32 });
+test('wraps import guidance, long filenames, and validation alerts at 200% text', async ({ page }) => {
+  await renderNarrowPreferences(page, {
+    width: 320,
+    rootFontSize: 32,
+    longImportFeedback: true,
+  });
 
   const body = page.locator('.onyx-sheet__body');
   const geometry = await body.evaluate((element) => ({
