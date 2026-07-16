@@ -59,6 +59,30 @@ describe('MessageText Block-Kit-lite', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Copy value for Copy token' })).toHaveTextContent('Copy failed'));
     expect(screen.getByRole('status')).toHaveTextContent('Copy token value could not be copied.');
   });
+
+  it('does not create copy feedback timers after the message row unmounts', async () => {
+    let resolveCopy: (() => void) | undefined;
+    const pendingCopy = new Promise<void>((resolve) => {
+      resolveCopy = resolve;
+    });
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn(() => pendingCopy) },
+    });
+    const view = render(() => (
+      <MessageText text={'[onyx:block] {"buttons":[{"label":"Copy token","value":"secret"}]}' } />
+    ));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy value for Copy token' }));
+    view.unmount();
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    resolveCopy?.();
+    await pendingCopy;
+    await Promise.resolve();
+
+    expect(setTimeoutSpy).not.toHaveBeenCalled();
+    setTimeoutSpy.mockRestore();
+  });
 });
 
 describe('MessageText emoji rendering (live parseMessage → emoji token → lookupEmoji path)', () => {

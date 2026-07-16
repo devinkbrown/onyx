@@ -280,17 +280,44 @@ function BlockKitLiteButtonView(props: {
   const [local] = splitProps(props, ['button', 'onAction']);
   const [copyStatus, setCopyStatus] = createSignal<'idle' | 'copied' | 'failed'>('idle');
   let copyResetTimer: ReturnType<typeof setTimeout> | undefined;
+  let copyEpoch = 0;
+  let disposed = false;
+
+  const clearCopyResetTimer = (): void => {
+    if (copyResetTimer !== undefined) clearTimeout(copyResetTimer);
+    copyResetTimer = undefined;
+  };
+
+  createEffect(() => {
+    void local.button.label;
+    void local.button.value;
+    copyEpoch += 1;
+    clearCopyResetTimer();
+    setCopyStatus('idle');
+  });
 
   onCleanup(() => {
-    if (copyResetTimer !== undefined) clearTimeout(copyResetTimer);
+    disposed = true;
+    copyEpoch += 1;
+    clearCopyResetTimer();
   });
 
   async function copyValue(): Promise<void> {
-    if (!local.button.value) return;
-    const copied = await writeClipboardText(local.button.value);
+    const value = local.button.value;
+    const label = local.button.label;
+    if (!value) return;
+    const epoch = ++copyEpoch;
+    const copied = await writeClipboardText(value);
+    if (
+      disposed
+      || epoch !== copyEpoch
+      || local.button.value !== value
+      || local.button.label !== label
+    ) return;
     setCopyStatus(copied ? 'copied' : 'failed');
-    if (copyResetTimer !== undefined) clearTimeout(copyResetTimer);
+    clearCopyResetTimer();
     copyResetTimer = setTimeout(() => {
+      if (disposed || epoch !== copyEpoch) return;
       copyResetTimer = undefined;
       setCopyStatus('idle');
     }, 1400);

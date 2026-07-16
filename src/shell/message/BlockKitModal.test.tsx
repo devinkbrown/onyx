@@ -100,4 +100,36 @@ describe('BlockKitModal', () => {
     ).toHaveTextContent('Copy failed'));
     expect(screen.getByRole('status')).toHaveTextContent('Copy release ID value could not be copied.');
   });
+
+  it('does not create copy feedback timers after the modal button unmounts', async () => {
+    let resolveCopy: (() => void) | undefined;
+    const pendingCopy = new Promise<void>((resolve) => {
+      resolveCopy = resolve;
+    });
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn(() => pendingCopy) },
+    });
+    const copyModal: BlockKitLiteModalBlock = {
+      ...releaseModal,
+      buttons: [{ label: 'Copy release ID', url: null, value: 'rel-42', action: null }],
+    };
+    const view = render(() => (
+      <BlockKitModal
+        block={copyModal}
+        open
+        onOpenChange={() => undefined}
+      />
+    ));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy value for Copy release ID' }));
+    view.unmount();
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    resolveCopy?.();
+    await pendingCopy;
+    await Promise.resolve();
+
+    expect(setTimeoutSpy).not.toHaveBeenCalled();
+    setTimeoutSpy.mockRestore();
+  });
 });
