@@ -257,6 +257,10 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
     const operation = ++savedOperationSeq;
     savedRefreshSeq += 1;
     if (!open) {
+      // The label is a draft for the current query, not a persisted preference.
+      // Dropping it with the query prevents a private/irrelevant name from
+      // resurfacing when the always-mounted Search Center opens later.
+      setSavedLabel('');
       setSavedStatus('idle');
       setSavedStatusMessage('');
       return;

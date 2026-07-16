@@ -238,6 +238,21 @@ describe('MessageSearch', () => {
     await waitFor(() => expect(document.activeElement).toBe(trigger));
   });
 
+  it('does not carry an unfinished saved-search label into a later search', async () => {
+    store.setState({ ...initialState, activeView: { kind: 'home' } }, true);
+    openMessageSearchWithQuery('first query');
+    render(() => <MessageSearch />);
+
+    const label = screen.getByRole('textbox', { name: 'Saved search name' });
+    fireEvent.input(label, { target: { value: 'Private working label' } });
+    expect(label).toHaveValue('Private working label');
+
+    closeMessageSearch();
+    openMessageSearchWithQuery('second query');
+
+    expect(screen.getByRole('textbox', { name: 'Saved search name' })).toHaveValue('');
+  });
+
   it('offers device recall terms for local search pivots', async () => {
     const liveA = message('live-needle-a', 'Kai', 'needle mobile launch brief', 1);
     const liveB = message('live-needle-b', 'Mira', 'needle mobile release plan', 2);
