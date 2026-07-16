@@ -114,6 +114,7 @@ import {
   normalizeCtcpVersionReply,
   saveCtcpConfig,
 } from '@/lib/ctcpMemory';
+import { loadInvisibleMode, saveInvisibleMode } from '@/lib/invisibleModeMemory';
 import {
   DEFAULT_FAVORITE_EMOJIS,
   MAX_EMOJI_USAGE_COUNT,
@@ -2819,6 +2820,7 @@ function _resetAccountBoundState(
       emojiSkinTone: '',
       ctcpVersionReply: DEFAULT_CTCP_CONFIG.versionReply,
       ctcpTimeEnabled: DEFAULT_CTCP_CONFIG.timeEnabled,
+      invisibleMode: false,
       mutedDMs: new Set(),
       userNotes: new Map(),
       topicHistory: {},
@@ -3607,6 +3609,13 @@ function _loadOwnedCtcpConfig(
   };
 }
 
+function _loadOwnedInvisibleMode(
+  state: Pick<OnyxState, 'server' | 'ourNick'>,
+): boolean {
+  const owner = selectDeviceMemoryOwner(state);
+  return owner ? loadInvisibleMode(owner) : false;
+}
+
 function _loadOwnedMutedDMs(
   state: Pick<OnyxState, 'server' | 'ourNick'>,
 ): Set<string> {
@@ -3974,6 +3983,7 @@ function deliverChatMessage(
 
 const _initialEmojiMemory = loadEmojiMemory();
 const _initialCtcpConfig = loadCtcpConfig();
+const _initialInvisibleMode = loadInvisibleMode();
 
 export const store = createStore<OnyxState>()(
   subscribeWithSelector<OnyxState>((set, get) => ({
@@ -4398,6 +4408,7 @@ export const store = createStore<OnyxState>()(
               channelColors: _loadOwnedChannelColors({ server, ourNick: newNick }),
               ..._loadOwnedEmojiMemory({ server, ourNick: newNick }),
               ..._loadOwnedCtcpConfig({ server, ourNick: newNick }),
+              invisibleMode: _loadOwnedInvisibleMode({ server, ourNick: newNick }),
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: newNick }),
               friends: _loadOwnedFriends({ server, ourNick: newNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: newNick }),
@@ -4493,6 +4504,7 @@ export const store = createStore<OnyxState>()(
               channelColors: _loadOwnedChannelColors({ server: srv, ourNick: get().ourNick }),
               ..._loadOwnedEmojiMemory({ server: srv, ourNick: get().ourNick }),
               ..._loadOwnedCtcpConfig({ server: srv, ourNick: get().ourNick }),
+              invisibleMode: _loadOwnedInvisibleMode({ server: srv, ourNick: get().ourNick }),
               mutedDMs: _loadOwnedMutedDMs({ server: srv, ourNick: get().ourNick }),
               friends: _loadOwnedFriends({ server: srv, ourNick: get().ourNick }),
               watchList: _loadOwnedWatchList({ server: srv, ourNick: get().ourNick }),
@@ -7622,6 +7634,7 @@ export const store = createStore<OnyxState>()(
               channelColors: _loadOwnedChannelColors({ server, ourNick: s.ourNick }),
               ..._loadOwnedEmojiMemory({ server, ourNick: s.ourNick }),
               ..._loadOwnedCtcpConfig({ server, ourNick: s.ourNick }),
+              invisibleMode: _loadOwnedInvisibleMode({ server, ourNick: s.ourNick }),
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
               friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
@@ -8283,6 +8296,7 @@ export const store = createStore<OnyxState>()(
                   channelColors: _loadOwnedChannelColors({ server, ourNick: s.ourNick }),
                   ..._loadOwnedEmojiMemory({ server, ourNick: s.ourNick }),
                   ..._loadOwnedCtcpConfig({ server, ourNick: s.ourNick }),
+                  invisibleMode: _loadOwnedInvisibleMode({ server, ourNick: s.ourNick }),
                 };
               });
               _saslAccount = null;
@@ -8861,6 +8875,7 @@ export const store = createStore<OnyxState>()(
                 channelColors: _loadOwnedChannelColors({ server, ourNick: newNick }),
                 ..._loadOwnedEmojiMemory({ server, ourNick: newNick }),
                 ..._loadOwnedCtcpConfig({ server, ourNick: newNick }),
+                invisibleMode: _loadOwnedInvisibleMode({ server, ourNick: newNick }),
                 mutedDMs: _loadOwnedMutedDMs({ server, ourNick: newNick }),
                 friends: _loadOwnedFriends({ server, ourNick: newNick }),
                 watchList: _loadOwnedWatchList({ server, ourNick: newNick }),
@@ -10082,6 +10097,7 @@ export const store = createStore<OnyxState>()(
                 channelColors: _loadOwnedChannelColors({ server, ourNick: s.ourNick }),
                 ..._loadOwnedEmojiMemory({ server, ourNick: s.ourNick }),
                 ..._loadOwnedCtcpConfig({ server, ourNick: s.ourNick }),
+                invisibleMode: _loadOwnedInvisibleMode({ server, ourNick: s.ourNick }),
                 mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
                 friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
                 watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
@@ -10135,6 +10151,7 @@ export const store = createStore<OnyxState>()(
               channelColors: _loadOwnedChannelColors({ server, ourNick: s.ourNick }),
               ..._loadOwnedEmojiMemory({ server, ourNick: s.ourNick }),
               ..._loadOwnedCtcpConfig({ server, ourNick: s.ourNick }),
+              invisibleMode: _loadOwnedInvisibleMode({ server, ourNick: s.ourNick }),
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
               friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
@@ -11878,14 +11895,17 @@ export const store = createStore<OnyxState>()(
     },
 
     // ── Invisible mode ────────────────────────────────────────────────────────
-    invisibleMode: typeof window !== 'undefined' && localStorage.getItem('onyx:invisibleMode') === '1',
+    invisibleMode: _initialInvisibleMode,
     setInvisibleMode: (v) => {
-      if (typeof window !== 'undefined') { try { localStorage.setItem('onyx:invisibleMode', v ? '1' : '0'); } catch {} }
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
+      const saved = saveInvisibleMode(v, owner);
+      if (saved === null) return;
       const { client, ourNick } = get();
       if (client && ourNick) {
-        client.sendRaw('MODE', ourNick, v ? '+i' : '-i');
+        client.sendRaw('MODE', ourNick, saved ? '+i' : '-i');
       }
-      set({ invisibleMode: v });
+      set({ invisibleMode: saved });
     },
 
     // ── Unread tracking ───────────────────────────────────────────────────────
