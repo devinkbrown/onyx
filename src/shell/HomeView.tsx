@@ -184,22 +184,30 @@ export function HomeView(): JSX.Element {
   const networkName = useStore((s) => s.networkName);
   const ourNick = useStore((s) => s.ourNick);
 
-  const [stats] = createResource(fetchStatsIndex);
+  const [stats] = createResource(fetchStatsIndex, { initialValue: null });
   const [reviewHistory, setReviewHistory] = createSignal<ReviewHistoryEntry[]>(readReviewHistory());
   const reviewHistorySummary = createMemo(() =>
     connectionStatus() === 'connected' ? 'catch-up ranges' : 'offline recall',
   );
-  const [outboxEntries, { refetch: refetchOutbox }] = createResource(connectionStatus, () => loadOutbox());
+  const [outboxEntries, { refetch: refetchOutbox }] = createResource(
+    connectionStatus,
+    () => loadOutbox(),
+    { initialValue: [] as OutboxEntry[] },
+  );
   const [confirmDiscardId, setConfirmDiscardId] = createSignal<string | null>(null);
   onCleanup(subscribeOutbox(() => {
     setConfirmDiscardId(null);
     void refetchOutbox();
   }));
-  const [topicDrafts] = createResource(connectionStatus, () => loadChannelTopicDrafts());
-  const queuedEntries = createMemo<OutboxEntry[]>(() => outboxEntries() ?? []);
+  const [topicDrafts] = createResource(
+    connectionStatus,
+    () => loadChannelTopicDrafts(),
+    { initialValue: {} },
+  );
+  const queuedEntries = createMemo<OutboxEntry[]>(() => outboxEntries.latest ?? []);
   const queuedSendCount = createMemo(() => queuedEntries().length);
   const roomDraftCount = createMemo(() => channelDraftCount(composerDrafts()));
-  const topicDraftCount = createMemo(() => Object.keys(topicDrafts() ?? {}).length);
+  const topicDraftCount = createMemo(() => Object.keys(topicDrafts.latest ?? {}).length);
   const localMemoryStatus = createMemo(() => {
     const waiting = [
       queuedSendCount() > 0 ? countLabel(queuedSendCount(), 'queued send') : null,
@@ -375,8 +383,8 @@ export function HomeView(): JSX.Element {
     const targets = key.split('\n').filter(Boolean);
     if (targets.length === 0) return [];
     return buildHomeMemory(targets, (target) => loadRecent(target, 24), 4);
-  });
-  const rememberedRooms = createMemo<HomeMemoryItem[]>(() => homeMemory() ?? []);
+  }, { initialValue: [] as HomeMemoryItem[] });
+  const rememberedRooms = createMemo<HomeMemoryItem[]>(() => homeMemory.latest ?? []);
   const openMemory = (item: HomeMemoryItem) => void getState().joinChannel(item.target);
   const quietActivity = createMemo<QuietActivityItem[]>(
     () => buildQuietActivity(channels().values(), channelLastActivity(), nowMs()),
@@ -449,21 +457,21 @@ export function HomeView(): JSX.Element {
   );
 
   const directory = createMemo(() => {
-    const data = stats();
+    const data = stats.latest;
     if (!data || data.channels.length === 0) return [];
     return [...data.channels]
       .sort((a, b) => b.messages - a.messages)
       .slice(0, 9);
   });
   const totalMessages = createMemo(() =>
-    (stats()?.channels ?? []).reduce((sum, c) => sum + c.messages, 0),
+    (stats.latest?.channels ?? []).reduce((sum, c) => sum + c.messages, 0),
   );
   const totalChatting = createMemo(() =>
-    (stats()?.channels ?? []).reduce((sum, c) => sum + c.active_users, 0),
+    (stats.latest?.channels ?? []).reduce((sum, c) => sum + c.active_users, 0),
   );
   const isJoined = (name: string) => channels().has(name.toLowerCase());
   const roomRhythm = createMemo<HomeRhythmItem[]>(() => {
-    const data = stats();
+    const data = stats.latest;
     if (!data) return [];
     const joined = channels();
     const events = scheduledEventsByChannel();
@@ -782,7 +790,7 @@ export function HomeView(): JSX.Element {
           </section>
         </Show>
 
-        <Show when={stats()}>
+        <Show when={stats.latest}>
           {(data) => (
             <div class="home-pulse" aria-label="Live network figures">
               <div class="home-pulse-tile">

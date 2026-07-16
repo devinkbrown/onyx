@@ -10,7 +10,8 @@
  * boundary via focusMessage (SC 2.4.3 Focus Order).
  */
 import 'fake-indexeddb/auto';
-import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
+import { Suspense } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { store } from '@/lib/store/store';
 import type { Channel, ChannelUser } from '@/lib/irc/types';
@@ -66,6 +67,21 @@ afterEach(() => {
 });
 
 describe('HomeView — resume section a11y', () => {
+  it('keeps Home mounted while the optional network pulse is pending', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
+
+    render(() => (
+      <Suspense fallback={<p data-testid="home-suspended">Loading shell</p>}>
+        <HomeView />
+      </Suspense>
+    ));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('home-suspended')).not.toBeInTheDocument();
+      expect(screen.getByRole('main', { name: 'Network home' })).toBeInTheDocument();
+    });
+  });
+
   it('renders each resume point as a named native button, not a bare div', () => {
     seedResume();
     render(() => <HomeView />);
