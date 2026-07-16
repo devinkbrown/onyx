@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-li
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { openPreferences, resetPreferences } from '@/lib/prefs/preferences';
+import { closePreferences, openPreferences, resetPreferences } from '@/lib/prefs/preferences';
 import { store } from '@/lib/store/store';
 import { _resetVaultForTests } from '@/lib/vault/historyVault';
 import { _resetSavedSearchesForTests } from '@/lib/vault/savedSearches';
@@ -17,6 +17,7 @@ describe('Home Search Center integration', () => {
   beforeEach(() => {
     store.setState({ ...initialState, activeView: { kind: 'home' } }, true);
     closeMessageSearch();
+    closePreferences();
     localStorage.clear();
     resetPreferences();
     globalThis.indexedDB = new IDBFactory();
@@ -28,6 +29,7 @@ describe('Home Search Center integration', () => {
   afterEach(() => {
     cleanup();
     closeMessageSearch();
+    closePreferences();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
