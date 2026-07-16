@@ -13,15 +13,16 @@ separate, deliberate decision (the AGPL grant only takes effect on public distri
 
 ## Stack
 - **SolidJS 1.9** + `@solidjs/router` — SPA, no SSR
-- **Vite 7** (`pnpm build` → static export in `out/`)
+- **Vite 7** (`pnpm build` → static export in `dist/`; only `deploy.sh` writes `out/`)
 - **Zustand vanilla** store + `useStore` Solid bridge (`src/lib/store/`)
 - **Tailwind 4** + hand-rolled CSS tokens; **TypeScript**
 - **pnpm always, never npm**
 
 ## Layout
 - Entry: `src/index.tsx` — routes `/` (Landing), `/about`, `/app` (AppShell),
-  `/appearance`. Route list MUST stay in sync with deploy.sh's SPA
-  entrypoint list (`for route in app about appearance`).
+  `/appearance`, `/stats`, `/status`, `/roadmap`, and `/invite`. Keep this
+  table in sync with `ROUTE_ENTRYPOINTS` in
+  `tools/materialize-route-entrypoints.mjs`, which owns their static metadata.
   First import is `src/lib/migrateStorage.ts` (legacy `ocean-*` →
   `onyx:*` localStorage migration, runs as an import side effect) — keep it first.
 - IRC layer: `src/lib/irc/` — `client.ts` (WS client, SASL PLAIN/SCRAM,
@@ -68,8 +69,8 @@ separate, deliberate decision (the AGPL grant only takes effect on public distri
 ```bash
 pnpm dev        # dev server
 pnpm build      # → dist/ (safe: NEVER touches production)
-./deploy.sh     # dist/ build + /app /about /appearance route copies + sw
-                # stamp + community-site overlay from /home/kain/landing,
+./deploy.sh     # dist/ build + route-correct SPA entrypoints + sw stamp
+                # + community-site overlay from /home/kain/landing,
                 # then rsync --delete dist/ → out/ (nginx serves out/)
 ```
 nginx serves `out/` at eshmaki.me. ONLY deploy.sh writes out/ — plain builds

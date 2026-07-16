@@ -23,8 +23,9 @@ client only: the server is Orochi (see [`../OROCHI_PROTOCOL.md`](../OROCHI_PROTO
 - Routes are declared with `@solidjs/router` (`src/index.tsx:86`): `/` (Landing,
   eager), and lazy routes `/about`, `/app` (`AppRoute` → the chat shell),
   `/appearance`, `/stats`, `/status`, `/roadmap`, `/invite`. **This `<Route>`
-  table must stay in sync with the SPA route-copy list in `deploy.sh:32`**
-  (`for route in app about appearance stats status roadmap invite`).
+  table must stay in sync with `ROUTE_ENTRYPOINTS` in
+  `tools/materialize-route-entrypoints.mjs`**, which materialises a document
+  with route-correct crawler and unfurl metadata for every SPA entrypoint.
 - The Cmd/Ctrl-K command palette host (`GlobalSpotlight`, `src/index.tsx:56`) is
   armed lazily on first open so its command catalogue stays off the landing chunk.
 - In dev only, the store module is exposed as `window.__onyx` for headless
@@ -260,13 +261,9 @@ state). Almost every module has a co-located `*.test.ts`.
 - `pnpm build` — Vite build to **`dist/`** (`vite.config.ts:13`), *not* `out/`.
   Manual chunks split `solid`, `media`, and the store `runtime`
   (`vite.config.ts:18`).
-- `./deploy.sh` — the only writer of `out/`. It builds to `dist/`, materialises
-  per-route `index.html` copies (`deploy.sh:32`), stamps the service-worker
-  cache name (`deploy.sh:38`), overlays the community site from
+- `./deploy.sh` — the only writer of `out/`. It builds to `dist/`, uses
+  `tools/materialize-route-entrypoints.mjs` for route-specific `index.html`
+  documents and metadata, stamps the service-worker cache name, overlays the community site from
   `/home/kain/landing`, then `rsync --delete dist/ → out/`. nginx serves `out/`
   at eshmaki.me. See [`../CONTRIBUTING.md`](../CONTRIBUTING.md) for the safety
   rationale.
-
-> Note (doc drift): `README.md` and `CLAUDE.md` describe `pnpm build` as
-> emitting `out/`. The build actually targets `dist/` (`vite.config.ts:13`);
-> only `deploy.sh` produces `out/`. Follow the code.

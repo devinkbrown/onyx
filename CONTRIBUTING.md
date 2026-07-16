@@ -86,10 +86,11 @@ syncs `dist/ → out/`.
 `./deploy.sh`:
 
 1. `pnpm build` → `dist/` (aborts if `dist/index.html` or `dist/sw.js` is missing).
-2. Materialises SPA route entrypoints as `dist/<route>/index.html` copies so hard
-   loads of client routes don't 404 under nginx. **Keep the route list in
-   `deploy.sh` in sync with the `<Route>` table in `src/index.tsx`** — currently
-   `app, about, appearance, stats, status, roadmap, invite`.
+2. Materialises SPA route entrypoints with route-correct canonical, Open Graph,
+   title, and description metadata so hard loads do not 404 and pre-hydration
+   crawlers see the right page. **Keep `ROUTE_ENTRYPOINTS` in
+   `tools/materialize-route-entrypoints.mjs` in sync with the `<Route>` table in
+   `src/index.tsx`.**
 3. Stamps the service-worker cache name (`onyx-shell-<version>`) into `dist/sw.js`.
 4. Overlays the community site from `/home/kain/landing`.
 5. `rsync -a --delete dist/ out/`.

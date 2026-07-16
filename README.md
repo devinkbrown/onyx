@@ -48,11 +48,11 @@ half-replace production. **`deploy.sh` is the only writer of `out/`.** The scrip
 (`deploy.sh`):
 
 1. runs `pnpm build` → `dist/`
-2. materialises SPA route entrypoints (`dist/<route>/index.html` copies for
-   `app about appearance stats status roadmap invite`, `deploy.sh:32`) so hard
-   loads of client routes don't 404 — keep that list in sync with the `<Route>`
-   table in `src/index.tsx`
+2. materialises SPA route entrypoints with route-specific canonical, Open Graph,
+   title, and description metadata via `tools/materialize-route-entrypoints.mjs`
+   so hard loads do not 404 and unfurlers do not mistake them for `/` — keep its
+   `ROUTE_ENTRYPOINTS` list in sync with the `<Route>` table in `src/index.tsx`
 3. stamps the service-worker cache name (`onyx-shell-<version>`) into `dist/sw.js`
-   so already-cached clients pick up the new build (`deploy.sh:38`)
+   so already-cached clients pick up the new build
 4. overlays the community site from `/home/kain/landing`, then
-   `rsync -a --delete dist/ → out/` (`deploy.sh:59`)
+   `rsync -a --delete dist/ → out/`

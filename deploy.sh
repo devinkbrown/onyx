@@ -7,7 +7,7 @@
 # plain `pnpm build` runs (tests, gates, e2e web servers) can never wipe or
 # half-replace production. ONLY this script writes out/.
 #
-# The full deploy = SPA build + SPA route copies + sw stamp + the community
+# The full deploy = SPA build + route-correct SPA documents + sw stamp + the community
 # site overlay from /home/kain/landing (root index.html, /guides/, /community/,
 # favicon). The overlay is part of THIS script so it cannot be forgotten —
 # a bare SPA sync would silently take the community site off the air.
@@ -26,13 +26,11 @@ test -f dist/sw.js      || { echo "FAIL: dist/sw.js missing"; exit 1; }
 # SPA route entrypoints. The app is client-routed (solid-router) but the build
 # emits only dist/index.html, so a HARD load / refresh / direct link to a route
 # (e.g. /app, the 'Open Onyx' target) 404s under nginx's
-# `try_files $uri $uri/ $uri/index.html =404`. Materialise each client route as
-# its own index.html copy. Keep this list in sync with the <Route> table in index.tsx.
-echo "==> materialising SPA route entrypoints (app, about, appearance, stats, status, roadmap, invite)"
-for route in app about appearance stats status roadmap invite; do
-  mkdir -p "dist/${route}"
-  cp dist/index.html "dist/${route}/index.html"
-done
+# `try_files $uri $uri/ $uri/index.html =404`. The materializer owns the route
+# list and stamps route-specific metadata into every document so crawlers and
+# link unfurlers do not see the root page before JavaScript hydrates.
+echo "==> materialising route-correct SPA entrypoints"
+node tools/materialize-route-entrypoints.mjs dist
 
 echo "==> stamping service-worker cache: onyx-shell-${VERSION}"
 sed -i "s/onyx-shell-__BUILD_VERSION__/onyx-shell-${VERSION}/" dist/sw.js

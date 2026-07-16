@@ -6,24 +6,40 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 
 type WebManifest = {
+  description: string;
   start_url: string;
   scope: string;
   display: string;
   display_override?: string[];
   launch_handler?: { client_mode?: string[] };
-  shortcuts?: Array<{ name: string; url: string }>;
+  shortcuts?: Array<{ name: string; description: string; url: string }>;
   screenshots?: Array<{ src: string; sizes: string; form_factor: string; label: string }>;
 };
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const manifestPath = join(root, 'public', 'manifest.json');
 const serviceWorkerPath = join(root, 'public', 'sw.js');
+const entryDocumentPath = join(root, 'index.html');
 
 function loadManifest(): WebManifest {
   return JSON.parse(readFileSync(manifestPath, 'utf8')) as WebManifest;
 }
 
 describe('PWA manifest', () => {
+  it('keeps retired wire branding out of public install and entry metadata', () => {
+    const manifest = loadManifest();
+    const entryDocument = readFileSync(entryDocumentPath, 'utf8');
+    const publicMetadata = [
+      manifest.description,
+      ...(manifest.shortcuts ?? []).flatMap((shortcut) => [shortcut.name, shortcut.description]),
+      entryDocument,
+    ].join('\n');
+
+    expect(publicMetadata).not.toMatch(/IRCXNet/i);
+    expect(manifest.description).toContain('Onyx mesh');
+    expect(entryDocument).toContain('<title>Onyx — open rooms and encrypted media</title>');
+  });
+
   it('keeps installed launches on the app route with wrapper-safe display metadata', () => {
     const manifest = loadManifest();
 
