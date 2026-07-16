@@ -132,7 +132,7 @@ function offlineNavigationFallback(pathname) {
   );
   if (fallbackPath === null) return Promise.resolve(unavailable());
   return caches.match(fallbackPath)
-    .then((cached) => cached ?? unavailable())
+    .then((cached) => isCanonicalShellResponse(fallbackPath, cached) ? cached : unavailable())
     .catch(() => unavailable());
 }
 

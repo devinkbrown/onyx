@@ -359,7 +359,10 @@ describe('PWA manifest', () => {
       url: `https://onyx.test${url}`,
     }));
     const cache = { add, match: currentCacheMatch, put };
-    const match = vi.fn<(key: unknown) => Promise<unknown>>(async (key) => ({ fallback: key }));
+    const match = vi.fn<(key: unknown) => Promise<unknown>>(async (key) => ({
+      fallback: key,
+      url: `https://onyx.test${String(key)}`,
+    }));
     const deleteCache = vi.fn(async () => {
       throw new Error('stale cache is unavailable');
     });
@@ -523,7 +526,7 @@ describe('PWA manifest', () => {
         navigationWork = work;
       },
     });
-    await expect(navigationWork).resolves.toEqual({ fallback: '/app/' });
+    await expect(navigationWork).resolves.toMatchObject({ fallback: '/app/' });
     expect(match).toHaveBeenLastCalledWith('/app/');
 
     listeners.get('fetch')?.({
@@ -536,7 +539,7 @@ describe('PWA manifest', () => {
         navigationWork = work;
       },
     });
-    await expect(navigationWork).resolves.toEqual({ fallback: '/app/' });
+    await expect(navigationWork).resolves.toMatchObject({ fallback: '/app/' });
     expect(match).toHaveBeenLastCalledWith('/app/');
 
     listeners.get('fetch')?.({
@@ -545,7 +548,7 @@ describe('PWA manifest', () => {
         navigationWork = work;
       },
     });
-    await expect(navigationWork).resolves.toEqual({ fallback: '/' });
+    await expect(navigationWork).resolves.toMatchObject({ fallback: '/' });
     expect(match).toHaveBeenLastCalledWith('/');
 
     const matchCallsBeforeDocument = match.mock.calls.length;
@@ -561,6 +564,20 @@ describe('PWA manifest', () => {
     expect(unavailableDocument.headers.get('Cache-Control')).toBe('no-store');
     await expect(unavailableDocument.text()).resolves.toContain('page is unavailable offline');
     expect(match).toHaveBeenCalledTimes(matchCallsBeforeDocument);
+
+    match.mockResolvedValueOnce({
+      fallback: '/app/',
+      url: 'https://login.example/app/',
+    });
+    listeners.get('fetch')?.({
+      request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/app/poisoned' },
+      respondWith: (work: Promise<unknown>) => {
+        navigationWork = work;
+      },
+    });
+    const poisonedFallback = await navigationWork as Response;
+    expect(poisonedFallback).toBeInstanceOf(Response);
+    expect(poisonedFallback.status).toBe(503);
 
     match.mockRejectedValueOnce(new Error('offline fallback cache unavailable'));
     listeners.get('fetch')?.({
