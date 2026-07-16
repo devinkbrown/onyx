@@ -5,6 +5,7 @@ import { deviceMemoryStorageKey, type DeviceMemoryOwner } from '@/lib/deviceMemo
 export const IGNORED_USERS_STORAGE_KEY = 'onyx:ignored-users';
 export const MAX_IGNORED_USERS = 512;
 export const MAX_IGNORED_NICK_LENGTH = 128;
+export const MAX_IGNORED_USERS_STORAGE_CHARS = 128 * 1024;
 
 const CONTROL_CHARACTERS = /[\x00-\x1f\x7f]/u;
 
@@ -53,6 +54,7 @@ export function loadIgnoredUsers(owner?: DeviceMemoryOwner): Set<string> {
   if (owner !== undefined) purgeLegacyIgnoredUsers();
   try {
     const raw = store.getItem(key);
+    if (raw && raw.length > MAX_IGNORED_USERS_STORAGE_CHARS) return new Set();
     return raw ? parseIgnoredUsers(JSON.parse(raw) as unknown) : new Set();
   } catch {
     return new Set();

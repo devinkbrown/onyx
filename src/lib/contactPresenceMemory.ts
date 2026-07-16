@@ -7,6 +7,7 @@ export const WATCH_LIST_STORAGE_KEY = 'onyx:watch-list';
 export const MAX_CONTACTS = 256;
 export const MAX_CONTACT_NICK_LENGTH = 128;
 export const MAX_FRIEND_NOTE_LENGTH = 512;
+export const MAX_CONTACT_PRESENCE_STORAGE_CHARS = 256 * 1024;
 
 const UNSAFE_MONITOR_NICK = /[\s,\x00-\x1f\x7f]/u;
 
@@ -107,6 +108,7 @@ export function loadFriends(owner?: DeviceMemoryOwner): Map<string, FriendEntry>
   if (owner !== undefined) purgeLegacyContactPresence();
   try {
     const raw = store.getItem(key);
+    if (raw && raw.length > MAX_CONTACT_PRESENCE_STORAGE_CHARS) return new Map();
     return raw ? parseFriends(JSON.parse(raw) as unknown) : new Map();
   } catch {
     return new Map();
@@ -145,6 +147,7 @@ export function loadWatchList(owner?: DeviceMemoryOwner): WatchEntry[] {
   if (owner !== undefined) purgeLegacyContactPresence();
   try {
     const raw = store.getItem(key);
+    if (raw && raw.length > MAX_CONTACT_PRESENCE_STORAGE_CHARS) return [];
     return raw ? parseWatchList(JSON.parse(raw) as unknown) : [];
   } catch {
     return [];

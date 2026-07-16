@@ -6,6 +6,7 @@ export const USER_NOTES_STORAGE_KEY = 'onyx:user-notes';
 export const MAX_USER_NOTES = 512;
 export const MAX_USER_NOTE_NICK_LENGTH = 128;
 export const MAX_USER_NOTE_LENGTH = 2_048;
+export const MAX_USER_NOTES_STORAGE_CHARS = 2 * 1024 * 1024;
 
 const INVALID_NICK_CHARACTERS = /[\s,\x00-\x1f\x7f]/u;
 
@@ -74,6 +75,7 @@ export function loadUserNotes(owner: DeviceMemoryOwner): Map<string, string> {
   purgeLegacyUserNotes();
   try {
     const raw = store.getItem(key);
+    if (raw && raw.length > MAX_USER_NOTES_STORAGE_CHARS) return new Map();
     return raw ? parseUserNotes(JSON.parse(raw) as unknown) : new Map();
   } catch {
     return new Map();

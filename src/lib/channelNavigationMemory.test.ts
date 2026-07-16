@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
 import {
@@ -7,6 +7,7 @@ import {
   emptyChannelNavigationMemory,
   LEGACY_CHANNEL_NAVIGATION_KEYS,
   loadChannelNavigationMemory,
+  MAX_CHANNEL_NAVIGATION_STORAGE_CHARS,
   MAX_NAVIGATION_CHANNELS,
   saveChannelNavigationMemory,
 } from './channelNavigationMemory';
@@ -16,6 +17,7 @@ const bob = { serverUrl: 'wss://navigation.example/ws', identity: 'bob' } as con
 
 describe('account-scoped channel navigation memory', () => {
   beforeEach(() => localStorage.clear());
+  afterEach(() => vi.restoreAllMocks());
 
   it('isolates owners and purges every unsafe ownerless room cache', () => {
     localStorage.setItem(CHANNEL_NAVIGATION_STORAGE_KEY, '{}');
@@ -76,5 +78,14 @@ describe('account-scoped channel navigation memory', () => {
       nsfwChannels: [],
       forumChannels: [],
     });
+  });
+
+  it('rejects oversized owner storage before parsing', () => {
+    const key = deviceMemoryStorageKey(CHANNEL_NAVIGATION_STORAGE_KEY, alice)!;
+    localStorage.setItem(key, `{${'x'.repeat(MAX_CHANNEL_NAVIGATION_STORAGE_CHARS)}}`);
+    const parse = vi.spyOn(JSON, 'parse');
+
+    expect(loadChannelNavigationMemory(alice)).toEqual(emptyChannelNavigationMemory());
+    expect(parse).not.toHaveBeenCalled();
   });
 });

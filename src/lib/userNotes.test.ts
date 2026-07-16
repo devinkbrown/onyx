@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
 import {
   loadUserNotes,
   MAX_USER_NOTE_LENGTH,
   MAX_USER_NOTES,
+  MAX_USER_NOTES_STORAGE_CHARS,
   saveUserNotes,
   USER_NOTES_STORAGE_KEY,
 } from './userNotes';
@@ -15,6 +16,7 @@ const bob = { serverUrl: 'wss://notes.example/ws', identity: 'bob' } as const;
 
 describe('account-scoped private user notes', () => {
   beforeEach(() => localStorage.clear());
+  afterEach(() => vi.restoreAllMocks());
 
   it('isolates owners and purges unsafe ownerless legacy notes', () => {
     localStorage.setItem(USER_NOTES_STORAGE_KEY, JSON.stringify({ trev: 'legacy private note' }));
@@ -53,5 +55,14 @@ describe('account-scoped private user notes', () => {
 
     expect(saveUserNotes(new Map(), alice)).toBe(true);
     expect(localStorage.getItem(key)).toBeNull();
+  });
+
+  it('rejects oversized owner storage before parsing', () => {
+    const key = deviceMemoryStorageKey(USER_NOTES_STORAGE_KEY, alice)!;
+    localStorage.setItem(key, `{${'x'.repeat(MAX_USER_NOTES_STORAGE_CHARS)}}`);
+    const parse = vi.spyOn(JSON, 'parse');
+
+    expect(loadUserNotes(alice)).toEqual(new Map());
+    expect(parse).not.toHaveBeenCalled();
   });
 });

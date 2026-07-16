@@ -5,6 +5,7 @@ import { deviceMemoryStorageKey, type DeviceMemoryOwner } from '@/lib/deviceMemo
 export const MUTED_DMS_STORAGE_KEY = 'onyx:muted-dms';
 export const MAX_MUTED_DMS = 512;
 export const MAX_MUTED_DM_NICK_LENGTH = 128;
+export const MAX_MUTED_DMS_STORAGE_CHARS = 128 * 1024;
 
 const CONTROL_CHARACTERS = /[\x00-\x1f\x7f]/u;
 
@@ -53,6 +54,7 @@ export function loadMutedDMs(owner?: DeviceMemoryOwner): Set<string> {
   if (owner !== undefined) purgeLegacyMutedDMs();
   try {
     const raw = store.getItem(key);
+    if (raw && raw.length > MAX_MUTED_DMS_STORAGE_CHARS) return new Set();
     return raw ? parseMutedDMs(JSON.parse(raw) as unknown) : new Set();
   } catch {
     return new Set();

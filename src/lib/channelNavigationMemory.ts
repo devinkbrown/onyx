@@ -10,6 +10,7 @@ export const CHANNEL_NAVIGATION_STORAGE_KEY = 'onyx:channel-navigation';
 export const MAX_NAVIGATION_CHANNELS = 256;
 export const MAX_CHANNEL_ORDER = 512;
 export const MAX_NAVIGATION_CHANNEL_LENGTH = 128;
+export const MAX_CHANNEL_NAVIGATION_STORAGE_CHARS = 2 * 1024 * 1024;
 
 export const LEGACY_CHANNEL_NAVIGATION_KEYS = [
   'onyx:pinned-channels',
@@ -151,6 +152,9 @@ export function loadChannelNavigationMemory(owner: DeviceMemoryOwner): ChannelNa
   purgeLegacyChannelNavigation();
   try {
     const raw = store.getItem(key);
+    if (raw && raw.length > MAX_CHANNEL_NAVIGATION_STORAGE_CHARS) {
+      return emptyChannelNavigationMemory();
+    }
     return raw ? parseChannelNavigationMemory(JSON.parse(raw) as unknown) : emptyChannelNavigationMemory();
   } catch {
     return emptyChannelNavigationMemory();

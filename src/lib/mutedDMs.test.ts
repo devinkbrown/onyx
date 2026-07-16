@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
 import {
   loadMutedDMs,
+  MAX_MUTED_DMS_STORAGE_CHARS,
   MUTED_DMS_STORAGE_KEY,
   saveMutedDMs,
 } from './mutedDMs';
@@ -13,6 +14,7 @@ const bob = { serverUrl: 'wss://mute.example/ws', identity: 'bob' } as const;
 
 describe('account-scoped muted DM contacts', () => {
   beforeEach(() => localStorage.clear());
+  afterEach(() => vi.restoreAllMocks());
 
   it('isolates Alice and Bob while purging ownerless contact metadata', () => {
     localStorage.setItem(MUTED_DMS_STORAGE_KEY, JSON.stringify(['legacy-contact']));
@@ -30,5 +32,14 @@ describe('account-scoped muted DM contacts', () => {
 
     expect(JSON.parse(localStorage.getItem(key) ?? '[]')).toEqual(['trouble']);
     expect(loadMutedDMs(alice)).toEqual(new Set(['trouble']));
+  });
+
+  it('rejects oversized owner storage before parsing', () => {
+    const key = deviceMemoryStorageKey(MUTED_DMS_STORAGE_KEY, alice)!;
+    localStorage.setItem(key, `[${'x'.repeat(MAX_MUTED_DMS_STORAGE_CHARS)}]`);
+    const parse = vi.spyOn(JSON, 'parse');
+
+    expect(loadMutedDMs(alice)).toEqual(new Set());
+    expect(parse).not.toHaveBeenCalled();
   });
 });

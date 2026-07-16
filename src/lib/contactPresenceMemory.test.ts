@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
 import {
   FRIENDS_STORAGE_KEY,
   loadFriends,
   loadWatchList,
+  MAX_CONTACT_PRESENCE_STORAGE_CHARS,
   parseFriends,
   parseWatchList,
   saveFriends,
@@ -18,6 +19,7 @@ const bob = { serverUrl: 'wss://contacts.example/ws', identity: 'bob' } as const
 
 describe('account-scoped MONITOR contacts', () => {
   beforeEach(() => localStorage.clear());
+  afterEach(() => vi.restoreAllMocks());
 
   it('isolates friends and watches while purging ownerless contact metadata', () => {
     localStorage.setItem(FRIENDS_STORAGE_KEY, JSON.stringify([{ nick: 'legacy-friend' }]));
@@ -82,5 +84,17 @@ describe('account-scoped MONITOR contacts', () => {
     expect(saveWatchList([], alice)).toBe(true);
     expect(localStorage.getItem(friendsKey)).toBeNull();
     expect(localStorage.getItem(watchKey)).toBeNull();
+  });
+
+  it.each([
+    [FRIENDS_STORAGE_KEY, () => loadFriends(alice), new Map()],
+    [WATCH_LIST_STORAGE_KEY, () => loadWatchList(alice), []],
+  ] as const)('rejects oversized owner storage for %s before parsing', (baseKey, load, empty) => {
+    const key = deviceMemoryStorageKey(baseKey, alice)!;
+    localStorage.setItem(key, `[${'x'.repeat(MAX_CONTACT_PRESENCE_STORAGE_CHARS)}]`);
+    const parse = vi.spyOn(JSON, 'parse');
+
+    expect(load()).toEqual(empty);
+    expect(parse).not.toHaveBeenCalled();
   });
 });

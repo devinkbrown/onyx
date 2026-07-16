@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
 import {
   IGNORED_USERS_STORAGE_KEY,
   loadIgnoredUsers,
+  MAX_IGNORED_USERS_STORAGE_CHARS,
   saveIgnoredUsers,
 } from './ignoredUsers';
 
@@ -13,6 +14,7 @@ const bob = { serverUrl: 'wss://ignore.example/ws', identity: 'bob' } as const;
 
 describe('account-scoped ignored users', () => {
   beforeEach(() => localStorage.clear());
+  afterEach(() => vi.restoreAllMocks());
 
   it('isolates Alice and Bob while purging ownerless contact metadata', () => {
     localStorage.setItem(IGNORED_USERS_STORAGE_KEY, JSON.stringify(['legacy-contact']));
@@ -30,5 +32,14 @@ describe('account-scoped ignored users', () => {
 
     expect(JSON.parse(localStorage.getItem(key) ?? '[]')).toEqual(['trouble']);
     expect(loadIgnoredUsers(alice)).toEqual(new Set(['trouble']));
+  });
+
+  it('rejects oversized owner storage before parsing', () => {
+    const key = deviceMemoryStorageKey(IGNORED_USERS_STORAGE_KEY, alice)!;
+    localStorage.setItem(key, `[${'x'.repeat(MAX_IGNORED_USERS_STORAGE_CHARS)}]`);
+    const parse = vi.spyOn(JSON, 'parse');
+
+    expect(loadIgnoredUsers(alice)).toEqual(new Set());
+    expect(parse).not.toHaveBeenCalled();
   });
 });
