@@ -124,6 +124,57 @@ describe('Spotlight', () => {
     expect(screen.queryByText('Go to #lapis')).not.toBeInTheDocument();
   });
 
+  it('leaves candidate navigation, confirmation, and dismissal to an active IME', () => {
+    const joinChannel = vi.fn();
+    const navigate = vi.fn();
+    setState({
+      channels: new Map([
+        ['#forge', channel('#forge')],
+        ['#lapis', channel('#lapis')],
+      ]),
+      joinChannel,
+      navigate,
+    });
+    renderSpotlight();
+
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    const input = screen.getByRole('combobox', { name: 'Command search' });
+    fireEvent.input(input, { target: { value: 'forge' } });
+    const firstActive = input.getAttribute('aria-activedescendant');
+
+    fireEvent.keyDown(input, { key: 'ArrowDown', isComposing: true });
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true });
+    fireEvent.keyDown(input, { key: 'Escape', isComposing: true });
+
+    expect(input).toHaveAttribute('aria-activedescendant', firstActive);
+    expect(joinChannel).not.toHaveBeenCalled();
+    expect(navigate).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Command palette' })).toBeInTheDocument();
+  });
+
+  it('honors a command-input key claimed by an earlier integration', () => {
+    setState({
+      channels: new Map([
+        ['#forge', channel('#forge')],
+        ['#lapis', channel('#lapis')],
+      ]),
+    });
+    renderSpotlight();
+
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    const input = screen.getByRole('combobox', { name: 'Command search' });
+    const firstActive = input.getAttribute('aria-activedescendant');
+    const claimed = new KeyboardEvent('keydown', {
+      key: 'ArrowDown',
+      bubbles: true,
+      cancelable: true,
+    });
+    claimed.preventDefault();
+    input.dispatchEvent(claimed);
+
+    expect(input).toHaveAttribute('aria-activedescendant', firstActive);
+  });
+
   it('keeps the Arrow-key-selected option visible without moving combobox focus', async () => {
     setState({
       channels: new Map([

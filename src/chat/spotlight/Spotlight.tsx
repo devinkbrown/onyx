@@ -62,6 +62,14 @@ function optionId(index: number): string {
   return `onyx-spotlight-option-${index}`;
 }
 
+function keyboardEventIsClaimed(event: KeyboardEvent): boolean {
+  // Candidate navigation and confirmation belong to the active input method,
+  // not to Spotlight. The legacy 229 value covers engines that drop
+  // `isComposing` on the final keydown. Also honor an earlier listener that
+  // deliberately claimed the key before the palette sees it.
+  return event.defaultPrevented || event.isComposing || event.keyCode === 229;
+}
+
 function tabbables(root: HTMLElement): HTMLElement[] {
   const selectors = [
     'button:not([disabled])',
@@ -243,6 +251,8 @@ export function Spotlight(props: SpotlightProps) {
   };
 
   const handleKeyDown: JSX.EventHandlerUnion<HTMLInputElement, KeyboardEvent> = (event) => {
+    if (keyboardEventIsClaimed(event)) return;
+
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       moveActive(1);
@@ -271,6 +281,8 @@ export function Spotlight(props: SpotlightProps) {
   };
 
   const handleRootKeyDown: JSX.EventHandlerUnion<HTMLDivElement, KeyboardEvent> = (event) => {
+    if (keyboardEventIsClaimed(event)) return;
+
     if (event.key === 'Escape') {
       event.preventDefault();
       closeSpotlight();
