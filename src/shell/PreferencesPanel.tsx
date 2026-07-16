@@ -2520,7 +2520,7 @@ function PreferenceCategoryNavigation(props: {
       if (index < 0) return;
       const button = buttons[index];
       if (button?.isConnected) {
-        button.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+        button.scrollIntoView?.({ block: 'nearest', inline: 'center' });
       }
     });
   }
@@ -2542,10 +2542,15 @@ function PreferenceCategoryNavigation(props: {
     categoryTabsQuery?.removeEventListener('change', handleCategoryTabsQueryChange);
   });
 
+  function selectCategory(category: PreferenceCategory): void {
+    props.onSelect(category);
+    if (horizontalTabs()) revealCategoryTabAfterRender(category);
+  }
+
   function selectAt(index: number): void {
     const category = PREFERENCE_CATEGORIES[index];
     if (category === undefined) return;
-    props.onSelect(category.id);
+    selectCategory(category.id);
     buttons[index]?.focus();
   }
 
@@ -2616,7 +2621,7 @@ function PreferenceCategoryNavigation(props: {
                   aria-describedby={`pref-category-summary-${category.id}`}
                   aria-selected={selected()}
                   tabindex={selected() ? 0 : -1}
-                  onClick={() => props.onSelect(category.id)}
+                  onClick={() => selectCategory(category.id)}
                   onKeyDown={(event) => onKeyDown(event, index())}
                 >
                   <span class="pref-category-tab__label">{category.label}</span>

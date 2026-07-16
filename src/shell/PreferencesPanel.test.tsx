@@ -273,6 +273,48 @@ describe('PreferencesPanel', () => {
     expect(removeEventListener).toHaveBeenCalledWith('change', categoryTabsListener);
   });
 
+  it('fully reveals a category selected with mobile arrow navigation', async () => {
+    vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+      matches: query === '(max-width: 42rem)',
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }) as MediaQueryList));
+    const revealed: string[] = [];
+    const originalScrollIntoView = Object.getOwnPropertyDescriptor(
+      window.HTMLElement.prototype,
+      'scrollIntoView',
+    );
+    Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
+      value(this: HTMLElement) {
+        revealed.push(this.getAttribute('aria-label') ?? '');
+      },
+      configurable: true,
+    });
+
+    try {
+      renderPreferences();
+      await waitFor(() => expect(revealed).toContain('Display'));
+      revealed.length = 0;
+      const display = screen.getByRole('tab', { name: /^Display/ });
+      display.focus();
+
+      fireEvent.keyDown(display, { key: 'ArrowRight' });
+
+      await waitFor(() => expect(revealed).toEqual(['Conversation']));
+    } finally {
+      if (originalScrollIntoView) {
+        Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', originalScrollIntoView);
+      } else {
+        delete (window.HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView;
+      }
+    }
+  });
+
   it('reveals a retained mobile category on reopen without stealing initial focus', async () => {
     vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
       matches: query === '(max-width: 42rem)',
@@ -305,7 +347,7 @@ describe('PreferencesPanel', () => {
 
       await waitFor(() => {
         expect(screen.getByRole('tab', { name: /^Accessibility/ })).toHaveAttribute('aria-selected', 'true');
-        expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' });
+        expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'center' });
         expect(screen.getByRole('button', { name: 'Close preferences' })).toHaveFocus();
       });
     } finally {

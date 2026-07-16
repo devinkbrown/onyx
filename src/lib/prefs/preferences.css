@@ -347,7 +347,7 @@
 
   .pref-category-nav {
     z-index: 2;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
     align-items: center;
     margin-inline: calc(-1 * var(--space-1));
     padding: var(--space-1);
@@ -377,18 +377,23 @@
   }
 
   .pref-reset-all {
+    justify-self: start;
+    min-width: 0;
+    max-width: 100%;
     margin-top: 0;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
+    white-space: normal;
   }
 
   .pref-category-tab {
     flex: 0 0 auto;
     width: auto;
-    max-width: 10rem;
+    max-width: 100%;
     min-height: 2.75rem;
     padding: var(--space-2) var(--space-3);
     border: 1px solid var(--line);
     border-radius: var(--r-pill);
+    overflow-wrap: anywhere;
     scroll-snap-align: start;
   }
 
@@ -419,6 +424,7 @@
 
 .pref-group-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-3);
@@ -499,6 +505,7 @@
 /* Segmented control — a row of mutually-exclusive options. */
 .pref-segments {
   display: flex;
+  flex-wrap: wrap;
   gap: 2px;
   padding: 3px;
   border: 1px solid var(--line);
@@ -507,7 +514,8 @@
 }
 
 .pref-segment {
-  flex: 1 1 0;
+  flex: 1 1 5rem;
+  min-width: min(100%, 5rem);
   appearance: none;
   cursor: pointer;
   padding: var(--space-2) var(--space-3);
@@ -518,6 +526,7 @@
   font: inherit;
   font-size: 0.82rem;
   letter-spacing: 0.01em;
+  overflow-wrap: anywhere;
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 
