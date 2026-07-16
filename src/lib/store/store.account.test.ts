@@ -10,7 +10,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { store, type Server } from './store';
+import { _resetAccountReplyStateForTests, store, type Server } from './store';
 import { parseIRCMessage } from '@/lib/irc/parser';
 import { loadCredentials, saveCredentials } from '@/lib/credentials';
 
@@ -47,9 +47,60 @@ function feed(line: string): void {
   store.getState()._handleMessage(parseIRCMessage(line));
 }
 
+function seedAccountBoundState(): void {
+  store.setState({
+    accountInfo: {
+      account: 'alice',
+      email: 'alice@example.net',
+      fetchedAt: new Date(),
+    },
+    accountInfoPending: true,
+    passkeyBusy: true,
+    passkeyError: 'alice error',
+    passkeyNotice: 'alice notice',
+    passkeyCreds: [{
+      id: 'alice-credential',
+      label: 'Alice laptop',
+      signCount: 1,
+      createdAt: null,
+    }],
+    passkeyListPending: true,
+    totp: {
+      status: 'pending',
+      secret: 'ALICESECRET',
+      otpauth: 'otpauth://totp/Onyx:alice?secret=ALICESECRET',
+      error: 'alice error',
+      busy: true,
+    },
+    personas: [{ name: 'alice', host: 'alice.example', source: 'grant' }],
+    personaOffers: [{ template: '*.example', label: 'Alice offer' }],
+  });
+}
+
+function expectAccountBoundStateCleared(): void {
+  const state = store.getState();
+  expect(state.accountInfo).toBeNull();
+  expect(state.accountInfoPending).toBe(false);
+  expect(state.passkeyBusy).toBe(false);
+  expect(state.passkeyError).toBeNull();
+  expect(state.passkeyNotice).toBeNull();
+  expect(state.passkeyCreds).toEqual([]);
+  expect(state.passkeyListPending).toBe(false);
+  expect(state.totp).toEqual({
+    status: 'unknown',
+    secret: null,
+    otpauth: null,
+    error: null,
+    busy: false,
+  });
+  expect(state.personas).toEqual([]);
+  expect(state.personaOffers).toEqual([]);
+}
+
 beforeEach(() => {
   localStorage.clear();
   store.setState(initialState, true);
+  _resetAccountReplyStateForTests();
 });
 
 describe('SESSION token persistence — server NOTICE compatibility', () => {
@@ -299,7 +350,8 @@ describe('account actions — raw command dispatch', () => {
 
 describe('account replies — state from the message handler', () => {
   it('ACCOUNTINFO NOTICE populates structured accountInfo', () => {
-    store.setState({ accountInfoPending: true, server: seedServer('alice') });
+    store.setState({ client: makeClient() as never, server: seedServer('alice') });
+    store.getState().accountInfo_fetch();
     feed(':eshmaki.me NOTICE alice :account=alice flags=8 email=alice@example.net secure=on enforce=off');
 
     const info = store.getState().accountInfo;
@@ -314,7 +366,8 @@ describe('account replies — state from the message handler', () => {
   });
 
   it('a NOTE ACCOUNTINFO standard reply also populates accountInfo', () => {
-    store.setState({ accountInfoPending: true, server: seedServer('bob') });
+    store.setState({ client: makeClient() as never, server: seedServer('bob') });
+    store.getState().accountInfo_fetch();
     feed(':eshmaki.me NOTE ACCOUNTINFO :account=bob flags=2');
     expect(store.getState().accountInfo).toMatchObject({ account: 'bob', flags: 2 });
     expect(store.getState().accountInfoPending).toBe(false);
@@ -353,19 +406,21 @@ describe('account replies — state from the message handler', () => {
     store.setState({
       client: client as never,
       server: seedServer('alice'),
-      accountInfo: { account: 'alice', fetchedAt: new Date() },
     });
+    seedAccountBoundState();
     feed(':eshmaki.me NOTICE alice :You are now logged out.');
 
     expect(store.getState().server?.account).toBeNull();
-    expect(store.getState().accountInfo).toBeNull();
+    expectAccountBoundStateCleared();
     expect(client.clearResumeTokens).toHaveBeenCalledOnce();
   });
 
   it('901 RPL_LOGGEDOUT clears the server account', () => {
     store.setState({ server: seedServer('alice') });
+    seedAccountBoundState();
     feed(':eshmaki.me 901 alice alice!u@h :You are now logged out');
     expect(store.getState().server?.account).toBeNull();
+    expectAccountBoundStateCleared();
   });
 
   it('does NOT clear the account from a peer PM mentioning "logged out"', () => {
@@ -408,6 +463,51 @@ describe('account replies — state from the message handler', () => {
     store.setState({ server: seedServer(null) });
     feed(':eshmaki.me 900 alice alice!u@h alice :You are now logged in as alice');
     expect(store.getState().server?.account).toBe('alice');
+  });
+
+  it('clears account-bound presentation when 900 switches Alice to Bob', () => {
+    store.setState({ server: seedServer('alice'), ourNick: 'alice' });
+    seedAccountBoundState();
+
+    feed(':eshmaki.me 900 alice alice!u@h bob :You are now logged in as bob');
+
+    expect(store.getState().server?.account).toBe('bob');
+    expectAccountBoundStateCleared();
+  });
+
+  it('ignores an Alice ACCOUNTINFO reply after the live account switches to Bob', () => {
+    const client = makeClient();
+    store.setState({ client: client as never, server: seedServer('alice'), ourNick: 'alice' });
+    store.getState().accountInfo_fetch();
+
+    feed(':eshmaki.me 900 alice alice!u@h bob :You are now logged in as bob');
+    feed(':eshmaki.me NOTICE alice :account=alice flags=8 email=alice@example.net secure=on enforce=off');
+
+    expect(store.getState().server?.account).toBe('bob');
+    expect(store.getState().accountInfo).toBeNull();
+
+    store.getState().accountInfo_fetch();
+    feed(':eshmaki.me NOTICE alice :account=bob flags=2 email=bob@example.net secure=off enforce=on');
+    expect(store.getState().accountInfo).toMatchObject({
+      account: 'bob',
+      email: 'bob@example.net',
+    });
+  });
+
+  it('accepts ACCOUNTINFO only for the exact requested account', () => {
+    const client = makeClient();
+    store.setState({ client: client as never, server: seedServer('bob'), ourNick: 'alice' });
+    store.getState().accountInfo_fetch();
+
+    feed(':eshmaki.me NOTICE alice :account=alice flags=8 email=alice@example.net');
+    expect(store.getState().accountInfo).toBeNull();
+    expect(store.getState().accountInfoPending).toBe(true);
+
+    feed(':eshmaki.me NOTICE alice :account=bob flags=2 email=bob@example.net');
+    expect(store.getState().accountInfo).toMatchObject({
+      account: 'bob',
+      email: 'bob@example.net',
+    });
   });
 
   it('does not replace our identity when another user sends account-notify', () => {

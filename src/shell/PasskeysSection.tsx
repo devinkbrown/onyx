@@ -77,8 +77,15 @@ export function PasskeysSection(props: PasskeysSectionProps): JSX.Element {
   // Probe the server's passkey list the first time the panel opens for a
   // signed-in user. `listPasskeys()` resolves `passkeySupported` fail-closed.
   createEffect(() => {
-    if (local.active && showManager()) {
-      // Track only `active`/account — a bare probe when the manager is shown.
+    const activeAccount = local.account;
+    if (
+      local.active
+      && activeAccount
+      && browserSupported()
+      && !serverUnavailable()
+    ) {
+      // Read the account string itself: Alice → Bob remains signed-in=true, so
+      // tracking only the boolean would leave Alice's list under Bob.
       getState().listPasskeys();
     }
   });

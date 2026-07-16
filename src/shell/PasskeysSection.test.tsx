@@ -5,7 +5,8 @@
  * WebAuthn, so we stub PublicKeyCredential/navigator.credentials to make
  * isPasskeySupported() true where a "browser supports it" path is under test.
  */
-import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
+import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { store, _resetPasskeyStateForTests, type PasskeyCredential } from '@/lib/store/store';
@@ -26,6 +27,19 @@ function stubBrowserSupport(supported: boolean): void {
 
 function makeClient() {
   return { sendRaw: vi.fn(), isupport: { CHANTYPES: '#&' }, negotiatedCaps: new Set<string>() };
+}
+
+function seedServer(account: string) {
+  return {
+    id: 'ircxnet',
+    name: 'eshmaki.me',
+    network: 'IRCXNet',
+    url: 'wss://eshmaki.me',
+    icon: '#000',
+    nick: account,
+    account,
+    connected: true,
+  };
 }
 
 const cred = (over: Partial<PasskeyCredential>): PasskeyCredential => ({
@@ -74,6 +88,20 @@ describe('PasskeysSection manager', () => {
     store.setState({ client: client as never });
     render(() => <PasskeysSection account="alice" active={true} />);
     expect(client.sendRaw).toHaveBeenCalledWith('WEBAUTHN', 'LIST');
+  });
+
+  it('refreshes the list when the open panel changes from Alice to Bob', async () => {
+    const client = makeClient();
+    const [account, setAccount] = createSignal('alice');
+    store.setState({ client: client as never, server: seedServer('alice') });
+    render(() => <PasskeysSection account={account()} active={true} />);
+    expect(client.sendRaw).toHaveBeenCalledTimes(1);
+
+    store.setState({ server: seedServer('bob') });
+    setAccount('bob');
+
+    await waitFor(() => expect(client.sendRaw).toHaveBeenCalledTimes(2));
+    expect(client.sendRaw).toHaveBeenLastCalledWith('WEBAUTHN', 'LIST');
   });
 
   it('shows the empty state once the list resolves with no creds', () => {

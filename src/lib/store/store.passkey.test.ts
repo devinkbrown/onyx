@@ -24,7 +24,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { store, _resetPasskeyStateForTests } from './store';
+import { store, _resetPasskeyStateForTests, type Server } from './store';
 import { parseIRCMessage } from '@/lib/irc/parser';
 
 // navigator.credentials must look present so isPasskeySupported() is true in the
@@ -51,6 +51,19 @@ function makeClient() {
 
 function feed(line: string): void {
   store.getState()._handleMessage(parseIRCMessage(line));
+}
+
+function seedServer(account: string | null): Server {
+  return {
+    id: 'ircxnet',
+    name: 'eshmaki.me',
+    network: 'IRCXNet',
+    url: 'wss://eshmaki.me',
+    icon: '#000',
+    nick: account ?? 'guest',
+    account,
+    connected: true,
+  };
 }
 
 beforeEach(() => {
@@ -125,6 +138,40 @@ describe('WEBAUTHN LIST reply fold-in (EVENT plane)', () => {
     expect(store.getState().passkeyCreds).toHaveLength(0);
     expect(store.getState().passkeySupported).toBe(true);
     expect(store.getState().passkeyListPending).toBe(false);
+  });
+
+  it('rejects a late Alice list after 900 switches the live account to Bob', () => {
+    const client = makeClient();
+    store.setState({ client: client as never, server: seedServer('alice'), ourNick: 'alice' });
+    store.getState().listPasskeys();
+    feed(':srv EVENT alice WEBAUTHN CRED alice-cred 7 :Alice laptop');
+
+    feed(':srv 900 alice alice!u@h bob :You are now logged in as bob');
+    feed(':srv EVENT alice WEBAUTHN LIST :end (1)');
+
+    expect(store.getState().server?.account).toBe('bob');
+    expect(store.getState().passkeyCreds).toEqual([]);
+    expect(store.getState().passkeyListPending).toBe(false);
+
+    store.getState().listPasskeys();
+    feed(':srv EVENT alice WEBAUTHN CRED bob-cred 2 :Bob phone');
+    feed(':srv EVENT alice WEBAUTHN LIST :end (1)');
+    expect(store.getState().passkeyCreds).toMatchObject([
+      { id: 'bob-cred', label: 'Bob phone' },
+    ]);
+  });
+
+  it('rejects a late Alice management reply after the live account switches to Bob', () => {
+    const client = makeClient();
+    store.setState({ client: client as never, server: seedServer('alice'), ourNick: 'alice' });
+    store.getState().registerPasskey('Alice laptop');
+
+    feed(':srv 900 alice alice!u@h bob :You are now logged in as bob');
+    feed(':srv EVENT alice WEBAUTHN REGISTERED alice-cred :Alice laptop');
+
+    expect(store.getState().server?.account).toBe('bob');
+    expect(store.getState().passkeyNotice).toBeNull();
+    expect(client.sendRaw).not.toHaveBeenCalledWith('WEBAUTHN', 'LIST');
   });
 });
 
@@ -232,6 +279,7 @@ describe('REGISTERED refreshes the list', () => {
   it('re-lists after a successful registration so the new key appears', () => {
     const client = makeClient();
     store.setState({ client: client as never });
+    store.getState().registerPasskey('My key');
     feed(':srv EVENT me WEBAUTHN REGISTERED credNEW :My key');
     expect(client.sendRaw).toHaveBeenCalledWith('WEBAUTHN', 'LIST');
     expect(store.getState().passkeyNotice).toBeTruthy();

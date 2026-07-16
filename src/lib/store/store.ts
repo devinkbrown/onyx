@@ -2253,6 +2253,18 @@ let _pendingPasskeyAuth: {
   timer: ReturnType<typeof setTimeout> | null;
 } | null = null;
 
+interface AccountReplyContext {
+  generation: number;
+  account: string | null;
+  client: IRCClient | null;
+}
+
+/** Account/generation ownership for replies whose wire shape has no request id. */
+let _accountInfoReplyContext: AccountReplyContext | null = null;
+let _passkeyListReplyContext: AccountReplyContext | null = null;
+let _passkeyActionReplyContext: AccountReplyContext | null = null;
+let _passkeyAuthReplyContext: AccountReplyContext | null = null;
+
 function passkeyErrText(e: unknown): string {
   if (e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'AbortError')) {
     return 'Passkey prompt was dismissed.';
@@ -2263,7 +2275,7 @@ function passkeyErrText(e: unknown): string {
 /** In-flight `WEBAUTHN LIST` accumulator; committed to state on the LIST end. */
 let _pendingPasskeyList: PasskeyCredential[] | null = null;
 /** Which management action is awaiting a reply — lets a FAIL map to the right UX. */
-let _lastPasskeyAction: 'remove' | 'rename' | null = null;
+let _lastPasskeyAction: 'register' | 'remove' | 'rename' | null = null;
 /**
  * Probe timeout: without an ISUPPORT advertisement, a server that lacks the
  * WEBAUTHN command answers `LIST` with a 421 (or nothing), which never reaches
@@ -2288,6 +2300,9 @@ function clearPasskeyProbeTimer(): void {
 export function _resetPasskeyStateForTests(): void {
   _pendingPasskeyList = null;
   _lastPasskeyAction = null;
+  _passkeyListReplyContext = null;
+  _passkeyActionReplyContext = null;
+  _passkeyAuthReplyContext = null;
   clearPasskeyProbeTimer();
 }
 
@@ -2550,6 +2565,8 @@ let _sessionTokenWritesAllowed = true;
  * connection nick would move the previous account's password into the new one.
  */
 let _credentialTokenCanonicalOnly = false;
+/** Monotonic boundary for account-owned async replies on the current socket. */
+let _accountGeneration = 0;
 
 // ── Nick reclaim timer (module-level) ────────────────────────────────────────
 /**
@@ -2590,6 +2607,80 @@ function _clearReconnectCountdown() {
 
 type SetFn = (partial: Partial<OnyxState> | ((s: OnyxState) => Partial<OnyxState>)) => void;
 type GetFn = () => OnyxState;
+
+function _accountKey(account: string | null | undefined): string | null {
+  const normalized = account?.trim().toLowerCase();
+  return normalized || null;
+}
+
+function _captureAccountReplyContext(
+  get: GetFn,
+  account = get().server?.account ?? null,
+): AccountReplyContext {
+  return {
+    generation: _accountGeneration,
+    account: _accountKey(account),
+    client: get().client,
+  };
+}
+
+function _replyTransportIsCurrent(context: AccountReplyContext | null, get: GetFn): boolean {
+  return Boolean(
+    context
+    && context.generation === _accountGeneration
+    && context.client === get().client,
+  );
+}
+
+function _replyAccountIsCurrent(context: AccountReplyContext | null, get: GetFn): boolean {
+  return Boolean(
+    _replyTransportIsCurrent(context, get)
+    && context?.account === _accountKey(get().server?.account),
+  );
+}
+
+function _invalidateAccountReplyContexts(): void {
+  _accountGeneration += 1;
+  _accountInfoReplyContext = null;
+  _passkeyListReplyContext = null;
+  _passkeyActionReplyContext = null;
+  _passkeyAuthReplyContext = null;
+  if (_pendingPasskeyAuth?.timer) clearTimeout(_pendingPasskeyAuth.timer);
+  _pendingPasskeyAuth = null;
+  _pendingPasskeyList = null;
+  _lastPasskeyAction = null;
+  clearPasskeyProbeTimer();
+}
+
+function _resetAccountBoundState(
+  set: SetFn,
+  resetServerPasskeySupport = false,
+  preservePasskeyError = false,
+): void {
+  _invalidateAccountReplyContexts();
+  set(s => ({
+    accountInfo: null,
+    accountInfoPending: false,
+    accountActionError: null,
+    passkeyBusy: false,
+    passkeyError: preservePasskeyError ? s.passkeyError : null,
+    passkeyNotice: null,
+    passkeyCreds: [],
+    passkeyListPending: false,
+    ...(resetServerPasskeySupport
+      ? { passkeySupported: null, passkeyRenameUnsupported: false }
+      : {}),
+    totp: { status: 'unknown', secret: null, otpauth: null, error: null, busy: false },
+    personas: [],
+    personaOffers: [],
+    serviceNotices: s.serviceNotices.filter(notice => notice.source !== 'Account'),
+  }));
+}
+
+/** Test-only reset for module-level account reply ownership. */
+export function _resetAccountReplyStateForTests(): void {
+  _invalidateAccountReplyContexts();
+}
 
 // ── Remembered-session restoration ───────────────────────────────────────────
 // A resumed account can register under a temporary 433 alias (`kain_`) while
@@ -2766,6 +2857,7 @@ function _clearRememberedSessionAfterLogout(get: GetFn, set: SetFn): void {
   state.client?.clearResumeTokens?.();
   _clearSessionRestore(set);
   _stopNickReclaim();
+  _resetAccountBoundState(set);
 }
 
 function _setRestoreRosterSyncing(set: SetFn, channelKey: string, syncing: boolean): void {
@@ -2977,13 +3069,21 @@ function _applyAccountInfo(
   set: SetFn,
   get: GetFn,
   fields: ReturnType<typeof parseAccountInfo>,
-): void {
+): boolean {
   if (!fields) {
-    set({ accountInfoPending: false });
-    return;
+    return false;
   }
-  const ownAccount = get().server?.account ?? null;
-  const name = fields.account ?? get().accountInfo?.account ?? ownAccount ?? '';
+  const request = _accountInfoReplyContext;
+  if (!_replyTransportIsCurrent(request, get)) return false;
+  const responseAccount = _accountKey(fields.account);
+  if (
+    (responseAccount && responseAccount !== request?.account)
+    || (!responseAccount && request?.account !== _accountKey(get().server?.account))
+  ) {
+    return false;
+  }
+  _accountInfoReplyContext = null;
+  const name = fields.account ?? request?.account ?? '';
   const next: AccountInfo = {
     account: name,
     ...(fields.flags !== undefined ? { flags: fields.flags } : {}),
@@ -2994,6 +3094,7 @@ function _applyAccountInfo(
     fetchedAt: new Date(),
   };
   set({ accountInfo: next, accountInfoPending: false, accountActionError: null });
+  return true;
 }
 
 function _startReconnectCountdown(get: GetFn, set: SetFn) {
@@ -3525,6 +3626,7 @@ export const store = createStore<OnyxState>()(
       const searchWasPending = _pendingServerSearch !== null || get().serverSearch.status === 'pending';
       const prev = get().client;
       if (prev) prev.destroy();
+      _resetAccountBoundState(set, true);
       // Clear any in-progress reconnect countdown
       _clearReconnectCountdown();
       // Reset transient protocol buffers from any prior session so they cannot
@@ -3791,6 +3893,7 @@ export const store = createStore<OnyxState>()(
       _stopScheduledDispatch();
       _motdBuffer = '';
       get().client?.destroy();
+      _resetAccountBoundState(set, true, true);
       set({
         client: null,
         status: 'disconnected',
@@ -4516,6 +4619,8 @@ export const store = createStore<OnyxState>()(
         set({ passkeyError: 'This browser does not support passkeys.', passkeyNotice: null });
         return;
       }
+      _passkeyActionReplyContext = _captureAccountReplyContext(get);
+      _lastPasskeyAction = 'register';
       set({ passkeyBusy: true, passkeyError: null, passkeyNotice: null });
       // Server replies `EVENT <me> WEBAUTHN REGISTER-CHALLENGE …`; the message
       // handler runs the create ceremony and sends REGISTER-FINISH.
@@ -4530,6 +4635,7 @@ export const store = createStore<OnyxState>()(
         set({ passkeyError: 'This browser does not support passkeys.', passkeyNotice: null });
         return;
       }
+      _passkeyAuthReplyContext = _captureAccountReplyContext(get, acct);
       set({ passkeyBusy: true, passkeyError: null, passkeyNotice: null });
       _credentialTokenCanonicalOnly = true;
       // Server replies AUTH-CHALLENGE + ALLOW-CRED lines; the handler collects
@@ -4546,6 +4652,8 @@ export const store = createStore<OnyxState>()(
         return;
       }
       _pendingPasskeyList = [];
+      _passkeyListReplyContext = _captureAccountReplyContext(get);
+      _passkeyActionReplyContext = null;
       _lastPasskeyAction = null;
       clearPasskeyProbeTimer();
       set({ passkeyListPending: true, passkeyError: null });
@@ -4553,8 +4661,12 @@ export const store = createStore<OnyxState>()(
       // Fail closed if the server never answers (no WEBAUTHN command / no reply).
       _passkeyListTimer = setTimeout(() => {
         _passkeyListTimer = null;
-        if (!get().passkeyListPending) return;
+        if (
+          !get().passkeyListPending
+          || !_replyAccountIsCurrent(_passkeyListReplyContext, get)
+        ) return;
         _pendingPasskeyList = null;
+        _passkeyListReplyContext = null;
         set({
           passkeyListPending: false,
           passkeySupported: get().passkeySupported ?? false,
@@ -4571,6 +4683,7 @@ export const store = createStore<OnyxState>()(
         return;
       }
       _lastPasskeyAction = 'remove';
+      _passkeyActionReplyContext = _captureAccountReplyContext(get);
       set({ passkeyBusy: true, passkeyError: null, passkeyNotice: null });
       // Server replies `EVENT <me> WEBAUTHN REMOVED :<target>`; the handler drops the row.
       client.sendRaw('WEBAUTHN', 'REMOVE', target);
@@ -4585,6 +4698,7 @@ export const store = createStore<OnyxState>()(
         return;
       }
       _lastPasskeyAction = 'rename';
+      _passkeyActionReplyContext = _captureAccountReplyContext(get);
       set({ passkeyBusy: true, passkeyError: null, passkeyNotice: null });
       // Label is the trailing param so it may contain spaces.
       client.sendRaw('WEBAUTHN', 'RENAME', target, label.trim());
@@ -4608,6 +4722,10 @@ export const store = createStore<OnyxState>()(
       const { client } = get();
       if (!client) return;
       const acct = account?.trim();
+      _accountInfoReplyContext = _captureAccountReplyContext(
+        get,
+        acct || get().server?.account || null,
+      );
       set({ accountInfoPending: true, accountActionError: null });
       // `ACCOUNTINFO [account]` — no arg = own account. Reply is parsed from the
       // `account=… flags=…` NOTICE in the message handler.
@@ -6014,9 +6132,16 @@ export const store = createStore<OnyxState>()(
           // so the success codes below no longer arrive as external NOTEs.
           const waClient = get().client;
           if (standard.kind === 'FAIL' || standard.kind === 'WARN') {
+            const ownsList = _replyAccountIsCurrent(_passkeyListReplyContext, get);
+            const ownsAction = _replyAccountIsCurrent(_passkeyActionReplyContext, get);
+            const ownsAuth = _replyTransportIsCurrent(_passkeyAuthReplyContext, get);
+            if (!ownsList && !ownsAction && !ownsAuth) return;
             if (_pendingPasskeyAuth?.timer) clearTimeout(_pendingPasskeyAuth.timer);
             _pendingPasskeyAuth = null;
             _pendingPasskeyList = null;
+            _passkeyListReplyContext = null;
+            _passkeyActionReplyContext = null;
+            _passkeyAuthReplyContext = null;
             clearPasskeyProbeTimer();
             // The feature itself being unavailable resolves the support probe to
             // false, so the section shows a disabled state instead of an error.
@@ -6039,6 +6164,11 @@ export const store = createStore<OnyxState>()(
           }
           switch (standard.code) {
             case 'REGISTER-CHALLENGE': {
+              const actionContext = _passkeyActionReplyContext;
+              if (
+                _lastPasskeyAction !== 'register'
+                || !_replyAccountIsCurrent(actionContext, get)
+              ) break;
               const challenge = standard.context[0];
               const rpId = standard.context[1];
               if (!waClient || !challenge || !rpId) {
@@ -6056,13 +6186,24 @@ export const store = createStore<OnyxState>()(
                 break;
               }
               createPasskey(createOpts)
-                .then((f) =>
-                  waClient.sendRaw('WEBAUTHN', 'REGISTER-FINISH', f.credId, f.clientDataJSON, f.authData),
-                )
-                .catch((e) => set({ passkeyBusy: false, passkeyError: passkeyErrText(e) }));
+                .then((f) => {
+                  if (!_replyAccountIsCurrent(actionContext, get)) return;
+                  waClient.sendRaw('WEBAUTHN', 'REGISTER-FINISH', f.credId, f.clientDataJSON, f.authData);
+                })
+                .catch((e) => {
+                  if (_replyAccountIsCurrent(actionContext, get)) {
+                    set({ passkeyBusy: false, passkeyError: passkeyErrText(e) });
+                  }
+                });
               break;
             }
             case 'REGISTERED': {
+              if (
+                _lastPasskeyAction !== 'register'
+                || !_replyAccountIsCurrent(_passkeyActionReplyContext, get)
+              ) break;
+              _passkeyActionReplyContext = null;
+              _lastPasskeyAction = null;
               const label = standard.description;
               set({
                 passkeyBusy: false,
@@ -6075,6 +6216,7 @@ export const store = createStore<OnyxState>()(
               break;
             }
             case 'CRED': {
+              if (!_replyAccountIsCurrent(_passkeyListReplyContext, get)) break;
               // `CRED <credId> <sign_count> [<created_unix>] :<label>` — one row
               // of an in-flight LIST. Tolerate the optional created column so the
               // client is forward-compatible if the daemon starts sending it.
@@ -6092,14 +6234,22 @@ export const store = createStore<OnyxState>()(
               break;
             }
             case 'LIST': {
+              if (!_replyAccountIsCurrent(_passkeyListReplyContext, get)) break;
               // Terminating `LIST :end (n)` — commit the accumulated rows.
               clearPasskeyProbeTimer();
               const creds = _pendingPasskeyList ?? [];
               _pendingPasskeyList = null;
+              _passkeyListReplyContext = null;
               set({ passkeyCreds: creds, passkeyListPending: false, passkeySupported: true });
               break;
             }
             case 'REMOVED': {
+              if (
+                _lastPasskeyAction !== 'remove'
+                || !_replyAccountIsCurrent(_passkeyActionReplyContext, get)
+              ) break;
+              _passkeyActionReplyContext = null;
+              _lastPasskeyAction = null;
               const target = standard.description;
               set((s) => ({
                 passkeyBusy: false,
@@ -6113,6 +6263,12 @@ export const store = createStore<OnyxState>()(
               break;
             }
             case 'RENAMED': {
+              if (
+                _lastPasskeyAction !== 'rename'
+                || !_replyAccountIsCurrent(_passkeyActionReplyContext, get)
+              ) break;
+              _passkeyActionReplyContext = null;
+              _lastPasskeyAction = null;
               const id = standard.context[0];
               const label = standard.description;
               set((s) => ({
@@ -6132,6 +6288,7 @@ export const store = createStore<OnyxState>()(
               break;
             }
             case 'AUTH-CHALLENGE': {
+              if (!_replyTransportIsCurrent(_passkeyAuthReplyContext, get)) break;
               if (_pendingPasskeyAuth?.timer) clearTimeout(_pendingPasskeyAuth.timer);
               _pendingPasskeyAuth = {
                 challenge: standard.context[0] ?? '',
@@ -6144,6 +6301,7 @@ export const store = createStore<OnyxState>()(
                 const p = _pendingPasskeyAuth;
                 _pendingPasskeyAuth = null;
                 const c = get().client;
+                if (!_replyTransportIsCurrent(_passkeyAuthReplyContext, get)) return;
                 if (!p || !c || !p.challenge || !p.rpId) {
                   set({ passkeyBusy: false, passkeyError: 'No passkey challenge to answer.' });
                   return;
@@ -6158,15 +6316,24 @@ export const store = createStore<OnyxState>()(
                   return;
                 }
                 getPasskeyAssertion(getOpts)
-                  .then((f) =>
-                    c.sendRaw('WEBAUTHN', 'AUTH-FINISH', f.credId, f.clientDataJSON, f.authData, f.signature),
-                  )
-                  .catch((e) => set({ passkeyBusy: false, passkeyError: passkeyErrText(e) }));
+                  .then((f) => {
+                    if (!_replyTransportIsCurrent(_passkeyAuthReplyContext, get)) return;
+                    c.sendRaw('WEBAUTHN', 'AUTH-FINISH', f.credId, f.clientDataJSON, f.authData, f.signature);
+                  })
+                  .catch((e) => {
+                    if (_replyTransportIsCurrent(_passkeyAuthReplyContext, get)) {
+                      set({ passkeyBusy: false, passkeyError: passkeyErrText(e) });
+                    }
+                  });
               }, 80);
               break;
             }
             case 'ALLOW-CRED': {
-              if (_pendingPasskeyAuth && standard.description) {
+              if (
+                _pendingPasskeyAuth
+                && standard.description
+                && _replyTransportIsCurrent(_passkeyAuthReplyContext, get)
+              ) {
                 _pendingPasskeyAuth.allowCreds.push(standard.description);
               }
               break;
@@ -6227,6 +6394,10 @@ export const store = createStore<OnyxState>()(
         // as a `NOTE ACCOUNTINFO :account=… flags=…`.
         if (ACCOUNT_COMMANDS.has(standard.command)) {
           if (standard.kind === 'FAIL' || standard.kind === 'WARN') {
+            if (standard.command === 'ACCOUNTINFO') {
+              if (!_replyTransportIsCurrent(_accountInfoReplyContext, get)) return;
+              _accountInfoReplyContext = null;
+            }
             set({
               accountInfoPending: false,
               accountActionError: {
@@ -6630,6 +6801,12 @@ export const store = createStore<OnyxState>()(
           // other user logging out turn the local UI into "Guest".
           if (!nick || nick.toLowerCase() !== ourNick.toLowerCase()) break;
           const account = params[0] === '*' ? null : params[0] ?? null;
+          const previousAccount = get().server?.account ?? null;
+          if (_accountKey(previousAccount) !== _accountKey(account)) {
+            _resetAccountBoundState(set);
+            _saslAccount = account;
+            _credentialTokenCanonicalOnly = true;
+          }
           set(s => ({ server: s.server ? { ...s.server, account } : null }));
           break;
         }
@@ -7206,8 +7383,9 @@ export const store = createStore<OnyxState>()(
 
             const info = parseAccountInfo(text);
             if (info) {
-              _applyAccountInfo(set, get, info);
-              get().addServiceNotice('Account', text);
+              if (_applyAccountInfo(set, get, info)) {
+                get().addServiceNotice('Account', text);
+              }
               break;
             }
             // Logout / drop confirmation — clear the logged-in account and any
@@ -8924,12 +9102,19 @@ export const store = createStore<OnyxState>()(
           // is an IRCX error and must not clobber the logged-in account.
           if (params.length >= 4 && params[2]) {
             const account900 = params[2];
-            const previousAccount = get().server?.account;
+            const existingServer = get().server;
+            const previousAccount = existingServer?.account;
             if (
               previousAccount
               && previousAccount.toLowerCase() !== account900.toLowerCase()
             ) {
               _credentialTokenCanonicalOnly = true;
+            }
+            if (
+              existingServer
+              && _accountKey(previousAccount) !== _accountKey(account900)
+            ) {
+              _resetAccountBoundState(set);
             }
             _sessionTokenWritesAllowed = true;
             // Capture before server object exists (900 arrives during CAP/SASL, before 001)
