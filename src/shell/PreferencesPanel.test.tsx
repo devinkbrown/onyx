@@ -3029,6 +3029,31 @@ describe('PreferencesPanel', () => {
     expect((await listSearches()).some((search) => search.query === 'saved query remains')).toBe(true);
   });
 
+  it('retires a pending queued-send count when Preferences unmounts', async () => {
+    let resolveCount: (entries: Awaited<ReturnType<typeof loadOutbox>>) => void = () => {};
+    const pendingCount = new Promise<Awaited<ReturnType<typeof loadOutbox>>>((resolve) => {
+      resolveCount = resolve;
+    });
+    const load = vi.spyOn(historyVault, 'loadOutbox')
+      .mockResolvedValueOnce([])
+      .mockReturnValueOnce(pendingCount);
+    const view = renderPreferences('History & data');
+    const card = screen.getByRole('heading', { name: 'Queued sends' }).closest('section');
+    const controls = within(card!);
+    const trigger = await controls.findByRole('button', { name: 'Discard queued sends' });
+
+    fireEvent.click(trigger);
+    await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
+    expect(trigger).toBeDisabled();
+
+    view.unmount();
+    resolveCount([]);
+    await pendingCount;
+    await Promise.resolve();
+
+    expect(screen.queryByRole('group', { name: 'Confirm discard queued sends' })).not.toBeInTheDocument();
+  });
+
   it('retains queued-send confirmation and plaintext when committed clear fails', async () => {
     globalThis.indexedDB = new IDBFactory();
     _resetVaultForTests();

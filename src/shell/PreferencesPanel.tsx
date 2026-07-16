@@ -2052,9 +2052,16 @@ function DiscardQueuedSendsControls(): JSX.Element {
   } | null>(null);
   let discardTrigger: HTMLButtonElement | undefined;
   let discardAction: HTMLButtonElement | undefined;
+  let operationEpoch = 0;
+  let disposed = false;
 
-  async function refreshCount(): Promise<number> {
+  function operationIsCurrent(epoch: number): boolean {
+    return !disposed && epoch === operationEpoch;
+  }
+
+  async function refreshCount(epoch = operationEpoch): Promise<number | null> {
     const count = (await loadOutbox()).length;
+    if (!operationIsCurrent(epoch)) return null;
     setQueueCount(count);
     return count;
   }
@@ -2062,15 +2069,23 @@ function DiscardQueuedSendsControls(): JSX.Element {
   onMount(() => {
     void refreshCount();
   });
-  onCleanup(subscribeOutbox(() => {
+  const unsubscribeOutbox = subscribeOutbox(() => {
     void refreshCount();
-  }));
+  });
+  onCleanup(() => {
+    disposed = true;
+    operationEpoch += 1;
+    unsubscribeOutbox();
+  });
 
   async function beginDiscard(trigger: HTMLButtonElement): Promise<void> {
+    if (busy()) return;
+    const epoch = ++operationEpoch;
     discardTrigger = trigger;
     setBusy(true);
     setStatus(null);
-    const count = await refreshCount();
+    const count = await refreshCount(epoch);
+    if (count === null) return;
     setStagedCount(count);
     setConfirming(true);
     setBusy(false);
@@ -2086,9 +2101,11 @@ function DiscardQueuedSendsControls(): JSX.Element {
 
   async function confirmDiscard(): Promise<void> {
     const expected = stagedCount();
-    if (expected === null) return;
+    if (expected === null || busy()) return;
+    const epoch = ++operationEpoch;
     setBusy(true);
     const current = (await loadOutbox()).length;
+    if (!operationIsCurrent(epoch)) return;
     setQueueCount(current);
     if (current !== expected) {
       setStagedCount(current);
@@ -2101,7 +2118,9 @@ function DiscardQueuedSendsControls(): JSX.Element {
     }
 
     const cleared = await clearOutbox();
+    if (!operationIsCurrent(epoch)) return;
     const remaining = (await loadOutbox()).length;
+    if (!operationIsCurrent(epoch)) return;
     if (!cleared || remaining > 0) {
       setQueueCount(remaining > 0 ? remaining : current);
       setStagedCount(remaining > 0 ? remaining : current);
