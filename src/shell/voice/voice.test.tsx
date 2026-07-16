@@ -31,6 +31,7 @@ const displayMediaDescriptor = Object.getOwnPropertyDescriptor(
   navigator.mediaDevices,
   'getDisplayMedia',
 );
+const wakeLockDescriptor = Object.getOwnPropertyDescriptor(navigator, 'wakeLock');
 
 function makeChannelUser(nick: string, modes: string[] = []): ChannelUser {
   return { nick, modes: new Set(modes) };
@@ -124,6 +125,35 @@ function restoreDisplayCapture(): void {
   } else {
     Reflect.deleteProperty(navigator.mediaDevices, 'getDisplayMedia');
   }
+}
+
+function setWakeLock(request: (type: 'screen') => Promise<{
+  readonly released: boolean;
+  release(): Promise<void>;
+  addEventListener(type: 'release', listener: () => void): void;
+  removeEventListener(type: 'release', listener: () => void): void;
+}>): void {
+  Object.defineProperty(navigator, 'wakeLock', {
+    configurable: true,
+    value: { request },
+  });
+}
+
+function restoreWakeLock(): void {
+  if (wakeLockDescriptor) {
+    Object.defineProperty(navigator, 'wakeLock', wakeLockDescriptor);
+  } else {
+    Reflect.deleteProperty(navigator, 'wakeLock');
+  }
+}
+
+function makeWakeLockSentinel() {
+  return {
+    released: false,
+    release: vi.fn(async () => {}),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  };
 }
 
 // ── VoiceStage ────────────────────────────────────────────────────────────────
@@ -463,11 +493,13 @@ describe('VoiceBar', () => {
   beforeEach(() => {
     store.setState(initialState, true);
     restoreDisplayCapture();
+    restoreWakeLock();
   });
 
   afterEach(() => {
     cleanup();
     restoreDisplayCapture();
+    restoreWakeLock();
   });
 
   it('does not render when callState is idle', () => {
@@ -489,6 +521,38 @@ describe('VoiceBar', () => {
 
     // Assert
     expect(getByTestId('voice-bar')).toBeDefined();
+  });
+
+  it('holds a screen wake lock only for accepted media and releases it on call end', async () => {
+    const sentinel = makeWakeLockSentinel();
+    const request = vi.fn(async () => sentinel);
+    setWakeLock(request);
+    const { queryByTestId } = render(() => <VoiceBar />);
+
+    expect(request).not.toHaveBeenCalled();
+    store.setState(s => ({ voice: { ...s.voice, callState: 'ringing_in' } }));
+    expect(queryByTestId('voice-bar')).toBeDefined();
+    expect(request).not.toHaveBeenCalled();
+
+    store.setState(s => ({ voice: { ...s.voice, callState: 'in_call' } }));
+    await waitFor(() => expect(request).toHaveBeenCalledOnce());
+    expect(request).toHaveBeenCalledWith('screen');
+
+    store.setState(s => ({ voice: { ...s.voice, callState: 'idle' } }));
+    await waitFor(() => expect(sentinel.release).toHaveBeenCalledOnce());
+  });
+
+  it('releases the active screen wake lock when VoiceBar unmounts', async () => {
+    const sentinel = makeWakeLockSentinel();
+    const request = vi.fn(async () => sentinel);
+    setWakeLock(request);
+    seedVoiceStore([]);
+
+    const { unmount } = render(() => <VoiceBar />);
+    await waitFor(() => expect(request).toHaveBeenCalledOnce());
+    unmount();
+
+    await waitFor(() => expect(sentinel.release).toHaveBeenCalledOnce());
   });
 
   it('mute button calls toggleMute and reflects muted state', () => {

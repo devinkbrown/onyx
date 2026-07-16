@@ -39,6 +39,7 @@ import {
   type ActiveSpeakerState,
 } from '@/lib/suimyaku-media/activeSpeaker';
 import { shortDuration } from '@/lib/time/relativeTime';
+import { createScreenWakeLockController } from '@/lib/screenWakeLock';
 import { Avatar, Popover, Tooltip } from '@/primitives';
 import {
   MicIcon, MicOffIcon, DeafenIcon, DeafenOffIcon, CameraIcon, CameraOffIcon,
@@ -238,6 +239,7 @@ export function VoiceBar() {
   const mediaAvailable = useStore(s => s.mediaAvailable);
   const spatialPositions = useStore(s => s.spatialPositions);
   const voiceChannelParticipants = useStore(s => s.voiceChannelParticipants);
+  const screenWakeLock = createScreenWakeLockController();
 
   const [reactionsOpen, setReactionsOpen] = createSignal(false);
   const [spatialOpen, setSpatialOpen] = createSignal(false);
@@ -312,6 +314,12 @@ export function VoiceBar() {
   const handleToggleLayout = () => getState().setCallLayout(isSpotlight() ? 'grid' : 'spotlight');
   const handleOpenSettings = () => getState().openVoiceSettings();
 
+  // Ringing surfaces can remain mounted for a long time, but only an accepted
+  // call is real active media and warrants keeping the display awake.
+  createEffect(() => {
+    screenWakeLock.setActive(voice().callState === 'in_call');
+  });
+
   createEffect(() => {
     const peers = spatialPeers();
     const selected = selectedSpatialNick();
@@ -332,6 +340,7 @@ export function VoiceBar() {
     disposed = true;
     screenshareOperationEpoch += 1;
     setSpatialDragging(false);
+    screenWakeLock.dispose();
   });
 
   // Reference-stable handle on the local capture stream: voice() is replaced on
