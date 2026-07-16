@@ -45,6 +45,14 @@ export async function refreshInstalledAppShell(
       };
     }
 
+    const installing = updated.installing ?? registration.installing;
+    if (installing && installing.state !== 'redundant') {
+      return {
+        state: 'activating',
+        detail: 'A refreshed app shell is installing. Onyx will reload when it takes control.',
+      };
+    }
+
     if (navigator.serviceWorker.controller) {
       reload();
       return {

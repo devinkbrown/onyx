@@ -29,10 +29,32 @@ describe('PWA update recovery', () => {
     });
     const reload = vi.fn();
 
-    await expect(refreshInstalledAppShell(reload)).resolves.toMatchObject({
+    await expect(refreshInstalledAppShell(reload)).resolves.toEqual({
       state: 'activating',
+      detail: 'A refreshed app shell is activating. Onyx will reload when it takes control.',
     });
     expect(postMessage).toHaveBeenCalledWith({ type: 'ONYX_SKIP_WAITING' });
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it('lets an installing worker take control instead of reloading the old shell', async () => {
+    const installing = { state: 'installing' };
+    vi.stubGlobal('navigator', {
+      serviceWorker: {
+        controller: {},
+        getRegistration: vi.fn(async () => ({
+          installing,
+          waiting: null,
+          update: vi.fn(async () => ({ installing, waiting: null })),
+        })),
+      },
+    });
+    const reload = vi.fn();
+
+    await expect(refreshInstalledAppShell(reload)).resolves.toEqual({
+      state: 'activating',
+      detail: 'A refreshed app shell is installing. Onyx will reload when it takes control.',
+    });
     expect(reload).not.toHaveBeenCalled();
   });
 
