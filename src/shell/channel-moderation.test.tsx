@@ -10,6 +10,7 @@
 import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { store } from '@/lib/store/store';
+import { parseIRCMessage } from '@/lib/irc/parser';
 import type { Channel, ChannelUser } from '@/lib/irc/types';
 import { MemberList } from './MemberList';
 import { PresenceRibbon } from './PresenceRibbon';
@@ -178,6 +179,21 @@ describe('MemberList moderation', () => {
 
     // Assert
     expect(client.sendRaw).toHaveBeenCalledWith('KICK', '#general', 'bob');
+  });
+
+  it('keeps focus in the roster when a kicked member row is removed', () => {
+    seedChannel({
+      ourNick: 'me',
+      users: [makeUser('me', ['o']), makeUser('bob'), makeUser('carol')],
+    });
+
+    render(() => <MemberList />);
+    fireEvent.click(screen.getByRole('button', { name: /Open member details for bob/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Kick bob from #general' }));
+    store.getState()._handleMessage(parseIRCMessage(':me!user@host KICK #general bob :Removed'));
+
+    expect(screen.queryByRole('button', { name: /Open member details for bob/ })).toBeNull();
+    expect(screen.getByRole('complementary', { name: 'Member list for #general' })).toHaveFocus();
   });
 
   it('clicking Op dispatches MODE +o through the client', () => {

@@ -91,6 +91,27 @@ function MemberCard(props: MemberCardProps): JSX.Element {
     return `member-card-${channel}-${nick}`;
   });
 
+  function memberTriggerForAction(event: MouseEvent): HTMLButtonElement | null {
+    const action = event.currentTarget;
+    return action instanceof HTMLElement
+      ? action.closest('.onyx-popover')?.querySelector<HTMLButtonElement>('.onyx-popover__trigger') ?? null
+      : null;
+  }
+
+  function closeCardForHandoff(event: MouseEvent, focusRoster = false): void {
+    const memberTrigger = memberTriggerForAction(event);
+    if (!memberTrigger) return;
+
+    const roster = memberTrigger.closest<HTMLElement>('.shell-members');
+    const target = focusRoster ? roster : memberTrigger;
+
+    if (memberTrigger.getAttribute('aria-expanded') === 'true') memberTrigger.click();
+    target?.focus({ preventScroll: true });
+    // Popover restores its own opener in a microtask. Run after that restore so
+    // a later MODE/KICK echo cannot remove the element that owns focus.
+    if (focusRoster && target) queueMicrotask(() => target.focus({ preventScroll: true }));
+  }
+
   function handleDm(): void {
     if (local.onOpenDm) {
       local.onOpenDm(local.user.nick);
@@ -103,28 +124,27 @@ function MemberCard(props: MemberCardProps): JSX.Element {
     // The WHOIS Sheet lives outside this native popover. Its first pointer
     // interaction light-dismisses the popover and removes this Profile button,
     // so make the persistent member-row trigger the Sheet's restore target.
-    const action = event.currentTarget;
-    const memberTrigger = action instanceof HTMLElement
-      ? action.closest('.onyx-popover')?.querySelector<HTMLButtonElement>('.onyx-popover__trigger')
-      : null;
-    if (memberTrigger?.getAttribute('aria-expanded') === 'true') memberTrigger.click();
-    memberTrigger?.focus({ preventScroll: true });
+    closeCardForHandoff(event);
     getState().whois(local.user.nick);
   }
 
-  function handleOp(): void {
+  function handleOp(event: MouseEvent): void {
+    closeCardForHandoff(event, true);
     getState().opMember(local.channel, local.user.nick, !hasMode('o'));
   }
 
-  function handleVoice(): void {
+  function handleVoice(event: MouseEvent): void {
+    closeCardForHandoff(event, true);
     getState().voiceMember(local.channel, local.user.nick, !hasMode('v'));
   }
 
-  function handleKick(): void {
+  function handleKick(event: MouseEvent): void {
+    closeCardForHandoff(event, true);
     getState().kickMember(local.channel, local.user.nick);
   }
 
-  function handleBan(): void {
+  function handleBan(event: MouseEvent): void {
+    closeCardForHandoff(event, true);
     // Ban by nick mask — a conservative, readable default.
     getState().banMask(local.channel, `${local.user.nick}!*@*`);
   }
@@ -308,7 +328,7 @@ export function MemberList(props: MemberListProps): JSX.Element {
       aria-label={memberListLabel()}
       aria-hidden={local.hidden ? 'true' : 'false'}
       aria-modal={local.modal && !local.hidden ? 'true' : undefined}
-      tabindex={local.modal && !local.hidden ? -1 : undefined}
+      tabindex={!local.hidden ? -1 : undefined}
     >
       <div class="shell-members-head">
         <span>members</span>
