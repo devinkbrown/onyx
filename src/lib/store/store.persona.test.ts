@@ -5,7 +5,7 @@
  * store folds them into structured totp/personas state.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { store } from './store';
+import { _resetAccountReplyStateForTests, store, type Server } from './store';
 import { parseIRCMessage } from '@/lib/irc/parser';
 
 const initialState = store.getInitialState();
@@ -24,11 +24,25 @@ function mockClient() {
   };
 }
 
+function seedServer(account: string | null): Server {
+  return {
+    id: 'ircxnet',
+    name: 'eshmaki.me',
+    network: 'IRCXNet',
+    url: 'wss://eshmaki.me',
+    icon: '#000',
+    nick: account ?? 'guest',
+    account,
+    connected: true,
+  };
+}
+
 const feed = (line: string) => store.getState()._handleMessage(parseIRCMessage(line));
 const notice = (text: string) => feed(`:irc.eshmaki.me NOTICE kain :${text}`);
 
 beforeEach(() => {
   store.setState({ ...initialState, ourNick: 'kain' }, true);
+  _resetAccountReplyStateForTests();
 });
 
 describe('TOTP notices', () => {
@@ -51,7 +65,9 @@ describe('TOTP notices', () => {
   });
 
   it('activation clears the secret and marks active', () => {
-    store.setState({ ...mockClient(), totp: { status: 'pending', secret: 'X', otpauth: 'y', error: null, busy: true } });
+    const { client } = mockClient();
+    store.setState({ client, totp: { status: 'pending', secret: 'X', otpauth: 'y', error: null, busy: true } });
+    store.getState().totpConfirm('123456');
     notice('TOTP: two-factor authentication is now ACTIVE — future logins require a code');
     const totp = store.getState().totp;
     expect(totp.status).toBe('active');
@@ -59,13 +75,55 @@ describe('TOTP notices', () => {
   });
 
   it('STATUS + DISABLE notices map to states; FAIL surfaces an error', () => {
-    store.setState(mockClient());
+    const { client } = mockClient();
+    store.setState({ client });
+    store.getState().totpStatus();
     notice('TOTP: two-factor authentication is active');
     expect(store.getState().totp.status).toBe('active');
+    store.getState().totpDisable();
     notice('TOTP: two-factor authentication disabled');
     expect(store.getState().totp.status).toBe('disabled');
+    store.getState().totpConfirm('000000');
     feed(':irc.eshmaki.me FAIL TOTP INVALID_CODE :Incorrect code; try the current one from your authenticator');
     expect(store.getState().totp.error).toMatch(/incorrect code/i);
+  });
+
+  it('rejects late Alice notices after 900 switches the live account to Bob', () => {
+    const { client } = mockClient();
+    store.setState({ client, server: seedServer('alice') });
+    store.getState().totpStatus();
+
+    feed(':irc.eshmaki.me 900 kain kain!u@h bob :You are now logged in as bob');
+    notice('TOTP: secret ALICESECRET');
+    notice('TOTP: enrollment pending for alice');
+
+    expect(store.getState().server?.account).toBe('bob');
+    expect(store.getState().totp).toEqual({
+      status: 'unknown',
+      secret: null,
+      otpauth: null,
+      error: null,
+      busy: false,
+    });
+
+    store.getState().totpStatus();
+    notice('TOTP: two-factor authentication is active');
+    expect(store.getState().totp.status).toBe('active');
+  });
+
+  it('rejects a reply owned by a superseded client for the same account', () => {
+    const oldClient = mockClient().client;
+    const newClient = mockClient().client;
+    store.setState({ client: oldClient, server: seedServer('alice') });
+    store.getState().totpStatus();
+
+    store.setState({ client: newClient });
+    notice('TOTP: two-factor authentication is active');
+    expect(store.getState().totp.status).toBe('unknown');
+
+    store.getState().totpStatus();
+    notice('TOTP: two-factor authentication is active');
+    expect(store.getState().totp.status).toBe('active');
   });
 });
 
@@ -95,9 +153,30 @@ describe('VHOST wardrobe notices', () => {
     vi.useFakeTimers();
     const { client, sent } = mockClient();
     store.setState({ client });
+    store.getState().vhostUse('nightshift');
     notice('VHOST: now wearing nightshift (night.works/kain)');
     vi.advanceTimersByTime(400);
     expect(sent.some((l) => l.includes('VHOST LIST'))).toBe(true);
     vi.useRealTimers();
+  });
+
+  it('rejects late Alice wardrobe rows after 900 switches the live account to Bob', () => {
+    const { client } = mockClient();
+    store.setState({ client, server: seedServer('alice') });
+    store.getState().vhostList();
+
+    feed(':irc.eshmaki.me 900 kain kain!u@h bob :You are now logged in as bob');
+    notice('VHOST persona alice-night = alice.example (granted)');
+    notice('VHOST offer alice.example/* :Alice offer');
+
+    expect(store.getState().server?.account).toBe('bob');
+    expect(store.getState().personas).toEqual([]);
+    expect(store.getState().personaOffers).toEqual([]);
+
+    store.getState().vhostList();
+    notice('VHOST persona bob-night = bob.example (granted)');
+    expect(store.getState().personas).toEqual([
+      { name: 'bob-night', host: 'bob.example', source: 'granted' },
+    ]);
   });
 });

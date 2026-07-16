@@ -2264,6 +2264,8 @@ let _accountInfoReplyContext: AccountReplyContext | null = null;
 let _passkeyListReplyContext: AccountReplyContext | null = null;
 let _passkeyActionReplyContext: AccountReplyContext | null = null;
 let _passkeyAuthReplyContext: AccountReplyContext | null = null;
+let _totpReplyContext: AccountReplyContext | null = null;
+let _vhostReplyContext: AccountReplyContext | null = null;
 
 function passkeyErrText(e: unknown): string {
   if (e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'AbortError')) {
@@ -2645,6 +2647,8 @@ function _invalidateAccountReplyContexts(): void {
   _passkeyListReplyContext = null;
   _passkeyActionReplyContext = null;
   _passkeyAuthReplyContext = null;
+  _totpReplyContext = null;
+  _vhostReplyContext = null;
   if (_pendingPasskeyAuth?.timer) clearTimeout(_pendingPasskeyAuth.timer);
   _pendingPasskeyAuth = null;
   _pendingPasskeyList = null;
@@ -4278,37 +4282,60 @@ export const store = createStore<OnyxState>()(
 
     // ── navigate ─────────────────────────────────────────────────────────
     totpEnroll() {
+      const { client } = get();
+      if (!client) return;
+      _totpReplyContext = _captureAccountReplyContext(get);
       set(st => ({ totp: { ...st.totp, busy: true, error: null, secret: null, otpauth: null } }));
-      get().client?.sendRaw('TOTP', 'ENROLL');
+      client.sendRaw('TOTP', 'ENROLL');
     },
     totpConfirm(code) {
       const trimmed = code.trim();
-      if (!trimmed) return;
+      const { client } = get();
+      if (!client || !trimmed) return;
+      _totpReplyContext = _captureAccountReplyContext(get);
       set(st => ({ totp: { ...st.totp, busy: true, error: null } }));
-      get().client?.sendRaw('TOTP', 'CONFIRM', trimmed);
+      client.sendRaw('TOTP', 'CONFIRM', trimmed);
     },
     totpDisable() {
+      const { client } = get();
+      if (!client) return;
+      _totpReplyContext = _captureAccountReplyContext(get);
       set(st => ({ totp: { ...st.totp, busy: true, error: null } }));
-      get().client?.sendRaw('TOTP', 'DISABLE');
+      client.sendRaw('TOTP', 'DISABLE');
     },
     totpStatus() {
-      get().client?.sendRaw('TOTP', 'STATUS');
+      const { client } = get();
+      if (!client) return;
+      _totpReplyContext = _captureAccountReplyContext(get);
+      client.sendRaw('TOTP', 'STATUS');
     },
 
     vhostList() {
+      const { client } = get();
+      if (!client) return;
+      _vhostReplyContext = _captureAccountReplyContext(get);
       set({ personas: [], personaOffers: [] });
-      get().client?.sendRaw('VHOST', 'LIST');
+      client.sendRaw('VHOST', 'LIST');
     },
     vhostUse(name) {
-      if (!name.trim()) return;
-      get().client?.sendRaw('VHOST', 'USE', name.trim());
+      const target = name.trim();
+      const { client } = get();
+      if (!client || !target) return;
+      _vhostReplyContext = _captureAccountReplyContext(get);
+      client.sendRaw('VHOST', 'USE', target);
     },
     vhostClaim(host) {
-      if (!host.trim()) return;
-      get().client?.sendRaw('VHOST', 'CLAIM', host.trim());
+      const target = host.trim();
+      const { client } = get();
+      if (!client || !target) return;
+      _vhostReplyContext = _captureAccountReplyContext(get);
+      client.sendRaw('VHOST', 'CLAIM', target);
     },
     vhostOff() {
-      get().client?.sendRaw('VHOST', 'OFF');
+      const { client } = get();
+      if (!client) return;
+      _vhostReplyContext = _captureAccountReplyContext(get);
+      client.sendRaw('VHOST', 'OFF');
     },
 
     searchServerHistory(target, query) {
@@ -6483,6 +6510,8 @@ export const store = createStore<OnyxState>()(
           return;
         }
         if (standard.kind === 'FAIL' && standard.command === 'TOTP') {
+          if (!_replyAccountIsCurrent(_totpReplyContext, get)) return;
+          _totpReplyContext = null;
           set(st => ({ totp: { ...st.totp, busy: false, error: standard.description || 'TOTP command failed' } }));
           return;
         }
@@ -7335,6 +7364,7 @@ export const store = createStore<OnyxState>()(
 
             // ── TOTP: structured 2FA notices ─────────────────────────────
             if (text.startsWith('TOTP:')) {
+              if (!_replyAccountIsCurrent(_totpReplyContext, get)) break;
               const body = text.slice(5).trim();
               const secretMatch = body.match(/^secret ([A-Z2-7]+)$/);
               const isOtpauth = body.startsWith('otpauth://');
@@ -7355,6 +7385,7 @@ export const store = createStore<OnyxState>()(
 
             // ── VHOST: Guise persona wardrobe lines ──────────────────────
             if (text.startsWith('VHOST')) {
+              if (!_replyAccountIsCurrent(_vhostReplyContext, get)) break;
               const persona = text.match(/^VHOST persona (\S+) = (\S+) \(([^)]*)\)$/);
               const offer = text.match(/^VHOST offer (\S+) :?(.*)$/);
               if (persona) {
@@ -7375,7 +7406,10 @@ export const store = createStore<OnyxState>()(
                 get().addServiceNotice('Account', text);
                 // A wear/claim confirmation changes the wardrobe — refresh it.
                 if (/now wearing|claimed|persona off|removed/i.test(text)) {
-                  setTimeout(() => get().vhostList(), 300);
+                  const confirmationContext = _vhostReplyContext;
+                  setTimeout(() => {
+                    if (_replyAccountIsCurrent(confirmationContext, get)) get().vhostList();
+                  }, 300);
                 }
               }
               break;
