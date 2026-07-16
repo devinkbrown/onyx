@@ -448,9 +448,11 @@ describe('About page — DOM rendering', () => {
     cleanup();
   });
 
-  it.skipIf(!renderAvailable)('hero h1 is present and contains expected text', () => {
+  it.skipIf(!renderAvailable)('uses the hero as the single page-level h1', () => {
     const { cleanup } = renderAbout!();
-    const h1 = document.querySelector('h1');
+    const headings = document.querySelectorAll('h1');
+    expect(headings).toHaveLength(1);
+    const h1 = headings.item(0);
     expect(h1).not.toBeNull();
     expect(h1!.textContent?.toLowerCase()).toContain('open wire');
     cleanup();

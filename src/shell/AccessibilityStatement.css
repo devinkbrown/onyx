@@ -27,13 +27,13 @@
   text-transform: uppercase;
 }
 
-.a11y-document h1,
 .a11y-document h2,
-.a11y-document h3 {
+.a11y-document h3,
+.a11y-document h4 {
   color: var(--washi);
 }
 
-.a11y-document h1 {
+.a11y-header h2 {
   margin: 0;
   font-family: var(--font-display);
   font-size: clamp(2.2rem, 1.55rem + 2.5vw, 3.4rem);
@@ -54,7 +54,7 @@
   margin-top: var(--space-8);
 }
 
-.a11y-section h2 {
+.a11y-section > h3 {
   margin: 0 0 var(--space-5);
   font-family: var(--font-mono);
   font-size: 0.78rem;
@@ -87,9 +87,9 @@
   padding-bottom: 0;
 }
 
-.a11y-standard h3,
-.a11y-topic h3,
-.a11y-feedback h3 {
+.a11y-standard h4,
+.a11y-topic h4,
+.a11y-feedback h4 {
   margin: 0 0 var(--space-3);
   font-size: 1.05rem;
   font-weight: 700;

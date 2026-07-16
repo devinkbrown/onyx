@@ -10,6 +10,10 @@ describe('AccessibilityStatement', () => {
   it('publishes current dense-client audit evidence', () => {
     render(() => <AccessibilityStatement />);
 
+    expect(screen.getByRole('heading', { level: 2, name: 'Accessibility statement' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3, name: 'Conformance posture' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 4, name: 'Standard' })).toBeInTheDocument();
+    expect(document.querySelector('h1')).toBeNull();
     expect(screen.getByRole('heading', { name: 'Current client audit' })).toBeInTheDocument();
     expect(screen.getByText(/Channel settings uses a labelled Sheet/i)).toBeInTheDocument();
     expect(screen.getByText(/Voice controls use a toolbar/i)).toBeInTheDocument();

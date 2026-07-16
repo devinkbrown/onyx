@@ -93,11 +93,11 @@ export function AccessibilityStatement(props: { class?: string }): JSX.Element {
     props.class ? `a11y-statement ${props.class}` : 'a11y-statement';
 
   return (
-    <section class={rootClass()} aria-labelledby="a11y-statement-title">
+    <div class={rootClass()}>
       <article class="a11y-document">
         <header class="a11y-header">
           <p class="a11y-kicker">Accessibility conformance</p>
-          <h1 id="a11y-statement-title">Accessibility statement</h1>
+          <h2 id="a11y-statement-title">Accessibility statement</h2>
           <p class="a11y-lede">
             Onyx aims to make time-native chat usable without requiring a mouse,
             animation, perfect color perception, or a specific display mode.
@@ -105,9 +105,9 @@ export function AccessibilityStatement(props: { class?: string }): JSX.Element {
         </header>
 
         <section class="a11y-section" aria-labelledby="a11y-posture-title">
-          <h2 id="a11y-posture-title">Conformance posture</h2>
+          <h3 id="a11y-posture-title">Conformance posture</h3>
           <section class="a11y-standard" aria-labelledby="a11y-standard-title">
-            <h3 id="a11y-standard-title">Standard</h3>
+            <h4 id="a11y-standard-title">Standard</h4>
             <p>
               Onyx targets <strong>WCAG 2.2 Level AA</strong> and uses{' '}
               <strong>EN 301 549</strong> as the accessibility reference for EU
@@ -124,12 +124,12 @@ export function AccessibilityStatement(props: { class?: string }): JSX.Element {
         </section>
 
         <section class="a11y-section" aria-labelledby="a11y-support-title">
-          <h2 id="a11y-support-title">Supported accessibility features</h2>
+          <h3 id="a11y-support-title">Supported accessibility features</h3>
           <div class="a11y-topic-list">
             <For each={ACCESSIBILITY_TOPICS}>
               {(topic) => (
                 <section class="a11y-topic" aria-labelledby={`a11y-${topic.id}-title`}>
-                  <h3 id={`a11y-${topic.id}-title`}>{topic.heading}</h3>
+                  <h4 id={`a11y-${topic.id}-title`}>{topic.heading}</h4>
                   <p>{topic.summary}</p>
                   <ul class="a11y-list">
                     <For each={topic.points}>{(point) => <li>{point}</li>}</For>
@@ -141,9 +141,9 @@ export function AccessibilityStatement(props: { class?: string }): JSX.Element {
         </section>
 
         <section class="a11y-section" aria-labelledby="a11y-feedback-title">
-          <h2 id="a11y-feedback-title">Feedback</h2>
+          <h3 id="a11y-feedback-title">Feedback</h3>
           <section class="a11y-feedback" aria-labelledby="a11y-reporting-title">
-            <h3 id="a11y-reporting-title">Reporting accessibility bugs</h3>
+            <h4 id="a11y-reporting-title">Reporting accessibility bugs</h4>
             <p>
               Onyx welcomes accessibility bug reports through your community&apos;s
               admin or an <code>#accessibility</code> channel so issues can be
@@ -152,6 +152,6 @@ export function AccessibilityStatement(props: { class?: string }): JSX.Element {
           </section>
         </section>
       </article>
-    </section>
+    </div>
   );
 }
