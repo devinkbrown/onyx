@@ -1434,6 +1434,52 @@ describe('AppShell', () => {
       });
     });
 
+    it('closes the mobile member drawer when navigation replaces its channel target', async () => {
+      stubMobileViewport();
+      seedStore('#general');
+      const current = store.getState().channels.get('#general');
+      expect(current).toBeDefined();
+      store.setState({
+        channels: new Map([
+          ...store.getState().channels,
+          ['#other', { ...current!, name: '#other' }],
+        ]),
+      });
+
+      const { container } = render(() => <AppShell />);
+      const memberList = container.querySelector<HTMLElement>('.shell-members');
+      expect(memberList).not.toBeNull();
+      const membersButton = screen.getByRole('button', { name: 'Toggle member list' });
+      membersButton.focus();
+      fireEvent.click(membersButton);
+      await waitFor(() => expect(memberList).toHaveAttribute('aria-label', 'Member list for #general'));
+
+      store.setState({ activeView: { kind: 'channel', channel: '#other' } });
+
+      await waitFor(() => {
+        expect(memberList).toHaveAttribute('aria-label', 'Member list for #other');
+        expect(memberList).toHaveAttribute('aria-hidden', 'true');
+        expect(memberList).toHaveAttribute('inert');
+        expect(membersButton).toHaveAttribute('aria-expanded', 'false');
+        expect(membersButton).toHaveFocus();
+      });
+
+      fireEvent.click(membersButton);
+      await waitFor(() => expect(memberList).toHaveAttribute('aria-hidden', 'false'));
+      store.setState({ activeView: { kind: 'home' } });
+      await waitFor(() => {
+        expect(memberList).toHaveAttribute('aria-hidden', 'true');
+        expect(screen.queryByRole('button', { name: 'Toggle member list' })).toBeNull();
+      });
+
+      store.setState({ activeView: { kind: 'channel', channel: '#general' } });
+      await waitFor(() => {
+        expect(memberList).toHaveAttribute('aria-label', 'Member list for #general');
+        expect(memberList).toHaveAttribute('aria-hidden', 'true');
+        expect(screen.getByRole('button', { name: 'Toggle member list' })).toHaveAttribute('aria-expanded', 'false');
+      });
+    });
+
     it('focuses and names the empty mobile member drawer until Escape restores its trigger', async () => {
       stubMobileViewport();
       seedStore('#general');

@@ -313,6 +313,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
   // so on narrow viewports it gets its own open state.
   const [isMobile, setIsMobile] = createSignal(false);
   const [mobileMembersOpen, setMobileMembersOpen] = createSignal(false);
+  let mobileMembersTarget: string | null = null;
   let sidebarDrawerRef: HTMLDivElement | undefined;
   let mobileRoomsButtonRef: HTMLButtonElement | undefined;
   let mobileMembersButtonRef: HTMLButtonElement | undefined;
@@ -506,6 +507,30 @@ export function AppShell(props: AppShellProps): JSX.Element {
     setMobileMembersOpen(false);
     restoreMobileDrawerFocus();
   }
+
+  // A mobile drawer belongs to the channel it was opened for. Global
+  // navigation (Spotlight, notifications, shortcuts, reconnect restore) can
+  // replace activeView without going through the drawer's own Message/Home
+  // handlers. Close on that boundary instead of retaining a true open signal
+  // that silently reappears with a stale roster on the next channel view.
+  createEffect(() => {
+    const view = activeView();
+    if (!mobileMembersOpen()) {
+      mobileMembersTarget = null;
+      return;
+    }
+
+    const nextTarget = view.kind === 'channel' ? view.channel.toLowerCase() : null;
+    if (nextTarget === null) {
+      closeMobileMembers();
+      return;
+    }
+    if (mobileMembersTarget === null) {
+      mobileMembersTarget = nextTarget;
+      return;
+    }
+    if (nextTarget !== mobileMembersTarget) closeMobileMembers();
+  });
 
   function openHome(): void {
     closeActiveMobileDrawer(false);
