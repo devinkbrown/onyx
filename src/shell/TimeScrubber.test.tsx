@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Suspense } from 'solid-js';
 
 import { store } from '@/lib/store/store';
 import { buildMomentLink, buildTimeScrubberBars } from './TimeScrubber';
@@ -68,6 +69,21 @@ describe('buildMomentLink', () => {
 });
 
 describe('TimeScrubber accessibility', () => {
+  it('keeps the surrounding shell mounted while room pulse data is pending', () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
+
+    render(() => (
+      <Suspense fallback={<p data-testid="shell-suspended">Loading shell</p>}>
+        <div data-testid="stable-shell-chrome">Connected shell</div>
+        <TimeScrubber />
+      </Suspense>
+    ));
+
+    expect(screen.getByTestId('stable-shell-chrome')).toBeInTheDocument();
+    expect(screen.queryByTestId('shell-suspended')).not.toBeInTheDocument();
+    expect(screen.getByText('loading')).toBeInTheDocument();
+  });
+
   it('rolls the untouched UTC date forward and jumps the current-hour bar to the new day', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-16T23:59:30.000Z'));

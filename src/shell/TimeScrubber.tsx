@@ -108,6 +108,9 @@ export function TimeScrubber(): JSX.Element {
   const [pulse, { refetch }] = createResource(
     () => activeChannel(),
     async (channel) => (channel ? fetchChannelPulse(channel) : null),
+    // The scrubber has its own quiet/loading UI. Seeding a resolved null makes
+    // `pulse.latest` non-suspending even before the first request completes.
+    { initialValue: null },
   );
 
   const timer = setInterval(() => {
@@ -124,10 +127,14 @@ export function TimeScrubber(): JSX.Element {
   });
 
   const bars = createMemo(() =>
-    buildTimeScrubberBars(pulse()?.hours ?? null, new Date(nowMs()).getUTCHours()),
+    buildTimeScrubberBars(pulse.latest?.hours ?? null, new Date(nowMs()).getUTCHours()),
   );
   const status = createMemo(() => {
-    const data = pulse();
+    // `latest` reads the most recently resolved value without registering this
+    // component as a Suspense dependency. The scrubber owns an explicit
+    // loading state, so suspending its lazy AppShell ancestor would otherwise
+    // blank the entire connected UI while this optional stats request is slow.
+    const data = pulse.latest;
     if (pulse.loading && !data) return 'loading';
     if (!data) return 'no stats yet';
     if (data.total <= 0) return 'quiet';
