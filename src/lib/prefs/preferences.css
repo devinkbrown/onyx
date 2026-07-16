@@ -503,6 +503,7 @@
 }
 
 .pref-action-card__title {
+  overflow-wrap: anywhere;
   color: var(--washi);
   font-size: 0.9rem;
   font-weight: 700;

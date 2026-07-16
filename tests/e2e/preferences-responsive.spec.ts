@@ -45,6 +45,15 @@ async function renderNarrowPreferences(
         </div>
         <div class="pref-category-content">
           <section class="pref-category-panel">
+            <button class="pref-action-card" type="button">
+              <span class="pref-action-card__icon" aria-hidden="true">◐</span>
+              <span class="pref-action-card__body">
+                <span class="pref-action-card__title">Theme and background</span>
+                <span class="pref-desc">
+                  Open Appearance for themes, room atmosphere, shared theme import, and background selection.
+                </span>
+              </span>
+            </button>
             <section class="pref-group">
               <div class="pref-group-head">
                 <h3 class="pref-label">Followed conversations</h3>
@@ -95,7 +104,7 @@ async function renderNarrowPreferences(
         --lapis-bright: #55baff;
       }
       html, body { margin: 0; width: 100%; }
-      .onyx-sheet__body { width: 100%; padding: 1rem; overflow: auto; }
+      .onyx-sheet__body { width: 100%; padding: 1.25rem; overflow: auto; }
       ${preferencesCss}
     `,
   });
@@ -128,7 +137,7 @@ test('contains enlarged preference controls and leaves a usable mobile tab strip
 
 test('wraps import guidance, long filenames, and validation alerts at 200% text', async ({ page }) => {
   await renderNarrowPreferences(page, {
-    width: 320,
+    width: 280,
     rootFontSize: 32,
     longImportFeedback: true,
   });
@@ -138,6 +147,11 @@ test('wraps import guidance, long filenames, and validation alerts at 200% text'
     clientWidth: element.clientWidth,
     scrollWidth: element.scrollWidth,
   }));
+  const appearanceAction = await page.locator('.pref-action-card').evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
 
   expect(geometry.scrollWidth).toBe(geometry.clientWidth);
+  expect(appearanceAction.scrollWidth).toBe(appearanceAction.clientWidth);
 });
