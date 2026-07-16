@@ -3,8 +3,8 @@
  * backups.ts — public backup manifest feed.
  *
  * Orochi's `[backup]` worker writes `latest.json` with a list of timestamped
- * account and chanstats snapshots. Operators choose where to serve it, so the
- * website probes a few conventional static paths and degrades quietly.
+ * account and chanstats snapshots. The composite Onyx deployment exposes that
+ * bounded manifest at one source-controlled canonical route.
  */
 import { boundedFeedText, boundedUnixSeconds } from './feedBounds';
 import { fetchPublicJson } from './fetchPublicJson';
@@ -57,9 +57,5 @@ export function normalizeBackupManifest(raw: unknown): BackupManifest | null {
 }
 
 export async function fetchBackupManifest(): Promise<BackupManifest | null> {
-  for (const path of ['/backups/latest.json', '/backup/latest.json', '/stats/backups/latest.json']) {
-    const manifest = normalizeBackupManifest(await fetchPublicJson(path));
-    if (manifest) return manifest;
-  }
-  return null;
+  return normalizeBackupManifest(await fetchPublicJson('/stats/backups/latest.json'));
 }

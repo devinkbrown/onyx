@@ -1,12 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  fetchBackupManifest,
   MAX_BACKUP_FILES,
   MAX_BACKUP_KIND_LENGTH,
   MAX_BACKUP_NAME_LENGTH,
   normalizeBackupManifest,
 } from './backups';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('normalizeBackupManifest', () => {
   it('returns null for non-object manifests', () => {
@@ -70,5 +75,28 @@ describe('normalizeBackupManifest', () => {
     expect(manifest.files[0]!.name).toHaveLength(MAX_BACKUP_NAME_LENGTH);
     expect(manifest.files[0]!.source).toHaveLength(512);
     expect(manifest.generated_at).toBe(0);
+  });
+});
+
+describe('fetchBackupManifest', () => {
+  it('requests only the deployed canonical public manifest', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      generated_at: 1783500000,
+      files: [{ kind: 'accounts', name: 'accounts.snap' }],
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(fetchBackupManifest()).resolves.toEqual({
+      generated_at: 1783500000,
+      files: [{ kind: 'accounts', name: 'accounts.snap', source: '' }],
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith('/stats/backups/latest.json', expect.objectContaining({
+      headers: { Accept: 'application/json' },
+      signal: expect.any(AbortSignal),
+    }));
   });
 });
