@@ -355,7 +355,9 @@ describe('PWA manifest', () => {
     const listeners = new Map<string, (event: Record<string, unknown>) => void>();
     const add = vi.fn<(url: string) => Promise<void>>(async () => undefined);
     const put = vi.fn(async () => undefined);
-    const currentCacheMatch = vi.fn<(url: string) => Promise<unknown>>(async () => ({ cached: true }));
+    const currentCacheMatch = vi.fn<(url: string) => Promise<unknown>>(async (url) => ({
+      url: `https://onyx.test${url}`,
+    }));
     const cache = { add, match: currentCacheMatch, put };
     const match = vi.fn<(key: unknown) => Promise<unknown>>(async (key) => ({ fallback: key }));
     const deleteCache = vi.fn(async () => {
@@ -453,7 +455,7 @@ describe('PWA manifest', () => {
     expect(enableNavigationPreload).toHaveBeenCalledOnce();
 
     deleteCache.mockClear();
-    currentCacheMatch.mockResolvedValueOnce(undefined);
+    currentCacheMatch.mockResolvedValueOnce({ url: 'https://login.example/app/' });
     claim.mockRejectedValueOnce(new Error('client claim unavailable'));
     activateWork = undefined;
     listeners.get('activate')?.({

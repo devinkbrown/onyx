@@ -104,6 +104,18 @@ function isCacheableStaticPath(pathname) {
     || /^\/screenshots\/[^/]+\.png$/.test(pathname);
 }
 
+function isCanonicalShellResponse(pathname, response) {
+  const fallbackPath = navigationFallbackPath(pathname);
+  if (fallbackPath === null || !response) return false;
+  try {
+    const finalUrl = new URL(response.url);
+    return finalUrl.origin === self.location.origin
+      && navigationFallbackPath(finalUrl.pathname) === fallbackPath;
+  } catch {
+    return false;
+  }
+}
+
 function offlineNavigationFallback(pathname) {
   const fallbackPath = navigationFallbackPath(pathname);
   const unavailable = () => new Response(
@@ -128,14 +140,8 @@ function cacheSuccessfulShellNavigation(pathname, response) {
   const fallbackPath = navigationFallbackPath(pathname);
   if (fallbackPath === null
     || response?.ok !== true
-    || typeof response.clone !== 'function') return Promise.resolve();
-  try {
-    const finalUrl = new URL(response.url);
-    if (finalUrl.origin !== self.location.origin
-      || navigationFallbackPath(finalUrl.pathname) !== fallbackPath) return Promise.resolve();
-  } catch {
-    return Promise.resolve();
-  }
+    || typeof response.clone !== 'function'
+    || !isCanonicalShellResponse(pathname, response)) return Promise.resolve();
   let clone;
   try {
     clone = response.clone();
@@ -170,7 +176,9 @@ function clearStaleShellCaches() {
       // A best-effort install may activate with one shell URL missing. Keep the
       // previous Onyx cache as the only available offline fallback until a
       // later complete deployment can safely retire it.
-      if (!entries.every(Boolean)) return undefined;
+      if (!entries.every((entry, index) => isCanonicalShellResponse(PRECACHE_URLS[index], entry))) {
+        return undefined;
+      }
       return caches.keys().then((keys) => Promise.all(
         keys
           // This worker shares an origin with public and operational surfaces.
