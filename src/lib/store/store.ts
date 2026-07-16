@@ -3109,8 +3109,36 @@ export function _resetBanListTransportForTests(): void {
 }
 
 // ── Temp-ban timers (module-level) ─────────────────────────────────────────────
-/** channel/mask → timer; survives moderation panel unmounts and uses the current client when firing */
-const _tempBanTimers = new Map<string, ReturnType<typeof setTimeout>>();
+/** A client-side temp-ban is best-effort; keep its authority and timer bounded. */
+export const MAX_TEMP_BAN_TIMERS = 128;
+export const MAX_TEMP_BAN_MINUTES = 7 * 24 * 60;
+const MAX_TEMP_BAN_RETRIES = 20;
+const TEMP_BAN_RETRY_MS = 30_000;
+
+interface TempBanTimer {
+  timer: ReturnType<typeof setTimeout> | null;
+  client: IRCClient;
+  serverUrl: string;
+  account: string | null;
+  channel: string;
+  mask: string;
+  retries: number;
+}
+
+/** normalized channel/mask → owner-scoped pending unban */
+const _tempBanTimers = new Map<string, TempBanTimer>();
+
+function _clearTempBanTimers(): void {
+  for (const entry of _tempBanTimers.values()) {
+    if (entry.timer) clearTimeout(entry.timer);
+  }
+  _tempBanTimers.clear();
+}
+
+/** Isolate client-side moderation timers between focused store tests. */
+export function _resetTempBanTimersForTests(): void {
+  _clearTempBanTimers();
+}
 
 // ── Reconnect countdown (module-level) ────────────────────────────────────────
 let _reconnectAttempts = 0;
@@ -4707,6 +4735,7 @@ export const store = createStore<OnyxState>()(
       _batchCollectors.clear();
       _openChathistoryByTarget.clear();
       _stopLatencyPing();
+      _clearTempBanTimers();
       _resetServerSearchTransport();
       _pendingTravel = null;
       _clearPendingDeepLinkTopicResolution();
@@ -5023,6 +5052,7 @@ export const store = createStore<OnyxState>()(
       _batchCollectors.clear();
       _openChathistoryByTarget.clear();
       _stopLatencyPing();
+      _clearTempBanTimers();
       const searchWasPending = _pendingServerSearch !== null || get().serverSearch.status === 'pending';
       _resetServerSearchTransport();
       _pendingTravel = null;
@@ -11884,22 +11914,68 @@ export const store = createStore<OnyxState>()(
       get().client?.sendRaw('MODE', channel, '+b');
     },
     tempBan: (channel, mask, minutes) => {
-      const key = `${channel.toLowerCase()}\0${mask.toLowerCase()}`;
+      const state = get();
+      const normalizedChannel = _normalizeBanChannel(channel);
+      const trimmedMask = mask.trim();
+      const normalizedMask = _normalizeBanEntry({ mask })?.mask;
+      if (
+        !state.client
+        || state.connectionStatus !== 'connected'
+        || !state.server?.url
+        || !state.server.connected
+        || !normalizedChannel
+        || !normalizedMask
+        || normalizedMask !== trimmedMask
+        || !Number.isSafeInteger(minutes)
+        || minutes < 1
+        || minutes > MAX_TEMP_BAN_MINUTES
+      ) return;
+
+      const key = `${normalizedChannel}\0${normalizedMask.toLowerCase()}`;
       const existing = _tempBanTimers.get(key);
-      if (existing) clearTimeout(existing);
-      get().client?.sendRaw('MODE', channel, '+b', mask);
+      if (!existing && _tempBanTimers.size >= MAX_TEMP_BAN_TIMERS) return;
+      if (!state.client.sendRaw('MODE', normalizedChannel, '+b', normalizedMask)) return;
+      if (existing?.timer) clearTimeout(existing.timer);
+
+      const entry: TempBanTimer = {
+        timer: null,
+        client: state.client,
+        serverUrl: state.server.url,
+        account: _accountKey(state.server.account),
+        channel: normalizedChannel,
+        mask: normalizedMask,
+        retries: 0,
+      };
 
       const fire = () => {
-        const { client, connectionStatus } = get();
-        if (client && connectionStatus === 'connected') {
-          client.sendRaw('MODE', channel, '-b', mask);
+        if (_tempBanTimers.get(key) !== entry) return;
+        const current = get();
+        if (
+          current.client !== entry.client
+          || current.server?.url !== entry.serverUrl
+          || _accountKey(current.server?.account) !== entry.account
+        ) {
           _tempBanTimers.delete(key);
           return;
         }
-        _tempBanTimers.set(key, setTimeout(fire, 30000));
+        if (
+          current.connectionStatus === 'connected'
+          && current.server?.connected
+          && entry.client.sendRaw('MODE', entry.channel, '-b', entry.mask)
+        ) {
+          _tempBanTimers.delete(key);
+          return;
+        }
+        if (entry.retries >= MAX_TEMP_BAN_RETRIES) {
+          _tempBanTimers.delete(key);
+          return;
+        }
+        entry.retries += 1;
+        entry.timer = setTimeout(fire, TEMP_BAN_RETRY_MS);
       };
 
-      _tempBanTimers.set(key, setTimeout(fire, Math.max(1, minutes) * 60 * 1000));
+      entry.timer = setTimeout(fire, minutes * 60 * 1000);
+      _tempBanTimers.set(key, entry);
     },
 
     // ── Highlight words ───────────────────────────────────────────────────

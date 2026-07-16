@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { parseIRCMessage } from '@/lib/irc/parser';
 import type { Channel } from '@/lib/irc/types';
 import {
   MAX_BAN_LIST_ENTRIES,
+  MAX_TEMP_BAN_MINUTES,
+  MAX_TEMP_BAN_TIMERS,
   _resetBanListTransportForTests,
+  _resetTempBanTimersForTests,
   store,
   type Server,
 } from './store';
@@ -68,7 +71,13 @@ function feed(line: string): void {
 
 beforeEach(() => {
   _resetBanListTransportForTests();
+  _resetTempBanTimersForTests();
   store.setState(initialState, true);
+});
+
+afterEach(() => {
+  _resetTempBanTimersForTests();
+  vi.useRealTimers();
 });
 
 describe('RPL_BANLIST transport bounds', () => {
@@ -126,5 +135,88 @@ describe('RPL_BANLIST transport bounds', () => {
     const bans = store.getState().banList.get('#room');
     expect(bans).toHaveLength(MAX_BAN_LIST_ENTRIES);
     expect(bans?.[0]).toEqual({ mask: 'mask0!*@*' });
+  });
+});
+
+describe('temporary ban timer ownership and bounds', () => {
+  it('sends a normalized ban and removes it after the requested duration', () => {
+    vi.useFakeTimers();
+    const client = connect();
+
+    store.getState().tempBan(' #Room ', ' bad!*@* ', 1);
+    expect(client.sendRaw).toHaveBeenCalledWith('MODE', '#room', '+b', 'bad!*@*');
+
+    vi.advanceTimersByTime(60_000);
+    expect(client.sendRaw).toHaveBeenCalledWith('MODE', '#room', '-b', 'bad!*@*');
+  });
+
+  it('rejects inputs that cannot be paired with a safe bounded unban timer', () => {
+    vi.useFakeTimers();
+    const client = connect();
+
+    store.getState().tempBan('room', 'bad!*@*', 1);
+    store.getState().tempBan('#room', `${'x'.repeat(513)}!*@*`, 1);
+    store.getState().tempBan('#room', 'bad!*@*', 0);
+    store.getState().tempBan('#room', 'bad!*@*', 1.5);
+    store.getState().tempBan('#room', 'bad!*@*', MAX_TEMP_BAN_MINUTES + 1);
+
+    expect(client.sendRaw).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('caps distinct pending timers before sending a ban it cannot retire', () => {
+    vi.useFakeTimers();
+    const client = connect();
+
+    for (let index = 0; index < MAX_TEMP_BAN_TIMERS + 1; index += 1) {
+      store.getState().tempBan('#room', `user${index}!*@*`, 1);
+    }
+
+    expect(client.sendRaw).toHaveBeenCalledTimes(MAX_TEMP_BAN_TIMERS);
+    expect(vi.getTimerCount()).toBe(MAX_TEMP_BAN_TIMERS);
+  });
+
+  it('never spends a replacement account authority on an older unban', () => {
+    vi.useFakeTimers();
+    const client = connect('#room', 'alice');
+    store.getState().tempBan('#room', 'bad!*@*', 1);
+
+    feed(':me!user@host ACCOUNT bob');
+    vi.advanceTimersByTime(60_000);
+
+    expect(client.sendRaw).not.toHaveBeenCalledWith('MODE', '#room', '-b', 'bad!*@*');
+  });
+
+  it('retries briefly on the same disconnected client and unbans after reconnect', () => {
+    vi.useFakeTimers();
+    const client = connect();
+    store.getState().tempBan('#room', 'bad!*@*', 1);
+    store.setState((state) => ({
+      connectionStatus: 'disconnected',
+      server: state.server ? { ...state.server, connected: false } : null,
+    }));
+
+    vi.advanceTimersByTime(60_000);
+    expect(client.sendRaw).toHaveBeenCalledTimes(1);
+    store.setState((state) => ({
+      connectionStatus: 'connected',
+      server: state.server ? { ...state.server, connected: true } : null,
+    }));
+    vi.advanceTimersByTime(30_000);
+
+    expect(client.sendRaw).toHaveBeenCalledWith('MODE', '#room', '-b', 'bad!*@*');
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('cancels pending authority when the user explicitly disconnects', () => {
+    vi.useFakeTimers();
+    const client = connect();
+    store.getState().tempBan('#room', 'bad!*@*', 1);
+
+    store.getState().disconnect();
+    vi.advanceTimersByTime(90_000);
+
+    expect(client.sendRaw).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
