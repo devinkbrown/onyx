@@ -258,6 +258,21 @@ describe('NAMES roster reconcile — interleaved / late bursts never collapse', 
 
     expect(store.getState().channels.get('#prefix-change')?.users.get('alice')?.modes).toEqual(new Set(['q']));
   });
+
+  it('retains roster roles and the last good map after a malformed PREFIX update', () => {
+    connect('me');
+    feed(':me!u@h JOIN #prefix-malformed');
+    feed(':server 353 me = #prefix-malformed :me @alice');
+    const beforePrefix = store.getState().isupportPrefixToMode;
+    const beforeMode = store.getState().isupportModeToPrefix;
+
+    feed(':server 005 me PREFIX=(ov)@ :are supported by this server');
+
+    expect(store.getState().channels.get('#prefix-malformed')?.users.get('alice')?.modes)
+      .toEqual(new Set(['o']));
+    expect(store.getState().isupportPrefixToMode).toBe(beforePrefix);
+    expect(store.getState().isupportModeToPrefix).toBe(beforeMode);
+  });
 });
 
 describe('netsplit QUIT batch — only the quitter leaves, NAMES restores truth', () => {

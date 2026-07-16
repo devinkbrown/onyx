@@ -1242,6 +1242,7 @@ export class IRCClient {
       switch (key) {
         case 'PREFIX': {
           const { modeToPrefix, prefixToMode } = parsePREFIX(val);
+          if (Object.keys(modeToPrefix).length === 0) break;
           this.modeToPrefix = modeToPrefix;
           this.prefixToMode = prefixToMode;
           this.isupport.PREFIX = modeToPrefix;

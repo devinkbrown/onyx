@@ -254,8 +254,21 @@ export function parsePREFIX(value: string): {
 
   const modes = match[1]!;
   const prefixes = match[2]!;
+  // Status modes are single ASCII letters and their visible NAMES prefixes are
+  // punctuation. A mismatched or duplicated map is not partially useful: a
+  // missing prefix creates an `undefined` property, while an alphanumeric
+  // prefix can strip the first letter from ordinary nicks. Reject the whole
+  // capability update so callers can retain their last known-good map.
+  if (
+    modes.length !== prefixes.length
+    || modes.length > 32
+    || !/^[A-Za-z]+$/u.test(modes)
+    || !/^[\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e]+$/u.test(prefixes)
+    || new Set(modes).size !== modes.length
+    || new Set(prefixes).size !== prefixes.length
+  ) return { modeToPrefix, prefixToMode };
   for (let i = 0; i < modes.length; i++) {
-    modeToPrefix[modes[i]!] = prefixes[i] ?? '';
+    modeToPrefix[modes[i]!] = prefixes[i]!;
     prefixToMode[prefixes[i]!] = modes[i]!;
   }
   return { modeToPrefix, prefixToMode };

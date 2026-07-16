@@ -11000,13 +11000,15 @@ export const store = createStore<OnyxState>()(
               }
               if (key === 'PREFIX') {
                 const parsed = parsePREFIX(val);
-                channels = remapRosterPrefixModes(
-                  channels,
-                  isupportModeToPrefix,
-                  parsed.prefixToMode,
-                );
-                isupportPrefixToMode = parsed.prefixToMode;
-                isupportModeToPrefix = parsed.modeToPrefix;
+                if (Object.keys(parsed.modeToPrefix).length > 0) {
+                  channels = remapRosterPrefixModes(
+                    channels,
+                    isupportModeToPrefix,
+                    parsed.prefixToMode,
+                  );
+                  isupportPrefixToMode = parsed.prefixToMode;
+                  isupportModeToPrefix = parsed.modeToPrefix;
+                }
               }
               if (key === 'CHANLIMIT') chanLimits = parseCHANLIMIT(val);
               if (key === 'CASEMAPPING' && val) caseMapping = val;

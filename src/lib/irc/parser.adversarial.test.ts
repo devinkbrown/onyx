@@ -38,6 +38,23 @@ describe('parsePREFIX adversarial ISUPPORT values', () => {
   it('fails closed to empty maps when PREFIX has no explicit prefix characters', () => {
     expect(parsePREFIX('(YQqov)')).toEqual({ modeToPrefix: {}, prefixToMode: {} });
   });
+
+  it('rejects mismatched, duplicate, and nick-like PREFIX maps atomically', () => {
+    const malformed = [
+      '(ov)@',
+      '(o)@@',
+      '(oo)@+',
+      '(ov)@@',
+      '(ov)o+',
+      `(${'o'.repeat(33)})${'@'.repeat(33)}`,
+    ];
+
+    for (const value of malformed) {
+      const parsed = parsePREFIX(value);
+      expect(parsed).toEqual({ modeToPrefix: {}, prefixToMode: {} });
+      expect(parsed.prefixToMode).not.toHaveProperty('undefined');
+    }
+  });
 });
 
 describe('parseIRCMessage adversarial tag and parameter parsing', () => {
