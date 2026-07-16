@@ -412,6 +412,7 @@ describe('PWA manifest', () => {
     expect(skipWaiting).toHaveBeenCalledOnce();
 
     caches.open.mockRejectedValueOnce(new Error('Cache Storage unavailable'));
+    skipWaiting.mockRejectedValueOnce(new Error('activation request unavailable'));
     let cacheFailureInstallWork: Promise<unknown> | undefined;
     listeners.get('install')?.({
       waitUntil: (work: Promise<unknown>) => {

@@ -182,6 +182,12 @@ function clearStaleShellCaches() {
     .catch(() => undefined);
 }
 
+function requestSkipWaiting() {
+  return Promise.resolve()
+    .then(() => self.skipWaiting())
+    .catch(() => undefined);
+}
+
 // ── Install: precache shell ────────────────────────────────────────────────────
 // CRITICAL: precache failures must NEVER abort install. cache.addAll rejects
 // wholesale if any single URL 404s, which bricks the update pipeline — every
@@ -194,7 +200,7 @@ self.addEventListener('install', (event) => {
       caches.open(CACHE_NAME).then((cache) =>
         Promise.allSettled(PRECACHE_URLS.map((url) => cache.add(url)))
       ).catch(() => undefined),
-      self.skipWaiting(),
+      requestSkipWaiting(),
     ])
   );
 });
@@ -212,7 +218,7 @@ self.addEventListener('activate', (event) => {
 // ── Manual update recovery from Preferences ──────────────────────────────────
 self.addEventListener('message', (event) => {
   if (event.data?.type !== 'ONYX_SKIP_WAITING') return;
-  const work = Promise.resolve().then(() => self.skipWaiting());
+  const work = requestSkipWaiting();
   // ExtendableMessageEvent keeps the worker alive until the update transition
   // is requested. Preserve compatibility with older test/webview shims that
   // expose a plain MessageEvent.
