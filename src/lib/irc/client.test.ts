@@ -6,6 +6,29 @@ import { IRCClient } from './client';
 import { _resetDeviceSigningForTests } from '../e2ee/deviceSign';
 import type { IRCMessage } from './types';
 
+const MIB = 1024 * 1024;
+
+interface TestSocket {
+  readyState: number;
+  bufferedAmount: number;
+  send(data: unknown): void;
+  close(code?: number, reason?: string): void;
+}
+
+function attachSocket(client: IRCClient, overrides: Partial<TestSocket> = {}) {
+  const sent: unknown[] = [];
+  const closed: Array<{ code?: number; reason?: string }> = [];
+  const socket: TestSocket = {
+    readyState: WebSocket.OPEN,
+    bufferedAmount: 0,
+    send: (data) => sent.push(data),
+    close: (code, reason) => closed.push({ code, reason }),
+    ...overrides,
+  };
+  (client as unknown as { ws: TestSocket }).ws = socket;
+  return { socket, sent, closed };
+}
+
 // Regression tests for the WebSocket framing gotcha (memory: Orochi wss sends one IRC
 // message per frame with NO trailing CRLF; clients must split on /\r?\n/ and must NOT
 // buffer a remainder across frames). _onMessage is driven directly — no socket needed.
@@ -41,6 +64,30 @@ describe('IRCClient WebSocket frame handling', () => {
     feed(client, ':s NOTICE * :frame-a');
     feed(client, ':s NOTICE * :frame-b');
     expect(commands).toEqual(['NOTICE', 'NOTICE']);
+  });
+
+  it('closes with 1009 before parsing an oversized UTF-8 text frame', () => {
+    const commands: string[] = [];
+    const errors: string[] = [];
+    const raw: string[] = [];
+    const client = new IRCClient({
+      url: 'wss://ircx.us:8080/',
+      nick: 'onyx',
+      onMessage: (message) => commands.push(message.command),
+      onRaw: (line) => raw.push(line),
+      onError: (error) => errors.push(error),
+    });
+    const { closed } = attachSocket(client);
+
+    // Each astral character occupies two UTF-16 code units but four UTF-8
+    // bytes. This stays below the code-unit guard while exceeding 1 MiB on the
+    // wire, pinning the byte-bound rather than merely the allocation fast path.
+    feed(client, '🌊'.repeat((MIB / 4) + 1));
+
+    expect(commands).toEqual([]);
+    expect(raw).toEqual([]);
+    expect(errors).toEqual(['WebSocket text frame exceeded the client safety limit.']);
+    expect(closed).toEqual([{ code: 1009, reason: 'WebSocket frame too large' }]);
   });
 });
 
@@ -95,6 +142,145 @@ describe('IRCClient binary media plane', () => {
     (client as unknown as { _onMessage(ev: { data: string }): void })._onMessage({ data: ':s NOTICE * :hi' });
     expect(commands).toEqual(['NOTICE']);
   });
+
+  it('closes with 1009 before dispatching an oversized binary frame', () => {
+    const viaOption: Uint8Array[] = [];
+    const errors: string[] = [];
+    const client = new IRCClient({
+      url: 'wss://ircx.us:8080/',
+      nick: 'onyx',
+      onMessage: () => {},
+      onBinary: (bytes) => viaOption.push(bytes),
+      onError: (error) => errors.push(error),
+    });
+    const viaHandler = vi.fn();
+    client.binaryHandlers.add(viaHandler);
+    const { closed } = attachSocket(client);
+
+    feedBinary(client, new Uint8Array((8 * MIB) + 1));
+
+    expect(viaOption).toEqual([]);
+    expect(viaHandler).not.toHaveBeenCalled();
+    expect(errors).toEqual(['WebSocket binary frame exceeded the client safety limit.']);
+    expect(closed).toEqual([{ code: 1009, reason: 'WebSocket frame too large' }]);
+  });
+});
+
+describe('IRCClient bounded WebSocket sends', () => {
+  function makeSendClient() {
+    const errors: string[] = [];
+    const raw: Array<{ line: string; direction: 'in' | 'out' }> = [];
+    const client = new IRCClient({
+      url: 'wss://ircx.us:8080/',
+      nick: 'onyx',
+      onMessage: () => {},
+      onError: (error) => errors.push(error),
+      onRaw: (line, direction) => raw.push({ line, direction }),
+    });
+    return { client, errors, raw };
+  }
+
+  it('returns true and logs only after an ordered text frame is accepted', () => {
+    const { client, errors, raw } = makeSendClient();
+    const { sent } = attachSocket(client);
+
+    expect(client.sendRaw('PRIVMSG', '#room', 'hello')).toBe(true);
+    expect(sent).toEqual(['PRIVMSG #room hello\r\n']);
+    expect(raw).toEqual([{ line: 'PRIVMSG #room hello', direction: 'out' }]);
+    expect(errors).toEqual([]);
+  });
+
+  it('rejects a closed socket with an explicit error and no raw-log entry', () => {
+    const { client, errors, raw } = makeSendClient();
+    const { sent } = attachSocket(client, { readyState: WebSocket.CLOSED });
+
+    expect(client.sendRaw('PING', 'late')).toBe(false);
+    expect(sent).toEqual([]);
+    expect(raw).toEqual([]);
+    expect(errors).toEqual(['Message was not sent: the connection is not open.']);
+  });
+
+  it('reports a send throw without claiming the frame in the raw log', () => {
+    const { client, errors, raw } = makeSendClient();
+    attachSocket(client, { send: () => { throw new Error('socket raced'); } });
+
+    expect(client.sendRaw('PING', 'race')).toBe(false);
+    expect(raw).toEqual([]);
+    expect(errors).toEqual(['Message was not sent: the connection closed during send.']);
+  });
+
+  it('reports a synchronous OPEN-to-CLOSING race after send', () => {
+    const { client, errors, raw } = makeSendClient();
+    const { socket, sent } = attachSocket(client);
+    socket.send = (data) => {
+      sent.push(data);
+      socket.readyState = WebSocket.CLOSING;
+    };
+
+    expect(client.sendRaw('PING', 'race')).toBe(false);
+    expect(sent).toEqual(['PING race\r\n']);
+    expect(raw).toEqual([]);
+    expect(errors).toEqual([
+      'Message delivery could not be confirmed: the connection closed during send.',
+    ]);
+  });
+
+  it('closes a congested control socket before adding another text frame', () => {
+    const { client, errors, raw } = makeSendClient();
+    const { sent, closed } = attachSocket(client, { bufferedAmount: 8 * MIB });
+
+    expect(client.sendRaw('PING', 'full')).toBe(false);
+    expect(sent).toEqual([]);
+    expect(raw).toEqual([]);
+    expect(errors).toEqual(['Message was not sent: the connection is congested. Reconnecting…']);
+    expect(closed).toEqual([{ code: 4004, reason: 'Send buffer congested' }]);
+  });
+
+  it('fails closed when the browser reports a non-finite send queue', () => {
+    const { client, errors } = makeSendClient();
+    const { sent, closed } = attachSocket(client, { bufferedAmount: Number.NaN });
+
+    expect(client.sendRaw('PING', 'unknown')).toBe(false);
+    expect(sent).toEqual([]);
+    expect(errors).toHaveLength(1);
+    expect(closed).toEqual([{ code: 4004, reason: 'Send buffer congested' }]);
+  });
+
+  it('rejects oversized UTF-8 text before send or logging', () => {
+    const { client, errors, raw } = makeSendClient();
+    const { sent } = attachSocket(client);
+
+    expect(client.send('🌊'.repeat((MIB / 4) + 1))).toBe(false);
+    expect(sent).toEqual([]);
+    expect(raw).toEqual([]);
+    expect(errors).toEqual(['Message was not sent: the IRC frame is too large.']);
+  });
+
+  it('copies accepted binary data and sheds media under congestion', () => {
+    const { client } = makeSendClient();
+    const { socket, sent, closed } = attachSocket(client);
+    const source = new Uint8Array([9, 1, 2, 8]).subarray(1, 3);
+
+    expect(client.sendBinary(source)).toBe(true);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toBeInstanceOf(Uint8Array);
+    expect(Array.from(sent[0] as Uint8Array)).toEqual([1, 2]);
+    expect(sent[0]).not.toBe(source);
+
+    socket.bufferedAmount = 8 * MIB;
+    expect(client.sendBinary(new Uint8Array([3]))).toBe(false);
+    expect(sent).toHaveLength(1);
+    expect(closed).toEqual([]);
+  });
+
+  it('rejects an oversized outbound binary frame without touching the socket', () => {
+    const { client } = makeSendClient();
+    const { sent, closed } = attachSocket(client);
+
+    expect(client.sendBinary(new Uint8Array((8 * MIB) + 1))).toBe(false);
+    expect(sent).toEqual([]);
+    expect(closed).toEqual([]);
+  });
 });
 
 // ── Session-resume token refresh ───────────────────────────────────────────
@@ -118,11 +304,11 @@ describe('IRCClient session-resume token lifecycle', () => {
       meshToken: opts?.meshToken,
     });
     const priv = client as unknown as {
-      ws: { readyState: number; send(l: string): void };
+      ws: { readyState: number; bufferedAmount: number; send(l: string): void };
       _loggedIn: boolean;
       _onMessage(ev: { data: string }): void;
     };
-    priv.ws = { readyState: WebSocket.OPEN, send: (l: string) => sent.push(l) };
+    priv.ws = { readyState: WebSocket.OPEN, bufferedAmount: 0, send: (l: string) => sent.push(l) };
     priv._loggedIn = loggedIn;
     return { client, sent, feed001: () => priv._onMessage({ data: ':eshmaki.me 001 onyx :Welcome' }) };
   }
@@ -202,8 +388,11 @@ describe('IRCClient account-attribution wiring (ACCOUNTRESIDENCE)', () => {
     const sent: string[][] = [];
     const origSendRaw = client.sendRaw.bind(client);
     client.sendRaw = (command: string, ...params: string[]) => {
-      if (command === 'IDENTITY') sent.push([command, ...params]);
-      else origSendRaw(command, ...params);
+      if (command === 'IDENTITY') {
+        sent.push([command, ...params]);
+        return true;
+      }
+      return origSendRaw(command, ...params);
     };
     for (const line of lines) feed(client, line);
     return sent;

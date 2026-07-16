@@ -7,7 +7,7 @@ import type { IRCMessage } from './types';
 // Drive the client with a fake OPEN socket that captures every outbound frame
 // verbatim, plus separate capture of the redacted onRaw log stream and onError.
 interface Priv {
-  ws: { readyState: number; send(l: string): void; close(code?: number, reason?: string): void } | null;
+  ws: { readyState: number; bufferedAmount: number; send(l: string): void; close(code?: number, reason?: string): void } | null;
   _saslMech: string | null;
   _saslPending: boolean;
   _loggedIn: boolean;
@@ -31,6 +31,7 @@ function makeSaslClient(password?: string) {
   const priv = client as unknown as Priv;
   priv.ws = {
     readyState: WebSocket.OPEN,
+    bufferedAmount: 0,
     send: (l: string) => sent.push(l),
     close: (code?: number, reason?: string) => closed.push({ code, reason }),
   };

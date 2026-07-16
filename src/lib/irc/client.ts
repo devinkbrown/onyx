@@ -18,6 +18,20 @@ import type { WatchTogetherActivity } from '../media/watchTogether';
 /** IRCX channel PROP key carrying the watch-together activity (wire format). */
 const WATCH_PROP = 'ocean.watch';
 const SASL_CHUNK_BYTES = 400;
+// Browser WebSocket has no buffered-amount-low event. Keep one generous bound
+// around the send queue: ordinary IRC lines are tiny, while an 8 MiB allowance
+// still accommodates the media engine's largest valid reassembled frame.
+const MAX_WEBSOCKET_BUFFERED_BYTES = 8 * 1024 * 1024;
+const MAX_INBOUND_TEXT_BYTES = 1024 * 1024;
+const MAX_BINARY_FRAME_BYTES = 8 * 1024 * 1024;
+const MAX_OUTBOUND_TEXT_BYTES = 1024 * 1024;
+
+function hasWebSocketSendCapacity(ws: WebSocket, payloadBytes: number): boolean {
+  const bufferedBytes = ws.bufferedAmount;
+  return Number.isFinite(bufferedBytes)
+    && bufferedBytes >= 0
+    && payloadBytes <= MAX_WEBSOCKET_BUFFERED_BYTES - bufferedBytes;
+}
 
 /**
  * SASL AUTHENTICATE payloads carry credentials: the base64 PLAIN blob decodes
@@ -286,19 +300,56 @@ export class IRCClient {
     }
   }
 
-  send(line: string) {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      this.opts.onRaw?.(redactAuthenticateForLog(line.replace(/\r\n$/, '')), 'out');
-      try {
-        this.ws.send(line);
-      } catch {
-        // WebSocket state raced — let _onClose handle the disconnect
-      }
+  /**
+   * Attempt one ordered IRC frame. `true` means WebSocket.send returned while
+   * the socket was still OPEN; rejected/raced sends are reported and return
+   * false, never appearing in the raw log as accepted outbound traffic.
+   */
+  send(line: string): boolean {
+    const ws = this.ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      this.opts.onError?.('Message was not sent: the connection is not open.');
+      return false;
     }
+
+    // Fast character bound avoids allocating another huge buffer just to learn
+    // that a hostile/accidental line cannot be admitted.
+    if (line.length > MAX_OUTBOUND_TEXT_BYTES) {
+      this.opts.onError?.('Message was not sent: the IRC frame is too large.');
+      return false;
+    }
+    const encodedBytes = new TextEncoder().encode(line).byteLength;
+    if (encodedBytes > MAX_OUTBOUND_TEXT_BYTES) {
+      this.opts.onError?.('Message was not sent: the IRC frame is too large.');
+      return false;
+    }
+
+    if (!hasWebSocketSendCapacity(ws, encodedBytes)) {
+      this.opts.onError?.('Message was not sent: the connection is congested. Reconnecting…');
+      try { ws.close(4004, 'Send buffer congested'); } catch { /* already closing */ }
+      return false;
+    }
+
+    try {
+      ws.send(line);
+    } catch {
+      this.opts.onError?.('Message was not sent: the connection closed during send.');
+      return false;
+    }
+
+    // Browsers silently discard send() calls made after the socket begins
+    // CLOSING. Catch a native state race even when send() did not throw.
+    if (ws.readyState !== WebSocket.OPEN) {
+      this.opts.onError?.('Message delivery could not be confirmed: the connection closed during send.');
+      return false;
+    }
+
+    this.opts.onRaw?.(redactAuthenticateForLog(line.replace(/\r\n$/, '')), 'out');
+    return true;
   }
 
-  sendRaw(command: string, ...params: string[]) {
-    this.send(formatIRCLine(command, ...params));
+  sendRaw(command: string, ...params: string[]): boolean {
+    return this.send(formatIRCLine(command, ...params));
   }
 
   /**
@@ -322,14 +373,24 @@ export class IRCClient {
   }
 
   /** Send a media datagram as a binary WebSocket frame (browser media plane). */
-  sendBinary(bytes: Uint8Array) {
-    if (this.ws?.readyState !== WebSocket.OPEN) return;
+  sendBinary(bytes: Uint8Array): boolean {
+    const ws = this.ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN || bytes.byteLength > MAX_BINARY_FRAME_BYTES) {
+      return false;
+    }
+    if (!hasWebSocketSendCapacity(ws, bytes.byteLength)) {
+      // Media is explicitly loss-tolerant. Shed this frame so media cannot
+      // consume the bounded buffer reserved for ordered IRC control/messages.
+      return false;
+    }
     try {
       // Copy into a fresh ArrayBuffer-backed view so a pooled/odd-offset source
       // buffer isn't sent with stale trailing bytes.
-      this.ws.send(bytes.slice());
+      ws.send(bytes.slice());
+      return ws.readyState === WebSocket.OPEN;
     } catch {
       // WebSocket state raced — let _onClose handle the disconnect.
+      return false;
     }
   }
 
@@ -476,6 +537,10 @@ export class IRCClient {
   private _onMessage(ev: MessageEvent) {
     // Binary frames carry browser media datagrams, not IRC lines.
     if (ev.data instanceof ArrayBuffer) {
+      if (ev.data.byteLength > MAX_BINARY_FRAME_BYTES) {
+        this._rejectOversizedInbound('binary');
+        return;
+      }
       if (ev.data.byteLength) {
         const bytes = new Uint8Array(ev.data);
         this.opts.onBinary?.(bytes);
@@ -487,6 +552,16 @@ export class IRCClient {
     }
     const data = typeof ev.data === 'string' ? ev.data : '';
     if (!data) return;
+    // As with outbound text, reject definitely-oversized strings before making
+    // a second allocation, then enforce the actual UTF-8 wire-size bound. A
+    // code-unit-only check would admit up to 4 MiB of astral Unicode here.
+    if (
+      data.length > MAX_INBOUND_TEXT_BYTES
+      || new TextEncoder().encode(data).byteLength > MAX_INBOUND_TEXT_BYTES
+    ) {
+      this._rejectOversizedInbound('text');
+      return;
+    }
 
     // Orochi follows the IRCv3 WebSocket sub-protocol: each frame carries a
     // complete IRC message and the trailing CRLF is OPTIONAL — Orochi omits it
@@ -513,6 +588,11 @@ export class IRCClient {
         console.warn('[nexus] failed to handle IRC line:', line, e);
       }
     }
+  }
+
+  private _rejectOversizedInbound(kind: 'text' | 'binary'): void {
+    this.opts.onError?.(`WebSocket ${kind} frame exceeded the client safety limit.`);
+    try { this.ws?.close(1009, 'WebSocket frame too large'); } catch { /* already closing */ }
   }
 
   private _onClose(ev: CloseEvent) {
