@@ -1543,6 +1543,43 @@ describe('AppShell', () => {
       await waitFor(() => expect(memberList).toHaveFocus());
     });
 
+    it('gives Escape to a portaled WHOIS before closing the mobile member drawer', async () => {
+      stubMobileViewport();
+      seedStore('#general');
+      store.setState({
+        client: {
+          sendRaw: vi.fn(),
+          isupport: { CHANTYPES: '#&' },
+        } as never,
+      });
+
+      const { container } = render(() => <AppShell />);
+      const membersButton = screen.getByRole('button', { name: 'Toggle member list' });
+      membersButton.focus();
+      fireEvent.click(membersButton);
+      const memberList = container.querySelector<HTMLElement>('.shell-members');
+      expect(memberList).not.toBeNull();
+      await waitFor(() => expect(memberList).toHaveAttribute('aria-hidden', 'false'));
+
+      const memberTrigger = within(memberList!).getByRole('button', { name: /Open member details for alice/i });
+      fireEvent.click(memberTrigger);
+      fireEvent.click(screen.getByRole('button', { name: 'View profile of alice' }));
+      await screen.findByRole('dialog', { name: 'Profile: alice' });
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: 'Profile: alice' })).toBeNull();
+        expect(memberList).toHaveAttribute('aria-hidden', 'false');
+        expect(memberTrigger).toHaveFocus();
+      });
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+      await waitFor(() => {
+        expect(memberList).toHaveAttribute('aria-hidden', 'true');
+        expect(membersButton).toHaveFocus();
+      });
+    });
+
     it('does not expose an empty channel nicklist inside a direct message', () => {
       stubMobileViewport(false);
       seedStore('#general');

@@ -377,6 +377,11 @@ export function AppShell(props: AppShellProps): JSX.Element {
     }
   }
 
+  function hasPortaledModalAboveDrawer(drawer: HTMLElement): boolean {
+    return Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]'))
+      .some((dialog) => dialog !== drawer && !drawer.contains(dialog));
+  }
+
   function closeActiveMobileDrawer(restoreFocus = true): void {
     if (mobileSidebarOpen()) getState().closeMobileSidebar();
     if (mobileMembersOpen()) setMobileMembersOpen(false);
@@ -407,7 +412,10 @@ export function AppShell(props: AppShellProps): JSX.Element {
       if (!drawer || keyboardEventIsClaimed(event)) return;
 
       if (event.key === 'Escape') {
-        if (drawer.querySelector('[role="dialog"]:not([hidden])')) return;
+        if (
+          drawer.querySelector('[role="dialog"]:not([hidden])')
+          || hasPortaledModalAboveDrawer(drawer)
+        ) return;
         event.preventDefault();
         closeActiveMobileDrawer();
         return;
