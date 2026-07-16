@@ -63,6 +63,7 @@ describe('PWA manifest', () => {
     const listeners = new Map<string, (event: Record<string, unknown>) => void>();
     const showNotification = vi.fn(async () => undefined);
     const openWindow = vi.fn(async () => undefined);
+    const matchAll = vi.fn<() => Promise<unknown[]>>(async () => []);
     const workerSource = readFileSync(serviceWorkerPath, 'utf8');
     const workerSelf = {
       location: { origin: 'https://onyx.test' },
@@ -72,7 +73,7 @@ describe('PWA manifest', () => {
       skipWaiting: vi.fn(),
       clients: {
         claim: vi.fn(),
-        matchAll: vi.fn(async () => []),
+        matchAll,
         openWindow,
       },
       registration: { showNotification },
