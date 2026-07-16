@@ -174,6 +174,48 @@ describe('credentials persistence', () => {
     expect(localStorage.getItem(SAVED_NICK_KEY)).toBe('Alice');
   });
 
+  it('rotates local and mesh tokens only for an explicitly targeted identity', () => {
+    saveCredentials({ nick: 'Alice', server: 'wss://alice.example', password: 'alice-pw' });
+    saveCredentials({ nick: 'Bob', server: 'wss://bob.example', password: 'bob-pw' });
+
+    storeSessionToken('alice-session', 1_800_000_000, undefined, {
+      server: 'wss://alice.example',
+      nick: 'Alice',
+    });
+    storeMeshToken('alice-mesh', undefined, {
+      server: 'wss://alice.example',
+      nick: 'Alice',
+    });
+
+    expect(loadCredentials('wss://alice.example', 'Alice')).toMatchObject({
+      sessionToken: 'alice-session',
+      meshToken: 'alice-mesh',
+    });
+    const bob = loadCredentials('wss://bob.example', 'Bob');
+    expect(bob).toMatchObject({ password: 'bob-pw' });
+    expect(bob?.sessionToken).toBeUndefined();
+    expect(bob?.meshToken).toBeUndefined();
+    expect(loadCredentials()).toMatchObject({ nick: 'Bob' });
+  });
+
+  it('does not fall back to the active identity when an explicit token target is missing', () => {
+    saveCredentials({ nick: 'Bob', server: 'wss://bob.example', password: 'bob-pw' });
+
+    storeSessionToken('wrong-session', undefined, undefined, {
+      server: 'wss://missing.example',
+      nick: 'Missing',
+    });
+    storeMeshToken('wrong-mesh', undefined, {
+      server: 'wss://missing.example',
+      nick: 'Missing',
+    });
+
+    const bob = loadCredentials('wss://bob.example', 'Bob');
+    expect(bob).toMatchObject({ password: 'bob-pw' });
+    expect(bob?.sessionToken).toBeUndefined();
+    expect(bob?.meshToken).toBeUndefined();
+  });
+
   it('clears local and mesh session tokens for a selected account', () => {
     saveCredentials({ nick: 'Alice', server: 'irc.example', password: 'pw' });
     storeSessionToken('session-token', 1_800_000_000);

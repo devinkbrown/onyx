@@ -17,7 +17,13 @@ import { parseChannelFolders } from './channelFoldersPersistence';
 import { IRCClient } from '@/lib/irc/client';
 import type { IRCMessage, Channel, ChannelUser, ChatMessage, ConnectionStatus, MessageReaction } from '@/lib/irc/types';
 import { parseMultilineLimits, planMultilineBatches, buildMultilineLines, assembleMultilineText } from '@/lib/irc/multiline';
-import { clearSessionToken, loadCredentials, storeMeshToken, storeSessionToken } from '@/lib/credentials';
+import {
+  clearSessionToken,
+  loadCredentials,
+  storeMeshToken,
+  storeSessionToken,
+  type CredentialTokenTarget,
+} from '@/lib/credentials';
 import { formatTaggedLine, parseAccountInfo, parseCHANLIMIT, parseMonitorNumeric, parseNamesPrefix, parsePREFIX, parseSessionMeshTokenNote, parseSessionTokenNote, parseStandardReply } from '@/lib/irc/parser';
 import type { SuimyakuPeerState, SuimyakuRoomStats, CallState } from '@/lib/suimyaku-media/types';
 import { getMountedSuimyakuMediaEngine } from '@/lib/mediaEngineMount';
@@ -2695,6 +2701,35 @@ function _confirmRememberedSessionAccount(get: GetFn, set: SetFn): void {
     state.client?.sendRaw('NICK', account);
     _startNickReclaim(account);
   }
+}
+
+/**
+ * Resolve the credential owned by this live socket without consulting the
+ * cross-tab mutable activeKey. Source nick comes first for a canonical re-key;
+ * canonical nick comes first for later local/mesh rotations after that re-key.
+ */
+function _liveCredentialTokenTarget(
+  get: GetFn,
+  sourceNickFirst: boolean,
+): CredentialTokenTarget | null {
+  const state = get();
+  const server = state.server?.url;
+  if (!server) return null;
+  const sourceNick = _connectNick || state.ourNick;
+  const canonicalNick = _saslAccount || state.server?.account || state.ourNick;
+  const candidates = sourceNickFirst
+    ? [sourceNick, canonicalNick, state.ourNick]
+    : [canonicalNick, sourceNick, state.ourNick];
+  const seen = new Set<string>();
+  let fallback = '';
+  for (const nick of candidates) {
+    const normalized = nick.trim().toLowerCase();
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    fallback ||= nick;
+    if (loadCredentials(server, nick)) return { server, nick };
+  }
+  return fallback ? { server, nick: fallback } : null;
 }
 
 function _setRestoreRosterSyncing(set: SetFn, channelKey: string, syncing: boolean): void {
@@ -6106,7 +6141,8 @@ export const store = createStore<OnyxState>()(
           if (token) {
             _confirmRememberedSessionAccount(get, set);
             const canonicalNick = _saslAccount ?? undefined;
-            storeSessionToken(token, undefined, canonicalNick);
+            const target = _liveCredentialTokenTarget(get, true);
+            if (target) storeSessionToken(token, undefined, canonicalNick, target);
             // Push the freshly-issued token into the LIVE client so an auto-reconnect
             // (same IRCClient instance) resumes with it, not the stale construction-time value.
             get().client?.updateResumeTokens({ sessionToken: token });
@@ -6120,7 +6156,8 @@ export const store = createStore<OnyxState>()(
           const mtoken = parseSessionMeshTokenNote(msg);
           if (mtoken) {
             _confirmRememberedSessionAccount(get, set);
-            storeMeshToken(mtoken);
+            const target = _liveCredentialTokenTarget(get, false);
+            if (target) storeMeshToken(mtoken, undefined, target);
             // Prefer the mesh token on the live client so a reconnect landing on a
             // different node resumes correctly (updateResumeTokens merges, not clobbers).
             get().client?.updateResumeTokens({ meshToken: mtoken });
@@ -7059,14 +7096,18 @@ export const store = createStore<OnyxState>()(
             const sessionToken = parseSessionTokenNote(msg);
             if (sessionToken) {
               _confirmRememberedSessionAccount(get, set);
-              storeSessionToken(sessionToken, undefined, _saslAccount ?? undefined);
+              const target = _liveCredentialTokenTarget(get, true);
+              if (target) {
+                storeSessionToken(sessionToken, undefined, _saslAccount ?? undefined, target);
+              }
               get().client?.updateResumeTokens({ sessionToken });
               break;
             }
             const sessionMeshToken = parseSessionMeshTokenNote(msg);
             if (sessionMeshToken) {
               _confirmRememberedSessionAccount(get, set);
-              storeMeshToken(sessionMeshToken);
+              const target = _liveCredentialTokenTarget(get, false);
+              if (target) storeMeshToken(sessionMeshToken, undefined, target);
               get().client?.updateResumeTokens({ meshToken: sessionMeshToken });
               break;
             }

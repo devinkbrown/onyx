@@ -43,6 +43,12 @@ export interface SavedCredentials {
   savedAt: string;
 }
 
+/** Exact remembered identity to receive a token rotation. */
+export interface CredentialTokenTarget {
+  server: string;
+  nick: string;
+}
+
 export interface AccountHandoff {
   nick: string;
   server: string;
@@ -91,6 +97,18 @@ function normalizeServer(server: string): string {
 
 function credentialKey(server: string, nick: string): string {
   return `${normalizeServer(server)}|${nick.trim().toLowerCase()}`;
+}
+
+function tokenTargetKey(
+  store: CredentialsStore,
+  target?: CredentialTokenTarget,
+): string | undefined {
+  if (target) {
+    const exact = credentialKey(target.server, target.nick);
+    return store.entries[exact] ? exact : undefined;
+  }
+  const active = store.activeKey ?? Object.keys(store.entries)[0];
+  return active && store.entries[active] ? active : undefined;
 }
 
 function identityId(key: string): string {
@@ -371,15 +389,20 @@ export function saveCredentials(opts: {
  * canonicalNick — if provided, overwrites the stored nick with the account
  *   name so future auto-connects use the real nick, not a '_'-suffixed alias.
  */
-export function storeSessionToken(token: string, expiresAt?: number, canonicalNick?: string): void {
+export function storeSessionToken(
+  token: string,
+  expiresAt?: number,
+  canonicalNick?: string,
+  target?: CredentialTokenTarget,
+): void {
   if (typeof window === 'undefined') return;
   try {
     const store = readStore();
     if (!store) return; // Only store tokens when we have base credentials
     purgeExpiredTokens(store);
-    const activeKey = store.activeKey ?? Object.keys(store.entries)[0];
-    if (!activeKey) return;
-    const existing = store.entries[activeKey];
+    const entryKey = tokenTargetKey(store, target);
+    if (!entryKey) return;
+    const existing = store.entries[entryKey];
     if (!existing) return;
     const expiry = expiresAt ? new Date(expiresAt * 1000).toISOString() : undefined;
     const nick = canonicalNick ?? existing.nick;
@@ -390,12 +413,15 @@ export function storeSessionToken(token: string, expiresAt?: number, canonicalNi
       tokenExpiry:  expiry,
     };
     const nextKey = credentialKey(existing.server, nick);
-    if (nextKey !== activeKey) delete store.entries[activeKey];
+    const wasActive = store.activeKey === entryKey;
+    if (nextKey !== entryKey) delete store.entries[entryKey];
     store.entries[nextKey] = creds;
-    store.activeKey = nextKey;
+    if (wasActive || !store.activeKey) store.activeKey = nextKey;
     writeStore(store);
     // Keep legacy nick key in sync
-    if (canonicalNick) localStorage.setItem('onyx:saved-nick', canonicalNick);
+    if (canonicalNick && store.activeKey === nextKey) {
+      localStorage.setItem('onyx:saved-nick', canonicalNick);
+    }
   } catch { /* quota */ }
 }
 
@@ -427,19 +453,23 @@ export function clearSessionToken(server?: string, nick?: string): void {
  *   server still enforces its own expiry on any resume attempt, so a stale local
  *   copy is a housekeeping concern, not an auth-lifetime one.
  */
-export function storeMeshToken(token: string, expiresAt?: number): void {
+export function storeMeshToken(
+  token: string,
+  expiresAt?: number,
+  target?: CredentialTokenTarget,
+): void {
   if (typeof window === 'undefined') return;
   try {
     const store = readStore();
     if (!store) return; // Only store tokens when we have base credentials
     purgeExpiredTokens(store);
-    const activeKey = store.activeKey ?? Object.keys(store.entries)[0];
-    if (!activeKey) return;
-    const existing = store.entries[activeKey];
+    const entryKey = tokenTargetKey(store, target);
+    if (!entryKey) return;
+    const existing = store.entries[entryKey];
     if (!existing) return;
     // Only set tokenExpiry when the caller supplies one; otherwise preserve any
     // expiry already governing an existing token rather than clobbering it.
-    store.entries[activeKey] = {
+    store.entries[entryKey] = {
       ...existing,
       meshToken: token,
       ...(expiresAt !== undefined

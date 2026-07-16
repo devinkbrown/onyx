@@ -82,6 +82,29 @@ describe('SESSION token persistence — server NOTICE compatibility', () => {
     expect(client.updateResumeTokens).toHaveBeenCalledWith({ meshToken: 'mesh-token' });
   });
 
+  it('keeps live token rotation scoped to the connected identity when another identity is active', () => {
+    const client = makeClient();
+    saveCredentials({ nick: 'alice', server: 'wss://eshmaki.me', password: 'alice-pw' });
+    saveCredentials({ nick: 'bob', server: 'wss://other.example', password: 'bob-pw' });
+    store.setState({
+      client: client as never,
+      server: seedServer('alice'),
+      ourNick: 'alice',
+    });
+
+    feed(':eshmaki.me NOTICE alice :SESSION TOKEN alice-local');
+    feed(':eshmaki.me NOTICE alice :SESSION MTOKEN alice-mesh');
+
+    expect(loadCredentials('wss://eshmaki.me', 'alice')).toMatchObject({
+      sessionToken: 'alice-local',
+      meshToken: 'alice-mesh',
+    });
+    const bob = loadCredentials('wss://other.example', 'bob');
+    expect(bob).toMatchObject({ password: 'bob-pw' });
+    expect(bob?.sessionToken).toBeUndefined();
+    expect(bob?.meshToken).toBeUndefined();
+  });
+
   it('ignores a peer NOTICE that impersonates a SESSION token reply', () => {
     const client = makeClient();
     saveCredentials({ nick: 'alice', server: 'wss://eshmaki.me', password: 'pw' });
