@@ -60,6 +60,84 @@ describe('voice overlays', () => {
     expect(acceptSpy).toHaveBeenCalledTimes(1);
   });
 
+  it('submits an incoming accept only once while the call is still ringing', () => {
+    store.getState().setVoiceCallState({ callState: 'ringing_in', callWith: 'Lapis' });
+    const acceptSpy = vi.spyOn(store.getState(), 'acceptDmCall');
+
+    render(() => <IncomingCallOverlay />);
+    const accept = screen.getByRole('button', { name: /accept call from lapis/i });
+    fireEvent.click(accept);
+    fireEvent.click(accept);
+
+    expect(acceptSpy).toHaveBeenCalledTimes(1);
+    expect(accept).toBeDisabled();
+    expect(screen.getByRole('status')).toHaveTextContent('Accepting call from Lapis');
+    expect(screen.getByTestId('incoming-call-overlay').querySelector('[aria-busy="true"]')).toBeTruthy();
+  });
+
+  it('reports a failed accept and allows a retry', () => {
+    store.getState().setVoiceCallState({ callState: 'ringing_in', callWith: 'Lapis' });
+    const acceptSpy = vi.spyOn(store.getState(), 'acceptDmCall')
+      .mockImplementationOnce(() => {
+        throw new Error('media engine unavailable');
+      });
+
+    render(() => <IncomingCallOverlay />);
+    const accept = screen.getByRole('button', { name: /accept call from lapis/i });
+    fireEvent.click(accept);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not accept the call from Lapis');
+    expect(accept).not.toBeDisabled();
+    fireEvent.click(accept);
+    expect(acceptSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('resets pending acceptance for a replacement caller and ignores the stale rejection', async () => {
+    let rejectFirst: (reason?: unknown) => void = () => {};
+    const firstAccept = new Promise<void>((_, reject) => {
+      rejectFirst = reject;
+    });
+    const acceptIncomingCall = vi.fn()
+      .mockReturnValueOnce(firstAccept)
+      .mockReturnValueOnce(undefined);
+    store.setState({ acceptIncomingCall } as never);
+    store.getState().setVoiceCallState({ callState: 'ringing_in', callWith: 'Lapis' });
+
+    render(() => <IncomingCallOverlay />);
+    fireEvent.click(screen.getByRole('button', { name: /accept call from lapis/i }));
+    expect(screen.getByRole('status')).toHaveTextContent('Accepting call from Lapis');
+
+    store.getState().setVoiceCallState({ callState: 'ringing_in', callWith: 'Mina' });
+    const replacementAccept = await screen.findByRole('button', { name: /accept call from mina/i });
+    expect(replacementAccept).not.toBeDisabled();
+    expect(screen.queryByRole('status')).toBeNull();
+
+    rejectFirst(new Error('stale failure'));
+    await Promise.resolve();
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    fireEvent.click(replacementAccept);
+    expect(acceptIncomingCall).toHaveBeenCalledTimes(2);
+  });
+
+  it('absorbs a pending accept rejection after unmount', async () => {
+    let rejectAccept: (reason?: unknown) => void = () => {};
+    const pendingAccept = new Promise<void>((_, reject) => {
+      rejectAccept = reject;
+    });
+    store.setState({ acceptIncomingCall: vi.fn(() => pendingAccept) } as never);
+    store.getState().setVoiceCallState({ callState: 'ringing_in', callWith: 'Lapis' });
+
+    const view = render(() => <IncomingCallOverlay />);
+    fireEvent.click(screen.getByRole('button', { name: /accept call from lapis/i }));
+    view.unmount();
+
+    rejectAccept(new Error('late failure'));
+    await pendingAccept.catch(() => undefined);
+    await Promise.resolve();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it('shows an outgoing call and cancels through the store action', () => {
     store.getState().setVoiceCallState({ callState: 'ringing_out', callWith: 'Mina' });
     const endSpy = vi.spyOn(store.getState(), 'endDmCall');
@@ -297,5 +375,79 @@ describe('voice overlays', () => {
     store.setState({ activeView: { kind: 'channel', channel: '#voice' } });
 
     expect(screen.queryByTestId('voice-pip')).toBeNull();
+  });
+
+  it('keeps PIP avatars bounded while reporting the full deduplicated room and speaker totals', () => {
+    const roster = new Set([
+      'onyx',
+      ...Array.from({ length: 12 }, (_, index) => `participant-${index + 1}`),
+    ]);
+    const speakingNicks = new Set(
+      Array.from({ length: 9 }, (_, index) => `PARTICIPANT-${index + 1}`),
+    );
+    store.setState({
+      activeView: { kind: 'channel', channel: '#general' },
+      ourNick: 'onyx',
+      speakingNicks,
+      voiceChannelParticipants: new Map([['#voice', roster]]),
+    });
+    store.getState().setVoiceCallState({
+      callState: 'in_call',
+      callChannel: '#voice',
+      peers: new Map(),
+    });
+
+    const { container } = render(() => <VoicePip />);
+
+    const participants = screen.getByLabelText('13 voice participants');
+    expect(participants.querySelectorAll('.voice-pip__participant')).toHaveLength(5);
+    expect(within(participants).getByText('+8')).toBeInTheDocument();
+    expect(screen.getByLabelText('9 speaking')).toHaveTextContent('9 live');
+    expect(container.querySelectorAll('.voice-pip__participant')).toHaveLength(5);
+  });
+
+  it('releases pointer capture and resets drag state when the PIP hides mid-drag', async () => {
+    store.setState({
+      activeView: { kind: 'channel', channel: '#general' },
+      ourNick: 'onyx',
+      voiceChannelParticipants: new Map([['#voice', new Set(['onyx', 'Mina'])]]),
+    });
+    store.getState().setVoiceCallState({
+      callState: 'in_call',
+      callChannel: '#voice',
+      peers: new Map([['Mina', peer('Mina')]]),
+    });
+
+    render(() => <VoicePip />);
+    const pip = screen.getByTestId('voice-pip');
+    const handle = pip.querySelector<HTMLElement>('.voice-pip__handle')!;
+    const setPointerCapture = vi.fn();
+    const releasePointerCapture = vi.fn();
+    handle.setPointerCapture = setPointerCapture;
+    handle.releasePointerCapture = releasePointerCapture;
+
+    fireEvent.pointerDown(handle, {
+      button: 0,
+      pointerId: 7,
+      clientX: 40,
+      clientY: 40,
+    });
+    expect(pip).toHaveAttribute('data-dragging', 'true');
+    expect(setPointerCapture).toHaveBeenCalledWith(7);
+
+    store.setState({ activeView: { kind: 'channel', channel: '#voice' } });
+    await waitFor(() => expect(screen.queryByTestId('voice-pip')).toBeNull());
+    expect(releasePointerCapture).toHaveBeenCalledWith(7);
+
+    store.setState({ activeView: { kind: 'channel', channel: '#general' } });
+    const remounted = await screen.findByTestId('voice-pip');
+    expect(remounted).toHaveAttribute('data-dragging', 'false');
+    const position = remounted.getAttribute('style');
+    fireEvent.pointerMove(remounted.querySelector<HTMLElement>('.voice-pip__handle')!, {
+      pointerId: 7,
+      clientX: 400,
+      clientY: 400,
+    });
+    expect(remounted).toHaveAttribute('style', position ?? '');
   });
 });

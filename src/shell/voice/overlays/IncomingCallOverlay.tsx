@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { createMemo } from 'solid-js';
+import { createEffect, createMemo, createSignal, onCleanup, Show } from 'solid-js';
 
 import { Avatar, Button, ModalShell } from '@/primitives';
 import { getState, useStore, type State } from '@/lib/store';
@@ -7,7 +7,7 @@ import { getState, useStore, type State } from '@/lib/store';
 import './voice-overlays.css';
 
 type VoiceActionAliases = {
-  acceptIncomingCall?: () => void;
+  acceptIncomingCall?: () => void | Promise<void>;
   rejectCall?: (nick: string) => void;
 };
 
@@ -15,13 +15,12 @@ function currentState() {
   return getState() as State & VoiceActionAliases;
 }
 
-function acceptCall() {
+function acceptCall(): void | Promise<void> {
   const state = currentState();
   if (typeof state.acceptIncomingCall === 'function') {
-    state.acceptIncomingCall();
-    return;
+    return state.acceptIncomingCall();
   }
-  state.acceptDmCall();
+  return state.acceptDmCall();
 }
 
 function declineCall(caller: string) {
@@ -58,6 +57,47 @@ export function IncomingCallOverlay() {
   const voice = useStore((state) => state.voice);
   const open = createMemo(() => voice().callState === 'ringing_in');
   const caller = createMemo(() => voice().callWith.trim() || 'Unknown caller');
+  const [accepting, setAccepting] = createSignal(false);
+  const [acceptError, setAcceptError] = createSignal<string | null>(null);
+  let callEpoch = 0;
+  let observedCall = '';
+  let disposed = false;
+
+  onCleanup(() => {
+    disposed = true;
+    callEpoch += 1;
+  });
+
+  createEffect(() => {
+    const nextCall = open() ? caller() : '';
+    if (nextCall === observedCall) return;
+    observedCall = nextCall;
+    callEpoch += 1;
+    setAccepting(false);
+    setAcceptError(null);
+  });
+
+  const handleAccept = () => {
+    if (!open() || accepting()) return;
+
+    const acceptedCaller = caller();
+    const epoch = ++callEpoch;
+    setAccepting(true);
+    setAcceptError(null);
+
+    const reportFailure = () => {
+      if (disposed || epoch !== callEpoch || !open() || caller() !== acceptedCaller) return;
+      setAccepting(false);
+      setAcceptError(`Could not accept the call from ${acceptedCaller}. Try again.`);
+    };
+
+    try {
+      const result = acceptCall();
+      if (result) void result.catch(reportFailure);
+    } catch {
+      reportFailure();
+    }
+  };
 
   return (
     <ModalShell
@@ -73,19 +113,30 @@ export function IncomingCallOverlay() {
         <div class="voice-call-token" aria-hidden="true">
           <Avatar name={caller()} />
         </div>
-        <div class="voice-call-meta">
+        <div class="voice-call-meta" aria-busy={accepting()}>
           <p class="voice-call-kicker">calling</p>
           <p class="voice-call-name">{caller()}</p>
           <p class="voice-call-subtext">Answer to join the voice session.</p>
+          <Show when={accepting()}>
+            <p class="voice-call-status" role="status">Accepting call from {caller()}…</p>
+          </Show>
+          <Show when={acceptError()}>
+            {(error) => <p class="voice-call-error" role="alert">{error()}</p>}
+          </Show>
         </div>
         <div class="voice-call-actions">
           <Button variant="danger" onClick={() => declineCall(caller())} aria-label={`Decline call from ${caller()}`}>
             <PhoneDeclineIcon />
             Decline
           </Button>
-          <Button variant="primary" onClick={acceptCall} aria-label={`Accept call from ${caller()}`}>
+          <Button
+            variant="primary"
+            onClick={handleAccept}
+            disabled={accepting()}
+            aria-label={`Accept call from ${caller()}`}
+          >
             <PhoneIncomingIcon />
-            Accept
+            {accepting() ? 'Accepting…' : 'Accept'}
           </Button>
         </div>
       </div>

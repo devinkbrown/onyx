@@ -84,6 +84,22 @@
   line-height: 1.45;
 }
 
+.voice-call-status,
+.voice-call-error {
+  margin: var(--space-1) 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.voice-call-status {
+  color: var(--lapis-bright);
+}
+
+.voice-call-error {
+  color: color-mix(in oklab, var(--shu) 72%, var(--washi));
+}
+
 .voice-call-actions {
   display: flex;
   flex-wrap: wrap;
