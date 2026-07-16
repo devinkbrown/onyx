@@ -85,10 +85,11 @@ export function ThemeImportDialog(props: {
     if (!canCopyShareUrl()) return;
 
     const epoch = ++copyEpoch;
+    const url = shareUrl();
     clearCopyTimer();
     setCopyStatus('idle');
-    const copied = await writeClipboardText(shareUrl());
-    if (disposed || epoch !== copyEpoch || !props.open) return;
+    const copied = await writeClipboardText(url);
+    if (disposed || epoch !== copyEpoch || !props.open || shareUrl() !== url) return;
     if (copied) {
       setCopyStatus('copied');
       queueCopyReset(epoch);
@@ -97,6 +98,15 @@ export function ThemeImportDialog(props: {
 
     setCopyStatus('failed');
   };
+
+  // The dialog can stay open while the selected custom theme changes. Retire
+  // feedback from the previous URL before it can describe the replacement.
+  createEffect(() => {
+    void shareUrl();
+    copyEpoch += 1;
+    clearCopyTimer();
+    setCopyStatus('idle');
+  });
 
   createEffect(() => {
     if (props.open) return;

@@ -14,6 +14,13 @@ const sharedTheme: CustomTheme = {
   overrides: { '--lapis': '#33ccff' },
 };
 
+const replacementTheme: CustomTheme = {
+  id: 'custom:replacement',
+  name: 'Replacement Theme',
+  base: 'ocean',
+  overrides: { '--lapis': '#ff6633' },
+};
+
 function deferredVoid(): {
   promise: Promise<void>;
   resolve: () => void;
@@ -139,6 +146,33 @@ describe('ThemeImportDialog accessibility', () => {
     setOpen(true);
 
     expect(screen.getByRole('button', { name: 'Copy share link for Shared Theme' })).toHaveTextContent('Copy link');
+    expect(screen.getByRole('status')).toHaveTextContent('');
+  });
+
+  it('ignores an old share-link completion after the selected theme changes', async () => {
+    const pending = deferredVoid();
+    const writeText = vi.fn(() => pending.promise);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    const [theme, setTheme] = createSignal(sharedTheme);
+    render(() => (
+      <ThemeImportDialog
+        open={true}
+        onClose={() => undefined}
+        onImport={vi.fn()}
+        shareTheme={theme()}
+      />
+    ));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy share link for Shared Theme' }));
+    expect(writeText).toHaveBeenCalledOnce();
+    setTheme(replacementTheme);
+    pending.resolve();
+    await flushMicrotasks();
+
+    expect(screen.getByRole('button', { name: 'Copy share link for Replacement Theme' })).toHaveTextContent('Copy link');
     expect(screen.getByRole('status')).toHaveTextContent('');
   });
 
