@@ -1063,6 +1063,11 @@
 
 /* ── Footer ── */
 .conn-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.14em;
@@ -1076,6 +1081,15 @@
 .conn-foot b {
   color: var(--lapis-bright);
   font-weight: 500;
+}
+
+.conn-foot a {
+  color: var(--lapis-bright);
+  text-underline-offset: 3px;
+}
+
+.conn-foot a:hover {
+  color: var(--washi);
 }
 
 /* ── Smooth mode / step transitions ── */

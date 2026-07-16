@@ -1541,7 +1541,9 @@ export function Connect(props: ConnectProps): JSX.Element {
 
             {/* Footer */}
             <footer class="conn-foot">
-              <b>Onyx</b> · encrypted · auto-routed
+              <span><b>Onyx</b> · encrypted · auto-routed</span>
+              <span aria-hidden="true">·</span>
+              <a href="/install/">Install guide</a>
             </footer>
           </div>
 

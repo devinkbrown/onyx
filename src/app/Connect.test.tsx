@@ -125,6 +125,11 @@ describe('Connect screen rendering', () => {
     expect(screen.getAllByText(/nearest node/i).length).toBeGreaterThan(0);
   });
 
+  it('links first-time visitors to the install guide before they connect', () => {
+    render(() => <Connect />);
+    expect(screen.getByRole('link', { name: 'Install guide' })).toHaveAttribute('href', '/install/');
+  });
+
   it('aborts its latency selection when the connect screen unmounts', async () => {
     let selectionSignal: AbortSignal | undefined;
     vi.mocked(selectBestNode).mockImplementationOnce((_nodes, options) => {
