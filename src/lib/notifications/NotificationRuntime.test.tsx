@@ -20,6 +20,19 @@ function setVisibility(value: DocumentVisibilityState): void {
   Object.defineProperty(document, 'visibilityState', { configurable: true, value });
 }
 
+function server(account: string) {
+  return {
+    id: `notification-${account}`,
+    name: 'Onyx',
+    network: 'Onyx',
+    url: 'wss://notifications.example/ws',
+    icon: '',
+    nick: account,
+    account,
+    connected: true,
+  };
+}
+
 function addMention(id: number): string {
   store.getState().addNotification({
     type: 'mention',
@@ -58,6 +71,7 @@ describe('NotificationRuntime coalesced policy', () => {
       ...initialState,
       notifications: [],
       ourNick: 'me',
+      server: server('me'),
       pushNotificationsEnabled: true,
       soundEnabled: false,
       dndEnabled: false,
@@ -125,6 +139,22 @@ describe('NotificationRuntime coalesced policy', () => {
     vi.advanceTimersByTime(6000);
 
     expect(showDesktopNotification).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels old-owner alerts and clears target throttles on an account switch', () => {
+    render(() => <NotificationRuntime />);
+    addMention(1);
+    addMention(2);
+    expect(showDesktopNotification).toHaveBeenCalledTimes(1);
+
+    store.setState({ ourNick: 'other', server: server('other') });
+    vi.advanceTimersByTime(6000);
+    expect(showDesktopNotification).toHaveBeenCalledTimes(1);
+
+    // The same room under the new owner is not throttled by the old account.
+    addMention(3);
+    expect(showDesktopNotification).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(showDesktopNotification).mock.calls[1]?.[0].body).toBe('message 3');
   });
 
   it('derives a coalesced alert count and body from the remaining unread rows', () => {

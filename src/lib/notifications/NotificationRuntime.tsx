@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { onCleanup, onMount } from 'solid-js';
 
+import { deviceMemoryOwnerKey } from '@/lib/deviceMemoryOwner';
 import { getState, selectDeviceMemoryOwner, subscribe } from '@/lib/store';
 import type { Notification as StoreNotification } from '@/lib/store/store';
 
@@ -101,10 +102,25 @@ function calmAllowsNotification(note: StoreNotification): boolean {
 
 export function NotificationRuntime(): null {
   onMount(() => {
+    const currentOwnerKey = (): string | null => {
+      const owner = selectDeviceMemoryOwner(getState());
+      return owner ? deviceMemoryOwnerKey(owner) : null;
+    };
+    let ownerKey = currentOwnerKey();
     let seen = new Set(getState().notifications.map((note) => note.id));
     const lastDesktopAt = new Map<string, number>();
     const lastSoundAt = new Map<string, number>();
     const pendingDesktop = new Map<string, PendingDesktop>();
+
+    function clearOwnerRuntimeState(): void {
+      for (const pending of pendingDesktop.values()) clearTimeout(pending.timer);
+      pendingDesktop.clear();
+      lastDesktopAt.clear();
+      lastSoundAt.clear();
+      // Existing inbox rows belong to the previous owner. Mark them observed so
+      // a later notification-array update cannot replay them under the new one.
+      seen = new Set(getState().notifications.map((note) => note.id));
+    }
 
     function showNote(note: StoreNotification, count = 1): void {
       const target = notificationTarget(note);
@@ -243,6 +259,20 @@ export function NotificationRuntime(): null {
       }
     }
 
+    // Register this before the notification listener so an atomic owner+inbox
+    // update clears old timers/state before any row can be considered for output.
+    const unsubscribeOwner = subscribe(
+      (state) => {
+        const owner = selectDeviceMemoryOwner(state);
+        return owner ? deviceMemoryOwnerKey(owner) : null;
+      },
+      (nextOwnerKey) => {
+        if (nextOwnerKey === ownerKey) return;
+        ownerKey = nextOwnerKey;
+        clearOwnerRuntimeState();
+      },
+    );
+
     const unsubscribe = subscribe(
       (state) => state.notifications,
       (notes) => {
@@ -255,9 +285,9 @@ export function NotificationRuntime(): null {
     );
 
     onCleanup(() => {
+      unsubscribeOwner();
       unsubscribe();
-      for (const pending of pendingDesktop.values()) clearTimeout(pending.timer);
-      pendingDesktop.clear();
+      clearOwnerRuntimeState();
     });
   });
 
