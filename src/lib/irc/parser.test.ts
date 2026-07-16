@@ -15,6 +15,7 @@ import {
   MAX_STANDARD_REPLY_TOKEN_LENGTH,
   parseSessionTokenNote,
   parseSessionMeshTokenNote,
+  MAX_SESSION_CREDENTIAL_LENGTH,
   buildSessionResumeLine,
   MAX_MONITOR_NUMERIC_TARGETS,
   parseMonitorNumeric,
@@ -259,6 +260,15 @@ describe('standard replies + SESSION notes', () => {
   });
   it('does not confuse TOKEN and MTOKEN', () => {
     expect(parseSessionMeshTokenNote(parseIRCMessage(':srv NOTE SESSION TOKEN :abc'))).toBeNull();
+  });
+  it('rejects malformed or oversized session credentials', () => {
+    expect(parseSessionTokenNote(parseIRCMessage(':srv NOTE SESSION TOKEN :abc extra'))).toBeNull();
+    expect(parseSessionTokenNote(parseIRCMessage(
+      `:srv NOTICE onyx :SESSION TOKEN ${'x'.repeat(MAX_SESSION_CREDENTIAL_LENGTH + 1)}`,
+    ))).toBeNull();
+    expect(parseSessionMeshTokenNote(parseIRCMessage(
+      `:srv NOTE SESSION MTOKEN :${'x'.repeat(MAX_SESSION_CREDENTIAL_LENGTH + 1)}`,
+    ))).toBeNull();
   });
   it('builds a resume line', () => {
     expect(buildSessionResumeLine('tok')).toBe('SESSION RESUME tok\r\n');

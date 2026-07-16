@@ -486,10 +486,21 @@ export function parseAccountInfo(text: string): AccountInfoFields | null {
   return matched ? fields : null;
 }
 
+export const MAX_SESSION_CREDENTIAL_LENGTH = 4 * 1024;
+const MAX_SESSION_CREDENTIAL_NOTICE_LENGTH = MAX_SESSION_CREDENTIAL_LENGTH + 512;
+
+function validSessionCredential(token: string | null | undefined): token is string {
+  return Boolean(
+    token
+    && token.length <= MAX_SESSION_CREDENTIAL_LENGTH
+    && !/[\s\u0000-\u001f\u007f]/u.test(token),
+  );
+}
+
 function parseSessionCredential(msg: IRCMessage, kind: 'TOKEN' | 'MTOKEN'): string | null {
   const reply = parseStandardReply(msg);
   if (reply?.kind === 'NOTE' && reply.command === 'SESSION' && reply.code === kind) {
-    return reply.description || null;
+    return validSessionCredential(reply.description) ? reply.description : null;
   }
 
   // Current Orochi emits session credentials as a traditional server NOTICE:
@@ -498,9 +509,10 @@ function parseSessionCredential(msg: IRCMessage, kind: 'TOKEN' | 'MTOKEN'): stri
   // the store applies the NOTICE result only inside its server-source trust gate.
   if (msg.command !== 'NOTICE') return null;
   const body = msg.params[msg.params.length - 1]?.trim() ?? '';
+  if (body.length > MAX_SESSION_CREDENTIAL_NOTICE_LENGTH) return null;
   const match = /^SESSION\s+(TOKEN|MTOKEN)\s+(\S+)(?:\s+.*)?$/i.exec(body);
   if (match?.[1]?.toUpperCase() !== kind) return null;
-  return match[2] ?? null;
+  return validSessionCredential(match[2]) ? match[2] : null;
 }
 
 export function parseSessionTokenNote(msg: IRCMessage): string | null {
