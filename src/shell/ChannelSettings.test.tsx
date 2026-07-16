@@ -70,6 +70,8 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  Reflect.deleteProperty(navigator, 'share');
+  Reflect.deleteProperty(navigator, 'canShare');
 });
 
 describe('ChannelSettings — Notifications', () => {
@@ -143,6 +145,64 @@ describe('ChannelSettings — Share invite a11y', () => {
     // Copy is a real button with a text name; open is a keyboard-reachable link.
     expect(screen.getByRole('button', { name: 'Copy invite link' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open invite in Onyx' })).toHaveAttribute('href');
+  });
+
+  it('offers the native share sheet only when the browser accepts the invite data', async () => {
+    seed();
+    const share = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'share', { value: share, configurable: true });
+    Object.defineProperty(navigator, 'canShare', {
+      value: vi.fn(() => true),
+      configurable: true,
+    });
+
+    renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'Share invite' }));
+
+    expect(await screen.findByText('Invite shared.')).toHaveAttribute('role', 'status');
+    expect(share).toHaveBeenCalledTimes(1);
+    expect(share).toHaveBeenCalledWith(expect.objectContaining({
+      title: '#general on Onyx',
+      text: 'Join #general on Onyx.',
+      url: expect.stringContaining('/invite?join=%23general'),
+    }));
+  });
+
+  it('guards a pending native share and reports cancellation without claiming success', async () => {
+    seed();
+    let rejectShare: ((reason: unknown) => void) | undefined;
+    const share = vi.fn(() => new Promise<void>((_resolve, reject) => {
+      rejectShare = reject;
+    }));
+    Object.defineProperty(navigator, 'share', { value: share, configurable: true });
+    Object.defineProperty(navigator, 'canShare', { value: () => true, configurable: true });
+
+    renderPanel();
+    const button = screen.getByRole('button', { name: 'Share invite' });
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    expect(share).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Opening share sheet…' })).toBeDisabled();
+    rejectShare?.(new DOMException('cancelled', 'AbortError'));
+    expect(await screen.findByText('Share cancelled. The invite link is still available below.')).toBeInTheDocument();
+    expect(screen.queryByText('Invite shared.')).not.toBeInTheDocument();
+  });
+
+  it('keeps copy as the fallback when native sharing is unavailable or rejects', async () => {
+    seed();
+    renderPanel();
+    expect(screen.queryByRole('button', { name: 'Share invite' })).not.toBeInTheDocument();
+    cleanup();
+
+    const share = vi.fn().mockRejectedValue(new Error('blocked'));
+    Object.defineProperty(navigator, 'share', { value: share, configurable: true });
+    Object.defineProperty(navigator, 'canShare', { value: () => true, configurable: true });
+    renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'Share invite' }));
+
+    expect(await screen.findByText('Could not open the share sheet. Copy the invite link instead.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy invite link' })).toBeEnabled();
   });
 
   it('announces a successful copy through a polite live region (SC 4.1.3)', async () => {

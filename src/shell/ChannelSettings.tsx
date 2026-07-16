@@ -25,6 +25,7 @@ import {
   createMemo,
   createSignal,
   For,
+  onCleanup,
   Show,
   splitProps,
   type JSX,
@@ -157,6 +158,8 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
   // toast host is not mounted in the shell, so a screen reader would otherwise
   // never learn the clipboard write succeeded (SC 4.1.3 Status Messages).
   const [copyStatus, setCopyStatus] = createSignal('');
+  const [shareBusy, setShareBusy] = createSignal(false);
+  let shareEpoch = 0;
   createEffect(() => {
     if (local.open) {
       setInvitePreferredNick('');
@@ -179,6 +182,57 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
       { network: networkName(), origin: inviteOrigin(), appOrigin: '/app' },
     ),
   );
+
+  const inviteShareData = createMemo<ShareData>(() => ({
+    title: `${inviteLink().card.channel ?? networkName()} on ${networkName()}`,
+    text: inviteLink().hasChannel
+      ? `Join ${inviteLink().card.channel} on ${networkName()}.`
+      : `Join ${networkName()} in Onyx.`,
+    url: inviteLink().shareUrl,
+  }));
+  const canShareInvite = createMemo(() => {
+    if (typeof navigator === 'undefined' || typeof navigator.share !== 'function') return false;
+    try {
+      return typeof navigator.canShare !== 'function' || navigator.canShare(inviteShareData());
+    } catch {
+      return false;
+    }
+  });
+
+  // A changing invite invalidates status from an older native share sheet. The
+  // OS sheet cannot be force-closed, but its later completion must not describe
+  // a newly edited invite or a reopened panel.
+  createEffect(() => {
+    const open = local.open;
+    const shareUrl = inviteShareData().url;
+    shareEpoch += 1;
+    setShareBusy(false);
+    if (open && shareUrl) setCopyStatus('');
+  });
+  onCleanup(() => {
+    shareEpoch += 1;
+  });
+
+  async function shareInvite(): Promise<void> {
+    if (!canShareInvite() || shareBusy()) return;
+    const epoch = ++shareEpoch;
+    const data = inviteShareData();
+    setShareBusy(true);
+    setCopyStatus('Opening your device share sheet.');
+    try {
+      await navigator.share(data);
+      if (epoch === shareEpoch && local.open) setCopyStatus('Invite shared.');
+    } catch (err) {
+      if (epoch !== shareEpoch || !local.open) return;
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setCopyStatus('Share cancelled. The invite link is still available below.');
+      } else {
+        setCopyStatus('Could not open the share sheet. Copy the invite link instead.');
+      }
+    } finally {
+      if (epoch === shareEpoch) setShareBusy(false);
+    }
+  }
 
   async function copyInviteLink(): Promise<void> {
     const url = inviteLink().shareUrl;
@@ -434,6 +488,18 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
           </div>
 
           <div class="shell-chset-inline-actions">
+            <Show when={canShareInvite()}>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                disabled={shareBusy()}
+                aria-busy={shareBusy()}
+                onClick={() => void shareInvite()}
+              >
+                {shareBusy() ? 'Opening share sheet…' : 'Share invite'}
+              </Button>
+            </Show>
             <Button type="button" variant="primary" size="sm" onClick={() => void copyInviteLink()}>
               Copy invite link
             </Button>
