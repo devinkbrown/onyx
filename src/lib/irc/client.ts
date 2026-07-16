@@ -790,6 +790,17 @@ export class IRCClient {
         }
         break;
 
+      case '900': // RPL_LOGGEDIN (SASL, passkey, IDENTIFY, or account claim)
+        // Orochi also uses numeric 900 for a two-parameter IRCX error. Only the
+        // four-parameter RPL_LOGGEDIN is account proof. SESSION is deliberately
+        // account-scoped, so passwordless reconnects must wait for this proof
+        // instead of replaying a bearer while they are still a guest.
+        if (msg.params.length >= 4 && msg.params[2]) {
+          this._loggedIn = true;
+          if (this._registered) this._sendSessionCommandsAfterAuthentication();
+        }
+        break;
+
       case '904': // ERR_SASLFAIL (during SASL only)
       case '905':
         if (this._saslPending || this._saslMech) {
@@ -843,9 +854,10 @@ export class IRCClient {
         // command is valid. Reclaim a prior detached session if we hold a token,
         // then request a fresh token for this session (arrives as
         // NOTE SESSION TOKEN, plus NOTE SESSION MTOKEN on mesh deployments).
-        // A held token represents a prior authenticated session, so RESUME must
-        // not depend on this connection having completed SASL first. This is
-        // especially important for remembered passwordless/passkey accounts.
+        // Orochi requires the live connection to authenticate to the owning
+        // account before accepting SESSION RESUME. Password SASL has already
+        // completed here; passwordless/passkey reconnects wait for their
+        // post-registration 900 RPL_LOGGEDIN.
         //
         // Prefer the mesh-sealed token for RESUME: a reconnect may land on a
         // different mesh node, where the local 16-byte token is meaningless but
@@ -853,18 +865,7 @@ export class IRCClient {
         // Fall back to the local token when no mesh token is held.
         // A malformed peer can send 001 more than once. Never replay a bearer
         // token or request multiple replacements on the same connection.
-        if (!this._sessionCommandsSent) {
-          this._sessionCommandsSent = true;
-          const resumeToken = this.opts.meshToken || this.opts.sessionToken;
-          if (resumeToken) {
-            this.send(buildSessionResumeLine(resumeToken));
-          }
-          // RESUME establishes the account before this next command is handled;
-          // a fresh SASL login has already established it via numeric 903.
-          if (resumeToken || this._loggedIn) {
-            this.sendRaw('SESSION', 'TOKEN');
-          }
-        }
+        this._sendSessionCommandsAfterAuthentication();
         this.opts.onConnected?.();
         break;
 
@@ -895,6 +896,19 @@ export class IRCClient {
         try { h(msg); } catch { /* keep other subscribers alive */ }
       }
     }
+  }
+
+  /**
+   * Resume/rotate only after this socket has account proof. A reclaim token
+   * selects one logical session within an account; it does not replace account
+   * authentication itself.
+   */
+  private _sendSessionCommandsAfterAuthentication(): void {
+    if (this._sessionCommandsSent || !this._registered || !this._loggedIn) return;
+    this._sessionCommandsSent = true;
+    const resumeToken = this.opts.meshToken || this.opts.sessionToken;
+    if (resumeToken) this.send(buildSessionResumeLine(resumeToken));
+    this.sendRaw('SESSION', 'TOKEN');
   }
 
   private _finishCap() {

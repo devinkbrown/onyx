@@ -310,16 +310,26 @@ describe('IRCClient session-resume token lifecycle', () => {
     };
     priv.ws = { readyState: WebSocket.OPEN, bufferedAmount: 0, send: (l: string) => sent.push(l) };
     priv._loggedIn = loggedIn;
-    return { client, sent, feed001: () => priv._onMessage({ data: ':eshmaki.me 001 onyx :Welcome' }) };
+    return {
+      client,
+      sent,
+      feed001: () => priv._onMessage({ data: ':eshmaki.me 001 onyx :Welcome' }),
+      feed900: () => priv._onMessage({
+        data: ':eshmaki.me 900 onyx onyx!web@example onyx :You are now logged in as onyx',
+      }),
+    };
   }
 
   function makeLoggedInClient(opts?: { sessionToken?: string; meshToken?: string }) {
     return makeSessionClient(opts, true);
   }
 
-  it('resumes a remembered session after 001 even when this connection did not run SASL', () => {
-    const { sent, feed001 } = makeSessionClient({ sessionToken: 'remembered-session' });
+  it('defers a passwordless remembered resume until post-registration account proof', () => {
+    const { sent, feed001, feed900 } = makeSessionClient({ sessionToken: 'remembered-session' });
     feed001();
+    expect(sent.some(line => line.startsWith('SESSION '))).toBe(false);
+
+    feed900();
     expect(sent).toContain('SESSION RESUME remembered-session\r\n');
     expect(sent).toContain('SESSION TOKEN\r\n');
   });
@@ -330,12 +340,31 @@ describe('IRCClient session-resume token lifecycle', () => {
     expect(sent.filter(line => line.startsWith('SESSION '))).toEqual([]);
   });
 
-  it('does not replay SESSION commands when 001 is received twice', () => {
-    const { sent, feed001 } = makeSessionClient({ meshToken: 'remembered-mesh' });
+  it('does not replay deferred SESSION commands when account proof repeats', () => {
+    const { sent, feed001, feed900 } = makeSessionClient({ meshToken: 'remembered-mesh' });
     feed001();
     feed001();
+    feed900();
+    feed900();
     expect(sent.filter(line => line === 'SESSION RESUME remembered-mesh\r\n')).toHaveLength(1);
     expect(sent.filter(line => line === 'SESSION TOKEN\r\n')).toHaveLength(1);
+  });
+
+  it('requests a session token when a connected guest signs in later', () => {
+    const { sent, feed001, feed900 } = makeSessionClient();
+    feed001();
+    expect(sent.filter(line => line.startsWith('SESSION '))).toEqual([]);
+
+    feed900();
+    expect(sent.filter(line => line.startsWith('SESSION '))).toEqual(['SESSION TOKEN\r\n']);
+  });
+
+  it('does not treat the short IRCX 900 error as account proof', () => {
+    const { client, sent, feed001 } = makeSessionClient({ sessionToken: 'held-token' });
+    const priv = client as unknown as { _onMessage(ev: { data: string }): void };
+    feed001();
+    priv._onMessage({ data: ':eshmaki.me 900 onyx :Bad command' });
+    expect(sent.some(line => line.startsWith('SESSION '))).toBe(false);
   });
 
   it('requests a token for a fresh SASL login without trying to resume', () => {
