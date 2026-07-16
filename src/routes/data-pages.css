@@ -499,3 +499,108 @@
     display: none;
   }
 }
+
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .data-page .r-wrap {
+    min-width: 0;
+    padding-inline: 12px;
+  }
+
+  .data-page .r-section {
+    padding-block: 40px;
+  }
+
+  .data-hero {
+    padding-block: 40px 32px;
+  }
+
+  .data-hero h1 {
+    font-size: 56px;
+    overflow-wrap: anywhere;
+  }
+
+  .data-hero .sub,
+  .data-card p,
+  .data-row strong,
+  .data-row span,
+  .data-row p,
+  .roadmap-phase p {
+    font-size: 18px;
+    overflow-wrap: anywhere;
+  }
+
+  .data-page .r-title {
+    font-size: 44px;
+    overflow-wrap: anywhere;
+  }
+
+  .data-summary,
+  .data-grid,
+  .roadmap-track {
+    min-width: 0;
+  }
+
+  .data-summary > *,
+  .data-grid > *,
+  .roadmap-phase > * {
+    min-width: 0;
+  }
+
+  .data-metric,
+  .data-card,
+  .roadmap-phase__body {
+    min-width: 0;
+    padding: 16px;
+  }
+
+  .data-metric {
+    min-height: 0;
+    gap: 12px;
+  }
+
+  .data-metric .value {
+    font-size: 40px;
+    overflow-wrap: anywhere;
+  }
+
+  .data-metric .note {
+    font-size: 16px;
+    overflow-wrap: anywhere;
+  }
+
+  .data-card h2 {
+    font-size: 36px;
+    overflow-wrap: anywhere;
+  }
+
+  .data-card h3 {
+    font-size: 26px;
+    overflow-wrap: anywhere;
+  }
+
+  .roadmap-phase__meta {
+    flex-wrap: wrap;
+  }
+
+  .roadmap-phase h3 {
+    font-size: 36px;
+    overflow-wrap: anywhere;
+  }
+
+  .roadmap-phase li {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .channel-spark {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .data-page .r-btn {
+    min-height: 44px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+  }
+}
