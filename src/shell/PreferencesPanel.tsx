@@ -2915,12 +2915,23 @@ export function PreferencesPanel(): JSX.Element {
   let panelRef: HTMLDivElement | undefined;
 
   function selectCategory(category: PreferenceCategory): void {
+    const previousCategory = activeCategory();
+    const activeElement = document.activeElement;
+    const focusDestinationTab = previousCategory !== category
+      && activeElement instanceof HTMLElement
+      && panelRef?.contains(activeElement) === true
+      && activeElement.closest(`#pref-category-panel-${previousCategory}`) !== null;
     setActiveCategory(category);
     panelRef?.closest<HTMLElement>('.onyx-sheet__body')?.scrollTo({
       top: 0,
       left: 0,
       behavior: 'auto',
     });
+    if (focusDestinationTab) {
+      queueMicrotask(() => {
+        document.getElementById(`pref-category-tab-${category}`)?.focus({ preventScroll: true });
+      });
+    }
   }
 
   createEffect(() => {

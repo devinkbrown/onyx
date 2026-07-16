@@ -478,6 +478,21 @@ describe('PreferencesPanel', () => {
     });
   });
 
+  it('moves focus out of a pane hidden by programmatic category routing', async () => {
+    renderPreferences('Accessibility');
+    const reduceMotion = screen.getByRole('switch', { name: 'Reduce motion' });
+    reduceMotion.focus();
+
+    openPreferences('history');
+
+    const historyTab = screen.getByRole('tab', { name: /^History & data/ });
+    await waitFor(() => {
+      expect(historyTab).toHaveAttribute('aria-selected', 'true');
+      expect(historyTab).toHaveFocus();
+      expect(reduceMotion.closest('[role="tabpanel"]')).toHaveAttribute('hidden');
+    });
+  });
+
   it('resets category scroll while preserving tab focus and mounted pane state', () => {
     renderPreferences('History & data');
     fireEvent.click(screen.getByRole('button', { name: 'Clear local history' }));
