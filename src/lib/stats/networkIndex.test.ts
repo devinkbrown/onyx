@@ -114,6 +114,19 @@ describe('normalizeIndex', () => {
     expect(index.network).toHaveLength(256);
     expect(index.node).toHaveLength(256);
   });
+
+  it('renders one canonical row for case-insensitive duplicate channels', () => {
+    const index = normalizeIndex({
+      channels: [
+        { channel: '#Root', messages: 12, present: 3 },
+        { channel: '#root', messages: 999, present: 99 },
+        { channel: '#Elsewhere', messages: 4, present: 1 },
+      ],
+    })!;
+
+    expect(index.channels.map((channel) => channel.channel)).toEqual(['#Root', '#Elsewhere']);
+    expect(index.channels[0]).toMatchObject({ messages: 12, present: 3 });
+  });
 });
 
 describe('relTime', () => {

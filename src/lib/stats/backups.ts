@@ -29,6 +29,7 @@ export function normalizeBackupManifest(raw: unknown): BackupManifest | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const r = raw as Record<string, unknown>;
   const files: BackupFile[] = [];
+  const seenFiles = new Set<string>();
   if (Array.isArray(r['files'])) {
     for (const entry of r['files'].slice(0, MAX_BACKUP_FILES)) {
       if (typeof entry !== 'object' || entry === null) continue;
@@ -43,6 +44,10 @@ export function normalizeBackupManifest(raw: unknown): BackupManifest | null {
       ) continue;
       const kind = e['kind'];
       const name = e['name'];
+      if (/[\u0000-\u001f\u007f]/u.test(kind) || /[\u0000-\u001f\u007f]/u.test(name)) continue;
+      const fileKey = `${kind.toLowerCase()}\u0000${name.toLowerCase()}`;
+      if (seenFiles.has(fileKey)) continue;
+      seenFiles.add(fileKey);
       files.push({
         kind,
         name,

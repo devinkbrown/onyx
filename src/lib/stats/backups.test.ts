@@ -61,7 +61,7 @@ describe('normalizeBackupManifest', () => {
   it('bounds file work and every rendered metadata field', () => {
     const files = Array.from({ length: MAX_BACKUP_FILES + 3 }, (_, index) => ({
       kind: 'k'.repeat(index === 0 ? MAX_BACKUP_KIND_LENGTH + 1 : MAX_BACKUP_KIND_LENGTH),
-      name: 'n'.repeat(MAX_BACKUP_NAME_LENGTH),
+      name: `${index}-`.padEnd(MAX_BACKUP_NAME_LENGTH, 'n').slice(0, MAX_BACKUP_NAME_LENGTH),
       source: `/${'s'.repeat(600)}-${index}`,
     }));
 
@@ -75,6 +75,21 @@ describe('normalizeBackupManifest', () => {
     expect(manifest.files[0]!.name).toHaveLength(MAX_BACKUP_NAME_LENGTH);
     expect(manifest.files[0]!.source).toHaveLength(512);
     expect(manifest.generated_at).toBe(0);
+  });
+
+  it('drops control-bearing and case-insensitive duplicate file rows', () => {
+    const manifest = normalizeBackupManifest({
+      files: [
+        { kind: 'accounts', name: 'accounts.snap', source: '/first' },
+        { kind: 'ACCOUNTS', name: 'ACCOUNTS.SNAP', source: '/duplicate' },
+        { kind: 'chanstats\nforged', name: 'stats.snap' },
+        { kind: 'chanstats', name: 'stats\tforged.snap' },
+      ],
+    })!;
+
+    expect(manifest.files).toEqual([
+      { kind: 'accounts', name: 'accounts.snap', source: '/first' },
+    ]);
   });
 });
 

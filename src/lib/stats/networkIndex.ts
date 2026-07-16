@@ -77,11 +77,14 @@ export function normalizeIndex(raw: unknown): StatsIndex | null {
   const r = raw as Record<string, unknown>;
   if (!Array.isArray(r['channels'])) return null;
   const channels: StatsChannel[] = [];
+  const seenChannels = new Set<string>();
   for (const entry of r['channels'].slice(0, MAX_STATS_CHANNELS)) {
     if (typeof entry !== 'object' || entry === null) continue;
     const e = entry as Record<string, unknown>;
     const channel = normalizedChannel(e['channel']);
-    if (!channel) continue;
+    const channelKey = channel.toLowerCase();
+    if (!channel || seenChannels.has(channelKey)) continue;
+    seenChannels.add(channelKey);
     channels.push({
       channel,
       messages: boundedFeedInteger(e['messages']),
