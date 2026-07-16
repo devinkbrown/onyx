@@ -19,6 +19,9 @@ import {
   MAX_LIVE_PROP_KEYS,
   MAX_LIVE_PROP_TARGETS,
   MAX_LIVE_PROP_VALUE_LENGTH,
+  MAX_MOTD_TEXT_LENGTH,
+  MAX_SERVER_AUX_TEXT_LENGTH,
+  MAX_SERVER_RULE_LINES,
   MAX_TEGAMI_CONVERSATIONS,
   MAX_TEGAMI_COUNT,
   store,
@@ -63,6 +66,34 @@ beforeEach(() => {
 });
 
 describe('live inbound message bounds', () => {
+  it('bounds requested MOTD, rules, service notices, and server-log text', () => {
+    feed(':server 372 me :unsolicited MOTD');
+    feed(':server 376 me :end');
+    expect(store.getState().motd).toBeNull();
+
+    feed(':server 375 me :- server MOTD -');
+    for (let index = 0; index < 24; index += 1) {
+      feed(`:server 372 me :${'m'.repeat(MAX_SERVER_AUX_TEXT_LENGTH)}😀tail`);
+    }
+    feed(':server 376 me :end');
+    expect(store.getState().motd?.length).toBeLessThanOrEqual(MAX_MOTD_TEXT_LENGTH);
+    expect(store.getState().motd?.endsWith('\ud83d')).toBe(false);
+
+    for (let index = 0; index < MAX_SERVER_RULE_LINES + 8; index += 1) {
+      feed(`:server 308 me :${index}-${'r'.repeat(MAX_SERVER_AUX_TEXT_LENGTH)}😀tail`);
+    }
+    expect(store.getState().serverRules).toHaveLength(MAX_SERVER_RULE_LINES);
+    expect(store.getState().serverRules.every((line) => line.length <= MAX_SERVER_AUX_TEXT_LENGTH))
+      .toBe(true);
+
+    store.getState().addServiceNotice('s'.repeat(MAX_SERVER_AUX_TEXT_LENGTH + 8), 't'.repeat(MAX_SERVER_AUX_TEXT_LENGTH + 8));
+    store.getState().addServerLog('l'.repeat(MAX_SERVER_AUX_TEXT_LENGTH + 8), 'f'.repeat(MAX_SERVER_AUX_TEXT_LENGTH + 8));
+    expect(store.getState().serviceNotices.at(-1)?.source).toHaveLength(MAX_SERVER_AUX_TEXT_LENGTH);
+    expect(store.getState().serviceNotices.at(-1)?.text).toHaveLength(MAX_SERVER_AUX_TEXT_LENGTH);
+    expect(store.getState().serverLog.at(-1)?.from).toHaveLength(MAX_SERVER_AUX_TEXT_LENGTH);
+    expect(store.getState().serverLog.at(-1)?.text).toHaveLength(MAX_SERVER_AUX_TEXT_LENGTH);
+  });
+
   it('accepts only requested, bounded, sanitized channel directory rows', () => {
     feed(':server 322 me #unsolicited 4 :hidden allocation');
     expect(store.getState().channelList).toEqual([]);

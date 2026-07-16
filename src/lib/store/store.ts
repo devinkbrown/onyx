@@ -2145,7 +2145,10 @@ export const MAX_NAMES_TOKENS_PER_LINE = MAX_LIVE_CHANNEL_USERS;
 export const MAX_CHANNEL_LIST_ENTRIES = 2_048;
 const MAX_NAMES_SCAN_CHARS = 256 * 1024;
 const MAX_NAMES_TOKEN_LENGTH = 512;
-const MAX_SYSTEM_EVENT_TEXT_LENGTH = 4 * 1024;
+export const MAX_SERVER_AUX_TEXT_LENGTH = 4 * 1024;
+export const MAX_MOTD_TEXT_LENGTH = 64 * 1024;
+export const MAX_SERVER_RULE_LINES = 256;
+const MAX_SYSTEM_EVENT_TEXT_LENGTH = MAX_SERVER_AUX_TEXT_LENGTH;
 export const MAX_LIVE_MEDIA_CHANNELS = 32;
 export const MAX_LIVE_MEDIA_PARTICIPANTS = 256;
 export const MAX_MEDIA_TRANSCRIPT_ENTRIES = 200;
@@ -2921,6 +2924,19 @@ let _rosterPollTimer: ReturnType<typeof setInterval> | null = null;
 // ── MOTD buffer (module-level) ────────────────────────────────────────────────
 /** Accumulates MOTD lines between RPL_MOTDSTART (375) and RPL_ENDOFMOTD (376) */
 let _motdBuffer = '';
+let _motdCollecting = false;
+
+function _appendMotdLine(value: string): void {
+  const line = _boundedSystemEventText(value);
+  if (!line || _motdBuffer.length >= MAX_MOTD_TEXT_LENGTH) return;
+  const separator = _motdBuffer ? '\n' : '';
+  const remaining = MAX_MOTD_TEXT_LENGTH - _motdBuffer.length - separator.length;
+  if (remaining <= 0) return;
+  let bounded = line.slice(0, remaining);
+  const finalCodeUnit = bounded.charCodeAt(bounded.length - 1);
+  if (finalCodeUnit >= 0xd800 && finalCodeUnit <= 0xdbff) bounded = bounded.slice(0, -1);
+  if (bounded) _motdBuffer += separator + bounded;
+}
 
 // ── Latency ping tracking (module-level) ─────────────────────────────────────
 /** cookie → performance.now() timestamp when that PING was sent */
@@ -4626,6 +4642,7 @@ export const store = createStore<OnyxState>()(
       _lastRosterRefresh.clear();
       _typingLastSent.clear();
       _motdBuffer = '';
+      _motdCollecting = false;
       // Poll the focused channel's roster so a stale member list self-heals even
       // without a manual channel switch (e.g. while sitting in #root through a
       // mesh flap). The throttle in _refreshChannelRoster keeps it cheap.
@@ -4942,6 +4959,7 @@ export const store = createStore<OnyxState>()(
       _stopScheduledDispatch();
       _typingLastSent.clear();
       _motdBuffer = '';
+      _motdCollecting = false;
       get().client?.destroy();
       _resetAccountBoundState(set, true, true);
       set({
@@ -7193,8 +7211,14 @@ export const store = createStore<OnyxState>()(
       set({ showServices: false });
     },
     addServiceNotice(source, text) {
+      const safeSource = _boundedSystemEventText(source);
+      const safeText = _boundedSystemEventText(text);
+      if (!safeSource || !safeText) return;
       set(s => ({
-        serviceNotices: [...s.serviceNotices, { source, text, time: new Date() }].slice(-60),
+        serviceNotices: [
+          ...s.serviceNotices,
+          { source: safeSource, text: safeText, time: new Date() },
+        ].slice(-60),
       }));
     },
     clearServiceNotices() {
@@ -7202,11 +7226,20 @@ export const store = createStore<OnyxState>()(
     },
 
     addServerLog(text, from = '', type = 'system') {
-      if (!text) return;
+      const safeText = _boundedSystemEventText(text);
+      const safeFrom = _boundedSystemEventText(from);
+      if (!safeText) return;
       set(s => ({
         serverLog: [
           ...s.serverLog,
-          { id: uid(), time: new Date(), from, text, type, target: STATUS_TARGET } as ChatMessage,
+          {
+            id: uid(),
+            time: new Date(),
+            from: safeFrom,
+            text: safeText,
+            type,
+            target: STATUS_TARGET,
+          } as ChatMessage,
         ].slice(-500),
       }));
     },
@@ -10552,7 +10585,12 @@ export const store = createStore<OnyxState>()(
         case '308': { // RPL_RULES — one line of rules
           const ruleLine = params[params.length - 1] ?? '';
           if (ruleLine) {
-            set(s => ({ serverRules: [...s.serverRules, ruleLine] }));
+            const boundedRule = _boundedSystemEventText(ruleLine);
+            if (boundedRule) {
+              set(s => s.serverRules.length < MAX_SERVER_RULE_LINES
+                ? { serverRules: [...s.serverRules, boundedRule] }
+                : {});
+            }
           }
           break;
         }
@@ -10563,11 +10601,13 @@ export const store = createStore<OnyxState>()(
         // ── MOTD numerics ─────────────────────────────────────────────────
         case '375': // RPL_MOTDSTART
           _motdBuffer = '';
+          _motdCollecting = true;
           break;
 
         case '372': { // RPL_MOTD
+          if (!_motdCollecting) break;
           const motdLine = params[1] ?? '';
-          _motdBuffer += (_motdBuffer ? '\n' : '') + motdLine;
+          _appendMotdLine(motdLine);
           // Mirror MOTD lines into the status buffer so they're browsable there
           // (the modal is a separate, dismissable convenience).
           get().addServerLog(motdLine, msg.prefix ?? '');
@@ -10575,6 +10615,11 @@ export const store = createStore<OnyxState>()(
         }
 
         case '376': { // RPL_ENDOFMOTD
+          if (!_motdCollecting) {
+            _motdBuffer = '';
+            break;
+          }
+          _motdCollecting = false;
           const hostname376 = get().server?.url ?? 'unknown';
           const suppressKey = `onyx:hide-motd-${hostname376}`;
           const suppress =
