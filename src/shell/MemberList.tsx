@@ -23,6 +23,7 @@ import {
   createEffect,
   createMemo,
   For,
+  onCleanup,
   Show,
   splitProps,
   type JSX,
@@ -239,6 +240,88 @@ function MemberCard(props: MemberCardProps): JSX.Element {
   );
 }
 
+type MemberRowProps = {
+  user: ChannelUser;
+  role: ResolvedRole;
+  channel: string;
+  hidden?: boolean;
+  onOpenDm?: (nick: string) => void;
+  getRoster: () => HTMLElement | undefined;
+};
+
+function MemberRow(props: MemberRowProps): JSX.Element {
+  let itemRef: HTMLLIElement | undefined;
+
+  // A PART removes this control; a MODE update can move it between role groups
+  // and replace the DOM row. If keyboard focus was inside the outgoing row,
+  // hand it to the replacement for the same nick or to the stable roster when
+  // the member is gone. Otherwise browsers reset focus to <body>.
+  onCleanup(() => {
+    const active = document.activeElement;
+    if (!itemRef || !(active instanceof Node) || !itemRef.contains(active)) return;
+    const focusKey = props.user.nick.toLowerCase();
+    const roster = props.getRoster();
+
+    queueMicrotask(() => {
+      if (!roster?.isConnected || roster.matches('[inert], [aria-hidden="true"]')) return;
+      const replacement = Array.from(
+        roster.querySelectorAll<HTMLElement>('[data-member-focus-key]'),
+      ).find((element) => element.dataset.memberFocusKey === focusKey)
+        ?.querySelector<HTMLButtonElement>('.onyx-popover__trigger');
+      (replacement ?? roster).focus({ preventScroll: true });
+    });
+  });
+
+  return (
+    <li
+      ref={itemRef}
+      class="shell-members-group-item"
+      data-member-focus-key={props.user.nick.toLowerCase()}
+    >
+      <Popover
+        panelLabel={`Member details for ${props.user.nick}`}
+        disabled={props.hidden}
+        trigger={
+          <div
+            class={`shell-member-row${props.user.away ? ' shell-member-row--away' : ''}`}
+          >
+            <span class="shell-member-avatar">
+              <Avatar
+                name={props.user.nick}
+                size="sm"
+                owner={props.role.key === 'owner' || props.role.key === 'founder'}
+                aria-hidden="true"
+              />
+              <span
+                class={`shell-member-presence${props.user.away ? ' shell-member-presence--away' : ''}`}
+                aria-hidden="true"
+              />
+            </span>
+            <span
+              class={`shell-member-nick${props.user.away ? ' shell-member-nick--away' : ''}`}
+            >
+              {props.user.nick}
+            </span>
+            <span class="sr-only">
+              Open member details for {props.user.nick}, {props.role.label}{props.user.away ? ', away' : ''}
+            </span>
+            <Show when={props.role.key !== 'member'}>
+              <RoleBadge role={props.role} decorative />
+            </Show>
+          </div>
+        }
+      >
+        <MemberCard
+          user={props.user}
+          role={props.role}
+          channel={props.channel}
+          onOpenDm={props.onOpenDm}
+        />
+      </Popover>
+    </li>
+  );
+}
+
 // ── Main component ───────────────────────────────────────────────────────────
 
 export type MemberListProps = {
@@ -395,48 +478,14 @@ export function MemberList(props: MemberListProps): JSX.Element {
                   <ul class="shell-members-group-list" role="list" aria-labelledby={groupLabelId}>
                     <For each={group.members}>
                       {({ user, role }) => (
-                        <li class="shell-members-group-item">
-                          <Popover
-                            panelLabel={`Member details for ${user.nick}`}
-                            disabled={local.hidden}
-                            trigger={
-                              <div
-                                class={`shell-member-row${user.away ? ' shell-member-row--away' : ''}`}
-                              >
-                                <span class="shell-member-avatar">
-                                  <Avatar
-                                    name={user.nick}
-                                    size="sm"
-                                    owner={role.key === 'owner' || role.key === 'founder'}
-                                    aria-hidden="true"
-                                  />
-                                  <span
-                                    class={`shell-member-presence${user.away ? ' shell-member-presence--away' : ''}`}
-                                    aria-hidden="true"
-                                  />
-                                </span>
-                                <span
-                                  class={`shell-member-nick${user.away ? ' shell-member-nick--away' : ''}`}
-                                >
-                                  {user.nick}
-                                </span>
-                                <span class="sr-only">
-                                  Open member details for {user.nick}, {role.label}{user.away ? ', away' : ''}
-                                </span>
-                                <Show when={role.key !== 'member'}>
-                                  <RoleBadge role={role} decorative />
-                                </Show>
-                              </div>
-                            }
-                          >
-                            <MemberCard
-                              user={user}
-                              role={role}
-                              channel={activeChannel()?.name ?? ''}
-                              onOpenDm={local.onOpenDm}
-                            />
-                          </Popover>
-                        </li>
+                        <MemberRow
+                          user={user}
+                          role={role}
+                          channel={activeChannel()?.name ?? ''}
+                          hidden={local.hidden}
+                          onOpenDm={local.onOpenDm}
+                          getRoster={() => memberListRef}
+                        />
                       )}
                     </For>
                   </ul>

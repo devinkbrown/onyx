@@ -12,7 +12,7 @@
  *    closes on Escape (SC 2.1.1, 2.1.2).
  */
 
-import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseIRCMessage } from '@/lib/irc/parser';
@@ -249,5 +249,31 @@ describe('MemberList accessibility', () => {
     expect(trigger).toHaveFocus();
     expect(store.getState().showWhois).toBe(true);
     expect(store.getState().whoisNick).toBe('bob');
+  });
+
+  it('keeps focus on a member when a role update moves their row to another group', async () => {
+    seedChannel([makeUser('me', ['o']), makeUser('bob', ['v'])]);
+    render(() => <MemberList />);
+
+    const voiceTrigger = screen.getByRole('button', { name: /Open member details for bob, Voice/ });
+    voiceTrigger.focus();
+    store.getState()._handleMessage(parseIRCMessage(':irc MODE #general +o bob'));
+
+    const opTrigger = await screen.findByRole('button', { name: /Open member details for bob, Op/ });
+    await waitFor(() => expect(opTrigger).toHaveFocus());
+  });
+
+  it('returns focus to the stable roster when the focused member leaves', async () => {
+    seedChannel([makeUser('me', ['o']), makeUser('bob', ['v'])]);
+    render(() => <MemberList />);
+
+    const trigger = screen.getByRole('button', { name: /Open member details for bob, Voice/ });
+    trigger.focus();
+    store.getState()._handleMessage(parseIRCMessage(':bob!user@example PART #general :Leaving'));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /Open member details for bob/ })).toBeNull();
+      expect(screen.getByRole('complementary', { name: 'Member list for #general' })).toHaveFocus();
+    });
   });
 });
