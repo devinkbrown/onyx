@@ -63,6 +63,19 @@ describe('encodeTheme and decodeTheme', () => {
     }))).toBeNull();
   });
 
+  it.each([
+    'url(https://attacker.example/pixel)',
+    'u\\72l(https://attacker.example/pixel)',
+    '@import "https://attacker.example/theme.css"',
+    'var(--unknown)',
+    '#fff; background: red',
+  ])('rejects a shared theme resource payload: %s', (value) => {
+    expect(decodeTheme(encodeJson({
+      ...MINIMAL_THEME,
+      overrides: { '--stone': value },
+    }))).toBeNull();
+  });
+
   it('does not encode a runtime-invalid theme', () => {
     expect(encodeTheme({
       ...MINIMAL_THEME,

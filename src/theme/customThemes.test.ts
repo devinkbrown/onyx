@@ -9,7 +9,9 @@ import {
   customThemeTokens,
   getCustomTheme,
   isCustomThemeId,
+  isSafeCustomThemeToken,
   loadCustomThemes,
+  parseCustomThemeTokenMap,
   removeCustomTheme,
 } from './customThemes';
 import { THEMES, type TokenMap } from './themes';
@@ -71,6 +73,83 @@ describe('customThemeTokens', () => {
 });
 
 describe('persistence', () => {
+  it('accepts only the finite safe grammar used by palette tokens', () => {
+    expect(parseCustomThemeTokenMap({
+      '--lapis': '#78d5ff',
+      '--washi': 'oklch(92% 0.02 220)',
+      '--seam': 'color-mix(in oklab, var(--lapis) 38%, transparent)',
+      '--r-sm': '8px',
+      '--dur': '260ms',
+      '--ease': 'cubic-bezier(0.16, 1, 0.3, 1)',
+      '--font-mono': "'JetBrains Mono Variable', ui-monospace, monospace",
+    })).toEqual({
+      '--lapis': '#78d5ff',
+      '--washi': 'oklch(92% 0.02 220)',
+      '--seam': 'color-mix(in oklab, var(--lapis) 38%, transparent)',
+      '--r-sm': '8px',
+      '--dur': '260ms',
+      '--ease': 'cubic-bezier(0.16, 1, 0.3, 1)',
+      '--font-mono': "'JetBrains Mono Variable', ui-monospace, monospace",
+    });
+  });
+
+  it('accepts every built-in token map through the same persistence boundary', () => {
+    for (const theme of Object.values(THEMES)) {
+      expect(parseCustomThemeTokenMap(theme.tokens)).toEqual(theme.tokens);
+    }
+  });
+
+  it.each([
+    ['resource URL', '--stone', 'url(https://attacker.example/pixel)'],
+    ['escaped resource URL', '--stone', 'u\\72l(https://attacker.example/pixel)'],
+    ['import at-rule', '--stone', '@import "https://attacker.example/theme.css"'],
+    ['declaration breakout', '--stone', '#fff; background: red'],
+    ['rule breakout', '--stone', '#fff} body { color: red'],
+    ['unknown variable', '--stone', 'var(--attacker-controlled)'],
+    ['fallback indirection', '--stone', 'var(--lapis, url(https://attacker.example/pixel))'],
+    ['gradient in a color token', '--stone', 'linear-gradient(#fff, #000)'],
+    ['unknown token', '--external-image', '#fff'],
+  ])('rejects %s before it can reach CSSOM', (_label, property, value) => {
+    expect(isSafeCustomThemeToken(property, value)).toBe(false);
+    expect(parseCustomThemeTokenMap({ [property]: value })).toBeNull();
+  });
+
+  it('drops unsafe persisted themes without losing a safe sibling', () => {
+    localStorage.setItem('onyx:custom-themes', JSON.stringify([
+      {
+        id: 'custom:unsafe-resource',
+        name: 'Unsafe resource',
+        base: 'ocean',
+        overrides: { '--stone': 'url(https://attacker.example/pixel)' },
+      },
+      {
+        id: 'custom:safe-sibling',
+        name: 'Safe sibling',
+        base: 'ocean',
+        overrides: { '--stone': '#123456' },
+      },
+    ]));
+
+    expect(loadCustomThemes()).toEqual([
+      {
+        id: 'custom:safe-sibling',
+        name: 'Safe sibling',
+        base: 'ocean',
+        overrides: { '--stone': '#123456' },
+      },
+    ]);
+  });
+
+  it('never persists a resource-bearing runtime override', () => {
+    const theme = addCustomTheme('No beacon', 'ocean', {
+      '--stone': 'url(https://attacker.example/pixel)',
+    });
+
+    expect(theme.overrides).toEqual({});
+    expect(JSON.parse(localStorage.getItem('onyx:custom-themes') ?? 'null'))
+      .toEqual([{ ...theme, overrides: {} }]);
+  });
+
   it('rejects malformed entries on load', () => {
     localStorage.setItem('onyx:custom-themes', JSON.stringify([{ id: 'nope', name: 'x' }, 42]));
     expect(loadCustomThemes()).toHaveLength(0);
