@@ -129,6 +129,23 @@ function stubMobileViewport(matches = true): void {
   })));
 }
 
+function stubResizableViewport(initiallyMobile = false): (mobile: boolean) => void {
+  let mobileListener: ((event: MediaQueryListEvent) => void) | undefined;
+  vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+    matches: query === '(max-width: 900px)' ? initiallyMobile : false,
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn((type: string, listener: (event: MediaQueryListEvent) => void) => {
+      if (query === '(max-width: 900px)' && type === 'change') mobileListener = listener;
+    }),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })));
+  return (mobile: boolean) => mobileListener?.({ matches: mobile } as MediaQueryListEvent);
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('AppShell', () => {
@@ -1508,6 +1525,44 @@ describe('AppShell', () => {
         fireEvent.click(within(laterProfile).getByRole('button', { name: 'Close member profile' }));
         await waitFor(() => expect(laterOpener).toHaveFocus());
       }
+    });
+
+    it('preserves the roster and focus handoff when an open desktop profile resizes to mobile', async () => {
+      const resize = stubResizableViewport(false);
+      seedStore('#general');
+      store.setState({
+        client: {
+          sendRaw: vi.fn(),
+          isupport: { CHANTYPES: '#&' },
+        } as never,
+      });
+
+      const { container } = render(() => <AppShell />);
+      const memberList = container.querySelector<HTMLElement>('.shell-members');
+      expect(memberList).not.toBeNull();
+      const memberTrigger = within(memberList!).getByRole('button', { name: /Open member details for alice/i });
+      fireEvent.click(memberTrigger);
+      fireEvent.click(screen.getByRole('button', { name: 'View profile of alice' }));
+      const profile = await screen.findByRole('dialog', { name: 'Profile: alice' });
+
+      resize(true);
+
+      await waitFor(() => {
+        expect(memberList).toHaveAttribute('aria-hidden', 'false');
+        expect(memberList).toHaveAttribute('aria-modal', 'true');
+        expect(memberList).not.toHaveAttribute('inert');
+      });
+      fireEvent.click(within(profile).getByRole('button', { name: 'Close member profile' }));
+      await waitFor(() => expect(memberTrigger).toHaveFocus());
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+
+      const mobileMembersButton = screen.getByRole('button', { name: 'Toggle member list' });
+      await waitFor(() => {
+        expect(memberList).toHaveAttribute('aria-hidden', 'true');
+        expect(memberList).toHaveAttribute('inert');
+        expect(mobileMembersButton).toHaveFocus();
+      });
     });
 
     it.each([

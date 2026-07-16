@@ -397,7 +397,17 @@ export function AppShell(props: AppShellProps): JSX.Element {
     const onChange = (e: MediaQueryListEvent): void => {
       setIsMobile(e.matches);
       keyboardOverlay?.setMobile(e.matches);
-      if (!e.matches) closeActiveMobileDrawer(false);
+      if (e.matches) {
+        // Keep the roster context that owns an open profile. Otherwise the
+        // desktop row becomes hidden/inert mid-dialog and the Sheet has no
+        // valid place to restore focus when it closes.
+        if (showWhois() && whoisReturnFocus()?.closest('.shell-members')) {
+          mobileDrawerRestoreTarget ||= mobileMembersButtonRef ?? null;
+          setMobileMembersOpen(true);
+        }
+      } else {
+        closeActiveMobileDrawer(false);
+      }
     };
     mq.addEventListener('change', onChange);
     onCleanup(() => {
