@@ -113,6 +113,19 @@ describe('SuimyakuMediaEngine control payload boundary', () => {
     expect(engine.getPeers().size).toBe(0);
   });
 
+  it('rejects oversized non-frame control payloads before parsing', () => {
+    const onPresence = vi.fn();
+    const engine = new SuimyakuMediaEngine(callbacks({ onPresence }), { kind: 'voice' });
+    const oversized = '1 '.repeat(40_000);
+
+    engine.handleMediaMessage('Alice', '#room', 'VIDEO_JOIN', oversized);
+    engine.handleMediaMessage('Alice', '#room', 'PRESENCE', oversized);
+    engine.handleMediaMessage('Alice', '#room', 'TSUMUGI_GROUP_KEY', oversized);
+
+    expect(engine.getPeers().size).toBe(0);
+    expect(onPresence).not.toHaveBeenCalled();
+  });
+
   it('shares codec startup and bounds frames retained while WASM loads', () => {
     const load = vi.spyOn(OpcodecWasm, 'load')
       .mockReturnValue(new Promise<OpcodecWasm>(() => {}));

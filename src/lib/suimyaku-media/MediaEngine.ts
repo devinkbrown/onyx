@@ -51,6 +51,13 @@ const MAX_MEDIA_NICK_LENGTH = 128;
 const MAX_MEDIA_CHANNEL_LENGTH = 256;
 const MAX_MEDIA_SUBTYPE_LENGTH = 512;
 const MAX_PENDING_WASM_FRAMES = 8;
+const MAX_MEDIA_CONTROL_PAYLOAD_CHARS = 64 * 1024;
+const LARGE_INLINE_MEDIA_SUBTYPES = new Set([
+  'SCREEN_DATA',
+  'TSUMUGI_DATA',
+  'VOICE_DATA',
+  'VIDEO_DATA',
+]);
 
 function validMediaToken(value: string, maxLength: number): boolean {
   return value.length > 0
@@ -1379,6 +1386,11 @@ export class SuimyakuMediaEngine {
       if (frame) this.dispatchFrame(fromNick, channel, subtype, frame);
       return;
     }
+
+    if (
+      payload.length > MAX_MEDIA_CONTROL_PAYLOAD_CHARS
+      && !LARGE_INLINE_MEDIA_SUBTYPES.has(subtype)
+    ) return;
 
     this.handleControl(fromNick, channel, subtype, payload);
   }
