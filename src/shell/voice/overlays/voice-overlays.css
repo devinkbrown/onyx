@@ -373,6 +373,80 @@
   }
 }
 
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .voice-captions {
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px) + 8px);
+    width: calc(100vw - 24px);
+    max-height: calc(100svh - 88px);
+    gap: 8px;
+    padding: 8px 10px;
+    overflow-x: hidden;
+    border-radius: 8px;
+  }
+
+  .voice-captions__head {
+    min-width: 0;
+    gap: 6px;
+    font-size: 14px;
+    letter-spacing: 0.08em;
+    line-height: 1.2;
+  }
+
+  .voice-captions__tools {
+    min-width: 0;
+    gap: 6px;
+  }
+
+  .voice-captions__copy {
+    max-width: 100%;
+    min-height: 44px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 14px;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+
+  .voice-captions__copy-state {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+
+  .voice-captions__log {
+    min-width: 0;
+    gap: 8px;
+  }
+
+  .voice-caption-line {
+    min-width: 0;
+    gap: 4px;
+  }
+
+  .voice-caption-speaker {
+    font-size: 14px;
+  }
+
+  .voice-caption-text {
+    font-size: 18px;
+    line-height: 1.35;
+  }
+
+  .voice-caption-translate {
+    justify-self: start;
+    pointer-events: auto;
+    font-family: var(--font-mono);
+  }
+
+  .voice-caption-translation {
+    min-width: 0;
+    font-size: 16px;
+    overflow-wrap: anywhere;
+  }
+}
+
 .voice-reactions {
   position: fixed;
   left: 0;
