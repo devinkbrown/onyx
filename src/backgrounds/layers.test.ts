@@ -8,6 +8,7 @@ import {
   composeSignature,
   GROUND_MAX_L,
   groundLayer,
+  kintsugiAccent,
   WASHI_GRAIN_COUNT_BASE,
   washiGrainCount,
 } from './variants/layers';
@@ -117,11 +118,11 @@ describe('composeSignature', () => {
     }).not.toThrow();
   });
 
-  it('runs clear → ground → ink → grain → vignette → seal in that order', () => {
+  it('runs clear → ground → ink → grain → vignette → edge seal in that order', () => {
     // The pipeline contract: the ground is laid before the ink, the ink before
     // the grain/vignette/seal. groundLayer draws the first radial (top glow);
-    // applyVignette draws the second radial. The kintsugi seal is the last
-    // stroke. So the ink must fall between the two radials, and the seal after.
+    // applyVignette draws the second radial, and the edge seal draws the third.
+    // So the ink must fall between the ground glow and the two finishing layers.
     const ctx = createFrameContext();
     const ink = vi.fn();
     composeSignature(ctx, 1234, ink);
@@ -129,20 +130,49 @@ describe('composeSignature', () => {
     const context = ctx.context as unknown as {
       clearRect: ReturnType<typeof vi.fn>;
       createRadialGradient: ReturnType<typeof vi.fn>;
-      stroke: ReturnType<typeof vi.fn>;
     };
     const clearOrder = context.clearRect.mock.invocationCallOrder[0]!;
     const inkOrder = ink.mock.invocationCallOrder[0]!;
     const radialOrders = context.createRadialGradient.mock.invocationCallOrder;
     const groundGlowOrder = radialOrders[0]!; // groundLayer's top glow
     const vignetteOrder = radialOrders[1]!; // applyVignette
-    const strokeOrders = context.stroke.mock.invocationCallOrder;
-    const lastStrokeOrder = strokeOrders[strokeOrders.length - 1]!; // kintsugi seal
+    const sealOrder = radialOrders[2]!; // kintsugiAccent's edge glow
 
     expect(clearOrder).toBeLessThan(inkOrder);
     expect(groundGlowOrder).toBeLessThan(inkOrder);
     expect(inkOrder).toBeLessThan(vignetteOrder);
-    expect(inkOrder).toBeLessThan(lastStrokeOrder);
+    expect(vignetteOrder).toBeLessThan(sealOrder);
+  });
+});
+
+describe('kintsugiAccent', () => {
+  it('keeps the vermilion signature at the edge without tracing a foreground path', () => {
+    const ctx = createFrameContext();
+    kintsugiAccent(ctx, THEME, 1234);
+
+    const context = ctx.context as unknown as {
+      createRadialGradient: ReturnType<typeof vi.fn>;
+      quadraticCurveTo: ReturnType<typeof vi.fn>;
+      stroke: ReturnType<typeof vi.fn>;
+    };
+    const radialCall = context.createRadialGradient.mock.calls[0];
+    expect(radialCall).toBeDefined();
+    const [x, y, innerRadius, outerX, outerY, outerRadius] = radialCall as [
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+    ];
+
+    expect(x).toBeGreaterThan(ctx.width * 0.9);
+    expect(outerX).toBe(x);
+    expect(outerY).toBe(y);
+    expect(innerRadius).toBeGreaterThanOrEqual(0);
+    expect(outerRadius).toBeGreaterThan(innerRadius);
+    expect(context.quadraticCurveTo).not.toHaveBeenCalled();
+    expect(context.stroke).not.toHaveBeenCalled();
   });
 });
 

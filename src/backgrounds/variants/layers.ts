@@ -10,7 +10,7 @@
  *   <ink layer>  → the preset's own distinctive scene drawing
  *   applyWashiGrain → the single mandatory washi grain, fixed density
  *   applyVignette   → edge darkening so foreground text stays legible at the rim
- *   kintsugiAccent  → the ONE hot vermilion --shu seal (kintsugi seam)
+ *   kintsugiAccent  → a quiet, edge-bound vermilion --shu seal glow
  *
  * `composeSignature` runs that stack in order; a preset only supplies its ink
  * layer. The ground/grain/vignette all draw from the dark, low-L theme tokens
@@ -143,54 +143,31 @@ export function applyVignette(
 }
 
 /**
- * The one hot accent: a single vermilion `--shu` seam — the kintsugi seal.
- * Deliberately just ONE stroke at modest alpha, so the brand's single hot
- * accent is present without ever competing with foreground text. Its gentle
- * sway is time-driven, so a frozen static frame simply holds a still seam.
+ * The one hot accent: a small vermilion `--shu` seal glow held against the
+ * upper-right edge. The old treatment traced a full-height curve from the
+ * centre of the canvas after every other layer; behind a translucent chat
+ * surface that read as a stray annotation crossing the transcript. Keeping the
+ * accent peripheral and mostly off-canvas preserves the house-colour signature
+ * without drawing a foreground line through content.
+ *
+ * This layer is intentionally time-independent. Animated scenes retain their
+ * own ambient motion, while reduced-motion/static frames render the same calm
+ * edge glow with no hidden animation state.
  */
-export function kintsugiAccent(ctx: BackgroundFrameContext, theme: BackgroundTheme, time = 0): void {
+export function kintsugiAccent(ctx: BackgroundFrameContext, theme: BackgroundTheme, _time = 0): void {
   const c = ctx.context;
-  const xStart = ctx.width * 0.5;
-  const yStart = -ctx.height * 0.06;
-  const segments = 6;
-  const yStep = (ctx.height * 1.2) / segments;
-  const sway = Math.sin(time * 0.00011) * 14 * ctx.qualityScale;
+  const radius = Math.max(24, Math.min(72, Math.min(ctx.width, ctx.height) * 0.11));
+  const x = ctx.width - radius * 0.3;
+  const y = Math.max(radius * 0.7, ctx.height * 0.14);
+  const seal = c.createRadialGradient(x, y, radius * 0.06, x, y, radius);
+  seal.addColorStop(0, rgba(theme.shuBright, 0.08));
+  seal.addColorStop(0.36, rgba(theme.shu, 0.045));
+  seal.addColorStop(1, rgba(theme.shu, 0));
 
   c.save();
-  c.lineCap = 'round';
-  c.lineJoin = 'round';
-  c.beginPath();
-  c.moveTo(xStart, yStart);
-
-  let x = xStart;
-  let y = yStart;
-  for (let segment = 0; segment < segments; segment += 1) {
-    const seed = segment * 13 + 3;
-    const nextX = x + (seeded(seed) - 0.5) * ctx.width * 0.16 + sway;
-    const nextY = y + yStep * (0.8 + seeded(seed + 1) * 0.4);
-    const controlX = x + (seeded(seed + 2) - 0.5) * ctx.width * 0.18 - sway * 0.5;
-    const controlY = y + yStep * 0.52;
-    c.quadraticCurveTo(controlX, controlY, nextX, nextY);
-    x = nextX;
-    y = nextY;
-  }
-
-  // Dark under-stroke for depth, then the vermilion core, then a bright filament.
-  c.globalAlpha = 0.2;
-  c.strokeStyle = rgba(theme.ink, 0.8);
-  c.lineWidth = 4;
-  c.stroke();
-
-  c.globalAlpha = 0.46;
-  c.strokeStyle = theme.shu;
-  c.lineWidth = 1.6;
-  c.stroke();
-
-  c.globalAlpha = 0.66;
-  c.strokeStyle = theme.shuBright;
-  c.lineWidth = 0.7;
-  c.stroke();
-
+  c.globalCompositeOperation = 'screen';
+  c.fillStyle = seal;
+  c.fillRect(x - radius, y - radius, radius * 2, radius * 2);
   c.restore();
 }
 
@@ -199,7 +176,7 @@ export type InkLayer = (theme: BackgroundTheme, time: number) => void;
 
 /**
  * Run the full signature stack: clear → capped ground → the preset's ink layer
- * → washi grain → vignette → the single vermilion seal. The theme is read once
+ * → washi grain → vignette → the peripheral vermilion seal glow. The theme is read once
  * (from the shared epoch cache) and threaded through every layer, so a live
  * theme switch repaints the whole stack on the next frame.
  */
