@@ -114,6 +114,7 @@ import {
   saveNickColorOverrides,
   saveSoftIgnoreList,
 } from '@/lib/identityOverrides';
+import { loadAutoJoinChannels, saveAutoJoinChannels } from '@/lib/autoJoinMemory';
 import { loadMutedDMs, parseMutedDMs, saveMutedDMs } from '@/lib/mutedDMs';
 import {
   emptyIdentityProfileMemory,
@@ -2793,6 +2794,7 @@ function _resetAccountBoundState(
       softIgnoreList: new Set(),
       nickColorOverrides: new Map(),
       displayNameOverrides: {},
+      autoJoinChannels: [],
       mutedDMs: new Set(),
       userNotes: new Map(),
       topicHistory: {},
@@ -3579,6 +3581,13 @@ function _loadOwnedIdentityOverrides(
   };
 }
 
+function _loadOwnedAutoJoinChannels(
+  state: Pick<OnyxState, 'server' | 'ourNick'>,
+): string[] {
+  const owner = selectDeviceMemoryOwner(state);
+  return owner ? loadAutoJoinChannels(owner) : [];
+}
+
 function _loadOwnedMutedDMs(
   state: Pick<OnyxState, 'server' | 'ourNick'>,
 ): Set<string> {
@@ -4363,6 +4372,7 @@ export const store = createStore<OnyxState>()(
               highlightWords: _loadOwnedHighlightWords({ server, ourNick: newNick }),
               ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: newNick }),
               ..._loadOwnedIdentityOverrides({ server, ourNick: newNick }),
+              autoJoinChannels: _loadOwnedAutoJoinChannels({ server, ourNick: newNick }),
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: newNick }),
               friends: _loadOwnedFriends({ server, ourNick: newNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: newNick }),
@@ -4454,6 +4464,7 @@ export const store = createStore<OnyxState>()(
               highlightWords: _loadOwnedHighlightWords({ server: srv, ourNick: get().ourNick }),
               ignoredUsers: _loadOwnedIgnoredUsers({ server: srv, ourNick: get().ourNick }),
               ..._loadOwnedIdentityOverrides({ server: srv, ourNick: get().ourNick }),
+              autoJoinChannels: _loadOwnedAutoJoinChannels({ server: srv, ourNick: get().ourNick }),
               mutedDMs: _loadOwnedMutedDMs({ server: srv, ourNick: get().ourNick }),
               friends: _loadOwnedFriends({ server: srv, ourNick: get().ourNick }),
               watchList: _loadOwnedWatchList({ server: srv, ourNick: get().ourNick }),
@@ -7579,6 +7590,7 @@ export const store = createStore<OnyxState>()(
               highlightWords: _loadOwnedHighlightWords({ server, ourNick: s.ourNick }),
               ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: s.ourNick }),
               ..._loadOwnedIdentityOverrides({ server, ourNick: s.ourNick }),
+              autoJoinChannels: _loadOwnedAutoJoinChannels({ server, ourNick: s.ourNick }),
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
               friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
@@ -8236,6 +8248,7 @@ export const store = createStore<OnyxState>()(
                   accountInfo: null,
                   accountActionError: null,
                   ..._loadOwnedIdentityOverrides({ server, ourNick: s.ourNick }),
+                  autoJoinChannels: _loadOwnedAutoJoinChannels({ server, ourNick: s.ourNick }),
                 };
               });
               _saslAccount = null;
@@ -8810,6 +8823,7 @@ export const store = createStore<OnyxState>()(
                 highlightWords: _loadOwnedHighlightWords({ server, ourNick: newNick }),
                 ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: newNick }),
                 ..._loadOwnedIdentityOverrides({ server, ourNick: newNick }),
+                autoJoinChannels: _loadOwnedAutoJoinChannels({ server, ourNick: newNick }),
                 mutedDMs: _loadOwnedMutedDMs({ server, ourNick: newNick }),
                 friends: _loadOwnedFriends({ server, ourNick: newNick }),
                 watchList: _loadOwnedWatchList({ server, ourNick: newNick }),
@@ -10027,6 +10041,7 @@ export const store = createStore<OnyxState>()(
                 highlightWords: _loadOwnedHighlightWords({ server, ourNick: s.ourNick }),
                 ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: s.ourNick }),
                 ..._loadOwnedIdentityOverrides({ server, ourNick: s.ourNick }),
+                autoJoinChannels: _loadOwnedAutoJoinChannels({ server, ourNick: s.ourNick }),
                 mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
                 friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
                 watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
@@ -10076,6 +10091,7 @@ export const store = createStore<OnyxState>()(
               highlightWords: _loadOwnedHighlightWords({ server, ourNick: s.ourNick }),
               ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: s.ourNick }),
               ..._loadOwnedIdentityOverrides({ server, ourNick: s.ourNick }),
+              autoJoinChannels: _loadOwnedAutoJoinChannels({ server, ourNick: s.ourNick }),
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
               friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
@@ -10798,22 +10814,30 @@ export const store = createStore<OnyxState>()(
     closeGroupDM: () => set({ showGroupDM: false }),
 
     // ── Auto-join ────────────────────────────────────────────────────────
-    autoJoinChannels: (() => {
-      if (typeof window === 'undefined') return [];
-      // Sanitize at the boundary: a wrong-shape persisted value (e.g. `{}`) would
-      // otherwise crash the first add/removeAutoJoin (`[...value]` / `.filter`).
-      return parseStringArray(localStorage.getItem('onyx:autojoin'));
-    })(),
-    addAutoJoin: (channel) => set(s => {
-      const next = [...new Set([...s.autoJoinChannels, channel])];
-      if (typeof window !== 'undefined') localStorage.setItem('onyx:autojoin', JSON.stringify(next));
-      return { autoJoinChannels: next };
-    }),
-    removeAutoJoin: (channel) => set(s => {
-      const next = s.autoJoinChannels.filter(c => c !== channel);
-      if (typeof window !== 'undefined') localStorage.setItem('onyx:autojoin', JSON.stringify(next));
-      return { autoJoinChannels: next };
-    }),
+    // This is owner-scoped preference memory only. Registration deliberately
+    // does not consume it: joining remains an explicit user/deep-link choice.
+    autoJoinChannels: loadAutoJoinChannels(),
+    addAutoJoin: (channel) => {
+      const owner = selectDeviceMemoryOwner(get());
+      const normalized = normalizeNavigationChannel(channel);
+      if (!owner || !normalized) return;
+      set(s => {
+        const saved = saveAutoJoinChannels([...s.autoJoinChannels, normalized], owner);
+        return saved ? { autoJoinChannels: saved } : {};
+      });
+    },
+    removeAutoJoin: (channel) => {
+      const owner = selectDeviceMemoryOwner(get());
+      const normalized = normalizeNavigationChannel(channel);
+      if (!owner || !normalized) return;
+      set(s => {
+        const saved = saveAutoJoinChannels(
+          s.autoJoinChannels.filter((candidate) => candidate !== normalized),
+          owner,
+        );
+        return saved ? { autoJoinChannels: saved } : {};
+      });
+    },
 
     // ── Starred channels ──────────────────────────────────────────────────
     starredChannels: new Set(),
