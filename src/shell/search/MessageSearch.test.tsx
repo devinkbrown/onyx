@@ -5,7 +5,13 @@ import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Channel, ChatMessage } from '@/lib/irc/types';
-import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
+import {
+  closePreferences,
+  isPreferencesOpen,
+  preferenceOpenRequest,
+  resetPreferences,
+  setPreference,
+} from '@/lib/prefs/preferences';
 import { store, type Server } from '@/lib/store/store';
 import { _resetVaultForTests, saveMessages } from '@/lib/vault/historyVault';
 import {
@@ -87,6 +93,7 @@ describe('MessageSearch', () => {
   beforeEach(() => {
     store.setState(initialState, true);
     closeMessageSearch();
+    closePreferences();
     localStorage.clear();
     resetPreferences();
     globalThis.indexedDB = new IDBFactory();
@@ -97,6 +104,7 @@ describe('MessageSearch', () => {
   afterEach(() => {
     cleanup();
     closeMessageSearch();
+    closePreferences();
     localStorage.clear();
     vi.restoreAllMocks();
   });
@@ -792,5 +800,11 @@ describe('MessageSearch', () => {
     await waitFor(() => {
       expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close search' }));
     });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open history preferences' }));
+
+    expect(screen.queryByRole('search', { name: 'Message search' })).not.toBeInTheDocument();
+    expect(isPreferencesOpen()).toBe(true);
+    expect(preferenceOpenRequest().category).toBe('history');
   });
 });

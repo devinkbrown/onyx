@@ -624,7 +624,7 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
               class="onyx-message-search__deep"
               onClick={() => {
                 closeMessageSearch();
-                openPreferences();
+                openPreferences('history');
               }}
             >
               Open history preferences
