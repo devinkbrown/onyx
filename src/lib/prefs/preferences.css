@@ -206,9 +206,113 @@
    selected states. */
 
 .pref-panel {
+  display: grid;
+  grid-template-columns: minmax(9rem, 11rem) minmax(0, 1fr);
+  align-items: start;
+  gap: clamp(var(--space-4), 4vw, var(--space-7));
+}
+
+.onyx-sheet:has(.pref-panel) .onyx-sheet__panel {
+  width: min(56rem, 100vw);
+}
+
+.pref-category-nav {
+  position: sticky;
+  top: 0;
+  display: grid;
+  gap: var(--space-2);
+  align-self: start;
+}
+
+.pref-category-nav__eyebrow {
+  margin: 0;
+  color: var(--washi-mute);
+  font: 700 0.64rem/1 var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.pref-category-tabs {
+  display: grid;
+  gap: 3px;
+  padding-left: var(--space-2);
+  border-left: 1px solid var(--line);
+}
+
+.pref-reset-all {
+  margin-top: var(--space-2);
+}
+
+.pref-category-tab {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  background: transparent;
+  color: var(--washi-dim);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.pref-category-tab::before {
+  content: '';
+  position: absolute;
+  inset: 5px auto 5px calc(-1 * var(--space-2) - 1px);
+  width: 2px;
+  border-radius: var(--r-pill);
+  background: transparent;
+}
+
+.pref-category-tab:hover {
+  color: var(--washi);
+  background: color-mix(in oklab, var(--lapis) 10%, transparent);
+}
+
+.pref-category-tab:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
+.pref-category-tab[aria-selected='true'] {
+  color: var(--washi);
+  background:
+    linear-gradient(90deg, color-mix(in oklab, var(--lapis) 19%, transparent), transparent 92%);
+}
+
+.pref-category-tab[aria-selected='true']::before {
+  background: var(--lapis-bright);
+  box-shadow: 0 0 12px color-mix(in oklab, var(--lapis-bright) 46%, transparent);
+}
+
+.pref-category-tab__label {
+  font-size: 0.82rem;
+  font-weight: 720;
+  line-height: 1.25;
+}
+
+.pref-category-tab__summary {
+  color: var(--washi-mute);
+  font: 0.64rem/1.35 var(--font-mono);
+}
+
+.pref-category-content {
+  min-width: 0;
+}
+
+.pref-category-panel {
   display: flex;
   flex-direction: column;
   gap: var(--gap-section);
+  min-width: 0;
+}
+
+.pref-category-panel[hidden] {
+  display: none;
 }
 
 .pref-group {
@@ -224,9 +328,77 @@
   border-top: 1px solid color-mix(in oklab, var(--line) 72%, transparent);
 }
 
-.pref-panel > .pref-section:first-child {
+.pref-category-panel > .pref-section:first-child {
   padding-top: 0;
   border-top: 0;
+}
+
+@media (max-width: 42rem) {
+  .pref-panel {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-4);
+  }
+
+  .pref-category-nav {
+    z-index: 2;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    margin-inline: calc(-1 * var(--space-1));
+    padding: var(--space-1);
+    background: color-mix(in oklab, var(--ink) 94%, transparent);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+  }
+
+  .pref-category-nav__eyebrow {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .pref-category-tabs {
+    display: flex;
+    gap: var(--space-1);
+    overflow-x: auto;
+    padding: 0 0 var(--space-1);
+    border-left: 0;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: inline proximity;
+    scrollbar-width: thin;
+  }
+
+  .pref-reset-all {
+    margin-top: 0;
+    white-space: nowrap;
+  }
+
+  .pref-category-tab {
+    flex: 0 0 auto;
+    width: auto;
+    max-width: 10rem;
+    min-height: 2.75rem;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-pill);
+    scroll-snap-align: start;
+  }
+
+  .pref-category-tab::before,
+  .pref-category-tab[aria-selected='true']::before {
+    display: none;
+  }
+
+  .pref-category-tab[aria-selected='true'] {
+    border-color: color-mix(in oklab, var(--lapis-bright) 68%, var(--line));
+    background: color-mix(in oklab, var(--lapis) 24%, var(--ink));
+  }
+
+  .pref-category-tab__summary {
+    display: none;
+  }
 }
 
 .pref-section-title {

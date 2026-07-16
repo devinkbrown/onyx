@@ -192,6 +192,15 @@ const VAULT_AGE_LABELS: Record<VaultAgeOption, string> = {
   '365': '1 year',
 };
 
+const PREFERENCE_CATEGORIES = [
+  { id: 'display', label: 'Display', summary: 'Reading and rhythm' },
+  { id: 'conversation', label: 'Conversation', summary: 'Channel surfaces' },
+  { id: 'history', label: 'History & data', summary: 'Local vault' },
+  { id: 'tools', label: 'App & tools', summary: 'Install and extensions' },
+  { id: 'accessibility', label: 'Accessibility', summary: 'Motion and access' },
+] as const;
+type PreferenceCategory = (typeof PREFERENCE_CATEGORIES)[number]['id'];
+
 function resetAllPreferences(): void {
   resetPreferences();
   resetSceneMotion();
@@ -2352,6 +2361,81 @@ function PreferenceSection(props: { title: string; description: string }): JSX.E
   );
 }
 
+function PreferenceCategoryNavigation(props: {
+  active: () => PreferenceCategory;
+  onSelect: (category: PreferenceCategory) => void;
+}): JSX.Element {
+  const buttons: (HTMLButtonElement | undefined)[] = [];
+
+  function selectAt(index: number): void {
+    const category = PREFERENCE_CATEGORIES[index];
+    if (category === undefined) return;
+    props.onSelect(category.id);
+    buttons[index]?.focus();
+  }
+
+  function onKeyDown(event: KeyboardEvent, index: number): void {
+    const last = PREFERENCE_CATEGORIES.length - 1;
+    switch (event.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        event.preventDefault();
+        selectAt(index === last ? 0 : index + 1);
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        event.preventDefault();
+        selectAt(index === 0 ? last : index - 1);
+        break;
+      case 'Home':
+        event.preventDefault();
+        selectAt(0);
+        break;
+      case 'End':
+        event.preventDefault();
+        selectAt(last);
+        break;
+    }
+  }
+
+  return (
+    <nav class="pref-category-nav" aria-label="Preference categories">
+      <p class="pref-category-nav__eyebrow">Browse</p>
+      <div class="pref-category-tabs" role="tablist" aria-label="Preference categories">
+        <For each={PREFERENCE_CATEGORIES}>
+          {(category, index) => {
+            const selected = () => props.active() === category.id;
+            return (
+              <button
+                ref={(element) => (buttons[index()] = element)}
+                type="button"
+                class="pref-category-tab"
+                role="tab"
+                id={`pref-category-tab-${category.id}`}
+                aria-controls={`pref-category-panel-${category.id}`}
+                aria-label={category.label}
+                aria-describedby={`pref-category-summary-${category.id}`}
+                aria-selected={selected()}
+                tabindex={selected() ? 0 : -1}
+                onClick={() => props.onSelect(category.id)}
+                onKeyDown={(event) => onKeyDown(event, index())}
+              >
+                <span class="pref-category-tab__label">{category.label}</span>
+                <span class="pref-category-tab__summary" id={`pref-category-summary-${category.id}`}>
+                  {category.summary}
+                </span>
+              </button>
+            );
+          }}
+        </For>
+      </div>
+      <button type="button" class="pref-reset pref-reset-all" onClick={() => resetAllPreferences()}>
+        Reset to defaults
+      </button>
+    </nav>
+  );
+}
+
 function AppearanceLauncher(): JSX.Element {
   function openAppearanceFromPreferences(): void {
     closePreferences();
@@ -2379,6 +2463,8 @@ function AppearanceLauncher(): JSX.Element {
 }
 
 export function PreferencesPanel(): JSX.Element {
+  const [activeCategory, setActiveCategory] = createSignal<PreferenceCategory>('display');
+
   return (
     <Sheet
       open={isPreferencesOpen()}
@@ -2388,227 +2474,233 @@ export function PreferencesPanel(): JSX.Element {
       closeLabel="Close preferences"
     >
       <div class="pref-panel" data-testid="preferences-panel">
-        <AppearanceLauncher />
+        <PreferenceCategoryNavigation active={activeCategory} onSelect={setActiveCategory} />
 
-        <PreferenceSection
-          title="Display"
-          description="Reading rhythm, type scale, and transcript behavior."
-        />
+        <div class="pref-category-content">
+          <section
+            class="pref-category-panel"
+            id="pref-category-panel-display"
+            role="tabpanel"
+            aria-labelledby="pref-category-tab-display"
+            hidden={activeCategory() !== 'display'}
+          >
+            <PreferenceSection
+              title="Display"
+              description="Reading rhythm, type scale, and transcript behavior."
+            />
+            <AppearanceLauncher />
+            <Segmented
+              legend="Message density"
+              description="Vertical rhythm of the message feed."
+              options={DENSITIES}
+              labels={DENSITY_LABELS}
+              value={() => preferences().density}
+              onSelect={(value) => setPreference('density', value)}
+            />
+            <Segmented
+              legend="Font scale"
+              description="Base size for the interface text."
+              options={FONT_SCALES}
+              labels={FONT_SCALE_LABELS}
+              value={() => preferences().fontScale}
+              onSelect={(value) => setPreference('fontScale', value)}
+            />
+            <Segmented
+              legend="Conversation width"
+              description="Cap the reading measure, or let the feed run edge-to-edge."
+              options={WIDTHS}
+              labels={WIDTH_LABELS}
+              value={() => preferences().width}
+              onSelect={(value) => setPreference('width', value)}
+            />
+            <Toggle
+              legend="Reader mode"
+              title="Read as a transcript"
+              description="A calm, typographic single-column layout — quiet chrome, the words lead."
+              value={() => preferences().readerMode}
+              onToggle={(value) => setPreference('readerMode', value)}
+            />
+            <Segmented
+              legend="Clock"
+              description="Timestamp format for messages and channel activity."
+              options={CLOCKS}
+              labels={CLOCK_LABELS}
+              value={() => preferences().clock}
+              onSelect={(value) => setPreference('clock', value)}
+            />
+          </section>
 
-        <Segmented
-          legend="Message density"
-          description="Vertical rhythm of the message feed."
-          options={DENSITIES}
-          labels={DENSITY_LABELS}
-          value={() => preferences().density}
-          onSelect={(value) => setPreference('density', value)}
-        />
+          <section
+            class="pref-category-panel"
+            id="pref-category-panel-conversation"
+            role="tabpanel"
+            aria-labelledby="pref-category-tab-conversation"
+            hidden={activeCategory() !== 'conversation'}
+          >
+            <PreferenceSection
+              title="Conversation"
+              description="Attention level and optional channel surfaces on this device."
+            />
+            <CalmModeControl />
+            <Toggle
+              legend="Time scrubber"
+              title="Show 24-hour activity strip"
+              description="Shows the channel activity bars and moment jump affordance above the transcript."
+              value={() => preferences().timeScrubber}
+              onToggle={(value) => setPreference('timeScrubber', value)}
+            />
+            <Toggle
+              legend="Voice and video"
+              title="Show join voice/video controls"
+              description="Keeps media available in the app, but removes the channel header voice/video controls when off."
+              value={() => preferences().voiceEntry}
+              onToggle={(value) => setPreference('voiceEntry', value)}
+            />
+            <Toggle
+              legend="Topic tools"
+              title="Show topic, forum, and follow controls"
+              description="Removes the topic creation row and forum/follow buttons above channel messages."
+              value={() => preferences().topicTools}
+              onToggle={(value) => setPreference('topicTools', value)}
+            />
+            <Toggle
+              legend="Watch together"
+              title="Show shared watch activity"
+              description="Hides the synchronized watch activity strip when a room has one."
+              value={() => preferences().watchTogether}
+              onToggle={(value) => setPreference('watchTogether', value)}
+            />
+            <Toggle
+              legend="System events"
+              title="Hide join, part & quit"
+              description="Removes the quiet system lines from the feed."
+              value={() => preferences().hideEvents}
+              onToggle={(value) => setPreference('hideEvents', value)}
+            />
+            <Toggle
+              legend="Link previews"
+              title="Preview web links"
+              description="Unfurl the first link in a message into a title-and-image card (fetched via this server, never your browser)."
+              value={() => preferences().linkPreviews}
+              onToggle={(value) => setPreference('linkPreviews', value)}
+            />
+            <Toggle
+              legend="Encrypted DMs"
+              title="End-to-end encrypt direct messages"
+              description="When the other person's app supports it, DMs are sealed on your device — the server relays only ciphertext. A lock marks encrypted messages; ones sent to another device stay locked."
+              value={() => preferences().e2eeDms}
+              onToggle={(value) => setPreference('e2eeDms', value)}
+            />
+          </section>
 
-        <Segmented
-          legend="Font scale"
-          description="Base size for the interface text."
-          options={FONT_SCALES}
-          labels={FONT_SCALE_LABELS}
-          value={() => preferences().fontScale}
-          onSelect={(value) => setPreference('fontScale', value)}
-        />
+          <section
+            class="pref-category-panel"
+            id="pref-category-panel-history"
+            role="tabpanel"
+            aria-labelledby="pref-category-tab-history"
+            hidden={activeCategory() !== 'history'}
+          >
+            <PreferenceSection
+              title="History & data"
+              description="How this browser remembers, finds, moves, and erases local conversation data."
+            />
+            <Toggle
+              legend="Local history"
+              title="Remember conversations on this device"
+              description="Keeps recent scrollback in this browser so rooms open instantly and read offline. Turning it off erases what's stored here."
+              value={() => preferences().localHistory}
+              onToggle={(value) => {
+                setPreference('localHistory', value);
+                if (!value) void clearVault();
+              }}
+            />
+            <PortableVaultControls />
+            <ClearReviewedAnchorsControls />
+            <Segmented
+              legend="Default search mode"
+              description="Which matching a device-memory search starts in: Text + related (literal matches, then token-similar terms), Exact (literal substring), or Related terms (token similarity only). All run in this browser — nothing is sent anywhere."
+              options={VAULT_SEARCH_MODES}
+              labels={VAULT_SEARCH_MODE_LABELS}
+              value={() => defaultVaultSearchMode()}
+              onSelect={(value) => {
+                setDefaultVaultSearchMode(value);
+                setVaultMode(value);
+              }}
+            />
+            <DiscardQueuedSendsControls />
+            <DiscardLocalDraftsControls />
+            <ClearFollowedConversationsControls />
+            <ClearSavedSearchesControls />
+            <ClearTopicReadPositionsControls />
+            <VaultRetentionCard />
+            <ClearLocalHistoryControls />
+            <DiscordImportControls />
+            <DiscordPackageImportControls />
+            <DiscordBotImportControls />
+            <SlackImportControls />
+            <IrcLogImportControls />
+          </section>
 
-        <Segmented
-          legend="Conversation width"
-          description="Cap the reading measure, or let the feed run edge-to-edge."
-          options={WIDTHS}
-          labels={WIDTH_LABELS}
-          value={() => preferences().width}
-          onSelect={(value) => setPreference('width', value)}
-        />
+          <section
+            class="pref-category-panel"
+            id="pref-category-panel-tools"
+            role="tabpanel"
+            aria-labelledby="pref-category-tab-tools"
+            hidden={activeCategory() !== 'tools'}
+          >
+            <PreferenceSection
+              title="App & tools"
+              description="Installed-app health, reviewed extensions, and on-device language capabilities."
+            />
+            <PwaReadinessPanel />
+            <ExtensionActionManifestControls />
+            <ExtensionAuditControls />
+            <LocalLanguageTools />
+          </section>
 
-        <Toggle
-          legend="Reader mode"
-          title="Read as a transcript"
-          description="A calm, typographic single-column layout — quiet chrome, the words lead."
-          value={() => preferences().readerMode}
-          onToggle={(value) => setPreference('readerMode', value)}
-        />
-
-        <Segmented
-          legend="Clock"
-          description="Timestamp format for messages and channel activity."
-          options={CLOCKS}
-          labels={CLOCK_LABELS}
-          value={() => preferences().clock}
-          onSelect={(value) => setPreference('clock', value)}
-        />
-
-        <CalmModeControl />
-
-        <PreferenceSection
-          title="Feature switches"
-          description="Turn off optional channel surfaces on this device. Core chat stays available."
-        />
-
-        <Toggle
-          legend="Time scrubber"
-          title="Show 24-hour activity strip"
-          description="Shows the channel activity bars and moment jump affordance above the transcript."
-          value={() => preferences().timeScrubber}
-          onToggle={(value) => setPreference('timeScrubber', value)}
-        />
-
-        <Toggle
-          legend="Voice and video"
-          title="Show join voice/video controls"
-          description="Keeps media available in the app, but removes the channel header voice/video controls when off."
-          value={() => preferences().voiceEntry}
-          onToggle={(value) => setPreference('voiceEntry', value)}
-        />
-
-        <Toggle
-          legend="Topic tools"
-          title="Show topic, forum, and follow controls"
-          description="Removes the topic creation row and forum/follow buttons above channel messages."
-          value={() => preferences().topicTools}
-          onToggle={(value) => setPreference('topicTools', value)}
-        />
-
-        <Toggle
-          legend="Watch together"
-          title="Show shared watch activity"
-          description="Hides the synchronized watch activity strip when a room has one."
-          value={() => preferences().watchTogether}
-          onToggle={(value) => setPreference('watchTogether', value)}
-        />
-
-        <Toggle
-          legend="System events"
-          title="Hide join, part & quit"
-          description="Removes the quiet system lines from the feed."
-          value={() => preferences().hideEvents}
-          onToggle={(value) => setPreference('hideEvents', value)}
-        />
-
-        <Toggle
-          legend="Link previews"
-          title="Preview web links"
-          description="Unfurl the first link in a message into a title-and-image card (fetched via this server, never your browser)."
-          value={() => preferences().linkPreviews}
-          onToggle={(value) => setPreference('linkPreviews', value)}
-        />
-
-        <Toggle
-          legend="Local history"
-          title="Remember conversations on this device"
-          description="Keeps recent scrollback in this browser so rooms open instantly and read offline. Turning it off erases what's stored here."
-          value={() => preferences().localHistory}
-          onToggle={(value) => {
-            setPreference('localHistory', value);
-            if (!value) void clearVault();
-          }}
-        />
-
-        <Toggle
-          legend="Encrypted DMs"
-          title="End-to-end encrypt direct messages"
-          description="When the other person's app supports it, DMs are sealed on your device — the server relays only ciphertext. A lock marks encrypted messages; ones sent to another device stay locked."
-          value={() => preferences().e2eeDms}
-          onToggle={(value) => setPreference('e2eeDms', value)}
-        />
-
-        <PortableVaultControls />
-
-        <ClearReviewedAnchorsControls />
-
-        <PreferenceSection
-          title="Search & history"
-          description="How on-device search matches, what this browser keeps, and how to erase it."
-        />
-
-        <Segmented
-          legend="Default search mode"
-          description="Which matching a device-memory search starts in: Text + related (literal matches, then token-similar terms), Exact (literal substring), or Related terms (token similarity only). All run in this browser — nothing is sent anywhere."
-          options={VAULT_SEARCH_MODES}
-          labels={VAULT_SEARCH_MODE_LABELS}
-          value={() => defaultVaultSearchMode()}
-          onSelect={(value) => {
-            setDefaultVaultSearchMode(value);
-            setVaultMode(value);
-          }}
-        />
-
-        <DiscardQueuedSendsControls />
-
-        <DiscardLocalDraftsControls />
-
-        <ClearFollowedConversationsControls />
-
-        <ClearSavedSearchesControls />
-
-        <ClearTopicReadPositionsControls />
-
-        <VaultRetentionCard />
-
-        <ClearLocalHistoryControls />
-
-        <DiscordImportControls />
-
-        <DiscordPackageImportControls />
-
-        <DiscordBotImportControls />
-
-        <SlackImportControls />
-
-        <IrcLogImportControls />
-
-        <PwaReadinessPanel />
-
-        <ExtensionActionManifestControls />
-
-        <ExtensionAuditControls />
-
-        <LocalLanguageTools />
-
-        <PreferenceSection
-          title="Accessibility"
-          description="Motion, transparency, and verified access surfaces."
-        />
-
-        <Segmented
-          legend="Background motion"
-          description="Animate the scene, freeze it on a still frame, or turn it off — independent of your OS motion setting."
-          options={SCENE_MOTIONS}
-          labels={SCENE_MOTION_LABELS}
-          value={() => sceneMotion()}
-          onSelect={(value) => setSceneMotion(value)}
-        />
-
-        <Toggle
-          legend="Motion"
-          title="Reduce motion"
-          description="Force-disable animations regardless of your OS setting."
-          value={() => preferences().reduceMotion}
-          onToggle={(value) => setPreference('reduceMotion', value)}
-        />
-
-        <Toggle
-          legend="Transparency"
-          title="Reduce transparency"
-          description="Flatten glassy overlays and translucent panels for stronger separation from the background."
-          value={() => preferences().reduceTransparency}
-          onToggle={(value) => setPreference('reduceTransparency', value)}
-        />
-
-        <Toggle
-          legend="Contrast"
-          title="Raise interface contrast"
-          description="Strengthens text, borders, focus outlines, and panel separation across the active theme."
-          value={() => preferences().highContrast}
-          onToggle={(value) => setPreference('highContrast', value)}
-        />
-
-        <AccessibilityAuditLedger />
-
-        <button type="button" class="pref-reset" onClick={() => resetAllPreferences()}>
-          Reset to defaults
-        </button>
+          <section
+            class="pref-category-panel"
+            id="pref-category-panel-accessibility"
+            role="tabpanel"
+            aria-labelledby="pref-category-tab-accessibility"
+            hidden={activeCategory() !== 'accessibility'}
+          >
+            <PreferenceSection
+              title="Accessibility"
+              description="Motion, transparency, contrast, and verified access surfaces."
+            />
+            <Segmented
+              legend="Background motion"
+              description="Animate the scene, freeze it on a still frame, or turn it off — independent of your OS motion setting."
+              options={SCENE_MOTIONS}
+              labels={SCENE_MOTION_LABELS}
+              value={() => sceneMotion()}
+              onSelect={(value) => setSceneMotion(value)}
+            />
+            <Toggle
+              legend="Motion"
+              title="Reduce motion"
+              description="Force-disable animations regardless of your OS setting."
+              value={() => preferences().reduceMotion}
+              onToggle={(value) => setPreference('reduceMotion', value)}
+            />
+            <Toggle
+              legend="Transparency"
+              title="Reduce transparency"
+              description="Flatten glassy overlays and translucent panels for stronger separation from the background."
+              value={() => preferences().reduceTransparency}
+              onToggle={(value) => setPreference('reduceTransparency', value)}
+            />
+            <Toggle
+              legend="Contrast"
+              title="Raise interface contrast"
+              description="Strengthens text, borders, focus outlines, and panel separation across the active theme."
+              value={() => preferences().highContrast}
+              onToggle={(value) => setPreference('highContrast', value)}
+            />
+            <AccessibilityAuditLedger />
+          </section>
+        </div>
       </div>
     </Sheet>
   );

@@ -106,6 +106,21 @@ async function stageEmptyPortableImport(): Promise<void> {
   await screen.findByRole('heading', { name: 'Review import' });
 }
 
+type PreferenceCategoryLabel = 'Display' | 'Conversation' | 'History & data' | 'App & tools' | 'Accessibility';
+
+function selectPreferenceCategory(category: PreferenceCategoryLabel): HTMLElement {
+  const tab = screen.getByRole('tab', { name: new RegExp(`^${category}`) });
+  fireEvent.click(tab);
+  return tab;
+}
+
+function renderPreferences(category: PreferenceCategoryLabel = 'Display') {
+  openPreferences();
+  const view = render(() => <PreferencesPanel />);
+  if (category !== 'Display') selectPreferenceCategory(category);
+  return view;
+}
+
 describe('PreferencesPanel', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -131,19 +146,85 @@ describe('PreferencesPanel', () => {
     store.setState({ showAppearance: false, composerDrafts: {} });
   });
 
+  it('shows one selected category pane instead of one giant settings scroll', () => {
+    renderPreferences();
+
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs).toHaveLength(5);
+    expect(screen.getByRole('tablist', { name: 'Preference categories' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Preference categories' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /^Display/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: /^Display/ })).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('tabpanel')).toHaveAccessibleName('Display');
+    expect(screen.getAllByRole('tabpanel', { hidden: true })).toHaveLength(5);
+    expect(screen.getByRole('button', { name: /Theme and background/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Export vault' })).not.toBeInTheDocument();
+
+    selectPreferenceCategory('History & data');
+
+    expect(screen.getByRole('tab', { name: /^History & data/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: /^History & data/ })).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('tab', { name: /^Display/ })).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByRole('tabpanel')).toHaveAccessibleName('History & data');
+    expect(screen.getByRole('button', { name: 'Export vault' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Theme and background/i })).not.toBeInTheDocument();
+  });
+
+  it('moves category selection and focus with tab-list navigation keys', () => {
+    renderPreferences();
+    const display = screen.getByRole('tab', { name: /^Display/ });
+    display.focus();
+
+    fireEvent.keyDown(display, { key: 'ArrowRight' });
+    const conversation = screen.getByRole('tab', { name: /^Conversation/ });
+    expect(conversation).toHaveFocus();
+    expect(conversation).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tabpanel')).toHaveAccessibleName('Conversation');
+
+    fireEvent.keyDown(conversation, { key: 'End' });
+    const accessibility = screen.getByRole('tab', { name: /^Accessibility/ });
+    expect(accessibility).toHaveFocus();
+    expect(accessibility).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.keyDown(accessibility, { key: 'Home' });
+    expect(display).toHaveFocus();
+    expect(display).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('keeps an inactive category mounted while removing it from the visible scroll', () => {
+    renderPreferences('History & data');
+    fireEvent.click(screen.getByRole('button', { name: 'Clear local history' }));
+    const confirmation = screen.getByRole('group', { name: 'Confirm clear local history' });
+
+    selectPreferenceCategory('Display');
+
+    expect(screen.getAllByRole('tabpanel')).toHaveLength(1);
+    expect(screen.queryByRole('group', { name: 'Confirm clear local history' })).not.toBeInTheDocument();
+    const historyPanel = document.getElementById('pref-category-panel-history');
+    expect(historyPanel).toHaveAttribute('hidden');
+    expect(within(historyPanel!).getByRole('group', {
+      name: 'Confirm clear local history',
+      hidden: true,
+    })).toBe(confirmation);
+
+    selectPreferenceCategory('History & data');
+
+    expect(screen.getByRole('group', { name: 'Confirm clear local history' })).toBe(confirmation);
+  });
+
   it('surfaces the client accessibility audit ledger', () => {
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences();
 
     expect(screen.getByTestId('preferences-panel')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Theme and background/i })).toBeInTheDocument();
     expect(screen.getByText('Open Appearance for themes, room atmosphere, shared theme import, and background selection.')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Client access audit' })).toBeInTheDocument();
-    expect(screen.getByText('Feature switches')).toBeInTheDocument();
+    selectPreferenceCategory('Conversation');
+    expect(screen.getByRole('heading', { name: 'Conversation' })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: /Show 24-hour activity strip/i })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('switch', { name: /Show join voice\/video controls/i })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('switch', { name: /Show topic, forum, and follow controls/i })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('switch', { name: /Show shared watch activity/i })).toHaveAttribute('aria-checked', 'true');
+    selectPreferenceCategory('History & data');
     expect(screen.getByRole('heading', { name: 'Portable vault' })).toBeInTheDocument();
     expect(screen.getByText(/Saved query text is included/i)).toBeInTheDocument();
     expect(screen.getByText(/Read cursors contain only room\/topic, message ID, and timestamp metadata/i)).toBeInTheDocument();
@@ -154,6 +235,7 @@ describe('PreferencesPanel', () => {
     expect(reviewedAnchors).not.toBeNull();
     expect(within(reviewedAnchors!).getByText('0 reviewed anchors')).toBeInTheDocument();
     expect(within(reviewedAnchors!).getByRole('button', { name: 'Clear reviewed anchors' })).toBeInTheDocument();
+    selectPreferenceCategory('App & tools');
     expect(screen.getByRole('heading', { name: 'Installed app readiness' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Install guide' })).toHaveAttribute('href', '/install/');
     expect(screen.getByRole('button', { name: 'Refresh app shell' })).toBeInTheDocument();
@@ -173,6 +255,8 @@ describe('PreferencesPanel', () => {
     expect(screen.getByText('Live caption overlays can copy the current transcript from local client state.')).toBeInTheDocument();
     expect(screen.getByText(/No browser local translator detected|Browser local translator available/)).toBeInTheDocument();
     expect(screen.getByText(/will not send message text to an external translation endpoint|on-device translator/)).toBeInTheDocument();
+    selectPreferenceCategory('Accessibility');
+    expect(screen.getByRole('heading', { name: 'Client access audit' })).toBeInTheDocument();
     expect(screen.getByText('Connect')).toBeInTheDocument();
     expect(screen.getByText('Channel settings')).toBeInTheDocument();
     expect(screen.getByText('Voice controls')).toBeInTheDocument();
@@ -240,8 +324,7 @@ describe('PreferencesPanel', () => {
       activatedAnchors.push(this);
       expect(this.isConnected).toBe(true);
     });
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     const exportButton = screen.getByRole('button', { name: 'Export vault' });
     fireEvent.click(exportButton);
@@ -272,8 +355,7 @@ describe('PreferencesPanel', () => {
       activatedAnchors.push(this);
       throw new Error('downloads blocked');
     });
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     fireEvent.click(screen.getByRole('button', { name: 'Export vault' }));
 
@@ -292,8 +374,7 @@ describe('PreferencesPanel', () => {
     vi.spyOn(portableTransfer, 'exportPortableTransfer').mockReturnValue(pendingExport);
     const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:stale-portable');
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
-    openPreferences();
-    const view = render(() => <PreferencesPanel />);
+    const view = renderPreferences('History & data');
 
     fireEvent.click(screen.getByRole('button', { name: 'Export vault' }));
     expect(screen.getByText('Preparing portable vault export…')).toHaveAttribute('role', 'status');
@@ -319,8 +400,7 @@ describe('PreferencesPanel', () => {
       activatedAnchors.push(this);
       expect(this.isConnected).toBe(true);
     });
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     fireEvent.click(screen.getByRole('button', { name: 'Export compressed vault' }));
 
@@ -337,8 +417,7 @@ describe('PreferencesPanel', () => {
 
   it('keeps ordinary JSON available when Compression Streams are unsupported', () => {
     vi.spyOn(portableCompression, 'supportsPortableGzip').mockReturnValue(false);
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     expect(screen.getByRole('button', { name: 'Export vault' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Export compressed vault' })).not.toBeInTheDocument();
@@ -356,8 +435,7 @@ describe('PreferencesPanel', () => {
         return { state: 'saved', detail: 'Portable vault saved.' };
       });
     const createObjectURL = vi.spyOn(URL, 'createObjectURL');
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     const saveButton = screen.getByRole('button', { name: 'Save vault to file' });
     expect(screen.getByRole('button', { name: 'Export vault' })).toBeInTheDocument();
@@ -377,8 +455,7 @@ describe('PreferencesPanel', () => {
 
   it('keeps the object-URL download controls unchanged when direct file saving is unsupported', () => {
     vi.spyOn(portableFileSave, 'supportsPortableFileSave').mockReturnValue(false);
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     expect(screen.getByRole('button', { name: 'Export vault' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Save vault to file' })).not.toBeInTheDocument();
@@ -398,8 +475,7 @@ describe('PreferencesPanel', () => {
         return { state: 'saved', detail: 'Portable vault saved.' };
       });
     const createObjectURL = vi.spyOn(URL, 'createObjectURL');
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     fireEvent.click(screen.getByRole('button', { name: 'Save compressed vault to file' }));
 
@@ -419,8 +495,7 @@ describe('PreferencesPanel', () => {
       state: 'cancelled',
       detail: 'Portable vault save cancelled. No file was changed.',
     });
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     fireEvent.click(screen.getByRole('button', { name: 'Save vault to file' }));
 
@@ -441,8 +516,7 @@ describe('PreferencesPanel', () => {
         await saveRequest.createBlob();
         return { state: 'saved', detail: 'Portable vault saved.' };
       });
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     fireEvent.click(screen.getByRole('button', { name: 'Save vault to file' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('download export remains available');
@@ -456,8 +530,7 @@ describe('PreferencesPanel', () => {
   it('decompresses a bounded portable gzip before staging the ordinary import review', async () => {
     const decompressPortableJson = vi.spyOn(portableCompression, 'decompressPortableJson')
       .mockResolvedValue(JSON.stringify(emptyPortableSnapshot()));
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
     const file = new File(['gzip bytes'], 'onyx-portable.json.gz', { type: 'application/gzip' });
 
     fireEvent.change(screen.getByLabelText('Import portable JSON'), { target: { files: [file] } });
@@ -477,8 +550,7 @@ describe('PreferencesPanel', () => {
       size: portableCompression.PORTABLE_GZIP_MAX_COMPRESSED_BYTES + 1,
       stream,
     } as unknown as File;
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     fireEvent.change(screen.getByLabelText('Import portable JSON'), { target: { files: [file] } });
 
@@ -495,8 +567,7 @@ describe('PreferencesPanel', () => {
       resolveDecompression = resolve;
     });
     vi.spyOn(portableCompression, 'decompressPortableJson').mockReturnValue(pendingDecompression);
-    openPreferences();
-    const view = render(() => <PreferencesPanel />);
+    const view = renderPreferences('History & data');
     const file = new File(['gzip bytes'], 'onyx-portable.json.gz', { type: 'application/gzip' });
 
     fireEvent.change(screen.getByLabelText('Import portable JSON'), { target: { files: [file] } });
@@ -520,8 +591,7 @@ describe('PreferencesPanel', () => {
     const sharePortableVaultJson = vi.spyOn(portableShare, 'sharePortableVaultJson')
       .mockResolvedValue({ state: 'shared', detail: 'Portable vault file shared.' });
     const createObjectURL = vi.spyOn(URL, 'createObjectURL');
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     const share = screen.getByRole('button', { name: 'Share vault file' });
     fireEvent.click(share);
@@ -544,8 +614,7 @@ describe('PreferencesPanel', () => {
 
   it('keeps JSON export first and visible when file sharing is unavailable', () => {
     vi.spyOn(portableShare, 'supportsPortableFileShare').mockReturnValue(false);
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     expect(screen.getByRole('button', { name: 'Export vault' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Share vault file' })).not.toBeInTheDocument();
@@ -558,8 +627,7 @@ describe('PreferencesPanel', () => {
     const sharePortableVaultJson = vi.spyOn(portableShare, 'sharePortableVaultJson')
       .mockResolvedValueOnce({ state: 'cancelled', detail: 'Portable vault sharing cancelled.' })
       .mockResolvedValueOnce({ state: 'rejected', detail: 'The browser rejected portable vault sharing. Export ordinary JSON instead.' });
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     fireEvent.click(screen.getByRole('button', { name: 'Share vault file' }));
     expect(await screen.findByText('Portable vault sharing cancelled.')).toHaveAttribute('role', 'status');
@@ -578,8 +646,7 @@ describe('PreferencesPanel', () => {
     vi.spyOn(portableTransfer, 'exportPortableTransfer').mockResolvedValue(emptyPortableSnapshot());
     const sharePortableVaultJson = vi.spyOn(portableShare, 'sharePortableVaultJson')
       .mockReturnValue(pendingShare);
-    openPreferences();
-    const view = render(() => <PreferencesPanel />);
+    const view = renderPreferences('History & data');
 
     fireEvent.click(screen.getByRole('button', { name: 'Share vault file' }));
     await waitFor(() => expect(sharePortableVaultJson).toHaveBeenCalledOnce());
@@ -603,8 +670,7 @@ describe('PreferencesPanel', () => {
         })),
       },
     });
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('App & tools');
 
     fireEvent.click(screen.getByRole('button', { name: 'Refresh app shell' }));
 
@@ -624,8 +690,7 @@ describe('PreferencesPanel', () => {
       storage: { persisted, persist },
       serviceWorker: { controller: null },
     });
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('App & tools');
 
     const request = await screen.findByRole('button', { name: 'Keep vault on this device' });
     expect(persisted).toHaveBeenCalledOnce();
@@ -652,8 +717,7 @@ describe('PreferencesPanel', () => {
       },
       serviceWorker: { controller: null },
     });
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('App & tools');
 
     fireEvent.click(await screen.findByRole('button', { name: 'Keep vault on this device' }));
 
@@ -673,8 +737,7 @@ describe('PreferencesPanel', () => {
       },
       serviceWorker: { controller: null },
     });
-    openPreferences();
-    const view = render(() => <PreferencesPanel />);
+    const view = renderPreferences('App & tools');
 
     fireEvent.click(await screen.findByRole('button', { name: 'Keep vault on this device' }));
     view.unmount();
@@ -702,8 +765,7 @@ describe('PreferencesPanel', () => {
       },
       serviceWorker: { controller: null },
     });
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('App & tools');
 
     expect(await screen.findByText(/12 MiB used of an estimated 2 GiB quota/i)).toHaveTextContent(
       'origin-wide storage, not vault-only',
@@ -730,8 +792,7 @@ describe('PreferencesPanel', () => {
       },
       serviceWorker: { controller: null },
     });
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('App & tools');
 
     expect(await screen.findByText(/does not expose an origin storage estimate/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /storage estimate/i })).not.toBeInTheDocument();
@@ -751,8 +812,7 @@ describe('PreferencesPanel', () => {
       },
       serviceWorker: { controller: null },
     });
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('App & tools');
 
     expect(await screen.findByRole('alert')).toHaveTextContent('browser storage estimate failed');
     fireEvent.click(screen.getByRole('button', { name: 'Retry storage estimate' }));
@@ -774,8 +834,7 @@ describe('PreferencesPanel', () => {
       },
       serviceWorker: { controller: null },
     });
-    openPreferences();
-    const view = render(() => <PreferencesPanel />);
+    const view = renderPreferences('App & tools');
 
     expect(screen.getByText('Checking origin-wide storage usage…')).toBeInTheDocument();
     view.unmount();
@@ -787,8 +846,7 @@ describe('PreferencesPanel', () => {
   });
 
   it('exposes segmented settings as a valid roving-tabindex radio group', () => {
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences();
 
     const group = screen.getByRole('radiogroup', { name: 'Message density' });
     const radios = screen.getAllByRole('radio').filter((radio) => group.contains(radio));
@@ -810,8 +868,7 @@ describe('PreferencesPanel', () => {
   });
 
   it('moves radio-group selection with arrow keys', () => {
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences();
 
     const group = screen.getByRole('radiogroup', { name: 'Message density' });
     expect(screen.getByRole('radio', { name: 'Cozy' })).toHaveAttribute('aria-checked', 'true');
@@ -829,8 +886,7 @@ describe('PreferencesPanel', () => {
   });
 
   it('exposes toggles as switches without a conflicting aria-pressed state', () => {
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('Accessibility');
 
     const reduceMotion = screen.getByRole('switch', { name: /Reduce motion/i });
     expect(reduceMotion).toHaveAttribute('aria-checked', 'false');
@@ -839,8 +895,7 @@ describe('PreferencesPanel', () => {
   });
 
   it('names toggle switches by their title and moves help text to a description', () => {
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('Accessibility');
 
     // A role="switch" accessible NAME must be its concise title — the long help
     // text belongs in the accessible description (aria-describedby), matching the
@@ -857,8 +912,7 @@ describe('PreferencesPanel', () => {
   });
 
   it('opens Appearance from Preferences for mobile theming discoverability', () => {
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences();
 
     fireEvent.click(screen.getByRole('button', { name: /Theme and background/i }));
 
@@ -866,8 +920,7 @@ describe('PreferencesPanel', () => {
   });
 
   it('reviews portable vault imports before merging them', async () => {
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     const snapshot = {
       kind: 'onyx-vault',
@@ -1002,8 +1055,7 @@ describe('PreferencesPanel', () => {
   });
 
   it('rejects an oversized portable JSON file before reading it', async () => {
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
     const text = vi.fn(async () => '{"kind":"onyx-vault"}');
     const file = {
       name: 'huge-portable.json',
@@ -1026,8 +1078,7 @@ describe('PreferencesPanel', () => {
     ) => callback(null));
     vi.stubGlobal('navigator', { locks: { request } });
     const importPortableTransfer = vi.spyOn(portableTransfer, 'importPortableTransfer');
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
     await stageEmptyPortableImport();
 
     fireEvent.click(screen.getByRole('button', { name: 'Import reviewed file' }));
@@ -1057,8 +1108,7 @@ describe('PreferencesPanel', () => {
     vi.stubGlobal('navigator', { locks: { request } });
     const importPortableTransfer = vi.spyOn(portableTransfer, 'importPortableTransfer')
       .mockReturnValue(pendingImport);
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
     await stageEmptyPortableImport();
 
     const confirm = screen.getByRole('button', { name: 'Import reviewed file' });
@@ -1079,8 +1129,7 @@ describe('PreferencesPanel', () => {
     const request = vi.fn().mockRejectedValue(new Error('locks disabled'));
     vi.stubGlobal('navigator', { locks: { request } });
     const importPortableTransfer = vi.spyOn(portableTransfer, 'importPortableTransfer');
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
     await stageEmptyPortableImport();
 
     fireEvent.click(screen.getByRole('button', { name: 'Import reviewed file' }));
@@ -1103,8 +1152,7 @@ describe('PreferencesPanel', () => {
     vi.stubGlobal('navigator', { locks: { request } });
     const importPortableTransfer = vi.spyOn(portableTransfer, 'importPortableTransfer')
       .mockReturnValue(pendingImport);
-    openPreferences();
-    const view = render(() => <PreferencesPanel />);
+    const view = renderPreferences('History & data');
     await stageEmptyPortableImport();
 
     fireEvent.click(screen.getByRole('button', { name: 'Import reviewed file' }));
@@ -1125,8 +1173,7 @@ describe('PreferencesPanel', () => {
       url: 'https://example.test/build?token=secret',
       keywords: [],
     });
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('App & tools');
 
     expect(screen.getByRole('list', { name: 'Recent extension actions' })).toBeInTheDocument();
     expect(screen.getByText('Open build dashboard')).toBeInTheDocument();
@@ -1140,8 +1187,7 @@ describe('PreferencesPanel', () => {
   });
 
   it('stages a payload-safe extension action preview before explicit verified import', () => {
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('App & tools');
 
     fireEvent.input(screen.getByLabelText('Action manifest JSON'), {
       target: {
@@ -1189,8 +1235,7 @@ describe('PreferencesPanel', () => {
   });
 
   it('cancels and replaces staged extension actions without persistence', () => {
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('App & tools');
     const input = screen.getByLabelText('Action manifest JSON');
     const manifest = JSON.stringify({
       version: 1,
@@ -1212,8 +1257,7 @@ describe('PreferencesPanel', () => {
   });
 
   it('rejects invalid and unsupported manifest versions without staging or persistence', () => {
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('App & tools');
     const input = screen.getByLabelText('Action manifest JSON');
 
     fireEvent.input(input, {
@@ -1232,8 +1276,7 @@ describe('PreferencesPanel', () => {
   });
 
   it('keeps the reviewed stage and reports failure when extension action storage is unavailable', () => {
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('App & tools');
     fireEvent.input(screen.getByLabelText('Action manifest JSON'), {
       target: {
         value: JSON.stringify({
@@ -1255,8 +1298,7 @@ describe('PreferencesPanel', () => {
   });
 
   it('selects a default vault search mode, persisting it and applying it live', () => {
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     const group = screen.getByRole('radiogroup', { name: 'Default search mode' });
     const radios = screen.getAllByRole('radio').filter((radio) => group.contains(radio));
@@ -1275,8 +1317,7 @@ describe('PreferencesPanel', () => {
   });
 
   it('surfaces bounded on-device retention controls with private framing', () => {
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     const card = screen.getByRole('heading', { name: 'On-device history' }).closest('section');
     expect(card).not.toBeNull();
@@ -1292,8 +1333,7 @@ describe('PreferencesPanel', () => {
   });
 
   it('persists retention choices and applies them to the live vault policy', async () => {
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     fireEvent.click(screen.getByRole('radio', { name: '1,000' }));
     fireEvent.click(screen.getByRole('radio', { name: '90 days' }));
@@ -1316,8 +1356,7 @@ describe('PreferencesPanel', () => {
       RETENTION_POLICY_STORAGE_KEY,
       JSON.stringify({ keep: 5000, maxAgeDays: 365 }),
     );
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     expect(getRetentionPolicy()).toEqual({ keep: 5000, maxAgeDays: 365 });
     expect(screen.getByRole('radio', { name: '5,000' })).toHaveAttribute('aria-checked', 'true');
@@ -1325,8 +1364,7 @@ describe('PreferencesPanel', () => {
   });
 
   it('guards clearing local history behind an explicit confirm step', async () => {
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     // First press only reveals the confirm affordance — it does not erase yet.
     fireEvent.click(screen.getByRole('button', { name: 'Clear local history' }));
@@ -1382,8 +1420,7 @@ describe('PreferencesPanel', () => {
       mentionCount: 0,
       preview: 'reviewed anchor only',
     });
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     const card = screen.getByRole('heading', { name: 'Reviewed catch-up anchors' }).closest('section');
     expect(card).not.toBeNull();
@@ -1426,8 +1463,7 @@ describe('PreferencesPanel', () => {
       if (key === REVIEW_HISTORY_KEY) throw new DOMException('blocked');
       removeItem(key);
     });
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     const card = screen.getByRole('heading', { name: 'Reviewed catch-up anchors' }).closest('section');
     const controls = within(card!);
@@ -1469,8 +1505,7 @@ describe('PreferencesPanel', () => {
     });
     await saveSearch({ label: 'First private query', query: 'alpha secret', mode: 'exact' });
     await saveSearch({ label: 'Second private query', query: 'beta secret', mode: 'hybrid' });
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     const card = screen.getByRole('heading', { name: 'Saved searches' }).closest('section');
     expect(card).not.toBeNull();
@@ -1517,8 +1552,7 @@ describe('PreferencesPanel', () => {
   it('refreshes the saved-search count after same-tab verified changes', async () => {
     globalThis.indexedDB = new IDBFactory();
     _resetSavedSearchesForTests();
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     const card = screen.getByRole('heading', { name: 'Saved searches' }).closest('section');
     const controls = within(card!);
@@ -1541,8 +1575,7 @@ describe('PreferencesPanel', () => {
     globalThis.indexedDB = new IDBFactory();
     _resetSavedSearchesForTests();
     await saveSearch({ label: 'Retained private query', query: 'do not lose me', mode: 'exact' });
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     const card = screen.getByRole('heading', { name: 'Saved searches' }).closest('section');
     const controls = within(card!);
@@ -1600,8 +1633,7 @@ describe('PreferencesPanel', () => {
     });
     markTopicRead(target, 'private roadmap', { id: 'private-cursor-one', time: messageTime });
     markTopicRead(target, 'private release', { id: 'private-cursor-two', time: messageTime });
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     const card = screen.getByRole('heading', { name: 'Topic read positions' }).closest('section');
     expect(card).not.toBeNull();
@@ -1654,8 +1686,7 @@ describe('PreferencesPanel', () => {
       if (key === TOPIC_READ_LEDGER_KEY) throw new DOMException('blocked');
       removeItem(key);
     });
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     const card = screen.getByRole('heading', { name: 'Topic read positions' }).closest('section');
     const controls = within(card!);
@@ -1709,8 +1740,7 @@ describe('PreferencesPanel', () => {
     localStorage.setItem('onyx:credentials', 'credential payload remains');
     follow(target, 'private roadmap');
     follow('#followed-ops');
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     const card = screen.getByRole('heading', { name: 'Followed conversations' }).closest('section');
     expect(card).not.toBeNull();
@@ -1760,8 +1790,7 @@ describe('PreferencesPanel', () => {
 
   it('keeps followed confirmation and state when verified removal fails', () => {
     follow('#followed-retained', 'private topic');
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     const card = screen.getByRole('heading', { name: 'Followed conversations' }).closest('section');
     const controls = within(card!);
@@ -1827,8 +1856,7 @@ describe('PreferencesPanel', () => {
     store.getState().setComposerDraft('alice', 'direct-message plaintext remains');
     saveChannelTopicDrafts({ [target]: 'first topic plaintext' });
 
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     const card = screen.getByRole('heading', { name: 'Local drafts' }).closest('section');
     expect(card).not.toBeNull();
@@ -1895,8 +1923,7 @@ describe('PreferencesPanel', () => {
     store.getState().setComposerDraft('#retained-room-draft', 'retained room plaintext');
     store.getState().setComposerDraft('alice', 'retained dm plaintext');
     saveChannelTopicDrafts({ '#retained-topic-draft': 'retained topic plaintext' });
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     const card = screen.getByRole('heading', { name: 'Local drafts' }).closest('section');
     const controls = within(card!);
@@ -1959,8 +1986,7 @@ describe('PreferencesPanel', () => {
       mentionCount: 0,
       preview: 'reviewed anchor remains',
     });
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     const card = screen.getByRole('heading', { name: 'Queued sends' }).closest('section');
     expect(card).not.toBeNull();
@@ -2013,8 +2039,7 @@ describe('PreferencesPanel', () => {
     globalThis.indexedDB = new IDBFactory();
     _resetVaultForTests();
     await queueOutbox('#queued-clear-retained', 'retained queued plaintext secret');
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     const card = screen.getByRole('heading', { name: 'Queued sends' }).closest('section');
     const controls = within(card!);
@@ -2049,8 +2074,7 @@ describe('PreferencesPanel', () => {
       if (key === TOPIC_READ_LEDGER_KEY) throw new DOMException('blocked');
       removeItem(key);
     });
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('History & data');
 
     fireEvent.click(screen.getByRole('button', { name: 'Clear local history' }));
     fireEvent.click(screen.getByRole('button', { name: 'Erase history' }));
@@ -2061,8 +2085,7 @@ describe('PreferencesPanel', () => {
 
   it('resets background motion with the rest of preferences', () => {
     setSceneMotion('off');
-    openPreferences();
-    render(() => <PreferencesPanel />);
+    renderPreferences('Accessibility');
 
     fireEvent.click(screen.getByRole('button', { name: 'Reset to defaults' }));
 
