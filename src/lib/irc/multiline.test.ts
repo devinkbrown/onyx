@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_MULTILINE_LIMITS,
+  MULTILINE_LIMIT_MAX_BYTES,
+  MULTILINE_LIMIT_MAX_LINES,
   assembleMultilineText,
   buildMultilineLines,
   parseMultilineLimits,
@@ -23,6 +25,13 @@ describe('parseMultilineLimits', () => {
     expect(parseMultilineLimits('max-bytes=potato')).toEqual(DEFAULT_MULTILINE_LIMITS);
     expect(parseMultilineLimits('max-bytes=-5,max-lines=0')).toEqual(DEFAULT_MULTILINE_LIMITS);
     expect(parseMultilineLimits('max-lines=8')).toEqual({ maxBytes: 4096, maxLines: 8 });
+  });
+
+  it('caps hostile advertised limits at client work ceilings', () => {
+    expect(parseMultilineLimits('max-bytes=999999999,max-lines=999999999')).toEqual({
+      maxBytes: MULTILINE_LIMIT_MAX_BYTES,
+      maxLines: MULTILINE_LIMIT_MAX_LINES,
+    });
   });
 });
 
@@ -115,6 +124,31 @@ describe('planMultilineBatches', () => {
       // each fragment must round-trip through UTF-8 intact
       expect(new TextDecoder().decode(new TextEncoder().encode(frag))).toBe(frag);
     }
+  });
+
+  it('normalizes invalid direct-call limits instead of bypassing defaults', () => {
+    const text = Array.from({ length: DEFAULT_MULTILINE_LIMITS.maxLines + 1 }, () => 'x').join('\n');
+    const batches = planMultilineBatches(text, { maxBytes: Number.NaN, maxLines: Infinity });
+
+    expect(batches).toHaveLength(2);
+    expect(batches?.[0]).toHaveLength(DEFAULT_MULTILINE_LIMITS.maxLines);
+  });
+
+  it('caps direct-call byte and line limits before planning', () => {
+    const oversizedLine = 'x'.repeat(MULTILINE_LIMIT_MAX_BYTES + 10);
+    const manyLines = Array.from({ length: MULTILINE_LIMIT_MAX_LINES + 1 }, () => 'y').join('\n');
+    const byteBatches = planMultilineBatches(`${oversizedLine}\ntail`, {
+      maxBytes: Number.MAX_SAFE_INTEGER,
+      maxLines: Number.MAX_SAFE_INTEGER,
+    });
+    const lineBatches = planMultilineBatches(manyLines, {
+      maxBytes: Number.MAX_SAFE_INTEGER,
+      maxLines: Number.MAX_SAFE_INTEGER,
+    });
+
+    expect(byteBatches?.flat()[0]?.text).toHaveLength(MULTILINE_LIMIT_MAX_BYTES);
+    expect(lineBatches).toHaveLength(2);
+    expect(lineBatches?.[0]).toHaveLength(MULTILINE_LIMIT_MAX_LINES);
   });
 });
 

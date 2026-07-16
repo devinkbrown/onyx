@@ -35,6 +35,30 @@ export const DEFAULT_MULTILINE_LIMITS: MultilineLimits = {
   maxBytes: 4096,
   maxLines: 24,
 };
+/** Hard client work ceilings for untrusted CAP values and direct callers. */
+export const MULTILINE_LIMIT_MAX_BYTES = 64 * 1024;
+export const MULTILINE_LIMIT_MAX_LINES = 256;
+
+function boundedPositiveLimit(value: unknown, fallback: number, maximum: number): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? Math.min(Math.floor(value), maximum)
+    : fallback;
+}
+
+function boundedMultilineLimits(value: MultilineLimits): MultilineLimits {
+  return {
+    maxBytes: boundedPositiveLimit(
+      value.maxBytes,
+      DEFAULT_MULTILINE_LIMITS.maxBytes,
+      MULTILINE_LIMIT_MAX_BYTES,
+    ),
+    maxLines: boundedPositiveLimit(
+      value.maxLines,
+      DEFAULT_MULTILINE_LIMITS.maxLines,
+      MULTILINE_LIMIT_MAX_LINES,
+    ),
+  };
+}
 
 /**
  * Parse a `draft/multiline` cap value ("max-bytes=4096,max-lines=24") into
@@ -49,8 +73,8 @@ export function parseMultilineLimits(capValue: string | undefined): MultilineLim
     const key = token.slice(0, eq).trim().toLowerCase();
     const num = Number.parseInt(token.slice(eq + 1), 10);
     if (!Number.isFinite(num) || num <= 0) continue;
-    if (key === 'max-bytes') limits.maxBytes = num;
-    if (key === 'max-lines') limits.maxLines = num;
+    if (key === 'max-bytes') limits.maxBytes = Math.min(num, MULTILINE_LIMIT_MAX_BYTES);
+    if (key === 'max-lines') limits.maxLines = Math.min(num, MULTILINE_LIMIT_MAX_LINES);
   }
   return limits;
 }
@@ -104,6 +128,7 @@ export function planMultilineBatches(
   text: string,
   limits: MultilineLimits = DEFAULT_MULTILINE_LIMITS,
 ): MultilineBatch[] | null {
+  const boundedLimits = boundedMultilineLimits(limits);
   // Split on every line-ending form (CRLF, lone CR, LF) so no bare `\r` can
   // survive into a PRIVMSG payload, and strip NUL bytes — both are illegal in
   // an IRC line and would either corrupt the frame (`...\r\r\n`) or let content
@@ -119,10 +144,10 @@ export function planMultilineBatches(
   // wire-sized parts uniformly.
   const parts: MultilinePart[] = [];
   for (const line of rawLines) {
-    if (byteLength(line) <= limits.maxBytes) {
+    if (byteLength(line) <= boundedLimits.maxBytes) {
       parts.push({ text: line, concat: false });
     } else {
-      const fragments = splitLineByBytes(line, limits.maxBytes);
+      const fragments = splitLineByBytes(line, boundedLimits.maxBytes);
       fragments.forEach((fragment, i) => {
         parts.push({ text: fragment, concat: i > 0 });
       });
@@ -137,7 +162,7 @@ export function planMultilineBatches(
     const partBytes = byteLength(part.text);
     const wouldOverflow =
       current.length > 0 &&
-      (current.length + 1 > limits.maxLines || currentBytes + partBytes > limits.maxBytes);
+      (current.length + 1 > boundedLimits.maxLines || currentBytes + partBytes > boundedLimits.maxBytes);
     if (wouldOverflow) {
       batches.push(current);
       current = [];
