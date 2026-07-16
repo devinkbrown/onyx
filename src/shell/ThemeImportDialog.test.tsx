@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
+import { createSignal } from 'solid-js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { encodeTheme } from '@/lib/theme/themeShare';
@@ -12,6 +13,25 @@ const sharedTheme: CustomTheme = {
   base: 'ocean',
   overrides: { '--lapis': '#33ccff' },
 };
+
+function deferredVoid(): {
+  promise: Promise<void>;
+  resolve: () => void;
+  reject: (reason: unknown) => void;
+} {
+  let resolve!: () => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<void>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+async function flushMicrotasks(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+}
 
 describe('ThemeImportDialog accessibility', () => {
   afterEach(() => {
@@ -95,6 +115,33 @@ describe('ThemeImportDialog accessibility', () => {
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining('?theme='));
   });
 
+  it('ignores a clipboard success that resolves after close', async () => {
+    const pending = deferredVoid();
+    const writeText = vi.fn(() => pending.promise);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    const [open, setOpen] = createSignal(true);
+    render(() => (
+      <ThemeImportDialog
+        open={open()}
+        onClose={() => setOpen(false)}
+        onImport={vi.fn()}
+        shareTheme={sharedTheme}
+      />
+    ));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy share link for Shared Theme' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    pending.resolve();
+    await flushMicrotasks();
+    setOpen(true);
+
+    expect(screen.getByRole('button', { name: 'Copy share link for Shared Theme' })).toHaveTextContent('Copy link');
+    expect(screen.getByRole('status')).toHaveTextContent('');
+  });
+
   it('reports a rejected clipboard write and never claims it copied', async () => {
     const writeText = vi.fn().mockRejectedValue(new Error('denied'));
     Object.defineProperty(navigator, 'clipboard', {
@@ -117,6 +164,33 @@ describe('ThemeImportDialog accessibility', () => {
     expect(status).toHaveAttribute('role', 'status');
     expect(button).toHaveTextContent('Copy failed');
     expect(button).not.toHaveTextContent('Copied');
+  });
+
+  it('ignores a clipboard failure that resolves after close', async () => {
+    const pending = deferredVoid();
+    const writeText = vi.fn(() => pending.promise);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    const [open, setOpen] = createSignal(true);
+    render(() => (
+      <ThemeImportDialog
+        open={open()}
+        onClose={() => setOpen(false)}
+        onImport={vi.fn()}
+        shareTheme={sharedTheme}
+      />
+    ));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy share link for Shared Theme' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    pending.reject(new Error('denied'));
+    await flushMicrotasks();
+    setOpen(true);
+
+    expect(screen.getByRole('button', { name: 'Copy share link for Shared Theme' })).toHaveTextContent('Copy link');
+    expect(screen.getByRole('status')).toHaveTextContent('');
   });
 
   it('keeps the copy action available and reports failure when the Clipboard API is unavailable', async () => {

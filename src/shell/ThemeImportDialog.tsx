@@ -3,7 +3,7 @@
  * ThemeImportDialog.tsx — local Sheet for sharing and importing theme codes.
  */
 
-import { createMemo, createSignal, onCleanup, Show, type JSX } from 'solid-js';
+import { createEffect, createMemo, createSignal, onCleanup, Show, type JSX } from 'solid-js';
 import { Sheet } from '@/primitives';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { parseThemeParam, themeShareUrl } from '@/lib/theme/themeShare';
@@ -44,6 +44,8 @@ export function ThemeImportDialog(props: {
   const [importInput, setImportInput] = createSignal('');
   const [copyStatus, setCopyStatus] = createSignal<'idle' | 'copied' | 'failed'>('idle');
   let copyTimer: number | undefined;
+  let copyEpoch = 0;
+  let disposed = false;
 
   const importedTheme = createMemo(() => parseThemeParam(extractCode(importInput())));
   const hasImportInput = createMemo(() => importInput().trim().length > 0);
@@ -64,10 +66,11 @@ export function ThemeImportDialog(props: {
     copyTimer = undefined;
   };
 
-  const queueCopyReset = (): void => {
+  const queueCopyReset = (epoch: number): void => {
     clearCopyTimer();
     if (typeof window === 'undefined') return;
     copyTimer = window.setTimeout(() => {
+      if (disposed || epoch !== copyEpoch) return;
       setCopyStatus('idle');
       copyTimer = undefined;
     }, COPY_FEEDBACK_MS);
@@ -81,19 +84,32 @@ export function ThemeImportDialog(props: {
   const copyShareLink = async (): Promise<void> => {
     if (!canCopyShareUrl()) return;
 
+    const epoch = ++copyEpoch;
     clearCopyTimer();
     setCopyStatus('idle');
     const copied = await writeClipboardText(shareUrl());
+    if (disposed || epoch !== copyEpoch || !props.open) return;
     if (copied) {
       setCopyStatus('copied');
-      queueCopyReset();
+      queueCopyReset(epoch);
       return;
     }
 
     setCopyStatus('failed');
   };
 
-  onCleanup(() => clearCopyTimer());
+  createEffect(() => {
+    if (props.open) return;
+    copyEpoch += 1;
+    clearCopyTimer();
+    setCopyStatus('idle');
+  });
+
+  onCleanup(() => {
+    disposed = true;
+    copyEpoch += 1;
+    clearCopyTimer();
+  });
 
   return (
     <Sheet
