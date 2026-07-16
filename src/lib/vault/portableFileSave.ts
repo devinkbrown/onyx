@@ -6,6 +6,8 @@ export type PortableFileSaveRequest = {
   format: PortableFileSaveFormat;
   suggestedName: string;
   createBlob: () => Promise<Blob>;
+  /** Live owner/component guard checked across picker and writable awaits. */
+  isCurrent?: () => boolean;
 };
 
 export type PortableFileSaveResult = {
@@ -76,6 +78,28 @@ function isPickerCancellation(error: unknown): boolean {
     && error.name === 'AbortError';
 }
 
+class PortableFileSaveStaleError extends Error {
+  constructor() {
+    super('Portable vault file save owner changed');
+    this.name = 'PortableFileSaveStaleError';
+  }
+}
+
+function requestIsCurrent(request: PortableFileSaveRequest): boolean {
+  try {
+    return request.isCurrent?.() !== false;
+  } catch {
+    return false;
+  }
+}
+
+function staleSaveResult(): PortableFileSaveResult {
+  return {
+    state: 'failed',
+    detail: 'The active account changed before the portable vault was written. Choose a file again.',
+  };
+}
+
 async function discardWritable(writable: PortableWritable, reason: unknown): Promise<void> {
   if (typeof writable.abort === 'function') {
     try {
@@ -123,13 +147,18 @@ export async function savePortableVaultFile(
       detail: 'The browser could not open a destination for the portable vault.',
     };
   }
+  if (!requestIsCurrent(request)) return staleSaveResult();
 
   let writable: PortableWritable | null = null;
   try {
     const blob = await request.createBlob();
+    if (!requestIsCurrent(request)) throw new PortableFileSaveStaleError();
     writable = await handle.createWritable({ keepExistingData: false });
+    if (!requestIsCurrent(request)) throw new PortableFileSaveStaleError();
     await writable.truncate(0);
+    if (!requestIsCurrent(request)) throw new PortableFileSaveStaleError();
     await writable.write(blob);
+    if (!requestIsCurrent(request)) throw new PortableFileSaveStaleError();
     await writable.close();
     writable = null;
     return {
@@ -138,6 +167,7 @@ export async function savePortableVaultFile(
     };
   } catch (error) {
     if (writable) await discardWritable(writable, error);
+    if (error instanceof PortableFileSaveStaleError) return staleSaveResult();
     return {
       state: 'failed',
       detail: 'The portable vault could not be written. The download export remains available.',

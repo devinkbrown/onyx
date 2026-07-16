@@ -815,6 +815,13 @@ function PortableVaultControls(): JSX.Element {
       const result = await savePortableVaultFile({
         format,
         suggestedName,
+        isCurrent: () => {
+          const currentOwner = memoryOwner();
+          return !disposed
+            && epoch === fileSaveEpoch
+            && currentOwner?.serverUrl === owner.serverUrl
+            && currentOwner.identity === owner.identity;
+        },
         createBlob: async () => {
           if (disposed || epoch !== fileSaveEpoch) throw new Error('stale portable vault save');
           reportStatus(format === 'gzip'

@@ -1110,6 +1110,36 @@ describe('PreferencesPanel', () => {
     expect(screen.getByRole('button', { name: 'Save vault to file' })).not.toBeDisabled();
   });
 
+  it('retires the direct-file mutation guard when the device-memory owner changes', async () => {
+    vi.spyOn(portableFileSave, 'supportsPortableFileSave').mockReturnValue(true);
+    let resolveSave: (result: portableFileSave.PortableFileSaveResult) => void = () => {};
+    const pendingSave = new Promise<portableFileSave.PortableFileSaveResult>((resolve) => {
+      resolveSave = resolve;
+    });
+    let saveIsCurrent: (() => boolean) | undefined;
+    vi.spyOn(portableFileSave, 'savePortableVaultFile').mockImplementation((request) => {
+      saveIsCurrent = request.isCurrent;
+      return pendingSave;
+    });
+    renderPreferences('Import & export');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save vault to file' }));
+    await waitFor(() => expect(saveIsCurrent).toBeTypeOf('function'));
+    expect(saveIsCurrent?.()).toBe(true);
+
+    const current = store.getState().server;
+    store.setState({
+      ourNick: 'bob',
+      server: current ? { ...current, nick: 'bob', account: 'bob' } : null,
+    });
+
+    await waitFor(() => expect(saveIsCurrent?.()).toBe(false));
+    resolveSave({ state: 'failed', detail: 'stale save retired' });
+    await pendingSave;
+    await Promise.resolve();
+    expect(screen.queryByText('stale save retired')).not.toBeInTheDocument();
+  });
+
   it('keeps the object-URL download controls unchanged when direct file saving is unsupported', () => {
     vi.spyOn(portableFileSave, 'supportsPortableFileSave').mockReturnValue(false);
     renderPreferences('Import & export');

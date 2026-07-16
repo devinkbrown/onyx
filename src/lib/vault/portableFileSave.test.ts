@@ -123,6 +123,47 @@ describe('portable vault direct file saving', () => {
     expect(picker).toHaveBeenCalledTimes(2);
   });
 
+  it('aborts before truncating when the owner changes while opening the writer', async () => {
+    let resolveWritable: (writable: {
+      truncate: ReturnType<typeof vi.fn>;
+      write: ReturnType<typeof vi.fn>;
+      close: ReturnType<typeof vi.fn>;
+      abort: ReturnType<typeof vi.fn>;
+    }) => void = () => {};
+    const pendingWritable = new Promise<{
+      truncate: ReturnType<typeof vi.fn>;
+      write: ReturnType<typeof vi.fn>;
+      close: ReturnType<typeof vi.fn>;
+      abort: ReturnType<typeof vi.fn>;
+    }>((resolve) => {
+      resolveWritable = resolve;
+    });
+    const writable = {
+      truncate: vi.fn().mockResolvedValue(undefined),
+      write: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+      abort: vi.fn().mockResolvedValue(undefined),
+    };
+    const createWritable = vi.fn().mockReturnValue(pendingWritable);
+    vi.stubGlobal('showSaveFilePicker', vi.fn().mockResolvedValue({ createWritable }));
+    let current = true;
+    const saveRequest = { ...request(), isCurrent: () => current };
+
+    const saving = savePortableVaultFile(saveRequest);
+    await vi.waitFor(() => expect(createWritable).toHaveBeenCalledOnce());
+    current = false;
+    resolveWritable(writable);
+
+    await expect(saving).resolves.toMatchObject({
+      state: 'failed',
+      detail: expect.stringContaining('active account changed'),
+    });
+    expect(writable.abort).toHaveBeenCalledOnce();
+    expect(writable.truncate).not.toHaveBeenCalled();
+    expect(writable.write).not.toHaveBeenCalled();
+    expect(writable.close).not.toHaveBeenCalled();
+  });
+
   it('falls back to closing a failed writer when abort is unavailable', async () => {
     const writable = {
       truncate: vi.fn().mockResolvedValue(undefined),
