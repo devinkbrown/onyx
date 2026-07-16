@@ -43,6 +43,7 @@ import {
 } from '@/lib/intelligence/translateMessage';
 import { isValidTopicLabel } from '@/lib/topics/topics';
 import { openMessageSearchWithQuery } from '@/shell/search/useMessageSearch';
+import { hasEncryptedMessageBoundary } from '@/lib/e2ee/replyPrivacy';
 import { ProvenanceBadge } from '@/shell/ProvenanceBadge';
 import { CopyIcon, EditIcon, OverflowIcon, PinIcon, ReactIcon, ReplyIcon, SearchIcon, TopicIcon, TranslateIcon, TrashIcon } from './icons';
 
@@ -88,7 +89,7 @@ export function loadedMessageActionText(
   msg: Pick<ChatMessage, 'text' | 'plaintext' | 'encrypted' | 'deleted' | 'redacted'>,
 ): string | null {
   if (msg.deleted || msg.redacted) return null;
-  const text = msg.encrypted ? msg.plaintext : msg.text;
+  const text = hasEncryptedMessageBoundary(msg) ? msg.plaintext : msg.text;
   return typeof text === 'string' && text.trim().length > 0 ? text : null;
 }
 
@@ -109,7 +110,11 @@ export function messageMenuCapabilities(input: CapabilityInput): MessageMenuCapa
     canSearchText: hasText,
     canCopyMoment: !gone && input.channelTarget,
     canStartTopic: !gone && input.channelTarget && hasText,
-    canEdit: !gone && isOwn && editingEnabled && msg.type === 'msg',
+    canEdit: !gone
+      && isOwn
+      && editingEnabled
+      && msg.type === 'msg'
+      && !hasEncryptedMessageBoundary(msg),
     canDelete: !gone && isOwn && deleteSupported,
   };
 }

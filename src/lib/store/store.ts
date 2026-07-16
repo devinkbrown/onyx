@@ -27,6 +27,11 @@ import { getVaultDmSearchPrivacy } from '@/lib/vault/dmSearchPrivacy';
 import { boundedSearchField, boundedSearchQuery } from '@/lib/vault/searchBounds';
 import { parseScheduledMessages, selectDueMessages } from '@/lib/schedule/dispatch';
 import { deviceKeys, isEnvelope } from '@/lib/e2ee/dmCipher';
+import {
+  hasEncryptedMessageBoundary,
+  persistedReplyPreviewText,
+  sanitizePersistedReplyPreviewText,
+} from '@/lib/e2ee/replyPrivacy';
 import { openDmTrusted, peerSafetyNumber, pinnedPeerKey, pinPeerKey, safetyNumber, sealDmTrusted } from '@/lib/e2ee/keyPinning';
 import {
   ENCRYPTION_POLICY_PROP,
@@ -2943,6 +2948,16 @@ type ActionKey = {
 
 export type Actions = Pick<State, ActionKey>;
 
+function conversationMessage(
+  state: Pick<OnyxState, 'channels' | 'dms'>,
+  target: string,
+  messageId: string,
+): ChatMessage | undefined {
+  const key = target.toLowerCase();
+  const messages = state.channels.get(key)?.messages ?? state.dms.get(key)?.messages;
+  return messages?.find((message) => message.id === messageId);
+}
+
 /**
  * Attempt one ordinary chat delivery without offline queuing. The boolean is
  * socket admission, not a server acknowledgement: callers may discard durable
@@ -2965,7 +2980,11 @@ function deliverChatMessage(
     ? { ...topicTags, '+draft/reply': replyingTo.id }
     : topicTags;
   const hasOutboundTags = Object.keys(outboundTags).length > 0;
-  const replySnapshot = replyingTo ? { id: replyingTo.id, from: replyingTo.from, text: replyingTo.text } : null;
+  const replySnapshot = replyingTo ? {
+    id: replyingTo.id,
+    from: replyingTo.from,
+    text: persistedReplyPreviewText(replyingTo),
+  } : null;
 
   // A DM to a peer who published a device key (and with E2EE on) is sealed
   // before socket admission. A seal or admission failure must not create an
@@ -4644,7 +4663,14 @@ export const store = createStore<OnyxState>()(
     },
 
     setComposerEditingMessage(msg) {
-      set({ editingMessage: msg });
+      if (!msg) {
+        set({ editingMessage: null });
+        return;
+      }
+      const current = conversationMessage(get(), msg.target, msg.id) ?? msg;
+      set({
+        editingMessage: hasEncryptedMessageBoundary(current) ? null : current,
+      });
     },
 
     openChannelConversation(channel, requestedTopic) {
@@ -4834,6 +4860,15 @@ export const store = createStore<OnyxState>()(
       const { client, ourNick } = get();
       if (!client?.negotiatedCaps.has('draft/message-editing')) return;
       const key = target.toLowerCase();
+      const current = conversationMessage(get(), target, messageId);
+      if (
+        !current
+        || current.from.toLowerCase() !== ourNick.toLowerCase()
+        || current.type !== 'msg'
+        || current.deleted
+        || current.redacted
+        || hasEncryptedMessageBoundary(current)
+      ) return;
 
       // Send EDIT command to the server (draft/message-editing cap)
       client.sendRaw('EDIT', target, messageId, newText);
@@ -6941,7 +6976,9 @@ export const store = createStore<OnyxState>()(
             const editKey = editTarget.toLowerCase();
             const applyRemoteEdit = (messages: ChatMessage[]): ChatMessage[] =>
               messages.map(m =>
-                m.id === editMsgId && m.from.toLowerCase() === sender.toLowerCase()
+                m.id === editMsgId
+                  && m.from.toLowerCase() === sender.toLowerCase()
+                  && !hasEncryptedMessageBoundary(m)
                   ? { ...m, text: editNewText, edited: true }
                   : m,
               );
@@ -7128,7 +7165,11 @@ export const store = createStore<OnyxState>()(
               ? text.slice(8, -1)
               : text;
             const applyTagEdit = (messages: ChatMessage[]): ChatMessage[] =>
-              messages.map(m => m.id === editRef ? { ...m, text: editedText, edited: true } : m);
+              messages.map(m => (
+                m.id === editRef && !hasEncryptedMessageBoundary(m)
+                  ? { ...m, text: editedText, edited: true }
+                  : m
+              ));
             set(s => {
               const channels = new Map(s.channels);
               const ch = channels.get(editTargetKey);
@@ -7164,7 +7205,7 @@ export const store = createStore<OnyxState>()(
             replyTo = {
               id: draftReplyTag,
               from: parentMsg?.from ?? '',
-              text: parentMsg?.text ?? '',
+              text: parentMsg ? persistedReplyPreviewText(parentMsg) : '',
             };
           } else {
             // Legacy CTCP REPLY fallback
@@ -7173,7 +7214,7 @@ export const store = createStore<OnyxState>()(
               replyTo = {
                 id: ctcpReplyMatch[1]!,
                 from: ctcpReplyMatch[2]!,
-                text: ctcpReplyMatch[3]!,
+                text: sanitizePersistedReplyPreviewText(ctcpReplyMatch[3]!),
               };
               resolvedText = ctcpReplyMatch[4]!;
             }
@@ -8034,7 +8075,11 @@ export const store = createStore<OnyxState>()(
             : editTarget;
           const editKey = editConvo.toLowerCase();
           const applyEdit = (msgs: ChatMessage[]): ChatMessage[] =>
-            msgs.map(m => m.id === editOldId ? { ...m, text: editText, edited: true } : m);
+            msgs.map(m => (
+              m.id === editOldId && !hasEncryptedMessageBoundary(m)
+                ? { ...m, text: editText, edited: true }
+                : m
+            ));
 
           set(s => {
             const channels = new Map(s.channels);

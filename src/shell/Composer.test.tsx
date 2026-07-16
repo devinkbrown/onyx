@@ -17,6 +17,7 @@ import { cleanup, fireEvent, render } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { store } from '@/lib/store/store';
+import { LOCKED_PLACEHOLDER } from '@/lib/e2ee/dmCipher';
 import { Composer } from './Composer';
 
 const initialState = store.getInitialState();
@@ -55,6 +56,69 @@ describe('Composer accessibility', () => {
     expect(getByRole('button', { name: 'Attach files' })).toBeDefined();
     expect(getByRole('button', { name: 'Insert emoji' })).toBeDefined();
     expect(getByRole('button', { name: 'Send message' })).toBeDefined();
+  });
+
+  it('previews an unlocked encrypted reply from transient plaintext only', () => {
+    seedActiveChannel();
+    store.setState({
+      replyingTo: {
+        id: 'encrypted-parent',
+        from: 'alice',
+        text: 'TSUMUGI1 ciphertext-envelope',
+        plaintext: 'private hello',
+        encrypted: true,
+        time: new Date(),
+        type: 'msg',
+        target: '#room',
+      },
+    });
+
+    const { getByRole, queryByText } = render(() => <Composer />);
+
+    expect(getByRole('status')).toHaveTextContent('replying to aliceprivate hello');
+    expect(queryByText(/TSUMUGI1 ciphertext-envelope/)).toBeNull();
+  });
+
+  it('uses the fixed locked placeholder and never an encrypted reply envelope', () => {
+    seedActiveChannel();
+    store.setState({
+      replyingTo: {
+        id: 'locked-parent',
+        from: 'alice',
+        text: 'TSUMUGI1 locked-envelope',
+        encrypted: true,
+        time: new Date(),
+        type: 'msg',
+        target: '#room',
+      },
+    });
+
+    const { getByRole, queryByText } = render(() => <Composer />);
+
+    expect(getByRole('status')).toHaveTextContent(LOCKED_PLACEHOLDER);
+    expect(queryByText(/TSUMUGI1 locked-envelope/)).toBeNull();
+  });
+
+  it('clears a legacy encrypted edit context instead of exposing or submitting it', () => {
+    seedActiveChannel();
+    store.setState({
+      editingMessage: {
+        id: 'encrypted-edit',
+        from: 'me',
+        text: 'TSUMUGI1 edit-envelope',
+        plaintext: 'private edit',
+        encrypted: true,
+        time: new Date(),
+        type: 'msg',
+        target: '#room',
+      },
+    });
+
+    const { getByRole, queryByText } = render(() => <Composer />);
+
+    expect(store.getState().editingMessage).toBeNull();
+    expect(getByRole('button', { name: 'Send message' })).toBeDefined();
+    expect(queryByText(/private edit|TSUMUGI1 edit-envelope/)).toBeNull();
   });
 
   it('exposes the slash-command popup as a labelled listbox of options', () => {

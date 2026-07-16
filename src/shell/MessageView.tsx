@@ -47,6 +47,7 @@ import {
 import { useStore, getState, STATUS_TARGET } from '@/lib/store';
 import { loadRecent } from '@/lib/vault/historyVault';
 import { LOCKED_PLACEHOLDER } from '@/lib/e2ee/dmCipher';
+import { sanitizePersistedReplyPreviewText } from '@/lib/e2ee/replyPrivacy';
 import { ScheduledEventLine } from './ScheduledEventLine';
 import type { ChatMessage } from '@/lib/irc/types';
 import { Avatar } from '@/primitives/index';
@@ -69,6 +70,11 @@ export type MessageViewProps = {
 
 const SYSTEM_TYPES = new Set(['join', 'part', 'quit', 'kick', 'mode', 'topic', 'nick', 'system', 'error']);
 const READER_MEMORY_PARTICIPANTS = 4;
+
+function clippedReplyPreview(text: string, max = 80): string {
+  const safe = sanitizePersistedReplyPreviewText(text);
+  return safe.length > max ? `${safe.slice(0, max)}…` : safe;
+}
 
 // Bounded-render window. The feed only builds DOM for the trailing
 // BASE_WINDOW_ROWS most-recent rows (plus any anchor an unread divider /
@@ -1629,7 +1635,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                         {(rt) => (
                           <div class="shell-msg-reply" aria-label={`Replying to ${rt().from}`}>
                             <span class="shell-msg-reply-from">{rt().from}</span>
-                            <span>{rt().text.slice(0, 80)}{rt().text.length > 80 ? '…' : ''}</span>
+                            <span>{clippedReplyPreview(rt().text)}</span>
                           </div>
                         )}
                       </Show>
@@ -1709,7 +1715,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                       {(rt) => (
                         <div class="shell-msg-reply" aria-label={`Replying to ${rt().from}`}>
                           <span class="shell-msg-reply-from">{rt().from}</span>
-                          <span>{rt().text.slice(0, 80)}{rt().text.length > 80 ? '…' : ''}</span>
+                          <span>{clippedReplyPreview(rt().text)}</span>
                         </div>
                       )}
                     </Show>

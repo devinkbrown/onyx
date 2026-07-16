@@ -15,6 +15,7 @@
  */
 import type { ChatMessage } from '@/lib/irc/types';
 import { isEnvelope } from '@/lib/e2ee/dmCipher';
+import { sanitizePersistedReplyPreviewText } from '@/lib/e2ee/replyPrivacy';
 import { clearAllTopicReads } from '@/lib/topics/topicReadLedger';
 import { effectiveKeep, resolvePolicyForChannel, type RetentionPolicy } from './retentionPolicy';
 import { boundedSearchField, boundedSearchQuery } from './searchBounds';
@@ -252,6 +253,12 @@ export function serializeMessage(target: string, msg: ChatMessage): StoredMessag
   // body. Mutating the fresh copy — not `msg` — keeps the input immutable.
   const row: Record<string, unknown> = { ...msg };
   for (const key of OMIT_AT_REST) delete row[key];
+  if (msg.replyTo) {
+    row.replyTo = {
+      ...msg.replyTo,
+      text: sanitizePersistedReplyPreviewText(msg.replyTo.text),
+    };
+  }
   row.time = msg.time instanceof Date ? msg.time.getTime() : Number(msg.time) || 0;
   row.target_key = target.toLowerCase();
   return row as StoredMessage;
@@ -259,7 +266,14 @@ export function serializeMessage(target: string, msg: ChatMessage): StoredMessag
 
 export function deserializeMessage(row: StoredMessage): ChatMessage {
   const { target_key: _key, time, ...rest } = row;
-  return { ...rest, time: new Date(time) } as ChatMessage;
+  const message = { ...rest, time: new Date(time) } as ChatMessage;
+  if (message.replyTo) {
+    message.replyTo = {
+      ...message.replyTo,
+      text: sanitizePersistedReplyPreviewText(message.replyTo.text),
+    };
+  }
+  return message;
 }
 
 /**
@@ -641,7 +655,11 @@ function reviveExportMessage(raw: unknown, fallbackTarget: string): ChatMessage 
     && typeof raw.replyTo.text === 'string'
     && raw.replyTo.text.length <= MAX_VAULT_REPLY_TEXT_LENGTH
   ) {
-    message.replyTo = { id: raw.replyTo.id, from: raw.replyTo.from, text: raw.replyTo.text };
+    message.replyTo = {
+      id: raw.replyTo.id,
+      from: raw.replyTo.from,
+      text: sanitizePersistedReplyPreviewText(raw.replyTo.text),
+    };
   }
   return message;
 }

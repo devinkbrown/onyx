@@ -37,6 +37,10 @@ import {
   parseDateTimeLocal,
   toDateTimeLocalValue,
 } from '@/lib/schedule/scheduleTime';
+import {
+  activeReplyPreviewText,
+  hasEncryptedMessageBoundary,
+} from '@/lib/e2ee/replyPrivacy';
 
 export type ComposerProps = {
   /** Optionally override the active target; defaults to deriving from activeView */
@@ -127,8 +131,15 @@ export function Composer(props: ComposerProps): JSX.Element {
   const activeEditing = createMemo(() => {
     const edit = editingMessage();
     const t = target();
-    if (!edit || !t) return null;
+    if (!edit || !t || hasEncryptedMessageBoundary(edit)) return null;
     return edit.target.toLowerCase() === t.toLowerCase() ? edit : null;
+  });
+
+  createEffect(() => {
+    const edit = editingMessage();
+    if (edit && hasEncryptedMessageBoundary(edit)) {
+      getState().setComposerEditingMessage(null);
+    }
   });
 
   // The composer stays USABLE while the connection is down — text written
@@ -644,7 +655,9 @@ export function Composer(props: ComposerProps): JSX.Element {
         {(reply) => (
           <div class="shell-composer-context" role="status" aria-live="polite">
             <span class="shell-composer-context-label">replying to {reply().from}</span>
-            <span class="shell-composer-context-text">{clippedText(reply().text)}</span>
+            <span class="shell-composer-context-text">
+              {clippedText(activeReplyPreviewText(reply()))}
+            </span>
             <button type="button" class="shell-composer-context-close" aria-label="Cancel reply" onClick={cancelReply}>
               ×
             </button>

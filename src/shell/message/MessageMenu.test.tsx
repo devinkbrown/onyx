@@ -161,6 +161,37 @@ describe('messageMenuCapabilities', () => {
     expect(caps.canDelete).toBe(true);
   });
 
+  it('forbids editing encrypted rows even when unlocked, owned, and enabled', () => {
+    const caps = messageMenuCapabilities(input({
+      msg: {
+        from: 'alice',
+        text: 'TSUMUGI1 ciphertext-envelope',
+        plaintext: 'private hello',
+        encrypted: true,
+        type: 'msg',
+      },
+    }));
+
+    expect(caps.canEdit).toBe(false);
+    expect(caps.canReply).toBe(true);
+    expect(caps.canCopy).toBe(true);
+    expect(caps.canDelete).toBe(true);
+  });
+
+  it('fails closed on an envelope whose legacy row omitted encrypted=true', () => {
+    const caps = messageMenuCapabilities(input({
+      msg: {
+        from: 'alice',
+        text: 'TSUMUGI1 legacy-envelope',
+        type: 'msg',
+      },
+    }));
+
+    expect(caps.canEdit).toBe(false);
+    expect(caps.canCopy).toBe(false);
+    expect(caps.canSearchText).toBe(false);
+  });
+
   it('forbids deleting when the store offers no redaction action', () => {
     // Arrange
     const args = input({ deleteSupported: false });
@@ -830,6 +861,26 @@ describe('<MessageMenu>', () => {
     expect(screen.queryByRole('menuitem', { name: /Copy text from message from alice/i })).toBeNull();
     expect(screen.queryByRole('menuitem', { name: /Search text from message from alice/i })).toBeNull();
     expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it('never renders Edit for an owned unlocked encrypted row', () => {
+    const msg: ChatMessage = {
+      id: 'm-edit-e2ee',
+      from: 'alice',
+      text: 'TSUMUGI1 ciphertext-envelope',
+      plaintext: 'private hello',
+      encrypted: true,
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: 'bob',
+    };
+
+    render(() => (
+      <MessageMenu msg={msg} target="bob" selfNick="alice" canEdit menuOpen />
+    ));
+
+    expect(screen.queryByRole('menuitem', { name: 'Edit message from alice' })).toBeNull();
+    expect(screen.getByRole('menuitem', { name: 'Reply to message from alice' })).toBeInTheDocument();
   });
 
   it('reports rejected clipboard writes without a persistence fallback', async () => {

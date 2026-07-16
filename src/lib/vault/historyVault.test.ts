@@ -9,6 +9,7 @@ import { IDBFactory } from 'fake-indexeddb';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ChatMessage } from '@/lib/irc/types';
+import { LOCKED_PLACEHOLDER } from '@/lib/e2ee/dmCipher';
 import {
   markTopicRead,
   readTopicReadLedger,
@@ -172,6 +173,23 @@ describe('historyVault', () => {
       expect(stored.encrypted).toBe(true);
       // The input message is not mutated by the strip.
       expect((withTransient as Record<string, unknown>).plaintext).toBe('secret-plaintext');
+    });
+
+    it('sanitizes legacy reply envelopes on both serialization and hydration', () => {
+      const envelope = 'TSUMUGI1 legacy-reply-envelope';
+      const original = msg('reply-envelope', 1000, {
+        replyTo: { id: 'parent', from: 'trev', text: envelope },
+      });
+
+      const stored = serializeMessage('Trev', original);
+      expect(stored.replyTo?.text).toBe(LOCKED_PLACEHOLDER);
+      expect(original.replyTo?.text).toBe(envelope);
+
+      const hydrated = deserializeMessage({
+        ...stored,
+        replyTo: { id: 'parent', from: 'trev', text: envelope },
+      });
+      expect(hydrated.replyTo?.text).toBe(LOCKED_PLACEHOLDER);
     });
   });
 

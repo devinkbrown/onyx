@@ -25,6 +25,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ChatMessage } from '@/lib/irc/types';
+import { LOCKED_PLACEHOLDER } from '@/lib/e2ee/dmCipher';
 import {
   deserializeMessage,
   MAX_EXPORT_RAW_MESSAGES,
@@ -482,6 +483,26 @@ describe('parseVaultExport — vault import validation contract', () => {
       from: 'f'.repeat(MAX_VAULT_SENDER_LENGTH),
       text: 'r'.repeat(MAX_VAULT_REPLY_TEXT_LENGTH),
     });
+  });
+
+  it('replaces a legacy reply envelope during portable import validation', () => {
+    const parsed = parseVaultExport({
+      kind: 'onyx-vault',
+      version: 1,
+      targets: [{
+        target: 'trev',
+        messages: [{
+          ...message('legacy-reply', 'trev', 1),
+          replyTo: {
+            id: 'parent',
+            from: 'trev',
+            text: 'TSUMUGI1 legacy-reply-envelope',
+          },
+        }],
+      }],
+    });
+
+    expect(parsed?.targets[0]?.messages[0]?.replyTo?.text).toBe(LOCKED_PLACEHOLDER);
   });
 
   it('DEDUPES duplicate message ids within a target deterministically (last occurrence wins)', () => {
