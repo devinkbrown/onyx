@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from 'vitest';
 
-import { MediaStreamRouter, mediaStreamId } from './mediaStream';
+import {
+  MAX_MEDIA_STREAM_CHANNEL_LENGTH,
+  MAX_MEDIA_STREAM_NICK_LENGTH,
+  MAX_MEDIA_STREAM_PARTICIPANTS,
+  MediaStreamRouter,
+  mediaStreamId,
+} from './mediaStream';
 
 describe('mediaStreamId', () => {
   it('is deterministic and a 32-bit unsigned int', () => {
@@ -42,10 +48,75 @@ describe('MediaStreamRouter', () => {
     expect(r.resolve(mediaStreamId('#call', 'carol', 'audio'))).toEqual({ nick: 'carol', kind: 'audio' });
   });
 
+  it('deduplicates participants case-insensitively', () => {
+    const r = new MediaStreamRouter();
+    r.setRoster('#call', ['Alice', 'alice']);
+    r.addParticipant('ALICE');
+
+    expect(r.resolve(mediaStreamId('#call', 'alice', 'audio'))).toEqual({
+      nick: 'Alice',
+      kind: 'audio',
+    });
+  });
+
+  it('bounds an untrusted server roster to the live peer cap', () => {
+    const r = new MediaStreamRouter();
+    const nicks = Array.from(
+      { length: MAX_MEDIA_STREAM_PARTICIPANTS + 8 },
+      (_, index) => `peer-${index}`,
+    );
+    r.setRoster('#call', nicks);
+
+    expect(r.resolve(mediaStreamId('#call', `peer-${MAX_MEDIA_STREAM_PARTICIPANTS - 1}`, 'video')))
+      .toEqual({ nick: `peer-${MAX_MEDIA_STREAM_PARTICIPANTS - 1}`, kind: 'video' });
+    expect(r.resolve(mediaStreamId('#call', `peer-${MAX_MEDIA_STREAM_PARTICIPANTS}`, 'audio')))
+      .toBeNull();
+    r.addParticipant('late-peer');
+    expect(r.resolve(mediaStreamId('#call', 'late-peer', 'audio'))).toBeNull();
+  });
+
+  it('rejects malformed or oversized routing identities', () => {
+    const invalidChannels = [
+      '#bad room',
+      `#${'c'.repeat(MAX_MEDIA_STREAM_CHANNEL_LENGTH)}`,
+    ];
+    for (const channel of invalidChannels) {
+      const r = new MediaStreamRouter();
+      r.setRoster(channel, ['alice']);
+      expect(r.resolve(mediaStreamId(channel, 'alice', 'audio'))).toBeNull();
+    }
+
+    const r = new MediaStreamRouter();
+    r.setRoster('#call', [
+      'valid',
+      'bad nick',
+      `n${'x'.repeat(MAX_MEDIA_STREAM_NICK_LENGTH)}`,
+    ]);
+    expect(r.resolve(mediaStreamId('#call', 'valid', 'audio'))).not.toBeNull();
+    expect(r.resolve(mediaStreamId('#call', 'bad nick', 'audio'))).toBeNull();
+    expect(r.resolve(mediaStreamId('#call', `n${'x'.repeat(MAX_MEDIA_STREAM_NICK_LENGTH)}`, 'audio')))
+      .toBeNull();
+  });
+
   it('clear empties the map', () => {
     const r = new MediaStreamRouter();
     r.setRoster('#call', ['alice']);
     r.clear();
     expect(r.resolve(mediaStreamId('#call', 'alice', 'audio'))).toBeNull();
+  });
+
+  it('clear releases the participant cap for the next room', () => {
+    const r = new MediaStreamRouter();
+    r.setRoster(
+      '#first',
+      Array.from({ length: MAX_MEDIA_STREAM_PARTICIPANTS }, (_, index) => `old-${index}`),
+    );
+    r.clear();
+    r.setRoster('#second', ['new-peer']);
+
+    expect(r.resolve(mediaStreamId('#second', 'new-peer', 'video'))).toEqual({
+      nick: 'new-peer',
+      kind: 'video',
+    });
   });
 });
