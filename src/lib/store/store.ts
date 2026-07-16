@@ -7,7 +7,6 @@ import {
   parseEmojiArray,
   normalizeCtcpVersionReply,
   parseStringArray,
-  parseStringRecord,
 } from './persistParse';
 import { parseStoredVoiceSettings, type StoredVoiceSettings } from './voiceSettingsPersistence';
 import {
@@ -115,6 +114,7 @@ import {
   saveSoftIgnoreList,
 } from '@/lib/identityOverrides';
 import { loadAutoJoinChannels, saveAutoJoinChannels } from '@/lib/autoJoinMemory';
+import { loadChannelColors, saveChannelColors } from '@/lib/channelColorMemory';
 import { loadMutedDMs, parseMutedDMs, saveMutedDMs } from '@/lib/mutedDMs';
 import {
   emptyIdentityProfileMemory,
@@ -2795,6 +2795,7 @@ function _resetAccountBoundState(
       nickColorOverrides: new Map(),
       displayNameOverrides: {},
       autoJoinChannels: [],
+      channelColors: new Map(),
       mutedDMs: new Set(),
       userNotes: new Map(),
       topicHistory: {},
@@ -3365,24 +3366,6 @@ function _startReconnectCountdown(get: GetFn, set: SetFn) {
   }, delaySecs * 1000);
 }
 
-// ── Channel color persistence helpers ────────────────────────────────────────
-
-function _loadChannelColors(): Map<string, string> {
-  if (typeof window === 'undefined') return new Map();
-  try {
-    const raw = localStorage.getItem('onyx:channel-colors');
-    if (!raw) return new Map();
-    return new Map(Object.entries(parseStringRecord(raw)).map(([channel, color]) => [channel.toLowerCase(), color]));
-  } catch { return new Map(); }
-}
-
-function _saveChannelColors(colors: Map<string, string>): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem('onyx:channel-colors', JSON.stringify(Object.fromEntries(colors)));
-  } catch {}
-}
-
 function _loadCompactSidebar(): boolean {
   return typeof window !== 'undefined' && localStorage.getItem('onyx:compact-sidebar') === '1';
 }
@@ -3586,6 +3569,13 @@ function _loadOwnedAutoJoinChannels(
 ): string[] {
   const owner = selectDeviceMemoryOwner(state);
   return owner ? loadAutoJoinChannels(owner) : [];
+}
+
+function _loadOwnedChannelColors(
+  state: Pick<OnyxState, 'server' | 'ourNick'>,
+): Map<string, string> {
+  const owner = selectDeviceMemoryOwner(state);
+  return owner ? loadChannelColors(owner) : new Map();
 }
 
 function _loadOwnedMutedDMs(
@@ -4373,6 +4363,7 @@ export const store = createStore<OnyxState>()(
               ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: newNick }),
               ..._loadOwnedIdentityOverrides({ server, ourNick: newNick }),
               autoJoinChannels: _loadOwnedAutoJoinChannels({ server, ourNick: newNick }),
+              channelColors: _loadOwnedChannelColors({ server, ourNick: newNick }),
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: newNick }),
               friends: _loadOwnedFriends({ server, ourNick: newNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: newNick }),
@@ -4465,6 +4456,7 @@ export const store = createStore<OnyxState>()(
               ignoredUsers: _loadOwnedIgnoredUsers({ server: srv, ourNick: get().ourNick }),
               ..._loadOwnedIdentityOverrides({ server: srv, ourNick: get().ourNick }),
               autoJoinChannels: _loadOwnedAutoJoinChannels({ server: srv, ourNick: get().ourNick }),
+              channelColors: _loadOwnedChannelColors({ server: srv, ourNick: get().ourNick }),
               mutedDMs: _loadOwnedMutedDMs({ server: srv, ourNick: get().ourNick }),
               friends: _loadOwnedFriends({ server: srv, ourNick: get().ourNick }),
               watchList: _loadOwnedWatchList({ server: srv, ourNick: get().ourNick }),
@@ -7591,6 +7583,7 @@ export const store = createStore<OnyxState>()(
               ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: s.ourNick }),
               ..._loadOwnedIdentityOverrides({ server, ourNick: s.ourNick }),
               autoJoinChannels: _loadOwnedAutoJoinChannels({ server, ourNick: s.ourNick }),
+              channelColors: _loadOwnedChannelColors({ server, ourNick: s.ourNick }),
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
               friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
@@ -8249,6 +8242,7 @@ export const store = createStore<OnyxState>()(
                   accountActionError: null,
                   ..._loadOwnedIdentityOverrides({ server, ourNick: s.ourNick }),
                   autoJoinChannels: _loadOwnedAutoJoinChannels({ server, ourNick: s.ourNick }),
+                  channelColors: _loadOwnedChannelColors({ server, ourNick: s.ourNick }),
                 };
               });
               _saslAccount = null;
@@ -8824,6 +8818,7 @@ export const store = createStore<OnyxState>()(
                 ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: newNick }),
                 ..._loadOwnedIdentityOverrides({ server, ourNick: newNick }),
                 autoJoinChannels: _loadOwnedAutoJoinChannels({ server, ourNick: newNick }),
+                channelColors: _loadOwnedChannelColors({ server, ourNick: newNick }),
                 mutedDMs: _loadOwnedMutedDMs({ server, ourNick: newNick }),
                 friends: _loadOwnedFriends({ server, ourNick: newNick }),
                 watchList: _loadOwnedWatchList({ server, ourNick: newNick }),
@@ -10042,6 +10037,7 @@ export const store = createStore<OnyxState>()(
                 ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: s.ourNick }),
                 ..._loadOwnedIdentityOverrides({ server, ourNick: s.ourNick }),
                 autoJoinChannels: _loadOwnedAutoJoinChannels({ server, ourNick: s.ourNick }),
+                channelColors: _loadOwnedChannelColors({ server, ourNick: s.ourNick }),
                 mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
                 friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
                 watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
@@ -10092,6 +10088,7 @@ export const store = createStore<OnyxState>()(
               ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: s.ourNick }),
               ..._loadOwnedIdentityOverrides({ server, ourNick: s.ourNick }),
               autoJoinChannels: _loadOwnedAutoJoinChannels({ server, ourNick: s.ourNick }),
+              channelColors: _loadOwnedChannelColors({ server, ourNick: s.ourNick }),
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
               friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
@@ -11233,18 +11230,29 @@ export const store = createStore<OnyxState>()(
     },
 
     // ── Channel color labels ───────────────────────────────────────────────────
-    channelColors: _loadChannelColors(),
+    channelColors: loadChannelColors(),
     setChannelColor: (channel, color) => {
-      const colors = new Map(get().channelColors);
-      colors.set(channel.toLowerCase(), color);
-      _saveChannelColors(colors);
-      set({ channelColors: colors });
+      const owner = selectDeviceMemoryOwner(get());
+      const channelKey = normalizeNavigationChannel(channel);
+      const safeColor = normalizeNickColor(color);
+      if (!owner || !channelKey || !safeColor) return;
+      set(s => {
+        const colors = new Map(s.channelColors);
+        colors.set(channelKey, safeColor);
+        const saved = saveChannelColors(colors, owner);
+        return saved ? { channelColors: saved } : {};
+      });
     },
     clearChannelColor: (channel) => {
-      const colors = new Map(get().channelColors);
-      colors.delete(channel.toLowerCase());
-      _saveChannelColors(colors);
-      set({ channelColors: colors });
+      const owner = selectDeviceMemoryOwner(get());
+      const channelKey = normalizeNavigationChannel(channel);
+      if (!owner || !channelKey) return;
+      set(s => {
+        const colors = new Map(s.channelColors);
+        colors.delete(channelKey);
+        const saved = saveChannelColors(colors, owner);
+        return saved ? { channelColors: saved } : {};
+      });
     },
 
     // ── Message font size ──────────────────────────────────────────────────────
