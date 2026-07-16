@@ -9,6 +9,7 @@ import {
   importAccountHandoffs,
   listRememberedIdentities,
   loadCredentials,
+  MAX_CREDENTIALS_STORAGE_CHARS,
   parseAccountHandoffs,
   removeCredentials,
   removeRememberedIdentity,
@@ -53,6 +54,7 @@ describe('credentials persistence', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
     localStorage.clear();
   });
 
@@ -125,6 +127,15 @@ describe('credentials persistence', () => {
     }));
 
     expect(loadCredentials()).toBeNull();
+  });
+
+  it('rejects oversized credential storage before parsing', () => {
+    localStorage.setItem(CREDENTIALS_KEY, `{${'x'.repeat(MAX_CREDENTIALS_STORAGE_CHARS)}}`);
+    const parse = vi.spyOn(JSON, 'parse');
+
+    expect(loadCredentials()).toBeNull();
+    expect(listRememberedIdentities()).toEqual([]);
+    expect(parse).not.toHaveBeenCalled();
   });
 
   it('preserves a live session token when the same credentials are saved again', () => {

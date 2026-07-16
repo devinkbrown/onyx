@@ -27,6 +27,7 @@
  */
 
 const KEY = 'onyx:credentials';
+export const MAX_CREDENTIALS_STORAGE_CHARS = 2 * 1024 * 1024;
 
 export interface SavedCredentials {
   nick: string;
@@ -190,7 +191,7 @@ function sanitizeHandoff(value: unknown): AccountHandoff | null {
 function readStore(): CredentialsStore | null {
   if (typeof window === 'undefined') return null;
   const raw = localStorage.getItem(KEY);
-  if (!raw) return null;
+  if (!raw || raw.length > MAX_CREDENTIALS_STORAGE_CHARS) return null;
 
   const parsed = JSON.parse(raw) as unknown;
   if (
