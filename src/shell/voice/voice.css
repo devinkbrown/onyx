@@ -914,6 +914,96 @@
   .voice-cq__rate { display: none; }
 }
 
+/* At 400% zoom the call controls cannot reflow as whole flex groups: the
+   four-button media group alone is wider than the viewport space left by the
+   room identity and connection pip. Keep the bar one control tall and make
+   its center cluster a keyboard-scrollable rail instead of letting children
+   escape the bar or consume the short viewport. */
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .voice-bar {
+    gap: 6px;
+    max-width: 100%;
+    min-height: 56px;
+    padding: 3px 8px;
+    overflow: hidden;
+  }
+
+  .voice-bar__identity {
+    flex: 0 1 64px;
+    margin-right: 0;
+    overflow: hidden;
+  }
+
+  .voice-bar__channel-name {
+    max-width: 64px;
+    font-size: 14px;
+  }
+
+  .voice-bar__count {
+    font-size: 14px;
+  }
+
+  .voice-bar > .voice-bar__sep {
+    display: none;
+  }
+
+  .voice-bar__controls {
+    flex-wrap: nowrap;
+    min-width: 0;
+    justify-content: flex-start;
+    gap: 6px;
+    padding: 3px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+    scroll-padding-inline: 3px;
+    scrollbar-width: thin;
+  }
+
+  .voice-bar__group {
+    flex: none;
+  }
+
+  .voice-bar__group .onyx-popover__trigger {
+    flex: none;
+    width: 44px;
+    min-width: 44px;
+    max-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    max-height: 44px;
+    padding: 0;
+  }
+
+  .voice-bar__group .onyx-popover__trigger > .onyx-icon-button {
+    width: 24px;
+    min-width: 24px;
+    max-width: 24px;
+    height: 24px;
+    min-height: 24px;
+    max-height: 24px;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .voice-bar__leave.onyx-icon-button {
+    flex: none;
+    width: 44px;
+    min-width: 44px;
+    max-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    max-height: 44px;
+    padding: 0;
+  }
+
+  .voice-bar__right {
+    flex: none;
+    margin-left: 0;
+  }
+}
+
 @keyframes voice-current-drift {
   from { transform: translateX(-8%); }
   to { transform: translateX(8%); }
