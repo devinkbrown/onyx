@@ -395,17 +395,22 @@ export function AppShell(props: AppShellProps): JSX.Element {
     setIsMobile(mq.matches);
     keyboardOverlay?.setMobile(mq.matches);
     const onChange = (e: MediaQueryListEvent): void => {
+      const roster = membersDrawerElement();
+      const active = document.activeElement;
+      const preserveMemberContext = e.matches && Boolean(roster && (
+        (active instanceof Node && roster.contains(active))
+        || (showWhois() && whoisReturnFocus()?.closest('.shell-members') === roster)
+      ));
+      // Open the drawer before changing layout modes. That prevents the
+      // persistent roster from becoming inert for one reactive turn, which
+      // would light-dismiss an open member card and strand focus on <body>.
+      if (preserveMemberContext) {
+        mobileDrawerRestoreTarget ||= mobileMembersButtonRef ?? null;
+        setMobileMembersOpen(true);
+      }
       setIsMobile(e.matches);
       keyboardOverlay?.setMobile(e.matches);
-      if (e.matches) {
-        // Keep the roster context that owns an open profile. Otherwise the
-        // desktop row becomes hidden/inert mid-dialog and the Sheet has no
-        // valid place to restore focus when it closes.
-        if (showWhois() && whoisReturnFocus()?.closest('.shell-members')) {
-          mobileDrawerRestoreTarget ||= mobileMembersButtonRef ?? null;
-          setMobileMembersOpen(true);
-        }
-      } else {
+      if (!e.matches) {
         closeActiveMobileDrawer(false);
       }
     };

@@ -1565,6 +1565,44 @@ describe('AppShell', () => {
       });
     });
 
+    it('keeps an open member card and its Escape stack across a desktop-to-mobile resize', async () => {
+      const resize = stubResizableViewport(false);
+      seedStore('#general');
+
+      const { container } = render(() => <AppShell />);
+      const memberList = container.querySelector<HTMLElement>('.shell-members');
+      expect(memberList).not.toBeNull();
+      const memberTrigger = within(memberList!).getByRole('button', { name: /Open member details for alice/i });
+      memberTrigger.focus();
+      fireEvent.click(memberTrigger);
+      const memberCard = screen.getByRole('dialog', { name: 'Member details for alice' });
+
+      resize(true);
+
+      await waitFor(() => {
+        expect(memberList).toHaveAttribute('aria-hidden', 'false');
+        expect(memberList).toHaveAttribute('aria-modal', 'true');
+        expect(memberList).not.toHaveAttribute('inert');
+        expect(memberCard).not.toHaveAttribute('hidden');
+        expect(memberTrigger).toHaveAttribute('aria-expanded', 'true');
+      });
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+      await waitFor(() => {
+        expect(memberTrigger).toHaveAttribute('aria-expanded', 'false');
+        expect(memberTrigger).toHaveFocus();
+        expect(memberList).toHaveAttribute('aria-hidden', 'false');
+      });
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+      const mobileMembersButton = screen.getByRole('button', { name: 'Toggle member list' });
+      await waitFor(() => {
+        expect(memberList).toHaveAttribute('aria-hidden', 'true');
+        expect(memberList).toHaveAttribute('inert');
+        expect(mobileMembersButton).toHaveFocus();
+      });
+    });
+
     it.each([
       { surface: 'desktop roster', mobile: false },
       { surface: 'mobile member drawer', mobile: true },
