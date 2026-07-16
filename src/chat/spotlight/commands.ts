@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { createEffect, createMemo, createSignal, onCleanup, onMount, type Accessor } from 'solid-js';
 import { backgroundOptions, type BackgroundId } from '@/backgrounds';
-import { getState, useStore } from '@/lib/store';
+import { getState, selectDeviceMemoryOwner, useStore } from '@/lib/store';
 import type { State } from '@/lib/store/store';
 import { applyThemeToDom, THEME_IDS, THEMES, type ThemeId } from '@/theme';
 import { saveRecent } from '@/lib/commands/registry';
@@ -426,7 +426,9 @@ function catchUpCommands(state: CommandState, query: string): SpotlightCommand[]
  * never turn into a time-travel request.
  */
 function reviewedAnchorCommands(): SpotlightCommand[] {
-  return readReviewHistory().flatMap<SpotlightCommand>((entry) => {
+  const owner = selectDeviceMemoryOwner(getState());
+  if (!owner) return [];
+  return readReviewHistory(owner).flatMap<SpotlightCommand>((entry) => {
     const plan = planReviewedAnchorRecall(entry);
     if (!plan) return [];
     const preview = entry.preview.replace(/\s+/g, ' ').trim().slice(0, 180);

@@ -67,6 +67,7 @@ import {
   readTopicReadLedger,
   type TopicReadMarker,
 } from '@/lib/topics/topicReadLedger';
+import type { DeviceMemoryOwner } from '@/lib/deviceMemoryOwner';
 
 export interface PortablePreferenceHandoff {
   preferences: Preferences;
@@ -134,13 +135,15 @@ function parsePreferenceHandoff(value: unknown): PortablePreferenceHandoff | nul
   };
 }
 
-export async function exportPortableTransfer(): Promise<PortableTransferSnapshot> {
+export async function exportPortableTransfer(
+  owner?: DeviceMemoryOwner,
+): Promise<PortableTransferSnapshot> {
   const savedSearches = await exportSavedSearches();
   return {
-    ...(await exportVault()),
-    reviewHistory: readReviewHistory(),
-    composerDrafts: portableComposerDrafts(loadComposerDrafts()),
-    channelTopicDrafts: sanitizeChannelTopicDrafts(loadChannelTopicDrafts()),
+    ...(await exportVault(owner)),
+    reviewHistory: readReviewHistory(owner),
+    composerDrafts: portableComposerDrafts(loadComposerDrafts(undefined, owner)),
+    channelTopicDrafts: sanitizeChannelTopicDrafts(loadChannelTopicDrafts(undefined, owner)),
     accountHandoffs: exportAccountHandoffs(),
     preferenceHandoff: {
       preferences: preferences(),
@@ -200,6 +203,7 @@ export function parsePortableTransfer(raw: unknown): PortableTransferSnapshot | 
 
 export async function importPortableTransfer(
   snapshot: PortableTransferSnapshot,
+  owner?: DeviceMemoryOwner,
 ): Promise<PortableTransferImportResult> {
   const preferenceHandoff = snapshot.preferenceHandoff;
   if (preferenceHandoff) {
@@ -220,7 +224,7 @@ export async function importPortableTransfer(
   // privacy boundary: clear existing rows and do not persist imported history.
   let vault: { targets: number; messages: number };
   if (preferences().localHistory) {
-    vault = await importVault(snapshot);
+    vault = await importVault(snapshot, owner);
   } else {
     const cleared = await clearVault();
     if (!cleared) {
@@ -239,17 +243,17 @@ export async function importPortableTransfer(
   const topicReadCursors = preferences().localHistory
     ? mergeTopicReadLedger(snapshot.topicReadCursors ?? [])
     : { imported: 0, total: 0 };
-  const reviews = mergeReviewHistory(snapshot.reviewHistory);
+  const reviews = mergeReviewHistory(snapshot.reviewHistory, owner);
   const drafts = portableComposerDrafts(snapshot.composerDrafts);
   saveComposerDrafts({
-    ...loadComposerDrafts(),
+    ...loadComposerDrafts(undefined, owner),
     ...drafts,
-  });
+  }, undefined, owner);
   const topicDrafts = sanitizeChannelTopicDrafts(snapshot.channelTopicDrafts);
   saveChannelTopicDrafts({
-    ...loadChannelTopicDrafts(),
+    ...loadChannelTopicDrafts(undefined, owner),
     ...topicDrafts,
-  });
+  }, undefined, owner);
   const accountHandoffs = importAccountHandoffs(snapshot.accountHandoffs);
   const followedConversations = mergeFollowedKeys(snapshot.followedConversations);
   const savedSearches = await importSavedSearches({

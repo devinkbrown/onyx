@@ -40,6 +40,28 @@ describe('reviewHistory', () => {
     localStorage.clear();
   });
 
+  test('isolates Alice and Bob, quarantines legacy, and scopes same-tab publication', () => {
+    const alice = { serverUrl: 'wss://example.test', identity: 'Alice' };
+    const bob = { serverUrl: 'wss://example.test', identity: 'bob' };
+    localStorage.setItem(REVIEW_HISTORY_KEY, JSON.stringify([
+      entry('#legacy', '2026-07-09T00:00:00.000Z'),
+    ]));
+    const aliceListener = vi.fn();
+    const stop = subscribeReviewHistory(aliceListener, alice);
+    try {
+      recordReviewHistory(entry('#alice', '2026-07-09T00:01:00.000Z'), alice);
+      aliceListener.mockClear();
+      recordReviewHistory(entry('#bob', '2026-07-09T00:02:00.000Z'), bob);
+
+      expect(readReviewHistory(alice).map((item) => item.target)).toEqual(['#alice']);
+      expect(readReviewHistory(bob).map((item) => item.target)).toEqual(['#bob']);
+      expect(readReviewHistory().map((item) => item.target)).toEqual(['#legacy']);
+      expect(aliceListener).not.toHaveBeenCalled();
+    } finally {
+      stop();
+    }
+  });
+
   test('reads newest valid entries and ignores corrupted storage', () => {
     localStorage.setItem(REVIEW_HISTORY_KEY, 'not json');
     expect(readReviewHistory()).toEqual([]);

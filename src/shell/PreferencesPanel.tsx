@@ -586,6 +586,10 @@ function AccessibilityAuditLedger(): JSX.Element {
 }
 
 function PortableVaultControls(): JSX.Element {
+  const memoryOwner = useStore(
+    selectDeviceMemoryOwner,
+    (left, right) => left?.serverUrl === right?.serverUrl && left?.identity === right?.identity,
+  );
   const [status, setStatus] = createSignal<{ message: string; failure: boolean } | null>(null);
   const [busy, setBusy] = createSignal(false);
   const [exportFormat, setExportFormat] = createSignal<'json' | 'gzip' | null>(null);
@@ -675,6 +679,11 @@ function PortableVaultControls(): JSX.Element {
     trigger?: HTMLButtonElement,
   ): Promise<void> {
     if (busy()) return;
+    const owner = memoryOwner();
+    if (!owner) {
+      reportStatus('Portable vault export needs an active account or guest identity.', true);
+      return;
+    }
     const epoch = ++exportEpoch;
     let downloadFocusTarget: HTMLElement | undefined = trigger !== undefined && document.activeElement === trigger
       ? trigger
@@ -685,7 +694,7 @@ function PortableVaultControls(): JSX.Element {
     let url: string | null = null;
     let link: HTMLAnchorElement | null = null;
     try {
-      const snapshot = await exportPortableTransfer();
+      const snapshot = await exportPortableTransfer(owner);
       if (disposed || epoch !== exportEpoch) return;
       const json = JSON.stringify(snapshot, null, 2);
       const blob = format === 'gzip'
@@ -748,6 +757,11 @@ function PortableVaultControls(): JSX.Element {
     trigger?: HTMLButtonElement,
   ): Promise<void> {
     if (busy()) return;
+    const owner = memoryOwner();
+    if (!owner) {
+      reportStatus('Portable vault saving needs an active account or guest identity.', true);
+      return;
+    }
     const epoch = ++fileSaveEpoch;
     const focusTarget = capturePortableActionFocus(trigger);
     const suggestedName = `onyx-portable-${new Date().toISOString().slice(0, 10)}.json${format === 'gzip' ? '.gz' : ''}`;
@@ -765,7 +779,7 @@ function PortableVaultControls(): JSX.Element {
           reportStatus(format === 'gzip'
             ? 'Preparing compressed portable vault for the selected file…'
             : 'Preparing portable vault for the selected file…');
-          const snapshot = await exportPortableTransfer();
+          const snapshot = await exportPortableTransfer(owner);
           if (disposed || epoch !== fileSaveEpoch) throw new Error('stale portable vault save');
           const json = JSON.stringify(snapshot, null, 2);
           const blob = format === 'gzip'
@@ -878,13 +892,18 @@ function PortableVaultControls(): JSX.Element {
 
   async function handleShare(trigger?: HTMLButtonElement): Promise<void> {
     if (busy()) return;
+    const owner = memoryOwner();
+    if (!owner) {
+      reportStatus('Portable vault sharing needs an active account or guest identity.', true);
+      return;
+    }
     const epoch = ++shareEpoch;
     let focusTarget = capturePortableActionFocus(trigger);
     setBusy(true);
     setShareBusy(true);
     reportStatus('Preparing portable vault file to share…');
     try {
-      const snapshot = await exportPortableTransfer();
+      const snapshot = await exportPortableTransfer(owner);
       if (disposed || epoch !== shareEpoch) return;
       focusTarget = capturePortableActionFocus(trigger) ?? focusTarget;
       const result = await sharePortableVaultJson(JSON.stringify(snapshot, null, 2));
@@ -913,11 +932,23 @@ function PortableVaultControls(): JSX.Element {
     if (busy()) return;
     const pending = pendingImport();
     if (!pending) return;
+    const owner = memoryOwner();
+    if (!owner) {
+      reportStatus('Portable vault import needs an active account or guest identity.', true);
+      return;
+    }
     const epoch = ++applyEpoch;
     setBusy(true);
     try {
       const locked = await withPortableImportLock(async () => {
-        const result = await importPortableTransfer(pending.snapshot);
+        const result = await importPortableTransfer(pending.snapshot, owner);
+        const currentOwner = memoryOwner();
+        if (
+          currentOwner?.serverUrl !== owner.serverUrl
+          || currentOwner.identity !== owner.identity
+        ) {
+          throw new Error('portable vault account changed during import');
+        }
         for (const [target, draft] of Object.entries(pending.snapshot.composerDrafts)) {
           getState().setComposerDraft(target, draft);
         }
@@ -1086,7 +1117,14 @@ function focusConnectedAfterRender(getElement: () => HTMLElement | undefined): v
 }
 
 function ClearReviewedAnchorsControls(): JSX.Element {
-  const [anchorCount, setAnchorCount] = createSignal(readReviewHistory().length);
+  const memoryOwner = useStore(
+    selectDeviceMemoryOwner,
+    (left, right) => left?.serverUrl === right?.serverUrl && left?.identity === right?.identity,
+  );
+  const initialOwner = memoryOwner();
+  const [anchorCount, setAnchorCount] = createSignal(
+    initialOwner ? readReviewHistory(initialOwner).length : 0,
+  );
   const [confirming, setConfirming] = createSignal(false);
   const [status, setStatus] = createSignal<{
     message: string;
@@ -1095,7 +1133,13 @@ function ClearReviewedAnchorsControls(): JSX.Element {
   let clearTrigger: HTMLButtonElement | undefined;
   let eraseAction: HTMLButtonElement | undefined;
 
-  onCleanup(subscribeReviewHistory((entries) => setAnchorCount(entries.length)));
+  createEffect(() => {
+    const owner = memoryOwner();
+    setAnchorCount(owner ? readReviewHistory(owner).length : 0);
+    if (owner) {
+      onCleanup(subscribeReviewHistory((entries) => setAnchorCount(entries.length), owner));
+    }
+  });
 
   function beginClear(): void {
     setStatus(null);
@@ -1109,7 +1153,17 @@ function ClearReviewedAnchorsControls(): JSX.Element {
   }
 
   function clearNow(): void {
-    const result = clearReviewHistory();
+    const owner = memoryOwner();
+    if (!owner) {
+      setConfirming(false);
+      setStatus({
+        message: 'Could not resolve an active account or guest identity. No reviewed anchors were changed.',
+        failure: true,
+      });
+      focusConnectedAfterRender(() => clearTrigger);
+      return;
+    }
+    const result = clearReviewHistory(owner);
     setAnchorCount(result.remaining);
     setConfirming(false);
     focusConnectedAfterRender(() => clearTrigger);

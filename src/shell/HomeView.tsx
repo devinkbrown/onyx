@@ -17,6 +17,7 @@ import {
   createMemo,
   createResource,
   createSignal,
+  createEffect,
   For,
   onCleanup,
   Show,
@@ -34,6 +35,7 @@ import {
   planReviewedAnchorRecall,
   readReviewHistory,
   recordReviewHistory,
+  subscribeReviewHistory,
   type ReviewHistoryEntry,
 } from '@/lib/notifications/reviewHistory';
 import {
@@ -194,7 +196,16 @@ export function HomeView(): JSX.Element {
   });
 
   const [stats] = createResource(fetchStatsIndex, { initialValue: null });
-  const [reviewHistory, setReviewHistory] = createSignal<ReviewHistoryEntry[]>(readReviewHistory());
+  const [reviewHistory, setReviewHistory] = createSignal<ReviewHistoryEntry[]>([]);
+  createEffect(() => {
+    const owner = memoryOwner();
+    if (!owner) {
+      setReviewHistory([]);
+      return;
+    }
+    setReviewHistory(readReviewHistory(owner));
+    onCleanup(subscribeReviewHistory((entries) => setReviewHistory([...entries]), owner));
+  });
   const reviewHistorySummary = createMemo(() =>
     connectionStatus() === 'connected' ? 'catch-up ranges' : 'offline recall',
   );
@@ -330,6 +341,8 @@ export function HomeView(): JSX.Element {
   );
   const reviewCatchUpFromStart = (recap: HomeCatchUpRecap) => {
     const state = getState();
+    const owner = memoryOwner();
+    if (!owner) return;
     setReviewHistory(recordReviewHistory({
       target: recap.item.target,
       name: recap.item.name,
@@ -340,7 +353,7 @@ export function HomeView(): JSX.Element {
       messageCount: recap.messageCount,
       mentionCount: recap.mentionCount,
       preview: recap.preview,
-    }));
+    }, owner));
     openCatchUp(recap.item);
     state.focusMessage(recap.firstMessage.id);
     if (recap.item.kind === 'channel') state.travelTo(recap.item.target, recap.firstMessage.time);

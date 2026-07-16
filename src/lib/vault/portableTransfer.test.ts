@@ -223,6 +223,42 @@ describe('portableTransfer', () => {
     ]);
   });
 
+  it('exports and imports only the selected account device-memory namespace', async () => {
+    const alice = { serverUrl: 'wss://portable.example/ws', identity: 'alice' } as const;
+    const bob = { serverUrl: 'wss://portable.example/ws', identity: 'bob' } as const;
+    await saveMessages('#alice', [msg('alice-row', 1_000, { target: '#alice' })], alice);
+    await saveMessages('#bob', [msg('bob-row', 2_000, { target: '#bob' })], bob);
+    await saveMessages('#legacy', [msg('legacy-row', 3_000, { target: '#legacy' })]);
+    recordReviewHistory(review('#alice'), alice);
+    recordReviewHistory(review('#bob'), bob);
+    recordReviewHistory(review('#legacy'));
+    saveComposerDrafts({ '#alice': 'alice room plaintext' }, undefined, alice);
+    saveComposerDrafts({ '#bob': 'bob room plaintext' }, undefined, bob);
+    saveComposerDrafts({ '#legacy': 'legacy room plaintext' });
+    saveChannelTopicDrafts({ '#alice': 'alice topic plaintext' }, undefined, alice);
+    saveChannelTopicDrafts({ '#bob': 'bob topic plaintext' }, undefined, bob);
+    saveChannelTopicDrafts({ '#legacy': 'legacy topic plaintext' });
+
+    const exported = await exportPortableTransfer(alice);
+    const serialized = JSON.stringify(exported);
+
+    expect(exported.targets.map((entry) => entry.target)).toEqual(['#alice']);
+    expect(exported.reviewHistory.map((entry) => entry.target)).toEqual(['#alice']);
+    expect(exported.composerDrafts).toEqual({ '#alice': 'alice room plaintext' });
+    expect(exported.channelTopicDrafts).toEqual({ '#alice': 'alice topic plaintext' });
+    expect(serialized).not.toContain('bob room plaintext');
+    expect(serialized).not.toContain('legacy room plaintext');
+
+    const imported = await importPortableTransfer(exported, bob);
+
+    expect(imported).toMatchObject({ targets: 1, messages: 1, reviews: 1, drafts: 1, topicDrafts: 1 });
+    expect((await loadRecent('#alice', 50, bob)).map((message) => message.id)).toEqual(['alice-row']);
+    expect(readReviewHistory(bob).map((entry) => entry.target)).toContain('#alice');
+    expect(loadComposerDrafts(undefined, bob)).toMatchObject({ '#alice': 'alice room plaintext' });
+    expect(loadChannelTopicDrafts(undefined, bob)).toMatchObject({ '#alice': 'alice topic plaintext' });
+    expect(readReviewHistory(alice).map((entry) => entry.target)).toEqual(['#alice']);
+  });
+
   it('rejects non-Onyx portable transfer files', () => {
     expect(parsePortableTransfer({ kind: 'nope', version: 1, targets: [] })).toBeNull();
   });

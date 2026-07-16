@@ -26,6 +26,7 @@ import { THEME_IDS } from '@/theme';
 import { buildCommands } from './commands';
 
 const initialState = store.getInitialState();
+const MEMORY_OWNER = { serverUrl: 'ircs://ircx.us:6697', identity: 'kain' } as const;
 
 function channel(name: string): Channel {
   return {
@@ -369,14 +370,15 @@ describe('buildCommands', () => {
   });
 
   it('lists bounded reviewed anchors newest-first and makes target and preview searchable', () => {
+    setState({ server: server() });
     for (let index = 0; index < 7; index += 1) {
       recordReviewHistory(review(
         `#review-${index}`,
         `2026-07-09T08:0${index}:00.000Z`,
-      ));
+      ), MEMORY_OWNER);
     }
 
-    expect(readReviewHistory()).toHaveLength(5);
+    expect(readReviewHistory(MEMORY_OWNER)).toHaveLength(5);
     const commands = buildCommands(getState()).filter((entry) => entry.id.startsWith('review:'));
     expect(commands.map((entry) => entry.title)).toEqual([
       'Reopen reviewed #review-6',
@@ -393,10 +395,11 @@ describe('buildCommands', () => {
   });
 
   it('reopens a reviewed anchor through exact-id vault travel', () => {
+    setState({ server: server() });
     recordReviewHistory(review('#forge', '2026-07-09T09:00:00.000Z', {
       firstMessageId: 'forge-exact-id',
       preview: 'handoff packet approved',
-    }));
+    }), MEMORY_OWNER);
     const openVaultResult = vi.fn();
     const travelTo = vi.fn();
     setState({ openVaultResult, travelTo });
@@ -416,10 +419,11 @@ describe('buildCommands', () => {
   });
 
   it('focuses an exact reviewed id but refuses time travel for an invalid date', () => {
+    setState({ server: server() });
     recordReviewHistory(review('aoi', '2026-07-09T09:00:00.000Z', {
       firstMessageId: 'dm-exact-id',
       firstAt: 'not-a-date',
-    }));
+    }), MEMORY_OWNER);
     const openVaultResult = vi.fn();
     const travelTo = vi.fn();
     setState({ openVaultResult, travelTo });

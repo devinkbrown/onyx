@@ -39,10 +39,11 @@ import {
   isFollowed,
 } from '@/lib/notifications/followed';
 import {
-  readReviewHistory,
-  recordReviewHistory,
+  readReviewHistory as readScopedReviewHistory,
+  recordReviewHistory as recordScopedReviewHistory,
   REVIEW_HISTORY_KEY,
 } from '@/lib/notifications/reviewHistory';
+import type { ReviewHistoryEntry } from '@/lib/notifications/reviewHistory';
 import type { ChatMessage } from '@/lib/irc/types';
 import {
   loadComposerDrafts,
@@ -69,6 +70,14 @@ import * as portableFileSave from '@/lib/vault/portableFileSave';
 import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
 
 const MEMORY_OWNER = { serverUrl: 'wss://preferences.example/ws', identity: 'testuser' } as const;
+
+function readReviewHistory(): ReviewHistoryEntry[] {
+  return readScopedReviewHistory(MEMORY_OWNER);
+}
+
+function recordReviewHistory(entry: ReviewHistoryEntry): ReviewHistoryEntry[] {
+  return recordScopedReviewHistory(entry, MEMORY_OWNER);
+}
 
 function emptyPortableSnapshot(): PortableTransferSnapshot {
   return {
@@ -1900,7 +1909,9 @@ describe('PreferencesPanel', () => {
     });
     const removeItem = localStorage.removeItem.bind(localStorage);
     vi.spyOn(localStorage, 'removeItem').mockImplementation((key) => {
-      if (key === REVIEW_HISTORY_KEY) throw new DOMException('blocked');
+      if (key === deviceMemoryStorageKey(REVIEW_HISTORY_KEY, MEMORY_OWNER)) {
+        throw new DOMException('blocked');
+      }
       removeItem(key);
     });
     renderPreferences('History & data');
@@ -1913,7 +1924,7 @@ describe('PreferencesPanel', () => {
     expect(controls.getByRole('alert')).toHaveTextContent('Could not verify that reviewed anchors were cleared');
     expect(controls.getByText('1 reviewed anchor')).toBeInTheDocument();
     expect(readReviewHistory()).toHaveLength(1);
-    expect(localStorage.getItem(REVIEW_HISTORY_KEY)).not.toBeNull();
+    expect(localStorage.getItem(deviceMemoryStorageKey(REVIEW_HISTORY_KEY, MEMORY_OWNER)!)).not.toBeNull();
   });
 
   it('clears all saved searches with exact-count review, cancel focus, and local-data isolation', async () => {

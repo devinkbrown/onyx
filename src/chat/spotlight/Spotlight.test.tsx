@@ -8,6 +8,7 @@ import { store } from '@/lib/store/store';
 import { Spotlight, SpotlightProvider } from './index';
 
 const initialState = store.getInitialState();
+const MEMORY_OWNER = { serverUrl: 'wss://spotlight.example/ws', identity: 'kain' } as const;
 
 function channel(name: string): Channel {
   return {
@@ -153,6 +154,18 @@ describe('Spotlight', () => {
   });
 
   it('finds a reviewed anchor by preview and runs exact-id recall', async () => {
+    setState({
+      server: {
+        id: 'spotlight',
+        name: 'Spotlight test',
+        network: 'spotlight',
+        url: MEMORY_OWNER.serverUrl,
+        icon: 'S',
+        nick: 'kain',
+        account: MEMORY_OWNER.identity,
+        connected: true,
+      } as never,
+    });
     recordReviewHistory({
       target: '#forge',
       name: '#forge',
@@ -163,7 +176,7 @@ describe('Spotlight', () => {
       messageCount: 3,
       mentionCount: 1,
       preview: 'handoff packet approved',
-    });
+    }, MEMORY_OWNER);
     const openVaultResult = vi.fn();
     const travelTo = vi.fn();
     setState({ openVaultResult, travelTo });

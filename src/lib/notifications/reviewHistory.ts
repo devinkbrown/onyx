@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { deviceMemoryStorageKey, type DeviceMemoryOwner } from '@/lib/deviceMemoryOwner';
+
 export type ReviewHistoryKind = 'channel' | 'dm';
 
 export interface ReviewHistoryEntry {
@@ -47,7 +49,7 @@ const TARGET_INVALID_PATTERN = /[\s,\x00-\x1f\x7f]/u;
 const MESSAGE_ID_CONTROL_PATTERN = /[\x00-\x1f\x7f]/u;
 const DISPLAY_TEXT_CONTROL_PATTERN = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/u;
 const CANONICAL_INSTANT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u;
-const listeners = new Set<ReviewHistoryListener>();
+const listeners = new Map<string, Set<ReviewHistoryListener>>();
 
 function canonicalInstant(value: unknown): Date | null {
   if (typeof value !== 'string' || (value.length !== 20 && value.length !== 24)) return null;
@@ -191,8 +193,14 @@ function sameEntries(
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-function publish(entries: readonly ReviewHistoryEntry[]): void {
-  for (const listener of [...listeners]) {
+function reviewStorageKey(owner?: DeviceMemoryOwner): string | null {
+  return deviceMemoryStorageKey(REVIEW_HISTORY_KEY, owner);
+}
+
+function publish(entries: readonly ReviewHistoryEntry[], owner?: DeviceMemoryOwner): void {
+  const scope = reviewStorageKey(owner);
+  if (!scope) return;
+  for (const listener of [...(listeners.get(scope) ?? [])]) {
     try {
       listener(entries.map((entry) => ({ ...entry })));
     } catch {
@@ -203,9 +211,19 @@ function publish(entries: readonly ReviewHistoryEntry[]): void {
 }
 
 /** Subscribe to verified same-tab reviewed-anchor changes. */
-export function subscribeReviewHistory(listener: ReviewHistoryListener): () => void {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
+export function subscribeReviewHistory(
+  listener: ReviewHistoryListener,
+  owner?: DeviceMemoryOwner,
+): () => void {
+  const scope = reviewStorageKey(owner);
+  if (!scope) return () => {};
+  const scoped = listeners.get(scope) ?? new Set<ReviewHistoryListener>();
+  scoped.add(listener);
+  listeners.set(scope, scoped);
+  return () => {
+    scoped.delete(listener);
+    if (scoped.size === 0) listeners.delete(scope);
+  };
 }
 
 export function parseReviewHistoryEntries(value: unknown): ReviewHistoryEntry[] {
@@ -228,11 +246,13 @@ export function parseReviewHistoryEntries(value: unknown): ReviewHistoryEntry[] 
     .slice(0, REVIEW_HISTORY_LIMIT);
 }
 
-export function readReviewHistory(): ReviewHistoryEntry[] {
+export function readReviewHistory(owner?: DeviceMemoryOwner): ReviewHistoryEntry[] {
   const store = storage();
   if (!store) return [];
+  const storageKey = reviewStorageKey(owner);
+  if (!storageKey) return [];
   try {
-    const raw = store.getItem(REVIEW_HISTORY_KEY);
+    const raw = store.getItem(storageKey);
     const parsed = JSON.parse(raw ?? '[]');
     return parseReviewHistoryEntries(parsed);
   } catch {
@@ -243,43 +263,54 @@ export function readReviewHistory(): ReviewHistoryEntry[] {
 export function latestReviewForTarget(
   target: string,
   kind?: ReviewHistoryKind,
+  owner?: DeviceMemoryOwner,
 ): ReviewHistoryEntry | null {
   const key = target.toLowerCase();
-  return readReviewHistory().find((entry) =>
+  return readReviewHistory(owner).find((entry) =>
     entry.target.toLowerCase() === key && (kind === undefined || entry.kind === kind),
   ) ?? null;
 }
 
-export function recordReviewHistory(entry: ReviewHistoryEntry): ReviewHistoryEntry[] {
-  const current = readReviewHistory();
+export function recordReviewHistory(
+  entry: ReviewHistoryEntry,
+  owner?: DeviceMemoryOwner,
+): ReviewHistoryEntry[] {
+  const current = readReviewHistory(owner);
   const safe = sanitizeReviewHistoryEntry(entry);
   if (!safe) return current;
   const store = storage();
-  if (!store) return current;
+  const storageKey = reviewStorageKey(owner);
+  if (!store || !storageKey) return current;
 
   const next = parseReviewHistoryEntries([safe, ...current]);
 
   try {
-    store.setItem(REVIEW_HISTORY_KEY, JSON.stringify(next));
+    store.setItem(storageKey, JSON.stringify(next));
   } catch {
-    const retained = readReviewHistory();
-    publish(retained);
+    const retained = readReviewHistory(owner);
+    publish(retained, owner);
     return retained;
   }
-  const committed = readReviewHistory();
+  const committed = readReviewHistory(owner);
   if (!sameEntries(committed, next)) {
-    publish(committed);
+    publish(committed, owner);
     return committed;
   }
-  publish(committed);
+  publish(committed, owner);
   return committed;
 }
 
-export function mergeReviewHistory(entries: readonly unknown[]): { imported: number; total: number } {
+export function mergeReviewHistory(
+  entries: readonly unknown[],
+  owner?: DeviceMemoryOwner,
+): { imported: number; total: number } {
   const imported = parseReviewHistoryEntries(entries);
-  const current = readReviewHistory();
+  const current = readReviewHistory(owner);
   const store = storage();
-  if (!store || imported.length === 0) return { imported: 0, total: current.length };
+  const storageKey = reviewStorageKey(owner);
+  if (!store || !storageKey || imported.length === 0) {
+    return { imported: 0, total: current.length };
+  }
 
   // Existing entries come first, so an imported collision with the exact same
   // reviewedAt cannot overwrite device-local display metadata. A strictly
@@ -287,14 +318,14 @@ export function mergeReviewHistory(entries: readonly unknown[]): { imported: num
   const next = parseReviewHistoryEntries([...current, ...imported]);
 
   try {
-    store.setItem(REVIEW_HISTORY_KEY, JSON.stringify(next));
+    store.setItem(storageKey, JSON.stringify(next));
   } catch {
-    const retained = readReviewHistory();
-    publish(retained);
+    const retained = readReviewHistory(owner);
+    publish(retained, owner);
     return { imported: 0, total: retained.length };
   }
-  const committed = readReviewHistory();
-  publish(committed);
+  const committed = readReviewHistory(owner);
+  publish(committed, owner);
   if (!sameEntries(committed, next)) return { imported: 0, total: committed.length };
 
   const retainedImported = imported.filter((entry) =>
@@ -309,26 +340,27 @@ export function mergeReviewHistory(entries: readonly unknown[]): { imported: num
  * state before reporting success. Message history, topic cursors, searches,
  * drafts, and every other local surface are deliberately outside this boundary.
  */
-export function clearReviewHistory(): ClearReviewHistoryResult {
-  const before = readReviewHistory();
+export function clearReviewHistory(owner?: DeviceMemoryOwner): ClearReviewHistoryResult {
+  const before = readReviewHistory(owner);
   const store = storage();
-  if (!store) {
-    publish(before);
+  const storageKey = reviewStorageKey(owner);
+  if (!store || !storageKey) {
+    publish(before, owner);
     return { success: false, cleared: 0, remaining: before.length };
   }
 
   try {
-    store.removeItem(REVIEW_HISTORY_KEY);
-    const keyRemoved = store.getItem(REVIEW_HISTORY_KEY) === null;
-    const remaining = readReviewHistory();
-    publish(remaining);
+    store.removeItem(storageKey);
+    const keyRemoved = store.getItem(storageKey) === null;
+    const remaining = readReviewHistory(owner);
+    publish(remaining, owner);
     if (!keyRemoved || remaining.length > 0) {
       return { success: false, cleared: 0, remaining: remaining.length };
     }
     return { success: true, cleared: before.length, remaining: 0 };
   } catch {
-    const retained = readReviewHistory();
-    publish(retained);
+    const retained = readReviewHistory(owner);
+    publish(retained, owner);
     return { success: false, cleared: 0, remaining: retained.length };
   }
 }

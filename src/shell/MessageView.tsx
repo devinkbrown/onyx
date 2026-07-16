@@ -884,7 +884,8 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   });
   const readerReviewedSpan = createMemo(() => {
     const context = readerMemoryContext();
-    return context ? latestReviewForTarget(context.target, 'channel') : null;
+    const owner = memoryOwner();
+    return context && owner ? latestReviewForTarget(context.target, 'channel', owner) : null;
   });
   const [readerVaultContext] = createResource(
     () => {
@@ -1021,23 +1022,26 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     const digest = sinceDigest();
     const divider = dividerId ? allMessages().find((message) => message.id === dividerId) : null;
     if (target.startsWith('#') && dividerId && digest && divider) {
-      const indexById = allIndexById();
-      const dividerIndex = indexById.get(dividerId) ?? -1;
-      const unreadMessages = messages().filter(
-        (message) => (indexById.get(message.id) ?? -1) >= dividerIndex && !isSystemMsg(message),
-      );
-      const latest = unreadMessages[unreadMessages.length - 1];
-      recordReviewHistory({
-        target,
-        name: target,
-        kind: 'channel',
-        firstMessageId: dividerId,
-        firstAt: divider.time.toISOString(),
-        reviewedAt: new Date().toISOString(),
-        messageCount: digest.totalMessages,
-        mentionCount: digest.totalMentions,
-        preview: clippedDigestPreview(latest ? (latest.plaintext ?? latest.text) : target),
-      });
+      const owner = memoryOwner();
+      if (owner) {
+        const indexById = allIndexById();
+        const dividerIndex = indexById.get(dividerId) ?? -1;
+        const unreadMessages = messages().filter(
+          (message) => (indexById.get(message.id) ?? -1) >= dividerIndex && !isSystemMsg(message),
+        );
+        const latest = unreadMessages[unreadMessages.length - 1];
+        recordReviewHistory({
+          target,
+          name: target,
+          kind: 'channel',
+          firstMessageId: dividerId,
+          firstAt: divider.time.toISOString(),
+          reviewedAt: new Date().toISOString(),
+          messageCount: digest.totalMessages,
+          mentionCount: digest.totalMentions,
+          preview: clippedDigestPreview(latest ? (latest.plaintext ?? latest.text) : target),
+        }, owner);
+      }
     }
     scrollToUnreadBoundary();
     getState().clearViewUnreadDivider(target);
