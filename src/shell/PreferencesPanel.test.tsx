@@ -392,6 +392,11 @@ describe('PreferencesPanel', () => {
       fireEvent.keyDown(display, { key: 'ArrowRight' });
 
       await waitFor(() => expect(revealed).toEqual(['Conversation']));
+
+      revealed.length = 0;
+      openPreferences('accessibility');
+
+      await waitFor(() => expect(revealed).toEqual(['Accessibility']));
     } finally {
       if (originalScrollIntoView) {
         Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', originalScrollIntoView);

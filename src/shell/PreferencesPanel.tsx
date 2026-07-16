@@ -2764,14 +2764,12 @@ function PreferenceCategoryNavigation(props: {
 
   const handleCategoryTabsQueryChange = (event: MediaQueryListEvent): void => {
     setHorizontalTabs(event.matches);
-    if (event.matches) revealCategoryTabAfterRender(props.active());
   };
 
   onMount(() => {
     if (typeof window.matchMedia !== 'function') return;
     categoryTabsQuery = window.matchMedia(MOBILE_CATEGORY_TABS_QUERY);
     setHorizontalTabs(categoryTabsQuery.matches);
-    if (categoryTabsQuery.matches) revealCategoryTabAfterRender(props.active());
     categoryTabsQuery.addEventListener('change', handleCategoryTabsQueryChange);
   });
 
@@ -2779,9 +2777,12 @@ function PreferenceCategoryNavigation(props: {
     categoryTabsQuery?.removeEventListener('change', handleCategoryTabsQueryChange);
   });
 
+  createEffect(() => {
+    if (horizontalTabs()) revealCategoryTabAfterRender(props.active());
+  });
+
   function selectCategory(category: PreferenceCategory): void {
     props.onSelect(category);
-    if (horizontalTabs()) revealCategoryTabAfterRender(category);
   }
 
   function selectAt(index: number): void {
