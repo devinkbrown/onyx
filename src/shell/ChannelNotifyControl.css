@@ -60,3 +60,23 @@
     transition: none;
   }
 }
+
+/* The presence ribbon is itself a bounded horizontal control strip at 400%.
+   Keep this three-option radio group compact enough for focus scrolling while
+   retaining a full touch target for every mode. */
+@media (max-width: 900px) and (max-height: 30rem) {
+  .chan-notify {
+    flex: none;
+  }
+
+  .chan-notify-seg {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    padding: 2px;
+    font-size: 14px;
+    letter-spacing: 0;
+    scroll-margin-inline: 4px;
+  }
+}

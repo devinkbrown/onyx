@@ -121,6 +121,33 @@ describe('ChannelNotifyControl', () => {
     expect(radio(/Mentions only/i)).toHaveAttribute('aria-checked', 'true');
   });
 
+  it('centres a focused segment in the bounded ribbon action scroller', () => {
+    seed();
+    render(() => (
+      <div class="shell-ribbon-right">
+        <ChannelNotifyControl channel="#general" />
+      </div>
+    ));
+    const scroller = document.querySelector<HTMLElement>('.shell-ribbon-right')!;
+    const mute = radio(/Mute/i);
+    Object.defineProperties(scroller, {
+      clientWidth: { configurable: true, value: 120 },
+      scrollWidth: { configurable: true, value: 300 },
+    });
+    scroller.getBoundingClientRect = () => ({
+      x: 10, y: 0, width: 120, height: 44, top: 0, right: 130,
+      bottom: 44, left: 10, toJSON: () => ({}),
+    });
+    mute.getBoundingClientRect = () => ({
+      x: 250, y: 0, width: 44, height: 44, top: 0, right: 294,
+      bottom: 44, left: 250, toJSON: () => ({}),
+    });
+
+    fireEvent.focus(mute);
+
+    expect(scroller.scrollLeft).toBe(180);
+  });
+
   it('wraps with ArrowLeft from the first segment to the last', () => {
     seed();
     renderControl();

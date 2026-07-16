@@ -5035,6 +5035,51 @@
     --mnav-h: 56px;
   }
 
+  .shell-ribbon {
+    height: 60px;
+    padding: 4px 8px;
+  }
+
+  .shell-ribbon-inner {
+    gap: 4px;
+  }
+
+  .shell-ribbon-identity {
+    flex: 0 1 auto;
+    min-width: 52px;
+  }
+
+  .shell-ribbon-channel {
+    max-width: min(24vw, 8ch);
+    font-size: 16px;
+  }
+
+  .shell-ribbon-right {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-left: 0;
+    gap: 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+    scroll-padding-inline: 4px;
+    scrollbar-width: thin;
+  }
+
+  .shell-ribbon-group {
+    flex: none;
+    gap: 4px;
+  }
+
+  .shell-ribbon-iconbtn {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    padding: 0;
+    font-size: 14px;
+    scroll-margin-inline: 4px;
+  }
+
   .shell-mobile-nav-btn {
     flex-direction: row;
     justify-content: flex-start;

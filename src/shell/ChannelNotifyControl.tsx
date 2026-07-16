@@ -40,6 +40,22 @@ export interface ChannelNotifyControlProps {
   class?: string;
 }
 
+/** Reveal a focused segment inside the short-viewport ribbon scroller without
+ * moving vertical ancestors (native scrollIntoView can jump the chat). */
+function revealInRibbonScroller(control: HTMLButtonElement): void {
+  const scroller = control.closest<HTMLElement>('.shell-ribbon-right');
+  if (!scroller) return;
+
+  const scrollerRect = scroller.getBoundingClientRect();
+  const controlRect = control.getBoundingClientRect();
+  const desiredLeft = scroller.scrollLeft
+    + controlRect.left
+    - scrollerRect.left
+    - ((scroller.clientWidth - controlRect.width) / 2);
+  const maxLeft = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
+  scroller.scrollLeft = Math.min(maxLeft, Math.max(0, desiredLeft));
+}
+
 export function ChannelNotifyControl(props: ChannelNotifyControlProps): JSX.Element {
   const [local] = splitProps(props, ['channel', 'class']);
 
@@ -92,6 +108,7 @@ export function ChannelNotifyControl(props: ChannelNotifyControlProps): JSX.Elem
               title={option.title}
               tabindex={active() ? 0 : -1}
               onClick={() => getState().setChannelNotifyMode(local.channel, option.mode)}
+              onFocus={(event) => revealInRibbonScroller(event.currentTarget)}
             >
               <span aria-hidden="true">{option.label}</span>
             </button>
