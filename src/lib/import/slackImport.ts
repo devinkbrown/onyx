@@ -20,8 +20,20 @@
  *    so imported content cannot inject markup.
  */
 import type { ChatMessage, MessageReaction, MessageType } from '@/lib/irc/types';
+import { isPreviewableUrl } from '@/lib/preview/linkPreview';
 import type { VaultExportSnapshot, VaultExportTarget } from '@/lib/vault/historyVault';
-import { VAULT_KEEP } from '@/lib/vault/historyVault';
+import {
+  MAX_EXPORT_RAW_MESSAGES,
+  MAX_EXPORT_TARGETS,
+  MAX_EXPORT_TOTAL_RAW_MESSAGES,
+  MAX_VAULT_MESSAGE_TEXT_LENGTH,
+  MAX_VAULT_REACTIONS,
+  MAX_VAULT_REACTION_FIELD_LENGTH,
+  MAX_VAULT_SENDER_LENGTH,
+  MAX_VAULT_TARGET_LENGTH,
+  MAX_VAULT_TIMESTAMP_LENGTH,
+  VAULT_KEEP,
+} from '@/lib/vault/historyVault';
 
 /** Options controlling how a Slack export is mapped into the vault. */
 export interface SlackImportOptions {
@@ -61,6 +73,13 @@ export interface SlackImportResult {
 
 /** Upper bound on stored reactor placeholders per reaction (keeps the vault lean). */
 const MAX_REACTION_USERS = 99;
+const MAX_ATTACHMENTS = 32;
+const MAX_ATTACHMENT_URL_LENGTH = 2_048;
+const MAX_WORKSPACE_NAME_LENGTH = 256;
+const MAX_CHANNEL_ID_LENGTH = 128;
+const MAX_SLACK_TIMESTAMP_LENGTH = 64;
+const MAX_SLACK_USERS = 4_096;
+const MAX_CHANNEL_EXPORT_SCAN = MAX_EXPORT_TARGETS * 4;
 
 /**
  * Cap on the per-target thread-resolution index. Slack exports are usually
@@ -69,13 +88,18 @@ const MAX_REACTION_USERS = 99;
  * older than the most recent ~MAX_REF_ENTRIES messages simply render without a
  * quote.
  */
-const MAX_REF_ENTRIES = 50_000;
+const MAX_REF_ENTRIES = MAX_EXPORT_TOTAL_RAW_MESSAGES;
 
 const CHAT_SUBTYPES = new Set(['', 'bot_message', 'file_share', 'thread_broadcast']);
 
 interface SlackChannelExport {
   root: Record<string, unknown>;
-  users: Map<string, string>;
+  users: SlackUserDirectory;
+}
+
+interface SlackUserDirectory {
+  shared: ReadonlyMap<string, string>;
+  local: ReadonlyMap<string, string>;
 }
 
 /** Mutable per-target accumulation state, carried across paginated files. */
@@ -86,6 +110,8 @@ interface TargetBucket {
   refIndex: Map<string, { id: string; from: string; text: string }>;
   /** Emitted vault ids, to avoid IndexedDB `put` collisions clobbering rows. */
   emittedIds: Set<string>;
+  /** Next collision suffix by base id, avoiding quadratic duplicate scans. */
+  nextSuffix: Map<string, number>;
   /** Monotonic fallback counter for messages that carry no Slack timestamp. */
   seq: number;
 }
@@ -96,6 +122,34 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value : '';
+}
+
+function boundedString(value: unknown, maxLength: number): string {
+  return asString(value).slice(0, maxLength);
+}
+
+function boundedWireToken(value: unknown, maxLength: number, fallback = ''): string {
+  const token = boundedString(value, maxLength)
+    .trim()
+    .replace(/[\u0000-\u0020\u007f]+/gu, '-')
+    .replace(/^-+|-+$/g, '');
+  return token || fallback;
+}
+
+function boundedDisplayText(value: unknown, maxLength: number): string {
+  return boundedString(value, maxLength)
+    .replace(/[\u0000-\u001f\u007f]+/gu, ' ')
+    .trim();
+}
+
+function publicHttpUrl(value: unknown): string {
+  const raw = boundedString(value, MAX_ATTACHMENT_URL_LENGTH).trim();
+  if (!isPreviewableUrl(raw)) return '';
+  try {
+    return new URL(raw).toString();
+  } catch {
+    return '';
+  }
 }
 
 /** Coerce an option to a finite positive integer, or fall back. */
@@ -113,35 +167,38 @@ function finitePositiveInt(value: unknown, fallback: number): number {
  */
 export function normalizeSlackChannelTarget(rawName: string): string {
   const cleaned = rawName
+    .slice(0, MAX_VAULT_TARGET_LENGTH * 4)
     .trim()
     .replace(/^#+/, '')
     .toLowerCase()
     .replace(/\s+/g, '-')
     .replace(/[^a-z0-9_-]/g, '')
     .replace(/-{2,}/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/^-+|-+$/g, '')
+    .slice(0, MAX_VAULT_TARGET_LENGTH - 1);
   return `#${cleaned || 'imported'}`;
 }
 
 function profileDisplayName(profile: unknown): string {
   if (!isRecord(profile)) return '';
-  return asString(profile.display_name).trim() || asString(profile.real_name).trim();
+  return boundedWireToken(profile.display_name, MAX_VAULT_SENDER_LENGTH)
+    || boundedWireToken(profile.real_name, MAX_VAULT_SENDER_LENGTH);
 }
 
 function slackUserDisplay(user: Record<string, unknown>): string {
   return (
     profileDisplayName(user.profile) ||
-    asString(user.name).trim() ||
-    asString(user.real_name).trim()
+    boundedWireToken(user.name, MAX_VAULT_SENDER_LENGTH) ||
+    boundedWireToken(user.real_name, MAX_VAULT_SENDER_LENGTH)
   );
 }
 
 function collectUsers(raw: unknown): Map<string, string> {
   const users = new Map<string, string>();
   if (!Array.isArray(raw)) return users;
-  for (const entry of raw) {
+  for (const entry of raw.slice(0, MAX_SLACK_USERS)) {
     if (!isRecord(entry)) continue;
-    const id = asString(entry.id).trim();
+    const id = boundedWireToken(entry.id, MAX_CHANNEL_ID_LENGTH);
     if (!id) continue;
     const display = slackUserDisplay(entry);
     if (display) users.set(id, display);
@@ -149,57 +206,66 @@ function collectUsers(raw: unknown): Map<string, string> {
   return users;
 }
 
-function mergeUsers(base: Map<string, string>, extra: unknown): Map<string, string> {
-  const merged = new Map(base);
-  for (const [id, name] of collectUsers(extra)) merged.set(id, name);
-  return merged;
+function userDirectory(shared: ReadonlyMap<string, string>, extra: unknown): SlackUserDirectory {
+  return { shared, local: collectUsers(extra) };
+}
+
+function lookupUser(users: SlackUserDirectory, id: string): string | undefined {
+  return users.local.get(id) ?? users.shared.get(id);
 }
 
 /** Best-effort display name for a Slack message author. */
-function authorName(message: Record<string, unknown>, users: Map<string, string>): string {
-  const userId = asString(message.user).trim();
-  if (userId) return users.get(userId) || userId;
-  const username = asString(message.username).trim();
+function authorName(message: Record<string, unknown>, users: SlackUserDirectory): string {
+  const userId = boundedWireToken(message.user, MAX_CHANNEL_ID_LENGTH);
+  if (userId) return lookupUser(users, userId) || userId;
+  const username = boundedWireToken(message.username, MAX_VAULT_SENDER_LENGTH);
   if (username) return username;
-  const botId = asString(message.bot_id).trim();
+  const botId = boundedWireToken(message.bot_id, MAX_CHANNEL_ID_LENGTH);
   if (botId) return botId;
   return 'unknown';
 }
 
-function rewriteMentions(text: string, users: Map<string, string>): string {
+function rewriteMentions(text: string, users: SlackUserDirectory): string {
   return text.replace(/<@([A-Z0-9]+)(?:\|[^>]+)?>/g, (match: string, userId: string): string => {
-    const name = users.get(userId);
+    const name = lookupUser(users, userId);
     return name ? `@${name}` : match;
   });
 }
 
 /** Append file URLs so links stay visible and searchable in the vault. */
-function composeText(content: string, files: unknown, users: Map<string, string>): string {
-  const base = rewriteMentions(content, users).trim();
+function composeText(content: string, files: unknown, users: SlackUserDirectory): string {
+  const base = rewriteMentions(content.slice(0, MAX_VAULT_MESSAGE_TEXT_LENGTH), users)
+    .slice(0, MAX_VAULT_MESSAGE_TEXT_LENGTH)
+    .trim();
   if (!Array.isArray(files) || files.length === 0) return base;
-  const urls = files
-    .map((file) => {
-      if (!isRecord(file)) return '';
-      return asString(file.permalink).trim() || asString(file.url_private).trim();
-    })
-    .filter((url) => url.length > 0);
-  if (urls.length === 0) return base;
-  return base ? `${base}\n${urls.join('\n')}` : urls.join('\n');
+  let text = base;
+  for (const file of files.slice(0, MAX_ATTACHMENTS)) {
+    if (!isRecord(file)) continue;
+    const url = publicHttpUrl(file.permalink) || publicHttpUrl(file.url_private);
+    if (!url) continue;
+    const next = text ? `${text}\n${url}` : url;
+    if (next.length > MAX_VAULT_MESSAGE_TEXT_LENGTH) continue;
+    text = next;
+  }
+  return text;
 }
 
-function mapReactions(raw: unknown, users: Map<string, string>): MessageReaction[] | undefined {
+function mapReactions(raw: unknown, users: SlackUserDirectory): MessageReaction[] | undefined {
   if (!Array.isArray(raw)) return undefined;
   const reactions: MessageReaction[] = [];
-  for (const entry of raw) {
+  for (const entry of raw.slice(0, MAX_VAULT_REACTIONS)) {
     if (!isRecord(entry)) continue;
-    const name = asString(entry.name).trim();
+    const name = boundedWireToken(entry.name, MAX_VAULT_REACTION_FIELD_LENGTH - 2);
     if (!name) continue;
     const named: string[] = Array.isArray(entry.users)
       ? entry.users
+          .slice(0, MAX_REACTION_USERS)
           .map((user) => {
             if (typeof user !== 'string') return '';
-            return users.get(user) || user;
+            const id = boundedWireToken(user, MAX_CHANNEL_ID_LENGTH);
+            return lookupUser(users, id) || id;
           })
+          .map((user) => boundedWireToken(user, MAX_VAULT_REACTION_FIELD_LENGTH))
           .filter((user): user is string => user.length > 0)
       : [];
     const count = finitePositiveInt(entry.count, 0);
@@ -212,7 +278,7 @@ function mapReactions(raw: unknown, users: Map<string, string>): MessageReaction
 }
 
 function parseSlackTime(raw: unknown): Date | null {
-  const value = asString(raw).trim();
+  const value = boundedString(raw, MAX_SLACK_TIMESTAMP_LENGTH).trim();
   if (!value) return null;
   const seconds = Number(value);
   if (!Number.isFinite(seconds) || seconds <= 0) return null;
@@ -227,28 +293,36 @@ function readChannelObject(root: Record<string, unknown>): Record<string, unknow
 function readChannelName(root: Record<string, unknown>): string {
   const channel = readChannelObject(root);
   if (!channel) return 'imported';
-  return asString(channel.name).trim() || asString(channel.id).trim() || 'imported';
+  return boundedString(channel.name, MAX_VAULT_TARGET_LENGTH * 4).trim()
+    || boundedString(channel.id, MAX_CHANNEL_ID_LENGTH).trim()
+    || 'imported';
 }
 
 function readChannelId(root: Record<string, unknown>, target: string): string {
   const channel = readChannelObject(root);
   if (!channel) return target;
-  return asString(channel.id).trim() || asString(channel.name).trim() || target;
+  return boundedWireToken(channel.id, MAX_CHANNEL_ID_LENGTH)
+    || boundedWireToken(channel.name, MAX_CHANNEL_ID_LENGTH)
+    || target;
 }
 
 function hasChannelMessages(root: Record<string, unknown>): boolean {
   if (!Array.isArray(root.messages)) return false;
   if (isRecord(root.channel)) return true;
-  return typeof root.name === 'string' && root.name.trim().length > 0;
+  return boundedString(root.name, MAX_VAULT_TARGET_LENGTH).trim().length > 0;
 }
 
 function workspaceName(raw: unknown): string | null {
   if (!isRecord(raw)) return null;
-  const direct = asString(raw.workspace).trim();
+  const direct = boundedDisplayText(raw.workspace, MAX_WORKSPACE_NAME_LENGTH);
   if (direct) return direct;
-  const workspace = isRecord(raw.workspace) ? asString(raw.workspace.name).trim() : '';
+  const workspace = isRecord(raw.workspace)
+    ? boundedDisplayText(raw.workspace.name, MAX_WORKSPACE_NAME_LENGTH)
+    : '';
   if (workspace) return workspace;
-  const team = isRecord(raw.team) ? asString(raw.team.name).trim() : '';
+  const team = isRecord(raw.team)
+    ? boundedDisplayText(raw.team.name, MAX_WORKSPACE_NAME_LENGTH)
+    : '';
   if (team) return team;
   return null;
 }
@@ -259,36 +333,36 @@ function collectChannelExports(raw: unknown): { exports: SlackChannelExport[]; w
   const topUsers = isRecord(raw) ? collectUsers(raw.users) : new Map<string, string>();
   const workspace = workspaceName(raw);
 
-  if (Array.isArray(raw)) {
-    for (const entry of raw) {
+  const append = (source: readonly unknown[]): void => {
+    const scan = Math.min(source.length, MAX_CHANNEL_EXPORT_SCAN);
+    for (let index = 0; index < scan && exports.length < MAX_EXPORT_TARGETS; index += 1) {
+      const entry = source[index];
       if (isRecord(entry) && hasChannelMessages(entry)) {
-        exports.push({ root: entry, users: mergeUsers(topUsers, entry.users) });
+        exports.push({ root: entry, users: userDirectory(topUsers, entry.users) });
       }
     }
+  };
+
+  if (Array.isArray(raw)) {
+    append(raw);
     return { exports, workspace };
   }
 
   if (!isRecord(raw)) return { exports, workspace };
 
   if (Array.isArray(raw.exports)) {
-    for (const entry of raw.exports) {
-      if (isRecord(entry) && hasChannelMessages(entry)) {
-        exports.push({ root: entry, users: mergeUsers(topUsers, entry.users) });
-      }
-    }
+    append(raw.exports);
     return { exports, workspace };
   }
 
   if (Array.isArray(raw.channels)) {
-    for (const channel of raw.channels) {
-      if (isRecord(channel) && hasChannelMessages(channel)) {
-        exports.push({ root: channel, users: mergeUsers(topUsers, channel.users) });
-      }
-    }
+    append(raw.channels);
     return { exports, workspace };
   }
 
-  if (hasChannelMessages(raw)) exports.push({ root: raw, users: topUsers });
+  if (hasChannelMessages(raw)) {
+    exports.push({ root: raw, users: { shared: topUsers, local: new Map() } });
+  }
   return { exports, workspace };
 }
 
@@ -297,15 +371,17 @@ function uniqueId(bucket: TargetBucket, channelId: string, slackTs: string): str
   const base = `slack:${channelId || 'ch'}:${slackTs || `idx${bucket.seq++}`}`;
   if (!bucket.emittedIds.has(base)) {
     bucket.emittedIds.add(base);
+    bucket.nextSuffix.set(base, 2);
     return base;
   }
-  let n = 2;
+  let n = bucket.nextSuffix.get(base) ?? 2;
   let candidate = `${base}#${n}`;
   while (bucket.emittedIds.has(candidate)) {
     n += 1;
     candidate = `${base}#${n}`;
   }
   bucket.emittedIds.add(candidate);
+  bucket.nextSuffix.set(base, n + 1);
   return candidate;
 }
 
@@ -332,6 +408,7 @@ export function parseSlackExport(raw: unknown, options: SlackImportOptions = {})
   const byTarget = new Map<string, TargetBucket>();
   let skipped = 0;
   let droppedOverCap = 0;
+  let remainingMessageWork = MAX_EXPORT_TOTAL_RAW_MESSAGES;
 
   // Sort a bucket chronologically and drop everything older than the newest
   // `keepPerChannel`. Called mid-scan (memory bound) and once at the end.
@@ -345,11 +422,22 @@ export function parseSlackExport(raw: unknown, options: SlackImportOptions = {})
   for (const channelExport of collected.exports) {
     const target = normalizeSlackChannelTarget(readChannelName(channelExport.root));
     const channelId = readChannelId(channelExport.root, target);
-    const messages = Array.isArray(channelExport.root.messages) ? channelExport.root.messages : [];
+    const rawMessages = Array.isArray(channelExport.root.messages) ? channelExport.root.messages : [];
+    const messageWork = Math.min(MAX_EXPORT_RAW_MESSAGES, remainingMessageWork);
+    const messages = messageWork > 0 ? rawMessages.slice(-messageWork) : [];
+    droppedOverCap += rawMessages.length - messages.length;
+    remainingMessageWork -= messages.length;
 
     let bucket = byTarget.get(target);
     if (!bucket) {
-      bucket = { target, messages: [], refIndex: new Map(), emittedIds: new Set(), seq: 0 };
+      bucket = {
+        target,
+        messages: [],
+        refIndex: new Map(),
+        emittedIds: new Set(),
+        nextSuffix: new Map(),
+        seq: 0,
+      };
       byTarget.set(target, bucket);
     }
 
@@ -359,26 +447,31 @@ export function parseSlackExport(raw: unknown, options: SlackImportOptions = {})
         continue;
       }
 
-      if (asString(rawMessage.type).trim() && asString(rawMessage.type).trim() !== 'message') {
+      const messageType = boundedString(rawMessage.type, 32).trim();
+      if (messageType && messageType !== 'message') {
         skipped += 1;
         continue;
       }
 
-      const subtype = asString(rawMessage.subtype).trim();
+      const subtype = boundedString(rawMessage.subtype, 64).trim();
       const isChat = CHAT_SUBTYPES.has(subtype);
       if (!isChat && !includeSystem) {
         skipped += 1;
         continue;
       }
 
-      const slackTs = asString(rawMessage.ts).trim();
+      const slackTs = boundedWireToken(rawMessage.ts, MAX_SLACK_TIMESTAMP_LENGTH);
       const time = parseSlackTime(slackTs);
       if (!time) {
         skipped += 1;
         continue;
       }
 
-      const text = composeText(asString(rawMessage.text), rawMessage.files, channelExport.users);
+      const text = composeText(
+        boundedString(rawMessage.text, MAX_VAULT_MESSAGE_TEXT_LENGTH),
+        rawMessage.files,
+        channelExport.users,
+      );
       if (!text) {
         skipped += 1;
         continue;
@@ -407,12 +500,15 @@ export function parseSlackExport(raw: unknown, options: SlackImportOptions = {})
         target,
       };
 
-      if (isRecord(rawMessage.edited) && asString(rawMessage.edited.ts).trim()) message.edited = true;
+      if (
+        isRecord(rawMessage.edited)
+        && boundedString(rawMessage.edited.ts, MAX_VAULT_TIMESTAMP_LENGTH).trim()
+      ) message.edited = true;
 
       const reactions = mapReactions(rawMessage.reactions, channelExport.users);
       if (reactions) message.reactions = reactions;
 
-      const threadTs = asString(rawMessage.thread_ts).trim();
+      const threadTs = boundedWireToken(rawMessage.thread_ts, MAX_SLACK_TIMESTAMP_LENGTH);
       if (threadTs && threadTs !== slackTs) {
         const referenced = bucket.refIndex.get(threadTs);
         if (referenced) {

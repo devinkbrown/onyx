@@ -777,6 +777,12 @@ client or public site needs to expose the result.
     suffixing.
     Oversized metadata cannot starve real channel rows, and both paths retain
     the newest bounded tail before the normal `VAULT_KEEP` prune.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Slack export transforms now
+    apply the same vault-aligned channel/message work ceilings, bounded layered
+    user directories, vault-safe sender/reaction fields, newest-tail retention,
+    amortized duplicate timestamps, and public credential-free attachment
+    policy. Internal/LAN, credential-bearing, and non-HTTP file URLs never enter
+    imported message text or become ambient browser requests.
 
 ## Phase 13 — Amanogawa Local Intelligence ← PLANNED
 34. **AI provenance chrome** *(client)* — every recap, search answer,

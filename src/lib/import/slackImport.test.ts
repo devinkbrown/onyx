@@ -47,6 +47,12 @@ describe('normalizeSlackChannelTarget', () => {
   it('falls back for an empty name', () => {
     expect(normalizeSlackChannelTarget('   ')).toBe('#imported');
   });
+
+  it('bounds hostile channel names to the vault target ceiling', () => {
+    const target = normalizeSlackChannelTarget('x'.repeat(20_000));
+    expect(target).toHaveLength(512);
+    expect(target.startsWith('#')).toBe(true);
+  });
 });
 
 describe('parseSlackExport — happy path', () => {
@@ -340,6 +346,99 @@ describe('parseSlackExport — robustness', () => {
     const kept = result!.snapshot.targets[0]!.messages;
     expect(kept.map((message) => message.text)).toEqual(['m17', 'm18', 'm19']);
     expect(result!.summary.droppedOverCap).toBe(17);
+  });
+
+  it('bounds hostile fields, files, reactions, and reactor lists', () => {
+    const files = [
+      { permalink: 'javascript:alert(1)' },
+      { permalink: 'https://user:secret@example.com/private.png' },
+      { permalink: 'http://127.0.0.1/internal.png' },
+      ...Array.from({ length: 40 }, (_, index) => ({
+        permalink: `https://files.example/${index}.png`,
+      })),
+    ];
+    const reactions = Array.from({ length: 70 }, (_, reactionIndex) => ({
+      name: `reaction-${reactionIndex}`,
+      count: 150,
+      users: Array.from({ length: 120 }, (_, userIndex) => `user ${userIndex}`),
+    }));
+    const result = parseSlackExport(exportFixture({
+      workspace: { name: `Workspace\u0000${'w'.repeat(400)}` },
+      channel: { id: 'c'.repeat(500), name: 'general' },
+      messages: [{
+        type: 'message',
+        username: `Alice Smith\u0000${'a'.repeat(400)}`,
+        text: 'x'.repeat(70 * 1_024),
+        ts: '1735725600.100000',
+        files,
+        reactions,
+      }],
+    }));
+    const message = result!.snapshot.targets[0]!.messages[0]!;
+
+    expect(result!.summary.workspace).toHaveLength(256);
+    expect(message.id.length).toBeLessThanOrEqual(512);
+    expect(message.from).toBe(`Alice-Smith-${'a'.repeat(244)}`);
+    expect(message.text).toHaveLength(64 * 1_024);
+    expect(message.text).not.toContain('javascript:');
+    expect(message.text).not.toContain('secret');
+    expect(message.text).not.toContain('127.0.0.1');
+    expect(message.reactions).toHaveLength(64);
+    expect(message.reactions![0]!.users).toHaveLength(99);
+    expect(message.reactions![0]!.users[0]).toBe('user-0');
+    expect(parseVaultExport(result!.snapshot)).not.toBeNull();
+  });
+
+  it('caps per-export and aggregate message work while retaining scanned tails', () => {
+    const rows = (prefix: string, count: number) => Array.from({ length: count }, (_, index) => ({
+      type: 'message',
+      username: 'a',
+      ts: `${1735725600 + index}.000000`,
+      text: `${prefix} ${index}`,
+    }));
+    const exports = Array.from({ length: 12 }, (_, index) => exportFixture({
+      channel: { id: `C${index + 100}`, name: `channel-${index}` },
+      messages: rows(`c${index}-`, 1_700),
+    }));
+    const result = parseSlackExport(exports);
+
+    expect(result!.summary.messages).toBe(10 * 400 + 384);
+    expect(result!.summary.droppedOverCap).toBe(12 * 1_700 - (10 * 400 + 384));
+    expect(result!.snapshot.targets[0]!.messages[0]!.text).toBe('c0- 1300');
+    expect(result!.snapshot.targets.at(-1)!.target).toBe('#channel-10');
+  });
+
+  it('allocates duplicate timestamps without quadratic suffix rescans', () => {
+    const messages = Array.from({ length: 1_000 }, (_, index) => ({
+      type: 'message',
+      username: 'a',
+      ts: '1735725600.000000',
+      text: `message ${index}`,
+    }));
+    const result = parseSlackExport(exportFixture({ messages }));
+    const ids = result!.snapshot.targets[0]!.messages.map((message) => message.id);
+
+    expect(ids).toHaveLength(400);
+    expect(new Set(ids).size).toBe(400);
+    expect(ids.at(-1)).toBe('slack:C100:1735725600.000000#1000');
+  });
+
+  it('never seats private or credential-bearing file URLs in imported text', () => {
+    const result = parseSlackExport(exportFixture({ messages: [{
+      type: 'message',
+      username: 'a',
+      ts: '1735725600.000000',
+      text: 'files',
+      files: [
+        { permalink: 'http://192.168.1.1/router.png' },
+        { permalink: 'https://user:secret@example.com/private.png' },
+        { permalink: 'https://files.example/public.png' },
+      ],
+    }] }));
+
+    expect(result!.snapshot.targets[0]!.messages[0]!.text).toBe(
+      'files\nhttps://files.example/public.png',
+    );
   });
 });
 
