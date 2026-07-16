@@ -1275,19 +1275,32 @@ describe('AppShell', () => {
       stubMobileViewport();
       seedStore('#general');
 
-      render(() => <AppShell />);
+      const { container } = render(() => <AppShell />);
 
       const roomsButton = screen.getByRole('button', { name: 'Toggle channel list' });
+      const conversation = container.querySelector<HTMLElement>('.shell-conversation');
+      const mobileNav = container.querySelector<HTMLElement>('.shell-mobile-nav');
+      expect(conversation).not.toHaveAttribute('inert');
+      expect(mobileNav).not.toHaveAttribute('inert');
       roomsButton.focus();
       fireEvent.click(roomsButton);
 
       const drawer = screen.getByRole('dialog', { name: 'Channel drawer' });
-      await waitFor(() => expect(drawer.contains(document.activeElement)).toBe(true));
+      await waitFor(() => {
+        expect(drawer.contains(document.activeElement)).toBe(true);
+        expect(drawer).not.toHaveAttribute('inert');
+        expect(conversation).toHaveAttribute('inert');
+        expect(mobileNav).toHaveAttribute('inert');
+      });
 
       fireEvent.keyDown(document, { key: 'Escape' });
 
-      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Channel drawer' })).not.toBeInTheDocument());
-      expect(roomsButton).toHaveFocus();
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: 'Channel drawer' })).not.toBeInTheDocument();
+        expect(conversation).not.toHaveAttribute('inert');
+        expect(mobileNav).not.toHaveAttribute('inert');
+        expect(roomsButton).toHaveFocus();
+      });
     });
 
     it('keeps the mobile channel drawer open for claimed or composing keys', async () => {
@@ -1321,9 +1334,15 @@ describe('AppShell', () => {
 
       const membersButton = screen.getByRole('button', { name: 'Toggle member list' });
       const memberList = container.querySelector<HTMLElement>('.shell-members');
+      const sidebar = container.querySelector<HTMLElement>('.shell-sidebar-slot');
+      const conversation = container.querySelector<HTMLElement>('.shell-conversation');
+      const mobileNav = container.querySelector<HTMLElement>('.shell-mobile-nav');
       expect(memberList).not.toBeNull();
       expect(memberList).toHaveAttribute('aria-hidden', 'true');
       expect(memberList).toHaveAttribute('inert');
+      expect(sidebar).not.toHaveAttribute('inert');
+      expect(conversation).not.toHaveAttribute('inert');
+      expect(mobileNav).not.toHaveAttribute('inert');
       expect(screen.queryByRole('region', { name: 'Channel members in #general' })).toBeNull();
       for (const trigger of memberList!.querySelectorAll<HTMLButtonElement>('.onyx-popover__trigger')) {
         expect(trigger).toBeDisabled();
@@ -1336,6 +1355,9 @@ describe('AppShell', () => {
         const members = screen.getByRole('region', { name: 'Channel members in #general' });
         expect(memberList).toHaveAttribute('aria-hidden', 'false');
         expect(memberList).not.toHaveAttribute('inert');
+        expect(sidebar).toHaveAttribute('inert');
+        expect(conversation).toHaveAttribute('inert');
+        expect(mobileNav).toHaveAttribute('inert');
         for (const trigger of memberList!.querySelectorAll<HTMLButtonElement>('.onyx-popover__trigger')) {
           expect(trigger).not.toBeDisabled();
         }
@@ -1347,6 +1369,9 @@ describe('AppShell', () => {
       await waitFor(() => {
         expect(memberList).toHaveAttribute('aria-hidden', 'true');
         expect(memberList).toHaveAttribute('inert');
+        expect(sidebar).not.toHaveAttribute('inert');
+        expect(conversation).not.toHaveAttribute('inert');
+        expect(mobileNav).not.toHaveAttribute('inert');
         expect(membersButton).toHaveFocus();
       });
       expect(screen.queryByRole('region', { name: 'Channel members in #general' })).toBeNull();

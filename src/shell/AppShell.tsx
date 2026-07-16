@@ -343,6 +343,32 @@ export function AppShell(props: AppShellProps): JSX.Element {
     return null;
   }
 
+  // aria-modal communicates the drawer boundary, but it does not make the
+  // rest of the document non-interactive on its own. Native inert keeps the
+  // conversation, inactive navigation, and bottom tabs out of both keyboard
+  // reach and the accessibility tree until the active mobile drawer closes.
+  createEffect(() => {
+    const drawer = activeMobileDrawerElement();
+    if (!drawer) return;
+
+    const backgroundRoots = [
+      document.querySelector<HTMLElement>('.shell-rail'),
+      document.querySelector<HTMLElement>('.shell-sidebar-slot'),
+      document.querySelector<HTMLElement>('.shell-conversation'),
+      document.querySelector<HTMLElement>('.shell-mobile-nav'),
+    ].filter((root): root is HTMLElement => Boolean(
+      root
+      && root !== drawer
+      && !root.contains(drawer)
+      && !drawer.contains(root)
+    ));
+
+    for (const root of backgroundRoots) root.setAttribute('inert', '');
+    onCleanup(() => {
+      for (const root of backgroundRoots) root.removeAttribute('inert');
+    });
+  });
+
   function focusFirstInMobileDrawer(root: HTMLElement | null | undefined): void {
     queueMicrotask(() => {
       const first = focusableIn(root)[0];
