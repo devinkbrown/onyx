@@ -224,6 +224,12 @@
   align-self: start;
 }
 
+.pref-category-nav__landmark {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
 .pref-category-nav__eyebrow {
   margin: 0;
   color: var(--washi-mute);

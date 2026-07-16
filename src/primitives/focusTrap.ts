@@ -20,9 +20,14 @@ const focusableSelector = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
+function focusableElements(panel: HTMLElement): HTMLElement[] {
+  return Array.from(panel.querySelectorAll<HTMLElement>(focusableSelector))
+    .filter((element) => !element.hasAttribute('disabled') && element.tabIndex !== -1);
+}
+
 /** Move focus into the panel on open — first focusable, else the panel itself. */
 export function focusFirst(panel: HTMLElement): void {
-  const first = panel.querySelector<HTMLElement>(focusableSelector);
+  const first = focusableElements(panel)[0];
   (first ?? panel).focus();
 }
 
@@ -33,8 +38,7 @@ export function focusFirst(panel: HTMLElement): void {
  * activeElement to <body>). (WCAG 2.4.3)
  */
 export function trapFocus(event: KeyboardEvent, panel: HTMLElement): void {
-  const focusable = Array.from(panel.querySelectorAll<HTMLElement>(focusableSelector))
-    .filter((element) => !element.hasAttribute('disabled') && element.tabIndex !== -1);
+  const focusable = focusableElements(panel);
 
   if (focusable.length === 0) {
     event.preventDefault();

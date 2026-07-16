@@ -2,6 +2,7 @@
 import { createSignal } from 'solid-js';
 import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
 import { afterEach, describe, expect, it } from 'vitest';
+import { focusFirst } from './focusTrap';
 import { Sheet } from './Sheet';
 
 const tick = () => new Promise((resolve) => window.setTimeout(resolve, 0));
@@ -21,6 +22,21 @@ describe('Sheet', () => {
     expect(dialog.getAttribute('aria-modal')).toBe('true');
     expect(dialog.textContent).toContain('Inspect this user');
     expect(screen.getByRole('button', { name: 'Message' })).toBeTruthy();
+  });
+
+  it('moves initial focus past disabled and roving-tab controls that are out of the tab order', () => {
+    const panel = document.createElement('div');
+    panel.innerHTML = `
+      <button type="button" disabled>Unavailable action</button>
+      <button type="button" role="tab" tabindex="-1">Inactive category</button>
+      <button type="button" role="tab" tabindex="0">Selected category</button>
+    `;
+    document.body.appendChild(panel);
+
+    focusFirst(panel);
+
+    expect(panel.querySelector('[role="tab"][tabindex="0"]')).toHaveFocus();
+    panel.remove();
   });
 
   it('closes from Escape through the controlled open signal', async () => {

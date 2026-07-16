@@ -200,6 +200,7 @@ const PREFERENCE_CATEGORIES = [
   { id: 'accessibility', label: 'Accessibility', summary: 'Motion and access' },
 ] as const;
 type PreferenceCategory = (typeof PREFERENCE_CATEGORIES)[number]['id'];
+const MOBILE_CATEGORY_TABS_QUERY = '(max-width: 42rem)';
 
 function resetAllPreferences(): void {
   resetPreferences();
@@ -2366,6 +2367,23 @@ function PreferenceCategoryNavigation(props: {
   onSelect: (category: PreferenceCategory) => void;
 }): JSX.Element {
   const buttons: (HTMLButtonElement | undefined)[] = [];
+  const [horizontalTabs, setHorizontalTabs] = createSignal(false);
+  let categoryTabsQuery: MediaQueryList | undefined;
+
+  const handleCategoryTabsQueryChange = (event: MediaQueryListEvent): void => {
+    setHorizontalTabs(event.matches);
+  };
+
+  onMount(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    categoryTabsQuery = window.matchMedia(MOBILE_CATEGORY_TABS_QUERY);
+    setHorizontalTabs(categoryTabsQuery.matches);
+    categoryTabsQuery.addEventListener('change', handleCategoryTabsQueryChange);
+  });
+
+  onCleanup(() => {
+    categoryTabsQuery?.removeEventListener('change', handleCategoryTabsQueryChange);
+  });
 
   function selectAt(index: number): void {
     const category = PREFERENCE_CATEGORIES[index];
@@ -2378,12 +2396,22 @@ function PreferenceCategoryNavigation(props: {
     const last = PREFERENCE_CATEGORIES.length - 1;
     switch (event.key) {
       case 'ArrowRight':
-      case 'ArrowDown':
+        if (!horizontalTabs()) return;
         event.preventDefault();
         selectAt(index === last ? 0 : index + 1);
         break;
       case 'ArrowLeft':
+        if (!horizontalTabs()) return;
+        event.preventDefault();
+        selectAt(index === 0 ? last : index - 1);
+        break;
+      case 'ArrowDown':
+        if (horizontalTabs()) return;
+        event.preventDefault();
+        selectAt(index === last ? 0 : index + 1);
+        break;
       case 'ArrowUp':
+        if (horizontalTabs()) return;
         event.preventDefault();
         selectAt(index === 0 ? last : index - 1);
         break;
@@ -2399,40 +2427,47 @@ function PreferenceCategoryNavigation(props: {
   }
 
   return (
-    <nav class="pref-category-nav" aria-label="Preference categories">
-      <p class="pref-category-nav__eyebrow">Browse</p>
-      <div class="pref-category-tabs" role="tablist" aria-label="Preference categories">
-        <For each={PREFERENCE_CATEGORIES}>
-          {(category, index) => {
-            const selected = () => props.active() === category.id;
-            return (
-              <button
-                ref={(element) => (buttons[index()] = element)}
-                type="button"
-                class="pref-category-tab"
-                role="tab"
-                id={`pref-category-tab-${category.id}`}
-                aria-controls={`pref-category-panel-${category.id}`}
-                aria-label={category.label}
-                aria-describedby={`pref-category-summary-${category.id}`}
-                aria-selected={selected()}
-                tabindex={selected() ? 0 : -1}
-                onClick={() => props.onSelect(category.id)}
-                onKeyDown={(event) => onKeyDown(event, index())}
-              >
-                <span class="pref-category-tab__label">{category.label}</span>
-                <span class="pref-category-tab__summary" id={`pref-category-summary-${category.id}`}>
-                  {category.summary}
-                </span>
-              </button>
-            );
-          }}
-        </For>
-      </div>
+    <div class="pref-category-nav">
+      <nav class="pref-category-nav__landmark" aria-label="Preference categories">
+        <p class="pref-category-nav__eyebrow">Browse</p>
+        <div
+          class="pref-category-tabs"
+          role="tablist"
+          aria-label="Preference categories"
+          aria-orientation={horizontalTabs() ? 'horizontal' : 'vertical'}
+        >
+          <For each={PREFERENCE_CATEGORIES}>
+            {(category, index) => {
+              const selected = () => props.active() === category.id;
+              return (
+                <button
+                  ref={(element) => (buttons[index()] = element)}
+                  type="button"
+                  class="pref-category-tab"
+                  role="tab"
+                  id={`pref-category-tab-${category.id}`}
+                  aria-controls={`pref-category-panel-${category.id}`}
+                  aria-label={category.label}
+                  aria-describedby={`pref-category-summary-${category.id}`}
+                  aria-selected={selected()}
+                  tabindex={selected() ? 0 : -1}
+                  onClick={() => props.onSelect(category.id)}
+                  onKeyDown={(event) => onKeyDown(event, index())}
+                >
+                  <span class="pref-category-tab__label">{category.label}</span>
+                  <span class="pref-category-tab__summary" id={`pref-category-summary-${category.id}`}>
+                    {category.summary}
+                  </span>
+                </button>
+              );
+            }}
+          </For>
+        </div>
+      </nav>
       <button type="button" class="pref-reset pref-reset-all" onClick={() => resetAllPreferences()}>
         Reset to defaults
       </button>
-    </nav>
+    </div>
   );
 }
 
@@ -2464,6 +2499,16 @@ function AppearanceLauncher(): JSX.Element {
 
 export function PreferencesPanel(): JSX.Element {
   const [activeCategory, setActiveCategory] = createSignal<PreferenceCategory>('display');
+  let panelRef: HTMLDivElement | undefined;
+
+  function selectCategory(category: PreferenceCategory): void {
+    setActiveCategory(category);
+    panelRef?.closest<HTMLElement>('.onyx-sheet__body')?.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: 'auto',
+    });
+  }
 
   return (
     <Sheet
@@ -2473,8 +2518,8 @@ export function PreferencesPanel(): JSX.Element {
       onOpenChange={(next) => (next ? openPreferences() : closePreferences())}
       closeLabel="Close preferences"
     >
-      <div class="pref-panel" data-testid="preferences-panel">
-        <PreferenceCategoryNavigation active={activeCategory} onSelect={setActiveCategory} />
+      <div ref={panelRef} class="pref-panel" data-testid="preferences-panel">
+        <PreferenceCategoryNavigation active={activeCategory} onSelect={selectCategory} />
 
         <div class="pref-category-content">
           <section

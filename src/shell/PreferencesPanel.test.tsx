@@ -150,9 +150,12 @@ describe('PreferencesPanel', () => {
     renderPreferences();
 
     const tabs = screen.getAllByRole('tab');
+    const categoryNav = screen.getByRole('navigation', { name: 'Preference categories' });
     expect(tabs).toHaveLength(5);
-    expect(screen.getByRole('tablist', { name: 'Preference categories' })).toBeInTheDocument();
-    expect(screen.getByRole('navigation', { name: 'Preference categories' })).toBeInTheDocument();
+    expect(screen.getByRole('tablist', { name: 'Preference categories' })).toHaveAttribute('aria-orientation', 'vertical');
+    expect(categoryNav).toBeInTheDocument();
+    expect(within(categoryNav).queryByRole('button', { name: 'Reset to defaults' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reset to defaults' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /^Display/ })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tab', { name: /^Display/ })).toHaveAttribute('tabindex', '0');
     expect(screen.getByRole('tabpanel')).toHaveAccessibleName('Display');
@@ -176,6 +179,10 @@ describe('PreferencesPanel', () => {
     display.focus();
 
     fireEvent.keyDown(display, { key: 'ArrowRight' });
+    expect(display).toHaveFocus();
+    expect(display).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.keyDown(display, { key: 'ArrowDown' });
     const conversation = screen.getByRole('tab', { name: /^Conversation/ });
     expect(conversation).toHaveFocus();
     expect(conversation).toHaveAttribute('aria-selected', 'true');
@@ -191,13 +198,60 @@ describe('PreferencesPanel', () => {
     expect(display).toHaveAttribute('aria-selected', 'true');
   });
 
-  it('keeps an inactive category mounted while removing it from the visible scroll', () => {
+  it('uses horizontal arrow keys on mobile and disposes its responsive listener', () => {
+    let categoryTabsListener: ((event: MediaQueryListEvent) => void) | undefined;
+    const removeEventListener = vi.fn();
+    vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+      matches: query === '(max-width: 42rem)',
+      media: query,
+      onchange: null,
+      addEventListener: (type: string, listener: (event: MediaQueryListEvent) => void) => {
+        if (query === '(max-width: 42rem)' && type === 'change') categoryTabsListener = listener;
+      },
+      removeEventListener,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      dispatchEvent: () => false,
+    }) as MediaQueryList));
+
+    const view = renderPreferences();
+    const tablist = screen.getByRole('tablist', { name: 'Preference categories' });
+    const display = screen.getByRole('tab', { name: /^Display/ });
+    display.focus();
+
+    expect(tablist).toHaveAttribute('aria-orientation', 'horizontal');
+    fireEvent.keyDown(display, { key: 'ArrowDown' });
+    expect(display).toHaveFocus();
+
+    fireEvent.keyDown(display, { key: 'ArrowRight' });
+    const conversation = screen.getByRole('tab', { name: /^Conversation/ });
+    expect(conversation).toHaveFocus();
+    expect(conversation).toHaveAttribute('aria-selected', 'true');
+
+    categoryTabsListener?.({ matches: false } as MediaQueryListEvent);
+    expect(tablist).toHaveAttribute('aria-orientation', 'vertical');
+
+    view.unmount();
+    expect(removeEventListener).toHaveBeenCalledWith('change', categoryTabsListener);
+  });
+
+  it('resets category scroll while preserving tab focus and mounted pane state', () => {
     renderPreferences('History & data');
     fireEvent.click(screen.getByRole('button', { name: 'Clear local history' }));
     const confirmation = screen.getByRole('group', { name: 'Confirm clear local history' });
+    const sheetBody = document.querySelector<HTMLElement>('.onyx-sheet__body');
+    expect(sheetBody).not.toBeNull();
+    const scrollTo = vi.spyOn(sheetBody!, 'scrollTo');
+    sheetBody!.scrollTop = 480;
+    const history = screen.getByRole('tab', { name: /^History & data/ });
+    history.focus();
 
-    selectPreferenceCategory('Display');
+    fireEvent.keyDown(history, { key: 'ArrowUp' });
 
+    const conversation = screen.getByRole('tab', { name: /^Conversation/ });
+    expect(conversation).toHaveFocus();
+    expect(conversation).toHaveAttribute('aria-selected', 'true');
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'auto' });
     expect(screen.getAllByRole('tabpanel')).toHaveLength(1);
     expect(screen.queryByRole('group', { name: 'Confirm clear local history' })).not.toBeInTheDocument();
     const historyPanel = document.getElementById('pref-category-panel-history');
@@ -207,8 +261,9 @@ describe('PreferencesPanel', () => {
       hidden: true,
     })).toBe(confirmation);
 
-    selectPreferenceCategory('History & data');
+    fireEvent.keyDown(conversation, { key: 'ArrowDown' });
 
+    expect(history).toHaveFocus();
     expect(screen.getByRole('group', { name: 'Confirm clear local history' })).toBe(confirmation);
   });
 
