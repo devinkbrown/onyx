@@ -108,6 +108,26 @@ export interface PortableTransferImportResult {
   savedSearches: number;
 }
 
+export interface PortableTransferImportOptions {
+  /**
+   * Live ownership guard supplied by mounted UI. Portable imports cross
+   * awaited IndexedDB work and must not resume device-wide writes after the
+   * reviewed account/session has been replaced.
+   */
+  isCurrent?: () => boolean;
+}
+
+export class PortableTransferOwnerChangedError extends Error {
+  constructor() {
+    super('Portable transfer owner changed during import');
+    this.name = 'PortableTransferOwnerChangedError';
+  }
+}
+
+function assertPortableTransferCurrent(options?: PortableTransferImportOptions): void {
+  if (options?.isCurrent?.() === false) throw new PortableTransferOwnerChangedError();
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -207,9 +227,12 @@ export function parsePortableTransfer(raw: unknown): PortableTransferSnapshot | 
 export async function importPortableTransfer(
   snapshot: PortableTransferSnapshot,
   owner?: DeviceMemoryOwner,
+  options?: PortableTransferImportOptions,
 ): Promise<PortableTransferImportResult> {
+  assertPortableTransferCurrent(options);
   const preferenceHandoff = snapshot.preferenceHandoff;
   if (preferenceHandoff) {
+    assertPortableTransferCurrent(options);
     applyPreferencesSnapshot(preferenceHandoff.preferences);
     setSceneMotion(preferenceHandoff.sceneMotion);
   }
@@ -220,16 +243,21 @@ export async function importPortableTransfer(
   // message and triggered pruning.
   const importedRetentionPolicy = preferenceHandoff?.retentionPolicy;
   if (importedRetentionPolicy) {
+    assertPortableTransferCurrent(options);
     writeRetentionPolicy(importedRetentionPolicy);
     await applyRetentionPolicy(importedRetentionPolicy);
+    assertPortableTransferCurrent(options);
   }
   // A transferred or already-active localHistory=false preference is a hard
   // privacy boundary: clear existing rows and do not persist imported history.
   let vault: { targets: number; messages: number };
+  assertPortableTransferCurrent(options);
   if (preferences().localHistory) {
     vault = await importVault(snapshot, owner);
+    assertPortableTransferCurrent(options);
   } else {
     const cleared = await clearVault();
+    assertPortableTransferCurrent(options);
     if (!cleared) {
       // `localHistory=false` is a privacy boundary, not a best-effort hint. Do
       // not continue merging the rest of a portable snapshot while old vault
@@ -239,6 +267,7 @@ export async function importPortableTransfer(
     }
     vault = { targets: 0, messages: 0 };
   }
+  assertPortableTransferCurrent(options);
   // Topic cursors are device-local transcript memory. Preserve the same
   // localHistory privacy boundary as the vault: a disabled handoff clears and
   // leaves them absent; otherwise merge through the ledger's canonical parser,
@@ -259,12 +288,14 @@ export async function importPortableTransfer(
   }, undefined, owner);
   const accountHandoffs = importAccountHandoffs(snapshot.accountHandoffs);
   const followedConversations = mergeFollowedKeys(snapshot.followedConversations, owner);
+  assertPortableTransferCurrent(options);
   const savedSearches = await importSavedSearches({
     kind: 'onyx-saved-searches',
     version: 1,
     exportedAt: new Date().toISOString(),
     searches: snapshot.savedSearches,
   }, owner);
+  assertPortableTransferCurrent(options);
   return {
     targets: vault.targets,
     messages: vault.messages,

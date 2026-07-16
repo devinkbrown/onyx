@@ -982,12 +982,17 @@ function PortableVaultControls(): JSX.Element {
     setBusy(true);
     try {
       const locked = await withPortableImportLock(async () => {
-        const result = await importPortableTransfer(pending.snapshot, owner);
-        const currentOwner = memoryOwner();
-        if (
-          currentOwner?.serverUrl !== owner.serverUrl
-          || currentOwner.identity !== owner.identity
-        ) {
+        const importIsCurrent = () => {
+          const currentOwner = memoryOwner();
+          return !disposed
+            && epoch === applyEpoch
+            && currentOwner?.serverUrl === owner.serverUrl
+            && currentOwner.identity === owner.identity;
+        };
+        const result = await importPortableTransfer(pending.snapshot, owner, {
+          isCurrent: importIsCurrent,
+        });
+        if (!importIsCurrent()) {
           throw new Error('portable vault account changed during import');
         }
         for (const [target, draft] of Object.entries(pending.snapshot.composerDrafts)) {

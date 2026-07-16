@@ -1919,6 +1919,38 @@ describe('PreferencesPanel', () => {
     expect(screen.queryByText(/^Imported 0 messages/)).not.toBeInTheDocument();
   });
 
+  it('retires the in-flight portable import mutation guard when the owner changes', async () => {
+    let resolveImport: (result: typeof emptyPortableImportResult) => void = () => {};
+    const pendingImport = new Promise<typeof emptyPortableImportResult>((resolve) => {
+      resolveImport = resolve;
+    });
+    let importIsCurrent: (() => boolean) | undefined;
+    vi.spyOn(portableTransfer, 'importPortableTransfer').mockImplementation(
+      (_snapshot, _owner, options) => {
+        importIsCurrent = options?.isCurrent;
+        return pendingImport;
+      },
+    );
+    renderPreferences('Import & export');
+    await stageEmptyPortableImport();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Import reviewed file' }));
+    await waitFor(() => expect(importIsCurrent).toBeTypeOf('function'));
+    expect(importIsCurrent?.()).toBe(true);
+
+    const current = store.getState().server;
+    store.setState({
+      ourNick: 'bob',
+      server: current ? { ...current, nick: 'bob', account: 'bob' } : null,
+    });
+
+    await waitFor(() => expect(importIsCurrent?.()).toBe(false));
+    resolveImport(emptyPortableImportResult);
+    await pendingImport;
+    await Promise.resolve();
+    expect(screen.queryByText(/^Imported 0 messages/)).not.toBeInTheDocument();
+  });
+
   it('surfaces and clears local extension action audit entries', () => {
     recordClientExtensionActionRun({
       id: 'open.build',

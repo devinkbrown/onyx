@@ -64,6 +64,7 @@ import {
   exportPortableTransfer,
   importPortableTransfer,
   parsePortableTransfer,
+  PortableTransferOwnerChangedError,
 } from './portableTransfer';
 
 function msg(id: string, time: number, over: Partial<ChatMessage> = {}): ChatMessage {
@@ -433,6 +434,40 @@ describe('portableTransfer', () => {
     expect(result.messages).toBe(1);
     expect((await loadRecent('#alpha')).map((message) => message.id)).toEqual(['a3']);
     expect(getRetentionPolicy()).toEqual({ keep: 1 });
+  });
+
+  it('stops post-await device writes when the reviewed owner is retired', async () => {
+    const owner = { serverUrl: 'wss://portable.example/ws', identity: 'alice' } as const;
+    const parsed = parsePortableTransfer({
+      kind: 'onyx-vault',
+      version: 1,
+      exportedAt: '2026-07-16T00:00:00.000Z',
+      targets: [],
+      reviewHistory: [review('#retired-owner')],
+      composerDrafts: { '#retired-owner': 'must not resume after owner switch' },
+      accountHandoffs: [{
+        nick: 'retired-owner',
+        server: 'wss://retired.example/ws',
+      }],
+      preferenceHandoff: {
+        preferences: { ...preferences(), density: 'compact' },
+        sceneMotion: 'still',
+        retentionPolicy: { keep: 100 },
+      },
+    });
+    expect(parsed).not.toBeNull();
+    let ownerIsCurrent = true;
+    queueMicrotask(() => {
+      ownerIsCurrent = false;
+    });
+
+    await expect(importPortableTransfer(parsed!, owner, {
+      isCurrent: () => ownerIsCurrent,
+    })).rejects.toBeInstanceOf(PortableTransferOwnerChangedError);
+
+    expect(readReviewHistory(owner)).toEqual([]);
+    expect(loadComposerDrafts(undefined, owner)).toEqual({});
+    expect(loadCredentials('wss://retired.example/ws', 'retired-owner')).toBeNull();
   });
 
   it('does not retain vault rows when the imported preference disables local history', async () => {
