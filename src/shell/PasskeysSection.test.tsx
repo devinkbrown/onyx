@@ -14,8 +14,14 @@ import { PasskeysSection } from './PasskeysSection';
 const initialState = store.getInitialState();
 
 function stubBrowserSupport(supported: boolean): void {
+  vi.stubGlobal('isSecureContext', supported);
   vi.stubGlobal('PublicKeyCredential', supported ? (function () {} as unknown) : undefined);
-  vi.stubGlobal('navigator', supported ? ({ credentials: {} } as unknown) : ({} as unknown));
+  vi.stubGlobal(
+    'navigator',
+    supported
+      ? ({ credentials: { create: vi.fn(), get: vi.fn() } } as unknown)
+      : ({} as unknown),
+  );
 }
 
 function makeClient() {

@@ -22,7 +22,7 @@
  * We mock the client to capture the exact raw line and feed parsed replies to
  * assert state — never a smoke "did not throw".
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { store, _resetPasskeyStateForTests } from './store';
 import { parseIRCMessage } from '@/lib/irc/parser';
@@ -30,8 +30,13 @@ import { parseIRCMessage } from '@/lib/irc/parser';
 // navigator.credentials must look present so isPasskeySupported() is true in the
 // jsdom environment (list/remove/rename gate on it before touching the wire).
 beforeEach(() => {
+  vi.stubGlobal('isSecureContext', true);
   vi.stubGlobal('PublicKeyCredential', function () {} as unknown);
-  vi.stubGlobal('navigator', { credentials: {} } as unknown);
+  vi.stubGlobal('navigator', { credentials: { create: vi.fn(), get: vi.fn() } } as unknown);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 const initialState = store.getInitialState();
