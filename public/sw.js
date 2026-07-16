@@ -36,6 +36,14 @@ function safeNotificationPath(value, fallback = '/') {
   }
 }
 
+function isSameOriginClient(client) {
+  try {
+    return new URL(client.url).origin === self.location.origin;
+  } catch {
+    return false;
+  }
+}
+
 // ── Install: precache shell ────────────────────────────────────────────────────
 // CRITICAL: precache failures must NEVER abort install. cache.addAll rejects
 // wholesale if any single URL 404s, which bricks the update pipeline — every
@@ -159,7 +167,7 @@ self.addEventListener('notificationclick', (event) => {
       .then((clientList) => {
         // If a window is already open, focus it and navigate
         for (const client of clientList) {
-          if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+          if (isSameOriginClient(client) && 'focus' in client) {
             const navigation = 'navigate' in client
               ? client.navigate(targetUrl)
               : Promise.resolve();

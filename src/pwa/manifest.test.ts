@@ -119,5 +119,24 @@ describe('PWA manifest', () => {
     });
     await clickWork;
     expect(openWindow).toHaveBeenCalledWith('/');
+
+    const prefixClient = {
+      url: 'https://onyx.test.evil.example/app',
+      focus: vi.fn(async () => undefined),
+      navigate: vi.fn(async () => undefined),
+    };
+    workerSelf.clients.matchAll.mockResolvedValueOnce([prefixClient]);
+    openWindow.mockClear();
+    clickWork = undefined;
+    click!({
+      notification: { close: vi.fn(), data: { url: '/app' } },
+      waitUntil: (work: Promise<unknown>) => {
+        clickWork = work;
+      },
+    });
+    await clickWork;
+    expect(prefixClient.navigate).not.toHaveBeenCalled();
+    expect(prefixClient.focus).not.toHaveBeenCalled();
+    expect(openWindow).toHaveBeenCalledWith('/app');
   });
 });
