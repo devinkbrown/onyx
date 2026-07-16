@@ -53,25 +53,39 @@ export type StatsIndex = {
   users_online: number;
   network_days: NetworkDay[];
   channels: StatsChannel[];
+  /** False when invalid, duplicate, or over-cap day rows were omitted. */
+  network_days_complete: boolean;
+  /** False when invalid, duplicate, or over-cap channel rows were omitted. */
+  channels_complete: boolean;
 };
 
-function normalizeNetworkDays(raw: unknown): NetworkDay[] {
-  if (!Array.isArray(raw)) return [];
+function normalizeNetworkDays(raw: unknown): { days: NetworkDay[]; complete: boolean } {
+  if (!Array.isArray(raw)) return { days: [], complete: false };
   const days: NetworkDay[] = [];
   const seenDates = new Set<string>();
+  let complete = raw.length <= MAX_STATS_DAYS;
   for (const entry of raw.slice(-MAX_STATS_DAYS)) {
-    if (typeof entry !== 'object' || entry === null) continue;
+    if (typeof entry !== 'object' || entry === null) {
+      complete = false;
+      continue;
+    }
     const e = entry as Record<string, unknown>;
-    if (typeof e['date'] !== 'string' || e['date'].length > 32) continue;
+    if (typeof e['date'] !== 'string' || e['date'].length > 32) {
+      complete = false;
+      continue;
+    }
     const date = e['date'];
-    if (!/^\d{4}-\d{2}-\d{2}$/u.test(date) || seenDates.has(date)) continue;
+    if (!/^\d{4}-\d{2}-\d{2}$/u.test(date) || seenDates.has(date)) {
+      complete = false;
+      continue;
+    }
     seenDates.add(date);
     days.push({
       date,
       messages: boundedFeedInteger(e['messages']),
     });
   }
-  return days;
+  return { days, complete };
 }
 
 export function normalizeIndex(raw: unknown): StatsIndex | null {
@@ -80,12 +94,19 @@ export function normalizeIndex(raw: unknown): StatsIndex | null {
   if (!Array.isArray(r['channels'])) return null;
   const channels: StatsChannel[] = [];
   const seenChannels = new Set<string>();
+  let channelsComplete = r['channels'].length <= MAX_STATS_CHANNELS;
   for (const entry of r['channels'].slice(0, MAX_STATS_CHANNELS)) {
-    if (typeof entry !== 'object' || entry === null) continue;
+    if (typeof entry !== 'object' || entry === null) {
+      channelsComplete = false;
+      continue;
+    }
     const e = entry as Record<string, unknown>;
     const channel = normalizedChannel(e['channel']);
     const channelKey = channel.toLowerCase();
-    if (!channel || seenChannels.has(channelKey)) continue;
+    if (!channel || seenChannels.has(channelKey)) {
+      channelsComplete = false;
+      continue;
+    }
     seenChannels.add(channelKey);
     channels.push({
       channel,
@@ -99,13 +120,16 @@ export function normalizeIndex(raw: unknown): StatsIndex | null {
         : [],
     });
   }
+  const networkDays = normalizeNetworkDays(r['network_days']);
   return {
     generated_at: boundedUnixSeconds(r['generated_at']),
     network: boundedFeedText(r['network'], MAX_STATS_META_LENGTH),
     node: boundedFeedText(r['node'], MAX_STATS_META_LENGTH),
     users_online: boundedFeedInteger(r['users_online']),
-    network_days: normalizeNetworkDays(r['network_days']),
+    network_days: networkDays.days,
     channels,
+    network_days_complete: networkDays.complete,
+    channels_complete: channelsComplete,
   };
 }
 

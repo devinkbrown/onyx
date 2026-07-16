@@ -73,6 +73,8 @@ describe('normalizeIndex', () => {
           spark: [],
         },
       ],
+      network_days_complete: false,
+      channels_complete: false,
     });
   });
 
@@ -113,6 +115,8 @@ describe('normalizeIndex', () => {
     expect(index.users_online).toBe(0);
     expect(index.network).toHaveLength(256);
     expect(index.node).toHaveLength(256);
+    expect(index.network_days_complete).toBe(false);
+    expect(index.channels_complete).toBe(false);
   });
 
   it('renders one canonical row for case-insensitive duplicate channels', () => {
@@ -135,6 +139,8 @@ describe('normalizeIndex', () => {
       { date: '2026-07-15', messages: 4 },
       { date: '2026-07-16', messages: 8 },
     ]);
+    expect(index.network_days_complete).toBe(false);
+    expect(index.channels_complete).toBe(false);
   });
 });
 

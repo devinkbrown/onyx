@@ -152,7 +152,7 @@ export default function Landing() {
                 {(data) => data().channels.length.toLocaleString('en-US')}
               </Show>
             </strong>
-            <p>tracked in the public index</p>
+            <p>{stats.latest?.channels_complete ? 'tracked in the public index' : 'partial public index'}</p>
           </article>
           <article class="r-live-tile">
             <span class="k">busiest</span>

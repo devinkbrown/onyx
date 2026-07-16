@@ -9,7 +9,7 @@ import { setPageMeta } from './pageMeta';
 
 function PageChrome(props: {
   children: JSX.Element;
-  feedState: PublicFeedFreshness | 'unavailable';
+  feedState: PublicFeedFreshness | 'partial' | 'unavailable';
 }) {
   const label = () => {
     switch (props.feedState) {
@@ -17,6 +17,7 @@ function PageChrome(props: {
       case 'stale': return 'stats stale';
       case 'future': return 'stats time mismatch';
       case 'unknown': return 'stats undated';
+      case 'partial': return 'stats incomplete';
       default: return 'stats unavailable';
     }
   };
@@ -122,9 +123,13 @@ export default function StatsRoute() {
   const busiest = createMemo(() => channels()[0] ?? null);
   const days = createMemo(() => stats.latest?.network_days ?? []);
   const maxDay = createMemo(() => Math.max(0, ...days().map((d) => d.messages)));
-  const feedState = createMemo<PublicFeedFreshness | 'unavailable'>(() => {
+  const feedState = createMemo<PublicFeedFreshness | 'partial' | 'unavailable'>(() => {
     const data = stats.latest;
-    return data ? publicFeedFreshness(data.generated_at, nowMs()) : 'unavailable';
+    if (!data) return 'unavailable';
+    const freshness = publicFeedFreshness(data.generated_at, nowMs());
+    return freshness === 'current' && (!data.channels_complete || !data.network_days_complete)
+      ? 'partial'
+      : freshness;
   });
 
   return (
@@ -147,12 +152,18 @@ export default function StatsRoute() {
               <div class="data-metric">
                 <span class="label">rooms tracked</span>
                 <span class="value">{data().channels.length.toLocaleString('en-US')}</span>
-                <span class="note">updated {relTime(data().generated_at, nowMs())}</span>
+                <span class="note">
+                  {data().channels_complete
+                    ? `updated ${relTime(data().generated_at, nowMs())}`
+                    : 'incomplete room index'}
+                </span>
               </div>
               <div class="data-metric">
                 <span class="label">messages counted</span>
                 <span class="value">{totalMessages().toLocaleString('en-US')}</span>
-                <span class="note">current public index</span>
+                <span class="note">
+                  {data().channels_complete ? 'current public index' : 'partial public index'}
+                </span>
               </div>
             </div>
           )}
@@ -194,6 +205,7 @@ export default function StatsRoute() {
           </Show>
           <p>
             The bars are the network-wide message total per exported day, oldest to newest.
+            {!stats.latest?.network_days_complete ? ' Some malformed or duplicate day rows were omitted. ' : ' '}
             They come from the same data that powers channel history.
           </p>
         </article>

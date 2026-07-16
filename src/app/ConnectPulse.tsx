@@ -92,6 +92,10 @@ export function ConnectPulse(props: { deepLink?: string | null }): JSX.Element {
                 <b>{totalMessages().toLocaleString('en-US')}</b> messages
                 <span class="cpulse-wire-sep">·</span>
                 updated {relTime(data().generated_at, nowMs())}
+                <Show when={!data().channels_complete}>
+                  <span class="cpulse-wire-sep">·</span>
+                  partial index
+                </Show>
               </span>
             </p>
           )}

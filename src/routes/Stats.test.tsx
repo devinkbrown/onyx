@@ -58,6 +58,26 @@ describe('StatsRoute', () => {
     );
   });
 
+  it('labels a fresh feed incomplete when duplicate public rows are omitted', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      generated_at: Math.floor(Date.now() / 1000),
+      network_days: [
+        { date: '2026-07-08', messages: 24 },
+        { date: '2026-07-08', messages: 99 },
+      ],
+      channels: [
+        { channel: '#Root', messages: 42 },
+        { channel: '#root', messages: 900 },
+      ],
+    }), { status: 200 })));
+
+    render(() => <StatsRoute />);
+
+    expect(await screen.findByText('stats incomplete')).toHaveAttribute('data-feed-state', 'partial');
+    expect(screen.getAllByText('partial public index').length).toBeGreaterThan(0);
+    expect(screen.getByText(/duplicate day rows were omitted/i)).toBeInTheDocument();
+  });
+
   it('omits the moment (never throws) when last_active is an out-of-range outlier', () => {
     // A garbage/mis-scaled feed value (e.g. ms or ns mistaken for seconds) pushes
     // the Date past JS's ±8.64e15 ms bound; toISOString() would throw RangeError
