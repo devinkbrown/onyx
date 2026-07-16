@@ -1440,6 +1440,23 @@ describe('PreferencesPanel', () => {
     expect(await screen.findByText('Local history cleared on this device.')).toBeInTheDocument();
   });
 
+  it('hands focus into the local history confirmation and restores it when cancelled', async () => {
+    renderPreferences('History & data');
+    await Promise.resolve();
+
+    const trigger = screen.getByRole('button', { name: 'Clear local history' });
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    const erase = screen.getByRole('button', { name: 'Erase history' });
+    await waitFor(() => expect(erase).toHaveFocus());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Keep history' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Clear local history' })).toHaveFocus();
+    });
+  });
+
   it('keeps history disabled and discloses retained rows when toggle erasure cannot be verified', async () => {
     globalThis.indexedDB = new IDBFactory();
     _resetVaultForTests();

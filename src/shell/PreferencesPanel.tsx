@@ -2367,6 +2367,26 @@ function ClearLocalHistoryControls(): JSX.Element {
   const [confirming, setConfirming] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
   const [status, setStatus] = createSignal<string | null>(null);
+  let triggerButton: HTMLButtonElement | undefined;
+  let eraseButton: HTMLButtonElement | undefined;
+
+  function focusAfterRender(getElement: () => HTMLButtonElement | undefined): void {
+    queueMicrotask(() => {
+      const element = getElement();
+      if (element?.isConnected) element.focus();
+    });
+  }
+
+  function openConfirmation(): void {
+    setStatus(null);
+    setConfirming(true);
+    focusAfterRender(() => eraseButton);
+  }
+
+  function closeConfirmation(): void {
+    setConfirming(false);
+    focusAfterRender(() => triggerButton);
+  }
 
   async function clearNow(): Promise<void> {
     setBusy(true);
@@ -2378,8 +2398,8 @@ function ClearLocalHistoryControls(): JSX.Element {
     } catch {
       setStatus('Could not clear local history. Try again after freeing storage.');
     } finally {
-      setConfirming(false);
       setBusy(false);
+      closeConfirmation();
     }
   }
 
@@ -2397,12 +2417,10 @@ function ClearLocalHistoryControls(): JSX.Element {
         fallback={
           <div class="pref-clear-history__actions">
             <button
+              ref={triggerButton}
               type="button"
               class="pref-reset pref-reset--danger"
-              onClick={() => {
-                setStatus(null);
-                setConfirming(true);
-              }}
+              onClick={openConfirmation}
             >
               Clear local history
             </button>
@@ -2413,6 +2431,7 @@ function ClearLocalHistoryControls(): JSX.Element {
           <p class="pref-desc">This permanently erases stored history on this device.</p>
           <div class="pref-clear-history__actions">
             <button
+              ref={eraseButton}
               type="button"
               class="pref-reset pref-reset--danger"
               disabled={busy()}
@@ -2424,7 +2443,7 @@ function ClearLocalHistoryControls(): JSX.Element {
               type="button"
               class="pref-reset"
               disabled={busy()}
-              onClick={() => setConfirming(false)}
+              onClick={closeConfirmation}
             >
               Keep history
             </button>
