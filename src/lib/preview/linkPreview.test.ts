@@ -4,6 +4,11 @@ import {
   pickPreviewUrl,
   fetchLinkPreview,
   isPreviewableUrl,
+  LINK_PREVIEW_DESCRIPTION_MAX,
+  LINK_PREVIEW_HREF_SCAN_MAX,
+  LINK_PREVIEW_SITE_MAX,
+  LINK_PREVIEW_TITLE_MAX,
+  LINK_PREVIEW_URL_MAX,
   _clearPreviewCache,
 } from './linkPreview';
 
@@ -26,6 +31,13 @@ describe('pickPreviewUrl', () => {
   it('ignores non-http protocols and garbage', () => {
     expect(pickPreviewUrl(['ircs://eshmaki.me:6697', 'not a url'])).toBeNull();
   });
+  it('bounds the candidate scan before URL parsing', () => {
+    const hrefs = [
+      ...Array.from({ length: LINK_PREVIEW_HREF_SCAN_MAX }, () => 'not a url'),
+      'https://outside-the-work-cap.example',
+    ];
+    expect(pickPreviewUrl(hrefs)).toBeNull();
+  });
 });
 
 describe('isPreviewableUrl (SSRF defense in depth)', () => {
@@ -45,6 +57,7 @@ describe('isPreviewableUrl (SSRF defense in depth)', () => {
       'ircs://eshmaki.me:6697',
       'not a url',
       '',
+      `https://example.com/${'x'.repeat(LINK_PREVIEW_URL_MAX)}`,
     ]) {
       expect(isPreviewableUrl(href)).toBe(false);
     }
@@ -166,6 +179,7 @@ describe('fetchLinkPreview', () => {
     expect(/^https?:\/\//.test(requested)).toBe(false);
     expect(fetchMock.mock.calls[0]?.[1]).toEqual({
       headers: { Accept: 'application/json' },
+      signal: expect.any(AbortSignal),
     });
   });
 
@@ -259,6 +273,35 @@ describe('fetchLinkPreview', () => {
     expect(a).toEqual({ url: 'https://example.com', title: 'Orochi', description: 'a daemon', image: '', site: 'GitHub' });
     expect(b).toBe(a);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('bounds metadata and rejects poisoned canonical/image URLs at normalization', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      url: 'http://127.0.0.1/admin',
+      title: 't'.repeat(LINK_PREVIEW_TITLE_MAX + 10),
+      description: 'd'.repeat(LINK_PREVIEW_DESCRIPTION_MAX + 10),
+      image: 'http://169.254.169.254/latest/meta-data/',
+      site: 's'.repeat(LINK_PREVIEW_SITE_MAX + 10),
+    }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const requested = 'https://public.example/page';
+
+    await expect(fetchLinkPreview(requested)).resolves.toEqual({
+      url: requested,
+      title: 't'.repeat(LINK_PREVIEW_TITLE_MAX),
+      description: 'd'.repeat(LINK_PREVIEW_DESCRIPTION_MAX),
+      image: '',
+      site: 's'.repeat(LINK_PREVIEW_SITE_MAX),
+    });
+  });
+
+  it('rejects an oversized endpoint response before JSON parsing', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ title: 'x'.repeat(300_000) }),
+      { status: 200 },
+    )));
+
+    await expect(fetchLinkPreview('https://oversized.example')).resolves.toBeNull();
   });
 
   it('returns null for empty metadata or errors', async () => {

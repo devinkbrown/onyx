@@ -15,6 +15,7 @@
  * SSRF boundary; this client-side gate is defense in depth and keeps obviously
  * hostile URLs (javascript:/data:, localhost, 169.254.169.254, …) off the wire.
  */
+import { fetchPublicJson } from '@/lib/stats/fetchPublicJson';
 
 export interface LinkPreview {
   url: string;
@@ -26,6 +27,11 @@ export interface LinkPreview {
 
 /** Hosts whose links never get an OG card (our own media already unfurls). */
 const SKIP_HOSTS = new Set(['eshmaki.me', 'www.eshmaki.me']);
+export const LINK_PREVIEW_URL_MAX = 2048;
+export const LINK_PREVIEW_HREF_SCAN_MAX = 64;
+export const LINK_PREVIEW_TITLE_MAX = 512;
+export const LINK_PREVIEW_DESCRIPTION_MAX = 2048;
+export const LINK_PREVIEW_SITE_MAX = 128;
 
 /** Non-routable / internal host names that must never reach the fetcher. */
 const BLOCKED_HOSTNAMES = new Set([
@@ -92,6 +98,7 @@ function isPrivateIPv6(host: string): boolean {
  * SSRF boundary — but it keeps obviously-hostile URLs off the wire entirely.
  */
 export function isPreviewableUrl(href: string): boolean {
+  if (href.length === 0 || href.length > LINK_PREVIEW_URL_MAX) return false;
   let parsed: URL;
   try {
     parsed = new URL(href);
@@ -118,7 +125,7 @@ export function isPreviewableUrl(href: string): boolean {
  * and is not an internal / non-routable target.
  */
 export function pickPreviewUrl(hrefs: readonly string[]): string | null {
-  for (const href of hrefs) {
+  for (const href of hrefs.slice(0, LINK_PREVIEW_HREF_SCAN_MAX)) {
     if (!isPreviewableUrl(href)) continue;
     const parsed = new URL(href);
     if (SKIP_HOSTS.has(parsed.hostname) && parsed.pathname.startsWith('/uploads/')) continue;
@@ -130,13 +137,17 @@ export function pickPreviewUrl(hrefs: readonly string[]): string | null {
 function normalize(raw: unknown, url: string): LinkPreview | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const r = raw as Record<string, unknown>;
-  const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
+  const str = (v: unknown, maxLength: number): string => (
+    typeof v === 'string' ? v.slice(0, maxLength).trim() : ''
+  );
+  const canonical = str(r['url'], LINK_PREVIEW_URL_MAX);
+  const image = str(r['image'], LINK_PREVIEW_URL_MAX);
   const preview: LinkPreview = {
-    url: str(r['url']) || url,
-    title: str(r['title']),
-    description: str(r['description']),
-    image: str(r['image']),
-    site: str(r['site']),
+    url: canonical && isPreviewableUrl(canonical) ? canonical : url,
+    title: str(r['title'], LINK_PREVIEW_TITLE_MAX),
+    description: str(r['description'], LINK_PREVIEW_DESCRIPTION_MAX),
+    image: image && isPreviewableUrl(image) ? image : '',
+    site: str(r['site'], LINK_PREVIEW_SITE_MAX),
   };
   // A card with neither title nor description nor image is worthless — treat
   // as "no preview" so the message renders clean.
@@ -163,19 +174,12 @@ export function fetchLinkPreview(url: string): Promise<LinkPreview | null> {
   // empty-metadata answer stays cached to avoid a retry storm.
   let transient = false;
   const promise = (async (): Promise<LinkPreview | null> => {
-    try {
-      const res = await fetch(`/linkpreview?url=${encodeURIComponent(url)}`, {
-        headers: { Accept: 'application/json' },
-      });
-      if (!res.ok) {
-        transient = true;
-        return null;
-      }
-      return normalize(await res.json(), url);
-    } catch {
+    const raw = await fetchPublicJson(`/linkpreview?url=${encodeURIComponent(url)}`);
+    if (raw === null) {
       transient = true;
       return null;
     }
+    return normalize(raw, url);
   })();
 
   // Evict only if this exact promise is still cached, so a newer in-flight
