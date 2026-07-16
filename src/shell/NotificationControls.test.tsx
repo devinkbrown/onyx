@@ -33,6 +33,15 @@ vi.mock('@/lib/notifications/webPush', () => ({
 }));
 
 const initialState = store.getInitialState();
+const permissionsDescriptor = Object.getOwnPropertyDescriptor(navigator, 'permissions');
+
+function restorePermissions(): void {
+  if (permissionsDescriptor) {
+    Object.defineProperty(navigator, 'permissions', permissionsDescriptor);
+  } else {
+    Reflect.deleteProperty(navigator, 'permissions');
+  }
+}
 
 function server(account: string): Server {
   return {
@@ -76,6 +85,7 @@ describe('NotificationControls accessibility', () => {
 
   afterEach(() => {
     cleanup();
+    restorePermissions();
     store.setState(initialState, true);
     setCalmPreset('regular');
     localStorage.clear();
@@ -92,6 +102,40 @@ describe('NotificationControls accessibility', () => {
     expect(screen.getByRole('button', { name: /Notification mode Regular/i })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByRole('button', { name: /Mute notification sound/i })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /Turn on do not disturb/i })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('tracks browser permission changes without prompting or automatically enabling notifications', async () => {
+    let actual: DesktopNotificationPermission = 'default';
+    let changeListener: (() => void) | undefined;
+    const permissionStatus = {
+      addEventListener: vi.fn((type: string, listener: () => void) => {
+        if (type === 'change') changeListener = listener;
+      }),
+      removeEventListener: vi.fn(),
+    };
+    const query = vi.fn(async () => permissionStatus);
+    Object.defineProperty(navigator, 'permissions', {
+      configurable: true,
+      value: { query },
+    });
+    browserMocks.getPermission.mockImplementation(() => actual);
+
+    render(() => <NotificationControls />);
+    await waitFor(() => expect(permissionStatus.addEventListener).toHaveBeenCalledOnce());
+    expect(browserMocks.requestPermission).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Enable desktop notifications' })).toHaveAttribute('aria-pressed', 'false');
+
+    actual = 'granted';
+    changeListener?.();
+    expect(store.getState().pushNotificationsEnabled).toBe(false);
+    expect(screen.getByRole('button', { name: 'Enable desktop notifications' })).toHaveAttribute('aria-pressed', 'false');
+
+    actual = 'denied';
+    changeListener?.();
+    expect(screen.getByRole('button', { name: 'Desktop notifications are blocked by the browser' })).toBeDisabled();
+
+    cleanup();
+    expect(permissionStatus.removeEventListener).toHaveBeenCalledWith('change', changeListener);
   });
 
   it('keeps calm, sound and do-not-disturb state reflected in accessible labels', () => {
@@ -181,7 +225,7 @@ describe('NotificationControls accessibility', () => {
     await Promise.resolve();
 
     expect(store.getState().pushNotificationsEnabled).toBe(true);
-    expect(screen.getByRole('button', { name: 'Desktop notifications are enabled' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Disable desktop notifications' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('does not apply a desktop permission completion after unmount', async () => {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { createSignal, onCleanup, onMount, Show, type JSX } from 'solid-js';
+import { createSignal, onCleanup, onMount, Show, untrack, type JSX } from 'solid-js';
 
 import { useStore, getState, selectAccount } from '@/lib/store';
 import {
@@ -7,6 +7,7 @@ import {
   requestDesktopNotificationPermission,
   type DesktopNotificationPermission,
 } from '@/lib/notifications';
+import { monitorDesktopNotificationPermission } from '@/lib/notifications/permissionMonitor';
 import {
   CALM_PRESETS,
   calmPreset,
@@ -27,10 +28,10 @@ const CALM_PRESET_HINTS: Record<CalmPreset, string> = {
   power: 'all alertable activity notifies',
 };
 
-function permissionLabel(permission: DesktopNotificationPermission): string {
+function permissionLabel(active: boolean, permission: DesktopNotificationPermission): string {
   if (permission === 'unsupported') return 'Desktop notifications are not supported';
   if (permission === 'denied') return 'Desktop notifications are blocked by the browser';
-  if (permission === 'granted') return 'Desktop notifications are enabled';
+  if (active) return 'Disable desktop notifications';
   return 'Enable desktop notifications';
 }
 
@@ -73,6 +74,18 @@ export function NotificationControls(): JSX.Element {
     }).catch(() => {
       if (isCurrentWebPushOperation(operation)) setWebPushOn(false);
     });
+  });
+
+  onMount(() => {
+    const stopMonitoring = monitorDesktopNotificationPermission((nextPermission) => {
+      if (disposed || nextPermission === untrack(permission)) return;
+      // An external browser/site-settings change supersedes a pending prompt
+      // completion. It updates only the displayed permission; the user's push
+      // preference is never enabled automatically.
+      desktopOperation += 1;
+      setPermission(nextPermission);
+    }, { readPermission: getDesktopNotificationPermission });
+    onCleanup(stopMonitoring);
   });
 
   onCleanup(() => {
@@ -166,8 +179,8 @@ export function NotificationControls(): JSX.Element {
           permission() === 'denied' ? 'shell-notify-btn--blocked' : '',
         ].filter(Boolean).join(' ')}
         disabled={permission() === 'unsupported' || permission() === 'denied'}
-        title={permissionLabel(permission())}
-        aria-label={permissionLabel(permission())}
+        title={permissionLabel(desktopActive(), permission())}
+        aria-label={permissionLabel(desktopActive(), permission())}
         aria-pressed={desktopActive()}
         onClick={() => void handleDesktopToggle()}
       >
