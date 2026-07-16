@@ -447,9 +447,12 @@
 .acct-totp-note { margin: 0; font-size: 0.78rem; color: var(--washi-dim); }
 .acct-totp-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .acct-totp-secret {
+  min-width: 0;
+  max-width: 100%;
   font-family: var(--font-mono);
   font-size: 0.85rem;
   letter-spacing: 0.12em;
+  overflow-wrap: anywhere;
   color: var(--gold-bright);
   background: var(--ink);
   border: 1px solid var(--line);
