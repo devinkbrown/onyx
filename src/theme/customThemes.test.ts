@@ -12,7 +12,7 @@ import {
   loadCustomThemes,
   removeCustomTheme,
 } from './customThemes';
-import { THEMES } from './themes';
+import { THEMES, type TokenMap } from './themes';
 
 beforeEach(() => localStorage.clear());
 afterEach(() => {
@@ -84,6 +84,7 @@ describe('persistence', () => {
         { id: 'ocean', name: 'Built-in collision', base: 'ocean', overrides: {} },
         { id: 'custom:missing-base', name: 'Missing base', overrides: {} },
         { id: 'custom:bad-base', name: 'Bad base', base: 'does-not-exist', overrides: {} },
+        { id: 'custom:prototype-base', name: 'Prototype base', base: 'toString', overrides: {} },
         { id: 'custom:bad-name', name: 12, base: 'ocean', overrides: {} },
         { id: 'custom:bad-overrides', name: 'Bad overrides', base: 'ocean', overrides: null },
       ]),
@@ -123,6 +124,55 @@ describe('persistence', () => {
     const loaded = loadCustomThemes();
     expect(loaded).toHaveLength(1);
     expect(loaded[0]?.overrides['--lapis']).toBe('#ff0000');
+  });
+
+  it('bounds the serialized collection before parsing', () => {
+    localStorage.setItem('onyx:custom-themes', ' '.repeat((256 * 1024) + 1));
+    expect(loadCustomThemes()).toEqual([]);
+  });
+
+  it('rejects unsafe ids, names, token keys, values, and oversized token maps', () => {
+    const tooManyTokens = Object.fromEntries(
+      Array.from({ length: 65 }, (_, index) => [`--token-${index}`, '#fff']),
+    );
+    localStorage.setItem('onyx:custom-themes', JSON.stringify([
+      { id: 'custom:UPPER', name: 'Upper', base: 'ocean', overrides: {} },
+      { id: 'custom:control', name: 'Bad\nName', base: 'ocean', overrides: {} },
+      { id: 'custom:key', name: 'Bad key', base: 'ocean', overrides: { color: '#fff' } },
+      { id: 'custom:value', name: 'Bad value', base: 'ocean', overrides: { '--lapis': 'x\nred' } },
+      { id: 'custom:many', name: 'Too many', base: 'ocean', overrides: tooManyTokens },
+    ]));
+
+    expect(loadCustomThemes()).toEqual([]);
+  });
+
+  it('caps retained themes and sanitizes runtime add inputs', () => {
+    for (let index = 0; index < 40; index += 1) {
+      addCustomTheme(`Theme ${index}`, 'ocean', { '--lapis': '#00ace9' });
+    }
+    const added = addCustomTheme(
+      `  Final\n${'x'.repeat(100)}  `,
+      'ocean',
+      { '--lapis': '#ff0000', invalid: 'discard all unsafe overrides' } as TokenMap,
+    );
+
+    expect(loadCustomThemes()).toHaveLength(32);
+    expect(added.name).not.toContain('\n');
+    expect(added.name.length).toBeLessThanOrEqual(80);
+    expect(added.overrides).toEqual({});
+    expect(getCustomTheme(added.id)).toEqual(added);
+  });
+
+  it('migrates and removes the legacy theme key once', () => {
+    localStorage.setItem('ruri:custom-themes', JSON.stringify([
+      { id: 'custom:legacy', name: 'Legacy', base: 'ruri', overrides: { '--lapis': '#00ace9' } },
+    ]));
+
+    expect(loadCustomThemes()).toEqual([
+      { id: 'custom:legacy', name: 'Legacy', base: 'onyx', overrides: { '--lapis': '#00ace9' } },
+    ]);
+    expect(localStorage.getItem('ruri:custom-themes')).toBeNull();
+    expect(JSON.parse(localStorage.getItem('onyx:custom-themes') ?? 'null')).toHaveLength(1);
   });
 
   it('round-trips saved themes through the onyx custom theme key', () => {

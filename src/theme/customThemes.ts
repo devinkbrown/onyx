@@ -28,6 +28,17 @@ const CUSTOM_PREFIX = 'custom:';
 /** Legacy built-in theme id that was renamed; migrate custom-theme `base` refs. */
 const LEGACY_BASE_ID = 'ruri';
 const MIGRATED_BASE_ID = 'onyx';
+const MAX_CUSTOM_THEME_STORAGE_BYTES = 256 * 1024;
+const MAX_CUSTOM_THEMES = 32;
+const MAX_CUSTOM_THEME_CANDIDATES = 128;
+const MAX_CUSTOM_THEME_ID_LENGTH = 128;
+const MAX_CUSTOM_THEME_NAME_LENGTH = 80;
+const MAX_CUSTOM_THEME_TOKEN_ENTRIES = 64;
+const MAX_CUSTOM_THEME_TOKEN_KEY_LENGTH = 80;
+const MAX_CUSTOM_THEME_TOKEN_VALUE_LENGTH = 512;
+const CUSTOM_THEME_ID_RE = /^custom:[a-z0-9](?:[a-z0-9-]{0,119})$/;
+const CUSTOM_PROPERTY_RE = /^--[A-Za-z0-9_-]+$/;
+const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
 
 /** True when `id` names a custom (user-created) theme rather than a built-in. */
 export function isCustomThemeId(id: string): boolean {
@@ -37,14 +48,24 @@ export function isCustomThemeId(id: string): boolean {
 export function loadCustomThemes(): CustomTheme[] {
   if (typeof window === 'undefined') return [];
   try {
-    // Current key first, then fall back to the legacy key (read-old-write-new)
-    // so themes saved under the previous brand survive the rebrand.
-    const serialized = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
-    const raw = JSON.parse(serialized ?? '[]');
+    const current = localStorage.getItem(STORAGE_KEY);
+    const legacy = current === null ? localStorage.getItem(LEGACY_STORAGE_KEY) : null;
+    const serialized = current ?? legacy;
+    if (!serialized || serialized.length > MAX_CUSTOM_THEME_STORAGE_BYTES) return [];
+    const raw: unknown = JSON.parse(serialized);
     if (!Array.isArray(raw)) return [];
-    // Migrate any custom theme whose base was the renamed legacy theme id, then
-    // validate (validation requires base to be a current THEMES key).
-    return raw.map(migrateCustomThemeBase).filter(isValidCustomTheme);
+    const themes: CustomTheme[] = [];
+    const seen = new Set<string>();
+    for (const candidate of raw.slice(0, MAX_CUSTOM_THEME_CANDIDATES)) {
+      if (themes.length >= MAX_CUSTOM_THEMES) break;
+      const theme = parseCustomTheme(migrateCustomThemeBase(candidate));
+      if (!theme || seen.has(theme.id)) continue;
+      seen.add(theme.id);
+      themes.push(theme);
+    }
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+    if (current === null && legacy !== null) persist(themes);
+    return themes;
   } catch {
     return [];
   }
@@ -69,17 +90,24 @@ function persist(list: CustomTheme[]): void {
   }
 }
 
-function isValidCustomTheme(value: unknown): value is CustomTheme {
-  if (typeof value !== 'object' || value === null) return false;
+function parseCustomTheme(value: unknown): CustomTheme | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
   const v = value as Record<string, unknown>;
-  return (
-    typeof v.id === 'string' &&
-    isCustomThemeId(v.id) &&
-    typeof v.name === 'string' &&
-    typeof v.base === 'string' &&
-    (v.base as string) in THEMES &&
-    isValidTokenMap(v.overrides)
-  );
+  if (
+    typeof v.id !== 'string'
+    || v.id.length > MAX_CUSTOM_THEME_ID_LENGTH
+    || !CUSTOM_THEME_ID_RE.test(v.id)
+    || typeof v.name !== 'string'
+    || v.name.length === 0
+    || v.name.length > MAX_CUSTOM_THEME_NAME_LENGTH
+    || v.name !== v.name.trim()
+    || CONTROL_CHARACTERS.test(v.name)
+    || typeof v.base !== 'string'
+    || !Object.hasOwn(THEMES, v.base)
+  ) return null;
+  const overrides = parseTokenMap(v.overrides);
+  if (!overrides) return null;
+  return { id: v.id, name: v.name, base: v.base as ThemeId, overrides };
 }
 
 /**
@@ -89,9 +117,23 @@ function isValidCustomTheme(value: unknown): value is CustomTheme {
  * garbage like `"[object Object]"`, silently corrupting `var(--token)` and
  * breaking the palette's contrast guarantee. Mirrors the `?theme=` import guard.
  */
-function isValidTokenMap(value: unknown): value is TokenMap {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
-  return Object.values(value as Record<string, unknown>).every((v) => typeof v === 'string');
+function parseTokenMap(value: unknown): TokenMap | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.length > MAX_CUSTOM_THEME_TOKEN_ENTRIES) return null;
+  const tokens: TokenMap = {};
+  for (const [key, token] of entries) {
+    if (
+      key.length > MAX_CUSTOM_THEME_TOKEN_KEY_LENGTH
+      || !CUSTOM_PROPERTY_RE.test(key)
+      || typeof token !== 'string'
+      || token.length === 0
+      || token.length > MAX_CUSTOM_THEME_TOKEN_VALUE_LENGTH
+      || CONTROL_CHARACTERS.test(token)
+    ) return null;
+    tokens[key] = token;
+  }
+  return tokens;
 }
 
 function slugify(name: string): string {
@@ -104,15 +146,20 @@ function slugify(name: string): string {
  */
 export function addCustomTheme(name: string, base: ThemeId, overrides: TokenMap): CustomTheme {
   const list = loadCustomThemes();
-  const slug = slugify(name);
+  const safeName = typeof name === 'string'
+    ? name.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, MAX_CUSTOM_THEME_NAME_LENGTH) || 'Custom'
+    : 'Custom';
+  const safeBase = Object.hasOwn(THEMES, base) ? base : 'onyx';
+  const safeOverrides = parseTokenMap(overrides) ?? {};
+  const slug = slugify(safeName);
   let id = `${CUSTOM_PREFIX}${slug}`;
   let n = 2;
   while (list.some((t) => t.id === id)) {
     id = `${CUSTOM_PREFIX}${slug}-${n}`;
     n += 1;
   }
-  const theme: CustomTheme = { id, name: name.trim() || 'Custom', base, overrides: { ...overrides } };
-  persist([...list, theme]);
+  const theme: CustomTheme = { id, name: safeName, base: safeBase, overrides: safeOverrides };
+  persist([...list.slice(-(MAX_CUSTOM_THEMES - 1)), theme]);
   return theme;
 }
 
