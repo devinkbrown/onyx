@@ -24,6 +24,7 @@ import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
 import { DM_PINS_STORAGE_KEY, saveDMPins } from '@/lib/dmPins';
 import { saveIgnoredUsers } from '@/lib/ignoredUsers';
 import { saveMutedDMs } from '@/lib/mutedDMs';
+import { saveFriends, saveWatchList } from '@/lib/contactPresenceMemory';
 import { saveChannelNotify } from '@/lib/notifications/channelNotifyMemory';
 import { saveHighlightWords } from '@/lib/notifications/highlightMemory';
 
@@ -602,6 +603,32 @@ describe('account replies — state from the message handler', () => {
     expectAccountBoundStateCleared();
   });
 
+  it('replaces account MONITOR contacts with the guest owner contacts on 901', () => {
+    const client = makeClient();
+    const guest = { serverUrl: seedServer('alice').url, identity: 'guest42' } as const;
+    saveFriends(new Map([['guest-friend', { nick: 'guest-friend', online: false }]]), guest);
+    saveWatchList([{ nick: 'guest-watch', online: false }], guest);
+    store.setState({
+      client: client as never,
+      connectionStatus: 'connected',
+      server: { ...seedServer('alice'), nick: 'guest42' },
+      ourNick: 'guest42',
+      friends: new Map([['alice-friend', { nick: 'alice-friend', online: true }]]),
+      watchList: [{ nick: 'alice-watch', online: true }],
+      monitoredNicks: new Set(['alice-friend', 'alice-watch']),
+    });
+
+    feed(':eshmaki.me 901 guest42 guest42!u@h :You are now logged out');
+
+    expect([...store.getState().friends.keys()]).toEqual(['guest-friend']);
+    expect(store.getState().watchList.map((entry) => entry.nick)).toEqual(['guest-watch']);
+    expect(client.sendRaw.mock.calls).toEqual([
+      ['MONITOR', 'C'],
+      ['MONITOR', '+', 'guest-friend'],
+      ['MONITOR', '+', 'guest-watch'],
+    ]);
+  });
+
   it('does NOT clear the account from a peer PM mentioning "logged out"', () => {
     store.setState({ server: seedServer('alice') });
     feed(':mallory!m@evil NOTICE alice :hey you got logged out lol');
@@ -852,6 +879,33 @@ describe('account replies — state from the message handler', () => {
 
     expect(store.getState().mutedDMs).toEqual(new Set(['bob-contact']));
     expect(store.getState().mutedDMs).not.toContain('alice-private-contact');
+  });
+
+  it('replaces Alice MONITOR contacts with Bob contacts on a live 900 account switch', () => {
+    const client = makeClient();
+    const bob = { serverUrl: seedServer('bob').url, identity: 'bob' } as const;
+    saveFriends(new Map([['bob-friend', { nick: 'bob-friend', online: false }]]), bob);
+    saveWatchList([{ nick: 'bob-watch', online: false }], bob);
+    store.setState({
+      client: client as never,
+      connectionStatus: 'connected',
+      server: seedServer('alice'),
+      ourNick: 'alice',
+      friends: new Map([['alice-friend', { nick: 'alice-friend', online: true }]]),
+      watchList: [{ nick: 'alice-watch', online: true }],
+      monitoredNicks: new Set(['alice-friend', 'alice-watch']),
+    });
+
+    feed(':eshmaki.me 900 alice alice!u@h bob :You are now logged in as bob');
+
+    expect([...store.getState().friends.keys()]).toEqual(['bob-friend']);
+    expect(store.getState().watchList.map((entry) => entry.nick)).toEqual(['bob-watch']);
+    expect(store.getState().monitoredNicks).toEqual(new Set(['bob-friend', 'bob-watch']));
+    expect(client.sendRaw.mock.calls).toEqual([
+      ['MONITOR', 'C'],
+      ['MONITOR', '+', 'bob-friend'],
+      ['MONITOR', '+', 'bob-watch'],
+    ]);
   });
 
   it('ignores an Alice ACCOUNTINFO reply after the live account switches to Bob', () => {

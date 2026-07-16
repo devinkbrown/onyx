@@ -5,12 +5,10 @@ import {
   parseCounterRecord,
   parseCtcpConfig,
   parseEmojiArray,
-  parseFriendArray,
   normalizeCtcpVersionReply,
   parseStringArray,
   parseStringArrayRecord,
   parseStringRecord,
-  parseWatchList,
 } from './persistParse';
 import { parseStoredVoiceSettings, type StoredVoiceSettings } from './voiceSettingsPersistence';
 import { parseChannelFolders } from './channelFoldersPersistence';
@@ -92,6 +90,17 @@ import {
 import { loadDMPins, sanitizeDMPins, saveDMPins } from '@/lib/dmPins';
 import { loadIgnoredUsers, parseIgnoredUsers, saveIgnoredUsers } from '@/lib/ignoredUsers';
 import { loadMutedDMs, parseMutedDMs, saveMutedDMs } from '@/lib/mutedDMs';
+import {
+  loadFriends,
+  loadWatchList,
+  MAX_CONTACTS,
+  parseFriends,
+  parseWatchList,
+  saveFriends,
+  saveWatchList,
+  type FriendEntry,
+  type WatchEntry,
+} from '@/lib/contactPresenceMemory';
 import { markViewedRead, normalizeTargetKey, totalMentions } from '@/lib/notifications/readState';
 import {
   buildCreateOptions,
@@ -718,8 +727,8 @@ export interface OnyxState {
   monitoredNicks: Set<string>;
 
   // ── Friends / Contacts ───────────────────────────────────────────────
-  /** Friends list persisted to localStorage 'onyx:friends' */
-  friends: Map<string, { nick: string; online: boolean; note?: string }>;
+  /** Friends list persisted in the active owner's local device namespace. */
+  friends: Map<string, FriendEntry>;
   showFriendsPanel: boolean;
   addFriend(nick: string): void;
   removeFriend(nick: string): void;
@@ -1678,7 +1687,7 @@ export interface OnyxState {
   isupportTokens: Record<string, string>;
 
   // ── Watch list (IRCv3 MONITOR command) ──────────────────────────────────
-  watchList: Array<{ nick: string; online: boolean; lastSeen?: Date }>;
+  watchList: WatchEntry[];
   addToWatchList: (nick: string) => void;
   removeFromWatchList: (nick: string) => void;
   setWatchOnline: (nick: string, online: boolean, time?: Date) => void;
@@ -2723,6 +2732,10 @@ function _resetAccountBoundState(
     ignoredUsers: new Set(),
     showIgnoreList: false,
     mutedDMs: new Set(),
+    friends: new Map(),
+    showFriendsPanel: false,
+    watchList: [],
+    monitoredNicks: new Set(),
     serviceNotices: s.serviceNotices.filter(notice => notice.source !== 'Account'),
   }));
 }
@@ -3470,6 +3483,72 @@ function _loadOwnedMutedDMs(
   return owner ? loadMutedDMs(owner) : new Set();
 }
 
+function _loadOwnedFriends(
+  state: Pick<OnyxState, 'server' | 'ourNick'>,
+): Map<string, FriendEntry> {
+  const owner = selectDeviceMemoryOwner(state);
+  return owner ? loadFriends(owner) : new Map();
+}
+
+function _loadOwnedWatchList(
+  state: Pick<OnyxState, 'server' | 'ourNick'>,
+): WatchEntry[] {
+  const owner = selectDeviceMemoryOwner(state);
+  return owner ? loadWatchList(owner) : [];
+}
+
+function _ownedMonitorContacts(
+  state: Pick<OnyxState, 'friends' | 'watchList'>,
+): Map<string, string> {
+  const contacts = new Map<string, string>();
+  for (const friend of state.friends.values()) {
+    contacts.set(friend.nick.toLowerCase(), friend.nick);
+  }
+  for (const entry of state.watchList) {
+    const key = entry.nick.toLowerCase();
+    if (!contacts.has(key)) contacts.set(key, entry.nick);
+  }
+  return contacts;
+}
+
+/** Replace contact-owned MONITOR subscriptions after registration/identity change. */
+function _replaceOwnedMonitorContacts(get: GetFn, set: SetFn, clearRemote: boolean): void {
+  const state = get();
+  const contacts = _ownedMonitorContacts(state);
+  // A same-owner socket reconnect must also restore DM presence watches that
+  // were opened during the prior connection. Identity changes pass
+  // clearRemote=true after the account reset has quarantined those targets.
+  if (!clearRemote) {
+    for (const key of state.monitoredNicks) {
+      if (!contacts.has(key)) contacts.set(key, key);
+    }
+  }
+  const monitoredNicks = new Set(contacts.keys());
+  if (state.connectionStatus !== 'connected' || !state.client) {
+    set({ monitoredNicks: new Set() });
+    return;
+  }
+  if (clearRemote) state.client.sendRaw('MONITOR', 'C');
+  // One bounded nick per command avoids exceeding the IRC line limit even at
+  // the maximum persisted contact count.
+  for (const nick of contacts.values()) state.client.sendRaw('MONITOR', '+', nick);
+  set({ monitoredNicks });
+}
+
+function _removeMonitorContactIfUnused(get: GetFn, set: SetFn, nick: string): void {
+  const key = nick.toLowerCase();
+  const state = get();
+  if (
+    state.friends.has(key)
+    || state.watchList.some((entry) => entry.nick.toLowerCase() === key)
+    || state.dms.has(key)
+  ) return;
+  if (state.connectionStatus === 'connected') state.client?.sendRaw('MONITOR', '-', nick);
+  const monitoredNicks = new Set(state.monitoredNicks);
+  monitoredNicks.delete(key);
+  set({ monitoredNicks });
+}
+
 export interface DeviceMemoryContext {
   readonly owner: DeviceMemoryOwner;
   readonly client: IRCClient | null;
@@ -3681,7 +3760,8 @@ export const store = createStore<OnyxState>()(
     showAccessList: false,
     showPinnedMessages: false,
     monitoredNicks: new Set(),
-    friends: _loadFriends(),
+    // Contact lists are private and load only after a server owner exists.
+    friends: new Map(),
     showFriendsPanel: false,
     pinnedChannels: _loadPinnedChannels(),
     followedChannels: _loadFollowedChannels(),
@@ -4042,6 +4122,7 @@ export const store = createStore<OnyxState>()(
         },
         onNickChanged(newNick) {
           _addSessionRestoreIdentity(get, newNick);
+          const previousOwner = selectDeviceMemoryOwner(get());
           set(s => {
             const server = s.server ? { ...s.server, nick: newNick } : null;
             return {
@@ -4053,8 +4134,13 @@ export const store = createStore<OnyxState>()(
               highlightWords: _loadOwnedHighlightWords({ server, ourNick: newNick }),
               ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: newNick }),
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: newNick }),
+              friends: _loadOwnedFriends({ server, ourNick: newNick }),
+              watchList: _loadOwnedWatchList({ server, ourNick: newNick }),
             };
           });
+          if (!_sameOutboxOwner(previousOwner, selectDeviceMemoryOwner(get()))) {
+            _replaceOwnedMonitorContacts(get, set, true);
+          }
         },
         onMessage(msg) {
           get()._handleMessage(msg);
@@ -4131,6 +4217,8 @@ export const store = createStore<OnyxState>()(
               highlightWords: _loadOwnedHighlightWords({ server: srv, ourNick: get().ourNick }),
               ignoredUsers: _loadOwnedIgnoredUsers({ server: srv, ourNick: get().ourNick }),
               mutedDMs: _loadOwnedMutedDMs({ server: srv, ourNick: get().ourNick }),
+              friends: _loadOwnedFriends({ server: srv, ourNick: get().ourNick }),
+              watchList: _loadOwnedWatchList({ server: srv, ourNick: get().ourNick }),
               isIRCX: client.isupport.IRCX,
               networkName: net,
               serverCapabilities: caps,
@@ -5812,24 +5900,33 @@ export const store = createStore<OnyxState>()(
 
     // ── Friends / Contacts ────────────────────────────────────────────────
     addFriend(nick) {
-      const key = nick.toLowerCase();
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
+      const parsed = parseFriends([{ nick }]);
+      const entry = parsed.values().next().value;
+      if (!entry) return;
+      const key = entry.nick.toLowerCase();
       set(s => {
         const friends = new Map(s.friends);
-        friends.set(key, { nick, online: false });
-        _saveFriends(friends);
+        friends.set(key, entry);
+        saveFriends(friends, owner);
         return { friends };
       });
-      get().monitorAdd(nick);
+      get().monitorAdd(entry.nick);
     },
     removeFriend(nick) {
-      const key = nick.toLowerCase();
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
+      const entry = parseFriends([{ nick }]).values().next().value;
+      if (!entry) return;
+      const key = entry.nick.toLowerCase();
       set(s => {
         const friends = new Map(s.friends);
         friends.delete(key);
-        _saveFriends(friends);
+        saveFriends(friends, owner);
         return { friends };
       });
-      get().client?.sendRaw('MONITOR', '-', nick);
+      _removeMonitorContactIfUnused(get, set, entry.nick);
     },
     setFriendOnline(nick, online) {
       const key = nick.toLowerCase();
@@ -7112,10 +7209,9 @@ export const store = createStore<OnyxState>()(
           if (typeof window !== 'undefined' && !localStorage.getItem(onboardKey)) {
             get().startOnboarding();
           }
-          // Re-add all friends to MONITOR after connect
-          for (const f of get().friends.values()) {
-            get().monitorAdd(f.nick);
-          }
+          // A new socket owns no MONITOR state. Restore this identity's bounded
+          // friend/watch union without trusting stale local subscription flags.
+          _replaceOwnedMonitorContacts(get, set, false);
           // Request server stats for HomeView widget
           get().client?.sendRaw('LUSERS');
           // Send initial latency ping
@@ -7197,13 +7293,6 @@ export const store = createStore<OnyxState>()(
               _startNickReclaim(desiredNick);
             }
           }
-          // Send watch list to server through IRCv3 MONITOR.
-          {
-            const { watchList: wl } = get();
-            if (wl.length > 0) {
-              get().client?.sendRaw('MONITOR', '+', wl.map(w => w.nick).join(','));
-            }
-          }
           break;
         }
 
@@ -7215,7 +7304,8 @@ export const store = createStore<OnyxState>()(
           if (!nick || nick.toLowerCase() !== ourNick.toLowerCase()) break;
           const account = params[0] === '*' ? null : params[0] ?? null;
           const previousAccount = get().server?.account ?? null;
-          if (_accountKey(previousAccount) !== _accountKey(account)) {
+          const ownerChanged = _accountKey(previousAccount) !== _accountKey(account);
+          if (ownerChanged) {
             _resetAccountBoundState(set);
             _resetAccountPrivateMessageState(set);
             _saslAccount = account;
@@ -7231,8 +7321,11 @@ export const store = createStore<OnyxState>()(
               highlightWords: _loadOwnedHighlightWords({ server, ourNick: s.ourNick }),
               ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: s.ourNick }),
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
+              friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
+              watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
             };
           });
+          if (ownerChanged) _replaceOwnedMonitorContacts(get, set, true);
           break;
         }
 
@@ -9583,16 +9676,17 @@ export const store = createStore<OnyxState>()(
             const account900 = params[2];
             const existingServer = get().server;
             const previousAccount = existingServer?.account;
+            const ownerChanged = Boolean(
+              existingServer
+              && _accountKey(previousAccount) !== _accountKey(account900),
+            );
             if (
               previousAccount
               && previousAccount.toLowerCase() !== account900.toLowerCase()
             ) {
               _credentialTokenCanonicalOnly = true;
             }
-            if (
-              existingServer
-              && _accountKey(previousAccount) !== _accountKey(account900)
-            ) {
+            if (ownerChanged) {
               _resetAccountBoundState(set);
               _resetAccountPrivateMessageState(set);
             }
@@ -9612,10 +9706,13 @@ export const store = createStore<OnyxState>()(
                 highlightWords: _loadOwnedHighlightWords({ server, ourNick: s.ourNick }),
                 ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: s.ourNick }),
                 mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
+                friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
+                watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
                 passkeyBusy: false,
                 passkeyError: null,
               };
             });
+            if (ownerChanged) _replaceOwnedMonitorContacts(get, set, true);
             // Registration may have fallen back to a temporary nick after 433.
             // Once 900 proves the canonical account, reclaim that nick now and
             // keep retrying until the zombie session releases it.
@@ -9633,6 +9730,7 @@ export const store = createStore<OnyxState>()(
 
         case '901': {
           // :server 901 nick nick!u@h :You are now logged out
+          const previousOwner = selectDeviceMemoryOwner(get());
           _clearRememberedSessionAfterLogout(get, set);
           _saslAccount = null;
           set(s => {
@@ -9645,8 +9743,13 @@ export const store = createStore<OnyxState>()(
               highlightWords: _loadOwnedHighlightWords({ server, ourNick: s.ourNick }),
               ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: s.ourNick }),
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
+              friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
+              watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
             };
           });
+          if (!_sameOutboxOwner(previousOwner, selectDeviceMemoryOwner(get()))) {
+            _replaceOwnedMonitorContacts(get, set, true);
+          }
           break;
         }
 
@@ -11062,21 +11165,30 @@ export const store = createStore<OnyxState>()(
     isupportTokens: {},
 
     // ── Watch list / MONITOR ──────────────────────────────────────────────
-    watchList: _loadWatchList(),
+    watchList: [],
     addToWatchList: (nick) => {
-      const { watchList, client } = get();
-      if (watchList.some(w => w.nick.toLowerCase() === nick.toLowerCase())) return;
-      const next = [...watchList, { nick, online: false }];
-      _saveWatchList(next);
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
+      const entry = parseWatchList([{ nick }])[0];
+      if (!entry) return;
+      const { watchList } = get();
+      if (watchList.some(w => w.nick.toLowerCase() === entry.nick.toLowerCase())) return;
+      if (watchList.length >= MAX_CONTACTS) return;
+      const next = [...watchList, entry];
+      saveWatchList(next, owner);
       set({ watchList: next });
-      client?.sendRaw('MONITOR', '+', nick);
+      get().monitorAdd(entry.nick);
     },
     removeFromWatchList: (nick) => {
-      const { watchList, client } = get();
-      const next = watchList.filter(w => w.nick.toLowerCase() !== nick.toLowerCase());
-      _saveWatchList(next);
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
+      const entry = parseWatchList([{ nick }])[0];
+      if (!entry) return;
+      const { watchList } = get();
+      const next = watchList.filter(w => w.nick.toLowerCase() !== entry.nick.toLowerCase());
+      saveWatchList(next, owner);
       set({ watchList: next });
-      client?.sendRaw('MONITOR', '-', nick);
+      _removeMonitorContactIfUnused(get, set, entry.nick);
     },
     setWatchOnline: (nick, online, time) => set(s => ({
       watchList: s.watchList.map(w =>
@@ -12688,34 +12800,6 @@ function _saveFollowedChannels(channels: Set<string>): void {
   _saveChannelSet('onyx:followed-channels', channels);
 }
 
-// ── Friends persistence ───────────────────────────────────────────────────────
-
-type FriendEntry = { nick: string; online: boolean; note?: string };
-
-function _loadFriends(): Map<string, FriendEntry> {
-  if (typeof window === 'undefined') return new Map();
-  try {
-    const raw = localStorage.getItem('onyx:friends');
-    if (!raw) return new Map();
-    return new Map(parseFriendArray(raw).map((friend) => [
-      friend.nick.toLowerCase(),
-      { nick: friend.nick, online: false, ...(friend.note !== undefined ? { note: friend.note } : {}) },
-    ]));
-  } catch {
-    return new Map();
-  }
-}
-
-function _saveFriends(friends: Map<string, FriendEntry>): void {
-  if (typeof window === 'undefined') return;
-  try {
-    const arr = Array.from(friends.values()).map(f => ({ nick: f.nick, note: f.note }));
-    localStorage.setItem('onyx:friends', JSON.stringify(arr));
-  } catch {
-    // Storage quota exceeded or unavailable — silently degrade
-  }
-}
-
 // ── User notes persistence ────────────────────────────────────────────────────
 
 function _loadUserNotes(): Map<string, string> {
@@ -12948,18 +13032,6 @@ function _loadBackground(): string {
 function _saveBackground(id: string): void {
   if (typeof window === 'undefined') return;
   try { localStorage.setItem('onyx:bg', id); } catch {}
-}
-
-// ── Watch list persistence ────────────────────────────────────────────────────
-function _loadWatchList(): Array<{ nick: string; online: boolean; lastSeen?: Date }> {
-  if (typeof window === 'undefined') return [];
-  try {
-    return parseWatchList(localStorage.getItem('onyx:watch-list'));
-  } catch { return []; }
-}
-function _saveWatchList(list: Array<{ nick: string; online: boolean }>): void {
-  if (typeof window === 'undefined') return;
-  try { localStorage.setItem('onyx:watch-list', JSON.stringify(list.map(w => ({ nick: w.nick, online: false })))); } catch {}
 }
 
 // ── High contrast mode persistence ───────────────────────────────────────────

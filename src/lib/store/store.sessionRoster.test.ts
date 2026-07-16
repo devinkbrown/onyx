@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { parseIRCMessage } from '@/lib/irc/parser';
 import { loadCredentials, saveCredentials, storeMeshToken, storeSessionToken } from '@/lib/credentials';
+import { saveFriends, saveWatchList } from '@/lib/contactPresenceMemory';
 import { _resetSessionRestoreForTests, store } from './store';
 
 const initialState = store.getInitialState();
@@ -73,6 +74,27 @@ describe('remembered session roster restoration', () => {
     receive(':example.test 366 kain_ #staff :End of NAMES list');
 
     expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#root' });
+  });
+
+  it('hydrates and restores only the registered owner MONITOR contacts on 001', () => {
+    const owner = { serverUrl: 'wss://example.test', identity: 'kain' } as const;
+    saveFriends(new Map([['friend-one', { nick: 'friend-one', online: false }]]), owner);
+    saveWatchList([{ nick: 'watch-one', online: false }], owner);
+    store.getState().connect({
+      url: owner.serverUrl,
+      nick: owner.identity,
+      password: 'remembered-secret',
+    });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+
+    receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+    receive(':example.test 001 kain :Welcome to IRCXNet');
+
+    expect([...store.getState().friends.keys()]).toEqual(['friend-one']);
+    expect(store.getState().watchList.map((entry) => entry.nick)).toEqual(['watch-one']);
+    expect(store.getState().monitoredNicks).toEqual(new Set(['friend-one', 'watch-one']));
+    expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('MONITOR + friend-one\r\n');
+    expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('MONITOR + watch-one\r\n');
   });
 
   it('retains an authoritative resume NAMES burst that arrives before self JOIN', () => {

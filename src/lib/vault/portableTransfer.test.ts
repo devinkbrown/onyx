@@ -15,6 +15,12 @@ import { loadChannelTopicDrafts, saveChannelTopicDrafts } from '@/lib/channel/to
 import { loadCredentials, saveCredentials, storeMeshToken, storeSessionToken } from '@/lib/credentials';
 import { preferences, resetPreferences, setPreference } from '@/lib/prefs/preferences';
 import { loadDMPins, saveDMPins } from '@/lib/dmPins';
+import {
+  loadFriends,
+  loadWatchList,
+  saveFriends,
+  saveWatchList,
+} from '@/lib/contactPresenceMemory';
 import { sceneMotion, setSceneMotion } from '@/lib/prefs/sceneMotion';
 import {
   MAX_TOPIC_READ_ENTRIES,
@@ -435,6 +441,27 @@ describe('portableTransfer', () => {
     expect(preferences().localHistory).toBe(false);
     expect(await loadRecent('#alpha')).toEqual([]);
     expect(loadDMPins(owner)).toEqual(new Map());
+  });
+
+  it('keeps private friend and WATCH rosters device-only', async () => {
+    const owner = { serverUrl: 'wss://portable.example/ws', identity: 'alice' } as const;
+    saveFriends(new Map([[
+      'portable-private-friend',
+      { nick: 'portable-private-friend', online: false, note: 'portable-private-note' },
+    ]]), owner);
+    saveWatchList([{ nick: 'portable-private-watch', online: false }], owner);
+
+    const exported = await exportPortableTransfer(owner);
+    const serialized = JSON.stringify(exported);
+
+    expect(serialized).not.toContain('portable-private-friend');
+    expect(serialized).not.toContain('portable-private-note');
+    expect(serialized).not.toContain('portable-private-watch');
+
+    // "Clear local history" erases transcripts, not the user's contact book.
+    expect(await clearVault()).toBe(true);
+    expect([...loadFriends(owner).keys()]).toEqual(['portable-private-friend']);
+    expect(loadWatchList(owner).map((entry) => entry.nick)).toEqual(['portable-private-watch']);
   });
 
   it('rejects a local-history-disabled import when the privacy clear does not commit', async () => {
