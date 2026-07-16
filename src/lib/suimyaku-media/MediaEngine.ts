@@ -19,6 +19,16 @@ import {
   constrainHighResolutionQuality,
   highResolutionCapability,
 } from './mediaCapabilities';
+import {
+  boundedReaction,
+  decodeInlineBase64,
+  parseChannelRoster,
+  parseKickTarget,
+  parseMediaRoster,
+  parseNegotiatedAudioBitrate,
+  parseRoomStats,
+  parseSuggestedBitrate,
+} from './mediaControlPayload';
 import type { IRCMessage } from '../irc/types';
 import type {
   CallState, VoiceCallState, MediaKind,
@@ -1285,7 +1295,8 @@ export class SuimyakuMediaEngine {
       const totalS = serverChunk ? parts[4] : parts[3];
       const fid = parseInt(fidS!, 10), n = parseInt(nS!, 10), total = parseInt(totalS!, 10);
       if (isNaN(fid) || isNaN(n) || isNaN(total)) return;
-      const chunk = Uint8Array.from(atob(payload), c => c.charCodeAt(0));
+      const chunk = decodeInlineBase64(payload, 65_536);
+      if (!chunk) return;
       const frame = this.assembler.ingest(senderNick!, ftype!, fid, n, total, chunk);
       if (frame) this.dispatchFrame(senderNick!, channel, ftype!, frame);
       return;
@@ -1297,8 +1308,9 @@ export class SuimyakuMediaEngine {
         const ftype = legacyType === 'AUDIO_FRAME'
           ? 'AUDIO'
           : legacyType === 'VIDEO_KEYFRAME' ? 'KEYFRAME' : 'FRAME';
-        this.dispatchFrame(senderNick, channel, ftype,
-                           Uint8Array.from(atob(payload), c => c.charCodeAt(0)));
+        const frame = decodeInlineBase64(payload);
+        if (!frame) return;
+        this.dispatchFrame(senderNick, channel, ftype, frame);
         return;
       }
     }
@@ -1389,23 +1401,20 @@ export class SuimyakuMediaEngine {
         break;
       }
       case 'ROSTER': {
-        try {
-          const roster = JSON.parse(payload) as { voice?: string[]; video?: string[] };
-          for (const nick of roster.voice ?? []) this.registry.getOrCreate(nick, channel, 'voice');
-          for (const nick of roster.video ?? []) this.registry.getOrCreate(nick, channel, 'video');
-        } catch { /* bad JSON */ }
+        const roster = parseMediaRoster(payload);
+        if (!roster) break;
+        for (const nick of roster.voice) this.registry.getOrCreate(nick, channel, 'voice');
+        for (const nick of roster.video) this.registry.getOrCreate(nick, channel, 'video');
         break;
       }
       case 'STATS': {
-        try { this.cb.onRoomStats?.(channel, JSON.parse(payload) as SuimyakuRoomStats); } catch { /* */ }
+        const stats = parseRoomStats(payload);
+        if (stats) this.cb.onRoomStats?.(channel, stats);
         break;
       }
       case 'MEDIA_STATS': {
-        try {
-          const val = JSON.parse(payload);
-          const bps = typeof val === 'number' ? val : typeof val?.suggested_bps === 'number' ? val.suggested_bps : 0;
-          if (bps > 0) this.applyNetworkBitrate(bps);
-        } catch { /* */ }
+        const bps = parseSuggestedBitrate(payload);
+        if (bps !== null) this.applyNetworkBitrate(bps);
         break;
       }
       case 'NEGO_OFFER': {
@@ -1416,14 +1425,12 @@ export class SuimyakuMediaEngine {
         break;
       }
       case 'NEGO_ANSWER': {
-        try {
-          const ans = JSON.parse(payload) as { max_bitrate_kbps?: number };
-          if (ans.max_bitrate_kbps) {
-            this.negotiatedBitrate.set(fromNick.toLowerCase(), ans.max_bitrate_kbps);
-            (this.audEnc as unknown as { setBitrate?: (n: number) => void })
-              ?.setBitrate?.(ans.max_bitrate_kbps * 1000);
-          }
-        } catch { /* */ }
+        const bitrate = parseNegotiatedAudioBitrate(payload);
+        if (bitrate !== null) {
+          this.negotiatedBitrate.set(fromNick.toLowerCase(), bitrate);
+          (this.audEnc as unknown as { setBitrate?: (n: number) => void })
+            ?.setBitrate?.(bitrate * 1000);
+        }
         break;
       }
       case 'PRESENCE': {
@@ -1433,7 +1440,8 @@ export class SuimyakuMediaEngine {
         break;
       }
       case 'SCREEN_DATA': {
-        const frame = Uint8Array.from(atob(payload), c => c.charCodeAt(0));
+        const frame = decodeInlineBase64(payload);
+        if (!frame) break;
         const pm = this.registry.getOrCreate(fromNick, channel, 'screen');
         this.ensureWasm().then(() => {
           this.registry.decodeScreenVideo(pm, frame, 'FRAME').catch(err =>
@@ -1463,33 +1471,33 @@ export class SuimyakuMediaEngine {
         }
         break;
       }
-      case 'REACTION':
-        if (payload.trim()) this.cb.onReaction?.(fromNick, payload.trim());
+      case 'REACTION': {
+        const reaction = boundedReaction(payload);
+        if (reaction) this.cb.onReaction?.(fromNick, reaction);
         break;
+      }
       case 'RECORD_START':
       case 'RECORD_STOP':
         this.cb.onRecordingAlert?.(fromNick, subtype === 'RECORD_START');
         break;
       case 'VOICE_KICK':
       case 'VIDEO_KICK': {
-        try {
-          const info = JSON.parse(payload) as { target?: string };
-          const myNick = this.getLocalNick();
-          if (!myNick || info.target?.toLowerCase() === myNick.toLowerCase()) {
-            this.setIdle();
-            this.cb.onError(`You were removed from ${subtype === 'VOICE_KICK' ? 'voice' : 'video'} by ${fromNick}`);
-          }
-        } catch { /* non-target */ }
+        const target = parseKickTarget(payload);
+        if (!target) break;
+        const myNick = this.getLocalNick();
+        if (!myNick || target.toLowerCase() === myNick.toLowerCase()) {
+          this.setIdle();
+          this.cb.onError(`You were removed from ${subtype === 'VOICE_KICK' ? 'voice' : 'video'} by ${fromNick}`);
+        }
         break;
       }
       case 'CHANNEL_INFO': {
-        try {
-          const roster = JSON.parse(payload) as Array<{ nick: string }>;
-          for (const p of roster) if (p.nick) this.registry.getOrCreate(p.nick, channel, 'voice');
-          if (roster.length >= 24 && !this.nearCapacityFired) {
-            this.nearCapacityFired = true; this.cb.onRoomNearFull?.();
-          }
-        } catch { /* */ }
+        const roster = parseChannelRoster(payload);
+        if (!roster) break;
+        for (const nick of roster) this.registry.getOrCreate(nick, channel, 'voice');
+        if (roster.length >= 24 && !this.nearCapacityFired) {
+          this.nearCapacityFired = true; this.cb.onRoomNearFull?.();
+        }
         break;
       }
       case 'CHANNEL_INFO_RESP': {
