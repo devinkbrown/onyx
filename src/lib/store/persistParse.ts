@@ -18,6 +18,92 @@ const MAX_PERSISTED_EMOJI_ITEMS = 256;
 const MAX_EMOJI_NAME_LENGTH = 64;
 const MAX_EMOJI_URL_LENGTH = 2_048;
 const MAX_EMOJI_AUTHOR_LENGTH = 128;
+const MAX_PERSISTED_RECORD_ENTRIES = 256;
+const MAX_PERSISTED_RECORD_KEY_LENGTH = 512;
+const MAX_PERSISTED_RECORD_VALUE_LENGTH = 2_048;
+const MAX_PERSISTED_NESTED_ITEMS = 32;
+
+function parseRecord(raw: string | null): Record<string, unknown> | null {
+  if (!raw || raw.length > MAX_PERSISTED_COLLECTION_BYTES) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function safeRecordKey(key: string): boolean {
+  return key.length > 0
+    && key.length <= MAX_PERSISTED_RECORD_KEY_LENGTH
+    && key !== '__proto__'
+    && key !== 'prototype'
+    && key !== 'constructor';
+}
+
+/** Parse a bounded plain string record, retaining valid siblings on corruption. */
+export function parseStringRecord(raw: string | null): Record<string, string> {
+  const parsed = parseRecord(raw);
+  const out: Record<string, string> = {};
+  if (!parsed) return out;
+  let accepted = 0;
+  for (const [key, value] of Object.entries(parsed)) {
+    if (accepted >= MAX_PERSISTED_RECORD_ENTRIES) break;
+    if (
+      safeRecordKey(key)
+      && typeof value === 'string'
+      && value.length <= MAX_PERSISTED_RECORD_VALUE_LENGTH
+    ) {
+      out[key] = value;
+      accepted += 1;
+    }
+  }
+  return out;
+}
+
+/** Parse non-negative integer counters used by bounded local usage ledgers. */
+export function parseCounterRecord(raw: string | null): Record<string, number> {
+  const parsed = parseRecord(raw);
+  const out: Record<string, number> = {};
+  if (!parsed) return out;
+  let accepted = 0;
+  for (const [key, value] of Object.entries(parsed)) {
+    if (accepted >= MAX_PERSISTED_RECORD_ENTRIES) break;
+    if (
+      safeRecordKey(key)
+      && typeof value === 'number'
+      && Number.isSafeInteger(value)
+      && value >= 0
+    ) {
+      out[key] = value;
+      accepted += 1;
+    }
+  }
+  return out;
+}
+
+/** Parse a bounded record of bounded string arrays (for per-target histories). */
+export function parseStringArrayRecord(raw: string | null): Record<string, string[]> {
+  const parsed = parseRecord(raw);
+  const out: Record<string, string[]> = {};
+  if (!parsed) return out;
+  let accepted = 0;
+  for (const [key, value] of Object.entries(parsed)) {
+    if (accepted >= MAX_PERSISTED_RECORD_ENTRIES) break;
+    if (!safeRecordKey(key) || !Array.isArray(value)) continue;
+    const items: string[] = [];
+    for (const item of value) {
+      if (items.length >= MAX_PERSISTED_NESTED_ITEMS) break;
+      if (typeof item === 'string' && item.length <= MAX_PERSISTED_STRING_LENGTH) {
+        items.push(item);
+      }
+    }
+    out[key] = items;
+    accepted += 1;
+  }
+  return out;
+}
 
 export function parseStringArray(raw: string | null): string[] {
   if (!raw || raw.length > MAX_PERSISTED_COLLECTION_BYTES) return [];

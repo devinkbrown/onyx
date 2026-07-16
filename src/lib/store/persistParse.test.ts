@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, it, expect } from 'vitest';
-import { parseStringArray, parseEmojiArray, parseWatchList } from './persistParse';
+import {
+  parseCounterRecord,
+  parseEmojiArray,
+  parseStringArray,
+  parseStringArrayRecord,
+  parseStringRecord,
+  parseWatchList,
+} from './persistParse';
 
 describe('parseStringArray', () => {
   it('returns [] for null / empty input', () => {
@@ -146,5 +153,57 @@ describe('parseWatchList', () => {
     const many = Array.from({ length: 300 }, (_, index) => ({ nick: `nick-${index}`, online: true }));
     expect(parseWatchList(JSON.stringify(many))).toHaveLength(256);
     expect(parseWatchList(`"${'x'.repeat(512 * 1024)}"`)).toEqual([]);
+  });
+});
+
+describe('bounded record parsers', () => {
+  it('retains only bounded string entries from a plain record', () => {
+    const parsed = parseStringRecord(JSON.stringify({
+      '#valid': 'mentions',
+      '#number': 7,
+      '#oversized': 'x'.repeat(2_049),
+      '': 'empty key',
+      constructor: 'unsafe key',
+    }));
+
+    expect(parsed).toEqual({ '#valid': 'mentions' });
+    expect(Object.getPrototypeOf(parsed)).toBe(Object.prototype);
+    expect(parseStringRecord('[]')).toEqual({});
+    expect(parseStringRecord(`"${'x'.repeat(512 * 1024)}"`)).toEqual({});
+  });
+
+  it('accepts only non-negative safe integer counters', () => {
+    expect(parseCounterRecord(JSON.stringify({
+      wave: 4,
+      string: '9',
+      negative: -1,
+      decimal: 1.5,
+      unsafe: Number.MAX_SAFE_INTEGER + 1,
+    }))).toEqual({ wave: 4 });
+    expect(parseCounterRecord('null')).toEqual({});
+  });
+
+  it('filters nested string arrays and bounds each history', () => {
+    const parsed = parseStringArrayRecord(JSON.stringify({
+      '#valid': ['one', 2, 'two', 'x'.repeat(513)],
+      '#wrong': 'not an array',
+      '#many': Array.from({ length: 40 }, (_, index) => `topic-${index}`),
+    }));
+
+    expect(parsed['#valid']).toEqual(['one', 'two']);
+    expect(parsed['#wrong']).toBeUndefined();
+    expect(parsed['#many']).toHaveLength(32);
+    expect(parseStringArrayRecord('{}')).toEqual({});
+  });
+
+  it('bounds record entry counts while preserving valid siblings', () => {
+    const many = Object.fromEntries(Array.from({ length: 300 }, (_, index) => [`key-${index}`, `value-${index}`]));
+    expect(Object.keys(parseStringRecord(JSON.stringify(many)))).toHaveLength(256);
+
+    const mixed = Object.fromEntries(Array.from({ length: 300 }, (_, index) => [
+      `key-${index}`,
+      index % 2 === 0 ? `value-${index}` : index,
+    ]));
+    expect(Object.keys(parseStringRecord(JSON.stringify(mixed)))).toHaveLength(150);
   });
 });

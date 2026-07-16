@@ -1,7 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { createStore } from 'zustand/vanilla';
 import { subscribeWithSelector } from 'zustand/middleware';
-import { parseStringArray, parseEmojiArray, parseWatchList } from './persistParse';
+import {
+  parseCounterRecord,
+  parseEmojiArray,
+  parseStringArray,
+  parseStringArrayRecord,
+  parseStringRecord,
+  parseWatchList,
+} from './persistParse';
 import { parseStoredVoiceSettings, type StoredVoiceSettings } from './voiceSettingsPersistence';
 import { parseChannelFolders } from './channelFoldersPersistence';
 import { IRCClient } from '@/lib/irc/client';
@@ -2738,7 +2745,7 @@ function _loadChannelColors(): Map<string, string> {
   try {
     const raw = localStorage.getItem('onyx:channel-colors');
     if (!raw) return new Map();
-    return new Map(Object.entries(JSON.parse(raw) as Record<string, string>));
+    return new Map(Object.entries(parseStringRecord(raw)).map(([channel, color]) => [channel.toLowerCase(), color]));
   } catch { return new Map(); }
 }
 
@@ -2754,7 +2761,11 @@ function _loadChannelNotify(): Map<string, 'all' | 'mentions' | 'none'> {
   try {
     const raw = localStorage.getItem('onyx:channel-notify');
     if (!raw) return new Map();
-    return new Map(Object.entries(JSON.parse(raw) as Record<string, 'mentions' | 'none'>));
+    const notify = new Map<string, 'all' | 'mentions' | 'none'>();
+    for (const [channel, level] of Object.entries(parseStringRecord(raw))) {
+      if (level === 'mentions' || level === 'none') notify.set(channel.toLowerCase(), level);
+    }
+    return notify;
   } catch { return new Map(); }
 }
 
@@ -11430,8 +11441,7 @@ function _loadUserNotes(): Map<string, string> {
   try {
     const raw = localStorage.getItem('onyx:user-notes');
     if (!raw) return new Map();
-    const obj = JSON.parse(raw) as Record<string, string>;
-    return new Map(Object.entries(obj));
+    return new Map(Object.entries(parseStringRecord(raw)).map(([nick, note]) => [nick.toLowerCase(), note]));
   } catch { return new Map(); }
 }
 
@@ -11451,7 +11461,7 @@ function _loadNickColorOverrides(): Map<string, string> {
   try {
     const raw = localStorage.getItem('onyx:nick-colors');
     if (!raw) return new Map();
-    return new Map(Object.entries(JSON.parse(raw) as Record<string, string>));
+    return new Map(Object.entries(parseStringRecord(raw)).map(([nick, color]) => [nick.toLowerCase(), color]));
   } catch { return new Map(); }
 }
 
@@ -11597,7 +11607,7 @@ function _loadEmojiUsage(): Record<string, number> {
   if (typeof window === 'undefined') return {};
   try {
     const raw = localStorage.getItem('onyx:emoji-usage');
-    return raw ? (JSON.parse(raw) as Record<string, number>) : {};
+    return parseCounterRecord(raw);
   } catch { return {}; }
 }
 
@@ -11632,7 +11642,7 @@ function _loadTopicHistory(): Record<string, string[]> {
   if (typeof window === 'undefined') return {};
   try {
     const raw = localStorage.getItem('onyx:topic-history');
-    return raw ? (JSON.parse(raw) as Record<string, string[]>) : {};
+    return parseStringArrayRecord(raw);
   } catch { return {}; }
 }
 
@@ -11736,7 +11746,7 @@ function _saveSoftIgnoreList(list: Set<string>): void {
 // ── Display name override persistence ────────────────────────────────────────
 function _loadDisplayNameOverrides(): Record<string, string> {
   if (typeof window === 'undefined') return {};
-  try { return JSON.parse(localStorage.getItem('onyx:display-names') ?? '{}'); } catch { return {}; }
+  try { return parseStringRecord(localStorage.getItem('onyx:display-names')); } catch { return {}; }
 }
 function _saveDisplayNameOverrides(overrides: Record<string, string>): void {
   if (typeof window === 'undefined') return;
