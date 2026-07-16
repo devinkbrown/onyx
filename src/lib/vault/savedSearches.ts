@@ -18,6 +18,8 @@
  *    reshapes or re-versions the primary 'onyx-vault' store.
  */
 
+import { createSavedSearchSync, type SavedSearchSync } from './savedSearchSync';
+
 const DB_NAME = 'onyx-vault-searches';
 const DB_VERSION = 1;
 const STORE = 'saved_searches';
@@ -75,6 +77,7 @@ export interface SavedSearchExport {
 let _seq = 0;
 let dbPromise: Promise<IDBDatabase | null> | null = null;
 let changeRevision = 0;
+let crossTabSync: SavedSearchSync | null = null;
 
 export type SavedSearchChangeReason = 'save' | 'delete' | 'clear' | 'import';
 export interface SavedSearchChange {
@@ -87,12 +90,7 @@ export interface SavedSearchChange {
 type SavedSearchChangeListener = (change: SavedSearchChange) => void;
 const changeListeners = new Set<SavedSearchChangeListener>();
 
-export function subscribeSavedSearches(listener: SavedSearchChangeListener): () => void {
-  changeListeners.add(listener);
-  return () => changeListeners.delete(listener);
-}
-
-function publishSavedSearchChange(reason: SavedSearchChangeReason, count: number): void {
+function dispatchSavedSearchChange(reason: SavedSearchChangeReason, count: number): SavedSearchChange {
   const change: SavedSearchChange = {
     revision: ++changeRevision,
     reason,
@@ -106,6 +104,33 @@ function publishSavedSearchChange(reason: SavedSearchChangeReason, count: number
       // reported failure or prevent other consumers from invalidating.
     }
   }
+  return change;
+}
+
+function savedSearchSync(): SavedSearchSync {
+  crossTabSync ??= createSavedSearchSync((change) => {
+    // Remote changes invalidate local readers only. Never republish them: that
+    // would turn two open tabs into an echo loop.
+    dispatchSavedSearchChange(change.reason, change.count);
+  });
+  return crossTabSync;
+}
+
+export function subscribeSavedSearches(listener: SavedSearchChangeListener): () => void {
+  changeListeners.add(listener);
+  savedSearchSync();
+  return () => {
+    changeListeners.delete(listener);
+    if (changeListeners.size === 0) {
+      crossTabSync?.close();
+      crossTabSync = null;
+    }
+  };
+}
+
+function publishSavedSearchChange(reason: SavedSearchChangeReason, count: number): void {
+  const change = dispatchSavedSearchChange(reason, count);
+  savedSearchSync().publish(change);
 }
 
 function openSearchDb(): Promise<IDBDatabase | null> {
@@ -595,6 +620,8 @@ function txDone(tx: IDBTransaction): Promise<boolean> {
 
 /** Test hook — reset the module's cached connection and seq counter. */
 export function _resetSavedSearchesForTests(): void {
+  crossTabSync?.close();
+  crossTabSync = null;
   dbPromise = null;
   _seq = 0;
   changeRevision = 0;
