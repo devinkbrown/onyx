@@ -154,10 +154,12 @@ import { CLOCKS,
   isPreferencesOpen,
   openPreferences,
   preferences,
+  requestedPreferenceCategory,
   resetPreferences,
   setPreference,
   type Density,
   type FontScale,
+  type PreferenceCategory,
   type Width,
 } from '@/lib/prefs/preferences';
 
@@ -201,7 +203,6 @@ const PREFERENCE_CATEGORIES = [
   { id: 'tools', label: 'App & tools', summary: 'Install and extensions' },
   { id: 'accessibility', label: 'Accessibility', summary: 'Motion and access' },
 ] as const;
-type PreferenceCategory = (typeof PREFERENCE_CATEGORIES)[number]['id'];
 const MOBILE_CATEGORY_TABS_QUERY = '(max-width: 42rem)';
 
 function resetAllPreferences(): void {
@@ -2920,6 +2921,12 @@ export function PreferencesPanel(): JSX.Element {
       behavior: 'auto',
     });
   }
+
+  createEffect(() => {
+    if (!isPreferencesOpen()) return;
+    const requested = requestedPreferenceCategory();
+    if (requested !== null) selectCategory(requested);
+  });
 
   return (
     <Sheet

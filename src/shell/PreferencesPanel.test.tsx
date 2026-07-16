@@ -445,6 +445,26 @@ describe('PreferencesPanel', () => {
     }
   });
 
+  it('opens category-specific entry points while ordinary reopens retain the last category', async () => {
+    renderPreferences('Accessibility');
+    closePreferences();
+
+    openPreferences('history');
+
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: /^History & data/ })).toHaveAttribute('aria-selected', 'true');
+      expect(screen.getByRole('tabpanel')).toHaveAccessibleName('History & data');
+    });
+
+    closePreferences();
+    openPreferences();
+
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: /^History & data/ })).toHaveAttribute('aria-selected', 'true');
+      expect(screen.getByRole('tabpanel')).toHaveAccessibleName('History & data');
+    });
+  });
+
   it('resets category scroll while preserving tab focus and mounted pane state', () => {
     renderPreferences('History & data');
     fireEvent.click(screen.getByRole('button', { name: 'Clear local history' }));

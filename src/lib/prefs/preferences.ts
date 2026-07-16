@@ -27,6 +27,16 @@ export type Width = (typeof WIDTHS)[number];
 export const CLOCKS = ['24h', '12h'] as const;
 export type Clock = (typeof CLOCKS)[number];
 
+export const PREFERENCE_CATEGORY_IDS = [
+  'display',
+  'conversation',
+  'history',
+  'transfer',
+  'tools',
+  'accessibility',
+] as const;
+export type PreferenceCategory = (typeof PREFERENCE_CATEGORY_IDS)[number];
+
 export interface Preferences {
   /** Vertical rhythm of the message feed. */
   density: Density;
@@ -187,6 +197,7 @@ export function applyPreferences(prefs: Preferences = preferences()): void {
 
 const [preferences, setPreferencesSignal] = createSignal<Preferences>(loadPreferences());
 const [open, setOpen] = createSignal(false);
+const [requestedCategory, setRequestedCategory] = createSignal<PreferenceCategory | null>(null);
 
 /** Accessor for the whole preferences object. */
 export { preferences };
@@ -194,7 +205,13 @@ export { preferences };
 /** Panel open-state accessor (gates `<PreferencesPanel/>`). */
 export const isPreferencesOpen: Accessor<boolean> = open;
 
-export function openPreferences(): void {
+/** Optional category requested by a category-specific Preferences entry point. */
+export const requestedPreferenceCategory: Accessor<PreferenceCategory | null> = requestedCategory;
+
+export function openPreferences(category?: PreferenceCategory): void {
+  // Clear an earlier deep-link request on ordinary opens so a normal reopen
+  // retains the category already selected in the mounted panel.
+  setRequestedCategory(category ?? null);
   setOpen(true);
 }
 

@@ -11,6 +11,7 @@ import {
   openPreferences,
   parsePreferencesSnapshot,
   preferences,
+  requestedPreferenceCategory,
   resetPreferences,
   setPreference,
   type Preferences,
@@ -341,6 +342,16 @@ describe('preferences store', () => {
       expect(isPreferencesOpen()).toBe(true);
       closePreferences();
       expect(isPreferencesOpen()).toBe(false);
+    });
+
+    it('exposes category-specific opens without making the request sticky', () => {
+      openPreferences('history');
+      expect(isPreferencesOpen()).toBe(true);
+      expect(requestedPreferenceCategory()).toBe('history');
+
+      closePreferences();
+      openPreferences();
+      expect(requestedPreferenceCategory()).toBeNull();
     });
   });
 });
