@@ -507,6 +507,8 @@ export interface OnyxState {
   channels: Map<string, Channel>;
   dms: Map<string, DMConversation>;
   ourNick: string;
+  /** Lowercase channel keys whose remembered-session roster is being rebuilt. */
+  rosterSyncing: Set<string>;
 
   // ── Properties (IRCX PROP) ──────────────────────────────────────────
   channelProps: Map<string, Record<string, string>>;
@@ -2574,6 +2576,124 @@ function _clearReconnectCountdown() {
 type SetFn = (partial: Partial<OnyxState> | ((s: OnyxState) => Partial<OnyxState>)) => void;
 type GetFn = () => OnyxState;
 
+// ── Remembered-session restoration ───────────────────────────────────────────
+// A resumed account can register under a temporary 433 alias (`kain_`) while
+// Orochi reclaims the canonical account identity (`kain`). Session-sync JOIN and
+// NAMES replay may therefore name either identity, and may arrive before each
+// other. Keep that equivalence narrowly scoped to this client and generation;
+// outside the bounded window the normal strict self/353 checks still apply.
+const _SESSION_RESTORE_CONNECT_MS = 45_000;
+const _SESSION_RESTORE_REPLAY_MS = 15_000;
+
+interface SessionRestoreContext {
+  generation: number;
+  client: IRCClient;
+  identities: Set<string>;
+  preserveActiveView: ActiveView | null;
+  selectedRestoredView: boolean;
+  allowEarlyNames: boolean;
+  rosterKeys: Set<string>;
+  expiresAt: number;
+}
+
+let _sessionRestoreGeneration = 0;
+let _sessionRestore: SessionRestoreContext | null = null;
+let _sessionRestoreTimer: ReturnType<typeof setTimeout> | null = null;
+
+function _clearSessionRestore(set?: SetFn): void {
+  if (_sessionRestoreTimer) clearTimeout(_sessionRestoreTimer);
+  _sessionRestoreTimer = null;
+  const rosterKeys = _sessionRestore?.rosterKeys ?? new Set<string>();
+  _sessionRestore = null;
+  if (set && rosterKeys.size > 0) {
+    set(s => {
+      const rosterSyncing = new Set(s.rosterSyncing);
+      for (const key of rosterKeys) rosterSyncing.delete(key);
+      return { rosterSyncing };
+    });
+  }
+}
+
+function _scheduleSessionRestoreExpiry(set: SetFn, generation: number, delay: number): void {
+  if (_sessionRestoreTimer) clearTimeout(_sessionRestoreTimer);
+  _sessionRestoreTimer = setTimeout(() => {
+    if (_sessionRestore?.generation === generation) _clearSessionRestore(set);
+  }, delay);
+}
+
+function _beginSessionRestore(
+  get: GetFn,
+  set: SetFn,
+  client: IRCClient,
+  preserveActiveView: ActiveView | null,
+  allowEarlyNames: boolean,
+): void {
+  _clearSessionRestore(set);
+  const state = get();
+  const identities = new Set(
+    [state.ourNick, _connectNick, _saslAccount ?? '']
+      .filter(Boolean)
+      .map(identity => identity.toLowerCase()),
+  );
+  const rosterKeys = new Set(state.channels.keys());
+  for (const key of rosterKeys) _beginNamesBurst(key);
+  const generation = ++_sessionRestoreGeneration;
+  _sessionRestore = {
+    generation,
+    client,
+    identities,
+    preserveActiveView,
+    selectedRestoredView: false,
+    allowEarlyNames,
+    rosterKeys,
+    expiresAt: _now() + _SESSION_RESTORE_CONNECT_MS,
+  };
+  if (rosterKeys.size > 0) set({ rosterSyncing: new Set(rosterKeys) });
+  _scheduleSessionRestoreExpiry(set, generation, _SESSION_RESTORE_CONNECT_MS);
+}
+
+function _currentSessionRestore(get: GetFn): SessionRestoreContext | null {
+  const restore = _sessionRestore;
+  if (!restore || restore.client !== get().client || _now() >= restore.expiresAt) return null;
+  return restore;
+}
+
+function _addSessionRestoreIdentity(get: GetFn, identity: string | null | undefined): void {
+  if (!identity) return;
+  _currentSessionRestore(get)?.identities.add(identity.toLowerCase());
+}
+
+function _isSessionRestoreIdentity(get: GetFn, identity: string): boolean {
+  return Boolean(identity && _currentSessionRestore(get)?.identities.has(identity.toLowerCase()));
+}
+
+function _armSessionRestoreReplay(get: GetFn, set: SetFn): void {
+  const restore = _currentSessionRestore(get);
+  if (!restore) return;
+  restore.expiresAt = _now() + _SESSION_RESTORE_REPLAY_MS;
+  _scheduleSessionRestoreExpiry(set, restore.generation, _SESSION_RESTORE_REPLAY_MS);
+}
+
+function _setRestoreRosterSyncing(set: SetFn, channelKey: string, syncing: boolean): void {
+  const restore = _sessionRestore;
+  if (restore) {
+    if (syncing) restore.rosterKeys.add(channelKey);
+    else restore.rosterKeys.delete(channelKey);
+  }
+  set(s => {
+    const rosterSyncing = new Set(s.rosterSyncing);
+    if (syncing) rosterSyncing.add(channelKey);
+    else rosterSyncing.delete(channelKey);
+    return { rosterSyncing };
+  });
+}
+
+/** Test-only reset for module-level remembered-session restoration state. */
+export function _resetSessionRestoreForTests(): void {
+  _clearSessionRestore();
+  _sessionRestoreGeneration = 0;
+}
+
 const DEEP_LINK_TOPIC_RESOLUTION_TIMEOUT_MS = 8_000;
 
 interface PendingDeepLinkTopicResolution {
@@ -2812,7 +2932,17 @@ function _startReconnectCountdown(get: GetFn, set: SetFn) {
     }
     set({ connectionStatus: "connecting", reconnectIn: 0 });
     const { client } = get();
+    if (client) {
+      _beginSessionRestore(
+        get,
+        set,
+        client,
+        get().activeView,
+        Boolean(get().server?.account),
+      );
+    }
     if (client && !client.connect()) {
+      _clearSessionRestore(set);
       _stopRosterPoll();
       _stopScheduledDispatch();
       set({ status: 'disconnected', connectionStatus: 'disconnected', reconnectIn: 0, autoReconnect: false });
@@ -3099,6 +3229,7 @@ export const store = createStore<OnyxState>()(
     channels: new Map(),
     dms: new Map(),
     ourNick: '',
+    rosterSyncing: new Set(),
     channelProps: new Map(),
     userProps: new Map(),
     showChannelInfo: false,
@@ -3279,8 +3410,16 @@ export const store = createStore<OnyxState>()(
       _reconnectAttempts = 0;
       const { client } = get();
       if (client) {
+        _beginSessionRestore(
+          get,
+          set,
+          client,
+          get().activeView,
+          Boolean(get().server?.account),
+        );
         set({ connectionStatus: 'connecting', reconnectIn: 0 });
         if (!client.connect()) {
+          _clearSessionRestore(set);
           _stopRosterPoll();
           _stopScheduledDispatch();
           set({ status: 'disconnected', connectionStatus: 'disconnected', reconnectIn: 0, autoReconnect: false });
@@ -3331,6 +3470,7 @@ export const store = createStore<OnyxState>()(
         autoReconnect: false,
         channels: new Map(),
         dms: new Map(),
+        rosterSyncing: new Set(),
         activeView: { kind: 'home' },
         firstUnreadId: new Map(),
         ...(searchWasPending
@@ -3347,6 +3487,9 @@ export const store = createStore<OnyxState>()(
       });
       _nickAliasTryIdx = 0;
       const savedCreds = loadCredentials(url, nick);
+      const canRestoreRememberedSession = Boolean(
+        password || hasClientCert || savedCreds?.sessionToken || savedCreds?.meshToken,
+      );
 
       // Per-client flag: true once this client has registered at least once, so
       // onConnected can tell a fresh connect from a reconnect/session-resume.
@@ -3444,6 +3587,7 @@ export const store = createStore<OnyxState>()(
           get().addServerLog(err, '', 'error');
         },
         onNickChanged(newNick) {
+          _addSessionRestoreIdentity(get, newNick);
           set(s => ({
             ourNick: newNick,
             server: s.server ? { ...s.server, nick: newNick } : null,
@@ -3469,7 +3613,14 @@ export const store = createStore<OnyxState>()(
         });
       };
 
+      if (canRestoreRememberedSession) {
+        _beginSessionRestore(get, set, client, null, true);
+      } else {
+        _clearSessionRestore(set);
+      }
+
       if (!client.connect()) {
+        _clearSessionRestore(set);
         // `new WebSocket(url)` can throw synchronously for a malformed or
         // unsupported endpoint. There will be no close event to finish the
         // state transition, so return the form to an actionable error state
@@ -3530,6 +3681,7 @@ export const store = createStore<OnyxState>()(
       _reconnectAttempts = 0;
       _connectNick  = '';
       _saslAccount  = null;
+      _clearSessionRestore(set);
       // Drop any in-flight CHATHISTORY batch state so a stale open batch can't
       // swallow live messages after a fresh connect.
       _batchCollectors.clear();
@@ -3550,6 +3702,7 @@ export const store = createStore<OnyxState>()(
         autoReconnect: false,
         channels: new Map(),
         dms: new Map(),
+        rosterSyncing: new Set(),
         server: null,
         activeView: { kind: 'home' },
         activeChannelTopics: new Map(),
@@ -6244,6 +6397,10 @@ export const store = createStore<OnyxState>()(
 
         // ── Registration ──────────────────────────────────────────────────
         case '001': { // RPL_WELCOME
+          _addSessionRestoreIdentity(get, params[0]);
+          _addSessionRestoreIdentity(get, _saslAccount);
+          _addSessionRestoreIdentity(get, _connectNick);
+          _armSessionRestoreReplay(get, set);
           // Orochi exposes voice/video via the MEDIA channel command for any
           // registered member — there is no media cap to gate on, so mark it
           // available on registration. MEDIA EVENTs keep it true.
@@ -6399,7 +6556,9 @@ export const store = createStore<OnyxState>()(
             _pushReplayEvent(tags, ch, `${joiner} joined`);
             break;
           }
-          const isSelf = joiner.toLowerCase() === ourNick.toLowerCase();
+          const restore = _currentSessionRestore(get);
+          const isSelf = joiner.toLowerCase() === ourNick.toLowerCase()
+            || _isSessionRestoreIdentity(get, joiner);
           if (isSelf && _recentNamesBurst(key)?.phase === 'settled') {
             // A new self-JOIN is a new membership generation. Let its explicit
             // reconcile replace the completed generation and its tombstones.
@@ -6412,11 +6571,22 @@ export const store = createStore<OnyxState>()(
           const joinAccount = params[1] && params[1] !== '*' ? params[1] : undefined;
 
           if (isSelf) {
+            if (restore) _setRestoreRosterSyncing(set, key, true);
+            const pendingJoin = get().pendingDeepLinkJoin;
+            const requestedRoom = pendingJoin?.toLowerCase() === key;
+            const restoreActiveView = requestedRoom
+              ? null
+              : (restore?.preserveActiveView
+                ?? (restore?.selectedRestoredView ? get().activeView : null));
+            if (restore && (!restore.selectedRestoredView || requestedRoom)) {
+              restore.selectedRestoredView = true;
+            }
             // We joined — create channel if not exists
             set(s => {
               const channels = new Map(s.channels);
               if (!channels.has(key)) channels.set(key, emptyChannel(ch));
-              return { channels, activeView: { kind: 'channel', channel: key } };
+              const activeView = restoreActiveView ?? { kind: 'channel' as const, channel: key };
+              return { channels, activeView };
             });
             // Track session join history
             get().addJoinHistory(ch);
@@ -6488,6 +6658,7 @@ export const store = createStore<OnyxState>()(
             // A pending/late NAMES reply is not proof that we are still joined.
             _namesBursts.delete(key);
             _lastRosterRefresh.delete(key);
+            if (get().rosterSyncing.has(key)) _setRestoreRosterSyncing(set, key, false);
             set(s => {
               const channels = new Map(s.channels);
               channels.delete(key);
@@ -6571,6 +6742,7 @@ export const store = createStore<OnyxState>()(
           if (isSelf) {
             _namesBursts.delete(key);
             _lastRosterRefresh.delete(key);
+            if (get().rosterSyncing.has(key)) _setRestoreRosterSyncing(set, key, false);
           } else {
             _excludeNickFromNames(key, target);
           }
@@ -6623,6 +6795,9 @@ export const store = createStore<OnyxState>()(
           const namesBurst = _recentNamesBurst(namesKey);
           if (namesBurst) {
             _namesBursts.set(namesKey, { ...namesBurst, phase: 'settled', at: _now() });
+          }
+          if (get().rosterSyncing.has(namesKey)) {
+            _setRestoreRosterSyncing(set, namesKey, false);
           }
           // Fetch channel PROP data if IRCX
           if (get().isIRCX) {
@@ -6702,6 +6877,24 @@ export const store = createStore<OnyxState>()(
           const key = ch.toLowerCase();
           const { client } = get();
           const names = (namesStr ?? '').split(' ').filter(Boolean);
+          const recipient = params[0] ?? '';
+          const restore = _currentSessionRestore(get);
+          const namesContainRestoringSelf = names.some(name => {
+            const parsed = parseNamesPrefix(name, client?.prefixToMode ?? DEFAULT_PREFIX_TO_MODE);
+            return _isSessionRestoreIdentity(get, parsed.nick);
+          });
+          const canCreateFromResume = Boolean(
+            restore?.allowEarlyNames
+            && _isSessionRestoreIdentity(get, recipient)
+            && namesContainRestoringSelf,
+          );
+          // Session-sync may emit the authoritative NAMES burst before its
+          // canonical self-JOIN echo. That is the sole bounded exception to the
+          // normal rule that a 353 can never create channel membership.
+          if (canCreateFromResume && !get().channels.has(key) && !_recentNamesBurst(key)) {
+            _beginNamesBurst(key);
+          }
+          if (canCreateFromResume) _setRestoreRosterSyncing(set, key, true);
           // Only a burst WE initiated in phase 'expect' may REPLACE the roster;
           // its first 353 does so and flips to 'appending'. Every other 353
           // (later lines, an overlapping burst, an expired reply, or a stray
@@ -6717,7 +6910,7 @@ export const store = createStore<OnyxState>()(
           }
           set(s => {
             const channels = new Map(s.channels);
-            const c = channels.get(key);
+            const c = channels.get(key) ?? (canCreateFromResume ? emptyChannel(ch) : undefined);
             // NAMES is a roster reply, not a JOIN. A delayed reply after our
             // PART/KICK must never recreate the channel in local state.
             if (!c) return {};
@@ -8616,6 +8809,7 @@ export const store = createStore<OnyxState>()(
             const account900 = params[2];
             // Capture before server object exists (900 arrives during CAP/SASL, before 001)
             _saslAccount = account900;
+            _addSessionRestoreIdentity(get, account900);
             // Clear any in-flight passkey ceremony — a passkey AUTH-FINISH that
             // verifies lands here as RPL_LOGGEDIN.
             set(s => ({

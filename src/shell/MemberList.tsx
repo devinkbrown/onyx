@@ -216,6 +216,7 @@ export function MemberList(props: MemberListProps): JSX.Element {
 
   const activeView = useStore((s) => s.activeView);
   const channels = useStore((s) => s.channels);
+  const rosterSyncing = useStore((s) => s.rosterSyncing);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const modeToPrefix = useStore((s) => s.client?.modeToPrefix ?? s.isupportModeToPrefix);
 
@@ -230,7 +231,16 @@ export function MemberList(props: MemberListProps): JSX.Element {
   // map while connected means "loading", not "genuinely empty".
   const isLoadingRoster = createMemo(() => {
     const ch = activeChannel();
-    return !!ch && ch.users.size === 0 && connectionStatus() === 'connected';
+    const view = activeView();
+    const restoreSyncing = view.kind === 'channel'
+      && rosterSyncing().has(view.channel.toLowerCase());
+    return !!ch && connectionStatus() === 'connected'
+      && (restoreSyncing || ch.users.size === 0);
+  });
+
+  const rosterStatusLabel = createMemo(() => {
+    const ch = activeChannel();
+    return ch && ch.users.size > 0 ? 'Refreshing members' : 'Loading members';
   });
 
   // Identity-stable grouping: unchanged members keep their entry/group object
@@ -245,6 +255,7 @@ export function MemberList(props: MemberListProps): JSX.Element {
   });
 
   const totalCount = createMemo(() => {
+    if (isLoadingRoster()) return 0;
     return groups().reduce((sum, g) => sum + g.members.length, 0);
   });
 
@@ -294,7 +305,7 @@ export function MemberList(props: MemberListProps): JSX.Element {
 
       <div class="shell-members-scroll" role="region" aria-label={rosterLabel()}>
         <Show
-          when={groups().length > 0}
+          when={!isLoadingRoster() && groups().length > 0}
           fallback={
             <Show
               when={isLoadingRoster()}
@@ -304,8 +315,8 @@ export function MemberList(props: MemberListProps): JSX.Element {
                 </p>
               }
             >
-              <div class="shell-members-skel" role="status" aria-label="Loading members">
-                <span class="sr-only">Loading members…</span>
+              <div class="shell-members-skel" role="status" aria-label={rosterStatusLabel()}>
+                <span class="sr-only">{rosterStatusLabel()}…</span>
                 <For each={[0, 1, 2, 3, 4]}>
                   {(i) => (
                     <div class="shell-members-skel-row" style={{ '--skel-i': i }} aria-hidden="true">

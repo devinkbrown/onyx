@@ -1,0 +1,139 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { parseIRCMessage } from '@/lib/irc/parser';
+import { _resetSessionRestoreForTests, store } from './store';
+
+const initialState = store.getInitialState();
+
+class FakeWebSocket {
+  static readonly OPEN = 1;
+  static latest: FakeWebSocket | null = null;
+
+  readyState = FakeWebSocket.OPEN;
+  bufferedAmount = 0;
+  binaryType = '';
+  onopen: ((event: Event) => void) | null = null;
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  onclose: ((event: CloseEvent) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  readonly send = vi.fn();
+  readonly close = vi.fn();
+
+  constructor() {
+    FakeWebSocket.latest = this;
+  }
+}
+
+function receive(line: string): void {
+  FakeWebSocket.latest?.onmessage?.(new MessageEvent('message', { data: line }));
+}
+
+describe('remembered session roster restoration', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    store.setState(initialState, true);
+    _resetSessionRestoreForTests();
+    FakeWebSocket.latest = null;
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+  });
+
+  afterEach(() => {
+    store.getState().disconnect();
+    _resetSessionRestoreForTests();
+    vi.unstubAllGlobals();
+  });
+
+  it('accepts canonical self JOIN and NAMES after a collision alias resumes the account', () => {
+    store.getState().connect({
+      url: 'wss://example.test',
+      nick: 'kain',
+      password: 'remembered-secret',
+    });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+
+    receive(':example.test 433 * kain :Nickname is already in use');
+    receive(':example.test 900 kain_ kain_!webchat@example kain :You are now logged in as kain');
+    store.getState().client?.updateResumeTokens({ sessionToken: 'resume-token' });
+    receive(':example.test 001 kain_ :Welcome to IRCXNet');
+
+    expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('SESSION RESUME resume-token\r\n');
+
+    receive(':kain!webchat@example JOIN #root');
+    receive(':example.test 353 kain_ = #root :@kain trev alice');
+    receive(':example.test 366 kain_ #root :End of NAMES list');
+
+    const root = store.getState().channels.get('#root');
+    expect(root).toBeDefined();
+    expect([...root!.users.values()].map(user => user.nick).sort()).toEqual(['alice', 'kain', 'trev']);
+
+    receive(':kain!webchat@example JOIN #staff');
+    receive(':example.test 353 kain_ = #staff :@kain operator');
+    receive(':example.test 366 kain_ #staff :End of NAMES list');
+
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#root' });
+  });
+
+  it('retains an authoritative resume NAMES burst that arrives before self JOIN', () => {
+    store.getState().connect({
+      url: 'wss://example.test',
+      nick: 'kain',
+      password: 'remembered-secret',
+    });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+
+    receive(':example.test 433 * kain :Nickname is already in use');
+    receive(':example.test 900 kain_ kain_!webchat@example kain :You are now logged in as kain');
+    store.getState().client?.updateResumeTokens({ sessionToken: 'resume-token' });
+    receive(':example.test 001 kain_ :Welcome to IRCXNet');
+
+    receive(':example.test 353 kain_ = #fabricated :intruder mallory');
+    expect(store.getState().channels.has('#fabricated')).toBe(false);
+
+    receive(':example.test 353 kain_ = #root :@kain trev alice');
+    receive(':example.test 366 kain_ #root :End of NAMES list');
+    receive(':kain!webchat@example JOIN #root');
+
+    const root = store.getState().channels.get('#root');
+    expect(root).toBeDefined();
+    expect([...root!.users.values()].map(user => user.nick).sort()).toEqual(['alice', 'kain', 'trev']);
+  });
+
+  it('does not let a stray NAMES reply create a channel outside a restore generation', () => {
+    store.setState({ ourNick: 'kain', connectionStatus: 'connected' });
+
+    store.getState()._handleMessage(
+      parseIRCMessage(':example.test 353 kain = #stray :kain intruder'),
+    );
+
+    expect(store.getState().channels.has('#stray')).toBe(false);
+  });
+
+  it('preserves the pre-drop active channel across multi-channel replay JOINs', () => {
+    store.getState().connect({
+      url: 'wss://example.test',
+      nick: 'kain',
+      password: 'remembered-secret',
+    });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+    receive(':example.test 001 kain :Welcome to IRCXNet');
+    receive(':kain!webchat@example JOIN #root');
+    receive(':example.test 353 kain = #root :@kain trev');
+    receive(':example.test 366 kain #root :End of NAMES list');
+    receive(':kain!webchat@example JOIN #staff');
+    receive(':example.test 353 kain = #staff :@kain alice');
+    receive(':example.test 366 kain #staff :End of NAMES list');
+    store.setState({ activeView: { kind: 'channel', channel: '#root' } });
+
+    FakeWebSocket.latest?.onclose?.(new CloseEvent('close', { code: 1006 }));
+    store.getState().reconnectNow();
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 001 kain :Welcome back');
+
+    receive(':kain!webchat@example JOIN #root');
+    receive(':kain!webchat@example JOIN #staff');
+
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#root' });
+  });
+});

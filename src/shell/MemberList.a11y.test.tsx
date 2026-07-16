@@ -147,6 +147,22 @@ describe('MemberList accessibility', () => {
     expect(screen.getByRole('button', { name: /Open member details for Alice, Voice/ })).toBeInTheDocument();
   });
 
+  it('shows an honest refresh state instead of a stale remembered-session roster', () => {
+    seedChannel([makeUser('me', ['o']), makeUser('departed', ['v'])]);
+    store.setState({ rosterSyncing: new Set(['#general']) });
+
+    render(() => <MemberList />);
+
+    expect(screen.getByRole('status', { name: 'Refreshing members' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Open member details for departed/ })).toBeNull();
+    expect(screen.getByLabelText('0 members')).toHaveTextContent('0');
+
+    store.setState({ rosterSyncing: new Set() });
+
+    expect(screen.queryByRole('status', { name: 'Refreshing members' })).toBeNull();
+    expect(screen.getByRole('button', { name: /Open member details for departed/ })).toBeInTheDocument();
+  });
+
   it('announces a member role in text exactly once, not doubled by the badge glyph', () => {
     // The row already states the role in its sr-only summary; the coloured glyph
     // badge must be decorative so screen readers do not read the role twice.
