@@ -56,6 +56,58 @@ describe('Sheet', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('restores an explicit durable target when the visible opener is removed', async () => {
+    const returnTarget = document.createElement('button');
+    returnTarget.textContent = 'Member row';
+    document.body.appendChild(returnTarget);
+
+    function Harness() {
+      const [open, setOpen] = createSignal(true);
+      return (
+        <Sheet open={open()} title="Profile" returnFocus={returnTarget} onOpenChange={setOpen}>
+          <button type="button">Temporary action</button>
+        </Sheet>
+      );
+    }
+
+    render(() => <Harness />);
+    fireEvent.click(screen.getByRole('button', { name: 'Close panel' }));
+    await tick();
+
+    expect(returnTarget).toHaveFocus();
+    returnTarget.remove();
+  });
+
+  it('uses a stable fallback when the explicit return target is removed while open', async () => {
+    const returnTarget = document.createElement('button');
+    const fallback = document.createElement('div');
+    fallback.tabIndex = -1;
+    document.body.append(returnTarget, fallback);
+
+    function Harness() {
+      const [open, setOpen] = createSignal(true);
+      return (
+        <Sheet
+          open={open()}
+          title="Profile"
+          returnFocus={returnTarget}
+          returnFocusFallback={fallback}
+          onOpenChange={setOpen}
+        >
+          <button type="button">Temporary action</button>
+        </Sheet>
+      );
+    }
+
+    render(() => <Harness />);
+    returnTarget.remove();
+    fireEvent.click(screen.getByRole('button', { name: 'Close panel' }));
+    await tick();
+
+    expect(fallback).toHaveFocus();
+    fallback.remove();
+  });
+
   it('closes from the inert backdrop click target', async () => {
     function Harness() {
       const [open, setOpen] = createSignal(true);

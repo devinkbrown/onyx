@@ -95,7 +95,18 @@ export type DialogFocusOptions = {
   getPanel: () => HTMLElement | undefined;
   /** Invoked when Escape is pressed while open. */
   onEscape: () => void;
+  /** Optional durable return target when the active opener will be unmounted. */
+  getReturnFocus?: () => HTMLElement | null | undefined;
+  /** Secondary return target when the preferred control is removed while open. */
+  getReturnFocusFallback?: () => HTMLElement | null | undefined;
 };
+
+function canRestoreDialogFocus(element: HTMLElement | null | undefined): element is HTMLElement {
+  if (!element?.isConnected || element.ownerDocument !== document) return false;
+  if (element.closest('[hidden], [inert], [aria-hidden="true"]')) return false;
+  if ('disabled' in element && element.disabled === true) return false;
+  return true;
+}
 
 /**
  * Wire the full modal focus lifecycle for a dialog primitive. Must be called
@@ -111,7 +122,9 @@ export function createDialogFocus(options: DialogFocusOptions): void {
     if (!options.isOpen()) return;
 
     const owner = Symbol('dialog-focus-owner');
-    const previous = document.activeElement as HTMLElement | null;
+    const previous = options.getReturnFocus?.()
+      ?? document.activeElement as HTMLElement | null;
+    const returnFallback = options.getReturnFocusFallback?.();
     dialogFocusStack.push(owner);
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isTopDialog(owner) || keyboardEventIsClaimed(event)) return;
@@ -136,7 +149,12 @@ export function createDialogFocus(options: DialogFocusOptions): void {
       const wasTopDialog = isTopDialog(owner);
       document.removeEventListener('keydown', handleKeyDown);
       removeDialog(owner);
-      if (wasTopDialog) previous?.focus?.();
+      if (wasTopDialog) {
+        const returnTarget = canRestoreDialogFocus(previous)
+          ? previous
+          : canRestoreDialogFocus(returnFallback) ? returnFallback : null;
+        returnTarget?.focus({ preventScroll: true });
+      }
     });
   });
 }

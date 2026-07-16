@@ -9,10 +9,14 @@ export type SheetProps = ParentProps<{
   description?: string;
   onOpenChange: (open: boolean) => void;
   closeLabel?: string;
+  /** Durable focus target for handoffs whose visible opener is being removed. */
+  returnFocus?: HTMLElement | null;
+  /** Stable surface to focus if returnFocus is removed while the sheet is open. */
+  returnFocusFallback?: HTMLElement | null;
 }>;
 
 export function Sheet(props: SheetProps) {
-  const [local, rest] = splitProps(props, ['open', 'title', 'description', 'onOpenChange', 'closeLabel', 'children']);
+  const [local, rest] = splitProps(props, ['open', 'title', 'description', 'onOpenChange', 'closeLabel', 'returnFocus', 'returnFocusFallback', 'children']);
   const titleId = () => `${local.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'sheet'}-title`;
   const descriptionId = () => local.description ? `${titleId()}-description` : undefined;
   let panelRef: HTMLElement | undefined;
@@ -21,6 +25,8 @@ export function Sheet(props: SheetProps) {
     isOpen: () => local.open,
     getPanel: () => panelRef,
     onEscape: () => local.onOpenChange(false),
+    getReturnFocus: () => local.returnFocus,
+    getReturnFocusFallback: () => local.returnFocusFallback,
   });
 
   return (

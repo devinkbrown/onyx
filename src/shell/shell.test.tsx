@@ -1461,8 +1461,11 @@ describe('AppShell', () => {
       });
     });
 
-    it('opens the live WHOIS profile surface from member details and restores focus', async () => {
-      stubMobileViewport(false);
+    it.each([
+      { surface: 'desktop roster', mobile: false },
+      { surface: 'mobile member drawer', mobile: true },
+    ])('opens the live WHOIS profile from the $surface and restores its stable trigger', async ({ mobile }) => {
+      stubMobileViewport(mobile);
       seedStore('#general');
       const sendRaw = vi.fn();
       store.setState({
@@ -1475,6 +1478,10 @@ describe('AppShell', () => {
       const { container } = render(() => <AppShell />);
       const memberList = container.querySelector<HTMLElement>('.shell-members');
       expect(memberList).not.toBeNull();
+      if (mobile) {
+        fireEvent.click(screen.getByRole('button', { name: 'Toggle member list' }));
+        await waitFor(() => expect(memberList).toHaveAttribute('aria-hidden', 'false'));
+      }
       const memberTrigger = within(memberList!).getByRole('button', { name: /Open member details for alice/i });
       fireEvent.click(memberTrigger);
       const profileButton = screen.getByRole('button', { name: 'View profile of alice' });
@@ -1492,6 +1499,48 @@ describe('AppShell', () => {
         expect(screen.queryByRole('dialog', { name: 'Profile: alice' })).toBeNull();
         expect(memberTrigger).toHaveFocus();
       });
+
+      if (!mobile) {
+        const laterOpener = screen.getByRole('button', { name: /3 members — toggle member list/i });
+        laterOpener.focus();
+        store.getState().whois('bob');
+        const laterProfile = await screen.findByRole('dialog', { name: 'Profile: bob' });
+        fireEvent.click(within(laterProfile).getByRole('button', { name: 'Close member profile' }));
+        await waitFor(() => expect(laterOpener).toHaveFocus());
+      }
+    });
+
+    it.each([
+      { surface: 'desktop roster', mobile: false },
+      { surface: 'mobile member drawer', mobile: true },
+    ])('falls back to the stable $surface when the profiled member leaves', async ({ mobile }) => {
+      stubMobileViewport(mobile);
+      seedStore('#general');
+      store.setState({
+        client: {
+          sendRaw: vi.fn(),
+          isupport: { CHANTYPES: '#&' },
+        } as never,
+      });
+
+      const { container } = render(() => <AppShell />);
+      const memberList = container.querySelector<HTMLElement>('.shell-members');
+      expect(memberList).not.toBeNull();
+      if (mobile) {
+        fireEvent.click(screen.getByRole('button', { name: 'Toggle member list' }));
+        await waitFor(() => expect(memberList).toHaveAttribute('aria-hidden', 'false'));
+      }
+
+      const memberTrigger = within(memberList!).getByRole('button', { name: /Open member details for alice/i });
+      fireEvent.click(memberTrigger);
+      fireEvent.click(screen.getByRole('button', { name: 'View profile of alice' }));
+      const profile = await screen.findByRole('dialog', { name: 'Profile: alice' });
+
+      store.getState()._handleMessage(parseIRCMessage(':alice!user@example PART #general :Leaving'));
+      await waitFor(() => expect(memberTrigger).not.toBeInTheDocument());
+      fireEvent.click(within(profile).getByRole('button', { name: 'Close member profile' }));
+
+      await waitFor(() => expect(memberList).toHaveFocus());
     });
 
     it('does not expose an empty channel nicklist inside a direct message', () => {

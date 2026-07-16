@@ -159,6 +159,8 @@ function roomIdentityStyle(identity: RoomIdentity | null): JSX.CSSProperties {
 
 export function AppShell(props: AppShellProps): JSX.Element {
   const [local] = splitProps(props, ['onDisconnect', 'selfNick']);
+  const [whoisReturnFocus, setWhoisReturnFocus] = createSignal<HTMLElement | null>(null);
+  const [whoisReturnFocusFallback, setWhoisReturnFocusFallback] = createSignal<HTMLElement | null>(null);
 
   // ── store reads ──
   const activeView = useStore((s) => s.activeView);
@@ -473,6 +475,17 @@ export function AppShell(props: AppShellProps): JSX.Element {
     });
   }
 
+  function openMemberWhois(nick: string, returnFocus: HTMLElement): void {
+    setWhoisReturnFocus(returnFocus);
+    setWhoisReturnFocusFallback(returnFocus.closest<HTMLElement>('.shell-members'));
+    getState().whois(nick);
+  }
+
+  function clearMemberWhoisReturnFocus(): void {
+    setWhoisReturnFocus(null);
+    setWhoisReturnFocusFallback(null);
+  }
+
   // ── is the member surface visible (column on desktop, drawer on mobile)? ──
   const membersVisible = createMemo(() =>
     hasMemberRoster() && (isMobile() ? mobileMembersOpen() : showMemberList()),
@@ -593,6 +606,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
           hidden={!membersVisible()}
           modal={isMobile()}
           onOpenDm={openMemberDm}
+          onOpenWhois={openMemberWhois}
         />
       </div>
 
@@ -661,7 +675,11 @@ export function AppShell(props: AppShellProps): JSX.Element {
         <ChannelBrowser />
       </Show>
       <Show when={showWhois()}>
-        <WhoisSheet />
+        <WhoisSheet
+          returnFocus={whoisReturnFocus()}
+          returnFocusFallback={whoisReturnFocusFallback()}
+          onClose={clearMemberWhoisReturnFocus}
+        />
       </Show>
 
       {/* Preferences panel — display & behaviour, gated on isPreferencesOpen() */}

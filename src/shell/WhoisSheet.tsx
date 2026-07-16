@@ -35,7 +35,13 @@ function formatIdle(seconds: number): string {
   return `${Math.floor(safe / 86400)} days`;
 }
 
-export function WhoisSheet(): JSX.Element {
+export type WhoisSheetProps = {
+  returnFocus?: HTMLElement | null;
+  returnFocusFallback?: HTMLElement | null;
+  onClose?: () => void;
+};
+
+export function WhoisSheet(props: WhoisSheetProps): JSX.Element {
   const open = useStore((s) => s.showWhois);
   const nick = useStore((s) => s.whoisNick);
   const info = useStore((s) => {
@@ -79,8 +85,13 @@ export function WhoisSheet(): JSX.Element {
       title={`Profile: ${nick() ?? 'member'}`}
       description="Live network identity and presence details from WHOIS."
       closeLabel="Close member profile"
+      returnFocus={props.returnFocus}
+      returnFocusFallback={props.returnFocusFallback}
       onOpenChange={(next) => {
-        if (!next) getState().closeWhois();
+        if (!next) {
+          getState().closeWhois();
+          props.onClose?.();
+        }
       }}
     >
       <div class="shell-whois">

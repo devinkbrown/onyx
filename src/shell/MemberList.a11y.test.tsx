@@ -235,7 +235,7 @@ describe('MemberList accessibility', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('closes member details before handing Profile focus to the WHOIS sheet', () => {
+  it('settles focus on the roster trigger before opening the WHOIS sheet', () => {
     seedChannel([makeUser('me', ['o']), makeUser('bob', ['v'])]);
 
     render(() => <MemberList />);

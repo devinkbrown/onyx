@@ -74,10 +74,12 @@ type MemberCardProps = {
   channel: string;
   /** Let the owning shell coordinate navigation with drawer and focus state. */
   onOpenDm?: (nick: string) => void;
+  /** Open WHOIS with a persistent row control as the modal return target. */
+  onOpenWhois?: (nick: string, returnFocus: HTMLElement) => void;
 };
 
 function MemberCard(props: MemberCardProps): JSX.Element {
-  const [local] = splitProps(props, ['user', 'role', 'channel', 'onOpenDm']);
+  const [local] = splitProps(props, ['user', 'role', 'channel', 'onOpenDm', 'onOpenWhois']);
 
   // Reactive op-gate: moderation controls only render for op (or higher).
   const canModerate = useStore((s) => selectIsChannelOp(local.channel)(s));
@@ -99,9 +101,9 @@ function MemberCard(props: MemberCardProps): JSX.Element {
       : null;
   }
 
-  function closeCardForHandoff(event: MouseEvent, focusRoster = false): void {
+  function closeCardForHandoff(event: MouseEvent, focusRoster = false): HTMLElement | null {
     const memberTrigger = memberTriggerForAction(event);
-    if (!memberTrigger) return;
+    if (!memberTrigger) return null;
 
     const roster = memberTrigger.closest<HTMLElement>('.shell-members');
     const target = focusRoster ? roster : memberTrigger;
@@ -111,6 +113,7 @@ function MemberCard(props: MemberCardProps): JSX.Element {
     // Popover restores its own opener in a microtask. Run after that restore so
     // a later MODE/KICK echo cannot remove the element that owns focus.
     if (focusRoster && target) queueMicrotask(() => target.focus({ preventScroll: true }));
+    return target;
   }
 
   function handleDm(): void {
@@ -124,8 +127,13 @@ function MemberCard(props: MemberCardProps): JSX.Element {
   function handleWhois(event: MouseEvent): void {
     // The WHOIS Sheet lives outside this native popover. Its first pointer
     // interaction light-dismisses the popover and removes this Profile button,
-    // so make the persistent member-row trigger the Sheet's restore target.
-    closeCardForHandoff(event);
+    // so explicitly give the owning shell the persistent member-row trigger
+    // instead of relying on native popover focus timing.
+    const memberTrigger = closeCardForHandoff(event);
+    if (local.onOpenWhois && memberTrigger) {
+      local.onOpenWhois(local.user.nick, memberTrigger);
+      return;
+    }
     getState().whois(local.user.nick);
   }
 
@@ -246,6 +254,7 @@ type MemberRowProps = {
   channel: string;
   hidden?: boolean;
   onOpenDm?: (nick: string) => void;
+  onOpenWhois?: (nick: string, returnFocus: HTMLElement) => void;
   getRoster: () => HTMLElement | undefined;
 };
 
@@ -316,6 +325,7 @@ function MemberRow(props: MemberRowProps): JSX.Element {
           role={props.role}
           channel={props.channel}
           onOpenDm={props.onOpenDm}
+          onOpenWhois={props.onOpenWhois}
         />
       </Popover>
     </li>
@@ -328,10 +338,11 @@ export type MemberListProps = {
   hidden?: boolean;
   modal?: boolean;
   onOpenDm?: (nick: string) => void;
+  onOpenWhois?: (nick: string, returnFocus: HTMLElement) => void;
 };
 
 export function MemberList(props: MemberListProps): JSX.Element {
-  const [local] = splitProps(props, ['hidden', 'modal', 'onOpenDm']);
+  const [local] = splitProps(props, ['hidden', 'modal', 'onOpenDm', 'onOpenWhois']);
   let memberListRef: HTMLElement | undefined;
 
   const activeView = useStore((s) => s.activeView);
@@ -484,6 +495,7 @@ export function MemberList(props: MemberListProps): JSX.Element {
                           channel={activeChannel()?.name ?? ''}
                           hidden={local.hidden}
                           onOpenDm={local.onOpenDm}
+                          onOpenWhois={local.onOpenWhois}
                           getRoster={() => memberListRef}
                         />
                       )}
