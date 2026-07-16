@@ -93,6 +93,11 @@ import {
   supportsPortableFileShare,
 } from '@/lib/vault/portableShare';
 import {
+  savePortableVaultFile,
+  supportsPortableFileSave,
+  type PortableFileSaveFormat,
+} from '@/lib/vault/portableFileSave';
+import {
   PortableImportLockError,
   withPortableImportLock,
 } from '@/lib/vault/portableImportLock';
@@ -482,6 +487,7 @@ function PortableVaultControls(): JSX.Element {
   const [status, setStatus] = createSignal<{ message: string; failure: boolean } | null>(null);
   const [busy, setBusy] = createSignal(false);
   const [exportFormat, setExportFormat] = createSignal<'json' | 'gzip' | null>(null);
+  const [fileSaveFormat, setFileSaveFormat] = createSignal<PortableFileSaveFormat | null>(null);
   const [shareBusy, setShareBusy] = createSignal(false);
   const [pendingImport, setPendingImport] = createSignal<{
     fileName: string;
@@ -497,8 +503,10 @@ function PortableVaultControls(): JSX.Element {
   } | null>(null);
   const activeObjectUrls = new Map<string, number | null>();
   const gzipAvailable = supportsPortableGzip();
+  const fileSaveAvailable = supportsPortableFileSave();
   const fileShareAvailable = supportsPortableFileShare();
   let exportEpoch = 0;
+  let fileSaveEpoch = 0;
   let importEpoch = 0;
   let shareEpoch = 0;
   let applyEpoch = 0;
@@ -523,6 +531,7 @@ function PortableVaultControls(): JSX.Element {
   onCleanup(() => {
     disposed = true;
     exportEpoch += 1;
+    fileSaveEpoch += 1;
     importEpoch += 1;
     shareEpoch += 1;
     applyEpoch += 1;
@@ -586,6 +595,60 @@ function PortableVaultControls(): JSX.Element {
       if (!disposed && epoch === exportEpoch) {
         setBusy(false);
         setExportFormat(null);
+      }
+    }
+  }
+
+  async function handleFileSave(format: PortableFileSaveFormat = 'json'): Promise<void> {
+    if (busy()) return;
+    const epoch = ++fileSaveEpoch;
+    const suggestedName = `onyx-portable-${new Date().toISOString().slice(0, 10)}.json${format === 'gzip' ? '.gz' : ''}`;
+    const prepared: { snapshot: PortableTransferSnapshot | null } = { snapshot: null };
+    setBusy(true);
+    setFileSaveFormat(format);
+    reportStatus('Choose where to save the portable vault…');
+
+    try {
+      const result = await savePortableVaultFile({
+        format,
+        suggestedName,
+        createBlob: async () => {
+          if (disposed || epoch !== fileSaveEpoch) throw new Error('stale portable vault save');
+          reportStatus(format === 'gzip'
+            ? 'Preparing compressed portable vault for the selected file…'
+            : 'Preparing portable vault for the selected file…');
+          const snapshot = await exportPortableTransfer();
+          if (disposed || epoch !== fileSaveEpoch) throw new Error('stale portable vault save');
+          const json = JSON.stringify(snapshot, null, 2);
+          const blob = format === 'gzip'
+            ? await compressPortableJson(json)
+            : new Blob([json], { type: 'application/json' });
+          if (disposed || epoch !== fileSaveEpoch) throw new Error('stale portable vault save');
+          prepared.snapshot = snapshot;
+          return blob;
+        },
+      });
+      if (disposed || epoch !== fileSaveEpoch) return;
+
+      const snapshot = prepared.snapshot;
+      if (result.state === 'saved' && snapshot) {
+        const messageCount = snapshot.targets.reduce((sum, target) => sum + target.messages.length, 0);
+        const draftCount = Object.keys(snapshot.composerDrafts).length;
+        const topicDraftCount = Object.keys(snapshot.channelTopicDrafts).length;
+        reportStatus(`Saved${format === 'gzip' ? ' compressed' : ''} ${countLabel(messageCount, 'message')}, ${countLabel(snapshot.targets.length, 'target')}, ${countLabel(snapshot.reviewHistory.length, 'review')}, ${countLabel(draftCount, 'room draft')}, ${countLabel(topicDraftCount, 'topic draft')}, ${countLabel(snapshot.followedConversations.length, 'followed conversation')}, ${countLabel(snapshot.topicReadCursors.length, 'topic read cursor')}, ${countLabel(snapshot.savedSearches.length, 'saved search', 'saved searches')}, ${countLabel(snapshot.accountHandoffs.length, 'account handoff')}, and ${countLabel(snapshot.preferenceHandoff ? 1 : 0, 'preference set')}.`);
+      } else if (result.state === 'cancelled' || result.state === 'unsupported') {
+        reportStatus(result.detail);
+      } else {
+        reportStatus(result.detail, true);
+      }
+    } catch {
+      if (!disposed && epoch === fileSaveEpoch) {
+        reportStatus('Portable vault file saving failed. The download export remains available.', true);
+      }
+    } finally {
+      if (!disposed && epoch === fileSaveEpoch) {
+        setBusy(false);
+        setFileSaveFormat(null);
       }
     }
   }
@@ -759,6 +822,28 @@ function PortableVaultControls(): JSX.Element {
           >
             {exportFormat() === 'gzip' ? 'Compressing export…' : 'Export compressed vault'}
           </button>
+        </Show>
+        <Show when={fileSaveAvailable}>
+          <button
+            type="button"
+            class="pref-reset"
+            disabled={busy()}
+            aria-busy={fileSaveFormat() === 'json'}
+            onClick={() => void handleFileSave()}
+          >
+            {fileSaveFormat() === 'json' ? 'Saving vault file…' : 'Save vault to file'}
+          </button>
+          <Show when={gzipAvailable}>
+            <button
+              type="button"
+              class="pref-reset"
+              disabled={busy()}
+              aria-busy={fileSaveFormat() === 'gzip'}
+              onClick={() => void handleFileSave('gzip')}
+            >
+              {fileSaveFormat() === 'gzip' ? 'Saving compressed vault file…' : 'Save compressed vault to file'}
+            </button>
+          </Show>
         </Show>
         <Show
           when={fileShareAvailable}

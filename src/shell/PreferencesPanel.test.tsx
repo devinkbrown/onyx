@@ -64,6 +64,7 @@ import * as portableTransfer from '@/lib/vault/portableTransfer';
 import type { PortableTransferSnapshot } from '@/lib/vault/portableTransfer';
 import * as portableCompression from '@/lib/vault/portableCompression';
 import * as portableShare from '@/lib/vault/portableShare';
+import * as portableFileSave from '@/lib/vault/portableFileSave';
 
 function emptyPortableSnapshot(): PortableTransferSnapshot {
   return {
@@ -342,6 +343,114 @@ describe('PreferencesPanel', () => {
     expect(screen.getByRole('button', { name: 'Export vault' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Export compressed vault' })).not.toBeInTheDocument();
     expect(screen.getByText('Compressed export unavailable; ordinary JSON remains portable.')).toBeInTheDocument();
+  });
+
+  it('saves JSON through the explicit file picker action without replacing the download export', async () => {
+    vi.spyOn(portableFileSave, 'supportsPortableFileSave').mockReturnValue(true);
+    const exportPortableTransfer = vi.spyOn(portableTransfer, 'exportPortableTransfer')
+      .mockResolvedValue(emptyPortableSnapshot());
+    const savePortableVaultFile = vi.spyOn(portableFileSave, 'savePortableVaultFile')
+      .mockImplementation(async (saveRequest) => {
+        const blob = await saveRequest.createBlob();
+        expect(blob.type).toBe('application/json');
+        return { state: 'saved', detail: 'Portable vault saved.' };
+      });
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL');
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    const saveButton = screen.getByRole('button', { name: 'Save vault to file' });
+    expect(screen.getByRole('button', { name: 'Export vault' })).toBeInTheDocument();
+    fireEvent.click(saveButton);
+    fireEvent.click(saveButton);
+
+    expect(savePortableVaultFile).toHaveBeenCalledOnce();
+    expect(exportPortableTransfer).toHaveBeenCalledOnce();
+    expect(savePortableVaultFile.mock.calls[0]?.[0]).toMatchObject({
+      format: 'json',
+      suggestedName: expect.stringMatching(/^onyx-portable-\d{4}-\d{2}-\d{2}\.json$/),
+    });
+    expect(await screen.findByText(/^Saved 0 messages/)).toHaveAttribute('role', 'status');
+    expect(createObjectURL).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Save vault to file' })).not.toBeDisabled();
+  });
+
+  it('keeps the object-URL download controls unchanged when direct file saving is unsupported', () => {
+    vi.spyOn(portableFileSave, 'supportsPortableFileSave').mockReturnValue(false);
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    expect(screen.getByRole('button', { name: 'Export vault' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save vault to file' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save compressed vault to file' })).not.toBeInTheDocument();
+  });
+
+  it('saves compressed JSON with the gzip format and filename', async () => {
+    vi.spyOn(portableCompression, 'supportsPortableGzip').mockReturnValue(true);
+    vi.spyOn(portableFileSave, 'supportsPortableFileSave').mockReturnValue(true);
+    vi.spyOn(portableTransfer, 'exportPortableTransfer').mockResolvedValue(emptyPortableSnapshot());
+    const compressedBlob = new Blob(['compressed'], { type: 'application/gzip' });
+    const compressPortableJson = vi.spyOn(portableCompression, 'compressPortableJson')
+      .mockResolvedValue(compressedBlob);
+    const savePortableVaultFile = vi.spyOn(portableFileSave, 'savePortableVaultFile')
+      .mockImplementation(async (saveRequest) => {
+        expect(await saveRequest.createBlob()).toBe(compressedBlob);
+        return { state: 'saved', detail: 'Portable vault saved.' };
+      });
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL');
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save compressed vault to file' }));
+
+    expect(await screen.findByText(/^Saved compressed 0 messages/)).toBeInTheDocument();
+    expect(savePortableVaultFile.mock.calls[0]?.[0]).toMatchObject({
+      format: 'gzip',
+      suggestedName: expect.stringMatching(/^onyx-portable-\d{4}-\d{2}-\d{2}\.json\.gz$/),
+    });
+    expect(compressPortableJson).toHaveBeenCalledOnce();
+    expect(createObjectURL).not.toHaveBeenCalled();
+  });
+
+  it('treats picker cancellation as neutral without preparing an export', async () => {
+    vi.spyOn(portableFileSave, 'supportsPortableFileSave').mockReturnValue(true);
+    const exportPortableTransfer = vi.spyOn(portableTransfer, 'exportPortableTransfer');
+    vi.spyOn(portableFileSave, 'savePortableVaultFile').mockResolvedValue({
+      state: 'cancelled',
+      detail: 'Portable vault save cancelled. No file was changed.',
+    });
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save vault to file' }));
+
+    expect(await screen.findByText('Portable vault save cancelled. No file was changed.')).toHaveAttribute('role', 'status');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(exportPortableTransfer).not.toHaveBeenCalled();
+  });
+
+  it('re-enables direct file saving after a writer failure so the user can retry', async () => {
+    vi.spyOn(portableFileSave, 'supportsPortableFileSave').mockReturnValue(true);
+    vi.spyOn(portableTransfer, 'exportPortableTransfer').mockResolvedValue(emptyPortableSnapshot());
+    const savePortableVaultFile = vi.spyOn(portableFileSave, 'savePortableVaultFile')
+      .mockResolvedValueOnce({
+        state: 'failed',
+        detail: 'The portable vault could not be written. The download export remains available.',
+      })
+      .mockImplementationOnce(async (saveRequest) => {
+        await saveRequest.createBlob();
+        return { state: 'saved', detail: 'Portable vault saved.' };
+      });
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save vault to file' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('download export remains available');
+    expect(screen.getByRole('button', { name: 'Save vault to file' })).not.toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save vault to file' }));
+    expect(await screen.findByText(/^Saved 0 messages/)).toBeInTheDocument();
+    expect(savePortableVaultFile).toHaveBeenCalledTimes(2);
   });
 
   it('decompresses a bounded portable gzip before staging the ordinary import review', async () => {
