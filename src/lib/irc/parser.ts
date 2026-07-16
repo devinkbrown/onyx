@@ -275,14 +275,38 @@ export function parsePREFIX(value: string): {
 }
 
 export function parseCHANLIMIT(value: string): Record<string, number> {
+  // CHANLIMIT is a server-controlled ISUPPORT value. Bound it before split so
+  // a single malformed 005 line cannot create an arbitrary number of groups or
+  // channel-type assignments. Reject the whole value on ambiguity; callers
+  // can then retain their last known-good limits instead of applying a partial
+  // capability update.
+  const MAX_CHANLIMIT_VALUE_LENGTH = 1024;
+  const MAX_CHANLIMIT_GROUPS = 32;
+  const MAX_CHANLIMIT_TYPES_PER_GROUP = 16;
+  const MAX_CHANLIMIT = 1_000_000;
   const out: Record<string, number> = {};
-  for (const part of value.split(',').filter(Boolean)) {
+  if (!value || value.length > MAX_CHANLIMIT_VALUE_LENGTH) return out;
+
+  const parts = value.split(',');
+  if (parts.length > MAX_CHANLIMIT_GROUPS) return out;
+  const seenTypes = new Set<string>();
+  for (const part of parts) {
     const idx = part.indexOf(':');
-    if (idx <= 0) continue;
+    if (idx <= 0 || idx !== part.lastIndexOf(':')) return {};
     const types = part.slice(0, idx);
-    const limit = Number.parseInt(part.slice(idx + 1), 10);
-    if (!Number.isFinite(limit)) continue;
-    for (const ch of types) out[ch] = limit;
+    const rawLimit = part.slice(idx + 1);
+    if (
+      types.length > MAX_CHANLIMIT_TYPES_PER_GROUP
+      || !/^[\x21-\x2b\x2d-\x39\x3b-\x7e]+$/u.test(types)
+      || !/^(?:0|[1-9]\d*)$/u.test(rawLimit)
+    ) return {};
+    const limit = Number(rawLimit);
+    if (!Number.isSafeInteger(limit) || limit > MAX_CHANLIMIT) return {};
+    for (const ch of types) {
+      if (seenTypes.has(ch)) return {};
+      seenTypes.add(ch);
+      out[ch] = limit;
+    }
   }
   return out;
 }

@@ -183,6 +183,16 @@ describe('parseCHANLIMIT', () => {
   it('expands grouped channel-type limits', () => {
     expect(parseCHANLIMIT('#&:25,!:10')).toEqual({ '#': 25, '&': 25, '!': 10 });
   });
+
+  it('rejects malformed, ambiguous, or unbounded values as a whole', () => {
+    expect(parseCHANLIMIT('#:25junk')).toEqual({});
+    expect(parseCHANLIMIT('#:-1')).toEqual({});
+    expect(parseCHANLIMIT('#:25,')).toEqual({});
+    expect(parseCHANLIMIT('#:25,#:10')).toEqual({});
+    expect(parseCHANLIMIT(`${'#'.repeat(17)}:25`)).toEqual({});
+    expect(parseCHANLIMIT('#:1000001')).toEqual({});
+    expect(parseCHANLIMIT('x'.repeat(1025))).toEqual({});
+  });
 });
 
 describe('normalizeCase', () => {

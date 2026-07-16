@@ -11074,7 +11074,10 @@ export const store = createStore<OnyxState>()(
                   isupportModeToPrefix = parsed.modeToPrefix;
                 }
               }
-              if (key === 'CHANLIMIT') chanLimits = parseCHANLIMIT(val);
+              if (key === 'CHANLIMIT') {
+                const parsed = parseCHANLIMIT(val);
+                if (Object.keys(parsed).length > 0) chanLimits = parsed;
+              }
               if (key === 'CASEMAPPING' && val) caseMapping = val;
             }
             if (networkUpdate) {

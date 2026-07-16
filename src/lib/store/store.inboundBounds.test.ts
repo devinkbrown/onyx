@@ -174,6 +174,14 @@ describe('live inbound message bounds', () => {
     expect(Object.hasOwn(store.getState().isupportTokens, '__proto__')).toBe(false);
   });
 
+  it('retains the last valid channel limits after malformed ISUPPORT updates', () => {
+    feed(':server 005 me CHANLIMIT=#&:25,!:10 :supported');
+    expect(store.getState().chanLimits).toEqual({ '#': 25, '&': 25, '!': 10 });
+
+    feed(':server 005 me CHANLIMIT=#:25junk :supported');
+    expect(store.getState().chanLimits).toEqual({ '#': 25, '&': 25, '!': 10 });
+  });
+
   it('repairs legacy away memory and refuses growth beyond one roster ceiling', () => {
     store.setState({
       awayNicks: new Set(Array.from(

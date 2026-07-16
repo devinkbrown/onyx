@@ -91,6 +91,19 @@ describe('IRCClient WebSocket frame handling', () => {
   });
 });
 
+describe('IRCClient ISUPPORT bounds', () => {
+  it('retains the last valid CHANLIMIT map after malformed updates', () => {
+    const { client } = makeClient();
+    feed(client, ':server 005 onyx CHANLIMIT=#&:25,!:10 :are supported');
+    expect(client.isupport.CHANLIMITS).toEqual({ '#': 25, '&': 25, '!': 10 });
+    expect(client.isupport.MAXCHANNELS).toBe(25);
+
+    feed(client, ':server 005 onyx CHANLIMIT=#:25junk :are supported');
+    expect(client.isupport.CHANLIMITS).toEqual({ '#': 25, '&': 25, '!': 10 });
+    expect(client.isupport.MAXCHANNELS).toBe(25);
+  });
+});
+
 describe('IRCClient binary media plane', () => {
   function feedBinary(client: IRCClient, bytes: Uint8Array): void {
     (client as unknown as { _onMessage(ev: { data: ArrayBuffer }): void })._onMessage({

@@ -1264,10 +1264,13 @@ export class IRCClient {
         case 'TOPICLEN':
           this.isupport.TOPICLEN = parseInt(val, 10);
           break;
-        case 'CHANLIMIT':
-          this.isupport.CHANLIMITS = parseCHANLIMIT(val);
-          this.isupport.MAXCHANNELS = Object.values(this.isupport.CHANLIMITS)[0] ?? this.isupport.MAXCHANNELS;
+        case 'CHANLIMIT': {
+          const limits = parseCHANLIMIT(val);
+          if (Object.keys(limits).length === 0) break;
+          this.isupport.CHANLIMITS = limits;
+          this.isupport.MAXCHANNELS = Object.values(limits)[0] ?? this.isupport.MAXCHANNELS;
           break;
+        }
         case 'MAXCHANNELS':
           this.isupport.MAXCHANNELS = parseInt(val, 10);
           break;
