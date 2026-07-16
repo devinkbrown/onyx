@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   SAVED_SEARCH_CAP,
+  SAVED_SEARCH_DB_CACHE_CAP,
   SAVED_SEARCH_SCAN_LIMIT,
   MAX_LABEL_LEN,
   MAX_QUERY_LEN,
@@ -17,6 +18,7 @@ import {
   MAX_SAVED_SEARCH_ID_LEN,
   MAX_SAVED_SEARCH_SEQ,
   _resetSavedSearchesForTests,
+  _savedSearchDbCacheSizeForTests,
   clearSavedSearches,
   deleteSearch,
   exportSavedSearches,
@@ -165,6 +167,26 @@ describe('savedSearches', () => {
       expect((await listSearches(alice)).map((entry) => entry.query)).toEqual(['alice private query']);
       expect((await listSearches(bob)).map((entry) => entry.query)).toEqual(['bob private query']);
       expect((await listSearches()).map((entry) => entry.query)).toEqual(['legacy private query']);
+    });
+
+    it('LRU-bounds owner database handles without deleting evicted private searches', async () => {
+      const closeSpy = vi.spyOn(IDBDatabase.prototype, 'close');
+      const firstOwner = { serverUrl: 'wss://searches.example/ws', identity: 'owner-0' } as const;
+      await saveSearch({ label: 'Private', query: 'retained after handle eviction', mode: 'exact' }, firstOwner);
+
+      for (let index = 1; index <= SAVED_SEARCH_DB_CACHE_CAP; index += 1) {
+        await listSearches({
+          serverUrl: 'wss://searches.example/ws',
+          identity: `owner-${index}`,
+        });
+      }
+
+      expect(_savedSearchDbCacheSizeForTests()).toBe(SAVED_SEARCH_DB_CACHE_CAP);
+      expect(closeSpy).toHaveBeenCalled();
+      await expect(listSearches(firstOwner)).resolves.toEqual([
+        expect.objectContaining({ query: 'retained after handle eviction' }),
+      ]);
+      expect(_savedSearchDbCacheSizeForTests()).toBe(SAVED_SEARCH_DB_CACHE_CAP);
     });
 
     it('creates a search and reads it back', async () => {
@@ -664,6 +686,7 @@ describe('savedSearches', () => {
       await expect(clearSavedSearches()).resolves.toBe(false);
       const snap = await exportSavedSearches();
       expect(snap.searches).toEqual([]);
+      expect(_savedSearchDbCacheSizeForTests()).toBe(0);
     });
   });
 });

@@ -39,6 +39,8 @@ export const SAVED_SEARCH_IMPORT_SCAN_LIMIT = SAVED_SEARCH_CAP * 4;
 export const MAX_SAVED_SEARCH_FUTURE_MS = 24 * 60 * 60 * 1000;
 /** A bounded same-millisecond tiebreaker; larger values cannot dominate sort. */
 export const MAX_SAVED_SEARCH_SEQ = 2_147_483_647;
+/** Maximum owner databases kept open by one long-lived tab. */
+export const SAVED_SEARCH_DB_CACHE_CAP = 8;
 
 // `semantic` is retained as the on-disk token for backwards compatibility. In
 // the UI it is described accurately as related-term/token similarity rather
@@ -75,7 +77,14 @@ export interface SavedSearchExport {
 }
 
 let _seq = 0;
-const dbPromises = new Map<string, Promise<IDBDatabase | null>>();
+interface SearchDbCacheEntry {
+  promise: Promise<IDBDatabase | null>;
+  db: IDBDatabase | null;
+  settled: boolean;
+  retired: boolean;
+}
+
+const dbCache = new Map<string, SearchDbCacheEntry>();
 let changeRevision = 0;
 let crossTabSync: SavedSearchSync | null = null;
 
@@ -139,29 +148,102 @@ function physicalDbName(owner?: DeviceMemoryOwner): string | null {
   return ownerKey ? `${DB_NAME}:owner:${encodeURIComponent(ownerKey)}` : null;
 }
 
+function retireSearchDb(entry: SearchDbCacheEntry): void {
+  entry.retired = true;
+  if (!entry.db) return;
+  try {
+    entry.db.close();
+  } catch {
+    // Closing an already-closing best-effort persistence handle is harmless.
+  }
+  entry.db = null;
+}
+
+/** Close least-recently-used settled handles; pending opens settle before pruning. */
+function pruneSearchDbCache(preserveName: string): void {
+  while (dbCache.size > SAVED_SEARCH_DB_CACHE_CAP) {
+    let victim: [string, SearchDbCacheEntry] | null = null;
+    for (const candidate of dbCache) {
+      if (candidate[0] !== preserveName && candidate[1].settled) {
+        victim = candidate;
+        break;
+      }
+    }
+    if (!victim) return;
+    dbCache.delete(victim[0]);
+    retireSearchDb(victim[1]);
+  }
+}
+
 function openSearchDb(owner?: DeviceMemoryOwner): Promise<IDBDatabase | null> {
   const dbName = physicalDbName(owner);
   if (!dbName) return Promise.resolve(null);
-  const existing = dbPromises.get(dbName);
-  if (existing) return existing;
+  const existing = dbCache.get(dbName);
+  if (existing) {
+    dbCache.delete(dbName);
+    dbCache.set(dbName, existing);
+    return existing.promise;
+  }
+
+  let resolvePending!: (db: IDBDatabase | null) => void;
   const pending = new Promise<IDBDatabase | null>((resolve) => {
-    try {
-      if (typeof indexedDB === 'undefined') return resolve(null);
-      const req = indexedDB.open(dbName, DB_VERSION);
-      req.onupgradeneeded = () => {
-        const db = req.result;
-        if (!db.objectStoreNames.contains(STORE)) {
-          db.createObjectStore(STORE, { keyPath: 'id' });
-        }
-      };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => resolve(null);
-      req.onblocked = () => resolve(null);
-    } catch {
-      resolve(null);
-    }
+    resolvePending = resolve;
   });
-  dbPromises.set(dbName, pending);
+  const entry: SearchDbCacheEntry = {
+    promise: pending,
+    db: null,
+    settled: false,
+    retired: false,
+  };
+  dbCache.set(dbName, entry);
+
+  let finished = false;
+  const finish = (db: IDBDatabase | null): void => {
+    // A blocked request can later succeed. If its caller already degraded to
+    // null, close that late handle instead of leaking it outside the cache.
+    if (finished) {
+      try { db?.close(); } catch {}
+      return;
+    }
+    finished = true;
+    entry.settled = true;
+    if (entry.retired) {
+      try { db?.close(); } catch {}
+      resolvePending(null);
+      return;
+    }
+    if (!db) {
+      if (dbCache.get(dbName) === entry) dbCache.delete(dbName);
+      resolvePending(null);
+      return;
+    }
+    entry.db = db;
+    db.onversionchange = () => {
+      if (dbCache.get(dbName) === entry) dbCache.delete(dbName);
+      retireSearchDb(entry);
+    };
+    resolvePending(db);
+    pruneSearchDbCache(dbName);
+  };
+
+  try {
+    if (typeof indexedDB === 'undefined') {
+      finish(null);
+      return pending;
+    }
+    const req = indexedDB.open(dbName, DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE)) {
+        db.createObjectStore(STORE, { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = () => finish(req.result);
+    req.onerror = () => finish(null);
+    req.onblocked = () => finish(null);
+  } catch {
+    finish(null);
+  }
   return pending;
 }
 
@@ -638,8 +720,14 @@ function txDone(tx: IDBTransaction): Promise<boolean> {
 export function _resetSavedSearchesForTests(): void {
   crossTabSync?.close();
   crossTabSync = null;
-  dbPromises.clear();
+  for (const entry of dbCache.values()) retireSearchDb(entry);
+  dbCache.clear();
   _seq = 0;
   changeRevision = 0;
   changeListeners.clear();
+}
+
+/** Test hook: inspect the owner-handle bound without exposing database names. */
+export function _savedSearchDbCacheSizeForTests(): number {
+  return dbCache.size;
 }
