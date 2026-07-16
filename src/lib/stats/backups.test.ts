@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from 'vitest';
 
-import { normalizeBackupManifest } from './backups';
+import {
+  MAX_BACKUP_FILES,
+  MAX_BACKUP_KIND_LENGTH,
+  MAX_BACKUP_NAME_LENGTH,
+  normalizeBackupManifest,
+} from './backups';
 
 describe('normalizeBackupManifest', () => {
   it('returns null for non-object manifests', () => {
@@ -46,5 +51,24 @@ describe('normalizeBackupManifest', () => {
 
   it('treats missing files as an empty manifest rather than rejecting the feed', () => {
     expect(normalizeBackupManifest({ generated_at: 3 })?.files).toEqual([]);
+  });
+
+  it('bounds file work and every rendered metadata field', () => {
+    const files = Array.from({ length: MAX_BACKUP_FILES + 3 }, (_, index) => ({
+      kind: 'k'.repeat(index === 0 ? MAX_BACKUP_KIND_LENGTH + 1 : MAX_BACKUP_KIND_LENGTH),
+      name: 'n'.repeat(MAX_BACKUP_NAME_LENGTH),
+      source: `/${'s'.repeat(600)}-${index}`,
+    }));
+
+    const manifest = normalizeBackupManifest({
+      generated_at: Number.POSITIVE_INFINITY,
+      files,
+    })!;
+
+    expect(manifest.files).toHaveLength(MAX_BACKUP_FILES - 1);
+    expect(manifest.files[0]!.kind).toHaveLength(MAX_BACKUP_KIND_LENGTH);
+    expect(manifest.files[0]!.name).toHaveLength(MAX_BACKUP_NAME_LENGTH);
+    expect(manifest.files[0]!.source).toHaveLength(512);
+    expect(manifest.generated_at).toBe(0);
   });
 });

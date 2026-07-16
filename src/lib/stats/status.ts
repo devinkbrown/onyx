@@ -5,6 +5,17 @@
  * Orochi writes `status.json` next to the stats index. The website consumes it
  * defensively because dev builds usually do not have live exported data.
  */
+import {
+  boundedFeedInteger,
+  boundedFeedNumber,
+  boundedFeedText,
+  boundedUnixSeconds,
+} from './feedBounds';
+
+export const MAX_STATUS_PEERS = 128;
+export const MAX_STATUS_PEER_NAME_LENGTH = 128;
+const MAX_STATUS_META_LENGTH = 256;
+const MAX_STATUS_STATE_LENGTH = 32;
 
 export type MeshEnvelope = {
   quorum: boolean;
@@ -30,10 +41,6 @@ export type NetworkStatus = {
   peers: StatusPeer[];
 };
 
-function numberOr(raw: unknown, fallback = 0): number {
-  return typeof raw === 'number' && Number.isFinite(raw) ? raw : fallback;
-}
-
 export function normalizeStatus(raw: unknown): NetworkStatus | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const r = raw as Record<string, unknown>;
@@ -42,30 +49,34 @@ export function normalizeStatus(raw: unknown): NetworkStatus | null {
     : {};
   const peers: StatusPeer[] = [];
   if (Array.isArray(r['peers'])) {
-    for (const entry of r['peers']) {
+    for (const entry of r['peers'].slice(0, MAX_STATUS_PEERS)) {
       if (typeof entry !== 'object' || entry === null) continue;
       const e = entry as Record<string, unknown>;
-      if (typeof e['name'] !== 'string' || !e['name']) continue;
+      if (typeof e['name'] !== 'string' || e['name'].length > MAX_STATUS_PEER_NAME_LENGTH) continue;
+      const name = e['name'];
+      if (!name || /[\u0000\r\n]/u.test(name)) continue;
       const rtt = e['rtt_ms'];
       peers.push({
-        name: e['name'],
-        state: typeof e['state'] === 'string' && e['state'] ? e['state'] : 'unknown',
+        name,
+        state: boundedFeedText(e['state'], MAX_STATUS_STATE_LENGTH) || 'unknown',
         up: e['up'] === true,
-        rtt_ms: typeof rtt === 'number' && Number.isFinite(rtt) ? rtt : null,
-        since_seconds: numberOr(e['since_seconds']),
+        rtt_ms: typeof rtt === 'number' && Number.isFinite(rtt) && rtt >= 0
+          ? boundedFeedNumber(rtt)
+          : null,
+        since_seconds: boundedFeedInteger(e['since_seconds']),
       });
     }
   }
   return {
-    generated_at: numberOr(r['generated_at']),
-    network: typeof r['network'] === 'string' ? r['network'] : '',
-    node: typeof r['node'] === 'string' ? r['node'] : '',
-    uptime_seconds: numberOr(r['uptime_seconds']),
-    users_online: numberOr(r['users_online']),
+    generated_at: boundedUnixSeconds(r['generated_at']),
+    network: boundedFeedText(r['network'], MAX_STATUS_META_LENGTH),
+    node: boundedFeedText(r['node'], MAX_STATUS_META_LENGTH),
+    uptime_seconds: boundedFeedInteger(r['uptime_seconds']),
+    users_online: boundedFeedInteger(r['users_online']),
     mesh: {
       quorum: meshRaw['quorum'] === true,
       partitioned: meshRaw['partitioned'] === true,
-      components: numberOr(meshRaw['components'], 1),
+      components: Math.max(1, boundedFeedInteger(meshRaw['components'], 1024)),
     },
     peers,
   };
@@ -86,7 +97,7 @@ export async function fetchNetworkStatus(): Promise<NetworkStatus | null> {
 }
 
 export function formatDuration(totalSeconds: number): string {
-  const s = Math.max(0, Math.floor(totalSeconds));
+  const s = boundedFeedInteger(totalSeconds);
   const days = Math.floor(s / 86400);
   const hours = Math.floor((s % 86400) / 3600);
   const minutes = Math.floor((s % 3600) / 60);

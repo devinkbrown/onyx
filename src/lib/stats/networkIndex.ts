@@ -9,6 +9,26 @@
  */
 
 import { relativeTime } from '@/lib/time/relativeTime';
+import {
+  boundedFeedInteger,
+  boundedFeedNumber,
+  boundedFeedText,
+  boundedUnixSeconds,
+  PUBLIC_FEED_UNIX_SECONDS_MAX,
+} from './feedBounds';
+
+export const MAX_STATS_CHANNELS = 512;
+export const MAX_STATS_DAYS = 366;
+export const MAX_STATS_SPARK_POINTS = 64;
+export const MAX_STATS_CHANNEL_LENGTH = 128;
+export const MAX_STATS_TOPIC_LENGTH = 512;
+const MAX_STATS_META_LENGTH = 256;
+
+function normalizedChannel(value: unknown): string {
+  if (typeof value !== 'string' || value.length > MAX_STATS_CHANNEL_LENGTH) return '';
+  const channel = value;
+  return /^(?:#|&)[^\u0000\r\n\t ,]+$/u.test(channel) ? channel : '';
+}
 
 export type StatsChannel = {
   channel: string;
@@ -37,13 +57,15 @@ export type StatsIndex = {
 function normalizeNetworkDays(raw: unknown): NetworkDay[] {
   if (!Array.isArray(raw)) return [];
   const days: NetworkDay[] = [];
-  for (const entry of raw) {
+  for (const entry of raw.slice(-MAX_STATS_DAYS)) {
     if (typeof entry !== 'object' || entry === null) continue;
     const e = entry as Record<string, unknown>;
-    if (typeof e['date'] !== 'string' || !e['date']) continue;
+    if (typeof e['date'] !== 'string' || e['date'].length > 32) continue;
+    const date = e['date'];
+    if (!/^\d{4}-\d{2}-\d{2}$/u.test(date)) continue;
     days.push({
-      date: e['date'],
-      messages: typeof e['messages'] === 'number' && e['messages'] > 0 ? Math.floor(e['messages']) : 0,
+      date,
+      messages: boundedFeedInteger(e['messages']),
     });
   }
   return days;
@@ -54,27 +76,28 @@ export function normalizeIndex(raw: unknown): StatsIndex | null {
   const r = raw as Record<string, unknown>;
   if (!Array.isArray(r['channels'])) return null;
   const channels: StatsChannel[] = [];
-  for (const entry of r['channels']) {
+  for (const entry of r['channels'].slice(0, MAX_STATS_CHANNELS)) {
     if (typeof entry !== 'object' || entry === null) continue;
     const e = entry as Record<string, unknown>;
-    if (typeof e['channel'] !== 'string' || !e['channel']) continue;
+    const channel = normalizedChannel(e['channel']);
+    if (!channel) continue;
     channels.push({
-      channel: e['channel'],
-      messages: typeof e['messages'] === 'number' ? e['messages'] : 0,
-      active_users: typeof e['active_users'] === 'number' ? e['active_users'] : 0,
-      present: typeof e['present'] === 'number' ? e['present'] : 0,
-      last_active: typeof e['last_active'] === 'number' ? e['last_active'] : 0,
-      topic: typeof e['topic'] === 'string' ? e['topic'] : '',
+      channel,
+      messages: boundedFeedInteger(e['messages']),
+      active_users: boundedFeedInteger(e['active_users']),
+      present: boundedFeedInteger(e['present']),
+      last_active: boundedUnixSeconds(e['last_active']),
+      topic: boundedFeedText(e['topic'], MAX_STATS_TOPIC_LENGTH),
       spark: Array.isArray(e['spark'])
-        ? e['spark'].map((n) => (typeof n === 'number' && n > 0 ? n : 0))
+        ? e['spark'].slice(-MAX_STATS_SPARK_POINTS).map((n) => boundedFeedNumber(n))
         : [],
     });
   }
   return {
-    generated_at: typeof r['generated_at'] === 'number' ? r['generated_at'] : 0,
-    network: typeof r['network'] === 'string' ? r['network'] : '',
-    node: typeof r['node'] === 'string' ? r['node'] : '',
-    users_online: typeof r['users_online'] === 'number' ? r['users_online'] : 0,
+    generated_at: boundedUnixSeconds(r['generated_at']),
+    network: boundedFeedText(r['network'], MAX_STATS_META_LENGTH),
+    node: boundedFeedText(r['node'], MAX_STATS_META_LENGTH),
+    users_online: boundedFeedInteger(r['users_online']),
     network_days: normalizeNetworkDays(r['network_days']),
     channels,
   };
@@ -94,6 +117,12 @@ export async function fetchStatsIndex(): Promise<StatsIndex | null> {
 
 /** Compact relative time from a unix-seconds stamp. */
 export function relTime(unixSec: number, nowMs: number): string {
-  if (!unixSec) return 'a while ago';
+  if (
+    !Number.isFinite(unixSec)
+    || unixSec <= 0
+    || unixSec > PUBLIC_FEED_UNIX_SECONDS_MAX
+    || !Number.isFinite(nowMs)
+    || Math.abs(nowMs) > PUBLIC_FEED_UNIX_SECONDS_MAX * 1000
+  ) return 'a while ago';
   return relativeTime(new Date(unixSec * 1000), new Date(nowMs));
 }

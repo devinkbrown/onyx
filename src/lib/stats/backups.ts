@@ -6,6 +6,12 @@
  * account and chanstats snapshots. Operators choose where to serve it, so the
  * website probes a few conventional static paths and degrades quietly.
  */
+import { boundedFeedText, boundedUnixSeconds } from './feedBounds';
+
+export const MAX_BACKUP_FILES = 128;
+export const MAX_BACKUP_KIND_LENGTH = 64;
+export const MAX_BACKUP_NAME_LENGTH = 256;
+const MAX_BACKUP_SOURCE_LENGTH = 512;
 
 export type BackupFile = {
   kind: string;
@@ -23,20 +29,28 @@ export function normalizeBackupManifest(raw: unknown): BackupManifest | null {
   const r = raw as Record<string, unknown>;
   const files: BackupFile[] = [];
   if (Array.isArray(r['files'])) {
-    for (const entry of r['files']) {
+    for (const entry of r['files'].slice(0, MAX_BACKUP_FILES)) {
       if (typeof entry !== 'object' || entry === null) continue;
       const e = entry as Record<string, unknown>;
-      if (typeof e['kind'] !== 'string' || !e['kind']) continue;
-      if (typeof e['name'] !== 'string' || !e['name']) continue;
+      if (
+        typeof e['kind'] !== 'string'
+        || e['kind'].length === 0
+        || e['kind'].length > MAX_BACKUP_KIND_LENGTH
+        || typeof e['name'] !== 'string'
+        || e['name'].length === 0
+        || e['name'].length > MAX_BACKUP_NAME_LENGTH
+      ) continue;
+      const kind = e['kind'];
+      const name = e['name'];
       files.push({
-        kind: e['kind'],
-        name: e['name'],
-        source: typeof e['source'] === 'string' ? e['source'] : '',
+        kind,
+        name,
+        source: boundedFeedText(e['source'], MAX_BACKUP_SOURCE_LENGTH),
       });
     }
   }
   return {
-    generated_at: typeof r['generated_at'] === 'number' ? r['generated_at'] : 0,
+    generated_at: boundedUnixSeconds(r['generated_at']),
     files,
   };
 }
