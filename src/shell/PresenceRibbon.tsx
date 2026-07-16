@@ -8,7 +8,7 @@
  * SOLID IDIOMS: never destructure props; splitProps; createMemo.
  */
 
-import { createMemo, createSignal, onCleanup, Show, splitProps, type JSX } from 'solid-js';
+import { createEffect, createMemo, createSignal, onCleanup, Show, splitProps, type JSX } from 'solid-js';
 import { useStore, getState, selectAccount, selectChannelEvent, selectChannelPins } from '@/lib/store';
 import { openPreferences } from '@/lib/prefs/preferences';
 import { eventCountdown, scheduledEventVisible, scheduledEventsEqual } from '@/lib/notifications/scheduledEvents';
@@ -125,8 +125,6 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   const speakingNicks = useStore((s) => s.speakingNicks);
   const mutedNicks = useStore((s) => s.mutedNicks);
   const [now, setNow] = createSignal(Date.now());
-  const timer = setInterval(() => setNow(Date.now()), 30_000);
-  onCleanup(() => clearInterval(timer));
 
   // ── derived ──
   const activeChannel = createMemo(() => {
@@ -235,6 +233,28 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     const event = scheduledEvent();
     if (!event || !scheduledEventVisible(event, now())) return null;
     return event;
+  });
+
+  // The ribbon is mounted for Home, status, DMs, and ordinary channels, but its
+  // clock serves only an active room event. Refresh immediately on a view/event
+  // revision so a timer-free idle period cannot leave the first countdown stale,
+  // then retain one clock only until that event's grace window closes.
+  createEffect(() => {
+    const view = activeView();
+    const event = scheduledEvent();
+    if (view.kind !== 'channel' || !event) return;
+
+    const refresh = (): boolean => {
+      const currentNow = Date.now();
+      setNow(currentNow);
+      return scheduledEventVisible(event, currentNow);
+    };
+    if (!refresh()) return;
+
+    const timer = setInterval(() => {
+      if (!refresh()) clearInterval(timer);
+    }, 30_000);
+    onCleanup(() => clearInterval(timer));
   });
 
   const ribbonEventLive = createMemo(() => {
