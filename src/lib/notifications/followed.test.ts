@@ -5,9 +5,11 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
 import {
   MAX_FOLLOWED_KEYS,
   MAX_FOLLOWED_KEY_LENGTH,
+  MAX_FOLLOWED_STORAGE_CHARS,
   FOLLOWED_STORAGE_KEY,
   clearFollowed,
   follow,
@@ -113,6 +115,16 @@ describe('followed conversations', () => {
       localStorage.setItem(FOLLOWED_STORAGE_KEY, '{not json');
 
       expect(loadFollowed()).toEqual(new Set<string>());
+    });
+
+    it('rejects oversized owner storage before parsing', () => {
+      const owner = { serverUrl: 'wss://followed.example/ws', identity: 'alice' } as const;
+      const key = deviceMemoryStorageKey(FOLLOWED_STORAGE_KEY, owner)!;
+      localStorage.setItem(key, `[${'x'.repeat(MAX_FOLLOWED_STORAGE_CHARS)}]`);
+      const parse = vi.spyOn(JSON, 'parse');
+
+      expect(loadFollowed(owner)).toEqual(new Set<string>());
+      expect(parse).not.toHaveBeenCalled();
     });
 
     it('sanitizes and caps persisted keys while loading', () => {

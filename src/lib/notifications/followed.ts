@@ -11,6 +11,8 @@ import { deviceMemoryStorageKey, type DeviceMemoryOwner } from '@/lib/deviceMemo
 export const FOLLOWED_STORAGE_KEY = 'onyx:followed';
 export const MAX_FOLLOWED_KEYS = 256;
 export const MAX_FOLLOWED_KEY_LENGTH = 160;
+/** Canonical output is below 42 KiB; leave migration headroom without quota-sized parsing. */
+export const MAX_FOLLOWED_STORAGE_CHARS = 128 * 1024;
 
 function hasStorage(): boolean {
   return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
@@ -59,7 +61,9 @@ export function loadFollowed(owner?: DeviceMemoryOwner): Set<string> {
   if (!storageKey) return new Set<string>();
 
   try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(storageKey) ?? '[]');
+    const raw = localStorage.getItem(storageKey);
+    if (raw && raw.length > MAX_FOLLOWED_STORAGE_CHARS) return new Set<string>();
+    const parsed: unknown = JSON.parse(raw ?? '[]');
     return Array.isArray(parsed) ? boundedFollowedKeys(parsed) : new Set<string>();
   } catch {
     return new Set<string>();
