@@ -126,9 +126,26 @@ export function WatchTogetherActivity(): JSX.Element {
 
   const activity = createMemo(() => parseWatchTogetherProp(rawWatch()));
 
+  let observedChannelKey: string | null | undefined;
   createEffect(() => {
-    channel();
+    const currentChannelKey = channel()?.toLowerCase() ?? null;
     rawWatch();
+    const channelChanged = observedChannelKey !== undefined
+      && observedChannelKey !== currentChannelKey;
+    observedChannelKey = currentChannelKey;
+
+    // Reviews and end confirmations are snapshots of one exact room + PROP.
+    // Never let those snapshots cross a channel boundary or cover a newer
+    // authoritative activity. Ordinary editor inputs may survive same-room PROP
+    // churn, but are room-scoped and cleared when the channel itself changes so
+    // an old title or media URL cannot leak into the next buffer.
+    setStartReview(null);
+    setEndConfirmation(null);
+    if (channelChanged) {
+      setStartTitle('');
+      setStartUrl('');
+      setStartDuration('');
+    }
     setPublishNotice(null);
     setStartFeedback(null);
     setStartEditorOpen(false);

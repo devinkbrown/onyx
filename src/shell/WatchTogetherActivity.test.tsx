@@ -378,7 +378,7 @@ describe('WatchTogetherActivity accessibility', () => {
     expect(screen.queryByTestId('watch-end-confirmation')).not.toBeInTheDocument();
   });
 
-  it('rechecks ownership, reports a stale host confirmation, and focuses the outcome', async () => {
+  it('dismisses a staged end confirmation when host ownership changes', async () => {
     const publishWatchTogether = seedWatch(
       'title=Demo;host=self;state=paused;participants=self,alice',
     );
@@ -393,19 +393,14 @@ describe('WatchTogetherActivity accessibility', () => {
         ['#watch', { 'ocean.watch': 'title=Demo;host=alice;state=paused;participants=self,alice' }],
       ]),
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm end activity' }));
 
     expect(publishWatchTogether).not.toHaveBeenCalled();
     expect(screen.queryByTestId('watch-end-confirmation')).not.toBeInTheDocument();
     expect(screen.queryByTestId('watch-end-button')).not.toBeInTheDocument();
-    const status = screen.getByTestId('watch-participation-status');
-    expect(status).toHaveTextContent(
-      'The activity was not ended because you are no longer the current host',
-    );
-    await waitFor(() => expect(status).toHaveFocus());
+    expect(screen.getByLabelText(/Watch together: Demo, Paused, host alice/)).toBeInTheDocument();
   });
 
-  it('refuses to clear when the staged activity wire value changed', () => {
+  it('dismisses a staged end confirmation when the activity wire value changes', () => {
     const publishWatchTogether = seedWatch(
       'title=Demo;host=self;state=paused;position=2;participants=self',
     );
@@ -417,16 +412,13 @@ describe('WatchTogetherActivity accessibility', () => {
         ['#watch', { 'ocean.watch': 'title=Demo;host=self;state=paused;position=3;participants=self' }],
       ]),
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm end activity' }));
 
     expect(publishWatchTogether).not.toHaveBeenCalled();
     expect(screen.queryByTestId('watch-end-confirmation')).not.toBeInTheDocument();
-    expect(screen.getByTestId('watch-participation-status')).toHaveTextContent(
-      'The activity was not ended because it changed. Review it and try again',
-    );
+    expect(screen.getByRole('button', { name: 'End activity: Demo' })).toBeInTheDocument();
   });
 
-  it('refuses to clear when the active channel changed after staging', () => {
+  it('dismisses a staged end confirmation when the active channel changes', () => {
     const publishWatchTogether = seedWatch(
       'title=Demo;host=self;state=paused;participants=self',
     );
@@ -440,13 +432,10 @@ describe('WatchTogetherActivity accessibility', () => {
         ['#other', { 'ocean.watch': 'title=Other;host=self;state=paused;participants=self' }],
       ]),
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm end activity' }));
 
     expect(publishWatchTogether).not.toHaveBeenCalled();
     expect(screen.queryByTestId('watch-end-confirmation')).not.toBeInTheDocument();
-    expect(screen.getByTestId('watch-participation-status')).toHaveTextContent(
-      'The activity was not ended because the active channel changed',
-    );
+    expect(screen.getByRole('button', { name: 'End activity: Other' })).toBeInTheDocument();
   });
 
   it('preserves the confirmation and activity when publishing becomes unavailable', () => {
@@ -622,13 +611,16 @@ describe('WatchTogetherActivity accessibility', () => {
     expect(publishWatchTogether).not.toHaveBeenCalled();
   });
 
-  it('does not replace an activity that arrived after review and focuses the truthful outcome', async () => {
+  it('dismisses a staged review when an authoritative activity arrives in the same channel', async () => {
     const publishWatchTogether = seedEmptyWatch();
 
     render(() => <WatchTogetherActivity />);
     openStartEditor();
     fireEvent.input(screen.getByRole('textbox', { name: 'Activity title' }), {
       target: { value: 'My movie' },
+    });
+    fireEvent.input(screen.getByRole('textbox', { name: 'Media URL (optional, http or https)' }), {
+      target: { value: 'https://private.example/my-movie' },
     });
     fireEvent.submit(screen.getByRole('form', { name: 'Start watch activity' }));
     await waitFor(() => {
@@ -639,18 +631,15 @@ describe('WatchTogetherActivity accessibility', () => {
         ['#watch', { 'ocean.watch': 'title=Existing;host=alice;state=paused;participants=alice' }],
       ]),
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm start activity' }));
 
     expect(publishWatchTogether).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('watch-start-review')).not.toBeInTheDocument();
+    expect(screen.queryByText('My movie')).not.toBeInTheDocument();
+    expect(screen.queryByText('https://private.example/my-movie')).not.toBeInTheDocument();
     expect(screen.getByLabelText(/Watch together: Existing/)).toBeInTheDocument();
-    const status = screen.getByTestId('watch-participation-status');
-    expect(status).toHaveTextContent(
-      'A watch activity arrived before this one was confirmed, so nothing was replaced',
-    );
-    await waitFor(() => expect(status).toHaveFocus());
   });
 
-  it('does not publish a staged activity after the active channel changed', () => {
+  it('drops room-scoped review details and drafts when the active channel changes', () => {
     const publishWatchTogether = seedEmptyWatch();
 
     render(() => <WatchTogetherActivity />);
@@ -658,14 +647,26 @@ describe('WatchTogetherActivity accessibility', () => {
     fireEvent.input(screen.getByRole('textbox', { name: 'Activity title' }), {
       target: { value: 'Channel-specific movie' },
     });
+    fireEvent.input(screen.getByRole('textbox', { name: 'Media URL (optional, http or https)' }), {
+      target: { value: 'https://private.example/old-room' },
+    });
+    fireEvent.input(screen.getByRole('spinbutton', { name: 'Duration in seconds (optional)' }), {
+      target: { value: '120' },
+    });
     fireEvent.submit(screen.getByRole('form', { name: 'Start watch activity' }));
+    expect(screen.getByTestId('watch-start-review')).toHaveTextContent('Channel-specific movie');
+
     store.setState({ activeView: { kind: 'channel', channel: '#other' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm start activity' }));
 
     expect(publishWatchTogether).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'The activity was not started because the active channel changed',
-    );
+    expect(screen.queryByTestId('watch-start-review')).not.toBeInTheDocument();
+    expect(screen.queryByText('Channel-specific movie')).not.toBeInTheDocument();
+    expect(screen.queryByText('https://private.example/old-room')).not.toBeInTheDocument();
+
+    openStartEditor();
+    expect(screen.getByRole('textbox', { name: 'Activity title' })).toHaveValue('');
+    expect(screen.getByRole('textbox', { name: 'Media URL (optional, http or https)' })).toHaveValue('');
+    expect(screen.getByRole('spinbutton', { name: 'Duration in seconds (optional)' })).toHaveValue(null);
   });
 
   it('preserves reviewed inputs when publishing becomes unavailable', () => {
