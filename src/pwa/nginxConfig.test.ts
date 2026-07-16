@@ -40,6 +40,14 @@ describe('public asset delivery policy', () => {
     expect(body).not.toContain('expires ');
   });
 
+  it('uses one bounded policy for stable-name public media', () => {
+    const body = locationBody('~* \\.(png|jpg|jpeg|gif|ico|svg|webp|woff|woff2|ttf|eot)$');
+
+    expect(body).toContain('add_header Cache-Control "public, max-age=86400";');
+    expect(body.match(/Cache-Control/g)).toHaveLength(1);
+    expect(body).not.toContain('expires ');
+  });
+
   it('merges baseline security headers into cache-specific locations', () => {
     expect(config).toContain('add_header_inherit merge;');
   });
