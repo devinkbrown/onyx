@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { deviceMemoryStorageKey, type DeviceMemoryOwner } from '@/lib/deviceMemoryOwner';
+import { isPreviewableUrl } from '@/lib/preview/linkPreview';
 
 export const CUSTOM_EMOJI_STORAGE_KEY = 'onyx:custom-emoji';
 export const RECENT_EMOJI_STORAGE_KEY = 'onyx:recent-emoji';
 export const FAVORITE_EMOJI_STORAGE_KEY = 'onyx:fav-emojis';
 export const EMOJI_USAGE_STORAGE_KEY = 'onyx:emoji-usage';
+export const EMOJI_SKIN_TONE_STORAGE_KEY = 'onyx:emoji-skin-tone';
 
 export const MAX_CUSTOM_EMOJI = 128;
 export const MAX_RECENT_EMOJIS = 20;
@@ -15,7 +17,6 @@ export const MAX_EMOJI_USAGE_COUNT = 1_000_000;
 
 const MAX_EMOJI_STORAGE_CHARS = 256 * 1024;
 const MAX_EMOJI_TOKEN_LENGTH = 64;
-const MAX_EMOJI_NAME_LENGTH = 64;
 const MAX_EMOJI_URL_LENGTH = 2_048;
 const MAX_EMOJI_AUTHOR_LENGTH = 128;
 const SHORTCODE_PATTERN = /^:[a-z0-9][a-z0-9_+-]{0,61}:$/;
@@ -33,11 +34,14 @@ export interface CustomEmoji {
   addedBy?: string;
 }
 
+export type EmojiSkinTone = '' | '🏻' | '🏼' | '🏽' | '🏾' | '🏿';
+
 export interface EmojiMemory {
   customEmoji: CustomEmoji[];
   recentEmojis: string[];
   favoriteEmojis: string[];
   emojiUsageCounts: Record<string, number>;
+  emojiSkinTone: EmojiSkinTone;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -79,11 +83,13 @@ export function purgeLegacyEmojiMemory(): boolean {
     store.removeItem(RECENT_EMOJI_STORAGE_KEY);
     store.removeItem(FAVORITE_EMOJI_STORAGE_KEY);
     store.removeItem(EMOJI_USAGE_STORAGE_KEY);
+    store.removeItem(EMOJI_SKIN_TONE_STORAGE_KEY);
     return [
       CUSTOM_EMOJI_STORAGE_KEY,
       RECENT_EMOJI_STORAGE_KEY,
       FAVORITE_EMOJI_STORAGE_KEY,
       EMOJI_USAGE_STORAGE_KEY,
+      EMOJI_SKIN_TONE_STORAGE_KEY,
     ].every(key => store.getItem(key) === null);
   } catch {
     return false;
@@ -105,6 +111,13 @@ export function normalizeEmojiToken(value: unknown): string | null {
     return SHORTCODE_PATTERN.test(normalized) ? normalized : null;
   }
   return EMOJI_CODE_POINT_PATTERN.test(token) ? token : null;
+}
+
+/** Admit only the five standardized Fitzpatrick emoji modifiers. */
+export function normalizeEmojiSkinTone(value: unknown): EmojiSkinTone {
+  return value === '🏻' || value === '🏼' || value === '🏽' || value === '🏾' || value === '🏿'
+    ? value
+    : '';
 }
 
 /** Normalize the bare name used to address one custom emoji. */
@@ -131,6 +144,7 @@ export function normalizeCustomEmojiUrl(value: unknown): string | null {
       || parsed.username
       || parsed.password
       || parsed.href.length > MAX_EMOJI_URL_LENGTH
+      || !isPreviewableUrl(parsed.href)
     ) return null;
     return parsed.href;
   } catch {
@@ -210,6 +224,7 @@ export function emptyEmojiMemory(): EmojiMemory {
     recentEmojis: [],
     favoriteEmojis: [...DEFAULT_FAVORITE_EMOJIS],
     emojiUsageCounts: {},
+    emojiSkinTone: '',
   };
 }
 
@@ -222,7 +237,10 @@ export function loadEmojiMemory(owner?: DeviceMemoryOwner): EmojiMemory {
   const recentKey = ownerStorageKey(RECENT_EMOJI_STORAGE_KEY, owner);
   const favoriteKey = ownerStorageKey(FAVORITE_EMOJI_STORAGE_KEY, owner);
   const usageKey = ownerStorageKey(EMOJI_USAGE_STORAGE_KEY, owner);
-  if (!customKey || !recentKey || !favoriteKey || !usageKey) return emptyEmojiMemory();
+  const skinToneKey = ownerStorageKey(EMOJI_SKIN_TONE_STORAGE_KEY, owner);
+  if (!customKey || !recentKey || !favoriteKey || !usageKey || !skinToneKey) {
+    return emptyEmojiMemory();
+  }
 
   const favoriteValue = parseStoredValue(store, favoriteKey);
   return {
@@ -232,6 +250,7 @@ export function loadEmojiMemory(owner?: DeviceMemoryOwner): EmojiMemory {
       ? [...DEFAULT_FAVORITE_EMOJIS]
       : normalizeEmojiTokens(favoriteValue, MAX_FAVORITE_EMOJIS),
     emojiUsageCounts: normalizeEmojiUsageCounts(parseStoredValue(store, usageKey)),
+    emojiSkinTone: normalizeEmojiSkinTone(parseStoredValue(store, skinToneKey)),
   };
 }
 
@@ -319,5 +338,21 @@ export function saveEmojiUsageCounts(
     owner,
     () => loadEmojiMemory(owner).emojiUsageCounts,
     verified => serializeUsage(verified) === serialized,
+  );
+}
+
+export function saveEmojiSkinTone(
+  value: unknown,
+  owner?: DeviceMemoryOwner,
+): EmojiSkinTone | null {
+  const skinTone = normalizeEmojiSkinTone(value);
+  const serialized = JSON.stringify(skinTone);
+  return saveOwnedValue(
+    EMOJI_SKIN_TONE_STORAGE_KEY,
+    serialized,
+    skinTone === '',
+    owner,
+    () => loadEmojiMemory(owner).emojiSkinTone,
+    verified => verified === skinTone,
   );
 }

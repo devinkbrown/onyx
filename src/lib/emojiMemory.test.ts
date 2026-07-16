@@ -5,6 +5,7 @@ import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
 import {
   CUSTOM_EMOJI_STORAGE_KEY,
   DEFAULT_FAVORITE_EMOJIS,
+  EMOJI_SKIN_TONE_STORAGE_KEY,
   EMOJI_USAGE_STORAGE_KEY,
   FAVORITE_EMOJI_STORAGE_KEY,
   loadEmojiMemory,
@@ -14,11 +15,13 @@ import {
   MAX_FAVORITE_EMOJIS,
   MAX_RECENT_EMOJIS,
   normalizeCustomEmojis,
+  normalizeEmojiSkinTone,
   normalizeEmojiToken,
   normalizeEmojiTokens,
   normalizeEmojiUsageCounts,
   RECENT_EMOJI_STORAGE_KEY,
   saveCustomEmojis,
+  saveEmojiSkinTone,
   saveEmojiUsageCounts,
   saveFavoriteEmojis,
   saveRecentEmojis,
@@ -43,6 +46,7 @@ describe('account-scoped emoji memory', () => {
     localStorage.setItem(RECENT_EMOJI_STORAGE_KEY, JSON.stringify(['😈']));
     localStorage.setItem(FAVORITE_EMOJI_STORAGE_KEY, JSON.stringify(['🤫']));
     localStorage.setItem(EMOJI_USAGE_STORAGE_KEY, JSON.stringify({ '😈': 99 }));
+    localStorage.setItem(EMOJI_SKIN_TONE_STORAGE_KEY, '🏿');
 
     expect(saveCustomEmojis([
       { name: 'alice_only', url: 'https://cdn.example/alice.png' },
@@ -52,6 +56,7 @@ describe('account-scoped emoji memory', () => {
     expect(saveRecentEmojis(['😀'], alice)).toEqual(['😀']);
     expect(saveFavoriteEmojis(['❤️'], alice)).toEqual(['❤️']);
     expect(saveEmojiUsageCounts({ '😀': 7 }, alice)).toEqual({ '😀': 7 });
+    expect(saveEmojiSkinTone('🏽', alice)).toBe('🏽');
 
     expect(saveCustomEmojis([
       { name: 'bob_only', url: 'https://cdn.example/bob.png' },
@@ -59,24 +64,28 @@ describe('account-scoped emoji memory', () => {
     expect(saveRecentEmojis(['😎'], bob)).toEqual(['😎']);
     expect(saveFavoriteEmojis(['🙏'], bob)).toEqual(['🙏']);
     expect(saveEmojiUsageCounts({ '😎': 3 }, bob)).toEqual({ '😎': 3 });
+    expect(saveEmojiSkinTone('🏻', bob)).toBe('🏻');
 
     expect(loadEmojiMemory(alice)).toEqual({
       customEmoji: [{ name: 'alice_only', url: 'https://cdn.example/alice.png' }],
       recentEmojis: ['😀'],
       favoriteEmojis: ['❤️'],
       emojiUsageCounts: { '😀': 7 },
+      emojiSkinTone: '🏽',
     });
     expect(loadEmojiMemory(bob)).toEqual({
       customEmoji: [{ name: 'bob_only', url: 'https://cdn.example/bob.png' }],
       recentEmojis: ['😎'],
       favoriteEmojis: ['🙏'],
       emojiUsageCounts: { '😎': 3 },
+      emojiSkinTone: '🏻',
     });
     expect(loadEmojiMemory(aliceElsewhere)).toEqual({
       customEmoji: [],
       recentEmojis: [],
       favoriteEmojis: [...DEFAULT_FAVORITE_EMOJIS],
       emojiUsageCounts: {},
+      emojiSkinTone: '',
     });
 
     for (const key of [
@@ -84,6 +93,7 @@ describe('account-scoped emoji memory', () => {
       RECENT_EMOJI_STORAGE_KEY,
       FAVORITE_EMOJI_STORAGE_KEY,
       EMOJI_USAGE_STORAGE_KEY,
+      EMOJI_SKIN_TONE_STORAGE_KEY,
     ]) expect(localStorage.getItem(key)).toBeNull();
   });
 
@@ -97,6 +107,12 @@ describe('account-scoped emoji memory', () => {
       { name: 'creds', url: 'https://user:secret@cdn.example/private.png' },
       { name: 'relative', url: '/emoji.png' },
       { name: 'space', url: 'https://cdn.example/bad image.png' },
+      { name: 'localhost', url: 'http://localhost:8080/emoji.png' },
+      { name: 'private_v4', url: 'http://192.168.1.20/emoji.png' },
+      { name: 'metadata', url: 'http://169.254.169.254/latest/meta-data/' },
+      { name: 'loopback_v6', url: 'http://[::1]/emoji.png' },
+      { name: 'private_v6', url: 'http://[fd12:3456::1]/emoji.png' },
+      { name: 'internal_host', url: 'http://emoji.internal/image.png' },
       ...Array.from({ length: MAX_CUSTOM_EMOJI + 10 }, (_, index) => ({
         name: `safe_${index}`,
         url: `http://cdn.example/${index}.png`,
@@ -111,11 +127,16 @@ describe('account-scoped emoji memory', () => {
     });
     expect(parsed.some(emoji => emoji.name === 'script')).toBe(false);
     expect(parsed.some(emoji => emoji.name === 'creds')).toBe(false);
+    expect(parsed.some(emoji => emoji.name === 'localhost')).toBe(false);
+    expect(parsed.some(emoji => emoji.name === 'private_v4')).toBe(false);
+    expect(parsed.some(emoji => emoji.name === 'loopback_v6')).toBe(false);
     expect(parsed.some(emoji => emoji.url.startsWith('data:'))).toBe(false);
 
     localStorage.setItem(storageKey(CUSTOM_EMOJI_STORAGE_KEY), JSON.stringify([
       { name: 'safe', url: 'https://cdn.example/safe.png' },
       { name: 'hostile', url: 'javascript:alert(document.domain)' },
+      { name: 'lan_probe', url: 'http://10.0.0.5/emoji.png' },
+      { name: 'ipv6_probe', url: 'http://[fe80::1]/emoji.png' },
     ]));
     expect(loadEmojiMemory(alice).customEmoji).toEqual([
       { name: 'safe', url: 'https://cdn.example/safe.png' },
@@ -123,6 +144,9 @@ describe('account-scoped emoji memory', () => {
   });
 
   it('bounds emoji tokens and usage counters while dropping hostile record keys', () => {
+    expect(normalizeEmojiSkinTone('🏾')).toBe('🏾');
+    expect(normalizeEmojiSkinTone('😀')).toBe('');
+    expect(normalizeEmojiSkinTone('<script>')).toBe('');
     expect(normalizeEmojiToken(' :Party_Parrot: ')).toBe(':party_parrot:');
     expect(normalizeEmojiToken('❤️')).toBe('❤️');
     expect(normalizeEmojiToken('1️⃣')).toBe('1️⃣');
@@ -172,11 +196,13 @@ describe('account-scoped emoji memory', () => {
     expect(saveRecentEmojis(['😀'])).toBeNull();
     expect(saveFavoriteEmojis(['😀'])).toBeNull();
     expect(saveEmojiUsageCounts({ '😀': 1 })).toBeNull();
+    expect(saveEmojiSkinTone('🏽')).toBeNull();
     expect(loadEmojiMemory()).toEqual({
       customEmoji: [],
       recentEmojis: [],
       favoriteEmojis: [...DEFAULT_FAVORITE_EMOJIS],
       emojiUsageCounts: {},
+      emojiSkinTone: '',
     });
     expect(localStorage.length).toBe(0);
 
@@ -184,15 +210,21 @@ describe('account-scoped emoji memory', () => {
     localStorage.setItem(storageKey(RECENT_EMOJI_STORAGE_KEY), JSON.stringify({ emoji: '😀' }));
     localStorage.setItem(storageKey(FAVORITE_EMOJI_STORAGE_KEY), 'x'.repeat(256 * 1024 + 1));
     localStorage.setItem(storageKey(EMOJI_USAGE_STORAGE_KEY), JSON.stringify(['😀', 1]));
+    localStorage.setItem(storageKey(EMOJI_SKIN_TONE_STORAGE_KEY), JSON.stringify('<script>'));
     expect(loadEmojiMemory(alice)).toEqual({
       customEmoji: [],
       recentEmojis: [],
       favoriteEmojis: [...DEFAULT_FAVORITE_EMOJIS],
       emojiUsageCounts: {},
+      emojiSkinTone: '',
     });
 
     expect(saveFavoriteEmojis([], alice)).toEqual([]);
     expect(loadEmojiMemory(alice).favoriteEmojis).toEqual([]);
+    expect(saveEmojiSkinTone('🏿', alice)).toBe('🏿');
+    expect(loadEmojiMemory(alice).emojiSkinTone).toBe('🏿');
+    expect(saveEmojiSkinTone('', alice)).toBe('');
+    expect(localStorage.getItem(storageKey(EMOJI_SKIN_TONE_STORAGE_KEY))).toBeNull();
     expect(normalizeEmojiTokens(Array.from({ length: 30 }, () => '😀'), MAX_RECENT_EMOJIS))
       .toEqual(['😀']);
   });

@@ -119,8 +119,10 @@ import {
   loadEmojiMemory,
   normalizeCustomEmojiName,
   normalizeCustomEmojiUrl,
+  normalizeEmojiSkinTone,
   normalizeEmojiToken,
   saveCustomEmojis,
+  saveEmojiSkinTone,
   saveEmojiUsageCounts,
   saveFavoriteEmojis,
   saveRecentEmojis,
@@ -2812,6 +2814,7 @@ function _resetAccountBoundState(
       recentEmojis: [],
       favoriteEmojis: [...DEFAULT_FAVORITE_EMOJIS],
       emojiUsageCounts: {},
+      emojiSkinTone: '',
       mutedDMs: new Set(),
       userNotes: new Map(),
       topicHistory: {},
@@ -3438,18 +3441,6 @@ function _loadPushNotificationsEnabled(): boolean {
   if (stored !== null) return stored !== 'false';
   const legacy = localStorage.getItem('onyx:notif-desktop');
   return legacy === null ? true : legacy !== 'false';
-}
-
-function _loadEmojiSkinTone(): OnyxState['emojiSkinTone'] {
-  if (typeof window === 'undefined') return '';
-  const stored = localStorage.getItem('onyx:emoji-skin-tone');
-  return stored === '\u{1F3FB}' || stored === '\u{1F3FC}' || stored === '\u{1F3FD}' ||
-    stored === '\u{1F3FE}' || stored === '\u{1F3FF}' ? stored : '';
-}
-
-function _normalizeEmojiSkinTone(tone: string): OnyxState['emojiSkinTone'] {
-  return tone === '\u{1F3FB}' || tone === '\u{1F3FC}' || tone === '\u{1F3FD}' ||
-    tone === '\u{1F3FE}' || tone === '\u{1F3FF}' ? tone : '';
 }
 
 function _persistScheduledMessages(
@@ -10940,13 +10931,12 @@ export const store = createStore<OnyxState>()(
         return saved ? { recentEmojis: saved } : {};
       });
     },
-    emojiSkinTone: _loadEmojiSkinTone(),
+    emojiSkinTone: _initialEmojiMemory.emojiSkinTone,
     setEmojiSkinTone: (tone) => {
-      const normalized = _normalizeEmojiSkinTone(tone);
-      if (typeof window !== 'undefined') {
-        try { localStorage.setItem('onyx:emoji-skin-tone', normalized); } catch {}
-      }
-      set({ emojiSkinTone: normalized });
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
+      const saved = saveEmojiSkinTone(normalizeEmojiSkinTone(tone), owner);
+      if (saved !== null) set({ emojiSkinTone: saved });
     },
     emojiUsageCounts: { ..._initialEmojiMemory.emojiUsageCounts },
     incrementEmojiUsage: (emoji) => {
