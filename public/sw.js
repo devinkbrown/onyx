@@ -48,6 +48,21 @@ function navigationFallbackPath(pathname) {
   return pathname === '/app' || pathname.startsWith('/app/') ? '/app' : '/';
 }
 
+function enableNavigationPreload() {
+  try {
+    const navigationPreload = self.registration?.navigationPreload;
+    if (!navigationPreload || typeof navigationPreload.enable !== 'function') {
+      return Promise.resolve();
+    }
+    // Navigation preload starts the request in parallel with service-worker
+    // startup. Treat it as an optional acceleration: browser policy failures
+    // must never block activation or offline fallback behavior.
+    return Promise.resolve(navigationPreload.enable()).catch(() => undefined);
+  } catch {
+    return Promise.resolve();
+  }
+}
+
 // ── Install: precache shell ────────────────────────────────────────────────────
 // CRITICAL: precache failures must NEVER abort install. cache.addAll rejects
 // wholesale if any single URL 404s, which bricks the update pipeline — every
@@ -68,13 +83,16 @@ self.addEventListener('install', (event) => {
 // ── Activate: clear stale caches ──────────────────────────────────────────────
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((k) => k !== CACHE_NAME)
-          .map((k) => caches.delete(k))
-      )
-    ).then(() => self.clients.claim())
+    Promise.all([
+      caches.keys().then((keys) =>
+        Promise.all(
+          keys
+            .filter((k) => k !== CACHE_NAME)
+            .map((k) => caches.delete(k))
+        )
+      ),
+      enableNavigationPreload(),
+    ]).then(() => self.clients.claim())
   );
 });
 
@@ -95,7 +113,10 @@ self.addEventListener('fetch', (event) => {
   // For navigation requests, try network then fall back to cached index
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => caches.match(navigationFallbackPath(url.pathname)))
+      Promise.resolve(event.preloadResponse)
+        .catch(() => undefined)
+        .then((preloaded) => preloaded ?? fetch(request))
+        .catch(() => caches.match(navigationFallbackPath(url.pathname)))
     );
     return;
   }

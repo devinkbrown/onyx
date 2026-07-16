@@ -155,6 +155,8 @@ describe('PWA manifest', () => {
     };
     const skipWaiting = vi.fn(async () => undefined);
     const claim = vi.fn(async () => undefined);
+    const enableNavigationPreload = vi.fn(async () => undefined);
+    const networkFetch = vi.fn(async () => Promise.reject(new Error('offline')));
     const workerSource = readFileSync(serviceWorkerPath, 'utf8');
     const workerSelf = {
       location: { origin: 'https://onyx.test' },
@@ -163,12 +165,15 @@ describe('PWA manifest', () => {
       },
       skipWaiting,
       clients: { claim, matchAll: vi.fn(), openWindow: vi.fn() },
-      registration: { showNotification: vi.fn() },
+      registration: {
+        showNotification: vi.fn(),
+        navigationPreload: { enable: enableNavigationPreload },
+      },
     };
     runInNewContext(workerSource, {
       self: workerSelf,
       caches,
-      fetch: vi.fn(async () => Promise.reject(new Error('offline'))),
+      fetch: networkFetch,
       URL,
       Promise,
     });
@@ -193,8 +198,20 @@ describe('PWA manifest', () => {
     expect(deleteCache).toHaveBeenCalledWith('old-shell');
     expect(deleteCache).not.toHaveBeenCalledWith('onyx-shell-__BUILD_VERSION__');
     expect(claim).toHaveBeenCalledOnce();
+    expect(enableNavigationPreload).toHaveBeenCalledOnce();
 
     let navigationWork: Promise<unknown> | undefined;
+    const preloadedResponse = { source: 'navigation-preload' };
+    listeners.get('fetch')?.({
+      request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/app' },
+      preloadResponse: Promise.resolve(preloadedResponse),
+      respondWith: (work: Promise<unknown>) => {
+        navigationWork = work;
+      },
+    });
+    await expect(navigationWork).resolves.toBe(preloadedResponse);
+    expect(networkFetch).not.toHaveBeenCalled();
+
     listeners.get('fetch')?.({
       request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/app?join=%23root' },
       respondWith: (work: Promise<unknown>) => {
