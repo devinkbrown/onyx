@@ -33,6 +33,12 @@ describe('normalizeIrcChannelTarget', () => {
     expect(normalizeIrcChannelTarget('!!!')).toBe('');
     expect(normalizeIrcChannelTarget('___')).toBe('');
   });
+
+  it('bounds hostile channel labels so generated vault ids remain valid', () => {
+    const target = normalizeIrcChannelTarget('x'.repeat(20_000));
+    expect(target).toHaveLength(256);
+    expect(target.startsWith('#')).toBe(true);
+  });
 });
 
 describe('parseIrcLog — supported formats', () => {
@@ -244,5 +250,43 @@ describe('parseIrcLog — robustness and vault interop', () => {
     expect(revived).not.toBeNull();
     expect(revived!.targets[0]!.target).toBe('#dev');
     expect(revived!.targets[0]!.messages[0]!.text).toBe('<img src=x onerror=alert(1)>');
+  });
+
+  it('bounds sender and message fields before creating vault rows', () => {
+    const text = 'x'.repeat(64 * 1_024 + 500);
+    const result = parseIrcLog(`14:05 <Alice Smith\u0000> ${text}`, {
+      channel: '#dev',
+      baseDate: '2025-01-02',
+    });
+    const message = result!.snapshot.targets[0]!.messages[0]!;
+
+    expect(message.from).toBe('Alice-Smith');
+    expect(message.text).toHaveLength(64 * 1_024);
+    expect(parseVaultExport(result!.snapshot)).not.toBeNull();
+  });
+
+  it('skips a single oversized line without losing a safe sibling', () => {
+    const oversized = `14:05 <alice> ${'x'.repeat(70 * 1_024)}`;
+    const result = parseIrcLog(`${oversized}\n14:06 <bob> safe`, {
+      channel: '#dev',
+      baseDate: '2025-01-02',
+    });
+
+    expect(result!.summary.skipped).toBe(1);
+    expect(result!.snapshot.targets[0]!.messages.map((message) => message.text)).toEqual(['safe']);
+  });
+
+  it('streams many short lines while retaining only the newest vault tail', () => {
+    const raw = Array.from(
+      { length: 20_000 },
+      (_, index) => `14:05 <alice> message ${index}`,
+    ).join('\n');
+    const result = parseIrcLog(raw, { channel: '#dev', baseDate: '2025-01-02' });
+    const messages = result!.snapshot.targets[0]!.messages;
+
+    expect(messages).toHaveLength(400);
+    expect(messages[0]!.text).toBe('message 19600');
+    expect(messages.at(-1)!.text).toBe('message 19999');
+    expect(result!.summary.droppedOverCap).toBe(19_600);
   });
 });

@@ -28,7 +28,12 @@
  */
 import type { ChatMessage, MessageType } from '@/lib/irc/types';
 import type { VaultExportSnapshot, VaultExportTarget } from '@/lib/vault/historyVault';
-import { VAULT_KEEP } from '@/lib/vault/historyVault';
+import {
+  MAX_VAULT_MESSAGE_TEXT_LENGTH,
+  MAX_VAULT_SENDER_LENGTH,
+  MAX_VAULT_TIMESTAMP_LENGTH,
+  VAULT_KEEP,
+} from '@/lib/vault/historyVault';
 
 /** Options controlling how an IRC text log is mapped into the vault. */
 export interface IrcLogImportOptions {
@@ -98,6 +103,9 @@ interface TargetBucket {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SYNTHETIC_START_DAY = Date.UTC(2000, 0, 1);
+const MAX_IRC_TARGET_LENGTH = 256;
+const MAX_IRC_RAW_TEXT_CHARS = 128 * 1024 * 1024;
+const MAX_IRC_LINE_CHARS = MAX_VAULT_MESSAGE_TEXT_LENGTH + 1_024;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -105,6 +113,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value : '';
+}
+
+function boundedString(value: unknown, maxLength: number): string {
+  return asString(value).slice(0, maxLength);
+}
+
+function boundedWireToken(value: unknown, maxLength: number, fallback = ''): string {
+  const token = boundedString(value, maxLength)
+    .trim()
+    .replace(/[\u0000-\u0020\u007f]+/gu, '-')
+    .replace(/^-+|-+$/g, '');
+  return token || fallback;
 }
 
 /** Coerce an option to a finite positive integer, or fall back. */
@@ -119,20 +139,26 @@ function finitePositiveInt(value: unknown, fallback: number): number {
  */
 export function normalizeIrcChannelTarget(rawName: string): string {
   const cleaned = rawName
+    .slice(0, MAX_IRC_TARGET_LENGTH * 4)
     .trim()
     .replace(/^#+/, '')
     .toLowerCase()
     .replace(/\s+/g, '-')
     .replace(/[^a-z0-9\-_]/g, '')
     .replace(/-{2,}/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/^-+|-+$/g, '')
+    .slice(0, MAX_IRC_TARGET_LENGTH - 1);
   // A punctuation-only key (for example "___") is technically non-empty but
   // does not identify a meaningful room and is dangerously collision-prone.
   return cleaned && /[a-z0-9]/.test(cleaned) ? `#${cleaned}` : '';
 }
 
 function stripNickPrefix(raw: string): string {
-  return raw.trim().replace(/^[~&@%+]+/, '').trim() || 'unknown';
+  return boundedWireToken(
+    raw.trim().replace(/^[~&@%+]+/, ''),
+    MAX_VAULT_SENDER_LENGTH,
+    'unknown',
+  );
 }
 
 function datePartsFromIsoDay(raw: string): DateParts | null {
@@ -176,7 +202,9 @@ function timeParts(hourRaw: string, minuteRaw: string, secondRaw: string | undef
 
 function baseDayFromOption(value: unknown): number | null {
   if (!(value instanceof Date) && typeof value !== 'string') return null;
-  const date = value instanceof Date ? value : new Date(value);
+  const date = value instanceof Date
+    ? value
+    : new Date(value.slice(0, MAX_VAULT_TIMESTAMP_LENGTH));
   const time = date.getTime();
   if (Number.isNaN(time)) return null;
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
@@ -376,7 +404,7 @@ function timestampForLine(
  * empty snapshot with `summary.skipped` explaining what happened.
  */
 export function parseIrcLog(raw: string, options: IrcLogImportOptions): IrcLogImportResult | null {
-  if (typeof raw !== 'string' || !raw.trim()) return null;
+  if (typeof raw !== 'string' || raw.length === 0 || !/\S/u.test(raw)) return null;
   if (!isRecord(options)) return null;
 
   const target = normalizeIrcChannelTarget(options.channel);
@@ -405,46 +433,91 @@ export function parseIrcLog(raw: string, options: IrcLogImportOptions): IrcLogIm
     bucket.messages = bucket.messages.slice(-keepPerChannel);
   };
 
-  const lines = raw.split(/\r?\n/);
-  for (const [index, line] of lines.entries()) {
+  // Avoid `split()` on a valid 128 MiB log: that duplicates the whole input and
+  // allocates an entry for every line before retention can prune anything. Walk
+  // line boundaries in place and allocate at most one bounded line at a time.
+  // Direct callers that bypass the file-selection ceiling retain the newest
+  // 128 MiB without copying it; the first partial line is discarded.
+  const boundedStart = Math.max(0, raw.length - MAX_IRC_RAW_TEXT_CHARS);
+  let cursor = boundedStart;
+  if (boundedStart > 0) {
+    skipped += 1; // one truncated prefix region; exact line count is intentionally not scanned
+    const firstBreak = raw.indexOf('\n', boundedStart);
+    cursor = firstBreak < 0 ? raw.length : firstBreak + 1;
+  }
+  let logicalLine = 0;
+  while (cursor <= raw.length) {
+    const nextBreak = raw.indexOf('\n', cursor);
+    const end = nextBreak < 0 ? raw.length : nextBreak;
+    logicalLine += 1;
+    if (end - cursor > MAX_IRC_LINE_CHARS) {
+      skipped += 1;
+      if (nextBreak < 0) break;
+      cursor = nextBreak + 1;
+      continue;
+    }
+    const line = raw.slice(cursor, end);
     const parsed = parseLine(line);
     if (!parsed) {
       skipped += 1;
+      if (nextBreak < 0) break;
+      cursor = nextBreak + 1;
       continue;
     }
 
     const body = parseLineBody(parsed);
     if (!body) {
       skipped += 1;
+      if (nextBreak < 0) break;
+      cursor = nextBreak + 1;
       continue;
     }
 
     if (body.system && !includeSystem) {
       skipped += 1;
+      if (nextBreak < 0) break;
+      cursor = nextBreak + 1;
       continue;
     }
 
     const time = timestampForLine(parsed, dateState);
     if (Number.isNaN(time.getTime())) {
       skipped += 1;
+      if (nextBreak < 0) break;
+      cursor = nextBreak + 1;
       continue;
     }
 
     if (cutoff !== null && time.getTime() < cutoff) {
       skipped += 1;
+      if (nextBreak < 0) break;
+      cursor = nextBreak + 1;
       continue;
     }
 
+    const from = boundedWireToken(body.from, MAX_VAULT_SENDER_LENGTH, 'unknown');
+    const text = body.text.slice(0, MAX_VAULT_MESSAGE_TEXT_LENGTH).trim();
+    if (!text) {
+      skipped += 1;
+      if (nextBreak < 0) break;
+      cursor = nextBreak + 1;
+      continue;
+    }
+
+    const lineDiscriminator = boundedStart === 0 ? logicalLine : cursor;
+
     bucket.messages.push({
-      id: messageId(bucket.target, time, index + 1),
+      id: messageId(bucket.target, time, lineDiscriminator),
       time,
-      from: body.from,
-      text: body.text,
+      from,
+      text,
       type: body.type,
       target,
     });
 
     if (bucket.messages.length >= compactAt) compact();
+    if (nextBreak < 0) break;
+    cursor = nextBreak + 1;
   }
 
   compact();

@@ -783,6 +783,12 @@ client or public site needs to expose the result.
     amortized duplicate timestamps, and public credential-free attachment
     policy. Internal/LAN, credential-bearing, and non-HTTP file URLs never enter
     imported message text or become ambient browser requests.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — IRC-log transforms now scan
+    accepted 128 MiB logs in place instead of duplicating the entire file with
+    `split()`, allocate at most one bounded line at a time, reject oversized
+    lines without losing safe siblings, and bound channel, sender, message, and
+    generated-id fields before vault rows are created. Direct callers beyond
+    the selection ceiling retain the newest bounded text window.
 
 ## Phase 13 — Amanogawa Local Intelligence ← PLANNED
 34. **AI provenance chrome** *(client)* — every recap, search answer,
