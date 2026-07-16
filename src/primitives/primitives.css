@@ -429,6 +429,11 @@
   border-bottom: 1px solid var(--seam-faint);
 }
 
+.onyx-sheet__header > div,
+.onyx-modal__header > div {
+  min-width: 0;
+}
+
 /* Full-bleed Sheets sit directly on viewport edges. Preserve the existing
    panel padding on ordinary displays, but keep header controls outside a
    notched/status-bar inset when viewport-fit=cover is active. Centered modal
@@ -449,6 +454,13 @@
   font-size: 0.68rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
+}
+
+.onyx-sheet__header p,
+.onyx-modal__header p,
+.onyx-sheet__header h2,
+.onyx-modal__header h2 {
+  overflow-wrap: anywhere;
 }
 
 .onyx-sheet__header h2,

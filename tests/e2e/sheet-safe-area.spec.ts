@@ -34,7 +34,11 @@ async function renderSheet(
     <div class="onyx-sheet">
       <aside class="onyx-sheet__panel" role="dialog" aria-label="Preferences">
         <header class="onyx-sheet__header">
-          <div><p>panel</p><h2>Preferences</h2></div>
+          <div>
+            <p>panel</p>
+            <h2>Preferences</h2>
+            <p>Display &amp; behaviour — applied live.</p>
+          </div>
           <button class="onyx-sheet__close" type="button" aria-label="Close preferences">×</button>
         </header>
         <div class="onyx-sheet__body">
@@ -101,5 +105,33 @@ test.describe('Sheet mobile safe-area geometry', () => {
 
     expect(padding.header).toEqual(['24px', '24px', '24px', '24px']);
     expect(padding.body).toEqual(['24px', '24px', '24px', '24px']);
+  });
+
+  test('contains the sheet header and close action at 200% text', async ({ page, browserName }) => {
+    test.skip(browserName !== 'chromium', 'Safe-area inset override uses the Chromium DevTools protocol.');
+    await renderSheet(page, { top: 0, bottom: 0 });
+    await page.setViewportSize({ width: 320, height: VIEWPORT_HEIGHT });
+    await page.evaluate(() => {
+      document.documentElement.style.fontSize = '32px';
+      document.documentElement.style.setProperty('--pad-panel-lg', '1.25rem');
+      document.documentElement.style.setProperty('--space-1', '0.25rem');
+      document.documentElement.style.setProperty('--space-2', '0.5rem');
+      document.documentElement.style.setProperty('--space-4', '1rem');
+    });
+
+    const geometry = await page.evaluate(() => {
+      const panel = document.querySelector<HTMLElement>('.onyx-sheet__panel')!;
+      const header = document.querySelector<HTMLElement>('.onyx-sheet__header')!;
+      return {
+        panel: [panel.clientWidth, panel.scrollWidth],
+        header: [header.clientWidth, header.scrollWidth],
+      };
+    });
+    const closeBox = await page.getByRole('button', { name: 'Close preferences' }).boundingBox();
+
+    expect(geometry.panel[1]).toBe(geometry.panel[0]);
+    expect(geometry.header[1]).toBe(geometry.header[0]);
+    expect(closeBox).not.toBeNull();
+    expect(closeBox!.x + closeBox!.width).toBeLessThanOrEqual(320);
   });
 });
