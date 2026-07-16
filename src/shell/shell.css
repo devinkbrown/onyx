@@ -3939,6 +3939,19 @@
   font-size: 0.62rem;
 }
 
+.shell-members-head-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.shell-members-refresh {
+  color: var(--lapis-bright);
+  font-size: 0.52rem;
+  letter-spacing: 0.08em;
+  opacity: 0.78;
+}
+
 .shell-members-scroll {
   flex: 1;
   overflow-y: auto;

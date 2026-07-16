@@ -147,15 +147,15 @@ describe('MemberList accessibility', () => {
     expect(screen.getByRole('button', { name: /Open member details for Alice, Voice/ })).toBeInTheDocument();
   });
 
-  it('shows an honest refresh state instead of a stale remembered-session roster', () => {
+  it('keeps the current roster visible and labels it while a resume refresh is pending', () => {
     seedChannel([makeUser('me', ['o']), makeUser('departed', ['v'])]);
     store.setState({ rosterSyncing: new Set(['#general']) });
 
     render(() => <MemberList />);
 
     expect(screen.getByRole('status', { name: 'Refreshing members' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Open member details for departed/ })).toBeNull();
-    expect(screen.getByLabelText('0 members')).toHaveTextContent('0');
+    expect(screen.getByRole('button', { name: /Open member details for departed/ })).toBeInTheDocument();
+    expect(screen.getByLabelText('2 members')).toHaveTextContent('2');
 
     store.setState({ rosterSyncing: new Set() });
 

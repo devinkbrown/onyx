@@ -226,16 +226,22 @@ export function MemberList(props: MemberListProps): JSX.Element {
     return channels().get(view.channel.toLowerCase()) ?? null;
   });
 
-  // We're in the channel but the roster hasn't landed yet (NAMES in flight): a
-  // channel you're a member of always lists at least yourself, so an empty user
-  // map while connected means "loading", not "genuinely empty".
+  const isRefreshingRoster = createMemo(() => {
+    const view = activeView();
+    return view.kind === 'channel'
+      && rosterSyncing().has(view.channel.toLowerCase());
+  });
+
+  // We're in the channel but the first roster hasn't landed yet (NAMES in
+  // flight): a channel you're a member of always lists at least yourself, so an
+  // empty user map while connected means "loading", not "genuinely empty".
+  // A refresh with existing rows keeps those rows visible and labels them as
+  // syncing; replacing useful content with a zero-count skeleton made the
+  // nicklist look broken on every remembered-session resume.
   const isLoadingRoster = createMemo(() => {
     const ch = activeChannel();
-    const view = activeView();
-    const restoreSyncing = view.kind === 'channel'
-      && rosterSyncing().has(view.channel.toLowerCase());
     return !!ch && connectionStatus() === 'connected'
-      && (restoreSyncing || ch.users.size === 0);
+      && ch.users.size === 0;
   });
 
   const rosterStatusLabel = createMemo(() => {
@@ -255,7 +261,6 @@ export function MemberList(props: MemberListProps): JSX.Element {
   });
 
   const totalCount = createMemo(() => {
-    if (isLoadingRoster()) return 0;
     return groups().reduce((sum, g) => sum + g.members.length, 0);
   });
 
@@ -295,11 +300,16 @@ export function MemberList(props: MemberListProps): JSX.Element {
           accessible name so it reads meaningfully on demand, but membership
           changes are announced elsewhere — never by re-reading this number.
         */}
-        <span
-          class="shell-members-count"
-          aria-label={`${totalCount()} member${totalCount() === 1 ? '' : 's'}`}
-        >
-          {totalCount()}
+        <span class="shell-members-head-meta">
+          <Show when={isRefreshingRoster() && groups().length > 0}>
+            <span class="shell-members-refresh" role="status" aria-label="Refreshing members">sync</span>
+          </Show>
+          <span
+            class="shell-members-count"
+            aria-label={`${totalCount()} member${totalCount() === 1 ? '' : 's'}`}
+          >
+            {totalCount()}
+          </span>
         </span>
       </div>
 
