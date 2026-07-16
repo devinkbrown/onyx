@@ -103,6 +103,17 @@ import { loadDMPins, sanitizeDMPins, saveDMPins } from '@/lib/dmPins';
 import { loadBookmarks, saveBookmarks } from '@/lib/bookmarks';
 import { loadNickAliases, saveNickAliases } from '@/lib/nickAliases';
 import { loadIgnoredUsers, parseIgnoredUsers, saveIgnoredUsers } from '@/lib/ignoredUsers';
+import {
+  loadDisplayNameOverrides,
+  loadNickColorOverrides,
+  loadSoftIgnoreList,
+  normalizeIdentityOverrideNick,
+  normalizeLocalDisplayName,
+  normalizeNickColor,
+  saveDisplayNameOverrides,
+  saveNickColorOverrides,
+  saveSoftIgnoreList,
+} from '@/lib/identityOverrides';
 import { loadMutedDMs, parseMutedDMs, saveMutedDMs } from '@/lib/mutedDMs';
 import {
   emptyIdentityProfileMemory,
@@ -2779,6 +2790,9 @@ function _resetAccountBoundState(
       highlightWords: [],
       ignoredUsers: new Set(),
       showIgnoreList: false,
+      softIgnoreList: new Set(),
+      nickColorOverrides: new Map(),
+      displayNameOverrides: {},
       mutedDMs: new Set(),
       userNotes: new Map(),
       topicHistory: {},
@@ -3554,6 +3568,17 @@ function _loadOwnedIgnoredUsers(
   return owner ? loadIgnoredUsers(owner) : new Set();
 }
 
+function _loadOwnedIdentityOverrides(
+  state: Pick<OnyxState, 'server' | 'ourNick'>,
+): Pick<OnyxState, 'softIgnoreList' | 'nickColorOverrides' | 'displayNameOverrides'> {
+  const owner = selectDeviceMemoryOwner(state);
+  return {
+    softIgnoreList: owner ? loadSoftIgnoreList(owner) : new Set(),
+    nickColorOverrides: owner ? loadNickColorOverrides(owner) : new Map(),
+    displayNameOverrides: owner ? loadDisplayNameOverrides(owner) : {},
+  };
+}
+
 function _loadOwnedMutedDMs(
   state: Pick<OnyxState, 'server' | 'ourNick'>,
 ): Set<string> {
@@ -3961,7 +3986,8 @@ export const store = createStore<OnyxState>()(
     // active server owner exists.
     ignoredUsers: new Set(),
     showIgnoreList: false,
-    softIgnoreList: _loadSoftIgnoreList(),
+    // Ownerless reads return empty and purge ambiguous pre-scoping journals.
+    softIgnoreList: loadSoftIgnoreList(),
     revealedMessages: new Set<string>(),
     collapsedNicks: new Set<string>(),
     // Private room names and notification policy load only after a server
@@ -4336,6 +4362,7 @@ export const store = createStore<OnyxState>()(
               channelNotify: _loadOwnedChannelNotify({ server, ourNick: newNick }),
               highlightWords: _loadOwnedHighlightWords({ server, ourNick: newNick }),
               ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: newNick }),
+              ..._loadOwnedIdentityOverrides({ server, ourNick: newNick }),
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: newNick }),
               friends: _loadOwnedFriends({ server, ourNick: newNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: newNick }),
@@ -4426,6 +4453,7 @@ export const store = createStore<OnyxState>()(
               channelNotify: _loadOwnedChannelNotify({ server: srv, ourNick: get().ourNick }),
               highlightWords: _loadOwnedHighlightWords({ server: srv, ourNick: get().ourNick }),
               ignoredUsers: _loadOwnedIgnoredUsers({ server: srv, ourNick: get().ourNick }),
+              ..._loadOwnedIdentityOverrides({ server: srv, ourNick: get().ourNick }),
               mutedDMs: _loadOwnedMutedDMs({ server: srv, ourNick: get().ourNick }),
               friends: _loadOwnedFriends({ server: srv, ourNick: get().ourNick }),
               watchList: _loadOwnedWatchList({ server: srv, ourNick: get().ourNick }),
@@ -6761,15 +6789,18 @@ export const store = createStore<OnyxState>()(
 
     // ── Soft ignore (client-side message hide) ────────────────────────────
     toggleSoftIgnore(nick) {
+      const owner = selectDeviceMemoryOwner(get());
+      const key = normalizeIdentityOverrideNick(nick);
+      if (!owner || !key) return;
       set(s => {
         const n = new Set(s.softIgnoreList);
-        if (n.has(nick)) {
-          n.delete(nick);
+        if (n.has(key)) {
+          n.delete(key);
         } else {
-          n.add(nick);
+          n.add(key);
         }
-        _saveSoftIgnoreList(n);
-        return { softIgnoreList: n };
+        const saved = saveSoftIgnoreList(n, owner);
+        return saved ? { softIgnoreList: saved } : {};
       });
     },
     revealMessage(msgId) {
@@ -7547,6 +7578,7 @@ export const store = createStore<OnyxState>()(
               channelNotify: _loadOwnedChannelNotify({ server, ourNick: s.ourNick }),
               highlightWords: _loadOwnedHighlightWords({ server, ourNick: s.ourNick }),
               ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: s.ourNick }),
+              ..._loadOwnedIdentityOverrides({ server, ourNick: s.ourNick }),
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
               friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
@@ -8197,11 +8229,15 @@ export const store = createStore<OnyxState>()(
               const context = dropConfirmation ? _dropReplyContext : _logoutReplyContext;
               if (!_replyAccountIsCurrent(context, get)) break;
               _clearRememberedSessionAfterLogout(get, set);
-              set(s => ({
-                server: s.server ? { ...s.server, account: null } : s.server,
-                accountInfo: null,
-                accountActionError: null,
-              }));
+              set(s => {
+                const server = s.server ? { ...s.server, account: null } : s.server;
+                return {
+                  server,
+                  accountInfo: null,
+                  accountActionError: null,
+                  ..._loadOwnedIdentityOverrides({ server, ourNick: s.ourNick }),
+                };
+              });
               _saslAccount = null;
               get().addServiceNotice('Account', text);
               break;
@@ -8773,6 +8809,7 @@ export const store = createStore<OnyxState>()(
                 channelNotify: _loadOwnedChannelNotify({ server, ourNick: newNick }),
                 highlightWords: _loadOwnedHighlightWords({ server, ourNick: newNick }),
                 ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: newNick }),
+                ..._loadOwnedIdentityOverrides({ server, ourNick: newNick }),
                 mutedDMs: _loadOwnedMutedDMs({ server, ourNick: newNick }),
                 friends: _loadOwnedFriends({ server, ourNick: newNick }),
                 watchList: _loadOwnedWatchList({ server, ourNick: newNick }),
@@ -9989,6 +10026,7 @@ export const store = createStore<OnyxState>()(
                 channelNotify: _loadOwnedChannelNotify({ server, ourNick: s.ourNick }),
                 highlightWords: _loadOwnedHighlightWords({ server, ourNick: s.ourNick }),
                 ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: s.ourNick }),
+                ..._loadOwnedIdentityOverrides({ server, ourNick: s.ourNick }),
                 mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
                 friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
                 watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
@@ -10037,6 +10075,7 @@ export const store = createStore<OnyxState>()(
               channelNotify: _loadOwnedChannelNotify({ server, ourNick: s.ourNick }),
               highlightWords: _loadOwnedHighlightWords({ server, ourNick: s.ourNick }),
               ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: s.ourNick }),
+              ..._loadOwnedIdentityOverrides({ server, ourNick: s.ourNick }),
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
               friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
@@ -10959,21 +10998,28 @@ export const store = createStore<OnyxState>()(
     closeInviteModal: () => set({ showInviteModal: false }),
 
     // ── Nick color overrides ──────────────────────────────────────────────
-    nickColorOverrides: _loadNickColorOverrides(),
+    nickColorOverrides: loadNickColorOverrides(),
     setNickColorOverride: (nick, color) => {
+      const owner = selectDeviceMemoryOwner(get());
+      const key = normalizeIdentityOverrideNick(nick);
+      const normalizedColor = normalizeNickColor(color);
+      if (!owner || !key || !normalizedColor) return;
       set(s => {
         const overrides = new Map(s.nickColorOverrides);
-        overrides.set(nick.toLowerCase(), color);
-        _saveNickColorOverrides(overrides);
-        return { nickColorOverrides: overrides };
+        overrides.set(key, normalizedColor);
+        const saved = saveNickColorOverrides(overrides, owner);
+        return saved ? { nickColorOverrides: saved } : {};
       });
     },
     clearNickColorOverride: (nick) => {
+      const owner = selectDeviceMemoryOwner(get());
+      const key = normalizeIdentityOverrideNick(nick);
+      if (!owner || !key) return;
       set(s => {
         const overrides = new Map(s.nickColorOverrides);
-        overrides.delete(nick.toLowerCase());
-        _saveNickColorOverrides(overrides);
-        return { nickColorOverrides: overrides };
+        overrides.delete(key);
+        const saved = saveNickColorOverrides(overrides, owner);
+        return saved ? { nickColorOverrides: saved } : {};
       });
     },
 
@@ -11654,18 +11700,29 @@ export const store = createStore<OnyxState>()(
     }),
 
     // ── Display name overrides ────────────────────────────────────────────────
-    displayNameOverrides: _loadDisplayNameOverrides(),
-    setDisplayNameOverride: (nick, displayName) => set(s => {
-      const overrides = { ...s.displayNameOverrides, [nick]: displayName };
-      _saveDisplayNameOverrides(overrides);
-      return { displayNameOverrides: overrides };
-    }),
-    clearDisplayNameOverride: (nick) => set(s => {
-      const displayNameOverrides = { ...s.displayNameOverrides };
-      delete displayNameOverrides[nick];
-      _saveDisplayNameOverrides(displayNameOverrides);
-      return { displayNameOverrides };
-    }),
+    displayNameOverrides: loadDisplayNameOverrides(),
+    setDisplayNameOverride: (nick, displayName) => {
+      const owner = selectDeviceMemoryOwner(get());
+      const key = normalizeIdentityOverrideNick(nick);
+      const normalizedDisplayName = normalizeLocalDisplayName(displayName);
+      if (!owner || !key || !normalizedDisplayName) return;
+      set(s => {
+        const overrides = { ...s.displayNameOverrides, [key]: normalizedDisplayName };
+        const saved = saveDisplayNameOverrides(overrides, owner);
+        return saved ? { displayNameOverrides: saved } : {};
+      });
+    },
+    clearDisplayNameOverride: (nick) => {
+      const owner = selectDeviceMemoryOwner(get());
+      const key = normalizeIdentityOverrideNick(nick);
+      if (!owner || !key) return;
+      set(s => {
+        const displayNameOverrides = { ...s.displayNameOverrides };
+        delete displayNameOverrides[key];
+        const saved = saveDisplayNameOverrides(displayNameOverrides, owner);
+        return saved ? { displayNameOverrides: saved } : {};
+      });
+    },
     selfDisplayName: '',
     setSelfDisplayName: (name) => {
       const owner = selectDeviceMemoryOwner(get());
@@ -13112,26 +13169,6 @@ function _addDMMessage(
   return { dms };
 }
 
-// ── Nick color overrides persistence ─────────────────────────────────────────
-
-function _loadNickColorOverrides(): Map<string, string> {
-  if (typeof window === 'undefined') return new Map();
-  try {
-    const raw = localStorage.getItem('onyx:nick-colors');
-    if (!raw) return new Map();
-    return new Map(Object.entries(parseStringRecord(raw)).map(([nick, color]) => [nick.toLowerCase(), color]));
-  } catch { return new Map(); }
-}
-
-function _saveNickColorOverrides(overrides: Map<string, string>): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem('onyx:nick-colors', JSON.stringify(Object.fromEntries(overrides)));
-  } catch {
-    // Storage quota exceeded or unavailable — silently degrade
-  }
-}
-
 // ── CTCP config helpers ───────────────────────────────────────────────────────
 
 const CTCP_CONFIG_KEY = 'onyx:ctcp-config';
@@ -13293,27 +13330,6 @@ function _saveBackground(id: string): void {
 // ── High contrast mode persistence ───────────────────────────────────────────
 function _loadHighContrast(): boolean { return typeof window !== 'undefined' && localStorage.getItem('onyx:high-contrast') === '1'; }
 
-// ── Soft ignore persistence ───────────────────────────────────────────────────
-function _loadSoftIgnoreList(): Set<string> {
-  if (typeof window === 'undefined') return new Set();
-  try {
-    return new Set(parseStringArray(localStorage.getItem('onyx:soft-ignore')));
-  } catch { return new Set(); }
-}
-function _saveSoftIgnoreList(list: Set<string>): void {
-  if (typeof window === 'undefined') return;
-  try { localStorage.setItem('onyx:soft-ignore', JSON.stringify([...list])); } catch {}
-}
-
-// ── Display name override persistence ────────────────────────────────────────
-function _loadDisplayNameOverrides(): Record<string, string> {
-  if (typeof window === 'undefined') return {};
-  try { return parseStringRecord(localStorage.getItem('onyx:display-names')); } catch { return {}; }
-}
-function _saveDisplayNameOverrides(overrides: Record<string, string>): void {
-  if (typeof window === 'undefined') return;
-  try { localStorage.setItem('onyx:display-names', JSON.stringify(overrides)); } catch {}
-}
 // ── Generic boolean pref loader ───────────────────────────────────────────────
 function _loadBoolPref(key: string): boolean {
   if (typeof window === 'undefined') return false;
