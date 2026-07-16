@@ -159,5 +159,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root { --dur: 0ms; }
+  /* ThemeProvider applies theme tokens inline, including --dur. The operating
+     system accessibility preference must outrank that authored inline value so
+     every transition built on the shared duration token actually stops. */
+  :root { --dur: 0ms !important; }
 }
