@@ -112,6 +112,18 @@ describe('buildCommands', () => {
     expect(commands.some((command) => command.title === 'Copy node address' && command.hint === 'ircs://ircx.us:6697')).toBe(true);
   });
 
+  it('opens the channel directory with one store-owned LIST request', () => {
+    const sendRaw = vi.fn();
+    setState({ client: { sendRaw } as never });
+
+    buildCommands(getState()).find((entry) => entry.id === 'action-browse-channels')?.run();
+
+    expect(sendRaw).toHaveBeenCalledOnce();
+    expect(sendRaw).toHaveBeenCalledWith('LIST');
+    expect(getState().showChannelBrowser).toBe(true);
+    expect(getState().channelListLoading).toBe(true);
+  });
+
   it('includes every theme and background action', () => {
     const commands = buildCommands(getState());
 

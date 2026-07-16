@@ -809,10 +809,7 @@ export function HomeView(): JSX.Element {
           <button
             type="button"
             class="home-cta"
-            onClick={() => {
-              getState().refreshChannelList();
-              getState().openChannelBrowser();
-            }}
+            onClick={() => getState().openChannelBrowser()}
           >
             Browse all channels
           </button>
