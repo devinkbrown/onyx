@@ -241,6 +241,8 @@
 .pref-category-tabs {
   display: grid;
   gap: 3px;
+  min-width: 0;
+  max-width: 100%;
   padding-left: var(--space-2);
   border-left: 1px solid var(--line);
 }
@@ -623,8 +625,31 @@
   }
 }
 
+/* The selected category's gradient is removed by Windows High Contrast, and
+   its accent rail is intentionally hidden in the mobile strip. Restate the
+   semantic aria-selected state with system colors after the mobile cascade so
+   all six category choices keep a visible current-location signal. */
+@media (forced-colors: active) {
+  .pref-category-tab[aria-selected='true'] {
+    color: HighlightText;
+    background: Highlight;
+    border-color: Highlight;
+  }
+
+  .pref-category-tab[aria-selected='true'] .pref-category-tab__summary {
+    color: HighlightText;
+  }
+
+  .pref-category-tab[aria-selected='true']::before {
+    background: HighlightText;
+    box-shadow: none;
+  }
+}
+
 .pref-section-title {
+  min-width: 0;
   margin: 0;
+  overflow-wrap: anywhere;
   color: var(--washi);
   font-family: var(--font-mono);
   font-size: 0.82rem;
@@ -634,6 +659,7 @@
 }
 
 .pref-group-head {
+  min-width: 0;
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -641,8 +667,15 @@
   gap: var(--space-3);
 }
 
+.pref-group-head > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .pref-label {
+  min-width: 0;
   margin: 0;
+  overflow-wrap: anywhere;
   font-family: var(--font-mono);
   font-size: 0.7rem;
   font-weight: 700;
@@ -978,6 +1011,9 @@
 }
 
 .pref-count {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   color: var(--washi-mute);
   font-family: var(--font-mono);
   font-size: 0.68rem;

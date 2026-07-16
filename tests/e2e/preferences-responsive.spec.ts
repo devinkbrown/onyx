@@ -373,3 +373,62 @@ test('keeps the active transfer route distinct in forced colors at 200% text', a
   await page.keyboard.press('Tab');
   await expect(inactive).toBeFocused();
 });
+
+test('contains every category and keeps the active one distinct at 400% text', async ({ page }) => {
+  await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });
+  await renderNarrowPreferences(page, {
+    width: 320,
+    height: 720,
+    rootFontSize: 64,
+  });
+
+  const sheetBody = page.locator('.onyx-sheet__body');
+  const tablist = page.getByRole('tablist', { name: 'Preference categories' });
+  const tabs = tablist.getByRole('tab');
+  await expect(tabs).toHaveCount(6);
+
+  const geometry = await page.evaluate(() => {
+    const body = document.querySelector<HTMLElement>('.onyx-sheet__body')!;
+    const list = document.querySelector<HTMLElement>('.pref-category-tabs')!;
+    const selected = list.querySelector<HTMLElement>('[aria-selected="true"]')!;
+    const unselected = list.querySelector<HTMLElement>('[aria-selected="false"]')!;
+    const selectedStyle = getComputedStyle(selected);
+    const unselectedStyle = getComputedStyle(unselected);
+    return {
+      bodyClientWidth: body.clientWidth,
+      bodyScrollWidth: body.scrollWidth,
+      listClientWidth: list.clientWidth,
+      selectedBackground: selectedStyle.backgroundColor,
+      unselectedBackground: unselectedStyle.backgroundColor,
+      selectedColor: selectedStyle.color,
+      unselectedColor: unselectedStyle.color,
+      selectedCount: list.querySelectorAll('[aria-selected="true"]').length,
+    };
+  });
+
+  expect(geometry.bodyScrollWidth).toBe(geometry.bodyClientWidth);
+  expect(geometry.selectedCount).toBe(1);
+  expect(geometry.selectedBackground).not.toBe(geometry.unselectedBackground);
+  expect(geometry.selectedColor).not.toBe(geometry.unselectedColor);
+
+  for (let index = 0; index < 6; index += 1) {
+    const tab = tabs.nth(index);
+    await tab.evaluate((element) => {
+      element.scrollIntoView({ block: 'nearest', inline: 'center' });
+      element.focus();
+    });
+    await expect(tab).toBeFocused();
+    const tabBox = await tab.boundingBox();
+    const listBox = await tablist.boundingBox();
+    expect(tabBox).not.toBeNull();
+    expect(listBox).not.toBeNull();
+    expect(tabBox!.x).toBeGreaterThanOrEqual(listBox!.x);
+    expect(tabBox!.x + tabBox!.width).toBeLessThanOrEqual(listBox!.x + listBox!.width);
+    expect(tabBox!.width).toBeLessThanOrEqual(geometry.listClientWidth);
+  }
+
+  await sheetBody.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect(tablist).toBeVisible();
+});

@@ -272,6 +272,31 @@ describe('PreferencesPanel', () => {
     expect(screen.queryByRole('button', { name: 'Clear local history' })).not.toBeInTheDocument();
   });
 
+  it('keeps all six category tabs paired with exactly one active tabpanel', () => {
+    renderPreferences();
+    const labels: PreferenceCategoryLabel[] = [
+      'Display',
+      'Conversation',
+      'History & data',
+      'Import & export',
+      'App & tools',
+      'Accessibility',
+    ];
+    const tablist = screen.getByRole('tablist', { name: 'Preference categories' });
+
+    for (const label of labels) {
+      const tab = selectPreferenceCategory(label);
+      const panelId = tab.getAttribute('aria-controls');
+      expect(panelId).not.toBeNull();
+      expect(within(tablist).getAllByRole('tab').filter((candidate) => (
+        candidate.getAttribute('aria-selected') === 'true'
+      ))).toEqual([tab]);
+      expect(document.getElementById(panelId!)).not.toHaveAttribute('hidden');
+      expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', tab.id);
+      expect(screen.getByRole('tabpanel')).toHaveAccessibleName(label);
+    }
+  });
+
   it('shows one bounded transfer workflow while keeping every route mounted', () => {
     renderPreferences('Import & export');
 
