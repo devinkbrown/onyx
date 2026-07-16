@@ -2,11 +2,8 @@
 import { createStore } from 'zustand/vanilla';
 import { subscribeWithSelector } from 'zustand/middleware';
 import {
-  parseCounterRecord,
   parseCtcpConfig,
-  parseEmojiArray,
   normalizeCtcpVersionReply,
-  parseStringArray,
 } from './persistParse';
 import { parseStoredVoiceSettings, type StoredVoiceSettings } from './voiceSettingsPersistence';
 import {
@@ -115,6 +112,21 @@ import {
 } from '@/lib/identityOverrides';
 import { loadAutoJoinChannels, saveAutoJoinChannels } from '@/lib/autoJoinMemory';
 import { loadChannelColors, saveChannelColors } from '@/lib/channelColorMemory';
+import {
+  DEFAULT_FAVORITE_EMOJIS,
+  MAX_EMOJI_USAGE_COUNT,
+  emptyEmojiMemory,
+  loadEmojiMemory,
+  normalizeCustomEmojiName,
+  normalizeCustomEmojiUrl,
+  normalizeEmojiToken,
+  saveCustomEmojis,
+  saveEmojiUsageCounts,
+  saveFavoriteEmojis,
+  saveRecentEmojis,
+  type CustomEmoji,
+  type EmojiMemory,
+} from '@/lib/emojiMemory';
 import { loadMutedDMs, parseMutedDMs, saveMutedDMs } from '@/lib/mutedDMs';
 import {
   emptyIdentityProfileMemory,
@@ -1417,7 +1429,7 @@ export interface OnyxState {
   unstarChannel: (channel: string) => void;
 
   // ── Custom emoji ──────────────────────────────────────────────────────
-  customEmoji: Array<{ name: string; url: string; addedBy?: string }>;
+  customEmoji: CustomEmoji[];
   addCustomEmoji: (name: string, url: string) => void;
   removeCustomEmoji: (name: string) => void;
 
@@ -2796,6 +2808,10 @@ function _resetAccountBoundState(
       displayNameOverrides: {},
       autoJoinChannels: [],
       channelColors: new Map(),
+      customEmoji: [],
+      recentEmojis: [],
+      favoriteEmojis: [...DEFAULT_FAVORITE_EMOJIS],
+      emojiUsageCounts: {},
       mutedDMs: new Set(),
       userNotes: new Map(),
       topicHistory: {},
@@ -3578,6 +3594,13 @@ function _loadOwnedChannelColors(
   return owner ? loadChannelColors(owner) : new Map();
 }
 
+function _loadOwnedEmojiMemory(
+  state: Pick<OnyxState, 'server' | 'ourNick'>,
+): EmojiMemory {
+  const owner = selectDeviceMemoryOwner(state);
+  return owner ? loadEmojiMemory(owner) : emptyEmojiMemory();
+}
+
 function _loadOwnedMutedDMs(
   state: Pick<OnyxState, 'server' | 'ourNick'>,
 ): Set<string> {
@@ -3942,6 +3965,8 @@ function deliverChatMessage(
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────
+
+const _initialEmojiMemory = loadEmojiMemory();
 
 export const store = createStore<OnyxState>()(
   subscribeWithSelector<OnyxState>((set, get) => ({
@@ -4364,6 +4389,7 @@ export const store = createStore<OnyxState>()(
               ..._loadOwnedIdentityOverrides({ server, ourNick: newNick }),
               autoJoinChannels: _loadOwnedAutoJoinChannels({ server, ourNick: newNick }),
               channelColors: _loadOwnedChannelColors({ server, ourNick: newNick }),
+              ..._loadOwnedEmojiMemory({ server, ourNick: newNick }),
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: newNick }),
               friends: _loadOwnedFriends({ server, ourNick: newNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: newNick }),
@@ -4457,6 +4483,7 @@ export const store = createStore<OnyxState>()(
               ..._loadOwnedIdentityOverrides({ server: srv, ourNick: get().ourNick }),
               autoJoinChannels: _loadOwnedAutoJoinChannels({ server: srv, ourNick: get().ourNick }),
               channelColors: _loadOwnedChannelColors({ server: srv, ourNick: get().ourNick }),
+              ..._loadOwnedEmojiMemory({ server: srv, ourNick: get().ourNick }),
               mutedDMs: _loadOwnedMutedDMs({ server: srv, ourNick: get().ourNick }),
               friends: _loadOwnedFriends({ server: srv, ourNick: get().ourNick }),
               watchList: _loadOwnedWatchList({ server: srv, ourNick: get().ourNick }),
@@ -7584,6 +7611,7 @@ export const store = createStore<OnyxState>()(
               ..._loadOwnedIdentityOverrides({ server, ourNick: s.ourNick }),
               autoJoinChannels: _loadOwnedAutoJoinChannels({ server, ourNick: s.ourNick }),
               channelColors: _loadOwnedChannelColors({ server, ourNick: s.ourNick }),
+              ..._loadOwnedEmojiMemory({ server, ourNick: s.ourNick }),
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
               friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
@@ -8243,6 +8271,7 @@ export const store = createStore<OnyxState>()(
                   ..._loadOwnedIdentityOverrides({ server, ourNick: s.ourNick }),
                   autoJoinChannels: _loadOwnedAutoJoinChannels({ server, ourNick: s.ourNick }),
                   channelColors: _loadOwnedChannelColors({ server, ourNick: s.ourNick }),
+                  ..._loadOwnedEmojiMemory({ server, ourNick: s.ourNick }),
                 };
               });
               _saslAccount = null;
@@ -8819,6 +8848,7 @@ export const store = createStore<OnyxState>()(
                 ..._loadOwnedIdentityOverrides({ server, ourNick: newNick }),
                 autoJoinChannels: _loadOwnedAutoJoinChannels({ server, ourNick: newNick }),
                 channelColors: _loadOwnedChannelColors({ server, ourNick: newNick }),
+                ..._loadOwnedEmojiMemory({ server, ourNick: newNick }),
                 mutedDMs: _loadOwnedMutedDMs({ server, ourNick: newNick }),
                 friends: _loadOwnedFriends({ server, ourNick: newNick }),
                 watchList: _loadOwnedWatchList({ server, ourNick: newNick }),
@@ -10038,6 +10068,7 @@ export const store = createStore<OnyxState>()(
                 ..._loadOwnedIdentityOverrides({ server, ourNick: s.ourNick }),
                 autoJoinChannels: _loadOwnedAutoJoinChannels({ server, ourNick: s.ourNick }),
                 channelColors: _loadOwnedChannelColors({ server, ourNick: s.ourNick }),
+                ..._loadOwnedEmojiMemory({ server, ourNick: s.ourNick }),
                 mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
                 friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
                 watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
@@ -10089,6 +10120,7 @@ export const store = createStore<OnyxState>()(
               ..._loadOwnedIdentityOverrides({ server, ourNick: s.ourNick }),
               autoJoinChannels: _loadOwnedAutoJoinChannels({ server, ourNick: s.ourNick }),
               channelColors: _loadOwnedChannelColors({ server, ourNick: s.ourNick }),
+              ..._loadOwnedEmojiMemory({ server, ourNick: s.ourNick }),
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
               friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
@@ -10862,22 +10894,32 @@ export const store = createStore<OnyxState>()(
     },
 
     // ── Custom emoji ──────────────────────────────────────────────────────
-    customEmoji: (() => {
-      if (typeof window === 'undefined') return [];
-      // Sanitize at the boundary: a wrong-shape persisted value would otherwise
-      // crash the first add/removeCustomEmoji (spread / `.filter` on a non-array).
-      return parseEmojiArray(localStorage.getItem('onyx:custom-emoji'));
-    })(),
-    addCustomEmoji: (name, url) => set(s => {
-      const next = [...s.customEmoji.filter(e => e.name !== name), { name, url }];
-      if (typeof window !== 'undefined') localStorage.setItem('onyx:custom-emoji', JSON.stringify(next));
-      return { customEmoji: next };
-    }),
-    removeCustomEmoji: (name) => set(s => {
-      const next = s.customEmoji.filter(e => e.name !== name);
-      if (typeof window !== 'undefined') localStorage.setItem('onyx:custom-emoji', JSON.stringify(next));
-      return { customEmoji: next };
-    }),
+    customEmoji: [..._initialEmojiMemory.customEmoji],
+    addCustomEmoji: (name, url) => {
+      const owner = selectDeviceMemoryOwner(get());
+      const normalizedName = normalizeCustomEmojiName(name);
+      const normalizedUrl = normalizeCustomEmojiUrl(url);
+      if (!owner || !normalizedName || !normalizedUrl) return;
+      set(s => {
+        const saved = saveCustomEmojis([
+          ...s.customEmoji.filter(emoji => emoji.name !== normalizedName),
+          { name: normalizedName, url: normalizedUrl },
+        ], owner);
+        return saved ? { customEmoji: saved } : {};
+      });
+    },
+    removeCustomEmoji: (name) => {
+      const owner = selectDeviceMemoryOwner(get());
+      const normalizedName = normalizeCustomEmojiName(name);
+      if (!owner || !normalizedName) return;
+      set(s => {
+        const saved = saveCustomEmojis(
+          s.customEmoji.filter(emoji => emoji.name !== normalizedName),
+          owner,
+        );
+        return saved ? { customEmoji: saved } : {};
+      });
+    },
 
     // ── Custom emoji modal ────────────────────────────────────────────────
     showCustomEmojiModal: false,
@@ -10885,14 +10927,17 @@ export const store = createStore<OnyxState>()(
     closeCustomEmojiModal: () => set({ showCustomEmojiModal: false }),
 
     // ── Emoji preferences ─────────────────────────────────────────────────
-    recentEmojis: _loadRecentEmojis(),
+    recentEmojis: [..._initialEmojiMemory.recentEmojis],
     addRecentEmoji: (emoji) => {
+      const owner = selectDeviceMemoryOwner(get());
+      const token = normalizeEmojiToken(emoji);
+      if (!owner || !token) return;
       set(s => {
-        const recent = [emoji, ...s.recentEmojis.filter(e => e !== emoji)].slice(0, 20);
-        if (typeof window !== 'undefined') {
-          try { localStorage.setItem('onyx:recent-emoji', JSON.stringify(recent)); } catch {}
-        }
-        return { recentEmojis: recent };
+        const saved = saveRecentEmojis(
+          [token, ...s.recentEmojis.filter(candidate => candidate !== token)],
+          owner,
+        );
+        return saved ? { recentEmojis: saved } : {};
       });
     },
     emojiSkinTone: _loadEmojiSkinTone(),
@@ -10903,14 +10948,15 @@ export const store = createStore<OnyxState>()(
       }
       set({ emojiSkinTone: normalized });
     },
-    emojiUsageCounts: _loadEmojiUsage(),
+    emojiUsageCounts: { ..._initialEmojiMemory.emojiUsageCounts },
     incrementEmojiUsage: (emoji) => {
+      const owner = selectDeviceMemoryOwner(get());
+      const token = normalizeEmojiToken(emoji);
+      if (!owner || !token) return;
       set(s => {
-        const counts = { ...s.emojiUsageCounts, [emoji]: (s.emojiUsageCounts[emoji] ?? 0) + 1 };
-        if (typeof window !== 'undefined') {
-          try { localStorage.setItem('onyx:emoji-usage', JSON.stringify(counts)); } catch {}
-        }
-        return { emojiUsageCounts: counts };
+        const count = Math.min((s.emojiUsageCounts[token] ?? 0) + 1, MAX_EMOJI_USAGE_COUNT);
+        const saved = saveEmojiUsageCounts({ ...s.emojiUsageCounts, [token]: count }, owner);
+        return saved ? { emojiUsageCounts: saved } : {};
       });
     },
 
@@ -11489,8 +11535,13 @@ export const store = createStore<OnyxState>()(
     },
 
     // ── Favorite emojis ───────────────────────────────────────────────────────
-    favoriteEmojis: _loadFavoriteEmojis(),
-    setFavoriteEmojis: (emojis) => { set({ favoriteEmojis: emojis }); _saveFavoriteEmojis(emojis); },
+    favoriteEmojis: [..._initialEmojiMemory.favoriteEmojis],
+    setFavoriteEmojis: (emojis) => {
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
+      const saved = saveFavoriteEmojis(emojis, owner);
+      if (saved) set({ favoriteEmojis: saved });
+    },
 
     // ── Poll create modal ─────────────────────────────────────────────────────
     showPollCreate: false,
@@ -13294,34 +13345,6 @@ function _loadChatBackground(): OnyxState['chatBackground'] {
     if (stored === 'dots' || stored === 'grid' || stored === 'noise' || stored === 'diagonal') return stored;
   } catch {}
   return 'solid';
-}
-
-function _loadRecentEmojis(): string[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    return parseStringArray(localStorage.getItem('onyx:recent-emoji'));
-  } catch { return []; }
-}
-
-function _loadEmojiUsage(): Record<string, number> {
-  if (typeof window === 'undefined') return {};
-  try {
-    const raw = localStorage.getItem('onyx:emoji-usage');
-    return parseCounterRecord(raw);
-  } catch { return {}; }
-}
-
-function _loadFavoriteEmojis(): string[] {
-  if (typeof window === 'undefined') return ['👍','❤️','😂','😮','😢','🙏'];
-  try {
-    const raw = localStorage.getItem('onyx:fav-emojis');
-    return raw ? parseStringArray(raw) : ['👍','❤️','😂','😮','😢','🙏'];
-  } catch { return ['👍','❤️','😂','😮','😢','🙏']; }
-}
-
-function _saveFavoriteEmojis(emojis: string[]): void {
-  if (typeof window === 'undefined') return;
-  try { localStorage.setItem('onyx:fav-emojis', JSON.stringify(emojis)); } catch {}
 }
 
 // ── UI font persistence ────────────────────────────────────────────────────────
