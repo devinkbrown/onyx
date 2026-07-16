@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   CLIENT_EXTENSION_ACTIONS_STORAGE_KEY,
   CLIENT_EXTENSION_AUDIT_STORAGE_KEY,
+  CLIENT_EXTENSION_JSON_MAX_CHARS,
   clearClientExtensionAudit,
   clearClientExtensionActions,
   exportClientExtensionActionManifest,
@@ -106,6 +107,34 @@ describe('client extension actions', () => {
       expect.objectContaining({ id: 'copy.room', text: '#root' }),
     ]);
     expect(readClientExtensionActions(ALICE)).toEqual([]);
+  });
+
+  it('rejects oversized manifest and browser-storage JSON before normalization', () => {
+    const action = { id: 'copy.room', title: 'Copy room', capability: 'copy-text', text: '#root' };
+    const manifest = JSON.stringify({ version: 1, actions: [action] });
+    const oversizedManifest = `${manifest}${' '.repeat(CLIENT_EXTENSION_JSON_MAX_CHARS)}`;
+    expect(() => JSON.parse(oversizedManifest)).not.toThrow();
+    expect(parseClientExtensionActionManifest(oversizedManifest)).toBeNull();
+
+    const actionsKey = deviceMemoryStorageKey(CLIENT_EXTENSION_ACTIONS_STORAGE_KEY, ALICE)!;
+    const auditKey = deviceMemoryStorageKey(CLIENT_EXTENSION_AUDIT_STORAGE_KEY, ALICE)!;
+    localStorage.setItem(
+      actionsKey,
+      `${JSON.stringify([action])}${' '.repeat(CLIENT_EXTENSION_JSON_MAX_CHARS)}`,
+    );
+    localStorage.setItem(
+      auditKey,
+      `${JSON.stringify([{
+        id: 'copy.room',
+        title: 'Copy room',
+        capability: 'copy-text',
+        at: '2026-07-16T12:00:00.000Z',
+        detail: 'Copied 5 characters',
+      }])}${' '.repeat(CLIENT_EXTENSION_JSON_MAX_CHARS)}`,
+    );
+
+    expect(readClientExtensionActions(ALICE)).toEqual([]);
+    expect(readClientExtensionAudit(ALICE)).toEqual([]);
   });
 
   it('produces payload-safe previews without copied plaintext, URL paths, queries, or credentials', () => {

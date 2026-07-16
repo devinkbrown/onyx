@@ -3,7 +3,11 @@ import 'fake-indexeddb/auto';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { readClientExtensionActions, recordClientExtensionActionRun } from '@/lib/extensions/clientActions';
+import {
+  CLIENT_EXTENSION_JSON_MAX_CHARS,
+  readClientExtensionActions,
+  recordClientExtensionActionRun,
+} from '@/lib/extensions/clientActions';
 import { closePreferences, openPreferences, preferences, resetPreferences } from '@/lib/prefs/preferences';
 import { sceneMotion, setSceneMotion } from '@/lib/prefs/sceneMotion';
 import { defaultVaultSearchMode, resetDefaultVaultSearchMode } from '@/lib/prefs/vaultSearchMode';
@@ -2079,6 +2083,25 @@ describe('PreferencesPanel', () => {
 
     expect(screen.getByText('Manifest must be a version 1 object or a legacy action array.')).toBeInTheDocument();
     expect(screen.queryByRole('list', { name: 'Reviewed extension actions' })).toBeNull();
+    expect(readClientExtensionActions(MEMORY_OWNER)).toEqual([]);
+  });
+
+  it('rejects an oversized extension manifest without retaining the pasted JSON', () => {
+    renderPreferences('App & tools');
+    const input = screen.getByLabelText('Action manifest JSON');
+    const manifest = JSON.stringify({
+      version: 1,
+      actions: [{ id: 'copy.room', title: 'Copy room', capability: 'copy-text', text: '#root' }],
+    });
+
+    fireEvent.input(input, {
+      target: { value: `${manifest}${' '.repeat(CLIENT_EXTENSION_JSON_MAX_CHARS)}` },
+    });
+
+    expect(input).toHaveValue('');
+    expect(screen.getByText('Action manifests are limited to 64 KiB. Choose a smaller reviewed manifest.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Review actions' })).toBeDisabled();
+    expect(screen.queryByRole('list', { name: 'Reviewed extension actions' })).not.toBeInTheDocument();
     expect(readClientExtensionActions(MEMORY_OWNER)).toEqual([]);
   });
 

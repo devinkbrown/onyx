@@ -30,6 +30,8 @@ export type ClientExtensionActionPreview = Pick<ClientExtensionAction, 'title' |
 
 export const CLIENT_EXTENSION_ACTIONS_STORAGE_KEY = 'onyx:client-extension-actions';
 export const CLIENT_EXTENSION_AUDIT_STORAGE_KEY = 'onyx:client-extension-audit';
+/** Pre-parse ceiling for imported and browser-stored extension JSON. */
+export const CLIENT_EXTENSION_JSON_MAX_CHARS = 64 * 1024;
 const MAX_ACTIONS = 12;
 const MAX_MANIFEST_ENTRIES = MAX_ACTIONS * 4;
 const MAX_KEYWORDS = 8;
@@ -158,7 +160,9 @@ export function readClientExtensionActions(owner?: DeviceMemoryOwner): ClientExt
   const storageKey = scopedStorageKey(CLIENT_EXTENSION_ACTIONS_STORAGE_KEY, owner);
   if (!storageKey) return [];
   try {
-    const raw = JSON.parse(localStorage.getItem(storageKey) ?? '[]') as unknown;
+    const stored = localStorage.getItem(storageKey) ?? '[]';
+    if (stored.length > CLIENT_EXTENSION_JSON_MAX_CHARS) return [];
+    const raw = JSON.parse(stored) as unknown;
     if (!Array.isArray(raw)) return [];
     const seen = new Set<string>();
     const actions: ClientExtensionAction[] = [];
@@ -197,6 +201,7 @@ export function saveClientExtensionActions(
 }
 
 export function parseClientExtensionActionManifest(raw: string): ClientExtensionAction[] | null {
+  if (raw.length > CLIENT_EXTENSION_JSON_MAX_CHARS) return null;
   try {
     const parsed = JSON.parse(raw) as unknown;
     if (Array.isArray(parsed)) {
@@ -265,7 +270,9 @@ export function readClientExtensionAudit(owner?: DeviceMemoryOwner): ClientExten
   const storageKey = scopedStorageKey(CLIENT_EXTENSION_AUDIT_STORAGE_KEY, owner);
   if (!storageKey) return [];
   try {
-    const raw = JSON.parse(localStorage.getItem(storageKey) ?? '[]') as unknown;
+    const stored = localStorage.getItem(storageKey) ?? '[]';
+    if (stored.length > CLIENT_EXTENSION_JSON_MAX_CHARS) return [];
+    const raw = JSON.parse(stored) as unknown;
     if (!Array.isArray(raw)) return [];
     return raw
       .flatMap((entry) => {

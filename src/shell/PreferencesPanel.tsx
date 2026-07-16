@@ -48,6 +48,7 @@ import {
 import {
   clearClientExtensionAudit,
   clearClientExtensionActions,
+  CLIENT_EXTENSION_JSON_MAX_CHARS,
   exportClientExtensionActionManifest,
   normalizeClientExtensionActions,
   parseClientExtensionActionManifest,
@@ -2303,6 +2304,13 @@ function ExtensionActionManifestControls(): JSX.Element {
   });
 
   function replaceManifestText(value: string): void {
+    if (value.length > CLIENT_EXTENSION_JSON_MAX_CHARS) {
+      setManifestText('');
+      setPendingActions(null);
+      setReviewedOwnerKey(null);
+      setStatus('Action manifests are limited to 64 KiB. Choose a smaller reviewed manifest.');
+      return;
+    }
     setManifestText(value);
     setPendingActions(null);
     setReviewedOwnerKey(null);
@@ -2407,9 +2415,14 @@ function ExtensionActionManifestControls(): JSX.Element {
         id="pref-extension-manifest"
         class="pref-json-input"
         rows={5}
+        maxlength={CLIENT_EXTENSION_JSON_MAX_CHARS}
         spellcheck={false}
         value={manifestText()}
-        onInput={(event) => replaceManifestText(event.currentTarget.value)}
+        onInput={(event) => {
+          const value = event.currentTarget.value;
+          if (value.length > CLIENT_EXTENSION_JSON_MAX_CHARS) event.currentTarget.value = '';
+          replaceManifestText(value);
+        }}
       />
       <div class="pref-import-review__actions">
         <button type="button" class="pref-reset" onClick={reviewManifest} disabled={!memoryOwner() || !manifestText().trim()}>
