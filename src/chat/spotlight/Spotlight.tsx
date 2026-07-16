@@ -80,8 +80,16 @@ function tabbables(root: HTMLElement): HTMLElement[] {
     '[tabindex]:not([tabindex="-1"])',
   ].join(',');
 
+  const browserHasLayout = root.getClientRects().length > 0;
   return Array.from(root.querySelectorAll<HTMLElement>(selectors))
-    .filter((node) => !node.hasAttribute('hidden') && node.getAttribute('aria-hidden') !== 'true');
+    .filter((node) => (
+      !node.hasAttribute('hidden')
+      && node.getAttribute('aria-hidden') !== 'true'
+      // Responsive CSS can remove controls without adding a hidden attribute.
+      // Real browsers expose no client rects for those nodes; jsdom exposes no
+      // layout for anything, so retain the semantic fallback used by unit tests.
+      && (!browserHasLayout || node.getClientRects().length > 0)
+    ));
 }
 
 function titleSegments(title: string, ranges: readonly HighlightRange[]) {

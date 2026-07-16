@@ -439,6 +439,134 @@
   }
 }
 
+/* Extreme zoom can turn a desktop window into a very short mobile viewport.
+   Keep the launcher and result list as the primary interaction; the example
+   chips collapse to a compact status rail instead of consuming the entire
+   dialog with rem-scaled chrome. */
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .onyx-spotlight {
+    --onyx-spotlight-edge-top: max(8px, env(safe-area-inset-top, 0px));
+    --onyx-spotlight-edge-right: max(8px, env(safe-area-inset-right, 0px));
+    --onyx-spotlight-edge-bottom: max(8px, env(safe-area-inset-bottom, 0px));
+    --onyx-spotlight-edge-left: max(8px, env(safe-area-inset-left, 0px));
+
+    padding:
+      var(--onyx-spotlight-edge-top)
+      var(--onyx-spotlight-edge-right)
+      var(--onyx-spotlight-edge-bottom)
+      var(--onyx-spotlight-edge-left);
+  }
+
+  .onyx-spotlight__panel {
+    width: 100%;
+    max-height: calc(
+      100svh
+      - var(--onyx-spotlight-edge-top)
+      - var(--onyx-spotlight-edge-bottom)
+    );
+    overflow: clip;
+  }
+
+  .onyx-spotlight__search {
+    grid-template-columns: 24px minmax(0, 1fr) 44px;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .onyx-spotlight__sigil {
+    width: 24px;
+    height: 24px;
+    font-size: 16px;
+  }
+
+  .onyx-spotlight__input {
+    font-size: 16px;
+    line-height: 1.4;
+  }
+
+  .onyx-spotlight__close {
+    width: 44px;
+    height: 44px;
+    font-size: 24px;
+  }
+
+  .onyx-spotlight__grammar {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px;
+    padding: 4px 8px;
+  }
+
+  .onyx-spotlight__grammar-label {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+  }
+
+  .onyx-spotlight__grammar-examples {
+    display: none;
+  }
+
+  .onyx-spotlight__grammar-status {
+    grid-column: 2;
+    font-size: 12px;
+  }
+
+  .onyx-spotlight__results {
+    min-height: 0;
+    max-height: none;
+    padding: 4px;
+  }
+
+  .onyx-spotlight__group + .onyx-spotlight__group {
+    margin-top: 4px;
+    padding-top: 4px;
+  }
+
+  .onyx-spotlight__section {
+    padding: 6px 8px 4px;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+  }
+
+  .onyx-spotlight__option {
+    grid-template-columns: 32px minmax(0, 1fr);
+    min-height: 44px;
+    gap: 2px 8px;
+    padding: 6px;
+  }
+
+  .onyx-spotlight__icon {
+    width: 32px;
+    height: 32px;
+    font-size: 13px;
+  }
+
+  .onyx-spotlight__title {
+    font-size: 16px;
+  }
+
+  .onyx-spotlight__hint {
+    font-size: 12px;
+  }
+
+  .onyx-spotlight__empty {
+    min-height: 100%;
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .onyx-spotlight__empty-mark {
+    font-size: 24px;
+  }
+
+  .onyx-spotlight__empty-text {
+    font-size: 16px;
+  }
+
+  .onyx-spotlight__empty-sub {
+    font-size: 12px;
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .onyx-spotlight {
     animation: onyx-spotlight-scrim var(--dur) var(--ease);

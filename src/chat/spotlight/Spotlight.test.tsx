@@ -54,6 +54,30 @@ describe('Spotlight', () => {
     expect(screen.getByRole('button', { name: 'Use command example mute 1h' })).toHaveFocus();
   });
 
+  it('excludes responsive CSS-hidden controls from the focus loop', async () => {
+    renderSpotlight();
+    fireEvent.keyDown(window, { key: 'k', metaKey: true });
+
+    const dialog = screen.getByRole('dialog', { name: 'Command palette' });
+    const input = screen.getByRole('combobox', { name: 'Command search' });
+    const close = screen.getByRole('button', { name: 'Close spotlight' });
+    await waitFor(() => expect(input).toHaveFocus());
+
+    const renderedRects = { length: 1, item: () => null } as unknown as DOMRectList;
+    const hiddenRects = { length: 0, item: () => null } as unknown as DOMRectList;
+    vi.spyOn(dialog, 'getClientRects').mockReturnValue(renderedRects);
+    vi.spyOn(input, 'getClientRects').mockReturnValue(renderedRects);
+    vi.spyOn(close, 'getClientRects').mockReturnValue(renderedRects);
+    for (const example of screen.getAllByRole('button', { name: /Use command example/ })) {
+      vi.spyOn(example, 'getClientRects').mockReturnValue(hiddenRects);
+    }
+
+    close.focus();
+    fireEvent.keyDown(close, { key: 'Tab' });
+
+    expect(input).toHaveFocus();
+  });
+
   it('opens on slash when the user is not typing in a field', () => {
     renderSpotlight();
 
