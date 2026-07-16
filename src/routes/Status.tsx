@@ -19,8 +19,8 @@ export default function StatusRoute() {
     'Public Onyx mesh health, node uptime, peer latency, users online, and backup readiness.',
     '/status',
   );
-  const [status, { refetch: refetchStatus }] = createResource(fetchNetworkStatus);
-  const [backups, { refetch: refetchBackups }] = createResource(fetchBackupManifest);
+  const [status, { refetch: refetchStatus }] = createResource(fetchNetworkStatus, { initialValue: null });
+  const [backups, { refetch: refetchBackups }] = createResource(fetchBackupManifest, { initialValue: null });
   const [nowMs, setNowMs] = createSignal(Date.now());
   const timer = setInterval(() => {
     setNowMs(Date.now());
@@ -29,7 +29,7 @@ export default function StatusRoute() {
   }, 30_000);
   onCleanup(() => clearInterval(timer));
   const feedState = createMemo(() => {
-    const data = status();
+    const data = status.latest;
     if (!data) return 'unavailable';
     const freshness = publicFeedFreshness(data.generated_at, nowMs());
     if (freshness !== 'current') return freshness;
@@ -81,7 +81,7 @@ export default function StatusRoute() {
           Node uptime, quorum, peer links, and latency from the same exported health
           feed operators use to see whether the network is whole.
         </p>
-        <Show when={status()} fallback={<div class="data-empty">Status is waiting for the next exported feed.</div>}>
+        <Show when={status.latest} fallback={<div class="data-empty">Status is waiting for the next exported feed.</div>}>
           {(data) => {
             const state = () => statusState(data().mesh.quorum, data().mesh.partitioned);
             const upPeers = () => data().peers.filter((p) => p.up).length;
@@ -118,7 +118,7 @@ export default function StatusRoute() {
       <section class="r-wrap r-section data-grid" aria-label="Mesh detail">
         <article class="data-card">
           <span class="label">quorum</span>
-          <Show when={status()} fallback={<h2>No feed yet</h2>}>
+          <Show when={status.latest} fallback={<h2>No feed yet</h2>}>
             {(data) => (
               <>
                 <h2>{data().mesh.quorum ? 'Majority side' : 'Minority side'}</h2>
@@ -136,15 +136,15 @@ export default function StatusRoute() {
           <span class="label">backups</span>
           <h3>Vault backups</h3>
           <p>
-            <Show when={backups()} fallback="Waiting for the public backup manifest.">
+            <Show when={backups.latest} fallback="Waiting for the public backup manifest.">
               {(manifest) => manifest().files.length === 0
                 ? 'The backup manifest is present, but no snapshot files are listed.'
                 : `${manifest().files.length} snapshot file${manifest().files.length === 1 ? '' : 's'} published ${relTime(manifest().generated_at, nowMs())}.`}
             </Show>
           </p>
-          <Show when={backups()?.files.length}>
+          <Show when={backups.latest?.files.length}>
             <div class="data-list data-list--compact">
-              <For each={backups()?.files ?? []}>
+              <For each={backups.latest?.files ?? []}>
                 {(file) => (
                   <div class="data-row">
                     <div>
@@ -177,7 +177,7 @@ export default function StatusRoute() {
       <section class="r-wrap r-section" aria-labelledby="peers-heading">
         <span class="r-eyebrow">peers</span>
         <h2 class="r-title" id="peers-heading">Links between<br />the shores</h2>
-        <Show when={status()?.peers.length} fallback={<div class="data-empty">No peer links are present in the current feed.</div>}>
+        <Show when={status.latest?.peers.length} fallback={<div class="data-empty">No peer links are present in the current feed.</div>}>
           <table class="peer-table">
             <thead>
               <tr>
@@ -188,7 +188,7 @@ export default function StatusRoute() {
               </tr>
             </thead>
             <tbody>
-              <For each={status()?.peers ?? []}>
+              <For each={status.latest?.peers ?? []}>
                 {(peer) => (
                   <tr>
                     <td>{peer.name}</td>

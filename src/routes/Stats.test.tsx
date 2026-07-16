@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@solidjs/testing-library';
+import { Suspense } from 'solid-js';
 
 import StatsRoute, { roomDeepLink } from './Stats';
 
@@ -61,5 +62,18 @@ describe('StatsRoute', () => {
     expect(() => roomDeepLink('#root', 1e17)).not.toThrow();
     expect(roomDeepLink('#root', 1e17)).toBe('/app?join=%23root');
     expect(roomDeepLink('#root', Number.POSITIVE_INFINITY)).toBe('/app?join=%23root');
+  });
+
+  it('keeps the stats page shell visible while the feed is pending', () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
+
+    render(() => (
+      <Suspense fallback={<p data-testid="stats-suspended">Loading stats</p>}>
+        <StatsRoute />
+      </Suspense>
+    ));
+
+    expect(screen.getByRole('heading', { name: /the rooms in motion/i })).toBeInTheDocument();
+    expect(screen.queryByTestId('stats-suspended')).not.toBeInTheDocument();
   });
 });

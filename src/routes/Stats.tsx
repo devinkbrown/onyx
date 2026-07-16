@@ -109,7 +109,7 @@ export default function StatsRoute() {
     'See public Onyx room activity, network message trends, people online, and channel sparklines.',
     '/stats',
   );
-  const [stats, { refetch: refetchStats }] = createResource(fetchStatsIndex);
+  const [stats, { refetch: refetchStats }] = createResource(fetchStatsIndex, { initialValue: null });
   const [nowMs, setNowMs] = createSignal(Date.now());
   const timer = setInterval(() => {
     setNowMs(Date.now());
@@ -117,13 +117,13 @@ export default function StatsRoute() {
   }, 30_000);
   onCleanup(() => clearInterval(timer));
 
-  const channels = createMemo(() => [...(stats()?.channels ?? [])].sort((a, b) => b.messages - a.messages));
+  const channels = createMemo(() => [...(stats.latest?.channels ?? [])].sort((a, b) => b.messages - a.messages));
   const totalMessages = createMemo(() => channels().reduce((sum, c) => sum + c.messages, 0));
   const busiest = createMemo(() => channels()[0] ?? null);
-  const days = createMemo(() => stats()?.network_days ?? []);
+  const days = createMemo(() => stats.latest?.network_days ?? []);
   const maxDay = createMemo(() => Math.max(0, ...days().map((d) => d.messages)));
   const feedState = createMemo<PublicFeedFreshness | 'unavailable'>(() => {
-    const data = stats();
+    const data = stats.latest;
     return data ? publicFeedFreshness(data.generated_at, nowMs()) : 'unavailable';
   });
 
@@ -136,7 +136,7 @@ export default function StatsRoute() {
           Live channel activity from the network itself: people present now, recent
           message volume, and the rhythm of the rooms without opening the app.
         </p>
-        <Show when={stats()} fallback={<div class="data-empty">Stats are waiting for the next exported feed.</div>}>
+        <Show when={stats.latest} fallback={<div class="data-empty">Stats are waiting for the next exported feed.</div>}>
           {(data) => (
             <div class="data-summary" aria-label="Network summary">
               <div class="data-metric">

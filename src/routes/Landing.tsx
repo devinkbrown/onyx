@@ -16,18 +16,18 @@ export default function Landing() {
     'Onyx is the public front door to the mesh: open rooms, encrypted media, live network stats, and a name that is yours.',
     '/',
   );
-  const [stats, { refetch: refetchStats }] = createResource(fetchStatsIndex);
-  const [status, { refetch: refetchStatus }] = createResource(fetchNetworkStatus);
+  const [stats, { refetch: refetchStats }] = createResource(fetchStatsIndex, { initialValue: null });
+  const [status, { refetch: refetchStatus }] = createResource(fetchNetworkStatus, { initialValue: null });
   const refreshTimer = setInterval(() => {
     void refetchStats();
     void refetchStatus();
   }, 30_000);
   onCleanup(() => clearInterval(refreshTimer));
   const busiest = createMemo(() =>
-    [...(stats()?.channels ?? [])].sort((a, b) => b.messages - a.messages)[0] ?? null,
+    [...(stats.latest?.channels ?? [])].sort((a, b) => b.messages - a.messages)[0] ?? null,
   );
   const meshState = createMemo(() => {
-    const s = status();
+    const s = status.latest;
     if (!s) return 'listening';
     return s.mesh.quorum && !s.mesh.partitioned ? 'operational' : 'degraded';
   });
@@ -112,7 +112,7 @@ export default function Landing() {
             <span class="k">mesh</span>
             <strong data-state={meshState()}>{meshState()}</strong>
             <p>
-              <Show when={status()} fallback="waiting for the public status feed">
+              <Show when={status.latest} fallback="waiting for the public status feed">
                 {(s) => s().mesh.partitioned
                   ? `${s().mesh.components} visible mesh components`
                   : `${s().peers.filter((p) => p.up).length}/${s().peers.length} peer links up`}
@@ -122,7 +122,7 @@ export default function Landing() {
           <article class="r-live-tile">
             <span class="k">people</span>
             <strong>
-              <Show when={stats()} fallback="--">
+              <Show when={stats.latest} fallback="--">
                 {(data) => data().users_online.toLocaleString('en-US')}
               </Show>
             </strong>
@@ -131,7 +131,7 @@ export default function Landing() {
           <article class="r-live-tile">
             <span class="k">rooms</span>
             <strong>
-              <Show when={stats()} fallback="--">
+              <Show when={stats.latest} fallback="--">
                 {(data) => data().channels.length.toLocaleString('en-US')}
               </Show>
             </strong>
@@ -145,7 +145,7 @@ export default function Landing() {
               </Show>
             </strong>
             <p>
-              <Show when={status()} fallback="updated by the stats cadence">
+              <Show when={status.latest} fallback="updated by the stats cadence">
                 {(s) => `${s().node || s().network || 'node'} up ${formatDuration(s().uptime_seconds)}`}
               </Show>
             </p>

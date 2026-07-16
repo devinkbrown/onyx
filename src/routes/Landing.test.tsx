@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { render } from '@solidjs/testing-library';
+import { Suspense } from 'solid-js';
 import Landing from './Landing';
 
 describe('Landing', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('renders the community-first hero headline', () => {
     const { getByText } = render(() => <Landing />);
     expect(getByText(/come live/i)).toBeInTheDocument();
@@ -75,5 +80,18 @@ describe('Landing', () => {
 
     expect(document.title).toMatch(/open rooms/i);
     expect(document.querySelector('meta[name="description"]')?.getAttribute('content')).toMatch(/front door/i);
+  });
+
+  it('keeps the landing shell visible while public feeds are pending', () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
+
+    const { getByRole, queryByTestId } = render(() => (
+      <Suspense fallback={<p data-testid="landing-suspended">Loading landing</p>}>
+        <Landing />
+      </Suspense>
+    ));
+
+    expect(getByRole('heading', { name: /come liveon the water/i })).toBeInTheDocument();
+    expect(queryByTestId('landing-suspended')).not.toBeInTheDocument();
   });
 });
