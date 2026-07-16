@@ -9,6 +9,7 @@ import {
   deceleratedFrameCap,
   frameInterval,
   IDLE_DECEL_AFTER_MS,
+  IDLE_HOLD_AFTER_MS,
   IDLE_MIN_FPS,
   isThemeMutation,
   rendersSingleFrame,
@@ -226,6 +227,33 @@ describe('frame cadence cap', () => {
       window.dispatchEvent(new Event('pointerdown'));
       raf.runNext(20_011);
       expect(variant.frame).toHaveBeenCalledTimes(4);
+    } finally {
+      engine.dispose();
+      now.mockRestore();
+      raf.restore();
+    }
+  });
+
+  it('holds the canvas loop after prolonged inactivity and wakes on activity', () => {
+    const raf = installControlledAnimationFrame();
+    const now = vi.spyOn(performance, 'now').mockReturnValue(0);
+    const variant = createVariant();
+    const engine = new BackgroundEngine({ canvas: createCanvas(), variant });
+
+    try {
+      engine.start();
+      expect(variant.frame).toHaveBeenCalledTimes(1);
+      expect(raf.pendingCount()).toBe(1);
+
+      raf.runNext(IDLE_HOLD_AFTER_MS);
+      expect(variant.frame).toHaveBeenCalledTimes(2);
+      expect(raf.pendingCount()).toBe(0);
+
+      now.mockReturnValue(IDLE_HOLD_AFTER_MS + 1);
+      window.dispatchEvent(new Event('pointerdown'));
+      expect(raf.pendingCount()).toBe(1);
+      raf.runNext(IDLE_HOLD_AFTER_MS + 2);
+      expect(variant.frame).toHaveBeenCalledTimes(3);
     } finally {
       engine.dispose();
       now.mockRestore();

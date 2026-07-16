@@ -82,6 +82,8 @@ export const IDLE_DECEL_AFTER_MS = 8000;
 export const IDLE_DECEL_RAMP_MS = 12000;
 /** The floor the idle cadence decelerates to — still alive, barely moving. */
 export const IDLE_MIN_FPS = 12;
+/** Prolonged inactivity freezes the final ambient frame until fresh input. */
+export const IDLE_HOLD_AFTER_MS = 60_000;
 /** Coalesce high-frequency input bursts before resetting the idle window. */
 export const ACTIVITY_THROTTLE_MS = 500;
 /** FPS-guard starvation threshold as a fraction of the cap (so a healthy capped
@@ -194,6 +196,8 @@ export class BackgroundEngine {
   /** True while the cadence is idle-decelerated below its cap; the FPS guard
    * ignores these frames so intentional throttling never drops quality. */
   private throttled = false;
+  /** True after prolonged inactivity has stopped the rAF loop entirely. */
+  private idleHeld = false;
   private resizeObserver: ResizeObserver | null = null;
   private themeObserver: MutationObserver | null = null;
   private pendingStaticRefresh = false;
@@ -247,6 +251,7 @@ export class BackgroundEngine {
     this.activeSince = null;
     this.lastActivityAt = null;
     this.throttled = false;
+    this.idleHeld = false;
     this.lowFpsFrames = 0;
   }
 
@@ -390,6 +395,16 @@ export class BackgroundEngine {
 
     this.rafId = requestAnimationFrame((time) => {
       this.rafId = null;
+      // After a minute without interaction, paint one final frame and stop the
+      // loop entirely. Any accepted activity restores cadence and schedules a
+      // fresh frame, so an all-day idle client consumes no background rAF work.
+      if (this.shouldEnterIdleHold(time)) {
+        this.throttled = true;
+        this.lastRenderAt = time;
+        this.renderFrame(time);
+        this.idleHeld = true;
+        return;
+      }
       // rAF fires at vsync (~60fps); only actually paint when the cadence cap's
       // interval has elapsed. Cheaply skipped frames just reschedule.
       if (this.shouldRenderNow(time)) {
@@ -404,6 +419,11 @@ export class BackgroundEngine {
   private effectiveFrameCap(time: number): number {
     const idleMs = this.activeSince === null ? 0 : Math.max(0, time - this.activeSince);
     return deceleratedFrameCap(this.frameCapFps, idleMs);
+  }
+
+  private shouldEnterIdleHold(time: number): boolean {
+    if (this.activeSince === null) return false;
+    return time - this.activeSince >= IDLE_HOLD_AFTER_MS;
   }
 
   /** Whether enough of the current cadence interval has elapsed to paint. */
@@ -487,6 +507,7 @@ export class BackgroundEngine {
     this.themeObserver = null;
     this.pendingStaticRefresh = false;
     this.windowBlurred = false;
+    this.idleHeld = false;
   }
 
   /**
@@ -511,6 +532,7 @@ export class BackgroundEngine {
     this.lastFrameAt = null;
     this.lowFpsFrames = 0;
     this.throttled = false;
+    this.idleHeld = false;
   }
 
   private readonly handleUserActivity = (): void => {
@@ -525,6 +547,7 @@ export class BackgroundEngine {
     // A resize is user activity — restore full cadence and paint promptly.
     this.restoreActiveCadence(animationNow());
     this.resize();
+    this.scheduleNextFrame();
   };
 
   private readonly handleThemeMutation = (records: MutationRecord[]): void => {
@@ -533,7 +556,7 @@ export class BackgroundEngine {
     // tokens; animated loops pick them up on their next frame.
     bumpThemeEpoch();
     // A frozen single frame won't repaint itself, so drive it explicitly.
-    if (rendersSingleFrame(this.staticMode, this.variant.kind)) this.refreshStaticFrame();
+    if (rendersSingleFrame(this.staticMode, this.variant.kind) || this.idleHeld) this.refreshStaticFrame();
   };
 
   /** Stop the live canvas loop while another window owns focus. Unlike the
