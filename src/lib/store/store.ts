@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { createStore } from 'zustand/vanilla';
 import { subscribeWithSelector } from 'zustand/middleware';
+import '@/lib/customCssRemoval';
 import { parseStoredVoiceSettings, type StoredVoiceSettings } from './voiceSettingsPersistence';
 import {
   emptyChannelNavigationMemory,
@@ -1611,10 +1612,6 @@ export interface OnyxState {
   // ── Bubble message mode ────────────────────────────────────────────────────
   bubbleMode: boolean;
   setBubbleMode: (v: boolean) => void;
-
-  // ── Custom CSS injection ───────────────────────────────────────────────────
-  customCss: string;
-  setCustomCss: (css: string) => void;
 
   // ── Sidebar width (drag-resizable) ────────────────────────────────────────
   sidebarWidth: number;
@@ -11632,24 +11629,6 @@ export const store = createStore<OnyxState>()(
       set({ bubbleMode: v });
     },
 
-    // ── Custom CSS injection ───────────────────────────────────────────────────
-    customCss: _loadCustomCss(),
-    setCustomCss: (css) => {
-      if (typeof document !== 'undefined') {
-        let el = document.getElementById('onyx:custom-css') as HTMLStyleElement | null;
-        if (!el) {
-          el = document.createElement('style');
-          el.id = 'onyx:custom-css';
-          document.head.appendChild(el);
-        }
-        el.textContent = css;
-      }
-      if (typeof window !== 'undefined') {
-        try { localStorage.setItem('onyx:custom-css', css); } catch {}
-      }
-      set({ customCss: css });
-    },
-
     // ── Sidebar width (drag-resizable) ────────────────────────────────────────
     sidebarWidth: _loadSidebarWidth(),
     setSidebarWidth: (w) => {
@@ -13600,9 +13579,6 @@ function _loadUiFont(): string { return typeof window !== 'undefined' ? (localSt
 
 // ── Bubble mode persistence ───────────────────────────────────────────────────
 function _loadBubbleMode(): boolean { return typeof window !== 'undefined' && localStorage.getItem('onyx:bubble-mode') === '1'; }
-
-// ── Custom CSS persistence ────────────────────────────────────────────────────
-function _loadCustomCss(): string { return typeof window !== 'undefined' ? (localStorage.getItem('onyx:custom-css') ?? '') : ''; }
 
 // ── Sidebar width persistence ─────────────────────────────────────────────────
 function _loadSidebarWidth(): number { const v = typeof window !== 'undefined' ? parseInt(localStorage.getItem('onyx:sidebar-width') ?? '240') : 240; return isNaN(v) ? 240 : Math.max(180, Math.min(320, v)); }
