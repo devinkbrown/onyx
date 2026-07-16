@@ -33,6 +33,18 @@ const MAX_CLIENT_SASL_MECHANISM_LENGTH = 64;
 export const MAX_CLIENT_LIST_ROWS = 2_048;
 export const MAX_CLIENT_LIST_CHANNEL_LENGTH = 512;
 export const MAX_CLIENT_LIST_TOPIC_LENGTH = 4 * 1024;
+export const MAX_CLIENT_ISUPPORT_TOKENS = 256;
+export const MAX_CLIENT_ISUPPORT_KEY_LENGTH = 64;
+export const MAX_CLIENT_ISUPPORT_VALUE_LENGTH = 1024;
+const MAX_CLIENT_ISUPPORT_NUMBER = 1_000_000;
+
+function parseIsupportPositiveInt(value: string): number | null {
+  if (!/^[1-9]\d*$/u.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed <= MAX_CLIENT_ISUPPORT_NUMBER
+    ? parsed
+    : null;
+}
 
 function parseAdvertisedCap(token: string): { name: string; value: string } | null {
   const eqIdx = token.indexOf('=');
@@ -1234,10 +1246,19 @@ export class IRCClient {
 
   private _parseISUPPORT(params: string[]) {
     // params[0] = ournick, params[last] = "are supported by this server" — skip both.
-    for (const token of params.slice(1, -1)) {
+    const end = Math.min(params.length - 1, MAX_CLIENT_ISUPPORT_TOKENS + 1);
+    for (let index = 1; index < end; index += 1) {
+      const token = params[index]!;
       const eqIdx = token.indexOf('=');
       const key = eqIdx === -1 ? token : token.slice(0, eqIdx);
       const val = eqIdx === -1 ? '' : token.slice(eqIdx + 1);
+      if (
+        key.length === 0
+        || key.length > MAX_CLIENT_ISUPPORT_KEY_LENGTH
+        || val.length > MAX_CLIENT_ISUPPORT_VALUE_LENGTH
+        || !/^[A-Z][A-Z0-9-]*$/u.test(key)
+        || /[\u0000-\u0020\u007f]/u.test(val)
+      ) continue;
 
       switch (key) {
         case 'PREFIX': {
@@ -1258,12 +1279,16 @@ export class IRCClient {
         case 'CASEMAPPING':
           this.isupport.CASEMAPPING = val;
           break;
-        case 'NICKLEN':
-          this.isupport.NICKLEN = parseInt(val, 10);
+        case 'NICKLEN': {
+          const parsed = parseIsupportPositiveInt(val);
+          if (parsed !== null) this.isupport.NICKLEN = parsed;
           break;
-        case 'TOPICLEN':
-          this.isupport.TOPICLEN = parseInt(val, 10);
+        }
+        case 'TOPICLEN': {
+          const parsed = parseIsupportPositiveInt(val);
+          if (parsed !== null) this.isupport.TOPICLEN = parsed;
           break;
+        }
         case 'CHANLIMIT': {
           const limits = parseCHANLIMIT(val);
           if (Object.keys(limits).length === 0) break;
@@ -1271,21 +1296,27 @@ export class IRCClient {
           this.isupport.MAXCHANNELS = Object.values(limits)[0] ?? this.isupport.MAXCHANNELS;
           break;
         }
-        case 'MAXCHANNELS':
-          this.isupport.MAXCHANNELS = parseInt(val, 10);
+        case 'MAXCHANNELS': {
+          const parsed = parseIsupportPositiveInt(val);
+          if (parsed !== null) this.isupport.MAXCHANNELS = parsed;
           break;
-        case 'MODES':
-          this.isupport.MODES = parseInt(val, 10);
+        }
+        case 'MODES': {
+          const parsed = parseIsupportPositiveInt(val);
+          if (parsed !== null) this.isupport.MODES = parsed;
           break;
+        }
         case 'CHANMODES':
           this.isupport.CHANMODES = val.split(',');
           break;
         case 'IRCX':
           this.isupport.IRCX = true;
           break;
-        case 'SILENCE':
-          this.isupport.SILENCE = parseInt(val, 10) || 20;
+        case 'SILENCE': {
+          const parsed = val ? parseIsupportPositiveInt(val) : 20;
+          if (parsed !== null) this.isupport.SILENCE = parsed;
           break;
+        }
         case 'VAPID':
           this.isupport.VAPID = val;
           break;

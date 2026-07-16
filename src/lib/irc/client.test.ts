@@ -2,7 +2,7 @@
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { describe, it, expect, vi } from 'vitest';
-import { IRCClient } from './client';
+import { IRCClient, MAX_CLIENT_ISUPPORT_TOKENS } from './client';
 import { _resetDeviceSigningForTests } from '../e2ee/deviceSign';
 import type { IRCMessage } from './types';
 
@@ -101,6 +101,32 @@ describe('IRCClient ISUPPORT bounds', () => {
     feed(client, ':server 005 onyx CHANLIMIT=#:25junk :are supported');
     expect(client.isupport.CHANLIMITS).toEqual({ '#': 25, '&': 25, '!': 10 });
     expect(client.isupport.MAXCHANNELS).toBe(25);
+  });
+
+  it('retains valid numeric defaults after partial or unbounded values', () => {
+    const { client } = makeClient();
+    feed(client, ':server 005 onyx NICKLEN=96 TOPICLEN=512 MAXCHANNELS=75 MODES=8 SILENCE=32 :supported');
+    expect(client.isupport).toMatchObject({
+      NICKLEN: 96, TOPICLEN: 512, MAXCHANNELS: 75, MODES: 8, SILENCE: 32,
+    });
+
+    feed(client, ':server 005 onyx NICKLEN=96junk TOPICLEN=-1 MAXCHANNELS=0 MODES=Infinity SILENCE=1000001 :supported');
+    expect(client.isupport).toMatchObject({
+      NICKLEN: 96, TOPICLEN: 512, MAXCHANNELS: 75, MODES: 8, SILENCE: 32,
+    });
+  });
+
+  it('caps token work and rejects oversized or noncanonical keys', () => {
+    const { client } = makeClient();
+    const tokens = Array.from(
+      { length: MAX_CLIENT_ISUPPORT_TOKENS },
+      (_, index) => `UNKNOWN${index}=value`,
+    ).join(' ');
+    feed(client, `:server 005 onyx ${tokens} NETWORK=overflow :supported`);
+    expect(client.isupport.NETWORK).toBe('Onyx');
+
+    feed(client, `:server 005 onyx NETWORK=${'x'.repeat(1025)} lowercase=bad :supported`);
+    expect(client.isupport.NETWORK).toBe('Onyx');
   });
 });
 
