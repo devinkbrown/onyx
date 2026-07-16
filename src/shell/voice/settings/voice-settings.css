@@ -283,3 +283,96 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Custom voice controls do not inherit every shared field rule. Compact their
+   intrinsic sizing explicitly in a 400% short viewport so device names,
+   switches, and push-to-talk keys remain inside the settings scroller. */
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .voice-settings {
+    min-width: 0;
+    gap: 8px;
+  }
+
+  .voice-settings__section {
+    min-width: 0;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .voice-settings__section-title {
+    font-size: 24px;
+    line-height: 1.1;
+    overflow-wrap: anywhere;
+  }
+
+  .voice-settings__section-copy {
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+
+  .voice-settings__grid {
+    gap: 8px;
+  }
+
+  .voice-settings__select {
+    min-width: 0;
+    max-width: 100%;
+    min-height: 44px;
+    padding: 8px 10px;
+    font-size: 16px;
+  }
+
+  .voice-settings__toggle {
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 8px;
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px;
+  }
+
+  .voice-settings__toggle input {
+    width: 52px;
+    height: 28px;
+    margin: 0;
+  }
+
+  .voice-settings__toggle input::before {
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+  }
+
+  .voice-settings__toggle input:checked::before {
+    transform: translateX(24px);
+  }
+
+  .voice-settings__toggle-label {
+    font-size: 14px;
+    letter-spacing: 0.08em;
+    overflow-wrap: anywhere;
+  }
+
+  .voice-settings__toggle-description {
+    font-size: 16px;
+    overflow-wrap: anywhere;
+  }
+
+  .voice-settings__key-row {
+    gap: 8px;
+  }
+
+  .voice-settings__key-display {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .voice-settings__key-value {
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px 10px;
+    font-size: 16px;
+  }
+}
