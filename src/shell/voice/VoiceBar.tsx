@@ -40,6 +40,7 @@ import {
 } from '@/lib/suimyaku-media/activeSpeaker';
 import { shortDuration } from '@/lib/time/relativeTime';
 import { createScreenWakeLockController } from '@/lib/screenWakeLock';
+import { createCallMediaSessionController } from '@/lib/callMediaSession';
 import { Avatar, Popover, Tooltip } from '@/primitives';
 import {
   MicIcon, MicOffIcon, DeafenIcon, DeafenOffIcon, CameraIcon, CameraOffIcon,
@@ -240,6 +241,11 @@ export function VoiceBar() {
   const spatialPositions = useStore(s => s.spatialPositions);
   const voiceChannelParticipants = useStore(s => s.voiceChannelParticipants);
   const screenWakeLock = createScreenWakeLockController();
+  const callMediaSession = createCallMediaSessionController({
+    onToggleMicrophone: () => getState().toggleMute(),
+    onToggleCamera: () => void getState().toggleVideo(),
+    onHangup: () => getState().leaveVoiceChannel(),
+  });
 
   const [reactionsOpen, setReactionsOpen] = createSignal(false);
   const [spatialOpen, setSpatialOpen] = createSignal(false);
@@ -321,6 +327,14 @@ export function VoiceBar() {
   });
 
   createEffect(() => {
+    callMediaSession.update({
+      active: voice().callState === 'in_call',
+      muted: voice().muted,
+      cameraOn: voice().cameraOn,
+    });
+  });
+
+  createEffect(() => {
     const peers = spatialPeers();
     const selected = selectedSpatialNick();
     if (selected && peers.some(peer => peer.nick === selected)) return;
@@ -341,6 +355,7 @@ export function VoiceBar() {
     screenshareOperationEpoch += 1;
     setSpatialDragging(false);
     screenWakeLock.dispose();
+    callMediaSession.dispose();
   });
 
   // Reference-stable handle on the local capture stream: voice() is replaced on
