@@ -27,8 +27,20 @@
  *    so imported content cannot inject markup.
  */
 import type { ChatMessage, MessageReaction, MessageType } from '@/lib/irc/types';
+import { isPreviewableUrl } from '@/lib/preview/linkPreview';
 import type { VaultExportSnapshot, VaultExportTarget } from '@/lib/vault/historyVault';
-import { VAULT_KEEP } from '@/lib/vault/historyVault';
+import {
+  MAX_EXPORT_RAW_MESSAGES,
+  MAX_EXPORT_TARGETS,
+  MAX_EXPORT_TOTAL_RAW_MESSAGES,
+  MAX_VAULT_MESSAGE_TEXT_LENGTH,
+  MAX_VAULT_REACTIONS,
+  MAX_VAULT_REACTION_FIELD_LENGTH,
+  MAX_VAULT_SENDER_LENGTH,
+  MAX_VAULT_TARGET_LENGTH,
+  MAX_VAULT_TIMESTAMP_LENGTH,
+  VAULT_KEEP,
+} from '@/lib/vault/historyVault';
 
 /** Options controlling how a Discord export is mapped into the vault. */
 export interface DiscordImportOptions {
@@ -71,6 +83,12 @@ const CHAT_TYPES = new Set(['Default', 'Reply']);
 
 /** Upper bound on stored reactor placeholders per reaction (keeps the vault lean). */
 const MAX_REACTION_USERS = 99;
+const MAX_ATTACHMENTS = 32;
+const MAX_ATTACHMENT_URL_LENGTH = 2_048;
+const MAX_GUILD_NAME_LENGTH = 256;
+const MAX_CHANNEL_ID_LENGTH = 128;
+const MAX_DISCORD_ID_LENGTH = 128;
+const MAX_CHANNEL_EXPORT_SCAN = MAX_EXPORT_TARGETS * 4;
 
 /**
  * Cap on the per-target reply-resolution index. Discord exports are ordered
@@ -78,7 +96,7 @@ const MAX_REACTION_USERS = 99;
  * has this many known ids we stop recording — replies to anything older than
  * the most recent ~MAX_REF_ENTRIES messages simply render without a quote.
  */
-const MAX_REF_ENTRIES = 50_000;
+const MAX_REF_ENTRIES = MAX_EXPORT_TOTAL_RAW_MESSAGES;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -86,6 +104,35 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value : '';
+}
+
+function boundedString(value: unknown, maxLength: number): string {
+  return asString(value).slice(0, maxLength);
+}
+
+/** Produce a vault-safe token without letting control/space bytes reach disk. */
+function boundedWireToken(value: unknown, maxLength: number, fallback = ''): string {
+  const token = boundedString(value, maxLength)
+    .trim()
+    .replace(/[\u0000-\u0020\u007f]+/gu, '-')
+    .replace(/^-+|-+$/g, '');
+  return token || fallback;
+}
+
+function boundedDisplayText(value: unknown, maxLength: number): string {
+  return boundedString(value, maxLength)
+    .replace(/[\u0000-\u001f\u007f]+/gu, ' ')
+    .trim();
+}
+
+function credentialFreeHttpUrl(value: unknown): string {
+  const raw = boundedString(value, MAX_ATTACHMENT_URL_LENGTH).trim();
+  if (!isPreviewableUrl(raw)) return '';
+  try {
+    return new URL(raw).toString();
+  } catch {
+    return '';
+  }
 }
 
 /** Coerce an option to a finite positive integer, or fall back. */
@@ -102,22 +149,24 @@ function finitePositiveInt(value: unknown, fallback: number): number {
  */
 export function normalizeChannelTarget(rawName: string): string {
   const cleaned = rawName
+    .slice(0, MAX_VAULT_TARGET_LENGTH * 4)
     .trim()
     .replace(/^#+/, '')
     .toLowerCase()
     .replace(/\s+/g, '-')
     .replace(/[^a-z0-9\-_]/g, '')
     .replace(/-{2,}/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/^-+|-+$/g, '')
+    .slice(0, MAX_VAULT_TARGET_LENGTH - 1);
   return `#${cleaned || 'imported'}`;
 }
 
 /** Best-effort display name for a Discord author record. */
 function authorName(author: unknown): string {
   if (!isRecord(author)) return 'unknown';
-  const nickname = asString(author.nickname).trim();
+  const nickname = boundedWireToken(author.nickname, MAX_VAULT_SENDER_LENGTH);
   if (nickname) return nickname;
-  const name = asString(author.name).trim();
+  const name = boundedWireToken(author.name, MAX_VAULT_SENDER_LENGTH);
   if (name) return name;
   return 'unknown';
 }
@@ -125,23 +174,25 @@ function authorName(author: unknown): string {
 /** Render a Discord emoji record to a compact display token. */
 function emojiToken(emoji: unknown): string {
   if (!isRecord(emoji)) return '';
-  const name = asString(emoji.name).trim();
+  const name = boundedWireToken(emoji.name, MAX_VAULT_REACTION_FIELD_LENGTH);
   if (name) return name; // unicode glyph, or a custom emoji's bare name
-  const code = asString(emoji.code).trim();
+  const code = boundedWireToken(emoji.code, MAX_VAULT_REACTION_FIELD_LENGTH - 2);
   return code ? `:${code}:` : '';
 }
 
 function mapReactions(raw: unknown): MessageReaction[] | undefined {
   if (!Array.isArray(raw)) return undefined;
   const reactions: MessageReaction[] = [];
-  for (const entry of raw) {
+  for (const entry of raw.slice(0, MAX_VAULT_REACTIONS)) {
     if (!isRecord(entry)) continue;
     const emoji = emojiToken(entry.emoji);
     if (!emoji) continue;
     // Prefer the real reactor list when the export carried it.
     const named: string[] = Array.isArray(entry.users)
       ? entry.users
+          .slice(0, MAX_REACTION_USERS)
           .map((u) => (isRecord(u) ? authorName(u) : typeof u === 'string' ? u : ''))
+          .map((u) => boundedWireToken(u, MAX_VAULT_REACTION_FIELD_LENGTH))
           .filter((u): u is string => u.length > 0)
       : [];
     // Preserve the reaction count even when the reactor list is absent or
@@ -158,23 +209,29 @@ function mapReactions(raw: unknown): MessageReaction[] | undefined {
 
 /** Append attachment URLs so links stay visible and searchable in the vault. */
 function composeText(content: string, attachments: unknown): string {
-  const base = content.trim();
+  const base = content.slice(0, MAX_VAULT_MESSAGE_TEXT_LENGTH).trim();
   if (!Array.isArray(attachments) || attachments.length === 0) return base;
-  const urls = attachments
-    .map((a) => (isRecord(a) ? asString(a.url).trim() : ''))
-    .filter((u) => u.length > 0);
-  if (urls.length === 0) return base;
-  return base ? `${base}\n${urls.join('\n')}` : urls.join('\n');
+  let text = base;
+  for (const attachment of attachments.slice(0, MAX_ATTACHMENTS)) {
+    const url = isRecord(attachment) ? credentialFreeHttpUrl(attachment.url) : '';
+    if (!url) continue;
+    const next = text ? `${text}\n${url}` : url;
+    if (next.length > MAX_VAULT_MESSAGE_TEXT_LENGTH) continue;
+    text = next;
+  }
+  return text;
 }
 
 function readChannelName(root: Record<string, unknown>): string {
   const channel = isRecord(root.channel) ? root.channel : {};
-  return asString(channel.name).trim() || asString(channel.id).trim() || 'imported';
+  return boundedString(channel.name, MAX_VAULT_TARGET_LENGTH * 4).trim()
+    || boundedString(channel.id, MAX_CHANNEL_ID_LENGTH).trim()
+    || 'imported';
 }
 
 function readChannelId(root: Record<string, unknown>, target: string): string {
   const channel = isRecord(root.channel) ? root.channel : {};
-  return asString(channel.id).trim() || target;
+  return boundedWireToken(channel.id, MAX_CHANNEL_ID_LENGTH, target);
 }
 
 /** Mutable per-target accumulation state, carried across paginated files. */
@@ -185,17 +242,29 @@ interface TargetBucket {
   refIndex: Map<string, { from: string; text: string }>;
   /** Emitted vault ids, to avoid IndexedDB `put` collisions clobbering rows. */
   emittedIds: Set<string>;
+  /** Next collision suffix by base id, avoiding quadratic duplicate-id scans. */
+  nextSuffix: Map<string, number>;
   /** Monotonic fallback counter for messages that carry no Discord id. */
   seq: number;
 }
 
 /** Normalize the accepted top-level shapes into a flat list of channel exports. */
 function collectChannelExports(raw: unknown): Record<string, unknown>[] {
-  if (Array.isArray(raw)) {
-    return raw.filter(isRecord);
+  const source = Array.isArray(raw)
+    ? raw
+    : isRecord(raw) && Array.isArray(raw.exports)
+      ? raw.exports
+      : null;
+  if (source) {
+    const out: Record<string, unknown>[] = [];
+    const scan = Math.min(source.length, MAX_CHANNEL_EXPORT_SCAN);
+    for (let index = 0; index < scan && out.length < MAX_EXPORT_TARGETS; index += 1) {
+      const candidate = source[index];
+      if (isRecord(candidate)) out.push(candidate);
+    }
+    return out;
   }
   if (isRecord(raw)) {
-    if (Array.isArray(raw.exports)) return raw.exports.filter(isRecord);
     // A single DiscordChatExporter file is `{ guild, channel, messages: [...] }`.
     if (Array.isArray(raw.messages)) return [raw];
   }
@@ -207,15 +276,17 @@ function uniqueId(bucket: TargetBucket, channelId: string, discordId: string): s
   const base = `discord:${channelId || 'ch'}:${discordId || `idx${bucket.seq++}`}`;
   if (!bucket.emittedIds.has(base)) {
     bucket.emittedIds.add(base);
+    bucket.nextSuffix.set(base, 2);
     return base;
   }
-  let n = 2;
+  let n = bucket.nextSuffix.get(base) ?? 2;
   let candidate = `${base}#${n}`;
   while (bucket.emittedIds.has(candidate)) {
     n += 1;
     candidate = `${base}#${n}`;
   }
   bucket.emittedIds.add(candidate);
+  bucket.nextSuffix.set(base, n + 1);
   return candidate;
 }
 
@@ -242,6 +313,7 @@ export function parseDiscordExport(raw: unknown, options: DiscordImportOptions =
   let guild: string | null = null;
   let skipped = 0;
   let droppedOverCap = 0;
+  let remainingMessageWork = MAX_EXPORT_TOTAL_RAW_MESSAGES;
 
   // Sort a bucket chronologically and drop everything older than the newest
   // `keepPerChannel`. Called mid-scan (memory bound) and once at the end.
@@ -254,17 +326,28 @@ export function parseDiscordExport(raw: unknown, options: DiscordImportOptions =
 
   for (const channelExport of channelExports) {
     if (!guild && isRecord(channelExport.guild)) {
-      const name = asString(channelExport.guild.name).trim();
+      const name = boundedDisplayText(channelExport.guild.name, MAX_GUILD_NAME_LENGTH);
       if (name) guild = name;
     }
 
     const target = normalizeChannelTarget(readChannelName(channelExport));
     const channelId = readChannelId(channelExport, target);
-    const messages = Array.isArray(channelExport.messages) ? channelExport.messages : [];
+    const rawMessages = Array.isArray(channelExport.messages) ? channelExport.messages : [];
+    const messageWork = Math.min(MAX_EXPORT_RAW_MESSAGES, remainingMessageWork);
+    const messages = messageWork > 0 ? rawMessages.slice(-messageWork) : [];
+    droppedOverCap += rawMessages.length - messages.length;
+    remainingMessageWork -= messages.length;
 
     let bucket = byTarget.get(target);
     if (!bucket) {
-      bucket = { target, messages: [], refIndex: new Map(), emittedIds: new Set(), seq: 0 };
+      bucket = {
+        target,
+        messages: [],
+        refIndex: new Map(),
+        emittedIds: new Set(),
+        nextSuffix: new Map(),
+        seq: 0,
+      };
       byTarget.set(target, bucket);
     }
 
@@ -274,26 +357,26 @@ export function parseDiscordExport(raw: unknown, options: DiscordImportOptions =
         continue;
       }
 
-      const discordType = asString(rawMessage.type) || 'Default';
+      const discordType = boundedString(rawMessage.type, 32) || 'Default';
       const isChat = CHAT_TYPES.has(discordType);
       if (!isChat && !includeSystem) {
         skipped += 1;
         continue;
       }
 
-      const time = new Date(asString(rawMessage.timestamp));
+      const time = new Date(boundedString(rawMessage.timestamp, MAX_VAULT_TIMESTAMP_LENGTH));
       if (Number.isNaN(time.getTime())) {
         skipped += 1;
         continue;
       }
 
-      const text = composeText(asString(rawMessage.content), rawMessage.attachments);
+      const text = composeText(boundedString(rawMessage.content, MAX_VAULT_MESSAGE_TEXT_LENGTH), rawMessage.attachments);
       if (!text) {
         skipped += 1;
         continue;
       }
 
-      const discordId = asString(rawMessage.id).trim();
+      const discordId = boundedWireToken(rawMessage.id, MAX_DISCORD_ID_LENGTH);
       const from = authorName(rawMessage.author);
 
       // Record this id BEFORE the cutoff check so later replies to an
@@ -316,13 +399,15 @@ export function parseDiscordExport(raw: unknown, options: DiscordImportOptions =
         target,
       };
 
-      if (asString(rawMessage.timestampEdited)) message.edited = true;
+      if (boundedString(rawMessage.timestampEdited, MAX_VAULT_TIMESTAMP_LENGTH)) message.edited = true;
 
       const reactions = mapReactions(rawMessage.reactions);
       if (reactions) message.reactions = reactions;
 
       const reference = isRecord(rawMessage.reference) ? rawMessage.reference : null;
-      const refId = reference ? asString(reference.messageId).trim() : '';
+      const refId = reference
+        ? boundedWireToken(reference.messageId, MAX_DISCORD_ID_LENGTH)
+        : '';
       if (refId) {
         const referenced = bucket.refIndex.get(refId);
         if (referenced) {

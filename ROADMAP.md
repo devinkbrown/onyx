@@ -768,6 +768,16 @@ client or public site needs to expose the result.
     `DiscordPackageImportControls` in Preferences
     (`src/shell/PreferencesPanel.tsx:911`), progress announced via `role="status"`.
 
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — Both file-derived Discord
+    transforms now bound work before building vault rows: package file/path,
+    metadata-channel, CSV/JSON row, field, attachment, and aggregate-text caps;
+    direct DiscordChatExporter channel/message scan ceilings aligned to the
+    vault validator; bounded vault-safe identities, reactions, and
+    public credential-free HTTP(S) attachments; and amortized duplicate-id
+    suffixing.
+    Oversized metadata cannot starve real channel rows, and both paths retain
+    the newest bounded tail before the normal `VAULT_KEEP` prune.
+
 ## Phase 13 — Amanogawa Local Intelligence ← PLANNED
 34. **AI provenance chrome** *(client)* — every recap, search answer,
     translation, or moderation suggestion must show where inference ran: this

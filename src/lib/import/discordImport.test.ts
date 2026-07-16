@@ -41,6 +41,11 @@ describe('normalizeChannelTarget', () => {
   it('falls back for an empty name', () => {
     expect(normalizeChannelTarget('   ')).toBe('#imported');
   });
+  it('bounds hostile channel names to the vault target ceiling', () => {
+    const target = normalizeChannelTarget('x'.repeat(20_000));
+    expect(target).toHaveLength(512);
+    expect(target.startsWith('#')).toBe(true);
+  });
 });
 
 describe('parseDiscordExport — happy path', () => {
@@ -327,6 +332,82 @@ describe('parseDiscordExport — robustness (independent review fixes)', () => {
     const kept = result!.snapshot.targets[0]!.messages;
     expect(kept.map((m) => m.text)).toEqual(['m17', 'm18', 'm19']);
     expect(result!.summary.droppedOverCap).toBe(17);
+  });
+
+  it('bounds oversized fields, attachments, reactions, and reactor lists', () => {
+    const attachments = [
+      { url: 'javascript:alert(1)' },
+      { url: 'https://user:secret@example.com/private.png' },
+      { url: 'http://127.0.0.1/internal.png' },
+      ...Array.from({ length: 40 }, (_, index) => ({ url: `https://cdn.example/${index}.png` })),
+    ];
+    const reactions = Array.from({ length: 70 }, (_, reactionIndex) => ({
+      emoji: { name: `emoji-${reactionIndex}` },
+      count: 150,
+      users: Array.from({ length: 120 }, (_, userIndex) => `user ${userIndex}`),
+    }));
+    const result = parseDiscordExport(exportFixture({
+      guild: { name: `Guild\u0000${'g'.repeat(400)}` },
+      channel: { id: 'c'.repeat(500), name: 'general' },
+      messages: [{
+        id: 'm'.repeat(500),
+        type: 'Default',
+        timestamp: '2025-01-01T00:00:00Z',
+        content: 'x'.repeat(70 * 1_024),
+        attachments,
+        author: { name: `Alice Smith\u0000${'a'.repeat(400)}` },
+        reactions,
+      }],
+    }));
+    const message = result!.snapshot.targets[0]!.messages[0]!;
+
+    expect(result!.summary.guild).toHaveLength(256);
+    expect(message.id.length).toBeLessThanOrEqual(512);
+    expect(message.from).toBe(`Alice-Smith-${'a'.repeat(244)}`);
+    expect(message.text).toHaveLength(64 * 1_024);
+    expect(message.text).not.toContain('javascript:');
+    expect(message.text).not.toContain('secret');
+    expect(message.text).not.toContain('127.0.0.1');
+    expect(message.reactions).toHaveLength(64);
+    expect(message.reactions![0]!.users).toHaveLength(99);
+    expect(message.reactions![0]!.users[0]).toBe('user-0');
+    expect(parseVaultExport(result!.snapshot)).not.toBeNull();
+  });
+
+  it('caps per-export and aggregate scan work while retaining each scanned tail', () => {
+    const rows = (prefix: string, count: number) => Array.from({ length: count }, (_, index) => ({
+      id: `${prefix}${index}`,
+      type: 'Default',
+      timestamp: new Date(Date.UTC(2025, 0, 1, 0, index)).toISOString(),
+      content: `${prefix} ${index}`,
+      author: { name: 'a' },
+    }));
+    const exports = Array.from({ length: 12 }, (_, index) => exportFixture({
+      channel: { id: `${index + 100}`, name: `channel-${index}` },
+      messages: rows(`c${index}-`, 1_700),
+    }));
+    const result = parseDiscordExport(exports);
+
+    expect(result!.summary.messages).toBe(10 * 400 + 384);
+    expect(result!.summary.droppedOverCap).toBe(12 * 1_700 - (10 * 400 + 384));
+    expect(result!.snapshot.targets[0]!.messages[0]!.text).toBe('c0- 1300');
+    expect(result!.snapshot.targets.at(-1)!.target).toBe('#channel-10');
+  });
+
+  it('allocates duplicate ids without quadratic suffix rescans', () => {
+    const messages = Array.from({ length: 1_000 }, (_, index) => ({
+      id: 'same',
+      type: 'Default',
+      timestamp: new Date(Date.UTC(2025, 0, 1, 0, index)).toISOString(),
+      content: `message ${index}`,
+      author: { name: 'a' },
+    }));
+    const result = parseDiscordExport(exportFixture({ messages }));
+    const ids = result!.snapshot.targets[0]!.messages.map((message) => message.id);
+
+    expect(ids).toHaveLength(400);
+    expect(new Set(ids).size).toBe(400);
+    expect(ids.at(-1)).toBe('discord:100:same#1000');
   });
 });
 
