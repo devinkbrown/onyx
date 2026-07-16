@@ -57,6 +57,10 @@ function persistDismissed(owner: DeviceMemoryOwner | null): void {
 }
 
 export function GuestClaimPrompt(): JSX.Element {
+  let expandButton: HTMLButtonElement | undefined;
+  let claimForm: HTMLFormElement | undefined;
+  let verifyForm: HTMLFormElement | undefined;
+
   // ── reactive store reads ──
   const account = useStore(selectAccount);
   const ourNick = useStore((s) => s.ourNick);
@@ -115,6 +119,20 @@ export function GuestClaimPrompt(): JSX.Element {
     resetClaimDrafts();
   });
 
+  createEffect(() => {
+    if (!expanded()) return;
+    const form = verifyRequired() ? verifyForm : claimForm;
+    queueMicrotask(() => {
+      if (!form?.isConnected) return;
+      form?.querySelector<HTMLElement>('input, button, [tabindex]:not([tabindex="-1"])')?.focus();
+    });
+  });
+
+  function collapse(): void {
+    setExpanded(false);
+    queueMicrotask(() => expandButton?.focus());
+  }
+
   function dismiss(): void {
     persistDismissed(guestOwner());
     setDismissed(true);
@@ -164,7 +182,13 @@ export function GuestClaimPrompt(): JSX.Element {
           </div>
           <div class="guest-claim__head-actions">
             <Show when={!expanded()}>
-              <Button type="button" variant="primary" size="sm" onClick={() => setExpanded(true)}>
+              <Button
+                ref={expandButton}
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={() => setExpanded(true)}
+              >
                 Claim your nick
               </Button>
             </Show>
@@ -183,7 +207,13 @@ export function GuestClaimPrompt(): JSX.Element {
           <Show
             when={verifyRequired()}
             fallback={
-              <form class="guest-claim__form" aria-label="Claim your nick" onSubmit={submitClaim} noValidate>
+              <form
+                ref={claimForm}
+                class="guest-claim__form"
+                aria-label="Claim your nick"
+                onSubmit={submitClaim}
+                noValidate
+              >
                 <FormField
                   id="guest-claim-nick"
                   label="Nick to claim"
@@ -233,14 +263,20 @@ export function GuestClaimPrompt(): JSX.Element {
                       <Spinner size="sm" label="Registering" />
                     </Show>
                   </Button>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setExpanded(false)}>
+                  <Button type="button" variant="ghost" size="sm" onClick={collapse}>
                     Not now
                   </Button>
                 </div>
               </form>
             }
           >
-            <form class="guest-claim__form" aria-label="Verify your nick" onSubmit={submitVerify} noValidate>
+            <form
+              ref={verifyForm}
+              class="guest-claim__form"
+              aria-label="Verify your nick"
+              onSubmit={submitVerify}
+              noValidate
+            >
               <p class="guest-claim__sub">
                 Almost there — enter the verification code we emailed you to finish claiming{' '}
                 <b class="guest-claim__nick">{nickValue()}</b>.

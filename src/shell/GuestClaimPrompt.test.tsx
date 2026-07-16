@@ -124,6 +124,27 @@ describe('GuestClaimPrompt', () => {
     expect(spy).toHaveBeenCalledWith('Nova', undefined, 'hunter2hunter2');
   });
 
+  it('moves focus into the claim form and restores it when collapsed', async () => {
+    seed({ account: null, nick: 'Nova' });
+    const expand = screen.getByRole('button', { name: 'Claim your nick' });
+    expand.focus();
+    fireEvent.click(expand);
+
+    await vi.waitFor(() => expect(screen.getByLabelText('Nick to claim')).toHaveFocus());
+    fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Claim your nick' })).toHaveFocus());
+  });
+
+  it('moves focus to verification when the expanded form changes mode', async () => {
+    seed({ account: null, nick: 'Nova' });
+    fireEvent.click(screen.getByRole('button', { name: 'Claim your nick' }));
+    await vi.waitFor(() => expect(screen.getByLabelText('Nick to claim')).toHaveFocus());
+
+    store.setState({ verifyRequired: true });
+
+    await vi.waitFor(() => expect(screen.getByLabelText('Verification code')).toHaveFocus());
+  });
+
   it('passes a trimmed email through when provided', () => {
     const spy = vi.spyOn(getState(), 'registerAccount').mockImplementation(() => {});
     seed({ account: null, nick: 'Nova' });
