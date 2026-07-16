@@ -84,11 +84,11 @@ async function renderNarrowPreferences(
                     <span class="pref-transfer-tool__label">Portable vault</span>
                     <span class="pref-transfer-tool__summary">Move Onyx device data</span>
                   </button>
-                  <button class="pref-transfer-tool" aria-expanded="false">Discord JSON</button>
-                  <button class="pref-transfer-tool" aria-expanded="false">Discord package</button>
-                  <button class="pref-transfer-tool" aria-expanded="false">Discord bot</button>
-                  <button class="pref-transfer-tool" aria-expanded="false">Slack JSON</button>
-                  <button class="pref-transfer-tool" aria-expanded="false">IRC log</button>
+                  <button class="pref-transfer-tool" aria-expanded="false"><span class="pref-transfer-tool__label">Discord JSON</span></button>
+                  <button class="pref-transfer-tool" aria-expanded="false"><span class="pref-transfer-tool__label">Discord package</span></button>
+                  <button class="pref-transfer-tool" aria-expanded="false"><span class="pref-transfer-tool__label">Discord bot</span></button>
+                  <button class="pref-transfer-tool" aria-expanded="false"><span class="pref-transfer-tool__label">Slack JSON</span></button>
+                  <button class="pref-transfer-tool" aria-expanded="false"><span class="pref-transfer-tool__label">IRC log</span></button>
                 </div>
               </nav>
               <div class="pref-transfer-tool-content">
@@ -333,3 +333,43 @@ for (const viewport of [
     expect(geometry.routeListScrollWidth).toBeGreaterThanOrEqual(geometry.routeListClientWidth);
   });
 }
+
+test('keeps the active transfer route distinct in forced colors at 200% text', async ({ page }) => {
+  await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });
+  await renderNarrowPreferences(page, {
+    width: 320,
+    height: 640,
+    rootFontSize: 32,
+  });
+
+  const routeNav = page.getByRole('navigation', { name: 'Import and export tools' });
+  const active = routeNav.getByRole('button', { name: 'Portable vault', exact: true });
+  const inactive = routeNav.getByRole('button', { name: 'Discord JSON', exact: true });
+  const visualState = await routeNav.evaluate((element) => {
+    const selected = element.querySelector<HTMLElement>('[aria-expanded="true"]')!;
+    const unselected = element.querySelector<HTMLElement>('[aria-expanded="false"]')!;
+    const selectedStyle = getComputedStyle(selected);
+    const unselectedStyle = getComputedStyle(unselected);
+    const labels = Array.from(element.querySelectorAll<HTMLElement>('.pref-transfer-tool__label'));
+    return {
+      selectedBackground: selectedStyle.backgroundColor,
+      unselectedBackground: unselectedStyle.backgroundColor,
+      selectedColor: selectedStyle.color,
+      unselectedColor: unselectedStyle.color,
+      animationName: selectedStyle.animationName,
+      transitionDuration: selectedStyle.transitionDuration,
+      labelsFit: labels.every((label) => label.scrollWidth <= label.clientWidth),
+    };
+  });
+
+  expect(visualState.selectedBackground).not.toBe(visualState.unselectedBackground);
+  expect(visualState.selectedColor).not.toBe(visualState.unselectedColor);
+  expect(visualState.animationName).toBe('none');
+  expect(visualState.transitionDuration).toBe('0s');
+  expect(visualState.labelsFit).toBe(true);
+
+  await active.focus();
+  await expect(active).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(inactive).toBeFocused();
+});

@@ -445,6 +445,27 @@
   display: none;
 }
 
+/* Windows High Contrast drops the gradient that distinguishes the expanded
+   route (and mobile intentionally hides the accent rail). Use system selection
+   colors so sighted forced-colors users retain the same active-tool context
+   exposed to assistive technology by aria-expanded. */
+@media (forced-colors: active) {
+  .pref-transfer-tool[aria-expanded='true'] {
+    color: HighlightText;
+    background: Highlight;
+    border-color: Highlight;
+  }
+
+  .pref-transfer-tool[aria-expanded='true'] .pref-transfer-tool__summary {
+    color: HighlightText;
+  }
+
+  .pref-transfer-tool[aria-expanded='true']::before {
+    background: HighlightText;
+    box-shadow: none;
+  }
+}
+
 @media (max-width: 42rem) {
   .pref-transfer-workspace {
     grid-template-columns: minmax(0, 1fr);

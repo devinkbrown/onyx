@@ -350,6 +350,24 @@ describe('PreferencesPanel', () => {
     expect(discord).toHaveAttribute('aria-expanded', 'true');
   });
 
+  it('keeps exactly one semantic active route while keyboard selection moves', () => {
+    renderPreferences('Import & export');
+    const routeNav = screen.getByRole('navigation', { name: 'Import and export tools' });
+    const portable = screen.getByRole('button', { name: 'Portable vault' });
+    portable.focus();
+
+    fireEvent.keyDown(portable, { key: 'End' });
+
+    const ircLog = screen.getByRole('button', { name: 'IRC log' });
+    expect(ircLog).toHaveFocus();
+    expect(ircLog).toHaveAttribute('aria-expanded', 'true');
+    expect(ircLog).toHaveAttribute('aria-controls', 'pref-transfer-panel-irc-log');
+    expect(document.getElementById('pref-transfer-panel-irc-log')).not.toHaveAttribute('hidden');
+    expect(within(routeNav).getAllByRole('button').filter((button) => (
+      button.getAttribute('aria-expanded') === 'true'
+    ))).toEqual([ircLog]);
+  });
+
   it('preserves a staged portable import while navigating through mounted categories', async () => {
     renderPreferences('Import & export');
     await stageEmptyPortableImport();
