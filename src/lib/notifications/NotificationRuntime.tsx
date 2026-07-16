@@ -2,6 +2,7 @@
 import { onCleanup, onMount } from 'solid-js';
 
 import { deviceMemoryOwnerKey } from '@/lib/deviceMemoryOwner';
+import { clearLinkPreviewCache } from '@/lib/preview/linkPreview';
 import { getState, selectDeviceMemoryOwner, subscribe } from '@/lib/store';
 import type { Notification as StoreNotification } from '@/lib/store/store';
 
@@ -123,6 +124,7 @@ export function NotificationRuntime(): null {
       for (const pending of pendingDesktop.values()) clearTimeout(pending.timer);
       pendingDesktop.clear();
       clearActiveDesktop();
+      clearLinkPreviewCache();
       lastDesktopAt.clear();
       lastSoundAt.clear();
       // Existing inbox rows belong to the previous owner. Mark them observed so

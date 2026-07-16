@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  clearLinkPreviewCache,
   pickPreviewUrl,
   fetchLinkPreview,
   isPreviewableUrl,
@@ -216,6 +217,23 @@ describe('fetchLinkPreview', () => {
     expect(secondPromise).toBe(firstPromise);
     expect(second).toBe(first);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases cached URL metadata at an owner boundary', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ title: 'Alice private title' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ title: 'Bob current title' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const url = 'https://cache.example/private?token=alice-secret';
+
+    const alice = fetchLinkPreview(url);
+    await expect(alice).resolves.toMatchObject({ title: 'Alice private title' });
+    clearLinkPreviewCache();
+    const bob = fetchLinkPreview(url);
+
+    expect(bob).not.toBe(alice);
+    await expect(bob).resolves.toMatchObject({ title: 'Bob current title' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('dedupes while the endpoint response is still in flight', async () => {

@@ -7,10 +7,16 @@ import { setCalmPreset } from './calmMode';
 import { showDesktopNotification } from './browser';
 import { NotificationRuntime } from './NotificationRuntime';
 
+const previewMocks = vi.hoisted(() => ({ clear: vi.fn() }));
+
 vi.mock('./browser', () => ({
   getDesktopNotificationPermission: vi.fn(() => 'granted'),
   playNotificationBeep: vi.fn(),
   showDesktopNotification: vi.fn(),
+}));
+
+vi.mock('@/lib/preview/linkPreview', () => ({
+  clearLinkPreviewCache: previewMocks.clear,
 }));
 
 const initialState = store.getInitialState();
@@ -66,6 +72,7 @@ describe('NotificationRuntime coalesced policy', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-15T12:00:00.000Z'));
     vi.mocked(showDesktopNotification).mockReset();
+    previewMocks.clear.mockReset();
     setCalmPreset('regular');
     store.setState({
       ...initialState,
@@ -148,6 +155,7 @@ describe('NotificationRuntime coalesced policy', () => {
     expect(showDesktopNotification).toHaveBeenCalledTimes(1);
 
     store.setState({ ourNick: 'other', server: server('other') });
+    expect(previewMocks.clear).toHaveBeenCalledOnce();
     vi.advanceTimersByTime(6000);
     expect(showDesktopNotification).toHaveBeenCalledTimes(1);
 

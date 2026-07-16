@@ -196,7 +196,10 @@ export function fetchLinkPreview(url: string): Promise<LinkPreview | null> {
   return promise;
 }
 
-/** Test hook: reset the module cache. */
-export function _clearPreviewCache(): void {
+/** Release URL keys and fetched metadata at an account/session boundary. */
+export function clearLinkPreviewCache(): void {
   cache.clear();
 }
+
+/** @deprecated Test compatibility alias. */
+export const _clearPreviewCache = clearLinkPreviewCache;
