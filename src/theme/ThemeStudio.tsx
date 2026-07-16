@@ -61,6 +61,7 @@ import {
   type PaletteSeed,
 } from './paletteFactory';
 import { exportThemeSeed, parseThemeSeed } from './seedTransfer';
+import { pickScreenColor, supportsEyeDropper } from './eyeDropper';
 import { useStore, getState } from '@/lib/store';
 import { backgroundOptions } from '@/backgrounds';
 
@@ -151,6 +152,13 @@ function isExportBlob(value: unknown): value is ExportBlob {
     value !== null &&
     (value as Record<string, unknown>).__onyx_theme_export__ === true
   );
+}
+
+function sampledAccentSeed(value: unknown): { hex: string; hue: number } | null {
+  if (typeof value !== 'string' || !/^#[0-9a-f]{6}$/i.test(value)) return null;
+  const hex = value.toLowerCase();
+  const color = hexToOklch(hex);
+  return color ? { hex, hue: Math.round(color.h) } : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -610,6 +618,12 @@ export function ThemeStudio(props: ThemeStudioProps) {
   const [exportCopied, setExportCopied] = createSignal(false);
   const [seedCopied, setSeedCopied] = createSignal(false);
   const [shareCopied, setShareCopied] = createSignal(false);
+  const [eyeDropperBusy, setEyeDropperBusy] = createSignal(false);
+  const [eyeDropperStatus, setEyeDropperStatus] = createSignal<{
+    message: string;
+    failure: boolean;
+  } | null>(null);
+  const eyeDropperAvailable = supportsEyeDropper();
   // Inline "save theme" naming (replaces a browser prompt).
   const [saving, setSaving] = createSignal(false);
   const [saveName, setSaveName] = createSignal('');
@@ -617,6 +631,8 @@ export function ThemeStudio(props: ThemeStudioProps) {
   let seedTimer: ReturnType<typeof setTimeout> | undefined;
   let shareTimer: ReturnType<typeof setTimeout> | undefined;
   let saveInputRef: HTMLInputElement | undefined;
+  let eyeDropperEpoch = 0;
+  let disposed = false;
 
   // ── Factory state ──
   // The generative seed driving the GENERATE panel.
@@ -638,6 +654,9 @@ export function ThemeStudio(props: ThemeStudioProps) {
   // token set onto the root.
   createEffect(() => {
     themeId(); // track
+    eyeDropperEpoch += 1;
+    setEyeDropperBusy(false);
+    setEyeDropperStatus(null);
     setOverrides({});
     setImportError(null);
     resetFactoryState();
@@ -653,6 +672,8 @@ export function ThemeStudio(props: ThemeStudioProps) {
 
   // Cleanup: remove any locally applied overrides on unmount.
   onCleanup(() => {
+    disposed = true;
+    eyeDropperEpoch += 1;
     const map = overrides();
     for (const prop of Object.keys(map)) {
       removeVar(prop);
@@ -865,6 +886,47 @@ export function ThemeStudio(props: ThemeStudioProps) {
   const handleAccentSeedColor: JSX.EventHandlerUnion<HTMLInputElement, InputEvent> = (e) => {
     const ok = hexToOklch((e.currentTarget as HTMLInputElement).value);
     if (ok) updateSeed({ accentHue: Math.round(ok.h) });
+  };
+
+  const handleAccentEyeDropper = async (): Promise<void> => {
+    if (eyeDropperBusy()) return;
+    const epoch = ++eyeDropperEpoch;
+    setEyeDropperBusy(true);
+    setEyeDropperStatus({ message: 'Choose an accent colour from the screen…', failure: false });
+
+    try {
+      const result = await pickScreenColor();
+      if (disposed || epoch !== eyeDropperEpoch) return;
+
+      if (result.state === 'selected') {
+        const sampled = sampledAccentSeed(result.sRGBHex);
+        if (!sampled) {
+          setEyeDropperStatus({
+            message: 'The sampled screen colour was invalid. The accent seed was not changed.',
+            failure: true,
+          });
+          return;
+        }
+        updateSeed({ accentHue: sampled.hue });
+        setEyeDropperStatus({
+          message: `Accent seed sampled from ${sampled.hex}.`,
+          failure: false,
+        });
+      } else if (result.state === 'cancelled' || result.state === 'unsupported') {
+        setEyeDropperStatus({ message: result.detail, failure: false });
+      } else {
+        setEyeDropperStatus({ message: result.detail, failure: true });
+      }
+    } catch {
+      if (!disposed && epoch === eyeDropperEpoch) {
+        setEyeDropperStatus({
+          message: 'Screen colour sampling failed. Use the accent colour control instead.',
+          failure: true,
+        });
+      }
+    } finally {
+      if (!disposed && epoch === eyeDropperEpoch) setEyeDropperBusy(false);
+    }
   };
 
   // Revert a single token to its base value, dropping just that override.
@@ -1110,6 +1172,30 @@ export function ThemeStudio(props: ThemeStudioProps) {
                   />
                   <code class="ts-token-value">{accentSwatch()} · {Math.round(seed().accentHue)}°</code>
                 </div>
+                <Show when={eyeDropperAvailable}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    class="ts-eyedropper-button"
+                    disabled={eyeDropperBusy()}
+                    aria-busy={eyeDropperBusy()}
+                    aria-label="Sample accent seed colour from the screen"
+                    onClick={() => void handleAccentEyeDropper()}
+                    data-testid="ts-accent-eyedropper"
+                  >
+                    {eyeDropperBusy() ? '[sampling screen…]' : '[⌖ sample screen]'}
+                  </Button>
+                </Show>
+                <Show when={eyeDropperStatus()}>
+                  {(status) => (
+                    <span
+                      class={`ts-eyedropper-status${status().failure ? ' ts-eyedropper-status--error' : ''}`}
+                      role={status().failure ? 'alert' : 'status'}
+                    >
+                      {status().message}
+                    </span>
+                  )}
+                </Show>
               </div>
             </div>
 
@@ -1717,6 +1803,19 @@ const STUDIO_CSS = `
 .ts-seed-color {
   display: grid;
   gap: 0.3rem;
+}
+.ts-eyedropper-button {
+  width: max-content;
+}
+.ts-eyedropper-status {
+  max-width: 22rem;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  line-height: 1.45;
+  color: var(--washi-dim);
+}
+.ts-eyedropper-status--error {
+  color: var(--shu-bright);
 }
 .ts-scheme-toggle {
   display: inline-flex;
