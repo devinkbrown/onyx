@@ -10,7 +10,12 @@ import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { DeviceMemoryOwner } from '@/lib/deviceMemoryOwner';
-import { store, _resetPasskeyStateForTests, type PasskeyCredential } from '@/lib/store/store';
+import {
+  store,
+  _resetPasskeyStateForTests,
+  MAX_PASSKEY_LABEL_LENGTH,
+  type PasskeyCredential,
+} from '@/lib/store/store';
 import { PasskeysSection } from './PasskeysSection';
 
 const initialState = store.getInitialState();
@@ -106,6 +111,26 @@ describe('PasskeysSection manager', () => {
     store.setState({ client: client as never });
     render(() => <PasskeysSection account="alice" owner={memoryOwner()} active={true} />);
     expect(client.sendRaw).toHaveBeenCalledWith('WEBAUTHN', 'LIST');
+  });
+
+  it('bounds and sanitizes a passkey label before retaining or dispatching it', () => {
+    const client = makeClient();
+    store.setState({ client: client as never });
+    render(() => <PasskeysSection account="alice" owner={memoryOwner()} active={true} />);
+    client.sendRaw.mockClear();
+    const input = screen.getByLabelText('Passkey name (optional)');
+    const oversized = `${'x'.repeat(MAX_PASSKEY_LABEL_LENGTH)}\u0000\n${'y'.repeat(200)}`;
+
+    fireEvent.input(input, { target: { value: oversized } });
+    expect(input).toHaveAttribute('maxlength', String(MAX_PASSKEY_LABEL_LENGTH));
+    expect(input).toHaveValue('x'.repeat(MAX_PASSKEY_LABEL_LENGTH));
+    fireEvent.click(screen.getByRole('button', { name: 'Add a passkey' }));
+
+    expect(client.sendRaw).toHaveBeenCalledWith(
+      'WEBAUTHN',
+      'REGISTER',
+      'x'.repeat(MAX_PASSKEY_LABEL_LENGTH),
+    );
   });
 
   it('refreshes the list when the open panel changes from Alice to Bob', async () => {
@@ -246,6 +271,31 @@ describe('PasskeysSection manager', () => {
     fireEvent.input(input, { target: { value: 'work laptop' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(client.sendRaw).toHaveBeenCalledWith('WEBAUTHN', 'RENAME', 'credAAA', 'work laptop');
+  });
+
+  it('bounds a renamed passkey label before dispatch', () => {
+    const client = makeClient();
+    store.setState({
+      client: client as never,
+      passkeySupported: true,
+      passkeyCreds: [cred({ id: 'credAAA', label: 'laptop' })],
+    });
+    render(() => <PasskeysSection account="alice" owner={memoryOwner()} active={true} />);
+    client.sendRaw.mockClear();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rename laptop' }));
+    const input = screen.getByLabelText('New name');
+    fireEvent.input(input, { target: { value: 'z'.repeat(MAX_PASSKEY_LABEL_LENGTH + 100) } });
+    expect(input).toHaveAttribute('maxlength', String(MAX_PASSKEY_LABEL_LENGTH));
+    expect(input).toHaveValue('z'.repeat(MAX_PASSKEY_LABEL_LENGTH));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(client.sendRaw).toHaveBeenCalledWith(
+      'WEBAUTHN',
+      'RENAME',
+      'credAAA',
+      'z'.repeat(MAX_PASSKEY_LABEL_LENGTH),
+    );
   });
 
   it('hides the rename control when the server lacks RENAME', () => {

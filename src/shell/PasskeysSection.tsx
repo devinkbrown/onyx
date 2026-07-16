@@ -30,7 +30,7 @@ import {
   normalizeDeviceMemoryOwner,
   type DeviceMemoryOwner,
 } from '@/lib/deviceMemoryOwner';
-import { useStore, getState } from '@/lib/store';
+import { useStore, getState, MAX_PASSKEY_LABEL_LENGTH } from '@/lib/store';
 import { isPasskeySupported } from '@/lib/webauthn/passkey';
 import { Button, FormField, Spinner } from '@/primitives/index';
 
@@ -55,6 +55,15 @@ function formatCreated(createdAt: number | null): string | null {
   } catch {
     return null;
   }
+}
+
+function boundedPasskeyLabel(value: string): string {
+  let label = value
+    .replace(/[\u0000-\u001f\u007f]/gu, '')
+    .slice(0, MAX_PASSKEY_LABEL_LENGTH);
+  const finalCodeUnit = label.charCodeAt(label.length - 1);
+  if (finalCodeUnit >= 0xd800 && finalCodeUnit <= 0xdbff) label = label.slice(0, -1);
+  return label;
 }
 
 export function PasskeysSection(props: PasskeysSectionProps): JSX.Element {
@@ -141,7 +150,7 @@ export function PasskeysSection(props: PasskeysSectionProps): JSX.Element {
   function startRename(id: string, current: string): void {
     setConfirmingId(null);
     setRenamingId(id);
-    setRenameValue(current);
+    setRenameValue(boundedPasskeyLabel(current));
   }
 
   function submitRename(event: SubmitEvent, id: string): void {
@@ -206,8 +215,9 @@ export function PasskeysSection(props: PasskeysSectionProps): JSX.Element {
               id="acct-passkey-label"
               label="Passkey name (optional)"
               placeholder="e.g. My laptop"
+              maxlength={MAX_PASSKEY_LABEL_LENGTH}
               value={label()}
-              onInput={(e) => setLabel(e.currentTarget.value)}
+              onInput={(e) => setLabel(boundedPasskeyLabel(e.currentTarget.value))}
             />
             <Button type="submit" variant="primary" size="sm" disabled={busy()}>
               {busy() ? 'Waiting for your device…' : 'Add a passkey'}
@@ -337,8 +347,9 @@ export function PasskeysSection(props: PasskeysSectionProps): JSX.Element {
                             <FormField
                               id={`acct-passkey-rename-${cred.id}`}
                               label="New name"
+                              maxlength={MAX_PASSKEY_LABEL_LENGTH}
                               value={renameValue()}
-                              onInput={(e) => setRenameValue(e.currentTarget.value)}
+                              onInput={(e) => setRenameValue(boundedPasskeyLabel(e.currentTarget.value))}
                             />
                             <div class="acct-passkey-actions">
                               <Button
