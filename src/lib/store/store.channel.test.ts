@@ -185,6 +185,7 @@ describe('channel management — raw command dispatch', () => {
 
   it('deduplicates channel browser LIST rows by room name', () => {
     seed('#general', [makeUser('me')]);
+    store.setState({ channelListLoading: true });
 
     feed(':server.test 322 me #general 2 :Launch room');
     feed(':server.test 322 me #General 5 :');

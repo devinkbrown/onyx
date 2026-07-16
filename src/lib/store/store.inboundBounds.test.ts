@@ -11,6 +11,7 @@ import {
 } from '@/lib/vault/historyVault';
 import {
   _beginNamesBurstForTests,
+  MAX_CHANNEL_LIST_ENTRIES,
   MAX_LIVE_CHANNELS,
   MAX_LIVE_CHANNEL_MESSAGES,
   MAX_LIVE_CHANNEL_USERS,
@@ -62,6 +63,25 @@ beforeEach(() => {
 });
 
 describe('live inbound message bounds', () => {
+  it('accepts only requested, bounded, sanitized channel directory rows', () => {
+    feed(':server 322 me #unsolicited 4 :hidden allocation');
+    expect(store.getState().channelList).toEqual([]);
+
+    store.setState({ channelListLoading: true });
+    feed(`:server 322 me #room-0 4 :${'x'.repeat(4 * 1024)}😀tail`);
+    feed(':server 322 me not-a-channel 5 :invalid');
+    for (let index = 1; index < MAX_CHANNEL_LIST_ENTRIES + 8; index += 1) {
+      feed(`:server 322 me #room-${index} ${index} :topic ${index}`);
+    }
+
+    const rows = store.getState().channelList;
+    expect(rows).toHaveLength(MAX_CHANNEL_LIST_ENTRIES);
+    expect(rows[0]).toMatchObject({ name: '#room-0', count: 4 });
+    expect(rows[0]?.topic).toBe('x'.repeat(4 * 1024));
+    expect(rows.some((row) => row.name === 'not-a-channel')).toBe(false);
+    expect(rows.some((row) => row.name === `#room-${MAX_CHANNEL_LIST_ENTRIES}`)).toBe(false);
+  });
+
   it('stores at most one vault-sized message body without splitting a surrogate pair', () => {
     const text = `${'x'.repeat(MAX_VAULT_MESSAGE_TEXT_LENGTH - 1)}😀tail`;
     feed(`:alice!u@host PRIVMSG #root :${text}`);

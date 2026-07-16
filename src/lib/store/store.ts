@@ -2142,6 +2142,7 @@ export const MAX_LIVE_PROP_VALUE_LENGTH = 16 * 1024;
 export const MAX_LIVE_CHANNEL_USERS = 4_096;
 export const MAX_LIVE_CHANNEL_MESSAGES = 500;
 export const MAX_NAMES_TOKENS_PER_LINE = MAX_LIVE_CHANNEL_USERS;
+export const MAX_CHANNEL_LIST_ENTRIES = 2_048;
 const MAX_NAMES_SCAN_CHARS = 256 * 1024;
 const MAX_NAMES_TOKEN_LENGTH = 512;
 const MAX_SYSTEM_EVENT_TEXT_LENGTH = 4 * 1024;
@@ -2716,18 +2717,25 @@ function nearestMessageId(messages: readonly ChatMessage[], at: Date): string | 
 }
 
 function mergeChannelListRow(
-  rows: readonly ChannelListEntry[],
+  rows: ChannelListEntry[],
   next: ChannelListEntry,
 ): ChannelListEntry[] {
+  if (
+    !_validInboundWireToken(next.name, MAX_VAULT_TARGET_LENGTH)
+    || !'#&'.includes(next.name[0] ?? '')
+    || next.name.includes(',')
+  ) return rows;
   const key = next.name.toLowerCase();
   const index = rows.findIndex((row) => row.name.toLowerCase() === key);
   const normalized = {
     name: next.name,
-    count: Number.isFinite(next.count) ? Math.max(0, next.count) : 0,
-    topic: next.topic,
+    count: Number.isSafeInteger(next.count) ? Math.max(0, next.count) : 0,
+    topic: _boundedSystemEventText(next.topic),
   };
 
-  if (index === -1) return [...rows, normalized];
+  if (index === -1) {
+    return rows.length < MAX_CHANNEL_LIST_ENTRIES ? [...rows, normalized] : rows;
+  }
 
   return rows.map((row, i) => {
     if (i !== index) return row;
@@ -10518,6 +10526,10 @@ export const store = createStore<OnyxState>()(
 
         // ── Channel LIST ──────────────────────────────────────────────────
         case '322': { // RPL_LIST: :server 322 me #channel count :topic
+          // LIST rows are meaningful only while this client has an outstanding
+          // directory request. Ignore unsolicited rows instead of letting a
+          // hostile server populate retained UI state in the background.
+          if (!get().channelListLoading) break;
           const listCh = params[1] ?? '';
           const listCount = parseInt(params[2] ?? '0', 10);
           const listTopic = params[3] ?? '';
