@@ -88,6 +88,15 @@ function seedAccountBoundState(): void {
     },
     personas: [{ name: 'alice', host: 'alice.example', source: 'grant' }],
     personaOffers: [{ template: '*.example', label: 'Alice offer' }],
+    notifications: [{
+      id: 'alice-private-notification',
+      type: 'dm',
+      text: 'Alice private plaintext',
+      from: 'trev',
+      at: new Date(),
+    }],
+    readNotificationIds: new Set(['alice-private-notification']),
+    showNotificationCenter: true,
   });
 }
 
@@ -109,6 +118,9 @@ function expectAccountBoundStateCleared(): void {
   });
   expect(state.personas).toEqual([]);
   expect(state.personaOffers).toEqual([]);
+  expect(state.notifications).toEqual([]);
+  expect(state.readNotificationIds).toEqual(new Set());
+  expect(state.showNotificationCenter).toBe(false);
 }
 
 beforeEach(() => {

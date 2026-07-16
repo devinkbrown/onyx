@@ -2127,6 +2127,7 @@ const TYPING_EXPIRY_MS = 6_000;
 const TYPING_RATE_LIMIT_MS = 4_000;
 export const MAX_LIVE_DM_CONVERSATIONS = 256;
 export const MAX_TEGAMI_CONVERSATIONS = MAX_LIVE_DM_CONVERSATIONS;
+export const MAX_LIVE_CHANNELS = 256;
 export const MAX_TEGAMI_COUNT = 9_999;
 export const MAX_USER_METADATA_TARGETS = 256;
 export const MAX_USER_METADATA_KEYS = 64;
@@ -3170,6 +3171,9 @@ function _resetAccountBoundState(
       totp: { status: 'unknown', secret: null, otpauth: null, error: null, busy: false },
       personas: [],
       personaOffers: [],
+      notifications: [],
+      readNotificationIds: new Set(),
+      showNotificationCenter: false,
       registerPending: false,
       registerError: null,
       verifyRequired: false,
@@ -8197,6 +8201,8 @@ export const store = createStore<OnyxState>()(
             : undefined;
 
           if (isSelf) {
+            const currentChannels = get().channels;
+            if (!currentChannels.has(key) && currentChannels.size >= MAX_LIVE_CHANNELS) break;
             if (restore) _setRestoreRosterSyncing(set, key, true);
             const pendingJoin = get().pendingDeepLinkJoin;
             const requestedRoom = pendingJoin?.toLowerCase() === key;
@@ -8596,10 +8602,13 @@ export const store = createStore<OnyxState>()(
             const parsed = parseNamesPrefix(name, client?.prefixToMode ?? DEFAULT_PREFIX_TO_MODE);
             return _isSessionRestoreIdentity(get, parsed.nick);
           });
+          const resumeChannelCapacity = get().channels.has(key)
+            || get().channels.size < MAX_LIVE_CHANNELS;
           const canCreateFromResume = Boolean(
             restore?.allowEarlyNames
             && _isSessionRestoreIdentity(get, recipient)
             && namesContainRestoringSelf,
+            && resumeChannelCapacity,
           );
           // Session-sync may emit the authoritative NAMES burst before its
           // canonical self-JOIN echo. That is the sole bounded exception to the
