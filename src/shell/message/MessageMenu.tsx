@@ -236,12 +236,14 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
   const translator = createBrowserTranslator();
 
   let disposed = false;
+  let clipboardEpoch = 0;
   let activeTranslation: symbol | undefined;
   let activeTranslationCopy: symbol | undefined;
   let observedTranslationInput = false;
   let observedMessageId = '';
   let observedSource: string | null = null;
   let observedTarget = '';
+  let observedMessageTarget = '';
   let observedCopyState = false;
   let observedCopyMessageId = '';
   let observedCopyTarget = '';
@@ -253,17 +255,27 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
     const messageId = local.msg.id;
     const source = actionText();
     const lang = translationLang();
+    const messageTarget = local.target;
     if (!observedTranslationInput) {
       observedTranslationInput = true;
       observedMessageId = messageId;
       observedSource = source;
       observedTarget = lang;
+      observedMessageTarget = messageTarget;
       return;
     }
-    if (messageId === observedMessageId && source === observedSource && lang === observedTarget) return;
+    if (
+      messageId === observedMessageId
+      && source === observedSource
+      && lang === observedTarget
+      && messageTarget === observedMessageTarget
+    ) return;
     observedMessageId = messageId;
     observedSource = source;
     observedTarget = lang;
+    observedMessageTarget = messageTarget;
+    clipboardEpoch += 1;
+    setClipboardStatus('');
     activeTranslation = undefined;
     setMessageTranslation({ status: 'idle' });
   });
@@ -432,17 +444,38 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
     if (!caps().canCopy) return;
     const source = actionText();
     if (source === null) return;
+    const messageId = local.msg.id;
+    const target = local.target;
+    const epoch = ++clipboardEpoch;
     const copied = await writeClipboardText(source);
+    if (
+      disposed
+      || epoch !== clipboardEpoch
+      || local.msg.id !== messageId
+      || local.target !== target
+      || actionText() !== source
+    ) return;
     reportClipboardResult(copied, 'message');
     setMenuOpen(false);
   }
 
   async function copyMomentLink(): Promise<void> {
     if (!caps().canCopyMoment) return;
+    const messageId = local.msg.id;
+    const messageTime = local.msg.time.getTime();
+    const target = local.target;
     const href = typeof window !== 'undefined' ? window.location.href : undefined;
-    const link = buildMomentLink(local.target, local.msg.time, href);
+    const link = buildMomentLink(target, local.msg.time, href);
+    const epoch = ++clipboardEpoch;
 
     const copied = await writeClipboardText(link);
+    if (
+      disposed
+      || epoch !== clipboardEpoch
+      || local.msg.id !== messageId
+      || local.msg.time.getTime() !== messageTime
+      || local.target !== target
+    ) return;
     reportClipboardResult(copied, 'moment');
     setMenuOpen(false);
   }
@@ -542,6 +575,7 @@ export function MessageMenu(props: MessageMenuProps): JSX.Element {
 
   onCleanup(() => {
     disposed = true;
+    clipboardEpoch += 1;
     activeTranslation = undefined;
     activeTranslationCopy = undefined;
     setReactOpen(false);

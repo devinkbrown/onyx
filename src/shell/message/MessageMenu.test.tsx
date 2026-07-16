@@ -911,6 +911,39 @@ describe('<MessageMenu>', () => {
     expect(localStorage.getItem('onyx:last-copied-moment')).toBeNull();
   });
 
+  it('does not enqueue clipboard feedback after the message row unmounts', async () => {
+    let resolveCopy: (() => void) | undefined;
+    const pendingCopy = new Promise<void>((resolve) => {
+      resolveCopy = resolve;
+    });
+    const writeText = vi.fn(() => pendingCopy);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    const addToast = vi.spyOn(store.getState(), 'addToast');
+    const msg: ChatMessage = {
+      id: 'm-copy-unmount',
+      from: 'alice',
+      text: 'belongs to the departing row',
+      time: new Date('2026-07-08T12:00:00Z'),
+      type: 'msg',
+      target: '#general',
+    };
+    const view = render(() => (
+      <MessageMenu msg={msg} target="#general" selfNick="bob" canEdit={false} menuOpen />
+    ));
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy text from message from alice' }));
+    expect(writeText).toHaveBeenCalledOnce();
+    view.unmount();
+    resolveCopy?.();
+    await pendingCopy;
+    await Promise.resolve();
+
+    expect(addToast).not.toHaveBeenCalled();
+  });
+
   it('reports an unavailable clipboard when copying a moment without saving it locally', async () => {
     Object.defineProperty(navigator, 'clipboard', {
       value: undefined,
