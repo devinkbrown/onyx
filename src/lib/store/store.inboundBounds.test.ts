@@ -11,6 +11,7 @@ import {
 } from '@/lib/vault/historyVault';
 import {
   _beginNamesBurstForTests,
+  MAX_LIVE_CHANNELS,
   MAX_LIVE_CHANNEL_MESSAGES,
   MAX_LIVE_CHANNEL_USERS,
   MAX_LIVE_DM_CONVERSATIONS,
@@ -221,6 +222,43 @@ describe('live inbound message bounds', () => {
     expect(root?.users.has('overflow')).toBe(false);
     expect(root?.messages).toEqual([]);
     expect(store.getState().channelEvents['#root']).toBeUndefined();
+  });
+
+  it('bounds server-driven self JOIN channel creation', () => {
+    const channels = new Map(Array.from(
+      { length: MAX_LIVE_CHANNELS },
+      (_, index) => [`#room-${index}`, channel(`#room-${index}`)] as const,
+    ));
+    store.setState({ channels });
+
+    feed(':me!u@host JOIN #overflow');
+
+    expect(store.getState().channels.size).toBe(MAX_LIVE_CHANNELS);
+    expect(store.getState().channels.has('#overflow')).toBe(false);
+  });
+
+  it('bounds channel event and welcome target collections', () => {
+    for (let index = 0; index < MAX_LIVE_CHANNELS + 8; index += 1) {
+      const room = `#room-${index}`;
+      store.getState().addChannelEvent(room, {
+        type: 'join',
+        nick: 'alice',
+        text: index === MAX_LIVE_CHANNELS + 7
+          ? 'x'.repeat(MAX_VAULT_MESSAGE_TEXT_LENGTH)
+          : `alice joined ${room}`,
+        time: new Date(),
+      });
+      store.getState().markWelcomeSeen(room);
+    }
+
+    const state = store.getState();
+    expect(Object.keys(state.channelEvents)).toHaveLength(MAX_LIVE_CHANNELS);
+    expect(state.channelEvents['#room-0']).toBeUndefined();
+    expect(state.channelEvents[`#room-${MAX_LIVE_CHANNELS + 7}`]?.[0]?.text.length)
+      .toBe(4 * 1024);
+    expect(state.channelWelcomeSeen.size).toBe(MAX_LIVE_CHANNELS);
+    expect(state.channelWelcomeSeen.has('#room-0')).toBe(false);
+    expect(state.channelWelcomeSeen.has(`#room-${MAX_LIVE_CHANNELS + 7}`)).toBe(true);
   });
 
   it('bounds live roster system lines and their untrusted reasons', () => {

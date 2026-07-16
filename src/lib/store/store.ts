@@ -8607,7 +8607,7 @@ export const store = createStore<OnyxState>()(
           const canCreateFromResume = Boolean(
             restore?.allowEarlyNames
             && _isSessionRestoreIdentity(get, recipient)
-            && namesContainRestoringSelf,
+            && namesContainRestoringSelf
             && resumeChannelCapacity,
           );
           // Session-sync may emit the authoritative NAMES burst before its
@@ -12233,9 +12233,17 @@ export const store = createStore<OnyxState>()(
 
     // ── Channel welcome banner ────────────────────────────────────────────────
     channelWelcomeSeen: new Set<string>(),
-    markWelcomeSeen: (channel) => set(s => ({
-      channelWelcomeSeen: new Set([...s.channelWelcomeSeen, channel.toLowerCase()]),
-    })),
+    markWelcomeSeen: (channel) => set(s => {
+      const key = normalizeNavigationChannel(channel);
+      if (!key || s.channelWelcomeSeen.has(key)) return {};
+      const channelWelcomeSeen = new Set(s.channelWelcomeSeen);
+      if (channelWelcomeSeen.size >= MAX_LIVE_CHANNELS) {
+        const oldest = channelWelcomeSeen.values().next().value as string | undefined;
+        if (oldest) channelWelcomeSeen.delete(oldest);
+      }
+      channelWelcomeSeen.add(key);
+      return { channelWelcomeSeen };
+    }),
 
     // ── Voice / SUIMYAKU speaking + channel tracking ────────────────────────────
     speakingNicks: new Set<string>(),
@@ -12268,10 +12276,23 @@ export const store = createStore<OnyxState>()(
     // ── Channel event log ───────────────────────────────────────────────
     channelEvents: {},
     addChannelEvent: (channel, event) => set(s => {
-      const key = channel.toLowerCase();
-      const prev = s.channelEvents[key] ?? [];
-      const next = [...prev, event].slice(-500);
-      return { channelEvents: { ...s.channelEvents, [key]: next } };
+      const key = normalizeNavigationChannel(channel);
+      if (!key) return {};
+      const boundedEvent: ChannelEvent = {
+        ...event,
+        nick: _boundedSystemEventText(event.nick),
+        text: _boundedSystemEventText(event.text),
+        time: Number.isFinite(event.time.getTime()) ? event.time : new Date(),
+      };
+      const entries = Object.entries(s.channelEvents).slice(-MAX_LIVE_CHANNELS);
+      const channelEvents = Object.fromEntries(entries) as Record<string, ChannelEvent[]>;
+      const prev = channelEvents[key] ?? [];
+      if (!Object.hasOwn(channelEvents, key) && entries.length >= MAX_LIVE_CHANNELS) {
+        const oldest = entries[0]?.[0];
+        if (oldest) delete channelEvents[oldest];
+      }
+      channelEvents[key] = [...prev, boundedEvent].slice(-MAX_LIVE_CHANNEL_MESSAGES);
+      return { channelEvents };
     }),
     clearChannelEvents: (channel) => set(s => {
       const key = channel.toLowerCase();
