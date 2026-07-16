@@ -356,11 +356,12 @@ describe('PWA manifest', () => {
     const add = vi.fn<(url: string) => Promise<void>>(async () => undefined);
     const put = vi.fn(async () => undefined);
     const currentCacheMatch = vi.fn<(url: string) => Promise<unknown>>(async (url) => ({
+      fallback: url,
       ok: true,
       url: `https://onyx.test${url}`,
     }));
     const cache = { add, match: currentCacheMatch, put };
-    const match = vi.fn<(key: unknown) => Promise<unknown>>(async (key) => ({
+    const matchAnyCache = vi.fn<(key: unknown) => Promise<unknown>>(async (key) => ({
       fallback: key,
       ok: true,
       url: `https://onyx.test${String(key)}`,
@@ -376,7 +377,7 @@ describe('PWA manifest', () => {
         'onyx-shell-__BUILD_VERSION__',
       ]),
       delete: deleteCache,
-      match,
+      match: matchAnyCache,
     };
     const skipWaiting = vi.fn(async () => undefined);
     const claim = vi.fn(async () => undefined);
@@ -529,7 +530,7 @@ describe('PWA manifest', () => {
       },
     });
     await expect(navigationWork).resolves.toMatchObject({ fallback: '/app/' });
-    expect(match).toHaveBeenLastCalledWith('/app/');
+    expect(currentCacheMatch).toHaveBeenLastCalledWith('/app/');
 
     listeners.get('fetch')?.({
       request: {
@@ -542,7 +543,7 @@ describe('PWA manifest', () => {
       },
     });
     await expect(navigationWork).resolves.toMatchObject({ fallback: '/app/' });
-    expect(match).toHaveBeenLastCalledWith('/app/');
+    expect(currentCacheMatch).toHaveBeenLastCalledWith('/app/');
 
     listeners.get('fetch')?.({
       request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/' },
@@ -551,9 +552,9 @@ describe('PWA manifest', () => {
       },
     });
     await expect(navigationWork).resolves.toMatchObject({ fallback: '/' });
-    expect(match).toHaveBeenLastCalledWith('/');
+    expect(currentCacheMatch).toHaveBeenLastCalledWith('/');
 
-    const matchCallsBeforeDocument = match.mock.calls.length;
+    const matchCallsBeforeDocument = currentCacheMatch.mock.calls.length;
     listeners.get('fetch')?.({
       request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/guides/' },
       respondWith: (work: Promise<unknown>) => {
@@ -565,9 +566,9 @@ describe('PWA manifest', () => {
     expect(unavailableDocument.status).toBe(503);
     expect(unavailableDocument.headers.get('Cache-Control')).toBe('no-store');
     await expect(unavailableDocument.text()).resolves.toContain('page is unavailable offline');
-    expect(match).toHaveBeenCalledTimes(matchCallsBeforeDocument);
+    expect(currentCacheMatch).toHaveBeenCalledTimes(matchCallsBeforeDocument);
 
-    match.mockResolvedValueOnce({
+    currentCacheMatch.mockResolvedValueOnce({
       fallback: '/app/',
       url: 'https://login.example/app/',
     });
@@ -581,7 +582,7 @@ describe('PWA manifest', () => {
     expect(poisonedFallback).toBeInstanceOf(Response);
     expect(poisonedFallback.status).toBe(503);
 
-    match.mockResolvedValueOnce({
+    currentCacheMatch.mockResolvedValueOnce({
       fallback: '/app/',
       ok: false,
       url: 'https://onyx.test/app/',
@@ -596,7 +597,7 @@ describe('PWA manifest', () => {
     expect(failedShellFallback).toBeInstanceOf(Response);
     expect(failedShellFallback.status).toBe(503);
 
-    match.mockRejectedValueOnce(new Error('offline fallback cache unavailable'));
+    currentCacheMatch.mockRejectedValueOnce(new Error('offline fallback cache unavailable'));
     listeners.get('fetch')?.({
       request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/app/offline' },
       respondWith: (work: Promise<unknown>) => {
@@ -617,7 +618,7 @@ describe('PWA manifest', () => {
     const assetRequest = { method: 'GET', mode: 'cors', url: 'https://onyx.test/assets/app.123.js' };
     let assetResponseWork: Promise<unknown> | undefined;
     let assetLifetimeWork: Promise<unknown> | undefined;
-    match.mockRejectedValueOnce(new Error('static cache read unavailable'));
+    currentCacheMatch.mockRejectedValueOnce(new Error('static cache read unavailable'));
     networkFetch.mockResolvedValueOnce(assetResponse);
     listeners.get('fetch')?.({
       request: assetRequest,
@@ -644,7 +645,7 @@ describe('PWA manifest', () => {
       mode: 'cors',
       url: 'https://onyx.test/assets/repair.456.js',
     };
-    match.mockResolvedValueOnce({
+    currentCacheMatch.mockResolvedValueOnce({
       ok: true,
       url: 'https://cdn.example/assets/repair.456.js',
     });
@@ -674,7 +675,7 @@ describe('PWA manifest', () => {
       mode: 'cors',
       url: 'https://onyx.test/assets/recover.789.js',
     };
-    match.mockResolvedValueOnce({
+    currentCacheMatch.mockResolvedValueOnce({
       ok: false,
       url: 'https://onyx.test/assets/recover.789.js',
     });
@@ -693,7 +694,7 @@ describe('PWA manifest', () => {
     expect(recoveredResponse.clone).toHaveBeenCalledOnce();
     expect(put).toHaveBeenCalledWith(recoverRequest, recoveredClone);
 
-    const matchCallsBeforeUpload = match.mock.calls.length;
+    const matchCallsBeforeUpload = currentCacheMatch.mock.calls.length;
     const fetchCallsBeforeUpload = networkFetch.mock.calls.length;
     const uploadRespondWith = vi.fn();
     const uploadWaitUntil = vi.fn();
@@ -704,7 +705,8 @@ describe('PWA manifest', () => {
     });
     expect(uploadRespondWith).not.toHaveBeenCalled();
     expect(uploadWaitUntil).not.toHaveBeenCalled();
-    expect(match).toHaveBeenCalledTimes(matchCallsBeforeUpload);
+    expect(currentCacheMatch).toHaveBeenCalledTimes(matchCallsBeforeUpload);
     expect(networkFetch).toHaveBeenCalledTimes(fetchCallsBeforeUpload);
+    expect(matchAnyCache).not.toHaveBeenCalled();
   });
 });

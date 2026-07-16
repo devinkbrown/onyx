@@ -142,7 +142,8 @@ function offlineNavigationFallback(pathname) {
     },
   );
   if (fallbackPath === null) return Promise.resolve(unavailable());
-  return caches.match(fallbackPath)
+  return caches.open(CACHE_NAME)
+    .then((cache) => cache.match(fallbackPath))
     .then((cached) => isCanonicalShellResponse(fallbackPath, cached) ? cached : unavailable())
     .catch(() => unavailable());
 }
@@ -276,7 +277,8 @@ self.addEventListener('fetch', (event) => {
 
   // Cache-first for static assets (hashed /assets from Vite, fonts, icons)
   if (isCacheableStaticPath(url.pathname)) {
-    const loaded = caches.match(request)
+    const loaded = caches.open(CACHE_NAME)
+      .then((cache) => cache.match(request))
       .catch(() => undefined)
       .then((cached) => {
         if (isCanonicalStaticResponse(url, cached)) {
