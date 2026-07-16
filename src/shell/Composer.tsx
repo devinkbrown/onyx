@@ -938,6 +938,7 @@ export function Composer(props: ComposerProps): JSX.Element {
         <textarea
           ref={textareaRef!}
           id="shell-composer-input"
+          data-composer-input=""
           class="shell-composer-textarea"
           placeholder={placeholder()}
           disabled={!isEnabled()}

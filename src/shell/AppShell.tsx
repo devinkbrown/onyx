@@ -454,6 +454,19 @@ export function AppShell(props: AppShellProps): JSX.Element {
     getState().navigate({ kind: 'home' });
   }
 
+  function openMemberDm(nick: string): void {
+    // The member trigger becomes hidden/inert as soon as a DM replaces the
+    // channel roster, so it cannot remain the focus owner. Close any mobile
+    // drawer without restoring that stale trigger, then hand focus directly
+    // to the conversation's persistent composer.
+    closeActiveMobileDrawer(false);
+    getState().navigate({ kind: 'dm', nick });
+    queueMicrotask(() => {
+      const composer = document.querySelector<HTMLTextAreaElement>('[data-composer-input]');
+      if (composer?.isConnected && !composer.disabled) composer.focus({ preventScroll: true });
+    });
+  }
+
   // ── is the member surface visible (column on desktop, drawer on mobile)? ──
   const membersVisible = createMemo(() =>
     hasMemberRoster() && (isMobile() ? mobileMembersOpen() : showMemberList()),
@@ -570,7 +583,11 @@ export function AppShell(props: AppShellProps): JSX.Element {
             onClick={closeMobileMembers}
           />
         </Show>
-        <MemberList hidden={!membersVisible()} modal={isMobile()} />
+        <MemberList
+          hidden={!membersVisible()}
+          modal={isMobile()}
+          onOpenDm={openMemberDm}
+        />
       </div>
 
       {/* Mobile bottom tab bar */}

@@ -71,10 +71,12 @@ type MemberCardProps = {
   role: ResolvedRole;
   /** Active channel the member belongs to (for moderation commands). */
   channel: string;
+  /** Let the owning shell coordinate navigation with drawer and focus state. */
+  onOpenDm?: (nick: string) => void;
 };
 
 function MemberCard(props: MemberCardProps): JSX.Element {
-  const [local] = splitProps(props, ['user', 'role', 'channel']);
+  const [local] = splitProps(props, ['user', 'role', 'channel', 'onOpenDm']);
 
   // Reactive op-gate: moderation controls only render for op (or higher).
   const canModerate = useStore((s) => selectIsChannelOp(local.channel)(s));
@@ -90,6 +92,10 @@ function MemberCard(props: MemberCardProps): JSX.Element {
   });
 
   function handleDm(): void {
+    if (local.onOpenDm) {
+      local.onOpenDm(local.user.nick);
+      return;
+    }
     getState().navigate({ kind: 'dm', nick: local.user.nick });
   }
 
@@ -209,10 +215,11 @@ function MemberCard(props: MemberCardProps): JSX.Element {
 export type MemberListProps = {
   hidden?: boolean;
   modal?: boolean;
+  onOpenDm?: (nick: string) => void;
 };
 
 export function MemberList(props: MemberListProps): JSX.Element {
-  const [local] = splitProps(props, ['hidden', 'modal']);
+  const [local] = splitProps(props, ['hidden', 'modal', 'onOpenDm']);
   let memberListRef: HTMLElement | undefined;
 
   const activeView = useStore((s) => s.activeView);
@@ -393,7 +400,12 @@ export function MemberList(props: MemberListProps): JSX.Element {
                               </div>
                             }
                           >
-                            <MemberCard user={user} role={role} channel={activeChannel()?.name ?? ''} />
+                            <MemberCard
+                              user={user}
+                              role={role}
+                              channel={activeChannel()?.name ?? ''}
+                              onOpenDm={local.onOpenDm}
+                            />
                           </Popover>
                         </li>
                       )}

@@ -795,6 +795,18 @@ describe('AppShell', () => {
   });
 
   describe('Composer input and send', () => {
+    it('exposes the production composer to the advertised focus shortcut', () => {
+      seedStore('#general');
+
+      const { container } = render(() => <AppShell />);
+      const textarea = container.querySelector<HTMLTextAreaElement>('[data-composer-input]');
+      expect(textarea).not.toBeNull();
+
+      fireEvent.keyDown(window, { key: 'Enter' });
+
+      expect(textarea).toHaveFocus();
+    });
+
     it('calls sendMessage with the correct target when Enter is pressed', async () => {
       // Arrange
       seedStore('#general');
@@ -1326,6 +1338,29 @@ describe('AppShell', () => {
       });
     });
 
+    it('hands focus to the DM composer when Message leaves the mobile member drawer', async () => {
+      stubMobileViewport();
+      seedStore('#general');
+
+      const { container } = render(() => <AppShell />);
+      fireEvent.click(screen.getByRole('button', { name: 'Toggle member list' }));
+
+      const memberList = container.querySelector<HTMLElement>('.shell-members');
+      expect(memberList).not.toBeNull();
+      await waitFor(() => expect(memberList).toHaveAttribute('aria-hidden', 'false'));
+      fireEvent.click(within(memberList!).getByRole('button', { name: /Open member details for alice/i }));
+      fireEvent.click(screen.getByRole('button', { name: 'Send DM to alice' }));
+
+      const composer = container.querySelector<HTMLTextAreaElement>('[data-composer-input]');
+      await waitFor(() => {
+        expect(store.getState().activeView).toEqual({ kind: 'dm', nick: 'alice' });
+        expect(memberList).toHaveAttribute('aria-hidden', 'true');
+        expect(memberList).toHaveAttribute('inert');
+        expect(composer).toHaveAttribute('aria-label', 'Message alice');
+        expect(composer).toHaveFocus();
+      });
+    });
+
     it('focuses and names the empty mobile member drawer until Escape restores its trigger', async () => {
       stubMobileViewport();
       seedStore('#general');
@@ -1372,6 +1407,26 @@ describe('AppShell', () => {
         expect(memberList).toHaveAttribute('aria-hidden', 'false');
         expect(memberList).not.toHaveAttribute('inert');
         expect(screen.getByRole('region', { name: 'Channel members in #general' })).toBeInTheDocument();
+      });
+    });
+
+    it('hands focus to the DM composer when Message hides the desktop member column', async () => {
+      stubMobileViewport(false);
+      seedStore('#general');
+
+      const { container } = render(() => <AppShell />);
+      const memberList = container.querySelector<HTMLElement>('.shell-members');
+      expect(memberList).not.toBeNull();
+      fireEvent.click(within(memberList!).getByRole('button', { name: /Open member details for alice/i }));
+      fireEvent.click(screen.getByRole('button', { name: 'Send DM to alice' }));
+
+      const composer = container.querySelector<HTMLTextAreaElement>('[data-composer-input]');
+      await waitFor(() => {
+        expect(store.getState().activeView).toEqual({ kind: 'dm', nick: 'alice' });
+        expect(memberList).toHaveAttribute('aria-hidden', 'true');
+        expect(memberList).toHaveAttribute('inert');
+        expect(composer).toHaveAttribute('aria-label', 'Message alice');
+        expect(composer).toHaveFocus();
       });
     });
 
