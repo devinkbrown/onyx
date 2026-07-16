@@ -568,6 +568,54 @@ describe('PreferencesPanel', () => {
     expect(scrollBy).toHaveBeenCalledWith({ top: -88, left: 0, behavior: 'auto' });
   });
 
+  it('keeps a focused preference clear of the sheet scroll edge', () => {
+    renderPreferences();
+    const sheetBody = document.querySelector<HTMLElement>('.onyx-sheet__body');
+    const nav = document.querySelector<HTMLElement>('.pref-category-nav');
+    const appearance = screen.getByRole('button', { name: /Theme and background/i });
+    expect(sheetBody).not.toBeNull();
+    expect(nav).not.toBeNull();
+
+    vi.spyOn(nav!, 'getBoundingClientRect').mockReturnValue({
+      x: 16,
+      y: 120,
+      left: 16,
+      top: 120,
+      right: 200,
+      bottom: 600,
+      width: 184,
+      height: 480,
+      toJSON: () => ({}),
+    });
+    vi.spyOn(sheetBody!, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 117,
+      left: 0,
+      top: 117,
+      right: 1280,
+      bottom: 720,
+      width: 1280,
+      height: 603,
+      toJSON: () => ({}),
+    });
+    vi.spyOn(appearance, 'getBoundingClientRect').mockReturnValue({
+      x: 220,
+      y: 650,
+      left: 220,
+      top: 650,
+      right: 900,
+      bottom: 720,
+      width: 680,
+      height: 70,
+      toJSON: () => ({}),
+    });
+    const scrollBy = vi.spyOn(sheetBody!, 'scrollBy');
+
+    fireEvent.focusIn(appearance);
+
+    expect(scrollBy).toHaveBeenCalledWith({ top: 8, left: 0, behavior: 'auto' });
+  });
+
   it('traps focus around visible controls while inactive category panes stay mounted', () => {
     renderPreferences();
     const close = screen.getByRole('button', { name: 'Close preferences' });

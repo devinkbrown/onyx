@@ -2925,11 +2925,18 @@ export function PreferencesPanel(): JSX.Element {
     const navRect = nav.getBoundingClientRect();
     const overlapsInline = targetRect.right > navRect.left && targetRect.left < navRect.right;
     const coveredByNav = targetRect.top < navRect.bottom && targetRect.bottom > navRect.top;
-    if (!overlapsInline || !coveredByNav) return;
-
     const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const revealGap = rootFontSize / 2;
+    let top: number;
+    if (overlapsInline && coveredByNav) {
+      top = targetRect.top - navRect.bottom - revealGap;
+    } else {
+      top = targetRect.bottom - sheetBody.getBoundingClientRect().bottom + revealGap;
+      if (top <= 0) return;
+    }
+
     sheetBody.scrollBy({
-      top: targetRect.top - navRect.bottom - rootFontSize / 2,
+      top,
       left: 0,
       behavior: 'auto',
     });
