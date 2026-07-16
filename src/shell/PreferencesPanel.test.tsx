@@ -531,6 +531,43 @@ describe('PreferencesPanel', () => {
     expect(screen.getByRole('group', { name: 'Confirm clear local history' })).toBe(confirmation);
   });
 
+  it('reveals a focused mobile preference covered by the sticky category navigator', () => {
+    renderPreferences();
+    const sheetBody = document.querySelector<HTMLElement>('.onyx-sheet__body');
+    const nav = document.querySelector<HTMLElement>('.pref-category-nav');
+    const appearance = screen.getByRole('button', { name: /Theme and background/i });
+    expect(sheetBody).not.toBeNull();
+    expect(nav).not.toBeNull();
+
+    vi.spyOn(nav!, 'getBoundingClientRect').mockReturnValue({
+      x: 16,
+      y: 60,
+      left: 16,
+      top: 60,
+      right: 374,
+      bottom: 180,
+      width: 358,
+      height: 120,
+      toJSON: () => ({}),
+    });
+    vi.spyOn(appearance, 'getBoundingClientRect').mockReturnValue({
+      x: 20,
+      y: 100,
+      left: 20,
+      top: 100,
+      right: 370,
+      bottom: 200,
+      width: 350,
+      height: 100,
+      toJSON: () => ({}),
+    });
+    const scrollBy = vi.spyOn(sheetBody!, 'scrollBy');
+
+    fireEvent.focusIn(appearance);
+
+    expect(scrollBy).toHaveBeenCalledWith({ top: -88, left: 0, behavior: 'auto' });
+  });
+
   it('traps focus around visible controls while inactive category panes stay mounted', () => {
     renderPreferences();
     const close = screen.getByRole('button', { name: 'Close preferences' });

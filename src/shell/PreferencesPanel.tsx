@@ -2914,6 +2914,27 @@ export function PreferencesPanel(): JSX.Element {
   const [activeCategory, setActiveCategory] = createSignal<PreferenceCategory>('display');
   let panelRef: HTMLDivElement | undefined;
 
+  function revealFocusedPreference(event: FocusEvent): void {
+    const target = event.target;
+    if (!(target instanceof HTMLElement) || !target.closest('.pref-category-content')) return;
+    const nav = panelRef?.querySelector<HTMLElement>('.pref-category-nav');
+    const sheetBody = panelRef?.closest<HTMLElement>('.onyx-sheet__body');
+    if (!nav || !sheetBody) return;
+
+    const targetRect = target.getBoundingClientRect();
+    const navRect = nav.getBoundingClientRect();
+    const overlapsInline = targetRect.right > navRect.left && targetRect.left < navRect.right;
+    const coveredByNav = targetRect.top < navRect.bottom && targetRect.bottom > navRect.top;
+    if (!overlapsInline || !coveredByNav) return;
+
+    const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    sheetBody.scrollBy({
+      top: targetRect.top - navRect.bottom - rootFontSize / 2,
+      left: 0,
+      behavior: 'auto',
+    });
+  }
+
   function selectCategory(category: PreferenceCategory, routed = false): void {
     const previousCategory = activeCategory();
     const activeElement = document.activeElement;
@@ -2948,7 +2969,12 @@ export function PreferencesPanel(): JSX.Element {
       onOpenChange={(next) => (next ? openPreferences() : closePreferences())}
       closeLabel="Close preferences"
     >
-      <div ref={panelRef} class="pref-panel" data-testid="preferences-panel">
+      <div
+        ref={panelRef}
+        class="pref-panel"
+        data-testid="preferences-panel"
+        onFocusIn={revealFocusedPreference}
+      >
         <PreferenceCategoryNavigation active={activeCategory} onSelect={selectCategory} />
 
         <div class="pref-category-content">
