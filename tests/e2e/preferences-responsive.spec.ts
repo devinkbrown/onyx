@@ -123,6 +123,7 @@ test('contains enlarged preference controls and leaves a usable mobile tab strip
     return {
       bodyClientWidth: body.clientWidth,
       bodyScrollWidth: body.scrollWidth,
+      navPosition: getComputedStyle(document.querySelector<HTMLElement>('.pref-category-nav')!).position,
       tabsClientWidth: tabs.clientWidth,
       widestTab,
       segmentsClientWidth: segments.clientWidth,
@@ -131,6 +132,7 @@ test('contains enlarged preference controls and leaves a usable mobile tab strip
   });
 
   expect(geometry.bodyScrollWidth).toBe(geometry.bodyClientWidth);
+  expect(geometry.navPosition).toBe('static');
   expect(geometry.tabsClientWidth).toBeGreaterThanOrEqual(geometry.widestTab);
   expect(geometry.segmentsScrollWidth).toBe(geometry.segmentsClientWidth);
 });

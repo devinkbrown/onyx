@@ -32,12 +32,17 @@ async function renderSheet(
     <!doctype html>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <div class="onyx-sheet">
-      <aside class="onyx-sheet__panel" role="dialog" aria-label="Preferences">
+      <aside
+        class="onyx-sheet__panel"
+        role="dialog"
+        aria-label="Preferences"
+        aria-describedby="preferences-description"
+      >
         <header class="onyx-sheet__header">
           <div>
             <p>panel</p>
             <h2>Preferences</h2>
-            <p>Display &amp; behaviour — applied live.</p>
+            <p id="preferences-description">Display &amp; behaviour — applied live.</p>
           </div>
           <button class="onyx-sheet__close" type="button" aria-label="Close preferences">×</button>
         </header>
@@ -55,6 +60,7 @@ async function renderSheet(
         --pad-panel-lg: 24px;
         --space-1: 4px;
         --space-2: 8px;
+        --space-3: 12px;
         --space-4: 16px;
         --r-md: 12px;
         --dur: 0ms;
@@ -103,14 +109,14 @@ test.describe('Sheet mobile safe-area geometry', () => {
       };
     });
 
-    expect(padding.header).toEqual(['24px', '24px', '24px', '24px']);
+    expect(padding.header).toEqual(['12px', '12px', '12px', '12px']);
     expect(padding.body).toEqual(['24px', '24px', '24px', '24px']);
   });
 
   test('contains the sheet header and close action at 200% text', async ({ page, browserName }) => {
     test.skip(browserName !== 'chromium', 'Safe-area inset override uses the Chromium DevTools protocol.');
     await renderSheet(page, { top: 0, bottom: 0 });
-    await page.setViewportSize({ width: 320, height: VIEWPORT_HEIGHT });
+    await page.setViewportSize({ width: 320, height: 400 });
     await page.evaluate(() => {
       document.documentElement.style.fontSize = '32px';
       document.documentElement.style.setProperty('--pad-panel-lg', '1.25rem');
@@ -125,13 +131,19 @@ test.describe('Sheet mobile safe-area geometry', () => {
       return {
         panel: [panel.clientWidth, panel.scrollWidth],
         header: [header.clientWidth, header.scrollWidth],
+        headerHeight: header.clientHeight,
+        bodyHeight: document.querySelector<HTMLElement>('.onyx-sheet__body')!.clientHeight,
       };
     });
     const closeBox = await page.getByRole('button', { name: 'Close preferences' }).boundingBox();
+    const dialog = page.getByRole('dialog', { name: 'Preferences' });
 
     expect(geometry.panel[1]).toBe(geometry.panel[0]);
     expect(geometry.header[1]).toBe(geometry.header[0]);
+    expect(geometry.headerHeight).toBeLessThanOrEqual(220);
+    expect(geometry.bodyHeight).toBeGreaterThanOrEqual(160);
     expect(closeBox).not.toBeNull();
     expect(closeBox!.x + closeBox!.width).toBeLessThanOrEqual(320);
+    await expect(dialog).toHaveAccessibleDescription('Display & behaviour — applied live.');
   });
 });
