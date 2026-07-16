@@ -140,4 +140,77 @@ describe('PWA manifest', () => {
     expect(prefixClient.focus).not.toHaveBeenCalled();
     expect(openWindow).toHaveBeenCalledWith('/app');
   });
+
+  it('keeps install and activation work alive and uses the cached app for offline app routes', async () => {
+    const listeners = new Map<string, (event: Record<string, unknown>) => void>();
+    const add = vi.fn<(url: string) => Promise<void>>(async () => undefined);
+    const cache = { add };
+    const match = vi.fn(async (key: string) => ({ fallback: key }));
+    const deleteCache = vi.fn(async () => true);
+    const caches = {
+      open: vi.fn(async () => cache),
+      keys: vi.fn(async () => ['old-shell', 'onyx-shell-__BUILD_VERSION__']),
+      delete: deleteCache,
+      match,
+    };
+    const skipWaiting = vi.fn(async () => undefined);
+    const claim = vi.fn(async () => undefined);
+    const workerSource = readFileSync(serviceWorkerPath, 'utf8');
+    const workerSelf = {
+      location: { origin: 'https://onyx.test' },
+      addEventListener: (type: string, listener: (event: Record<string, unknown>) => void) => {
+        listeners.set(type, listener);
+      },
+      skipWaiting,
+      clients: { claim, matchAll: vi.fn(), openWindow: vi.fn() },
+      registration: { showNotification: vi.fn() },
+    };
+    runInNewContext(workerSource, {
+      self: workerSelf,
+      caches,
+      fetch: vi.fn(async () => Promise.reject(new Error('offline'))),
+      URL,
+      Promise,
+    });
+
+    let installWork: Promise<unknown> | undefined;
+    listeners.get('install')?.({
+      waitUntil: (work: Promise<unknown>) => {
+        installWork = work;
+      },
+    });
+    await installWork;
+    expect(add.mock.calls.map(([url]) => url)).toEqual(['/', '/app']);
+    expect(skipWaiting).toHaveBeenCalledOnce();
+
+    let activateWork: Promise<unknown> | undefined;
+    listeners.get('activate')?.({
+      waitUntil: (work: Promise<unknown>) => {
+        activateWork = work;
+      },
+    });
+    await activateWork;
+    expect(deleteCache).toHaveBeenCalledWith('old-shell');
+    expect(deleteCache).not.toHaveBeenCalledWith('onyx-shell-__BUILD_VERSION__');
+    expect(claim).toHaveBeenCalledOnce();
+
+    let navigationWork: Promise<unknown> | undefined;
+    listeners.get('fetch')?.({
+      request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/app?join=%23root' },
+      respondWith: (work: Promise<unknown>) => {
+        navigationWork = work;
+      },
+    });
+    await expect(navigationWork).resolves.toEqual({ fallback: '/app' });
+    expect(match).toHaveBeenLastCalledWith('/app');
+
+    listeners.get('fetch')?.({
+      request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/install/' },
+      respondWith: (work: Promise<unknown>) => {
+        navigationWork = work;
+      },
+    });
+    await expect(navigationWork).resolves.toEqual({ fallback: '/' });
+    expect(match).toHaveBeenLastCalledWith('/');
+  });
 });

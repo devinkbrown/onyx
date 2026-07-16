@@ -44,6 +44,10 @@ function isSameOriginClient(client) {
   }
 }
 
+function navigationFallbackPath(pathname) {
+  return pathname === '/app' || pathname.startsWith('/app/') ? '/app' : '/';
+}
+
 // ── Install: precache shell ────────────────────────────────────────────────────
 // CRITICAL: precache failures must NEVER abort install. cache.addAll rejects
 // wholesale if any single URL 404s, which bricks the update pipeline — every
@@ -52,11 +56,13 @@ function isSameOriginClient(client) {
 // live users on a weeks-old build. Precache best-effort, always install.
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) =>
-      Promise.allSettled(PRECACHE_URLS.map((url) => cache.add(url)))
-    )
+    Promise.all([
+      caches.open(CACHE_NAME).then((cache) =>
+        Promise.allSettled(PRECACHE_URLS.map((url) => cache.add(url)))
+      ),
+      self.skipWaiting(),
+    ])
   );
-  self.skipWaiting();
 });
 
 // ── Activate: clear stale caches ──────────────────────────────────────────────
@@ -68,9 +74,8 @@ self.addEventListener('activate', (event) => {
           .filter((k) => k !== CACHE_NAME)
           .map((k) => caches.delete(k))
       )
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 // ── Manual update recovery from Preferences ──────────────────────────────────
@@ -90,7 +95,7 @@ self.addEventListener('fetch', (event) => {
   // For navigation requests, try network then fall back to cached index
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => caches.match('/'))
+      fetch(request).catch(() => caches.match(navigationFallbackPath(url.pathname)))
     );
     return;
   }
