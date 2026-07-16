@@ -922,6 +922,45 @@
   border-radius: var(--r-md);
 }
 
+/* A wrapped tablist can consume a short, zoomed settings viewport before its
+   active panel starts. Keep horizontal tabs on one keyboard-scrollable rail;
+   real browser focus scrolling reveals the newly focused trigger. */
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .onyx-tabs {
+    width: 100%;
+    min-width: 0;
+    gap: 8px;
+  }
+
+  .onyx-tabs__list[aria-orientation='horizontal'] {
+    flex-wrap: nowrap;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    gap: 4px;
+    padding: 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+    scroll-padding-inline: 4px;
+    scrollbar-width: thin;
+  }
+
+  .onyx-tabs__list[aria-orientation='horizontal'] > .onyx-tabs__trigger {
+    flex: none;
+    min-height: 44px;
+    padding: 8px 12px;
+    font-size: 14px;
+    scroll-margin-inline: 4px;
+  }
+
+  .onyx-tabs__content {
+    min-width: 0;
+    padding: 8px;
+    overflow-wrap: anywhere;
+  }
+}
+
 .onyx-spinner {
   display: inline-flex;
   align-items: center;
