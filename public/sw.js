@@ -95,6 +95,15 @@ function navigationFallbackPath(pathname) {
   return null;
 }
 
+function isCacheableStaticPath(pathname) {
+  return pathname.startsWith('/assets/')
+    || pathname.startsWith('/fonts/')
+    || pathname === '/favicon.ico'
+    || pathname === '/icon-192.png'
+    || pathname === '/icon-512.png'
+    || /^\/screenshots\/[^/]+\.png$/.test(pathname);
+}
+
 function offlineNavigationFallback(pathname) {
   const fallbackPath = navigationFallbackPath(pathname);
   const unavailable = () => new Response(
@@ -200,13 +209,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Cache-first for static assets (hashed /assets from Vite, fonts, icons)
-  if (
-    url.pathname.startsWith('/assets/') ||
-    url.pathname.startsWith('/fonts/') ||
-    url.pathname.endsWith('.ico') ||
-    url.pathname.endsWith('.png') ||
-    url.pathname.endsWith('.svg')
-  ) {
+  if (isCacheableStaticPath(url.pathname)) {
     const loaded = caches.match(request).then((cached) => {
       if (cached) return { response: cached, shouldCache: false };
       return fetch(request).then((response) => ({ response, shouldCache: response.ok }));

@@ -539,5 +539,19 @@ describe('PWA manifest', () => {
     await assetLifetimeWork;
     expect(assetResponse.clone).toHaveBeenCalledOnce();
     expect(put).toHaveBeenCalledWith(assetRequest, cachedClone);
+
+    const matchCallsBeforeUpload = match.mock.calls.length;
+    const fetchCallsBeforeUpload = networkFetch.mock.calls.length;
+    const uploadRespondWith = vi.fn();
+    const uploadWaitUntil = vi.fn();
+    listeners.get('fetch')?.({
+      request: { method: 'GET', mode: 'cors', url: 'https://onyx.test/uploads/private.png' },
+      respondWith: uploadRespondWith,
+      waitUntil: uploadWaitUntil,
+    });
+    expect(uploadRespondWith).not.toHaveBeenCalled();
+    expect(uploadWaitUntil).not.toHaveBeenCalled();
+    expect(match).toHaveBeenCalledTimes(matchCallsBeforeUpload);
+    expect(networkFetch).toHaveBeenCalledTimes(fetchCallsBeforeUpload);
   });
 });
