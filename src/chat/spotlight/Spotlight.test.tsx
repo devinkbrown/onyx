@@ -102,6 +102,28 @@ describe('Spotlight', () => {
     expect(screen.queryByRole('dialog', { name: 'Command palette' })).not.toBeInTheDocument();
   });
 
+  it('does not open from composed, claimed, or extra-modifier launcher keys', () => {
+    renderSpotlight();
+
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true, isComposing: true });
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true, shiftKey: true });
+    fireEvent.keyDown(window, { key: '/', altKey: true });
+    expect(screen.queryByRole('dialog', { name: 'Command palette' })).not.toBeInTheDocument();
+
+    const claimed = new KeyboardEvent('keydown', {
+      key: 'k',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    claimed.preventDefault();
+    window.dispatchEvent(claimed);
+    expect(screen.queryByRole('dialog', { name: 'Command palette' })).not.toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    expect(screen.getByRole('dialog', { name: 'Command palette' })).toBeInTheDocument();
+  });
+
   it('filters as you type and moves the active item with arrow keys', () => {
     setState({
       channels: new Map([

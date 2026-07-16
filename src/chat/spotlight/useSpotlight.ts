@@ -19,9 +19,22 @@ function isEditableTarget(target: EventTarget | null): boolean {
 }
 
 function handleGlobalKeyDown(event: KeyboardEvent): void {
+  // Browser integrations and input methods get first refusal. In particular,
+  // a composing `k` or `/` must never tear open a modal over the candidate
+  // window, and an earlier listener's preventDefault is an explicit claim.
+  if (event.defaultPrevented || event.isComposing || event.keyCode === 229) return;
+
   const key = event.key.toLowerCase();
-  const isLauncherCombo = key === 'k' && (event.metaKey || event.ctrlKey);
-  const isSlashLauncher = event.key === '/' && !isEditableTarget(event.target);
+  const isLauncherCombo = key === 'k'
+    && (event.metaKey || event.ctrlKey)
+    && !event.shiftKey
+    && !event.altKey;
+  const isSlashLauncher = event.key === '/'
+    && !event.metaKey
+    && !event.ctrlKey
+    && !event.shiftKey
+    && !event.altKey
+    && !isEditableTarget(event.target);
 
   if (!isLauncherCombo && !isSlashLauncher) return;
 
