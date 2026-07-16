@@ -18,6 +18,12 @@
  */
 import { createEffect, createMemo, createSignal, Show, type JSX } from 'solid-js';
 import { useStore, getState, selectAccount } from '@/lib/store';
+import {
+  deviceMemoryOwnerKey,
+  deviceMemoryStorageKey,
+  normalizeDeviceMemoryOwner,
+  type DeviceMemoryOwner,
+} from '@/lib/deviceMemoryOwner';
 import { Button } from '@/primitives/Button';
 import { FormField } from '@/primitives/FormField';
 import { Spinner } from '@/primitives/Spinner';
@@ -26,17 +32,25 @@ import './guest-claim.css';
 /** localStorage flag: the user dismissed the claim prompt (onyx: namespace). */
 export const GUEST_CLAIM_DISMISS_KEY = 'onyx:guest-claim-dismissed';
 
-function readDismissed(): boolean {
+function guestClaimDismissKey(owner: DeviceMemoryOwner | null): string | null {
+  return owner ? deviceMemoryStorageKey(GUEST_CLAIM_DISMISS_KEY, owner) : null;
+}
+
+function readDismissed(owner: DeviceMemoryOwner | null): boolean {
   try {
-    return localStorage.getItem(GUEST_CLAIM_DISMISS_KEY) === '1';
+    localStorage.removeItem(GUEST_CLAIM_DISMISS_KEY);
+    const key = guestClaimDismissKey(owner);
+    return key ? localStorage.getItem(key) === '1' : false;
   } catch {
     return false;
   }
 }
 
-function persistDismissed(): void {
+function persistDismissed(owner: DeviceMemoryOwner | null): void {
   try {
-    localStorage.setItem(GUEST_CLAIM_DISMISS_KEY, '1');
+    localStorage.removeItem(GUEST_CLAIM_DISMISS_KEY);
+    const key = guestClaimDismissKey(owner);
+    if (key) localStorage.setItem(key, '1');
   } catch {
     /* storage unavailable (private mode / quota) — degrade to session-only. */
   }
@@ -46,12 +60,20 @@ export function GuestClaimPrompt(): JSX.Element {
   // ── reactive store reads ──
   const account = useStore(selectAccount);
   const ourNick = useStore((s) => s.ourNick);
+  const serverUrl = useStore((s) => s.server?.url ?? '');
   const registerPending = useStore((s) => s.registerPending);
   const registerError = useStore((s) => s.registerError);
   const verifyRequired = useStore((s) => s.verifyRequired);
 
   // ── local UI state ──
-  const [dismissed, setDismissed] = createSignal(readDismissed());
+  const initialState = getState();
+  const initialOwner = initialState.server?.account
+    ? null
+    : normalizeDeviceMemoryOwner({
+        serverUrl: initialState.server?.url ?? '',
+        identity: initialState.ourNick,
+      });
+  const [dismissed, setDismissed] = createSignal(readDismissed(initialOwner));
   const [expanded, setExpanded] = createSignal(false);
   // null = follow the live nick; a string = the user edited the field.
   const [nickDraft, setNickDraft] = createSignal<string | null>(null);
@@ -61,26 +83,40 @@ export function GuestClaimPrompt(): JSX.Element {
   const [verifyCode, setVerifyCode] = createSignal('');
 
   const isGuest = createMemo(() => !account());
+  const guestOwner = createMemo<DeviceMemoryOwner | null>(() => (
+    isGuest()
+      ? normalizeDeviceMemoryOwner({ serverUrl: serverUrl(), identity: ourNick() })
+      : null
+  ));
   const nickValue = createMemo(() => nickDraft() ?? ourNick());
   const show = createMemo(() => isGuest() && !dismissed() && ourNick().trim() !== '');
   // Prefer a local validation message; otherwise surface the server's verdict.
   const errorText = createMemo(() => localError() ?? registerError() ?? undefined);
 
-  // Signing in hides this permanently mounted component but does not dispose
-  // its signals. Clear every claim draft at that identity boundary so logging
-  // out later cannot reveal credentials from the previous guest session.
-  createEffect(() => {
-    if (isGuest()) return;
+  function resetClaimDrafts(): void {
     setExpanded(false);
     setNickDraft(null);
     setEmail('');
     setPassword('');
     setLocalError(undefined);
     setVerifyCode('');
+  }
+
+  // This component stays mounted through login, logout, guest NICK changes,
+  // and endpoint switches. Rehydrate the exact guest dismissal and erase all
+  // transient claim credentials whenever that owner boundary changes.
+  let activeOwnerKey = initialOwner ? deviceMemoryOwnerKey(initialOwner) : null;
+  createEffect(() => {
+    const owner = guestOwner();
+    const nextOwnerKey = owner ? deviceMemoryOwnerKey(owner) : null;
+    if (nextOwnerKey === activeOwnerKey) return;
+    activeOwnerKey = nextOwnerKey;
+    setDismissed(readDismissed(owner));
+    resetClaimDrafts();
   });
 
   function dismiss(): void {
-    persistDismissed();
+    persistDismissed(guestOwner());
     setDismissed(true);
   }
 

@@ -14,8 +14,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { cleanup, render, screen, fireEvent } from '@solidjs/testing-library';
 import { GuestClaimPrompt, GUEST_CLAIM_DISMISS_KEY } from './GuestClaimPrompt';
 import { store, getState, type Server } from '@/lib/store';
+import { deviceMemoryStorageKey, type DeviceMemoryOwner } from '@/lib/deviceMemoryOwner';
 
 const initialState = store.getInitialState();
+
+function guestOwner(nick: string, serverUrl = 'wss://eshmaki.me'): DeviceMemoryOwner {
+  return { serverUrl, identity: nick.toLowerCase() };
+}
 
 function seedServer(account: string | null): Server {
   return {
@@ -72,13 +77,35 @@ describe('GuestClaimPrompt', () => {
     seed({ account: null, nick: 'Nova' });
     fireEvent.click(screen.getByRole('button', { name: /dismiss/i }));
     expect(screen.queryByTestId('guest-claim')).not.toBeInTheDocument();
-    expect(localStorage.getItem(GUEST_CLAIM_DISMISS_KEY)).toBe('1');
+    const key = deviceMemoryStorageKey(GUEST_CLAIM_DISMISS_KEY, guestOwner('Nova'))!;
+    expect(localStorage.getItem(key)).toBe('1');
+    expect(localStorage.getItem(GUEST_CLAIM_DISMISS_KEY)).toBeNull();
   });
 
   it('stays absent on mount when previously dismissed', () => {
-    localStorage.setItem(GUEST_CLAIM_DISMISS_KEY, '1');
+    const key = deviceMemoryStorageKey(GUEST_CLAIM_DISMISS_KEY, guestOwner('Nova'))!;
+    localStorage.setItem(key, '1');
     seed({ account: null, nick: 'Nova' });
     expect(screen.queryByTestId('guest-claim')).not.toBeInTheDocument();
+  });
+
+  it('purges the ownerless dismissal instead of assigning it to the next guest', () => {
+    localStorage.setItem(GUEST_CLAIM_DISMISS_KEY, '1');
+    seed({ account: null, nick: 'Nova' });
+
+    expect(screen.getByTestId('guest-claim')).toBeInTheDocument();
+    expect(localStorage.getItem(GUEST_CLAIM_DISMISS_KEY)).toBeNull();
+  });
+
+  it('isolates dismissals across guest identities on the same endpoint', () => {
+    seed({ account: null, nick: 'Nova' });
+    fireEvent.click(screen.getByRole('button', { name: /dismiss/i }));
+
+    store.setState({ server: { ...seedServer(null), nick: 'Echo' }, ourNick: 'Echo' });
+    expect(screen.getByTestId('guest-claim')).toHaveTextContent('Echo');
+
+    store.setState({ server: { ...seedServer(null), nick: 'Nova' }, ourNick: 'Nova' });
+    expect(screen.queryByTestId('guest-claim')).toBeNull();
   });
 
   it('dispatches registerAccount with the current nick when claimed', () => {
@@ -152,6 +179,24 @@ describe('GuestClaimPrompt', () => {
     expect(screen.queryByRole('form', { name: 'Claim your nick' })).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Claim your nick' }));
+    expect(screen.getByLabelText('Nick to claim')).toHaveValue('Echo');
+    expect(screen.getByLabelText('Password')).toHaveValue('');
+    expect(screen.getByLabelText('Recovery email (optional)')).toHaveValue('');
+  });
+
+  it('clears claim credentials on a direct guest identity change', () => {
+    seed({ account: null, nick: 'Nova' });
+    fireEvent.click(screen.getByRole('button', { name: 'Claim your nick' }));
+    fireEvent.input(screen.getByLabelText('Nick to claim'), { target: { value: 'EditedNova' } });
+    fireEvent.input(screen.getByLabelText('Password'), { target: { value: 'guest-secret' } });
+    fireEvent.input(screen.getByLabelText('Recovery email (optional)'), {
+      target: { value: 'guest@example.com' },
+    });
+
+    store.setState({ server: { ...seedServer(null), nick: 'Echo' }, ourNick: 'Echo' });
+    expect(screen.getByRole('button', { name: 'Claim your nick' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Claim your nick' }));
+
     expect(screen.getByLabelText('Nick to claim')).toHaveValue('Echo');
     expect(screen.getByLabelText('Password')).toHaveValue('');
     expect(screen.getByLabelText('Recovery email (optional)')).toHaveValue('');
