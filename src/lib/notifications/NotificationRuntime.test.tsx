@@ -20,13 +20,16 @@ function setVisibility(value: DocumentVisibilityState): void {
   Object.defineProperty(document, 'visibilityState', { configurable: true, value });
 }
 
-function addMention(id: number): void {
+function addMention(id: number): string {
   store.getState().addNotification({
     type: 'mention',
     text: `message ${id}`,
     from: 'alice',
     channel: '#room',
   });
+  const note = store.getState().notifications.at(-1);
+  if (!note) throw new Error('Expected mention notification to be stored');
+  return note.id;
 }
 
 function addFollow(topic?: string | null): void {
@@ -98,6 +101,47 @@ describe('NotificationRuntime coalesced policy', () => {
     vi.advanceTimersByTime(6000);
 
     expect(showDesktopNotification).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops a throttled alert that is dismissed before its timer fires', () => {
+    render(() => <NotificationRuntime />);
+    addMention(1);
+    const pendingId = addMention(2);
+    expect(showDesktopNotification).toHaveBeenCalledTimes(1);
+
+    store.getState().dismissNotification(pendingId);
+    vi.advanceTimersByTime(6000);
+
+    expect(showDesktopNotification).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops a throttled alert when the inbox is marked read before its timer fires', () => {
+    render(() => <NotificationRuntime />);
+    addMention(1);
+    addMention(2);
+    expect(showDesktopNotification).toHaveBeenCalledTimes(1);
+
+    store.getState().markAllNotificationsRead();
+    vi.advanceTimersByTime(6000);
+
+    expect(showDesktopNotification).toHaveBeenCalledTimes(1);
+  });
+
+  it('derives a coalesced alert count and body from the remaining unread rows', () => {
+    render(() => <NotificationRuntime />);
+    addMention(1);
+    addMention(2);
+    const dismissedId = addMention(3);
+    addMention(4);
+    store.getState().dismissNotification(dismissedId);
+
+    vi.advanceTimersByTime(6000);
+
+    expect(showDesktopNotification).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(showDesktopNotification).mock.calls[1]?.[0]).toMatchObject({
+      title: '2 new alerts in #room',
+      body: 'message 4',
+    });
   });
 
   it('restores a valid followed-topic context before opening its channel', () => {

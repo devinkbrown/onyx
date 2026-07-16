@@ -1,15 +1,68 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { setCalmPreset } from '@/lib/notifications/calmMode';
-import { store } from '@/lib/store/store';
+import type { DesktopNotificationPermission } from '@/lib/notifications/decision';
+import type { WebPushResult } from '@/lib/notifications/webPush';
+import { store, type Server } from '@/lib/store/store';
 import { NotificationControls } from './NotificationControls';
+
+const browserMocks = vi.hoisted(() => ({
+  getPermission: vi.fn<() => DesktopNotificationPermission>(() => 'unsupported'),
+  requestPermission: vi.fn<() => Promise<DesktopNotificationPermission>>(async () => 'unsupported'),
+}));
+
+const webPushMocks = vi.hoisted(() => ({
+  active: vi.fn(async () => false),
+  disable: vi.fn<() => Promise<WebPushResult>>(async () => ({ ok: true })),
+  enable: vi.fn<() => Promise<WebPushResult>>(async () => ({ ok: true })),
+  supported: vi.fn(() => false),
+}));
+
+vi.mock('@/lib/notifications', () => ({
+  getDesktopNotificationPermission: browserMocks.getPermission,
+  requestDesktopNotificationPermission: browserMocks.requestPermission,
+}));
+
+vi.mock('@/lib/notifications/webPush', () => ({
+  disableWebPush: webPushMocks.disable,
+  enableWebPush: webPushMocks.enable,
+  webPushActive: webPushMocks.active,
+  webPushSupported: webPushMocks.supported,
+}));
 
 const initialState = store.getInitialState();
 
+function server(account: string): Server {
+  return {
+    id: 'local',
+    name: 'Local',
+    network: 'Orochi',
+    url: 'wss://example.invalid',
+    icon: '#000',
+    nick: 'me',
+    account,
+    connected: true,
+  };
+}
+
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 describe('NotificationControls accessibility', () => {
   beforeEach(() => {
+    browserMocks.getPermission.mockReset().mockReturnValue('unsupported');
+    browserMocks.requestPermission.mockReset().mockResolvedValue('unsupported');
+    webPushMocks.active.mockReset().mockResolvedValue(false);
+    webPushMocks.disable.mockReset().mockResolvedValue({ ok: true });
+    webPushMocks.enable.mockReset().mockResolvedValue({ ok: true });
+    webPushMocks.supported.mockReset().mockReturnValue(false);
     localStorage.clear();
     setCalmPreset('regular');
     store.setState({
@@ -70,5 +123,113 @@ describe('NotificationControls accessibility', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Notification mode Calm/i }));
     expect(screen.getByRole('button', { name: /Notification mode Regular/i })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('does not let a stale initial push check overwrite a completed enable action', async () => {
+    const readiness = deferred<boolean>();
+    webPushMocks.supported.mockReturnValue(true);
+    webPushMocks.active.mockReturnValue(readiness.promise);
+    store.setState({ server: server('alice') });
+    render(() => <NotificationControls />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enable web push' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Disable web push' })).toBeEnabled());
+
+    readiness.resolve(false);
+    await readiness.promise;
+    await Promise.resolve();
+
+    expect(screen.getByRole('button', { name: 'Disable web push' })).toHaveAttribute('aria-pressed', 'true');
+    expect(store.getState().toasts.at(-1)).toMatchObject({ title: 'Push on', variant: 'success' });
+  });
+
+  it('keeps push on and reports a truthful failure when unsubscribe fails', async () => {
+    webPushMocks.supported.mockReturnValue(true);
+    webPushMocks.active.mockResolvedValue(true);
+    webPushMocks.disable.mockResolvedValue({ ok: false, reason: 'The browser could not remove its push subscription.' });
+    store.setState({ server: server('alice') });
+    render(() => <NotificationControls />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Disable web push' })).toBeEnabled());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Disable web push' }));
+
+    await waitFor(() => expect(store.getState().toasts.at(-1)).toMatchObject({
+      title: 'Push unavailable',
+      description: 'The browser could not remove its push subscription.',
+    }));
+    expect(screen.getByRole('button', { name: 'Disable web push' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('lets only the newest overlapping desktop permission request update state', async () => {
+    const older = deferred<NotificationPermission>();
+    const newer = deferred<NotificationPermission>();
+    browserMocks.getPermission.mockReturnValue('default');
+    browserMocks.requestPermission
+      .mockReturnValueOnce(older.promise)
+      .mockReturnValueOnce(newer.promise);
+    render(() => <NotificationControls />);
+    const desktop = screen.getByRole('button', { name: 'Enable desktop notifications' });
+
+    fireEvent.click(desktop);
+    fireEvent.click(desktop);
+    expect(browserMocks.requestPermission).toHaveBeenCalledTimes(2);
+
+    newer.resolve('granted');
+    await waitFor(() => expect(store.getState().pushNotificationsEnabled).toBe(true));
+    older.resolve('denied');
+    await older.promise;
+    await Promise.resolve();
+
+    expect(store.getState().pushNotificationsEnabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Desktop notifications are enabled' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('does not apply a desktop permission completion after unmount', async () => {
+    const pending = deferred<NotificationPermission>();
+    browserMocks.getPermission.mockReturnValue('default');
+    browserMocks.requestPermission.mockReturnValue(pending.promise);
+    render(() => <NotificationControls />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enable desktop notifications' }));
+    cleanup();
+    pending.resolve('granted');
+    await pending.promise;
+    await Promise.resolve();
+
+    expect(store.getState().pushNotificationsEnabled).toBe(false);
+  });
+
+  it('does not claim push success after the signed-in account changes', async () => {
+    const result = deferred<{ ok: true }>();
+    webPushMocks.supported.mockReturnValue(true);
+    webPushMocks.enable.mockReturnValue(result.promise);
+    store.setState({ server: server('alice') });
+    render(() => <NotificationControls />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enable web push' }));
+    store.setState({ server: server('bob') });
+    result.resolve({ ok: true });
+
+    await waitFor(() => expect(store.getState().toasts.at(-1)).toMatchObject({
+      title: 'Push setup changed',
+      variant: 'warning',
+    }));
+    expect(screen.getByRole('button', { name: 'Enable web push' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('does not publish a push completion after unmount', async () => {
+    const result = deferred<{ ok: true }>();
+    webPushMocks.supported.mockReturnValue(true);
+    webPushMocks.enable.mockReturnValue(result.promise);
+    store.setState({ server: server('alice') });
+    render(() => <NotificationControls />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enable web push' }));
+    cleanup();
+    result.resolve({ ok: true });
+    await result.promise;
+    await Promise.resolve();
+
+    expect(store.getState().toasts).toEqual([]);
   });
 });

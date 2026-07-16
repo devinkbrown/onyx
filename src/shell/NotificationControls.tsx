@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { createSignal, onMount, Show, type JSX } from 'solid-js';
+import { createSignal, onCleanup, onMount, Show, type JSX } from 'solid-js';
 
 import { useStore, getState, selectAccount } from '@/lib/store';
 import {
@@ -59,30 +59,57 @@ export function NotificationControls(): JSX.Element {
   const [permission, setPermission] = createSignal(getDesktopNotificationPermission());
   const [webPushOn, setWebPushOn] = createSignal(false);
   const [webPushBusy, setWebPushBusy] = createSignal(false);
+  let disposed = false;
+  let desktopOperation = 0;
+  let webPushOperation = 0;
+
+  const isCurrentWebPushOperation = (operation: number): boolean => !disposed && operation === webPushOperation;
+  const isCurrentDesktopOperation = (operation: number): boolean => !disposed && operation === desktopOperation;
 
   onMount(() => {
-    void webPushActive().then(setWebPushOn);
+    const operation = ++webPushOperation;
+    void webPushActive().then((active) => {
+      if (isCurrentWebPushOperation(operation)) setWebPushOn(active);
+    }).catch(() => {
+      if (isCurrentWebPushOperation(operation)) setWebPushOn(false);
+    });
+  });
+
+  onCleanup(() => {
+    disposed = true;
+    desktopOperation += 1;
+    webPushOperation += 1;
   });
 
   async function handleWebPushToggle(): Promise<void> {
     if (webPushBusy()) return;
+    const operation = ++webPushOperation;
+    const enable = !webPushOn();
+    const startingAccount = account();
+    const startingClient = getState().client;
     setWebPushBusy(true);
     try {
-      if (webPushOn()) {
-        await disableWebPush();
+      const result = enable ? await enableWebPush() : await disableWebPush();
+      if (!isCurrentWebPushOperation(operation)) return;
+
+      const current = getState();
+      if (enable && (selectAccount(current) !== startingAccount || current.client !== startingClient)) {
         setWebPushOn(false);
-        getState().addToast({ variant: 'info', title: 'Push off', description: 'This browser will no longer be nudged while closed.' });
+        current.addToast({
+          variant: 'warning',
+          title: 'Push setup changed',
+          description: 'Your account or connection changed before push setup finished. Try again.',
+        });
+      } else if (result.ok) {
+        setWebPushOn(enable);
+        current.addToast(enable
+          ? { variant: 'success', title: 'Push on', description: 'DMs reach this browser even with the tab closed.' }
+          : { variant: 'info', title: 'Push off', description: 'This browser will no longer be nudged while closed.' });
       } else {
-        const result = await enableWebPush();
-        if (result.ok) {
-          setWebPushOn(true);
-          getState().addToast({ variant: 'success', title: 'Push on', description: 'DMs reach this browser even with the tab closed.' });
-        } else {
-          getState().addToast({ variant: 'warning', title: 'Push unavailable', description: result.reason });
-        }
+        current.addToast({ variant: 'warning', title: 'Push unavailable', description: result.reason });
       }
     } finally {
-      setWebPushBusy(false);
+      if (isCurrentWebPushOperation(operation)) setWebPushBusy(false);
     }
   }
 
@@ -94,12 +121,14 @@ export function NotificationControls(): JSX.Element {
   const desktopActive = (): boolean => pushEnabled() && permission() === 'granted';
 
   async function handleDesktopToggle(): Promise<void> {
+    const operation = ++desktopOperation;
     if (desktopActive()) {
       getState().setPushNotificationsEnabled(false);
       return;
     }
 
     const next = await requestDesktopNotificationPermission();
+    if (!isCurrentDesktopOperation(operation)) return;
     setPermission(next);
     getState().setPushNotificationsEnabled(next === 'granted');
   }

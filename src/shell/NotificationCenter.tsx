@@ -12,7 +12,7 @@
  * SOLID IDIOMS: never destructure props; createMemo chains; For/Show.
  */
 import './notification-center.css';
-import { createMemo, createSignal, For, Show, type JSX } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, Show, untrack, type JSX } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
 import type { Notification } from '@/lib/store/store';
 import { Popover } from '@/primitives/index';
@@ -58,6 +58,9 @@ export function NotificationCenter(): JSX.Element {
   const notifications = useStore((s) => s.notifications);
   const readIds = useStore((s) => s.readNotificationIds);
   const [inboxOpen, setInboxOpen] = createSignal(false);
+  let centerRef: HTMLDivElement | undefined;
+  let closeRef: HTMLButtonElement | undefined;
+  let wrapperRef: HTMLSpanElement | undefined;
 
   const ordered = createMemo(() => [...notifications()].reverse());
   const unreadCount = createMemo(
@@ -67,8 +70,35 @@ export function NotificationCenter(): JSX.Element {
       ).length,
   );
 
-  const activateNotification = (n: Notification) => {
+  const focusTrigger = (): void => {
+    queueMicrotask(() => {
+      wrapperRef?.querySelector<HTMLButtonElement>('.onyx-popover__trigger')?.focus();
+    });
+  };
+
+  const closeInbox = (restoreFocus = false): void => {
+    setInboxOpen(false);
+    if (restoreFocus) focusTrigger();
+  };
+
+  const focusableControls = (): HTMLButtonElement[] => (
+    centerRef ? Array.from(centerRef.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')) : []
+  );
+
+  createEffect(() => {
+    if (!inboxOpen()) return;
+    queueMicrotask(() => {
+      if (!untrack(inboxOpen) || !centerRef || centerRef.contains(document.activeElement)) return;
+      focusableControls()[0]?.focus();
+    });
+  });
+
+  const activateNotification = (notification: Notification) => {
     const state = getState();
+    // A queued click can outlive the keyed row if another update removes it.
+    // Navigate only from the current record, never a stale closure.
+    const n = state.notifications.find((candidate) => candidate.id === notification.id);
+    if (!n) return;
     state.markNotificationRead(n.id);
     const target = targetOf(n);
     if (target?.kind === 'channel') {
@@ -79,11 +109,66 @@ export function NotificationCenter(): JSX.Element {
     } else if (target) {
       state.navigate(target);
     }
-    setInboxOpen(false);
+    closeInbox();
+  };
+
+  const focusDismissControl = (id: string | undefined): boolean => {
+    if (!id || !centerRef) return false;
+    const dismissControls = centerRef.querySelectorAll<HTMLButtonElement>('.notif-center__dismiss');
+    for (const control of dismissControls) {
+      if (control.dataset.notificationId === id) {
+        control.focus();
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const dismissNotification = (id: string, control: HTMLButtonElement): void => {
+    const state = getState();
+    const currentOrder = [...state.notifications].reverse();
+    const index = currentOrder.findIndex((candidate) => candidate.id === id);
+    if (index < 0) return;
+    const nextIds = currentOrder.slice(index + 1).map((notification) => notification.id);
+    const previousIds = currentOrder.slice(0, index).reverse().map((notification) => notification.id);
+    const restoreFocus = document.activeElement === control;
+
+    state.dismissNotification(id);
+    if (!restoreFocus) return;
+    queueMicrotask(() => {
+      if (!untrack(inboxOpen)) return;
+      for (const nextId of nextIds) {
+        if (focusDismissControl(nextId)) return;
+      }
+      for (const previousId of previousIds) {
+        if (focusDismissControl(previousId)) return;
+      }
+      closeRef?.focus();
+    });
+  };
+
+  const handleDialogKeyDown = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      closeInbox(true);
+      return;
+    }
+    if (event.key !== 'Tab') return;
+
+    const controls = focusableControls();
+    if (controls.length === 0) return;
+    const activeIndex = controls.indexOf(document.activeElement as HTMLButtonElement);
+    const atStart = activeIndex <= 0;
+    const atEnd = activeIndex === controls.length - 1;
+    if (event.shiftKey ? atStart : atEnd || activeIndex < 0) {
+      event.preventDefault();
+      controls[event.shiftKey ? controls.length - 1 : 0]?.focus();
+    }
   };
 
   return (
-    <span class="shell-ribbon-inbox">
+    <span ref={wrapperRef} class="shell-ribbon-inbox">
       <Popover
         open={inboxOpen()}
         onOpenChange={setInboxOpen}
@@ -114,7 +199,7 @@ export function NotificationCenter(): JSX.Element {
           </span>
         }
       >
-        <div class="notif-center" data-testid="notification-center">
+        <div ref={centerRef} class="notif-center" data-testid="notification-center" onKeyDown={handleDialogKeyDown}>
           <header class="notif-center__head">
             <h2>Inbox</h2>
             <Show when={notifications().length > 0}>
@@ -122,6 +207,15 @@ export function NotificationCenter(): JSX.Element {
                 Mark all read
               </button>
             </Show>
+            <button
+              ref={closeRef}
+              type="button"
+              class="notif-center__close"
+              aria-label="Close notification inbox"
+              onClick={() => closeInbox(true)}
+            >
+              ×
+            </button>
           </header>
 
           <Show
@@ -162,8 +256,9 @@ export function NotificationCenter(): JSX.Element {
                       <button
                         type="button"
                         class="notif-center__dismiss"
+                        data-notification-id={n.id}
                         aria-label={dismissLabel(n)}
-                        onClick={() => getState().dismissNotification(n.id)}
+                        onClick={(event) => dismissNotification(n.id, event.currentTarget)}
                       >
                         ×
                       </button>

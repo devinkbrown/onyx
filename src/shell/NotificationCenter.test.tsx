@@ -2,7 +2,7 @@
 /**
  * NotificationCenter tests — badge counting, list rendering, jump + mark-read.
  */
-import { cleanup, fireEvent, render, screen, within } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { store } from '@/lib/store/store';
 import type { Notification } from '@/lib/store/store';
@@ -123,5 +123,128 @@ describe('<NotificationCenter>', () => {
     expect(store.getState().notifications.map((n) => n.id)).toEqual(['x']);
     fireEvent.click(getByText('Mark all read'));
     expect(store.getState().readNotificationIds.has('x')).toBe(true);
+  });
+
+  it('moves focus to the next row after dismissing the focused middle row', async () => {
+    store.setState({
+      notifications: [
+        note({ id: 'oldest', type: 'dm', from: 'oldest', text: 'oldest message' }),
+        note({ id: 'middle', type: 'dm', from: 'middle', text: 'middle message' }),
+        note({ id: 'newest', type: 'dm', from: 'newest', text: 'newest message' }),
+      ],
+    });
+    render(() => <NotificationCenter />);
+    fireEvent.click(screen.getByRole('button', { name: /Inbox — 3 unread/i }));
+    const middle = screen.getByRole('button', { name: /Dismiss notification from middle/i });
+    middle.focus();
+
+    fireEvent.click(middle);
+
+    const next = screen.getByRole('button', { name: /Dismiss notification from oldest/i });
+    await waitFor(() => expect(next).toHaveFocus());
+    expect(store.getState().notifications.map((notification) => notification.id)).toEqual(['oldest', 'newest']);
+  });
+
+  it('moves focus to the previous row when the focused last row has no next row', async () => {
+    store.setState({
+      notifications: [
+        note({ id: 'oldest', type: 'dm', from: 'oldest', text: 'oldest message' }),
+        note({ id: 'newest', type: 'dm', from: 'newest', text: 'newest message' }),
+      ],
+    });
+    render(() => <NotificationCenter />);
+    fireEvent.click(screen.getByRole('button', { name: /Inbox — 2 unread/i }));
+    const oldest = screen.getByRole('button', { name: /Dismiss notification from oldest/i });
+    oldest.focus();
+
+    fireEvent.click(oldest);
+
+    const previous = screen.getByRole('button', { name: /Dismiss notification from newest/i });
+    await waitFor(() => expect(previous).toHaveFocus());
+  });
+
+  it('skips a next row that disappears before focus handoff completes', async () => {
+    store.setState({
+      notifications: [
+        note({ id: 'oldest', type: 'dm', from: 'oldest', text: 'oldest message' }),
+        note({ id: 'middle', type: 'dm', from: 'middle', text: 'middle message' }),
+        note({ id: 'newest', type: 'dm', from: 'newest', text: 'newest message' }),
+      ],
+    });
+    render(() => <NotificationCenter />);
+    fireEvent.click(screen.getByRole('button', { name: /Inbox — 3 unread/i }));
+    const newest = screen.getByRole('button', { name: /Dismiss notification from newest/i });
+    newest.focus();
+
+    fireEvent.click(newest);
+    store.getState().dismissNotification('middle');
+
+    const remaining = screen.getByRole('button', { name: /Dismiss notification from oldest/i });
+    await waitFor(() => expect(remaining).toHaveFocus());
+  });
+
+  it('moves focus to the stable close control after dismissing the only row', async () => {
+    store.setState({
+      notifications: [note({ id: 'only', type: 'dm', from: 'only', text: 'only message' })],
+    });
+    render(() => <NotificationCenter />);
+    fireEvent.click(screen.getByRole('button', { name: /Inbox — 1 unread/i }));
+    const dismiss = screen.getByRole('button', { name: /Dismiss notification from only/i });
+    dismiss.focus();
+
+    fireEvent.click(dismiss);
+
+    const close = screen.getByRole('button', { name: 'Close notification inbox' });
+    await waitFor(() => expect(close).toHaveFocus());
+    expect(screen.getByText(/Nothing yet/)).toBeInTheDocument();
+  });
+
+  it('keeps Tab and Shift+Tab inside the notification dialog', async () => {
+    store.setState({
+      notifications: [note({ id: 'only', type: 'dm', from: 'mizu', text: 'one message' })],
+    });
+    render(() => <NotificationCenter />);
+    fireEvent.click(screen.getByRole('button', { name: /Inbox — 1 unread/i }));
+    const first = screen.getByRole('button', { name: 'Mark all read' });
+    await waitFor(() => expect(first).toHaveFocus());
+    const last = screen.getByRole('button', { name: /Dismiss notification from mizu/i });
+
+    last.focus();
+    fireEvent.keyDown(last, { key: 'Tab' });
+    expect(first).toHaveFocus();
+
+    fireEvent.keyDown(first, { key: 'Tab', shiftKey: true });
+    expect(last).toHaveFocus();
+  });
+
+  it('closes on Escape and restores focus to the inbox trigger', async () => {
+    store.setState({
+      notifications: [note({ id: 'only', type: 'dm', from: 'mizu', text: 'one message' })],
+    });
+    render(() => <NotificationCenter />);
+    const trigger = screen.getByRole('button', { name: /Inbox — 1 unread/i });
+    fireEvent.click(trigger);
+    const close = screen.getByRole('button', { name: 'Close notification inbox' });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Mark all read' })).toHaveFocus());
+
+    fireEvent.keyDown(close, { key: 'Escape' });
+
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(screen.queryByRole('dialog', { name: 'Notification inbox' })).toBeNull();
+  });
+
+  it('does not navigate from a stale row that was already removed', () => {
+    store.setState({
+      notifications: [note({ id: 'stale', type: 'dm', from: 'mizu', text: 'stale message' })],
+    });
+    render(() => <NotificationCenter />);
+    fireEvent.click(screen.getByRole('button', { name: /Inbox — 1 unread/i }));
+    const stale = screen.getByRole('button', { name: /Open notification from mizu/i });
+    store.setState({ notifications: [] });
+
+    fireEvent.click(stale);
+
+    expect(store.getState().activeView).toEqual(initialState.activeView);
+    expect(store.getState().readNotificationIds.has('stale')).toBe(false);
   });
 });

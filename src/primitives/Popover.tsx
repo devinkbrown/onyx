@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { createEffect, createSignal, onCleanup, Show, splitProps, type JSX, type ParentProps } from 'solid-js';
+import { createEffect, createSignal, onCleanup, Show, splitProps, untrack, type JSX, type ParentProps } from 'solid-js';
 
 type PopoverElement = HTMLDivElement & {
   showPopover?: () => void;
@@ -17,6 +17,30 @@ export type PopoverProps = ParentProps<{
 }>;
 
 let popoverId = 0;
+const openPopoverStack: symbol[] = [];
+
+function removeFromOpenStack(instance: symbol): void {
+  const index = openPopoverStack.lastIndexOf(instance);
+  if (index >= 0) openPopoverStack.splice(index, 1);
+}
+
+function addToOpenStack(instance: symbol): void {
+  removeFromOpenStack(instance);
+  openPopoverStack.push(instance);
+}
+
+function currentFocusableElement(): HTMLElement | null {
+  const active = typeof document === 'undefined' ? null : document.activeElement;
+  if (!(active instanceof HTMLElement) || active === document.body || active === document.documentElement) return null;
+  return active;
+}
+
+function canRestoreFocus(element: HTMLElement): boolean {
+  if (!element.isConnected || element.ownerDocument !== document) return false;
+  if (element.closest('[hidden], [inert], [aria-hidden="true"]')) return false;
+  if ('disabled' in element && element.disabled === true) return false;
+  return true;
+}
 
 export function Popover(props: PopoverProps) {
   const [local, rest] = splitProps(props, ['trigger', 'id', 'open', 'defaultOpen', 'onOpenChange', 'placement', 'panelLabel', 'children']);
@@ -24,13 +48,39 @@ export function Popover(props: PopoverProps) {
   const instanceId = ++popoverId;
   const id = () => local.id ?? `onyx-popover-${instanceId}`;
   const anchorName = `--onyx-popover-anchor-${instanceId}`;
+  const stackToken = Symbol(`onyx-popover-${instanceId}`);
   let panelRef: PopoverElement | undefined;
   let triggerRef: HTMLButtonElement | undefined;
+  let disposed = false;
+  let pendingOpener: HTMLElement | null = null;
+  let opener: HTMLElement | null = null;
+  let wasOpen = false;
+  let openCycle = 0;
+  let restoredCycle = -1;
+  let focusTask = 0;
 
   const isOpen = () => local.open ?? innerOpen();
-  const setOpen = (next: boolean) => {
+  const setOpen = (next: boolean, requestedOpener: HTMLElement | null = null) => {
+    if (next && !isOpen()) pendingOpener = requestedOpener ?? currentFocusableElement();
     if (local.open === undefined) setInnerOpen(next);
     local.onOpenChange?.(next);
+    if (next) {
+      const captured = pendingOpener;
+      queueMicrotask(() => {
+        if (!untrack(isOpen) && pendingOpener === captured) pendingOpener = null;
+      });
+    }
+  };
+
+  const scheduleFocusRestore = (cycle: number): void => {
+    if (cycle <= 0 || restoredCycle === cycle) return;
+    restoredCycle = cycle;
+    const candidate = opener;
+    const task = ++focusTask;
+    queueMicrotask(() => {
+      if (disposed || focusTask !== task || untrack(isOpen) || !candidate || !canRestoreFocus(candidate)) return;
+      if (document.activeElement !== candidate) candidate.focus({ preventScroll: true });
+    });
   };
 
   const handleNativeToggle = (event: Event): void => {
@@ -39,10 +89,34 @@ export function Popover(props: PopoverProps) {
     // the Solid state in lockstep so aria-expanded and the next trigger click
     // reflect what is actually visible. Programmatic show/hide already updates
     // state before the native toggle event, so do not emit duplicate changes.
-    if (isOpen() !== next) setOpen(next);
+    if (isOpen() !== next) setOpen(next, next ? currentFocusableElement() : null);
   };
 
-  onCleanup(() => panelRef?.removeEventListener('toggle', handleNativeToggle));
+  onCleanup(() => {
+    disposed = true;
+    focusTask += 1;
+    removeFromOpenStack(stackToken);
+    panelRef?.removeEventListener('toggle', handleNativeToggle);
+  });
+
+  createEffect(() => {
+    const open = isOpen();
+    if (open === wasOpen) return;
+    wasOpen = open;
+
+    if (open) {
+      openCycle += 1;
+      focusTask += 1;
+      restoredCycle = -1;
+      opener = pendingOpener ?? currentFocusableElement();
+      pendingOpener = null;
+      addToOpenStack(stackToken);
+      return;
+    }
+
+    removeFromOpenStack(stackToken);
+    scheduleFocusRestore(openCycle);
+  });
 
   createEffect(() => {
     const panel = panelRef;
@@ -60,11 +134,24 @@ export function Popover(props: PopoverProps) {
     if (!isOpen()) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key !== 'Escape' || openPopoverStack.at(-1) !== stackToken) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setOpen(false);
+    };
+    const handlePointerDown = (event: PointerEvent) => {
+      if (openPopoverStack.at(-1) !== stackToken) return;
+      const target = event.target;
+      if (!(target instanceof Node) || panelRef?.contains(target) || triggerRef?.contains(target)) return;
+      setOpen(false);
     };
 
     document.addEventListener('keydown', handleKeyDown);
-    onCleanup(() => document.removeEventListener('keydown', handleKeyDown));
+    document.addEventListener('pointerdown', handlePointerDown);
+    onCleanup(() => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('pointerdown', handlePointerDown);
+    });
   });
 
   // Position the panel relative to its trigger, clamped to the viewport. The
@@ -125,7 +212,7 @@ export function Popover(props: PopoverProps) {
         aria-haspopup="dialog"
         aria-expanded={isOpen()}
         aria-controls={id()}
-        onClick={() => setOpen(!isOpen())}
+        onClick={(event) => setOpen(!isOpen(), event.currentTarget)}
       >
         {local.trigger}
       </button>

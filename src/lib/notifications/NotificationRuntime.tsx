@@ -15,11 +15,26 @@ import { isFollowed } from './followed';
 
 const DESKTOP_THROTTLE_MS = 6000;
 const SOUND_THROTTLE_MS = 1500;
+// The notification inbox retains 50 rows. Runtime-only throttle state must not
+// grow beyond that user-visible window during a long-lived browser session.
+const MAX_TRACKED_NOTIFICATIONS = 50;
+const MAX_TRACKED_TARGETS = 50;
 
 interface PendingDesktop {
-  count: number;
-  last: StoreNotification;
+  ids: string[];
   timer: ReturnType<typeof setTimeout>;
+}
+
+function rememberTargetTimestamp(map: Map<string, number>, key: string, at: number): void {
+  // Refresh insertion order so the first entry remains the least recently
+  // touched target and can be evicted deterministically.
+  map.delete(key);
+  map.set(key, at);
+  while (map.size > MAX_TRACKED_TARGETS) {
+    const oldestKey = map.keys().next().value;
+    if (oldestKey === undefined) break;
+    map.delete(oldestKey);
+  }
 }
 
 function notificationTarget(note: StoreNotification): { key: string; label: string; navigate: () => void } | null {
@@ -102,7 +117,22 @@ export function NotificationRuntime(): null {
           target.navigate();
         },
       });
-      lastDesktopAt.set(target.key, Date.now());
+      rememberTargetTimestamp(lastDesktopAt, target.key, Date.now());
+    }
+
+    function pruneTargetMaps(notes: readonly StoreNotification[]): void {
+      const activeKeys = new Set(pendingDesktop.keys());
+      for (const note of notes) {
+        const target = notificationTarget(note);
+        if (target) activeKeys.add(target.key);
+      }
+
+      for (const key of lastDesktopAt.keys()) {
+        if (!activeKeys.has(key)) lastDesktopAt.delete(key);
+      }
+      for (const key of lastSoundAt.keys()) {
+        if (!activeKeys.has(key)) lastSoundAt.delete(key);
+      }
     }
 
     function flushPending(key: string): void {
@@ -115,12 +145,19 @@ export function NotificationRuntime(): null {
       // CURRENT policy rather than blindly replaying the stale decision that
       // originally queued it. Omit the previous desktop timestamp: the timer
       // itself has already served the throttle delay.
-      const target = notificationTarget(pending.last);
-      if (!target || !calmAllowsNotification(pending.last)) return;
       const state = getState();
+      const pendingIds = new Set(pending.ids);
+      const liveNotes = state.notifications.filter((note) => {
+        if (!pendingIds.has(note.id) || state.readNotificationIds.has(note.id)) return false;
+        return notificationTarget(note)?.key === key && calmAllowsNotification(note);
+      });
+      const newest = liveNotes.at(-1);
+      pruneTargetMaps(state.notifications);
+      if (!newest) return;
+
       const decision = shouldNotify({
-        kind: pending.last.type,
-        isSelf: !!pending.last.from && pending.last.from.toLowerCase() === state.ourNick.toLowerCase(),
+        kind: newest.type,
+        isSelf: !!newest.from && newest.from.toLowerCase() === state.ourNick.toLowerCase(),
         muted: false,
         pushEnabled: state.pushNotificationsEnabled,
         soundEnabled: false,
@@ -132,20 +169,28 @@ export function NotificationRuntime(): null {
         desktopThrottleMs: DESKTOP_THROTTLE_MS,
         soundThrottleMs: SOUND_THROTTLE_MS,
       });
-      if (decision.desktop) showNote(pending.last, pending.count);
+      if (decision.desktop) showNote(newest, liveNotes.length);
     }
 
     function queueCoalesced(note: StoreNotification, key: string, waitMs: number): void {
       const existing = pendingDesktop.get(key);
       if (existing) {
-        existing.count += 1;
-        existing.last = note;
+        if (!existing.ids.includes(note.id)) existing.ids.push(note.id);
+        if (existing.ids.length > MAX_TRACKED_NOTIFICATIONS) existing.ids.shift();
+        pendingDesktop.delete(key);
+        pendingDesktop.set(key, existing);
         return;
       }
 
+      while (pendingDesktop.size >= MAX_TRACKED_TARGETS) {
+        const oldestKey = pendingDesktop.keys().next().value;
+        if (oldestKey === undefined) break;
+        const oldest = pendingDesktop.get(oldestKey);
+        if (oldest) clearTimeout(oldest.timer);
+        pendingDesktop.delete(oldestKey);
+      }
       pendingDesktop.set(key, {
-        count: 1,
-        last: note,
+        ids: [note.id],
         timer: setTimeout(() => flushPending(key), waitMs),
       });
     }
@@ -182,7 +227,7 @@ export function NotificationRuntime(): null {
 
       if (decision.sound) {
         playNotificationBeep(state.soundVolume);
-        lastSoundAt.set(target.key, nowMs);
+        rememberTargetTimestamp(lastSoundAt, target.key, nowMs);
       }
 
       if (decision.desktop) {
@@ -200,6 +245,7 @@ export function NotificationRuntime(): null {
           if (!seen.has(note.id)) handleNotification(note);
         }
         seen = new Set(notes.map((note) => note.id));
+        pruneTargetMaps(notes);
       },
     );
 

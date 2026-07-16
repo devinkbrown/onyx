@@ -10,6 +10,7 @@
  * the service worker renders it. Account-scoped: guests can't subscribe.
  */
 import { getState, selectAccount } from '@/lib/store';
+import type { OnyxState } from '@/lib/store/store';
 
 export type WebPushResult =
   | { ok: true }
@@ -34,10 +35,21 @@ export function webPushSupported(): boolean {
   );
 }
 
-/** The server's VAPID key, advertised in ISUPPORT (`VAPID=`). No round-trip. */
-function vapidKey(): string | null {
-  const key = getState().client?.isupport.VAPID ?? '';
-  return key.length > 0 ? key : null;
+const SESSION_CHANGED_REASON = 'Your account or connection changed. Try again.';
+
+function pushSessionCurrent(account: string, client: NonNullable<OnyxState['client']>): boolean {
+  const state = getState();
+  return state.connectionStatus === 'connected' && state.client === client && selectAccount(state) === account;
+}
+
+async function discardCreatedSubscription(subscription: PushSubscription | null): Promise<void> {
+  if (!subscription) return;
+  try {
+    await subscription.unsubscribe();
+  } catch {
+    // It was never registered with the server; best-effort local cleanup is
+    // safer than sending it on a replacement account or client session.
+  }
 }
 
 /** True when this browser holds a live push subscription. */
@@ -54,46 +66,85 @@ export async function webPushActive(): Promise<boolean> {
 /** Subscribe this browser and register it with the server. */
 export async function enableWebPush(): Promise<WebPushResult> {
   if (!webPushSupported()) return { ok: false, reason: 'This browser does not support push.' };
-  if (!selectAccount(getState())) return { ok: false, reason: 'Sign in first — push is tied to your account.' };
-  if (getState().connectionStatus !== 'connected') return { ok: false, reason: 'Reconnect first.' };
-
-  const permission = await Notification.requestPermission();
-  if (permission !== 'granted') return { ok: false, reason: 'Notifications are blocked by the browser.' };
-
-  const key = vapidKey();
+  const initialState = getState();
+  const account = selectAccount(initialState);
+  if (!account) return { ok: false, reason: 'Sign in first — push is tied to your account.' };
+  if (initialState.connectionStatus !== 'connected' || !initialState.client) {
+    return { ok: false, reason: 'Reconnect first.' };
+  }
+  const client = initialState.client;
+  const key = client.isupport.VAPID ?? '';
   if (!key) return { ok: false, reason: 'Push is not enabled on this server.' };
 
+  let permission: NotificationPermission;
+  try {
+    permission = await Notification.requestPermission();
+  } catch {
+    return { ok: false, reason: 'Requesting notification permission failed.' };
+  }
+  if (permission !== 'granted') return { ok: false, reason: 'Notifications are blocked by the browser.' };
+  if (!pushSessionCurrent(account, client)) return { ok: false, reason: SESSION_CHANGED_REASON };
+
+  let createdSubscription: PushSubscription | null = null;
   try {
     const reg = await navigator.serviceWorker.ready;
-    const sub =
-      (await reg.pushManager.getSubscription()) ??
-      (await reg.pushManager.subscribe({
+    if (!pushSessionCurrent(account, client)) return { ok: false, reason: SESSION_CHANGED_REASON };
+
+    let sub = await reg.pushManager.getSubscription();
+    if (!pushSessionCurrent(account, client)) return { ok: false, reason: SESSION_CHANGED_REASON };
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: vapidKeyToBytes(key).buffer as ArrayBuffer,
-      }));
+      });
+      createdSubscription = sub;
+    }
+    if (!pushSessionCurrent(account, client)) {
+      await discardCreatedSubscription(createdSubscription);
+      return { ok: false, reason: SESSION_CHANGED_REASON };
+    }
+
     const json = sub.toJSON();
     const p256dh = json.keys?.p256dh;
     const auth = json.keys?.auth;
     if (!sub.endpoint || !p256dh || !auth) {
+      await discardCreatedSubscription(createdSubscription);
       return { ok: false, reason: 'The browser returned an incomplete subscription.' };
     }
-    getState().client?.sendRaw('WEBPUSH', 'SUBSCRIBE', sub.endpoint, p256dh, auth);
+    client.sendRaw('WEBPUSH', 'SUBSCRIBE', sub.endpoint, p256dh, auth);
     return { ok: true };
   } catch {
+    await discardCreatedSubscription(createdSubscription);
     return { ok: false, reason: 'Subscribing failed — check site notification settings.' };
   }
 }
 
 /** Drop this browser's subscription locally and on the server. */
-export async function disableWebPush(): Promise<void> {
-  if (!webPushSupported()) return;
+export async function disableWebPush(): Promise<WebPushResult> {
+  if (!webPushSupported()) return { ok: false, reason: 'This browser does not support push.' };
+  const initialState = getState();
+  const account = selectAccount(initialState);
+  const client = initialState.client;
   try {
     const reg = await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.getSubscription();
-    if (!sub) return;
-    getState().client?.sendRaw('WEBPUSH', 'UNSUBSCRIBE', sub.endpoint);
-    await sub.unsubscribe();
+    if (!sub) return { ok: true };
+
+    if (!await sub.unsubscribe()) {
+      return { ok: false, reason: 'The browser could not remove its push subscription.' };
+    }
+
+    // Never unregister an endpoint through a replacement account/session.
+    // Local unsubscribe remains safe and makes the browser truthfully off.
+    if (account && client && pushSessionCurrent(account, client)) {
+      try {
+        client.sendRaw('WEBPUSH', 'UNSUBSCRIBE', sub.endpoint);
+      } catch {
+        // The local subscription is already revoked, so this browser is off.
+      }
+    }
+    return { ok: true };
   } catch {
-    /* best-effort */
+    return { ok: false, reason: 'Turning off push failed. Try again.' };
   }
 }
