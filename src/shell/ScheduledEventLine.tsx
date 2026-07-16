@@ -13,12 +13,33 @@ import { eventCountdown, scheduledEventVisible, scheduledEventsEqual } from '@/l
 type ScheduledEventLineProps = { channel: string };
 
 export function ScheduledEventLine(props: ScheduledEventLineProps): JSX.Element {
-  // Value-equality: selectChannelEvent allocates a fresh object per call, so an
-  // unguarded subscription would re-fire on every store mutation while an event
-  // is set. Comparing by value keeps the countdown memos quiet until it changes.
-  const event = useStore((s) => selectChannelEvent(props.channel)(s), scheduledEventsEqual);
-  const canManage = useStore((s) => selectIsChannelOp(props.channel)(s));
-  const voiceActive = useStore((s) => s.voice.callChannel?.toLowerCase() === props.channel.toLowerCase());
+  // Keep store subscriptions independent of the reactive channel prop. The
+  // Solid memos below then update immediately on a channel-to-channel switch,
+  // without waiting for an unrelated store mutation to re-run a stale selector.
+  const channelProps = useStore((s) => s.channelProps);
+  const channels = useStore((s) => s.channels);
+  const ourNick = useStore((s) => s.ourNick);
+  const isOper = useStore((s) => s.isOper);
+  const callChannel = useStore((s) => s.voice.callChannel);
+
+  // Value-equality: selectChannelEvent allocates a fresh object per call.
+  const event = createMemo(
+    () => {
+      channelProps();
+      return selectChannelEvent(props.channel)(getState());
+    },
+    null,
+    { equals: scheduledEventsEqual },
+  );
+  const canManage = createMemo(() => {
+    channels();
+    ourNick();
+    isOper();
+    return selectIsChannelOp(props.channel)(getState());
+  });
+  const voiceActive = createMemo(
+    () => callChannel()?.toLowerCase() === props.channel.toLowerCase(),
+  );
 
   // A ticking "now" so the countdown stays live without per-second store churn.
   const [now, setNow] = createSignal(Date.now());
