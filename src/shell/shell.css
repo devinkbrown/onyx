@@ -294,6 +294,7 @@
     );
   border-right: 1px solid var(--seam-faint);
   overflow: hidden;
+  overflow: clip;
 }
 
 .shell-sidebar-head {
@@ -399,6 +400,7 @@
 
 .shell-sidebar-scroll {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
@@ -4443,6 +4445,7 @@
     z-index: 90;
     width: min(300px, 86vw);
     padding-top: env(safe-area-inset-top, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
     transform: translateX(-100%);
     transition: transform var(--dur) var(--ease);
     grid-column: unset;
@@ -5017,7 +5020,40 @@
     overflow-x: auto;
     overflow-y: hidden;
     overscroll-behavior-x: contain;
+    scroll-padding-inline: 12px;
     scrollbar-width: thin;
+  }
+
+  .shell-sidebar-head button {
+    scroll-margin-inline: 12px;
+  }
+
+  .shell-sidebar-head {
+    flex: none;
+    justify-content: flex-start;
+    gap: 4px;
+    padding: 8px 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+
+  .shell-sidebar-network {
+    flex: none;
+    gap: 8px;
+    letter-spacing: 0.04em;
+  }
+
+  .shell-notify-controls {
+    flex: none;
+    gap: 4px;
+  }
+
+  .shell-notify-btn {
+    width: 44px;
+    height: 44px;
+    font-size: 24px;
   }
 
   .shell-members-title {
