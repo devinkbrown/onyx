@@ -11,7 +11,7 @@ const CACHE_NAME = 'onyx-shell-__BUILD_VERSION__';
 // App shell assets to precache on install
 const PRECACHE_URLS = [
   '/',
-  '/app',
+  '/app/',
 ];
 
 const PUSH_TITLE_MAX = 160;
@@ -45,7 +45,7 @@ function isSameOriginClient(client) {
 }
 
 function navigationFallbackPath(pathname) {
-  if (pathname === '/app' || pathname.startsWith('/app/')) return '/app';
+  if (pathname === '/app' || pathname.startsWith('/app/')) return '/app/';
   if (pathname === '/') return '/';
   return null;
 }
@@ -53,7 +53,7 @@ function navigationFallbackPath(pathname) {
 function offlineNavigationFallback(pathname) {
   const fallbackPath = navigationFallbackPath(pathname);
   const unavailable = () => new Response(
-    fallbackPath === '/app'
+    fallbackPath === '/app/'
       ? 'Onyx is unavailable offline because its app shell was not cached. Reconnect and reload once to make offline access available.'
       : 'This Onyx page is unavailable offline. Reconnect and reload to open it.',
     {

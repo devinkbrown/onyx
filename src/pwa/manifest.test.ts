@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 type WebManifest = {
   description: string;
+  id: string;
   start_url: string;
   scope: string;
   display: string;
@@ -20,6 +21,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const manifestPath = join(root, 'public', 'manifest.json');
 const serviceWorkerPath = join(root, 'public', 'sw.js');
 const entryDocumentPath = join(root, 'index.html');
+const deployScriptPath = join(root, 'deploy.sh');
 
 function loadManifest(): WebManifest {
   return JSON.parse(readFileSync(manifestPath, 'utf8')) as WebManifest;
@@ -43,7 +45,8 @@ describe('PWA manifest', () => {
   it('keeps installed launches on the app route with wrapper-safe display metadata', () => {
     const manifest = loadManifest();
 
-    expect(manifest.start_url).toBe('/app');
+    expect(manifest.id).toBe('/app');
+    expect(manifest.start_url).toBe('/app/');
     expect(manifest.scope).toBe('/');
     expect(manifest.display).toBe('standalone');
     expect(manifest.display_override).toContain('window-controls-overlay');
@@ -53,7 +56,7 @@ describe('PWA manifest', () => {
   it('declares app shortcuts and install screenshots backed by public assets', () => {
     const manifest = loadManifest();
 
-    expect(manifest.shortcuts?.map((shortcut) => shortcut.url)).toEqual(['/app', '/status', '/stats']);
+    expect(manifest.shortcuts?.map((shortcut) => shortcut.url)).toEqual(['/app/', '/status/', '/stats/']);
     expect(manifest.screenshots?.map((shot) => shot.form_factor).sort()).toEqual(['narrow', 'wide']);
 
     for (const screenshot of manifest.screenshots ?? []) {
@@ -73,6 +76,21 @@ describe('PWA manifest', () => {
     for (const asset of notificationAssets) {
       expect(existsSync(join(root, 'public', asset))).toBe(true);
     }
+  });
+
+  it('keeps the worker cache version contract aligned with deploy output', () => {
+    const placeholder = 'onyx-shell-__BUILD_VERSION__';
+    const worker = readFileSync(serviceWorkerPath, 'utf8');
+    const deploy = readFileSync(deployScriptPath, 'utf8');
+    const occurrences = worker.match(new RegExp(placeholder, 'g')) ?? [];
+
+    expect(occurrences).toHaveLength(1);
+    expect(deploy).toContain('s/onyx-shell-__BUILD_VERSION__/onyx-shell-${VERSION}/');
+    expect(deploy).toContain('grep -q "onyx-shell-${VERSION}" dist/sw.js');
+
+    const stamped = worker.replace(placeholder, 'onyx-shell-20260716-test');
+    expect(stamped).not.toContain('__BUILD_VERSION__');
+    expect(stamped).toContain("const CACHE_NAME = 'onyx-shell-20260716-test';");
   });
 
   it('bounds push content and rejects cross-origin notification destinations', async () => {
@@ -205,7 +223,9 @@ describe('PWA manifest', () => {
       },
     });
     await installWork;
-    expect(add.mock.calls.map(([url]) => url)).toEqual(['/', '/app']);
+    const precachedUrls = add.mock.calls.map(([url]) => url);
+    expect(precachedUrls).toEqual(['/', '/app/']);
+    expect(precachedUrls).toContain(loadManifest().start_url);
     expect(skipWaiting).toHaveBeenCalledOnce();
 
     let activateWork: Promise<unknown> | undefined;
@@ -238,8 +258,8 @@ describe('PWA manifest', () => {
         navigationWork = work;
       },
     });
-    await expect(navigationWork).resolves.toEqual({ fallback: '/app' });
-    expect(match).toHaveBeenLastCalledWith('/app');
+    await expect(navigationWork).resolves.toEqual({ fallback: '/app/' });
+    expect(match).toHaveBeenLastCalledWith('/app/');
 
     listeners.get('fetch')?.({
       request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/' },

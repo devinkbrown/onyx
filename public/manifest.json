@@ -3,7 +3,7 @@
   "short_name": "Onyx",
   "description": "Open rooms, local-first memory, encrypted media, and live Onyx mesh telemetry.",
   "id": "/app",
-  "start_url": "/app",
+  "start_url": "/app/",
   "scope": "/",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "browser"],
@@ -19,19 +19,19 @@
       "name": "Open Onyx",
       "short_name": "Chat",
       "description": "Open the Onyx app.",
-      "url": "/app"
+      "url": "/app/"
     },
     {
       "name": "Network status",
       "short_name": "Status",
       "description": "View live mesh node and backup status.",
-      "url": "/status"
+      "url": "/status/"
     },
     {
       "name": "Channel stats",
       "short_name": "Stats",
       "description": "View public channel rhythm and activity.",
-      "url": "/stats"
+      "url": "/stats/"
     }
   ],
   "icons": [
