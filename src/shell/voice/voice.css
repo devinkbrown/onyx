@@ -937,6 +937,83 @@
   .voice-cq__rate { display: none; }
 }
 
+/* Multiple 16:9 tiles become too narrow to expose their action clusters at
+   400% zoom. Reflow the stage into one scroll-owned column, keep every action
+   visible without hover, and stop rem-sized avatar/badge glyphs from crowding
+   the participant name. */
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .voice-stage {
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .voice-stage__grid[data-count] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: minmax(160px, auto);
+    align-content: start;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-block: contain;
+    scroll-padding-block: 4px;
+    scrollbar-width: thin;
+  }
+
+  .voice-tile {
+    width: 100%;
+    min-height: 160px;
+    aspect-ratio: auto;
+    scroll-margin-block: 4px;
+  }
+
+  .voice-tile__avatar-wrap .onyx-avatar {
+    font-size: 24px;
+  }
+
+  .voice-tile__camera-off,
+  .voice-tile__bar,
+  .voice-tile__you-tag,
+  .voice-tile__role {
+    font-size: 14px;
+  }
+
+  .voice-tile__topbar {
+    top: 3px;
+    right: 3px;
+    max-width: calc(100% - 6px);
+    padding: 3px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+    scroll-padding-inline: 3px;
+    scrollbar-width: thin;
+  }
+
+  .voice-tile__pin,
+  .voice-tile__pip {
+    flex: none;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    font-size: 20px;
+    opacity: 1;
+    transform: none;
+  }
+
+  .voice-tile__bar {
+    padding: 4px 8px 7px;
+  }
+
+  .voice-tile__badge {
+    font-size: 14px;
+  }
+
+  .voice-tile__badge-icon {
+    width: 24px;
+    height: 24px;
+  }
+}
+
 /* At 400% zoom the call controls cannot reflow as whole flex groups: the
    four-button media group alone is wider than the viewport space left by the
    room identity and connection pip. Keep the bar one control tall and make
