@@ -224,4 +224,48 @@ describe('vanilla store', () => {
       vi.unstubAllGlobals();
     }
   });
+
+  it('does not expose the previous account after an explicit replacement connect fails', () => {
+    class ThrowingWebSocket {
+      constructor() {
+        throw new Error('replacement endpoint unavailable');
+      }
+    }
+    const previousClient = { destroy: vi.fn() };
+    store.setState({
+      client: previousClient as never,
+      status: 'connected',
+      connectionStatus: 'connected',
+      server: {
+        id: 'old-session',
+        name: 'Old network',
+        network: 'Old network',
+        url: 'wss://old.example',
+        icon: '#000',
+        nick: 'alice',
+        account: 'alice',
+        connected: true,
+      },
+    });
+    vi.stubGlobal('WebSocket', ThrowingWebSocket);
+
+    try {
+      store.getState().connect({
+        url: 'wss://new.example',
+        nick: 'bob',
+      });
+
+      expect(previousClient.destroy).toHaveBeenCalledOnce();
+      expect(store.getState()).toMatchObject({
+        client: null,
+        status: 'disconnected',
+        connectionStatus: 'disconnected',
+        ourNick: 'bob',
+        server: null,
+      });
+    } finally {
+      store.getState().disconnect();
+      vi.unstubAllGlobals();
+    }
+  });
 });

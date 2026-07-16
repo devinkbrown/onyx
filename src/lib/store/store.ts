@@ -3551,6 +3551,7 @@ export const store = createStore<OnyxState>()(
         connectionStatus: 'connecting',
         ourNick: nick,
         autoReconnect: false,
+        server: null,
         channels: new Map(),
         dms: new Map(),
         rosterSyncing: new Set(),
