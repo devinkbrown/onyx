@@ -91,6 +91,13 @@ import { loadDMPins, sanitizeDMPins, saveDMPins } from '@/lib/dmPins';
 import { loadIgnoredUsers, parseIgnoredUsers, saveIgnoredUsers } from '@/lib/ignoredUsers';
 import { loadMutedDMs, parseMutedDMs, saveMutedDMs } from '@/lib/mutedDMs';
 import {
+  loadUserNotes,
+  MAX_USER_NOTE_LENGTH,
+  MAX_USER_NOTES,
+  normalizeUserNoteNick,
+  saveUserNotes,
+} from '@/lib/userNotes';
+import {
   loadFriends,
   loadWatchList,
   MAX_CONTACTS,
@@ -2732,6 +2739,7 @@ function _resetAccountBoundState(
     ignoredUsers: new Set(),
     showIgnoreList: false,
     mutedDMs: new Set(),
+    userNotes: new Map(),
     friends: new Map(),
     showFriendsPanel: false,
     watchList: [],
@@ -3497,6 +3505,13 @@ function _loadOwnedWatchList(
   return owner ? loadWatchList(owner) : [];
 }
 
+function _loadOwnedUserNotes(
+  state: Pick<OnyxState, 'server' | 'ourNick'>,
+): Map<string, string> {
+  const owner = selectDeviceMemoryOwner(state);
+  return owner ? loadUserNotes(owner) : new Map();
+}
+
 function _ownedMonitorContacts(
   state: Pick<OnyxState, 'friends' | 'watchList'>,
 ): Map<string, string> {
@@ -4136,6 +4151,7 @@ export const store = createStore<OnyxState>()(
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: newNick }),
               friends: _loadOwnedFriends({ server, ourNick: newNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: newNick }),
+              userNotes: _loadOwnedUserNotes({ server, ourNick: newNick }),
             };
           });
           if (!_sameOutboxOwner(previousOwner, selectDeviceMemoryOwner(get()))) {
@@ -4219,6 +4235,7 @@ export const store = createStore<OnyxState>()(
               mutedDMs: _loadOwnedMutedDMs({ server: srv, ourNick: get().ourNick }),
               friends: _loadOwnedFriends({ server: srv, ourNick: get().ourNick }),
               watchList: _loadOwnedWatchList({ server: srv, ourNick: get().ourNick }),
+              userNotes: _loadOwnedUserNotes({ server: srv, ourNick: get().ourNick }),
               isIRCX: client.isupport.IRCX,
               networkName: net,
               serverCapabilities: caps,
@@ -7323,6 +7340,7 @@ export const store = createStore<OnyxState>()(
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
               friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
+              userNotes: _loadOwnedUserNotes({ server, ourNick: s.ourNick }),
             };
           });
           if (ownerChanged) _replaceOwnedMonitorContacts(get, set, true);
@@ -9708,6 +9726,7 @@ export const store = createStore<OnyxState>()(
                 mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
                 friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
                 watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
+                userNotes: _loadOwnedUserNotes({ server, ourNick: s.ourNick }),
                 passkeyBusy: false,
                 passkeyError: null,
               };
@@ -9745,6 +9764,7 @@ export const store = createStore<OnyxState>()(
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
               friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
+              userNotes: _loadOwnedUserNotes({ server, ourNick: s.ourNick }),
             };
           });
           if (!_sameOutboxOwner(previousOwner, selectDeviceMemoryOwner(get()))) {
@@ -10604,28 +10624,39 @@ export const store = createStore<OnyxState>()(
     closeHighlightModal: () => set({ showHighlightModal: false }),
 
     // ── User notes ────────────────────────────────────────────────────────
-    userNotes: _loadUserNotes(),
+    // Private per-user annotations load only after an owner is known.
+    userNotes: new Map(),
     setUserNote: (nick, note) => {
+      const owner = selectDeviceMemoryOwner(get());
+      const key = normalizeUserNoteNick(nick);
+      if (!owner || !key) return;
+      const normalizedNote = note.trim();
+      if (normalizedNote.length > MAX_USER_NOTE_LENGTH) return;
       set(s => {
         const notes = new Map(s.userNotes);
-        const key = nick.toLowerCase();
-        if (note.trim()) {
-          notes.set(key, note.trim());
+        if (normalizedNote) {
+          if (!notes.has(key) && notes.size >= MAX_USER_NOTES) return {};
+          notes.set(key, normalizedNote);
         } else {
           notes.delete(key);
         }
-        _saveUserNotes(notes);
+        saveUserNotes(notes, owner);
         return { userNotes: notes };
       });
     },
     getUserNote: (nick) => {
-      return get().userNotes.get(nick.toLowerCase()) ?? '';
+      if (!selectDeviceMemoryOwner(get())) return '';
+      const key = normalizeUserNoteNick(nick);
+      return key ? get().userNotes.get(key) ?? '' : '';
     },
     deleteUserNote: (nick) => {
+      const owner = selectDeviceMemoryOwner(get());
+      const key = normalizeUserNoteNick(nick);
+      if (!owner || !key) return;
       set(s => {
         const notes = new Map(s.userNotes);
-        notes.delete(nick.toLowerCase());
-        _saveUserNotes(notes);
+        notes.delete(key);
+        saveUserNotes(notes, owner);
         return { userNotes: notes };
       });
     },
@@ -12798,26 +12829,6 @@ function _savePinnedChannels(channels: Set<string>): void {
 
 function _saveFollowedChannels(channels: Set<string>): void {
   _saveChannelSet('onyx:followed-channels', channels);
-}
-
-// ── User notes persistence ────────────────────────────────────────────────────
-
-function _loadUserNotes(): Map<string, string> {
-  if (typeof window === 'undefined') return new Map();
-  try {
-    const raw = localStorage.getItem('onyx:user-notes');
-    if (!raw) return new Map();
-    return new Map(Object.entries(parseStringRecord(raw)).map(([nick, note]) => [nick.toLowerCase(), note]));
-  } catch { return new Map(); }
-}
-
-function _saveUserNotes(notes: Map<string, string>): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem('onyx:user-notes', JSON.stringify(Object.fromEntries(notes)));
-  } catch {
-    // Storage quota exceeded or unavailable — silently degrade
-  }
 }
 
 // ── Nick color overrides persistence ─────────────────────────────────────────

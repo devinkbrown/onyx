@@ -21,6 +21,7 @@ import {
   saveFriends,
   saveWatchList,
 } from '@/lib/contactPresenceMemory';
+import { loadUserNotes, saveUserNotes } from '@/lib/userNotes';
 import { sceneMotion, setSceneMotion } from '@/lib/prefs/sceneMotion';
 import {
   MAX_TOPIC_READ_ENTRIES,
@@ -450,6 +451,7 @@ describe('portableTransfer', () => {
       { nick: 'portable-private-friend', online: false, note: 'portable-private-note' },
     ]]), owner);
     saveWatchList([{ nick: 'portable-private-watch', online: false }], owner);
+    saveUserNotes(new Map([['portable-private-user', 'portable private user note']]), owner);
 
     const exported = await exportPortableTransfer(owner);
     const serialized = JSON.stringify(exported);
@@ -457,11 +459,14 @@ describe('portableTransfer', () => {
     expect(serialized).not.toContain('portable-private-friend');
     expect(serialized).not.toContain('portable-private-note');
     expect(serialized).not.toContain('portable-private-watch');
+    expect(serialized).not.toContain('portable-private-user');
+    expect(serialized).not.toContain('portable private user note');
 
     // "Clear local history" erases transcripts, not the user's contact book.
     expect(await clearVault()).toBe(true);
     expect([...loadFriends(owner).keys()]).toEqual(['portable-private-friend']);
     expect(loadWatchList(owner).map((entry) => entry.nick)).toEqual(['portable-private-watch']);
+    expect(loadUserNotes(owner)).toEqual(new Map([['portable-private-user', 'portable private user note']]));
   });
 
   it('rejects a local-history-disabled import when the privacy clear does not commit', async () => {

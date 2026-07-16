@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseIRCMessage } from '@/lib/irc/parser';
 import { loadCredentials, saveCredentials, storeMeshToken, storeSessionToken } from '@/lib/credentials';
 import { saveFriends, saveWatchList } from '@/lib/contactPresenceMemory';
+import { saveUserNotes } from '@/lib/userNotes';
 import { _resetSessionRestoreForTests, store } from './store';
 
 const initialState = store.getInitialState();
@@ -80,6 +81,7 @@ describe('remembered session roster restoration', () => {
     const owner = { serverUrl: 'wss://example.test', identity: 'kain' } as const;
     saveFriends(new Map([['friend-one', { nick: 'friend-one', online: false }]]), owner);
     saveWatchList([{ nick: 'watch-one', online: false }], owner);
+    saveUserNotes(new Map([['friend-one', 'private context']]), owner);
     store.getState().connect({
       url: owner.serverUrl,
       nick: owner.identity,
@@ -92,6 +94,7 @@ describe('remembered session roster restoration', () => {
 
     expect([...store.getState().friends.keys()]).toEqual(['friend-one']);
     expect(store.getState().watchList.map((entry) => entry.nick)).toEqual(['watch-one']);
+    expect(store.getState().getUserNote('friend-one')).toBe('private context');
     expect(store.getState().monitoredNicks).toEqual(new Set(['friend-one', 'watch-one']));
     expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('MONITOR + friend-one\r\n');
     expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('MONITOR + watch-one\r\n');
