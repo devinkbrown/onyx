@@ -1852,12 +1852,18 @@ describe('PreferencesPanel', () => {
   });
 
   it('guards clearing local history behind an explicit confirm step', async () => {
+    let resolveClear: (cleared: boolean) => void = () => {};
+    const clearResult = new Promise<boolean>((resolve) => {
+      resolveClear = resolve;
+    });
+    const clearVault = vi.spyOn(historyVault, 'clearVault').mockReturnValue(clearResult);
     renderPreferences('History & data');
 
     // First press only reveals the confirm affordance — it does not erase yet.
     fireEvent.click(screen.getByRole('button', { name: 'Clear local history' }));
     expect(screen.getByRole('group', { name: 'Confirm clear local history' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erase history' })).toBeInTheDocument();
+    expect(clearVault).not.toHaveBeenCalled();
 
     // Backing out keeps history and dismisses the confirm.
     fireEvent.click(screen.getByRole('button', { name: 'Keep history' }));
@@ -1869,7 +1875,10 @@ describe('PreferencesPanel', () => {
     // Confirming runs the wipe and reports it.
     fireEvent.click(screen.getByRole('button', { name: 'Clear local history' }));
     fireEvent.click(screen.getByRole('button', { name: 'Erase history' }));
-    expect(await screen.findByText('Local history cleared on this device.')).toBeInTheDocument();
+    expect(clearVault).toHaveBeenCalledTimes(1);
+    resolveClear(true);
+    await Promise.resolve();
+    expect(screen.getByText('Local history cleared on this device.')).toBeInTheDocument();
   });
 
   it('hands focus into the local history confirmation and restores it when cancelled', async () => {
