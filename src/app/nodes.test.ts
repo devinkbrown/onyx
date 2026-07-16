@@ -6,7 +6,7 @@
  * by a fetch/performance seam, so these tests never open real sockets.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_NODE, type IrcNode, NODES, initialNode, selectBestNode } from './nodes';
+import { DEFAULT_NODE, type IrcNode, NODES, initialNode, pingNode, selectBestNode } from './nodes';
 
 const NODE_SET = new Set(NODES.map((n) => n.wss));
 
@@ -14,6 +14,12 @@ const CUSTOM_NODES = [
   { id: 'slow', host: 'slow.example.test', wss: 'wss://slow.example.test:8080' },
   { id: 'fast', host: 'fast.example.test', wss: 'wss://fast.example.test:8080' },
 ] as const satisfies readonly IrcNode[];
+
+const MANY_NODES: readonly IrcNode[] = Array.from({ length: 6 }, (_, index) => ({
+  id: `node-${index}`,
+  host: `node-${index}.example.test`,
+  wss: `wss://node-${index}.example.test:8080`,
+}));
 
 function stubSuccessfulProbes(...nowValues: number[]): ReturnType<typeof vi.fn> {
   const now = vi.fn(() => nowValues.shift() ?? 0);
@@ -24,6 +30,7 @@ function stubSuccessfulProbes(...nowValues: number[]): ReturnType<typeof vi.fn> 
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
@@ -107,6 +114,119 @@ describe('selectBestNode', () => {
     // Assert
     expect(chosen).toEqual({ id: 'env', host: 'custom', wss: pinned });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('bounds concurrent probes for a caller-supplied registry', async () => {
+    vi.stubEnv('VITE_IRC_WS', '');
+    let active = 0;
+    let peak = 0;
+    const releases: Array<() => void> = [];
+    const fetchMock = vi.fn(() => new Promise<Response>((resolve) => {
+      active += 1;
+      peak = Math.max(peak, active);
+      releases.push(() => {
+        active -= 1;
+        resolve(new Response(null, { status: 204 }));
+      });
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const selection = selectBestNode(MANY_NODES, { maxConcurrency: 2 });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    for (let expected = 3; expected <= MANY_NODES.length; expected += 1) {
+      releases.shift()?.();
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(expected));
+    }
+    while (releases.length > 0) releases.shift()?.();
+
+    await expect(selection).resolves.toBe(MANY_NODES[0]);
+    expect(peak).toBe(2);
+  });
+
+  it('cancels active probes and does not start queued probes after selection cancellation', async () => {
+    vi.useFakeTimers();
+    vi.stubEnv('VITE_IRC_WS', '');
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const fetchSignals: AbortSignal[] = [];
+    const fetchMock = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.signal) fetchSignals.push(init.signal);
+      return new Promise<Response>(() => {});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const controller = new AbortController();
+
+    const selection = selectBestNode(MANY_NODES, {
+      signal: controller.signal,
+      timeoutMs: 10_000,
+      maxConcurrency: 2,
+    });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    controller.abort();
+
+    await expect(selection).resolves.toBe(MANY_NODES[0]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchSignals).toHaveLength(2);
+    expect(fetchSignals.every((signal) => signal.aborted)).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe('pingNode', () => {
+  it('times out a hung fetch, aborts it, and clears the deadline', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('performance', { now: vi.fn(() => 100) });
+    let fetchSignal: AbortSignal | null | undefined;
+    vi.stubGlobal('fetch', vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      fetchSignal = init?.signal;
+      return new Promise<Response>(() => {});
+    }));
+
+    const latency = pingNode(CUSTOM_NODES[0], 25);
+    await vi.advanceTimersByTimeAsync(25);
+
+    await expect(latency).resolves.toBe(Number.POSITIVE_INFINITY);
+    expect(fetchSignal?.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('settles immediately and aborts fetch when its caller cancels', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('performance', { now: vi.fn(() => 100) });
+    let fetchSignal: AbortSignal | null | undefined;
+    vi.stubGlobal('fetch', vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      fetchSignal = init?.signal;
+      return new Promise<Response>(() => {});
+    }));
+    const controller = new AbortController();
+
+    const latency = pingNode(CUSTOM_NODES[0], 10_000, controller.signal);
+    controller.abort();
+
+    await expect(latency).resolves.toBe(Number.POSITIVE_INFINITY);
+    expect(fetchSignal?.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('does not start fetch for a caller that is already cancelled', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(pingNode(CUSTOM_NODES[0], 100, controller.signal))
+      .resolves.toBe(Number.POSITIVE_INFINITY);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('maps a synchronous fetch failure to the documented unreachable result', async () => {
+    vi.stubGlobal('performance', { now: vi.fn(() => 100) });
+    vi.stubGlobal('fetch', vi.fn(() => {
+      throw new TypeError('invalid fetch options');
+    }));
+
+    await expect(pingNode(CUSTOM_NODES[0]))
+      .resolves.toBe(Number.POSITIVE_INFINITY);
   });
 });
 

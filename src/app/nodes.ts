@@ -17,6 +17,18 @@ export interface IrcNode {
   wss: string;
 }
 
+export interface NodeSelectionOptions {
+  /** Cancels this caller's probes without affecting another selection. */
+  signal?: AbortSignal;
+  /** Per-node deadline. Invalid values retain the bounded default. */
+  timeoutMs?: number;
+  /** Maximum simultaneous HTTPS probes for caller-supplied node registries. */
+  maxConcurrency?: number;
+}
+
+const DEFAULT_PROBE_TIMEOUT_MS = 4000;
+const DEFAULT_MAX_CONCURRENT_PROBES = 4;
+
 export const NODES: readonly IrcNode[] = [
   { id: 'a', host: 'ircx.us', wss: 'wss://ircx.us:8080' },
   { id: 'b', host: 'eshmaki.me', wss: 'wss://eshmaki.me:8080' },
@@ -61,28 +73,41 @@ export const DEFAULT_NODE: IrcNode = initialNode();
  * opening throwaway probe sockets on the IRC port trips flood protection and
  * breaks the *real* connection that follows. The :443 round-trip is a clean proxy
  * for geographic latency and never touches the IRC connection limiter. Resolves
- * to Infinity on error/timeout (or in a non-browser env without fetch).
+ * to Infinity on error, timeout, caller cancellation, or without browser fetch.
  */
-export function pingNode(node: IrcNode, timeoutMs = 4000): Promise<number> {
+export function pingNode(
+  node: IrcNode,
+  timeoutMs = DEFAULT_PROBE_TIMEOUT_MS,
+  signal?: AbortSignal,
+): Promise<number> {
   return new Promise((resolve) => {
-    if (typeof fetch === 'undefined' || typeof performance === 'undefined') {
+    if (typeof fetch === 'undefined' || typeof performance === 'undefined' || signal?.aborted) {
       resolve(Number.POSITIVE_INFINITY);
       return;
     }
 
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
     let settled = false;
+    const handleCallerAbort = (): void => {
+      controller?.abort();
+      finish(Number.POSITIVE_INFINITY);
+    };
     const finish = (ms: number): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      signal?.removeEventListener('abort', handleCallerAbort);
       resolve(ms);
     };
 
+    const boundedTimeout = Number.isFinite(timeoutMs) && timeoutMs >= 0
+      ? timeoutMs
+      : DEFAULT_PROBE_TIMEOUT_MS;
     const timer = setTimeout(() => {
       controller?.abort();
       finish(Number.POSITIVE_INFINITY);
-    }, timeoutMs);
+    }, boundedTimeout);
+    signal?.addEventListener('abort', handleCallerAbort, { once: true });
 
     const start = performance.now();
     // no-cors: we only need the round-trip, not the body (opaque response is fine).
@@ -90,27 +115,74 @@ export function pingNode(node: IrcNode, timeoutMs = 4000): Promise<number> {
     // NOTE: no-cors REQUIRES redirect:'follow' — 'manual' makes the fetch
     // reject outright ("redirect mode is not follow"), which read as the node
     // being permanently unreachable and broke nearest-node selection.
-    fetch(`https://${node.host}/?_lat=${start}`, {
-      mode: 'no-cors',
-      cache: 'no-store',
-      signal: controller?.signal,
-    })
-      .then(() => finish(performance.now() - start))
-      .catch(() => finish(Number.POSITIVE_INFINITY));
+    try {
+      void fetch(`https://${node.host}/?_lat=${start}`, {
+        mode: 'no-cors',
+        cache: 'no-store',
+        signal: controller?.signal ?? signal,
+      })
+        .then(() => finish(performance.now() - start))
+        .catch(() => finish(Number.POSITIVE_INFINITY));
+    } catch {
+      // Some fetch implementations throw synchronously for invalid options.
+      finish(Number.POSITIVE_INFINITY);
+    }
   });
+}
+
+function probeConcurrency(requested: number | undefined, nodeCount: number): number {
+  const finite = requested !== undefined && Number.isFinite(requested)
+    ? Math.floor(requested)
+    : DEFAULT_MAX_CONCURRENT_PROBES;
+  return Math.min(nodeCount, Math.max(1, finite));
+}
+
+async function probeNodes(
+  nodes: readonly IrcNode[],
+  options: NodeSelectionOptions,
+): Promise<Array<{ node: IrcNode; ms: number }>> {
+  const results: Array<{ node: IrcNode; ms: number } | undefined> = new Array(nodes.length);
+  let nextIndex = 0;
+
+  const worker = async (): Promise<void> => {
+    while (!options.signal?.aborted) {
+      const index = nextIndex++;
+      const node = nodes[index];
+      if (!node) return;
+      results[index] = {
+        node,
+        ms: await pingNode(node, options.timeoutMs, options.signal),
+      };
+    }
+  };
+
+  const workers = Array.from(
+    { length: probeConcurrency(options.maxConcurrency, nodes.length) },
+    () => worker(),
+  );
+  await Promise.all(workers);
+  return results.filter((result): result is { node: IrcNode; ms: number } => result !== undefined);
 }
 
 /**
  * Pick the node to attach to: an env pin always wins; otherwise probe every node
- * in parallel and choose the lowest-latency (nearest) reachable one. If none
- * answer, fall back to a random node so a connection is still attempted.
+ * with bounded concurrency and choose the lowest-latency (nearest) reachable
+ * one. If none answer, fall back to a random node so connection is attempted.
  */
-export async function selectBestNode(nodes: readonly IrcNode[] = NODES): Promise<IrcNode> {
+export async function selectBestNode(
+  nodes: readonly IrcNode[] = NODES,
+  options: NodeSelectionOptions = {},
+): Promise<IrcNode> {
   const pinned = envNode();
   if (pinned) return pinned;
 
-  const probed = await Promise.all(nodes.map(async (node) => ({ node, ms: await pingNode(node) })));
-  const reachable = probed.filter((r) => Number.isFinite(r.ms)).sort((a, b) => a.ms - b.ms);
+  const probed = await probeNodes(nodes, options);
+  let fastest: { node: IrcNode; ms: number } | undefined;
+  for (const result of probed) {
+    if (Number.isFinite(result.ms) && (!fastest || result.ms < fastest.ms)) {
+      fastest = result;
+    }
+  }
 
-  return reachable[0]?.node ?? randomNode(nodes);
+  return fastest?.node ?? randomNode(nodes);
 }

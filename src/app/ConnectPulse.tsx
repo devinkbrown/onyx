@@ -30,20 +30,24 @@ const NODE_ROLE: Record<string, string> = {
   'ircx.us': 'mesh peer',
 };
 
-async function pingAll(): Promise<NodePing[]> {
+async function pingAll(signal?: AbortSignal): Promise<NodePing[]> {
   const results = await Promise.all(
-    NODES.map(async (n) => ({ host: n.host, ms: await pingNode(n, 2500) })),
+    NODES.map(async (n) => ({ host: n.host, ms: await pingNode(n, 2500, signal) })),
   );
   return results;
 }
 
 export function ConnectPulse(props: { deepLink?: string | null }): JSX.Element {
+  const pingController = typeof AbortController === 'undefined' ? null : new AbortController();
   const [stats] = createResource(fetchStatsIndex);
-  const [pings] = createResource(pingAll);
+  const [pings] = createResource(() => pingAll(pingController?.signal));
 
   const [nowMs, setNowMs] = createSignal(Date.now());
   const clock = setInterval(() => setNowMs(Date.now()), 30_000);
-  onCleanup(() => clearInterval(clock));
+  onCleanup(() => {
+    clearInterval(clock);
+    pingController?.abort();
+  });
 
   const rooms = createMemo(() => {
     const data = stats();

@@ -61,7 +61,7 @@ import {
   type RememberedIdentity,
   type SavedCredentials,
 } from '@/lib/credentials';
-import { initialNode, selectBestNode, type IrcNode } from './nodes';
+import { initialNode, NODES, selectBestNode, type IrcNode } from './nodes';
 import { installConnectPageLifecycle } from './connectPageLifecycle';
 
 // ── Deep-water atmosphere — depth, azure currents, bioluminescence ───────────
@@ -414,7 +414,16 @@ export function Connect(props: ConnectProps): JSX.Element {
 
   onMount(() => {
     onCleanup(installConnectPageLifecycle(getState));
-    void selectBestNode().then((node) => {
+    const nodeSelectionController = typeof AbortController === 'undefined'
+      ? null
+      : new AbortController();
+    let selectionActive = true;
+    onCleanup(() => {
+      selectionActive = false;
+      nodeSelectionController?.abort();
+    });
+    void selectBestNode(NODES, { signal: nodeSelectionController?.signal }).then((node) => {
+      if (!selectionActive) return;
       setChosenNode(node);
       setRouting(false);
     });

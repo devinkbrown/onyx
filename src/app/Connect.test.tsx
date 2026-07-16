@@ -16,13 +16,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { cleanup, render, screen, fireEvent, waitFor, within } from '@solidjs/testing-library';
 import { Connect } from './Connect';
-import { NODES } from './nodes';
+import { NODES, selectBestNode } from './nodes';
 import { store, getState } from '@/lib/store';
 import { preferences, resetPreferences } from '@/lib/prefs/preferences';
 import { loadCredentials } from '@/lib/credentials';
 
-// The connect screen probes node latency by opening real WebSockets on mount.
-// In jsdom that would hit the live servers, so stub the probe + selector here —
+// The connect screen probes node latency through lightweight HTTPS on mount.
+// In jsdom that would hit the live web tiers, so stub the probe + selector here —
 // real latency routing is exercised in the browser / e2e, not in unit tests.
 vi.mock('./nodes', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./nodes')>();
@@ -113,6 +113,20 @@ describe('Connect screen rendering', () => {
   it('shows the auto-routing indicator', () => {
     render(() => <Connect />);
     expect(screen.getAllByText(/nearest node/i).length).toBeGreaterThan(0);
+  });
+
+  it('aborts its latency selection when the connect screen unmounts', async () => {
+    let selectionSignal: AbortSignal | undefined;
+    vi.mocked(selectBestNode).mockImplementationOnce((_nodes, options) => {
+      selectionSignal = options?.signal;
+      return new Promise(() => {});
+    });
+    const view = render(() => <Connect />);
+    await waitFor(() => expect(selectionSignal).toBeDefined());
+
+    view.unmount();
+
+    expect(selectionSignal?.aborted).toBe(true);
   });
 
   it('renders the three-mode switch', () => {
