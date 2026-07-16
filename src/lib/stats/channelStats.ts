@@ -8,6 +8,9 @@
  * this is the same contract proven in orochi-stats/src/lib/slug.ts.
  */
 
+import { boundedFeedInteger, PUBLIC_FEED_COUNT_MAX } from './feedBounds';
+import { fetchPublicJson } from './fetchPublicJson';
+
 const MAX_SLUG_BYTES = 128;
 // IRC channel sigils the server strips (a single leading one).
 const STRIP_SIGILS = new Set([0x23 /* # */, 0x26 /* & */, 0x2b /* + */, 0x21 /* ! */]);
@@ -47,7 +50,11 @@ export type ChannelPulse = {
 
 function normalizeHours(raw: unknown): number[] | null {
   if (!Array.isArray(raw) || raw.length !== 24) return null;
-  return raw.map((n) => (typeof n === 'number' && n > 0 ? Math.floor(n) : 0));
+  return raw.map((n) => boundedFeedInteger(n));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -58,18 +65,15 @@ export async function fetchChannelPulse(channel: string): Promise<ChannelPulse |
   const slug = channelToSlug(channel);
   if (!slug) return null;
   try {
-    const res = await fetch(`/stats/data/${encodeURIComponent(slug)}.json`, {
-      headers: { Accept: 'application/json' },
-    });
-    if (!res.ok) return null;
-    const raw = (await res.json()) as Record<string, unknown>;
+    const raw = await fetchPublicJson(`/stats/data/${encodeURIComponent(slug)}.json`);
+    if (!isRecord(raw)) return null;
     const hours = normalizeHours(raw['hours']);
     if (!hours) return null;
     const totals = raw['totals'];
-    const total =
-      typeof totals === 'object' && totals !== null && typeof (totals as Record<string, unknown>)['messages'] === 'number'
-        ? ((totals as Record<string, unknown>)['messages'] as number)
-        : hours.reduce((a, b) => a + b, 0);
+    const reportedTotal = isRecord(totals) ? totals['messages'] : undefined;
+    const total = typeof reportedTotal === 'number' && Number.isFinite(reportedTotal) && reportedTotal >= 0
+      ? boundedFeedInteger(reportedTotal)
+      : Math.min(hours.reduce((a, b) => a + b, 0), PUBLIC_FEED_COUNT_MAX);
     return { hours, total };
   } catch {
     return null;
