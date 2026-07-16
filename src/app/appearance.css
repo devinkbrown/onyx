@@ -159,3 +159,37 @@
 .ap-lede-hint b { font-family: var(--font-mono); font-weight: 600; }
 
 .ap-studio { margin-top: clamp(34px, 5vw, 64px); }
+
+/* The display headline and serif introduction are intentionally expansive at
+   normal sizes, but must not become the route's horizontal canvas at 400%.
+   Browser zoom still magnifies these fixed CSS pixels physically. */
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .ap-bar {
+    gap: 8px;
+    padding: 8px;
+    flex-wrap: wrap;
+  }
+
+  .ap-wrap {
+    min-width: 0;
+    padding: 16px;
+  }
+
+  .ap-h1 {
+    font-size: 44px;
+    line-height: 1;
+    overflow-wrap: anywhere;
+  }
+
+  .ap-lede {
+    font-size: 16px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+
+  .ap-chip {
+    max-width: 100%;
+    min-height: 44px;
+    overflow-wrap: anywhere;
+  }
+}

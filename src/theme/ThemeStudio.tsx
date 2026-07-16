@@ -2539,6 +2539,312 @@ const STUDIO_CSS = `
   border-color: var(--lapis);
 }
 .ts-save-input::placeholder { color: var(--washi-mute); }
+
+/* At 400% zoom the studio is a narrow editing surface, not a scaled desktop
+   canvas. Collapse decorative preview chrome and let every editing group own
+   its wrapping so the page never inherits a multi-column min-content width. */
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .ts-studio,
+  .ts-studio * {
+    min-width: 0;
+  }
+
+  .ts-studio {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .ts-header,
+  .ts-section,
+  .ts-editor,
+  .ts-preview-pane,
+  .ts-footer {
+    padding: 8px;
+  }
+
+  .ts-header,
+  .ts-factory__col,
+  .ts-group,
+  .ts-preview-pane {
+    gap: 8px;
+  }
+
+  .ts-header__title-row,
+  .ts-factory__col-head,
+  .ts-audit__head {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .ts-header__desc,
+  .ts-factory__hint,
+  .ts-eyedropper-status,
+  .ts-error {
+    overflow-wrap: anywhere;
+  }
+
+  .ts-header__desc,
+  .ts-factory__hint,
+  .ts-eyedropper-status {
+    font-size: 16px;
+    line-height: 1.4;
+  }
+
+  .ts-eyebrow,
+  .ts-section__heading,
+  .ts-token-label {
+    font-size: 14px;
+    letter-spacing: 0.08em;
+  }
+
+  .ts-section__heading {
+    margin-bottom: 8px;
+  }
+
+  .ts-theme-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  .ts-theme-chip {
+    width: 100%;
+    min-height: 44px;
+    padding: 8px 10px;
+    font-size: 14px;
+  }
+
+  .ts-factory__col {
+    padding: 8px;
+  }
+
+  .ts-scheme-toggle {
+    display: flex;
+    width: 100%;
+  }
+
+  .ts-scheme-toggle__btn {
+    flex: 1 1 0;
+    min-height: 44px;
+    padding: 8px;
+    font-size: 14px;
+  }
+
+  .ts-factory__actions,
+  .ts-seed-transfer,
+  .ts-footer__left,
+  .ts-footer__right,
+  .ts-save-row {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .ts-seed-transfer {
+    width: 100%;
+    padding: 4px 0 0;
+    border-inline-start: 0;
+    border-top: 1px solid var(--seam-faint);
+  }
+
+  .ts-studio .onyx-button {
+    min-height: 44px;
+    max-width: 100%;
+    padding: 8px 10px;
+    font-size: 14px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .ts-seed-colors {
+    gap: 8px;
+  }
+
+  .ts-seed-color {
+    width: 100%;
+  }
+
+  .ts-token-color-row {
+    gap: 8px;
+  }
+
+  .ts-token-swatch {
+    width: 44px;
+    height: 44px;
+    padding: 2px;
+    flex: none;
+  }
+
+  .ts-token-value {
+    font-size: 14px;
+    overflow-wrap: anywhere;
+  }
+
+  .ts-audit {
+    padding: 8px;
+  }
+
+  .ts-audit__row {
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    gap: 4px 8px;
+  }
+
+  .ts-audit__sample {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    width: 44px;
+    height: 44px;
+    font-size: 16px;
+  }
+
+  .ts-audit__label {
+    grid-column: 2 / -1;
+    grid-row: 1;
+    font-size: 16px;
+    overflow-wrap: anywhere;
+  }
+
+  .ts-audit__ratio {
+    grid-column: 2;
+    grid-row: 2;
+    font-size: 14px;
+  }
+
+  .ts-audit__badge {
+    grid-column: 3;
+    grid-row: 2;
+    padding: 2px 6px;
+    font-size: 12px;
+  }
+
+  .ts-preview__bar {
+    gap: 4px;
+    padding: 8px;
+  }
+
+  .ts-preview__bar-title {
+    font-size: 14px;
+    overflow-wrap: anywhere;
+  }
+
+  .ts-preview__chrome {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ts-preview,
+  .ts-preview__chrome,
+  .ts-pv-main {
+    overflow: hidden;
+  }
+
+  .ts-pv-side,
+  .ts-pv-members {
+    display: none;
+  }
+
+  .ts-pv-head {
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 8px;
+  }
+
+  .ts-pv-head__chan {
+    font-size: 14px;
+  }
+
+  .ts-pv-head__topic {
+    display: none;
+  }
+
+  .ts-pv-badge {
+    padding: 2px 4px;
+    font-size: 10px;
+  }
+
+  .ts-pv-thread {
+    gap: 4px;
+    padding: 8px;
+  }
+
+  .ts-pv-msg {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 2px 4px;
+    font-size: 14px;
+  }
+
+  .ts-pv-msg__time {
+    font-size: 10px;
+  }
+
+  .ts-pv-msg__nick {
+    font-size: 12px;
+    overflow-wrap: anywhere;
+  }
+
+  .ts-pv-msg__text {
+    grid-column: 1 / -1;
+    font-size: 14px;
+    overflow-wrap: anywhere;
+  }
+
+  .ts-pv-actions {
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 0 8px 8px;
+  }
+
+  .ts-pv-btn {
+    min-height: 44px;
+    max-width: 100%;
+    padding: 8px;
+    font-size: 12px;
+    overflow-wrap: anywhere;
+  }
+
+  .ts-pv-composer {
+    gap: 4px;
+    margin: 0 8px 8px;
+    padding: 8px;
+  }
+
+  .ts-pv-composer__prompt {
+    font-size: 14px;
+  }
+
+  .ts-pv-composer__ghost,
+  .ts-pv-composer__cursor {
+    font-size: 12px;
+  }
+
+  .ts-footer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .ts-footer__left,
+  .ts-footer__right,
+  .ts-save-row {
+    width: 100%;
+  }
+
+  .ts-save-input {
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: 100%;
+    min-height: 44px;
+    padding: 8px 10px;
+    font-size: 16px;
+  }
+
+  .ts-error {
+    width: 100%;
+    font-size: 14px;
+  }
+}
 `;
 
 // Inject the studio styles once at module evaluation time.
