@@ -29,6 +29,13 @@ export interface EmbeddingProvider {
 /** Never fan one local recall query out into an unbounded provider burst. */
 export const EMBEDDING_MAX_CONCURRENCY = 4;
 
+/** Bounds for the explicitly opt-in local Ollama HTTP provider. */
+export const OLLAMA_RESPONSE_MAX_BYTES = 2 * 1024 * 1024;
+export const OLLAMA_REQUEST_TIMEOUT_MS = 15_000;
+export const OLLAMA_PROMPT_MAX_CHARS = 65_536;
+export const OLLAMA_MODEL_MAX_CHARS = 128;
+export const OLLAMA_MAX_DIM = 4_096;
+
 export interface EmbeddedItem<T> {
   item: T;
   vector: Float32Array;
@@ -221,6 +228,45 @@ export interface OllamaEmbeddingConfig {
   enabled: boolean;
 }
 
+async function readOllamaJson(response: Response, controller: AbortController): Promise<unknown | null> {
+  const declaredLength = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declaredLength) && declaredLength > OLLAMA_RESPONSE_MAX_BYTES) return null;
+
+  try {
+    if (!response.body) {
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (bytes.byteLength > OLLAMA_RESPONSE_MAX_BYTES) return null;
+      return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+    }
+
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      total += value.byteLength;
+      if (total > OLLAMA_RESPONSE_MAX_BYTES) {
+        controller.abort();
+        void reader.cancel().catch(() => {});
+        return null;
+      }
+      chunks.push(value);
+    }
+
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * GATED stub for a local Ollama embedding model. Kept model- and
  * network-agnostic and NEVER exercised by unit tests or the default search —
@@ -233,8 +279,15 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
   private readonly config: OllamaEmbeddingConfig;
 
   constructor(config: OllamaEmbeddingConfig) {
-    this.config = config;
-    this.dim = config.dim;
+    this.dim = typeof config.dim === 'number' && Number.isFinite(config.dim) && config.dim > 0
+      ? Math.min(Math.floor(config.dim), OLLAMA_MAX_DIM)
+      : EMBEDDING_DIM;
+    this.config = {
+      ...config,
+      endpoint: config.endpoint.slice(0, 2_048),
+      model: config.model.slice(0, OLLAMA_MODEL_MAX_CHARS),
+      dim: this.dim,
+    };
   }
 
   /** True only when opted in and a fetch implementation exists. */
@@ -244,21 +297,28 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
 
   async embed(text: string): Promise<Float32Array> {
     if (!this.isAvailable()) return new Float32Array(this.dim);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), OLLAMA_REQUEST_TIMEOUT_MS);
     try {
       const res = await fetch(`${this.config.endpoint.replace(/\/+$/, '')}/api/embeddings`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ model: this.config.model, prompt: text }),
+        body: JSON.stringify({
+          model: this.config.model,
+          prompt: text.slice(0, OLLAMA_PROMPT_MAX_CHARS),
+        }),
+        signal: controller.signal,
       });
       if (!res.ok) return new Float32Array(this.dim);
-      const data: unknown = await res.json();
+      const data = await readOllamaJson(res, controller);
       const embedding =
         typeof data === 'object' && data !== null && Array.isArray((data as { embedding?: unknown }).embedding)
           ? (data as { embedding: unknown[] }).embedding
           : null;
       if (!embedding) return new Float32Array(this.dim);
-      const vec = new Float32Array(embedding.length);
-      for (let i = 0; i < embedding.length; i += 1) {
+      const vec = new Float32Array(this.dim);
+      const length = Math.min(embedding.length, this.dim);
+      for (let i = 0; i < length; i += 1) {
         const value = embedding[i];
         vec[i] = typeof value === 'number' && Number.isFinite(value) ? value : 0;
       }
@@ -266,6 +326,8 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
     } catch {
       // Network / daemon unavailable — fail soft to a zero vector.
       return new Float32Array(this.dim);
+    } finally {
+      clearTimeout(timeout);
     }
   }
 }

@@ -3,13 +3,16 @@
  * embeddingIndex.test.ts — the pure, model-free embedding math behind
  * vault-RAG. No DOM, no IndexedDB: all deterministic.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   EMBEDDING_DIM,
   EMBEDDING_MAX_CONCURRENCY,
   HashingEmbeddingProvider,
   OllamaEmbeddingProvider,
+  OLLAMA_MODEL_MAX_CHARS,
+  OLLAMA_PROMPT_MAX_CHARS,
+  OLLAMA_RESPONSE_MAX_BYTES,
   cosineSimilarity,
   embed,
   embedItemsBounded,
@@ -353,6 +356,8 @@ describe('HashingEmbeddingProvider', () => {
 describe('OllamaEmbeddingProvider (gated stub)', () => {
   const config = { endpoint: 'http://127.0.0.1:11434', model: 'nomic-embed-text', dim: 8, enabled: false };
 
+  afterEach(() => vi.unstubAllGlobals());
+
   it('is unavailable when not explicitly enabled', () => {
     const provider = new OllamaEmbeddingProvider(config);
     expect(provider.isAvailable()).toBe(false);
@@ -367,5 +372,43 @@ describe('OllamaEmbeddingProvider (gated stub)', () => {
 
   it('exposes its declared dimensionality', () => {
     expect(new OllamaEmbeddingProvider(config).dim).toBe(8);
+  });
+
+  it('returns exactly its declared dimension and bounds the request fields', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ embedding: [1, 2, 3, 4, 5] })));
+    vi.stubGlobal('fetch', fetchMock);
+    const provider = new OllamaEmbeddingProvider({
+      endpoint: 'http://127.0.0.1:11434/',
+      model: 'm'.repeat(OLLAMA_MODEL_MAX_CHARS + 20),
+      dim: 3,
+      enabled: true,
+    });
+
+    const vector = await provider.embed('p'.repeat(OLLAMA_PROMPT_MAX_CHARS + 20));
+
+    expect(Array.from(vector)).toEqual([1, 2, 3]);
+    const request = fetchMock.mock.calls[0]![1] as RequestInit;
+    const body = JSON.parse(String(request.body)) as { model: string; prompt: string };
+    expect(body.model).toHaveLength(OLLAMA_MODEL_MAX_CHARS);
+    expect(body.prompt).toHaveLength(OLLAMA_PROMPT_MAX_CHARS);
+    expect(request.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('pads short vectors, replaces non-finite entries, and rejects oversized responses', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ embedding: [1, Number.POSITIVE_INFINITY] })))
+      .mockResolvedValueOnce(new Response('{}', {
+        headers: { 'content-length': String(OLLAMA_RESPONSE_MAX_BYTES + 1) },
+      }));
+    vi.stubGlobal('fetch', fetchMock);
+    const provider = new OllamaEmbeddingProvider({ ...config, dim: 4, enabled: true });
+
+    expect(Array.from(await provider.embed('first'))).toEqual([1, 0, 0, 0]);
+    expect(Array.from(await provider.embed('second'))).toEqual([0, 0, 0, 0]);
+  });
+
+  it('sanitizes invalid declared dimensions instead of allocating attacker-sized vectors', () => {
+    expect(new OllamaEmbeddingProvider({ ...config, dim: Number.POSITIVE_INFINITY }).dim).toBe(EMBEDDING_DIM);
+    expect(new OllamaEmbeddingProvider({ ...config, dim: 1_000_000 }).dim).toBe(4_096);
   });
 });
