@@ -3,7 +3,10 @@ import { createStore } from 'zustand/vanilla';
 import { subscribeWithSelector } from 'zustand/middleware';
 import {
   parseCounterRecord,
+  parseCtcpConfig,
   parseEmojiArray,
+  parseFriendArray,
+  normalizeCtcpVersionReply,
   parseStringArray,
   parseStringArrayRecord,
   parseStringRecord,
@@ -9296,9 +9299,10 @@ export const store = createStore<OnyxState>()(
     ctcpPingEnabled: true,
     ctcpEnabled: true,
     setCTCPVersionReply: (reply) => {
-      const cfg = { ..._loadCTCPConfig(), versionReply: reply };
+      const versionReply = normalizeCtcpVersionReply(reply);
+      const cfg = { ..._loadCTCPConfig(), versionReply };
       _saveCTCPConfig(cfg);
-      set({ ctcpVersionReply: reply });
+      set({ ctcpVersionReply: versionReply });
     },
     setCTCPTimeEnabled: (enabled) => {
       const cfg = { ..._loadCTCPConfig(), timeEnabled: enabled };
@@ -11417,8 +11421,10 @@ function _loadFriends(): Map<string, FriendEntry> {
   try {
     const raw = localStorage.getItem('onyx:friends');
     if (!raw) return new Map();
-    const arr = JSON.parse(raw) as Array<{ nick: string; note?: string }>;
-    return new Map(arr.map(f => [f.nick.toLowerCase(), { nick: f.nick, online: false, note: f.note }]));
+    return new Map(parseFriendArray(raw).map((friend) => [
+      friend.nick.toLowerCase(),
+      { nick: friend.nick, online: false, ...(friend.note !== undefined ? { note: friend.note } : {}) },
+    ]));
   } catch {
     return new Map();
   }
@@ -11505,12 +11511,10 @@ const CTCP_CONFIG_KEY = 'onyx:ctcp-config';
 interface CTCPConfig { versionReply: string; timeEnabled: boolean; }
 
 function _loadCTCPConfig(): CTCPConfig {
-  if (typeof window === 'undefined') return { versionReply: 'Onyx IRC Client', timeEnabled: true };
+  if (typeof window === 'undefined') return parseCtcpConfig(null);
   try {
-    const raw = localStorage.getItem(CTCP_CONFIG_KEY);
-    if (!raw) return { versionReply: 'Onyx IRC Client', timeEnabled: true };
-    return JSON.parse(raw) as CTCPConfig;
-  } catch { return { versionReply: 'Onyx IRC Client', timeEnabled: true }; }
+    return parseCtcpConfig(localStorage.getItem(CTCP_CONFIG_KEY));
+  } catch { return parseCtcpConfig(null); }
 }
 function _saveCTCPConfig(cfg: CTCPConfig): void {
   if (typeof window === 'undefined') return;

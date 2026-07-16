@@ -2,7 +2,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   parseCounterRecord,
+  parseCtcpConfig,
   parseEmojiArray,
+  parseFriendArray,
+  normalizeCtcpVersionReply,
   parseStringArray,
   parseStringArrayRecord,
   parseStringRecord,
@@ -205,5 +208,38 @@ describe('bounded record parsers', () => {
       index % 2 === 0 ? `value-${index}` : index,
     ]));
     expect(Object.keys(parseStringRecord(JSON.stringify(mixed)))).toHaveLength(150);
+  });
+});
+
+describe('structured persisted preferences', () => {
+  it('recovers valid friends, resets duplicates, and bounds fields', () => {
+    expect(parseFriendArray(JSON.stringify([
+      { nick: 'Alice', note: 'met at #onyx', online: true },
+      { nick: 'alice', note: 'duplicate' },
+      { nick: 'Bob', note: 7 },
+      { nick: '' },
+      { nick: 'x'.repeat(129) },
+      null,
+    ]))).toEqual([
+      { nick: 'Alice', note: 'met at #onyx' },
+      { nick: 'Bob' },
+    ]);
+    expect(parseFriendArray('{}')).toEqual([]);
+  });
+
+  it('normalizes CTCP configuration without trusting valid JSON shape', () => {
+    expect(parseCtcpConfig(JSON.stringify({
+      versionReply: 'Custom\r\n\0\x01Reply',
+      timeEnabled: false,
+    }))).toEqual({ versionReply: 'CustomReply', timeEnabled: false });
+    expect(parseCtcpConfig(JSON.stringify({ versionReply: 7, timeEnabled: 'yes' }))).toEqual({
+      versionReply: 'Onyx IRC Client',
+      timeEnabled: true,
+    });
+    expect(parseCtcpConfig('[]')).toEqual({
+      versionReply: 'Onyx IRC Client',
+      timeEnabled: true,
+    });
+    expect(normalizeCtcpVersionReply('x'.repeat(300))).toHaveLength(256);
   });
 });
