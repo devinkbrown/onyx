@@ -28,9 +28,15 @@ import {
   fromB64url,
   toB64url,
 } from '@/lib/e2ee/dmCipher';
-import { pinnedPeerKey } from '@/lib/e2ee/keyPinning';
+import { pinnedPeerKey as readPinnedPeerKey } from '@/lib/e2ee/keyPinning';
 
 const initialState = store.getInitialState();
+const MEMORY_OWNER = { serverUrl: 'wss://e2ee-store.example/ws', identity: 'alice' } as const;
+const BOB_MEMORY_OWNER = { ...MEMORY_OWNER, identity: 'bob' } as const;
+
+function pinnedPeerKey(peer: string): Promise<string | null> {
+  return readPinnedPeerKey(peer, MEMORY_OWNER);
+}
 
 /** A peer device that can seal to us, mirroring dmCipher's static-static derivation. */
 async function makePeer(myPublicB64: string) {
@@ -99,12 +105,73 @@ beforeEach(() => {
   _resetDeviceKeysForTests();
   _resetSharedKeysForTests();
   localStorage.clear();
-  store.setState({ ...initialState, ourNick: 'me', connectionStatus: 'connected', client: mockClient() }, true);
+  store.setState({
+    ...initialState,
+    ourNick: 'me',
+    connectionStatus: 'connected',
+    client: mockClient(),
+    server: {
+      id: 'e2ee-store',
+      name: 'E2EE store test',
+      network: 'e2ee-store',
+      url: MEMORY_OWNER.serverUrl,
+      icon: 'E',
+      nick: 'me',
+      account: MEMORY_OWNER.identity,
+      connected: true,
+    },
+  }, true);
 });
 
 afterEach(() => vi.useRealTimers());
 
 describe('DM key pinning (TOFU) through the store', () => {
+  it('rejects an Alice decrypt completion after the live account switches to Bob', async () => {
+    const mine = await deviceKeys();
+    const peer = await makePeer(mine!.publicB64);
+    const envelope = await peer.seal('Alice account plaintext');
+    const message = {
+      id: 'shared-server-message-id',
+      time: new Date(1_000),
+      from: 'trev',
+      text: envelope,
+      encrypted: true,
+      type: 'msg',
+      target: 'me',
+    } as const;
+    store.setState({
+      peerDmKeys: new Map([['trev', peer.publicB64]]),
+      dms: new Map([['trev', {
+        nick: 'trev',
+        account: 'trev',
+        unread: 0,
+        highlights: 0,
+        messages: [message],
+      }]]) as never,
+    });
+
+    store.getState()._decryptDm('trev', message.id);
+    feed(':e2ee-store.example 900 me me!u@h bob :You are now logged in as bob');
+    store.setState({
+      peerDmKeys: new Map([['trev', peer.publicB64]]),
+      dms: new Map([['trev', {
+        nick: 'trev',
+        account: 'trev',
+        unread: 0,
+        highlights: 0,
+        messages: [{ ...message }],
+      }]]) as never,
+    });
+
+    await untilAsync(async () => (await readPinnedPeerKey('trev', MEMORY_OWNER)) === peer.publicB64);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(store.getState().server?.account).toBe('bob');
+    expect(await readPinnedPeerKey('trev', BOB_MEMORY_OWNER)).toBeNull();
+    expect(dmMsgs('trev')[0]?.plaintext).toBeUndefined();
+    expect(store.getState().notifications.some((entry) => entry.text === 'Alice account plaintext')).toBe(false);
+  });
+
   it('routes the DM send through sealDmTrusted — first use pins the key, then seals unchanged', async () => {
     const mine = await deviceKeys();
     const peer = await makePeer(mine!.publicB64);

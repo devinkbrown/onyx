@@ -15,6 +15,7 @@ import { MemberList } from './MemberList';
 import { PresenceRibbon } from './PresenceRibbon';
 
 const initialState = store.getInitialState();
+const MEMORY_OWNER = { serverUrl: 'wss://channel-settings.example/ws', identity: 'me' } as const;
 
 function makeClient() {
   return {
@@ -58,6 +59,16 @@ function seedChannel(opts: { ourNick: string; users: ChannelUser[]; modes?: stri
     channels,
     channelProps,
     ourNick: opts.ourNick,
+    server: {
+      id: 'channel-settings',
+      name: 'Channel settings test',
+      network: 'channel-settings',
+      url: MEMORY_OWNER.serverUrl,
+      icon: 'C',
+      nick: opts.ourNick,
+      account: MEMORY_OWNER.identity,
+      connected: true,
+    },
     activeView: { kind: 'channel', channel: '#general' },
     connectionStatus: 'connected',
   }, true);

@@ -3516,10 +3516,27 @@ function deliverChatMessage(
   const isDm = target.length > 0 && !cp.includes(target[0]!);
   const peerKey = get().peerDmKeys.get(target.toLowerCase());
   if (isDm && peerKey && preferences().e2eeDms) {
+    const memoryContext = captureDeviceMemoryContext(get());
+    if (!memoryContext) {
+      get().addToast({
+        variant: 'error',
+        title: 'Encryption unavailable',
+        description: `Your message to ${target} was NOT sent because Onyx could not resolve the active account's encryption trust store.`,
+      });
+      get().addNotification({
+        type: 'error',
+        text: `Encryption unavailable — message to ${target} was not sent (no active account trust namespace).`,
+      });
+      return false;
+    }
     const encryptedKind: E2eeMessageKind | null = client.negotiatedCaps.has(E2EE_CAP) ? 'mls' : null;
     const encryptedOutboundTags = encryptedKind ? { ...outboundTags, ...e2eeMessageTag(encryptedKind) } : outboundTags;
-    return sealDmTrusted(target, peerKey, text).then((outcome) => {
-      if (generation !== _accountGeneration || client !== get().client) return false;
+    return sealDmTrusted(target, peerKey, text, memoryContext.owner).then((outcome) => {
+      if (
+        generation !== _accountGeneration
+        || client !== get().client
+        || !isDeviceMemoryContextCurrent(memoryContext, get())
+      ) return false;
       if (outcome.status === 'key-changed') {
         // SECURITY — fail closed on a possible machine-in-the-middle.
         void get()._flagPeerKeyChange(target, peerKey);
@@ -6663,7 +6680,11 @@ export const store = createStore<OnyxState>()(
         }
         if (standard.kind === 'FAIL' && standard.command === 'SESSION') {
           clearSessionToken(get().server?.url, _connectNick || get().ourNick);
-          _sessionTokenWritesAllowed = false;
+          // A terminal resume failure invalidates the stale bearer, but a 900
+          // may already have authenticated this socket independently. Keep
+          // accepting the freshly-queued SESSION TOKEN only for that proven
+          // account; an ordinary guest remains unable to persist token notes.
+          _sessionTokenWritesAllowed = Boolean(_saslAccount || get().server?.account);
           _credentialTokenCanonicalOnly = true;
           get().client?.clearResumeTokens?.();
           _clearSessionRestore(set);
@@ -9513,6 +9534,17 @@ export const store = createStore<OnyxState>()(
                 passkeyError: null,
               };
             });
+            // Registration may have fallen back to a temporary nick after 433.
+            // Once 900 proves the canonical account, reclaim that nick now and
+            // keep retrying until the zombie session releases it.
+            const authenticated = get();
+            if (
+              authenticated.currentNickIsAlias
+              && authenticated.ourNick.toLowerCase() !== account900.toLowerCase()
+            ) {
+              authenticated.client?.sendRaw('NICK', account900);
+              _startNickReclaim(account900);
+            }
           }
           break;
         }
@@ -11221,6 +11253,8 @@ export const store = createStore<OnyxState>()(
 
     _decryptDm(target, id) {
       const key = target.toLowerCase();
+      const memoryContext = captureDeviceMemoryContext(get());
+      if (!memoryContext) return;
       const peerKey = get().peerDmKeys.get(key);
       if (!peerKey) return;
       const dm = get().dms.get(key);
@@ -11231,7 +11265,16 @@ export const store = createStore<OnyxState>()(
       // decrypt on an unchanged key, and stay LOCKED on a silently-changed sender
       // key — never a plaintext fallback. A key-change additionally raises the
       // visible warning (vs the benign wrong-device/rotated-key locked case).
-      void openDmTrusted(target, peerKey, envelope).then((outcome) => {
+      void openDmTrusted(target, peerKey, envelope, memoryContext.owner).then((outcome) => {
+        if (!isDeviceMemoryContextCurrent(memoryContext, get())) return;
+        if (get().peerDmKeys.get(key) !== peerKey) return;
+        const current = get().dms.get(key)?.messages.find((message) => message.id === id);
+        if (
+          !current
+          || !current.encrypted
+          || current.plaintext !== undefined
+          || current.text !== envelope
+        ) return;
         if (outcome.status !== 'opened') {
           // Ciphertext stays LOCKED (LOCKED_PLACEHOLDER in the view) — no
           // plaintext ever leaks on a decrypt/verify failure. Fail closed.
@@ -11260,14 +11303,19 @@ export const store = createStore<OnyxState>()(
 
     _flagPeerKeyChange(peer, newKey) {
       const key = peer.toLowerCase();
+      const memoryContext = captureDeviceMemoryContext(get());
+      if (!memoryContext) return Promise.resolve();
       // Fetch the previously-pinned key for the warning display / safety compare.
       // The pinnedPeerKey read is best-effort; an unreadable pin store still
       // raises the warning (fail closed) with an empty pinnedKey.
-      return pinnedPeerKey(peer).then((pinned) => {
+      return pinnedPeerKey(peer, memoryContext.owner).then((pinned) => {
         // Verification runs asynchronously. The directory may have advanced to
         // another key while this pin read was in flight; never let that stale
         // completion replace the key the user is being asked to verify.
-        if (get().peerDmKeys.get(key) !== newKey) return;
+        if (
+          !isDeviceMemoryContextCurrent(memoryContext, get())
+          || get().peerDmKeys.get(key) !== newKey
+        ) return;
         const already = get().peerKeyChanges.has(key);
         set(s => {
           const peerKeyChanges = new Map(s.peerKeyChanges);
@@ -11295,17 +11343,20 @@ export const store = createStore<OnyxState>()(
 
     acceptPeerKeyChange(peer) {
       const key = peer.toLowerCase();
+      const memoryContext = captureDeviceMemoryContext(get());
+      if (!memoryContext) return;
       // Accept only the exact pending key that is still advertised. A stale
       // warning must never re-pin an older key after the directory has advanced.
       const newKey = get().peerKeyChanges.get(key)?.newKey;
       if (!newKey || get().peerDmKeys.get(key) !== newKey) return;
-      void pinPeerKey(peer, newKey).then((ok) => {
+      void pinPeerKey(peer, newKey, memoryContext.owner).then((ok) => {
         // Could not persist the new pin → stay fail-closed, keep the warning.
         if (!ok) return;
         // The advertised/pending key can rotate again while IndexedDB persists
         // the acceptance. Keep that newer warning intact instead of clearing it.
         if (
-          get().peerDmKeys.get(key) !== newKey
+          !isDeviceMemoryContextCurrent(memoryContext, get())
+          || get().peerDmKeys.get(key) !== newKey
           || get().peerKeyChanges.get(key)?.newKey !== newKey
         ) return;
         set(s => {
@@ -11340,7 +11391,10 @@ export const store = createStore<OnyxState>()(
 
     loadSafetyNumber(peer) {
       const key = peer.toLowerCase();
-      return peerSafetyNumber(peer).then((sn) => {
+      const memoryContext = captureDeviceMemoryContext(get());
+      if (!memoryContext) return Promise.resolve(null);
+      return peerSafetyNumber(peer, memoryContext.owner).then((sn) => {
+        if (!isDeviceMemoryContextCurrent(memoryContext, get())) return null;
         if (sn == null) return null;
         set(s => {
           const peerSafetyNumbers = new Map(s.peerSafetyNumbers);
@@ -11353,14 +11407,21 @@ export const store = createStore<OnyxState>()(
 
     loadPendingKeySafetyNumber(peer) {
       const key = peer.toLowerCase();
+      const memoryContext = captureDeviceMemoryContext(get());
+      if (!memoryContext) return Promise.resolve(null);
       const newKey = get().peerKeyChanges.get(key)?.newKey;
       if (!newKey) return Promise.resolve(null);
       return deviceKeys().then((mine) => {
+        if (!isDeviceMemoryContextCurrent(memoryContext, get())) return null;
         if (!mine) return null;
         return safetyNumber(mine.publicB64, newKey).then((sn) => {
           // Guard against a race: only cache if the pending change still names
           // this exact key (an accept/dismiss/new-change may have intervened).
-          if (sn == null || get().peerKeyChanges.get(key)?.newKey !== newKey) return sn;
+          if (sn == null) return null;
+          if (
+            !isDeviceMemoryContextCurrent(memoryContext, get())
+            || get().peerKeyChanges.get(key)?.newKey !== newKey
+          ) return null;
           set(s => {
             const pendingKeySafetyNumbers = new Map(s.pendingKeySafetyNumbers);
             pendingKeySafetyNumbers.set(key, sn);

@@ -30,6 +30,7 @@ const KEY = PEER.toLowerCase();
 const PINNED_A = 'pinned-a';
 const STALE_B = 'stale-b';
 const CURRENT_C = 'current-c';
+const MEMORY_OWNER = { serverUrl: 'wss://key-rotation.example/ws', identity: 'alice' } as const;
 const B_SAFETY = '11111 11111 11111 11111 11111 11111 11111 11111 11111 11111 11111 11111';
 const C_SAFETY = '99999 99999 99999 99999 99999 99999 99999 99999 99999 99999 99999 99999';
 
@@ -40,7 +41,20 @@ function deferred<T>() {
 }
 
 beforeEach(() => {
-  store.setState(initialState, true);
+  store.setState({
+    ...initialState,
+    ourNick: 'alice',
+    server: {
+      id: 'key-rotation',
+      name: 'Key rotation test',
+      network: 'key-rotation',
+      url: MEMORY_OWNER.serverUrl,
+      icon: 'K',
+      nick: 'alice',
+      account: MEMORY_OWNER.identity,
+      connected: true,
+    },
+  }, true);
   keyPinningMocks.pinnedPeerKey.mockReset();
   keyPinningMocks.pinPeerKey.mockReset();
   keyPinningMocks.pinPeerKey.mockResolvedValue(true);
@@ -101,8 +115,8 @@ describe('DmKeyChangeBanner overlapping peer-key rotations', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /accept new key/i }));
     await waitFor(() => expect(keyPinningMocks.pinPeerKey).toHaveBeenCalledOnce());
-    expect(keyPinningMocks.pinPeerKey).toHaveBeenCalledWith(PEER, CURRENT_C);
-    expect(keyPinningMocks.pinPeerKey).not.toHaveBeenCalledWith(PEER, STALE_B);
+    expect(keyPinningMocks.pinPeerKey).toHaveBeenCalledWith(PEER, CURRENT_C, MEMORY_OWNER);
+    expect(keyPinningMocks.pinPeerKey).not.toHaveBeenCalledWith(PEER, STALE_B, MEMORY_OWNER);
   });
 
   it('refuses Accept when pending state no longer matches the advertised key', () => {

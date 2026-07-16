@@ -129,6 +129,24 @@ describe('safetyNumber', () => {
 });
 
 describe('peerKeyStatus + pin lifecycle', () => {
+  it('isolates the same peer pin by local account and quarantines the legacy bucket', async () => {
+    const localAlice = { serverUrl: 'wss://e2ee.example/ws', identity: 'alice' } as const;
+    const localBob = { serverUrl: 'wss://e2ee.example/ws', identity: 'bob' } as const;
+    const aliceView = await makePeer();
+    const bobView = await makePeer();
+    const legacyView = await makePeer();
+
+    await pinPeerKey('Trev', legacyView.publicB64);
+    await pinPeerKey('Trev', aliceView.publicB64, localAlice);
+    await pinPeerKey('Trev', bobView.publicB64, localBob);
+
+    expect(await pinnedPeerKey('trev', localAlice)).toBe(aliceView.publicB64);
+    expect(await pinnedPeerKey('trev', localBob)).toBe(bobView.publicB64);
+    expect(await pinnedPeerKey('trev')).toBe(legacyView.publicB64);
+    expect(await peerKeyStatus('TREV', bobView.publicB64, localAlice)).toBe('changed');
+    expect(await peerKeyStatus('TREV', bobView.publicB64, localBob)).toBe('unchanged');
+  });
+
   it('reports first-use when nothing is pinned, then unchanged after a pin', async () => {
     const peer = await makePeer();
     expect(await peerKeyStatus('Alice', peer.publicB64)).toBe('first-use');

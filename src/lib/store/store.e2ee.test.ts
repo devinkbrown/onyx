@@ -24,6 +24,7 @@ import {
 } from '@/lib/e2ee/dmCipher';
 
 const initialState = store.getInitialState();
+const MEMORY_OWNER = { serverUrl: 'wss://e2ee-flow.example/ws', identity: 'alice' } as const;
 
 /** A peer device that can seal to us, mirroring dmCipher's derivation. */
 async function makePeer(myPublicB64: string) {
@@ -100,7 +101,22 @@ beforeEach(() => {
   _resetDeviceKeysForTests();
   _resetSharedKeysForTests();
   localStorage.clear();
-  store.setState({ ...initialState, ourNick: 'me', connectionStatus: 'connected', client: mockClient() }, true);
+  store.setState({
+    ...initialState,
+    ourNick: 'me',
+    connectionStatus: 'connected',
+    client: mockClient(),
+    server: {
+      id: 'e2ee-flow',
+      name: 'E2EE flow test',
+      network: 'e2ee-flow',
+      url: MEMORY_OWNER.serverUrl,
+      icon: 'E',
+      nick: 'me',
+      account: MEMORY_OWNER.identity,
+      connected: true,
+    },
+  }, true);
 });
 
 afterEach(() => vi.useRealTimers());

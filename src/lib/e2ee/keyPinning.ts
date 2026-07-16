@@ -33,6 +33,10 @@
  */
 
 import { deviceKeys, isEnvelope, isValidPeerPublicKey, openDm, sealDm } from './dmCipher';
+import {
+  deviceMemoryOwnerKey,
+  type DeviceMemoryOwner,
+} from '@/lib/deviceMemoryOwner';
 
 // ── pin store (sibling IndexedDB) ─────────────────────────────────────────────
 
@@ -53,6 +57,19 @@ const PIN_STORE = 'pins';
  */
 function acctKey(account: string): string {
   return account.toLowerCase();
+}
+
+/**
+ * Physical trust bucket. Signed sessions always include the local owner, so two
+ * accounts on the same browser can make independent trust decisions about the
+ * same peer. Omitting `owner` deliberately addresses only the legacy bucket;
+ * old unowned pins stay quarantined instead of being claimed by the next login.
+ */
+function pinRecordKey(account: string, owner?: DeviceMemoryOwner): string | null {
+  const peer = acctKey(account);
+  if (owner === undefined) return peer;
+  const ownerKey = deviceMemoryOwnerKey(owner);
+  return ownerKey ? JSON.stringify([ownerKey, peer]) : null;
 }
 
 function openPinsDb(): Promise<IDBDatabase | null> {
@@ -77,13 +94,15 @@ function openPinsDb(): Promise<IDBDatabase | null> {
 /** ok:false means the store could not be read at all — callers MUST fail closed. */
 type PinRead = { ok: true; key: string | null } | { ok: false };
 
-function readPin(account: string): Promise<PinRead> {
+function readPin(account: string, owner?: DeviceMemoryOwner): Promise<PinRead> {
+  const recordKey = pinRecordKey(account, owner);
+  if (!recordKey) return Promise.resolve({ ok: false });
   return new Promise((resolve) => {
     void openPinsDb().then((db) => {
       if (!db) return resolve({ ok: false });
       try {
         const tx = db.transaction(PIN_STORE, 'readonly');
-        const get = tx.objectStore(PIN_STORE).get(acctKey(account));
+        const get = tx.objectStore(PIN_STORE).get(recordKey);
         get.onsuccess = () => {
           const val = get.result;
           db.close();
@@ -101,13 +120,15 @@ function readPin(account: string): Promise<PinRead> {
   });
 }
 
-function writePin(account: string, key: string): Promise<boolean> {
+function writePin(account: string, key: string, owner?: DeviceMemoryOwner): Promise<boolean> {
+  const recordKey = pinRecordKey(account, owner);
+  if (!recordKey) return Promise.resolve(false);
   return new Promise((resolve) => {
     void openPinsDb().then((db) => {
       if (!db) return resolve(false);
       try {
         const tx = db.transaction(PIN_STORE, 'readwrite');
-        tx.objectStore(PIN_STORE).put(key, acctKey(account));
+        tx.objectStore(PIN_STORE).put(key, recordKey);
         tx.oncomplete = () => {
           db.close();
           resolve(true);
@@ -128,13 +149,15 @@ function writePin(account: string, key: string): Promise<boolean> {
   });
 }
 
-function deletePin(account: string): Promise<void> {
+function deletePin(account: string, owner?: DeviceMemoryOwner): Promise<void> {
+  const recordKey = pinRecordKey(account, owner);
+  if (!recordKey) return Promise.resolve();
   return new Promise((resolve) => {
     void openPinsDb().then((db) => {
       if (!db) return resolve();
       try {
         const tx = db.transaction(PIN_STORE, 'readwrite');
-        tx.objectStore(PIN_STORE).delete(acctKey(account));
+        tx.objectStore(PIN_STORE).delete(recordKey);
         tx.oncomplete = () => {
           db.close();
           resolve();
@@ -154,8 +177,11 @@ function deletePin(account: string): Promise<void> {
 // ── public pin API ────────────────────────────────────────────────────────────
 
 /** The device key currently pinned for an account, or null if none / unreadable. */
-export async function pinnedPeerKey(account: string): Promise<string | null> {
-  const read = await readPin(account);
+export async function pinnedPeerKey(
+  account: string,
+  owner?: DeviceMemoryOwner,
+): Promise<string | null> {
+  const read = await readPin(account, owner);
   return read.ok ? read.key : null;
 }
 
@@ -165,14 +191,18 @@ export async function pinnedPeerKey(account: string): Promise<string | null> {
  * Returns false if the key is invalid OR the write could not be persisted — in
  * which case the caller must fail closed rather than proceed unverified.
  */
-export async function pinPeerKey(account: string, key: string): Promise<boolean> {
+export async function pinPeerKey(
+  account: string,
+  key: string,
+  owner?: DeviceMemoryOwner,
+): Promise<boolean> {
   if (!isValidPeerPublicKey(key)) return false;
-  return writePin(account, key);
+  return writePin(account, key, owner);
 }
 
 /** Forget an account's pin (drops back to first-use on next contact). */
-export function unpinPeerKey(account: string): Promise<void> {
-  return deletePin(account);
+export function unpinPeerKey(account: string, owner?: DeviceMemoryOwner): Promise<void> {
+  return deletePin(account, owner);
 }
 
 /** The trust verdict for a presented key against the account's pin. */
@@ -191,8 +221,12 @@ export type PeerKeyVerdict =
  * anything. Pure read: pinning happens explicitly in the gated seal/open paths
  * or via pinPeerKey, so a mere status check never establishes trust.
  */
-export async function peerKeyStatus(account: string, presentedKey: string): Promise<PeerKeyVerdict> {
-  const read = await readPin(account);
+export async function peerKeyStatus(
+  account: string,
+  presentedKey: string,
+  owner?: DeviceMemoryOwner,
+): Promise<PeerKeyVerdict> {
+  const read = await readPin(account, owner);
   if (!read.ok) return 'unreadable';
   if (read.key === null) return 'first-use';
   return read.key === presentedKey ? 'unchanged' : 'changed';
@@ -223,19 +257,20 @@ export async function sealDmTrusted(
   account: string,
   presentedKey: string,
   plaintext: string,
+  owner?: DeviceMemoryOwner,
 ): Promise<SealTrustedOutcome> {
   if (!isValidPeerPublicKey(presentedKey)) return { status: 'unavailable', envelope: null };
 
-  const verdict = await peerKeyStatus(account, presentedKey);
+  const verdict = await peerKeyStatus(account, presentedKey, owner);
   if (verdict === 'unreadable') return { status: 'unavailable', envelope: null };
   if (verdict === 'changed') {
-    const pinnedKey = (await pinnedPeerKey(account)) ?? '';
+    const pinnedKey = (await pinnedPeerKey(account, owner)) ?? '';
     return { status: 'key-changed', envelope: null, pinnedKey };
   }
   if (verdict === 'first-use') {
     // TOFU: persist the pin BEFORE sealing. If we cannot persist it we cannot
     // detect a future silent swap, so refuse rather than seal unverifiably.
-    if (!(await pinPeerKey(account, presentedKey))) return { status: 'unavailable', envelope: null };
+    if (!(await pinPeerKey(account, presentedKey, owner))) return { status: 'unavailable', envelope: null };
   }
 
   const envelope = await sealDm(presentedKey, plaintext);
@@ -272,11 +307,12 @@ export async function openDmTrusted(
   account: string,
   presentedKey: string,
   envelope: string,
+  owner?: DeviceMemoryOwner,
 ): Promise<OpenTrustedOutcome> {
   if (!isEnvelope(envelope)) return { status: 'locked', reason: 'undecryptable' };
   if (!isValidPeerPublicKey(presentedKey)) return { status: 'locked', reason: 'unavailable' };
 
-  const verdict = await peerKeyStatus(account, presentedKey);
+  const verdict = await peerKeyStatus(account, presentedKey, owner);
   if (verdict === 'unreadable') return { status: 'locked', reason: 'unavailable' };
   if (verdict === 'changed') return { status: 'locked', reason: 'key-changed' };
 
@@ -287,7 +323,7 @@ export async function openDmTrusted(
 
   if (verdict === 'first-use') {
     // Pin only a key we have just confirmed can produce a valid message.
-    if (!(await pinPeerKey(account, presentedKey))) return { status: 'locked', reason: 'unavailable' };
+    if (!(await pinPeerKey(account, presentedKey, owner))) return { status: 'locked', reason: 'unavailable' };
   }
   return { status: 'opened', plaintext, keyStatus: verdict === 'first-use' ? 'first-use' : 'unchanged' };
 }
@@ -359,8 +395,11 @@ export async function safetyNumber(keyA_b64: string, keyB_b64: string): Promise<
  * the DM UI surfaces for out-of-band verification. Null if we have no device key
  * or the peer is not yet pinned.
  */
-export async function peerSafetyNumber(account: string): Promise<string | null> {
-  const pinned = await pinnedPeerKey(account);
+export async function peerSafetyNumber(
+  account: string,
+  owner?: DeviceMemoryOwner,
+): Promise<string | null> {
+  const pinned = await pinnedPeerKey(account, owner);
   if (!pinned) return null;
   const mine = await deviceKeys();
   if (!mine) return null;
