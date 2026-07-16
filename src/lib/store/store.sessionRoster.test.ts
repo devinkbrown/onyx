@@ -143,7 +143,7 @@ describe('remembered session roster restoration', () => {
     expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#root' });
   });
 
-  it('promotes a passwordless remembered identity only after SESSION success evidence', () => {
+  it('defers a passwordless remembered resume until account proof arrives', () => {
     saveCredentials({ nick: 'kain', server: 'wss://example.test' });
     storeSessionToken('remembered-token');
     store.getState().connect({ url: 'wss://example.test', nick: 'kain' });
@@ -152,33 +152,45 @@ describe('remembered session roster restoration', () => {
     receive(':example.test 433 * kain :Nickname is already in use');
     receive(':example.test 001 kain_ :Welcome to IRCXNet');
 
-    expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('SESSION RESUME remembered-token\r\n');
+    expect(FakeWebSocket.latest?.send).not.toHaveBeenCalledWith('SESSION RESUME remembered-token\r\n');
     expect(store.getState().server?.account).toBeNull();
     const reclaimAttemptsBeforeSuccess = FakeWebSocket.latest?.send.mock.calls
       .filter(([line]) => line === 'NICK kain\r\n').length ?? 0;
 
-    receive(':example.test NOTE SESSION TOKEN :fresh-token');
+    receive(':example.test 900 kain_ kain_!webchat@example kain :You are now logged in as kain');
 
+    expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('SESSION RESUME remembered-token\r\n');
+    expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('SESSION TOKEN\r\n');
     expect(store.getState().server?.account).toBe('kain');
     expect(FakeWebSocket.latest?.send.mock.calls
       .filter(([line]) => line === 'NICK kain\r\n')).toHaveLength(reclaimAttemptsBeforeSuccess + 1);
+
+    receive(':example.test NOTE SESSION TOKEN :fresh-token');
+
+    expect(store.getState().server?.account).toBe('kain');
+    expect(loadCredentials('wss://example.test', 'kain')?.sessionToken).toBe('fresh-token');
   });
 
-  it('keeps a failed remembered SESSION resume in the guest state', () => {
+  it('rotates a failed resume token without discarding fresh account proof', () => {
     saveCredentials({ nick: 'kain', server: 'wss://example.test' });
     storeSessionToken('stale-token');
     store.getState().connect({ url: 'wss://example.test', nick: 'kain' });
     FakeWebSocket.latest?.onopen?.(new Event('open'));
     receive(':example.test 001 kain :Welcome to IRCXNet');
+    expect(FakeWebSocket.latest?.send).not.toHaveBeenCalledWith('SESSION RESUME stale-token\r\n');
+
+    receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+    expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('SESSION RESUME stale-token\r\n');
 
     receive(':example.test FAIL SESSION INVALID_TOKEN :The session token is invalid');
 
-    expect(store.getState().server?.account).toBeNull();
+    expect(store.getState().server?.account).toBe('kain');
     expect(loadCredentials('wss://example.test', 'kain')?.sessionToken).toBeUndefined();
 
     receive(':example.test NOTE SESSION TOKEN :late-token');
 
-    expect(store.getState().server?.account).toBeNull();
+    expect(store.getState().server?.account).toBe('kain');
+    expect(loadCredentials('wss://example.test', 'kain')?.sessionToken).toBe('late-token');
   });
 
   it('does not promote an ordinary guest from an unsolicited SESSION token note', () => {
@@ -198,10 +210,12 @@ describe('remembered session roster restoration', () => {
     store.getState().connect({ url: 'wss://example.test', nick: 'kain' });
     FakeWebSocket.latest?.onopen?.(new Event('open'));
     receive(':example.test 001 kain :Welcome to IRCXNet');
+    expect(FakeWebSocket.latest?.send).not.toHaveBeenCalledWith('SESSION RESUME remembered-mesh\r\n');
+    receive(':example.test 900 kain kain!webchat@example kain :You are now logged in as kain');
+    expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('SESSION RESUME remembered-mesh\r\n');
     receive(':example.test NOTE SESSION TOKEN :fresh-token');
     receive(':example.test NOTE SESSION MTOKEN :fresh-mesh');
     expect(store.getState().server?.account).toBe('kain');
-    expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('SESSION RESUME remembered-mesh\r\n');
 
     receive(':example.test 901 kain kain!webchat@example :You are now logged out');
 
