@@ -17,7 +17,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { cleanup, render, screen, fireEvent, waitFor } from '@solidjs/testing-library';
 import { createSignal } from 'solid-js';
 import { AccountPanel } from './Account';
-import { store, getState, type Server } from '@/lib/store';
+import { store, getState, MAX_PERSONA_HOST_LENGTH, type Server } from '@/lib/store';
 import * as dmCipher from '@/lib/e2ee/dmCipher';
 import * as clipboard from '@/lib/clipboard/writeClipboardText';
 
@@ -393,6 +393,20 @@ describe('Account panel — signed in', () => {
     expect(spy).toHaveBeenCalledWith('alice', undefined);
   });
 
+  it('bounds an oversized recover-nick paste before dispatch', () => {
+    const spy = vi.spyOn(getState(), 'recover');
+    renderPanel({ account: 'alice' });
+    const input = screen.getByLabelText('Nick');
+    const expected = 'n'.repeat(64);
+
+    fireEvent.input(input, { target: { value: `${expected}${'x'.repeat(32)}` } });
+
+    expect(input).toHaveAttribute('maxlength', '64');
+    expect(input).toHaveValue(expected);
+    fireEvent.submit(screen.getByRole('form', { name: 'Recover a nick' }));
+    expect(spy).toHaveBeenCalledWith(expected, undefined);
+  });
+
   it('bind-certificate calls certAdd + certList', () => {
     const addSpy = vi.spyOn(getState(), 'certAdd');
     const listSpy = vi.spyOn(getState(), 'certList');
@@ -492,6 +506,23 @@ describe('Account panel — signed in', () => {
     });
 
     expect(screen.getByRole('button', { name: 'Wear persona poet' })).toBeInTheDocument();
+  });
+
+  it('bounds an oversized persona-host paste before dispatch', () => {
+    const spy = vi.spyOn(getState(), 'vhostClaim');
+    renderPanel({ account: 'alice' });
+    store.setState({
+      personaOffers: [{ template: 'poets.society/*', label: 'Poets' }],
+    });
+    const input = screen.getByLabelText('Claim a host');
+    const expected = 'h'.repeat(MAX_PERSONA_HOST_LENGTH);
+
+    fireEvent.input(input, { target: { value: `${expected}${'x'.repeat(32)}` } });
+
+    expect(input).toHaveAttribute('maxlength', String(MAX_PERSONA_HOST_LENGTH));
+    expect(input).toHaveValue(expected);
+    fireEvent.submit(screen.getByRole('form', { name: 'Claim a persona host' }));
+    expect(spy).toHaveBeenCalledWith(expected);
   });
 
   it('surfaces the last action error', () => {

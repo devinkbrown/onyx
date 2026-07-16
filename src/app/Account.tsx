@@ -41,6 +41,7 @@ import {
 import {
   useStore,
   getState,
+  MAX_PERSONA_HOST_LENGTH,
   selectAccount,
   selectDeviceMemoryOwner,
 } from '@/lib/store';
@@ -62,9 +63,17 @@ export interface AccountPanelProps {
 const MIN_PASSWORD_LEN = 8;
 const TOTP_CODE_LENGTH = 6;
 const TOTP_CODE_RE = /^[0-9]{6}$/u;
+const RECOVER_NICK_MAX_LENGTH = 64;
 
 function boundedTotpCode(value: string): string {
   return value.replace(/[^0-9]/gu, '').slice(0, TOTP_CODE_LENGTH);
+}
+
+function boundedAccountInput(value: string, maxLength: number): string {
+  let bounded = value.slice(0, maxLength);
+  const finalCodeUnit = bounded.charCodeAt(bounded.length - 1);
+  if (finalCodeUnit >= 0xd800 && finalCodeUnit <= 0xdbff) bounded = bounded.slice(0, -1);
+  return bounded;
 }
 
 // ── Password input with show / hide toggle (local; mirrors Connect's feel) ───
@@ -939,8 +948,12 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
                       label="Claim a host"
                       type="text"
                       placeholder="poets.society/you"
+                      maxlength={MAX_PERSONA_HOST_LENGTH}
                       value={claimHost()}
-                      onInput={(e) => setClaimHost(e.currentTarget.value)}
+                      onInput={(e) => setClaimHost(boundedAccountInput(
+                        e.currentTarget.value,
+                        MAX_PERSONA_HOST_LENGTH,
+                      ))}
                     />
                     <Button type="submit" variant="ghost" size="sm" disabled={!claimHost().trim()}>
                       Claim
@@ -959,8 +972,12 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
                 label="Nick"
                 type="text"
                 placeholder="your-registered-nick"
+                maxlength={RECOVER_NICK_MAX_LENGTH}
                 value={recoverNick()}
-                onInput={(e) => setRecoverNick(e.currentTarget.value)}
+                onInput={(e) => setRecoverNick(boundedAccountInput(
+                  e.currentTarget.value,
+                  RECOVER_NICK_MAX_LENGTH,
+                ))}
               />
               <PasswordField
                 id="acct-recover-password"
