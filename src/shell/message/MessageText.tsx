@@ -18,6 +18,7 @@
  */
 
 import {
+  createEffect,
   createMemo,
   createSignal,
   For,
@@ -82,6 +83,26 @@ function isHttpUrl(url: string): boolean {
   }
 }
 
+/**
+ * Automatic subresource loads get a stricter boundary than user-activated
+ * links: embedded URL credentials must never be sent merely because a message
+ * entered the viewport. Ordinary credential-free http(s) attachments remain
+ * direct browser loads; using `crossorigin="anonymous"` here would CORS-block
+ * many otherwise valid user attachments, so it is deliberately not imposed.
+ */
+function isAutoLoadableHttpUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return (
+      (parsed.protocol === 'https:' || parsed.protocol === 'http:')
+      && parsed.username === ''
+      && parsed.password === ''
+    );
+  } catch {
+    return false;
+  }
+}
+
 function detectMediaKind(url: string): MediaKind {
   try {
     // Only allow https/http
@@ -106,54 +127,86 @@ type MediaUnfurlProps = {
 
 function MediaUnfurl(props: MediaUnfurlProps): JSX.Element {
   const [local] = splitProps(props, ['href', 'kind']);
+  const [failed, setFailed] = createSignal(false);
 
-  // Defense in depth at the sink: mirror the link/preview anchor guard so only an
-  // http(s) URL can ever reach a media src/href. detectMediaKind already enforces
-  // this today, but re-checking here means a future caller that hands MediaUnfurl a
-  // kind alongside a non-http(s) href can never place a javascript:/data: source.
-  const safeHref = createMemo(() => (isHttpUrl(local.href) ? local.href : null));
+  // Defense in depth at the sink: only credential-free http(s) may auto-load.
+  // detectMediaKind already enforces the scheme today, but re-checking here
+  // protects future callers and prevents ambient loads from URL userinfo.
+  const safeHref = createMemo(() => (isAutoLoadableHttpUrl(local.href) ? local.href : null));
+
+  let observedResource = '';
+  createEffect(() => {
+    const nextResource = `${local.kind ?? ''}\u0000${local.href}`;
+    if (nextResource === observedResource) return;
+    observedResource = nextResource;
+    setFailed(false);
+  });
 
   return (
     <Show when={local.kind !== null && safeHref()}>
       {(href) => (
         <div class="shell-msg-media">
-          <Switch>
-            <Match when={local.kind === 'image'}>
+          <Show
+            when={!failed()}
+            fallback={(
               <a
                 href={href()}
                 target="_blank"
                 rel="noopener noreferrer"
-                class="shell-msg-media-link"
-                aria-label="Open image in new tab"
+                class="shell-msg-link shell-msg-media-fallback"
               >
-                <img
-                  src={href()}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                  class="shell-msg-media-img"
-                />
+                {local.kind === 'image'
+                  ? 'Image preview unavailable — open attachment'
+                  : local.kind === 'video'
+                    ? 'Video preview unavailable — open attachment'
+                    : 'Audio preview unavailable — open attachment'}
               </a>
-            </Match>
-            <Match when={local.kind === 'video'}>
-              <video
-                src={href()}
-                controls
-                preload="metadata"
-                class="shell-msg-media-video"
-                aria-label="Attached video"
-              />
-            </Match>
-            <Match when={local.kind === 'audio'}>
-              <audio
-                src={href()}
-                controls
-                preload="metadata"
-                class="shell-msg-media-audio"
-                aria-label="Attached audio"
-              />
-            </Match>
-          </Switch>
+            )}
+          >
+            <Switch>
+              <Match when={local.kind === 'image'}>
+                <a
+                  href={href()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="shell-msg-media-link"
+                  aria-label="Open image in new tab"
+                >
+                  <img
+                    src={href()}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    referrerPolicy="no-referrer"
+                    class="shell-msg-media-img"
+                    onError={() => setFailed(true)}
+                  />
+                </a>
+              </Match>
+              <Match when={local.kind === 'video'}>
+                <video
+                  {...{ loading: 'lazy' }}
+                  src={href()}
+                  controls
+                  preload="none"
+                  class="shell-msg-media-video"
+                  aria-label="Attached video"
+                  onError={() => setFailed(true)}
+                />
+              </Match>
+              <Match when={local.kind === 'audio'}>
+                <audio
+                  {...{ loading: 'lazy' }}
+                  src={href()}
+                  controls
+                  preload="none"
+                  class="shell-msg-media-audio"
+                  aria-label="Attached audio"
+                  onError={() => setFailed(true)}
+                />
+              </Match>
+            </Switch>
+          </Show>
         </div>
       )}
     </Show>
@@ -817,15 +870,25 @@ export type MessageTextProps = {
 function LinkPreviewCard(props: { url: string }): JSX.Element {
   const [local] = splitProps(props, ['url']);
   const [preview] = createResource(() => local.url, fetchLinkPreview);
+  const [thumbnailFailed, setThumbnailFailed] = createSignal(false);
 
   // Defense in depth at the sink: the card's canonical URL is extracted by the
   // same-origin /linkpreview endpoint from the (untrusted) target page's OG
   // metadata, so a hostile page could set og:url to a javascript: scheme. The
   // same-origin endpoint is the real boundary; here we drop any card whose URL
-  // is not http(s) (fail closed) so a dangerous scheme never reaches the anchor.
+  // is not credential-free http(s), so a dangerous scheme or URL userinfo never
+  // reaches the anchor.
   const safe = createMemo(() => {
     const p = preview();
-    return p && isHttpUrl(p.url) ? p : null;
+    return p && isAutoLoadableHttpUrl(p.url) ? p : null;
+  });
+
+  let observedThumbnail = '';
+  createEffect(() => {
+    const nextThumbnail = safe()?.image ?? '';
+    if (nextThumbnail === observedThumbnail) return;
+    observedThumbnail = nextThumbnail;
+    setThumbnailFailed(false);
   });
 
   return (
@@ -849,13 +912,17 @@ function LinkPreviewCard(props: { url: string }): JSX.Element {
               <span class="shell-msg-preview-desc">{p().description}</span>
             </Show>
           </span>
-          <Show when={p().image && isHttpUrl(p().image)}>
+          <Show when={!thumbnailFailed() && p().image && isAutoLoadableHttpUrl(p().image)}>
             <img
               class="shell-msg-preview-thumb"
               src={p().image}
               alt=""
+              width={72}
+              height={72}
               loading="lazy"
               decoding="async"
+              referrerPolicy="no-referrer"
+              onError={() => setThumbnailFailed(true)}
             />
           </Show>
         </a>

@@ -8,7 +8,7 @@
  * the card's <a href> or <img src>.
  */
 
-import { render, screen, waitFor } from '@solidjs/testing-library';
+import { fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LinkPreview } from '@/lib/preview/linkPreview';
 
@@ -70,6 +70,38 @@ describe('MessageText link-preview scheme guard', () => {
     expect(card?.querySelector('img.shell-msg-preview-thumb')).toBeNull();
   });
 
+  it('drops a credential-bearing canonical URL instead of seating it in a card', async () => {
+    fetchLinkPreview.mockResolvedValue(
+      preview({ url: 'https://alice:secret@ok.example/page', title: 'Credential bait' }),
+    );
+
+    const { container } = render(() => (
+      <MessageText text="look at https://ok.example/page please" />
+    ));
+
+    await waitFor(() => expect(fetchLinkPreview).toHaveBeenCalled());
+    expect(container.querySelector('a.shell-msg-preview')).toBeNull();
+    expect(container.querySelector('[href*="alice:secret"]')).toBeNull();
+  });
+
+  it('suppresses a credential-bearing preview thumbnail subresource', async () => {
+    fetchLinkPreview.mockResolvedValue(
+      preview({
+        url: 'https://ok.example/page',
+        title: 'Safe card',
+        image: 'https://alice:secret@cdn.example/i.png',
+      }),
+    );
+
+    const { container } = render(() => (
+      <MessageText text="look at https://ok.example/page please" />
+    ));
+
+    await waitFor(() => expect(screen.getByText('Safe card')).toBeInTheDocument());
+    expect(container.querySelector('a.shell-msg-preview')).not.toBeNull();
+    expect(container.querySelector('img.shell-msg-preview-thumb')).toBeNull();
+  });
+
   it('renders a fully benign http(s) preview card unchanged', async () => {
     fetchLinkPreview.mockResolvedValue(
       preview({ url: 'https://ok.example/page', title: 'Good', image: 'https://cdn.example/i.png' }),
@@ -83,5 +115,17 @@ describe('MessageText link-preview scheme guard', () => {
     const thumb = container.querySelector('img.shell-msg-preview-thumb');
     expect(thumb).not.toBeNull();
     expect(thumb?.getAttribute('src')).toBe('https://cdn.example/i.png');
+    expect(thumb).toHaveAttribute('width', '72');
+    expect(thumb).toHaveAttribute('height', '72');
+    expect(thumb).toHaveAttribute('loading', 'lazy');
+    expect(thumb).toHaveAttribute('decoding', 'async');
+    expect(thumb).toHaveAttribute('referrerpolicy', 'no-referrer');
+    expect(thumb).not.toHaveAttribute('crossorigin');
+
+    fireEvent.error(thumb!);
+
+    expect(container.querySelector('img.shell-msg-preview-thumb')).toBeNull();
+    expect(container.querySelector('a.shell-msg-preview')).not.toBeNull();
+    expect(screen.getByText('Good')).toBeInTheDocument();
   });
 });
