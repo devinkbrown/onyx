@@ -41,6 +41,23 @@ import type {
 const WS_BAND_AUDIO = 64;          // kaguravox audio, plaintext
 const WS_BAND_VIDEO = 65;          // kaguravis video
 const WS_BAND_TSUMUGI_AUDIO = 66;  // kaguravox audio, TSUMUGI group-encrypted ciphertext
+const MAX_MEDIA_TRACKED_PEERS = 64;
+const MAX_MEDIA_NICK_LENGTH = 128;
+const MAX_MEDIA_CHANNEL_LENGTH = 256;
+const MAX_MEDIA_SUBTYPE_LENGTH = 512;
+
+function validMediaToken(value: string, maxLength: number): boolean {
+  return value.length > 0
+    && value.length <= maxLength
+    && !/[\u0000-\u0020\u007f]/u.test(value);
+}
+
+function deleteCaseInsensitive(source: Set<string>, value: string): void {
+  const key = value.toLowerCase();
+  for (const candidate of source) {
+    if (candidate.toLowerCase() === key) source.delete(candidate);
+  }
+}
 
 export type { CallState, VoiceCallState, MediaKind, SuimyakuPeerState, SuimyakuRoomStats, NetworkQualityTier, SuimyakuMediaCallbacks, SuimyakuChannelInfo };
 
@@ -263,6 +280,7 @@ export class SuimyakuMediaEngine {
   private negotiatedBitrate = new Map<string, number>();
   private audioLevelTimer: ReturnType<typeof setInterval> | null = null;
   private tsumugiSessions = new Map<string, TsumugiSession>();
+  private pendingTsumugiPeers = new Set<string>();
   private tsumugiGroupKey: TsumugiGroup | null = null;
   private tsumugiGroupKeyPromise: Promise<TsumugiGroup> | null = null;
   // Fences async crypto write-backs so a continuation scheduled during call A
@@ -1277,12 +1295,22 @@ export class SuimyakuMediaEngine {
   // ----------------------------------------------------------------
 
   handleMediaMessage(fromNick: string, channel: string, subtype: string, payload: string) {
+    if (
+      !validMediaToken(fromNick, MAX_MEDIA_NICK_LENGTH)
+      || !validMediaToken(channel, MAX_MEDIA_CHANNEL_LENGTH)
+      || !validMediaToken(subtype, MAX_MEDIA_SUBTYPE_LENGTH)
+    ) return;
     if (subtype.startsWith('MCHUNK/')) {
       const parts = subtype.slice(7).split('/');
       if (parts.length < 4) return;
       const serverChunk = parts.length >= 5;
       const ftype = parts[0];
       const senderNick = serverChunk ? parts[1] : fromNick;
+      if (
+        !senderNick
+        || !validMediaToken(senderNick, MAX_MEDIA_NICK_LENGTH)
+        || (ftype !== 'AUDIO' && ftype !== 'FRAME' && ftype !== 'KEYFRAME')
+      ) return;
       const fidS = serverChunk ? parts[2] : parts[1];
       const nS = serverChunk ? parts[3] : parts[2];
       const totalS = serverChunk ? parts[4] : parts[3];
@@ -1297,7 +1325,13 @@ export class SuimyakuMediaEngine {
 
     if (subtype.includes('/')) {
       const [legacyType, senderNick] = subtype.split('/', 2);
-      if (senderNick && (legacyType === 'AUDIO_FRAME' || legacyType === 'VIDEO_FRAME' || legacyType === 'VIDEO_KEYFRAME')) {
+      if (
+        senderNick
+        && validMediaToken(senderNick, MAX_MEDIA_NICK_LENGTH)
+        && (legacyType === 'AUDIO_FRAME'
+          || legacyType === 'VIDEO_FRAME'
+          || legacyType === 'VIDEO_KEYFRAME')
+      ) {
         const ftype = legacyType === 'AUDIO_FRAME'
           ? 'AUDIO'
           : legacyType === 'VIDEO_KEYFRAME' ? 'KEYFRAME' : 'FRAME';
@@ -1420,7 +1454,11 @@ export class SuimyakuMediaEngine {
       case 'NEGO_ANSWER': {
         const bitrate = parseNegotiatedAudioBitrate(payload);
         if (bitrate !== null) {
-          this.negotiatedBitrate.set(fromNick.toLowerCase(), bitrate);
+          const peerKey = fromNick.toLowerCase();
+          if (
+            this.negotiatedBitrate.has(peerKey)
+            || this.negotiatedBitrate.size < MAX_MEDIA_TRACKED_PEERS
+          ) this.negotiatedBitrate.set(peerKey, bitrate);
           (this.audEnc as unknown as { setBitrate?: (n: number) => void })
             ?.setBitrate?.(bitrate * 1000);
         }
@@ -1428,7 +1466,15 @@ export class SuimyakuMediaEngine {
       }
       case 'PRESENCE': {
         const available = payload === '1' || payload.toLowerCase() === 'true';
-        if (available) this.presenceList.add(fromNick); else this.presenceList.delete(fromNick);
+        const alreadyPresent = [...this.presenceList]
+          .find(candidate => candidate.toLowerCase() === fromNick.toLowerCase());
+        if (available) {
+          if (!alreadyPresent && this.presenceList.size >= MAX_MEDIA_TRACKED_PEERS) break;
+          if (alreadyPresent) this.presenceList.delete(alreadyPresent);
+          this.presenceList.add(fromNick);
+        } else {
+          deleteCaseInsensitive(this.presenceList, fromNick);
+        }
         this.cb.onPresence?.(fromNick, available);
         break;
       }
@@ -1520,10 +1566,27 @@ export class SuimyakuMediaEngine {
       case 'TSUMUGI_HANDSHAKE': {
         const peerKeyBytes = decodeInlineBase64(payload, 65);
         if (!peerKeyBytes) break;
-        const existing = this.tsumugiSessions.get(fromNick.toLowerCase());
+        const peerKey = fromNick.toLowerCase();
+        const existing = this.tsumugiSessions.get(peerKey);
+        if (!existing) {
+          if (this.pendingTsumugiPeers.has(peerKey)) break;
+          if (
+            this.tsumugiSessions.size + this.pendingTsumugiPeers.size
+            >= MAX_MEDIA_TRACKED_PEERS
+          ) break;
+          this.pendingTsumugiPeers.add(peerKey);
+        }
         const shouldReply = !existing?.established;
         const hsGen = this.callGuard.capture();
-        (existing ? Promise.resolve(existing) : this.createTsumugiSession()).then(async vs => {
+        let created: TsumugiSession | null = null;
+        let retained = Boolean(existing);
+        const session = existing
+          ? Promise.resolve(existing)
+          : this.createTsumugiSession().then((candidate) => {
+              created = candidate;
+              return candidate;
+            });
+        session.then(async vs => {
           await vs.ingestPeerKey(peerKeyBytes);
           // Hangup (or a rejoin) happened while we were establishing — drop this
           // session instead of resurrecting it into an idle/new call.
@@ -1531,7 +1594,8 @@ export class SuimyakuMediaEngine {
             if (!existing) vs.destroy();
             return;
           }
-          this.tsumugiSessions.set(fromNick.toLowerCase(), vs);
+          this.tsumugiSessions.set(peerKey, vs);
+          retained = true;
           if (shouldReply) {
             const ourPub = await this.exportTsumugiPublicKey(vs);
             void ourPub;
@@ -1543,7 +1607,10 @@ export class SuimyakuMediaEngine {
           /* When all known peers have TSUMUGI sessions and we're in a room,
            * create/refresh the group key and distribute it. */
           if (this.activeRoom) this.maybeDistributeTsumugiGroup().catch(() => {});
-        }).catch(() => {});
+        }).catch(() => {}).finally(() => {
+          if (!retained) created?.destroy();
+          if (!existing) this.pendingTsumugiPeers.delete(peerKey);
+        });
         break;
       }
       case 'TSUMUGI_RATCHET': {
@@ -1607,9 +1674,16 @@ export class SuimyakuMediaEngine {
         if (frame) this.dispatchFrame(fromNick, channel, 'FRAME', frame);
         break;
       }
-      case 'MEDIA_BYE':
+      case 'MEDIA_BYE': {
+        const peerKey = fromNick.toLowerCase();
         this.registry.remove(fromNick);
+        deleteCaseInsensitive(this.presenceList, fromNick);
+        this.negotiatedBitrate.delete(peerKey);
+        this.pendingTsumugiPeers.delete(peerKey);
+        this.tsumugiSessions.get(peerKey)?.destroy();
+        this.tsumugiSessions.delete(peerKey);
         break;
+      }
       case 'SPEAKING': {
         const parts = payload.split(' ');
         const peerNick = parts[0] ?? fromNick;
@@ -1758,6 +1832,9 @@ export class SuimyakuMediaEngine {
     this.callGuard.bump();
     for (const vs of this.tsumugiSessions.values()) vs.destroy();
     this.tsumugiSessions.clear();
+    this.pendingTsumugiPeers.clear();
+    this.presenceList.clear();
+    this.negotiatedBitrate.clear();
     this.tsumugiGroupKey?.destroy();
     this.tsumugiGroupKey = null;
     this.tsumugiGroupKeyPromise = null;

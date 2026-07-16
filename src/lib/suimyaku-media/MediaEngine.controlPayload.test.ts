@@ -15,6 +15,20 @@ function callbacks(overrides: Partial<SuimyakuMediaCallbacks> = {}): SuimyakuMed
 }
 
 describe('SuimyakuMediaEngine control payload boundary', () => {
+  it('rejects malformed media envelopes before allocating peer state', () => {
+    const onPresence = vi.fn();
+    const engine = new SuimyakuMediaEngine(callbacks({ onPresence }), { kind: 'voice' });
+
+    engine.handleMediaMessage('bad nick', '#room', 'VOICE_JOIN', '');
+    engine.handleMediaMessage('alice', '#bad room', 'VOICE_JOIN', '');
+    engine.handleMediaMessage('alice', '#room', 'VOICE JOIN', '');
+    engine.handleMediaMessage('alice', '#room', `AUDIO_FRAME/${'x'.repeat(129)}`, 'YQ==');
+    engine.handleMediaMessage('alice', '#room', `MCHUNK/AUDIO/${'x'.repeat(129)}/1/1/1`, 'YQ==');
+
+    expect(engine.getPeers().size).toBe(0);
+    expect(onPresence).not.toHaveBeenCalled();
+  });
+
   it('does not partially populate peers from wrong-shape roster fields', () => {
     const engine = new SuimyakuMediaEngine(callbacks(), { kind: 'voice' });
 
@@ -102,5 +116,35 @@ describe('SuimyakuMediaEngine control payload boundary', () => {
 
     expect(engine.getPeers().size).toBe(64);
     expect(onRoomNearFull).toHaveBeenCalledOnce();
+  });
+
+  it('bounds and retires per-peer presence and negotiation state', () => {
+    const engine = new SuimyakuMediaEngine(callbacks(), { kind: 'voice' });
+    const negotiation = JSON.stringify({ max_bitrate_kbps: 128 });
+
+    for (let index = 0; index < 72; index += 1) {
+      engine.handleMediaMessage(`peer-${index}`, '#room', 'PRESENCE', 'true');
+      engine.handleMediaMessage(`peer-${index}`, '#room', 'NEGO_ANSWER', negotiation);
+    }
+
+    const internals = engine as unknown as {
+      negotiatedBitrate: Map<string, number>;
+    };
+    expect(engine.getPresenceList()).toHaveLength(64);
+    expect(internals.negotiatedBitrate.size).toBe(64);
+    expect(engine.getPresenceList()).not.toContain('peer-64');
+    expect(internals.negotiatedBitrate.has('peer-64')).toBe(false);
+
+    engine.handleMediaMessage('PEER-0', '#room', 'PRESENCE', 'true');
+    expect(engine.getPresenceList()).toHaveLength(64);
+    expect(engine.getPresenceList()).toContain('PEER-0');
+
+    engine.handleMediaMessage('peer-0', '#room', 'MEDIA_BYE', '');
+    expect(engine.getPresenceList()).not.toContain('PEER-0');
+    expect(internals.negotiatedBitrate.has('peer-0')).toBe(false);
+
+    engine.handleMediaMessage('server', '#room', 'HANGUP', '');
+    expect(engine.getPresenceList()).toEqual([]);
+    expect(internals.negotiatedBitrate.size).toBe(0);
   });
 });
