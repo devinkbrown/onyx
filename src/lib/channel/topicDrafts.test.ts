@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
 import {
   CHANNEL_TOPIC_DRAFTS_KEY,
   MAX_CHANNEL_TOPIC_DRAFT_LENGTH,
   MAX_CHANNEL_TOPIC_DRAFTS,
+  MAX_CHANNEL_TOPIC_DRAFTS_STORAGE_CHARS,
   MAX_CHANNEL_TOPIC_TARGET_LENGTH,
   channelTopicDraftKey,
   clearChannelTopicDrafts,
@@ -17,6 +19,7 @@ import {
 
 describe('channel topic drafts', () => {
   beforeEach(() => localStorage.clear());
+  afterEach(() => vi.restoreAllMocks());
 
   it('isolates Alice and Bob while purging ownerless legacy topic drafts', () => {
     const alice = { serverUrl: 'wss://example.test', identity: 'Alice' };
@@ -91,6 +94,16 @@ describe('channel topic drafts', () => {
     localStorage.setItem(CHANNEL_TOPIC_DRAFTS_KEY, '{not json');
 
     expect(loadChannelTopicDrafts()).toEqual({});
+  });
+
+  it('rejects oversized owner storage before parsing', () => {
+    const owner = { serverUrl: 'wss://example.test', identity: 'alice' };
+    const key = deviceMemoryStorageKey(CHANNEL_TOPIC_DRAFTS_KEY, owner)!;
+    localStorage.setItem(key, `{${'x'.repeat(MAX_CHANNEL_TOPIC_DRAFTS_STORAGE_CHARS)}}`);
+    const parse = vi.spyOn(JSON, 'parse');
+
+    expect(loadChannelTopicDrafts(undefined, owner)).toEqual({});
+    expect(parse).not.toHaveBeenCalled();
   });
 
   it('removes storage when every saved draft is sanitized away', () => {

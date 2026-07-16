@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
 
 import {
   COMPOSER_DRAFTS_KEY,
   MAX_COMPOSER_DRAFTS,
+  MAX_COMPOSER_DRAFTS_STORAGE_CHARS,
   MAX_DRAFT_LEN,
+  MAX_DRAFT_TARGET_LENGTH,
   clearRoomComposerDrafts,
   composerDraftKey,
   getComposerDraft,
@@ -26,6 +30,8 @@ function makeStorage(): Storage {
 }
 
 describe('composer draft logic', () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it('isolates Alice and Bob while quarantining ownerless legacy drafts', () => {
     const storage = makeStorage();
     const alice = { serverUrl: 'wss://example.test', identity: 'Alice' };
@@ -43,6 +49,9 @@ describe('composer draft logic', () => {
   it('normalizes targets for channel and dm drafts', () => {
     expect(composerDraftKey(' #Root ')).toBe('#root');
     expect(composerDraftKey('Alice')).toBe('alice');
+    expect(composerDraftKey(`alice${'x'.repeat(MAX_DRAFT_TARGET_LENGTH)}`)).toBe('');
+    expect(composerDraftKey('two targets')).toBe('');
+    expect(composerDraftKey('bad\u0000target')).toBe('');
   });
 
   it('sets, reads, and removes target-scoped drafts immutably', () => {
@@ -85,6 +94,17 @@ describe('composer draft logic', () => {
     const long = 'b'.repeat(MAX_DRAFT_LEN + 42);
     storage.setItem(COMPOSER_DRAFTS_KEY, JSON.stringify({ '#root': long }));
     expect(loadComposerDrafts(storage)['#root']).toHaveLength(MAX_DRAFT_LEN);
+  });
+
+  it('rejects oversized owner storage before parsing', () => {
+    const storage = makeStorage();
+    const owner = { serverUrl: 'wss://example.test', identity: 'alice' };
+    const key = deviceMemoryStorageKey(COMPOSER_DRAFTS_KEY, owner)!;
+    storage.setItem(key, `{${'x'.repeat(MAX_COMPOSER_DRAFTS_STORAGE_CHARS)}}`);
+    const parse = vi.spyOn(JSON, 'parse');
+
+    expect(loadComposerDrafts(storage, owner)).toEqual({});
+    expect(parse).not.toHaveBeenCalled();
   });
 
   it('caps stored drafts at MAX_COMPOSER_DRAFTS keeping the first N by insertion order', () => {

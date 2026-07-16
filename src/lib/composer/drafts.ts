@@ -11,6 +11,10 @@ export const COMPOSER_DRAFTS_KEY = 'onyx:composer-drafts';
  */
 export const MAX_COMPOSER_DRAFTS = 50;
 export const MAX_DRAFT_LEN = 8192;
+export const MAX_DRAFT_TARGET_LENGTH = 256;
+export const MAX_COMPOSER_DRAFTS_STORAGE_CHARS = 3 * 1024 * 1024;
+
+const INVALID_DRAFT_TARGET_CHARACTERS = /[\s,\x00-\x1f\x7f]/u;
 
 export type ComposerDrafts = Record<string, string>;
 
@@ -42,7 +46,13 @@ function storageOrDefault(storage?: DraftStorage): DraftStorage | null {
 }
 
 export function composerDraftKey(target: string): string {
-  return target.trim().toLowerCase();
+  const key = target.trim().toLowerCase();
+  if (
+    key.length === 0
+    || key.length > MAX_DRAFT_TARGET_LENGTH
+    || INVALID_DRAFT_TARGET_CHARACTERS.test(key)
+  ) return '';
+  return key;
 }
 
 export function sanitizeComposerDrafts(value: unknown): ComposerDrafts {
@@ -67,6 +77,7 @@ export function loadComposerDrafts(
   if (!storageKey) return {};
   try {
     const raw = resolved.getItem(storageKey);
+    if (raw && raw.length > MAX_COMPOSER_DRAFTS_STORAGE_CHARS) return {};
     return raw ? sanitizeComposerDrafts(JSON.parse(raw)) : {};
   } catch {
     return {};

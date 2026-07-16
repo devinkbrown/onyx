@@ -5,6 +5,7 @@ export const CHANNEL_TOPIC_DRAFTS_KEY = 'onyx:channel-topic-drafts';
 export const MAX_CHANNEL_TOPIC_DRAFTS = 50;
 export const MAX_CHANNEL_TOPIC_DRAFT_LENGTH = 2048;
 export const MAX_CHANNEL_TOPIC_TARGET_LENGTH = 256;
+export const MAX_CHANNEL_TOPIC_DRAFTS_STORAGE_CHARS = 1024 * 1024;
 
 export type ChannelTopicDrafts = Record<string, string>;
 
@@ -61,6 +62,7 @@ export function loadChannelTopicDrafts(
   if (owner !== undefined) purgeLegacyChannelTopicDrafts(resolved);
   try {
     const raw = resolved.getItem(storageKey);
+    if (raw && raw.length > MAX_CHANNEL_TOPIC_DRAFTS_STORAGE_CHARS) return {};
     return raw ? sanitizeChannelTopicDrafts(JSON.parse(raw)) : {};
   } catch {
     return {};

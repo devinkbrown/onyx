@@ -16,6 +16,7 @@ export const MAX_TOPIC_READ_ENTRIES = 256;
 export const MAX_TOPIC_READ_MESSAGES = 4_096;
 /** Maximum untrusted rows inspected before dedupe/sort during storage/import parsing. */
 export const MAX_TOPIC_READ_PARSE_ENTRIES = 4_096;
+export const MAX_TOPIC_READ_LEDGER_STORAGE_CHARS = 512 * 1024;
 
 const MAX_CHANNEL_LENGTH = 128;
 const MAX_MESSAGE_ID_LENGTH = 512;
@@ -192,7 +193,7 @@ export function parseTopicReadLedger(value: unknown): TopicReadMarker[] {
 }
 
 function parseSerializedLedger(raw: string | null): TopicReadMarker[] {
-  if (raw === null) return [];
+  if (raw === null || raw.length > MAX_TOPIC_READ_LEDGER_STORAGE_CHARS) return [];
   try {
     return sanitizeLedger(JSON.parse(raw) as unknown);
   } catch {

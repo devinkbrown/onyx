@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
 import {
   MAX_TOPIC_READ_ENTRIES,
+  MAX_TOPIC_READ_LEDGER_STORAGE_CHARS,
   MAX_TOPIC_READ_MESSAGES,
   MAX_TOPIC_READ_PARSE_ENTRIES,
   TOPIC_READ_LEDGER_KEY,
@@ -146,6 +148,16 @@ describe('topic read ledger', () => {
     expect(readTopicReadLedger()).toEqual([]);
     localStorage.setItem(TOPIC_READ_LEDGER_KEY, JSON.stringify({ entries: [] }));
     expect(readTopicReadLedger()).toEqual([]);
+  });
+
+  it('rejects oversized owner storage before parsing', () => {
+    const owner = { serverUrl: 'wss://topics.example/ws', identity: 'alice' };
+    const key = deviceMemoryStorageKey(TOPIC_READ_LEDGER_KEY, owner)!;
+    localStorage.setItem(key, `[${'x'.repeat(MAX_TOPIC_READ_LEDGER_STORAGE_CHARS)}]`);
+    const parse = vi.spyOn(JSON, 'parse');
+
+    expect(readTopicReadLedger(owner)).toEqual([]);
+    expect(parse).not.toHaveBeenCalled();
   });
 
   it('fails closed when storage reads and writes throw', () => {
