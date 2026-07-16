@@ -82,6 +82,29 @@ function emptyPortableSnapshot(): PortableTransferSnapshot {
   };
 }
 
+const emptyPortableImportResult = {
+  targets: 0,
+  messages: 0,
+  reviews: 0,
+  drafts: 0,
+  topicDrafts: 0,
+  accountHandoffs: 0,
+  preferenceHandoffs: 0,
+  followedConversations: 0,
+  topicReadCursors: 0,
+  savedSearches: 0,
+};
+
+async function stageEmptyPortableImport(): Promise<void> {
+  const file = new File(
+    [JSON.stringify(emptyPortableSnapshot())],
+    'onyx-portable.json',
+    { type: 'application/json' },
+  );
+  fireEvent.change(screen.getByLabelText('Import portable JSON'), { target: { files: [file] } });
+  await screen.findByRole('heading', { name: 'Review import' });
+}
+
 describe('PreferencesPanel', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -884,6 +907,105 @@ describe('PreferencesPanel', () => {
     expect(await screen.findByText('huge-portable.json exceeds the 64 MiB portable JSON limit. Choose a smaller portable vault file.')).toBeInTheDocument();
     expect(text).not.toHaveBeenCalled();
     expect(screen.queryByRole('heading', { name: 'Review import' })).not.toBeInTheDocument();
+  });
+
+  it('keeps a reviewed import staged when another tab holds the import lock', async () => {
+    const request = vi.fn(async (
+      _name: string,
+      _options: LockOptions,
+      callback: (held: Lock | null) => Promise<unknown>,
+    ) => callback(null));
+    vi.stubGlobal('navigator', { locks: { request } });
+    const importPortableTransfer = vi.spyOn(portableTransfer, 'importPortableTransfer');
+    openPreferences();
+    render(() => <PreferencesPanel />);
+    await stageEmptyPortableImport();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Import reviewed file' }));
+
+    const contention = await screen.findByText(/Another Onyx tab is applying a portable vault import/i);
+    expect(contention).toHaveAttribute('role', 'status');
+    expect(request).toHaveBeenCalledWith(
+      'onyx:portable-vault-import',
+      { mode: 'exclusive', ifAvailable: true },
+      expect.any(Function),
+    );
+    expect(importPortableTransfer).not.toHaveBeenCalled();
+    expect(screen.getByRole('heading', { name: 'Review import' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Import reviewed file' })).not.toBeDisabled();
+  });
+
+  it('holds one exclusive lock across the full reviewed apply and guards rapid confirmation', async () => {
+    let resolveImport: (result: typeof emptyPortableImportResult) => void = () => {};
+    const pendingImport = new Promise<typeof emptyPortableImportResult>((resolve) => {
+      resolveImport = resolve;
+    });
+    const request = vi.fn(async (
+      _name: string,
+      _options: LockOptions,
+      callback: (held: Lock | null) => Promise<unknown>,
+    ) => callback({ name: 'onyx:portable-vault-import', mode: 'exclusive' } as Lock));
+    vi.stubGlobal('navigator', { locks: { request } });
+    const importPortableTransfer = vi.spyOn(portableTransfer, 'importPortableTransfer')
+      .mockReturnValue(pendingImport);
+    openPreferences();
+    render(() => <PreferencesPanel />);
+    await stageEmptyPortableImport();
+
+    const confirm = screen.getByRole('button', { name: 'Import reviewed file' });
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+    await waitFor(() => expect(importPortableTransfer).toHaveBeenCalledOnce());
+
+    expect(request).toHaveBeenCalledOnce();
+    expect(confirm).toBeDisabled();
+    expect(screen.getByRole('heading', { name: 'Review import' })).toBeInTheDocument();
+
+    resolveImport(emptyPortableImportResult);
+    expect(await screen.findByText(/^Imported 0 messages/)).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Review import' })).not.toBeInTheDocument();
+  });
+
+  it('reports lock-manager failure without starting or discarding the reviewed import', async () => {
+    const request = vi.fn().mockRejectedValue(new Error('locks disabled'));
+    vi.stubGlobal('navigator', { locks: { request } });
+    const importPortableTransfer = vi.spyOn(portableTransfer, 'importPortableTransfer');
+    openPreferences();
+    render(() => <PreferencesPanel />);
+    await stageEmptyPortableImport();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Import reviewed file' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('could not coordinate this import across tabs');
+    expect(importPortableTransfer).not.toHaveBeenCalled();
+    expect(screen.getByRole('heading', { name: 'Review import' })).toBeInTheDocument();
+  });
+
+  it('ignores reviewed-import completion after Preferences unmounts', async () => {
+    let resolveImport: (result: typeof emptyPortableImportResult) => void = () => {};
+    const pendingImport = new Promise<typeof emptyPortableImportResult>((resolve) => {
+      resolveImport = resolve;
+    });
+    const request = vi.fn(async (
+      _name: string,
+      _options: LockOptions,
+      callback: (held: Lock | null) => Promise<unknown>,
+    ) => callback({ name: 'onyx:portable-vault-import', mode: 'exclusive' } as Lock));
+    vi.stubGlobal('navigator', { locks: { request } });
+    const importPortableTransfer = vi.spyOn(portableTransfer, 'importPortableTransfer')
+      .mockReturnValue(pendingImport);
+    openPreferences();
+    const view = render(() => <PreferencesPanel />);
+    await stageEmptyPortableImport();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Import reviewed file' }));
+    await waitFor(() => expect(importPortableTransfer).toHaveBeenCalledOnce());
+    view.unmount();
+    resolveImport(emptyPortableImportResult);
+    await pendingImport;
+    await Promise.resolve();
+
+    expect(screen.queryByText(/^Imported 0 messages/)).not.toBeInTheDocument();
   });
 
   it('surfaces and clears local extension action audit entries', () => {

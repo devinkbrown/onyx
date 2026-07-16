@@ -93,6 +93,10 @@ import {
   supportsPortableFileShare,
 } from '@/lib/vault/portableShare';
 import {
+  PortableImportLockError,
+  withPortableImportLock,
+} from '@/lib/vault/portableImportLock';
+import {
   clearSavedSearches,
   listSearches,
   subscribeSavedSearches,
@@ -497,6 +501,7 @@ function PortableVaultControls(): JSX.Element {
   let exportEpoch = 0;
   let importEpoch = 0;
   let shareEpoch = 0;
+  let applyEpoch = 0;
   let disposed = false;
 
   const reportStatus = (message: string, failure = false) => {
@@ -520,6 +525,7 @@ function PortableVaultControls(): JSX.Element {
     exportEpoch += 1;
     importEpoch += 1;
     shareEpoch += 1;
+    applyEpoch += 1;
     for (const [url, timer] of activeObjectUrls) {
       if (timer !== null) window.clearTimeout(timer);
       try {
@@ -688,20 +694,37 @@ function PortableVaultControls(): JSX.Element {
   }
 
   async function confirmImport(): Promise<void> {
+    if (busy()) return;
     const pending = pendingImport();
     if (!pending) return;
+    const epoch = ++applyEpoch;
     setBusy(true);
     try {
-      const result = await importPortableTransfer(pending.snapshot);
-      for (const [target, draft] of Object.entries(pending.snapshot.composerDrafts)) {
-        getState().setComposerDraft(target, draft);
+      const locked = await withPortableImportLock(async () => {
+        const result = await importPortableTransfer(pending.snapshot);
+        for (const [target, draft] of Object.entries(pending.snapshot.composerDrafts)) {
+          getState().setComposerDraft(target, draft);
+        }
+        return result;
+      });
+      if (disposed || epoch !== applyEpoch) return;
+      if (locked.state === 'contended') {
+        reportStatus('Another Onyx tab is applying a portable vault import. Wait for it to finish, then retry this reviewed file.');
+        return;
       }
       setPendingImport(null);
-      reportStatus(`Imported ${countLabel(result.messages, 'message')}, ${countLabel(result.targets, 'target')}, ${countLabel(result.reviews, 'review')}, ${countLabel(result.drafts, 'room draft')}, ${countLabel(result.topicDrafts, 'topic draft')}, ${countLabel(result.followedConversations, 'followed conversation')}, ${countLabel(result.topicReadCursors, 'topic read cursor')}, ${countLabel(result.savedSearches, 'saved search', 'saved searches')}, ${countLabel(result.accountHandoffs, 'account handoff')}, and ${countLabel(result.preferenceHandoffs, 'preference set')}.`);
-    } catch {
-      reportStatus('Import failed while merging this portable vault.', true);
+      reportStatus(`Imported ${countLabel(locked.value.messages, 'message')}, ${countLabel(locked.value.targets, 'target')}, ${countLabel(locked.value.reviews, 'review')}, ${countLabel(locked.value.drafts, 'room draft')}, ${countLabel(locked.value.topicDrafts, 'topic draft')}, ${countLabel(locked.value.followedConversations, 'followed conversation')}, ${countLabel(locked.value.topicReadCursors, 'topic read cursor')}, ${countLabel(locked.value.savedSearches, 'saved search', 'saved searches')}, ${countLabel(locked.value.accountHandoffs, 'account handoff')}, and ${countLabel(locked.value.preferenceHandoffs, 'preference set')}.`);
+    } catch (error) {
+      if (!disposed && epoch === applyEpoch) {
+        reportStatus(
+          error instanceof PortableImportLockError
+            ? 'Onyx could not coordinate this import across tabs. No reviewed import was started; try again.'
+            : 'Import failed while merging this portable vault.',
+          true,
+        );
+      }
     } finally {
-      setBusy(false);
+      if (!disposed && epoch === applyEpoch) setBusy(false);
     }
   }
 
