@@ -2,7 +2,7 @@
 import { createRoot } from 'solid-js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { store } from '@/lib/store';
+import { MAX_LIVE_MEDIA_PARTICIPANTS, store } from '@/lib/store';
 import type { SuimyakuMediaCallbacks, SuimyakuPeerState } from '@/lib/suimyaku-media/types';
 
 const mediaMock = vi.hoisted(() => {
@@ -68,6 +68,18 @@ vi.mock('@/lib/suimyaku-media/MediaEngine', () => ({
 }));
 
 const initialState = store.getInitialState();
+
+function peer(nick: string, channel = '#video'): SuimyakuPeerState {
+  return {
+    nick,
+    channel,
+    kind: 'voice',
+    speaking: false,
+    muted: false,
+    hasVideo: false,
+    canvas: null,
+  };
+}
 
 describe('mountMedia', () => {
   beforeEach(() => {
@@ -146,5 +158,58 @@ describe('mountMedia', () => {
     expect(engine?.setClient).toHaveBeenLastCalledWith(client);
 
     dispose();
+  });
+
+  it('bounds callback peers and replaces casing instead of duplicating identities', async () => {
+    const { mountMedia } = await import('./useSuimyakuMedia');
+
+    createRoot(dispose => {
+      mountMedia();
+      const engine = mediaMock.instances[0];
+      expect(engine).toBeDefined();
+
+      engine?.callbacks.onPeerState?.(peer('Alice'));
+      engine?.callbacks.onPeerState?.(peer('aLiCe'));
+      for (let index = 1; index < MAX_LIVE_MEDIA_PARTICIPANTS + 8; index += 1) {
+        engine?.callbacks.onPeerState?.(peer(`peer-${index}`));
+      }
+      engine?.callbacks.onPeerState?.(peer('bad nick'));
+      engine?.callbacks.onPeerState?.(peer('outside', 'not-a-channel'));
+
+      const state = store.getState();
+      expect(state.voice.peers.size).toBe(MAX_LIVE_MEDIA_PARTICIPANTS);
+      expect(state.voice.peers.has('Alice')).toBe(false);
+      expect(state.voice.peers.has('aLiCe')).toBe(true);
+      expect(state.voice.peers.has(`peer-${MAX_LIVE_MEDIA_PARTICIPANTS}`)).toBe(false);
+      expect(state.voiceChannelParticipants.get('#video')?.size)
+        .toBe(MAX_LIVE_MEDIA_PARTICIPANTS);
+
+      engine?.callbacks.onPeerLeft?.('ALICE');
+      expect(store.getState().voice.peers.has('aLiCe')).toBe(false);
+      expect(store.getState().voiceChannelParticipants.get('#video')?.has('aLiCe')).toBe(false);
+
+      dispose();
+    });
+  });
+
+  it('dispatches bounded reactions only for known peers', async () => {
+    const { mountMedia } = await import('./useSuimyakuMedia');
+    const reactions: Array<{ nick: string; emoji: string }> = [];
+    const handler = (event: Event) => reactions.push((event as CustomEvent).detail);
+    window.addEventListener('ocean:voice-reaction', handler);
+
+    createRoot(dispose => {
+      mountMedia();
+      const callbacks = mediaMock.instances[0]?.callbacks;
+      callbacks?.onReaction?.('stranger', 'wave');
+      callbacks?.onPeerState?.(peer('mika'));
+      callbacks?.onReaction?.('MIKA', 'wave');
+      callbacks?.onReaction?.('mika', 'x'.repeat(65));
+
+      expect(reactions).toEqual([{ nick: 'MIKA', emoji: 'wave' }]);
+      dispose();
+    });
+
+    window.removeEventListener('ocean:voice-reaction', handler);
   });
 });

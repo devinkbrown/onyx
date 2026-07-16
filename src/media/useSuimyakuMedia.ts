@@ -1,7 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { createEffect, onCleanup } from 'solid-js';
 
-import { getState, setState, useStore } from '@/lib/store';
+import {
+  getState,
+  MAX_LIVE_MEDIA_CHANNELS,
+  MAX_LIVE_MEDIA_PARTICIPANTS,
+  setState,
+  useStore,
+} from '@/lib/store';
+import {
+  MAX_VAULT_SENDER_LENGTH,
+  MAX_VAULT_TARGET_LENGTH,
+} from '@/lib/vault/historyVault';
 import {
   SuimyakuMediaEngine,
   setMountedSuimyakuMediaEngine,
@@ -28,6 +38,35 @@ type StreamStartDetail = {
 };
 
 const canvasStreamCache = new Map<string, CanvasStreamCacheEntry>();
+
+const MAX_MEDIA_CALLBACK_TEXT_LENGTH = 4 * 1024;
+const MAX_MEDIA_CALLBACK_REACTION_LENGTH = 64;
+
+function validMediaNick(nick: string): boolean {
+  return nick.length > 0
+    && nick.length <= MAX_VAULT_SENDER_LENGTH
+    && !nick.startsWith(':')
+    && !nick.includes(',')
+    && !/[\u0000-\u0020\u007f]/u.test(nick);
+}
+
+function validMediaChannel(channel: string | null): channel is string {
+  return Boolean(
+    channel
+    && channel.length <= MAX_VAULT_TARGET_LENGTH
+    && '#&'.includes(channel[0] ?? '')
+    && !channel.includes(',')
+    && !/[\u0000-\u0020\u007f]/u.test(channel),
+  );
+}
+
+function caseInsensitiveKey<T>(source: ReadonlyMap<string, T>, value: string): string | null {
+  const key = value.toLowerCase();
+  for (const candidate of source.keys()) {
+    if (candidate.toLowerCase() === key) return candidate;
+  }
+  return null;
+}
 
 function stopStream(stream: MediaStream | null | undefined): void {
   stream?.getTracks().forEach(track => track.stop());
@@ -60,6 +99,7 @@ function canvasStreamForPeer(peer: SuimyakuPeerState): MediaStream | null {
 }
 
 function removeNickFromVoicePresence(nick: string): void {
+  if (!validMediaNick(nick)) return;
   const lowerNick = nick.toLowerCase();
   setState(state => {
     let changed = false;
@@ -72,7 +112,8 @@ function removeNickFromVoicePresence(nick: string): void {
       }
       if (next.size !== participants.size) {
         changed = true;
-        voiceChannelParticipants.set(channel, next);
+        if (next.size === 0) voiceChannelParticipants.delete(channel);
+        else voiceChannelParticipants.set(channel, next);
       }
     }
 
@@ -81,20 +122,29 @@ function removeNickFromVoicePresence(nick: string): void {
 }
 
 function setVoicePresence(nick: string, channel: string | null, available: boolean): void {
-  if (!channel) return;
+  if (!validMediaNick(nick) || !validMediaChannel(channel)) return;
 
   const channelKey = channel.toLowerCase();
   const lowerNick = nick.toLowerCase();
   setState(state => {
     const voiceChannelParticipants = new Map(state.voiceChannelParticipants);
+    if (
+      available
+      && !voiceChannelParticipants.has(channelKey)
+      && voiceChannelParticipants.size >= MAX_LIVE_MEDIA_CHANNELS
+    ) return {};
     const participants = new Set(voiceChannelParticipants.get(channelKey) ?? []);
 
     for (const participant of participants) {
       if (participant.toLowerCase() === lowerNick) participants.delete(participant);
     }
-    if (available) participants.add(nick);
+    if (available) {
+      if (participants.size >= MAX_LIVE_MEDIA_PARTICIPANTS) return {};
+      participants.add(nick);
+    }
 
-    voiceChannelParticipants.set(channelKey, participants);
+    if (participants.size === 0) voiceChannelParticipants.delete(channelKey);
+    else voiceChannelParticipants.set(channelKey, participants);
     return { voiceChannelParticipants, mediaAvailable: true };
   });
 }
@@ -120,20 +170,31 @@ export function mountMedia(): void {
 
   const callbacks: SuimyakuMediaCallbacks = {
     onCallState(state, nick, channel) {
+      const safeNick = validMediaNick(nick) ? nick : '';
+      const safeChannel = validMediaChannel(channel) ? channel : null;
       getState().setVoiceCallState({
         callState: state,
-        callWith: nick,
-        callChannel: channel,
+        callWith: safeNick,
+        callChannel: safeChannel,
       });
     },
 
     onPeerState(peer) {
+      if (!validMediaNick(peer.nick) || !validMediaChannel(peer.channel)) return;
       const state = getState();
       const peers = new Map(state.voice.peers);
+      const existingPeerKey = caseInsensitiveKey(peers, peer.nick);
+      if (!existingPeerKey && peers.size >= MAX_LIVE_MEDIA_PARTICIPANTS) return;
+      if (existingPeerKey && existingPeerKey !== peer.nick) {
+        peers.delete(existingPeerKey);
+        clearCachedPeerStream(existingPeerKey);
+      }
       peers.set(peer.nick, peer);
 
       const videoParticipants = new Map(state.voice.videoParticipants);
-      const existingVideo = videoParticipants.get(peer.nick);
+      const existingVideoKey = caseInsensitiveKey(videoParticipants, peer.nick);
+      const existingVideo = existingVideoKey ? videoParticipants.get(existingVideoKey) : undefined;
+      if (existingVideoKey && existingVideoKey !== peer.nick) videoParticipants.delete(existingVideoKey);
       const screenStream = engine?.getScreenStream(peer.nick) ?? null;
       const canvasStream = screenStream ? null : canvasStreamForPeer(peer);
       const mediaStream = screenStream ?? canvasStream;
@@ -151,24 +212,29 @@ export function mountMedia(): void {
     },
 
     onPeerLeft(nick) {
+      if (!validMediaNick(nick)) return;
       const state = getState();
       const peers = new Map(state.voice.peers);
-      peers.delete(nick);
+      const peerKey = caseInsensitiveKey(peers, nick);
+      if (peerKey) peers.delete(peerKey);
 
       const videoParticipants = new Map(state.voice.videoParticipants);
-      videoParticipants.delete(nick);
+      const videoKey = caseInsensitiveKey(videoParticipants, nick);
+      if (videoKey) videoParticipants.delete(videoKey);
 
-      clearCachedPeerStream(nick);
+      clearCachedPeerStream(peerKey ?? nick);
       state.setVoiceCallState({ peers, videoParticipants });
       state.setSpeakingNick(nick, false);
       removeNickFromVoicePresence(nick);
     },
 
     onPeerSpeaking(nick, speaking) {
+      if (!validMediaNick(nick)) return;
       const state = getState();
       const peers = new Map(state.voice.peers);
-      const peer = peers.get(nick);
-      if (peer) peers.set(nick, { ...peer, speaking });
+      const peerKey = caseInsensitiveKey(peers, nick);
+      const peer = peerKey ? peers.get(peerKey) : undefined;
+      if (peer && peerKey) peers.set(peerKey, { ...peer, speaking });
       state.setVoiceCallState({ peers });
       state.setSpeakingNick(nick, speaking);
     },
@@ -185,21 +251,24 @@ export function mountMedia(): void {
     },
 
     onRoomStats(channel, stats) {
+      if (!validMediaChannel(channel)) return;
       const state = getState();
       const roomStats = new Map(state.voice.roomStats);
+      if (!roomStats.has(channel) && roomStats.size >= MAX_LIVE_MEDIA_CHANNELS) return;
       roomStats.set(channel, stats);
       state.setVoiceCallState({ roomStats });
     },
 
     onError(message) {
+      const safeMessage = message.slice(0, MAX_MEDIA_CALLBACK_TEXT_LENGTH);
       // Both surfaces: the inbox keeps a record, the toast makes the failure
       // visible AT THE MOMENT it happens (a silent camera/permission failure
       // reads as "clicking Join video does nothing").
-      getState().addNotification({ type: 'error', text: `Voice: ${message}` });
+      getState().addNotification({ type: 'error', text: `Voice: ${safeMessage}` });
       getState().addToast({
         variant: 'error',
         title: 'Media error',
-        description: message,
+        description: safeMessage,
       });
     },
 
@@ -208,10 +277,12 @@ export function mountMedia(): void {
     },
 
     onAudioLevel(nick, level) {
+      if (!validMediaNick(nick) || !Number.isFinite(level)) return;
       dispatchWindowEvent('onyx:voice-audio-level', { nick, level });
     },
 
     onPresence(nick, available) {
+      if (!validMediaNick(nick)) return;
       dispatchWindowEvent('onyx:voice-presence', { nick, available });
       if (!available) {
         removeNickFromVoicePresence(nick);
@@ -223,6 +294,13 @@ export function mountMedia(): void {
     },
 
     onReaction(nick, emoji) {
+      if (
+        !validMediaNick(nick)
+        || emoji.length === 0
+        || emoji.length > MAX_MEDIA_CALLBACK_REACTION_LENGTH
+        || /[\u0000-\u001f\u007f]/u.test(emoji)
+        || !caseInsensitiveKey(getState().voice.peers, nick)
+      ) return;
       dispatchWindowEvent('ocean:voice-reaction', { nick, emoji });
       // A ✋ reaction is the raise-hand signal (toggleRaiseHand emits it on raise;
       // there is no explicit lower signal), so surface the peer's raised hand and
@@ -242,6 +320,7 @@ export function mountMedia(): void {
     },
 
     onRecordingAlert(nick, started) {
+      if (!validMediaNick(nick)) return;
       getState().addToast({
         variant: started ? 'warning' : 'info',
         title: started ? 'Recording started' : 'Recording stopped',
@@ -262,6 +341,7 @@ export function mountMedia(): void {
     },
 
     onRecordConsent(nick) {
+      if (!validMediaNick(nick)) return;
       getState().addToast({
         variant: 'warning',
         title: 'Recording request',
@@ -357,6 +437,8 @@ export function mountMedia(): void {
   onCleanup(() => {
     engine?.destroy();
     clearCachedPeerStreams();
+    for (const timer of _handTimers.values()) clearTimeout(timer);
+    _handTimers.clear();
     setMountedSuimyakuMediaEngine(null);
     engine = null;
   });
