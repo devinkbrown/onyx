@@ -253,7 +253,7 @@ export async function importPortableTransfer(
   let vault: { targets: number; messages: number };
   assertPortableTransferCurrent(options);
   if (preferences().localHistory) {
-    vault = await importVault(snapshot, owner);
+    vault = await importVault(snapshot, owner, { isCurrent: options?.isCurrent });
     assertPortableTransferCurrent(options);
   } else {
     const cleared = await clearVault();

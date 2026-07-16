@@ -42,6 +42,7 @@ import {
   serializeMessage,
   setRetentionPolicy,
   subscribeOutbox,
+  VaultImportOwnerChangedError,
 } from './historyVault';
 import { SEARCH_CORPUS_TEXT_MAX } from './searchBounds';
 
@@ -697,6 +698,28 @@ describe('historyVault', () => {
       ]);
       await expect(loadRecent('#private', VAULT_KEEP, BOB_OWNER)).resolves.toEqual([]);
       await expect(exportVault(BOB_OWNER)).resolves.toMatchObject({ targets: [] });
+    });
+
+    it('stops later target writes when the captured import owner retires', async () => {
+      const snapshot: VaultExportSnapshot = {
+        kind: 'onyx-vault',
+        version: 1,
+        exportedAt: '2026-07-16T00:00:00.000Z',
+        targets: [
+          { target: '#first', messages: [msg('first', 1_000, { target: '#first' })] },
+          { target: '#must-not-continue', messages: [msg('second', 2_000, { target: '#must-not-continue' })] },
+        ],
+      };
+      let ownerIsCurrent = true;
+      queueMicrotask(() => {
+        ownerIsCurrent = false;
+      });
+
+      await expect(importVault(snapshot, OUTBOX_OWNER, {
+        isCurrent: () => ownerIsCurrent,
+      })).rejects.toBeInstanceOf(VaultImportOwnerChangedError);
+
+      expect(await loadRecent('#must-not-continue', VAULT_KEEP, OUTBOX_OWNER)).toEqual([]);
     });
 
     it('rejects unknown portable vault documents', () => {

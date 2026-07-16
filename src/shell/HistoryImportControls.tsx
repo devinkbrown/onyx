@@ -292,7 +292,9 @@ export function JsonVaultImportControls(props: JsonVaultImportProps): JSX.Elemen
     try {
       let imported = 0;
       for (const snapshot of job.snapshots) {
-        const result = await importVault(snapshot, job.ownerScope.owner);
+        const result = await importVault(snapshot, job.ownerScope.owner, {
+          isCurrent: () => importOwner.isActive(job.ownerScope),
+        });
         if (!importOwner.isActive(job.ownerScope)) return;
         imported += result.messages;
       }
@@ -525,7 +527,9 @@ export function DiscordPackageImportControls(): JSX.Element {
     }
     setBusy(true);
     try {
-      const result = await importVault(job.snapshot, job.ownerScope.owner);
+      const result = await importVault(job.snapshot, job.ownerScope.owner, {
+        isCurrent: () => importOwner.isActive(job.ownerScope),
+      });
       if (!importOwner.isActive(job.ownerScope)) return;
       setPending(null);
       setStatus(`Imported ${countLabel(result.messages, 'message')} into ${countLabel(job.channels, 'channel')}. Open a channel to read the history, or search it from anywhere.`);
@@ -750,7 +754,9 @@ export function DiscordBotImportControls(): JSX.Element {
     }
     setBusy(true);
     try {
-      const result = await importVault(job.snapshot, job.ownerScope.owner);
+      const result = await importVault(job.snapshot, job.ownerScope.owner, {
+        isCurrent: () => importOwner.isActive(job.ownerScope),
+      });
       if (!importOwner.isActive(job.ownerScope)) return;
       setPending(null);
       setStatus(`Imported ${countLabel(result.messages, 'message')} into ${countLabel(job.channels, 'channel')}. Open a channel to read the history, or search it from anywhere.`);
@@ -1031,7 +1037,9 @@ export function IrcLogImportControls(): JSX.Element {
     }
     setBusy(true);
     try {
-      const result = await importVault(job.snapshot, job.ownerScope.owner);
+      const result = await importVault(job.snapshot, job.ownerScope.owner, {
+        isCurrent: () => importOwner.isActive(job.ownerScope),
+      });
       if (!importOwner.isActive(job.ownerScope)) return;
       setPending(null);
       setStatus(`Imported ${countLabel(result.messages, 'message')} into ${job.target}. Open it to read the history, or search from anywhere.`);

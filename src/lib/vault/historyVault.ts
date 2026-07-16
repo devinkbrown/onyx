@@ -642,10 +642,28 @@ export async function exportVault(owner?: DeviceMemoryOwner): Promise<VaultExpor
  * before writing. Success counters are exact surviving imported ids after the
  * destination retention policy prunes, not merely attempted writes.
  */
+export interface VaultImportOptions {
+  /** Live owner/component guard checked across each target's awaited writes. */
+  isCurrent?: () => boolean;
+}
+
+export class VaultImportOwnerChangedError extends Error {
+  constructor() {
+    super('Vault import owner changed');
+    this.name = 'VaultImportOwnerChangedError';
+  }
+}
+
+function assertVaultImportCurrent(options?: VaultImportOptions): void {
+  if (options?.isCurrent?.() === false) throw new VaultImportOwnerChangedError();
+}
+
 export async function importVault(
   snapshot: VaultExportSnapshot,
   owner?: DeviceMemoryOwner,
+  options?: VaultImportOptions,
 ): Promise<{ targets: number; messages: number }> {
+  assertVaultImportCurrent(options);
   const safeOwner = owner === undefined ? null : normalizeDeviceMemoryOwner(owner);
   if (owner !== undefined && !safeOwner) return { targets: 0, messages: 0 };
   let targetCount = 0;
@@ -653,6 +671,7 @@ export async function importVault(
   if (!Array.isArray(snapshot?.targets)) return { targets: 0, messages: 0 };
   let remainingMessageWork = MAX_EXPORT_TOTAL_RAW_MESSAGES;
   for (const rawEntry of snapshot.targets.slice(0, MAX_EXPORT_TARGETS)) {
+    assertVaultImportCurrent(options);
     if (remainingMessageWork <= 0) break;
     if (!isRecord(rawEntry) || !Array.isArray(rawEntry.messages)) continue;
     const normalizedTarget = normalizeVaultTarget(rawEntry.target, '');
@@ -673,11 +692,14 @@ export async function importVault(
     // counters as a success message, so counting a quota/private-mode failure
     // would tell the user their history was restored when IndexedDB contains
     // nothing.
+    assertVaultImportCurrent(options);
     const committed = await saveMessages(target, retained, safeOwner ?? undefined);
+    assertVaultImportCurrent(options);
     if (!committed) continue;
     const candidateIds = new Set(retained.map((message) => message.id));
     const survivors = (await loadRecent(target, keep, safeOwner ?? undefined))
       .filter((message) => candidateIds.has(message.id)).length;
+    assertVaultImportCurrent(options);
     if (survivors === 0) continue;
     targetCount += 1;
     messageCount += survivors;
