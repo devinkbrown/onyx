@@ -2266,6 +2266,9 @@ let _passkeyActionReplyContext: AccountReplyContext | null = null;
 let _passkeyAuthReplyContext: AccountReplyContext | null = null;
 let _totpReplyContext: AccountReplyContext | null = null;
 let _vhostReplyContext: AccountReplyContext | null = null;
+let _e2eeKeyReplyContext: AccountReplyContext | null = null;
+let _keyTransparencyReplyContext: AccountReplyContext | null = null;
+let _certReplyContext: AccountReplyContext | null = null;
 
 function passkeyErrText(e: unknown): string {
   if (e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'AbortError')) {
@@ -2649,6 +2652,9 @@ function _invalidateAccountReplyContexts(): void {
   _passkeyAuthReplyContext = null;
   _totpReplyContext = null;
   _vhostReplyContext = null;
+  _e2eeKeyReplyContext = null;
+  _keyTransparencyReplyContext = null;
+  _certReplyContext = null;
   if (_pendingPasskeyAuth?.timer) clearTimeout(_pendingPasskeyAuth.timer);
   _pendingPasskeyAuth = null;
   _pendingPasskeyList = null;
@@ -3061,7 +3067,24 @@ const ACCOUNT_COMMANDS = new Set([
   'DROP',
   'E2EEKEY',
   'KEYTRANS',
+  'CERTADD',
+  'CERTLIST',
+  'CERTDEL',
 ]);
+
+type AccountSecurityReplyKind = 'e2ee-key' | 'key-transparency' | 'certificate';
+
+function accountSecurityReplyKind(text: string): AccountSecurityReplyKind | null {
+  const body = text.replace(/^\[?Account\]?:?\s+/i, '');
+  if (/^E2EEKEY\b/i.test(body)) return 'e2ee-key';
+  if (/^KEYTRANS\b/i.test(body)) return 'key-transparency';
+  if (/^(?:CERT(?:IFICATE|ADD|LIST|DEL)?|FINGERPRINT)\b/i.test(body)) return 'certificate';
+  return null;
+}
+
+function hasAccountSecurityReplyMarker(text: string): boolean {
+  return /\b(?:E2EEKEY|KEYTRANS|CERTIFICATE|CERTLIST|CERTADD|CERTDEL|FINGERPRINT)\b/i.test(text);
+}
 
 /**
  * Merge parsed ACCOUNTINFO fields into the structured `accountInfo` state.
@@ -4816,33 +4839,44 @@ export const store = createStore<OnyxState>()(
 
     certAdd() {
       const { client } = get();
+      if (!client) return;
+      _certReplyContext = _captureAccountReplyContext(get);
       // `CERTADD` takes no params — it binds the cert presented on THIS
       // connection. Server fails (FAIL CERTADD NO_CLIENT_CERT) if none.
-      client?.sendRaw('CERTADD');
+      client.sendRaw('CERTADD');
     },
 
     certList() {
       const { client } = get();
+      if (!client) return;
+      _certReplyContext = _captureAccountReplyContext(get);
       // Replies: `:server NOTICE <nick> :CERTLIST <fp>` per fingerprint (or a
       // single "no fingerprints bound" notice). Surfaced via serviceNotices.
-      client?.sendRaw('CERTLIST');
+      client.sendRaw('CERTLIST');
     },
 
     certDel(fingerprint) {
       const { client } = get();
       const fp = fingerprint.trim();
       if (!client || !fp) return;
+      _certReplyContext = _captureAccountReplyContext(get);
       client.sendRaw('CERTDEL', fp);
     },
 
     e2eeKeyStatus() {
-      get().client?.sendRaw('E2EEKEY', 'STATUS');
+      const { client } = get();
+      if (!client) return;
+      _e2eeKeyReplyContext = _captureAccountReplyContext(get);
+      client.sendRaw('E2EEKEY', 'STATUS');
     },
 
     e2eeKeyList(account) {
+      const { client } = get();
+      if (!client) return;
       const acct = account?.trim();
-      if (acct) get().client?.sendRaw('E2EEKEY', 'LIST', acct);
-      else get().client?.sendRaw('E2EEKEY', 'LIST');
+      _e2eeKeyReplyContext = _captureAccountReplyContext(get);
+      if (acct) client.sendRaw('E2EEKEY', 'LIST', acct);
+      else client.sendRaw('E2EEKEY', 'LIST');
     },
 
     e2eeKeyAdd(deviceId, algorithm, publicKey) {
@@ -4850,23 +4884,33 @@ export const store = createStore<OnyxState>()(
       if (!e2eeDevicePropKey(id)) return;
       const value = e2eeDeviceValue(algorithm, publicKey);
       if (!id || !value) return;
+      const { client } = get();
+      if (!client) return;
       const colon = value.indexOf(':');
-      get().client?.sendRaw('E2EEKEY', 'ADD', id, value.slice(0, colon), value.slice(colon + 1));
+      _e2eeKeyReplyContext = _captureAccountReplyContext(get);
+      client.sendRaw('E2EEKEY', 'ADD', id, value.slice(0, colon), value.slice(colon + 1));
     },
 
     e2eeKeyDelete(deviceId) {
       const id = deviceId.trim();
-      if (!id) return;
-      get().client?.sendRaw('E2EEKEY', 'DEL', id);
+      const { client } = get();
+      if (!client || !id) return;
+      _e2eeKeyReplyContext = _captureAccountReplyContext(get);
+      client.sendRaw('E2EEKEY', 'DEL', id);
     },
 
     keyTransparencyStatus() {
-      get().client?.sendRaw('KEYTRANS', 'STATUS');
+      const { client } = get();
+      if (!client) return;
+      _keyTransparencyReplyContext = _captureAccountReplyContext(get);
+      client.sendRaw('KEYTRANS', 'STATUS');
     },
 
     keyTransparencyProof(position) {
-      if (!Number.isInteger(position) || position < 0) return;
-      get().client?.sendRaw('KEYTRANS', 'PROOF', String(position));
+      const { client } = get();
+      if (!client || !Number.isInteger(position) || position < 0) return;
+      _keyTransparencyReplyContext = _captureAccountReplyContext(get);
+      client.sendRaw('KEYTRANS', 'PROOF', String(position));
     },
 
     // ── requestHistory ───────────────────────────────────────────────────
@@ -6420,6 +6464,20 @@ export const store = createStore<OnyxState>()(
         // arrive either as a NOTICE (handled below) or, on some deployments,
         // as a `NOTE ACCOUNTINFO :account=… flags=…`.
         if (ACCOUNT_COMMANDS.has(standard.command)) {
+          if (
+            standard.command === 'E2EEKEY'
+            && !_replyAccountIsCurrent(_e2eeKeyReplyContext, get)
+          ) return;
+          if (
+            standard.command === 'KEYTRANS'
+            && !_replyAccountIsCurrent(_keyTransparencyReplyContext, get)
+          ) return;
+          if (
+            (standard.command === 'CERTADD'
+              || standard.command === 'CERTLIST'
+              || standard.command === 'CERTDEL')
+            && !_replyAccountIsCurrent(_certReplyContext, get)
+          ) return;
           if (standard.kind === 'FAIL' || standard.kind === 'WARN') {
             if (standard.command === 'ACCOUNTINFO') {
               if (!_replyTransportIsCurrent(_accountInfoReplyContext, get)) return;
@@ -7362,6 +7420,22 @@ export const store = createStore<OnyxState>()(
               break;
             }
 
+            // Account security replies are server-authored but carry no request
+            // id. Keep the three protocols on separate account/client/generation
+            // contexts so one current request cannot reopen another reply stream.
+            const securityReplyKind = accountSecurityReplyKind(text);
+            if (securityReplyKind) {
+              const context = securityReplyKind === 'e2ee-key'
+                ? _e2eeKeyReplyContext
+                : securityReplyKind === 'key-transparency'
+                  ? _keyTransparencyReplyContext
+                  : _certReplyContext;
+              if (_replyAccountIsCurrent(context, get)) {
+                get().addServiceNotice('Account', text);
+              }
+              break;
+            }
+
             // ── TOTP: structured 2FA notices ─────────────────────────────
             if (text.startsWith('TOTP:')) {
               if (!_replyAccountIsCurrent(_totpReplyContext, get)) break;
@@ -7455,6 +7529,9 @@ export const store = createStore<OnyxState>()(
           }
 
           if (command === 'NOTICE' && !text.startsWith('\x01') && !isChan(target)) {
+            // Security replies are accepted only by the server-authored branch
+            // above. A peer PM must never impersonate account key/cert state.
+            if (hasAccountSecurityReplyMarker(text)) break;
             const rawSource = sender || msg.prefix || '';
             const sourceUpper = rawSource.toUpperCase();
             const textUpper = text.toUpperCase();
@@ -7465,7 +7542,7 @@ export const store = createStore<OnyxState>()(
               (/\b(MEMO|MEMOS)\b/.test(textUpper) ? 'Memo' : undefined) ??
               (/\bWEBHOOK\b/.test(textUpper) ? 'Webhook' : undefined) ??
               (/\bVHOST\b/.test(textUpper) ? 'VHost' : undefined) ??
-              (/\b(ACCESS LIST|HOST MASK|CERTIFICATE|CERTLIST|CERTADD|CERTDEL|FINGERPRINT|E2EEKEY|KEYTRANS)\b/.test(textUpper) ? 'Account' : undefined) ??
+              (/\b(ACCESS LIST|HOST MASK)\b/.test(textUpper) ? 'Account' : undefined) ??
               (/\b(ACCOUNT|IDENTIFIED|REGISTERED|PASSWORD|EMAIL|GHOST|RECOVER|GROUPED|UNGROUP)\b/.test(textUpper) ? 'Account' : undefined);
 
             if (serviceSource) {

@@ -394,11 +394,75 @@ describe('account replies — state from the message handler', () => {
   });
 
   it('FAIL E2EEKEY surfaces accountActionError', () => {
+    const client = makeClient();
+    store.setState({ client: client as never, server: seedServer('alice') });
+    store.getState().e2eeKeyAdd('laptop', 'tsumugi-p256', 'public-key');
     feed(':eshmaki.me FAIL E2EEKEY BAD_DEVICE :Device id must use safe characters');
     expect(store.getState().accountActionError).toMatchObject({
       command: 'E2EEKEY',
       code: 'BAD_DEVICE',
     });
+  });
+
+  it('rejects late Alice E2EEKEY notices and failures after switching to Bob', () => {
+    const client = makeClient();
+    store.setState({ client: client as never, server: seedServer('alice') });
+    store.getState().e2eeKeyStatus();
+
+    feed(':eshmaki.me 900 alice alice!u@h bob :You are now logged in as bob');
+    feed(':eshmaki.me NOTICE alice :E2EEKEY STATUS account=alice devices=1');
+    feed(':eshmaki.me FAIL E2EEKEY BAD_DEVICE :Alice device failed');
+
+    expect(store.getState().server?.account).toBe('bob');
+    expect(store.getState().accountActionError).toBeNull();
+    expect(store.getState().serviceNotices).not.toContainEqual(expect.objectContaining({
+      text: expect.stringContaining('account=alice'),
+    }));
+
+    store.getState().e2eeKeyStatus();
+    feed(':eshmaki.me NOTICE alice :E2EEKEY STATUS account=bob devices=2');
+    expect(store.getState().serviceNotices.at(-1)).toMatchObject({
+      source: 'Account',
+      text: 'E2EEKEY STATUS account=bob devices=2',
+    });
+  });
+
+  it('rejects late Alice KEYTRANS and CERT notices after switching to Bob', () => {
+    const client = makeClient();
+    store.setState({ client: client as never, server: seedServer('alice') });
+    store.getState().keyTransparencyStatus();
+    store.getState().certList();
+
+    feed(':eshmaki.me 900 alice alice!u@h bob :You are now logged in as bob');
+    feed(':eshmaki.me NOTICE alice :KEYTRANS STATUS account=alice entries=1 root=alice-root');
+    feed(':eshmaki.me NOTICE alice :CERTLIST SHA256:alice-fingerprint');
+    feed(':eshmaki.me FAIL CERTLIST UNAVAILABLE :Alice certificate lookup failed');
+
+    expect(store.getState().serviceNotices).not.toContainEqual(expect.objectContaining({
+      text: expect.stringMatching(/alice-root|alice-fingerprint|Alice certificate lookup failed/),
+    }));
+
+    store.getState().keyTransparencyStatus();
+    feed(':eshmaki.me NOTICE alice :KEYTRANS STATUS account=bob entries=2 root=bob-root');
+    store.getState().certList();
+    feed(':eshmaki.me NOTICE alice :CERTLIST SHA256:bob-fingerprint');
+
+    expect(store.getState().serviceNotices.map((notice) => notice.text)).toEqual([
+      'KEYTRANS STATUS account=bob entries=2 root=bob-root',
+      'CERTLIST SHA256:bob-fingerprint',
+    ]);
+  });
+
+  it('rejects peer notices impersonating account security replies', () => {
+    const client = makeClient();
+    store.setState({ client: client as never, server: seedServer('alice') });
+    store.getState().e2eeKeyStatus();
+
+    feed(':mallory!m@evil NOTICE alice :E2EEKEY STATUS account=alice devices=99');
+    feed(':mallory!m@evil NOTICE alice :KEYTRANS STATUS account=alice entries=99 root=evil');
+    feed(':mallory!m@evil NOTICE alice :CERTLIST SHA256:evil-fingerprint');
+
+    expect(store.getState().serviceNotices).toEqual([]);
   });
 
   it('a logout confirmation NOTICE clears account + accountInfo', () => {
