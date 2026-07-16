@@ -448,6 +448,20 @@ describe('PreferencesPanel', () => {
     );
   });
 
+  it('keeps the client access ledger compact until its evidence is requested', () => {
+    renderPreferences('Accessibility');
+
+    const summary = screen.getByText('25 surfaces checked · Review audit details');
+    const disclosure = summary.closest('details');
+    expect(disclosure).not.toBeNull();
+    expect(disclosure).not.toHaveAttribute('open');
+
+    fireEvent.click(summary);
+
+    expect(disclosure).toHaveAttribute('open');
+    expect(within(disclosure!).getByRole('list')).toHaveAttribute('aria-label', 'Audited client surfaces');
+  });
+
   it('downloads one portable vault through an attached anchor and releases its object URL', async () => {
     let resolveExport: (snapshot: PortableTransferSnapshot) => void = () => {};
     const pendingExport = new Promise<PortableTransferSnapshot>((resolve) => {

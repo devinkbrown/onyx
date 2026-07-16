@@ -562,19 +562,24 @@ function AccessibilityAuditLedger(): JSX.Element {
       <p class="pref-desc">
         WCAG 2.2 AA / EN 301 549 tracking for the dense app surfaces.
       </p>
-      <div class="pref-a11y-rows" role="list">
-        <For each={ACCESS_AUDIT_ROWS}>
-          {(row) => (
-            <div class="pref-a11y-row" role="listitem" data-status={row.status}>
-              <span class="pref-a11y-status">{row.status}</span>
-              <span class="pref-a11y-main">
-                <span class="pref-a11y-surface">{row.surface}</span>
-                <span class="pref-desc">{row.note}</span>
-              </span>
-            </div>
-          )}
-        </For>
-      </div>
+      <details class="pref-a11y-disclosure">
+        <summary class="pref-a11y-disclosure__summary">
+          {ACCESS_AUDIT_ROWS.length} surfaces checked · Review audit details
+        </summary>
+        <div class="pref-a11y-rows" role="list" aria-label="Audited client surfaces">
+          <For each={ACCESS_AUDIT_ROWS}>
+            {(row) => (
+              <div class="pref-a11y-row" role="listitem" data-status={row.status}>
+                <span class="pref-a11y-status">{row.status}</span>
+                <span class="pref-a11y-main">
+                  <span class="pref-a11y-surface">{row.surface}</span>
+                  <span class="pref-desc">{row.note}</span>
+                </span>
+              </div>
+            )}
+          </For>
+        </div>
+      </details>
     </section>
   );
 }

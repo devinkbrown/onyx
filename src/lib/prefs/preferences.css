@@ -1083,9 +1083,33 @@
   border-radius: var(--r-sm);
 }
 
+.pref-a11y-disclosure {
+  border-block: 1px solid var(--line);
+}
+
+.pref-a11y-disclosure__summary {
+  padding-block: var(--space-3);
+  color: var(--washi);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pref-a11y-disclosure__summary::marker {
+  color: var(--lapis-bright);
+}
+
+.pref-a11y-disclosure__summary:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
 .pref-a11y-rows {
   display: grid;
   gap: 6px;
+  padding-block: 0 var(--space-3);
 }
 
 .pref-a11y-row {
