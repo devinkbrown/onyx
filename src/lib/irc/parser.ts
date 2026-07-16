@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { IRCMessage, StandardReply } from './types';
 
+export const MAX_IRCV3_MESSAGE_TAGS = 256;
+export const MAX_IRCV3_TAG_KEY_LENGTH = 256;
+export const MAX_IRCV3_TAG_VALUE_LENGTH = 64 * 1024;
+const MAX_IRCV3_TAG_BLOCK_LENGTH = 128 * 1024;
+
 /**
  * Split a received WebSocket text frame into complete IRC lines.
  *
@@ -36,18 +41,31 @@ export function parseIRCMessage(raw: string): IRCMessage {
   // Strip \r\n and null bytes
   const line = raw.replace(/\r?\n$/, '').replace(/\x00/g, '');
 
-  // Parse tags: @tag=val;tag2;tag3=val3 <space>
+  // Parse tags: @tag=val;tag2;tag3=val3 <space>. Message tags are remote input,
+  // so cap the block before splitting and define keys as own data properties:
+  // ordinary assignment to `__proto__` would invoke Object.prototype's setter
+  // instead of recording the wire tag.
   if (line[pos] === '@') {
     pos++;
     const tagEnd = line.indexOf(' ', pos);
     const tagStr = tagEnd === -1 ? line.slice(pos) : line.slice(pos, tagEnd);
-    for (const tag of tagStr.split(';')) {
-      if (!tag) continue;
-      const eq = tag.indexOf('=');
-      if (eq === -1) {
-        tags[tag] = '';
-      } else {
-        tags[tag.slice(0, eq)] = unescapeTagValue(tag.slice(eq + 1));
+    if (tagStr.length <= MAX_IRCV3_TAG_BLOCK_LENGTH) {
+      for (const tag of tagStr.split(';', MAX_IRCV3_MESSAGE_TAGS)) {
+        if (!tag) continue;
+        const eq = tag.indexOf('=');
+        const key = eq === -1 ? tag : tag.slice(0, eq);
+        const rawValue = eq === -1 ? '' : tag.slice(eq + 1);
+        if (
+          key.length > MAX_IRCV3_TAG_KEY_LENGTH
+          || rawValue.length > MAX_IRCV3_TAG_VALUE_LENGTH
+          || /[\s\u0000-\u001f\u007f]/u.test(key)
+        ) continue;
+        Object.defineProperty(tags, key, {
+          configurable: true,
+          enumerable: true,
+          writable: true,
+          value: unescapeTagValue(rawValue),
+        });
       }
     }
     pos = tagEnd === -1 ? line.length : tagEnd + 1;

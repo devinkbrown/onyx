@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from 'vitest';
-import { formatIRCLine, parseIRCMessage } from './parser';
+import {
+  formatIRCLine,
+  MAX_IRCV3_MESSAGE_TAGS,
+  MAX_IRCV3_TAG_KEY_LENGTH,
+  MAX_IRCV3_TAG_VALUE_LENGTH,
+  parseIRCMessage,
+} from './parser';
 
 const bodyWithoutTerminator = (line: string): string => line.slice(0, -2);
 
@@ -73,6 +79,34 @@ describe('parseIRCMessage tag parsing with hostile wire values', () => {
     expect(msg.tags['']).toBe('value');
     expect(msg.tags.normal).toBe('ok');
     expect(msg.command).toBe('CMD');
+  });
+
+  it('records prototype-named tags as own data without mutating prototypes', () => {
+    const msg = parseIRCMessage('@__proto__=wire;constructor=remote;normal=ok CMD');
+
+    expect(Object.getPrototypeOf(msg.tags)).toBe(Object.prototype);
+    expect(Object.hasOwn(msg.tags, '__proto__')).toBe(true);
+    expect(msg.tags.__proto__).toBe('wire');
+    expect(msg.tags.constructor).toBe('remote');
+    expect(msg.tags.normal).toBe('ok');
+    expect(Object.prototype).not.toHaveProperty('wire');
+  });
+
+  it('bounds tag count, keys, and values before decoding', () => {
+    const many = Array.from(
+      { length: MAX_IRCV3_MESSAGE_TAGS + 10 },
+      (_, index) => `tag${index}=value`,
+    ).join(';');
+    const bounded = parseIRCMessage(`@${many} CMD`);
+    expect(Object.keys(bounded.tags)).toHaveLength(MAX_IRCV3_MESSAGE_TAGS);
+    expect(bounded.tags.tag255).toBe('value');
+    expect(bounded.tags.tag256).toBeUndefined();
+
+    const fields = parseIRCMessage(
+      `@${'k'.repeat(MAX_IRCV3_TAG_KEY_LENGTH + 1)}=bad;huge=${'x'.repeat(MAX_IRCV3_TAG_VALUE_LENGTH + 1)};normal=ok CMD`,
+    );
+    expect(fields.tags).toEqual({ normal: 'ok' });
+    expect(fields.command).toBe('CMD');
   });
 });
 
