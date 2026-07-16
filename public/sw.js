@@ -106,7 +106,7 @@ function isCacheableStaticPath(pathname) {
 
 function isCanonicalShellResponse(pathname, response) {
   const fallbackPath = navigationFallbackPath(pathname);
-  if (fallbackPath === null || !response) return false;
+  if (fallbackPath === null || response?.ok !== true) return false;
   try {
     const finalUrl = new URL(response.url);
     return finalUrl.origin === self.location.origin
@@ -117,7 +117,7 @@ function isCanonicalShellResponse(pathname, response) {
 }
 
 function isCanonicalStaticResponse(requestUrl, response) {
-  if (!response) return false;
+  if (response?.ok !== true) return false;
   try {
     const finalUrl = new URL(response.url);
     return finalUrl.origin === self.location.origin

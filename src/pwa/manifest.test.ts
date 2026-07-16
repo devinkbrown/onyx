@@ -356,11 +356,13 @@ describe('PWA manifest', () => {
     const add = vi.fn<(url: string) => Promise<void>>(async () => undefined);
     const put = vi.fn(async () => undefined);
     const currentCacheMatch = vi.fn<(url: string) => Promise<unknown>>(async (url) => ({
+      ok: true,
       url: `https://onyx.test${url}`,
     }));
     const cache = { add, match: currentCacheMatch, put };
     const match = vi.fn<(key: unknown) => Promise<unknown>>(async (key) => ({
       fallback: key,
+      ok: true,
       url: `https://onyx.test${String(key)}`,
     }));
     const deleteCache = vi.fn(async () => {
@@ -579,6 +581,21 @@ describe('PWA manifest', () => {
     expect(poisonedFallback).toBeInstanceOf(Response);
     expect(poisonedFallback.status).toBe(503);
 
+    match.mockResolvedValueOnce({
+      fallback: '/app/',
+      ok: false,
+      url: 'https://onyx.test/app/',
+    });
+    listeners.get('fetch')?.({
+      request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/app/failed-shell' },
+      respondWith: (work: Promise<unknown>) => {
+        navigationWork = work;
+      },
+    });
+    const failedShellFallback = await navigationWork as Response;
+    expect(failedShellFallback).toBeInstanceOf(Response);
+    expect(failedShellFallback.status).toBe(503);
+
     match.mockRejectedValueOnce(new Error('offline fallback cache unavailable'));
     listeners.get('fetch')?.({
       request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/app/offline' },
@@ -645,6 +662,36 @@ describe('PWA manifest', () => {
     await assetLifetimeWork;
     expect(repairedResponse.clone).toHaveBeenCalledOnce();
     expect(put).toHaveBeenCalledWith(repairRequest, repairedClone);
+
+    const recoveredClone = { kind: 'recovered-asset-clone' };
+    const recoveredResponse = {
+      ok: true,
+      url: 'https://onyx.test/assets/recover.789.js',
+      clone: vi.fn(() => recoveredClone),
+    };
+    const recoverRequest = {
+      method: 'GET',
+      mode: 'cors',
+      url: 'https://onyx.test/assets/recover.789.js',
+    };
+    match.mockResolvedValueOnce({
+      ok: false,
+      url: 'https://onyx.test/assets/recover.789.js',
+    });
+    networkFetch.mockResolvedValueOnce(recoveredResponse);
+    listeners.get('fetch')?.({
+      request: recoverRequest,
+      respondWith: (work: Promise<unknown>) => {
+        assetResponseWork = work;
+      },
+      waitUntil: (work: Promise<unknown>) => {
+        assetLifetimeWork = work;
+      },
+    });
+    await expect(assetResponseWork).resolves.toBe(recoveredResponse);
+    await assetLifetimeWork;
+    expect(recoveredResponse.clone).toHaveBeenCalledOnce();
+    expect(put).toHaveBeenCalledWith(recoverRequest, recoveredClone);
 
     const matchCallsBeforeUpload = match.mock.calls.length;
     const fetchCallsBeforeUpload = networkFetch.mock.calls.length;
