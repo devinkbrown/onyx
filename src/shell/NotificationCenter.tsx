@@ -96,6 +96,10 @@ export function NotificationCenter(): JSX.Element {
 
   createEffect(() => {
     if (!inboxOpen()) return;
+    // Keep this effect subscribed to row membership as well as open state.
+    // A synchronized dismissal can remove the focused control without going
+    // through dismissNotification(), which otherwise leaves focus on <body>.
+    ordered();
     queueMicrotask(() => {
       if (!untrack(inboxOpen) || !centerRef || centerRef.contains(document.activeElement)) return;
       focusableControls()[0]?.focus();

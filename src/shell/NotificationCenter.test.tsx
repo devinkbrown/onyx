@@ -240,6 +240,24 @@ describe('<NotificationCenter>', () => {
     expect(screen.getByText(/Nothing yet/)).toBeInTheDocument();
   });
 
+  it('recaptures focus when a synchronized update removes the focused row', async () => {
+    store.setState({
+      notifications: [note({ id: 'remote', type: 'dm', from: 'mizu', text: 'remote message' })],
+    });
+    render(() => <NotificationCenter />);
+    fireEvent.click(screen.getByRole('button', { name: /Inbox — 1 unread/i }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Mark all read' })).toHaveFocus());
+    const row = screen.getByRole('button', { name: /Open notification from mizu/i });
+    row.focus();
+    expect(row).toHaveFocus();
+
+    store.setState({ notifications: [] });
+
+    const close = screen.getByRole('button', { name: 'Close notification inbox' });
+    await waitFor(() => expect(close).toHaveFocus());
+    expect(screen.getByText(/Nothing yet/)).toBeInTheDocument();
+  });
+
   it('keeps Tab and Shift+Tab inside the notification dialog', async () => {
     store.setState({
       notifications: [note({ id: 'only', type: 'dm', from: 'mizu', text: 'one message' })],
