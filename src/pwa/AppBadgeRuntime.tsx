@@ -45,11 +45,12 @@ export function AppBadgeRuntime(): JSX.Element {
   let applied = -1;
   let syncing = false;
   let disposed = false;
+  let syncTask: Promise<void> | undefined;
 
   const flush = (): void => {
     if (syncing || disposed) return;
     syncing = true;
-    void (async () => {
+    syncTask = (async () => {
       while (!disposed && applied !== requested) {
         const next = requested;
         await applyBadge(next);
@@ -68,9 +69,10 @@ export function AppBadgeRuntime(): JSX.Element {
   onCleanup(() => {
     disposed = true;
     // Leaving the app route must not strand a stale operating-system badge.
-    void applyBadge(0);
+    // Queue the terminal clear behind any platform write already in flight so
+    // a slow setAppBadge cannot become the final operation after unmount.
+    void (syncTask ?? Promise.resolve()).then(() => applyBadge(0));
   });
 
   return null;
 }
-

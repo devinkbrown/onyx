@@ -59,6 +59,33 @@ describe('AppBadgeRuntime', () => {
     expect(setAppBadge).toHaveBeenCalledTimes(2);
   });
 
+  it('queues the terminal clear behind an in-flight badge update', async () => {
+    let releaseSet: (() => void) | undefined;
+    const operations: string[] = [];
+    const setAppBadge = vi.fn().mockImplementation(() => {
+      operations.push('set');
+      return new Promise<void>((resolve) => {
+        releaseSet = resolve;
+      });
+    });
+    const clearAppBadge = vi.fn().mockImplementation(async () => {
+      operations.push('clear');
+    });
+    installBadgeApi(setAppBadge, clearAppBadge);
+    store.setState({ totalUnreadMentions: 4 });
+
+    render(() => <AppBadgeRuntime />);
+    await waitFor(() => expect(setAppBadge).toHaveBeenCalledWith(4));
+
+    cleanup();
+    await Promise.resolve();
+    expect(clearAppBadge).not.toHaveBeenCalled();
+
+    releaseSet?.();
+    await waitFor(() => expect(clearAppBadge).toHaveBeenCalledTimes(1));
+    expect(operations).toEqual(['set', 'clear']);
+  });
+
   it('falls back to setAppBadge(0), ignores failures, and no-ops when unsupported', async () => {
     const setAppBadge = vi.fn().mockRejectedValue(new DOMException('denied', 'NotAllowedError'));
     Object.defineProperty(navigator, 'setAppBadge', { value: setAppBadge, configurable: true });
@@ -70,4 +97,3 @@ describe('AppBadgeRuntime', () => {
     expect(() => render(() => <AppBadgeRuntime />)).not.toThrow();
   });
 });
-
