@@ -142,6 +142,20 @@ describe('PWA manifest', () => {
     expect(stamped).toContain("const CACHE_NAME = 'onyx-shell-20260716-test';");
   });
 
+  it('fails closed before a missing community site can erase public routes', () => {
+    const deploy = readFileSync(deployScriptPath, 'utf8');
+    const landingGuard = deploy.indexOf('test -d "${LANDING}"');
+    const clientBuild = deploy.indexOf('NODE_OPTIONS="--disable-warning=DEP0205" pnpm build');
+    const liveSync = deploy.indexOf('rsync -a --delete dist/ out/');
+
+    expect(landingGuard).toBeGreaterThan(0);
+    expect(landingGuard).toBeLessThan(clientBuild);
+    expect(landingGuard).toBeLessThan(liveSync);
+    expect(deploy).toContain('refusing to remove the public website');
+    expect(deploy).not.toContain('deploying the bare SPA');
+    expect(deploy).not.toMatch(/if \[ -d "\$\{LANDING\}" \]/);
+  });
+
   it('bounds push content and keeps notification targets on canonical app routes', async () => {
     const listeners = new Map<string, (event: Record<string, unknown>) => void>();
     const showNotification = vi.fn(async () => undefined);

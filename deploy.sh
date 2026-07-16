@@ -17,6 +17,9 @@ cd "$(dirname "$0")"
 VERSION="$(date +%Y%m%d-%H%M%S)-$(git rev-parse --short HEAD 2>/dev/null || echo local)"
 LANDING=/home/kain/landing
 
+test -d "${LANDING}" \
+  || { echo "FAIL: ${LANDING} missing — refusing to remove the public website"; exit 1; }
+
 echo "==> building static export -> dist/"
 NODE_OPTIONS="--disable-warning=DEP0205" pnpm build
 
@@ -39,18 +42,14 @@ grep -q "onyx-shell-${VERSION}" dist/sw.js \
 
 # Community site overlay — staged into dist/ BEFORE the live sync so the swap
 # is one rsync, never a window where the root 404s.
-if [ -d "${LANDING}" ]; then
-  echo "==> building + staging the community site overlay"
-  (cd "${LANDING}" && node build.mjs >/dev/null && node build.mjs --check >/dev/null)
-  for reserved in app about appearance assets; do
-    if [ -e "${LANDING}/dist/${reserved}" ]; then
-      echo "FAIL: landing dist/${reserved} would clobber the SPA"; exit 1
-    fi
-  done
-  cp -r "${LANDING}/dist/." dist/
-else
-  echo "WARN: ${LANDING} missing — deploying the bare SPA (no community site!)"
-fi
+echo "==> building + staging the community site overlay"
+(cd "${LANDING}" && node build.mjs >/dev/null && node build.mjs --check >/dev/null)
+for reserved in app about appearance assets; do
+  if [ -e "${LANDING}/dist/${reserved}" ]; then
+    echo "FAIL: landing dist/${reserved} would clobber the SPA"; exit 1
+  fi
+done
+cp -r "${LANDING}/dist/." dist/
 
 # Static files must remain readable/traversable by nginx. Some landing build
 # environments create output under a restrictive umask, and `rsync -a` would
