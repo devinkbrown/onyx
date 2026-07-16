@@ -1037,6 +1037,8 @@ export class SuimyakuMediaEngine {
         .catch(() => {});
     } else if (verb === 'JOIN' || verb === 'ROSTER') {
       if (arg) this.streamRouter.addParticipant(arg);
+    } else if (verb === 'LEAVE') {
+      if (arg) this.streamRouter.removeParticipant(arg);
     }
   }
 

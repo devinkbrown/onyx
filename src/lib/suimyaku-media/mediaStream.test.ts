@@ -105,6 +105,24 @@ describe('MediaStreamRouter', () => {
     expect(r.resolve(mediaStreamId('#call', 'alice', 'audio'))).toBeNull();
   });
 
+  it('removes departed participants case-insensitively and releases their slot', () => {
+    const r = new MediaStreamRouter();
+    r.setRoster(
+      '#call',
+      Array.from({ length: MAX_MEDIA_STREAM_PARTICIPANTS }, (_, index) => `peer-${index}`),
+    );
+
+    r.removeParticipant('PEER-0');
+    expect(r.resolve(mediaStreamId('#call', 'peer-0', 'audio'))).toBeNull();
+    expect(r.resolve(mediaStreamId('#call', 'peer-0', 'video'))).toBeNull();
+
+    r.addParticipant('replacement');
+    expect(r.resolve(mediaStreamId('#call', 'replacement', 'audio'))).toEqual({
+      nick: 'replacement',
+      kind: 'audio',
+    });
+  });
+
   it('clear releases the participant cap for the next room', () => {
     const r = new MediaStreamRouter();
     r.setRoster(

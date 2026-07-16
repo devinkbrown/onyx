@@ -80,6 +80,15 @@ export class MediaStreamRouter {
     this.participants.add(participantKey);
   }
 
+  /** Remove a departed participant and release its slot immediately. */
+  removeParticipant(nick: string): void {
+    if (!this.channel || !validRoutingToken(nick, MAX_MEDIA_STREAM_NICK_LENGTH)) return;
+    const participantKey = nick.toLowerCase();
+    if (!this.participants.delete(participantKey)) return;
+    this.map.delete(mediaStreamId(this.channel, nick, 'audio'));
+    this.map.delete(mediaStreamId(this.channel, nick, 'video'));
+  }
+
   resolve(streamId: number): MediaStreamSource | null {
     return this.map.get(streamId >>> 0) ?? null;
   }
