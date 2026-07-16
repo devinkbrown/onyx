@@ -16,6 +16,7 @@ import {
   boundedUnixSeconds,
   PUBLIC_FEED_UNIX_SECONDS_MAX,
 } from './feedBounds';
+import { fetchPublicJson } from './fetchPublicJson';
 
 export const MAX_STATS_CHANNELS = 512;
 export const MAX_STATS_DAYS = 366;
@@ -104,15 +105,7 @@ export function normalizeIndex(raw: unknown): StatsIndex | null {
 }
 
 export async function fetchStatsIndex(): Promise<StatsIndex | null> {
-  try {
-    const res = await fetch('/stats/data/index.json', {
-      headers: { Accept: 'application/json' },
-    });
-    if (!res.ok) return null;
-    return normalizeIndex(await res.json());
-  } catch {
-    return null; // dev servers have no /stats — consumers hide the pulse
-  }
+  return normalizeIndex(await fetchPublicJson('/stats/data/index.json'));
 }
 
 /** Compact relative time from a unix-seconds stamp. */

@@ -7,6 +7,7 @@
  * website probes a few conventional static paths and degrades quietly.
  */
 import { boundedFeedText, boundedUnixSeconds } from './feedBounds';
+import { fetchPublicJson } from './fetchPublicJson';
 
 export const MAX_BACKUP_FILES = 128;
 export const MAX_BACKUP_KIND_LENGTH = 64;
@@ -57,14 +58,8 @@ export function normalizeBackupManifest(raw: unknown): BackupManifest | null {
 
 export async function fetchBackupManifest(): Promise<BackupManifest | null> {
   for (const path of ['/backups/latest.json', '/backup/latest.json', '/stats/backups/latest.json']) {
-    try {
-      const res = await fetch(path, { headers: { Accept: 'application/json' } });
-      if (!res.ok) continue;
-      const manifest = normalizeBackupManifest(await res.json());
-      if (manifest) return manifest;
-    } catch {
-      // Try the next conventional static path.
-    }
+    const manifest = normalizeBackupManifest(await fetchPublicJson(path));
+    if (manifest) return manifest;
   }
   return null;
 }

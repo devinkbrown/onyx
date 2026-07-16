@@ -11,6 +11,7 @@ import {
   boundedFeedText,
   boundedUnixSeconds,
 } from './feedBounds';
+import { fetchPublicJson } from './fetchPublicJson';
 
 export const MAX_STATUS_PEERS = 128;
 export const MAX_STATUS_PEER_NAME_LENGTH = 128;
@@ -84,14 +85,8 @@ export function normalizeStatus(raw: unknown): NetworkStatus | null {
 
 export async function fetchNetworkStatus(): Promise<NetworkStatus | null> {
   for (const path of ['/stats/data/status.json', '/stats/status.json', '/status.json']) {
-    try {
-      const res = await fetch(path, { headers: { Accept: 'application/json' } });
-      if (!res.ok) continue;
-      const status = normalizeStatus(await res.json());
-      if (status) return status;
-    } catch {
-      // Try the next known deployment path.
-    }
+    const status = normalizeStatus(await fetchPublicJson(path));
+    if (status) return status;
   }
   return null;
 }
