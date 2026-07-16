@@ -664,3 +664,143 @@
     -webkit-box-orient: vertical;
   }
 }
+
+/* At extreme zoom the mobile search center must fit between the top cutout and
+   bottom navigation. Keep its primary controls sticky while secondary search
+   panes scroll vertically; fixed pixel dimensions here prevent rem-scaled
+   fields and buttons from creating a hidden horizontal canvas. */
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .onyx-message-search {
+    top: max(8px, env(safe-area-inset-top, 0px));
+    right: max(8px, env(safe-area-inset-right, 0px));
+    bottom: calc(
+      var(--mnav-h, 56px)
+      + env(safe-area-inset-bottom, 0px)
+      + 8px
+    );
+    left: max(8px, env(safe-area-inset-left, 0px));
+    max-height: none;
+    padding: 0;
+    overflow-x: hidden;
+    scroll-padding-top: 112px;
+  }
+
+  .onyx-message-search__surface {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 8px;
+    padding: 8px;
+  }
+
+  .onyx-message-search__input {
+    height: 44px;
+    font-size: 16px;
+  }
+
+  .onyx-message-search__count {
+    min-width: 0;
+    padding: 4px 6px;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+  }
+
+  .onyx-message-search__provenance {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: center;
+    min-height: 24px;
+    padding: 2px 6px;
+    font-size: 10px;
+  }
+
+  .onyx-message-search .provenance-badge {
+    min-height: 24px;
+    padding: 2px 6px;
+    font-size: 10px;
+  }
+
+  .onyx-message-search__controls {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+    gap: 4px;
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .onyx-message-search__button {
+    width: 44px;
+    height: 44px;
+    font-size: 16px;
+  }
+
+  .onyx-message-search__recall,
+  .onyx-message-search__saved,
+  .onyx-message-search__history-off,
+  .onyx-message-search__server,
+  .onyx-message-search__vault {
+    padding: 8px;
+  }
+
+  .onyx-message-search__history-off {
+    gap: 8px;
+    font-size: 14px;
+  }
+
+  .onyx-message-search__recall-chip,
+  .onyx-message-search__segment {
+    min-height: 44px;
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .onyx-message-search__save-input {
+    height: 44px;
+    padding: 0 8px;
+    font-size: 14px;
+  }
+
+  .onyx-message-search__deep {
+    min-height: 44px;
+    padding: 6px 10px;
+    font-size: 14px;
+  }
+
+  .onyx-message-search__saved-run {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+    padding: 8px;
+  }
+
+  .onyx-message-search__saved-run strong,
+  .onyx-message-search__saved-run span {
+    font-size: 14px;
+  }
+
+  .onyx-message-search__saved-run small,
+  .onyx-message-search__server-count,
+  .onyx-message-search__server-when,
+  .onyx-message-search__vault-target {
+    font-size: 11px;
+  }
+
+  .onyx-message-search__server-error,
+  .onyx-message-search__server-notice,
+  .onyx-message-search__vault-label {
+    font-size: 12px;
+  }
+
+  .onyx-message-search__server-row {
+    gap: 2px 8px;
+    min-height: 44px;
+    padding: 6px;
+    font-size: 14px;
+  }
+
+  .onyx-message-search__vault-target {
+    max-width: 96px;
+    padding: 2px 6px;
+  }
+}
