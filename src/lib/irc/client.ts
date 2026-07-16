@@ -515,6 +515,19 @@ export class IRCClient {
     };
   }
 
+  /**
+   * Forget every bearer held by this live instance after confirmed account
+   * logout. Auto-reconnect reuses the IRCClient, so clearing durable storage
+   * alone would still replay the in-memory token on its next 001.
+   */
+  clearResumeTokens(): void {
+    this.opts = {
+      ...this.opts,
+      sessionToken: undefined,
+      meshToken: undefined,
+    };
+  }
+
   // ── Internals ───────────────────────────────────────────────────────────
 
   private _onOpen() {

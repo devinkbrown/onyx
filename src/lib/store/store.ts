@@ -2541,6 +2541,8 @@ let _reconnectScheduleTimer: ReturnType<typeof setTimeout> | null = null;
 let _connectNick = '';
 /** Account authenticated via SASL (set on 900 RPL_LOGGEDIN, cleared on connect/disconnect). */
 let _saslAccount: string | null = null;
+/** False after confirmed logout/failed resume so queued token notes cannot re-arm it. */
+let _sessionTokenWritesAllowed = true;
 
 // ── Nick reclaim timer (module-level) ────────────────────────────────────────
 /**
@@ -2703,6 +2705,16 @@ function _confirmRememberedSessionAccount(get: GetFn, set: SetFn): void {
   }
 }
 
+function _canAcceptSessionToken(get: GetFn): boolean {
+  if (!_sessionTokenWritesAllowed) return false;
+  const state = get();
+  return Boolean(
+    _saslAccount
+    || state.server?.account
+    || _currentSessionRestore(get)?.allowEarlyNames,
+  );
+}
+
 /**
  * Resolve the credential owned by this live socket without consulting the
  * cross-tab mutable activeKey. Source nick comes first for a canonical re-key;
@@ -2730,6 +2742,18 @@ function _liveCredentialTokenTarget(
     if (loadCredentials(server, nick)) return { server, nick };
   }
   return fallback ? { server, nick: fallback } : null;
+}
+
+/** Clear durable and same-client bearer state only after server-confirmed logout. */
+function _clearRememberedSessionAfterLogout(get: GetFn, set: SetFn): void {
+  const state = get();
+  const server = state.server?.url;
+  const account = _saslAccount || state.server?.account || _connectNick || state.ourNick;
+  if (server && account) clearSessionToken(server, account);
+  _sessionTokenWritesAllowed = false;
+  state.client?.clearResumeTokens?.();
+  _clearSessionRestore(set);
+  _stopNickReclaim();
 }
 
 function _setRestoreRosterSyncing(set: SetFn, channelKey: string, syncing: boolean): void {
@@ -3515,6 +3539,7 @@ export const store = createStore<OnyxState>()(
       _stopNickReclaim();
       _connectNick = nick;
       _saslAccount = null;
+      _sessionTokenWritesAllowed = true;
 
       // Start every explicit connect from a clean roster. Only disconnect() used
       // to clear these, so reconnecting from the form (e.g. after changing nick)
@@ -6138,7 +6163,7 @@ export const store = createStore<OnyxState>()(
 
         if (standard.kind === 'NOTE' && standard.command === 'SESSION' && standard.code === 'TOKEN') {
           const token = parseSessionTokenNote(msg);
-          if (token) {
+          if (token && _canAcceptSessionToken(get)) {
             _confirmRememberedSessionAccount(get, set);
             const canonicalNick = _saslAccount ?? undefined;
             const target = _liveCredentialTokenTarget(get, true);
@@ -6154,7 +6179,7 @@ export const store = createStore<OnyxState>()(
           // different mesh node can still resume via SESSION RESUME <mtoken>
           // (server.zig handleSession TOKEN → handleMeshReclaim).
           const mtoken = parseSessionMeshTokenNote(msg);
-          if (mtoken) {
+          if (mtoken && _canAcceptSessionToken(get)) {
             _confirmRememberedSessionAccount(get, set);
             const target = _liveCredentialTokenTarget(get, false);
             if (target) storeMeshToken(mtoken, undefined, target);
@@ -6166,6 +6191,8 @@ export const store = createStore<OnyxState>()(
         }
         if (standard.kind === 'FAIL' && standard.command === 'SESSION') {
           clearSessionToken(get().server?.url, _connectNick || get().ourNick);
+          _sessionTokenWritesAllowed = false;
+          get().client?.clearResumeTokens?.();
           _clearSessionRestore(set);
           get().addNotification({ type: 'error', text: standard.description || `SESSION ${standard.code}` });
           return;
@@ -7094,7 +7121,7 @@ export const store = createStore<OnyxState>()(
             // used NOTE standard replies, handled above. Keep both paths so a
             // rolling mesh upgrade cannot strand reconnect state.
             const sessionToken = parseSessionTokenNote(msg);
-            if (sessionToken) {
+            if (sessionToken && _canAcceptSessionToken(get)) {
               _confirmRememberedSessionAccount(get, set);
               const target = _liveCredentialTokenTarget(get, true);
               if (target) {
@@ -7104,7 +7131,7 @@ export const store = createStore<OnyxState>()(
               break;
             }
             const sessionMeshToken = parseSessionMeshTokenNote(msg);
-            if (sessionMeshToken) {
+            if (sessionMeshToken && _canAcceptSessionToken(get)) {
               _confirmRememberedSessionAccount(get, set);
               const target = _liveCredentialTokenTarget(get, false);
               if (target) storeMeshToken(sessionMeshToken, undefined, target);
@@ -7169,6 +7196,7 @@ export const store = createStore<OnyxState>()(
             // Logout / drop confirmation — clear the logged-in account and any
             // cached info so the UI flips back to the guest state.
             if (/\b(logged out|logout|signed out)\b/i.test(text) || /\b(account (?:dropped|deleted)|drop(?:ped)?)\b/i.test(text)) {
+              _clearRememberedSessionAfterLogout(get, set);
               set(s => ({
                 server: s.server ? { ...s.server, account: null } : s.server,
                 accountInfo: null,
@@ -8876,6 +8904,7 @@ export const store = createStore<OnyxState>()(
           // is an IRCX error and must not clobber the logged-in account.
           if (params.length >= 4 && params[2]) {
             const account900 = params[2];
+            _sessionTokenWritesAllowed = true;
             // Capture before server object exists (900 arrives during CAP/SASL, before 001)
             _saslAccount = account900;
             _addSessionRestoreIdentity(get, account900);
@@ -8892,6 +8921,7 @@ export const store = createStore<OnyxState>()(
 
         case '901': {
           // :server 901 nick nick!u@h :You are now logged out
+          _clearRememberedSessionAfterLogout(get, set);
           _saslAccount = null;
           set(s => ({ server: s.server ? { ...s.server, account: null } : null }));
           break;

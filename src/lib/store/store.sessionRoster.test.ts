@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { parseIRCMessage } from '@/lib/irc/parser';
-import { loadCredentials, saveCredentials, storeSessionToken } from '@/lib/credentials';
+import { loadCredentials, saveCredentials, storeMeshToken, storeSessionToken } from '@/lib/credentials';
 import { _resetSessionRestoreForTests, store } from './store';
 
 const initialState = store.getInitialState();
@@ -184,5 +184,40 @@ describe('remembered session roster restoration', () => {
     receive(':example.test NOTE SESSION TOKEN :unsolicited-token');
 
     expect(store.getState().server?.account).toBeNull();
+  });
+
+  it('does not reuse remembered tokens after the account logs out', () => {
+    saveCredentials({ nick: 'kain', server: 'wss://example.test' });
+    storeSessionToken('remembered-token');
+    storeMeshToken('remembered-mesh');
+    store.getState().connect({ url: 'wss://example.test', nick: 'kain' });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 001 kain :Welcome to IRCXNet');
+    receive(':example.test NOTE SESSION TOKEN :fresh-token');
+    receive(':example.test NOTE SESSION MTOKEN :fresh-mesh');
+    expect(store.getState().server?.account).toBe('kain');
+    expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('SESSION RESUME remembered-mesh\r\n');
+
+    receive(':example.test 901 kain kain!webchat@example :You are now logged out');
+
+    expect(store.getState().server?.account).toBeNull();
+    expect(loadCredentials('wss://example.test', 'kain')?.sessionToken).toBeUndefined();
+    expect(loadCredentials('wss://example.test', 'kain')?.meshToken).toBeUndefined();
+
+    // A rotation already queued before 901 must not re-arm the logged-out
+    // identity after logout cleanup wins the race.
+    receive(':example.test NOTE SESSION TOKEN :late-token');
+    receive(':example.test NOTE SESSION MTOKEN :late-mesh');
+    expect(loadCredentials('wss://example.test', 'kain')?.sessionToken).toBeUndefined();
+    expect(loadCredentials('wss://example.test', 'kain')?.meshToken).toBeUndefined();
+
+    store.getState().reconnectNow();
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 001 kain :Welcome back');
+
+    const replayedResume = FakeWebSocket.latest?.send.mock.calls
+      .map(([line]) => line)
+      .filter(line => line.startsWith('SESSION RESUME ')) ?? [];
+    expect(replayedResume).toEqual([]);
   });
 });

@@ -22,6 +22,7 @@ function makeClient() {
   return {
     sendRaw: vi.fn(),
     updateResumeTokens: vi.fn(),
+    clearResumeTokens: vi.fn(),
     isupport: { CHANTYPES: '#&' },
     negotiatedCaps: new Set<string>(),
   };
@@ -279,7 +280,9 @@ describe('account replies — state from the message handler', () => {
   });
 
   it('a logout confirmation NOTICE clears account + accountInfo', () => {
+    const client = makeClient();
     store.setState({
+      client: client as never,
       server: seedServer('alice'),
       accountInfo: { account: 'alice', fetchedAt: new Date() },
     });
@@ -287,6 +290,7 @@ describe('account replies — state from the message handler', () => {
 
     expect(store.getState().server?.account).toBeNull();
     expect(store.getState().accountInfo).toBeNull();
+    expect(client.clearResumeTokens).toHaveBeenCalledOnce();
   });
 
   it('901 RPL_LOGGEDOUT clears the server account', () => {
