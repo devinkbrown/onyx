@@ -184,4 +184,23 @@ describe('cancelScheduledMessage', () => {
     expect(q[0]!.text).toBe('b');
     expect(JSON.parse(localStorage.getItem('onyx:scheduled') || '[]')).toHaveLength(1);
   });
+
+  it('does not let Bob cancel Alice or ownerless legacy entries', () => {
+    store.getState().scheduleMessage('#root', 'Alice only', 1000);
+    const alice = store.getState().scheduledMessages[0]!;
+    const legacy = { ...alice, id: 'legacy-ownerless', text: 'Legacy held', owner: null };
+    store.setState({ scheduledMessages: [alice, legacy] });
+    localStorage.setItem('onyx:scheduled', JSON.stringify([alice, legacy]));
+
+    store.setState({ server: server('bob'), ourNick: 'bob' });
+    store.getState().cancelScheduledMessage(alice.id);
+    store.getState().cancelScheduledMessage(legacy.id);
+
+    expect(store.getState().scheduledMessages).toEqual([alice, legacy]);
+    expect(JSON.parse(localStorage.getItem('onyx:scheduled') || '[]')).toEqual([alice, legacy]);
+
+    store.setState({ server: server('alice'), ourNick: 'alice' });
+    store.getState().cancelScheduledMessage(alice.id);
+    expect(store.getState().scheduledMessages).toEqual([legacy]);
+  });
 });

@@ -310,6 +310,27 @@ describe('Composer schedule (send later)', () => {
     expect(textarea.value).toBe('');
   });
 
+  it('counts only scheduled messages owned by the current account', () => {
+    seedActiveChannel();
+    store.getState().scheduleMessage('#room', 'Alice only', Date.now() + 3_600_000);
+    const aliceServer = store.getState().server!;
+    store.setState({
+      ourNick: 'bob',
+      server: { ...aliceServer, id: 'composer-bob', nick: 'bob', account: 'bob' },
+    });
+
+    const { getByRole, queryByRole } = render(() => <Composer />);
+    fireEvent.input(getByRole('textbox', { name: /message #room/i }), {
+      target: { value: 'Bob draft' },
+    });
+    fireEvent.click(getByRole('button', { name: 'Schedule message to send later' }));
+
+    expect(queryByRole('button', { name: 'View 1 scheduled' })).toBeNull();
+
+    store.setState({ ourNick: 'me', server: aliceServer });
+    expect(getByRole('button', { name: 'View 1 scheduled' })).toBeDefined();
+  });
+
   it('exposes the schedule popover as a labelled dialog with presets', () => {
     seedActiveChannel();
     const { getByRole } = render(() => <Composer />);

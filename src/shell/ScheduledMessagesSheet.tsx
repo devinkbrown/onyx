@@ -11,13 +11,17 @@
  * useStore; lists via <For>; conditionals via <Show>.
  */
 import { For, Show } from 'solid-js';
-import { getState, useStore } from '@/lib/store';
+import { getState, selectOwnedScheduledMessages, useStore } from '@/lib/store';
 import { Sheet } from '@/primitives/Sheet';
 import { RelativeTime } from '@/components/RelativeTime';
 
 export function ScheduledMessagesSheet() {
   const open = useStore((s) => s.showScheduledMessages);
-  const scheduled = useStore((s) => s.scheduledMessages);
+  const scheduled = useStore(
+    selectOwnedScheduledMessages,
+    (left, right) => left.length === right.length
+      && left.every((entry, index) => entry === right[index]),
+  );
 
   return (
     <Sheet

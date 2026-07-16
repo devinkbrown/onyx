@@ -22,7 +22,7 @@ import {
   splitProps,
   type JSX,
 } from 'solid-js';
-import { useStore, getState } from '@/lib/store';
+import { useStore, getState, selectOwnedScheduledMessageCount } from '@/lib/store';
 import { searchEmojis } from '@/lib/emoji/emoji';
 import {
   completeSlashCommand,
@@ -93,7 +93,7 @@ export function Composer(props: ComposerProps): JSX.Element {
   const activeChannelTopics = useStore((s) => s.activeChannelTopics);
   const replyingTo = useStore((s) => s.replyingTo);
   const editingMessage = useStore((s) => s.editingMessage);
-  const scheduledCount = useStore((s) => s.scheduledMessages.length);
+  const scheduledCount = useStore(selectOwnedScheduledMessageCount);
 
   const [text, setText] = createSignal('');
   const [attachments, setAttachments] = createSignal<ComposerAttachment[]>([]);

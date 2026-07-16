@@ -58,4 +58,43 @@ describe('ScheduledMessagesSheet', () => {
     // The list is gone; the empty state replaces it — proves reactivity.
     expect(screen.queryByRole('list', { name: 'Pending scheduled messages' })).toBeNull();
   });
+
+  it('shows and cancels only the current account queue while holding legacy rows', () => {
+    store.getState().scheduleMessage('#alice', 'Alice private plan', Date.now() + 3_600_000);
+    const alice = store.getState().scheduledMessages[0]!;
+    const legacy = { ...alice, id: 'legacy-ownerless', text: 'Legacy private plan', owner: null };
+    store.setState({
+      scheduledMessages: [alice, legacy],
+      ourNick: 'bob',
+      server: {
+        ...store.getState().server!,
+        id: 'scheduled-sheet-bob',
+        nick: 'bob',
+        account: 'bob',
+      },
+    });
+    store.getState().scheduleMessage('#bob', 'Bob private plan', Date.now() + 7_200_000);
+
+    render(() => <ScheduledMessagesSheet />);
+
+    expect(screen.getByText('Bob private plan')).toBeInTheDocument();
+    expect(screen.queryByText('Alice private plan')).not.toBeInTheDocument();
+    expect(screen.queryByText('Legacy private plan')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Cancel scheduled message to #bob/ }));
+    expect(store.getState().scheduledMessages).toEqual([alice, legacy]);
+    expect(screen.queryByRole('list', { name: 'Pending scheduled messages' })).toBeNull();
+
+    store.setState({
+      ourNick: 'alice',
+      server: {
+        ...store.getState().server!,
+        id: 'scheduled-sheet-alice',
+        nick: 'alice',
+        account: 'alice',
+      },
+    });
+    expect(screen.getByText('Alice private plan')).toBeInTheDocument();
+    expect(screen.queryByText('Legacy private plan')).not.toBeInTheDocument();
+  });
 });

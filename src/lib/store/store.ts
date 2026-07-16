@@ -3328,6 +3328,28 @@ function _sameScheduledMessageOwner(
   return actual?.serverUrl === expected.serverUrl && actual.identity === expected.identity;
 }
 
+/** Scheduled rows visible/actionable in the current server identity only. */
+export function selectOwnedScheduledMessages(
+  state: Pick<OnyxState, 'scheduledMessages' | 'server' | 'ourNick'>,
+): ScheduledMessage[] {
+  const owner = _scheduledMessageOwner(state);
+  if (!owner) return [];
+  return state.scheduledMessages.filter((message) =>
+    _sameScheduledMessageOwner(message.owner, owner),
+  );
+}
+
+/** Stable primitive selector for queue badges and compact counts. */
+export function selectOwnedScheduledMessageCount(state: OnyxState): number {
+  const owner = _scheduledMessageOwner(state);
+  if (!owner) return 0;
+  let count = 0;
+  for (const message of state.scheduledMessages) {
+    if (_sameScheduledMessageOwner(message.owner, owner)) count += 1;
+  }
+  return count;
+}
+
 function _outboxOwner(state: Pick<OnyxState, 'server' | 'ourNick'>): OutboxOwner | null {
   return _scheduledMessageOwner(state);
 }
@@ -9955,6 +9977,9 @@ export const store = createStore<OnyxState>()(
     },
     cancelScheduledMessage: (id) => {
       set(s => {
+        const owner = _scheduledMessageOwner(s);
+        const entry = s.scheduledMessages.find((message) => message.id === id);
+        if (!owner || !entry || !_sameScheduledMessageOwner(entry.owner, owner)) return {};
         const next = s.scheduledMessages.filter(m => m.id !== id);
         _persistScheduledMessages(next);
         return { scheduledMessages: next };
