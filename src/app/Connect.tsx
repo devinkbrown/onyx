@@ -864,7 +864,7 @@ export function Connect(props: ConnectProps): JSX.Element {
     if (restoreFocus) queueMicrotask(() => passkeyButtonRef?.focus());
   }
 
-  function handlePasskeySignIn(): void {
+  function startPasskeySignIn(resumeCredentials?: SavedCredentials): void {
     if (!isFormReady() || passkeySignInAttempt()) return;
     const account = nickTrimmed();
     const err = validateNick(account);
@@ -880,15 +880,23 @@ export function Connect(props: ConnectProps): JSX.Element {
     // WEBAUTHN AUTH is an IRC command, so Connect must establish the anonymous
     // transport first. This deliberately bypasses doConnect: passkey sign-in
     // must not delete or rewrite a remembered identity just to open transport.
-    const node = chosenNode();
+    // A local SESSION token is bound to its issuing node. Keep the passkey
+    // re-authentication on that remembered transport so the client can replay
+    // the token only after 900 proves the account; mesh tokens are valid there
+    // too and can rotate normally after attachment.
+    const url = resumeCredentials?.server ?? chosenNode().wss;
     getState().connect({
-      url: node.wss,
+      url,
       nick: account,
       realname: `${account} (Onyx)`,
     });
     setPasskeySignInAttempt((current) =>
       current?.account === account ? { ...current, transportStarted: true } : current,
     );
+  }
+
+  function handlePasskeySignIn(): void {
+    startPasskeySignIn();
   }
 
   createEffect(() => {
@@ -993,6 +1001,21 @@ export function Connect(props: ConnectProps): JSX.Element {
     if (identity.access === 'identity-only') {
       setPassword('');
       switchMode('signin');
+      return;
+    }
+
+    if (
+      identity.access === 'resume'
+      && (typeof credentials.password !== 'string' || credentials.password.length === 0)
+    ) {
+      // SESSION tokens select a remembered logical session but Orochi still
+      // requires fresh account proof. Never connect this identity as a guest
+      // and hope RESUME authenticates it: that is rejected server-side and was
+      // the top-bar “Guest” regression. A supported passkey keeps this a
+      // one-click flow; otherwise leave the populated sign-in form actionable.
+      setPassword('');
+      switchMode('signin');
+      if (passkeySupported()) startPasskeySignIn(credentials);
       return;
     }
 

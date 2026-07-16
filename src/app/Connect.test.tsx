@@ -933,7 +933,8 @@ describe('Session resume', () => {
     expect(screen.queryByTestId('conn-resume')).not.toBeInTheDocument();
   });
 
-  it('offers resume for a current token-only passwordless identity', async () => {
+  it('re-authenticates a token-only identity with a passkey before resume', async () => {
+    enablePasskeys();
     window.localStorage.setItem(
       'onyx:credentials',
       JSON.stringify({
@@ -949,7 +950,12 @@ describe('Session resume', () => {
         },
       }),
     );
-    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
+    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {
+      store.setState({ status: 'connecting', connectionStatus: 'connecting' });
+    });
+    const signInSpy = vi.spyOn(getState(), 'signInWithPasskey').mockImplementation(() => {
+      store.setState({ passkeyBusy: true, passkeyError: null });
+    });
 
     render(() => <Connect />);
 
@@ -961,10 +967,52 @@ describe('Session resume', () => {
 
     await waitFor(() => expect(connectSpy).toHaveBeenCalledOnce());
     expect(connectSpy.mock.calls[0]![0]).toMatchObject({
+      url: 'wss://ircx.us:8080',
       nick: 'kain',
-      password: undefined,
     });
+    expect(connectSpy.mock.calls[0]![0].password).toBeUndefined();
+    expect(signInSpy).not.toHaveBeenCalled();
+
+    store.setState({
+      status: 'connected',
+      connectionStatus: 'connected',
+      autoReconnect: true,
+      server: {
+        id: 'resume-passkey', name: 'Onyx', network: 'Onyx',
+        url: 'wss://ircx.us:8080', icon: '', nick: 'kain', account: null, connected: true,
+      },
+    });
+
+    await waitFor(() => expect(signInSpy).toHaveBeenCalledWith('kain'));
     connectSpy.mockRestore();
+  });
+
+  it('never opens a token-only remembered identity as a guest without passkey support', async () => {
+    window.localStorage.setItem(
+      'onyx:credentials',
+      JSON.stringify({
+        version: 2,
+        activeKey: 'wss://ircx.us:8080|kain',
+        entries: {
+          'wss://ircx.us:8080|kain': {
+            nick: 'kain',
+            server: 'wss://ircx.us:8080',
+            sessionToken: 'local-token',
+            savedAt: new Date().toISOString(),
+          },
+        },
+      }),
+    );
+    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});
+
+    render(() => <Connect />);
+    await waitFor(() => expect(screen.getByTestId('conn-resume')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('conn-resume'));
+
+    expect(connectSpy).not.toHaveBeenCalled();
+    expect(screen.getByRole('tab', { name: /sign in/i })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByLabelText(/account password/i)).toBeInTheDocument();
+    expect(nickField()).toHaveValue('kain');
   });
 
   it('labels a saved password without a session token as sign-in, not resume', async () => {
