@@ -533,10 +533,13 @@ describe('PreferencesPanel', () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
       activatedAnchors.push(this);
       expect(this.isConnected).toBe(true);
+      this.focus();
     });
     renderPreferences('Import & export');
 
     const exportButton = screen.getByRole('button', { name: 'Export vault' });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Close preferences' })).toHaveFocus());
+    exportButton.focus();
     fireEvent.click(exportButton);
     fireEvent.click(exportButton);
 
@@ -554,6 +557,33 @@ describe('PreferencesPanel', () => {
     expect(activatedAnchors[0]?.isConnected).toBe(false);
     await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:onyx-portable'));
     expect(screen.getByRole('button', { name: 'Export vault' })).not.toBeDisabled();
+    await waitFor(() => expect(exportButton).toHaveFocus());
+  });
+
+  it('preserves newer category focus when a pending download finishes', async () => {
+    let resolveExport: (snapshot: PortableTransferSnapshot) => void = () => {};
+    const pendingExport = new Promise<PortableTransferSnapshot>((resolve) => {
+      resolveExport = resolve;
+    });
+    vi.spyOn(portableTransfer, 'exportPortableTransfer').mockReturnValue(pendingExport);
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:focus-portable');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      this.focus();
+    });
+    renderPreferences('Import & export');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Close preferences' })).toHaveFocus());
+    const exportButton = screen.getByRole('button', { name: 'Export vault' });
+    exportButton.focus();
+    fireEvent.click(exportButton);
+    const history = selectPreferenceCategory('History & data');
+    history.focus();
+
+    resolveExport(emptyPortableSnapshot());
+    await pendingExport;
+
+    await waitFor(() => expect(history).toHaveFocus());
+    expect(screen.getByRole('tabpanel')).toHaveAccessibleName('History & data');
   });
 
   it('cleans up the anchor and object URL when download activation fails', async () => {
@@ -563,17 +593,22 @@ describe('PreferencesPanel', () => {
     const activatedAnchors: HTMLAnchorElement[] = [];
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
       activatedAnchors.push(this);
+      this.focus();
       throw new Error('downloads blocked');
     });
     renderPreferences('Import & export');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Close preferences' })).toHaveFocus());
+    const exportButton = screen.getByRole('button', { name: 'Export vault' });
+    exportButton.focus();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Export vault' }));
+    fireEvent.click(exportButton);
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Export failed');
     expect(activatedAnchors).toHaveLength(1);
     expect(activatedAnchors[0]?.isConnected).toBe(false);
     await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:failed-portable'));
     expect(screen.getByRole('button', { name: 'Export vault' })).not.toBeDisabled();
+    await waitFor(() => expect(exportButton).toHaveFocus());
   });
 
   it('does not activate a stale export after the Preferences panel unmounts', async () => {
@@ -701,17 +736,27 @@ describe('PreferencesPanel', () => {
   it('treats picker cancellation as neutral without preparing an export', async () => {
     vi.spyOn(portableFileSave, 'supportsPortableFileSave').mockReturnValue(true);
     const exportPortableTransfer = vi.spyOn(portableTransfer, 'exportPortableTransfer');
-    vi.spyOn(portableFileSave, 'savePortableVaultFile').mockResolvedValue({
-      state: 'cancelled',
-      detail: 'Portable vault save cancelled. No file was changed.',
+    vi.spyOn(portableFileSave, 'savePortableVaultFile').mockImplementation(async () => {
+      const nativePicker = document.createElement('button');
+      document.body.append(nativePicker);
+      nativePicker.focus();
+      nativePicker.remove();
+      return {
+        state: 'cancelled',
+        detail: 'Portable vault save cancelled. No file was changed.',
+      };
     });
     renderPreferences('Import & export');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Close preferences' })).toHaveFocus());
+    const saveButton = screen.getByRole('button', { name: 'Save vault to file' });
+    saveButton.focus();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save vault to file' }));
+    fireEvent.click(saveButton);
 
     expect(await screen.findByText('Portable vault save cancelled. No file was changed.')).toHaveAttribute('role', 'status');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(exportPortableTransfer).not.toHaveBeenCalled();
+    await waitFor(() => expect(saveButton).toHaveFocus());
   });
 
   it('re-enables direct file saving after a writer failure so the user can retry', async () => {
@@ -835,14 +880,24 @@ describe('PreferencesPanel', () => {
     vi.spyOn(portableShare, 'supportsPortableFileShare').mockReturnValue(true);
     vi.spyOn(portableTransfer, 'exportPortableTransfer').mockResolvedValue(emptyPortableSnapshot());
     const sharePortableVaultJson = vi.spyOn(portableShare, 'sharePortableVaultJson')
-      .mockResolvedValueOnce({ state: 'cancelled', detail: 'Portable vault sharing cancelled.' })
+      .mockImplementationOnce(async () => {
+        const nativeShare = document.createElement('button');
+        document.body.append(nativeShare);
+        nativeShare.focus();
+        nativeShare.remove();
+        return { state: 'cancelled', detail: 'Portable vault sharing cancelled.' };
+      })
       .mockResolvedValueOnce({ state: 'rejected', detail: 'The browser rejected portable vault sharing. Export ordinary JSON instead.' });
     renderPreferences('Import & export');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Close preferences' })).toHaveFocus());
+    const shareButton = screen.getByRole('button', { name: 'Share vault file' });
+    shareButton.focus();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Share vault file' }));
+    fireEvent.click(shareButton);
     expect(await screen.findByText('Portable vault sharing cancelled.')).toHaveAttribute('role', 'status');
+    await waitFor(() => expect(shareButton).toHaveFocus());
 
-    fireEvent.click(screen.getByRole('button', { name: 'Share vault file' }));
+    fireEvent.click(shareButton);
     expect(await screen.findByText(/browser rejected portable vault sharing/i)).toHaveAttribute('role', 'alert');
     expect(sharePortableVaultJson).toHaveBeenCalledTimes(2);
   });

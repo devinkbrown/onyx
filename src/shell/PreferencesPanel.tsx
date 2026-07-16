@@ -619,6 +619,26 @@ function PortableVaultControls(): JSX.Element {
     setStatus({ message, failure });
   };
 
+  const capturePortableActionFocus = (trigger?: HTMLButtonElement): HTMLElement | undefined => {
+    const active = document.activeElement;
+    const dialog = trigger?.closest('[role="dialog"]');
+    return active instanceof HTMLElement && active !== document.body && active !== dialog
+      ? active
+      : undefined;
+  };
+
+  const restorePortableActionFocus = (
+    target: HTMLElement | undefined,
+    trigger?: HTMLButtonElement,
+  ) => {
+    if (!target) return;
+    focusConnectedAfterRender(() => {
+      const dialog = trigger?.closest('[role="dialog"]');
+      if (document.activeElement !== document.body && document.activeElement !== dialog) return undefined;
+      return target.closest('[hidden]') ? undefined : target;
+    });
+  };
+
   const revokeObjectUrlSoon = (url: string) => {
     if (!activeObjectUrls.has(url)) return;
     const timer = window.setTimeout(() => {
@@ -649,9 +669,15 @@ function PortableVaultControls(): JSX.Element {
     activeObjectUrls.clear();
   });
 
-  async function handleExport(format: 'json' | 'gzip' = 'json'): Promise<void> {
+  async function handleExport(
+    format: 'json' | 'gzip' = 'json',
+    trigger?: HTMLButtonElement,
+  ): Promise<void> {
     if (busy()) return;
     const epoch = ++exportEpoch;
+    let downloadFocusTarget: HTMLElement | undefined = trigger !== undefined && document.activeElement === trigger
+      ? trigger
+      : undefined;
     setBusy(true);
     setExportFormat(format);
     setStatus(null);
@@ -671,6 +697,13 @@ function PortableVaultControls(): JSX.Element {
       link.href = url;
       link.download = `onyx-portable-${new Date().toISOString().slice(0, 10)}.json${format === 'gzip' ? '.gz' : ''}`;
       document.body.append(link);
+      const dialog = trigger?.closest('[role="dialog"]');
+      if (document.activeElement instanceof HTMLElement
+        && document.activeElement !== document.body
+        && document.activeElement !== dialog
+        && document.activeElement !== trigger) {
+        downloadFocusTarget = document.activeElement;
+      }
       link.click();
       const messageCount = snapshot.targets.reduce((sum, target) => sum + target.messages.length, 0);
       const draftCount = Object.keys(snapshot.composerDrafts).length;
@@ -698,13 +731,24 @@ function PortableVaultControls(): JSX.Element {
       if (!disposed && epoch === exportEpoch) {
         setBusy(false);
         setExportFormat(null);
+        if (downloadFocusTarget) {
+          focusConnectedAfterRender(() => {
+            const dialog = trigger?.closest('[role="dialog"]');
+            if (document.activeElement !== document.body && document.activeElement !== dialog) return undefined;
+            return downloadFocusTarget?.closest('[hidden]') ? undefined : downloadFocusTarget;
+          });
+        }
       }
     }
   }
 
-  async function handleFileSave(format: PortableFileSaveFormat = 'json'): Promise<void> {
+  async function handleFileSave(
+    format: PortableFileSaveFormat = 'json',
+    trigger?: HTMLButtonElement,
+  ): Promise<void> {
     if (busy()) return;
     const epoch = ++fileSaveEpoch;
+    const focusTarget = capturePortableActionFocus(trigger);
     const suggestedName = `onyx-portable-${new Date().toISOString().slice(0, 10)}.json${format === 'gzip' ? '.gz' : ''}`;
     const prepared: { snapshot: PortableTransferSnapshot | null } = { snapshot: null };
     setBusy(true);
@@ -752,6 +796,7 @@ function PortableVaultControls(): JSX.Element {
       if (!disposed && epoch === fileSaveEpoch) {
         setBusy(false);
         setFileSaveFormat(null);
+        restorePortableActionFocus(focusTarget, trigger);
       }
     }
   }
@@ -830,15 +875,17 @@ function PortableVaultControls(): JSX.Element {
     }
   }
 
-  async function handleShare(): Promise<void> {
+  async function handleShare(trigger?: HTMLButtonElement): Promise<void> {
     if (busy()) return;
     const epoch = ++shareEpoch;
+    let focusTarget = capturePortableActionFocus(trigger);
     setBusy(true);
     setShareBusy(true);
     reportStatus('Preparing portable vault file to share…');
     try {
       const snapshot = await exportPortableTransfer();
       if (disposed || epoch !== shareEpoch) return;
+      focusTarget = capturePortableActionFocus(trigger) ?? focusTarget;
       const result = await sharePortableVaultJson(JSON.stringify(snapshot, null, 2));
       if (disposed || epoch !== shareEpoch) return;
       if (result.state === 'shared') {
@@ -856,6 +903,7 @@ function PortableVaultControls(): JSX.Element {
       if (!disposed && epoch === shareEpoch) {
         setBusy(false);
         setShareBusy(false);
+        restorePortableActionFocus(focusTarget, trigger);
       }
     }
   }
@@ -910,7 +958,7 @@ function PortableVaultControls(): JSX.Element {
           class="pref-reset"
           disabled={busy()}
           aria-busy={exportFormat() === 'json'}
-          onClick={() => void handleExport()}
+          onClick={(event) => void handleExport('json', event.currentTarget)}
         >
           {exportFormat() === 'json' ? 'Preparing export…' : 'Export vault'}
         </button>
@@ -923,7 +971,7 @@ function PortableVaultControls(): JSX.Element {
             class="pref-reset"
             disabled={busy()}
             aria-busy={exportFormat() === 'gzip'}
-            onClick={() => void handleExport('gzip')}
+            onClick={(event) => void handleExport('gzip', event.currentTarget)}
           >
             {exportFormat() === 'gzip' ? 'Compressing export…' : 'Export compressed vault'}
           </button>
@@ -934,7 +982,7 @@ function PortableVaultControls(): JSX.Element {
             class="pref-reset"
             disabled={busy()}
             aria-busy={fileSaveFormat() === 'json'}
-            onClick={() => void handleFileSave()}
+            onClick={(event) => void handleFileSave('json', event.currentTarget)}
           >
             {fileSaveFormat() === 'json' ? 'Saving vault file…' : 'Save vault to file'}
           </button>
@@ -944,7 +992,7 @@ function PortableVaultControls(): JSX.Element {
               class="pref-reset"
               disabled={busy()}
               aria-busy={fileSaveFormat() === 'gzip'}
-              onClick={() => void handleFileSave('gzip')}
+              onClick={(event) => void handleFileSave('gzip', event.currentTarget)}
             >
               {fileSaveFormat() === 'gzip' ? 'Saving compressed vault file…' : 'Save compressed vault to file'}
             </button>
@@ -959,7 +1007,7 @@ function PortableVaultControls(): JSX.Element {
             class="pref-reset"
             disabled={busy()}
             aria-busy={shareBusy()}
-            onClick={() => void handleShare()}
+            onClick={(event) => void handleShare(event.currentTarget)}
           >
             {shareBusy() ? 'Sharing vault file…' : 'Share vault file'}
           </button>
