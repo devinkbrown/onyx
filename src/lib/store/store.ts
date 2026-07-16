@@ -24,7 +24,24 @@ import { formatTaggedLine, parseAccountInfo, parseCHANLIMIT, parseMonitorNumeric
 import type { SuimyakuPeerState, SuimyakuRoomStats, CallState } from '@/lib/suimyaku-media/types';
 import { getMountedSuimyakuMediaEngine } from '@/lib/mediaEngineMount';
 import { parseActivity } from '@/lib/activity';
-import { OUTBOX_MAX_AGE_MS, classifyVaultDmSearchPrivacy, deleteOutboxEntry, deviceMemoryPrivacyTarget, loadAround, loadOutbox, loadRecent, queueOutbox, subscribeVerifiedDeviceHistoryClear, type DeviceMemoryOwner, type OutboxEntry, type OutboxOwner } from '@/lib/vault/historyVault';
+import {
+  MAX_VAULT_MESSAGE_ID_LENGTH,
+  MAX_VAULT_MESSAGE_TEXT_LENGTH,
+  MAX_VAULT_SENDER_LENGTH,
+  MAX_VAULT_TARGET_LENGTH,
+  OUTBOX_MAX_AGE_MS,
+  classifyVaultDmSearchPrivacy,
+  deleteOutboxEntry,
+  deviceMemoryPrivacyTarget,
+  loadAround,
+  loadOutbox,
+  loadRecent,
+  queueOutbox,
+  subscribeVerifiedDeviceHistoryClear,
+  type DeviceMemoryOwner,
+  type OutboxEntry,
+  type OutboxOwner,
+} from '@/lib/vault/historyVault';
 import { getVaultDmSearchPrivacy } from '@/lib/vault/dmSearchPrivacy';
 import { boundedSearchField, boundedSearchQuery } from '@/lib/vault/searchBounds';
 import {
@@ -2322,6 +2339,19 @@ function _validBatchEnvelope(batchRef: string, target: string): boolean {
     && target.length <= SERVER_SEARCH_TARGET_MAX
     && !/[\u0000-\u001f\u007f]/u.test(target)
   );
+}
+
+function _boundedInboundMessageText(value: string): string {
+  let text = value.slice(0, MAX_VAULT_MESSAGE_TEXT_LENGTH);
+  const finalCodeUnit = text.charCodeAt(text.length - 1);
+  if (finalCodeUnit >= 0xd800 && finalCodeUnit <= 0xdbff) text = text.slice(0, -1);
+  return text;
+}
+
+function _validInboundWireToken(value: string, maxLength: number, allowEmpty = false): boolean {
+  return (allowEmpty || value.length > 0)
+    && value.length <= maxLength
+    && !/[\u0000-\u0020\u007f]/u.test(value);
 }
 
 /**
@@ -8293,9 +8323,14 @@ export const store = createStore<OnyxState>()(
         // ── Messages ──────────────────────────────────────────────────────
         case 'PRIVMSG':
         case 'NOTICE': {
-          const target = params[0]!;
-          const text = params[1] ?? '';
+          const target = params[0] ?? '';
+          const rawText = params[1] ?? '';
           const sender = nick ?? '';
+          if (
+            !_validInboundWireToken(target, MAX_VAULT_TARGET_LENGTH)
+            || !_validInboundWireToken(sender, MAX_VAULT_SENDER_LENGTH, true)
+          ) break;
+          const text = _boundedInboundMessageText(rawText);
           const isSelf = sender.toLowerCase() === ourNick.toLowerCase();
 
           // ── Intercept server-wide NOTICE (target * or $$*) ───────────────
@@ -8734,7 +8769,11 @@ export const store = createStore<OnyxState>()(
           let replyTo: { id: string; from: string; text: string } | undefined;
           let resolvedText = text;
 
-          const draftReplyTag = tags['+draft/reply'] ?? tags['draft/reply'];
+          const rawDraftReplyTag = tags['+draft/reply'] ?? tags['draft/reply'];
+          const draftReplyTag = rawDraftReplyTag
+            && _validInboundWireToken(rawDraftReplyTag, MAX_VAULT_MESSAGE_ID_LENGTH)
+            ? rawDraftReplyTag
+            : null;
           if (draftReplyTag) {
             // Look up the referenced message to populate from/text fields
             const replyKey = isChan(target) ? target.toLowerCase() : (isSelf ? target : sender).toLowerCase();
@@ -8777,7 +8816,11 @@ export const store = createStore<OnyxState>()(
           const messageTopic = isChannel ? parseMessageTopic(tags) : null;
 
           // Use server-provided msgid when available (e.g. from CHATHISTORY batch)
-          const serverMsgId = tags['msgid'] ?? tags['draft/msgid'];
+          const rawServerMsgId = tags['msgid'] ?? tags['draft/msgid'];
+          const serverMsgId = rawServerMsgId
+            && _validInboundWireToken(rawServerMsgId, MAX_VAULT_MESSAGE_ID_LENGTH)
+            ? rawServerMsgId
+            : undefined;
           const e2eeTag = parseE2eeMessageTag(tags);
           // E2EE: a DM carrying a Tsumugi envelope stays ciphertext in the
           // store (and thus in CHATHISTORY/vault) until decrypted in place.
