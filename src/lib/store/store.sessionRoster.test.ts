@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseIRCMessage } from '@/lib/irc/parser';
 import { loadCredentials, saveCredentials, storeMeshToken, storeSessionToken } from '@/lib/credentials';
 import { saveFriends, saveWatchList } from '@/lib/contactPresenceMemory';
+import { emptyIdentityProfileMemory, saveIdentityProfileMemory } from '@/lib/identityProfileMemory';
 import { saveUserNotes } from '@/lib/userNotes';
 import { _resetSessionRestoreForTests, store } from './store';
 
@@ -98,6 +99,34 @@ describe('remembered session roster restoration', () => {
     expect(store.getState().monitoredNicks).toEqual(new Set(['friend-one', 'watch-one']));
     expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('MONITOR + friend-one\r\n');
     expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('MONITOR + watch-one\r\n');
+  });
+
+  it('replaces guest identity drafts when a live nick change changes the owner', () => {
+    const kain = { serverUrl: 'wss://example.test', identity: 'kain' } as const;
+    const mika = { serverUrl: 'wss://example.test', identity: 'mika' } as const;
+    saveIdentityProfileMemory({
+      ...emptyIdentityProfileMemory(),
+      customStatus: '🎵 Listening to Kain mix',
+      selfBio: 'Kain draft',
+    }, kain);
+    saveIdentityProfileMemory({
+      ...emptyIdentityProfileMemory(),
+      customStatus: '🎵 Listening to Mika mix',
+      selfBio: 'Mika draft',
+    }, mika);
+
+    store.getState().connect({ url: kain.serverUrl, nick: kain.identity });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 001 kain :Welcome to IRCXNet');
+    expect(store.getState().selfBio).toBe('Kain draft');
+
+    receive(':kain!webchat@example NICK mika');
+
+    expect(store.getState().ourNick).toBe('mika');
+    expect(store.getState().selfBio).toBe('Mika draft');
+    expect(store.getState().customStatus).toBe('🎵 Listening to Mika mix');
+    expect(store.getState().userActivities.kain).toBeUndefined();
+    expect(store.getState().userActivities.mika?.text).toBe('Listening to Mika mix');
   });
 
   it('retains an authoritative resume NAMES burst that arrives before self JOIN', () => {

@@ -91,6 +91,18 @@ import { loadDMPins, sanitizeDMPins, saveDMPins } from '@/lib/dmPins';
 import { loadIgnoredUsers, parseIgnoredUsers, saveIgnoredUsers } from '@/lib/ignoredUsers';
 import { loadMutedDMs, parseMutedDMs, saveMutedDMs } from '@/lib/mutedDMs';
 import {
+  emptyIdentityProfileMemory,
+  loadIdentityProfileMemory,
+  normalizeCustomStatus,
+  normalizeCustomStatusExpiry,
+  normalizeSelfBannerUrl,
+  normalizeSelfBio,
+  normalizeSelfDisplayName,
+  normalizeSelfPronouns,
+  saveIdentityProfileMemory,
+  type IdentityProfileMemory,
+} from '@/lib/identityProfileMemory';
+import {
   loadUserNotes,
   MAX_USER_NOTE_LENGTH,
   MAX_USER_NOTES,
@@ -2713,39 +2725,61 @@ function _resetAccountBoundState(
   preservePasskeyError = false,
 ): void {
   _invalidateAccountReplyContexts();
-  set(s => ({
-    accountInfo: null,
-    accountInfoPending: false,
-    accountActionError: null,
-    passkeyBusy: false,
-    passkeyError: preservePasskeyError ? s.passkeyError : null,
-    passkeyNotice: null,
-    passkeyCreds: [],
-    passkeyListPending: false,
-    ...(resetServerPasskeySupport
-      ? { passkeySupported: null, passkeyRenameUnsupported: false }
-      : {}),
-    totp: { status: 'unknown', secret: null, otpauth: null, error: null, busy: false },
-    personas: [],
-    personaOffers: [],
-    registerPending: false,
-    registerError: null,
-    verifyRequired: false,
-    dmPinnedMessages: new Map(),
-    showDMPins: false,
-    dmPinsNick: null,
-    channelNotify: new Map(),
-    highlightWords: [],
-    ignoredUsers: new Set(),
-    showIgnoreList: false,
-    mutedDMs: new Set(),
-    userNotes: new Map(),
-    friends: new Map(),
-    showFriendsPanel: false,
-    watchList: [],
-    monitoredNicks: new Set(),
-    serviceNotices: s.serviceNotices.filter(notice => notice.source !== 'Account'),
-  }));
+  set(s => {
+    const ownKey = s.ourNick.toLowerCase();
+    const userActivities = { ...s.userActivities };
+    delete userActivities[ownKey];
+    const userProps = new Map(s.userProps);
+    userProps.delete(ownKey);
+    const userMetadata = new Map(s.userMetadata);
+    userMetadata.delete(ownKey);
+    const userProfiles = new Map(s.userProfiles);
+    userProfiles.delete(ownKey);
+    return {
+      accountInfo: null,
+      accountInfoPending: false,
+      accountActionError: null,
+      passkeyBusy: false,
+      passkeyError: preservePasskeyError ? s.passkeyError : null,
+      passkeyNotice: null,
+      passkeyCreds: [],
+      passkeyListPending: false,
+      ...(resetServerPasskeySupport
+        ? { passkeySupported: null, passkeyRenameUnsupported: false }
+        : {}),
+      totp: { status: 'unknown', secret: null, otpauth: null, error: null, busy: false },
+      personas: [],
+      personaOffers: [],
+      registerPending: false,
+      registerError: null,
+      verifyRequired: false,
+      dmPinnedMessages: new Map(),
+      showDMPins: false,
+      dmPinsNick: null,
+      channelNotify: new Map(),
+      highlightWords: [],
+      ignoredUsers: new Set(),
+      showIgnoreList: false,
+      mutedDMs: new Set(),
+      userNotes: new Map(),
+      customStatus: '',
+      customStatusExpiry: null,
+      showCustomStatus: false,
+      selfDisplayName: '',
+      selfBio: '',
+      selfPronouns: '',
+      selfBannerUrl: '',
+      userActivities,
+      userProps,
+      userMetadata,
+      userProfiles,
+      friends: new Map(),
+      showFriendsPanel: false,
+      watchList: [],
+      monitoredNicks: new Set(),
+      serviceNotices: s.serviceNotices.filter(notice => notice.source !== 'Account'),
+    };
+  });
 }
 
 /**
@@ -3512,6 +3546,65 @@ function _loadOwnedUserNotes(
   return owner ? loadUserNotes(owner) : new Map();
 }
 
+function _identityProfileMemory(
+  state: Pick<OnyxState,
+    | 'customStatus'
+    | 'customStatusExpiry'
+    | 'selfDisplayName'
+    | 'selfBio'
+    | 'selfPronouns'
+    | 'selfBannerUrl'>,
+): IdentityProfileMemory {
+  return {
+    customStatus: state.customStatus,
+    customStatusExpiry: state.customStatusExpiry,
+    selfDisplayName: state.selfDisplayName,
+    selfBio: state.selfBio,
+    selfPronouns: state.selfPronouns,
+    selfBannerUrl: state.selfBannerUrl,
+  };
+}
+
+function _loadOwnedIdentityProfile(
+  state: Pick<OnyxState, 'server' | 'ourNick'>,
+): IdentityProfileMemory {
+  const owner = selectDeviceMemoryOwner(state);
+  return owner ? loadIdentityProfileMemory(owner) : emptyIdentityProfileMemory();
+}
+
+/** Project the active owner's device-local status without retaining the old self key. */
+function _syncOwnCustomStatusActivity(get: GetFn, set: SetFn, previousNick?: string): void {
+  const { customStatus, ourNick } = get();
+  set(s => {
+    const userActivities = { ...s.userActivities };
+    if (previousNick) delete userActivities[previousNick.toLowerCase()];
+    if (ourNick) {
+      const key = ourNick.toLowerCase();
+      const activity = parseActivity(customStatus);
+      if (activity) {
+        userActivities[key] = {
+          emoji: activity.emoji,
+          typeLabel: activity.typeLabel,
+          text: activity.text,
+        };
+      } else {
+        delete userActivities[key];
+      }
+    }
+    return { userActivities };
+  });
+}
+
+/** Bound only known public profile values; preserve unknown METADATA contracts. */
+function _normalizeProfileMetadataValue(key: string, value: string): string | null {
+  const norm = key.toLowerCase().replace(/^ocean\./, '');
+  if (norm === 'display-name' || norm === 'displayname') return normalizeSelfDisplayName(value);
+  if (norm === 'pronouns') return normalizeSelfPronouns(value);
+  if (norm === 'bio') return normalizeSelfBio(value);
+  if (norm === 'banner' || norm === 'banner-url') return normalizeSelfBannerUrl(value);
+  return value;
+}
+
 function _ownedMonitorContacts(
   state: Pick<OnyxState, 'friends' | 'watchList'>,
 ): Map<string, string> {
@@ -3798,8 +3891,9 @@ export const store = createStore<OnyxState>()(
     profileNick: null,
     profileAnchor: null,
     userStatus: 'online',
-    customStatus: _loadCustomStatus(),
-    customStatusExpiry: _loadCustomStatusExpiry(),
+    // Identity-visible drafts load only after a server owner is known.
+    customStatus: '',
+    customStatusExpiry: null,
     showCustomStatus: false,
     userActivities: {},
     isIRCX: false,
@@ -4138,6 +4232,7 @@ export const store = createStore<OnyxState>()(
         onNickChanged(newNick) {
           _addSessionRestoreIdentity(get, newNick);
           const previousOwner = selectDeviceMemoryOwner(get());
+          const previousNick = get().ourNick;
           set(s => {
             const server = s.server ? { ...s.server, nick: newNick } : null;
             return {
@@ -4152,8 +4247,10 @@ export const store = createStore<OnyxState>()(
               friends: _loadOwnedFriends({ server, ourNick: newNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: newNick }),
               userNotes: _loadOwnedUserNotes({ server, ourNick: newNick }),
+              ..._loadOwnedIdentityProfile({ server, ourNick: newNick }),
             };
           });
+          _syncOwnCustomStatusActivity(get, set, previousNick);
           if (!_sameOutboxOwner(previousOwner, selectDeviceMemoryOwner(get()))) {
             _replaceOwnedMonitorContacts(get, set, true);
           }
@@ -4236,10 +4333,12 @@ export const store = createStore<OnyxState>()(
               friends: _loadOwnedFriends({ server: srv, ourNick: get().ourNick }),
               watchList: _loadOwnedWatchList({ server: srv, ourNick: get().ourNick }),
               userNotes: _loadOwnedUserNotes({ server: srv, ourNick: get().ourNick }),
+              ..._loadOwnedIdentityProfile({ server: srv, ourNick: get().ourNick }),
               isIRCX: client.isupport.IRCX,
               networkName: net,
               serverCapabilities: caps,
             });
+            _syncOwnCustomStatusActivity(get, set);
             unsub();
           }
         },
@@ -5983,22 +6082,19 @@ export const store = createStore<OnyxState>()(
 
     // ── custom status ─────────────────────────────────────────────────────
     setCustomStatus(status) {
-      set({ customStatus: status });
-      // Persist to localStorage
-      try {
-        if (typeof window !== 'undefined') {
-          if (status) {
-            localStorage.setItem('onyx:custom-status', status);
-          } else {
-            localStorage.removeItem('onyx:custom-status');
-          }
-        }
-      } catch { /* ignore */ }
+      const owner = selectDeviceMemoryOwner(get());
+      const normalizedStatus = normalizeCustomStatus(status);
+      if (!owner || normalizedStatus === null) return;
+      set(s => {
+        const next = { ..._identityProfileMemory(s), customStatus: normalizedStatus };
+        saveIdentityProfileMemory(next, owner);
+        return { customStatus: normalizedStatus };
+      });
       // Update own activity locally so rich presence shows immediately
       const { client, isIRCX, userStatus, ourNick } = get();
       if (ourNick) {
         const key = ourNick.toLowerCase();
-        const parsed = parseActivity(status);
+        const parsed = parseActivity(normalizedStatus);
         set(s => {
           const userActivities = { ...s.userActivities };
           if (parsed) {
@@ -6011,10 +6107,10 @@ export const store = createStore<OnyxState>()(
       }
       // Send to IRC via IRCX PROP
       if (client && isIRCX) {
-        client.sendRaw('PROP', '*', 'STATUS', status);
+        client.sendRaw('PROP', '*', 'STATUS', normalizedStatus);
         // Optionally update AWAY when idle and status is set
-        if (status && userStatus === 'idle') {
-          client.sendRaw('AWAY', `Idle — ${status}`);
+        if (normalizedStatus && userStatus === 'idle') {
+          client.sendRaw('AWAY', `Idle — ${normalizedStatus}`);
         }
       }
     },
@@ -6025,16 +6121,14 @@ export const store = createStore<OnyxState>()(
       set({ showCustomStatus: false });
     },
     setCustomStatusExpiry(expiry) {
-      set({ customStatusExpiry: expiry });
-      try {
-        if (typeof window !== 'undefined') {
-          if (expiry) {
-            localStorage.setItem('onyx:custom-status-expiry', expiry.toISOString());
-          } else {
-            localStorage.removeItem('onyx:custom-status-expiry');
-          }
-        }
-      } catch { /* ignore */ }
+      const owner = selectDeviceMemoryOwner(get());
+      const normalizedExpiry = normalizeCustomStatusExpiry(expiry);
+      if (!owner || (expiry !== null && normalizedExpiry === null)) return;
+      set(s => {
+        const next = { ..._identityProfileMemory(s), customStatusExpiry: normalizedExpiry };
+        saveIdentityProfileMemory(next, owner);
+        return { customStatusExpiry: normalizedExpiry };
+      });
     },
 
     // ── user activities ───────────────────────────────────────────────────
@@ -7341,8 +7435,10 @@ export const store = createStore<OnyxState>()(
               friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
               userNotes: _loadOwnedUserNotes({ server, ourNick: s.ourNick }),
+              ..._loadOwnedIdentityProfile({ server, ourNick: s.ourNick }),
             };
           });
+          _syncOwnCustomStatusActivity(get, set);
           if (ownerChanged) _replaceOwnedMonitorContacts(get, set, true);
           break;
         }
@@ -8511,6 +8607,17 @@ export const store = createStore<OnyxState>()(
           }
 
           if (isSelf) {
+            const beforeNickChange = get();
+            const previousOwner = selectDeviceMemoryOwner(beforeNickChange);
+            const nextServer = beforeNickChange.server
+              ? { ...beforeNickChange.server, nick: newNick }
+              : null;
+            const nextOwner = selectDeviceMemoryOwner({ server: nextServer, ourNick: newNick });
+            const ownerChanged = !_sameOutboxOwner(previousOwner, nextOwner);
+            if (ownerChanged) {
+              _resetAccountBoundState(set);
+              _resetAccountPrivateMessageState(set);
+            }
             // A rename to Guest##### that we never asked for is the server's
             // nick ENFORCEMENT evicting us from a protected nick. Without this
             // branch the client silently became "Guest12345" with zero
@@ -8518,11 +8625,26 @@ export const store = createStore<OnyxState>()(
             // confusing. Keep the alias state and say what happened.
             const forcedGuest = /^Guest\d+$/i.test(newNick) && !/^Guest\d+$/i.test(oldNick);
             _stopNickReclaim();
-            set(s => ({
-              ourNick: newNick,
-              currentNickIsAlias: forcedGuest,
-              server: s.server ? { ...s.server, nick: newNick } : null,
-            }));
+            set(s => {
+              const server = s.server ? { ...s.server, nick: newNick } : null;
+              return {
+                ourNick: newNick,
+                currentNickIsAlias: forcedGuest,
+                server,
+                composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: newNick }),
+                dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: newNick }),
+                channelNotify: _loadOwnedChannelNotify({ server, ourNick: newNick }),
+                highlightWords: _loadOwnedHighlightWords({ server, ourNick: newNick }),
+                ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: newNick }),
+                mutedDMs: _loadOwnedMutedDMs({ server, ourNick: newNick }),
+                friends: _loadOwnedFriends({ server, ourNick: newNick }),
+                watchList: _loadOwnedWatchList({ server, ourNick: newNick }),
+                userNotes: _loadOwnedUserNotes({ server, ourNick: newNick }),
+                ..._loadOwnedIdentityProfile({ server, ourNick: newNick }),
+              };
+            });
+            _syncOwnCustomStatusActivity(get, set, oldNick);
+            if (ownerChanged) _replaceOwnedMonitorContacts(get, set, true);
             if (forcedGuest) {
               get().addToast({
                 variant: 'error',
@@ -9727,10 +9849,12 @@ export const store = createStore<OnyxState>()(
                 friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
                 watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
                 userNotes: _loadOwnedUserNotes({ server, ourNick: s.ourNick }),
+                ..._loadOwnedIdentityProfile({ server, ourNick: s.ourNick }),
                 passkeyBusy: false,
                 passkeyError: null,
               };
             });
+            _syncOwnCustomStatusActivity(get, set);
             if (ownerChanged) _replaceOwnedMonitorContacts(get, set, true);
             // Registration may have fallen back to a temporary nick after 433.
             // Once 900 proves the canonical account, reclaim that nick now and
@@ -9765,8 +9889,10 @@ export const store = createStore<OnyxState>()(
               friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
               userNotes: _loadOwnedUserNotes({ server, ourNick: s.ourNick }),
+              ..._loadOwnedIdentityProfile({ server, ourNick: s.ourNick }),
             };
           });
+          _syncOwnCustomStatusActivity(get, set);
           if (!_sameOutboxOwner(previousOwner, selectDeviceMemoryOwner(get()))) {
             _replaceOwnedMonitorContacts(get, set, true);
           }
@@ -11350,29 +11476,51 @@ export const store = createStore<OnyxState>()(
       _saveDisplayNameOverrides(displayNameOverrides);
       return { displayNameOverrides };
     }),
-    selfDisplayName: _loadSelfDisplayName(),
+    selfDisplayName: '',
     setSelfDisplayName: (name) => {
-      if (typeof window !== 'undefined') {
-        try { localStorage.setItem('onyx:self-display-name', name); } catch {}
-      }
-      set({ selfDisplayName: name });
+      const owner = selectDeviceMemoryOwner(get());
+      const normalized = normalizeSelfDisplayName(name);
+      if (!owner || normalized === null) return;
+      set(s => {
+        const next = { ..._identityProfileMemory(s), selfDisplayName: normalized };
+        saveIdentityProfileMemory(next, owner);
+        return { selfDisplayName: normalized };
+      });
     },
 
     // ── Self profile ──────────────────────────────────────────────────────────
-    selfBio: typeof window !== 'undefined' ? (localStorage.getItem('onyx:selfBio') ?? '') : '',
-    selfPronouns: typeof window !== 'undefined' ? (localStorage.getItem('onyx:selfPronouns') ?? '') : '',
-    selfBannerUrl: typeof window !== 'undefined' ? (localStorage.getItem('onyx:selfBannerUrl') ?? '') : '',
+    selfBio: '',
+    selfPronouns: '',
+    selfBannerUrl: '',
     setSelfBio: (bio) => {
-      if (typeof window !== 'undefined') { try { localStorage.setItem('onyx:selfBio', bio); } catch {} }
-      set({ selfBio: bio });
+      const owner = selectDeviceMemoryOwner(get());
+      const normalized = normalizeSelfBio(bio);
+      if (!owner || normalized === null) return;
+      set(s => {
+        const next = { ..._identityProfileMemory(s), selfBio: normalized };
+        saveIdentityProfileMemory(next, owner);
+        return { selfBio: normalized };
+      });
     },
     setSelfPronouns: (pronouns) => {
-      if (typeof window !== 'undefined') { try { localStorage.setItem('onyx:selfPronouns', pronouns); } catch {} }
-      set({ selfPronouns: pronouns });
+      const owner = selectDeviceMemoryOwner(get());
+      const normalized = normalizeSelfPronouns(pronouns);
+      if (!owner || normalized === null) return;
+      set(s => {
+        const next = { ..._identityProfileMemory(s), selfPronouns: normalized };
+        saveIdentityProfileMemory(next, owner);
+        return { selfPronouns: normalized };
+      });
     },
     setSelfBannerUrl: (url) => {
-      if (typeof window !== 'undefined') { try { localStorage.setItem('onyx:selfBannerUrl', url); } catch {} }
-      set({ selfBannerUrl: url });
+      const owner = selectDeviceMemoryOwner(get());
+      const normalized = normalizeSelfBannerUrl(url);
+      if (!owner || normalized === null) return;
+      set(s => {
+        const next = { ..._identityProfileMemory(s), selfBannerUrl: normalized };
+        saveIdentityProfileMemory(next, owner);
+        return { selfBannerUrl: normalized };
+      });
     },
 
     // ── Invisible mode ────────────────────────────────────────────────────────
@@ -11440,14 +11588,16 @@ export const store = createStore<OnyxState>()(
     setOwnMetadata(key, value) {
       const { client, ourNick } = get();
       if (!client || !key) return;
-      if (value === null || value === '') {
+      const normalizedValue = value === null ? '' : _normalizeProfileMetadataValue(key, value);
+      if (normalizedValue === null) return;
+      if (normalizedValue === '') {
         // Orochi handleMetadata: SET with no/empty value deletes the key.
         client.sendRaw('METADATA', '*', 'SET', key);
       } else {
-        client.sendRaw('METADATA', '*', 'SET', key, value);
+        client.sendRaw('METADATA', '*', 'SET', key, normalizedValue);
       }
       // Optimistic local apply — the server also echoes 761 RPL_KEYVALUE.
-      if (ourNick) get()._applyMetadata(ourNick, key, value ?? '');
+      if (ourNick) get()._applyMetadata(ourNick, key, normalizedValue);
     },
 
     _applyMetadata(target, key, value) {
@@ -11488,17 +11638,17 @@ export const store = createStore<OnyxState>()(
       const norm = key.toLowerCase().replace(/^ocean\./, '');
       const profilePatch: Partial<RichUserProfile> | null =
         norm === 'display-name' || norm === 'displayname'
-          ? { displayName: value || undefined }
+          ? { displayName: normalizeSelfDisplayName(value) || undefined }
           : norm === 'pronouns'
-            ? { pronouns: value || undefined }
+            ? { pronouns: normalizeSelfPronouns(value) || undefined }
             : norm === 'bio'
-              ? { bio: value || undefined }
+              ? { bio: normalizeSelfBio(value) || undefined }
               : norm === 'accent' || norm === 'accent-color' || norm === 'color'
                 ? { accentColor: value || undefined }
                 : norm === 'links' || norm === 'url' || norm === 'website'
                   ? { links: value ? value.split(/[\s,]+/).filter(Boolean) : undefined }
                   : norm === 'banner' || norm === 'banner-url'
-                    ? { bannerUrl: value || undefined }
+                    ? { bannerUrl: normalizeSelfBannerUrl(value) || undefined }
                     : null;
       if (profilePatch) get().setUserProfile(resolvedTarget, profilePatch);
     },
@@ -12745,29 +12895,6 @@ function _addDMMessage(
   return { dms };
 }
 
-// ── Custom status persistence ─────────────────────────────────────────────────
-
-function _loadCustomStatus(): string {
-  if (typeof window === 'undefined') return '';
-  try {
-    return localStorage.getItem('onyx:custom-status') ?? '';
-  } catch {
-    return '';
-  }
-}
-
-function _loadCustomStatusExpiry(): Date | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem('onyx:custom-status-expiry');
-    if (!raw) return null;
-    const d = new Date(raw);
-    return isNaN(d.getTime()) ? null : d;
-  } catch {
-    return null;
-  }
-}
-
 // ── Bookmark persistence ──────────────────────────────────────────────────────
 
 const BOOKMARK_KEY = 'onyx:bookmarks';
@@ -13078,11 +13205,6 @@ function _saveDisplayNameOverrides(overrides: Record<string, string>): void {
   if (typeof window === 'undefined') return;
   try { localStorage.setItem('onyx:display-names', JSON.stringify(overrides)); } catch {}
 }
-function _loadSelfDisplayName(): string {
-  if (typeof window === 'undefined') return '';
-  return localStorage.getItem('onyx:self-display-name') ?? '';
-}
-
 // ── Generic boolean pref loader ───────────────────────────────────────────────
 function _loadBoolPref(key: string): boolean {
   if (typeof window === 'undefined') return false;
