@@ -69,17 +69,20 @@ export function TypingIndicator(): JSX.Element {
   createEffect(() => {
     const k = key();
     const map = k ? typingUsers().get(k) : undefined;
+    const currentNow = Date.now();
+    setNow(currentNow);
     if (!map || map.size === 0) return;
 
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const schedule = (): void => {
-      if (latestTypingExpiry(map) <= Date.now()) return; // all expired → stop
+    const schedule = (at: number): void => {
+      if (latestTypingExpiry(map) <= at) return; // all expired → stop
       timer = setTimeout(() => {
-        setNow(Date.now());
-        schedule();
+        const nextNow = Date.now();
+        setNow(nextNow);
+        schedule(nextNow);
       }, TICK_MS);
     };
-    schedule();
+    schedule(currentNow);
     onCleanup(() => {
       if (timer !== undefined) clearTimeout(timer);
     });

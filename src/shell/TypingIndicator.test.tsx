@@ -1,6 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { describe, expect, it } from 'vitest';
-import { formatTypingLabel, latestTypingExpiry } from './TypingIndicator';
+import { cleanup, render, screen } from '@solidjs/testing-library';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { store } from '@/lib/store/store';
+import { formatTypingLabel, latestTypingExpiry, TypingIndicator } from './TypingIndicator';
+
+const initialState = store.getInitialState();
+
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+  store.setState(initialState, true);
+});
 
 describe('formatTypingLabel', () => {
   it('returns empty string for no typers', () => {
@@ -44,5 +54,28 @@ describe('latestTypingExpiry', () => {
     // callers compare the result against Date.now() to decide whether to tick.
     const map = new Map([['aurora', 10], ['vesper', 20]]);
     expect(latestTypingExpiry(map)).toBe(20);
+  });
+});
+
+describe('<TypingIndicator>', () => {
+  it('does not revive an inactive room typing entry that expired before navigation', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-16T12:00:00.000Z'));
+    store.setState({
+      ...initialState,
+      activeView: { kind: 'channel', channel: '#root' },
+      ourNick: 'kain',
+    }, true);
+    render(() => <TypingIndicator />);
+
+    store.getState().setTyping('#other', 'alice', true);
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
+
+    vi.advanceTimersByTime(7_000);
+    store.setState({ activeView: { kind: 'channel', channel: '#other' } });
+
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
