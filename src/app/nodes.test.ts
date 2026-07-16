@@ -173,6 +173,25 @@ describe('selectBestNode', () => {
 });
 
 describe('pingNode', () => {
+  it('uses a cache-busted bodyless request for latency-only probes', async () => {
+    const now = vi.fn()
+      .mockReturnValueOnce(100)
+      .mockReturnValueOnce(125);
+    vi.stubGlobal('performance', { now });
+    const fetchMock = vi.fn(async () => new Response(null, { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(pingNode(CUSTOM_NODES[0])).resolves.toBe(25);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://slow.example.test/?_lat=100',
+      expect.objectContaining({
+        method: 'HEAD',
+        mode: 'no-cors',
+        cache: 'no-store',
+      }),
+    );
+  });
+
   it('times out a hung fetch, aborts it, and clears the deadline', async () => {
     vi.useFakeTimers();
     vi.stubGlobal('performance', { now: vi.fn(() => 100) });

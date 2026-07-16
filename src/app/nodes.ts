@@ -66,7 +66,7 @@ export function initialNode(): IrcNode {
 export const DEFAULT_NODE: IrcNode = initialNode();
 
 /**
- * Estimate latency to a node by timing a lightweight HTTPS request to its web
+ * Estimate latency to a node by timing a bodyless HTTPS HEAD request to its web
  * tier (`https://<host>/`, i.e. nginx on :443) — NOT the IRC WebSocket.
  *
  * This is deliberate: IRC servers throttle/temp-ban rapid connect-disconnect, so
@@ -110,13 +110,15 @@ export function pingNode(
     signal?.addEventListener('abort', handleCallerAbort, { once: true });
 
     const start = performance.now();
-    // no-cors: we only need the round-trip, not the body (opaque response is fine).
+    // HEAD keeps a probe bodyless even when the web root is a large landing page.
+    // no-cors: we only need the round-trip, not response metadata (opaque is fine).
     // A cache-buster avoids timing a cached 0ms response.
     // NOTE: no-cors REQUIRES redirect:'follow' — 'manual' makes the fetch
     // reject outright ("redirect mode is not follow"), which read as the node
     // being permanently unreachable and broke nearest-node selection.
     try {
       void fetch(`https://${node.host}/?_lat=${start}`, {
+        method: 'HEAD',
         mode: 'no-cors',
         cache: 'no-store',
         signal: controller?.signal ?? signal,
