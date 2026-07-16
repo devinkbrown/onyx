@@ -83,6 +83,7 @@ export function clearCommands(): void {
 // ── Recent targets ────────────────────────────────────────────────────────────
 
 export const PALETTE_RECENTS_STORAGE_KEY = 'onyx:palette-recents';
+export const MAX_PALETTE_RECENTS_STORAGE_CHARS = 16 * 1024;
 /** Legacy key from the previous brand name; read-only for one-time migration. */
 const LEGACY_RECENTS_KEY = 'ruri:palette-recents';
 const MAX_RECENTS = 6;
@@ -139,7 +140,7 @@ export function loadRecents(owner?: DeviceMemoryOwner): RecentTarget[] {
     const key = recentStorageKey(owner);
     if (!key) return [];
     const raw = localStorage.getItem(key);
-    if (!raw) return [];
+    if (!raw || raw.length > MAX_PALETTE_RECENTS_STORAGE_CHARS) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
     return parsed.slice(0, MAX_RECENTS).flatMap((entry) => {

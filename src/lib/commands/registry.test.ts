@@ -2,8 +2,9 @@
 /**
  * src/lib/commands/registry.test.ts
  */
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  MAX_PALETTE_RECENTS_STORAGE_CHARS,
   PALETTE_RECENTS_STORAGE_KEY,
   clearCommands,
   clearRecents,
@@ -88,6 +89,7 @@ describe('recents', () => {
   beforeEach(() => {
     localStorage.clear();
   });
+  afterEach(() => vi.restoreAllMocks());
 
   it('fails closed without an owner and purges ownerless legacy rows', () => {
     localStorage.setItem(PALETTE_RECENTS_STORAGE_KEY, JSON.stringify([
@@ -139,6 +141,15 @@ describe('recents', () => {
     expect(loadRecents(ALICE).map((entry) => entry.id)).toEqual(['valid']);
     saveRecent({ id: 'x'.repeat(257), label: 'too long', section: 'Actions' }, ALICE);
     expect(loadRecents(ALICE).map((entry) => entry.id)).toEqual(['valid']);
+  });
+
+  it('rejects oversized owner storage before parsing', () => {
+    const key = deviceMemoryStorageKey(PALETTE_RECENTS_STORAGE_KEY, ALICE)!;
+    localStorage.setItem(key, `[${'x'.repeat(MAX_PALETTE_RECENTS_STORAGE_CHARS)}]`);
+    const parse = vi.spyOn(JSON, 'parse');
+
+    expect(loadRecents(ALICE)).toEqual([]);
+    expect(parse).not.toHaveBeenCalled();
   });
 
   it('clearRecents removes only the selected owner', () => {
