@@ -40,7 +40,10 @@ describe('StatsRoute', () => {
 
     render(() => <StatsRoute />);
 
-    expect(await screen.findByLabelText(/daily message totals/i)).toBeInTheDocument();
+    const totals = await screen.findByRole('list', { name: /daily message totals/i });
+    expect(totals).toHaveTextContent('2026-07-08: 24 messages');
+    const chart = screen.getByRole('figure', { name: /daily message totals, oldest to newest/i });
+    expect(chart.querySelector('.data-bars')).toHaveAttribute('aria-hidden', 'true');
     expect(screen.getByText('stats current')).toHaveAttribute('data-feed-state', 'current');
     expect(screen.getByLabelText(/#root recent activity/i)).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /open/i }).some((a) =>

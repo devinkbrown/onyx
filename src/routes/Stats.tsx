@@ -166,17 +166,31 @@ export default function StatsRoute() {
           <span class="label">last exported days</span>
           <h2>Network tide</h2>
           <Show when={days().length > 0} fallback={<p>No daily series has been exported yet.</p>}>
-            <div class="data-bars" aria-label="Daily message totals">
-              <For each={days()}>
-                {(day) => (
-                  <span
-                    class="data-bar"
-                    title={`${day.date}: ${day.messages.toLocaleString('en-US')} messages`}
-                    style={{ '--h': String(barHeight(day, maxDay())) }}
-                  />
-                )}
-              </For>
-            </div>
+            <figure class="data-chart" aria-labelledby="network-tide-caption">
+              <div class="data-bars" aria-hidden="true">
+                <For each={days()}>
+                  {(day) => (
+                    <span
+                      class="data-bar"
+                      title={`${day.date}: ${day.messages.toLocaleString('en-US')} messages`}
+                      style={{ '--h': String(barHeight(day, maxDay())) }}
+                    />
+                  )}
+                </For>
+              </div>
+              <figcaption id="network-tide-caption" class="sr-only">
+                Daily message totals, oldest to newest.
+              </figcaption>
+              <ol class="sr-only" aria-label="Daily message totals">
+                <For each={days()}>
+                  {(day) => (
+                    <li>
+                      <time datetime={day.date}>{day.date}</time>: {day.messages.toLocaleString('en-US')} messages
+                    </li>
+                  )}
+                </For>
+              </ol>
+            </figure>
           </Show>
           <p>
             The bars are the network-wide message total per exported day, oldest to newest.
