@@ -127,6 +127,13 @@ function cacheSuccessfulShellNavigation(pathname, response) {
   if (fallbackPath === null
     || response?.ok !== true
     || typeof response.clone !== 'function') return Promise.resolve();
+  try {
+    const finalUrl = new URL(response.url);
+    if (finalUrl.origin !== self.location.origin
+      || navigationFallbackPath(finalUrl.pathname) !== fallbackPath) return Promise.resolve();
+  } catch {
+    return Promise.resolve();
+  }
   let clone;
   try {
     clone = response.clone();

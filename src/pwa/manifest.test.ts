@@ -470,6 +470,7 @@ describe('PWA manifest', () => {
     const preloadedResponse = {
       source: 'navigation-preload',
       ok: true,
+      url: 'https://onyx.test/app/',
       clone: vi.fn(() => navigationClone),
     };
     listeners.get('fetch')?.({
@@ -487,6 +488,27 @@ describe('PWA manifest', () => {
     expect(networkFetch).not.toHaveBeenCalled();
     expect(preloadedResponse.clone).toHaveBeenCalledOnce();
     expect(put).toHaveBeenCalledWith('/app/', navigationClone);
+
+    const redirectedClone = vi.fn(() => ({ source: 'unsafe-clone' }));
+    navigationCacheWork = undefined;
+    listeners.get('fetch')?.({
+      request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/app/' },
+      preloadResponse: Promise.resolve({
+        ok: true,
+        url: 'https://login.example/app/',
+        clone: redirectedClone,
+      }),
+      respondWith: (work: Promise<unknown>) => {
+        navigationWork = work;
+      },
+      waitUntil: (work: Promise<unknown>) => {
+        navigationCacheWork = work;
+      },
+    });
+    await navigationWork;
+    await navigationCacheWork;
+    expect(redirectedClone).not.toHaveBeenCalled();
+    expect(put).toHaveBeenCalledTimes(1);
 
     listeners.get('fetch')?.({
       request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/app?join=%23root' },
