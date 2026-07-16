@@ -366,6 +366,19 @@ export interface AccountInfoFields {
   registered?: string;
 }
 
+export const MAX_ACCOUNT_INFO_TEXT_LENGTH = 4 * 1024;
+const MAX_ACCOUNT_INFO_PAIRS = 64;
+const MAX_ACCOUNT_INFO_ACCOUNT_LENGTH = 128;
+const MAX_ACCOUNT_INFO_EMAIL_LENGTH = 320;
+const MAX_ACCOUNT_INFO_REGISTERED_LENGTH = 64;
+const MAX_ACCOUNT_INFO_FLAGS = 0xffff_ffff;
+
+function validAccountInfoToken(value: string, maxLength: number): boolean {
+  return value.length > 0
+    && value.length <= maxLength
+    && !/[\s,\u0000-\u001f\u007f]/u.test(value);
+}
+
 function parseBoolToken(value: string): boolean | undefined {
   const v = value.trim().toLowerCase();
   if (v === 'on' || v === 'true' || v === 'yes' || v === '1') return true;
@@ -380,53 +393,76 @@ function parseBoolToken(value: string): boolean | undefined {
  * account-channel notices. Tolerant of ordering and extra whitespace.
  */
 export function parseAccountInfo(text: string): AccountInfoFields | null {
-  if (!text) return null;
+  if (!text || text.length > MAX_ACCOUNT_INFO_TEXT_LENGTH) return null;
   const fields: AccountInfoFields = {};
   let matched = false;
+  let pairCount = 0;
+  const seen = new Set<string>();
   // Match key=value where value runs to the next whitespace (values here are
   // tokens: a name, a number, on/off). Email is also a single token.
   const re = /(\w+)=([^\s]+)/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
+    pairCount += 1;
+    if (pairCount > MAX_ACCOUNT_INFO_PAIRS) return null;
     const key = m[1]!.toLowerCase();
     const value = m[2]!;
+    if (
+      (key === 'account'
+        || key === 'flags'
+        || key === 'email'
+        || key === 'secure'
+        || key === 'enforce'
+        || key === 'registered')
+      && seen.has(key)
+    ) return null;
     switch (key) {
-      case 'account':
+      case 'account': {
+        if (!validAccountInfoToken(value, MAX_ACCOUNT_INFO_ACCOUNT_LENGTH)) return null;
+        seen.add(key);
         fields.account = value;
         matched = true;
         break;
+      }
       case 'flags': {
-        const n = Number.parseInt(value, 10);
-        if (Number.isFinite(n)) {
-          fields.flags = n;
-          matched = true;
-        }
+        if (!/^(?:0|[1-9]\d*)$/u.test(value)) return null;
+        const n = Number(value);
+        if (!Number.isSafeInteger(n) || n > MAX_ACCOUNT_INFO_FLAGS) return null;
+        seen.add(key);
+        fields.flags = n;
+        matched = true;
         break;
       }
-      case 'email':
+      case 'email': {
+        if (!validAccountInfoToken(value, MAX_ACCOUNT_INFO_EMAIL_LENGTH)) return null;
+        seen.add(key);
         fields.email = value;
         matched = true;
         break;
+      }
       case 'secure': {
         const b = parseBoolToken(value);
-        if (b !== undefined) {
-          fields.secure = b;
-          matched = true;
-        }
+        if (b === undefined) return null;
+        seen.add(key);
+        fields.secure = b;
+        matched = true;
         break;
       }
       case 'enforce': {
         const b = parseBoolToken(value);
-        if (b !== undefined) {
-          fields.enforce = b;
-          matched = true;
-        }
+        if (b === undefined) return null;
+        seen.add(key);
+        fields.enforce = b;
+        matched = true;
         break;
       }
-      case 'registered':
+      case 'registered': {
+        if (!validAccountInfoToken(value, MAX_ACCOUNT_INFO_REGISTERED_LENGTH)) return null;
+        seen.add(key);
         fields.registered = value;
         matched = true;
         break;
+      }
       default:
         break;
     }

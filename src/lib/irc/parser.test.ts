@@ -17,6 +17,7 @@ import {
   MAX_MONITOR_NUMERIC_TARGETS,
   parseMonitorNumeric,
   parseAccountInfo,
+  MAX_ACCOUNT_INFO_TEXT_LENGTH,
 } from './parser';
 
 describe('parseIRCMessage', () => {
@@ -339,5 +340,13 @@ describe('parseAccountInfo', () => {
       account: 'dave',
       flags: 5,
     });
+  });
+
+  it('rejects partial numbers, duplicate fields, and oversized payloads', () => {
+    expect(parseAccountInfo('account=alice flags=8junk')).toBeNull();
+    expect(parseAccountInfo('account=alice account=bob flags=8')).toBeNull();
+    expect(parseAccountInfo(`account=alice email=${'x'.repeat(321)}`)).toBeNull();
+    expect(parseAccountInfo('account=alice flags=4294967296')).toBeNull();
+    expect(parseAccountInfo(`account=alice ${'x'.repeat(MAX_ACCOUNT_INFO_TEXT_LENGTH)}`)).toBeNull();
   });
 });
