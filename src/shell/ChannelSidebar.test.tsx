@@ -123,6 +123,16 @@ describe('ChannelSidebar accessibility', () => {
     expect(getByRole('complementary', { name: 'Channel navigation' })).toBeDefined();
   });
 
+  it('keeps the retired IRCXNet wire label out of the public sidebar', () => {
+    seed();
+
+    const { container } = render(() => <ChannelSidebar />);
+    const network = container.querySelector('.shell-sidebar-network');
+
+    expect(network).toHaveTextContent('Onyx');
+    expect(network).not.toHaveTextContent('IRCXNet');
+  });
+
   it('keeps a single tab stop on the active conversation', () => {
     // Arrange — #bravo is active.
     seed();

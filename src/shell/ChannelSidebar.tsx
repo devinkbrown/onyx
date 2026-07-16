@@ -39,6 +39,14 @@ type ViewTransitionDocument = Document & {
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
+function publicNetworkName(networkName: string): string {
+  const trimmed = networkName.trim();
+  // IRCXNet remains a legitimate legacy/wire token, but it is not the public
+  // product name. Preserve custom self-hosted network labels while projecting
+  // the retired first-party token to the Onyx brand at the UI boundary.
+  return !trimmed || trimmed.toLocaleLowerCase() === 'ircxnet' ? 'Onyx' : trimmed;
+}
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 function isChannelActive(activeView: ActiveView, channel: Channel): boolean {
@@ -190,6 +198,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
   const activeView = useStore((s) => s.activeView);
   const connectionStatus = useStore((s) => s.connectionStatus);
   const networkName = useStore((s) => s.networkName);
+  const displayNetworkName = createMemo(() => publicNetworkName(networkName()));
 
   // ── join input ──
   const [joinInput, setJoinInput] = createSignal('');
@@ -333,7 +342,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
             class={`shell-sidebar-dot shell-sidebar-dot${statusMod()}`}
             aria-hidden="true"
           />
-          {networkName() || 'Onyx'}
+          {displayNetworkName()}
           <span class="sr-only" aria-live="polite" aria-atomic="true">
             {`Connection ${statusLabel()}`}
           </span>
