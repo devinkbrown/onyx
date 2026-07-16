@@ -337,6 +337,18 @@ describe('PWA manifest', () => {
     expect(marketingOnlyClient.navigate).not.toHaveBeenCalled();
     expect(marketingOnlyClient.focus).not.toHaveBeenCalled();
     expect(openWindow).toHaveBeenCalledWith(roomTarget);
+
+    workerSelf.clients.matchAll.mockRejectedValueOnce(new Error('client enumeration unavailable'));
+    openWindow.mockClear();
+    clickWork = undefined;
+    click!({
+      notification: { close: vi.fn(), data: { url: roomTarget } },
+      waitUntil: (work: Promise<unknown>) => {
+        clickWork = work;
+      },
+    });
+    await clickWork;
+    expect(openWindow).toHaveBeenCalledWith(roomTarget);
   });
 
   it('keeps install and activation alive without substituting shells for offline document routes', async () => {

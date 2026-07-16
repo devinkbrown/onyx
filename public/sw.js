@@ -263,5 +263,6 @@ self.addEventListener('notificationclick', (event) => {
       .then((clientList) => {
         return focusNotificationTarget(clientList, targetUrl);
       })
+      .catch(() => self.clients.openWindow(targetUrl))
   );
 });
