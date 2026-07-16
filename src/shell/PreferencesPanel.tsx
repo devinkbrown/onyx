@@ -634,6 +634,8 @@ function PortableVaultControls(): JSX.Element {
   let disposed = false;
   let importInput: HTMLInputElement | undefined;
   let importReviewHeading: HTMLHeadingElement | undefined;
+  const initialPortableOwner = memoryOwner();
+  let activeOwnerKey = initialPortableOwner ? deviceMemoryOwnerKey(initialPortableOwner) : null;
 
   const reportStatus = (message: string, failure = false) => {
     setStatus({ message, failure });
@@ -671,22 +673,45 @@ function PortableVaultControls(): JSX.Element {
     activeObjectUrls.set(url, timer);
   };
 
-  onCleanup(() => {
-    disposed = true;
+  const invalidatePortableActions = () => {
     exportEpoch += 1;
     fileSaveEpoch += 1;
     importEpoch += 1;
     shareEpoch += 1;
     applyEpoch += 1;
+  };
+
+  const revokeActiveObjectUrls = () => {
     for (const [url, timer] of activeObjectUrls) {
       if (timer !== null) window.clearTimeout(timer);
       try {
         URL.revokeObjectURL(url);
       } catch {
-        // Cleanup is best-effort; the component is already being disposed.
+        // Best-effort cleanup: no stale URL remains tracked by this component.
       }
     }
     activeObjectUrls.clear();
+  };
+
+  createEffect(() => {
+    const owner = memoryOwner();
+    const nextOwnerKey = owner ? deviceMemoryOwnerKey(owner) : null;
+    if (nextOwnerKey === activeOwnerKey) return;
+    activeOwnerKey = nextOwnerKey;
+    invalidatePortableActions();
+    revokeActiveObjectUrls();
+    setPendingImport(null);
+    setStatus(null);
+    setBusy(false);
+    setExportFormat(null);
+    setFileSaveFormat(null);
+    setShareBusy(false);
+  });
+
+  onCleanup(() => {
+    disposed = true;
+    invalidatePortableActions();
+    revokeActiveObjectUrls();
   });
 
   async function handleExport(

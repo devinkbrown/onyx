@@ -350,6 +350,20 @@ describe('PreferencesPanel', () => {
     expect(screen.getByRole('group', { name: 'Review import' })).toBe(stagedReview);
   });
 
+  it('discards a staged portable import when the device-memory owner changes', async () => {
+    renderPreferences('Import & export');
+    await stageEmptyPortableImport();
+    expect(screen.getByRole('group', { name: 'Review import' })).toBeInTheDocument();
+
+    const current = store.getState().server;
+    store.setState({
+      ourNick: 'bob',
+      server: current ? { ...current, nick: 'bob', account: 'bob' } : null,
+    });
+
+    await waitFor(() => expect(screen.queryByRole('group', { name: 'Review import' })).not.toBeInTheDocument());
+  });
+
   it('uses horizontal transfer-route keys on mobile', () => {
     vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
       matches: query === '(max-width: 42rem)',
@@ -995,6 +1009,35 @@ describe('PreferencesPanel', () => {
     await Promise.resolve();
     expect(createObjectURL).not.toHaveBeenCalled();
     expect(click).not.toHaveBeenCalled();
+  });
+
+  it('does not activate a stale export after the device-memory owner changes', async () => {
+    let resolveExport: (snapshot: PortableTransferSnapshot) => void = () => {};
+    const pendingExport = new Promise<PortableTransferSnapshot>((resolve) => {
+      resolveExport = resolve;
+    });
+    const exportPortableTransfer = vi.spyOn(portableTransfer, 'exportPortableTransfer')
+      .mockReturnValue(pendingExport);
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:alice-stale');
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    renderPreferences('Import & export');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export vault' }));
+    expect(exportPortableTransfer).toHaveBeenCalledOnce();
+    const current = store.getState().server;
+    store.setState({
+      ourNick: 'bob',
+      server: current ? { ...current, nick: 'bob', account: 'bob' } : null,
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Export vault' })).not.toBeDisabled());
+
+    resolveExport(emptyPortableSnapshot());
+    await pendingExport;
+    await Promise.resolve();
+
+    expect(createObjectURL).not.toHaveBeenCalled();
+    expect(click).not.toHaveBeenCalled();
+    expect(screen.queryByText(/^Exported /)).not.toBeInTheDocument();
   });
 
   it('offers gzip as a secondary export with a safe filename and the same URL cleanup', async () => {
