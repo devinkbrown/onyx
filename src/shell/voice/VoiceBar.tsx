@@ -253,8 +253,12 @@ export function VoiceBar() {
   const [displayCaptureAvailable, setDisplayCaptureAvailable] = createSignal(
     supportsDisplayCapture(),
   );
+  const [screensharePending, setScreensharePending] = createSignal(false);
+  const [screenshareStatus, setScreenshareStatus] = createSignal('');
 
   let spatialPadRef: HTMLDivElement | undefined;
+  let screenshareOperationEpoch = 0;
+  let disposed = false;
 
   const isActive = createMemo(() =>
     voice().callState === 'in_call' || voice().callState === 'ringing_out' || voice().callState === 'ringing_in'
@@ -325,6 +329,8 @@ export function VoiceBar() {
   });
 
   onCleanup(() => {
+    disposed = true;
+    screenshareOperationEpoch += 1;
     setSpatialDragging(false);
   });
 
@@ -476,19 +482,41 @@ export function VoiceBar() {
   );
   const screenshareLabel = createMemo(() => {
     if (voice().screenshareActive) return 'Stop sharing screen';
+    if (screensharePending()) return 'Starting screen sharing';
     return screenshareUnavailable() ? 'Screen sharing unavailable' : 'Share screen';
   });
 
-  const handleToggleScreenshare = () => {
+  const handleToggleScreenshare = async (): Promise<void> => {
     if (voice().screenshareActive) {
+      screenshareOperationEpoch += 1;
+      setScreensharePending(false);
       voice().stopScreenshare();
+      setScreenshareStatus('Screen sharing stopped');
       return;
     }
+    if (screensharePending()) return;
     if (!mediaAvailable() || !supportsDisplayCapture()) {
       setDisplayCaptureAvailable(false);
       return;
     }
-    void voice().startScreenshare();
+    const epoch = ++screenshareOperationEpoch;
+    const startScreenshare = voice().startScreenshare;
+    setScreensharePending(true);
+    setScreenshareStatus('Requesting screen sharing permission');
+    try {
+      await startScreenshare();
+      if (disposed || epoch !== screenshareOperationEpoch) return;
+      setScreenshareStatus(
+        getState().voice.screenshareActive
+          ? 'Screen sharing started'
+          : 'Screen sharing did not start. Check browser permission and try again',
+      );
+    } catch {
+      if (disposed || epoch !== screenshareOperationEpoch) return;
+      setScreenshareStatus('Screen sharing could not start. Check browser permission and try again');
+    } finally {
+      if (!disposed && epoch === screenshareOperationEpoch) setScreensharePending(false);
+    }
   };
 
   const handleLeave = () => getState().leaveVoiceChannel();
@@ -695,9 +723,10 @@ export function VoiceBar() {
                 class="onyx-icon-button onyx-icon-button--ghost onyx-icon-button--md"
                 aria-label={screenshareLabel()}
                 aria-pressed={voice().screenshareActive}
+                aria-busy={screensharePending() && !voice().screenshareActive}
                 title={screenshareLabel()}
-                disabled={screenshareUnavailable()}
-                onClick={handleToggleScreenshare}
+                disabled={screenshareUnavailable() || (screensharePending() && !voice().screenshareActive)}
+                onClick={() => void handleToggleScreenshare()}
                 data-testid="screenshare-button"
               >
                 <span class="onyx-icon-button__glyph" aria-hidden="true">
@@ -705,6 +734,15 @@ export function VoiceBar() {
                 </span>
               </button>
             </Tooltip>
+            <span
+              class="sr-only"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+              data-testid="screenshare-status"
+            >
+              {screenshareStatus()}
+            </span>
           </div>
 
           <div class="voice-bar__sep" aria-hidden="true" />

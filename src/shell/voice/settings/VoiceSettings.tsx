@@ -115,24 +115,61 @@ function VoiceSettingsContent() {
   const voice = useStore((state) => state.voice);
   const [devices, setDevices] = createSignal<DeviceChoice[]>([]);
   const [deviceError, setDeviceError] = createSignal<string | null>(null);
+  const [devicesLoading, setDevicesLoading] = createSignal(true);
   const [capturingKey, setCapturingKey] = createSignal(false);
+  let captureButton: HTMLButtonElement | undefined;
+  let deviceLoadEpoch = 0;
+  let disposed = false;
+
+  onCleanup(() => {
+    disposed = true;
+    deviceLoadEpoch += 1;
+  });
 
   const inputs = createMemo(() => devices().filter((device) => device.kind === 'audioinput'));
   const outputs = createMemo(() => devices().filter((device) => device.kind === 'audiooutput'));
   const cameras = createMemo(() => devices().filter((device) => device.kind === 'videoinput'));
 
   const loadDevices = async () => {
+    const epoch = ++deviceLoadEpoch;
+    setDevicesLoading(true);
+    setDeviceError(null);
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) {
-      setDeviceError('Device enumeration is unavailable in this browser.');
+      if (!disposed && epoch === deviceLoadEpoch) {
+        setDeviceError('Device enumeration is unavailable in this browser.');
+        setDevicesLoading(false);
+      }
       return;
     }
 
     try {
       const nextDevices = await navigator.mediaDevices.enumerateDevices();
-      setDevices(normalizeDevices(nextDevices));
+      if (disposed || epoch !== deviceLoadEpoch) return;
+      const normalizedDevices = normalizeDevices(nextDevices);
+      const availableInputs = new Set(normalizedDevices.filter((device) => device.kind === 'audioinput').map((device) => device.deviceId));
+      const availableOutputs = new Set(normalizedDevices.filter((device) => device.kind === 'audiooutput').map((device) => device.deviceId));
+      const availableCameras = new Set(normalizedDevices.filter((device) => device.kind === 'videoinput').map((device) => device.deviceId));
+      const currentVoice = getState().voice;
+      const selectionPatch: Partial<VoiceState> = {};
+
+      if (currentVoice.inputDeviceId && !availableInputs.has(currentVoice.inputDeviceId)) {
+        selectionPatch.inputDeviceId = null;
+      }
+      if (currentVoice.outputDeviceId && !availableOutputs.has(currentVoice.outputDeviceId)) {
+        selectionPatch.outputDeviceId = null;
+      }
+      if (currentVoice.cameraDeviceId && !availableCameras.has(currentVoice.cameraDeviceId)) {
+        selectionPatch.cameraDeviceId = null;
+      }
+
+      setDevices(normalizedDevices);
+      if (Object.keys(selectionPatch).length > 0) updateVoice(selectionPatch);
       setDeviceError(null);
+      setDevicesLoading(false);
     } catch {
+      if (disposed || epoch !== deviceLoadEpoch) return;
       setDeviceError('Device enumeration failed. Check media permissions.');
+      setDevicesLoading(false);
     }
   };
 
@@ -148,13 +185,18 @@ function VoiceSettingsContent() {
 
     const onKeyDown = (event: KeyboardEvent) => {
       event.preventDefault();
+      event.stopPropagation();
+      setCapturingKey(false);
+      queueMicrotask(() => captureButton?.focus());
+
+      if (event.key === 'Escape') return;
+
       const key = event.key === ' ' ? 'Space' : event.key;
       updateVoice({ pushToTalkKey: key, pushToTalk: true });
-      setCapturingKey(false);
     };
 
-    window.addEventListener('keydown', onKeyDown, { once: true });
-    onCleanup(() => window.removeEventListener('keydown', onKeyDown));
+    window.addEventListener('keydown', onKeyDown, { capture: true, once: true });
+    onCleanup(() => window.removeEventListener('keydown', onKeyDown, true));
   });
 
   return (
@@ -162,6 +204,9 @@ function VoiceSettingsContent() {
       <section class="voice-settings__section" aria-labelledby="voice-devices-title">
         <h3 class="voice-settings__section-title" id="voice-devices-title">Devices</h3>
         <p class="voice-settings__section-copy">Choose the capture, playback, and camera paths for this voice session.</p>
+        <Show when={devicesLoading()}>
+          <p class="onyx-field__description" role="status">Checking media devices…</p>
+        </Show>
         <Show when={deviceError()}>
           {(error) => <p class="onyx-field__error" role="alert">{error()}</p>}
         </Show>
@@ -278,16 +323,20 @@ function VoiceSettingsContent() {
             </span>
           </div>
           <Button
+            ref={captureButton}
             variant="ghost"
-            onClick={() => setCapturingKey(true)}
-            aria-label="Capture push-to-talk key"
+            onClick={() => setCapturingKey((capturing) => !capturing)}
+            aria-label={capturingKey() ? 'Cancel push-to-talk key capture' : 'Capture push-to-talk key'}
             aria-pressed={capturingKey() ? 'true' : 'false'}
           >
-            Capture key
+            {capturingKey() ? 'Cancel capture' : 'Capture key'}
           </Button>
           <Button
             variant="danger"
-            onClick={() => updateVoice({ pushToTalkKey: null })}
+            onClick={() => {
+              setCapturingKey(false);
+              updateVoice({ pushToTalkKey: null });
+            }}
             disabled={!voice().pushToTalkKey}
             aria-label="Clear push-to-talk key"
           >

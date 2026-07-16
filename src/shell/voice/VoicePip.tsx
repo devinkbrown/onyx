@@ -19,8 +19,15 @@ type PipParticipant = {
   self: boolean;
 };
 
+type PipParticipantSummary = {
+  visible: PipParticipant[];
+  total: number;
+  speaking: number;
+};
+
 const storageKey = 'onyx-voice-pip-position';
 const margin = 12;
+const PIP_VISIBLE_PARTICIPANT_MAX = 5;
 
 function viewportSize() {
   if (typeof window === 'undefined') return { width: 1024, height: 768 };
@@ -55,10 +62,14 @@ function savePosition(position: PipPosition) {
   } catch {}
 }
 
-function participantFromPeer(peer: SuimyakuPeerState, selfNick: string, speakingNicks: Set<string>): PipParticipant {
+function participantFromPeer(
+  peer: SuimyakuPeerState,
+  selfNick: string,
+  speakingNickKeys: ReadonlySet<string>,
+): PipParticipant {
   return {
     nick: peer.nick,
-    speaking: peer.speaking || speakingNicks.has(peer.nick),
+    speaking: peer.speaking || speakingNickKeys.has(peer.nick.toLowerCase()),
     muted: peer.muted,
     self: peer.nick.toLowerCase() === selfNick.toLowerCase(),
   };
@@ -122,6 +133,8 @@ export function VoicePip() {
   const [dragging, setDragging] = createSignal(false);
   let pipRef: HTMLElement | undefined;
   let dragOffset = { x: 0, y: 0 };
+  let dragTarget: HTMLElement | undefined;
+  let dragPointerId: number | null = null;
   let visibleLastFrame = false;
 
   const target = createMemo(() => state().voice.callChannel ?? state().voice.callWith.trim());
@@ -150,10 +163,13 @@ export function VoicePip() {
     if (persist) savePosition(clamped);
   };
 
-  const participants = createMemo<PipParticipant[]>(() => {
+  const participantSummary = createMemo<PipParticipantSummary>(() => {
     const current = state();
     const voice = current.voice;
     const selfNick = current.ourNick || 'You';
+    const speakingNickKeys = new Set(
+      [...current.speakingNicks].map((nick) => nick.toLowerCase()),
+    );
     const seen = new Set<string>();
     const collected: PipParticipant[] = [];
 
@@ -166,13 +182,13 @@ export function VoicePip() {
 
     add({
       nick: selfNick,
-      speaking: current.speakingNicks.has(selfNick),
+      speaking: speakingNickKeys.has(selfNick.toLowerCase()),
       muted: voice.muted,
       self: true,
     });
 
     for (const peer of voice.peers.values()) {
-      add(participantFromPeer(peer, selfNick, current.speakingNicks));
+      add(participantFromPeer(peer, selfNick, speakingNickKeys));
     }
 
     if (voice.callChannel) {
@@ -180,7 +196,7 @@ export function VoicePip() {
       for (const nick of inRoom ?? []) {
         add({
           nick,
-          speaking: current.speakingNicks.has(nick),
+          speaking: speakingNickKeys.has(nick.toLowerCase()),
           muted: false,
           self: nick.toLowerCase() === selfNick.toLowerCase(),
         });
@@ -188,26 +204,50 @@ export function VoicePip() {
     } else if (voice.callWith) {
       add({
         nick: voice.callWith,
-        speaking: current.speakingNicks.has(voice.callWith),
+        speaking: speakingNickKeys.has(voice.callWith.toLowerCase()),
         muted: false,
         self: false,
       });
     }
 
-    return collected.sort((a, b) => Number(b.speaking) - Number(a.speaking)).slice(0, 8);
+    collected.sort((a, b) => Number(b.speaking) - Number(a.speaking));
+    return {
+      visible: collected.slice(0, PIP_VISIBLE_PARTICIPANT_MAX),
+      total: collected.length,
+      speaking: collected.filter((participant) => participant.speaking).length,
+    };
   });
 
-  const hiddenParticipantCount = createMemo(() => Math.max(0, participants().length - 5));
-  const visibleParticipants = createMemo(() => participants().slice(0, 5));
-  const speakingCount = createMemo(() => participants().filter((participant) => participant.speaking).length);
+  const hiddenParticipantCount = createMemo(() =>
+    Math.max(0, participantSummary().total - participantSummary().visible.length)
+  );
+
+  const finishDrag = (persist: boolean): void => {
+    setDragging(false);
+    if (dragTarget && dragPointerId !== null) {
+      try {
+        dragTarget.releasePointerCapture(dragPointerId);
+      } catch {}
+    }
+    dragTarget = undefined;
+    dragPointerId = null;
+    if (persist) savePosition(position());
+  };
 
   createEffect(() => {
     const nextVisible = isVisible();
+    if (!nextVisible) {
+      finishDrag(false);
+      visibleLastFrame = false;
+      return;
+    }
     if (nextVisible && !visibleLastFrame) {
       moveTo(position(), true);
     }
     visibleLastFrame = nextVisible;
   });
+
+  onCleanup(() => finishDrag(false));
 
   createEffect(() => {
     if (typeof window === 'undefined') return;
@@ -224,7 +264,11 @@ export function VoicePip() {
       y: event.clientY - rect.top,
     };
     setDragging(true);
-    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    dragTarget = event.currentTarget as HTMLElement;
+    dragPointerId = event.pointerId;
+    try {
+      dragTarget.setPointerCapture(event.pointerId);
+    } catch {}
   };
 
   const onPointerMove = (event: PointerEvent) => {
@@ -237,11 +281,8 @@ export function VoicePip() {
 
   const onPointerUp = (event: PointerEvent) => {
     if (!dragging()) return;
-    setDragging(false);
-    try {
-      (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
-    } catch {}
-    savePosition(position());
+    if (dragPointerId !== null && event.pointerId !== dragPointerId) return;
+    finishDrag(true);
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
@@ -290,14 +331,14 @@ export function VoicePip() {
             <span class="voice-pip__kicker">{isChannel() ? 'voice room' : 'voice call'}</span>
             <span class="voice-pip__target">{target()}</span>
           </div>
-          <span class="voice-pip__status" aria-label={`${speakingCount()} speaking`}>
-            {speakingCount() > 0 ? `${speakingCount()} live` : 'live'}
+          <span class="voice-pip__status" aria-label={`${participantSummary().speaking} speaking`}>
+            {participantSummary().speaking > 0 ? `${participantSummary().speaking} live` : 'live'}
           </span>
         </div>
 
         <div class="voice-pip__body">
-          <div class="voice-pip__participants" aria-label={`${participants().length} voice participants`}>
-            <For each={visibleParticipants()}>
+          <div class="voice-pip__participants" aria-label={`${participantSummary().total} voice participants`}>
+            <For each={participantSummary().visible}>
               {(participant) => (
                 <Tooltip
                   content={`${participant.nick}${participant.speaking ? ' is speaking' : ''}${participant.muted ? ' is muted' : ''}`}

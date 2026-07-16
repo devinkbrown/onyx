@@ -14,7 +14,7 @@
  * AAA structure throughout.
  */
 
-import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { store } from '@/lib/store/store';
 import type { Channel, ChannelUser } from '@/lib/irc/types';
@@ -200,6 +200,35 @@ describe('VoiceStage', () => {
 
     // Assert — no video elements (hasVideo false, no streams)
     expect(queryAllByTestId('tile-video')).toHaveLength(0);
+  });
+
+  it('preserves an unchanged peer video element across unrelated voice state updates', () => {
+    const stop = vi.fn();
+    const stream = {
+      getTracks: () => [{ stop }],
+      getVideoTracks: () => [],
+    } as unknown as MediaStream;
+    seedVoiceStore(
+      [makePeer('alice', { hasVideo: true })],
+      [],
+      { videoParticipants: new Map([['alice', stream]]) },
+    );
+
+    const view = render(() => <VoiceStage />);
+    const initialVideo = view.getByTestId('tile-video') as HTMLVideoElement;
+    expect(initialVideo.srcObject).toBe(stream);
+
+    store.getState().setVoiceCallState({ muted: true });
+
+    const currentVideo = view.getByTestId('tile-video') as HTMLVideoElement;
+    expect(currentVideo).toBe(initialVideo);
+    expect(currentVideo.srcObject).toBe(stream);
+
+    view.unmount();
+    expect(initialVideo.srcObject).toBeNull();
+    // Media streams are owned by the media engine; a presentational tile only
+    // detaches its element and must not stop a track shared with another view.
+    expect(stop).not.toHaveBeenCalled();
   });
 
   it('keeps roster-only cross-node participants in the screenshare filmstrip without duplicates', () => {
@@ -568,23 +597,57 @@ describe('VoiceBar', () => {
     startSpy.mockRestore();
   });
 
-  it('starts screen sharing immediately when browser and server media are available', () => {
+  it('allows only one pending screen-share request and reports a truthful empty completion', async () => {
     // Arrange
     seedVoiceStore([]);
     store.setState({ mediaAvailable: true });
     setDisplayCapture(vi.fn().mockResolvedValue({} as MediaStream));
-    const startSpy = vi.spyOn(store.getState().voice, 'startScreenshare').mockResolvedValue();
+    let resolveStart: (() => void) | undefined;
+    const pendingStart = new Promise<void>((resolve) => {
+      resolveStart = resolve;
+    });
+    const startSpy = vi.spyOn(store.getState().voice, 'startScreenshare').mockReturnValue(pendingStart);
 
     // Act
     const { getByTestId } = render(() => <VoiceBar />);
     const btn = getByTestId('screenshare-button');
     fireEvent.click(btn);
+    fireEvent.click(btn);
 
-    // Assert
-    expect(btn).toBeEnabled();
-    expect(btn).toHaveAttribute('aria-label', 'Share screen');
-    expect(btn).toHaveAttribute('title', 'Share screen');
+    // Assert — the permission gap is visibly busy and cannot launch a second prompt.
     expect(startSpy).toHaveBeenCalledOnce();
+    expect(btn).toBeDisabled();
+    expect(btn).toHaveAttribute('aria-busy', 'true');
+    expect(btn).toHaveAttribute('aria-label', 'Starting screen sharing');
+    expect(getByTestId('screenshare-status')).toHaveTextContent('Requesting screen sharing permission');
+
+    resolveStart?.();
+    await waitFor(() => expect(btn).toBeEnabled());
+    expect(btn).toHaveAttribute('aria-busy', 'false');
+    expect(btn).toHaveAttribute('aria-label', 'Share screen');
+    expect(getByTestId('screenshare-status')).toHaveTextContent(
+      'Screen sharing did not start. Check browser permission and try again',
+    );
+    startSpy.mockRestore();
+  });
+
+  it('catches a rejected screen-share request and exposes a retryable status', async () => {
+    seedVoiceStore([]);
+    store.setState({ mediaAvailable: true });
+    setDisplayCapture(vi.fn().mockResolvedValue({} as MediaStream));
+    const startSpy = vi.spyOn(store.getState().voice, 'startScreenshare')
+      .mockRejectedValue(new Error('permission denied'));
+
+    const { getByTestId } = render(() => <VoiceBar />);
+    const btn = getByTestId('screenshare-button');
+    fireEvent.click(btn);
+
+    await waitFor(() => expect(btn).toBeEnabled());
+    expect(startSpy).toHaveBeenCalledOnce();
+    expect(getByTestId('screenshare-status')).toHaveTextContent(
+      'Screen sharing could not start. Check browser permission and try again',
+    );
+    expect(btn).toHaveAttribute('aria-label', 'Share screen');
     startSpy.mockRestore();
   });
 

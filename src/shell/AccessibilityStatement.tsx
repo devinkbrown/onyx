@@ -64,6 +64,7 @@ const ACCESSIBILITY_TOPICS: readonly AccessibilityTopic[] = [
     points: [
       'Channel settings uses a labelled Sheet, labelled forms, switch-mode flags, and read-only non-op fallbacks.',
       'Voice controls use a toolbar, grouped labelled controls, aria-pressed media state, and a live call timer.',
+      'The mini voice view renders at most five avatars while its participant, hidden, and speaking counts reflect the full case-insensitive room roster.',
       'Appearance uses radio groups for themes and backgrounds with labelled swatches and modal focus handling.',
       'Home catch-up exposes recaps, reviewed ranges, and the channel directory as labelled card lists with direct action buttons.',
       'Message search uses a search landmark, labelled match navigation, and named archived/device-memory result lists.',

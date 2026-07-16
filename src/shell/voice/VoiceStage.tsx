@@ -29,7 +29,7 @@
  * Renders calm over the app background — no heavyweight overlay.
  */
 
-import { createMemo, For, Show } from 'solid-js';
+import { createMemo, Index, Show } from 'solid-js';
 import { getState, useStore } from '@/lib/store';
 import type { SuimyakuPeerState } from '@/lib/suimyaku-media/types';
 import { ParticipantTile } from './ParticipantTile';
@@ -133,6 +133,9 @@ export function VoiceStage() {
       muted: (participant.peer?.muted ?? false) || hasNick(normalizedMutedNicks(), participant.nick),
     }))
   );
+  // Layouts use `<Index>` below because slot objects are intentionally rebuilt
+  // as voice state changes. Keying `<For>` by those objects would remount every
+  // tile and interrupt an unchanged video stream on mute/speaking/hand updates.
   const allSlots = createMemo<Slot[]>(() => [selfSlot(), ...remoteSlots()]);
 
   // Total participant count (self + media peers + roster-only members).
@@ -188,23 +191,23 @@ export function VoiceStage() {
             fallback={
               /* ── Grid layout ── */
               <div class="voice-stage__grid" data-count={countAttr()}>
-                <For each={allSlots()}>
+                <Index each={allSlots()}>
                   {(slot) => (
                     <ParticipantTile
-                      nick={slot.nick}
-                      peer={slot.peer}
-                      stream={slot.stream}
-                      isSelf={slot.isSelf}
-                      speaking={slot.isSelf ? slot.speaking : undefined}
-                      muted={slot.muted}
-                      deafened={slot.isSelf ? voice().deafened : undefined}
-                      handRaised={slot.handRaised}
-                      pinned={voice().pinnedParticipant === slot.nick}
+                      nick={slot().nick}
+                      peer={slot().peer}
+                      stream={slot().stream}
+                      isSelf={slot().isSelf}
+                      speaking={slot().isSelf ? slot().speaking : undefined}
+                      muted={slot().muted}
+                      deafened={slot().isSelf ? voice().deafened : undefined}
+                      handRaised={slot().handRaised}
+                      pinned={voice().pinnedParticipant === slot().nick}
                       onPin={handlePin}
-                      channelUser={userFor(slot.nick)}
+                      channelUser={userFor(slot().nick)}
                     />
                   )}
-                </For>
+                </Index>
               </div>
             }
           >
@@ -232,24 +235,24 @@ export function VoiceStage() {
 
             <Show when={filmstripSlots().length > 0}>
               <div class="voice-stage__filmstrip" role="list" aria-label="Other participants">
-                <For each={filmstripSlots()}>
+                <Index each={filmstripSlots()}>
                   {(slot) => (
                     <ParticipantTile
-                      nick={slot.nick}
-                      peer={slot.peer}
-                      stream={slot.stream}
-                      isSelf={slot.isSelf}
-                      speaking={slot.isSelf ? slot.speaking : undefined}
-                      muted={slot.muted}
-                      deafened={slot.isSelf ? voice().deafened : undefined}
-                      handRaised={slot.handRaised}
-                      pinned={voice().pinnedParticipant === slot.nick}
+                      nick={slot().nick}
+                      peer={slot().peer}
+                      stream={slot().stream}
+                      isSelf={slot().isSelf}
+                      speaking={slot().isSelf ? slot().speaking : undefined}
+                      muted={slot().muted}
+                      deafened={slot().isSelf ? voice().deafened : undefined}
+                      handRaised={slot().handRaised}
+                      pinned={voice().pinnedParticipant === slot().nick}
                       onPin={handlePin}
-                      channelUser={userFor(slot.nick)}
+                      channelUser={userFor(slot().nick)}
                       class="voice-stage__filmstrip-tile"
                     />
                   )}
-                </For>
+                </Index>
               </div>
             </Show>
           </Show>
@@ -286,22 +289,22 @@ export function VoiceStage() {
             />
           </Show>
 
-          <For each={remoteSlots()}>
+          <Index each={remoteSlots()}>
             {(slot) => (
               <ParticipantTile
-                nick={slot.nick}
-                peer={slot.peer}
-                stream={slot.stream}
-                speaking={slot.speaking}
-                muted={slot.muted}
-                handRaised={slot.handRaised}
-                pinned={voice().pinnedParticipant === slot.nick}
+                nick={slot().nick}
+                peer={slot().peer}
+                stream={slot().stream}
+                speaking={slot().speaking}
+                muted={slot().muted}
+                handRaised={slot().handRaised}
+                pinned={voice().pinnedParticipant === slot().nick}
                 onPin={handlePin}
-                channelUser={userFor(slot.nick)}
+                channelUser={userFor(slot().nick)}
                 class="voice-stage__filmstrip-tile"
               />
             )}
-          </For>
+          </Index>
         </div>
       </Show>
     </div>
