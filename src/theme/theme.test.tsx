@@ -20,6 +20,7 @@ import { contrastRatio, parseHex } from './contrast';
 import { ThemeStudio } from './ThemeStudio';
 import { ALL_STUDIO_TOKENS, EDITABLE_PROPERTIES } from './tokens';
 import { auditPalette, hexToOklch, generatePalette, enforceAA, type PaletteSeed } from './paletteFactory';
+import { setPreference } from '@/lib/prefs/preferences';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -109,6 +110,26 @@ describe('applyThemeToDom', () => {
 // ---------------------------------------------------------------------------
 
 describe('ThemeProvider', () => {
+  it('re-derives the active palette when the manual high-contrast preference changes', () => {
+    setPreference('highContrast', false);
+    render(() => (
+      <ThemeProvider>
+        <ThemeIdDisplay />
+      </ThemeProvider>
+    ));
+
+    const base = getVar('--washi-dim');
+    expect(base).toBeTruthy();
+
+    setPreference('highContrast', true);
+    const boosted = getVar('--washi-dim');
+    expect(boosted).toBeTruthy();
+    expect(boosted).not.toBe(base);
+
+    setPreference('highContrast', false);
+    expect(getVar('--washi-dim')).toBe(base);
+  });
+
   it('applies the default theme on mount', () => {
     render(() => (
       <ThemeProvider>

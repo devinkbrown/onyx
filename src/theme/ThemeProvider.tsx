@@ -38,6 +38,7 @@ import { parseThemeParam } from '@/lib/theme/themeShare';
 import { persistThemeId, readThemeId } from './themeStorage';
 import { highContrastOverrides } from './highContrastTheme';
 import { prefersMoreContrast } from '@/lib/a11y/mediaPrefs';
+import { preferences } from '@/lib/prefs/preferences';
 
 type ThemeContextValue = {
   /** The currently active theme ID (a built-in ThemeId or a `custom:` id). */
@@ -266,11 +267,13 @@ export function ThemeProvider(props: ThemeProviderProps) {
   importSharedThemeFromUrl();
 
   // Apply CSS variables whenever the active theme (or its custom overrides)
-  // change, or the OS `prefers-contrast: more` signal flips — so enabling the
-  // preference re-derives the current theme's high-contrast variant live.
+  // change, the OS `prefers-contrast: more` signal flips, or the explicit
+  // Preferences accessibility toggle changes. Both accessibility paths drive
+  // the same per-theme OKLCH solver; the manual toggle must not degrade to a
+  // handful of static CSS overrides while the OS path gets the real palette.
   createEffect(() => {
     customThemes(); // re-apply if the active custom theme was edited
-    applyThemeToDom(themeId(), prefersMoreContrast());
+    applyThemeToDom(themeId(), prefersMoreContrast() || preferences().highContrast);
   });
 
   // On unmount, remove the data-theme attribute so tests stay isolated.
