@@ -21,7 +21,7 @@
  *   - Nick label + animated speaking bars
  */
 
-import { For, createEffect, createMemo, onCleanup, Show, splitProps, type JSX } from 'solid-js';
+import { For, createEffect, createMemo, createSignal, onCleanup, Show, splitProps, type JSX } from 'solid-js';
 import { Avatar } from '@/primitives';
 import { CameraOffIcon, MicOffIcon, DeafenIcon } from './icons';
 import type { NetworkQualityTier, SuimyakuPeerState } from '@/lib/suimyaku-media/types';
@@ -81,6 +81,15 @@ const QUALITY_META: Record<NetworkQualityTier, { label: string; bars: number }> 
   3: { label: 'Poor', bars: 1 },
 };
 
+/** Native video PiP is an optional browser enhancement, never a call requirement. */
+function supportsNativeVideoPictureInPicture(): boolean {
+  return typeof document !== 'undefined'
+    && typeof HTMLVideoElement !== 'undefined'
+    && document.pictureInPictureEnabled === true
+    && typeof HTMLVideoElement.prototype.requestPictureInPicture === 'function'
+    && typeof document.exitPictureInPicture === 'function';
+}
+
 function SpeakingBars(props: { active: boolean }) {
   return (
     <span
@@ -101,6 +110,16 @@ export function ParticipantTile(props: ParticipantTileProps): JSX.Element {
   ]);
 
   let videoRef: HTMLVideoElement | undefined;
+  const nativePipSupported = supportsNativeVideoPictureInPicture();
+  const [nativePipActive, setNativePipActive] = createSignal(false);
+  const [nativePipPending, setNativePipPending] = createSignal(false);
+  let nativePipOperation = 0;
+  let disposed = false;
+
+  onCleanup(() => {
+    disposed = true;
+    nativePipOperation += 1;
+  });
 
   // Bind stream to <video>.srcObject — never via attribute.
   // Runs whenever the stream changes, and cleans up the previous assignment.
@@ -108,8 +127,36 @@ export function ParticipantTile(props: ParticipantTileProps): JSX.Element {
     const el = videoRef;
     const s = local.stream;
     if (!el) return;
+
+    const handleEnterPictureInPicture = () => {
+      if (!disposed) setNativePipActive(true);
+    };
+    const handleLeavePictureInPicture = () => {
+      if (!disposed) setNativePipActive(false);
+    };
+
     el.srcObject = s ?? null;
+    if (nativePipSupported) {
+      el.addEventListener('enterpictureinpicture', handleEnterPictureInPicture);
+      el.addEventListener('leavepictureinpicture', handleLeavePictureInPicture);
+    }
     onCleanup(() => {
+      // A stream replacement can remove the <video> while a PiP request is
+      // still pending even though the tile component itself remains mounted.
+      // Fence that request exactly like an unmount and let a later stream start
+      // with a usable (non-pending) control.
+      nativePipOperation += 1;
+      el.removeEventListener('enterpictureinpicture', handleEnterPictureInPicture);
+      el.removeEventListener('leavepictureinpicture', handleLeavePictureInPicture);
+      if (!disposed) {
+        setNativePipActive(false);
+        setNativePipPending(false);
+      }
+      if (nativePipSupported && document.pictureInPictureElement === el) {
+        void document.exitPictureInPicture().catch(() => {
+          // The browser may already be closing PiP during navigation/unmount.
+        });
+      }
       if (el.srcObject) el.srcObject = null;
     });
   });
@@ -170,6 +217,41 @@ export function ParticipantTile(props: ParticipantTileProps): JSX.Element {
     local.onPin?.(local.nick);
   };
 
+  const handleNativePip = async (event: MouseEvent) => {
+    event.stopPropagation();
+    const el = videoRef;
+    if (!nativePipSupported || !el || nativePipPending()) return;
+
+    const operation = ++nativePipOperation;
+    setNativePipPending(true);
+    try {
+      if (document.pictureInPictureElement === el) {
+        await document.exitPictureInPicture();
+      } else {
+        await el.requestPictureInPicture();
+      }
+
+      // A request can resolve after the tile disappeared. Close any PiP it
+      // opened rather than leaving an orphaned browser window behind.
+      if (disposed || operation !== nativePipOperation) {
+        if (document.pictureInPictureElement === el) {
+          await document.exitPictureInPicture().catch(() => {
+            // Navigation may already have closed it.
+          });
+        }
+        return;
+      }
+      setNativePipActive(document.pictureInPictureElement === el);
+    } catch {
+      // User cancellation, policy denial, and transient browser failures are
+      // neutral outcomes: retain the in-page video without an error state.
+    } finally {
+      if (!disposed && operation === nativePipOperation) {
+        setNativePipPending(false);
+      }
+    }
+  };
+
   return (
     <div
       {...rest}
@@ -210,7 +292,7 @@ export function ParticipantTile(props: ParticipantTileProps): JSX.Element {
         <span class="voice-tile__screen-label" aria-hidden="true">[SCREEN]</span>
       </Show>
 
-      {/* Top-right cluster: raised hand + connection quality + pin */}
+      {/* Top-right cluster: raised hand + connection quality + PiP + pin */}
       <div class="voice-tile__topbar">
         <Show when={handRaised()}>
           <span
@@ -236,6 +318,26 @@ export function ParticipantTile(props: ParticipantTileProps): JSX.Element {
               {(i) => <span class={i <= QUALITY_META[local.quality!].bars ? 'on' : 'off'} />}
             </For>
           </span>
+        </Show>
+
+        <Show when={hasVideo() && nativePipSupported}>
+          <button
+            type="button"
+            class="voice-tile__pip"
+            aria-label={nativePipPending()
+              ? `Opening ${displayNick()} video in Picture-in-Picture`
+              : nativePipActive()
+                ? `Close ${displayNick()} Picture-in-Picture`
+                : `Open ${displayNick()} video in Picture-in-Picture`}
+            aria-pressed={nativePipActive()}
+            aria-busy={nativePipPending() ? 'true' : undefined}
+            data-testid="native-pip-button"
+            disabled={nativePipPending()}
+            onClick={handleNativePip}
+            title={nativePipActive() ? 'Close Picture-in-Picture' : 'Picture-in-Picture'}
+          >
+            <span aria-hidden="true">▣</span>
+          </button>
         </Show>
 
         <Show when={local.onPin && !local.isScreenshare}>

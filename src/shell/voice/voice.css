@@ -373,7 +373,8 @@
   .voice-tile__hand-badge {
     animation: none !important;
   }
-  .voice-tile__pin {
+  .voice-tile__pin,
+  .voice-tile__pip {
     transition: opacity var(--dur) var(--ease);
     transform: none;
   }
@@ -471,8 +472,9 @@
 .voice-tile__quality--t2 { --q-color: var(--gold-bright); }
 .voice-tile__quality--t3 { --q-color: var(--shu); }
 
-/* Pin / spotlight affordance — reveals on hover/focus, stays for pinned tiles */
-.voice-tile__pin {
+/* Video actions reveal on hover/focus and stay visible while active. */
+.voice-tile__pin,
+.voice-tile__pip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -497,29 +499,41 @@
 }
 
 .voice-tile:hover .voice-tile__pin,
+.voice-tile:hover .voice-tile__pip,
 .voice-tile:focus-within .voice-tile__pin,
+.voice-tile:focus-within .voice-tile__pip,
 .voice-tile__pin:focus-visible,
-.voice-tile__pin[aria-pressed="true"] {
+.voice-tile__pip:focus-visible,
+.voice-tile__pin[aria-pressed="true"],
+.voice-tile__pip[aria-pressed="true"] {
   opacity: 1;
   transform: translateY(0);
 }
 
-.voice-tile__pin:hover {
+.voice-tile__pin:hover,
+.voice-tile__pip:hover {
   color: var(--lapis-bright);
   background: color-mix(in oklab, var(--lapis) 16%, var(--stone));
   border-color: var(--seam);
 }
 
-.voice-tile__pin:focus-visible {
+.voice-tile__pin:focus-visible,
+.voice-tile__pip:focus-visible {
   outline: 2px solid var(--lapis-bright);
   outline-offset: 2px;
 }
 
-.voice-tile__pin[aria-pressed="true"] {
+.voice-tile__pin[aria-pressed="true"],
+.voice-tile__pip[aria-pressed="true"] {
   color: var(--lapis-bright);
   background: color-mix(in oklab, var(--lapis-deep) 32%, var(--ink));
   border-color: color-mix(in oklab, var(--lapis-bright) 60%, var(--seam));
   box-shadow: 0 0 12px color-mix(in oklab, var(--lapis-bright) 26%, transparent);
+}
+
+.voice-tile__pip:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 /* Pinned tile — persistent azure frame so it reads as the focus */

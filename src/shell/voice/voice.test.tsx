@@ -15,6 +15,7 @@
  */
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
+import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { store } from '@/lib/store/store';
 import type { Channel, ChannelUser } from '@/lib/irc/types';
@@ -32,6 +33,22 @@ const displayMediaDescriptor = Object.getOwnPropertyDescriptor(
   'getDisplayMedia',
 );
 const wakeLockDescriptor = Object.getOwnPropertyDescriptor(navigator, 'wakeLock');
+const pictureInPictureEnabledDescriptor = Object.getOwnPropertyDescriptor(
+  document,
+  'pictureInPictureEnabled',
+);
+const pictureInPictureElementDescriptor = Object.getOwnPropertyDescriptor(
+  document,
+  'pictureInPictureElement',
+);
+const exitPictureInPictureDescriptor = Object.getOwnPropertyDescriptor(
+  document,
+  'exitPictureInPicture',
+);
+const requestPictureInPictureDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLVideoElement.prototype,
+  'requestPictureInPicture',
+);
 
 function makeChannelUser(nick: string, modes: string[] = []): ChannelUser {
   return { nick, modes: new Set(modes) };
@@ -154,6 +171,60 @@ function makeWakeLockSentinel() {
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
   };
+}
+
+function restorePictureInPicture(): void {
+  const restore = (target: object, key: PropertyKey, descriptor: PropertyDescriptor | undefined) => {
+    if (descriptor) Object.defineProperty(target, key, descriptor);
+    else Reflect.deleteProperty(target, key);
+  };
+
+  restore(document, 'pictureInPictureEnabled', pictureInPictureEnabledDescriptor);
+  restore(document, 'pictureInPictureElement', pictureInPictureElementDescriptor);
+  restore(document, 'exitPictureInPicture', exitPictureInPictureDescriptor);
+  restore(HTMLVideoElement.prototype, 'requestPictureInPicture', requestPictureInPictureDescriptor);
+}
+
+function setPictureInPictureSupport(
+  requestImplementation?: (
+    video: HTMLVideoElement,
+    enter: (video: HTMLVideoElement) => void,
+  ) => Promise<unknown>,
+) {
+  let activeElement: HTMLVideoElement | null = null;
+  const enter = (video: HTMLVideoElement) => {
+    activeElement = video;
+    video.dispatchEvent(new Event('enterpictureinpicture'));
+  };
+  const request = vi.fn(function (this: HTMLVideoElement) {
+    if (requestImplementation) return requestImplementation(this, enter);
+    enter(this);
+    return Promise.resolve();
+  });
+  const exit = vi.fn(async () => {
+    const previous = activeElement;
+    activeElement = null;
+    previous?.dispatchEvent(new Event('leavepictureinpicture'));
+  });
+
+  Object.defineProperty(document, 'pictureInPictureEnabled', {
+    configurable: true,
+    value: true,
+  });
+  Object.defineProperty(document, 'pictureInPictureElement', {
+    configurable: true,
+    get: () => activeElement,
+  });
+  Object.defineProperty(document, 'exitPictureInPicture', {
+    configurable: true,
+    value: exit,
+  });
+  Object.defineProperty(HTMLVideoElement.prototype, 'requestPictureInPicture', {
+    configurable: true,
+    value: request,
+  });
+
+  return { request, exit };
 }
 
 // ── VoiceStage ────────────────────────────────────────────────────────────────
@@ -300,6 +371,138 @@ describe('VoiceStage', () => {
 describe('ParticipantTile', () => {
   afterEach(() => {
     cleanup();
+    restorePictureInPicture();
+  });
+
+  it('keeps video in-page when native Picture-in-Picture is unavailable', () => {
+    Object.defineProperty(document, 'pictureInPictureEnabled', {
+      configurable: true,
+      value: false,
+    });
+    const stream = {} as MediaStream;
+
+    const { getByTestId, queryByTestId } = render(() => (
+      <ParticipantTile nick="alice" peer={makePeer('alice')} stream={stream} channelUser={undefined} />
+    ));
+
+    expect(getByTestId('tile-video')).toBeDefined();
+    expect(queryByTestId('native-pip-button')).toBeNull();
+  });
+
+  it('opens and closes the tile video in native Picture-in-Picture only on click', async () => {
+    const { request, exit } = setPictureInPictureSupport();
+    const stream = {} as MediaStream;
+    const { getByTestId } = render(() => (
+      <ParticipantTile nick="alice" peer={makePeer('alice')} stream={stream} channelUser={undefined} />
+    ));
+    const video = getByTestId('tile-video');
+    const button = getByTestId('native-pip-button');
+
+    expect(request).not.toHaveBeenCalled();
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(button);
+    await waitFor(() => expect(request).toHaveBeenCalledOnce());
+    expect(request.mock.instances[0]).toBe(video);
+    expect(button).toHaveAttribute('aria-pressed', 'true');
+    expect(button).toHaveAccessibleName('Close alice Picture-in-Picture');
+
+    fireEvent.click(button);
+    await waitFor(() => expect(exit).toHaveBeenCalledOnce());
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('treats a denied Picture-in-Picture request as a neutral outcome', async () => {
+    const { request } = setPictureInPictureSupport(async () => {
+      throw new DOMException('Request cancelled', 'NotAllowedError');
+    });
+    const { getByTestId, queryByRole } = render(() => (
+      <ParticipantTile nick="alice" peer={makePeer('alice')} stream={{} as MediaStream} channelUser={undefined} />
+    ));
+    const button = getByTestId('native-pip-button');
+
+    fireEvent.click(button);
+
+    await waitFor(() => expect(request).toHaveBeenCalledOnce());
+    await waitFor(() => expect(button).not.toBeDisabled());
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+    expect(queryByRole('alert')).toBeNull();
+  });
+
+  it('coalesces clicks while a Picture-in-Picture request is pending', async () => {
+    let finishRequest: (() => void) | undefined;
+    const { request } = setPictureInPictureSupport((video, enter) => new Promise((resolve) => {
+      finishRequest = () => {
+        enter(video);
+        resolve(undefined);
+      };
+    }));
+    const { getByTestId } = render(() => (
+      <ParticipantTile nick="alice" peer={makePeer('alice')} stream={{} as MediaStream} channelUser={undefined} />
+    ));
+    const button = getByTestId('native-pip-button');
+
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    expect(request).toHaveBeenCalledOnce();
+    expect(button).toBeDisabled();
+    finishRequest?.();
+    await waitFor(() => expect(button).toHaveAttribute('aria-pressed', 'true'));
+  });
+
+  it('closes native Picture-in-Picture when its tile unmounts', async () => {
+    const { exit } = setPictureInPictureSupport();
+    const view = render(() => (
+      <ParticipantTile nick="alice" peer={makePeer('alice')} stream={{} as MediaStream} channelUser={undefined} />
+    ));
+
+    fireEvent.click(view.getByTestId('native-pip-button'));
+    await waitFor(() => expect(view.getByTestId('native-pip-button')).toHaveAttribute('aria-pressed', 'true'));
+    view.unmount();
+
+    await waitFor(() => expect(exit).toHaveBeenCalledOnce());
+  });
+
+  it('closes a Picture-in-Picture request that resolves after unmount', async () => {
+    let finishRequest: (() => void) | undefined;
+    const { exit } = setPictureInPictureSupport((video, enter) => new Promise((resolve) => {
+      finishRequest = () => {
+        enter(video);
+        resolve(undefined);
+      };
+    }));
+    const view = render(() => (
+      <ParticipantTile nick="alice" peer={makePeer('alice')} stream={{} as MediaStream} channelUser={undefined} />
+    ));
+
+    fireEvent.click(view.getByTestId('native-pip-button'));
+    view.unmount();
+    expect(exit).not.toHaveBeenCalled();
+
+    finishRequest?.();
+    await waitFor(() => expect(exit).toHaveBeenCalledOnce());
+  });
+
+  it('closes a pending Picture-in-Picture request when its stream disappears', async () => {
+    let finishRequest: (() => void) | undefined;
+    const { exit } = setPictureInPictureSupport((video, enter) => new Promise((resolve) => {
+      finishRequest = () => {
+        enter(video);
+        resolve(undefined);
+      };
+    }));
+    const [stream, setStream] = createSignal<MediaStream | null>({} as MediaStream);
+    const view = render(() => (
+      <ParticipantTile nick="alice" peer={makePeer('alice')} stream={stream()} channelUser={undefined} />
+    ));
+
+    fireEvent.click(view.getByTestId('native-pip-button'));
+    setStream(null);
+    expect(view.queryByTestId('native-pip-button')).toBeNull();
+
+    finishRequest?.();
+    await waitFor(() => expect(exit).toHaveBeenCalledOnce());
   });
 
   it('shows the speaking ring class when peer is speaking', () => {
