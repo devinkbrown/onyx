@@ -2,6 +2,8 @@ import { chromium } from '@playwright/test';
 
 const origin = process.env.ONYX_ORIGIN ?? 'https://eshmaki.me';
 const nick = `nlprobe${Math.floor(Math.random() * 100_000)}`;
+const durationMs = Number.parseInt(process.env.ONYX_ROSTER_PROBE_MS ?? '70000', 10);
+const sampleMs = 2_000;
 const browser = await chromium.launch();
 const page = await (await browser.newContext({
   viewport: { width: 1440, height: 900 },
@@ -23,16 +25,34 @@ try {
   process.exitCode = 1;
   process.exit();
 }
-const members = await page.evaluate(() =>
-  [...document.querySelectorAll('.shell-member-row')]
-    .map((row) => row.querySelector('.shell-member-nick')?.textContent?.trim() ?? '')
-    .filter(Boolean)
-    .slice(0, 20)
-);
-console.log('member rows:', JSON.stringify(members, null, 1));
+const failures = [];
+let members = [];
+let previousSignature = '';
+for (let elapsedMs = 0; elapsedMs <= durationMs; elapsedMs += sampleMs) {
+  const sample = await page.evaluate(() => ({
+    shellMounted: document.querySelector('[data-testid="app-shell"]') !== null,
+    panelVisible: document.querySelector('.shell-members:not(.shell-members--hidden)') !== null,
+    members: [...document.querySelectorAll('.shell-member-row')]
+      .map((row) => row.querySelector('.shell-member-nick')?.textContent?.trim() ?? '')
+      .filter(Boolean)
+      .slice(0, 20),
+  }));
+  members = sample.members;
+  const signature = `${sample.shellMounted}:${sample.panelVisible}:${members.join(',')}`;
+  if (signature !== previousSignature) {
+    console.log(`roster at +${String(elapsedMs / 1000).padStart(2, '0')}s:`, signature);
+    previousSignature = signature;
+  }
+  if (!sample.shellMounted || !sample.panelVisible || members.length === 0) {
+    failures.push({ elapsedMs, ...sample });
+  }
+  if (elapsedMs < durationMs) await page.waitForTimeout(sampleMs);
+}
+console.log('final member rows:', JSON.stringify(members, null, 1));
 const memberPanelText = await page.evaluate(() => document.querySelector('.shell-members')?.textContent?.slice(0, 400));
 console.log('panel text:', memberPanelText);
 console.log('errors:', errs.length ? errs : 'none');
+console.log('transient roster failures:', failures.length ? failures : 'none');
 await browser.close();
 
-if (members.length === 0 || errs.length > 0) process.exitCode = 1;
+if (members.length === 0 || failures.length > 0 || errs.length > 0) process.exitCode = 1;
