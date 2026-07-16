@@ -25,6 +25,42 @@ const MAX_WEBSOCKET_BUFFERED_BYTES = 8 * 1024 * 1024;
 const MAX_INBOUND_TEXT_BYTES = 1024 * 1024;
 const MAX_BINARY_FRAME_BYTES = 8 * 1024 * 1024;
 const MAX_OUTBOUND_TEXT_BYTES = 1024 * 1024;
+export const MAX_CLIENT_CAP_ENTRIES = 256;
+export const MAX_CLIENT_CAP_NAME_LENGTH = 128;
+export const MAX_CLIENT_CAP_VALUE_LENGTH = 4 * 1024;
+export const MAX_CLIENT_SASL_MECHANISMS = 16;
+const MAX_CLIENT_SASL_MECHANISM_LENGTH = 64;
+export const MAX_CLIENT_LIST_ROWS = 2_048;
+export const MAX_CLIENT_LIST_CHANNEL_LENGTH = 512;
+export const MAX_CLIENT_LIST_TOPIC_LENGTH = 4 * 1024;
+
+function parseAdvertisedCap(token: string): { name: string; value: string } | null {
+  const eqIdx = token.indexOf('=');
+  const name = eqIdx === -1 ? token : token.slice(0, eqIdx);
+  const value = eqIdx === -1 ? '' : token.slice(eqIdx + 1);
+  if (
+    !name
+    || name.length > MAX_CLIENT_CAP_NAME_LENGTH
+    || value.length > MAX_CLIENT_CAP_VALUE_LENGTH
+    || /[\u0000-\u0020\u007f,]/u.test(name)
+    || /[\u0000-\u0020\u007f]/u.test(value)
+  ) return null;
+  return { name, value };
+}
+
+function parseSaslMechanisms(value: string): string[] {
+  const mechanisms: string[] = [];
+  for (const mechanism of value.split(',')) {
+    if (
+      mechanisms.length >= MAX_CLIENT_SASL_MECHANISMS
+      || !mechanism
+      || mechanism.length > MAX_CLIENT_SASL_MECHANISM_LENGTH
+      || !/^[A-Za-z0-9_-]+$/u.test(mechanism)
+    ) continue;
+    if (!mechanisms.includes(mechanism)) mechanisms.push(mechanism);
+  }
+  return mechanisms;
+}
 
 function hasWebSocketSendCapacity(ws: WebSocket, payloadBytes: number): boolean {
   const bufferedBytes = ws.bufferedAmount;
@@ -158,6 +194,7 @@ export class IRCClient {
   /** In-flight LIST collection (see list()). */
   private _listPending: {
     rows: ChannelListRow[];
+    seen: Set<string>;
     resolve: (rows: ChannelListRow[]) => void;
     promise: Promise<ChannelListRow[]>;
     timer: ReturnType<typeof setTimeout>;
@@ -470,9 +507,12 @@ export class IRCClient {
 
     let resolve!: (rows: ChannelListRow[]) => void;
     const promise = new Promise<ChannelListRow[]>((r) => { resolve = r; });
-    const timer = setTimeout(() => this._finishList(), timeoutMs);
-    this._listPending = { rows: [], resolve, promise, timer };
-    this.sendRaw('LIST');
+    const boundedTimeout = Number.isSafeInteger(timeoutMs)
+      ? Math.max(100, Math.min(60_000, timeoutMs))
+      : 15_000;
+    const timer = setTimeout(() => this._finishList(), boundedTimeout);
+    this._listPending = { rows: [], seen: new Set(), resolve, promise, timer };
+    if (!this.sendRaw('LIST')) this._finishList();
     return promise;
   }
 
@@ -609,6 +649,17 @@ export class IRCClient {
     try { this.ws?.close(1009, 'WebSocket frame too large'); } catch { /* already closing */ }
   }
 
+  private _recordAvailableCap(name: string, value: string): boolean {
+    if (this._capAvailable.includes(name)) {
+      this.capValues.set(name, value);
+      return true;
+    }
+    if (this._capAvailable.length >= MAX_CLIENT_CAP_ENTRIES) return false;
+    this._capAvailable.push(name);
+    this.capValues.set(name, value);
+    return true;
+  }
+
   private _onClose(ev: CloseEvent) {
     this._attribution.stop(); // no residence refresh on a dead socket
     this._clearPingTimers();
@@ -641,13 +692,10 @@ export class IRCClient {
             const capsStr = isMultiline ? msg.params[3] : msg.params[2];
             // Accumulate caps; track sasl mechanisms separately
             for (const token of (capsStr ?? '').split(' ').filter(Boolean)) {
-              const eqIdx = token.indexOf('=');
-              const capName = eqIdx === -1 ? token : token.slice(0, eqIdx);
-              const capVal = eqIdx === -1 ? '' : token.slice(eqIdx + 1);
-              this._capAvailable.push(capName);
-              this.capValues.set(capName, capVal);
-              if (capName === 'sasl' && capVal) {
-                this._saslMechs = capVal.split(',');
+              const cap = parseAdvertisedCap(token);
+              if (!cap || !this._recordAvailableCap(cap.name, cap.value)) continue;
+              if (cap.name === 'sasl' && cap.value) {
+                this._saslMechs = parseSaslMechanisms(cap.value);
               }
             }
 
@@ -666,9 +714,14 @@ export class IRCClient {
 
           case 'ACK': {
             const caps = (msg.params[2] ?? '').split(' ').filter(Boolean);
-            for (const c of caps) {
-              this.negotiatedCaps.add(c);
-              this._capReqPendingNames.delete(c);
+            for (const token of caps) {
+              const cap = parseAdvertisedCap(token);
+              if (!cap) continue;
+              if (
+                this.negotiatedCaps.has(cap.name)
+                || this.negotiatedCaps.size < MAX_CLIENT_CAP_ENTRIES
+              ) this.negotiatedCaps.add(cap.name);
+              this._capReqPendingNames.delete(cap.name);
             }
             if (caps.length > 0) this.onCapChange?.();
             if (this._capReqPending > 0) this._capReqPending--;
@@ -712,14 +765,13 @@ export class IRCClient {
             const newAvailable: string[] = [];
             const newSaslMechs: string[] = [];
             for (const token of newCapsStr.split(' ').filter(Boolean)) {
-              const eqIdx = token.indexOf('=');
-              const capName = eqIdx === -1 ? token : token.slice(0, eqIdx);
-              const capVal = eqIdx === -1 ? '' : token.slice(eqIdx + 1);
-              newAvailable.push(capName);
-              this.capValues.set(capName, capVal);
-              if (capName === 'sasl' && capVal) newSaslMechs.push(...capVal.split(','));
+              const cap = parseAdvertisedCap(token);
+              if (!cap || !this._recordAvailableCap(cap.name, cap.value)) continue;
+              if (!newAvailable.includes(cap.name)) newAvailable.push(cap.name);
+              if (cap.name === 'sasl' && cap.value) {
+                newSaslMechs.push(...parseSaslMechanisms(cap.value));
+              }
             }
-            this._capAvailable.push(...newAvailable);
             if (newAvailable.length > 0) this.onCapChange?.();
             if (newSaslMechs.length) this._saslMechs = newSaslMechs;
             const wantNew = this._wantedCaps(newAvailable);
@@ -732,6 +784,7 @@ export class IRCClient {
             for (const c of delCaps) {
               this.negotiatedCaps.delete(c);
               this.capValues.delete(c);
+              this._capAvailable = this._capAvailable.filter(name => name !== c);
             }
             if (delCaps.length > 0) this.onCapChange?.();
             break;
@@ -827,17 +880,36 @@ export class IRCClient {
 
       // ── LIST collection (see list()) ─────────────────────────────────────
       case '321': // RPL_LISTSTART — reset any partial rows
-        if (this._listPending) this._listPending.rows = [];
+        if (this._listPending) {
+          this._listPending.rows = [];
+          this._listPending.seen.clear();
+        }
         break;
 
       case '322': { // RPL_LIST: :server 322 me #channel <users> :<topic>
         const pending = this._listPending;
         if (pending) {
           const channel = msg.params[1] ?? '';
-          const users = Number.parseInt(msg.params[2] ?? '0', 10);
-          const topic = msg.params[3] ?? '';
-          if (channel) {
-            pending.rows.push({ channel, users: Number.isFinite(users) ? users : 0, topic });
+          const rawUsers = msg.params[2] ?? '';
+          const users = /^\d+$/u.test(rawUsers) ? Number(rawUsers) : 0;
+          let topic = (msg.params[3] ?? '')
+            .replace(/[\u0000-\u001f\u007f]/gu, '')
+            .slice(0, MAX_CLIENT_LIST_TOPIC_LENGTH);
+          const finalCodeUnit = topic.charCodeAt(topic.length - 1);
+          if (finalCodeUnit >= 0xd800 && finalCodeUnit <= 0xdbff) topic = topic.slice(0, -1);
+          const key = channel.toLowerCase();
+          if (
+            pending.rows.length < MAX_CLIENT_LIST_ROWS
+            && channel.length <= MAX_CLIENT_LIST_CHANNEL_LENGTH
+            && /^[#&][^\u0000-\u0020\u007f,]+$/u.test(channel)
+            && !pending.seen.has(key)
+          ) {
+            pending.seen.add(key);
+            pending.rows.push({
+              channel,
+              users: Number.isSafeInteger(users) && users >= 0 ? users : 0,
+              topic,
+            });
           }
         }
         break;
