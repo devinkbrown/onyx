@@ -91,6 +91,7 @@ import {
 } from '@/lib/composer/drafts';
 import { loadDMPins, sanitizeDMPins, saveDMPins } from '@/lib/dmPins';
 import { loadIgnoredUsers, parseIgnoredUsers, saveIgnoredUsers } from '@/lib/ignoredUsers';
+import { loadMutedDMs, parseMutedDMs, saveMutedDMs } from '@/lib/mutedDMs';
 import { markViewedRead, normalizeTargetKey, totalMentions } from '@/lib/notifications/readState';
 import {
   buildCreateOptions,
@@ -2721,6 +2722,7 @@ function _resetAccountBoundState(
     highlightWords: [],
     ignoredUsers: new Set(),
     showIgnoreList: false,
+    mutedDMs: new Set(),
     serviceNotices: s.serviceNotices.filter(notice => notice.source !== 'Account'),
   }));
 }
@@ -3461,6 +3463,13 @@ function _loadOwnedIgnoredUsers(
   return owner ? loadIgnoredUsers(owner) : new Set();
 }
 
+function _loadOwnedMutedDMs(
+  state: Pick<OnyxState, 'server' | 'ourNick'>,
+): Set<string> {
+  const owner = selectDeviceMemoryOwner(state);
+  return owner ? loadMutedDMs(owner) : new Set();
+}
+
 export interface DeviceMemoryContext {
   readonly owner: DeviceMemoryOwner;
   readonly client: IRCClient | null;
@@ -4043,6 +4052,7 @@ export const store = createStore<OnyxState>()(
               channelNotify: _loadOwnedChannelNotify({ server, ourNick: newNick }),
               highlightWords: _loadOwnedHighlightWords({ server, ourNick: newNick }),
               ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: newNick }),
+              mutedDMs: _loadOwnedMutedDMs({ server, ourNick: newNick }),
             };
           });
         },
@@ -4120,6 +4130,7 @@ export const store = createStore<OnyxState>()(
               channelNotify: _loadOwnedChannelNotify({ server: srv, ourNick: get().ourNick }),
               highlightWords: _loadOwnedHighlightWords({ server: srv, ourNick: get().ourNick }),
               ignoredUsers: _loadOwnedIgnoredUsers({ server: srv, ourNick: get().ourNick }),
+              mutedDMs: _loadOwnedMutedDMs({ server: srv, ourNick: get().ourNick }),
               isIRCX: client.isupport.IRCX,
               networkName: net,
               serverCapabilities: caps,
@@ -7219,6 +7230,7 @@ export const store = createStore<OnyxState>()(
               channelNotify: _loadOwnedChannelNotify({ server, ourNick: s.ourNick }),
               highlightWords: _loadOwnedHighlightWords({ server, ourNick: s.ourNick }),
               ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: s.ourNick }),
+              mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
             };
           });
           break;
@@ -9599,6 +9611,7 @@ export const store = createStore<OnyxState>()(
                 channelNotify: _loadOwnedChannelNotify({ server, ourNick: s.ourNick }),
                 highlightWords: _loadOwnedHighlightWords({ server, ourNick: s.ourNick }),
                 ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: s.ourNick }),
+                mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
                 passkeyBusy: false,
                 passkeyError: null,
               };
@@ -9631,6 +9644,7 @@ export const store = createStore<OnyxState>()(
               channelNotify: _loadOwnedChannelNotify({ server, ourNick: s.ourNick }),
               highlightWords: _loadOwnedHighlightWords({ server, ourNick: s.ourNick }),
               ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: s.ourNick }),
+              mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
             };
           });
           break;
@@ -10680,20 +10694,24 @@ export const store = createStore<OnyxState>()(
     closeDMPins: () => set({ showDMPins: false, dmPinsNick: null }),
 
     // ── DM mute ───────────────────────────────────────────────────────────────
-    mutedDMs: _loadMutedDMs(),
+    // Muted contacts affect private-message delivery and belong to one owner.
+    mutedDMs: new Set(),
     muteDM: (nick) => {
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
       set(s => {
-        const muted = new Set(s.mutedDMs);
-        muted.add(nick.toLowerCase());
-        _saveMutedDMs(muted);
+        const muted = parseMutedDMs([...s.mutedDMs, nick]);
+        saveMutedDMs(muted, owner);
         return { mutedDMs: muted };
       });
     },
     unmuteDM: (nick) => {
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
       set(s => {
         const muted = new Set(s.mutedDMs);
-        muted.delete(nick.toLowerCase());
-        _saveMutedDMs(muted);
+        muted.delete(nick.trim().toLowerCase());
+        saveMutedDMs(muted, owner);
         return { mutedDMs: muted };
       });
     },
@@ -12846,18 +12864,6 @@ function _loadEmojiUsage(): Record<string, number> {
     const raw = localStorage.getItem('onyx:emoji-usage');
     return parseCounterRecord(raw);
   } catch { return {}; }
-}
-
-function _loadMutedDMs(): Set<string> {
-  if (typeof window === 'undefined') return new Set();
-  try {
-    return new Set(parseStringArray(localStorage.getItem('onyx:muted-dms')));
-  } catch { return new Set(); }
-}
-
-function _saveMutedDMs(muted: Set<string>): void {
-  if (typeof window === 'undefined') return;
-  try { localStorage.setItem('onyx:muted-dms', JSON.stringify([...muted])); } catch {}
 }
 
 function _loadFavoriteEmojis(): string[] {
