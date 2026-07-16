@@ -4411,7 +4411,9 @@
     grid-template-columns: 1fr;
   }
   .shell {
-    --mnav-h: 58px;
+    /* Keep the rail compact at ordinary sizes, but let enlarged text grow its
+       content box instead of clipping icons and labels into a fixed 58px row. */
+    --mnav-h: max(58px, 2.25rem);
     grid-template-columns: 1fr;
     grid-template-rows: 1fr;
     /* Sit above the fixed bottom tab bar; clear the notch up top. */
@@ -4711,16 +4713,26 @@
 
   /* Bottom tab bar — fixed, safe-area aware, real touch targets */
   .shell-mobile-nav {
+    --mnav-h: max(58px, 2.25rem);
+
     display: flex;
     align-items: stretch;
-    justify-content: space-around;
+    justify-content: flex-start;
     position: fixed;
     left: 0;
     right: 0;
     bottom: var(--shell-virtual-keyboard-inset, 0px);
     z-index: 95;
-    height: calc(var(--mnav-h, 54px) + env(safe-area-inset-bottom, 0px));
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    height: calc(var(--mnav-h) + env(safe-area-inset-bottom, 0px));
+    padding:
+      0
+      env(safe-area-inset-right, 0px)
+      env(safe-area-inset-bottom, 0px)
+      env(safe-area-inset-left, 0px);
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
     background:
       linear-gradient(180deg, color-mix(in oklab, var(--stone-2) 42%, transparent), transparent 42%),
       color-mix(in oklab, var(--ink) 94%, var(--stone));
@@ -4733,7 +4745,9 @@
   }
 
   .shell-mobile-nav-btn {
-    flex: 1;
+    /* Equal fifths at ordinary text sizes; intrinsic min-content width wins at
+       high zoom, turning the containing nav into a single-axis rail. */
+    flex: 1 0 20%;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -4933,8 +4947,9 @@
 
 /* Phone-specific tightening */
 @media (max-width: 480px) {
-  .shell {
-    --mnav-h: 56px;
+  .shell,
+  .shell-mobile-nav {
+    --mnav-h: max(56px, 2.25rem);
   }
   .shell-ribbon { gap: 6px; padding: 0 8px; }
   .shell-ribbon-channel { font-size: 0.98rem; max-width: min(48vw, 13ch); }
