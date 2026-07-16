@@ -2150,6 +2150,8 @@ const MAX_NAMES_TOKEN_LENGTH = 512;
 export const MAX_SERVER_AUX_TEXT_LENGTH = 4 * 1024;
 export const MAX_MOTD_TEXT_LENGTH = 64 * 1024;
 export const MAX_SERVER_RULE_LINES = 256;
+export const MAX_NOTIFICATION_ENTRIES = 50;
+export const MAX_TOAST_ENTRIES = 20;
 const MAX_SYSTEM_EVENT_TEXT_LENGTH = MAX_SERVER_AUX_TEXT_LENGTH;
 export const MAX_LIVE_MEDIA_CHANNELS = 32;
 export const MAX_LIVE_MEDIA_PARTICIPANTS = 256;
@@ -6144,14 +6146,53 @@ export const store = createStore<OnyxState>()(
 
     // ── notifications ─────────────────────────────────────────────────────
     addNotification(n) {
-      const note: Notification = { ...n, id: uid(), at: new Date() };
-      set(s => ({ notifications: [...s.notifications.slice(-49), note] }));
+      const text = _boundedSystemEventText(n.text);
+      if (!text) return;
+      const from = n.from ? _normalizeMetadataTarget(n.from) : null;
+      const channel = n.channel ? _normalizePropertyTarget(n.channel) : null;
+      const boundedTopic = typeof n.topic === 'string'
+        ? _boundedSystemEventText(n.topic)
+        : '';
+      // Preserve a bounded non-canonical label for the existing activation
+      // boundary to fail safely to the room. Dropping commas here changed that
+      // observable contract; only control-bearing values are discarded early.
+      const topic = boundedTopic && !/[\u0000-\u001f\u007f]/u.test(boundedTopic)
+        ? boundedTopic
+        : null;
+      const note: Notification = {
+        id: uid(),
+        type: n.type,
+        text,
+        at: new Date(),
+        ...(from ? { from } : {}),
+        ...(channel ? { channel } : {}),
+        ...(topic ? { topic } : n.topic === null ? { topic: null } : {}),
+      };
+      set(s => {
+        const notifications = [...s.notifications, note].slice(-MAX_NOTIFICATION_ENTRIES);
+        const retainedIds = new Set(notifications.map((item) => item.id));
+        const readNotificationIds = new Set(
+          [...s.readNotificationIds].filter((id) => retainedIds.has(id)),
+        );
+        return { notifications, readNotificationIds };
+      });
     },
     dismissNotification(id) {
-      set(s => ({ notifications: s.notifications.filter(n => n.id !== id) }));
+      set(s => {
+        const notifications = s.notifications.filter(n => n.id !== id);
+        if (notifications.length === s.notifications.length) return {};
+        const readNotificationIds = new Set(s.readNotificationIds);
+        readNotificationIds.delete(id);
+        return { notifications, readNotificationIds };
+      });
     },
     markNotificationRead(id) {
-      set(s => ({ readNotificationIds: new Set([...s.readNotificationIds, id]) }));
+      set(s => {
+        if (s.readNotificationIds.has(id) || !s.notifications.some((item) => item.id === id)) {
+          return {};
+        }
+        return { readNotificationIds: new Set([...s.readNotificationIds, id]) };
+      });
     },
     markAllNotificationsRead() {
       set(s => ({ readNotificationIds: new Set(s.notifications.map(n => n.id)) }));
@@ -6165,8 +6206,30 @@ export const store = createStore<OnyxState>()(
 
     // ── toast system ──────────────────────────────────────────────────────
     addToast(t) {
-      const toast: Toast = { ...t, id: uid() };
-      set(s => ({ toasts: [...s.toasts.slice(-19), toast] }));
+      const title = _boundedSystemEventText(t.title);
+      if (!title) return;
+      const description = t.description === undefined
+        ? undefined
+        : _boundedSystemEventText(t.description);
+      const duration = t.duration !== undefined
+        && Number.isFinite(t.duration)
+        && t.duration >= 0
+        && t.duration <= 60_000
+        ? t.duration
+        : undefined;
+      const groupKey = t.groupKey === undefined
+        ? undefined
+        : _boundedSystemEventText(t.groupKey);
+      const toast: Toast = {
+        id: uid(),
+        variant: t.variant,
+        title,
+        ...(description ? { description } : {}),
+        ...(duration !== undefined ? { duration } : {}),
+        ...(t.undoAction ? { undoAction: t.undoAction } : {}),
+        ...(groupKey ? { groupKey } : {}),
+      };
+      set(s => ({ toasts: [...s.toasts, toast].slice(-MAX_TOAST_ENTRIES) }));
     },
     dismissToast(id) {
       set(s => ({ toasts: s.toasts.filter(t => t.id !== id) }));
