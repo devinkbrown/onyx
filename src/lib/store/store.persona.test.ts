@@ -5,7 +5,18 @@
  * store folds them into structured totp/personas state.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { _resetAccountReplyStateForTests, store, type Server } from './store';
+import {
+  MAX_PERSONA_ENTRIES,
+  MAX_PERSONA_HOST_LENGTH,
+  MAX_PERSONA_LABEL_LENGTH,
+  MAX_PERSONA_NAME_LENGTH,
+  MAX_PERSONA_SOURCE_LENGTH,
+  MAX_TOTP_SECRET_LENGTH,
+  MAX_TOTP_URI_LENGTH,
+  _resetAccountReplyStateForTests,
+  store,
+  type Server,
+} from './store';
 import { parseIRCMessage } from '@/lib/irc/parser';
 
 const initialState = store.getInitialState();
@@ -125,6 +136,22 @@ describe('TOTP notices', () => {
     notice('TOTP: two-factor authentication is active');
     expect(store.getState().totp.status).toBe('active');
   });
+
+  it('rejects malformed confirmation codes and oversized enrollment secrets', () => {
+    const { client, sent } = mockClient();
+    store.setState({ client });
+
+    for (const code of ['', '12345', '1234567', '12345x', '１２３４５６']) {
+      store.getState().totpConfirm(code);
+    }
+    expect(sent).toEqual([]);
+
+    store.getState().totpEnroll();
+    notice(`TOTP: secret ${'A'.repeat(MAX_TOTP_SECRET_LENGTH + 1)}`);
+    notice(`TOTP: otpauth://${'a'.repeat(MAX_TOTP_URI_LENGTH)}`);
+    expect(store.getState().totp.secret).toBeNull();
+    expect(store.getState().totp.otpauth).toBeNull();
+  });
 });
 
 describe('VHOST wardrobe notices', () => {
@@ -178,5 +205,68 @@ describe('VHOST wardrobe notices', () => {
     expect(store.getState().personas).toEqual([
       { name: 'bob-night', host: 'bob.example', source: 'granted' },
     ]);
+  });
+
+  it('bounds and deduplicates persona and offer reply streams', () => {
+    const { client } = mockClient();
+    store.setState({ client });
+    store.getState().vhostList();
+
+    for (let index = 0; index < MAX_PERSONA_ENTRIES + 8; index += 1) {
+      const key = index.toString().padStart(4, '0');
+      notice(`VHOST persona p${key} = host${key}.example (source ${key})`);
+      notice(`VHOST offer offer${key}.example/* :label ${key}`);
+    }
+    notice('VHOST persona P0000 = replacement.example (updated)');
+    notice('VHOST offer OFFER0000.example/* :replacement');
+
+    const state = store.getState();
+    expect(state.personas).toHaveLength(MAX_PERSONA_ENTRIES);
+    expect(state.personaOffers).toHaveLength(MAX_PERSONA_ENTRIES);
+    expect(state.personas.at(-1)).toEqual({
+      name: 'P0000',
+      host: 'replacement.example',
+      source: 'updated',
+    });
+    expect(state.personaOffers.at(-1)).toEqual({
+      template: 'OFFER0000.example/*',
+      label: 'replacement',
+    });
+  });
+
+  it('rejects oversized persona tokens and bounds display-only labels', () => {
+    const { client } = mockClient();
+    store.setState({ client });
+    store.getState().vhostList();
+
+    notice(`VHOST persona ${'n'.repeat(MAX_PERSONA_NAME_LENGTH + 1)} = safe.example (grant)`);
+    notice(`VHOST persona safe = ${'h'.repeat(MAX_PERSONA_HOST_LENGTH + 1)} (grant)`);
+    notice(`VHOST persona bounded = bounded.example (${'s'.repeat(MAX_PERSONA_SOURCE_LENGTH + 20)})`);
+    notice(`VHOST offer bounded.example/* :${'l'.repeat(MAX_PERSONA_LABEL_LENGTH + 20)}`);
+
+    expect(store.getState().personas).toEqual([{
+      name: 'bounded',
+      host: 'bounded.example',
+      source: 's'.repeat(MAX_PERSONA_SOURCE_LENGTH),
+    }]);
+    expect(store.getState().personaOffers).toEqual([{
+      template: 'bounded.example/*',
+      label: 'l'.repeat(MAX_PERSONA_LABEL_LENGTH),
+    }]);
+  });
+
+  it('validates persona action targets before writing to the wire', () => {
+    const { client, sent } = mockClient();
+    store.setState({ client });
+
+    store.getState().vhostUse('bad name');
+    store.getState().vhostUse('n'.repeat(MAX_PERSONA_NAME_LENGTH + 1));
+    store.getState().vhostClaim('bad host');
+    store.getState().vhostClaim('h'.repeat(MAX_PERSONA_HOST_LENGTH + 1));
+    expect(sent).toEqual([]);
+
+    store.getState().vhostUse('nightshift');
+    store.getState().vhostClaim('night.example/alice');
+    expect(sent).toEqual(['VHOST USE nightshift', 'VHOST CLAIM night.example/alice']);
   });
 });

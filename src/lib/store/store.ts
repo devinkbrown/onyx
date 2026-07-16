@@ -2160,6 +2160,13 @@ export const MAX_PASSKEY_CREDENTIALS = 64;
 /** WebAuthn credential ids are at most 1023 bytes (1364 base64url characters). */
 export const MAX_PASSKEY_CREDENTIAL_ID_LENGTH = 1_364;
 export const MAX_PASSKEY_LABEL_LENGTH = 256;
+export const MAX_PERSONA_ENTRIES = 64;
+export const MAX_PERSONA_NAME_LENGTH = 64;
+export const MAX_PERSONA_HOST_LENGTH = 256;
+export const MAX_PERSONA_SOURCE_LENGTH = 128;
+export const MAX_PERSONA_LABEL_LENGTH = 256;
+export const MAX_TOTP_SECRET_LENGTH = 256;
+export const MAX_TOTP_URI_LENGTH = 2_048;
 const MAX_SYSTEM_EVENT_TEXT_LENGTH = MAX_SERVER_AUX_TEXT_LENGTH;
 export const MAX_LIVE_MEDIA_CHANNELS = 32;
 export const MAX_LIVE_MEDIA_PARTICIPANTS = 256;
@@ -2756,6 +2763,18 @@ function boundedUnsignedInteger(value: string | undefined, max: number): number 
   if (!value || !/^(?:0|[1-9]\d*)$/u.test(value)) return null;
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed <= max ? parsed : null;
+}
+
+function normalizedAccountToken(value: string, maxLength: number): string | null {
+  const token = value.trim();
+  return _validInboundWireToken(token, maxLength) && !token.startsWith(':') ? token : null;
+}
+
+function boundedAccountLabel(value: string, maxLength: number): string {
+  let label = value.replace(/[\u0000-\u001f\u007f]/gu, '').slice(0, maxLength);
+  const finalCodeUnit = label.charCodeAt(label.length - 1);
+  if (finalCodeUnit >= 0xd800 && finalCodeUnit <= 0xdbff) label = label.slice(0, -1);
+  return label;
 }
 
 /** In-flight `WEBAUTHN LIST` accumulator; committed to state on the LIST end. */
@@ -5503,7 +5522,7 @@ export const store = createStore<OnyxState>()(
     totpConfirm(code) {
       const trimmed = code.trim();
       const { client } = get();
-      if (!client || !trimmed) return;
+      if (!client || !/^\d{6}$/u.test(trimmed)) return;
       _totpReplyContext = _captureAccountReplyContext(get);
       set(st => ({ totp: { ...st.totp, busy: true, error: null } }));
       client.sendRaw('TOTP', 'CONFIRM', trimmed);
@@ -5530,14 +5549,14 @@ export const store = createStore<OnyxState>()(
       client.sendRaw('VHOST', 'LIST');
     },
     vhostUse(name) {
-      const target = name.trim();
+      const target = normalizedAccountToken(name, MAX_PERSONA_NAME_LENGTH);
       const { client } = get();
       if (!client || !target) return;
       _vhostReplyContext = _captureAccountReplyContext(get);
       client.sendRaw('VHOST', 'USE', target);
     },
     vhostClaim(host) {
-      const target = host.trim();
+      const target = normalizedAccountToken(host, MAX_PERSONA_HOST_LENGTH);
       const { client } = get();
       if (!client || !target) return;
       _vhostReplyContext = _captureAccountReplyContext(get);
@@ -9126,10 +9145,13 @@ export const store = createStore<OnyxState>()(
               if (!_replyAccountIsCurrent(_totpReplyContext, get)) break;
               const body = text.slice(5).trim();
               const secretMatch = body.match(/^secret ([A-Z2-7]+)$/);
-              const isOtpauth = body.startsWith('otpauth://');
+              const secret = secretMatch?.[1];
+              const isOtpauth = body.startsWith('otpauth://')
+                && body.length <= MAX_TOTP_URI_LENGTH
+                && !/[\u0000-\u0020\u007f]/u.test(body);
               set(st => {
                 const totp = { ...st.totp, busy: false };
-                if (secretMatch) totp.secret = secretMatch[1]!;
+                if (secret && secret.length <= MAX_TOTP_SECRET_LENGTH) totp.secret = secret;
                 else if (isOtpauth) totp.otpauth = body;
                 else if (/now ACTIVE/i.test(body)) { totp.status = 'active'; totp.secret = null; totp.otpauth = null; }
                 else if (/is active$/i.test(body)) totp.status = 'active';
@@ -9148,19 +9170,26 @@ export const store = createStore<OnyxState>()(
               const persona = text.match(/^VHOST persona (\S+) = (\S+) \(([^)]*)\)$/);
               const offer = text.match(/^VHOST offer (\S+) :?(.*)$/);
               if (persona) {
-                set(st => ({
-                  personas: [
-                    ...st.personas.filter(pn => pn.name !== persona[1]),
-                    { name: persona[1]!, host: persona[2]!, source: persona[3]! },
-                  ],
-                }));
+                const name = normalizedAccountToken(persona[1]!, MAX_PERSONA_NAME_LENGTH);
+                const host = normalizedAccountToken(persona[2]!, MAX_PERSONA_HOST_LENGTH);
+                if (!name || !host) break;
+                const source = boundedAccountLabel(persona[3]!, MAX_PERSONA_SOURCE_LENGTH);
+                set(st => {
+                  const key = name.toLowerCase();
+                  const personas = st.personas.filter(pn => pn.name.toLowerCase() !== key);
+                  if (personas.length >= MAX_PERSONA_ENTRIES) return {};
+                  return { personas: [...personas, { name, host, source }] };
+                });
               } else if (offer) {
-                set(st => ({
-                  personaOffers: [
-                    ...st.personaOffers.filter(o => o.template !== offer[1]),
-                    { template: offer[1]!, label: offer[2]! },
-                  ],
-                }));
+                const template = normalizedAccountToken(offer[1]!, MAX_PERSONA_HOST_LENGTH);
+                if (!template) break;
+                const label = boundedAccountLabel(offer[2]!, MAX_PERSONA_LABEL_LENGTH);
+                set(st => {
+                  const key = template.toLowerCase();
+                  const personaOffers = st.personaOffers.filter(o => o.template.toLowerCase() !== key);
+                  if (personaOffers.length >= MAX_PERSONA_ENTRIES) return {};
+                  return { personaOffers: [...personaOffers, { template, label }] };
+                });
               } else {
                 get().addServiceNotice('Account', text);
                 // A wear/claim confirmation changes the wardrobe — refresh it.
