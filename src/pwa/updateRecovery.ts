@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-export type PwaUpdateRecoveryState = 'unsupported' | 'missing' | 'checked' | 'activating' | 'reloading';
+export type PwaUpdateRecoveryState =
+  | 'unsupported'
+  | 'missing'
+  | 'checked'
+  | 'activating'
+  | 'reloading'
+  | 'failed';
 
 export type PwaUpdateRecoveryResult = {
   state: PwaUpdateRecoveryState;
@@ -53,7 +59,7 @@ export async function refreshInstalledAppShell(
     };
   } catch {
     return {
-      state: 'checked',
+      state: 'failed',
       detail: 'Update recovery could not complete. Use the browser reload control once.',
     };
   }

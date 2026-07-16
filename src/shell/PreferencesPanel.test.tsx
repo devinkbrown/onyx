@@ -80,6 +80,7 @@ describe('PreferencesPanel', () => {
     setVaultMode('hybrid');
     setRetentionPolicy(null);
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     localStorage.clear();
     clearFollowed();
     store.setState({ showAppearance: false, composerDrafts: {} });
@@ -177,6 +178,28 @@ describe('PreferencesPanel', () => {
     expect(screen.getByRole('link', { name: 'Public ledger' })).toHaveAttribute(
       'href',
       '/accessibility/',
+    );
+  });
+
+  it('announces failed app-shell recovery as an alert', async () => {
+    vi.stubGlobal('navigator', {
+      serviceWorker: {
+        controller: {},
+        getRegistration: vi.fn(async () => ({
+          waiting: null,
+          update: vi.fn(async () => {
+            throw new Error('offline');
+          }),
+        })),
+      },
+    });
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh app shell' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Update recovery could not complete. Use the browser reload control once.',
     );
   });
 

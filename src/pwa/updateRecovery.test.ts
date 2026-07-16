@@ -53,4 +53,23 @@ describe('PWA update recovery', () => {
     });
     expect(reload).toHaveBeenCalledOnce();
   });
+
+  it('reports a failed recovery instead of presenting an update error as checked', async () => {
+    vi.stubGlobal('navigator', {
+      serviceWorker: {
+        controller: {},
+        getRegistration: vi.fn(async () => ({
+          waiting: null,
+          update: vi.fn(async () => {
+            throw new Error('offline');
+          }),
+        })),
+      },
+    });
+
+    await expect(refreshInstalledAppShell(vi.fn())).resolves.toEqual({
+      state: 'failed',
+      detail: 'Update recovery could not complete. Use the browser reload control once.',
+    });
+  });
 });

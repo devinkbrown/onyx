@@ -101,7 +101,10 @@ import {
   translationTarget,
 } from '@/lib/intelligence/translateMessage';
 import { pwaReadiness } from '@/pwa/readiness';
-import { refreshInstalledAppShell } from '@/pwa/updateRecovery';
+import {
+  refreshInstalledAppShell,
+  type PwaUpdateRecoveryResult,
+} from '@/pwa/updateRecovery';
 import { CalmModeControl } from './CalmModeControl';
 import { ProvenanceBadge } from './ProvenanceBadge';
 import {
@@ -1713,14 +1716,14 @@ function LocalLanguageTools(): JSX.Element {
 
 function PwaReadinessPanel(): JSX.Element {
   const items = createMemo(() => pwaReadiness());
-  const [updateStatus, setUpdateStatus] = createSignal<string | null>(null);
+  const [updateResult, setUpdateResult] = createSignal<PwaUpdateRecoveryResult | null>(null);
   const [updateBusy, setUpdateBusy] = createSignal(false);
 
   async function recoverUpdate(): Promise<void> {
     setUpdateBusy(true);
     try {
       const result = await refreshInstalledAppShell();
-      setUpdateStatus(result.detail);
+      setUpdateResult(result);
     } finally {
       setUpdateBusy(false);
     }
@@ -1741,8 +1744,12 @@ function PwaReadinessPanel(): JSX.Element {
           Refresh app shell
         </button>
       </div>
-      <Show when={updateStatus()}>
-        <p class="pref-status" role="status">{updateStatus()}</p>
+      <Show when={updateResult()}>
+        {(result) => (
+          <p class="pref-status" role={result().state === 'failed' ? 'alert' : 'status'}>
+            {result().detail}
+          </p>
+        )}
       </Show>
       <div class="pref-pwa-readiness__rows" role="list" aria-label="Installed app readiness checks">
         <For each={items()}>

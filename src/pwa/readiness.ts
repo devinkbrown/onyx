@@ -17,12 +17,27 @@ function standaloneMode(): boolean {
 }
 
 function storageReady(): boolean {
+  const key = 'onyx:pwa-readiness-test';
+  let previous: string | null = null;
+  let previousRead = false;
   try {
-    const key = 'onyx:pwa-readiness-test';
+    previous = localStorage.getItem(key);
+    previousRead = true;
     localStorage.setItem(key, '1');
     localStorage.removeItem(key);
+    if (previous !== null) localStorage.setItem(key, previous);
     return typeof indexedDB !== 'undefined';
   } catch {
+    // A readiness probe must never consume an existing value, even when the
+    // browser fails partway through the write/remove sequence.
+    if (previousRead) {
+      try {
+        if (previous === null) localStorage.removeItem(key);
+        else localStorage.setItem(key, previous);
+      } catch {
+        // Storage is unavailable; readiness remains false.
+      }
+    }
     return false;
   }
 }

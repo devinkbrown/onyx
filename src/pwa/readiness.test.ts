@@ -48,6 +48,7 @@ describe('PWA readiness', () => {
     vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })));
     const setItem = vi.fn();
     vi.stubGlobal('localStorage', {
+      getItem: vi.fn(() => null),
       setItem,
       removeItem: vi.fn(),
       clear: vi.fn(),
@@ -56,5 +57,41 @@ describe('PWA readiness', () => {
     pwaReadiness();
 
     expect(setItem).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores an existing probe-key value after checking storage', () => {
+    localStorage.setItem('onyx:pwa-readiness-test', 'keep-me');
+    vi.stubGlobal('navigator', {});
+    vi.stubGlobal('Notification', { permission: 'default' });
+    vi.stubGlobal('indexedDB', {});
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })));
+
+    pwaReadiness();
+
+    expect(localStorage.getItem('onyx:pwa-readiness-test')).toBe('keep-me');
+  });
+
+  it('best-effort restores an existing value when the probe fails midway', () => {
+    const values = new Map([['onyx:pwa-readiness-test', 'keep-me']]);
+    let removeAttempts = 0;
+    vi.stubGlobal('navigator', {});
+    vi.stubGlobal('Notification', { permission: 'default' });
+    vi.stubGlobal('indexedDB', {});
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })));
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn((key: string) => values.get(key) ?? null),
+      setItem: vi.fn((key: string, value: string) => values.set(key, value)),
+      removeItem: vi.fn((key: string) => {
+        removeAttempts += 1;
+        if (removeAttempts === 1) throw new Error('blocked remove');
+        values.delete(key);
+      }),
+      clear: vi.fn(),
+    });
+
+    const readiness = pwaReadiness();
+
+    expect(readiness).toContainEqual(expect.objectContaining({ key: 'storage', state: 'unavailable' }));
+    expect(values.get('onyx:pwa-readiness-test')).toBe('keep-me');
   });
 });
