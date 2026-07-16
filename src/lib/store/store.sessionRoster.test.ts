@@ -132,7 +132,12 @@ describe('remembered session roster restoration', () => {
     FakeWebSocket.latest?.onopen?.(new Event('open'));
     receive(':example.test 001 kain :Welcome back');
 
+    const namesBeforeReplay = FakeWebSocket.latest?.send.mock.calls
+      .filter(([line]) => line.startsWith('NAMES ')).length ?? 0;
     receive(':kain!webchat@example JOIN #root');
+    expect(FakeWebSocket.latest?.send.mock.calls
+      .filter(([line]) => line.startsWith('NAMES '))).toHaveLength(namesBeforeReplay + 1);
+    expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('NAMES #root\r\n');
     receive(':kain!webchat@example JOIN #staff');
 
     expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#root' });

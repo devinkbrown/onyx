@@ -8,9 +8,10 @@ import {
 } from './dispatch';
 
 const NOW = 1_000_000;
+const OWNER = { serverUrl: 'wss://example.test', identity: 'alice' } as const;
 
 function msg(id: string, sendAt: number): ScheduledMessage {
-  return { id, channel: '#root', text: `t-${id}`, sendAt };
+  return { id, channel: '#root', text: `t-${id}`, sendAt, owner: OWNER };
 }
 
 describe('selectDueMessages', () => {
@@ -91,23 +92,39 @@ describe('parseScheduledMessages', () => {
       { id: 'later', channel: '#root', text: '  keep spacing  ', sendAt: 2_000 },
       { id: 'first', channel: '#onyx', text: 'hello', sendAt: 1_000 },
     ]))).toEqual([
-      { id: 'first', channel: '#onyx', text: 'hello', sendAt: 1_000 },
-      { id: 'later', channel: '#root', text: '  keep spacing  ', sendAt: 2_000 },
+      { id: 'first', channel: '#onyx', text: 'hello', sendAt: 1_000, owner: null },
+      { id: 'later', channel: '#root', text: '  keep spacing  ', sendAt: 2_000, owner: null },
+    ]);
+  });
+
+  it('normalizes valid owners while preserving legacy and malformed owners as held rows', () => {
+    expect(parseScheduledMessages(JSON.stringify([
+      { id: 'owned', channel: '#root', text: 'owned', sendAt: 1_000, owner: {
+        serverUrl: 'wss://example.test', identity: 'Alice',
+      } },
+      { id: 'legacy', channel: '#root', text: 'legacy', sendAt: 2_000 },
+      { id: 'malformed', channel: '#root', text: 'malformed', sendAt: 3_000, owner: {
+        serverUrl: '', identity: 'alice',
+      } },
+    ]))).toEqual([
+      { id: 'owned', channel: '#root', text: 'owned', sendAt: 1_000, owner: OWNER },
+      { id: 'legacy', channel: '#root', text: 'legacy', sendAt: 2_000, owner: null },
+      { id: 'malformed', channel: '#root', text: 'malformed', sendAt: 3_000, owner: null },
     ]);
   });
 
   it('drops invalid fields and duplicate ids instead of poisoning dispatch', () => {
-    const valid = { id: 'one', channel: '#root', text: 'hello', sendAt: 1_000 };
+    const rawValid = { id: 'one', channel: '#root', text: 'hello', sendAt: 1_000 };
     expect(parseScheduledMessages(JSON.stringify([
-      valid,
-      { ...valid, channel: '#other', sendAt: 2_000 },
-      { ...valid, id: '', sendAt: 3_000 },
-      { ...valid, id: 'bad-channel', channel: 1, sendAt: 3_000 },
-      { ...valid, id: 'empty', text: '   ', sendAt: 3_000 },
-      { ...valid, id: 'nan', sendAt: null },
-      { ...valid, id: 'fraction', sendAt: 1.5 },
-      { ...valid, id: 'negative', sendAt: -1 },
-    ]))).toEqual([valid]);
+      rawValid,
+      { ...rawValid, channel: '#other', sendAt: 2_000 },
+      { ...rawValid, id: '', sendAt: 3_000 },
+      { ...rawValid, id: 'bad-channel', channel: 1, sendAt: 3_000 },
+      { ...rawValid, id: 'empty', text: '   ', sendAt: 3_000 },
+      { ...rawValid, id: 'nan', sendAt: null },
+      { ...rawValid, id: 'fraction', sendAt: 1.5 },
+      { ...rawValid, id: 'negative', sendAt: -1 },
+    ]))).toEqual([{ ...rawValid, owner: null }]);
   });
 
   it('bounds the restored queue', () => {

@@ -31,7 +31,12 @@ import { parseActivity } from '@/lib/activity';
 import { OUTBOX_MAX_AGE_MS, classifyVaultDmSearchPrivacy, deleteOutboxEntry, loadAround, loadOutbox, loadRecent, queueOutbox, type OutboxEntry } from '@/lib/vault/historyVault';
 import { getVaultDmSearchPrivacy } from '@/lib/vault/dmSearchPrivacy';
 import { boundedSearchField, boundedSearchQuery } from '@/lib/vault/searchBounds';
-import { parseScheduledMessages, selectDueMessages } from '@/lib/schedule/dispatch';
+import {
+  parseScheduledMessages,
+  selectDueMessages,
+  type ScheduledMessage,
+  type ScheduledMessageOwner,
+} from '@/lib/schedule/dispatch';
 import { deviceKeys, isEnvelope } from '@/lib/e2ee/dmCipher';
 import {
   hasEncryptedMessageBoundary,
@@ -1297,7 +1302,7 @@ export interface OnyxState {
   operAction: (command: string, ...args: string[]) => void;
 
   // ── Scheduled Messages ──────────────────────────────────────────────
-  scheduledMessages: Array<{ id: string; channel: string; text: string; sendAt: number }>;
+  scheduledMessages: ScheduledMessage[];
   showScheduledMessages: boolean;
   scheduleMessage: (channel: string, text: string, sendAt: number) => void;
   cancelScheduledMessage: (id: string) => void;
@@ -2769,7 +2774,6 @@ function _beginSessionRestore(
       .map(identity => identity.toLowerCase()),
   );
   const rosterKeys = new Set(state.channels.keys());
-  for (const key of rosterKeys) _beginNamesBurst(key);
   const generation = ++_sessionRestoreGeneration;
   _sessionRestore = {
     generation,
@@ -3299,7 +3303,7 @@ function _normalizeEmojiSkinTone(tone: string): OnyxState['emojiSkinTone'] {
 }
 
 function _persistScheduledMessages(
-  messages: readonly { id: string; channel: string; text: string; sendAt: number }[],
+  messages: readonly ScheduledMessage[],
 ): void {
   if (typeof window === 'undefined') return;
   try {
@@ -3307,6 +3311,21 @@ function _persistScheduledMessages(
   } catch {
     // The in-memory queue remains usable when storage is blocked or full.
   }
+}
+
+function _scheduledMessageOwner(
+  state: Pick<OnyxState, 'server' | 'ourNick'>,
+): ScheduledMessageOwner | null {
+  const serverUrl = state.server?.url.trim() ?? '';
+  const identity = (state.server?.account ?? state.ourNick).trim().toLowerCase();
+  return serverUrl && identity ? { serverUrl, identity } : null;
+}
+
+function _sameScheduledMessageOwner(
+  actual: ScheduledMessageOwner | null,
+  expected: ScheduledMessageOwner,
+): boolean {
+  return actual?.serverUrl === expected.serverUrl && actual.identity === expected.identity;
 }
 
 export type State = OnyxState;
@@ -7317,7 +7336,7 @@ export const store = createStore<OnyxState>()(
           // Session-sync may emit the authoritative NAMES burst before its
           // canonical self-JOIN echo. That is the sole bounded exception to the
           // normal rule that a 353 can never create channel membership.
-          if (canCreateFromResume && !get().channels.has(key) && !_recentNamesBurst(key)) {
+          if (canCreateFromResume && !_recentNamesBurst(key)) {
             _beginNamesBurst(key);
           }
           if (canCreateFromResume) _setRestoreRosterSyncing(set, key, true);
@@ -9889,7 +9908,15 @@ export const store = createStore<OnyxState>()(
       // the state boundary — refuse an empty body or a non-finite time so a
       // stray caller can't queue an undeliverable/never-due entry.
       if (!channel || !text.trim() || !Number.isFinite(sendAt)) return;
-      const entry = { id: `sched-${Date.now()}-${Math.random().toString(36).slice(2)}`, channel, text, sendAt };
+      const owner = _scheduledMessageOwner(get());
+      if (!owner) return;
+      const entry: ScheduledMessage = {
+        id: `sched-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        channel,
+        text,
+        sendAt,
+        owner,
+      };
       set(s => {
         const next = [...s.scheduledMessages, entry].sort((a, b) => a.sendAt - b.sendAt);
         _persistScheduledMessages(next);
@@ -9906,8 +9933,13 @@ export const store = createStore<OnyxState>()(
     _dispatchScheduledMessages: () => {
       const s = get();
       const connected = s.connectionStatus === 'connected' && !!s.client;
-      const { due, pending } = selectDueMessages(s.scheduledMessages, Date.now(), connected);
+      const owner = _scheduledMessageOwner(s);
+      if (!owner) return;
+      const owned = s.scheduledMessages.filter((message) => _sameScheduledMessageOwner(message.owner, owner));
+      const held = s.scheduledMessages.filter((message) => !_sameScheduledMessageOwner(message.owner, owner));
+      const { due, pending: ownedPending } = selectDueMessages(owned, Date.now(), connected);
       if (due.length === 0) return;
+      const pending = [...held, ...ownedPending].sort((a, b) => a.sendAt - b.sendAt || a.id.localeCompare(b.id));
       // Remove the due entries BEFORE sending (and persist the shrunk queue), so
       // idempotency never depends on the send succeeding: if sendMessage throws,
       // or a second tick fires, the entry is already gone and can't double-send.

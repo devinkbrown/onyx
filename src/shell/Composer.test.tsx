@@ -30,6 +30,16 @@ function seedActiveChannel(): void {
       activeView: { kind: 'channel', channel: '#room' },
       connectionStatus: 'connected',
       ourNick: 'me',
+      server: {
+        id: 'composer-test',
+        name: 'Onyx',
+        network: 'Onyx',
+        url: 'wss://example.test',
+        icon: '',
+        nick: 'me',
+        account: 'me',
+        connected: true,
+      },
     },
     true,
   );
@@ -296,6 +306,7 @@ describe('Composer schedule (send later)', () => {
     expect(queued[0]!.channel).toBe('#room');
     expect(queued[0]!.text).toBe('stand-up reminder');
     expect(queued[0]!.sendAt).toBeGreaterThan(Date.now());
+    expect(queued[0]!.owner).toEqual({ serverUrl: 'wss://example.test', identity: 'me' });
     expect(textarea.value).toBe('');
   });
 

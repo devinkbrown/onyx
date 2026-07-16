@@ -15,12 +15,21 @@
  *  - Inputs are never mutated; both output arrays are fresh.
  */
 
+export interface ScheduledMessageOwner {
+  /** Exact WebSocket endpoint that owned the composing session. */
+  readonly serverUrl: string;
+  /** Lowercased account name, or guest nick when no account was authenticated. */
+  readonly identity: string;
+}
+
 export interface ScheduledMessage {
   readonly id: string;
   readonly channel: string;
   readonly text: string;
   /** Epoch milliseconds at which the message should be sent. */
   readonly sendAt: number;
+  /** Legacy rows have no owner and are preserved but never auto-dispatched. */
+  readonly owner: ScheduledMessageOwner | null;
 }
 
 export const MAX_SCHEDULED_MESSAGES = 256;
@@ -28,9 +37,27 @@ export const MAX_SCHEDULED_ID_LENGTH = 128;
 export const MAX_SCHEDULED_CHANNEL_LENGTH = 256;
 export const MAX_SCHEDULED_TEXT_LENGTH = 65_536;
 const MAX_SCHEDULED_STORAGE_LENGTH = 2 * 1024 * 1024;
+const MAX_SCHEDULED_SERVER_LENGTH = 2_048;
+const MAX_SCHEDULED_IDENTITY_LENGTH = 256;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function parseOwner(value: unknown): ScheduledMessageOwner | null {
+  if (!isRecord(value)) return null;
+  const { serverUrl, identity } = value;
+  if (
+    typeof serverUrl !== 'string'
+    || serverUrl.length === 0
+    || serverUrl.length > MAX_SCHEDULED_SERVER_LENGTH
+    || serverUrl !== serverUrl.trim()
+    || typeof identity !== 'string'
+    || identity.length === 0
+    || identity.length > MAX_SCHEDULED_IDENTITY_LENGTH
+    || identity !== identity.trim()
+  ) return null;
+  return { serverUrl, identity: identity.toLowerCase() };
 }
 
 /** Parse the local scheduled-message queue as untrusted, version-drifting data. */
@@ -66,7 +93,7 @@ export function parseScheduledMessages(raw: string | null): ScheduledMessage[] {
       || sendAt <= 0
     ) continue;
     ids.add(id);
-    messages.push({ id, channel, text, sendAt });
+    messages.push({ id, channel, text, sendAt, owner: parseOwner(value.owner) });
   }
   return messages.sort((a, b) => a.sendAt - b.sendAt || a.id.localeCompare(b.id));
 }

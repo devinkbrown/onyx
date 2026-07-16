@@ -24,16 +24,35 @@ function makeClient() {
   };
 }
 
+function server(account: string | null) {
+  return {
+    id: `scheduled-${account ?? 'guest'}`,
+    name: 'Onyx',
+    network: 'Onyx',
+    url: 'wss://example.test',
+    icon: '',
+    nick: account ?? 'guest',
+    account,
+    connected: true,
+  };
+}
+
 /** Seed a connected session with a mock client. */
-function connect() {
+function connect(account: string | null = 'alice') {
   const client = makeClient();
-  store.setState({ client: client as never, connectionStatus: 'connected', ourNick: 'me' });
+  store.setState({
+    client: client as never,
+    connectionStatus: 'connected',
+    ourNick: account ?? 'guest',
+    server: server(account),
+  });
   return client;
 }
 
 beforeEach(() => {
   localStorage.clear();
   store.setState(initialState, true);
+  store.setState({ server: server('alice'), ourNick: 'alice' });
 });
 
 afterEach(() => {
@@ -134,6 +153,23 @@ describe('_dispatchScheduledMessages', () => {
 
     expect(client.sendRaw.mock.calls.filter((c) => c[0] === 'PRIVMSG')).toHaveLength(0);
     expect(store.getState().scheduledMessages).toHaveLength(1);
+  });
+
+  it('holds Alice messages while Bob is connected, then sends them as Alice', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(10_000);
+    store.getState().scheduleMessage('#root', 'Alice only', 5_000);
+
+    const bobClient = connect('bob');
+    store.getState()._dispatchScheduledMessages();
+
+    expect(bobClient.sendRaw.mock.calls.filter((call) => call[0] === 'PRIVMSG')).toEqual([]);
+    expect(store.getState().scheduledMessages.map((message) => message.text)).toEqual(['Alice only']);
+
+    const aliceClient = connect('alice');
+    store.getState()._dispatchScheduledMessages();
+
+    expect(aliceClient.sendRaw).toHaveBeenCalledWith('PRIVMSG', '#root', 'Alice only');
+    expect(store.getState().scheduledMessages).toEqual([]);
   });
 });
 

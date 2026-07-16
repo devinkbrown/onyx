@@ -17,6 +17,19 @@ const initialState = store.getInitialState();
 describe('ScheduledMessagesSheet', () => {
   beforeEach(() => {
     store.setState(initialState, true);
+    store.setState({
+      ourNick: 'alice',
+      server: {
+        id: 'scheduled-sheet-test',
+        name: 'Onyx',
+        network: 'Onyx',
+        url: 'wss://example.test',
+        icon: '',
+        nick: 'alice',
+        account: 'alice',
+        connected: true,
+      },
+    });
     store.getState().openScheduledMessages();
   });
 
