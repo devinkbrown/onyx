@@ -2,6 +2,7 @@
 import { createStore } from 'zustand/vanilla';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { parseStringArray, parseEmojiArray } from './persistParse';
+import { parseStoredVoiceSettings, type StoredVoiceSettings } from './voiceSettingsPersistence';
 import { IRCClient } from '@/lib/irc/client';
 import type { IRCMessage, Channel, ChannelUser, ChatMessage, ConnectionStatus, MessageReaction } from '@/lib/irc/types';
 import { parseMultilineLimits, planMultilineBatches, buildMultilineLines, assembleMultilineText } from '@/lib/irc/multiline';
@@ -225,20 +226,6 @@ export interface VoiceState {
 /** Voice-stage layout mode. */
 export type CallLayout = 'grid' | 'spotlight';
 
-type StoredVoiceSettings = Pick<
-  VoiceState,
-  | 'inputDeviceId'
-  | 'outputDeviceId'
-  | 'outputVolume'
-  | 'vadEnabled'
-  | 'vadSensitivity'
-  | 'noiseSuppression'
-  | 'echoCancellation'
-  | 'pushToTalk'
-  | 'pushToTalkKey'
-  | 'cameraDeviceId'
->;
-
 const VOICE_SETTINGS_KEY = 'onyx:voice-settings';
 
 /**
@@ -252,24 +239,11 @@ function _dispatchVoiceEvent(name: string, detail: unknown): void {
 }
 
 function _loadVoiceSettings(): StoredVoiceSettings {
-  const defaults: StoredVoiceSettings = {
-    inputDeviceId: null,
-    outputDeviceId: null,
-    outputVolume: 80,
-    vadEnabled: true,
-    vadSensitivity: 'medium',
-    noiseSuppression: true,
-    echoCancellation: true,
-    pushToTalk: false,
-    pushToTalkKey: null,
-    cameraDeviceId: null,
-  };
-  if (typeof window === 'undefined') return defaults;
+  if (typeof window === 'undefined') return parseStoredVoiceSettings(null);
   try {
-    const saved = JSON.parse(localStorage.getItem(VOICE_SETTINGS_KEY) ?? '{}') as Partial<StoredVoiceSettings>;
-    return { ...defaults, ...saved };
+    return parseStoredVoiceSettings(localStorage.getItem(VOICE_SETTINGS_KEY));
   } catch {
-    return defaults;
+    return parseStoredVoiceSettings(null);
   }
 }
 
