@@ -25,7 +25,21 @@ function canonicalUrl(path = '/'): string {
   const origin = typeof window !== 'undefined' && window.location?.origin
     ? window.location.origin
     : DEFAULT_ORIGIN;
-  return new URL(path, origin).toString();
+  const url = new URL(path, origin);
+  // nginx canonicalises directory entrypoints to a trailing slash. Keep the
+  // metadata on that final URL so hydration never replaces a truthful stamped
+  // canonical with one that redirects. Query context may be meaningful for a
+  // rich invite; fragments are local-only and never belong in canonical URLs.
+  if (
+    url.origin === origin
+    && url.pathname !== '/'
+    && !url.pathname.endsWith('/')
+    && !url.pathname.split('/').at(-1)?.includes('.')
+  ) {
+    url.pathname += '/';
+  }
+  url.hash = '';
+  return url.toString();
 }
 
 /**

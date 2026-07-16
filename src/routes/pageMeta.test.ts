@@ -5,7 +5,7 @@ import { setPageMeta } from './pageMeta';
 
 describe('setPageMeta', () => {
   it('updates the document title and description', () => {
-    setPageMeta('Onyx status', 'Mesh health and node status.', '/status');
+    setPageMeta('Onyx status', 'Mesh health and node status.', '/status?view=mesh#local-only');
 
     expect(document.title).toBe('Onyx status');
     expect(document.querySelector('meta[name="description"]')?.getAttribute('content')).toBe(
@@ -13,7 +13,9 @@ describe('setPageMeta', () => {
     );
     expect(document.querySelector('meta[property="og:title"]')?.getAttribute('content')).toBe('Onyx status');
     expect(document.querySelector('meta[name="twitter:card"]')?.getAttribute('content')).toBe('summary');
-    expect(document.querySelector('link[rel="canonical"]')?.getAttribute('href')).toMatch(/\/status$/);
+    const canonical = `${window.location.origin}/status/?view=mesh`;
+    expect(document.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe(canonical);
+    expect(document.querySelector('meta[property="og:url"]')?.getAttribute('content')).toBe(canonical);
     expect(document.querySelector('script[data-onyx-route-jsonld]')?.textContent).toContain('Onyx status');
   });
 });
