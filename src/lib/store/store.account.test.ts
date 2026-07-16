@@ -905,6 +905,7 @@ describe('account replies — state from the message handler', () => {
       ['MONITOR', 'C'],
       ['MONITOR', '+', 'bob-friend'],
       ['MONITOR', '+', 'bob-watch'],
+      ['NICK', 'bob'],
     ]);
   });
 

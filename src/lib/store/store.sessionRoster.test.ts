@@ -7,6 +7,7 @@ import { saveFriends, saveWatchList } from '@/lib/contactPresenceMemory';
 import { emptyIdentityProfileMemory, saveIdentityProfileMemory } from '@/lib/identityProfileMemory';
 import { saveUserNotes } from '@/lib/userNotes';
 import { saveBookmarks } from '@/lib/bookmarks';
+import { saveNickAliases } from '@/lib/nickAliases';
 import { _resetSessionRestoreForTests, store } from './store';
 
 const initialState = store.getInitialState();
@@ -321,5 +322,40 @@ describe('remembered session roster restoration', () => {
       .map(([line]) => line)
       .filter(line => line.startsWith('SESSION RESUME ')) ?? [];
     expect(replayedResume).toEqual([]);
+  });
+
+  it('keeps owner aliases and credentials canonical across collision fallback and reconnect', () => {
+    const owner = { serverUrl: 'wss://example.test', identity: 'kain' } as const;
+    saveCredentials({ nick: owner.identity, server: owner.serverUrl });
+    storeSessionToken('canonical-token');
+    saveNickAliases(['KainAway'], owner);
+
+    store.getState().connect({ url: owner.serverUrl, nick: owner.identity });
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    receive(':example.test 433 * kain :Nickname is already in use');
+    expect(store.getState().nickAliases).toEqual([]);
+
+    receive(':example.test 900 kain_ kain_!webchat@example kain :You are now logged in as kain');
+    receive(':example.test 001 kain_ :Welcome to IRCXNet');
+    expect(store.getState().nickAliases).toEqual(['KainAway']);
+
+    receive(':example.test 433 kain_ kain :Nickname is still in use');
+    expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('NICK KainAway\r\n');
+    receive(':kain_!webchat@example NICK KainAway');
+    expect(store.getState().currentNickIsAlias).toBe(true);
+
+    FakeWebSocket.latest?.onclose?.(new CloseEvent('close', { code: 1006 }));
+    store.getState().reconnectNow();
+    FakeWebSocket.latest?.onopen?.(new Event('open'));
+    expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('NICK kain\r\n');
+
+    receive(':example.test 433 * kain :Nickname is still in use');
+    expect(FakeWebSocket.latest?.send).toHaveBeenCalledWith('NICK kain_\r\n');
+    receive(':example.test 001 kain_ :Welcome back');
+    expect(store.getState().nickAliases).toEqual(['KainAway']);
+    receive(':kain_!webchat@example NICK kain');
+
+    expect(loadCredentials(owner.serverUrl, owner.identity)?.sessionToken).toBe('canonical-token');
+    expect(loadCredentials(owner.serverUrl, 'KainAway')).toBeNull();
   });
 });

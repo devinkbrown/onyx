@@ -101,6 +101,7 @@ import {
 } from '@/lib/composer/drafts';
 import { loadDMPins, sanitizeDMPins, saveDMPins } from '@/lib/dmPins';
 import { loadBookmarks, saveBookmarks } from '@/lib/bookmarks';
+import { loadNickAliases, saveNickAliases } from '@/lib/nickAliases';
 import { loadIgnoredUsers, parseIgnoredUsers, saveIgnoredUsers } from '@/lib/ignoredUsers';
 import { loadMutedDMs, parseMutedDMs, saveMutedDMs } from '@/lib/mutedDMs';
 import {
@@ -2738,6 +2739,7 @@ function _resetAccountBoundState(
   preservePasskeyError = false,
 ): void {
   _invalidateAccountReplyContexts();
+  _nickAliasTryIdx = 0;
   set(s => {
     const ownKey = s.ourNick.toLowerCase();
     const userActivities = { ...s.userActivities };
@@ -2771,6 +2773,8 @@ function _resetAccountBoundState(
       dmPinsNick: null,
       bookmarks: [],
       showBookmarks: false,
+      nickAliases: [],
+      currentNickIsAlias: false,
       channelNotify: new Map(),
       highlightWords: [],
       ignoredUsers: new Set(),
@@ -3522,6 +3526,13 @@ function _loadOwnedBookmarks(
   return owner ? loadBookmarks(owner) : loadBookmarks();
 }
 
+function _loadOwnedNickAliases(
+  state: Pick<OnyxState, 'server' | 'ourNick'>,
+): string[] {
+  const owner = selectDeviceMemoryOwner(state);
+  return owner ? loadNickAliases(owner) : loadNickAliases();
+}
+
 function _loadOwnedChannelNotify(
   state: Pick<OnyxState, 'server' | 'ourNick'>,
 ): Map<string, 'mentions' | 'none'> {
@@ -4183,6 +4194,7 @@ export const store = createStore<OnyxState>()(
         status: 'connecting',
         connectionStatus: 'connecting',
         ourNick: nick,
+        currentNickIsAlias: false,
         autoReconnect: false,
         server: null,
         channels: new Map(),
@@ -4312,10 +4324,15 @@ export const store = createStore<OnyxState>()(
             const server = s.server ? { ...s.server, nick: newNick } : null;
             return {
               ourNick: newNick,
+              currentNickIsAlias: Boolean(
+                _connectNick
+                && newNick.toLowerCase() !== _connectNick.toLowerCase(),
+              ),
               server,
               composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: newNick }),
               dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: newNick }),
               bookmarks: _loadOwnedBookmarks({ server, ourNick: newNick }),
+              nickAliases: _loadOwnedNickAliases({ server, ourNick: newNick }),
               channelNotify: _loadOwnedChannelNotify({ server, ourNick: newNick }),
               highlightWords: _loadOwnedHighlightWords({ server, ourNick: newNick }),
               ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: newNick }),
@@ -4405,6 +4422,7 @@ export const store = createStore<OnyxState>()(
               composerDrafts: _loadOwnedComposerDrafts({ server: srv, ourNick: get().ourNick }),
               dmPinnedMessages: _loadOwnedDMPins({ server: srv, ourNick: get().ourNick }),
               bookmarks: _loadOwnedBookmarks({ server: srv, ourNick: get().ourNick }),
+              nickAliases: _loadOwnedNickAliases({ server: srv, ourNick: get().ourNick }),
               channelNotify: _loadOwnedChannelNotify({ server: srv, ourNick: get().ourNick }),
               highlightWords: _loadOwnedHighlightWords({ server: srv, ourNick: get().ourNick }),
               ignoredUsers: _loadOwnedIgnoredUsers({ server: srv, ourNick: get().ourNick }),
@@ -7518,9 +7536,14 @@ export const store = createStore<OnyxState>()(
             const server = s.server ? { ...s.server, account } : null;
             return {
               server,
+              currentNickIsAlias: Boolean(
+                account
+                && s.ourNick.toLowerCase() !== account.toLowerCase(),
+              ),
               composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: s.ourNick }),
               dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: s.ourNick }),
               bookmarks: _loadOwnedBookmarks({ server, ourNick: s.ourNick }),
+              nickAliases: _loadOwnedNickAliases({ server, ourNick: s.ourNick }),
               channelNotify: _loadOwnedChannelNotify({ server, ourNick: s.ourNick }),
               highlightWords: _loadOwnedHighlightWords({ server, ourNick: s.ourNick }),
               ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: s.ourNick }),
@@ -7535,6 +7558,13 @@ export const store = createStore<OnyxState>()(
           });
           _syncOwnCustomStatusActivity(get, set);
           if (ownerChanged) _replaceOwnedMonitorContacts(get, set, true);
+          const authenticated = get();
+          if (account && authenticated.currentNickIsAlias && authenticated.client) {
+            authenticated.client.sendRaw('NICK', account);
+            _startNickReclaim(account);
+          } else {
+            _stopNickReclaim();
+          }
           break;
         }
 
@@ -8730,11 +8760,16 @@ export const store = createStore<OnyxState>()(
               const server = s.server ? { ...s.server, nick: newNick } : null;
               return {
                 ourNick: newNick,
-                currentNickIsAlias: forcedGuest,
+                currentNickIsAlias: Boolean(
+                  forcedGuest
+                  || (server?.account
+                    && newNick.toLowerCase() !== server.account.toLowerCase()),
+                ),
                 server,
                 composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: newNick }),
                 dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: newNick }),
                 bookmarks: _loadOwnedBookmarks({ server, ourNick: newNick }),
+                nickAliases: _loadOwnedNickAliases({ server, ourNick: newNick }),
                 channelNotify: _loadOwnedChannelNotify({ server, ourNick: newNick }),
                 highlightWords: _loadOwnedHighlightWords({ server, ourNick: newNick }),
                 ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: newNick }),
@@ -9944,9 +9979,13 @@ export const store = createStore<OnyxState>()(
               const server = s.server ? { ...s.server, account: account900 } : null;
               return {
                 server,
+                currentNickIsAlias: server
+                  ? s.ourNick.toLowerCase() !== account900.toLowerCase()
+                  : s.currentNickIsAlias,
                 composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: s.ourNick }),
                 dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: s.ourNick }),
                 bookmarks: _loadOwnedBookmarks({ server, ourNick: s.ourNick }),
+                nickAliases: _loadOwnedNickAliases({ server, ourNick: s.ourNick }),
                 channelNotify: _loadOwnedChannelNotify({ server, ourNick: s.ourNick }),
                 highlightWords: _loadOwnedHighlightWords({ server, ourNick: s.ourNick }),
                 ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: s.ourNick }),
@@ -9969,10 +10008,13 @@ export const store = createStore<OnyxState>()(
             const authenticated = get();
             if (
               authenticated.currentNickIsAlias
+              && authenticated.client
               && authenticated.ourNick.toLowerCase() !== account900.toLowerCase()
             ) {
-              authenticated.client?.sendRaw('NICK', account900);
+              authenticated.client.sendRaw('NICK', account900);
               _startNickReclaim(account900);
+            } else {
+              _stopNickReclaim();
             }
           }
           break;
@@ -9987,9 +10029,11 @@ export const store = createStore<OnyxState>()(
             const server = s.server ? { ...s.server, account: null } : null;
             return {
               server,
+              currentNickIsAlias: false,
               composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: s.ourNick }),
               dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: s.ourNick }),
               bookmarks: _loadOwnedBookmarks({ server, ourNick: s.ourNick }),
+              nickAliases: _loadOwnedNickAliases({ server, ourNick: s.ourNick }),
               channelNotify: _loadOwnedChannelNotify({ server, ourNick: s.ourNick }),
               highlightWords: _loadOwnedHighlightWords({ server, ourNick: s.ourNick }),
               ignoredUsers: _loadOwnedIgnoredUsers({ server, ourNick: s.ourNick }),
@@ -10072,7 +10116,13 @@ export const store = createStore<OnyxState>()(
           const triedAliases = _nickAliasTryIdx > 0
             ? nickAliases.slice(0, _nickAliasTryIdx)
             : [];
-          const nextAlias = nickAliases.find(a => !triedAliases.includes(a));
+          const currentKey = ourNick.toLowerCase();
+          const rejectedKey = nick433.toLowerCase();
+          const triedKeys = new Set(triedAliases.map(alias => alias.toLowerCase()));
+          const nextAlias = nickAliases.find(alias => {
+            const key = alias.toLowerCase();
+            return key !== currentKey && key !== rejectedKey && !triedKeys.has(key);
+          });
           if (nextAlias && client433) {
             _nickAliasTryIdx = nickAliases.indexOf(nextAlias) + 1;
             client433.sendRaw('NICK', nextAlias);
@@ -11447,12 +11497,15 @@ export const store = createStore<OnyxState>()(
     }),
 
     // ── Nick aliases ─────────────────────────────────────────────────────
-    nickAliases: _loadNickAliases(),
+    nickAliases: [],
     currentNickIsAlias: false,
     setNickAliases: (aliases) => {
-      const clean = aliases.map(a => a.trim()).filter(Boolean);
-      _saveNickAliases(clean);
-      set({ nickAliases: clean });
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
+      const saved = saveNickAliases(aliases, owner);
+      if (!saved) return;
+      _nickAliasTryIdx = 0;
+      set({ nickAliases: saved });
     },
 
     // ── ISUPPORT token store ──────────────────────────────────────────────
@@ -13219,16 +13272,6 @@ function _loadMessageMaxWidth(): 680 | 860 | 0 { const v = typeof window !== 'un
 
 // ── Glass sidebar persistence ──────────────────────────────────────────────────
 function _loadGlassSidebar(): boolean { return typeof window !== 'undefined' && localStorage.getItem('onyx:glass-sidebar') === '1'; }
-
-// ── Nick aliases persistence ──────────────────────────────────────────────────
-function _loadNickAliases(): string[] {
-  if (typeof window === 'undefined') return [];
-  try { return parseStringArray(localStorage.getItem('onyx:nick-aliases')); } catch { return []; }
-}
-function _saveNickAliases(aliases: string[]): void {
-  if (typeof window === 'undefined') return;
-  try { localStorage.setItem('onyx:nick-aliases', JSON.stringify(aliases)); } catch {}
-}
 
 // ── Background persistence (shared with the Appearance route, key 'onyx:bg') ──
 // NB: literals are inlined (not module-level consts) because _loadBackground is
