@@ -8,6 +8,10 @@ export interface DesktopNotificationPayload {
   onClick: () => void;
 }
 
+export interface DesktopNotificationHandle {
+  close(): void;
+}
+
 let audioContext: AudioContext | null = null;
 
 export function getDesktopNotificationPermission(): DesktopNotificationPermission {
@@ -20,8 +24,8 @@ export async function requestDesktopNotificationPermission(): Promise<DesktopNot
   return await window.Notification.requestPermission();
 }
 
-export function showDesktopNotification(payload: DesktopNotificationPayload): void {
-  if (getDesktopNotificationPermission() !== 'granted') return;
+export function showDesktopNotification(payload: DesktopNotificationPayload): DesktopNotificationHandle | null {
+  if (getDesktopNotificationPermission() !== 'granted') return null;
 
   const notification = new window.Notification(payload.title, {
     body: payload.body,
@@ -35,6 +39,8 @@ export function showDesktopNotification(payload: DesktopNotificationPayload): vo
     payload.onClick();
     notification.close();
   };
+
+  return { close: () => notification.close() };
 }
 
 export function playNotificationBeep(volume: number): void {

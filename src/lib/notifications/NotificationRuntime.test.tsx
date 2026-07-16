@@ -65,7 +65,7 @@ describe('NotificationRuntime coalesced policy', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-15T12:00:00.000Z'));
-    vi.mocked(showDesktopNotification).mockClear();
+    vi.mocked(showDesktopNotification).mockReset();
     setCalmPreset('regular');
     store.setState({
       ...initialState,
@@ -155,6 +155,35 @@ describe('NotificationRuntime coalesced policy', () => {
     addMention(3);
     expect(showDesktopNotification).toHaveBeenCalledTimes(2);
     expect(vi.mocked(showDesktopNotification).mock.calls[1]?.[0].body).toBe('message 3');
+  });
+
+  it('closes an active old-owner alert and rejects its stale click target', () => {
+    const close = vi.fn();
+    const openChannelConversation = vi.fn();
+    vi.mocked(showDesktopNotification).mockReturnValue({ close });
+    store.setState({ openChannelConversation });
+    render(() => <NotificationRuntime />);
+
+    addMention(1);
+    const stalePayload = vi.mocked(showDesktopNotification).mock.calls[0]?.[0];
+    expect(stalePayload).toBeDefined();
+
+    store.setState({ ourNick: 'other', server: server('other') });
+
+    expect(close).toHaveBeenCalledOnce();
+    stalePayload?.onClick();
+    expect(openChannelConversation).not.toHaveBeenCalled();
+  });
+
+  it('closes active desktop alerts when the runtime unmounts', () => {
+    const close = vi.fn();
+    vi.mocked(showDesktopNotification).mockReturnValue({ close });
+    const view = render(() => <NotificationRuntime />);
+
+    addMention(1);
+    view.unmount();
+
+    expect(close).toHaveBeenCalledOnce();
   });
 
   it('derives a coalesced alert count and body from the remaining unread rows', () => {

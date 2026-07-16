@@ -9,6 +9,7 @@ import {
   getDesktopNotificationPermission,
   playNotificationBeep,
   showDesktopNotification,
+  type DesktopNotificationHandle,
 } from './browser';
 import { calmPreset, classifyNotification, type CalmContext } from './calmMode';
 import { shouldNotify } from './decision';
@@ -111,10 +112,17 @@ export function NotificationRuntime(): null {
     const lastDesktopAt = new Map<string, number>();
     const lastSoundAt = new Map<string, number>();
     const pendingDesktop = new Map<string, PendingDesktop>();
+    const activeDesktop = new Map<string, DesktopNotificationHandle>();
+
+    function clearActiveDesktop(): void {
+      for (const handle of activeDesktop.values()) handle.close();
+      activeDesktop.clear();
+    }
 
     function clearOwnerRuntimeState(): void {
       for (const pending of pendingDesktop.values()) clearTimeout(pending.timer);
       pendingDesktop.clear();
+      clearActiveDesktop();
       lastDesktopAt.clear();
       lastSoundAt.clear();
       // Existing inbox rows belong to the previous owner. Mark them observed so
@@ -129,15 +137,32 @@ export function NotificationRuntime(): null {
         ? `${count} new alerts in ${target.label}`
         : titleFor(note, target.label);
 
-      showDesktopNotification({
+      activeDesktop.get(target.key)?.close();
+      activeDesktop.delete(target.key);
+      const shownOwnerKey = ownerKey;
+      let handle: DesktopNotificationHandle | null = null;
+      handle = showDesktopNotification({
         title,
         body: bodyFor(note),
         tag: `onyx-${target.key}`,
         onClick: () => {
+          // Closing a browser notification and dispatching its click can race.
+          // Never navigate an old owner's captured target in the new session.
+          if (shownOwnerKey !== ownerKey || shownOwnerKey !== currentOwnerKey()) return;
+          if (handle && activeDesktop.get(target.key) === handle) activeDesktop.delete(target.key);
           focusApp();
           target.navigate();
         },
       });
+      if (handle) {
+        activeDesktop.set(target.key, handle);
+        while (activeDesktop.size > MAX_TRACKED_TARGETS) {
+          const oldestKey = activeDesktop.keys().next().value;
+          if (oldestKey === undefined) break;
+          activeDesktop.get(oldestKey)?.close();
+          activeDesktop.delete(oldestKey);
+        }
+      }
       rememberTargetTimestamp(lastDesktopAt, target.key, Date.now());
     }
 
