@@ -2543,6 +2543,13 @@ let _connectNick = '';
 let _saslAccount: string | null = null;
 /** False after confirmed logout/failed resume so queued token notes cannot re-arm it. */
 let _sessionTokenWritesAllowed = true;
+/**
+ * The first token issued during connect may migrate a collision alias to the
+ * canonical account. After an in-session identity change, however, token
+ * rotation must address only that canonical credential: falling back to the
+ * connection nick would move the previous account's password into the new one.
+ */
+let _credentialTokenCanonicalOnly = false;
 
 // ── Nick reclaim timer (module-level) ────────────────────────────────────────
 /**
@@ -2717,8 +2724,10 @@ function _canAcceptSessionToken(get: GetFn): boolean {
 
 /**
  * Resolve the credential owned by this live socket without consulting the
- * cross-tab mutable activeKey. Source nick comes first for a canonical re-key;
- * canonical nick comes first for later local/mesh rotations after that re-key.
+ * cross-tab mutable activeKey. Source nick comes first for the initial
+ * collision-alias re-key. Once the socket changes account, only an existing
+ * canonical credential may receive tokens; the explicit fallback target makes
+ * persistence fail closed when that account is not remembered.
  */
 function _liveCredentialTokenTarget(
   get: GetFn,
@@ -2729,9 +2738,11 @@ function _liveCredentialTokenTarget(
   if (!server) return null;
   const sourceNick = _connectNick || state.ourNick;
   const canonicalNick = _saslAccount || state.server?.account || state.ourNick;
-  const candidates = sourceNickFirst
-    ? [sourceNick, canonicalNick, state.ourNick]
-    : [canonicalNick, sourceNick, state.ourNick];
+  const candidates = _credentialTokenCanonicalOnly
+    ? [canonicalNick]
+    : sourceNickFirst
+      ? [sourceNick, canonicalNick, state.ourNick]
+      : [canonicalNick, sourceNick, state.ourNick];
   const seen = new Set<string>();
   let fallback = '';
   for (const nick of candidates) {
@@ -2751,6 +2762,7 @@ function _clearRememberedSessionAfterLogout(get: GetFn, set: SetFn): void {
   const account = _saslAccount || state.server?.account || _connectNick || state.ourNick;
   if (server && account) clearSessionToken(server, account);
   _sessionTokenWritesAllowed = false;
+  _credentialTokenCanonicalOnly = true;
   state.client?.clearResumeTokens?.();
   _clearSessionRestore(set);
   _stopNickReclaim();
@@ -3540,6 +3552,7 @@ export const store = createStore<OnyxState>()(
       _connectNick = nick;
       _saslAccount = null;
       _sessionTokenWritesAllowed = true;
+      _credentialTokenCanonicalOnly = false;
 
       // Start every explicit connect from a clean roster. Only disconnect() used
       // to clear these, so reconnecting from the form (e.g. after changing nick)
@@ -4490,6 +4503,7 @@ export const store = createStore<OnyxState>()(
       const acct = account.trim();
       if (!client || !acct || !password) return;
       set({ accountActionError: null });
+      _credentialTokenCanonicalOnly = true;
       // Login success returns as 900 RPL_LOGGEDIN (sets server.account);
       // failure as 464 ERR_PASSWDMISMATCH or `FAIL IDENTIFY`.
       client.sendRaw('IDENTIFY', acct, password);
@@ -4517,6 +4531,7 @@ export const store = createStore<OnyxState>()(
         return;
       }
       set({ passkeyBusy: true, passkeyError: null, passkeyNotice: null });
+      _credentialTokenCanonicalOnly = true;
       // Server replies AUTH-CHALLENGE + ALLOW-CRED lines; the handler collects
       // them and runs the get ceremony → AUTH-FINISH → 900 RPL_LOGGEDIN.
       client.sendRaw('WEBAUTHN', 'AUTH', acct);
@@ -6193,6 +6208,7 @@ export const store = createStore<OnyxState>()(
         if (standard.kind === 'FAIL' && standard.command === 'SESSION') {
           clearSessionToken(get().server?.url, _connectNick || get().ourNick);
           _sessionTokenWritesAllowed = false;
+          _credentialTokenCanonicalOnly = true;
           get().client?.clearResumeTokens?.();
           _clearSessionRestore(set);
           get().addNotification({ type: 'error', text: standard.description || `SESSION ${standard.code}` });
@@ -8905,6 +8921,13 @@ export const store = createStore<OnyxState>()(
           // is an IRCX error and must not clobber the logged-in account.
           if (params.length >= 4 && params[2]) {
             const account900 = params[2];
+            const previousAccount = get().server?.account;
+            if (
+              previousAccount
+              && previousAccount.toLowerCase() !== account900.toLowerCase()
+            ) {
+              _credentialTokenCanonicalOnly = true;
+            }
             _sessionTokenWritesAllowed = true;
             // Capture before server object exists (900 arrives during CAP/SASL, before 001)
             _saslAccount = account900;

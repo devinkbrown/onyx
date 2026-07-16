@@ -106,6 +106,75 @@ describe('SESSION token persistence — server NOTICE compatibility', () => {
     expect(bob?.meshToken).toBeUndefined();
   });
 
+  it('keeps NOTE token rotation on the newly identified account without re-keying the previous account', () => {
+    const client = makeClient();
+    saveCredentials({ nick: 'alice', server: 'wss://eshmaki.me', password: 'alice-pw' });
+    saveCredentials({ nick: 'bob', server: 'wss://eshmaki.me', password: 'bob-pw' });
+    store.setState({
+      client: client as never,
+      server: seedServer('alice'),
+      ourNick: 'alice',
+    });
+
+    feed(':eshmaki.me 900 alice alice!u@h bob :You are now logged in as bob');
+    feed(':eshmaki.me NOTE SESSION TOKEN :bob-local');
+
+    expect(loadCredentials('wss://eshmaki.me', 'alice')).toMatchObject({
+      nick: 'alice',
+      password: 'alice-pw',
+    });
+    expect(loadCredentials('wss://eshmaki.me', 'bob')).toMatchObject({
+      nick: 'bob',
+      password: 'bob-pw',
+      sessionToken: 'bob-local',
+    });
+  });
+
+  it('keeps NOTICE token rotation on the newly identified account after logout', () => {
+    const client = makeClient();
+    saveCredentials({ nick: 'alice', server: 'wss://eshmaki.me', password: 'alice-pw' });
+    saveCredentials({ nick: 'bob', server: 'wss://eshmaki.me', password: 'bob-pw' });
+    store.setState({
+      client: client as never,
+      server: seedServer('alice'),
+      ourNick: 'alice',
+    });
+
+    feed(':eshmaki.me NOTICE alice :You are now logged out.');
+    feed(':eshmaki.me 900 alice alice!u@h bob :You are now logged in as bob');
+    feed(':eshmaki.me NOTICE alice :SESSION TOKEN bob-local');
+
+    expect(loadCredentials('wss://eshmaki.me', 'alice')).toMatchObject({
+      nick: 'alice',
+      password: 'alice-pw',
+    });
+    expect(loadCredentials('wss://eshmaki.me', 'bob')).toMatchObject({
+      nick: 'bob',
+      password: 'bob-pw',
+      sessionToken: 'bob-local',
+    });
+  });
+
+  it('does not create a newly identified account from another account credentials', () => {
+    const client = makeClient();
+    saveCredentials({ nick: 'alice', server: 'wss://eshmaki.me', password: 'alice-pw' });
+    store.setState({
+      client: client as never,
+      server: seedServer('alice'),
+      ourNick: 'alice',
+    });
+
+    feed(':eshmaki.me 900 alice alice!u@h bob :You are now logged in as bob');
+    feed(':eshmaki.me NOTICE alice :SESSION TOKEN bob-local');
+
+    expect(loadCredentials('wss://eshmaki.me', 'alice')).toMatchObject({
+      nick: 'alice',
+      password: 'alice-pw',
+    });
+    expect(loadCredentials('wss://eshmaki.me', 'bob')).toBeNull();
+    expect(client.updateResumeTokens).toHaveBeenCalledWith({ sessionToken: 'bob-local' });
+  });
+
   it('ignores a peer NOTICE that impersonates a SESSION token reply', () => {
     const client = makeClient();
     saveCredentials({ nick: 'alice', server: 'wss://eshmaki.me', password: 'pw' });
