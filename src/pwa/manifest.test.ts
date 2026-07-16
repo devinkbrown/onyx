@@ -577,7 +577,7 @@ describe('PWA manifest', () => {
     const assetRequest = { method: 'GET', mode: 'cors', url: 'https://onyx.test/assets/app.123.js' };
     let assetResponseWork: Promise<unknown> | undefined;
     let assetLifetimeWork: Promise<unknown> | undefined;
-    match.mockResolvedValueOnce(undefined);
+    match.mockRejectedValueOnce(new Error('static cache read unavailable'));
     networkFetch.mockResolvedValueOnce(assetResponse);
     listeners.get('fetch')?.({
       request: assetRequest,

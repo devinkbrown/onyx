@@ -255,10 +255,12 @@ self.addEventListener('fetch', (event) => {
 
   // Cache-first for static assets (hashed /assets from Vite, fonts, icons)
   if (isCacheableStaticPath(url.pathname)) {
-    const loaded = caches.match(request).then((cached) => {
-      if (cached) return { response: cached, shouldCache: false };
-      return fetch(request).then((response) => ({ response, shouldCache: response.ok }));
-    });
+    const loaded = caches.match(request)
+      .catch(() => undefined)
+      .then((cached) => {
+        if (cached) return { response: cached, shouldCache: false };
+        return fetch(request).then((response) => ({ response, shouldCache: response.ok }));
+      });
     // Keep the worker alive until a newly fetched asset is actually stored.
     // Without waitUntil(), the browser may terminate the worker after the
     // response is delivered and silently drop this best-effort cache write.
