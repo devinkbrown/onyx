@@ -1,7 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from 'vitest';
 import { parseVaultExport } from '@/lib/vault/historyVault';
-import { normalizeIrcChannelTarget, parseIrcLog } from './ircLogImport';
+import { normalizeIrcChannelTarget, parseIrcLog, parseIrcLogFile } from './ircLogImport';
+
+function chunkedFile(contents: string): Pick<File, 'size' | 'slice'> {
+  const blob = new Blob([contents]);
+  return {
+    size: blob.size,
+    slice: (start?: number, end?: number) => blob.slice(start, end),
+  };
+}
 
 describe('normalizeIrcChannelTarget', () => {
   it('prefixes with # and lowercases', () => {
@@ -288,5 +296,44 @@ describe('parseIrcLog — robustness and vault interop', () => {
     expect(messages[0]!.text).toBe('message 19600');
     expect(messages.at(-1)!.text).toBe('message 19999');
     expect(result!.summary.droppedOverCap).toBe(19_600);
+  });
+});
+
+describe('parseIrcLogFile — incremental browser-file reads', () => {
+  it('preserves parser state and the newest vault tail across byte chunks', async () => {
+    const raw = Array.from(
+      { length: 40_000 },
+      (_, index) => index === 0
+        ? '2025-01-02 14:00:00\t<alice>\tmessage 0'
+        : `14:${String(index % 60).padStart(2, '0')} <alice> message ${index}`,
+    ).join('\n');
+
+    const streamed = await parseIrcLogFile(chunkedFile(raw), { channel: '#dev' });
+    const direct = parseIrcLog(raw, { channel: '#dev' });
+
+    expect(streamed?.summary).toEqual(direct?.summary);
+    expect(streamed?.snapshot.targets[0]?.messages.map(message => ({
+      id: message.id,
+      time: message.time.toISOString(),
+      text: message.text,
+    }))).toEqual(direct?.snapshot.targets[0]?.messages.map(message => ({
+      id: message.id,
+      time: message.time.toISOString(),
+      text: message.text,
+    })));
+  });
+
+  it('drops one multi-chunk oversized line without retaining it or losing the next line', async () => {
+    const raw = `${'x'.repeat(1024 * 1024 + 17)}\n2025-01-02 14:06:00\t<bob>\tsafe`;
+    const result = await parseIrcLogFile(chunkedFile(raw), { channel: '#dev' });
+
+    expect(result?.summary.skipped).toBe(1);
+    expect(result?.snapshot.targets[0]?.messages.map(message => message.text)).toEqual(['safe']);
+  });
+
+  it('fails closed for empty, oversized, or invalid-destination file objects', async () => {
+    expect(await parseIrcLogFile(chunkedFile(''), { channel: '#dev' })).toBeNull();
+    expect(await parseIrcLogFile({ size: 128 * 1024 * 1024 + 1, slice: () => new Blob() }, { channel: '#dev' })).toBeNull();
+    expect(await parseIrcLogFile(chunkedFile('14:05 <alice> hi'), { channel: '___' })).toBeNull();
   });
 });

@@ -25,11 +25,17 @@ import {
   IRC_LOG_MAX_FILE_BYTES,
 } from './importFileLimits';
 
-type TrackedFile = { file: File; text: ReturnType<typeof vi.fn> };
+type TrackedFile = {
+  file: File;
+  text: ReturnType<typeof vi.fn>;
+  slice: ReturnType<typeof vi.fn>;
+};
 
 function trackedFile(name: string, contents: string, size = new TextEncoder().encode(contents).byteLength): TrackedFile {
   const text = vi.fn(async () => contents);
-  return { file: { name, size, text } as unknown as File, text };
+  const blob = new Blob([contents]);
+  const slice = vi.fn((start?: number, end?: number) => blob.slice(start, end));
+  return { file: { name, size, text, slice } as unknown as File, text, slice };
 }
 
 /** A File-like stand-in with realistic byte metadata. */
@@ -184,9 +190,13 @@ describe('IrcLogImportControls', () => {
     render(() => <IrcLogImportControls />);
     fireEvent.input(screen.getByLabelText('Channel'), { target: { value: '#dev' } });
     const chooser = screen.getByLabelText('Choose log file') as HTMLInputElement;
+    const log = trackedFile(
+      'log.txt',
+      '2025-01-01 10:00:00\t<alice>\thi there\n2025-01-01 10:01:00\t<bob>\thello',
+    );
     chooseFile(
       'Choose log file',
-      fakeFile('log.txt', '2025-01-01 10:00:00\t<alice>\thi there\n2025-01-01 10:01:00\t<bob>\thello'),
+      log.file,
     );
 
     await screen.findByText(/Ready to import 2 messages into #dev/);
@@ -199,6 +209,8 @@ describe('IrcLogImportControls', () => {
     await waitFor(() => expect(chooser).toHaveFocus());
     const stored = await loadRecent('#dev');
     expect(stored).toHaveLength(2);
+    expect(log.slice).toHaveBeenCalled();
+    expect(log.text).not.toHaveBeenCalled();
   });
 
   it('warns when normalization changes the requested label and confirms only the exact displayed target', async () => {
@@ -267,6 +279,7 @@ function trackedPackageFile(
   return {
     file: { ...tracked.file, name, size, webkitRelativePath: path, text: tracked.text } as unknown as File,
     text: tracked.text,
+    slice: tracked.slice,
   };
 }
 

@@ -106,6 +106,7 @@ const SYNTHETIC_START_DAY = Date.UTC(2000, 0, 1);
 const MAX_IRC_TARGET_LENGTH = 256;
 const MAX_IRC_RAW_TEXT_CHARS = 128 * 1024 * 1024;
 const MAX_IRC_LINE_CHARS = MAX_VAULT_MESSAGE_TEXT_LENGTH + 1_024;
+const IRC_LOG_FILE_CHUNK_BYTES = 1024 * 1024;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -396,142 +397,111 @@ function timestampForLine(
   return new Date(state.runningDay);
 }
 
-/**
- * Transform a raw WeeChat/irssi/mIRC-style IRC text log into a vault snapshot.
- *
- * Returns null only when the input is empty/whitespace or no usable channel was
- * supplied. A non-empty log whose lines all fail parsing still returns a valid
- * empty snapshot with `summary.skipped` explaining what happened.
- */
-export function parseIrcLog(raw: string, options: IrcLogImportOptions): IrcLogImportResult | null {
-  if (typeof raw !== 'string' || raw.length === 0 || !/\S/u.test(raw)) return null;
-  if (!isRecord(options)) return null;
+interface IrcLogScanState {
+  target: string;
+  includeSystem: boolean;
+  keepPerChannel: number;
+  compactAt: number;
+  cutoff: number | null;
+  bucket: TargetBucket;
+  dateState: {
+    runningDay: number | null;
+    lastTimeOfDay: number | null;
+    lastTimestamp: number | null;
+    baseDay: number | null;
+  };
+  skipped: number;
+  droppedOverCap: number;
+}
 
+function createScanState(options: IrcLogImportOptions): IrcLogScanState | null {
+  if (!isRecord(options)) return null;
   const target = normalizeIrcChannelTarget(options.channel);
   if (!target) return null;
 
-  const includeSystem = options.includeSystem === true;
   const keepPerChannel = Math.min(finitePositiveInt(options.keepPerChannel, VAULT_KEEP), VAULT_KEEP);
-  const compactAt = keepPerChannel * 2;
   const sinceDays = finitePositiveInt(options.sinceDays, 0);
-  const cutoff = sinceDays > 0 ? Date.now() - sinceDays * DAY_MS : null;
-  const bucket: TargetBucket = { target, messages: [] };
-  const dateState = {
-    runningDay: null as number | null,
-    lastTimeOfDay: null as number | null,
-    lastTimestamp: null as number | null,
-    baseDay: baseDayFromOption(options.baseDate),
+  return {
+    target,
+    includeSystem: options.includeSystem === true,
+    keepPerChannel,
+    compactAt: keepPerChannel * 2,
+    cutoff: sinceDays > 0 ? Date.now() - sinceDays * DAY_MS : null,
+    bucket: { target, messages: [] },
+    dateState: {
+      runningDay: null,
+      lastTimeOfDay: null,
+      lastTimestamp: null,
+      baseDay: baseDayFromOption(options.baseDate),
+    },
+    skipped: 0,
+    droppedOverCap: 0,
   };
+}
 
-  let skipped = 0;
-  let droppedOverCap = 0;
+function compactScan(state: IrcLogScanState): void {
+  if (state.bucket.messages.length <= state.keepPerChannel) return;
+  state.bucket.messages.sort((a, b) => a.time.getTime() - b.time.getTime());
+  state.droppedOverCap += state.bucket.messages.length - state.keepPerChannel;
+  state.bucket.messages = state.bucket.messages.slice(-state.keepPerChannel);
+}
 
-  const compact = (): void => {
-    if (bucket.messages.length <= keepPerChannel) return;
-    bucket.messages.sort((a, b) => a.time.getTime() - b.time.getTime());
-    droppedOverCap += bucket.messages.length - keepPerChannel;
-    bucket.messages = bucket.messages.slice(-keepPerChannel);
-  };
-
-  // Avoid `split()` on a valid 128 MiB log: that duplicates the whole input and
-  // allocates an entry for every line before retention can prune anything. Walk
-  // line boundaries in place and allocate at most one bounded line at a time.
-  // Direct callers that bypass the file-selection ceiling retain the newest
-  // 128 MiB without copying it; the first partial line is discarded.
-  const boundedStart = Math.max(0, raw.length - MAX_IRC_RAW_TEXT_CHARS);
-  let cursor = boundedStart;
-  if (boundedStart > 0) {
-    skipped += 1; // one truncated prefix region; exact line count is intentionally not scanned
-    const firstBreak = raw.indexOf('\n', boundedStart);
-    cursor = firstBreak < 0 ? raw.length : firstBreak + 1;
+function scanLine(state: IrcLogScanState, line: string, lineDiscriminator: number): void {
+  if (line.length > MAX_IRC_LINE_CHARS) {
+    state.skipped += 1;
+    return;
   }
-  let logicalLine = 0;
-  while (cursor <= raw.length) {
-    const nextBreak = raw.indexOf('\n', cursor);
-    const end = nextBreak < 0 ? raw.length : nextBreak;
-    logicalLine += 1;
-    if (end - cursor > MAX_IRC_LINE_CHARS) {
-      skipped += 1;
-      if (nextBreak < 0) break;
-      cursor = nextBreak + 1;
-      continue;
-    }
-    const line = raw.slice(cursor, end);
-    const parsed = parseLine(line);
-    if (!parsed) {
-      skipped += 1;
-      if (nextBreak < 0) break;
-      cursor = nextBreak + 1;
-      continue;
-    }
-
-    const body = parseLineBody(parsed);
-    if (!body) {
-      skipped += 1;
-      if (nextBreak < 0) break;
-      cursor = nextBreak + 1;
-      continue;
-    }
-
-    if (body.system && !includeSystem) {
-      skipped += 1;
-      if (nextBreak < 0) break;
-      cursor = nextBreak + 1;
-      continue;
-    }
-
-    const time = timestampForLine(parsed, dateState);
-    if (Number.isNaN(time.getTime())) {
-      skipped += 1;
-      if (nextBreak < 0) break;
-      cursor = nextBreak + 1;
-      continue;
-    }
-
-    if (cutoff !== null && time.getTime() < cutoff) {
-      skipped += 1;
-      if (nextBreak < 0) break;
-      cursor = nextBreak + 1;
-      continue;
-    }
-
-    const from = boundedWireToken(body.from, MAX_VAULT_SENDER_LENGTH, 'unknown');
-    const text = body.text.slice(0, MAX_VAULT_MESSAGE_TEXT_LENGTH).trim();
-    if (!text) {
-      skipped += 1;
-      if (nextBreak < 0) break;
-      cursor = nextBreak + 1;
-      continue;
-    }
-
-    const lineDiscriminator = boundedStart === 0 ? logicalLine : cursor;
-
-    bucket.messages.push({
-      id: messageId(bucket.target, time, lineDiscriminator),
-      time,
-      from,
-      text,
-      type: body.type,
-      target,
-    });
-
-    if (bucket.messages.length >= compactAt) compact();
-    if (nextBreak < 0) break;
-    cursor = nextBreak + 1;
+  const parsed = parseLine(line);
+  if (!parsed) {
+    state.skipped += 1;
+    return;
   }
 
-  compact();
-  bucket.messages.sort((a, b) => a.time.getTime() - b.time.getTime());
+  const body = parseLineBody(parsed);
+  if (!body || (body.system && !state.includeSystem)) {
+    state.skipped += 1;
+    return;
+  }
+
+  const time = timestampForLine(parsed, state.dateState);
+  if (Number.isNaN(time.getTime()) || (state.cutoff !== null && time.getTime() < state.cutoff)) {
+    state.skipped += 1;
+    return;
+  }
+
+  const from = boundedWireToken(body.from, MAX_VAULT_SENDER_LENGTH, 'unknown');
+  const text = body.text.slice(0, MAX_VAULT_MESSAGE_TEXT_LENGTH).trim();
+  if (!text) {
+    state.skipped += 1;
+    return;
+  }
+
+  state.bucket.messages.push({
+    id: messageId(state.target, time, lineDiscriminator),
+    time,
+    from,
+    text,
+    type: body.type,
+    target: state.target,
+  });
+  if (state.bucket.messages.length >= state.compactAt) compactScan(state);
+}
+
+function finishScan(state: IrcLogScanState): IrcLogImportResult {
+  compactScan(state);
+  state.bucket.messages.sort((a, b) => a.time.getTime() - b.time.getTime());
 
   let oldest: number | null = null;
   let newest: number | null = null;
-  for (const message of bucket.messages) {
+  for (const message of state.bucket.messages) {
     const time = message.time.getTime();
     if (oldest === null || time < oldest) oldest = time;
     if (newest === null || time > newest) newest = time;
   }
 
-  const targets: VaultExportTarget[] = bucket.messages.length > 0 ? [{ target, messages: bucket.messages }] : [];
+  const targets: VaultExportTarget[] = state.bucket.messages.length > 0
+    ? [{ target: state.target, messages: state.bucket.messages }]
+    : [];
   const snapshot: VaultExportSnapshot = {
     kind: 'onyx-vault',
     version: 1,
@@ -543,11 +513,125 @@ export function parseIrcLog(raw: string, options: IrcLogImportOptions): IrcLogIm
     snapshot,
     summary: {
       channels: targets.length,
-      messages: bucket.messages.length,
-      skipped,
-      droppedOverCap,
+      messages: state.bucket.messages.length,
+      skipped: state.skipped,
+      droppedOverCap: state.droppedOverCap,
       oldest: oldest !== null ? new Date(oldest).toISOString() : null,
       newest: newest !== null ? new Date(newest).toISOString() : null,
     },
   };
+}
+
+/**
+ * Transform a raw WeeChat/irssi/mIRC-style IRC text log into a vault snapshot.
+ *
+ * Returns null only when the input is empty/whitespace or no usable channel was
+ * supplied. A non-empty log whose lines all fail parsing still returns a valid
+ * empty snapshot with `summary.skipped` explaining what happened.
+ */
+export function parseIrcLog(raw: string, options: IrcLogImportOptions): IrcLogImportResult | null {
+  if (typeof raw !== 'string' || raw.length === 0 || !/\S/u.test(raw)) return null;
+  const state = createScanState(options);
+  if (!state) return null;
+
+  // Avoid `split()` on a valid 128 MiB log: that duplicates the whole input and
+  // allocates an entry for every line before retention can prune anything. Walk
+  // line boundaries in place and allocate at most one bounded line at a time.
+  // Direct callers that bypass the file-selection ceiling retain the newest
+  // 128 MiB without copying it; the first partial line is discarded.
+  const boundedStart = Math.max(0, raw.length - MAX_IRC_RAW_TEXT_CHARS);
+  let cursor = boundedStart;
+  if (boundedStart > 0) {
+    state.skipped += 1; // one truncated prefix region; exact line count is intentionally not scanned
+    const firstBreak = raw.indexOf('\n', boundedStart);
+    cursor = firstBreak < 0 ? raw.length : firstBreak + 1;
+  }
+  let logicalLine = 0;
+  while (cursor <= raw.length) {
+    const nextBreak = raw.indexOf('\n', cursor);
+    const end = nextBreak < 0 ? raw.length : nextBreak;
+    logicalLine += 1;
+    const line = raw.slice(cursor, end);
+    const lineDiscriminator = boundedStart === 0 ? logicalLine : cursor;
+    scanLine(state, line, lineDiscriminator);
+    if (nextBreak < 0) break;
+    cursor = nextBreak + 1;
+  }
+  return finishScan(state);
+}
+
+/**
+ * Parse a browser File without first materialising the whole log as one giant
+ * JavaScript string. UTF-8 is decoded incrementally, date/rollover state is
+ * retained across chunk boundaries, and an oversized physical line is dropped
+ * while only a bounded prefix is ever kept in memory.
+ */
+export async function parseIrcLogFile(
+  file: Pick<File, 'size' | 'slice'>,
+  options: IrcLogImportOptions,
+): Promise<IrcLogImportResult | null> {
+  if (!file || !Number.isFinite(file.size) || file.size <= 0 || file.size > MAX_IRC_RAW_TEXT_CHARS) {
+    return null;
+  }
+  const state = createScanState(options);
+  if (!state) return null;
+
+  const decoder = new TextDecoder();
+  let carry = '';
+  let discardingLongLine = false;
+  let sawNonWhitespace = false;
+  let logicalLine = 0;
+  let endedWithNewline = false;
+
+  const consume = (decoded: string): void => {
+    if (/\S/u.test(decoded)) sawNonWhitespace = true;
+    let offset = 0;
+    while (offset < decoded.length) {
+      const newline = decoded.indexOf('\n', offset);
+      const end = newline < 0 ? decoded.length : newline;
+      const segment = decoded.slice(offset, end);
+      if (!discardingLongLine) {
+        if (carry.length + segment.length > MAX_IRC_LINE_CHARS) {
+          carry = '';
+          discardingLongLine = true;
+        } else {
+          carry += segment;
+        }
+      }
+
+      if (newline < 0) {
+        endedWithNewline = false;
+        break;
+      }
+
+      logicalLine += 1;
+      if (discardingLongLine) {
+        state.skipped += 1;
+        discardingLongLine = false;
+      } else {
+        scanLine(state, carry, logicalLine);
+      }
+      carry = '';
+      endedWithNewline = true;
+      offset = newline + 1;
+    }
+  };
+
+  for (let offset = 0; offset < file.size; offset += IRC_LOG_FILE_CHUNK_BYTES) {
+    const end = Math.min(file.size, offset + IRC_LOG_FILE_CHUNK_BYTES);
+    const bytes = await file.slice(offset, end).arrayBuffer();
+    consume(decoder.decode(bytes, { stream: end < file.size }));
+  }
+  consume(decoder.decode());
+
+  // Match the string parser's final logical line, including its trailing empty
+  // line when the source ends in a newline.
+  if (discardingLongLine) {
+    state.skipped += 1;
+  } else if (carry.length > 0 || endedWithNewline) {
+    logicalLine += 1;
+    scanLine(state, carry, logicalLine);
+  }
+
+  return sawNonWhitespace ? finishScan(state) : null;
 }

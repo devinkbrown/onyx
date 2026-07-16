@@ -789,6 +789,12 @@ client or public site needs to expose the result.
     lines without losing safe siblings, and bound channel, sender, message, and
     generated-id fields before vault rows are created. Direct callers beyond
     the selection ceiling retain the newest bounded text window.
+    ✅ **CLIENT HARDENING SHIPPED 2026-07-16** — The browser IRC-log chooser now
+    decodes accepted files incrementally in 1 MiB UTF-8 chunks instead of
+    materializing the full 128 MiB selection with `File.text()` before bounded
+    parsing begins. Date rollover and stable line ids survive chunk boundaries,
+    oversized physical lines are discarded without being retained, and only one
+    bounded line plus the vault's newest 400-message window stays live.
 
 ## Phase 13 — Amanogawa Local Intelligence ← PLANNED
 34. **AI provenance chrome** *(client)* — every recap, search answer,

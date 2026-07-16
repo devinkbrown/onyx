@@ -820,14 +820,14 @@ export function IrcLogImportControls(): JSX.Element {
     }
     setBusy(true);
     try {
-      const { normalizeIrcChannelTarget, parseIrcLog } = await import('@/lib/import/ircLogImport');
+      const { normalizeIrcChannelTarget, parseIrcLogFile } = await import('@/lib/import/ircLogImport');
       const normalizedTarget = normalizeIrcChannelTarget(requestedChannel);
       if (!normalizedTarget) {
         setPending(null);
         setStatus(`The requested channel "${requestedChannel}" does not normalize to a safe destination. Enter a channel containing letters or numbers (for example, #dev).`);
         return;
       }
-      const result = parseIrcLog(await file.text(), { channel: requestedChannel });
+      const result = await parseIrcLogFile(file, { channel: requestedChannel });
       if (!result || result.summary.messages === 0) {
         setPending(null);
         setStatus('No recognizable log lines found. Supported: weechat, irssi, and mIRC text logs.');
