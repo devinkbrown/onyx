@@ -20,6 +20,8 @@ import {
   MAX_LIVE_PROP_KEYS,
   MAX_LIVE_PROP_TARGETS,
   MAX_LIVE_PROP_VALUE_LENGTH,
+  MAX_ISUPPORT_TOKENS,
+  MAX_ISUPPORT_VALUE_LENGTH,
   MAX_MOTD_TEXT_LENGTH,
   MAX_SERVER_AUX_TEXT_LENGTH,
   MAX_SERVER_RULE_LINES,
@@ -148,6 +150,28 @@ describe('live inbound message bounds', () => {
     feed(':server 352 me #root user host server Alice H :0 present');
     expect(store.getState().awayNicks).toEqual(new Set());
     expect(store.getState().channels.get('#root')?.users.get('alice')?.away).toBe(false);
+  });
+
+  it('bounds and sanitizes the accumulated ISUPPORT feature registry', () => {
+    feed(':server 005 me __proto__=poison lowercase=bad 9BAD=nope :supported');
+    expect(store.getState().serverFeatures.size).toBe(0);
+    expect(Object.keys(store.getState().isupportTokens)).toEqual([]);
+
+    const tokens = Array.from(
+      { length: MAX_ISUPPORT_TOKENS + 12 },
+      (_, index) => `FEATURE${index}=value-${index}`,
+    ).join(' ');
+    feed(`:server 005 me ${tokens} :supported`);
+    expect(store.getState().serverFeatures.size).toBe(MAX_ISUPPORT_TOKENS);
+    expect(Object.keys(store.getState().isupportTokens)).toHaveLength(MAX_ISUPPORT_TOKENS);
+    expect(store.getState().serverFeatures.has(`FEATURE${MAX_ISUPPORT_TOKENS}`)).toBe(false);
+
+    feed(`:server 005 me FEATURE0=updated OVERSIZED=${'x'.repeat(MAX_ISUPPORT_VALUE_LENGTH + 1)} OVERFLOW=new :supported`);
+    expect(store.getState().serverFeatures.size).toBe(MAX_ISUPPORT_TOKENS);
+    expect(store.getState().serverFeatures.get('FEATURE0')).toBe('updated');
+    expect(store.getState().serverFeatures.has('OVERSIZED')).toBe(false);
+    expect(store.getState().serverFeatures.has('OVERFLOW')).toBe(false);
+    expect(Object.hasOwn(store.getState().isupportTokens, '__proto__')).toBe(false);
   });
 
   it('repairs legacy away memory and refuses growth beyond one roster ceiling', () => {

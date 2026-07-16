@@ -2154,6 +2154,9 @@ const MAX_NAMES_TOKEN_LENGTH = 512;
 export const MAX_SERVER_AUX_TEXT_LENGTH = 4 * 1024;
 export const MAX_MOTD_TEXT_LENGTH = 64 * 1024;
 export const MAX_SERVER_RULE_LINES = 256;
+export const MAX_ISUPPORT_TOKENS = 256;
+export const MAX_ISUPPORT_KEY_LENGTH = 64;
+export const MAX_ISUPPORT_VALUE_LENGTH = 1_024;
 export const MAX_NOTIFICATION_ENTRIES = 50;
 export const MAX_TOAST_ENTRIES = 20;
 /** Management and authentication replies are server-controlled streams. */
@@ -2450,6 +2453,21 @@ function _updateBoundedAwayNicks(
   }
   if (away && next.size < MAX_AWAY_NICKS) next.add(nickKey);
   return next;
+}
+
+function _normalizeIsupportKey(value: string): string | null {
+  return value.length > 0
+    && value.length <= MAX_ISUPPORT_KEY_LENGTH
+    && /^[A-Z][A-Z0-9-]*$/u.test(value)
+    ? value
+    : null;
+}
+
+function _normalizeIsupportValue(value: string): string | null {
+  return value.length <= MAX_ISUPPORT_VALUE_LENGTH
+    && !/[\u0000-\u001f\u007f]/u.test(value)
+    ? value
+    : null;
 }
 
 function _deleteCaseInsensitive(source: Set<string>, value: string): Set<string> {
@@ -11002,10 +11020,24 @@ export const store = createStore<OnyxState>()(
         // ── 005 ISUPPORT — store parsed features in serverFeatures map ───
         case '005': {
           // params[0] = our nick, last param = ":are supported..." — skip both
-          const tokens005 = params.slice(1, -1);
+          const tokens005 = params.slice(
+            1,
+            Math.min(params.length - 1, MAX_ISUPPORT_TOKENS + 1),
+          );
           set(s => {
-            const serverFeatures = new Map(s.serverFeatures);
-            const newIsupportTokens: Record<string, string> = {};
+            // Repair any pre-hardening state while copying. Keeping the Map as
+            // the single source avoids allocating Object.entries() for a
+            // legacy oversized plain-object mirror before the ceiling applies.
+            const serverFeatures = new Map<string, string>();
+            const isupportTokens: Record<string, string> = {};
+            for (const [rawKey, rawValue] of s.serverFeatures) {
+              if (serverFeatures.size >= MAX_ISUPPORT_TOKENS) break;
+              const key = _normalizeIsupportKey(rawKey);
+              const value = _normalizeIsupportValue(rawValue);
+              if (!key || value === null || serverFeatures.has(key)) continue;
+              serverFeatures.set(key, value);
+              isupportTokens[key] = value;
+            }
             let networkUpdate: string | null = null;
             let isupportPrefixToMode = s.isupportPrefixToMode;
             let isupportModeToPrefix = s.isupportModeToPrefix;
@@ -11014,10 +11046,19 @@ export const store = createStore<OnyxState>()(
             let channels = s.channels;
             for (const token of tokens005) {
               const eqIdx = token.indexOf('=');
-              const key = eqIdx === -1 ? token : token.slice(0, eqIdx);
-              const val = eqIdx === -1 ? '' : token.slice(eqIdx + 1);
+              const key = _normalizeIsupportKey(
+                eqIdx === -1 ? token : token.slice(0, eqIdx),
+              );
+              const val = _normalizeIsupportValue(
+                eqIdx === -1 ? '' : token.slice(eqIdx + 1),
+              );
+              if (
+                !key
+                || val === null
+                || (!serverFeatures.has(key) && serverFeatures.size >= MAX_ISUPPORT_TOKENS)
+              ) continue;
               serverFeatures.set(key, val);
-              newIsupportTokens[key] = val;
+              isupportTokens[key] = val;
               if (key === 'NETWORK' && val) {
                 networkUpdate = val;
               }
@@ -11036,7 +11077,6 @@ export const store = createStore<OnyxState>()(
               if (key === 'CHANLIMIT') chanLimits = parseCHANLIMIT(val);
               if (key === 'CASEMAPPING' && val) caseMapping = val;
             }
-            const isupportTokens = { ...s.isupportTokens, ...newIsupportTokens };
             if (networkUpdate) {
               return {
                 serverFeatures,
