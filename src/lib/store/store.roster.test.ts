@@ -22,7 +22,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { store } from './store';
+import { _resetNamesBurstsForTests, store } from './store';
 import { parseIRCMessage } from '@/lib/irc/parser';
 
 const initialState = store.getInitialState();
@@ -63,6 +63,7 @@ function roster(channel: string): string[] {
 
 beforeEach(() => {
   store.setState(initialState, true);
+  _resetNamesBurstsForTests();
 });
 
 describe('NAMES roster reconcile — interleaved / late bursts never collapse', () => {
@@ -141,6 +142,104 @@ describe('NAMES roster reconcile — interleaved / late bursts never collapse', 
     feed(':server 366 me #reconcile :End of /NAMES list.');
 
     expect(roster('#reconcile')).toEqual(['alice', 'me']); // ghost dropped
+  });
+
+  it('does not let a later 353 chunk undo a live PART during the burst', () => {
+    connect('me');
+    feed(':me!u@h JOIN #part-race');
+    feed(':server 353 me = #part-race :me alice');
+
+    feed(':alice!u@h PART #part-race :gone');
+    feed(':server 353 me = #part-race :alice bob');
+    feed(':server 366 me #part-race :End of /NAMES list.');
+
+    expect(roster('#part-race')).toEqual(['bob', 'me']);
+  });
+
+  it('does not let a late 353 after an early 366 undo a live QUIT', () => {
+    connect('me');
+    feed(':me!u@h JOIN #quit-race');
+    feed(':server 353 me = #quit-race :me alice');
+
+    feed(':alice!u@h QUIT :gone');
+    feed(':server 366 me #quit-race :End of /NAMES list.');
+    feed(':server 353 me = #quit-race :alice bob');
+
+    expect(roster('#quit-race')).toEqual(['bob', 'me']);
+  });
+
+  it('does not resurrect the old nick from a late 353 after a live NICK', () => {
+    connect('me');
+    feed(':me!u@h JOIN #nick-race');
+    feed(':server 353 me = #nick-race :me alice');
+
+    feed(':alice!u@h NICK alicia');
+    feed(':server 353 me = #nick-race :alice bob');
+    feed(':server 366 me #nick-race :End of /NAMES list.');
+
+    expect(roster('#nick-race')).toEqual(['alicia', 'bob', 'me']);
+  });
+
+  it('does not recreate a channel from a late 353 after self-PART', () => {
+    connect('me');
+    feed(':me!u@h JOIN #self-part-race');
+    feed(':server 353 me = #self-part-race :me alice');
+
+    feed(':me!u@h PART #self-part-race :gone');
+    feed(':server 353 me = #self-part-race :me alice');
+    feed(':server 366 me #self-part-race :End of /NAMES list.');
+
+    expect(store.getState().channels.has('#self-part-race')).toBe(false);
+  });
+
+  it('an expired burst cannot promote a late partial 353 to roster replacement', () => {
+    const now = vi.spyOn(performance, 'now').mockReturnValue(0);
+    try {
+      connect('me');
+      feed(':me!u@h JOIN #expired');
+      feed(':server 353 me = #expired :me alice');
+
+      now.mockReturnValue(15_001);
+      feed(':server 353 me = #expired :bob');
+
+      expect(roster('#expired')).toEqual(['alice', 'bob', 'me']);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('does not re-arm a focus refresh while settled late lines can still arrive', () => {
+    const now = vi.spyOn(performance, 'now').mockReturnValue(0);
+    try {
+      const client = connect('me');
+      feed(':me!u@h JOIN #settled-focus');
+      feed(':server 353 me = #settled-focus :me alice carol');
+      feed(':server 366 me #settled-focus :End of /NAMES list.');
+
+      // Past the ordinary 8s focus throttle but still within the 15s window in
+      // which an interleaved mesh 353 can trail the first observed 366.
+      now.mockReturnValue(9_000);
+      store.getState().navigate({ kind: 'home' });
+      store.getState().navigate({ kind: 'channel', channel: '#settled-focus' });
+      expect(client.sendRaw.mock.calls.filter((call) => call[0] === 'NAMES')).toHaveLength(1);
+
+      feed(':server 353 me = #settled-focus :bob');
+      expect(roster('#settled-focus')).toEqual(['alice', 'bob', 'carol', 'me']);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('remaps existing roster status modes when ISUPPORT PREFIX changes', () => {
+    connect('me');
+    feed(':me!u@h JOIN #prefix-change');
+    feed(':server 353 me = #prefix-change :me @alice');
+    expect(store.getState().channels.get('#prefix-change')?.users.get('alice')?.modes).toEqual(new Set(['o']));
+
+    // The same @ prefix now represents owner (q), not operator (o).
+    feed(':server 005 me PREFIX=(qa)@+ :are supported by this server');
+
+    expect(store.getState().channels.get('#prefix-change')?.users.get('alice')?.modes).toEqual(new Set(['q']));
   });
 });
 

@@ -91,6 +91,17 @@ describe('event-playback replay guard', () => {
     expect(store.getState().channels.get('#root')!.users.has('mizu')).toBe(false);
   });
 
+  it('live channel events during an open batch are not swallowed without a msgid', () => {
+    feed('BATCH +r-live chathistory #root');
+    feed(':newbie!n@host JOIN #root');
+    feed(':mizu!m@host PART #root :actually leaving now');
+    feed('BATCH -r-live');
+
+    const users = store.getState().channels.get('#root')!.users;
+    expect(users.has('newbie')).toBe(true);
+    expect(users.has('mizu')).toBe(false);
+  });
+
   it('replayed NICK does not rename anyone now', () => {
     feed('BATCH +r3 chathistory #root');
     feed('@time=2026-07-01T09:00:00.000Z;msgid=old-n1 :kain!k@host NICK kain2');
@@ -98,6 +109,16 @@ describe('event-playback replay guard', () => {
     const ch = store.getState().channels.get('#root')!;
     expect(ch.users.has('kain')).toBe(true);
     expect(ch.users.has('kain2')).toBe(false);
+  });
+
+  it('replayed MODE does not change current member ranks', () => {
+    feed('BATCH +r-mode chathistory #root');
+    feed('@time=2026-07-01T09:00:00.000Z;msgid=old-m1 :kain!k@host MODE #root +o trev');
+    feed('BATCH -r-mode');
+
+    const ch = store.getState().channels.get('#root')!;
+    expect(ch.users.get('trev')?.modes).toEqual(new Set());
+    expect(ch.messages.some((message) => message.text === 'kain set mode +o trev')).toBe(true);
   });
 
   it('dedupes replayed join events when the same time-travel window is fetched twice', () => {

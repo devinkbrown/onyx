@@ -2176,14 +2176,18 @@ function _collectServerSearchMessage(
  * the channel RIGHT NOW (the "nicklist shrinks after a while" bug). Orochi's
  * replay lines carry @time+msgid but NO batch tag, so detection is:
  *   1. spec path — a batch tag referencing an open collector;
- *   2. Orochi path — the event's channel has an open chathistory batch;
+ *   2. Orochi path — the event's channel has an open chathistory batch AND the
+ *      bare replay line carries a msgid;
  *   3. channel-less events (QUIT/NICK) — some batch is open AND the line
  *      carries a msgid (live event lines don't; replayed ones always do).
  */
 function _isHistoryReplay(tags: Record<string, string>, channel: string | null): boolean {
   const batchTag = tags['batch'];
   if (batchTag !== undefined && _batchCollectors.has(batchTag)) return true;
-  if (channel) return _openChathistoryByTarget.has(channel.toLowerCase());
+  if (channel) {
+    return _openChathistoryByTarget.has(channel.toLowerCase())
+      && tags['msgid'] !== undefined;
+  }
   return _openChathistoryByTarget.size > 0 && tags['msgid'] !== undefined;
 }
 
@@ -2341,7 +2345,12 @@ function mergeChannelListRow(
  * burst whose 366 was lost so a dropped terminator can't permanently suppress
  * reconciliation.
  */
-type NamesBurst = { phase: 'expect' | 'appending'; at: number };
+type NamesBurst = {
+  phase: 'expect' | 'appending' | 'settled';
+  at: number;
+  /** Live removals/renames that a stale later 353 must not resurrect. */
+  excludedNicks: Set<string>;
+};
 const _namesBursts = new Map<string, NamesBurst>();
 /** A burst older than this (its 366 was lost) is treated as finished. */
 const _NAMES_BURST_TTL_MS = 15000;
@@ -2352,7 +2361,7 @@ const _NAMES_BURST_TTL_MS = 15000;
  * sending a NAMES, or on self-JOIN before the server's automatic NAMES lands.
  */
 function _beginNamesBurst(key: string): void {
-  _namesBursts.set(key, { phase: 'expect', at: _now() });
+  _namesBursts.set(key, { phase: 'expect', at: _now(), excludedNicks: new Set() });
 }
 
 /**
@@ -2363,6 +2372,28 @@ function _beginNamesBurst(key: string): void {
 function _namesBurstActive(key: string): boolean {
   const b = _namesBursts.get(key);
   return b !== undefined && _now() - b.at < _NAMES_BURST_TTL_MS;
+}
+
+/** Return recent burst state, dropping bounded late-line protection after TTL. */
+function _recentNamesBurst(key: string): NamesBurst | undefined {
+  const burst = _namesBursts.get(key);
+  if (burst && _now() - burst.at >= _NAMES_BURST_TTL_MS) {
+    _namesBursts.delete(key);
+    return undefined;
+  }
+  return burst;
+}
+
+/** A live removal/rename wins over any stale 353 still in flight for the burst. */
+function _excludeNickFromNames(key: string, nick: string): void {
+  if (!nick) return;
+  _recentNamesBurst(key)?.excludedNicks.add(nick.toLowerCase());
+}
+
+/** A later live JOIN/NICK explicitly makes this nick current again. */
+function _includeNickInNames(key: string, nick: string): void {
+  if (!nick) return;
+  _recentNamesBurst(key)?.excludedNicks.delete(nick.toLowerCase());
 }
 
 /**
@@ -2403,6 +2434,45 @@ const DEFAULT_MODE_TO_PREFIX: Record<string, string> = {
   h: '%',
   v: '+',
 };
+
+/**
+ * Preserve each visible prefix's meaning when a server changes ISUPPORT PREFIX
+ * during registration/resume. ChannelUser stores mode letters, so leaving the
+ * old letters in place would silently display stale ranks until another NAMES.
+ */
+function remapRosterPrefixModes(
+  channels: Map<string, Channel>,
+  oldModeToPrefix: Record<string, string>,
+  newPrefixToMode: Record<string, string>,
+): Map<string, Channel> {
+  let nextChannels: Map<string, Channel> | null = null;
+
+  for (const [channelKey, channel] of channels) {
+    let nextUsers: Map<string, ChannelUser> | null = null;
+    for (const [userKey, user] of channel.users) {
+      const nextModes = new Set<string>();
+      for (const mode of user.modes) {
+        const oldPrefix = oldModeToPrefix[mode];
+        if (!oldPrefix) {
+          nextModes.add(mode);
+          continue;
+        }
+        const nextMode = newPrefixToMode[oldPrefix];
+        if (nextMode) nextModes.add(nextMode);
+      }
+      const changed = nextModes.size !== user.modes.size
+        || [...nextModes].some((mode) => !user.modes.has(mode));
+      if (!changed) continue;
+      nextUsers ??= new Map(channel.users);
+      nextUsers.set(userKey, { ...user, modes: nextModes });
+    }
+    if (!nextUsers) continue;
+    nextChannels ??= new Map(channels);
+    nextChannels.set(channelKey, { ...channel, users: nextUsers });
+  }
+
+  return nextChannels ?? channels;
+}
 
 // ── Active-roster reconciliation (module-level) ───────────────────────────────
 // The member list can silently drift from the server's truth: a mesh peer flap
@@ -6269,6 +6339,14 @@ export const store = createStore<OnyxState>()(
             break;
           }
           const isSelf = joiner.toLowerCase() === ourNick.toLowerCase();
+          if (isSelf && _recentNamesBurst(key)?.phase === 'settled') {
+            // A new self-JOIN is a new membership generation. Let its explicit
+            // reconcile replace the completed generation and its tombstones.
+            _namesBursts.delete(key);
+            _lastRosterRefresh.delete(key);
+          } else {
+            _includeNickInNames(key, joiner);
+          }
           // extended-join: params[1] = account ('*' = not logged in), params[2] = realname
           const joinAccount = params[1] && params[1] !== '*' ? params[1] : undefined;
 
@@ -6346,6 +6424,9 @@ export const store = createStore<OnyxState>()(
           const isSelf = parter.toLowerCase() === ourNick.toLowerCase();
 
           if (isSelf) {
+            // A pending/late NAMES reply is not proof that we are still joined.
+            _namesBursts.delete(key);
+            _lastRosterRefresh.delete(key);
             set(s => {
               const channels = new Map(s.channels);
               channels.delete(key);
@@ -6363,6 +6444,7 @@ export const store = createStore<OnyxState>()(
               return { channels, channelFolders, activeView: next, activeChannelTopics };
             });
           } else {
+            _excludeNickFromNames(key, parter);
             const partReason = params[1] ?? '';
             set(s => {
               const channels = new Map(s.channels);
@@ -6390,6 +6472,11 @@ export const store = createStore<OnyxState>()(
           if (_isHistoryReplay(tags, null)) {
             _pushReplayEvent(tags, null, `${quitter} quit${quitReason ? `: ${quitReason}` : ''}`);
             break;
+          }
+          for (const [channelKey, channel] of get().channels) {
+            if (channel.users.has(quitter.toLowerCase())) {
+              _excludeNickFromNames(channelKey, quitter);
+            }
           }
           const quitChannels: string[] = [];
           set(s => {
@@ -6420,6 +6507,12 @@ export const store = createStore<OnyxState>()(
             break;
           }
           const isSelf = target.toLowerCase() === ourNick.toLowerCase();
+          if (isSelf) {
+            _namesBursts.delete(key);
+            _lastRosterRefresh.delete(key);
+          } else {
+            _excludeNickFromNames(key, target);
+          }
           set(s => {
             const channels = new Map(s.channels);
             if (isSelf) {
@@ -6459,10 +6552,17 @@ export const store = createStore<OnyxState>()(
         case '366': { // RPL_ENDOFNAMES
           const ch366 = params[1];
           if (!ch366) break;
-          // Close the burst. A later stray 353 (no burst entry) then APPENDS
-          // rather than replacing, so it can never collapse the roster; a fresh
-          // reconcile re-arms 'expect' via _beginNamesBurst before its NAMES.
-          _namesBursts.delete(ch366.toLowerCase());
+          // Settle rather than immediately discard the burst. Mesh replies can
+          // interleave so an early 366 may be followed by another stale 353;
+          // keeping live-removal tombstones for one bounded TTL prevents that
+          // late line from resurrecting a PART/QUIT/NICK target. Keep a settled
+          // burst refresh-active until TTL as well: re-arming before late lines
+          // drain would let the first stale partial replace the whole roster.
+          const namesKey = ch366.toLowerCase();
+          const namesBurst = _recentNamesBurst(namesKey);
+          if (namesBurst) {
+            _namesBursts.set(namesKey, { ...namesBurst, phase: 'settled', at: _now() });
+          }
           // Fetch channel PROP data if IRCX
           if (get().isIRCX) {
             get().requestChannelProps(ch366);
@@ -6541,22 +6641,40 @@ export const store = createStore<OnyxState>()(
           const key = ch.toLowerCase();
           const { client } = get();
           const names = (namesStr ?? '').split(' ').filter(Boolean);
-          // Only a burst WE initiated (phase 'expect') — or one whose 366 was
-          // lost (expired) — may REPLACE the roster; its first 353 does so and
-          // flips to 'appending'. Every other 353 (later lines of this burst, an
-          // overlapping burst, or a stray/late line with no entry) APPENDS, so a
-          // partial line can never collapse the full roster to a subset.
-          const burst = _namesBursts.get(key);
-          const expired = burst !== undefined && _now() - burst.at >= _NAMES_BURST_TTL_MS;
-          const freshNames = burst?.phase === 'expect' || expired;
-          _namesBursts.set(key, { phase: 'appending', at: freshNames ? _now() : (burst?.at ?? _now()) });
+          // Only a burst WE initiated in phase 'expect' may REPLACE the roster;
+          // its first 353 does so and flips to 'appending'. Every other 353
+          // (later lines, an overlapping burst, an expired reply, or a stray
+          // line with no entry) APPENDS, so a partial cannot collapse the full
+          // roster to a subset.
+          const burst = _recentNamesBurst(key);
+          const freshNames = burst?.phase === 'expect';
+          // Only a known, active request stays tracked. An unsolicited 353
+          // appends without suppressing a later authoritative refresh, while a
+          // settled burst keeps its removal tombstones for bounded late lines.
+          if (burst?.phase === 'expect') {
+            _namesBursts.set(key, { ...burst, phase: 'appending', at: _now() });
+          }
           set(s => {
             const channels = new Map(s.channels);
-            const c = channels.get(key) ?? emptyChannel(ch);
+            const c = channels.get(key);
+            // NAMES is a roster reply, not a JOIN. A delayed reply after our
+            // PART/KICK must never recreate the channel in local state.
+            if (!c) return {};
             const users = freshNames ? new Map<string, ChannelUser>() : new Map(c.users);
             for (const name of names) {
               const { nick: n, modes } = parseNamesPrefix(name, client?.prefixToMode ?? DEFAULT_PREFIX_TO_MODE);
-              if (n) users.set(n.toLowerCase(), { nick: n, modes: new Set(modes), away: false });
+              if (n && !burst?.excludedNicks.has(n.toLowerCase())) {
+                const userKey = n.toLowerCase();
+                const existing = c.users.get(userKey);
+                users.set(userKey, {
+                  ...existing,
+                  // NAMES owns membership, canonical casing, and status modes;
+                  // it does not carry WHO/AWAY or extended-JOIN account data.
+                  nick: n,
+                  modes: new Set(modes),
+                  away: existing?.away ?? false,
+                });
+              }
             }
             channels.set(key, { ...c, users });
             return { channels };
@@ -7244,6 +7362,12 @@ export const store = createStore<OnyxState>()(
             break;
           }
 
+          for (const [channelKey, channel] of get().channels) {
+            if (!channel.users.has(oldNick.toLowerCase())) continue;
+            _excludeNickFromNames(channelKey, oldNick);
+            _includeNickInNames(channelKey, newNick);
+          }
+
           if (isSelf) {
             // A rename to Guest##### that we never asked for is the server's
             // nick ENFORCEMENT evicting us from a protected nick. Without this
@@ -7309,6 +7433,10 @@ export const store = createStore<OnyxState>()(
         case 'MODE': {
           const target = params[0]!;
           const key = target.toLowerCase();
+          if (isChan(target) && _isHistoryReplay(tags, target)) {
+            _pushReplayEvent(tags, target, `${nick ?? 'server'} set mode ${params.slice(1).join(' ')}`);
+            break;
+          }
           if (isChan(target)) {
             const modeStr = params[1] ?? '';
             const modeArgs = params.slice(2);
@@ -8321,6 +8449,7 @@ export const store = createStore<OnyxState>()(
             let isupportModeToPrefix = s.isupportModeToPrefix;
             let chanLimits = s.chanLimits;
             let caseMapping = s.caseMapping;
+            let channels = s.channels;
             for (const token of tokens005) {
               const eqIdx = token.indexOf('=');
               const key = eqIdx === -1 ? token : token.slice(0, eqIdx);
@@ -8332,6 +8461,11 @@ export const store = createStore<OnyxState>()(
               }
               if (key === 'PREFIX') {
                 const parsed = parsePREFIX(val);
+                channels = remapRosterPrefixModes(
+                  channels,
+                  isupportModeToPrefix,
+                  parsed.prefixToMode,
+                );
                 isupportPrefixToMode = parsed.prefixToMode;
                 isupportModeToPrefix = parsed.modeToPrefix;
               }
@@ -8347,12 +8481,13 @@ export const store = createStore<OnyxState>()(
                 isupportModeToPrefix,
                 chanLimits,
                 caseMapping,
+                channels,
                 mediaAvailable: serverFeatures.has('standard-replies'),
                 networkName: networkUpdate,
                 server: s.server ? { ...s.server, name: networkUpdate, network: networkUpdate } : null,
               };
             }
-            return { serverFeatures, isupportTokens, isupportPrefixToMode, isupportModeToPrefix, chanLimits, caseMapping };
+            return { serverFeatures, isupportTokens, isupportPrefixToMode, isupportModeToPrefix, chanLimits, caseMapping, channels };
           });
           break;
         }

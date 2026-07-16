@@ -390,11 +390,13 @@ describe('channel mode tracking via _handleMessage', () => {
 describe('NAMES (353/366) replaces the roster', () => {
   function seedEmpty(name: string, ourNick = 'me') {
     const client = makeClient();
+    const channels = new Map<string, Channel>();
+    channels.set(name.toLowerCase(), makeChannel(name, []));
     store.setState({
       ...initialState,
       client: client as never,
       ourNick,
-      channels: new Map(),
+      channels,
       activeView: { kind: 'channel', channel: name.toLowerCase() },
     }, true);
     return client;
@@ -456,6 +458,28 @@ describe('NAMES (353/366) replaces the roster', () => {
     expect(users?.get('halfop')?.modes.has('h')).toBe(true);
     expect(users?.get('voice')?.modes.has('v')).toBe(true);
     expect(users?.get('plain')?.modes.size).toBe(0);
+  });
+
+  it('preserves away and account metadata while NAMES refreshes roles and membership', () => {
+    seed('#root', [
+      makeUser('me'),
+      { nick: 'alice', modes: new Set(['v']), away: true, account: 'alice-account' },
+      makeUser('ghost'),
+    ]);
+
+    _beginNamesBurstForTests('#root');
+    feed(':irc 353 me = #root :me @alice bob');
+    feed(':irc 366 me #root :End of /NAMES list.');
+
+    const users = store.getState().channels.get('#root')?.users;
+    expect([...users?.keys() ?? []].sort()).toEqual(['alice', 'bob', 'me']);
+    expect(users?.get('alice')).toMatchObject({
+      nick: 'alice',
+      away: true,
+      account: 'alice-account',
+    });
+    expect(users?.get('alice')?.modes).toEqual(new Set(['o']));
+    expect(users?.get('bob')).toMatchObject({ nick: 'bob', away: false });
   });
 });
 

@@ -140,6 +140,7 @@ describe('vanilla store', () => {
       static latest: FakeWebSocket | null = null;
 
       readyState = FakeWebSocket.OPEN;
+      bufferedAmount = 0;
       binaryType = '';
       onopen: ((event: Event) => void) | null = null;
       onmessage: ((event: MessageEvent) => void) | null = null;

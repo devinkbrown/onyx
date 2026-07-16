@@ -14,7 +14,8 @@
 
 import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { store } from '@/lib/store/store';
+import { parseIRCMessage } from '@/lib/irc/parser';
+import { _beginNamesBurstForTests, _resetNamesBurstsForTests, store } from '@/lib/store/store';
 import type { Channel, ChannelUser } from '@/lib/irc/types';
 import { MemberList } from './MemberList';
 
@@ -68,6 +69,7 @@ function seedChannel(users: ChannelUser[], ourNick = 'me') {
 
 beforeEach(() => {
   store.setState(initialState, true);
+  _resetNamesBurstsForTests();
   localStorage.clear();
 });
 
@@ -126,6 +128,27 @@ describe('MemberList accessibility', () => {
     render(() => <MemberList />);
 
     expect(screen.getByRole('button', { name: /Open member details for bob, Member, away/ })).toBeInTheDocument();
+  });
+
+  it('keeps an away member visibly away when NAMES refreshes their role', () => {
+    seedChannel([
+      makeUser('me'),
+      makeUser('bob', ['v'], { away: true, account: 'bob-account' }),
+      makeUser('ghost'),
+    ]);
+    render(() => <MemberList />);
+
+    _beginNamesBurstForTests('#general');
+    store.getState()._handleMessage(parseIRCMessage(':irc 353 me = #general :me @bob alice'));
+    store.getState()._handleMessage(parseIRCMessage(':irc 366 me #general :End of /NAMES list.'));
+
+    expect(screen.getByLabelText('3 members')).toHaveTextContent('3');
+    expect(screen.queryByRole('button', { name: /Open member details for ghost/ })).toBeNull();
+    const bob = screen.getByRole('button', { name: /Open member details for bob, Op, away/ });
+    expect(bob.querySelector('.shell-member-row')).toHaveClass('shell-member-row--away');
+
+    fireEvent.click(bob);
+    expect(screen.getByText('~bob-account')).toBeInTheDocument();
   });
 
   it('opens a member dialog from a keyboard-operable button and closes on Escape', () => {
