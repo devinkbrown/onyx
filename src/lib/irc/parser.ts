@@ -6,6 +6,9 @@ export const MAX_IRCV3_TAG_KEY_LENGTH = 256;
 export const MAX_IRCV3_TAG_VALUE_LENGTH = 64 * 1024;
 const MAX_IRCV3_TAG_BLOCK_LENGTH = 128 * 1024;
 export const MAX_WIRE_FRAME_LINES = 512;
+export const MAX_IRC_PREFIX_LENGTH = 512;
+export const MAX_IRC_COMMAND_LENGTH = 64;
+export const MAX_IRC_MESSAGE_PARAMS = 512;
 
 /**
  * Split a received WebSocket text frame into complete IRC lines.
@@ -96,32 +99,39 @@ export function parseIRCMessage(raw: string): IRCMessage {
   if (line[pos] === ':') {
     pos++;
     const prefixEnd = line.indexOf(' ', pos);
-    prefix = prefixEnd === -1 ? line.slice(pos) : line.slice(pos, prefixEnd);
+    const rawPrefix = prefixEnd === -1 ? line.slice(pos) : line.slice(pos, prefixEnd);
     pos = prefixEnd === -1 ? line.length : prefixEnd + 1;
 
+    if (
+      rawPrefix.length <= MAX_IRC_PREFIX_LENGTH
+      && !/[\s,\u0000-\u001f\u007f]/u.test(rawPrefix)
+    ) prefix = rawPrefix;
+
     // Extract nick and host from prefix
-    const bangIdx = prefix.indexOf('!');
-    if (bangIdx !== -1) {
-      nick = prefix.slice(0, bangIdx);
-      const atIdx = prefix.indexOf('@', bangIdx);
-      host = atIdx !== -1 ? prefix.slice(atIdx + 1) : null;
-    } else {
-      // Could be server name or just a nick
-      const atIdx = prefix.indexOf('@');
-      if (atIdx !== -1) {
-        nick = prefix.slice(0, atIdx);
-        host = prefix.slice(atIdx + 1);
+    if (prefix !== null) {
+      const bangIdx = prefix.indexOf('!');
+      if (bangIdx !== -1) {
+        nick = prefix.slice(0, bangIdx);
+        const atIdx = prefix.indexOf('@', bangIdx);
+        host = atIdx !== -1 ? prefix.slice(atIdx + 1) : null;
       } else {
-        // A prefix without user/host can be either a server name or a bare
-        // nickname. Server names normally contain a dot; bare JOIN/NICK/etc.
-        // prefixes do not. Treat nick-like prefixes as nicks so membership
-        // events still populate channel state on minimal IRC daemons/proxies.
-        if (prefix.includes('.')) {
-          nick = null;
-          host = prefix;
+        // Could be server name or just a nick
+        const atIdx = prefix.indexOf('@');
+        if (atIdx !== -1) {
+          nick = prefix.slice(0, atIdx);
+          host = prefix.slice(atIdx + 1);
         } else {
-          nick = prefix;
-          host = null;
+          // A prefix without user/host can be either a server name or a bare
+          // nickname. Server names normally contain a dot; bare JOIN/NICK/etc.
+          // prefixes do not. Treat nick-like prefixes as nicks so membership
+          // events still populate channel state on minimal IRC daemons/proxies.
+          if (prefix.includes('.')) {
+            nick = null;
+            host = prefix;
+          } else {
+            nick = prefix;
+            host = null;
+          }
         }
       }
     }
@@ -129,14 +139,17 @@ export function parseIRCMessage(raw: string): IRCMessage {
 
   // Parse command
   const commandEnd = line.indexOf(' ', pos);
-  const command = commandEnd === -1
-    ? line.slice(pos).toUpperCase()
-    : line.slice(pos, commandEnd).toUpperCase();
+  const rawCommand = commandEnd === -1 ? line.slice(pos) : line.slice(pos, commandEnd);
+  const command = rawCommand.length <= MAX_IRC_COMMAND_LENGTH && /^[A-Za-z0-9]+$/u.test(rawCommand)
+    ? rawCommand.toUpperCase()
+    : '';
   pos = commandEnd === -1 ? line.length : commandEnd + 1;
 
   // Parse params
   const params: string[] = [];
-  while (pos < line.length) {
+  while (pos < line.length && params.length < MAX_IRC_MESSAGE_PARAMS) {
+    while (line[pos] === ' ') pos += 1;
+    if (pos >= line.length) break;
     if (line[pos] === ':') {
       // trailing param — everything to end
       params.push(line.slice(pos + 1));

@@ -2,6 +2,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatIRCLine,
+  MAX_IRC_COMMAND_LENGTH,
+  MAX_IRC_MESSAGE_PARAMS,
+  MAX_IRC_PREFIX_LENGTH,
   parseIRCMessage,
   parseNamesPrefix,
   parsePREFIX,
@@ -106,6 +109,36 @@ describe('parseIRCMessage adversarial tag and parameter parsing', () => {
       expect(msg.params).toBeDefined();
       expect(typeof msg.command).toBe('string');
     }
+  });
+
+  it('bounds prefixes, commands, and parameter arrays independently', () => {
+    const oversizedPrefix = parseIRCMessage(
+      `:${'p'.repeat(MAX_IRC_PREFIX_LENGTH + 1)} PRIVMSG #room :ignored source`,
+    );
+    expect(oversizedPrefix.prefix).toBeNull();
+    expect(oversizedPrefix.nick).toBeNull();
+    expect(oversizedPrefix.command).toBe('PRIVMSG');
+
+    const oversizedCommand = parseIRCMessage(`${'C'.repeat(MAX_IRC_COMMAND_LENGTH + 1)} value`);
+    expect(oversizedCommand.command).toBe('');
+    expect(oversizedCommand.params).toEqual(['value']);
+
+    const params = Array.from(
+      { length: MAX_IRC_MESSAGE_PARAMS + 32 },
+      (_, index) => `p${index}`,
+    );
+    const bounded = parseIRCMessage(`COMMAND ${params.join(' ')}`);
+    expect(bounded.params).toHaveLength(MAX_IRC_MESSAGE_PARAMS);
+    expect(bounded.params[MAX_IRC_MESSAGE_PARAMS - 1]).toBe(`p${MAX_IRC_MESSAGE_PARAMS - 1}`);
+  });
+
+  it('ignores repeated parameter separators without creating empty fields', () => {
+    expect(parseIRCMessage('COMMAND   alpha  beta   :tail value').params).toEqual([
+      'alpha',
+      'beta',
+      'tail value',
+    ]);
+    expect(parseIRCMessage('   ').params).toEqual([]);
   });
 });
 
