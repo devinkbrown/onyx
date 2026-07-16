@@ -222,6 +222,37 @@ describe('webPushActive', () => {
     expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBeNull();
   });
 
+  it('does not retire foreign push resources after the app owner changes during notification lookup', async () => {
+    const notifications = deferred<Array<{ close: () => void }>>();
+    const getNotifications = vi.fn(() => notifications.promise);
+    const unsubscribe = vi.fn().mockResolvedValue(true);
+    const close = vi.fn();
+    store.setState({ server: server('alice') });
+    markOwner('bob');
+    vi.stubGlobal('window', { PushManager: class PushManager {}, Notification: class Notification {} });
+    vi.stubGlobal('navigator', {
+      serviceWorker: {
+        ready: Promise.resolve({
+          getNotifications,
+          pushManager: {
+            getSubscription: vi.fn().mockResolvedValue(pushSubscription(unsubscribe)),
+          },
+        }),
+      },
+    });
+
+    const active = webPushActive();
+    await vi.waitFor(() => expect(getNotifications).toHaveBeenCalledOnce());
+    store.setState({ server: server('carol') });
+    markOwner('carol');
+    notifications.resolve([{ close }]);
+
+    await expect(active).resolves.toBe(false);
+    expect(close).not.toHaveBeenCalled();
+    expect(unsubscribe).not.toHaveBeenCalled();
+    expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBe(ownerKey('carol'));
+  });
+
   it('closes prior-owner notifications when the subscription is already gone', async () => {
     const close = vi.fn();
     store.setState({ server: server('alice') });
@@ -345,6 +376,51 @@ describe('web push operations', () => {
       'auth-key',
     );
     expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBe(ownerKey('alice'));
+  });
+
+  it('does not retire foreign push resources after the enabling owner changes during notification lookup', async () => {
+    const notifications = deferred<Array<{ close: () => void }>>();
+    const getNotifications = vi.fn(() => notifications.promise);
+    const oldUnsubscribe = vi.fn().mockResolvedValue(true);
+    const oldSub = pushSubscription(oldUnsubscribe);
+    const subscribe = vi.fn();
+    const oldSendRaw = vi.fn();
+    const newSendRaw = vi.fn();
+    const close = vi.fn();
+    stubPushBrowser(
+      vi.fn().mockResolvedValue('granted'),
+      Promise.resolve({
+        getNotifications,
+        pushManager: {
+          getSubscription: vi.fn().mockResolvedValue(oldSub),
+          subscribe,
+        },
+      }),
+    );
+    store.setState({
+      ...initialState,
+      server: server('alice'),
+      connectionStatus: 'connected',
+      client: client(oldSendRaw),
+    }, true);
+    markOwner('bob');
+
+    const result = enableWebPush();
+    await vi.waitFor(() => expect(getNotifications).toHaveBeenCalledOnce());
+    store.setState({ server: server('carol'), client: client(newSendRaw) });
+    markOwner('carol');
+    notifications.resolve([{ close }]);
+
+    await expect(result).resolves.toEqual({
+      ok: false,
+      reason: 'Your account or connection changed. Try again.',
+    });
+    expect(close).not.toHaveBeenCalled();
+    expect(oldUnsubscribe).not.toHaveBeenCalled();
+    expect(subscribe).not.toHaveBeenCalled();
+    expect(oldSendRaw).not.toHaveBeenCalled();
+    expect(newSendRaw).not.toHaveBeenCalled();
+    expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBe(ownerKey('carol'));
   });
 
   it('refuses to cross-register an endpoint when foreign retirement fails', async () => {
@@ -502,12 +578,16 @@ describe('web push operations', () => {
     expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBeNull();
   });
 
-  it('does not send unsubscribe through a replacement account session', async () => {
-    const ready = deferred<{ pushManager: Pick<PushManager, 'getSubscription' | 'subscribe'> }>();
+  it('does not retire a replacement account subscription after service-worker readiness settles', async () => {
+    const ready = deferred<{
+      getNotifications: () => Promise<Array<{ close: () => void }>>;
+      pushManager: Pick<PushManager, 'getSubscription' | 'subscribe'>;
+    }>();
     const oldSendRaw = vi.fn();
     const newSendRaw = vi.fn();
     const oldClient = client(oldSendRaw);
     const unsubscribe = vi.fn().mockResolvedValue(true);
+    const close = vi.fn();
     stubPushBrowser(vi.fn().mockResolvedValue('granted'), ready.promise);
     store.setState({
       ...initialState,
@@ -519,16 +599,65 @@ describe('web push operations', () => {
 
     const result = disableWebPush();
     store.setState({ server: server('bob'), client: client(newSendRaw) });
+    markOwner('bob');
     ready.resolve({
+      getNotifications: vi.fn().mockResolvedValue([{ close }]),
       pushManager: {
         getSubscription: vi.fn().mockResolvedValue(pushSubscription(unsubscribe)),
         subscribe: vi.fn(),
       },
     });
 
-    await expect(result).resolves.toEqual({ ok: true });
-    expect(unsubscribe).toHaveBeenCalledTimes(1);
+    await expect(result).resolves.toEqual({
+      ok: false,
+      reason: 'Your account or connection changed. Try again.',
+    });
+    expect(close).not.toHaveBeenCalled();
+    expect(unsubscribe).not.toHaveBeenCalled();
     expect(oldSendRaw).not.toHaveBeenCalled();
     expect(newSendRaw).not.toHaveBeenCalled();
+    expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBe(ownerKey('bob'));
+  });
+
+  it('does not close or unsubscribe replacement resources after the owner changes during notification lookup', async () => {
+    const notifications = deferred<Array<{ close: () => void }>>();
+    const getNotifications = vi.fn(() => notifications.promise);
+    const oldSendRaw = vi.fn();
+    const newSendRaw = vi.fn();
+    const unsubscribe = vi.fn().mockResolvedValue(true);
+    const close = vi.fn();
+    stubPushBrowser(
+      vi.fn().mockResolvedValue('granted'),
+      Promise.resolve({
+        getNotifications,
+        pushManager: {
+          getSubscription: vi.fn().mockResolvedValue(pushSubscription(unsubscribe)),
+          subscribe: vi.fn(),
+        },
+      }),
+    );
+    store.setState({
+      ...initialState,
+      server: server('alice'),
+      connectionStatus: 'connected',
+      client: client(oldSendRaw),
+    }, true);
+    markOwner('alice');
+
+    const result = disableWebPush();
+    await vi.waitFor(() => expect(getNotifications).toHaveBeenCalledOnce());
+    store.setState({ server: server('bob'), client: client(newSendRaw) });
+    markOwner('bob');
+    notifications.resolve([{ close }]);
+
+    await expect(result).resolves.toEqual({
+      ok: false,
+      reason: 'Your account or connection changed. Try again.',
+    });
+    expect(close).not.toHaveBeenCalled();
+    expect(unsubscribe).not.toHaveBeenCalled();
+    expect(oldSendRaw).not.toHaveBeenCalled();
+    expect(newSendRaw).not.toHaveBeenCalled();
+    expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBe(ownerKey('bob'));
   });
 });

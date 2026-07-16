@@ -79,6 +79,14 @@ function pushSessionCurrent(ownerKey: string, client: NonNullable<OnyxState['cli
     && signedInPushOwnerKey(state) === ownerKey;
 }
 
+function pushCleanupScopeCurrent(
+  appOwnerKey: string | null,
+  markedOwnerKey: string | null,
+): boolean {
+  return signedInPushOwnerKey(getState()) === appOwnerKey
+    && readPushOwnerKey() === markedOwnerKey;
+}
+
 async function discardCreatedSubscription(subscription: PushSubscription | null): Promise<void> {
   if (!subscription) return;
   try {
@@ -89,14 +97,21 @@ async function discardCreatedSubscription(subscription: PushSubscription | null)
   }
 }
 
-async function closeRegistrationNotifications(registration: ServiceWorkerRegistration): Promise<void> {
-  if (typeof registration.getNotifications !== 'function') return;
+async function closeRegistrationNotifications(
+  registration: ServiceWorkerRegistration,
+  stillCurrent: () => boolean = () => true,
+): Promise<boolean> {
+  if (!stillCurrent()) return false;
+  if (typeof registration.getNotifications !== 'function') return stillCurrent();
   try {
     const notifications = await registration.getNotifications();
+    if (!stillCurrent()) return false;
     for (const notification of notifications) notification.close();
+    return true;
   } catch {
     // Subscription retirement remains authoritative. Some browsers expose
     // getNotifications() but reject it outside a worker-controlled document.
+    return stillCurrent();
   }
 }
 
@@ -110,18 +125,24 @@ export async function webPushActive(): Promise<boolean> {
   const ownerKey = signedInPushOwnerKey(getState());
   try {
     const reg = await navigator.serviceWorker.ready;
-    const markedOwnerKey = readPushOwnerKey();
     const sub = await reg.pushManager.getSubscription();
+    const markedOwnerKey = readPushOwnerKey();
+    const cleanupScopeCurrent = () => pushCleanupScopeCurrent(ownerKey, markedOwnerKey);
     if (!sub) {
-      if (!ownerKey || markedOwnerKey !== ownerKey) await closeRegistrationNotifications(reg);
-      clearPushOwnerKey();
+      if (!cleanupScopeCurrent()) return false;
+      if (!ownerKey || markedOwnerKey !== ownerKey) {
+        if (!await closeRegistrationNotifications(reg, cleanupScopeCurrent) || !cleanupScopeCurrent()) {
+          return false;
+        }
+      }
+      clearPushOwnerKey(markedOwnerKey);
       return false;
     }
-    if (ownerKey && markedOwnerKey === ownerKey && signedInPushOwnerKey(getState()) === ownerKey) return true;
-    // Do not let a stale check retire a subscription after the account changed
-    // while service-worker readiness was pending. The replacement check owns it.
-    if (signedInPushOwnerKey(getState()) !== ownerKey) return false;
-    await closeRegistrationNotifications(reg);
+    if (ownerKey && markedOwnerKey === ownerKey && cleanupScopeCurrent()) return true;
+    if (!cleanupScopeCurrent()) return false;
+    if (!await closeRegistrationNotifications(reg, cleanupScopeCurrent) || !cleanupScopeCurrent()) {
+      return false;
+    }
     if (await sub.unsubscribe()) clearPushOwnerKey(markedOwnerKey);
     return false;
   } catch {
@@ -161,7 +182,13 @@ export async function enableWebPush(): Promise<WebPushResult> {
     if (!pushSessionCurrent(ownerKey, client)) return { ok: false, reason: SESSION_CHANGED_REASON };
     const markedOwnerKey = readPushOwnerKey();
     if (markedOwnerKey !== ownerKey) {
-      await closeRegistrationNotifications(reg);
+      const cleanupScopeCurrent = () => (
+        pushSessionCurrent(ownerKey, client)
+        && readPushOwnerKey() === markedOwnerKey
+      );
+      if (!await closeRegistrationNotifications(reg, cleanupScopeCurrent) || !cleanupScopeCurrent()) {
+        return { ok: false, reason: SESSION_CHANGED_REASON };
+      }
       if (sub) {
         if (!await sub.unsubscribe()) {
           return { ok: false, reason: 'This browser could not retire another account\'s push subscription.' };
@@ -207,16 +234,21 @@ export async function disableWebPush(): Promise<WebPushResult> {
   if (!webPushSupported()) return { ok: false, reason: 'This browser does not support push.' };
   const initialState = getState();
   const ownerKey = signedInPushOwnerKey(initialState);
+  const markedOwnerKey = readPushOwnerKey();
   const client = initialState.client;
+  const cleanupScopeCurrent = () => pushCleanupScopeCurrent(ownerKey, markedOwnerKey);
   try {
     const reg = await navigator.serviceWorker.ready;
-    await closeRegistrationNotifications(reg);
+    if (!cleanupScopeCurrent()) return { ok: false, reason: SESSION_CHANGED_REASON };
+    if (!await closeRegistrationNotifications(reg, cleanupScopeCurrent) || !cleanupScopeCurrent()) {
+      return { ok: false, reason: SESSION_CHANGED_REASON };
+    }
     const sub = await reg.pushManager.getSubscription();
+    if (!cleanupScopeCurrent()) return { ok: false, reason: SESSION_CHANGED_REASON };
     if (!sub) {
-      clearPushOwnerKey();
+      clearPushOwnerKey(markedOwnerKey);
       return { ok: true };
     }
-    const markedOwnerKey = readPushOwnerKey();
 
     if (!await sub.unsubscribe()) {
       return { ok: false, reason: 'The browser could not remove its push subscription.' };
