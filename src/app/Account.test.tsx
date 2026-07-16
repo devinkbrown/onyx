@@ -380,6 +380,32 @@ describe('Account panel — signed in', () => {
     });
   });
 
+  it('does not publish an Alice device key after the panel switches to Bob', async () => {
+    let resolveKeys: (keys: Awaited<ReturnType<typeof dmCipher.deviceKeys>>) => void = () => {};
+    const pendingKeys = new Promise<Awaited<ReturnType<typeof dmCipher.deviceKeys>>>((resolve) => {
+      resolveKeys = resolve;
+    });
+    vi.spyOn(dmCipher, 'deviceKeys').mockReturnValue(pendingKeys);
+    const registrySpy = vi.spyOn(dmCipher, 'deviceRegistryId').mockResolvedValue('alice-device-id');
+    const addSpy = vi.spyOn(getState(), 'e2eeKeyAdd');
+    renderPanel({ account: 'alice' });
+
+    const publish = screen.getByRole('button', { name: 'Publish this device key' });
+    fireEvent.click(publish);
+    expect(publish).toBeDisabled();
+
+    store.setState({ server: seedServer('bob'), accountInfo: null });
+    resolveKeys({
+      publicB64: 'alice-public-key',
+      keyPair: {} as CryptoKeyPair,
+    });
+
+    await waitFor(() => expect(publish).not.toBeDisabled());
+    await waitFor(() => expect(registrySpy).toHaveBeenCalledWith('alice-public-key'));
+    await Promise.resolve();
+    expect(addSpy).not.toHaveBeenCalled();
+  });
+
   it('surfaces E2EEKEY and KEYTRANS account notices', () => {
     renderPanel({ account: 'alice' });
     store.setState({

@@ -157,6 +157,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
   const serviceNotices = useStore((s) => s.serviceNotices);
   const totp = useStore((s) => s.totp);
   const [e2eeDeviceBusy, setE2eeDeviceBusy] = createSignal(false);
+  let e2eePublishEpoch = 0;
   const personas = useStore((s) => s.personas);
   const personaOffers = useStore((s) => s.personaOffers);
 
@@ -237,6 +238,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
   onCleanup(() => {
     disposed = true;
     copyEpoch += 1;
+    e2eePublishEpoch += 1;
     clearCopyTimer();
   });
 
@@ -259,6 +261,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
     setCertFingerprint('');
     setTotpCode('');
     setClaimHost('');
+    e2eePublishEpoch += 1;
     setE2eeDeviceBusy(false);
     setDropConfirm('');
     setDropPassword('');
@@ -340,15 +343,29 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
 
   async function publishThisDeviceKey(): Promise<void> {
     if (e2eeDeviceBusy()) return;
+    const stateAtStart = getState();
+    const accountAtStart = stateAtStart.server?.account?.trim().toLowerCase() || null;
+    const clientAtStart = stateAtStart.client;
+    if (!accountAtStart || !clientAtStart) return;
+    const epoch = ++e2eePublishEpoch;
     setE2eeDeviceBusy(true);
     try {
       const keys = await deviceKeys();
       if (!keys?.publicB64) return;
       const deviceId = await deviceRegistryId(keys.publicB64);
       if (!deviceId) return;
-      getState().e2eeKeyAdd(deviceId, 'tsumugi-p256', keys.publicB64);
+      const current = getState();
+      const currentAccount = current.server?.account?.trim().toLowerCase() || null;
+      if (
+        disposed
+        || epoch !== e2eePublishEpoch
+        || !local.open
+        || current.client !== clientAtStart
+        || currentAccount !== accountAtStart
+      ) return;
+      current.e2eeKeyAdd(deviceId, 'tsumugi-p256', keys.publicB64);
     } finally {
-      setE2eeDeviceBusy(false);
+      if (!disposed && epoch === e2eePublishEpoch) setE2eeDeviceBusy(false);
     }
   }
 
