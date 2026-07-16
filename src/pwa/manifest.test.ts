@@ -694,6 +694,36 @@ describe('PWA manifest', () => {
     expect(recoveredResponse.clone).toHaveBeenCalledOnce();
     expect(put).toHaveBeenCalledWith(recoverRequest, recoveredClone);
 
+    const queryClone = { kind: 'query-asset-clone' };
+    const queryResponse = {
+      ok: true,
+      url: 'https://onyx.test/assets/query.js?v=current',
+      clone: vi.fn(() => queryClone),
+    };
+    const queryRequest = {
+      method: 'GET',
+      mode: 'cors',
+      url: 'https://onyx.test/assets/query.js?v=current',
+    };
+    currentCacheMatch.mockResolvedValueOnce({
+      ok: true,
+      url: 'https://onyx.test/assets/query.js?v=stale',
+    });
+    networkFetch.mockResolvedValueOnce(queryResponse);
+    listeners.get('fetch')?.({
+      request: queryRequest,
+      respondWith: (work: Promise<unknown>) => {
+        assetResponseWork = work;
+      },
+      waitUntil: (work: Promise<unknown>) => {
+        assetLifetimeWork = work;
+      },
+    });
+    await expect(assetResponseWork).resolves.toBe(queryResponse);
+    await assetLifetimeWork;
+    expect(queryResponse.clone).toHaveBeenCalledOnce();
+    expect(put).toHaveBeenCalledWith(queryRequest, queryClone);
+
     const matchCallsBeforeUpload = currentCacheMatch.mock.calls.length;
     const fetchCallsBeforeUpload = networkFetch.mock.calls.length;
     const uploadRespondWith = vi.fn();

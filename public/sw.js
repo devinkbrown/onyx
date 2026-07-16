@@ -121,7 +121,8 @@ function isCanonicalStaticResponse(requestUrl, response) {
   try {
     const finalUrl = new URL(response.url);
     return finalUrl.origin === self.location.origin
-      && finalUrl.pathname === requestUrl.pathname;
+      && finalUrl.pathname === requestUrl.pathname
+      && finalUrl.search === requestUrl.search;
   } catch {
     return false;
   }
