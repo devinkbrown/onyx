@@ -99,7 +99,15 @@ function MemberCard(props: MemberCardProps): JSX.Element {
     getState().navigate({ kind: 'dm', nick: local.user.nick });
   }
 
-  function handleWhois(): void {
+  function handleWhois(event: MouseEvent): void {
+    // The WHOIS Sheet lives outside this native popover. Its first pointer
+    // interaction light-dismisses the popover and removes this Profile button,
+    // so make the persistent member-row trigger the Sheet's restore target.
+    const action = event.currentTarget;
+    const memberTrigger = action instanceof HTMLElement
+      ? action.closest('.onyx-popover')?.querySelector<HTMLButtonElement>('.onyx-popover__trigger')
+      : null;
+    memberTrigger?.focus({ preventScroll: true });
     getState().whois(local.user.nick);
   }
 

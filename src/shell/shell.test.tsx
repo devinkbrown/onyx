@@ -1430,6 +1430,31 @@ describe('AppShell', () => {
       });
     });
 
+    it('opens the live WHOIS profile surface from member details and restores focus', async () => {
+      stubMobileViewport(false);
+      seedStore('#general');
+
+      const { container } = render(() => <AppShell />);
+      const memberList = container.querySelector<HTMLElement>('.shell-members');
+      expect(memberList).not.toBeNull();
+      const memberTrigger = within(memberList!).getByRole('button', { name: /Open member details for alice/i });
+      fireEvent.click(memberTrigger);
+      const profileButton = screen.getByRole('button', { name: 'View profile of alice' });
+      fireEvent.click(profileButton);
+
+      const profile = await screen.findByRole('dialog', { name: 'Profile: alice' });
+      expect(within(profile).getByRole('status')).toHaveTextContent('Asking the network');
+      expect(store.getState().showWhois).toBe(true);
+      expect(store.getState().whoisNick).toBe('alice');
+
+      fireEvent.click(within(profile).getByRole('button', { name: 'Close member profile' }));
+
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: 'Profile: alice' })).toBeNull();
+        expect(memberTrigger).toHaveFocus();
+      });
+    });
+
     it('does not expose an empty channel nicklist inside a direct message', () => {
       stubMobileViewport(false);
       seedStore('#general');

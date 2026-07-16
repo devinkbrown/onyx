@@ -38,6 +38,7 @@ import { ServerRail } from './ServerRail';
 import { ChannelSidebar } from './ChannelSidebar';
 import { HomeView } from './HomeView';
 const ChannelBrowser = lazy(() => import('./ChannelBrowser'));
+const WhoisSheet = lazy(() => import('./WhoisSheet').then((m) => ({ default: m.WhoisSheet })));
 import { PresenceRibbon } from './PresenceRibbon';
 import { GuestClaimPrompt } from './GuestClaimPrompt';
 import { DmKeyChangeBanner } from './DmKeyChangeBanner';
@@ -161,6 +162,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const mobileSidebarOpen = useStore((s) => s.mobileSidebarOpen);
   const ourNick = useStore((s) => s.ourNick);
   const showAccount = useStore((s) => s.showAccount);
+  const showWhois = useStore((s) => s.showWhois);
   const showKeyboardShortcuts = useStore((s) => s.showKeyboardShortcuts);
   const reducedData = makeReducedDataSignal();
 
@@ -653,6 +655,9 @@ export function AppShell(props: AppShellProps): JSX.Element {
       <AppearancePanel />
       <Show when={useStore((s) => s.showChannelBrowser)()}>
         <ChannelBrowser />
+      </Show>
+      <Show when={showWhois()}>
+        <WhoisSheet />
       </Show>
 
       {/* Preferences panel — display & behaviour, gated on isPreferencesOpen() */}
