@@ -17,7 +17,8 @@ import 'fake-indexeddb/auto';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { store } from '@/lib/store/store';
+import { _resetNamesBurstsForTests, store } from '@/lib/store/store';
+import { parseIRCMessage } from '@/lib/irc/parser';
 import type { Channel } from '@/lib/irc/types';
 import type { ChatMessage, ChannelUser } from '@/lib/irc/types';
 import { saveChannelTopicDrafts } from '@/lib/channel/topicDrafts';
@@ -119,6 +120,7 @@ function stubMobileViewport(matches = true): void {
 describe('AppShell', () => {
   beforeEach(() => {
     store.setState(initialState, true);
+    _resetNamesBurstsForTests();
     for (const key of followed()) unfollow(key);
     localStorage.clear();
     resetPreferences();
@@ -128,6 +130,7 @@ describe('AppShell', () => {
 
   afterEach(() => {
     cleanup();
+    _resetNamesBurstsForTests();
     vi.unstubAllGlobals();
   });
 
@@ -1120,6 +1123,44 @@ describe('AppShell', () => {
       // Assert
       const main = getByRole('main', { name: 'Network home' });
       expect(main).toBeDefined();
+    });
+
+    it('reveals the mounted member list when a connected Home session joins a channel', async () => {
+      // Arrange — a nick-only guest starts connected on Home with no active
+      // conversation, so the desktop member column exists but is hidden/inert.
+      stubMobileViewport(false);
+      store.setState({
+        ...initialState,
+        activeView: { kind: 'home' },
+        connectionStatus: 'connected',
+        status: 'connected',
+        ourNick: 'Guest42',
+      }, true);
+
+      const { container } = render(() => <AppShell />);
+      const memberList = container.querySelector<HTMLElement>('aside.shell-members');
+      expect(memberList).not.toBeNull();
+      expect(memberList).toHaveAttribute('aria-label', 'Member list');
+      expect(memberList).toHaveAttribute('aria-hidden', 'true');
+      expect(memberList).toHaveAttribute('inert');
+
+      // Act — drive the same explicit JOIN + NAMES path as a room requested
+      // after registration. AppShell stays mounted throughout the transition.
+      store.getState()._handleMessage(parseIRCMessage(':Guest42!webchat@host JOIN #root'));
+      store.getState()._handleMessage(parseIRCMessage(':server 353 Guest42 = #root :Guest42 Alice @Bob'));
+      store.getState()._handleMessage(parseIRCMessage(':server 366 Guest42 #root :End of /NAMES list'));
+
+      // Assert — the existing column reacts to activeView + roster state instead
+      // of requiring a shell remount or a manual member-list toggle.
+      await waitFor(() => {
+        expect(container.querySelector('aside.shell-members')).toBe(memberList);
+        expect(memberList).toHaveAttribute('aria-label', 'Member list for #root');
+        expect(memberList).toHaveAttribute('aria-hidden', 'false');
+        expect(memberList).not.toHaveAttribute('inert');
+        expect(within(memberList!).getByText('Guest42', { exact: true })).toBeInTheDocument();
+        expect(within(memberList!).getByText('Alice', { exact: true })).toBeInTheDocument();
+        expect(within(memberList!).getByText('Bob', { exact: true })).toBeInTheDocument();
+      });
     });
 
     it('does not render the composer on the home view', () => {
