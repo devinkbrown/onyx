@@ -50,9 +50,15 @@ export type VoiceRoomStatus = {
 type ChannelWithAiPolicy = Channel & { aiPolicy?: AiPolicy };
 
 export function buildVoiceRoomStatus(input: VoiceRoomStatusInput): VoiceRoomStatus {
-  const speakers = input.participants.filter((nick) => input.speakingNicks.has(nick));
-  const raised = input.participants.filter((nick) => input.raisedHands.has(nick));
-  const mutedPeers = input.participants.filter((nick) => input.mutedNicks.has(nick));
+  // MEDIA roster entries retain display casing, while event-plane state can use
+  // a different casing (and speakingNicks is intentionally stored lowercase).
+  // Compare in one normalized keyspace but return the roster's display names.
+  const speakingKeys = new Set([...input.speakingNicks].map((nick) => nick.toLowerCase()));
+  const raisedKeys = new Set([...input.raisedHands].map((nick) => nick.toLowerCase()));
+  const mutedKeys = new Set([...input.mutedNicks].map((nick) => nick.toLowerCase()));
+  const speakers = input.participants.filter((nick) => speakingKeys.has(nick.toLowerCase()));
+  const raised = input.participants.filter((nick) => raisedKeys.has(nick.toLowerCase()));
+  const mutedPeers = input.participants.filter((nick) => mutedKeys.has(nick.toLowerCase()));
   const labelParts: string[] = [];
   const ariaParts: string[] = [];
 
