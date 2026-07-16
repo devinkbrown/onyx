@@ -26,6 +26,14 @@ describe('parseStringArray', () => {
     expect(parseStringArray('["a",5,null,"b",{},true]')).toEqual(['a', 'b']);
   });
 
+  it('bounds item count, individual strings, and serialized input size', () => {
+    expect(parseStringArray(JSON.stringify(Array.from({ length: 300 }, (_, index) => `v${index}`))))
+      .toHaveLength(256);
+    expect(parseStringArray(JSON.stringify(['ok', 'x'.repeat(513), 'still-ok'])))
+      .toEqual(['ok', 'still-ok']);
+    expect(parseStringArray(`"${'x'.repeat(512 * 1024)}"`)).toEqual([]);
+  });
+
   it('returns [] for malformed (non-JSON) input', () => {
     expect(parseStringArray('{not json')).toEqual([]);
     expect(parseStringArray('["unterminated"')).toEqual([]);
@@ -75,6 +83,18 @@ describe('parseEmojiArray', () => {
 
   it('drops a non-string addedBy rather than propagating a bad shape', () => {
     expect(parseEmojiArray('[{"name":"a","url":"u","addedBy":5}]')).toEqual([{ name: 'a', url: 'u' }]);
+  });
+
+  it('bounds emoji count and rejects empty or oversized display fields', () => {
+    const many = Array.from({ length: 300 }, (_, index) => ({ name: `e${index}`, url: `https://x/${index}` }));
+    expect(parseEmojiArray(JSON.stringify(many))).toHaveLength(256);
+    expect(parseEmojiArray(JSON.stringify([
+      { name: '', url: 'https://x/empty-name' },
+      { name: 'x'.repeat(65), url: 'https://x/long-name' },
+      { name: 'empty-url', url: '' },
+      { name: 'long-url', url: 'x'.repeat(2_049) },
+      { name: 'ok', url: 'https://x/ok', addedBy: 'x'.repeat(129) },
+    ]))).toEqual([{ name: 'ok', url: 'https://x/ok' }]);
   });
 
   it('returns [] for malformed (non-JSON) input', () => {

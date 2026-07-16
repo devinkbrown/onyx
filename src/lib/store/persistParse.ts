@@ -11,12 +11,27 @@
  * Parse a persisted JSON string into a `string[]`, discarding anything that is
  * not a JSON array of strings. Always returns an array — never throws.
  */
+const MAX_PERSISTED_COLLECTION_BYTES = 512 * 1024;
+const MAX_PERSISTED_STRING_ITEMS = 256;
+const MAX_PERSISTED_STRING_LENGTH = 512;
+const MAX_PERSISTED_EMOJI_ITEMS = 256;
+const MAX_EMOJI_NAME_LENGTH = 64;
+const MAX_EMOJI_URL_LENGTH = 2_048;
+const MAX_EMOJI_AUTHOR_LENGTH = 128;
+
 export function parseStringArray(raw: string | null): string[] {
-  if (!raw) return [];
+  if (!raw || raw.length > MAX_PERSISTED_COLLECTION_BYTES) return [];
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((v): v is string => typeof v === 'string');
+    const out: string[] = [];
+    for (const value of parsed) {
+      if (out.length >= MAX_PERSISTED_STRING_ITEMS) break;
+      if (typeof value === 'string' && value.length <= MAX_PERSISTED_STRING_LENGTH) {
+        out.push(value);
+      }
+    }
+    return out;
   } catch {
     return [];
   }
@@ -37,17 +52,27 @@ export interface CustomEmoji {
  * spreads/`.filter`s the value.
  */
 export function parseEmojiArray(raw: string | null): CustomEmoji[] {
-  if (!raw) return [];
+  if (!raw || raw.length > MAX_PERSISTED_COLLECTION_BYTES) return [];
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     const out: CustomEmoji[] = [];
     for (const item of parsed) {
+      if (out.length >= MAX_PERSISTED_EMOJI_ITEMS) break;
       if (typeof item !== 'object' || item === null) continue;
       const rec = item as Record<string, unknown>;
-      if (typeof rec.name !== 'string' || typeof rec.url !== 'string') continue;
+      if (
+        typeof rec.name !== 'string'
+        || rec.name.length === 0
+        || rec.name.length > MAX_EMOJI_NAME_LENGTH
+        || typeof rec.url !== 'string'
+        || rec.url.length === 0
+        || rec.url.length > MAX_EMOJI_URL_LENGTH
+      ) continue;
       const emoji: CustomEmoji = { name: rec.name, url: rec.url };
-      if (typeof rec.addedBy === 'string') emoji.addedBy = rec.addedBy;
+      if (typeof rec.addedBy === 'string' && rec.addedBy.length <= MAX_EMOJI_AUTHOR_LENGTH) {
+        emoji.addedBy = rec.addedBy;
+      }
       out.push(emoji);
     }
     return out;
