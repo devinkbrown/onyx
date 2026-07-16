@@ -13,8 +13,8 @@ import {
 } from '@/lib/stats/status';
 import { setPageMeta } from './pageMeta';
 
-function topologyState(quorum: boolean, partitioned: boolean): 'up' | 'degraded' {
-  return quorum && !partitioned ? 'up' : 'degraded';
+function topologyState(quorum: boolean, partitioned: boolean, peersComplete: boolean): 'up' | 'degraded' {
+  return quorum && !partitioned && peersComplete ? 'up' : 'degraded';
 }
 
 export default function StatusRoute() {
@@ -75,7 +75,11 @@ export default function StatusRoute() {
         </p>
         <Show when={status.latest} fallback={<div class="data-empty">Status is waiting for the next exported feed.</div>}>
           {(data) => {
-            const state = () => topologyState(data().mesh.quorum, data().mesh.partitioned);
+            const state = () => topologyState(
+              data().mesh.quorum,
+              data().mesh.partitioned,
+              data().peers_complete,
+            );
             const upPeers = () => data().peers.filter((p) => p.up).length;
             return (
               <div class="data-summary" aria-label="Status summary">
@@ -92,7 +96,9 @@ export default function StatusRoute() {
                 <div class="data-metric">
                   <span class="label">peer links</span>
                   <span class="value">{upPeers()}/{data().peers.length}</span>
-                  <span class="note">currently established</span>
+                  <span class="note">
+                    {data().peers_complete ? 'currently established' : 'incomplete peer feed'}
+                  </span>
                 </div>
                 <div class="data-metric">
                   <span class="label">uptime</span>

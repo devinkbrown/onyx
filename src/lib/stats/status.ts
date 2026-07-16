@@ -42,18 +42,23 @@ export type NetworkStatus = {
   users_online: number;
   mesh: MeshEnvelope;
   peers: StatusPeer[];
+  /** False when invalid, duplicate, or over-cap peer rows were omitted. */
+  peers_complete: boolean;
 };
 
 export type PublicMeshFeedState = PublicFeedFreshness | 'degraded' | 'unavailable';
 
 export function publicMeshFeedState(
-  status: Pick<NetworkStatus, 'generated_at' | 'mesh'> | null,
+  status: (Pick<NetworkStatus, 'generated_at' | 'mesh'>
+    & Partial<Pick<NetworkStatus, 'peers_complete'>>) | null,
   nowMs: number,
 ): PublicMeshFeedState {
   if (!status) return 'unavailable';
   const freshness = publicFeedFreshness(status.generated_at, nowMs);
   if (freshness !== 'current') return freshness;
-  return status.mesh.quorum && !status.mesh.partitioned ? 'current' : 'degraded';
+  return status.mesh.quorum && !status.mesh.partitioned && status.peers_complete !== false
+    ? 'current'
+    : 'degraded';
 }
 
 export function publicMeshFeedLabel(state: PublicMeshFeedState): string {
@@ -74,13 +79,27 @@ export function normalizeStatus(raw: unknown): NetworkStatus | null {
     ? (r['mesh'] as Record<string, unknown>)
     : {};
   const peers: StatusPeer[] = [];
+  let peersComplete = true;
   if (Array.isArray(r['peers'])) {
+    if (r['peers'].length > MAX_STATUS_PEERS) peersComplete = false;
+    const seenPeerNames = new Set<string>();
     for (const entry of r['peers'].slice(0, MAX_STATUS_PEERS)) {
-      if (typeof entry !== 'object' || entry === null) continue;
+      if (typeof entry !== 'object' || entry === null) {
+        peersComplete = false;
+        continue;
+      }
       const e = entry as Record<string, unknown>;
-      if (typeof e['name'] !== 'string' || e['name'].length > MAX_STATUS_PEER_NAME_LENGTH) continue;
-      const name = e['name'];
-      if (!name || /[\u0000\r\n]/u.test(name)) continue;
+      if (typeof e['name'] !== 'string' || e['name'].length > MAX_STATUS_PEER_NAME_LENGTH) {
+        peersComplete = false;
+        continue;
+      }
+      const name = e['name'].trim();
+      const peerKey = name.toLowerCase();
+      if (!name || /[\u0000-\u001f\u007f]/u.test(name) || seenPeerNames.has(peerKey)) {
+        peersComplete = false;
+        continue;
+      }
+      seenPeerNames.add(peerKey);
       const rtt = e['rtt_ms'];
       peers.push({
         name,
@@ -105,6 +124,7 @@ export function normalizeStatus(raw: unknown): NetworkStatus | null {
       components: Math.max(1, boundedFeedInteger(meshRaw['components'], 1024)),
     },
     peers,
+    peers_complete: peersComplete,
   };
 }
 

@@ -20,6 +20,7 @@ const HEALTHY_STATUS: NetworkStatus = {
   users_online: 2,
   mesh: { quorum: true, partitioned: false, components: 1 },
   peers: [],
+  peers_complete: true,
 };
 
 describe('normalizeStatus', () => {
@@ -45,6 +46,7 @@ describe('normalizeStatus', () => {
     expect(status?.mesh.quorum).toBe(true);
     expect(status?.peers[0]?.rtt_ms).toBe(38);
     expect(status?.peers[1]?.state).toBe('down');
+    expect(status?.peers_complete).toBe(true);
   });
 
   it('defaults malformed mesh, counters, and peer fields defensively', () => {
@@ -69,6 +71,7 @@ describe('normalizeStatus', () => {
       users_online: 0,
       mesh: { quorum: false, partitioned: true, components: 1 },
       peers: [{ name: 'edge', state: 'unknown', up: false, rtt_ms: null, since_seconds: 0 }],
+      peers_complete: false,
     });
   });
 
@@ -95,12 +98,30 @@ describe('normalizeStatus', () => {
     expect(status.peers[0]).toMatchObject({ rtt_ms: null, since_seconds: 0 });
     expect(status.peers.some((peer) => peer.name.length > MAX_STATUS_PEER_NAME_LENGTH)).toBe(false);
     expect(status.peers[0]!.state).toHaveLength(32);
+    expect(status.peers_complete).toBe(false);
     expect(status.generated_at).toBe(0);
     expect(status.uptime_seconds).toBe(0);
     expect(status.users_online).toBe(0);
     expect(status.mesh.components).toBe(1024);
     expect(status.network).toHaveLength(256);
     expect(status.node).toHaveLength(256);
+  });
+
+  it('deduplicates peer names case-insensitively and marks the feed incomplete', () => {
+    const status = normalizeStatus({
+      generated_at: NOW_MS / 1000,
+      mesh: { quorum: true, partitioned: false, components: 1 },
+      peers: [
+        { name: 'ircx.us', state: 'up', up: true, rtt_ms: 12, since_seconds: 60 },
+        { name: 'IRCX.US', state: 'up', up: true, rtt_ms: 8, since_seconds: 90 },
+      ],
+    })!;
+
+    expect(status.peers).toEqual([
+      { name: 'ircx.us', state: 'up', up: true, rtt_ms: 12, since_seconds: 60 },
+    ]);
+    expect(status.peers_complete).toBe(false);
+    expect(publicMeshFeedState(status, NOW_MS)).toBe('degraded');
   });
 
   it('formats compact durations for status rows', () => {

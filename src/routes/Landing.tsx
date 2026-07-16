@@ -128,7 +128,9 @@ export default function Landing() {
             <strong data-state={meshState()}>{meshState()}</strong>
             <p>
               <Show when={status.latest} fallback="waiting for the public status feed">
-                {(s) => s().mesh.partitioned
+                {(s) => !s().peers_complete
+                  ? 'peer feed incomplete'
+                  : s().mesh.partitioned
                   ? `${s().mesh.components} visible mesh components`
                   : `${s().peers.filter((p) => p.up).length}/${s().peers.length} peer links up`}
               </Show>
