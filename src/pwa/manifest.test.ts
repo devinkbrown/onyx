@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { runInNewContext } from 'node:vm';
@@ -11,8 +12,11 @@ type WebManifest = {
   start_url: string;
   scope: string;
   display: string;
+  background_color: string;
+  theme_color: string;
   display_override?: string[];
   launch_handler?: { client_mode?: string[] };
+  icons?: Array<{ src: string; sizes: string; type: string; purpose: string }>;
   shortcuts?: Array<{ name: string; description: string; url: string }>;
   screenshots?: Array<{ src: string; sizes: string; form_factor: string; label: string }>;
 };
@@ -55,6 +59,10 @@ describe('PWA manifest', () => {
 
   it('declares app shortcuts and install screenshots backed by public assets', () => {
     const manifest = loadManifest();
+    const retiredScreenshotDigests = new Set([
+      'c1542f755f1547ea55895c4f6fe330c40f6a3b2a8851ba0c3d66fae162b81cde',
+      'ea3f78127f21dfb9b19151f249575e83da39b88406e568622d284677bd23e800',
+    ]);
 
     expect(manifest.shortcuts?.map((shortcut) => shortcut.url)).toEqual(['/app/', '/status/', '/stats/']);
     expect(manifest.screenshots?.map((shot) => shot.form_factor).sort()).toEqual(['narrow', 'wide']);
@@ -62,8 +70,28 @@ describe('PWA manifest', () => {
     for (const screenshot of manifest.screenshots ?? []) {
       expect(screenshot.label).toMatch(/^Onyx /);
       expect(screenshot.sizes).toMatch(/^\d+x\d+$/);
-      expect(existsSync(join(root, 'public', screenshot.src))).toBe(true);
+      const screenshotPath = join(root, 'public', screenshot.src);
+      expect(existsSync(screenshotPath)).toBe(true);
+      const digest = createHash('sha256').update(readFileSync(screenshotPath)).digest('hex');
+      expect(retiredScreenshotDigests).not.toContain(digest);
     }
+  });
+
+  it('keeps install chrome aligned and does not overclaim full-bleed icons as maskable', () => {
+    const manifest = loadManifest();
+    const document = new DOMParser().parseFromString(
+      readFileSync(entryDocumentPath, 'utf8'),
+      'text/html',
+    );
+
+    expect(manifest.icons).toEqual([
+      expect.objectContaining({ src: '/icon-192.png', sizes: '192x192', purpose: 'any' }),
+      expect.objectContaining({ src: '/icon-512.png', sizes: '512x512', purpose: 'any' }),
+    ]);
+    expect(manifest.icons?.some((icon) => icon.purpose.split(/\s+/).includes('maskable'))).toBe(false);
+    expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content'))
+      .toBe(manifest.theme_color);
+    expect(manifest.background_color).toBe(manifest.theme_color);
   });
 
   it('references notification icons that exist in public assets', () => {
