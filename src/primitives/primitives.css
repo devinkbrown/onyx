@@ -902,6 +902,44 @@
   opacity: 0.52;
 }
 
+/* Intrinsic input sizing and unbroken server errors can otherwise widen a
+   zoomed settings scroller far beyond its viewport. Keep the field compact
+   while preserving readable copy and a full-size input target. */
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .onyx-field {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    gap: 4px;
+  }
+
+  .onyx-field__label,
+  .onyx-field__description,
+  .onyx-field__error {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .onyx-field__label {
+    font-size: 14px;
+    letter-spacing: 0.08em;
+  }
+
+  .onyx-field__description,
+  .onyx-field__error {
+    font-size: 16px;
+    line-height: 1.4;
+  }
+
+  .onyx-field__input {
+    min-width: 0;
+    max-width: 100%;
+    min-height: 44px;
+    padding: 8px 12px;
+    font-size: 16px;
+  }
+}
+
 .onyx-tabs {
   display: grid;
   gap: 0.85rem;
