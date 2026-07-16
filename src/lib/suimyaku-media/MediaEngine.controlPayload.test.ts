@@ -57,15 +57,38 @@ describe('SuimyakuMediaEngine control payload boundary', () => {
     expect(Array.from(onReaction.mock.calls[0]?.[1] as string)).toHaveLength(64);
   });
 
-  it('contains malformed base64 in chunk, legacy-frame, and screen-data paths', () => {
+  it('contains malformed base64 in every inline media and crypto path', () => {
     const engine = new SuimyakuMediaEngine(callbacks(), { kind: 'voice' });
 
-    expect(() => engine.handleMediaMessage('Alice', '#room', 'MCHUNK/AUDIO/1/1/1', '%%%bad%%%'))
-      .not.toThrow();
-    expect(() => engine.handleMediaMessage('Alice', '#room', 'AUDIO_FRAME/Alice', '%%%bad%%%'))
-      .not.toThrow();
-    expect(() => engine.handleMediaMessage('Alice', '#room', 'SCREEN_DATA', '%%%bad%%%'))
-      .not.toThrow();
+    const subtypes = [
+      'MCHUNK/AUDIO/1/1/1',
+      'AUDIO_FRAME/Alice',
+      'SCREEN_DATA',
+      'AUDIO',
+      'KEYFRAME',
+      'FRAME',
+      'CHANNEL_INFO_RESP',
+      'TSUMUGI_HANDSHAKE',
+      'TSUMUGI_DATA',
+      'TSUMUGI_GROUP_KEY',
+      'VOICE_DATA',
+      'VIDEO_DATA',
+    ];
+    for (const subtype of subtypes) {
+      expect(() => engine.handleMediaMessage('Alice', '#room', subtype, '%%%bad%%%'))
+        .not.toThrow();
+    }
+    expect(engine.getPeers().size).toBe(0);
+  });
+
+  it('rejects oversized inline frames before decoding or allocating peers', () => {
+    const engine = new SuimyakuMediaEngine(callbacks(), { kind: 'voice' });
+    const oversized = 'A'.repeat(Math.ceil((1024 * 1024) / 3) * 4 + 8);
+
+    engine.handleMediaMessage('Alice', '#room', 'AUDIO', oversized);
+    engine.handleMediaMessage('Alice', '#room', 'VIDEO_DATA', oversized);
+    engine.handleMediaMessage('Alice', '#room', 'TSUMUGI_DATA', oversized);
+
     expect(engine.getPeers().size).toBe(0);
   });
 

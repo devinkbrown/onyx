@@ -42,13 +42,6 @@ const WS_BAND_AUDIO = 64;          // kaguravox audio, plaintext
 const WS_BAND_VIDEO = 65;          // kaguravis video
 const WS_BAND_TSUMUGI_AUDIO = 66;  // kaguravox audio, TSUMUGI group-encrypted ciphertext
 
-function base64ToBytes(b64: string): Uint8Array {
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-
 export type { CallState, VoiceCallState, MediaKind, SuimyakuPeerState, SuimyakuRoomStats, NetworkQualityTier, SuimyakuMediaCallbacks, SuimyakuChannelInfo };
 
 // The mounted engine is a cross-module globalThis-backed singleton. The
@@ -976,15 +969,15 @@ export class SuimyakuMediaEngine {
     if (verb === 'MACKEY') {
       const b64 = arg;
       if (!b64) return;
+      const macKey = decodeInlineBase64(b64, 64);
+      if (!macKey) return;
       this.wsMyNick = this.client?.currentNick ?? this.wsMyNick;
       this.wsAudSeq = 0;
       this.wsVidSeq = 0;
       this.streamRouter.setRoster(channel, this.wsMyNick ? [this.wsMyNick] : []);
-      try {
-        importMediaMacKey(base64ToBytes(b64))
-          .then((k) => { this.wsMediaKey = k; })
-          .catch(() => {});
-      } catch { /* malformed key — stay a no-op */ }
+      importMediaMacKey(macKey)
+        .then((k) => { this.wsMediaKey = k; })
+        .catch(() => {});
     } else if (verb === 'JOIN' || verb === 'ROSTER') {
       if (arg) this.streamRouter.addParticipant(arg);
     }
@@ -1316,8 +1309,8 @@ export class SuimyakuMediaEngine {
     }
 
     if (subtype === 'AUDIO' || subtype === 'KEYFRAME' || subtype === 'FRAME') {
-      this.dispatchFrame(fromNick, channel, subtype,
-                         Uint8Array.from(atob(payload), c => c.charCodeAt(0)));
+      const frame = decodeInlineBase64(payload);
+      if (frame) this.dispatchFrame(fromNick, channel, subtype, frame);
       return;
     }
 
@@ -1501,17 +1494,15 @@ export class SuimyakuMediaEngine {
         break;
       }
       case 'CHANNEL_INFO_RESP': {
-        try {
-          const b = Uint8Array.from(atob(payload), c => c.charCodeAt(0));
-          if (b.length >= 9) {
-            const view = new DataView(b.buffer, b.byteOffset, b.byteLength);
-            this.cb.onChannelInfo?.(channel, {
-              voiceCount: view.getUint8(0), voiceMax:   view.getUint8(1),
-              videoCount: view.getUint8(2), videoMax:   view.getUint8(3),
-              flags:      view.getUint32(4, false),
-            });
-          }
-        } catch { /* */ }
+        const b = decodeInlineBase64(payload, 64);
+        if (b && b.length >= 9) {
+          const view = new DataView(b.buffer, b.byteOffset, b.byteLength);
+          this.cb.onChannelInfo?.(channel, {
+            voiceCount: view.getUint8(0), voiceMax:   view.getUint8(1),
+            videoCount: view.getUint8(2), videoMax:   view.getUint8(3),
+            flags:      view.getUint32(4, false),
+          });
+        }
         break;
       }
       case 'MEDIA_PONG':
@@ -1527,7 +1518,8 @@ export class SuimyakuMediaEngine {
           this.client.send?.(`MEDIA ${this.activeRoom} MEDIA_PONG2 :${payload}`);
         break;
       case 'TSUMUGI_HANDSHAKE': {
-        const peerKeyBytes = Uint8Array.from(atob(payload), c => c.charCodeAt(0));
+        const peerKeyBytes = decodeInlineBase64(payload, 65);
+        if (!peerKeyBytes) break;
         const existing = this.tsumugiSessions.get(fromNick.toLowerCase());
         const shouldReply = !existing?.established;
         const hsGen = this.callGuard.capture();
@@ -1565,7 +1557,8 @@ export class SuimyakuMediaEngine {
         break;
       }
       case 'TSUMUGI_DATA': {
-        const ct = Uint8Array.from(atob(payload), c => c.charCodeAt(0));
+        const ct = decodeInlineBase64(payload);
+        if (!ct) break;
         /* Try group key first (multi-party) */
         if (this.tsumugiGroupKey) {
           this.tsumugiGroupKey.decrypt(ct)
@@ -1590,7 +1583,8 @@ export class SuimyakuMediaEngine {
         const targetNick = parts.length >= 3 ? parts[1] : '';
         const myNick = this.getLocalNick().toLowerCase();
         if (targetNick && myNick && targetNick.toLowerCase() !== myNick) break;
-        const wrapped = Uint8Array.from(atob(wrappedB64), c => c.charCodeAt(0));
+        const wrapped = decodeInlineBase64(wrappedB64, 256);
+        if (!wrapped) break;
         const vs = this.tsumugiSessions.get(fromNick.toLowerCase());
         if (vs?.established) {
           const gkGen = this.callGuard.capture();
@@ -1603,14 +1597,16 @@ export class SuimyakuMediaEngine {
         }
         break;
       }
-      case 'VOICE_DATA':
-        this.dispatchFrame(fromNick, channel, 'AUDIO',
-                           Uint8Array.from(atob(payload), c => c.charCodeAt(0)));
+      case 'VOICE_DATA': {
+        const frame = decodeInlineBase64(payload);
+        if (frame) this.dispatchFrame(fromNick, channel, 'AUDIO', frame);
         break;
-      case 'VIDEO_DATA':
-        this.dispatchFrame(fromNick, channel, 'FRAME',
-                           Uint8Array.from(atob(payload), c => c.charCodeAt(0)));
+      }
+      case 'VIDEO_DATA': {
+        const frame = decodeInlineBase64(payload);
+        if (frame) this.dispatchFrame(fromNick, channel, 'FRAME', frame);
         break;
+      }
       case 'MEDIA_BYE':
         this.registry.remove(fromNick);
         break;
