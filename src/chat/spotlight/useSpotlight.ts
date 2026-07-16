@@ -39,6 +39,10 @@ function handleGlobalKeyDown(event: KeyboardEvent): void {
   if (!isLauncherCombo && !isSlashLauncher) return;
 
   event.preventDefault();
+  // An open modal owns the keyboard. Spotlight is mounted at the app root and
+  // its listener can run before shell-local guards, so enforce the boundary
+  // here rather than opening a second modal over Preferences or another Sheet.
+  if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
   openSpotlight();
 }
 

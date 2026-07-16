@@ -124,6 +124,28 @@ describe('Spotlight', () => {
     expect(screen.getByRole('dialog', { name: 'Command palette' })).toBeInTheDocument();
   });
 
+  it('keeps launcher keys with an existing modal, then resumes after it closes', () => {
+    renderSpotlight();
+    const dialog = document.createElement('div');
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
+    const modalButton = document.createElement('button');
+    modalButton.textContent = 'Modal action';
+    dialog.append(modalButton);
+    document.body.append(dialog);
+    modalButton.focus();
+
+    fireEvent.keyDown(modalButton, { key: 'k', ctrlKey: true });
+    fireEvent.keyDown(modalButton, { key: '/' });
+
+    expect(screen.queryByRole('dialog', { name: 'Command palette' })).not.toBeInTheDocument();
+    expect(modalButton).toHaveFocus();
+
+    dialog.remove();
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    expect(screen.getByRole('dialog', { name: 'Command palette' })).toBeInTheDocument();
+  });
+
   it('filters as you type and moves the active item with arrow keys', () => {
     setState({
       channels: new Map([
