@@ -535,6 +535,7 @@ describe('AppShell', () => {
       channels.set('#general', channel);
       store.setState({
         ...initialState,
+        server: memoryServer,
         channels,
         activeView: { kind: 'channel', channel: '#general' },
         connectionStatus: 'connected',
@@ -555,7 +556,7 @@ describe('AppShell', () => {
       expect(scrollIntoView).toHaveBeenCalled();
       expect(screen.queryByRole('region', { name: 'Since you left' })).not.toBeInTheDocument();
       expect(store.getState().viewUnreadDividerId.has('#general')).toBe(false);
-      expect(readReviewHistory()[0]).toMatchObject({
+      expect(readReviewHistory(MEMORY_OWNER)[0]).toMatchObject({
         target: '#general',
         firstMessageId: 'msg-new-a',
         messageCount: 2,
@@ -603,7 +604,7 @@ describe('AppShell', () => {
         messageCount: 2,
         mentionCount: 1,
         preview: 'Hydrated note one',
-      });
+      }, MEMORY_OWNER);
 
       render(() => <AppShell />);
 
@@ -689,7 +690,7 @@ describe('AppShell', () => {
         messageCount: 1,
         mentionCount: 0,
         preview: 'Saved reviewed anchor',
-      });
+      }, MEMORY_OWNER);
 
       render(() => <AppShell />);
 
@@ -1344,6 +1345,7 @@ describe('AppShell', () => {
       channels.set('#general', channel);
       store.setState({
         ...initialState,
+        server: memoryServer,
         channels,
         activeView: { kind: 'home' },
         connectionStatus: 'connected',
@@ -1440,7 +1442,7 @@ describe('AppShell', () => {
         messageCount: 2,
         mentionCount: 1,
         preview: 'Offline recall note',
-      });
+      }, MEMORY_OWNER);
       store.setState({
         ...initialState,
         activeView: { kind: 'home' },
