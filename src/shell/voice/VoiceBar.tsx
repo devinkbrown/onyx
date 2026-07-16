@@ -1003,21 +1003,11 @@ export function VoiceBar() {
                           <For each={spatialPeers()}>{(peer) => (
                             <button
                               type="button"
+                              class="voice-bar__spatial-participant"
                               aria-pressed={peer.nick === nick()}
                               onClick={() => {
                                 setSelectedSpatialNick(peer.nick);
                                 setLocalSpatialPosition(null);
-                              }}
-                              style={{
-                                padding: '3px 6px',
-                                'border-radius': '6px',
-                                border: peer.nick === nick()
-                                  ? '1px solid var(--lapis-bright)'
-                                  : '1px solid color-mix(in oklab, var(--washi) 18%, transparent)',
-                                color: peer.nick === nick() ? 'var(--washi)' : 'var(--washi-mute)',
-                                background: 'transparent',
-                                'font-size': '10px',
-                                'font-weight': '800',
                               }}
                             >
                               {peer.nick}

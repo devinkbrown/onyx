@@ -855,6 +855,29 @@
   text-transform: uppercase;
 }
 
+.voice-bar__spatial-participant {
+  max-width: 100%;
+  padding: 3px 6px;
+  border: 1px solid color-mix(in oklab, var(--washi) 18%, transparent);
+  border-radius: 6px;
+  color: var(--washi-mute);
+  background: transparent;
+  font-size: 10px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.voice-bar__spatial-participant[aria-pressed="true"] {
+  border-color: var(--lapis-bright);
+  color: var(--washi);
+}
+
+.voice-bar__spatial-participant:focus-visible {
+  outline: 2px solid var(--lapis-bright);
+  outline-offset: 2px;
+}
+
 /* ── ConnectionQuality pip ──────────────────────────────────────────────────── */
 
 .voice-cq {
@@ -996,6 +1019,33 @@
     min-height: 44px;
     max-height: 44px;
     padding: 0;
+  }
+
+  .voice-bar__reactions {
+    grid-template-columns: repeat(4, minmax(44px, 1fr));
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+    padding: 0;
+  }
+
+  .voice-bar__reaction {
+    width: 44px;
+    height: 44px;
+    font-size: 24px;
+  }
+
+  .voice-bar__spatial {
+    width: 100%;
+    min-width: 0;
+    padding: 0;
+  }
+
+  .voice-bar__spatial-participant {
+    min-height: 44px;
+    padding: 8px;
+    font-size: 14px;
+    line-height: 1.4;
   }
 
   .voice-bar__right {
