@@ -25,6 +25,8 @@ export interface CalmContext {
 
 const STORAGE_KEY = 'onyx:calm';
 const DEFAULT_CALM_PRESET: CalmPreset = 'regular';
+/** Plain and legacy JSON-quoted preset tokens are at most nine characters. */
+export const MAX_CALM_PRESET_STORAGE_CHARS = 32;
 
 function hasStorage(): boolean {
   return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
@@ -57,6 +59,7 @@ export function loadCalmPreset(): CalmPreset {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (isCalmPreset(stored)) return stored;
+    if (stored && stored.length > MAX_CALM_PRESET_STORAGE_CHARS) return DEFAULT_CALM_PRESET;
     const parsed: unknown = JSON.parse(stored ?? 'null');
     return isCalmPreset(parsed) ? parsed : DEFAULT_CALM_PRESET;
   } catch {

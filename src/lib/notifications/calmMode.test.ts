@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   CALM_PRESETS,
   classifyNotification,
   loadCalmPreset,
+  MAX_CALM_PRESET_STORAGE_CHARS,
   setCalmPreset,
   type CalmContext,
   type CalmPreset,
@@ -25,6 +26,7 @@ function context(overrides: Partial<CalmContext>): CalmContext {
 
 describe('calm notification mode', () => {
   beforeEach(() => localStorage.clear());
+  afterEach(() => vi.restoreAllMocks());
 
   describe('classifyNotification', () => {
     const cases: readonly {
@@ -73,6 +75,19 @@ describe('calm notification mode', () => {
     it('returns regular when the stored value is invalid', () => {
       localStorage.setItem(STORAGE_KEY, 'urgent');
       expect(loadCalmPreset()).toBe('regular');
+    });
+
+    it('preserves legacy JSON-quoted presets', () => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify('power'));
+      expect(loadCalmPreset()).toBe('power');
+    });
+
+    it('rejects oversized storage before legacy JSON parsing', () => {
+      localStorage.setItem(STORAGE_KEY, `[${'x'.repeat(MAX_CALM_PRESET_STORAGE_CHARS)}]`);
+      const parse = vi.spyOn(JSON, 'parse');
+
+      expect(loadCalmPreset()).toBe('regular');
+      expect(parse).not.toHaveBeenCalled();
     });
   });
 
