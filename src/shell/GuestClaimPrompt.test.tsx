@@ -134,4 +134,46 @@ describe('GuestClaimPrompt', () => {
     store.setState({ server: seedServer('Nova') });
     expect(screen.queryByTestId('guest-claim')).not.toBeInTheDocument();
   });
+
+  it('clears claim credentials and returns compact with the live nick after logout', () => {
+    seed({ account: null, nick: 'Nova' });
+    fireEvent.click(screen.getByRole('button', { name: 'Claim your nick' }));
+    fireEvent.input(screen.getByLabelText('Nick to claim'), { target: { value: 'EditedNova' } });
+    fireEvent.input(screen.getByLabelText('Password'), { target: { value: 'guest-secret' } });
+    fireEvent.input(screen.getByLabelText('Recovery email (optional)'), {
+      target: { value: 'guest@example.com' },
+    });
+
+    store.setState({ server: seedServer('Nova') });
+    expect(screen.queryByTestId('guest-claim')).not.toBeInTheDocument();
+
+    store.setState({ server: seedServer(null), ourNick: 'Echo' });
+    expect(screen.getByRole('button', { name: 'Claim your nick' })).toBeInTheDocument();
+    expect(screen.queryByRole('form', { name: 'Claim your nick' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Claim your nick' }));
+    expect(screen.getByLabelText('Nick to claim')).toHaveValue('Echo');
+    expect(screen.getByLabelText('Password')).toHaveValue('');
+    expect(screen.getByLabelText('Recovery email (optional)')).toHaveValue('');
+  });
+
+  it('clears verification codes and local errors across account transitions', () => {
+    seed({ account: null, nick: 'Nova' });
+    store.setState({ verifyRequired: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Claim your nick' }));
+    fireEvent.input(screen.getByLabelText('Verification code'), { target: { value: '123456' } });
+
+    store.setState({ server: seedServer('Nova') });
+    store.setState({ server: seedServer(null), verifyRequired: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Claim your nick' }));
+    expect(screen.getByLabelText('Verification code')).toHaveValue('');
+
+    fireEvent.submit(screen.getByRole('form', { name: 'Verify your nick' }));
+    expect(screen.getByRole('alert')).toHaveTextContent(/enter the verification code/i);
+
+    store.setState({ server: seedServer('Nova') });
+    store.setState({ server: seedServer(null), verifyRequired: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Claim your nick' }));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
 });

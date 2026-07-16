@@ -16,7 +16,7 @@
  *     nag across sessions; the reactive gate hides the prompt the instant the
  *     server confirms the account (isGuest flips false).
  */
-import { createMemo, createSignal, Show, type JSX } from 'solid-js';
+import { createEffect, createMemo, createSignal, Show, type JSX } from 'solid-js';
 import { useStore, getState, selectAccount } from '@/lib/store';
 import { Button } from '@/primitives/Button';
 import { FormField } from '@/primitives/FormField';
@@ -65,6 +65,19 @@ export function GuestClaimPrompt(): JSX.Element {
   const show = createMemo(() => isGuest() && !dismissed() && ourNick().trim() !== '');
   // Prefer a local validation message; otherwise surface the server's verdict.
   const errorText = createMemo(() => localError() ?? registerError() ?? undefined);
+
+  // Signing in hides this permanently mounted component but does not dispose
+  // its signals. Clear every claim draft at that identity boundary so logging
+  // out later cannot reveal credentials from the previous guest session.
+  createEffect(() => {
+    if (isGuest()) return;
+    setExpanded(false);
+    setNickDraft(null);
+    setEmail('');
+    setPassword('');
+    setLocalError(undefined);
+    setVerifyCode('');
+  });
 
   function dismiss(): void {
     persistDismissed();
