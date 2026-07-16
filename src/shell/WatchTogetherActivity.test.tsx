@@ -55,6 +55,11 @@ function clickWithDrift(element: HTMLElement, drift: () => void): void {
   fireEvent.click(element);
 }
 
+function openStartEditor(): HTMLFormElement {
+  fireEvent.click(screen.getByRole('button', { name: 'Start watch activity' }));
+  return screen.getByRole('form', { name: 'Start watch activity' });
+}
+
 describe('WatchTogetherActivity accessibility', () => {
   beforeEach(() => {
     store.setState(initialState, true);
@@ -493,11 +498,36 @@ describe('WatchTogetherActivity accessibility', () => {
     expect(publishWatchTogether).toHaveBeenCalledWith('#watch', null);
   });
 
+  it('keeps the empty state compact and restores focus after the editor closes', async () => {
+    seedEmptyWatch();
+
+    render(() => <WatchTogetherActivity />);
+
+    const launcher = screen.getByRole('button', { name: 'Start watch activity' });
+    expect(launcher).toHaveAttribute('aria-expanded', 'false');
+    expect(launcher).toHaveAttribute('aria-controls', 'watch-start-editor');
+    expect(screen.queryByRole('form', { name: 'Start watch activity' })).not.toBeInTheDocument();
+
+    fireEvent.click(launcher);
+
+    expect(launcher).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('form', { name: 'Start watch activity' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('textbox', { name: 'Activity title' })).toHaveFocus();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close activity editor' }));
+
+    expect(screen.queryByRole('form', { name: 'Start watch activity' })).not.toBeInTheDocument();
+    expect(launcher).toHaveAttribute('aria-expanded', 'false');
+    await waitFor(() => expect(launcher).toHaveFocus());
+  });
+
   it('reviews and publishes a bounded room-wide activity, then restores focus', async () => {
     const publishWatchTogether = seedEmptyWatch();
 
     render(() => <WatchTogetherActivity />);
-    const form = screen.getByRole('form', { name: 'Start watch activity' });
+    const form = openStartEditor();
     expect(form).toHaveTextContent('room-wide');
     expect(form).toHaveTextContent('never saved');
     fireEvent.input(screen.getByRole('textbox', { name: 'Activity title' }), {
@@ -514,8 +544,8 @@ describe('WatchTogetherActivity accessibility', () => {
     const review = screen.getByTestId('watch-start-review');
     expect(review).toHaveTextContent('Review room-wide activity');
     expect(review).toHaveTextContent('Host self in #watch');
-    expect(review).toHaveTextContent('Media URL: https://example.test/movie');
-    expect(review).toHaveTextContent('Duration: 120 seconds');
+    expect(review).toHaveTextContent('https://example.test/movie');
+    expect(review).toHaveTextContent('120 seconds');
     expect(publishWatchTogether).not.toHaveBeenCalled();
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Confirm start activity' })).toHaveFocus();
@@ -546,7 +576,7 @@ describe('WatchTogetherActivity accessibility', () => {
     const publishWatchTogether = seedEmptyWatch();
 
     render(() => <WatchTogetherActivity />);
-    const form = screen.getByRole('form', { name: 'Start watch activity' });
+    const form = openStartEditor();
     fireEvent.submit(form);
     expect(screen.getByRole('alert')).toHaveTextContent('Enter an activity title');
 
@@ -576,6 +606,7 @@ describe('WatchTogetherActivity accessibility', () => {
     const publishWatchTogether = seedEmptyWatch();
 
     render(() => <WatchTogetherActivity />);
+    openStartEditor();
     fireEvent.input(screen.getByRole('textbox', { name: 'Activity title' }), {
       target: { value: 'Unsafe movie' },
     });
@@ -595,6 +626,7 @@ describe('WatchTogetherActivity accessibility', () => {
     const publishWatchTogether = seedEmptyWatch();
 
     render(() => <WatchTogetherActivity />);
+    openStartEditor();
     fireEvent.input(screen.getByRole('textbox', { name: 'Activity title' }), {
       target: { value: 'My movie' },
     });
@@ -622,6 +654,7 @@ describe('WatchTogetherActivity accessibility', () => {
     const publishWatchTogether = seedEmptyWatch();
 
     render(() => <WatchTogetherActivity />);
+    openStartEditor();
     fireEvent.input(screen.getByRole('textbox', { name: 'Activity title' }), {
       target: { value: 'Channel-specific movie' },
     });
@@ -639,6 +672,7 @@ describe('WatchTogetherActivity accessibility', () => {
     const publishWatchTogether = seedEmptyWatch();
 
     render(() => <WatchTogetherActivity />);
+    openStartEditor();
     fireEvent.input(screen.getByRole('textbox', { name: 'Activity title' }), {
       target: { value: 'Keep this movie' },
     });
@@ -660,6 +694,7 @@ describe('WatchTogetherActivity accessibility', () => {
     seedEmptyWatch('self', publishWatchTogether);
 
     render(() => <WatchTogetherActivity />);
+    openStartEditor();
     fireEvent.input(screen.getByRole('textbox', { name: 'Activity title' }), {
       target: { value: 'Retry this movie' },
     });
@@ -677,6 +712,7 @@ describe('WatchTogetherActivity accessibility', () => {
     const publishWatchTogether = seedEmptyWatch();
 
     render(() => <WatchTogetherActivity />);
+    openStartEditor();
     fireEvent.input(screen.getByRole('textbox', { name: 'Activity title' }), {
       target: { value: 'Maybe later' },
     });
@@ -706,6 +742,7 @@ describe('WatchTogetherActivity accessibility', () => {
     render(() => <WatchTogetherActivity />);
 
     expect(screen.queryByRole('form', { name: 'Start watch activity' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start watch activity' })).not.toBeInTheDocument();
     expect(publishWatchTogether).not.toHaveBeenCalled();
   });
 

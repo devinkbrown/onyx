@@ -694,6 +694,280 @@
   }
 }
 
+/* ── Watch-together launcher/editor ───────────────────────────────────── */
+.shell-watch-start {
+  flex: none;
+  width: 100%;
+  padding: 7px clamp(12px, 2vw, 20px);
+  border-bottom: 1px solid var(--seam-faint);
+  box-sizing: border-box;
+  font-family: var(--font-mono);
+}
+
+.shell-watch-start__launcher {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  width: min(100%, 360px);
+  min-height: 42px;
+  padding: 6px 9px;
+  color: var(--washi);
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--stone) 50%, transparent);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+
+.shell-watch-start__launcher:hover,
+.shell-watch-start__launcher:focus-visible {
+  border-color: color-mix(in oklab, var(--lapis-bright) 64%, var(--seam));
+  background: color-mix(in oklab, var(--lapis-deep) 18%, var(--stone));
+}
+
+.shell-watch-start__launcher:active {
+  transform: translateY(1px);
+}
+
+.shell-watch-start__cue {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: var(--ink);
+  border-radius: 50%;
+  background: var(--lapis-bright);
+  box-shadow: 0 0 16px color-mix(in oklab, var(--lapis-bright) 30%, transparent);
+  font-size: 9px;
+  line-height: 1;
+}
+
+.shell-watch-start__launcher-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.shell-watch-start__launcher-copy strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell-watch-start__launcher-copy span {
+  overflow: hidden;
+  color: var(--washi-mute);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell-watch-start__launcher-action {
+  color: var(--lapis-bright);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.shell-watch-start__card {
+  display: grid;
+  gap: 12px;
+  width: min(100%, 680px);
+  margin-top: 7px;
+  padding: 14px;
+  color: var(--washi);
+  border: 1px solid var(--seam);
+  border-left: 3px solid var(--lapis-bright);
+  border-radius: var(--r-md);
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--lapis-deep) 12%, transparent), transparent 42%),
+    color-mix(in oklab, var(--stone) 90%, var(--ink));
+  box-shadow: 0 14px 34px -28px color-mix(in oklab, var(--ink) 94%, transparent);
+  box-sizing: border-box;
+}
+
+.shell-watch-start__card--review {
+  margin-top: 0;
+}
+
+.shell-watch-start__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.shell-watch-start__header > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.shell-watch-start__eyebrow {
+  color: var(--lapis-bright);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.shell-watch-start__heading {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.shell-watch-start__summary {
+  max-width: 70ch;
+  margin: 0;
+  color: var(--washi-dim);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.shell-watch-start__fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.38fr);
+  gap: 10px;
+}
+
+.shell-watch-start__field {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  min-width: 0;
+  color: var(--washi-dim);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.shell-watch-start__field--title {
+  grid-column: 1 / -1;
+}
+
+.shell-watch-start__field input {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 8px;
+  color: var(--washi);
+  border: 1px solid var(--seam);
+  border-radius: var(--r-sm);
+  outline: none;
+  background: color-mix(in oklab, var(--ink) 58%, var(--stone-2));
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 11px;
+  text-transform: none;
+}
+
+.shell-watch-start__field input:focus {
+  border-color: var(--lapis-bright);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--lapis-bright) 22%, transparent);
+}
+
+.shell-watch-start__feedback {
+  color: var(--washi-dim);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.shell-watch-start__feedback[role='alert'] {
+  color: var(--shu-bright);
+}
+
+.shell-watch-start__feedback--launcher {
+  display: block;
+  width: min(100%, 680px);
+  margin-top: 6px;
+}
+
+.shell-watch-start__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.shell-watch-start__primary,
+.shell-watch-start__secondary,
+.shell-watch-start__close {
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid var(--seam);
+  border-radius: var(--r-sm);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.shell-watch-start__primary {
+  color: var(--ink);
+  border-color: var(--lapis-bright);
+  background: var(--lapis-bright);
+}
+
+.shell-watch-start__secondary,
+.shell-watch-start__close {
+  color: var(--washi-dim);
+  background: color-mix(in oklab, var(--stone-2) 72%, var(--ink));
+}
+
+.shell-watch-start__primary:hover,
+.shell-watch-start__primary:focus-visible {
+  filter: brightness(1.12);
+}
+
+.shell-watch-start__secondary:hover,
+.shell-watch-start__secondary:focus-visible,
+.shell-watch-start__close:hover,
+.shell-watch-start__close:focus-visible {
+  color: var(--washi);
+  border-color: var(--lapis-bright);
+}
+
+.shell-watch-start__review-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.shell-watch-start__review-details div {
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid var(--seam-faint);
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--ink) 42%, transparent);
+}
+
+.shell-watch-start__review-details dt {
+  color: var(--washi-mute);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.shell-watch-start__review-details dd {
+  overflow-wrap: anywhere;
+  margin: 3px 0 0;
+  color: var(--washi);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
 /* ── Watch-together room activity ─────────────────────────────────────── */
 .shell-watch-together {
   display: flex;
@@ -4314,6 +4588,43 @@
   .shell-watch-together__seek {
     flex: 1 1 64px;
     max-width: 100px;
+  }
+
+  .shell-watch-start {
+    padding: 6px 10px;
+  }
+
+  .shell-watch-start__launcher {
+    width: min(100%, 330px);
+  }
+
+  .shell-watch-start__card {
+    width: 100%;
+    padding: 12px;
+  }
+
+  .shell-watch-start__fields,
+  .shell-watch-start__review-details {
+    grid-template-columns: 1fr;
+  }
+
+  .shell-watch-start__field--title {
+    grid-column: auto;
+  }
+
+  .shell-watch-start__field input {
+    min-height: 40px;
+    font-size: 16px;
+  }
+
+  .shell-watch-start__actions {
+    justify-content: stretch;
+  }
+
+  .shell-watch-start__primary,
+  .shell-watch-start__secondary {
+    flex: 1 1 0;
+    min-height: 40px;
   }
 
   /* Bigger tap target for the member toggle in the ribbon */
