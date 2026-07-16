@@ -5099,6 +5099,7 @@
     justify-content: flex-start;
     gap: 8px;
     padding: 8px 12px;
+    font-size: 14px;
     letter-spacing: 0.08em;
     overflow-x: auto;
     overflow-y: hidden;
@@ -5160,6 +5161,52 @@
     width: 44px;
     height: 44px;
     font-size: 24px;
+  }
+
+  .shell-members-count {
+    font-size: 14px;
+  }
+
+  .shell-members-refresh {
+    font-size: 12px;
+  }
+
+  .shell-members-scroll {
+    padding: 4px 0;
+  }
+
+  .shell-members-group-label {
+    gap: 8px;
+    padding: 8px 8px 4px;
+    font-size: 14px;
+    letter-spacing: 0.08em;
+  }
+
+  .shell-members-scroll .onyx-popover__trigger {
+    min-height: 44px;
+  }
+
+  .shell-member-row {
+    gap: 8px;
+    min-height: 44px;
+    margin: 0 4px;
+    padding: 6px 8px;
+  }
+
+  .shell-member-row .onyx-avatar--sm {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+
+  .shell-member-nick {
+    font-size: 14px;
+  }
+
+  .shell-role-badge {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
   }
 }
 
