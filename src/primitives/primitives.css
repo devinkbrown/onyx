@@ -381,10 +381,16 @@
 }
 
 .onyx-modal__dialog {
+  --onyx-modal-viewport-gap: min(12vh, 6rem);
+
   position: relative;
   width: min(34rem, calc(100vw - 2rem));
-  max-height: calc(100svh - 2rem);
-  margin: min(12vh, 6rem) auto;
+  max-height: calc(
+    100svh
+    - var(--onyx-modal-viewport-gap)
+    - var(--onyx-modal-viewport-gap)
+  );
+  margin: var(--onyx-modal-viewport-gap) auto;
   display: flex;
   flex-direction: column;
   color: var(--washi);
