@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { describe, expect, it, vi } from 'vitest';
+import type { IRCClient } from '../irc/client';
 import { SuimyakuMediaEngine } from './MediaEngine';
+import { mediaStreamId } from './mediaStream';
 import { OpcodecWasm } from './OpcodecWasm';
 import {
   MAX_PEER_VIDEO_FPS,
@@ -10,6 +12,13 @@ import {
   type PeerMedia,
 } from './PeerRegistry';
 import type { SuimyakuMediaCallbacks } from './types';
+
+function mediaClient(): IRCClient {
+  return {
+    binaryHandlers: new Set(),
+    extraMessageHandlers: new Set(),
+  } as unknown as IRCClient;
+}
 
 function callbacks(overrides: Partial<SuimyakuMediaCallbacks> = {}): SuimyakuMediaCallbacks {
   return {
@@ -22,6 +31,40 @@ function callbacks(overrides: Partial<SuimyakuMediaCallbacks> = {}): SuimyakuMed
 }
 
 describe('SuimyakuMediaEngine control payload boundary', () => {
+  it('tears down owner-bound media state on a direct client replacement', () => {
+    const onCallState = vi.fn();
+    const engine = new SuimyakuMediaEngine(callbacks({ onCallState }), { kind: 'voice' });
+    const aliceClient = mediaClient();
+    const bobClient = mediaClient();
+    engine.setClient(aliceClient);
+
+    const internals = engine as unknown as {
+      activeRoom: string | null;
+      callState: 'idle' | 'in_call';
+      presenceList: Set<string>;
+      streamRouter: {
+        setRoster(channel: string, nicks: readonly string[]): void;
+        resolve(streamId: number): unknown;
+      };
+    };
+    internals.activeRoom = '#alice';
+    internals.callState = 'in_call';
+    internals.presenceList.add('peer');
+    internals.streamRouter.setRoster('#alice', ['peer']);
+    expect(internals.streamRouter.resolve(mediaStreamId('#alice', 'peer', 'audio'))).not.toBeNull();
+
+    engine.setClient(bobClient);
+
+    expect(engine.getCallState()).toEqual({ callState: 'idle', callWith: '', callChannel: null });
+    expect(internals.presenceList.size).toBe(0);
+    expect(internals.streamRouter.resolve(mediaStreamId('#alice', 'peer', 'audio'))).toBeNull();
+    expect((aliceClient.binaryHandlers as Set<unknown>).size).toBe(0);
+    expect((aliceClient.extraMessageHandlers as Set<unknown>).size).toBe(0);
+    expect((bobClient.binaryHandlers as Set<unknown>).size).toBe(1);
+    expect((bobClient.extraMessageHandlers as Set<unknown>).size).toBe(1);
+    expect(onCallState).toHaveBeenLastCalledWith('idle', '', null);
+  });
+
   it('rejects malformed media envelopes before allocating peer state', () => {
     const onPresence = vi.fn();
     const engine = new SuimyakuMediaEngine(callbacks({ onPresence }), { kind: 'voice' });

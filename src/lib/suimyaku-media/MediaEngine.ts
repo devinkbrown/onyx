@@ -356,6 +356,7 @@ export class SuimyakuMediaEngine {
 
   setClient(client: IRCClient | null) {
     const prev = this.client;
+    const replacedClient = Boolean(prev && client && prev !== client);
     this.client = client;
     // Move the media-plane subscriptions to the new client (binary datagrams +
     // EVENT MEDIA MACKEY/JOIN/ROSTER), tolerating repeat calls with the same client.
@@ -369,6 +370,10 @@ export class SuimyakuMediaEngine {
       client.extraMessageHandlers.add(this.onMediaServerMessageBound);
       this.boundMediaClient = client;
     }
+    // A direct client replacement is an owner/connection boundary. Never carry
+    // camera tracks, peer state, MAC keys, or call routing into the replacement
+    // session, even when the store swaps clients without an intermediate null.
+    if (replacedClient) { this.setIdle(); return; }
     if (!client && this.callState !== 'idle') { this.setIdle(); return; }
     if (client && !prev && this.callState === 'in_call' && this.activeRoom) {
       const room = this.activeRoom;
