@@ -895,6 +895,140 @@ describe('WatchTogetherActivity accessibility', () => {
     }
   });
 
+  it('does not own a local clock while no watch activity can advance', () => {
+    vi.useFakeTimers();
+    try {
+      render(() => <WatchTogetherActivity />);
+      expect(vi.getTimerCount()).toBe(0);
+
+      seedEmptyWatch();
+      expect(vi.getTimerCount()).toBe(0);
+
+      store.setState({
+        channelProps: new Map([
+          ['#watch', { 'ocean.watch': 'title=Paused;host=self;state=paused;position=3;participants=self' }],
+        ]),
+      });
+      expect(vi.getTimerCount()).toBe(0);
+
+      store.setState({
+        channelProps: new Map([
+          ['#watch', { 'ocean.watch': 'title=Handoff;host=self;state=handoff;position=3;participants=self,bob;handoff=bob' }],
+        ]),
+      });
+      expect(vi.getTimerCount()).toBe(0);
+
+      store.setState({ activeView: { kind: 'home' } });
+      expect(vi.getTimerCount()).toBe(0);
+      cleanup();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('owns one clock for a playing revision and clears it across every lifecycle boundary', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_700_000_000_000);
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
+    const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval');
+    try {
+      seedWatch(
+        'title=First;host=self;state=playing;position=0;duration=30;participants=self',
+      );
+      const view = render(() => <WatchTogetherActivity />);
+      const firstTimer = setIntervalSpy.mock.results[0]?.value;
+      expect(setIntervalSpy).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(1);
+
+      vi.advanceTimersByTime(1_000);
+      expect(setIntervalSpy).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(1);
+
+      store.setState({
+        channelProps: new Map([
+          ['#watch', { 'ocean.watch': 'title=Paused;host=self;state=paused;position=1;participants=self' }],
+        ]),
+      });
+      expect(clearIntervalSpy).toHaveBeenCalledWith(firstTimer);
+      expect(vi.getTimerCount()).toBe(0);
+
+      store.setState({
+        channelProps: new Map([
+          ['#watch', { 'ocean.watch': 'title=Second;host=self;state=playing;position=1;participants=self' }],
+        ]),
+      });
+      expect(setIntervalSpy).toHaveBeenCalledTimes(2);
+      expect(vi.getTimerCount()).toBe(1);
+
+      store.setState({
+        channelProps: new Map([
+          ['#watch', { 'ocean.watch': 'title=Handoff;host=self;state=handoff;position=1;participants=self,bob;handoff=bob' }],
+        ]),
+      });
+      expect(vi.getTimerCount()).toBe(0);
+
+      store.setState({
+        channelProps: new Map([
+          ['#watch', { 'ocean.watch': 'title=Third;host=self;state=playing;position=1;participants=self' }],
+        ]),
+      });
+      expect(setIntervalSpy).toHaveBeenCalledTimes(3);
+      expect(vi.getTimerCount()).toBe(1);
+
+      store.setState({ channelProps: new Map() });
+      expect(vi.getTimerCount()).toBe(0);
+
+      store.setState({
+        channelProps: new Map([
+          ['#watch', { 'ocean.watch': 'title=Fourth;host=self;state=playing;position=1;participants=self' }],
+        ]),
+      });
+      expect(setIntervalSpy).toHaveBeenCalledTimes(4);
+      expect(vi.getTimerCount()).toBe(1);
+
+      store.setState({
+        activeView: { kind: 'channel', channel: '#other' },
+        channelProps: new Map([
+          ['#other', { 'ocean.watch': 'title=Other;host=self;state=playing;position=0;duration=1;participants=self' }],
+        ]),
+      });
+      expect(setIntervalSpy).toHaveBeenCalledTimes(5);
+      expect(vi.getTimerCount()).toBe(1);
+
+      vi.advanceTimersByTime(1_000);
+      expect(screen.getByRole('region', { name: /Watch together: Other/ })).toHaveAttribute(
+        'data-state',
+        'paused',
+      );
+      expect(vi.getTimerCount()).toBe(0);
+
+      store.setState({
+        channelProps: new Map([
+          ['#other', { 'ocean.watch': 'title=Restarted;host=self;state=playing;position=0;participants=self' }],
+        ]),
+      });
+      expect(setIntervalSpy).toHaveBeenCalledTimes(6);
+      expect(vi.getTimerCount()).toBe(1);
+
+      store.setState({ activeView: { kind: 'home' } });
+      expect(vi.getTimerCount()).toBe(0);
+
+      store.setState({
+        activeView: { kind: 'channel', channel: '#other' },
+      });
+      expect(setIntervalSpy).toHaveBeenCalledTimes(7);
+      expect(vi.getTimerCount()).toBe(1);
+
+      view.unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      cleanup();
+      setIntervalSpy.mockRestore();
+      clearIntervalSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
   it('does not publish pause from a control whose raw activity changed during activation', () => {
     const publishWatchTogether = seedWatch(
       'title=Race;host=self;state=playing;position=3;participants=self',

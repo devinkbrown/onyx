@@ -101,11 +101,7 @@ export function WatchTogetherActivity(): JSX.Element {
   let participationStatusElement: HTMLSpanElement | undefined;
   let watchRevisionSequence = 0;
   const watchActionRevisions = new Map<string, WatchActionRevision>();
-  const timer = setInterval(() => setTickNow(Date.now()), TICK_MS);
-  onCleanup(() => {
-    clearInterval(timer);
-    watchActionRevisions.clear();
-  });
+  onCleanup(() => watchActionRevisions.clear());
 
   const channel = createMemo(() => {
     const view = activeView();
@@ -202,6 +198,25 @@ export function WatchTogetherActivity(): JSX.Element {
   const liveActivity = createMemo(() => live()?.activity ?? null);
   const displayPosition = createMemo(() => liveActivity()?.positionSeconds ?? null);
   const isPlaying = createMemo(() => liveActivity()?.state === 'playing');
+
+  // Keep one clock only for the exact room activity that can advance. Returning
+  // the same primitive revision while its local position changes prevents the
+  // effect from tearing down and recreating the interval on every tick. Channel
+  // or wire revisions still restart ownership, and a local duration boundary
+  // flips `isPlaying` to false so the interval is cleared without another push.
+  const tickingRevision = createMemo(() => {
+    if (!isPlaying()) return null;
+    const currentChannel = channel();
+    const currentRaw = rawWatch();
+    return currentChannel && currentRaw
+      ? `${currentChannel.toLowerCase()}\u0000${currentRaw}`
+      : null;
+  });
+  createEffect(() => {
+    if (!tickingRevision()) return;
+    const timer = setInterval(() => setTickNow(Date.now()), TICK_MS);
+    onCleanup(() => clearInterval(timer));
+  });
 
   const isHost = createMemo(() => {
     const s = live();
