@@ -2327,17 +2327,35 @@ describe('PreferencesPanel', () => {
     expect(localStorage.getItem(TOPIC_READ_LEDGER_KEY)).not.toBeNull();
   });
 
-  it('resets background motion and announces completion without moving focus', () => {
+  it('resets background motion and announces every completion without moving focus', async () => {
     setSceneMotion('off');
     renderPreferences('Accessibility');
 
     const reset = screen.getByRole('button', { name: 'Reset to defaults' });
+    const status = screen.getByRole('status');
+    const announcements: string[] = [];
+    const observer = new MutationObserver(() => {
+      if (status.textContent === 'Preferences reset to defaults.') {
+        announcements.push(status.textContent);
+      }
+    });
+    observer.observe(status, { childList: true, characterData: true, subtree: true });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Close preferences' })).toHaveFocus());
     reset.focus();
     fireEvent.click(reset);
 
     expect(sceneMotion()).toBe('animated');
     expect(document.documentElement.dataset.sceneMotion).toBe('animated');
-    expect(screen.getByRole('status')).toHaveTextContent('Preferences reset to defaults.');
+    await waitFor(() => expect(announcements).toHaveLength(1));
+    expect(status).toHaveTextContent('Preferences reset to defaults.');
     expect(reset).toHaveFocus();
+
+    setSceneMotion('off');
+    fireEvent.click(reset);
+
+    expect(sceneMotion()).toBe('animated');
+    await waitFor(() => expect(announcements).toHaveLength(2));
+    expect(reset).toHaveFocus();
+    observer.disconnect();
   });
 });

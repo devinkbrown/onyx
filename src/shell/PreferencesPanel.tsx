@@ -2545,7 +2545,10 @@ function PreferenceCategoryNavigation(props: {
 
   function resetToDefaults(): void {
     resetAllPreferences();
-    setResetAnnouncement('Preferences reset to defaults.');
+    // Re-arm the live region so repeating a reset after another preference
+    // change produces a fresh announcement instead of an identical no-op write.
+    setResetAnnouncement('');
+    queueMicrotask(() => setResetAnnouncement('Preferences reset to defaults.'));
   }
 
   function onKeyDown(event: KeyboardEvent, index: number): void {
