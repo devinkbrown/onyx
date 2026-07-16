@@ -1018,10 +1018,10 @@ function PortableVaultControls(): JSX.Element {
           </p>
         )}
       </Show>
-      <Show when={status()}>
+      <Show when={status()} keyed>
         {(current) => (
-          <p class={`pref-status${current().failure ? ' pref-status--error' : ''}`} role={current().failure ? 'alert' : 'status'}>
-            {current().message}
+          <p class={`pref-status${current.failure ? ' pref-status--error' : ''}`} role={current.failure ? 'alert' : 'status'}>
+            {current.message}
           </p>
         )}
       </Show>

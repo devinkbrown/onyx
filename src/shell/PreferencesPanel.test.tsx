@@ -1285,6 +1285,24 @@ describe('PreferencesPanel', () => {
     expect(screen.queryByRole('heading', { name: 'Review import' })).not.toBeInTheDocument();
   });
 
+  it('recreates repeated portable validation alerts so assistive technology announces them again', async () => {
+    renderPreferences('Import & export');
+    const file = {
+      name: 'repeat-portable.json',
+      size: PORTABLE_JSON_MAX_FILE_BYTES + 1,
+      text: vi.fn(async () => '{"kind":"onyx-vault"}'),
+    } as unknown as File;
+    const input = screen.getByLabelText('Import portable JSON');
+
+    fireEvent.change(input, { target: { files: [file] } });
+    const firstAlert = await screen.findByRole('alert');
+
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => expect(screen.getByRole('alert')).not.toBe(firstAlert));
+    expect(screen.getByRole('alert')).toHaveTextContent('repeat-portable.json exceeds the 64 MiB portable JSON limit.');
+  });
+
   it('keeps a reviewed import staged when another tab holds the import lock', async () => {
     const request = vi.fn(async (
       _name: string,
