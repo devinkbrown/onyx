@@ -130,9 +130,18 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
   // Re-seed the draft whenever the panel opens or the server topic changes
   // (and we're not mid-edit). Keeps the field in sync without clobbering typing.
   createEffect(() => {
-    if (local.open) {
-      setTopicDraft(readChannelTopicDraft(local.channel) ?? serverTopic());
+    const authoritativeTopic = serverTopic();
+    const savedDraft = readChannelTopicDraft(local.channel);
+    const acknowledged = savedDraft !== null && savedDraft === authoritativeTopic;
+    if (acknowledged) {
+      saveChannelTopicDraft(local.channel, savedDraft, authoritativeTopic);
     }
+    if (!local.open) return;
+    if (savedDraft === null || acknowledged) {
+      setTopicDraft(authoritativeTopic);
+      return;
+    }
+    setTopicDraft(savedDraft);
   });
 
   // +t locks topic editing to ops. Without +t, anyone may set it.
@@ -144,7 +153,6 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
     event.preventDefault();
     if (!canEditTopic() || !topicDirty() || !isConnected()) return;
     getState().setTopic(channel()?.name ?? local.channel, topicDraft());
-    saveChannelTopicDraft(local.channel, serverTopic(), serverTopic());
   }
 
   // ── Share invite (any member can build a rich shareable link) ─────────────

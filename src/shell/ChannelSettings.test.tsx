@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { store } from '@/lib/store/store';
 import type { Channel, ChannelUser } from '@/lib/irc/types';
 import type { NotifyLevel } from '@/lib/notifications/channelNotifyMode';
+import { readChannelTopicDraft } from '@/lib/channel/topicDrafts';
 import { ChannelSettings } from './ChannelSettings';
 
 const initialState = store.getInitialState();
@@ -32,6 +33,14 @@ function makeChannel(name: string): Channel {
     createdAt: null,
     messages: [],
   };
+}
+
+function setServerTopic(topic: string): void {
+  const current = store.getState().channels.get('#general');
+  if (!current) throw new Error('missing #general test channel');
+  store.setState({
+    channels: new Map([['#general', { ...current, topic }]]),
+  });
 }
 
 function seed(notify?: Map<string, NotifyLevel>): void {
@@ -132,6 +141,60 @@ describe('ChannelSettings — Notifications', () => {
     renderPanel();
 
     expect(notifySelect()).not.toBeDisabled();
+  });
+});
+
+describe('ChannelSettings — Topic draft durability', () => {
+  it('keeps a submitted draft across reopen until a server echo arrives', () => {
+    seed();
+    const setTopic = vi.spyOn(store.getState(), 'setTopic').mockImplementation(() => {});
+    const first = renderPanel();
+    fireEvent.input(screen.getByLabelText('Topic text'), {
+      target: { value: 'Awaiting acknowledgement' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save topic' }));
+
+    expect(setTopic).toHaveBeenCalledWith('#general', 'Awaiting acknowledgement');
+    expect(readChannelTopicDraft('#general')).toBe('Awaiting acknowledgement');
+    first.unmount();
+    renderPanel();
+    expect(screen.getByLabelText('Topic text')).toHaveValue('Awaiting acknowledgement');
+  });
+
+  it('clears a submitted draft only after the matching server topic arrives', () => {
+    seed();
+    vi.spyOn(store.getState(), 'setTopic').mockImplementation(() => {});
+    const first = renderPanel();
+    fireEvent.input(screen.getByLabelText('Topic text'), {
+      target: { value: 'Confirmed topic' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save topic' }));
+
+    setServerTopic('Confirmed topic');
+
+    expect(readChannelTopicDraft('#general')).toBeNull();
+    first.unmount();
+    renderPanel();
+    expect(screen.getByLabelText('Topic text')).toHaveValue('Confirmed topic');
+  });
+
+  it('preserves a submitted draft when the authoritative echo diverges', () => {
+    seed();
+    vi.spyOn(store.getState(), 'setTopic').mockImplementation(() => {});
+    const first = renderPanel();
+    fireEvent.input(screen.getByLabelText('Topic text'), {
+      target: { value: 'My proposed topic' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save topic' }));
+
+    setServerTopic('Moderator override');
+
+    expect(readChannelTopicDraft('#general')).toBe('My proposed topic');
+    expect(screen.getByLabelText('Topic text')).toHaveValue('My proposed topic');
+    first.unmount();
+    renderPanel();
+    expect(screen.getByLabelText('Topic text')).toHaveValue('My proposed topic');
   });
 });
 
