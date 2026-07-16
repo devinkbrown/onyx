@@ -9,6 +9,11 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { store } from './store';
+import {
+  MAX_SCHEDULED_CHANNEL_LENGTH,
+  MAX_SCHEDULED_MESSAGES,
+  MAX_SCHEDULED_TEXT_LENGTH,
+} from '@/lib/schedule/dispatch';
 
 const initialState = store.getInitialState();
 
@@ -76,6 +81,34 @@ describe('scheduleMessage', () => {
     expect(() => store.getState().scheduleMessage('#root', 'still queued', 5_000)).not.toThrow();
     expect(store.getState().scheduledMessages).toHaveLength(1);
     expect(store.getState().scheduledMessages[0]?.text).toBe('still queued');
+  });
+
+  it('rejects malformed rows at the live state boundary', () => {
+    store.getState().scheduleMessage('room with spaces', 'body', 5_000);
+    store.getState().scheduleMessage(`#${'x'.repeat(MAX_SCHEDULED_CHANNEL_LENGTH)}`, 'body', 5_000);
+    store.getState().scheduleMessage('#one,#two', 'body', 5_000);
+    store.getState().scheduleMessage('#root', ' ', 5_000);
+    store.getState().scheduleMessage('#root', 'x'.repeat(MAX_SCHEDULED_TEXT_LENGTH + 1), 5_000);
+    store.getState().scheduleMessage('#root', 'body', Number.NaN);
+    store.getState().scheduleMessage('#root', 'body', 1.5);
+    store.getState().scheduleMessage('#root', 'body', -1);
+
+    expect(store.getState().scheduledMessages).toEqual([]);
+    expect(localStorage.getItem('onyx:scheduled')).toBeNull();
+  });
+
+  it('caps the live queue before persisting another row', () => {
+    for (let index = 0; index < MAX_SCHEDULED_MESSAGES + 1; index += 1) {
+      store.getState().scheduleMessage('#root', `message ${index}`, index + 1);
+    }
+
+    expect(store.getState().scheduledMessages).toHaveLength(MAX_SCHEDULED_MESSAGES);
+    expect(JSON.parse(localStorage.getItem('onyx:scheduled') || '[]')).toHaveLength(
+      MAX_SCHEDULED_MESSAGES,
+    );
+    expect(store.getState().scheduledMessages.at(-1)?.text).toBe(
+      `message ${MAX_SCHEDULED_MESSAGES - 1}`,
+    );
   });
 });
 

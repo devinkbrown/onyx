@@ -46,6 +46,9 @@ import {
 import { getVaultDmSearchPrivacy } from '@/lib/vault/dmSearchPrivacy';
 import { boundedSearchField, boundedSearchQuery } from '@/lib/vault/searchBounds';
 import {
+  MAX_SCHEDULED_CHANNEL_LENGTH,
+  MAX_SCHEDULED_MESSAGES,
+  MAX_SCHEDULED_TEXT_LENGTH,
   parseScheduledMessages,
   selectDueMessages,
   type ScheduledMessage,
@@ -11662,19 +11665,29 @@ export const store = createStore<OnyxState>()(
     showScheduledMessages: false,
     scheduleMessage: (channel, text, sendAt) => {
       // Defense-in-depth: the composer already guards these, but the action is
-      // the state boundary — refuse an empty body or a non-finite time so a
-      // stray caller can't queue an undeliverable/never-due entry.
-      if (!channel || !text.trim() || !Number.isFinite(sendAt)) return;
+      // the state boundary and localStorage is finite. Validate the exact same
+      // shape as the reload parser before allocating or persisting a row.
+      const target = channel.trim();
+      if (
+        !_validInboundWireToken(target, MAX_SCHEDULED_CHANNEL_LENGTH)
+        || target.startsWith(':')
+        || target.includes(',')
+        || !text.trim()
+        || text.length > MAX_SCHEDULED_TEXT_LENGTH
+        || !Number.isSafeInteger(sendAt)
+        || sendAt <= 0
+      ) return;
       const owner = _scheduledMessageOwner(get());
       if (!owner) return;
       const entry: ScheduledMessage = {
         id: `sched-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        channel,
+        channel: target,
         text,
         sendAt,
         owner,
       };
       set(s => {
+        if (s.scheduledMessages.length >= MAX_SCHEDULED_MESSAGES) return {};
         const next = [...s.scheduledMessages, entry].sort((a, b) => a.sendAt - b.sendAt);
         _persistScheduledMessages(next);
         return { scheduledMessages: next };
