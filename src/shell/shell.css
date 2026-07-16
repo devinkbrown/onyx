@@ -4478,6 +4478,7 @@
     z-index: 90;
     width: min(290px, 84vw);
     padding-top: env(safe-area-inset-top, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
     transform: translateX(100%);
     transition: transform var(--dur) var(--ease);
     grid-column: unset;
