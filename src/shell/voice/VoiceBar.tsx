@@ -222,7 +222,6 @@ function CallTimer(props: { active: boolean; startedAt: number | null }) {
       <span
         class="voice-bar__timer"
         role="timer"
-        aria-live="polite"
         aria-label={`Call duration: ${durationLabel()}`}
       >
         {formatted()}

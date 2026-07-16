@@ -703,6 +703,7 @@ describe('VoiceBar', () => {
     cleanup();
     restoreDisplayCapture();
     restoreWakeLock();
+    vi.useRealTimers();
   });
 
   it('does not render when callState is idle', () => {
@@ -1116,7 +1117,7 @@ describe('VoiceBar', () => {
     spy.mockRestore();
   });
 
-  it('shows the live duration timer with an accessible label', () => {
+  it('updates the duration timer without making each tick a live announcement', () => {
     // Arrange
     const now = new Date('2026-07-08T12:00:00Z');
     vi.useFakeTimers();
@@ -1130,6 +1131,13 @@ describe('VoiceBar', () => {
     const timer = getByRole('timer');
     expect(timer).toHaveTextContent('01:05');
     expect(timer).toHaveAttribute('aria-label', 'Call duration: 1m 5s');
+    expect(timer).not.toHaveAttribute('aria-live', 'polite');
+    expect(timer).not.toHaveAttribute('aria-live', 'assertive');
+
+    vi.advanceTimersByTime(1_000);
+
+    expect(timer).toHaveTextContent('01:06');
+    expect(timer).toHaveAttribute('aria-label', 'Call duration: 1m 6s');
   });
 
   it('shows the participant count without roster data (self + peers)', () => {
