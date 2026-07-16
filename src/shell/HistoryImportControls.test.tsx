@@ -15,6 +15,7 @@ import {
   IrcLogImportControls,
 } from './HistoryImportControls';
 import { loadRecent, _resetVaultForTests } from '@/lib/vault/historyVault';
+import { store } from '@/lib/store';
 import {
   DISCORD_PACKAGE_MAX_AGGREGATE_BYTES,
   DISCORD_PACKAGE_MAX_FILE_BYTES,
@@ -61,11 +62,30 @@ const discordExport = JSON.stringify({
   ],
 });
 
+const MEMORY_OWNER = { serverUrl: 'wss://history-import.example/ws', identity: 'alice' } as const;
+
+function setMemoryOwner(identity: string): void {
+  store.setState({
+    ourNick: identity,
+    server: {
+      id: `history-import-${identity}`,
+      name: 'History import',
+      network: 'History import',
+      url: MEMORY_OWNER.serverUrl,
+      icon: '',
+      nick: identity,
+      account: identity,
+      connected: true,
+    },
+  });
+}
+
 beforeEach(() => {
   // Fresh, isolated vault per test.
   (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
   _resetVaultForTests();
   cleanup();
+  setMemoryOwner(MEMORY_OWNER.identity);
 });
 
 describe('DiscordImportControls', () => {
@@ -85,8 +105,21 @@ describe('DiscordImportControls', () => {
 
     await screen.findByText(/Imported 2 messages into 1 channel/);
     await waitFor(() => expect(chooser).toHaveFocus());
-    const stored = await loadRecent('#general');
+    const stored = await loadRecent('#general', 400, MEMORY_OWNER);
     expect(stored.map((m) => m.text)).toEqual(['hello', 'world']);
+    expect(await loadRecent('#general')).toHaveLength(0);
+  });
+
+  it('discards a reviewed export when the device-memory owner changes', async () => {
+    render(() => <DiscordImportControls />);
+    chooseFile('Choose Discord JSON', fakeFile('general.json', discordExport));
+    await screen.findByText(/Ready to import 2 messages/);
+
+    setMemoryOwner('bob');
+
+    await waitFor(() => expect(screen.queryByRole('group', { name: 'Review import' })).not.toBeInTheDocument());
+    expect(await loadRecent('#general', 400, MEMORY_OWNER)).toHaveLength(0);
+    expect(await loadRecent('#general', 400, { ...MEMORY_OWNER, identity: 'bob' })).toHaveLength(0);
   });
 
   it('rejects a non-Discord JSON file without offering an import', async () => {
@@ -106,7 +139,7 @@ describe('DiscordImportControls', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel import' }));
     await screen.findByText(/Import cancelled/);
     await waitFor(() => expect(chooser).toHaveFocus());
-    const stored = await loadRecent('#general');
+    const stored = await loadRecent('#general', 400, MEMORY_OWNER);
     expect(stored).toHaveLength(0);
   });
 
@@ -161,7 +194,7 @@ describe('SlackImportControls', () => {
 
     await screen.findByText(/Imported 1 message into 1 channel/);
     await waitFor(() => expect(chooser).toHaveFocus());
-    const stored = await loadRecent('#dev');
+    const stored = await loadRecent('#dev', 400, MEMORY_OWNER);
     expect(stored).toHaveLength(1);
     expect(stored[0]!.text).toContain('ship it');
   });
@@ -207,7 +240,7 @@ describe('IrcLogImportControls', () => {
 
     await screen.findByText(/Imported 2 messages into #dev/);
     await waitFor(() => expect(chooser).toHaveFocus());
-    const stored = await loadRecent('#dev');
+    const stored = await loadRecent('#dev', 400, MEMORY_OWNER);
     expect(stored).toHaveLength(2);
     expect(log.slice).toHaveBeenCalled();
     expect(log.text).not.toHaveBeenCalled();
@@ -222,13 +255,13 @@ describe('IrcLogImportControls', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Channel destination changed. Requested " #Ops Room! "; import destination: #ops-room. Confirm only if this is the intended room.',
     );
-    expect(await loadRecent('#ops-room')).toHaveLength(0);
+    expect(await loadRecent('#ops-room', 400, MEMORY_OWNER)).toHaveLength(0);
 
     fireEvent.click(screen.getByRole('button', { name: 'Import into #ops-room' }));
 
     await screen.findByText(/Imported 1 message into #ops-room/);
-    expect((await loadRecent('#ops-room')).map(message => message.text)).toEqual(['ship it']);
-    expect(await loadRecent('#ops room!')).toHaveLength(0);
+    expect((await loadRecent('#ops-room', 400, MEMORY_OWNER)).map(message => message.text)).toEqual(['ship it']);
+    expect(await loadRecent('#ops room!', 400, MEMORY_OWNER)).toHaveLength(0);
   });
 
   it('makes a collision-looking label explicit before any merge', async () => {
@@ -241,7 +274,7 @@ describe('IrcLogImportControls', () => {
       'Requested "#ops---room!"; import destination: #ops-room',
     );
     expect(screen.getByRole('button', { name: 'Import into #ops-room' })).toBeInTheDocument();
-    expect(await loadRecent('#ops-room')).toHaveLength(0);
+    expect(await loadRecent('#ops-room', 400, MEMORY_OWNER)).toHaveLength(0);
   });
 
   it('rejects a requested label that normalizes to an unsafe target before reading the log', async () => {

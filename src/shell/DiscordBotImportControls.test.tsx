@@ -13,12 +13,30 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
 import { DiscordBotImportControls } from './HistoryImportControls';
 import { loadRecent, _resetVaultForTests } from '@/lib/vault/historyVault';
+import { store } from '@/lib/store';
 
 /** Typed fetch signature so `mock.calls[i]` carries the [url, init] tuple. */
 type FetchFn = (...args: Parameters<typeof fetch>) => Promise<Response>;
 
 const PROXY_DISCLOSURE = "Your bot token is sent to this Onyx deployment's same-origin import proxy, which contacts Discord's API on your behalf. The token is used only for this request and is not stored in the portable vault or local history.";
 const PROXY_ACKNOWLEDGEMENT = "I understand that my bot token will be sent to this deployment's import proxy.";
+const MEMORY_OWNER = { serverUrl: 'wss://bot-import.example/ws', identity: 'alice' } as const;
+
+function setMemoryOwner(identity: string): void {
+  store.setState({
+    ourNick: identity,
+    server: {
+      id: `bot-import-${identity}`,
+      name: 'Bot import',
+      network: 'Bot import',
+      url: MEMORY_OWNER.serverUrl,
+      icon: '',
+      nick: identity,
+      account: identity,
+      connected: true,
+    },
+  });
+}
 
 function fakeRes(status: number, body: unknown, headers: Record<string, string> = {}): Response {
   return {
@@ -75,6 +93,7 @@ beforeEach(() => {
   (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
   _resetVaultForTests();
   cleanup();
+  setMemoryOwner(MEMORY_OWNER.identity);
 });
 
 afterEach(() => {
@@ -122,8 +141,9 @@ describe('DiscordBotImportControls', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Import into vault' }));
     await screen.findByText(/Imported 2 messages into 1 channel/);
     await waitFor(() => expect(tokenInput).toHaveFocus());
-    const stored = await loadRecent('#general');
+    const stored = await loadRecent('#general', 400, MEMORY_OWNER);
     expect(stored.map((m) => m.text)).toEqual(['hello', 'world']);
+    expect(await loadRecent('#general')).toHaveLength(0);
   });
 
   it('includes a pinned message from the pins endpoint, deduped by id', async () => {
@@ -148,7 +168,7 @@ describe('DiscordBotImportControls', () => {
     await screen.findByText(/1 pinned message included/);
     fireEvent.click(screen.getByRole('button', { name: 'Import into vault' }));
     await screen.findByText(/Imported 2 messages/);
-    const stored = await loadRecent('#general');
+    const stored = await loadRecent('#general', 400, MEMORY_OWNER);
     expect(stored.map((m) => m.text).sort()).toEqual(['a pinned note', 'live']);
   });
 
@@ -190,6 +210,29 @@ describe('DiscordBotImportControls', () => {
     // The signal was cleared in the finally block, emptying the bound input.
     expect(tokenInput.value).toBe('');
     expect(acknowledgement).not.toBeChecked();
+  });
+
+  it('aborts and clears a bot-token fetch when the device-memory owner changes', async () => {
+    let fetchSignal: AbortSignal | null = null;
+    const fetchMock = vi.fn<FetchFn>((_input, init) => new Promise<Response>((_resolve, reject) => {
+      fetchSignal = init?.signal ?? null;
+      fetchSignal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(() => <DiscordBotImportControls />);
+    const tokenInput = screen.getByLabelText('Bot token') as HTMLInputElement;
+    const guildInput = screen.getByLabelText('Server ID') as HTMLInputElement;
+    await enterAndFetch('alice-secret', '9');
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+
+    setMemoryOwner('bob');
+
+    await waitFor(() => expect(fetchSignal?.aborted).toBe(true));
+    expect(tokenInput.value).toBe('');
+    expect(guildInput.value).toBe('');
+    expect(screen.getByRole('checkbox', { name: PROXY_ACKNOWLEDGEMENT })).not.toBeChecked();
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
   });
 
   it('rejects a non-numeric Server ID without any fetch', async () => {

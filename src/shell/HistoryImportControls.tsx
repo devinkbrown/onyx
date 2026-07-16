@@ -11,7 +11,12 @@
  *
  * SOLID IDIOMS: component runs once; never destructure props; For/Show.
  */
-import { createSignal, onCleanup, Show, type JSX } from 'solid-js';
+import { createEffect, createSignal, onCleanup, Show, type JSX } from 'solid-js';
+import { selectDeviceMemoryOwner, useStore } from '@/lib/store';
+import {
+  deviceMemoryOwnerKey,
+  type DeviceMemoryOwner,
+} from '@/lib/deviceMemoryOwner';
 import { importVault, VAULT_KEEP } from '@/lib/vault/historyVault';
 import type { DiscordPackageFile } from '@/lib/import/discordPackageImport';
 import { countLabel } from '@/lib/format/countLabel';
@@ -53,7 +58,14 @@ interface VaultImportResultLike {
   summary: VaultImportSummaryLike;
 }
 
+interface ImportOwnerScope {
+  owner: DeviceMemoryOwner;
+  ownerKey: string;
+  epoch: number;
+}
+
 interface PendingJsonImport {
+  ownerScope: ImportOwnerScope;
   fileNames: string[];
   snapshots: import('@/lib/vault/historyVault').VaultExportSnapshot[];
   channels: number;
@@ -93,6 +105,55 @@ function focusSoon(target: () => HTMLElement | undefined): void {
     const element = target();
     if (element?.isConnected) element.focus();
   });
+}
+
+const IMPORT_OWNER_REQUIRED = 'Connect to an account or guest session before importing history into this device vault.';
+
+/**
+ * Bind temporary import material and async completions to one vault owner.
+ * Preferences stays mounted across account changes, so component lifetime is
+ * not an ownership boundary by itself.
+ */
+function useImportOwner(onOwnerChange: () => void): {
+  capture: () => ImportOwnerScope | null;
+  isActive: (scope: ImportOwnerScope) => boolean;
+} {
+  const memoryOwner = useStore(
+    selectDeviceMemoryOwner,
+    (left, right) => left?.serverUrl === right?.serverUrl && left?.identity === right?.identity,
+  );
+  const initialOwner = memoryOwner();
+  let activeOwnerKey = initialOwner ? deviceMemoryOwnerKey(initialOwner) : null;
+  let epoch = 0;
+  let disposed = false;
+
+  createEffect(() => {
+    const owner = memoryOwner();
+    const nextOwnerKey = owner ? deviceMemoryOwnerKey(owner) : null;
+    if (nextOwnerKey === activeOwnerKey) return;
+    activeOwnerKey = nextOwnerKey;
+    epoch += 1;
+    onOwnerChange();
+  });
+
+  onCleanup(() => {
+    disposed = true;
+    activeOwnerKey = null;
+    epoch += 1;
+  });
+
+  return {
+    capture: () => {
+      const owner = memoryOwner();
+      const ownerKey = owner ? deviceMemoryOwnerKey(owner) : null;
+      return !disposed && owner && ownerKey && ownerKey === activeOwnerKey
+        ? { owner, ownerKey, epoch }
+        : null;
+    },
+    isActive: (scope) => !disposed
+      && scope.epoch === epoch
+      && scope.ownerKey === activeOwnerKey,
+  };
 }
 
 interface JsonVaultImportProps {
@@ -138,6 +199,11 @@ export function JsonVaultImportControls(props: JsonVaultImportProps): JSX.Elemen
   const [pending, setPending] = createSignal<PendingJsonImport | null>(null);
   let fileInput: HTMLInputElement | undefined;
   let reviewHeading: HTMLHeadingElement | undefined;
+  const importOwner = useImportOwner(() => {
+    setPending(null);
+    setStatus(null);
+    setBusy(false);
+  });
 
   async function handleSelect(event: Event): Promise<void> {
     const input = event.currentTarget as HTMLInputElement;
@@ -150,9 +216,16 @@ export function JsonVaultImportControls(props: JsonVaultImportProps): JSX.Elemen
       setStatus(jsonLimitMessage(limitFailure));
       return;
     }
+    const ownerScope = importOwner.capture();
+    if (!ownerScope) {
+      setPending(null);
+      setStatus(IMPORT_OWNER_REQUIRED);
+      return;
+    }
     setBusy(true);
     try {
       const parse = await props.loadParse();
+      if (!importOwner.isActive(ownerScope)) return;
       const snapshots: PendingJsonImport['snapshots'] = [];
       const fileNames: string[] = [];
       const targets = new Set<string>();
@@ -172,6 +245,7 @@ export function JsonVaultImportControls(props: JsonVaultImportProps): JSX.Elemen
           rejected += 1;
           continue;
         }
+        if (!importOwner.isActive(ownerScope)) return;
         const result = parse(raw);
         if (!result) {
           rejected += 1;
@@ -194,35 +268,42 @@ export function JsonVaultImportControls(props: JsonVaultImportProps): JSX.Elemen
         setStatus(props.rejectMessage);
         return;
       }
-      setPending({ fileNames, snapshots, channels: targets.size, messages, skipped, droppedOverCap, guild, oldest, newest });
+      setPending({ ownerScope, fileNames, snapshots, channels: targets.size, messages, skipped, droppedOverCap, guild, oldest, newest });
       const rejectedNote = rejected > 0 ? ` ${countLabel(rejected, 'file')} skipped as unreadable.` : '';
       setStatus(`Ready to import ${countLabel(messages, 'message')} across ${countLabel(targets.size, 'channel')}${guild ? ` from ${guild}` : ''}.${rejectedNote}`);
       focusSoon(() => reviewHeading);
     } catch {
+      if (!importOwner.isActive(ownerScope)) return;
       setPending(null);
       setStatus(props.rejectMessage);
     } finally {
-      setBusy(false);
+      if (importOwner.isActive(ownerScope)) setBusy(false);
     }
   }
 
   async function confirmImport(): Promise<void> {
     const job = pending();
     if (!job) return;
+    if (!importOwner.isActive(job.ownerScope)) {
+      setPending(null);
+      return;
+    }
     setBusy(true);
     try {
       let imported = 0;
       for (const snapshot of job.snapshots) {
-        const result = await importVault(snapshot);
+        const result = await importVault(snapshot, job.ownerScope.owner);
+        if (!importOwner.isActive(job.ownerScope)) return;
         imported += result.messages;
       }
       setPending(null);
       setStatus(`Imported ${countLabel(imported, 'message')} into ${countLabel(job.channels, 'channel')}. Open a channel to read the history, or search it from anywhere.`);
       focusSoon(() => fileInput);
     } catch {
+      if (!importOwner.isActive(job.ownerScope)) return;
       setStatus('Import failed while merging into the local vault.');
     } finally {
-      setBusy(false);
+      if (importOwner.isActive(job.ownerScope)) setBusy(false);
     }
   }
 
@@ -306,6 +387,7 @@ export function DiscordImportControls(): JSX.Element {
 }
 
 interface PendingPackageImport {
+  ownerScope: ImportOwnerScope;
   snapshot: import('@/lib/vault/historyVault').VaultExportSnapshot;
   channels: number;
   messages: number;
@@ -358,6 +440,11 @@ export function DiscordPackageImportControls(): JSX.Element {
   const [pending, setPending] = createSignal<PendingPackageImport | null>(null);
   let packageInput: HTMLInputElement | undefined;
   let reviewHeading: HTMLHeadingElement | undefined;
+  const importOwner = useImportOwner(() => {
+    setPending(null);
+    setStatus(null);
+    setBusy(false);
+  });
 
   async function handleSelect(event: Event): Promise<void> {
     const input = event.currentTarget as HTMLInputElement;
@@ -384,14 +471,22 @@ export function DiscordPackageImportControls(): JSX.Element {
       setStatus(discordPackageLimitMessage(limitFailure));
       return;
     }
+    const ownerScope = importOwner.capture();
+    if (!ownerScope) {
+      setPending(null);
+      setStatus(IMPORT_OWNER_REQUIRED);
+      return;
+    }
     setBusy(true);
     try {
       const packageFiles: DiscordPackageFile[] = [];
       for (const file of recognizedFiles) {
         const path = file.webkitRelativePath || file.name;
         packageFiles.push({ path, text: await file.text() });
+        if (!importOwner.isActive(ownerScope)) return;
       }
       const { parseDiscordPackage } = await import('@/lib/import/discordPackageImport');
+      if (!importOwner.isActive(ownerScope)) return;
       const result = parseDiscordPackage(packageFiles);
       if (!result || result.summary.messages === 0) {
         setPending(null);
@@ -400,6 +495,7 @@ export function DiscordPackageImportControls(): JSX.Element {
       }
       const s = result.summary;
       setPending({
+        ownerScope,
         snapshot: result.snapshot,
         channels: s.channels,
         messages: s.messages,
@@ -412,26 +508,33 @@ export function DiscordPackageImportControls(): JSX.Element {
       setStatus(`Ready to import ${countLabel(s.messages, 'message')} across ${countLabel(s.channels, 'channel')}${s.guild ? ` from ${s.guild}` : ''}.`);
       focusSoon(() => reviewHeading);
     } catch {
+      if (!importOwner.isActive(ownerScope)) return;
       setPending(null);
       setStatus('Could not read that folder as a Discord data package.');
     } finally {
-      setBusy(false);
+      if (importOwner.isActive(ownerScope)) setBusy(false);
     }
   }
 
   async function confirmImport(): Promise<void> {
     const job = pending();
     if (!job) return;
+    if (!importOwner.isActive(job.ownerScope)) {
+      setPending(null);
+      return;
+    }
     setBusy(true);
     try {
-      const result = await importVault(job.snapshot);
+      const result = await importVault(job.snapshot, job.ownerScope.owner);
+      if (!importOwner.isActive(job.ownerScope)) return;
       setPending(null);
       setStatus(`Imported ${countLabel(result.messages, 'message')} into ${countLabel(job.channels, 'channel')}. Open a channel to read the history, or search it from anywhere.`);
       focusSoon(() => packageInput);
     } catch {
+      if (!importOwner.isActive(job.ownerScope)) return;
       setStatus('Import failed while merging into the local vault.');
     } finally {
-      setBusy(false);
+      if (importOwner.isActive(job.ownerScope)) setBusy(false);
     }
   }
 
@@ -497,6 +600,7 @@ export function DiscordPackageImportControls(): JSX.Element {
 }
 
 interface PendingBotImport {
+  ownerScope: ImportOwnerScope;
   snapshot: import('@/lib/vault/historyVault').VaultExportSnapshot;
   channels: number;
   messages: number;
@@ -534,6 +638,16 @@ export function DiscordBotImportControls(): JSX.Element {
   const [abort, setAbort] = createSignal<AbortController | null>(null);
   let tokenInput: HTMLInputElement | undefined;
   let reviewHeading: HTMLHeadingElement | undefined;
+  const importOwner = useImportOwner(() => {
+    abort()?.abort();
+    setAbort(null);
+    setToken('');
+    setGuildId('');
+    setProxyAcknowledged(false);
+    setPending(null);
+    setStatus(null);
+    setBusy(false);
+  });
 
   // Token contract: on unmount, abort any in-flight fetch (so the run's
   // finally disposes the client and releases its token copy immediately) and
@@ -559,6 +673,12 @@ export function DiscordBotImportControls(): JSX.Element {
       setStatus('Enter the numeric Server ID (turn on Developer Mode, then right-click the server icon → Copy Server ID).');
       return;
     }
+    const ownerScope = importOwner.capture();
+    if (!ownerScope) {
+      setPending(null);
+      setStatus(IMPORT_OWNER_REQUIRED);
+      return;
+    }
     const controller = new AbortController();
     setAbort(controller);
     setPending(null);
@@ -566,18 +686,24 @@ export function DiscordBotImportControls(): JSX.Element {
     setStatus('Connecting to Discord…');
     try {
       const { runDiscordGuildImport } = await import('@/lib/import/discordSnapshotImport');
+      if (!importOwner.isActive(ownerScope)) return;
       const res = await runDiscordGuildImport({
         token: tok,
         guildId: guild,
         sinceDays: BOT_IMPORT_SINCE_DAYS,
         signal: controller.signal,
-        onProgress: (p) =>
-          setStatus(
-            `Importing ${p.channelName} (channel ${p.channelIndex} of ${p.channelCount})… ${countLabel(p.fetched, 'message')} so far.`,
-          ),
+        onProgress: (p) => {
+          if (importOwner.isActive(ownerScope)) {
+            setStatus(
+              `Importing ${p.channelName} (channel ${p.channelIndex} of ${p.channelCount})… ${countLabel(p.fetched, 'message')} so far.`,
+            );
+          }
+        },
       });
+      if (!importOwner.isActive(ownerScope)) return;
       const s = res.result.summary;
       setPending({
+        ownerScope,
         snapshot: res.result.snapshot,
         channels: s.channels,
         messages: s.messages,
@@ -597,6 +723,7 @@ export function DiscordBotImportControls(): JSX.Element {
       );
       focusSoon(() => reviewHeading);
     } catch (err) {
+      if (!importOwner.isActive(ownerScope)) return;
       setPending(null);
       // DiscordImportError.message is already user-safe and never contains the token.
       setStatus(err instanceof Error && err.message ? err.message : 'Discord import failed.');
@@ -604,27 +731,35 @@ export function DiscordBotImportControls(): JSX.Element {
       // Zero the token at end-of-run: fetching is done, the vault merge below
       // never needs it. Consent is per-request, so a retry re-pastes and
       // explicitly acknowledges the proxy disclosure again.
-      setToken('');
-      setProxyAcknowledged(false);
-      setAbort(null);
-      setBusy(false);
-      if (!pending()) focusSoon(() => tokenInput);
+      if (importOwner.isActive(ownerScope)) {
+        setToken('');
+        setProxyAcknowledged(false);
+        setAbort(null);
+        setBusy(false);
+        if (!pending()) focusSoon(() => tokenInput);
+      }
     }
   }
 
   async function confirmImport(): Promise<void> {
     const job = pending();
     if (!job) return;
+    if (!importOwner.isActive(job.ownerScope)) {
+      setPending(null);
+      return;
+    }
     setBusy(true);
     try {
-      const result = await importVault(job.snapshot);
+      const result = await importVault(job.snapshot, job.ownerScope.owner);
+      if (!importOwner.isActive(job.ownerScope)) return;
       setPending(null);
       setStatus(`Imported ${countLabel(result.messages, 'message')} into ${countLabel(job.channels, 'channel')}. Open a channel to read the history, or search it from anywhere.`);
       focusSoon(() => tokenInput);
     } catch {
+      if (!importOwner.isActive(job.ownerScope)) return;
       setStatus('Import failed while merging into the local vault.');
     } finally {
-      setBusy(false);
+      if (importOwner.isActive(job.ownerScope)) setBusy(false);
     }
   }
 
@@ -767,6 +902,7 @@ export function SlackImportControls(): JSX.Element {
 }
 
 interface PendingIrcLogImport {
+  ownerScope: ImportOwnerScope;
   fileName: string;
   snapshot: import('@/lib/vault/historyVault').VaultExportSnapshot;
   requestedChannel: string;
@@ -790,6 +926,12 @@ export function IrcLogImportControls(): JSX.Element {
   const [pending, setPending] = createSignal<PendingIrcLogImport | null>(null);
   let fileInput: HTMLInputElement | undefined;
   let reviewHeading: HTMLHeadingElement | undefined;
+  const importOwner = useImportOwner(() => {
+    setChannel('');
+    setPending(null);
+    setStatus(null);
+    setBusy(false);
+  });
 
   async function handleSelect(event: Event): Promise<void> {
     const input = event.currentTarget as HTMLInputElement;
@@ -818,9 +960,16 @@ export function IrcLogImportControls(): JSX.Element {
       setStatus('Enter the channel these logs belong to first (e.g. #dev).');
       return;
     }
+    const ownerScope = importOwner.capture();
+    if (!ownerScope) {
+      setPending(null);
+      setStatus(IMPORT_OWNER_REQUIRED);
+      return;
+    }
     setBusy(true);
     try {
       const { normalizeIrcChannelTarget, parseIrcLogFile } = await import('@/lib/import/ircLogImport');
+      if (!importOwner.isActive(ownerScope)) return;
       const normalizedTarget = normalizeIrcChannelTarget(requestedChannel);
       if (!normalizedTarget) {
         setPending(null);
@@ -828,6 +977,7 @@ export function IrcLogImportControls(): JSX.Element {
         return;
       }
       const result = await parseIrcLogFile(file, { channel: requestedChannel });
+      if (!importOwner.isActive(ownerScope)) return;
       if (!result || result.summary.messages === 0) {
         setPending(null);
         setStatus('No recognizable log lines found. Supported: weechat, irssi, and mIRC text logs.');
@@ -846,6 +996,7 @@ export function IrcLogImportControls(): JSX.Element {
       }
       const s = result.summary;
       setPending({
+        ownerScope,
         fileName: file.name,
         snapshot: result.snapshot,
         requestedChannel,
@@ -863,26 +1014,33 @@ export function IrcLogImportControls(): JSX.Element {
       setStatus(`Ready to import ${countLabel(s.messages, 'message')} into ${actualTarget}.${changed}`);
       focusSoon(() => reviewHeading);
     } catch {
+      if (!importOwner.isActive(ownerScope)) return;
       setPending(null);
       setStatus('Could not read that log file.');
     } finally {
-      setBusy(false);
+      if (importOwner.isActive(ownerScope)) setBusy(false);
     }
   }
 
   async function confirmImport(): Promise<void> {
     const job = pending();
     if (!job) return;
+    if (!importOwner.isActive(job.ownerScope)) {
+      setPending(null);
+      return;
+    }
     setBusy(true);
     try {
-      const result = await importVault(job.snapshot);
+      const result = await importVault(job.snapshot, job.ownerScope.owner);
+      if (!importOwner.isActive(job.ownerScope)) return;
       setPending(null);
       setStatus(`Imported ${countLabel(result.messages, 'message')} into ${job.target}. Open it to read the history, or search from anywhere.`);
       focusSoon(() => fileInput);
     } catch {
+      if (!importOwner.isActive(job.ownerScope)) return;
       setStatus('Import failed while merging into the local vault.');
     } finally {
-      setBusy(false);
+      if (importOwner.isActive(job.ownerScope)) setBusy(false);
     }
   }
 
