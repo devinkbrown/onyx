@@ -1464,6 +1464,13 @@ describe('AppShell', () => {
     it('opens the live WHOIS profile surface from member details and restores focus', async () => {
       stubMobileViewport(false);
       seedStore('#general');
+      const sendRaw = vi.fn();
+      store.setState({
+        client: {
+          sendRaw,
+          isupport: { CHANTYPES: '#&' },
+        } as never,
+      });
 
       const { container } = render(() => <AppShell />);
       const memberList = container.querySelector<HTMLElement>('.shell-members');
@@ -1475,6 +1482,7 @@ describe('AppShell', () => {
 
       const profile = await screen.findByRole('dialog', { name: 'Profile: alice' });
       expect(within(profile).getByRole('status')).toHaveTextContent('Asking the network');
+      expect(sendRaw).toHaveBeenCalledWith('WHOIS', 'alice', 'alice');
       expect(store.getState().showWhois).toBe(true);
       expect(store.getState().whoisNick).toBe('alice');
 
