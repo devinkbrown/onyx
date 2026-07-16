@@ -7,6 +7,7 @@ import {
   createSignal,
   onCleanup,
   splitProps,
+  untrack,
   type JSX,
 } from 'solid-js';
 import { Dynamic } from 'solid-js/web';
@@ -114,6 +115,7 @@ export function Spotlight(props: SpotlightProps) {
   const [activeIndex, setActiveIndex] = createSignal(0);
   let inputRef: HTMLInputElement | undefined;
   let panelRef: HTMLDivElement | undefined;
+  let resultsRef: HTMLDivElement | undefined;
   let restoreFocusTo: HTMLElement | null = null;
 
   const matches = createMemo<MatchedCommand[]>(() => (
@@ -181,6 +183,20 @@ export function Spotlight(props: SpotlightProps) {
     }
     setQuery(spotlight.initialQuery());
     queueMicrotask(() => inputRef?.focus());
+  });
+
+  createEffect(() => {
+    const id = activeOptionId();
+    if (!spotlight.isOpen() || !id) return;
+
+    // aria-activedescendant deliberately keeps DOM focus in the combobox, so
+    // the browser will not reveal an off-screen option for us as Arrow keys
+    // advance through the scrollable listbox.
+    queueMicrotask(() => {
+      if (!untrack(spotlight.isOpen) || untrack(activeOptionId) !== id) return;
+      const option = resultsRef?.querySelector<HTMLElement>(`#${id}`);
+      option?.scrollIntoView?.({ block: 'nearest' });
+    });
   });
 
   onCleanup(() => {
@@ -371,7 +387,13 @@ export function Spotlight(props: SpotlightProps) {
             <span class="onyx-spotlight__grammar-status">{activeHint()}</span>
           </div>
 
-          <div id={LISTBOX_ID} class="onyx-spotlight__results" role="listbox" aria-label="Commands">
+          <div
+            ref={resultsRef}
+            id={LISTBOX_ID}
+            class="onyx-spotlight__results"
+            role="listbox"
+            aria-label="Commands"
+          >
             <Show
               when={groups().length > 0}
               fallback={

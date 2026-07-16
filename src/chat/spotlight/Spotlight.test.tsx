@@ -123,6 +123,35 @@ describe('Spotlight', () => {
     expect(screen.queryByText('Go to #lapis')).not.toBeInTheDocument();
   });
 
+  it('keeps the Arrow-key-selected option visible without moving combobox focus', async () => {
+    setState({
+      channels: new Map([
+        ['#forge', channel('#forge')],
+        ['#lapis', channel('#lapis')],
+      ]),
+    });
+    renderSpotlight();
+
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    const input = screen.getByRole('combobox', { name: 'Command search' });
+    await waitFor(() => expect(input).toHaveFocus());
+    const nextOption = screen.getAllByRole('option')[1];
+    if (!nextOption) throw new Error('Expected at least two Spotlight options');
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(nextOption, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    });
+
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+
+    expect(input).toHaveAttribute('aria-activedescendant', nextOption.id);
+    expect(input).toHaveFocus();
+    await waitFor(() => {
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
+    });
+  });
+
   it('finds a reviewed anchor by preview and runs exact-id recall', async () => {
     recordReviewHistory({
       target: '#forge',
