@@ -856,6 +856,19 @@
   margin: 0;
 }
 
+.pref-storage-estimate {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  width: 100%;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.pref-storage-estimate h5 {
+  margin: 0;
+}
+
 @media (max-width: 560px) {
   .pref-extension-audit__row,
   .pref-local-language__row,

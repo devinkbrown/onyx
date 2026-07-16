@@ -470,6 +470,107 @@ describe('PreferencesPanel', () => {
     expect(screen.queryByText(/browser did not grant persistent storage/i)).not.toBeInTheDocument();
   });
 
+  it('shows an origin-wide storage estimate and guards rapid refresh clicks', async () => {
+    let resolveRefresh: (estimate: StorageEstimate) => void = () => {};
+    const pendingRefresh = new Promise<StorageEstimate>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    const estimate = vi.fn()
+      .mockResolvedValueOnce({ usage: 12 * 1024 * 1024, quota: 2 * 1024 * 1024 * 1024 })
+      .mockReturnValueOnce(pendingRefresh);
+    const persist = vi.fn().mockResolvedValue(false);
+    vi.stubGlobal('navigator', {
+      storage: {
+        persisted: vi.fn().mockResolvedValue(false),
+        persist,
+        estimate,
+      },
+      serviceWorker: { controller: null },
+    });
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    expect(await screen.findByText(/12 MiB used of an estimated 2 GiB quota/i)).toHaveTextContent(
+      'origin-wide storage, not vault-only',
+    );
+    expect(persist).not.toHaveBeenCalled();
+
+    const refresh = screen.getByRole('button', { name: 'Refresh storage estimate' });
+    fireEvent.click(refresh);
+    fireEvent.click(refresh);
+    expect(estimate).toHaveBeenCalledTimes(2);
+    expect(refresh).toBeDisabled();
+    expect(refresh).toHaveAttribute('aria-busy', 'true');
+
+    resolveRefresh({ usage: 24 * 1024 * 1024, quota: 2 * 1024 * 1024 * 1024 });
+    expect(await screen.findByText(/24 MiB used of an estimated 2 GiB quota/i)).toBeInTheDocument();
+  });
+
+  it('reports unsupported origin estimates without a misleading refresh control', async () => {
+    const persist = vi.fn().mockResolvedValue(false);
+    vi.stubGlobal('navigator', {
+      storage: {
+        persisted: vi.fn().mockResolvedValue(false),
+        persist,
+      },
+      serviceWorker: { controller: null },
+    });
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    expect(await screen.findByText(/does not expose an origin storage estimate/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /storage estimate/i })).not.toBeInTheDocument();
+    expect(persist).not.toHaveBeenCalled();
+  });
+
+  it('surfaces estimate errors and retries without requesting persistence', async () => {
+    const estimate = vi.fn()
+      .mockRejectedValueOnce(new Error('private mode'))
+      .mockResolvedValueOnce({ usage: 3 * 1024 * 1024 });
+    const persist = vi.fn().mockResolvedValue(false);
+    vi.stubGlobal('navigator', {
+      storage: {
+        persisted: vi.fn().mockResolvedValue(false),
+        persist,
+        estimate,
+      },
+      serviceWorker: { controller: null },
+    });
+    openPreferences();
+    render(() => <PreferencesPanel />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('browser storage estimate failed');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry storage estimate' }));
+    expect(await screen.findByText(/3 MiB estimated used; quota was not reported/i)).toBeInTheDocument();
+    expect(estimate).toHaveBeenCalledTimes(2);
+    expect(persist).not.toHaveBeenCalled();
+  });
+
+  it('ignores an origin estimate that resolves after Preferences unmounts', async () => {
+    let resolveEstimate: (estimate: StorageEstimate) => void = () => {};
+    const pendingEstimate = new Promise<StorageEstimate>((resolve) => {
+      resolveEstimate = resolve;
+    });
+    vi.stubGlobal('navigator', {
+      storage: {
+        persisted: vi.fn().mockResolvedValue(false),
+        persist: vi.fn().mockResolvedValue(false),
+        estimate: vi.fn().mockReturnValue(pendingEstimate),
+      },
+      serviceWorker: { controller: null },
+    });
+    openPreferences();
+    const view = render(() => <PreferencesPanel />);
+
+    expect(screen.getByText('Checking origin-wide storage usage…')).toBeInTheDocument();
+    view.unmount();
+    resolveEstimate({ usage: 99 * 1024 * 1024, quota: 1024 * 1024 * 1024 });
+    await pendingEstimate;
+    await Promise.resolve();
+
+    expect(screen.queryByText(/99 MiB used/i)).not.toBeInTheDocument();
+  });
+
   it('exposes segmented settings as a valid roving-tabindex radio group', () => {
     openPreferences();
     render(() => <PreferencesPanel />);

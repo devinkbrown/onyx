@@ -77,6 +77,10 @@ import {
   type VaultPersistenceResult,
 } from '@/lib/vault/persistentStorage';
 import {
+  readOriginStorageEstimate,
+  type OriginStorageEstimateResult,
+} from '@/lib/vault/storageEstimate';
+import {
   compressPortableJson,
   decompressPortableJson,
   isPortableGzipFile,
@@ -1857,12 +1861,16 @@ function PwaReadinessPanel(): JSX.Element {
   const [updateBusy, setUpdateBusy] = createSignal(false);
   const [persistenceResult, setPersistenceResult] = createSignal<VaultPersistenceResult | null>(null);
   const [persistenceBusy, setPersistenceBusy] = createSignal(false);
+  const [storageEstimate, setStorageEstimate] = createSignal<OriginStorageEstimateResult | null>(null);
+  const [estimateBusy, setEstimateBusy] = createSignal(false);
   let persistenceEpoch = 0;
+  let estimateEpoch = 0;
   let disposed = false;
 
   onCleanup(() => {
     disposed = true;
     persistenceEpoch += 1;
+    estimateEpoch += 1;
   });
 
   onMount(() => {
@@ -1871,6 +1879,7 @@ function PwaReadinessPanel(): JSX.Element {
       if (disposed || epoch !== persistenceEpoch) return;
       setPersistenceResult(result);
     });
+    void refreshStorageEstimate();
   });
 
   async function persistVaultStorage(): Promise<void> {
@@ -1883,6 +1892,19 @@ function PwaReadinessPanel(): JSX.Element {
       setPersistenceResult(result);
     } finally {
       if (!disposed && epoch === persistenceEpoch) setPersistenceBusy(false);
+    }
+  }
+
+  async function refreshStorageEstimate(): Promise<void> {
+    if (estimateBusy()) return;
+    const epoch = ++estimateEpoch;
+    setEstimateBusy(true);
+    try {
+      const result = await readOriginStorageEstimate();
+      if (disposed || epoch !== estimateEpoch) return;
+      setStorageEstimate(result);
+    } finally {
+      if (!disposed && epoch === estimateEpoch) setEstimateBusy(false);
     }
   }
 
@@ -1957,6 +1979,37 @@ function PwaReadinessPanel(): JSX.Element {
             {persistenceBusy() ? 'Requesting persistence…' : 'Keep vault on this device'}
           </button>
         </Show>
+        <div class="pref-storage-estimate" aria-labelledby="pref-storage-estimate-title">
+          <h5 id="pref-storage-estimate-title" class="pref-pwa-readiness__title">Origin storage estimate</h5>
+          <Show
+            when={storageEstimate()}
+            fallback={<p class="pref-status" role="status">Checking origin-wide storage usage…</p>}
+          >
+            {(result) => (
+              <p
+                class={`pref-status${result().state === 'error' ? ' pref-status--error' : ''}`}
+                role={result().state === 'error' ? 'alert' : 'status'}
+              >
+                {result().detail}
+              </p>
+            )}
+          </Show>
+          <Show when={storageEstimate()?.state !== 'unsupported'}>
+            <button
+              type="button"
+              class="pref-reset"
+              disabled={estimateBusy()}
+              aria-busy={estimateBusy()}
+              onClick={() => void refreshStorageEstimate()}
+            >
+              {estimateBusy()
+                ? 'Refreshing estimate…'
+                : storageEstimate()?.state === 'error'
+                  ? 'Retry storage estimate'
+                  : 'Refresh storage estimate'}
+            </button>
+          </Show>
+        </div>
       </section>
     </section>
   );
