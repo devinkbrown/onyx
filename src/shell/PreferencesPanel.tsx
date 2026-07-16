@@ -1017,6 +1017,13 @@ function PortableVaultControls(): JSX.Element {
   );
 }
 
+function focusConnectedAfterRender(getElement: () => HTMLButtonElement | undefined): void {
+  queueMicrotask(() => {
+    const element = getElement();
+    if (element?.isConnected) element.focus();
+  });
+}
+
 function ClearReviewedAnchorsControls(): JSX.Element {
   const [anchorCount, setAnchorCount] = createSignal(readReviewHistory().length);
   const [confirming, setConfirming] = createSignal(false);
@@ -1024,13 +1031,27 @@ function ClearReviewedAnchorsControls(): JSX.Element {
     message: string;
     failure: boolean;
   } | null>(null);
+  let clearTrigger: HTMLButtonElement | undefined;
+  let eraseAction: HTMLButtonElement | undefined;
 
   onCleanup(subscribeReviewHistory((entries) => setAnchorCount(entries.length)));
+
+  function beginClear(): void {
+    setStatus(null);
+    setConfirming(true);
+    focusConnectedAfterRender(() => eraseAction);
+  }
+
+  function cancelClear(): void {
+    setConfirming(false);
+    focusConnectedAfterRender(() => clearTrigger);
+  }
 
   function clearNow(): void {
     const result = clearReviewHistory();
     setAnchorCount(result.remaining);
     setConfirming(false);
+    focusConnectedAfterRender(() => clearTrigger);
     if (result.success) {
       setStatus({
         message: result.cleared > 0
@@ -1061,12 +1082,10 @@ function ClearReviewedAnchorsControls(): JSX.Element {
         fallback={
           <div class="pref-clear-history__actions">
             <button
+              ref={clearTrigger}
               type="button"
               class="pref-reset pref-reset--danger"
-              onClick={() => {
-                setStatus(null);
-                setConfirming(true);
-              }}
+              onClick={beginClear}
             >
               Clear reviewed anchors
             </button>
@@ -1079,6 +1098,7 @@ function ClearReviewedAnchorsControls(): JSX.Element {
           </p>
           <div class="pref-clear-history__actions">
             <button
+              ref={eraseAction}
               type="button"
               class="pref-reset pref-reset--danger"
               onClick={clearNow}
@@ -1088,7 +1108,7 @@ function ClearReviewedAnchorsControls(): JSX.Element {
             <button
               type="button"
               class="pref-reset"
-              onClick={() => setConfirming(false)}
+              onClick={cancelClear}
             >
               Keep reviewed anchors
             </button>
@@ -1116,6 +1136,7 @@ function ClearSavedSearchesControls(): JSX.Element {
     failure: boolean;
   } | null>(null);
   let clearTrigger: HTMLButtonElement | undefined;
+  let eraseAction: HTMLButtonElement | undefined;
 
   async function refreshCount(): Promise<number> {
     const count = (await listSearches()).length;
@@ -1138,13 +1159,14 @@ function ClearSavedSearchesControls(): JSX.Element {
     setStagedCount(count);
     setConfirming(true);
     setBusy(false);
+    focusConnectedAfterRender(() => eraseAction);
   }
 
   function cancelClear(): void {
     setConfirming(false);
     setStagedCount(null);
     setStatus({ message: 'Saved searches kept on this device.', failure: false });
-    queueMicrotask(() => clearTrigger?.focus());
+    focusConnectedAfterRender(() => clearTrigger);
   }
 
   async function confirmClear(): Promise<void> {
@@ -1186,6 +1208,7 @@ function ClearSavedSearchesControls(): JSX.Element {
       failure: false,
     });
     setBusy(false);
+    focusConnectedAfterRender(() => clearTrigger);
   }
 
   return (
@@ -1225,6 +1248,7 @@ function ClearSavedSearchesControls(): JSX.Element {
           </p>
           <div class="pref-clear-history__actions">
             <button
+              ref={eraseAction}
               type="button"
               class="pref-reset pref-reset--danger"
               disabled={busy()}
@@ -1263,6 +1287,7 @@ function ClearTopicReadPositionsControls(): JSX.Element {
     failure: boolean;
   } | null>(null);
   let clearTrigger: HTMLButtonElement | undefined;
+  let eraseAction: HTMLButtonElement | undefined;
 
   onCleanup(subscribeTopicReadLedger((markers) => setCursorCount(markers.length)));
 
@@ -1273,13 +1298,14 @@ function ClearTopicReadPositionsControls(): JSX.Element {
     setStagedCount(count);
     setStatus(null);
     setConfirming(true);
+    focusConnectedAfterRender(() => eraseAction);
   }
 
   function cancelClear(): void {
     setConfirming(false);
     setStagedCount(null);
     setStatus({ message: 'Topic read positions kept on this device.', failure: false });
-    queueMicrotask(() => clearTrigger?.focus());
+    focusConnectedAfterRender(() => clearTrigger);
   }
 
   function confirmClear(): void {
@@ -1315,6 +1341,7 @@ function ClearTopicReadPositionsControls(): JSX.Element {
       message: `Cleared ${countLabel(current, 'topic read position')} from this device.`,
       failure: false,
     });
+    focusConnectedAfterRender(() => clearTrigger);
   }
 
   return (
@@ -1348,6 +1375,7 @@ function ClearTopicReadPositionsControls(): JSX.Element {
           </p>
           <div class="pref-clear-history__actions">
             <button
+              ref={eraseAction}
               type="button"
               class="pref-reset pref-reset--danger"
               onClick={confirmClear}
@@ -1384,19 +1412,21 @@ function ClearFollowedConversationsControls(): JSX.Element {
     failure: boolean;
   } | null>(null);
   let clearTrigger: HTMLButtonElement | undefined;
+  let eraseAction: HTMLButtonElement | undefined;
 
   function beginClear(trigger: HTMLButtonElement): void {
     clearTrigger = trigger;
     setStagedCount(followed().size);
     setStatus(null);
     setConfirming(true);
+    focusConnectedAfterRender(() => eraseAction);
   }
 
   function cancelClear(): void {
     setConfirming(false);
     setStagedCount(null);
     setStatus({ message: 'Followed conversations kept on this device.', failure: false });
-    queueMicrotask(() => clearTrigger?.focus());
+    focusConnectedAfterRender(() => clearTrigger);
   }
 
   function confirmClear(): void {
@@ -1428,6 +1458,7 @@ function ClearFollowedConversationsControls(): JSX.Element {
       message: `Cleared ${countLabel(current, 'followed conversation')} from this device.`,
       failure: false,
     });
+    focusConnectedAfterRender(() => clearTrigger);
   }
 
   return (
@@ -1466,6 +1497,7 @@ function ClearFollowedConversationsControls(): JSX.Element {
           </p>
           <div class="pref-clear-history__actions">
             <button
+              ref={eraseAction}
               type="button"
               class="pref-reset pref-reset--danger"
               onClick={confirmClear}
@@ -1535,6 +1567,7 @@ function DiscardLocalDraftsControls(): JSX.Element {
     failure: boolean;
   } | null>(null);
   let discardTrigger: HTMLButtonElement | undefined;
+  let discardAction: HTMLButtonElement | undefined;
 
   function refreshCounts(): LocalDraftSnapshot {
     const snapshot = readLocalDraftSnapshot();
@@ -1548,13 +1581,14 @@ function DiscardLocalDraftsControls(): JSX.Element {
     setStagedCounts({ roomCount: snapshot.roomCount, topicCount: snapshot.topicCount });
     setStatus(null);
     setConfirming(true);
+    focusConnectedAfterRender(() => discardAction);
   }
 
   function cancelDiscard(): void {
     setConfirming(false);
     setStagedCounts(null);
     setStatus({ message: 'Local room and topic drafts kept on this device.', failure: false });
-    queueMicrotask(() => discardTrigger?.focus());
+    focusConnectedAfterRender(() => discardTrigger);
   }
 
   function restoreRoomDrafts(drafts: ComposerDrafts): void {
@@ -1641,6 +1675,7 @@ function DiscardLocalDraftsControls(): JSX.Element {
       message: `Discarded ${localDraftCountLabel(current.roomCount, current.topicCount)} from this device. Direct-message drafts were not changed.`,
       failure: false,
     });
+    focusConnectedAfterRender(() => discardTrigger);
   }
 
   return (
@@ -1684,6 +1719,7 @@ function DiscardLocalDraftsControls(): JSX.Element {
           </p>
           <div class="pref-clear-history__actions">
             <button
+              ref={discardAction}
               type="button"
               class="pref-reset pref-reset--danger"
               onClick={discardNow}
@@ -1721,6 +1757,7 @@ function DiscardQueuedSendsControls(): JSX.Element {
     failure: boolean;
   } | null>(null);
   let discardTrigger: HTMLButtonElement | undefined;
+  let discardAction: HTMLButtonElement | undefined;
 
   async function refreshCount(): Promise<number> {
     const count = (await loadOutbox()).length;
@@ -1743,13 +1780,14 @@ function DiscardQueuedSendsControls(): JSX.Element {
     setStagedCount(count);
     setConfirming(true);
     setBusy(false);
+    focusConnectedAfterRender(() => discardAction);
   }
 
   function cancelDiscard(): void {
     setConfirming(false);
     setStagedCount(null);
     setStatus({ message: 'Queued sends kept on this device.', failure: false });
-    queueMicrotask(() => discardTrigger?.focus());
+    focusConnectedAfterRender(() => discardTrigger);
   }
 
   async function confirmDiscard(): Promise<void> {
@@ -1789,6 +1827,7 @@ function DiscardQueuedSendsControls(): JSX.Element {
       failure: false,
     });
     setBusy(false);
+    focusConnectedAfterRender(() => discardTrigger);
   }
 
   return (
@@ -1828,6 +1867,7 @@ function DiscardQueuedSendsControls(): JSX.Element {
           </p>
           <div class="pref-clear-history__actions">
             <button
+              ref={discardAction}
               type="button"
               class="pref-reset pref-reset--danger"
               disabled={busy()}
@@ -2370,22 +2410,15 @@ function ClearLocalHistoryControls(): JSX.Element {
   let triggerButton: HTMLButtonElement | undefined;
   let eraseButton: HTMLButtonElement | undefined;
 
-  function focusAfterRender(getElement: () => HTMLButtonElement | undefined): void {
-    queueMicrotask(() => {
-      const element = getElement();
-      if (element?.isConnected) element.focus();
-    });
-  }
-
   function openConfirmation(): void {
     setStatus(null);
     setConfirming(true);
-    focusAfterRender(() => eraseButton);
+    focusConnectedAfterRender(() => eraseButton);
   }
 
   function closeConfirmation(): void {
     setConfirming(false);
-    focusAfterRender(() => triggerButton);
+    focusConnectedAfterRender(() => triggerButton);
   }
 
   async function clearNow(): Promise<void> {

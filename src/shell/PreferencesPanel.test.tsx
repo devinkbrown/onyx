@@ -1592,19 +1592,31 @@ describe('PreferencesPanel', () => {
     expect(card).not.toBeNull();
     const controls = within(card!);
     expect(controls.getByText('1 reviewed anchor')).toBeInTheDocument();
+    await Promise.resolve();
 
-    fireEvent.click(controls.getByRole('button', { name: 'Clear reviewed anchors' }));
+    const trigger = controls.getByRole('button', { name: 'Clear reviewed anchors' });
+    trigger.focus();
+    fireEvent.click(trigger);
     expect(controls.getByRole('group', { name: 'Confirm clear reviewed anchors' })).toBeInTheDocument();
     expect(readReviewHistory()).toHaveLength(1);
+    await waitFor(() => {
+      expect(controls.getByRole('button', { name: 'Erase reviewed anchors' })).toHaveFocus();
+    });
 
     fireEvent.click(controls.getByRole('button', { name: 'Keep reviewed anchors' }));
     expect(controls.queryByRole('group', { name: 'Confirm clear reviewed anchors' })).toBeNull();
     expect(readReviewHistory()).toHaveLength(1);
+    await waitFor(() => {
+      expect(controls.getByRole('button', { name: 'Clear reviewed anchors' })).toHaveFocus();
+    });
 
     fireEvent.click(controls.getByRole('button', { name: 'Clear reviewed anchors' }));
     fireEvent.click(controls.getByRole('button', { name: 'Erase reviewed anchors' }));
 
     expect(controls.getByRole('status')).toHaveTextContent('Cleared 1 reviewed anchor from this device.');
+    await waitFor(() => {
+      expect(controls.getByRole('button', { name: 'Clear reviewed anchors' })).toHaveFocus();
+    });
     expect(controls.getByText('0 reviewed anchors')).toBeInTheDocument();
     expect(readReviewHistory()).toEqual([]);
     expect((await loadRecent(target)).map((message) => message.id)).toContain(vaultMessage.id);
@@ -1684,6 +1696,7 @@ describe('PreferencesPanel', () => {
     await waitFor(() => {
       expect(controls.getByRole('group', { name: 'Confirm clear all saved searches' }))
         .toHaveTextContent('Permanently erase 2 saved searches and their saved query text from this device?');
+      expect(controls.getByRole('button', { name: 'Erase all saved searches' })).toHaveFocus();
     });
     fireEvent.click(controls.getByRole('button', { name: 'Keep saved searches' }));
     await waitFor(() => expect(controls.getByRole('button', { name: 'Clear all saved searches' })).toHaveFocus());
@@ -1708,6 +1721,7 @@ describe('PreferencesPanel', () => {
       expect(controls.getByRole('status')).toHaveTextContent(
         'Cleared 3 saved searches and removed the saved query text from this device.',
       );
+      expect(controls.getByRole('button', { name: 'Clear all saved searches' })).toHaveFocus();
     });
     expect(await listSearches()).toEqual([]);
     expect((await loadRecent(target)).map((message) => message.id)).toContain(vaultMessage.id);
@@ -1813,6 +1827,9 @@ describe('PreferencesPanel', () => {
     expect(confirmation).not.toHaveTextContent(target);
     expect(confirmation).not.toHaveTextContent('private roadmap');
     expect(confirmation).not.toHaveTextContent('private-cursor-one');
+    await waitFor(() => {
+      expect(controls.getByRole('button', { name: 'Erase topic read positions' })).toHaveFocus();
+    });
 
     fireEvent.click(controls.getByRole('button', { name: 'Keep topic read positions' }));
     await waitFor(() => expect(controls.getByRole('button', { name: 'Clear topic read positions' })).toHaveFocus());
@@ -1833,6 +1850,9 @@ describe('PreferencesPanel', () => {
     expect(controls.getByRole('status')).toHaveTextContent(
       'Cleared 3 topic read positions from this device.',
     );
+    await waitFor(() => {
+      expect(controls.getByRole('button', { name: 'Clear topic read positions' })).toHaveFocus();
+    });
     expect(controls.getByRole('status')).not.toHaveTextContent('private');
     expect(readTopicReadLedger()).toEqual([]);
     expect((await loadRecent(target)).map((message) => message.id)).toContain(vaultMessage.id);
@@ -1919,6 +1939,9 @@ describe('PreferencesPanel', () => {
     expect(confirmation).toHaveTextContent('Remove 2 followed conversations from this device only?');
     expect(confirmation).not.toHaveTextContent(target);
     expect(confirmation).not.toHaveTextContent('private roadmap');
+    await waitFor(() => {
+      expect(controls.getByRole('button', { name: 'Erase followed conversations' })).toHaveFocus();
+    });
 
     fireEvent.click(controls.getByRole('button', { name: 'Keep followed conversations' }));
     await waitFor(() => {
@@ -1939,6 +1962,9 @@ describe('PreferencesPanel', () => {
     expect(controls.getByRole('status')).toHaveTextContent(
       'Cleared 3 followed conversations from this device.',
     );
+    await waitFor(() => {
+      expect(controls.getByRole('button', { name: 'Clear followed conversations' })).toHaveFocus();
+    });
     expect(localStorage.getItem(FOLLOWED_STORAGE_KEY)).toBeNull();
     expect(isFollowed(target, 'private roadmap')).toBe(false);
     expect((await loadRecent(target)).map((message) => message.id)).toContain(vaultMessage.id);
@@ -2038,6 +2064,9 @@ describe('PreferencesPanel', () => {
     expect(confirmation).not.toHaveTextContent('first room plaintext');
     expect(confirmation).not.toHaveTextContent('first topic plaintext');
     expect(confirmation).not.toHaveTextContent('direct-message plaintext remains');
+    await waitFor(() => {
+      expect(controls.getByRole('button', { name: 'Discard room and topic drafts' })).toHaveFocus();
+    });
 
     fireEvent.click(controls.getByRole('button', { name: 'Keep local drafts' }));
     await waitFor(() => expect(controls.getByRole('button', { name: 'Discard local drafts' })).toHaveFocus());
@@ -2067,6 +2096,9 @@ describe('PreferencesPanel', () => {
     expect(controls.getByRole('status')).toHaveTextContent(
       'Discarded 3 room drafts · 2 topic drafts from this device. Direct-message drafts were not changed.',
     );
+    await waitFor(() => {
+      expect(controls.getByRole('button', { name: 'Discard local drafts' })).toHaveFocus();
+    });
     expect(controls.getByRole('status')).not.toHaveTextContent('plaintext');
     expect(loadComposerDrafts()).toEqual({ alice: 'direct-message plaintext remains' });
     expect(store.getState().composerDrafts).toEqual({ alice: 'direct-message plaintext remains' });
@@ -2164,6 +2196,7 @@ describe('PreferencesPanel', () => {
     await waitFor(() => {
       expect(controls.getByRole('group', { name: 'Confirm discard queued sends' }))
         .toHaveTextContent('Discard 2 queued sends? Their unsent message text will be removed from this device and will not be sent.');
+      expect(controls.getByRole('button', { name: 'Discard all queued sends' })).toHaveFocus();
     });
     expect(controls.getByRole('group', { name: 'Confirm discard queued sends' }))
       .not.toHaveTextContent('queued plaintext secret');
@@ -2191,6 +2224,7 @@ describe('PreferencesPanel', () => {
       expect(controls.getByRole('status')).toHaveTextContent(
         'Discarded 3 queued sends. Their unsent message text was removed from this device and will not be sent.',
       );
+      expect(controls.getByRole('button', { name: 'Discard queued sends' })).toHaveFocus();
     });
     expect(controls.getByRole('status')).not.toHaveTextContent('secret');
     expect(await loadOutbox()).toEqual([]);
