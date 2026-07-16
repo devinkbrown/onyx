@@ -31,6 +31,22 @@
  */
 import { parseDiscordExport, type DiscordImportOptions, type DiscordImportResult } from './discordImport';
 
+const MAX_PACKAGE_FILES = 4_096;
+const MAX_PACKAGE_PATH_LENGTH = 1_024;
+const MAX_PACKAGE_TOTAL_TEXT = 256 * 1024 * 1024;
+const MAX_PACKAGE_MESSAGE_FILE_TEXT = 32 * 1024 * 1024;
+const MAX_PACKAGE_METADATA_FILE_TEXT = 1024 * 1024;
+const MAX_PACKAGE_CHANNELS = 2_048;
+const MAX_PACKAGE_INDEX_ENTRIES = 4_096;
+const MAX_PACKAGE_ROWS_PER_CHANNEL = 800;
+const MAX_PACKAGE_CSV_CELLS = 16;
+const MAX_PACKAGE_FIELD_LENGTH = 32 * 1024;
+const MAX_PACKAGE_ID_LENGTH = 128;
+const MAX_PACKAGE_TIMESTAMP_LENGTH = 128;
+const MAX_PACKAGE_NAME_LENGTH = 256;
+const MAX_PACKAGE_ATTACHMENTS = 16;
+const MAX_PACKAGE_URL_LENGTH = 2_048;
+
 /** One file from the selected package folder: its relative path + raw text. */
 export interface DiscordPackageFile {
   /** Relative path within the picked folder, e.g. `messages/c100/messages.json`. */
@@ -45,6 +61,32 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value : '';
+}
+
+function boundedString(value: unknown, maxLength: number): string {
+  return asString(value).slice(0, maxLength);
+}
+
+function boundedPackageFiles(files: readonly DiscordPackageFile[]): DiscordPackageFile[] {
+  const accepted: DiscordPackageFile[] = [];
+  let totalText = 0;
+  for (const file of files.slice(0, MAX_PACKAGE_FILES)) {
+    if (
+      typeof file.path !== 'string'
+      || file.path.length === 0
+      || file.path.length > MAX_PACKAGE_PATH_LENGTH
+      || typeof file.text !== 'string'
+    ) continue;
+    const isMessageFile = pathEndsWith(file.path, 'messages.json')
+      || pathEndsWith(file.path, 'messages.csv');
+    const fileLimit = isMessageFile
+      ? MAX_PACKAGE_MESSAGE_FILE_TEXT
+      : MAX_PACKAGE_METADATA_FILE_TEXT;
+    if (file.text.length > fileLimit || totalText + file.text.length > MAX_PACKAGE_TOTAL_TEXT) continue;
+    totalText += file.text.length;
+    accepted.push(file);
+  }
+  return accepted;
 }
 
 /** Case-insensitive test for a file whose path ends with `suffix`. */
@@ -96,14 +138,14 @@ function normalizeTimestamp(raw: string): string {
 function splitAttachments(value: unknown): { url: string }[] {
   const urls: string[] = [];
   if (typeof value === 'string') {
-    for (const part of value.split(/\s+/)) {
+    for (const part of value.split(/\s+/, MAX_PACKAGE_ATTACHMENTS)) {
       const url = part.trim();
-      if (url) urls.push(url);
+      if (url && url.length <= MAX_PACKAGE_URL_LENGTH) urls.push(url);
     }
   } else if (Array.isArray(value)) {
-    for (const entry of value) {
+    for (const entry of value.slice(0, MAX_PACKAGE_ATTACHMENTS)) {
       const url = isRecord(entry) ? asString(entry.url).trim() : asString(entry).trim();
-      if (url) urls.push(url);
+      if (url && url.length <= MAX_PACKAGE_URL_LENGTH) urls.push(url);
     }
   }
   return urls.map((url) => ({ url }));
@@ -116,24 +158,41 @@ function splitAttachments(value: unknown): { url: string }[] {
  * under `noUncheckedIndexedAccess`.
  */
 function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
+  let header: string[] | null = null;
+  let rows: string[][] = [];
   let row: string[] = [];
   let field = '';
   let inQuotes = false;
   let sawAny = false;
   const n = text.length;
+  const pushField = (): void => {
+    if (row.length < MAX_PACKAGE_CSV_CELLS) row.push(field);
+    field = '';
+  };
+  const pushRow = (): void => {
+    pushField();
+    if (header === null) header = row;
+    else {
+      rows.push(row);
+      if (rows.length >= MAX_PACKAGE_ROWS_PER_CHANNEL * 2) {
+        rows = rows.slice(-MAX_PACKAGE_ROWS_PER_CHANNEL);
+      }
+    }
+    row = [];
+    sawAny = false;
+  };
   for (let i = 0; i < n; i += 1) {
     const c = text.charAt(i);
     if (inQuotes) {
       if (c === '"') {
         if (text.charAt(i + 1) === '"') {
-          field += '"';
+          if (field.length < MAX_PACKAGE_FIELD_LENGTH) field += '"';
           i += 1;
         } else {
           inQuotes = false;
         }
       } else {
-        field += c;
+        if (field.length < MAX_PACKAGE_FIELD_LENGTH) field += c;
       }
       continue;
     }
@@ -141,25 +200,19 @@ function parseCsv(text: string): string[][] {
       inQuotes = true;
       sawAny = true;
     } else if (c === ',') {
-      row.push(field);
-      field = '';
+      pushField();
       sawAny = true;
     } else if (c === '\n') {
-      row.push(field);
-      rows.push(row);
-      row = [];
-      field = '';
-      sawAny = false;
+      pushRow();
     } else if (c !== '\r') {
-      field += c;
+      if (field.length < MAX_PACKAGE_FIELD_LENGTH) field += c;
       sawAny = true;
     }
   }
   if (sawAny || field.length > 0 || row.length > 0) {
-    row.push(field);
-    rows.push(row);
+    pushRow();
   }
-  return rows;
+  return header ? [header, ...rows.slice(-MAX_PACKAGE_ROWS_PER_CHANNEL)] : [];
 }
 
 /** DiscordChatExporter-shaped message row that {@link parseDiscordExport} reads. */
@@ -174,10 +227,10 @@ interface DceRow {
 
 function toDceRow(id: string, timestamp: string, content: string, attachments: unknown, selfName: string): DceRow {
   return {
-    id,
+    id: id.slice(0, MAX_PACKAGE_ID_LENGTH),
     type: 'Default',
-    timestamp: normalizeTimestamp(timestamp),
-    content,
+    timestamp: normalizeTimestamp(timestamp.slice(0, MAX_PACKAGE_TIMESTAMP_LENGTH)),
+    content: content.slice(0, MAX_PACKAGE_FIELD_LENGTH),
     attachments: splitAttachments(attachments),
     author: { name: selfName },
   };
@@ -190,13 +243,19 @@ function rowsFromJson(data: unknown, selfName: string): DceRow[] {
   for (const entry of data) {
     if (!isRecord(entry)) continue;
     // Package uses capital keys; tolerate lowercase defensively.
-    const id = asString(entry.ID) || asString(entry.id);
-    const timestamp = asString(entry.Timestamp) || asString(entry.timestamp);
-    const content = asString(entry.Contents) || asString(entry.content);
+    const id = boundedString(entry.ID, MAX_PACKAGE_ID_LENGTH)
+      || boundedString(entry.id, MAX_PACKAGE_ID_LENGTH);
+    const timestamp = boundedString(entry.Timestamp, MAX_PACKAGE_TIMESTAMP_LENGTH)
+      || boundedString(entry.timestamp, MAX_PACKAGE_TIMESTAMP_LENGTH);
+    const content = boundedString(entry.Contents, MAX_PACKAGE_FIELD_LENGTH)
+      || boundedString(entry.content, MAX_PACKAGE_FIELD_LENGTH);
     const attachments = entry.Attachments ?? entry.attachments;
     out.push(toDceRow(id, timestamp, content, attachments, selfName));
+    if (out.length >= MAX_PACKAGE_ROWS_PER_CHANNEL * 2) {
+      out.splice(0, out.length - MAX_PACKAGE_ROWS_PER_CHANNEL);
+    }
   }
-  return out;
+  return out.slice(-MAX_PACKAGE_ROWS_PER_CHANNEL);
 }
 
 /** Parse a `messages.csv` payload into DCE rows. */
@@ -234,7 +293,8 @@ function resolveSelfName(files: readonly DiscordPackageFile[]): string {
     try {
       const data: unknown = JSON.parse(file.text);
       if (isRecord(data)) {
-        const name = asString(data.global_name).trim() || asString(data.username).trim();
+        const name = boundedString(data.global_name, MAX_PACKAGE_NAME_LENGTH).trim()
+          || boundedString(data.username, MAX_PACKAGE_NAME_LENGTH).trim();
         if (name) return name;
       }
     } catch {
@@ -253,7 +313,13 @@ function resolveIndexNames(files: readonly DiscordPackageFile[]): Map<string, st
       const data: unknown = JSON.parse(file.text);
       if (!isRecord(data)) continue;
       for (const [id, value] of Object.entries(data)) {
-        if (typeof value === 'string' && value.trim()) names.set(id, value.trim());
+        if (names.size >= MAX_PACKAGE_INDEX_ENTRIES) break;
+        if (
+          id.length <= MAX_PACKAGE_ID_LENGTH
+          && typeof value === 'string'
+          && value.length <= MAX_PACKAGE_NAME_LENGTH
+          && value.trim()
+        ) names.set(id, value.trim());
       }
     } catch {
       /* not a usable index */
@@ -274,35 +340,36 @@ export function parseDiscordPackage(
   options: DiscordImportOptions = {},
 ): DiscordImportResult | null {
   if (files.length === 0) return null;
-  const selfName = resolveSelfName(files);
-  const indexNames = resolveIndexNames(files);
+  const boundedFiles = boundedPackageFiles(files);
+  if (boundedFiles.length === 0) return null;
+  const selfName = resolveSelfName(boundedFiles);
+  const indexNames = resolveIndexNames(boundedFiles);
 
   const byDir = new Map<string, DirEntry>();
-  const entryFor = (dir: string): DirEntry => {
+  const entryFor = (dir: string): DirEntry | null => {
     let entry = byDir.get(dir);
     if (!entry) {
+      if (byDir.size >= MAX_PACKAGE_CHANNELS) return null;
       entry = { channel: null, rows: [] };
       byDir.set(dir, entry);
     }
     return entry;
   };
 
+  // Build message buckets first. A package may list channel metadata before
+  // messages; letting metadata allocate buckets would allow thousands of
+  // empty channel.json files to exhaust the channel cap and starve real rows.
   let sawMessages = false;
-  for (const file of files) {
+  for (const file of boundedFiles) {
     const base = baseOf(file.path).toLowerCase();
     const dir = dirOf(file.path);
-    if (base === 'channel.json') {
-      try {
-        const data: unknown = JSON.parse(file.text);
-        if (isRecord(data)) entryFor(dir).channel = data;
-      } catch {
-        /* skip unreadable channel.json */
-      }
-    } else if (base === 'messages.json') {
+    if (base === 'messages.json') {
       try {
         const rows = rowsFromJson(JSON.parse(file.text), selfName);
         if (rows.length > 0) {
-          entryFor(dir).rows.push(...rows);
+          const entry = entryFor(dir);
+          if (!entry) continue;
+          entry.rows = [...entry.rows, ...rows].slice(-MAX_PACKAGE_ROWS_PER_CHANNEL);
           sawMessages = true;
         }
       } catch {
@@ -311,9 +378,24 @@ export function parseDiscordPackage(
     } else if (base === 'messages.csv') {
       const rows = rowsFromCsv(file.text, selfName);
       if (rows.length > 0) {
-        entryFor(dir).rows.push(...rows);
+        const entry = entryFor(dir);
+        if (!entry) continue;
+        entry.rows = [...entry.rows, ...rows].slice(-MAX_PACKAGE_ROWS_PER_CHANNEL);
         sawMessages = true;
       }
+    }
+  }
+
+  // Attach metadata only to directories that actually produced messages.
+  for (const file of boundedFiles) {
+    if (baseOf(file.path).toLowerCase() !== 'channel.json') continue;
+    const entry = byDir.get(dirOf(file.path));
+    if (!entry) continue;
+    try {
+      const data: unknown = JSON.parse(file.text);
+      if (isRecord(data)) entry.channel = data;
+    } catch {
+      /* skip unreadable channel.json */
     }
   }
 
@@ -325,14 +407,22 @@ export function parseDiscordPackage(
   for (const [dir, entry] of byDir) {
     if (entry.rows.length === 0) continue;
     const channel = entry.channel ?? {};
-    const id = asString(channel.id).trim() || channelIdFromDir(dir) || dir || 'imported';
-    const name = asString(channel.name).trim() || indexNames.get(id) || id;
-    const guild = isRecord(channel.guild) ? channel.guild : undefined;
+    const id = boundedString(channel.id, MAX_PACKAGE_ID_LENGTH).trim()
+      || channelIdFromDir(dir).slice(0, MAX_PACKAGE_ID_LENGTH)
+      || dir.slice(0, MAX_PACKAGE_ID_LENGTH)
+      || 'imported';
+    const name = boundedString(channel.name, MAX_PACKAGE_NAME_LENGTH).trim()
+      || indexNames.get(id)
+      || id;
+    const rawGuild = isRecord(channel.guild) ? channel.guild : undefined;
+    const guildName = rawGuild
+      ? boundedString(rawGuild.name, MAX_PACKAGE_NAME_LENGTH).trim()
+      : '';
     const channelExport: Record<string, unknown> = {
       channel: { id, name },
       messages: entry.rows,
     };
-    if (guild) channelExport.guild = guild;
+    if (guildName) channelExport.guild = { name: guildName };
     exports.push(channelExport);
   }
 

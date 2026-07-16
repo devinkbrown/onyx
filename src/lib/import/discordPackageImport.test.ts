@@ -248,4 +248,83 @@ describe('parseDiscordPackage — robustness', () => {
     );
     expect(result!.snapshot.targets[0]!.messages[0]!.text).toBe('<img src=x onerror=alert(1)>');
   });
+
+  it('skips an overlong package path without rejecting safe sibling files', () => {
+    const result = parseDiscordPackage([
+      {
+        path: `messages/${'x'.repeat(1_025)}/messages.json`,
+        text: messagesJson([
+          { ID: 'bad', Timestamp: '2025-01-01 10:00:00', Contents: 'hidden', Attachments: '' },
+        ]),
+      },
+      ...pkg({
+        'messages/c100000000000000100/messages.json': messagesJson([
+          { ID: 'ok', Timestamp: '2025-01-01 10:00:00', Contents: 'safe', Attachments: '' },
+        ]),
+      }),
+    ]);
+
+    expect(result!.summary.messages).toBe(1);
+    expect(result!.snapshot.targets[0]!.messages[0]!.text).toBe('safe');
+  });
+
+  it('bounds message fields and attachment URLs before building vault rows', () => {
+    const attachmentUrls = Array.from(
+      { length: 20 },
+      (_, index) => `https://cdn.example/${index}.png`,
+    ).join(' ');
+    const result = parseDiscordPackage(
+      pkg({
+        'messages/c100000000000000100/messages.json': messagesJson([
+          {
+            ID: 'a1',
+            Timestamp: '2025-01-01 10:00:00',
+            Contents: 'x'.repeat(32 * 1_024 + 50),
+            Attachments: attachmentUrls,
+          },
+        ]),
+      }),
+    );
+    const text = result!.snapshot.targets[0]!.messages[0]!.text;
+
+    expect(text.startsWith('x'.repeat(32 * 1_024))).toBe(true);
+    expect(text).toContain('https://cdn.example/15.png');
+    expect(text).not.toContain('https://cdn.example/16.png');
+  });
+
+  it('retains only the newest bounded tail from a large channel payload', () => {
+    const rows = Array.from({ length: 805 }, (_, index) => ({
+      ID: `m${index}`,
+      Timestamp: new Date(Date.UTC(2025, 0, 1, 0, index)).toISOString(),
+      Contents: `message ${index}`,
+      Attachments: '',
+    }));
+    const result = parseDiscordPackage(
+      pkg({ 'messages/c100000000000000100/messages.json': messagesJson(rows) }),
+    );
+    const messages = result!.snapshot.targets[0]!.messages;
+
+    expect(messages).toHaveLength(400);
+    expect(messages[0]!.id).toBe('discord:100000000000000100:m405');
+    expect(messages.at(-1)!.id).toBe('discord:100000000000000100:m804');
+  });
+
+  it('does not let metadata-only directories consume the real channel budget', () => {
+    const metadata = Array.from({ length: 2_049 }, (_, index) => ({
+      path: `messages/c${String(100_000 + index)}/channel.json`,
+      text: channelJson(String(100_000 + index), `empty-${index}`),
+    }));
+    const realDir = 'messages/c999999999999999999';
+    const result = parseDiscordPackage([
+      ...metadata,
+      { path: `${realDir}/messages.json`, text: messagesJson([
+        { ID: 'real', Timestamp: '2025-01-01 10:00:00', Contents: 'survived', Attachments: '' },
+      ]) },
+      { path: `${realDir}/channel.json`, text: channelJson('999999999999999999', 'real-channel') },
+    ]);
+
+    expect(result!.snapshot.targets).toHaveLength(1);
+    expect(result!.snapshot.targets[0]!.target).toBe('#real-channel');
+    expect(result!.snapshot.targets[0]!.messages[0]!.text).toBe('survived');
+  });
 });
