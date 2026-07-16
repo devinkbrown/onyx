@@ -2138,6 +2138,12 @@ export const MAX_LIVE_PROP_TARGETS = 256;
 export const MAX_LIVE_PROP_KEYS = 64;
 export const MAX_LIVE_PROP_KEY_LENGTH = 128;
 export const MAX_LIVE_PROP_VALUE_LENGTH = 16 * 1024;
+export const MAX_LIVE_CHANNEL_USERS = 4_096;
+export const MAX_LIVE_CHANNEL_MESSAGES = 500;
+export const MAX_NAMES_TOKENS_PER_LINE = MAX_LIVE_CHANNEL_USERS;
+const MAX_NAMES_SCAN_CHARS = 256 * 1024;
+const MAX_NAMES_TOKEN_LENGTH = 512;
+const MAX_SYSTEM_EVENT_TEXT_LENGTH = 4 * 1024;
 
 // ── CHATHISTORY batch collectors (module-level) ───────────────────────────────
 export const SERVER_SEARCH_RESULT_MAX = 200;
@@ -2364,6 +2370,20 @@ function _boundedInboundMessageText(value: string): string {
   return text;
 }
 
+function _boundedSystemEventText(value: string): string {
+  let text = value.slice(0, MAX_SYSTEM_EVENT_TEXT_LENGTH);
+  const finalCodeUnit = text.charCodeAt(text.length - 1);
+  if (finalCodeUnit >= 0xd800 && finalCodeUnit <= 0xdbff) text = text.slice(0, -1);
+  return text;
+}
+
+function _appendBoundedChannelMessage(
+  messages: readonly ChatMessage[] | undefined,
+  message: ChatMessage,
+): ChatMessage[] {
+  return [...(messages ?? []).slice(-(MAX_LIVE_CHANNEL_MESSAGES - 1)), message];
+}
+
 function _validInboundWireToken(value: string, maxLength: number, allowEmpty = false): boolean {
   return (allowEmpty || value.length > 0)
     && value.length <= maxLength
@@ -2428,9 +2448,10 @@ function _updateBoundedProperties(
   targetKey: string,
   propertyName: string,
   value: string,
+  deleteEmpty = true,
 ): Map<string, Record<string, string>> | null {
   const existing = source.get(targetKey);
-  if (value === '') {
+  if (deleteEmpty && value === '') {
     if (!existing || !Object.hasOwn(existing, propertyName)) return source;
     const entry = { ...existing };
     delete entry[propertyName];
@@ -2447,6 +2468,25 @@ function _updateBoundedProperties(
   const next = new Map(source);
   next.set(targetKey, { ...(existing ?? {}), [propertyName]: value });
   return next;
+}
+
+function _boundedNamesTokens(value: string): string[] {
+  const scanLength = Math.min(value.length, MAX_NAMES_SCAN_CHARS);
+  const tokens: string[] = [];
+  let cursor = 0;
+  while (cursor < scanLength && tokens.length < MAX_NAMES_TOKENS_PER_LINE) {
+    while (cursor < scanLength && value[cursor] === ' ') cursor += 1;
+    if (cursor >= scanLength) break;
+    const start = cursor;
+    while (cursor < scanLength && value[cursor] !== ' ') cursor += 1;
+    // The scan ceiling cut through this token. Do not invent a truncated nick.
+    if (cursor === scanLength && scanLength < value.length && value[cursor] !== ' ') break;
+    const length = cursor - start;
+    if (length > 0 && length <= MAX_NAMES_TOKEN_LENGTH) {
+      tokens.push(value.slice(start, cursor));
+    }
+  }
+  return tokens;
 }
 
 /**
@@ -8058,9 +8098,18 @@ export const store = createStore<OnyxState>()(
 
         // ── Channels ──────────────────────────────────────────────────────
         case 'JOIN': {
-          const ch = params[0]!;
-          const key = ch.toLowerCase();
+          const ch = params[0] ?? '';
           const joiner = nick ?? '';
+          if (
+            !_validInboundWireToken(ch, MAX_VAULT_TARGET_LENGTH)
+            || ch.startsWith(':')
+            || ch.includes(',')
+            || !isChan(ch)
+            || !_validInboundWireToken(joiner, MAX_VAULT_SENDER_LENGTH)
+            || joiner.startsWith(':')
+            || joiner.includes(',')
+          ) break;
+          const key = ch.toLowerCase();
           // draft/event-playback: a replayed historical JOIN must render into
           // the history batch, never touch the live roster.
           if (_isHistoryReplay(tags, ch)) {
@@ -8079,7 +8128,11 @@ export const store = createStore<OnyxState>()(
             _includeNickInNames(key, joiner);
           }
           // extended-join: params[1] = account ('*' = not logged in), params[2] = realname
-          const joinAccount = params[1] && params[1] !== '*' ? params[1] : undefined;
+          const accountParam = params[1] && params[1] !== '*' ? params[1] : undefined;
+          const joinAccount = accountParam
+            && _validInboundWireToken(accountParam, MAX_VAULT_SENDER_LENGTH)
+            ? accountParam
+            : undefined;
 
           if (isSelf) {
             if (restore) _setRestoreRosterSyncing(set, key, true);
@@ -8128,27 +8181,34 @@ export const store = createStore<OnyxState>()(
             // Traditional IRC shows the mask on join — Orochi hosts are
             // cloaks/personas, so this is safe to render.
             const joinMask = msg.prefix && msg.prefix.includes('!')
-              ? msg.prefix.slice(msg.prefix.indexOf('!') + 1)
+              ? msg.prefix.slice(msg.prefix.indexOf('!') + 1, msg.prefix.indexOf('!') + 257)
               : null;
+            let joined = false;
             set(s => {
               const channels = new Map(s.channels);
               const c = channels.get(key);
               if (c) {
                 const users = new Map(c.users);
-                users.set(joiner.toLowerCase(), {
+                const joinerKey = joiner.toLowerCase();
+                if (!users.has(joinerKey) && users.size >= MAX_LIVE_CHANNEL_USERS) return {};
+                users.set(joinerKey, {
                   nick: joiner,
-                  modes: new Set(alreadyPresent ? c.users.get(joiner.toLowerCase())?.modes ?? [] : []),
-                  away: alreadyPresent ? (c.users.get(joiner.toLowerCase())?.away ?? false) : false,
+                  modes: new Set(alreadyPresent ? c.users.get(joinerKey)?.modes ?? [] : []),
+                  away: alreadyPresent ? (c.users.get(joinerKey)?.away ?? false) : false,
                   ...(joinAccount ? { account: joinAccount } : {}),
                 });
                 const msgs = alreadyPresent
                   ? c.messages
-                  : [...(c.messages ?? []), sysMsg(`${joiner}${joinMask ? ` (${joinMask})` : ''} joined`, ch, eventTime(tags))];
+                  : _appendBoundedChannelMessage(
+                    c.messages,
+                    sysMsg(`${joiner}${joinMask ? ` (${joinMask})` : ''} joined`, ch, eventTime(tags)),
+                  );
                 channels.set(key, { ...c, users, messages: msgs } as Channel);
+                joined = true;
               }
               return { channels };
             });
-            if (!alreadyPresent) {
+            if (!alreadyPresent && joined) {
               get().addChannelEvent(ch, { type: 'join', nick: joiner, text: `${joiner} joined`, time: new Date() });
             }
           }
@@ -8156,11 +8216,21 @@ export const store = createStore<OnyxState>()(
         }
 
         case 'PART': {
-          const ch = params[0]!;
-          const key = ch.toLowerCase();
+          const ch = params[0] ?? '';
           const parter = nick ?? '';
+          if (
+            !_validInboundWireToken(ch, MAX_VAULT_TARGET_LENGTH)
+            || ch.startsWith(':')
+            || ch.includes(',')
+            || !isChan(ch)
+            || !_validInboundWireToken(parter, MAX_VAULT_SENDER_LENGTH)
+            || parter.startsWith(':')
+            || parter.includes(',')
+          ) break;
+          const key = ch.toLowerCase();
+          const partReason = _boundedSystemEventText(params[1] ?? '');
           if (_isHistoryReplay(tags, ch)) {
-            _pushReplayEvent(tags, ch, `${parter} left${params[1] ? ` (${params[1]})` : ''}`);
+            _pushReplayEvent(tags, ch, `${parter} left${partReason ? ` (${partReason})` : ''}`);
             break;
           }
           const isSelf = parter.toLowerCase() === ourNick.toLowerCase();
@@ -8191,28 +8261,39 @@ export const store = createStore<OnyxState>()(
             });
           } else {
             _excludeNickFromNames(key, parter);
-            const partReason = params[1] ?? '';
+            let removed = false;
             set(s => {
               const channels = new Map(s.channels);
               const c = channels.get(key);
-              if (c) {
+              if (c?.users.has(parter.toLowerCase())) {
                 const users = new Map(c.users);
                 users.delete(parter.toLowerCase());
                 const reasonSuffix = partReason ? ` (${partReason})` : '';
-                const msgs = [...(c.messages ?? []), sysMsg(`${parter} left${reasonSuffix}`, ch, eventTime(tags))];
+                const msgs = _appendBoundedChannelMessage(
+                  c.messages,
+                  sysMsg(`${parter} left${reasonSuffix}`, ch, eventTime(tags)),
+                );
                 channels.set(key, { ...c, users, messages: msgs } as Channel);
+                removed = true;
               }
               return { channels };
             });
-            const partText = partReason ? `${parter} left (${partReason})` : `${parter} left`;
-            get().addChannelEvent(ch, { type: 'part', nick: parter, text: partText, time: new Date() });
+            if (removed) {
+              const partText = partReason ? `${parter} left (${partReason})` : `${parter} left`;
+              get().addChannelEvent(ch, { type: 'part', nick: parter, text: partText, time: new Date() });
+            }
           }
           break;
         }
 
         case 'QUIT': {
           const quitter = nick ?? '';
-          const quitReason = params[0] ?? '';
+          if (
+            !_validInboundWireToken(quitter, MAX_VAULT_SENDER_LENGTH)
+            || quitter.startsWith(':')
+            || quitter.includes(',')
+          ) break;
+          const quitReason = _boundedSystemEventText(params[0] ?? '');
           // Channel-less: replay-detected via open batch + history msgid. A
           // replayed QUIT deleting a CURRENT member was the roster-shrink bug.
           if (_isHistoryReplay(tags, null)) {
@@ -8231,7 +8312,11 @@ export const store = createStore<OnyxState>()(
               if (ch.users.has(quitter.toLowerCase())) {
                 const users = new Map(ch.users);
                 users.delete(quitter.toLowerCase());
-                const msgs = [...(ch.messages ?? []), sysMsg(`${quitter} quit: ${quitReason}`, ch.name, eventTime(tags))];
+                const quitText = quitReason ? `${quitter} quit: ${quitReason}` : `${quitter} quit`;
+                const msgs = _appendBoundedChannelMessage(
+                  ch.messages,
+                  sysMsg(quitText, ch.name, eventTime(tags)),
+                );
                 channels.set(chanKey, { ...ch, users, messages: msgs } as Channel);
                 quitChannels.push(ch.name);
               }
@@ -8246,10 +8331,25 @@ export const store = createStore<OnyxState>()(
         }
 
         case 'KICK': {
-          const [ch, target, reason] = params as [string, string, string?];
+          const ch = params[0] ?? '';
+          const target = params[1] ?? '';
+          const actor = nick ?? 'server';
+          if (
+            !_validInboundWireToken(ch, MAX_VAULT_TARGET_LENGTH)
+            || ch.startsWith(':')
+            || ch.includes(',')
+            || !isChan(ch)
+            || !_validInboundWireToken(target, MAX_VAULT_SENDER_LENGTH)
+            || target.startsWith(':')
+            || target.includes(',')
+            || !_validInboundWireToken(actor, MAX_VAULT_SENDER_LENGTH)
+            || actor.startsWith(':')
+            || actor.includes(',')
+          ) break;
+          const reason = _boundedSystemEventText(params[2] ?? '');
           const key = ch.toLowerCase();
           if (_isHistoryReplay(tags, ch)) {
-            _pushReplayEvent(tags, ch, `${target} was kicked by ${nick ?? 'someone'}${reason ? ` (${reason})` : ''}`);
+            _pushReplayEvent(tags, ch, `${target} was kicked by ${actor}${reason ? ` (${reason})` : ''}`);
             break;
           }
           const isSelf = target.toLowerCase() === ourNick.toLowerCase();
@@ -8260,6 +8360,7 @@ export const store = createStore<OnyxState>()(
           } else {
             _excludeNickFromNames(key, target);
           }
+          let removed = false;
           set(s => {
             const channels = new Map(s.channels);
             if (isSelf) {
@@ -8281,31 +8382,33 @@ export const store = createStore<OnyxState>()(
               return { channels, channelFolders, activeChannelTopics, activeView };
             } else {
               const c = channels.get(key);
-              if (c) {
+              if (c?.users.has(target.toLowerCase())) {
                 const users = new Map(c.users);
                 users.delete(target.toLowerCase());
-                const kickMsg = sysMsg(`${nick} kicked ${target}: ${reason ?? ''}`, ch, eventTime(tags));
-                const msgs = [...(c.messages ?? []), kickMsg];
+                const reasonSuffix = reason ? `: ${reason}` : '';
+                const kickMsg = sysMsg(`${actor} kicked ${target}${reasonSuffix}`, ch, eventTime(tags));
+                const msgs = _appendBoundedChannelMessage(c.messages, kickMsg);
                 channels.set(key, { ...c, users, messages: msgs } as Channel);
+                removed = true;
               }
             }
             return { channels };
           });
-          if (!isSelf) {
-            get().addChannelEvent(ch, { type: 'kick', nick: target, text: `${target} was kicked by ${nick ?? 'server'}${reason ? ` (${reason})` : ''}`, time: new Date() });
+          if (!isSelf && removed) {
+            get().addChannelEvent(ch, { type: 'kick', nick: target, text: `${target} was kicked by ${actor}${reason ? ` (${reason})` : ''}`, time: new Date() });
           }
           get().addAuditEntry({
             type: 'kick',
-            actor: nick ?? 'server',
+            actor,
             target,
             channel: ch,
-            detail: reason ?? '',
+            detail: reason,
           });
           get().addModerationEntry({
             action: 'KICK',
-            target: target ?? '',
-            by: nick ?? 'server',
-            channel: ch ?? '',
+            target,
+            by: actor,
+            channel: ch,
           });
           break;
         }
@@ -8363,13 +8466,20 @@ export const store = createStore<OnyxState>()(
                 propKey,
                 propName,
                 propVal,
+                false,
               );
               if (!channelProps) return {};
               accepted = true;
               const channels = projectChannelAiPolicy(s.channels, propKey, propName, propVal);
               return channels ? { channelProps, channels } : { channelProps };
             } else {
-              const userProps = _updateBoundedProperties(s.userProps, propKey, propName, propVal);
+              const userProps = _updateBoundedProperties(
+                s.userProps,
+                propKey,
+                propName,
+                propVal,
+                false,
+              );
               if (!userProps) return {};
               accepted = true;
               // Parse activity from STATUS or ACTIVITY prop
@@ -8408,10 +8518,16 @@ export const store = createStore<OnyxState>()(
           const visibility = params[1] ?? '';
           const ch = VISIBILITY.has(visibility) ? params[2] : params[1];
           const namesStr = VISIBILITY.has(visibility) ? params[3] : params[2];
-          if (!ch) break;
+          if (
+            !ch
+            || !_validInboundWireToken(ch, MAX_VAULT_TARGET_LENGTH)
+            || ch.startsWith(':')
+            || ch.includes(',')
+            || !isChan(ch)
+          ) break;
           const key = ch.toLowerCase();
           const { client } = get();
-          const names = (namesStr ?? '').split(' ').filter(Boolean);
+          const names = _boundedNamesTokens(namesStr ?? '');
           const recipient = params[0] ?? '';
           const restore = _currentSessionRestore(get);
           const namesContainRestoringSelf = names.some(name => {
@@ -8452,18 +8568,23 @@ export const store = createStore<OnyxState>()(
             const users = freshNames ? new Map<string, ChannelUser>() : new Map(c.users);
             for (const name of names) {
               const { nick: n, modes } = parseNamesPrefix(name, client?.prefixToMode ?? DEFAULT_PREFIX_TO_MODE);
-              if (n && !burst?.excludedNicks.has(n.toLowerCase())) {
-                const userKey = n.toLowerCase();
-                const existing = c.users.get(userKey);
-                users.set(userKey, {
-                  ...existing,
-                  // NAMES owns membership, canonical casing, and status modes;
-                  // it does not carry WHO/AWAY or extended-JOIN account data.
-                  nick: n,
-                  modes: new Set(modes),
-                  away: existing?.away ?? false,
-                });
-              }
+              if (
+                !_validInboundWireToken(n, MAX_VAULT_SENDER_LENGTH)
+                || n.startsWith(':')
+                || n.includes(',')
+                || burst?.excludedNicks.has(n.toLowerCase())
+              ) continue;
+              const userKey = n.toLowerCase();
+              if (!users.has(userKey) && users.size >= MAX_LIVE_CHANNEL_USERS) continue;
+              const existing = c.users.get(userKey);
+              users.set(userKey, {
+                ...existing,
+                // NAMES owns membership, canonical casing, and status modes;
+                // it does not carry WHO/AWAY or extended-JOIN account data.
+                nick: n,
+                modes: new Set(modes),
+                away: existing?.away ?? false,
+              });
             }
             channels.set(key, { ...c, users });
             return { channels };
@@ -9220,7 +9341,15 @@ export const store = createStore<OnyxState>()(
         // ── Nick changes ──────────────────────────────────────────────────
         case 'NICK': {
           const oldNick = nick ?? '';
-          const newNick = params[0]!;
+          const newNick = params[0] ?? '';
+          if (
+            !_validInboundWireToken(oldNick, MAX_VAULT_SENDER_LENGTH)
+            || oldNick.startsWith(':')
+            || oldNick.includes(',')
+            || !_validInboundWireToken(newNick, MAX_VAULT_SENDER_LENGTH)
+            || newNick.startsWith(':')
+            || newNick.includes(',')
+          ) break;
           const isSelf = oldNick.toLowerCase() === ourNick.toLowerCase();
           // A replayed historical rename must not rename anyone NOW.
           if (_isHistoryReplay(tags, null)) {
@@ -9310,7 +9439,7 @@ export const store = createStore<OnyxState>()(
                 users.delete(oldKey);
                 users.set(newNick.toLowerCase(), { ...u, nick: newNick });
                 const nm = sysMsg(`${oldNick} → ${newNick}`, ch.name, eventTime(tags));
-                const msgs = [...(ch.messages ?? []), nm];
+                const msgs = _appendBoundedChannelMessage(ch.messages, nm);
                 channels.set(key, { ...ch, users, messages: msgs } as Channel);
               }
             }
@@ -9337,10 +9466,16 @@ export const store = createStore<OnyxState>()(
 
         // ── Mode ──────────────────────────────────────────────────────────
         case 'MODE': {
-          const target = params[0]!;
+          const target = params[0] ?? '';
+          if (
+            !_validInboundWireToken(target, MAX_VAULT_TARGET_LENGTH)
+            || target.startsWith(':')
+            || target.includes(',')
+          ) break;
           const key = target.toLowerCase();
+          const modeText = _boundedSystemEventText(params.slice(1).join(' '));
           if (isChan(target) && _isHistoryReplay(tags, target)) {
-            _pushReplayEvent(tags, target, `${nick ?? 'server'} set mode ${params.slice(1).join(' ')}`);
+            _pushReplayEvent(tags, target, `${nick ?? 'server'} set mode ${modeText}`);
             break;
           }
           if (isChan(target)) {
@@ -9350,7 +9485,6 @@ export const store = createStore<OnyxState>()(
               const channels = new Map(s.channels);
               const c = channels.get(key);
               if (!c) return {};
-              const modeText = params.slice(1).join(' ');
               const users = new Map(c.users);
               const prefixModes = new Set(Object.keys(get().client?.modeToPrefix ?? DEFAULT_MODE_TO_PREFIX));
               const chanmodes = get().client?.isupport.CHANMODES ?? [];
@@ -9379,7 +9513,7 @@ export const store = createStore<OnyxState>()(
               const nextModes = applyChannelModeDelta(c.modes ?? '', modeStr, modeArgs, chanmodes, prefixModes);
 
               const sysm = sysMsg(`${nick ?? 'server'} set mode ${modeText}`, target, eventTime(tags));
-              const msgs = [...(c.messages ?? []), sysm];
+              const msgs = _appendBoundedChannelMessage(c.messages, sysm);
               return { channels: new Map(channels).set(key, { ...c, modes: nextModes, users: changedUsers ? users : c.users, messages: msgs } as Channel) };
             });
 
@@ -9449,7 +9583,7 @@ export const store = createStore<OnyxState>()(
                 type: 'mode',
                 actor: nick ?? 'server',
                 channel: target,
-                detail: params.slice(1).join(' '),
+                detail: modeText,
               });
             } else if (sawBan && sawOtherMode) {
               // Mixed: has both ban and other chars — emit one more for the non-ban parts
@@ -9457,17 +9591,17 @@ export const store = createStore<OnyxState>()(
                 type: 'mode',
                 actor: nick ?? 'server',
                 channel: target,
-                detail: params.slice(1).join(' '),
+                detail: modeText,
               });
             }
             // Emit channel event for mode change
-            get().addChannelEvent(target, { type: 'mode', nick: nick ?? 'server', text: `${nick ?? 'server'} set mode ${params.slice(1).join(' ')}`, time: new Date() });
+            get().addChannelEvent(target, { type: 'mode', nick: nick ?? 'server', text: `${nick ?? 'server'} set mode ${modeText}`, time: new Date() });
           } else if (target.toLowerCase() === get().ourNick.toLowerCase()) {
             const modeStr = params[1] ?? '';
             if (modeStr.includes('+') && modeStr.includes('o')) set({ isOper: true });
             if (modeStr.includes('-') && modeStr.includes('o')) set({ isOper: false });
             const byWhom = nick && nick.toLowerCase() !== target.toLowerCase() ? `${nick} set ` : '';
-            get().addServerLog(`${byWhom}your user mode: ${params.slice(1).join(' ')}`.trim());
+            get().addServerLog(`${byWhom}your user mode: ${modeText}`.trim());
           }
           break;
         }
@@ -9486,12 +9620,19 @@ export const store = createStore<OnyxState>()(
                 key,
                 propName,
                 propVal,
+                false,
               );
               if (!channelProps) return {};
               const channels = projectChannelAiPolicy(s.channels, key, propName, propVal);
               return channels ? { channelProps, channels } : { channelProps };
             } else {
-              const userProps = _updateBoundedProperties(s.userProps, key, propName, propVal);
+              const userProps = _updateBoundedProperties(
+                s.userProps,
+                key,
+                propName,
+                propVal,
+                false,
+              );
               if (!userProps) return {};
               // Parse activity from STATUS or ACTIVITY prop
               if (propName === 'STATUS' || propName === 'ACTIVITY') {
@@ -9755,13 +9896,15 @@ export const store = createStore<OnyxState>()(
             const channels = new Map(s.channels);
             channels.delete(oldKey);
             const renameNote = sysMsg(
-              `${renamer} renamed ${oldName} → ${newName}${renameReason ? ` (${renameReason})` : ''}`,
+              _boundedSystemEventText(
+                `${renamer} renamed ${oldName} → ${newName}${renameReason ? ` (${renameReason})` : ''}`,
+              ),
               newName,
             );
             channels.set(newKey, {
               ...existing,
               name: newName,
-              messages: [...(existing.messages ?? []), renameNote],
+              messages: _appendBoundedChannelMessage(existing.messages, renameNote),
             });
 
             const moveKey = <V,>(m: Map<string, V>): Map<string, V> => {
@@ -13412,7 +13555,7 @@ function _addChannelMessage(
     && !state.activeChannelTopics.has(key);
   channels.set(key, {
     ...c,
-    messages: [...(c.messages ?? []).slice(-499), msg],
+    messages: _appendBoundedChannelMessage(c.messages, msg),
     unread: isActiveWholeRoom
       ? 0
       : (isVisibleConversation || skipUnread) ? c.unread : c.unread + 1,

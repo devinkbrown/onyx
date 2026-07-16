@@ -10,6 +10,9 @@ import {
   MAX_VAULT_TARGET_LENGTH,
 } from '@/lib/vault/historyVault';
 import {
+  _beginNamesBurstForTests,
+  MAX_LIVE_CHANNEL_MESSAGES,
+  MAX_LIVE_CHANNEL_USERS,
   MAX_LIVE_DM_CONVERSATIONS,
   MAX_LIVE_PROP_KEYS,
   MAX_LIVE_PROP_TARGETS,
@@ -47,7 +50,7 @@ beforeEach(() => {
       isupport: { CHANTYPES: '#&' },
       negotiatedCaps: new Set<string>(),
       capValues: new Map<string, string>(),
-      prefixToMode: {},
+      prefixToMode: { '@': 'o' },
       sendRaw: () => true,
       send: () => true,
     } as never,
@@ -165,7 +168,7 @@ describe('live inbound message bounds', () => {
       .toHaveLength(MAX_LIVE_PROP_KEYS);
 
     feed(':server PROP #root large :');
-    expect(store.getState().channelProps.get('#root')).not.toHaveProperty('large');
+    expect(store.getState().channelProps.get('#root')?.['large']).toBe('');
   });
 
   it('caps property targets and the derived activity record together', () => {
@@ -177,5 +180,86 @@ describe('live inbound message bounds', () => {
     expect(Object.keys(store.getState().userActivities)).toHaveLength(MAX_LIVE_PROP_TARGETS);
     expect(store.getState().userProps.has(`user-${MAX_LIVE_PROP_TARGETS}`)).toBe(false);
     expect(store.getState().userActivities[`user-${MAX_LIVE_PROP_TARGETS}`]).toBeUndefined();
+  });
+
+  it('caps authoritative NAMES rosters while still refreshing existing members', () => {
+    _beginNamesBurstForTests('#root');
+    const names = Array.from(
+      { length: MAX_LIVE_CHANNEL_USERS + 32 },
+      (_, index) => `user-${index}`,
+    ).join(' ');
+    feed(`:server 353 me = #root :${names}`);
+
+    let users = store.getState().channels.get('#root')?.users;
+    expect(users?.size).toBe(MAX_LIVE_CHANNEL_USERS);
+    expect(users?.has(`user-${MAX_LIVE_CHANNEL_USERS}`)).toBe(false);
+
+    feed(':server 353 me = #root :@user-0 overflow');
+    users = store.getState().channels.get('#root')?.users;
+    expect(users?.get('user-0')?.modes).toEqual(new Set(['o']));
+    expect(users?.has('overflow')).toBe(false);
+  });
+
+  it('rejects roster overflow joins without producing phantom activity', () => {
+    const users = new Map(Array.from(
+      { length: MAX_LIVE_CHANNEL_USERS },
+      (_, index) => [`user-${index}`, {
+        nick: `user-${index}`,
+        modes: new Set<string>(),
+        away: false,
+      }] as const,
+    ));
+    store.setState({
+      channels: new Map([['#root', { ...channel('#root'), users }]]),
+      channelEvents: {},
+    });
+
+    feed(':overflow!u@host JOIN #root');
+
+    const root = store.getState().channels.get('#root');
+    expect(root?.users.size).toBe(MAX_LIVE_CHANNEL_USERS);
+    expect(root?.users.has('overflow')).toBe(false);
+    expect(root?.messages).toEqual([]);
+    expect(store.getState().channelEvents['#root']).toBeUndefined();
+  });
+
+  it('bounds live roster system lines and their untrusted reasons', () => {
+    const messages = Array.from({ length: MAX_LIVE_CHANNEL_MESSAGES }, (_, index) => ({
+      id: `seed-${index}`,
+      time: new Date(index),
+      from: '',
+      text: `seed ${index}`,
+      type: 'system' as const,
+      target: '#root',
+    }));
+    store.setState({ channels: new Map([['#root', { ...channel('#root'), messages }]]) });
+
+    feed(':alice!u@host JOIN #root');
+    feed(`:alice!u@host PART #root :${'x'.repeat(MAX_VAULT_MESSAGE_TEXT_LENGTH)}`);
+    feed(':bob!u@host JOIN #root');
+    feed(`:bob!u@host QUIT :${'y'.repeat(MAX_VAULT_MESSAGE_TEXT_LENGTH)}`);
+    feed(':carol!u@host JOIN #root');
+    feed(`:mod!u@host KICK #root carol :${'z'.repeat(MAX_VAULT_MESSAGE_TEXT_LENGTH)}`);
+
+    const root = store.getState().channels.get('#root');
+    expect(root?.messages).toHaveLength(MAX_LIVE_CHANNEL_MESSAGES);
+    expect(root?.users.size).toBe(0);
+    for (const message of root?.messages.slice(-6) ?? []) {
+      expect(message.text.length).toBeLessThanOrEqual(4 * 1024 + 64);
+    }
+  });
+
+  it('ignores malformed roster events without throwing or mutating state', () => {
+    expect(() => {
+      feed(':alice!u@host JOIN');
+      feed(':alice!u@host PART');
+      feed('QUIT :gone');
+      feed(':mod!u@host KICK #root');
+      feed(':alice!u@host NICK');
+      feed(':server MODE');
+      feed(':server 353 me = not-a-channel :alice');
+    }).not.toThrow();
+
+    expect(store.getState().channels.get('#root')).toEqual(channel('#root'));
   });
 });
