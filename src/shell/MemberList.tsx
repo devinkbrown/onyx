@@ -308,6 +308,7 @@ function MemberRow(props: MemberRowProps): JSX.Element {
             </span>
             <span
               class={`shell-member-nick${props.user.away ? ' shell-member-nick--away' : ''}`}
+              aria-hidden="true"
             >
               {props.user.nick}
             </span>

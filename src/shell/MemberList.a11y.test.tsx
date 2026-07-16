@@ -193,6 +193,18 @@ describe('MemberList accessibility', () => {
     expect(screen.getByRole('button', { name: /Open member details for bob, Member, away/ })).toBeInTheDocument();
   });
 
+  it('announces a long nick, role, and away state exactly once', () => {
+    const nick = 'vickysomething-with-a-very-long-name';
+    seedChannel([makeUser('me', ['o']), makeUser(nick, ['v'], { away: true })]);
+
+    render(() => <MemberList />);
+
+    const accessibleName = `Open member details for ${nick}, Voice, away`;
+    const trigger = screen.getByRole('button', { name: accessibleName });
+    expect(trigger).toHaveAccessibleName(accessibleName);
+    expect(trigger.querySelector('.shell-member-nick')).toHaveAttribute('aria-hidden', 'true');
+  });
+
   it('keeps an away member visibly away when NAMES refreshes their role', () => {
     seedChannel([
       makeUser('me'),
