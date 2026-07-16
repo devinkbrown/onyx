@@ -777,46 +777,16 @@
   text-transform: uppercase;
 }
 
-.shell-watch-start__card {
+.shell-watch-start__dialog-content,
+.shell-watch-start__review {
   display: grid;
   gap: 12px;
-  width: min(100%, 680px);
-  margin-top: 7px;
-  padding: 14px;
-  color: var(--washi);
-  border: 1px solid var(--seam);
-  border-left: 3px solid var(--lapis-bright);
-  border-radius: var(--r-md);
-  background:
-    linear-gradient(135deg, color-mix(in oklab, var(--lapis-deep) 12%, transparent), transparent 42%),
-    color-mix(in oklab, var(--stone) 90%, var(--ink));
-  box-shadow: 0 14px 34px -28px color-mix(in oklab, var(--ink) 94%, transparent);
-  box-sizing: border-box;
-}
-
-.shell-watch-start__card--review {
-  margin-top: 0;
-}
-
-.shell-watch-start__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-}
-
-.shell-watch-start__header > div {
-  display: grid;
-  gap: 3px;
   min-width: 0;
 }
 
-.shell-watch-start__eyebrow {
-  color: var(--lapis-bright);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+.shell-watch-start__dialog-content {
+  color: var(--washi);
+  font-family: var(--font-mono);
 }
 
 .shell-watch-start__heading {
@@ -900,8 +870,7 @@
 }
 
 .shell-watch-start__primary,
-.shell-watch-start__secondary,
-.shell-watch-start__close {
+.shell-watch-start__secondary {
   min-height: 30px;
   padding: 5px 9px;
   border: 1px solid var(--seam);
@@ -918,8 +887,7 @@
   background: var(--lapis-bright);
 }
 
-.shell-watch-start__secondary,
-.shell-watch-start__close {
+.shell-watch-start__secondary {
   color: var(--washi-dim);
   background: color-mix(in oklab, var(--stone-2) 72%, var(--ink));
 }
@@ -930,9 +898,7 @@
 }
 
 .shell-watch-start__secondary:hover,
-.shell-watch-start__secondary:focus-visible,
-.shell-watch-start__close:hover,
-.shell-watch-start__close:focus-visible {
+.shell-watch-start__secondary:focus-visible {
   color: var(--washi);
   border-color: var(--lapis-bright);
 }
@@ -4635,11 +4601,6 @@
 
   .shell-watch-start__launcher {
     width: min(100%, 330px);
-  }
-
-  .shell-watch-start__card {
-    width: 100%;
-    padding: 12px;
   }
 
   .shell-watch-start__fields,

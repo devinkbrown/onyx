@@ -500,7 +500,10 @@ describe('WatchTogetherActivity accessibility', () => {
     fireEvent.click(launcher);
 
     expect(launcher).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('form', { name: 'Start watch activity' })).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog', { name: 'Start watch activity' });
+    const form = screen.getByRole('form', { name: 'Start watch activity' });
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(launcher.closest('.shell-watch-start')).not.toContainElement(form);
     await waitFor(() => {
       expect(screen.getByRole('textbox', { name: 'Activity title' })).toHaveFocus();
     });
@@ -512,13 +515,47 @@ describe('WatchTogetherActivity accessibility', () => {
     await waitFor(() => expect(launcher).toHaveFocus());
   });
 
+  it('traps focus, closes on Escape, and keeps the temporary draft only in memory', async () => {
+    seedEmptyWatch();
+    const storageWrite = vi.spyOn(Storage.prototype, 'setItem');
+
+    render(() => (
+      <>
+        <button type="button">Background action</button>
+        <WatchTogetherActivity />
+      </>
+    ));
+
+    const launcher = screen.getByRole('button', { name: 'Start watch activity' });
+    fireEvent.click(launcher);
+    const dialog = screen.getByRole('dialog', { name: 'Start watch activity' });
+    const title = screen.getByRole('textbox', { name: 'Activity title' });
+    fireEvent.input(title, { target: { value: 'Temporary draft' } });
+
+    screen.getByRole('button', { name: 'Background action' }).focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Start watch activity' })).not.toBeInTheDocument();
+      expect(launcher).toHaveFocus();
+    });
+    expect(storageWrite).not.toHaveBeenCalled();
+
+    fireEvent.click(launcher);
+    expect(screen.getByRole('textbox', { name: 'Activity title' })).toHaveValue('Temporary draft');
+    storageWrite.mockRestore();
+  });
+
   it('reviews and publishes a bounded room-wide activity, then restores focus', async () => {
     const publishWatchTogether = seedEmptyWatch();
 
     render(() => <WatchTogetherActivity />);
     const form = openStartEditor();
-    expect(form).toHaveTextContent('room-wide');
-    expect(form).toHaveTextContent('never saved');
+    const editorDialog = screen.getByRole('dialog', { name: 'Start watch activity' });
+    expect(editorDialog).toHaveTextContent('room-wide');
+    expect(editorDialog).toHaveTextContent('never saved');
     fireEvent.input(screen.getByRole('textbox', { name: 'Activity title' }), {
       target: { value: 'Movie night' },
     });
@@ -531,7 +568,7 @@ describe('WatchTogetherActivity accessibility', () => {
     fireEvent.submit(form);
 
     const review = screen.getByTestId('watch-start-review');
-    expect(review).toHaveTextContent('Review room-wide activity');
+    expect(screen.getByRole('dialog', { name: 'Review room-wide activity' })).toContainElement(review);
     expect(review).toHaveTextContent('Host self in #watch');
     expect(review).toHaveTextContent('https://example.test/movie');
     expect(review).toHaveTextContent('120 seconds');
@@ -555,10 +592,12 @@ describe('WatchTogetherActivity accessibility', () => {
     expect(screen.getByRole('status')).toHaveTextContent(
       'Start requested for Movie night. Waiting for the room to confirm it',
     );
-    expect(screen.getByRole('textbox', { name: 'Activity title' })).toHaveValue('');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Review activity' })).toHaveFocus();
+      expect(screen.getByRole('button', { name: 'Start watch activity' })).toHaveFocus();
     });
+    fireEvent.click(screen.getByRole('button', { name: 'Start watch activity' }));
+    expect(screen.getByRole('textbox', { name: 'Activity title' })).toHaveValue('');
   });
 
   it('rejects missing and oversized titles and out-of-range durations before review', () => {

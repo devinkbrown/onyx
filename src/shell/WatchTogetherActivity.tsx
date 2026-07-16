@@ -27,6 +27,7 @@ import {
   tick,
   type WatchSession,
 } from '@/lib/media/watchTogetherController';
+import { ModalShell } from '@/primitives';
 
 const WATCH_PROP = 'ocean.watch';
 const TICK_MS = 1000;
@@ -688,16 +689,19 @@ export function WatchTogetherActivity(): JSX.Element {
     if (!session) return;
     setStartFeedback(null);
     setStartReview({ channel: currentChannel, activity: session.activity });
-    queueMicrotask(() => confirmStartButton?.focus());
+    queueMicrotask(() => queueMicrotask(() => confirmStartButton?.focus()));
   }
 
   function onOpenStartEditor(): void {
     setStartFeedback(null);
     setStartEditorOpen(true);
-    queueMicrotask(() => startTitleInput?.focus());
+    // ModalShell first moves focus into the dialog. Run after that lifecycle
+    // microtask so the title field is the deterministic editing target.
+    queueMicrotask(() => queueMicrotask(() => startTitleInput?.focus()));
   }
 
   function onCloseStartEditor(): void {
+    setStartReview(null);
     setStartFeedback(null);
     setStartEditorOpen(false);
     focusFirstConnected(() => startActivityTrigger);
@@ -762,7 +766,8 @@ export function WatchTogetherActivity(): JSX.Element {
         kind: 'status',
         message: `Start requested for ${staged.activity.title}. Waiting for the room to confirm it`,
       });
-      focusAfterClosedReview(() => reviewStartButton);
+      setStartEditorOpen(false);
+      focusFirstConnected(() => startActivityTrigger);
     } catch {
       setStartFeedback({
         kind: 'error',
@@ -779,80 +784,7 @@ export function WatchTogetherActivity(): JSX.Element {
 
   return (
     <>
-      <Show when={startReview()}>
-        {(pending) => (
-          <div class="shell-watch-start" data-testid="watch-start-review">
-            <section
-              class="shell-watch-start__card shell-watch-start__card--review"
-              aria-label={`Review watch activity ${pending().activity.title}`}
-            >
-              <header class="shell-watch-start__header">
-                <div>
-                  <span class="shell-watch-start__eyebrow">Review room-wide activity</span>
-                  <strong class="shell-watch-start__heading">{pending().activity.title}</strong>
-                </div>
-                <button
-                  type="button"
-                  class="shell-watch-start__close"
-                  aria-label="Back to activity editor"
-                  onClick={onCancelStartActivity}
-                >
-                  Back to edit
-                </button>
-              </header>
-              <p class="shell-watch-start__summary">
-                Host {pending().activity.host} in {pending().channel}. These details become
-                visible to everyone in the channel only after you confirm.
-              </p>
-              <dl class="shell-watch-start__review-details">
-                <Show when={pending().activity.url}>
-                  {(url) => (
-                    <div>
-                      <dt>Media URL</dt>
-                      <dd>{url()}</dd>
-                    </div>
-                  )}
-                </Show>
-                <Show when={pending().activity.durationSeconds !== null}>
-                  <div>
-                    <dt>Duration</dt>
-                    <dd>{pending().activity.durationSeconds} seconds</dd>
-                  </div>
-                </Show>
-              </dl>
-              <Show when={startFeedback()}>
-                {(feedback) => (
-                  <span
-                    class="shell-watch-start__feedback"
-                    role={feedback().kind === 'error' ? 'alert' : 'status'}
-                  >
-                    {feedback().message}
-                  </span>
-                )}
-              </Show>
-              <div class="shell-watch-start__actions" role="group" aria-label="Confirm new watch activity">
-                <button
-                  ref={(element) => { confirmStartButton = element; }}
-                  type="button"
-                  class="shell-watch-start__primary"
-                  onClick={onConfirmStartActivity}
-                >
-                  Confirm start activity
-                </button>
-                <button
-                  type="button"
-                  class="shell-watch-start__secondary"
-                  onClick={onCancelStartActivity}
-                >
-                  Cancel starting activity
-                </button>
-              </div>
-            </section>
-          </div>
-        )}
-      </Show>
-
-      <Show when={!startReview() && canStartActivity()}>
+      <Show when={canStartActivity()}>
         <div class="shell-watch-start">
           <button
             ref={(element) => { startActivityTrigger = element; }}
@@ -880,32 +812,29 @@ export function WatchTogetherActivity(): JSX.Element {
               </span>
             )}
           </Show>
-          <Show when={startEditorOpen()}>
-            <form
-              id="watch-start-editor"
-              class="shell-watch-start__card"
-              aria-label="Start watch activity"
-              novalidate
-              onSubmit={onStageStartActivity}
-            >
-              <header class="shell-watch-start__header">
-                <div>
-                  <span class="shell-watch-start__eyebrow">Room activity</span>
-                  <strong class="shell-watch-start__heading">Set a shared watch cue</strong>
-                </div>
-                <button
-                  type="button"
-                  class="shell-watch-start__close"
-                  aria-label="Close activity editor"
-                  onClick={onCloseStartEditor}
-                >
-                  Close
-                </button>
-              </header>
-              <p class="shell-watch-start__summary">
-                Review before publishing. Confirming makes these details room-wide in
-                {` ${channel() ?? 'this channel'}`}; this draft is temporary and is never saved.
-              </p>
+        </div>
+      </Show>
+
+      <ModalShell
+        open={startEditorOpen()}
+        title={startReview() ? 'Review room-wide activity' : 'Start watch activity'}
+        description={startReview()
+          ? `Confirming publishes these details to everyone in ${channel() ?? 'this channel'}.`
+          : `Review before publishing. Confirming makes these details room-wide in ${channel() ?? 'this channel'}; this draft is temporary and is never saved.`}
+        closeLabel="Close activity editor"
+        onOpenChange={(open) => {
+          if (!open) onCloseStartEditor();
+        }}
+      >
+        <form
+          id="watch-start-editor"
+          class="shell-watch-start__dialog-content"
+          aria-label="Start watch activity"
+          novalidate
+          onSubmit={onStageStartActivity}
+        >
+          <Show when={startReview()} fallback={
+            <>
               <div class="shell-watch-start__fields">
                 <label class="shell-watch-start__field shell-watch-start__field--title" for="watch-start-title">
                   <span>Activity title</span>
@@ -969,10 +898,67 @@ export function WatchTogetherActivity(): JSX.Element {
                   Cancel
                 </button>
               </div>
-            </form>
+            </>
+          }>
+            {(pending) => (
+              <section
+                class="shell-watch-start__review"
+                data-testid="watch-start-review"
+                aria-label={`Review watch activity ${pending().activity.title}`}
+              >
+                <strong class="shell-watch-start__heading">{pending().activity.title}</strong>
+                <p class="shell-watch-start__summary">
+                  Host {pending().activity.host} in {pending().channel}. These details become
+                  visible to everyone in the channel only after you confirm.
+                </p>
+                <dl class="shell-watch-start__review-details">
+                  <Show when={pending().activity.url}>
+                    {(url) => (
+                      <div>
+                        <dt>Media URL</dt>
+                        <dd>{url()}</dd>
+                      </div>
+                    )}
+                  </Show>
+                  <Show when={pending().activity.durationSeconds !== null}>
+                    <div>
+                      <dt>Duration</dt>
+                      <dd>{pending().activity.durationSeconds} seconds</dd>
+                    </div>
+                  </Show>
+                </dl>
+                <Show when={startFeedback()}>
+                  {(feedback) => (
+                    <span
+                      class="shell-watch-start__feedback"
+                      role={feedback().kind === 'error' ? 'alert' : 'status'}
+                    >
+                      {feedback().message}
+                    </span>
+                  )}
+                </Show>
+                <div class="shell-watch-start__actions" role="group" aria-label="Confirm new watch activity">
+                  <button
+                    ref={(element) => { confirmStartButton = element; }}
+                    type="button"
+                    class="shell-watch-start__primary"
+                    onClick={onConfirmStartActivity}
+                  >
+                    Confirm start activity
+                  </button>
+                  <button
+                    type="button"
+                    class="shell-watch-start__secondary"
+                    onClick={onCancelStartActivity}
+                  >
+                    Cancel starting activity
+                  </button>
+                </div>
+              </section>
+            )}
           </Show>
-        </div>
-      </Show>
+        </form>
+      </ModalShell>
 
       <Show when={displayedActivity()}>
         {(item) => (
