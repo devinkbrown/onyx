@@ -38,7 +38,13 @@ import {
   splitProps,
   type JSX,
 } from 'solid-js';
-import { useStore, getState, selectAccount } from '@/lib/store';
+import {
+  useStore,
+  getState,
+  selectAccount,
+  selectDeviceMemoryOwner,
+} from '@/lib/store';
+import { deviceMemoryOwnerKey } from '@/lib/deviceMemoryOwner';
 import { deviceKeys, deviceRegistryId } from '@/lib/e2ee/dmCipher';
 import { PasskeysSection } from '@/shell/PasskeysSection';
 import { ModalShell } from '@/primitives/index';
@@ -151,6 +157,10 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
 
   // ── store reads ──
   const account = useStore(selectAccount);
+  const memoryOwner = useStore(
+    selectDeviceMemoryOwner,
+    (left, right) => left?.serverUrl === right?.serverUrl && left?.identity === right?.identity,
+  );
   const info = useStore((s) => s.accountInfo);
   const infoPending = useStore((s) => s.accountInfoPending);
   const actionError = useStore((s) => s.accountActionError);
@@ -274,14 +284,15 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
   };
 
   let accountBoundaryInitialized = false;
-  let previousAccount: string | null = null;
+  let previousOwnerKey: string | null = null;
   createEffect(() => {
     const open = local.open;
-    const currentAccount = account();
-    const accountChanged = accountBoundaryInitialized && currentAccount !== previousAccount;
-    previousAccount = currentAccount;
+    const owner = memoryOwner();
+    const currentOwnerKey = owner ? deviceMemoryOwnerKey(owner) : null;
+    const ownerChanged = accountBoundaryInitialized && currentOwnerKey !== previousOwnerKey;
+    previousOwnerKey = currentOwnerKey;
     accountBoundaryInitialized = true;
-    if (!open || accountChanged) clearLocalAccountState();
+    if (!open || ownerChanged) clearLocalAccountState();
   });
 
   // ── derived ──
@@ -307,7 +318,8 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
 
   // ── fetch fresh ACCOUNTINFO whenever the panel opens for a signed-in user ──
   createEffect(() => {
-    if (local.open && account()) {
+    const owner = memoryOwner();
+    if (local.open && account() && owner) {
       getState().accountInfo_fetch();
       getState().totpStatus();
       getState().e2eeKeyStatus();

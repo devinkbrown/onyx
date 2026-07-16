@@ -28,12 +28,12 @@ function makeClient() {
   return { sendRaw: vi.fn() };
 }
 
-function seedServer(account: string | null): Server {
+function seedServer(account: string | null, url = 'wss://eshmaki.me'): Server {
   return {
     id: 'ircxnet',
     name: 'eshmaki.me',
     network: 'IRCXNet',
-    url: 'wss://eshmaki.me',
+    url,
     icon: '#000',
     nick: account ?? 'guest',
     account,
@@ -190,6 +190,26 @@ describe('Account panel — signed in', () => {
     await waitFor(() => expect(screen.getByLabelText('Email address')).toHaveValue('bob@example.net'));
   });
 
+  it('clears account secrets when the same account name moves to another server', async () => {
+    renderPanel({ account: 'alice' });
+    fireEvent.input(screen.getByLabelText(/account password \(to change protection\)/i), {
+      target: { value: 'first-server-password' },
+    });
+    fireEvent.click(screen.getByTestId('account-drop-arm'));
+    fireEvent.input(screen.getByLabelText(/type "alice" to confirm/i), {
+      target: { value: 'alice' },
+    });
+    fireEvent.input(screen.getByLabelText('Account password'), {
+      target: { value: 'first-server-password' },
+    });
+
+    store.setState({ server: seedServer('alice', 'wss://second.example/ws') });
+
+    await waitFor(() => expect(screen.getByTestId('account-drop-arm')).toBeInTheDocument());
+    expect(screen.getByLabelText(/account password \(to change protection\)/i)).toHaveValue('');
+    expect(screen.queryByLabelText('Confirm account deletion')).not.toBeInTheDocument();
+  });
+
   it('reports authenticator copy success only after the shared write resolves', async () => {
     seedTotpEnrollment();
     let resolveCopy: (copied: boolean) => void = () => {};
@@ -240,6 +260,25 @@ describe('Account panel — signed in', () => {
     await Promise.resolve();
 
     expect(screen.queryByText('Authenticator secret copied to clipboard.')).not.toBeInTheDocument();
+  });
+
+  it('ignores a secret copy completion after moving to a same-named account on another server', async () => {
+    seedTotpEnrollment();
+    let resolveCopy: (copied: boolean) => void = () => {};
+    const pending = new Promise<boolean>((resolve) => {
+      resolveCopy = resolve;
+    });
+    vi.spyOn(clipboard, 'writeClipboardText').mockReturnValue(pending);
+    renderPanel({ account: 'alice' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy secret' }));
+    store.setState({ server: seedServer('alice', 'wss://second.example/ws') });
+    resolveCopy(true);
+    await pending;
+    await Promise.resolve();
+
+    expect(screen.queryByText('Authenticator secret copied to clipboard.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy secret' })).not.toBeDisabled();
   });
 
   it('exposes dense account sections as named regions', () => {
