@@ -2508,14 +2508,27 @@ function PreferenceCategoryNavigation(props: {
   const [resetAnnouncement, setResetAnnouncement] = createSignal('');
   let categoryTabsQuery: MediaQueryList | undefined;
 
+  function revealCategoryTabAfterRender(categoryId: PreferenceCategory): void {
+    queueMicrotask(() => {
+      const index = PREFERENCE_CATEGORIES.findIndex((category) => category.id === categoryId);
+      if (index < 0) return;
+      const button = buttons[index];
+      if (button?.isConnected) {
+        button.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+      }
+    });
+  }
+
   const handleCategoryTabsQueryChange = (event: MediaQueryListEvent): void => {
     setHorizontalTabs(event.matches);
+    if (event.matches) revealCategoryTabAfterRender(props.active());
   };
 
   onMount(() => {
     if (typeof window.matchMedia !== 'function') return;
     categoryTabsQuery = window.matchMedia(MOBILE_CATEGORY_TABS_QUERY);
     setHorizontalTabs(categoryTabsQuery.matches);
+    if (categoryTabsQuery.matches) revealCategoryTabAfterRender(props.active());
     categoryTabsQuery.addEventListener('change', handleCategoryTabsQueryChange);
   });
 

@@ -236,6 +236,50 @@ describe('PreferencesPanel', () => {
     expect(removeEventListener).toHaveBeenCalledWith('change', categoryTabsListener);
   });
 
+  it('reveals a retained mobile category on reopen without stealing initial focus', async () => {
+    vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+      matches: query === '(max-width: 42rem)',
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }) as MediaQueryList));
+    const scrollIntoView = vi.fn();
+    const originalScrollIntoView = Object.getOwnPropertyDescriptor(
+      window.HTMLElement.prototype,
+      'scrollIntoView',
+    );
+    Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
+      value: scrollIntoView,
+      configurable: true,
+    });
+
+    try {
+      renderPreferences();
+      selectPreferenceCategory('Accessibility');
+      closePreferences();
+      expect(screen.queryByRole('dialog', { name: 'Preferences' })).not.toBeInTheDocument();
+      scrollIntoView.mockClear();
+
+      openPreferences();
+
+      await waitFor(() => {
+        expect(screen.getByRole('tab', { name: /^Accessibility/ })).toHaveAttribute('aria-selected', 'true');
+        expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' });
+        expect(screen.getByRole('button', { name: 'Close preferences' })).toHaveFocus();
+      });
+    } finally {
+      if (originalScrollIntoView) {
+        Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', originalScrollIntoView);
+      } else {
+        delete (window.HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView;
+      }
+    }
+  });
+
   it('resets category scroll while preserving tab focus and mounted pane state', () => {
     renderPreferences('History & data');
     fireEvent.click(screen.getByRole('button', { name: 'Clear local history' }));
