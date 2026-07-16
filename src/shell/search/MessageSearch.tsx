@@ -439,17 +439,38 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
   const timeLabel = (time: Date) =>
     time.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
+  const commitInputQuery = (value: string): void => {
+    search.setQuery(value);
+  };
+
   const handleInput: JSX.EventHandlerUnion<HTMLInputElement, InputEvent> = (event) => {
-    search.setQuery((event.currentTarget as HTMLInputElement).value);
+    if (event.isComposing) return;
+    commitInputQuery(event.currentTarget.value);
+  };
+
+  const handleCompositionEnd: JSX.EventHandlerUnion<HTMLInputElement, CompositionEvent> = (event) => {
+    commitInputQuery(event.currentTarget.value);
   };
 
   const handleKeyDown: JSX.EventHandlerUnion<HTMLInputElement, KeyboardEvent> = (event) => {
-    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+    if (event.defaultPrevented || event.isComposing || event.keyCode === 229) return;
+
+    if (
+      event.key === 'Enter'
+      && (event.ctrlKey || event.metaKey)
+      && !event.shiftKey
+      && !event.altKey
+    ) {
       event.preventDefault();
       search.runServerSearch();
       return;
     }
-    if (event.key === 'Enter') {
+    if (
+      event.key === 'Enter'
+      && !event.ctrlKey
+      && !event.metaKey
+      && !event.altKey
+    ) {
       event.preventDefault();
       if (event.shiftKey) {
         search.previous();
@@ -460,6 +481,7 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
   };
 
   const handleSearchKeyDown: JSX.EventHandlerUnion<HTMLDivElement, KeyboardEvent> = (event) => {
+    if (event.defaultPrevented || event.isComposing || event.keyCode === 229) return;
     if (event.key !== 'Escape') return;
     event.preventDefault();
     event.stopPropagation();
@@ -511,6 +533,7 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
                 : 'Device history is off'}
             disabled={!search.hasConversation() && !search.localHistoryEnabled()}
             onInput={handleInput}
+            onCompositionEnd={handleCompositionEnd}
             onKeyDown={handleKeyDown}
           />
           <span class="onyx-message-search__count" aria-hidden="true">

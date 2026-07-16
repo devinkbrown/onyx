@@ -73,4 +73,23 @@ describe('Home Search Center integration', () => {
 
     expect(screen.queryByRole('searchbox', { name: 'Search messages' })).not.toBeInTheDocument();
   });
+
+  it('leaves composed, claimed, and extra-modifier find chords to their owner', () => {
+    render(() => <AppShell />);
+
+    fireEvent.keyDown(window, { key: 'f', ctrlKey: true, isComposing: true });
+    fireEvent.keyDown(window, { key: 'f', ctrlKey: true, shiftKey: true });
+    fireEvent.keyDown(window, { key: 'f', metaKey: true, altKey: true });
+    expect(screen.queryByRole('searchbox', { name: 'Search messages' })).not.toBeInTheDocument();
+
+    const claimed = new KeyboardEvent('keydown', {
+      key: 'f',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    claimed.preventDefault();
+    window.dispatchEvent(claimed);
+    expect(screen.queryByRole('searchbox', { name: 'Search messages' })).not.toBeInTheDocument();
+  });
 });

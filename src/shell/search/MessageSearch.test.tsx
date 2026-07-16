@@ -202,6 +202,34 @@ describe('MessageSearch', () => {
       .toHaveAttribute('aria-hidden', 'true');
   });
 
+  it('defers composed queries and leaves candidate keys inside the input method', async () => {
+    store.setState({
+      ...initialState,
+      activeView: { kind: 'channel', channel: '#root' },
+      channels: new Map([['#root', channel('#root', [
+        message('first', 'Kai', 'needle one', 1),
+        message('second', 'Mira', 'needle two', 2),
+      ])]]),
+    }, true);
+    openMessageSearchWithQuery('needle');
+    render(() => <MessageSearch />);
+
+    const input = screen.getByRole('searchbox', { name: 'Search messages' });
+    const localStatus = document.getElementById('onyx-message-search-status')!;
+    expect(localStatus).toHaveTextContent('1 of 2 for “needle” in #root');
+
+    fireEvent.input(input, { target: { value: 'one' }, isComposing: true });
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true });
+    fireEvent.keyDown(input, { key: 'Escape', isComposing: true });
+
+    expect(localStatus).toHaveTextContent('1 of 2 for “needle” in #root');
+    expect(screen.getByRole('search', { name: 'Message search' })).toBeInTheDocument();
+
+    fireEvent.compositionEnd(input, { data: 'one' });
+
+    await waitFor(() => expect(localStatus).toHaveTextContent('1 of 1 for “one” in #root'));
+  });
+
   it('restores focus to the pre-open trigger when the search closes (SC 2.4.3)', async () => {
     store.setState({
       ...initialState,

@@ -118,10 +118,13 @@ function focusableIn(root: HTMLElement | null | undefined): HTMLElement[] {
 // ── Disconnected banner ──────────────────────────────────────────────────────
 
 function handleMessageSearchHotkey(event: KeyboardEvent): void {
-  if (event.defaultPrevented) return;
+  if (event.defaultPrevented || event.isComposing || event.keyCode === 229) return;
 
   const key = event.key.toLowerCase();
-  const isFindCombo = key === 'f' && (event.metaKey || event.ctrlKey) && !event.altKey;
+  const isFindCombo = key === 'f'
+    && (event.metaKey || event.ctrlKey)
+    && !event.shiftKey
+    && !event.altKey;
   if (!isFindCombo) return;
 
   event.preventDefault();
