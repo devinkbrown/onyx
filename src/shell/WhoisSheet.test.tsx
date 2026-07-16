@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { store } from '@/lib/store/store';
+import { parseIRCMessage } from '@/lib/irc/parser';
 import { WhoisSheet } from './WhoisSheet';
 
 const initialState = store.getInitialState();
@@ -68,5 +69,38 @@ describe('WhoisSheet', () => {
     render(() => <WhoisSheet />);
 
     expect(screen.getByText('The network returned no additional profile details.')).toBeInTheDocument();
+  });
+
+  it('announces an immediate reconnect error instead of spinning without a client', () => {
+    store.getState().whois('offline-user');
+
+    render(() => <WhoisSheet />);
+
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.getByRole('alert')).toHaveTextContent('Reconnect to request profile details.');
+    expect(screen.queryByText('The network returned no additional profile details.')).toBeNull();
+  });
+
+  it('replaces loading with an accessible error after ERR_NOSUCHNICK', async () => {
+    store.setState({
+      client: {
+        sendRaw: vi.fn(),
+        isupport: { CHANTYPES: '#&' },
+      } as never,
+      connectionStatus: 'connected',
+      ourNick: 'me',
+    });
+    store.getState().whois('departed-user');
+    render(() => <WhoisSheet />);
+    expect(screen.getByRole('status')).toHaveTextContent('Asking the network');
+
+    store.getState()._handleMessage(parseIRCMessage(':server 401 me departed-user :No such nick'));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('status')).toBeNull();
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'No profile was found for departed-user. They may have left the network.',
+      );
+    });
   });
 });

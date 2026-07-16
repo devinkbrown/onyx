@@ -267,6 +267,30 @@ describe('channel management — raw command dispatch', () => {
     expect(store.getState().whoisNick).toBe('bob');
   });
 
+  it('settles WHOIS immediately with a reconnect error when no client is available', () => {
+    store.setState({ ...initialState }, true);
+
+    store.getState().whois('offline-user');
+
+    expect(store.getState().showWhois).toBe(true);
+    expect(store.getState().whoisData.get('offline-user')).toMatchObject({
+      loading: false,
+      error: 'Reconnect to request profile details.',
+    });
+  });
+
+  it('settles the matching WHOIS request when the server reports no such nick', () => {
+    seed('#general', [makeUser('me', ['o'])]);
+    store.getState().whois('departed-user');
+
+    feed(':server 401 me departed-user :No such nick');
+
+    expect(store.getState().whoisData.get('departed-user')).toMatchObject({
+      loading: false,
+      error: 'No profile was found for departed-user. They may have left the network.',
+    });
+  });
+
   it('actions are safe no-ops without a client', () => {
     store.setState({ ...initialState }, true);
     expect(() => {

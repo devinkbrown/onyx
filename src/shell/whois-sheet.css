@@ -38,6 +38,7 @@
 }
 
 .shell-whois-status,
+.shell-whois-error,
 .shell-whois-empty {
   margin: 0;
   padding: var(--space-3);
@@ -46,6 +47,12 @@
   background: color-mix(in oklab, var(--lapis-deep) 10%, transparent);
   color: var(--washi-dim);
   line-height: 1.5;
+}
+
+.shell-whois-error {
+  border-color: color-mix(in oklab, var(--shu) 58%, var(--seam-faint));
+  background: color-mix(in oklab, var(--shu) 10%, transparent);
+  color: var(--shu-bright);
 }
 
 .shell-whois-details {

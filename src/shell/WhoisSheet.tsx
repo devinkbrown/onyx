@@ -97,11 +97,14 @@ export function WhoisSheet(): JSX.Element {
         <Show when={info()?.loading}>
           <p class="shell-whois-status" role="status">Asking the network for profile details…</p>
         </Show>
+        <Show when={info()?.error}>
+          {(error) => <p class="shell-whois-error" role="alert">{error()}</p>}
+        </Show>
 
         <Show
           when={hasDetails()}
           fallback={
-            <Show when={!info()?.loading}>
+            <Show when={!info()?.loading && !info()?.error}>
               <p class="shell-whois-empty">The network returned no additional profile details.</p>
             </Show>
           }

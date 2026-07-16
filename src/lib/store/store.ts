@@ -152,6 +152,7 @@ export interface WhoisInfo {
   special?: string;
   realHost?: string;
   loading: boolean;
+  error?: string;
 }
 
 export interface UserProfile {
@@ -5895,13 +5896,19 @@ export const store = createStore<OnyxState>()(
 
     // ── profile modal ─────────────────────────────────────────────────────
     openWhois(nick) {
+      const { client, connectionStatus } = get();
+      const canRequest = client !== null && connectionStatus === 'connected';
       set(s => {
         const whoisData = new Map(s.whoisData);
-        whoisData.set(nick.toLowerCase(), { nick, loading: true });
+        whoisData.set(nick.toLowerCase(), {
+          nick,
+          loading: canRequest,
+          ...(canRequest ? {} : { error: 'Reconnect to request profile details.' }),
+        });
         return { showWhois: true, whoisNick: nick, whoisData };
       });
       // WHOIS nick nick — double nick requests idle time (RPL_WHOISIDLE 317)
-      get().client?.sendRaw('WHOIS', nick, nick);
+      if (canRequest) client.sendRaw('WHOIS', nick, nick);
     },
     closeWhois() {
       set({ showWhois: false, whoisNick: null });
@@ -9578,6 +9585,19 @@ export const store = createStore<OnyxState>()(
 
         case '401': { // ERR_NOSUCHNICK
           const target401 = params[1] ?? '';
+          const key401 = target401.toLowerCase();
+          set(s => {
+            if (!key401 || s.whoisNick?.toLowerCase() !== key401) return {};
+            const existing = s.whoisData.get(key401);
+            if (!existing) return {};
+            const whoisData = new Map(s.whoisData);
+            whoisData.set(key401, {
+              ...existing,
+              loading: false,
+              error: `No profile was found for ${target401}. They may have left the network.`,
+            });
+            return { whoisData };
+          });
           get().addNotification({ type: 'error', text: `No such nick: ${target401}` });
           break;
         }
