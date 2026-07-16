@@ -33,7 +33,7 @@
  * global newest-first row cap in addition to per-target retention before the
  * embed pass starts.
  */
-import { readAllVaultHits, type VaultSearchHit } from './historyVault';
+import { readAllVaultHits, type DeviceMemoryOwner, type VaultSearchHit } from './historyVault';
 import {
   defaultEmbeddingProvider,
   embedItemsBounded,
@@ -103,6 +103,8 @@ export interface HybridSearchOptions {
   provider?: EmbeddingProvider;
   /** Stop scheduling candidate work when a newer UI query supersedes this one. */
   signal?: AbortSignal;
+  /** Exact server/account namespace whose remembered rows may be searched. */
+  owner?: DeviceMemoryOwner;
 }
 
 const DEFAULT_LIMIT = 40;
@@ -147,7 +149,7 @@ export async function searchVaultHybrid(
   const limit = opts.limit ?? DEFAULT_LIMIT;
   const minScore = opts.minScore ?? 0;
 
-  const hits = await readAllVaultHits();
+  const hits = await readAllVaultHits(undefined, opts.owner);
   if (hits.length === 0 || opts.signal?.aborted) return [];
 
   // Lexical ranking: locale-aware, case-insensitive substring over sender+body,

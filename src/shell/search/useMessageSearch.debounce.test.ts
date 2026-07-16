@@ -2,7 +2,7 @@
 import { createRoot } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Channel, ChatMessage } from '@/lib/irc/types';
-import type { VaultSearchHit } from '@/lib/vault/historyVault';
+import type { DeviceMemoryOwner, VaultSearchHit } from '@/lib/vault/historyVault';
 import { setState } from '@/lib/store';
 import { store } from '@/lib/store/store';
 import { resetPreferences } from '@/lib/prefs/preferences';
@@ -10,17 +10,25 @@ import { closeMessageSearch, openMessageSearch, setVaultMode, useMessageSearch }
 
 // The vault (device-memory) search fetch is exercised through a spy so we can
 // assert *when* it runs against the fake timer, independent of IndexedDB.
-const searchVaultMock = vi.fn<(query: string) => Promise<VaultSearchHit[]>>(async () => []);
+const searchVaultMock = vi.fn<(
+  query: string,
+  limit?: number,
+  owner?: DeviceMemoryOwner,
+) => Promise<VaultSearchHit[]>>(async () => []);
 const searchVaultSemanticMock = vi.fn<(query: string) => Promise<VaultSearchHit[]>>(async () => []);
 
-vi.mock('@/lib/vault/historyVault', () => ({
-  searchVault: (query: string) => searchVaultMock(query),
+vi.mock('@/lib/vault/historyVault', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/vault/historyVault')>(),
+  searchVault: (query: string, limit?: number, owner?: DeviceMemoryOwner) => (
+    searchVaultMock(query, limit, owner)
+  ),
 }));
 vi.mock('@/lib/vault/searchVaultSemantic', () => ({
   searchVaultSemantic: (query: string) => searchVaultSemanticMock(query),
 }));
 
 const initialState = store.getInitialState();
+const MEMORY_OWNER = { serverUrl: 'wss://example.test', identity: 'alice' } as const;
 
 function message(id: string, from: string, text: string, minute: number, target = '#root'): ChatMessage {
   return {
@@ -50,7 +58,20 @@ function channel(name: string, messages: ChatMessage[]): Channel {
 
 describe('useMessageSearch — vault debounce isolation', () => {
   beforeEach(() => {
-    store.setState(initialState, true);
+    store.setState({
+      ...initialState,
+      ourNick: 'alice',
+      server: {
+        id: 'search-debounce',
+        name: 'Example',
+        network: 'Example',
+        url: MEMORY_OWNER.serverUrl,
+        icon: '',
+        nick: 'alice',
+        account: MEMORY_OWNER.identity,
+        connected: true,
+      },
+    }, true);
     closeMessageSearch();
     resetPreferences();
     // Pin the lexical (exact) matcher so this suite exercises searchVault's
@@ -102,7 +123,7 @@ describe('useMessageSearch — vault debounce isolation', () => {
     // unrelated update the fetch will not have fired yet (regression).
     await vi.advanceTimersByTimeAsync(100);
     expect(searchVaultMock).toHaveBeenCalledTimes(1);
-    expect(searchVaultMock).toHaveBeenCalledWith('needle');
+    expect(searchVaultMock).toHaveBeenCalledWith('needle', 80, MEMORY_OWNER);
 
     dispose();
   });
@@ -128,7 +149,7 @@ describe('useMessageSearch — vault debounce isolation', () => {
     });
 
     await vi.advanceTimersByTimeAsync(250);
-    expect(searchVaultMock).toHaveBeenCalledWith('needle');
+    expect(searchVaultMock).toHaveBeenCalledWith('needle', 80, MEMORY_OWNER);
 
     closeMessageSearch();
     resolveSearch([{
@@ -141,6 +162,81 @@ describe('useMessageSearch — vault debounce isolation', () => {
     expect(search.isOpen()).toBe(false);
     expect(search.vaultResults()).toEqual([]);
 
+    dispose();
+  });
+
+  it('does not let an Alice vault query populate Bob search results', async () => {
+    setState({
+      activeView: { kind: 'channel', channel: '#root' },
+      channels: new Map([['#root', channel('#root', [])]]),
+    });
+
+    let resolveSearch!: (hits: VaultSearchHit[]) => void;
+    searchVaultMock.mockReturnValueOnce(new Promise((resolve) => {
+      resolveSearch = resolve;
+    }));
+
+    let dispose!: () => void;
+    let search!: ReturnType<typeof useMessageSearch>;
+    createRoot((cleanup) => {
+      dispose = cleanup;
+      search = useMessageSearch();
+      openMessageSearch();
+      search.setQuery('needle');
+    });
+
+    await vi.advanceTimersByTimeAsync(250);
+    expect(searchVaultMock).toHaveBeenCalledWith('needle', 80, MEMORY_OWNER);
+
+    store.setState({
+      ourNick: 'bob',
+      server: {
+        ...store.getState().server!,
+        nick: 'bob',
+        account: 'bob',
+      },
+    });
+    resolveSearch([{
+      target: '#alice-private',
+      message: message('alice-late', 'Alice', 'needle from Alice memory', 2, '#alice-private'),
+    }]);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(search.vaultResults()).toEqual([]);
+    dispose();
+  });
+
+  it('does not let an old socket query populate a reconnected Alice session', async () => {
+    setState({
+      activeView: { kind: 'channel', channel: '#root' },
+      channels: new Map([['#root', channel('#root', [])]]),
+    });
+
+    let resolveSearch!: (hits: VaultSearchHit[]) => void;
+    searchVaultMock.mockReturnValueOnce(new Promise((resolve) => {
+      resolveSearch = resolve;
+    }));
+
+    let dispose!: () => void;
+    let search!: ReturnType<typeof useMessageSearch>;
+    createRoot((cleanup) => {
+      dispose = cleanup;
+      search = useMessageSearch();
+      openMessageSearch();
+      search.setQuery('needle');
+    });
+
+    await vi.advanceTimersByTimeAsync(250);
+    store.setState({ client: { isupport: { CHANTYPES: '#&' } } as never });
+    resolveSearch([{
+      target: '#old-socket',
+      message: message('old-socket', 'Alice', 'needle from the old socket', 2, '#old-socket'),
+    }]);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(search.vaultResults()).toEqual([]);
     dispose();
   });
 });

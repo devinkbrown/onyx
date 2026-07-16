@@ -20,6 +20,26 @@ import { _resetVaultSyncForTests, initVaultSync } from './vaultSync';
 const { _resetVaultForTests, loadRecent, saveMessages, searchVault } = vault;
 
 const initialState = store.getInitialState();
+const ALICE_OWNER = { serverUrl: 'wss://example.test', identity: 'alice' } as const;
+const BOB_OWNER = { serverUrl: 'wss://example.test', identity: 'bob' } as const;
+
+function server(account: string) {
+  return {
+    id: `vault-sync-${account}`,
+    name: 'Onyx',
+    network: 'Onyx',
+    url: ALICE_OWNER.serverUrl,
+    icon: '',
+    nick: account,
+    account,
+    connected: true,
+  };
+}
+
+const saveOwnedMessages = (target: string, messages: readonly ChatMessage[]) =>
+  saveMessages(target, messages, ALICE_OWNER);
+const loadOwnedRecent = (target: string) => loadRecent(target, undefined, ALICE_OWNER);
+const searchOwnedVault = (query: string) => searchVault(query, 80, ALICE_OWNER);
 
 function msg(id: string, time: number, target = '#room'): ChatMessage {
   return { id, time: new Date(time), from: 'kain', text: `hi ${id}`, type: 'msg', target };
@@ -62,7 +82,11 @@ describe('vaultSync', () => {
     resetPreferences();
     _resetVaultForTests();
     _resetVaultSyncForTests();
-    store.setState(initialState, true);
+    store.setState({
+      ...initialState,
+      ourNick: 'alice',
+      server: server('alice'),
+    }, true);
   });
 
   afterEach(() => {
@@ -72,7 +96,7 @@ describe('vaultSync', () => {
   });
 
   it('hydrates a fresh channel buffer from the vault', async () => {
-    await saveMessages('#room', [msg('v1', 1000), msg('v2', 2000)]);
+    await saveOwnedMessages('#room', [msg('v1', 1000), msg('v2', 2000)]);
 
     initVaultSync();
     setChannel('#room', []); // joining: empty buffer appears
@@ -82,8 +106,45 @@ describe('vaultSync', () => {
     expect(buf.map((m) => m.id)).toEqual(['v1', 'v2']);
   });
 
+  it('never hydrates ownerless legacy rows into a signed-in session', async () => {
+    await saveMessages('#room', [msg('legacy-secret', 1000)]);
+
+    initVaultSync();
+    setChannel('#room', []);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(store.getState().channels.get('#room')?.messages).toEqual([]);
+    expect(await loadOwnedRecent('#room')).toEqual([]);
+  });
+
+  it('drops a stale Alice hydration for Bob and retries when Alice returns', async () => {
+    await saveOwnedMessages('#room', [msg('alice-owned', 1000)]);
+    let resolveAlice: (messages: ChatMessage[]) => void = () => {};
+    const pendingAlice = new Promise<ChatMessage[]>((resolve) => {
+      resolveAlice = resolve;
+    });
+    vi.spyOn(vault, 'loadRecent').mockImplementationOnce(() => pendingAlice);
+
+    initVaultSync();
+    setChannel('#room', []);
+    store.setState({ ourNick: 'bob', server: server('bob') });
+    setChannel('#room', []);
+    resolveAlice([msg('alice-owned', 1000)]);
+    await pendingAlice;
+    await Promise.resolve();
+
+    expect(store.getState().channels.get('#room')?.messages).toEqual([]);
+
+    store.setState({ ourNick: 'alice', server: server('alice') });
+    setChannel('#room', []);
+    await until(() => (store.getState().channels.get('#room')?.messages.length ?? 0) === 1);
+
+    expect(store.getState().channels.get('#room')?.messages.map((message) => message.id))
+      .toEqual(['alice-owned']);
+  });
+
   it('merges hydration UNDER live messages without duplicating ids', async () => {
-    await saveMessages('#room', [msg('v1', 1000), msg('live1', 2000)]);
+    await saveOwnedMessages('#room', [msg('v1', 1000), msg('live1', 2000)]);
 
     initVaultSync();
     // The server already replayed 'live1' before hydration finished.
@@ -102,8 +163,26 @@ describe('vaultSync', () => {
     vi.advanceTimersByTime(1600); // past FLUSH_MS
     vi.useRealTimers();
 
-    await until(async () => (await loadRecent('#room')).length === 2);
-    expect((await loadRecent('#room')).map((m) => m.id)).toEqual(['m1', 'm2']);
+    await until(async () => (await loadOwnedRecent('#room')).length === 2);
+    expect((await loadOwnedRecent('#room')).map((m) => m.id)).toEqual(['m1', 'm2']);
+  });
+
+  it('persists each account buffer only inside its captured owner namespace', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    initVaultSync();
+    setChannel('#room', [msg('alice-row', 1000)]);
+    await vi.advanceTimersByTimeAsync(1600);
+
+    store.setState({ ourNick: 'bob', server: server('bob') });
+    setChannel('#room', [msg('bob-row', 2000)]);
+    await vi.advanceTimersByTimeAsync(1600);
+    vi.useRealTimers();
+
+    expect((await loadRecent('#room', undefined, ALICE_OWNER)).map((message) => message.id))
+      .toEqual(['alice-row']);
+    expect((await loadRecent('#room', undefined, BOB_OWNER)).map((message) => message.id))
+      .toEqual(['bob-row']);
+    expect(await loadRecent('#room')).toEqual([]);
   });
 
   it('retries the tail after a failed write instead of dropping it forever', async () => {
@@ -118,15 +197,15 @@ describe('vaultSync', () => {
     await vi.advanceTimersByTimeAsync(1600); // first flush → forced failure
 
     expect(spy).toHaveBeenCalledTimes(1);
-    expect(await loadRecent('#room')).toEqual([]); // nothing landed
+    expect(await loadOwnedRecent('#room')).toEqual([]); // nothing landed
 
     // A later store update with the SAME tail id must re-attempt the write.
     setChannel('#room', [msg('m1', 1000)]);
     await vi.advanceTimersByTimeAsync(1600); // second flush → real write
     vi.useRealTimers();
 
-    await until(async () => (await loadRecent('#room')).length === 1);
-    expect((await loadRecent('#room')).map((m) => m.id)).toEqual(['m1']);
+    await until(async () => (await loadOwnedRecent('#room')).length === 1);
+    expect((await loadOwnedRecent('#room')).map((m) => m.id)).toEqual(['m1']);
     expect(spy.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
@@ -142,12 +221,12 @@ describe('vaultSync', () => {
     await vi.advanceTimersByTimeAsync(1600);
     vi.useRealTimers();
 
-    await until(async () => (await loadRecent('#room')).length === 1);
+    await until(async () => (await loadOwnedRecent('#room')).length === 1);
     expect(spy).toHaveBeenCalledTimes(1); // the second, redundant flush is skipped
   });
 
   it('does nothing in either direction when localHistory is off', async () => {
-    await saveMessages('#room', [msg('v1', 1000)]);
+    await saveOwnedMessages('#room', [msg('v1', 1000)]);
     setPreference('localHistory', false);
 
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
@@ -160,7 +239,7 @@ describe('vaultSync', () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(store.getState().channels.get('#room')!.messages.map((m) => m.id)).toEqual(['m1']);
     // ...and no persistence out.
-    expect((await loadRecent('#room')).map((m) => m.id)).toEqual(['v1']);
+    expect((await loadOwnedRecent('#room')).map((m) => m.id)).toEqual(['v1']);
   });
 
   it('never persists an optimistic outbox placeholder — no stuck-pending ghost', async () => {
@@ -181,7 +260,7 @@ describe('vaultSync', () => {
     await vi.advanceTimersByTimeAsync(1600);
 
     // The placeholder must NOT have landed in the vault.
-    expect(await loadRecent('#room')).toEqual([]);
+    expect(await loadOwnedRecent('#room')).toEqual([]);
 
     // Reconnect: flushOutbox drops the placeholder and the real message arrives
     // under a fresh server uid.
@@ -191,8 +270,8 @@ describe('vaultSync', () => {
     await vi.advanceTimersByTimeAsync(1600);
     vi.useRealTimers();
 
-    await until(async () => (await loadRecent('#room')).length === 1);
-    const rows = await loadRecent('#room');
+    await until(async () => (await loadOwnedRecent('#room')).length === 1);
+    const rows = await loadOwnedRecent('#room');
     // Exactly one row — the delivered message — and no `outbox:` ghost.
     expect(rows.map((m) => m.id)).toEqual(['srv-99']);
     expect(rows.some((m) => m.id.startsWith('outbox:') || m.pending)).toBe(false);
@@ -208,7 +287,7 @@ describe('vaultSync', () => {
     await vi.advanceTimersByTimeAsync(1600); // durable un-redacted row
 
     // The un-redacted content is searchable at this point.
-    expect((await searchVault('secret plans')).length).toBe(1);
+    expect((await searchOwnedVault('secret plans')).length).toBe(1);
 
     // Redact IN PLACE: same id, new object, redacted text — the tail id is
     // unchanged, so only a content-signature watermark re-flushes it.
@@ -218,16 +297,16 @@ describe('vaultSync', () => {
     vi.useRealTimers();
 
     // The stored row is now the redacted one, and search skips it entirely.
-    await until(async () => (await searchVault('secret plans')).length === 0);
-    expect(await searchVault('secret plans')).toEqual([]);
-    const rows = await loadRecent('#room');
+    await until(async () => (await searchOwnedVault('secret plans')).length === 0);
+    expect(await searchOwnedVault('secret plans')).toEqual([]);
+    const rows = await loadOwnedRecent('#room');
     expect(rows).toHaveLength(1);
     expect(rows[0]!.redacted).toBe(true);
     expect(rows[0]!.text).toBe('[Message deleted]');
   });
 
   it('hydrates DM buffers too', async () => {
-    await saveMessages('trev', [msg('d1', 1000, 'trev')]);
+    await saveOwnedMessages('trev', [msg('d1', 1000, 'trev')]);
 
     initVaultSync();
     const dms = new Map(store.getState().dms);

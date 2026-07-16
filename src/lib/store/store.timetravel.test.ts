@@ -9,14 +9,25 @@
  */
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { store } from './store';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { store, type Server } from './store';
 import type { Channel, ChatMessage } from '@/lib/irc/types';
 import { parseIRCMessage } from '@/lib/irc/parser';
 import { resetPreferences } from '@/lib/prefs/preferences';
-import { _resetVaultForTests, saveMessages } from '@/lib/vault/historyVault';
+import * as vault from '@/lib/vault/historyVault';
 
 const initialState = store.getInitialState();
+const MEMORY_OWNER = { serverUrl: 'wss://example.test', identity: 'me' } as const;
+const testServer: Server = {
+  id: 'time-travel',
+  name: 'Example',
+  network: 'Example',
+  url: MEMORY_OWNER.serverUrl,
+  icon: '',
+  nick: 'me',
+  account: MEMORY_OWNER.identity,
+  connected: true,
+};
 
 const live = (id: string, time: string, text: string, target = '#root'): ChatMessage => ({
   id,
@@ -71,13 +82,14 @@ function mockClient(sendRaw = vi.fn(), join = vi.fn(), caps: readonly string[] =
 
 beforeEach(() => {
   globalThis.indexedDB = new IDBFactory();
-  _resetVaultForTests();
+  vault._resetVaultForTests();
   resetPreferences();
   store.setState(
     {
       ...initialState,
       client: mockClient(),
       ourNick: 'me',
+      server: testServer,
       channels: new Map([
         ['#root', channel('#root', [
           live('live-1', '2026-07-02T10:00:00.000Z', 'today one'),
@@ -87,6 +99,10 @@ beforeEach(() => {
     },
     true,
   );
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('travelTo', () => {
@@ -169,9 +185,9 @@ describe('travelTo', () => {
 
   it('opens a vault hit in an unjoined channel immediately and hydrates it', async () => {
     const join = vi.fn();
-    await saveMessages('#elsewhere', [
+    await vault.saveMessages('#elsewhere', [
       live('old-9', '2026-06-30T12:00:00.000Z', 'saved elsewhere', '#elsewhere'),
-    ]);
+    ], MEMORY_OWNER);
     store.setState({ client: mockClient(vi.fn(), join) });
     store.getState().openVaultResult('#elsewhere', 'old-9');
     expect(join).toHaveBeenCalledWith('#elsewhere', undefined);
@@ -191,11 +207,11 @@ describe('travelTo', () => {
 
   it('hydrates from the local vault without the chathistory cap', async () => {
     const sendRaw = vi.fn();
-    await saveMessages('#root', [
+    await vault.saveMessages('#root', [
       live('old-1', '2026-06-30T11:50:00.000Z', 'past one'),
       live('old-2', '2026-06-30T12:01:00.000Z', 'past two'),
       live('old-3', '2026-06-30T12:08:00.000Z', 'past three'),
-    ]);
+    ], MEMORY_OWNER);
     store.setState({ client: mockClient(sendRaw, vi.fn(), []) });
 
     store.getState().travelTo('#root', new Date('2026-06-30T12:00:00.000Z'));
@@ -210,5 +226,24 @@ describe('travelTo', () => {
       ]);
       expect(store.getState().timeTravelLandingId).toBe('old-2');
     });
+  });
+
+  it('rejects a late Alice local-history completion after 900 switches to Bob', async () => {
+    let resolveAlice!: (messages: ChatMessage[]) => void;
+    const pendingAlice = new Promise<ChatMessage[]>((resolve) => {
+      resolveAlice = resolve;
+    });
+    vi.spyOn(vault, 'loadAround').mockReturnValueOnce(pendingAlice);
+    store.setState({ client: mockClient(vi.fn(), vi.fn(), []) });
+
+    store.getState().travelTo('#root', new Date('2026-06-30T12:00:00.000Z'));
+    feed(':example.test 900 me me!u@h bob :You are now logged in as bob');
+    resolveAlice([live('alice-late', '2026-06-30T12:00:00.000Z', 'Alice private history')]);
+    await pendingAlice;
+    await Promise.resolve();
+
+    expect(store.getState().server?.account).toBe('bob');
+    expect(store.getState().channels.get('#root')?.messages).toEqual([]);
+    expect(store.getState().timeTravelLandingId).toBeNull();
   });
 });

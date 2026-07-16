@@ -11,7 +11,7 @@
  * Nothing leaves the device. The history-vault reader applies both per-target
  * retention and a global row cap before this module schedules embedding work.
  */
-import { readAllVaultHits, type VaultSearchHit } from './historyVault';
+import { readAllVaultHits, type DeviceMemoryOwner, type VaultSearchHit } from './historyVault';
 import {
   defaultEmbeddingProvider,
   embedItemsBounded,
@@ -29,6 +29,8 @@ export interface SemanticSearchOptions {
   provider?: EmbeddingProvider;
   /** Stop scheduling candidate work when a newer UI query supersedes this one. */
   signal?: AbortSignal;
+  /** Exact server/account namespace whose remembered rows may be searched. */
+  owner?: DeviceMemoryOwner;
 }
 
 const DEFAULT_LIMIT = 40;
@@ -57,7 +59,7 @@ export async function searchVaultSemantic(
   const limit = opts.limit ?? DEFAULT_LIMIT;
   const minScore = opts.minScore ?? 0;
 
-  const hits = await readAllVaultHits();
+  const hits = await readAllVaultHits(undefined, opts.owner);
   if (hits.length === 0 || opts.signal?.aborted) return [];
 
   const qVec = await Promise.resolve(provider.embed(trimmed));

@@ -28,7 +28,7 @@ import { formatTaggedLine, parseAccountInfo, parseCHANLIMIT, parseMonitorNumeric
 import type { SuimyakuPeerState, SuimyakuRoomStats, CallState } from '@/lib/suimyaku-media/types';
 import { getMountedSuimyakuMediaEngine } from '@/lib/mediaEngineMount';
 import { parseActivity } from '@/lib/activity';
-import { OUTBOX_MAX_AGE_MS, classifyVaultDmSearchPrivacy, deleteOutboxEntry, loadAround, loadOutbox, loadRecent, queueOutbox, type OutboxEntry, type OutboxOwner } from '@/lib/vault/historyVault';
+import { OUTBOX_MAX_AGE_MS, classifyVaultDmSearchPrivacy, deleteOutboxEntry, deviceMemoryPrivacyTarget, loadAround, loadOutbox, loadRecent, queueOutbox, type DeviceMemoryOwner, type OutboxEntry, type OutboxOwner } from '@/lib/vault/historyVault';
 import { getVaultDmSearchPrivacy } from '@/lib/vault/dmSearchPrivacy';
 import { boundedSearchField, boundedSearchQuery } from '@/lib/vault/searchBounds';
 import {
@@ -3423,6 +3423,37 @@ function _sameOutboxOwner(actual: OutboxOwner | null, expected: OutboxOwner | nu
   );
 }
 
+/** Current device-memory namespace, shared by vault sync/search/hydration. */
+export function selectDeviceMemoryOwner(
+  state: Pick<OnyxState, 'server' | 'ourNick'>,
+): DeviceMemoryOwner | null {
+  return _outboxOwner(state);
+}
+
+export interface DeviceMemoryContext {
+  readonly owner: DeviceMemoryOwner;
+  readonly client: IRCClient | null;
+  readonly generation: number;
+}
+
+/** Capture the full async ownership boundary before opening IndexedDB. */
+export function captureDeviceMemoryContext(
+  state: Pick<OnyxState, 'server' | 'ourNick' | 'client'> = store.getState(),
+): DeviceMemoryContext | null {
+  const owner = selectDeviceMemoryOwner(state);
+  return owner ? { owner, client: state.client, generation: _accountGeneration } : null;
+}
+
+/** Reject any completion that crossed account, socket, or owner namespace. */
+export function isDeviceMemoryContextCurrent(
+  context: DeviceMemoryContext,
+  state: Pick<OnyxState, 'server' | 'ourNick' | 'client'> = store.getState(),
+): boolean {
+  return context.generation === _accountGeneration
+    && context.client === state.client
+    && _sameOutboxOwner(context.owner, selectDeviceMemoryOwner(state));
+}
+
 export type State = OnyxState;
 
 type ActionKey = {
@@ -4109,7 +4140,10 @@ export const store = createStore<OnyxState>()(
       if (_serverSearchOwnsTarget(target)) return;
       if (!hasChatHistoryCap(client)) {
         if (!preferences().localHistory) return;
-        void loadAround(target, at, HISTORY_PAGE_SIZE).then((localMsgs) => {
+        const memoryContext = captureDeviceMemoryContext(get());
+        if (!memoryContext) return;
+        void loadAround(target, at, HISTORY_PAGE_SIZE, memoryContext.owner).then((localMsgs) => {
+          if (!isDeviceMemoryContextCurrent(memoryContext, get())) return;
           if (localMsgs.length === 0) return;
           get().hydrateHistory(target, localMsgs);
           const landingId = preferredMessageId && localMsgs.some((message) => message.id === preferredMessageId)
@@ -4324,7 +4358,10 @@ export const store = createStore<OnyxState>()(
         set({ channels, activeView: { kind: 'channel', channel: key } });
         get().joinChannel(target);
         if (preferences().localHistory) {
-          void loadRecent(target, HISTORY_PAGE_SIZE).then((localMsgs) => {
+          const memoryContext = captureDeviceMemoryContext(get());
+          if (!memoryContext) return;
+          void loadRecent(target, HISTORY_PAGE_SIZE, memoryContext.owner).then((localMsgs) => {
+            if (!isDeviceMemoryContextCurrent(memoryContext, get())) return;
             if (localMsgs.length > 0) get().hydrateHistory(target, localMsgs);
           });
         }
@@ -4554,7 +4591,13 @@ export const store = createStore<OnyxState>()(
       ) ?? false;
       const chantypes = client.isupport.CHANTYPES ?? '#&';
       const targetIsDm = !chantypes.includes(cleanTarget[0]!);
-      const vaultPrivacy = targetIsDm ? getVaultDmSearchPrivacy(targetKey) : 'plain';
+      const memoryOwner = selectDeviceMemoryOwner(state);
+      const privacyTarget = memoryOwner
+        ? deviceMemoryPrivacyTarget(memoryOwner, targetKey)
+        : null;
+      const vaultPrivacy = targetIsDm && privacyTarget
+        ? getVaultDmSearchPrivacy(privacyTarget)
+        : targetIsDm ? 'unknown' : 'plain';
       const encryptedBoundary = targetIsDm && (
         encryptedDm
         || vaultPrivacy === 'encrypted'
@@ -4565,7 +4608,9 @@ export const store = createStore<OnyxState>()(
         // The action is a public boundary, not just a UI helper. Start the proof
         // for a direct caller, but never hold/replay its sensitive query: the user
         // can retry only after the target is synchronously known plain.
-        if (privacyUnknown) void classifyVaultDmSearchPrivacy(targetKey);
+        if (privacyUnknown && memoryOwner) {
+          void classifyVaultDmSearchPrivacy(targetKey, memoryOwner);
+        }
         set({
           serverSearch: {
             target: cleanTarget,

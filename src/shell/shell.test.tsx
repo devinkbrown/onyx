@@ -18,7 +18,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@solidjs/te
 import { IDBFactory } from 'fake-indexeddb';
 import { Suspense } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { _resetNamesBurstsForTests, store } from '@/lib/store/store';
+import { _resetNamesBurstsForTests, store, type Server } from '@/lib/store/store';
 import { parseIRCMessage } from '@/lib/irc/parser';
 import type { Channel } from '@/lib/irc/types';
 import type { ChatMessage, ChannelUser } from '@/lib/irc/types';
@@ -34,6 +34,17 @@ import { AppShell } from './AppShell';
 // ── Shared fixture helpers ────────────────────────────────────────────────────
 
 const initialState = store.getInitialState();
+const MEMORY_OWNER = { serverUrl: 'wss://example.test', identity: 'testuser' } as const;
+const memoryServer: Server = {
+  id: 'shell-memory',
+  name: 'Example',
+  network: 'Example',
+  url: MEMORY_OWNER.serverUrl,
+  icon: '',
+  nick: 'testuser',
+  account: MEMORY_OWNER.identity,
+  connected: true,
+};
 
 function makeUser(nick: string, modes: string[] = []): ChannelUser {
   return { nick, modes: new Set(modes) };
@@ -575,6 +586,7 @@ describe('AppShell', () => {
       channels.set('#general', channel);
       store.setState({
         ...initialState,
+        server: memoryServer,
         channels,
         activeView: { kind: 'channel', channel: '#general' },
         connectionStatus: 'connected',
@@ -651,7 +663,7 @@ describe('AppShell', () => {
         makeMessage('msg-memory-b', 'bob', 'Saved reviewed anchor', '#general'),
         makeMessage('msg-memory-c', 'carol', 'Visible live tail', '#general'),
       ];
-      await saveMessages('#general', vaultMessages);
+      await saveMessages('#general', vaultMessages, MEMORY_OWNER);
       const channel = makeChannel(
         '#general',
         [makeMessage('msg-memory-c', 'carol', 'Visible live tail', '#general')],
@@ -661,6 +673,7 @@ describe('AppShell', () => {
       channels.set('#general', channel);
       store.setState({
         ...initialState,
+        server: memoryServer,
         channels,
         activeView: { kind: 'channel', channel: '#general' },
         connectionStatus: 'connected',

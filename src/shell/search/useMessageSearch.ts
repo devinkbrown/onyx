@@ -1,11 +1,22 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { createEffect, createMemo, createSignal, onCleanup, type Accessor } from 'solid-js';
-import { getState, useStore } from '@/lib/store';
+import {
+  captureDeviceMemoryContext,
+  getState,
+  isDeviceMemoryContextCurrent,
+  selectDeviceMemoryOwner,
+  useStore,
+} from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
 import { isEnvelope } from '@/lib/e2ee/dmCipher';
 import { preferences } from '@/lib/prefs/preferences';
 import { VAULT_SEARCH_MODES, loadDefaultVaultSearchMode } from '@/lib/prefs/vaultSearchMode';
-import { classifyVaultDmSearchPrivacy, searchVault } from '@/lib/vault/historyVault';
+import {
+  classifyVaultDmSearchPrivacy,
+  deviceMemoryOwnerKey,
+  deviceMemoryPrivacyTarget,
+  searchVault,
+} from '@/lib/vault/historyVault';
 import { getVaultDmSearchPrivacy, subscribeVaultDmSearchPrivacy } from '@/lib/vault/dmSearchPrivacy';
 import { searchVaultSemantic } from '@/lib/vault/searchVaultSemantic';
 import { searchVaultHybrid } from '@/lib/vault/searchVaultHybrid';
@@ -281,6 +292,10 @@ export function useMessageSearch(): UseMessageSearch {
   const serverSearch = useStore((s) => s.serverSearch);
   const peerDmKeys = useStore((s) => s.peerDmKeys);
   const client = useStore((s) => s.client);
+  const memoryOwner = useStore(
+    selectDeviceMemoryOwner,
+    (left, right) => left?.serverUrl === right?.serverUrl && left?.identity === right?.identity,
+  );
 
   // IndexedDB classification is async, but its result must participate in this
   // reactive search gate. Missing/invalidated targets remain `unknown` and thus
@@ -292,13 +307,22 @@ export function useMessageSearch(): UseMessageSearch {
 
   createEffect(() => {
     const view = activeView();
-    if (view.kind === 'dm') void classifyVaultDmSearchPrivacy(view.nick);
+    const owner = memoryOwner();
+    if (view.kind === 'dm' && owner) {
+      void classifyVaultDmSearchPrivacy(view.nick, owner);
+    }
   });
 
   const activeDmVaultPrivacy = createMemo(() => {
     vaultPrivacyRevision();
     const view = activeView();
-    return view.kind === 'dm' ? getVaultDmSearchPrivacy(view.nick) : 'plain';
+    const owner = memoryOwner();
+    const privacyTarget = view.kind === 'dm' && owner
+      ? deviceMemoryPrivacyTarget(owner, view.nick)
+      : null;
+    return view.kind !== 'dm'
+      ? 'plain'
+      : privacyTarget ? getVaultDmSearchPrivacy(privacyTarget) : 'unknown';
   });
 
   const channelTypes = createMemo(() => client()?.isupport.CHANTYPES ?? '#&');
@@ -502,6 +526,9 @@ export function useMessageSearch(): UseMessageSearch {
     const mode = vaultSearchMode();
     const localHistory = preferences().localHistory;
     const chantypes = channelTypes();
+    const memoryContext = captureDeviceMemoryContext(getState());
+    const owner = memoryContext?.owner;
+    const ownerKey = owner ? deviceMemoryOwnerKey(owner) : null;
     if (vaultTimer !== undefined) clearTimeout(vaultTimer);
     vaultAbort?.abort();
     vaultAbort = undefined;
@@ -509,7 +536,7 @@ export function useMessageSearch(): UseMessageSearch {
     // when search closes, the query becomes too short, or local history is
     // disabled. Otherwise its late promise can repopulate a cleared panel.
     const seq = ++vaultSeq;
-    if (!open || query.length < 2 || !localHistory) {
+    if (!open || query.length < 2 || !localHistory || !memoryContext || !ownerKey) {
       setVaultRawHits([]);
       setVaultStatus('idle');
       return;
@@ -520,13 +547,17 @@ export function useMessageSearch(): UseMessageSearch {
       vaultAbort = abort;
       const run =
         mode === 'semantic'
-          ? searchVaultSemantic(query, { signal: abort.signal })
+          ? searchVaultSemantic(query, { signal: abort.signal, owner })
           : mode === 'hybrid'
-            ? searchVaultHybrid(query, { signal: abort.signal })
-            : searchVault(query);
+            ? searchVaultHybrid(query, { signal: abort.signal, owner })
+            : searchVault(query, 80, owner);
       void run
         .then((hits) => {
-          if (seq !== vaultSeq || abort.signal.aborted) return; // a newer query superseded this one
+          if (
+            seq !== vaultSeq
+            || abort.signal.aborted
+            || !isDeviceMemoryContextCurrent(memoryContext)
+          ) return; // a newer query or owner superseded this one
           setVaultRawHits(
             hits
               // Vault serialization strips plaintext by construction. An
@@ -551,7 +582,11 @@ export function useMessageSearch(): UseMessageSearch {
         .catch(() => {
           // IndexedDB or an opt-in embedding provider may fail. Search is a
           // best-effort projection, so fail closed without an unhandled promise.
-          if (seq === vaultSeq && !abort.signal.aborted) {
+          if (
+            seq === vaultSeq
+            && !abort.signal.aborted
+            && isDeviceMemoryContextCurrent(memoryContext)
+          ) {
             setVaultRawHits([]);
             setVaultStatus('error');
           }

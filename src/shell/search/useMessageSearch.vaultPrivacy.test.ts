@@ -14,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ChatMessage } from '@/lib/irc/types';
 import { resetPreferences } from '@/lib/prefs/preferences';
-import { store } from '@/lib/store/store';
+import { store, type Server } from '@/lib/store/store';
 import * as vault from '@/lib/vault/historyVault';
 import {
   _resetVaultDmSearchPrivacyForTests,
@@ -28,6 +28,18 @@ import {
 } from './useMessageSearch';
 
 const initialState = store.getInitialState();
+const MEMORY_OWNER = { serverUrl: 'wss://example.test', identity: 'alice' } as const;
+const memoryServer: Server = {
+  id: 'vault-privacy',
+  name: 'Example',
+  network: 'Example',
+  url: MEMORY_OWNER.serverUrl,
+  icon: '',
+  nick: 'alice',
+  account: MEMORY_OWNER.identity,
+  connected: true,
+};
+const privacyTarget = vault.deviceMemoryPrivacyTarget(MEMORY_OWNER, 'Mika')!;
 
 function message(id: string, text: string, encrypted = false): ChatMessage {
   return {
@@ -88,7 +100,7 @@ describe('useMessageSearch vault-only DM privacy', () => {
 
   it('never sends a query for a vault-only encrypted DM while hydration is deferred', async () => {
     const encrypted = message('cipher-1', 'TSUMUGI1 opaque-ciphertext', true);
-    await vault.saveMessages('Mika', [encrypted]);
+    await vault.saveMessages('Mika', [encrypted], MEMORY_OWNER);
     const hydration = deferred<ChatMessage[]>();
     vi.spyOn(vault, 'loadRecent').mockImplementation(() => hydration.promise);
 
@@ -97,6 +109,8 @@ describe('useMessageSearch vault-only DM privacy', () => {
     const { client, sent } = mockSearchClient();
     store.setState({
       activeView: { kind: 'dm', nick: 'Mika' },
+      server: memoryServer,
+      ourNick: MEMORY_OWNER.identity,
       canSearchHistory: true,
       client,
       connectionStatus: 'connected',
@@ -118,13 +132,13 @@ describe('useMessageSearch vault-only DM privacy', () => {
       openMessageSearchWithQuery('private launch phrase');
     });
 
-    expect(getVaultDmSearchPrivacy('Mika')).toBe('unknown');
+    expect(getVaultDmSearchPrivacy(privacyTarget)).toBe('unknown');
     expect(search.canServerSearch()).toBe(false);
     search.runServerSearch();
     store.getState().searchServerHistory('Mika', 'direct private phrase');
     expect(sent).toEqual([]);
 
-    await until(() => getVaultDmSearchPrivacy('Mika') === 'encrypted');
+    await until(() => getVaultDmSearchPrivacy(privacyTarget) === 'encrypted');
     expect(search.serverSearchBlockedByE2ee()).toBe(true);
     expect(search.canServerSearch()).toBe(false);
     expect(sent).toEqual([]);
@@ -138,7 +152,7 @@ describe('useMessageSearch vault-only DM privacy', () => {
 
   it('enables server search only after the complete vault target is proven plain', async () => {
     const plain = message('plain-1', 'ordinary remembered line');
-    await vault.saveMessages('Mika', [plain]);
+    await vault.saveMessages('Mika', [plain], MEMORY_OWNER);
     const hydration = deferred<ChatMessage[]>();
     vi.spyOn(vault, 'loadRecent').mockImplementation(() => hydration.promise);
 
@@ -146,6 +160,8 @@ describe('useMessageSearch vault-only DM privacy', () => {
     const { client, sent } = mockSearchClient();
     store.setState({
       activeView: { kind: 'dm', nick: 'Mika' },
+      server: memoryServer,
+      ourNick: MEMORY_OWNER.identity,
       canSearchHistory: true,
       client,
       connectionStatus: 'connected',
@@ -167,11 +183,11 @@ describe('useMessageSearch vault-only DM privacy', () => {
       openMessageSearchWithQuery('ordinary');
     });
 
-    expect(getVaultDmSearchPrivacy('Mika')).toBe('unknown');
+    expect(getVaultDmSearchPrivacy(privacyTarget)).toBe('unknown');
     expect(search.canServerSearch()).toBe(false);
     expect(sent).toEqual([]);
 
-    await until(() => getVaultDmSearchPrivacy('Mika') === 'plain');
+    await until(() => getVaultDmSearchPrivacy(privacyTarget) === 'plain');
     expect(search.canServerSearch()).toBe(true);
     search.runServerSearch();
     expect(sent).toEqual(['SEARCH Mika ordinary']);

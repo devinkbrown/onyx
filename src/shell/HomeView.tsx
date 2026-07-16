@@ -54,6 +54,7 @@ import {
   loadOutbox,
   loadRecent,
   subscribeOutbox,
+  deviceMemoryOwnerKey,
   type OutboxEntry,
 } from '@/lib/vault/historyVault';
 import type { ChatMessage } from '@/lib/irc/types';
@@ -187,6 +188,10 @@ export function HomeView(): JSX.Element {
   const accountIdentity = useStore((s) =>
     (s.server?.account ?? s.ourNick).trim().toLowerCase(),
   );
+  const memoryOwner = createMemo(() => {
+    const owner = { serverUrl: serverUrl(), identity: accountIdentity() };
+    return owner.serverUrl && owner.identity ? owner : null;
+  });
 
   const [stats] = createResource(fetchStatsIndex, { initialValue: null });
   const [reviewHistory, setReviewHistory] = createSignal<ReviewHistoryEntry[]>(readReviewHistory());
@@ -209,8 +214,8 @@ export function HomeView(): JSX.Element {
     { initialValue: {} },
   );
   const queuedEntries = createMemo<OutboxEntry[]>(() => {
-    const owner = { serverUrl: serverUrl(), identity: accountIdentity() };
-    if (!owner.serverUrl || !owner.identity) return [];
+    const owner = memoryOwner();
+    if (!owner) return [];
     return (outboxEntries.latest ?? []).filter((entry) =>
       entry.owner?.serverUrl === owner.serverUrl && entry.owner.identity === owner.identity,
     );
@@ -386,15 +391,26 @@ export function HomeView(): JSX.Element {
   const recentRooms = createMemo(() =>
     joinHistory().filter((c) => !channels().has(c.toLowerCase())).slice(0, 6),
   );
-  const memoryKey = createMemo(() =>
-    preferences().localHistory ? recentRooms().join('\n') : '',
-  );
-  const [homeMemory] = createResource(memoryKey, async (key) => {
-    const targets = key.split('\n').filter(Boolean);
-    if (targets.length === 0) return [];
-    return buildHomeMemory(targets, (target) => loadRecent(target, 24), 4);
-  }, { initialValue: [] as HomeMemoryItem[] });
-  const rememberedRooms = createMemo<HomeMemoryItem[]>(() => homeMemory.latest ?? []);
+  const memorySource = createMemo(() => {
+    const owner = memoryOwner();
+    const targets = recentRooms();
+    return preferences().localHistory && owner && targets.length > 0
+      ? { owner, targets }
+      : null;
+  });
+  const [homeMemory] = createResource(memorySource, async (source) => {
+    const items = await buildHomeMemory(
+      source.targets,
+      (target) => loadRecent(target, 24, source.owner),
+      4,
+    );
+    return { ownerKey: deviceMemoryOwnerKey(source.owner) ?? '', items };
+  }, { initialValue: null });
+  const rememberedRooms = createMemo<HomeMemoryItem[]>(() => {
+    const owner = memoryOwner();
+    const currentOwnerKey = owner ? deviceMemoryOwnerKey(owner) : null;
+    return homeMemory.latest?.ownerKey === currentOwnerKey ? homeMemory.latest.items : [];
+  });
   const openMemory = (item: HomeMemoryItem) => void getState().joinChannel(item.target);
   const quietActivity = createMemo<QuietActivityItem[]>(
     () => buildQuietActivity(channels().values(), channelLastActivity(), nowMs()),

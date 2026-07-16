@@ -10,10 +10,21 @@
  *
  * Everything is preference-gated (prefs.localHistory) and best-effort.
  */
-import { store, getState } from '@/lib/store';
+import {
+  captureDeviceMemoryContext,
+  getState,
+  isDeviceMemoryContextCurrent,
+  store,
+  type DeviceMemoryContext,
+} from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
 import { preferences } from '@/lib/prefs/preferences';
-import { classifyVaultDmSearchPrivacy, loadRecent, saveMessages } from './historyVault';
+import {
+  classifyVaultDmSearchPrivacy,
+  deviceMemoryOwnerKey,
+  loadRecent,
+  saveMessages,
+} from './historyVault';
 
 const FLUSH_MS = 1500;
 
@@ -76,21 +87,26 @@ function bufferSignature(rows: readonly ChatMessage[]): string {
   return `${rows.length}:${h.toString(36)}`;
 }
 
-function scheduleFlush(target: string, messages: readonly ChatMessage[]): void {
-  const key = target.toLowerCase();
-  if (_lastPersistedSig.get(key) === bufferSignature(persistableRows(messages))) return;
+function ownedTargetKey(context: DeviceMemoryContext, target: string): string {
+  return `${deviceMemoryOwnerKey(context.owner) ?? ''}\n${target.toLowerCase()}`;
+}
+
+function scheduleFlush(
+  context: DeviceMemoryContext,
+  target: string,
+  messages: readonly ChatMessage[],
+): void {
+  const targetKey = target.toLowerCase();
+  const key = ownedTargetKey(context, targetKey);
+  const rows = persistableRows(messages);
+  const nextSig = bufferSignature(rows);
+  if (_lastPersistedSig.get(key) === nextSig) return;
   const existing = _pendingFlush.get(key);
   if (existing) clearTimeout(existing);
   _pendingFlush.set(
     key,
     setTimeout(() => {
       _pendingFlush.delete(key);
-      const state = getState();
-      const buf =
-        state.channels.get(key)?.messages ?? state.dms.get(key)?.messages ?? null;
-      if (!buf || buf.length === 0) return;
-      const rows = persistableRows(buf);
-      const nextSig = bufferSignature(rows);
       const prevSig = _lastPersistedSig.get(key);
       if (prevSig === nextSig) return; // already durable — nothing new to write
 
@@ -104,7 +120,7 @@ function scheduleFlush(target: string, messages: readonly ChatMessage[]): void {
       // permanently dropped. System lines (joins/quits) are conversation too;
       // only optimistic outbox placeholders are held back (persistableRows).
       _lastPersistedSig.set(key, nextSig);
-      void saveMessages(key, rows).then((committed) => {
+      void saveMessages(targetKey, rows, context.owner).then((committed) => {
         if (committed) return;
         if (_lastPersistedSig.get(key) === nextSig) {
           if (prevSig === undefined) _lastPersistedSig.delete(key);
@@ -115,19 +131,26 @@ function scheduleFlush(target: string, messages: readonly ChatMessage[]): void {
   );
 }
 
-async function hydrate(target: string, dm = false): Promise<void> {
-  const key = target.toLowerCase();
+async function hydrate(context: DeviceMemoryContext, target: string, dm = false): Promise<void> {
+  const targetKey = target.toLowerCase();
+  const key = ownedTargetKey(context, targetKey);
   if (_hydrated.has(key)) return;
   _hydrated.add(key);
   // DM classification covers the complete retained target, independent of the
   // bounded rows hydration returns. Run both together; privacy remains unknown
   // (and server SEARCH stays blocked) until the full scan proves it plain.
   const [local] = await Promise.all([
-    loadRecent(key),
-    dm ? classifyVaultDmSearchPrivacy(key) : Promise.resolve(),
+    loadRecent(targetKey, undefined, context.owner),
+    dm ? classifyVaultDmSearchPrivacy(targetKey, context.owner) : Promise.resolve(),
   ]);
+  if (!isDeviceMemoryContextCurrent(context)) {
+    // This owner was never hydrated. Make a later return to the same account
+    // retryable instead of leaving a permanent false-positive watermark.
+    _hydrated.delete(key);
+    return;
+  }
   if (local.length === 0) return;
-  getState().hydrateHistory(key, local);
+  getState().hydrateHistory(targetKey, local);
 }
 
 /** Start vault sync. Call once at app boot; safe to call in any environment. */
@@ -140,9 +163,12 @@ export function initVaultSync(): void {
       (s) => s.channels,
       (channels) => {
         if (!preferences().localHistory) return;
+        const context = captureDeviceMemoryContext();
+        if (!context) return;
         for (const [key, ch] of channels) {
-          if (!_hydrated.has(key)) void hydrate(key);
-          if (ch.messages.length > 0) scheduleFlush(key, ch.messages);
+          const ownedKey = ownedTargetKey(context, key);
+          if (!_hydrated.has(ownedKey)) void hydrate(context, key);
+          if (ch.messages.length > 0) scheduleFlush(context, key, ch.messages);
         }
       },
     ),
@@ -150,9 +176,12 @@ export function initVaultSync(): void {
       (s) => s.dms,
       (dms) => {
         if (!preferences().localHistory) return;
+        const context = captureDeviceMemoryContext();
+        if (!context) return;
         for (const [key, dm] of dms) {
-          if (!_hydrated.has(key)) void hydrate(key, true);
-          if (dm.messages.length > 0) scheduleFlush(key, dm.messages);
+          const ownedKey = ownedTargetKey(context, key);
+          if (!_hydrated.has(ownedKey)) void hydrate(context, key, true);
+          if (dm.messages.length > 0) scheduleFlush(context, key, dm.messages);
         }
       },
     ),

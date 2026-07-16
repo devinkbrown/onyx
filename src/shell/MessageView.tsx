@@ -44,8 +44,15 @@ import {
   splitProps,
   type JSX,
 } from 'solid-js';
-import { useStore, getState, STATUS_TARGET } from '@/lib/store';
-import { loadRecent } from '@/lib/vault/historyVault';
+import {
+  captureDeviceMemoryContext,
+  getState,
+  isDeviceMemoryContextCurrent,
+  selectDeviceMemoryOwner,
+  STATUS_TARGET,
+  useStore,
+} from '@/lib/store';
+import { deviceMemoryOwnerKey, loadRecent } from '@/lib/vault/historyVault';
 import { LOCKED_PLACEHOLDER } from '@/lib/e2ee/dmCipher';
 import { sanitizePersistedReplyPreviewText } from '@/lib/e2ee/replyPrivacy';
 import { ScheduledEventLine } from './ScheduledEventLine';
@@ -116,6 +123,7 @@ export type ReviewedContextTrail = {
 type ReviewedAnchorSource = 'visible' | 'vault' | null;
 
 type ReviewedVaultContext = {
+  ownerKey: string;
   messages: ChatMessage[];
   trail: ReviewedContextTrail | null;
   hasAnchor: boolean;
@@ -644,6 +652,14 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   const historyLoading = useStore((s) => s.historyLoading);
   const historyExhausted = useStore((s) => s.historyExhausted);
   const forumChannels = useStore((s) => s.forumChannels);
+  const memoryOwner = useStore(
+    selectDeviceMemoryOwner,
+    (left, right) => left?.serverUrl === right?.serverUrl && left?.identity === right?.identity,
+  );
+  const memoryOwnerKey = createMemo(() => {
+    const owner = memoryOwner();
+    return owner ? deviceMemoryOwnerKey(owner) : null;
+  });
 
   const selfNick = createMemo(() => local.selfNick ?? ourNick() ?? '');
 
@@ -873,10 +889,11 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   const [readerVaultContext] = createResource(
     () => {
       const entry = readerReviewedSpan();
-      return entry ? { target: entry.target, firstMessageId: entry.firstMessageId } : null;
+      const owner = memoryOwner();
+      return entry && owner ? { target: entry.target, firstMessageId: entry.firstMessageId, owner } : null;
     },
     async (key): Promise<ReviewedVaultContext> => {
-      const localMessages = await loadRecent(key.target, 80);
+      const localMessages = await loadRecent(key.target, 80, key.owner);
       const entry: ReviewHistoryEntry = {
         target: key.target,
         name: key.target,
@@ -889,6 +906,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
         preview: '',
       };
       return {
+        ownerKey: deviceMemoryOwnerKey(key.owner) ?? '',
         messages: localMessages,
         trail: buildReviewedContextTrail(entry, localMessages),
         hasAnchor: hasReviewedAnchor(entry, localMessages),
@@ -903,14 +921,18 @@ export function MessageView(props: MessageViewProps): JSX.Element {
     const entry = readerReviewedSpan();
     return entry ? buildReviewedContextTrail(entry, messages()) : null;
   });
+  const ownedReaderVaultContext = createMemo(() => {
+    const context = readerVaultContext.latest;
+    return context?.ownerKey === memoryOwnerKey() ? context : null;
+  });
   const readerAnchorSource = createMemo(() => {
     const entry = readerReviewedSpan();
     const visibleMessages = messages();
-    if (entry && readerVaultContext.latest?.hasAnchor && !hasReviewedAnchor(entry, visibleMessages)) return 'vault';
+    if (entry && ownedReaderVaultContext()?.hasAnchor && !hasReviewedAnchor(entry, visibleMessages)) return 'vault';
     return reviewedAnchorSource(entry, visibleMessages, null);
   });
   const readerReviewedTrail = createMemo(() =>
-    mergeReviewedContextTrails(readerHydratedTrail(), readerVaultContext.latest?.trail ?? null),
+    mergeReviewedContextTrails(readerHydratedTrail(), ownedReaderVaultContext()?.trail ?? null),
   );
 
   // ── scroll state ──
@@ -1023,10 +1045,14 @@ export function MessageView(props: MessageViewProps): JSX.Element {
 
   async function jumpToReviewedSpan(entry: ReviewHistoryEntry): Promise<void> {
     const state = getState();
+    const memoryContext = captureDeviceMemoryContext(state);
+    if (!memoryContext) return;
     const visibleMessages = messages();
-    const cachedVault = readerVaultContext.latest;
+    const cachedVault = ownedReaderVaultContext();
     if (!hasReviewedAnchor(entry, visibleMessages)) {
-      const localMessages = cachedVault?.messages ?? await loadRecent(entry.target, 80);
+      const localMessages = cachedVault?.messages
+        ?? await loadRecent(entry.target, 80, memoryContext.owner);
+      if (!isDeviceMemoryContextCurrent(memoryContext)) return;
       if (hasReviewedAnchor(entry, localMessages)) {
         state.hydrateHistory(entry.target, localMessages);
       }

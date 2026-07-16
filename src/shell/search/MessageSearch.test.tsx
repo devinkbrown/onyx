@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Channel, ChatMessage } from '@/lib/irc/types';
 import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
-import { store } from '@/lib/store/store';
+import { store, type Server } from '@/lib/store/store';
 import { _resetVaultForTests, saveMessages } from '@/lib/vault/historyVault';
 import {
   _resetSavedSearchesForTests,
@@ -23,6 +23,17 @@ import {
 import { MessageSearch, type SavedSearchPersistence } from './MessageSearch';
 
 const initialState = store.getInitialState();
+const MEMORY_OWNER = { serverUrl: 'wss://example.test', identity: 'testuser' } as const;
+const memoryServer: Server = {
+  id: 'message-search',
+  name: 'Example',
+  network: 'Example',
+  url: MEMORY_OWNER.serverUrl,
+  icon: '',
+  nick: 'testuser',
+  account: MEMORY_OWNER.identity,
+  connected: true,
+};
 
 function deferred<T>(): {
   promise: Promise<T>;
@@ -91,10 +102,12 @@ describe('MessageSearch', () => {
     const archived = message('archived-needle', 'Mira', 'needle from archived history', 2);
     const vaulted = message('vault-needle', 'Noa', 'needle on another device-memory target', 3, '#other');
     const sameRoomVaultOnly = message('vault-root-needle', 'Ira', 'needle saved only on this device', 4, '#root');
-    await saveMessages('#other', [vaulted]);
-    await saveMessages('#root', [live, sameRoomVaultOnly]);
+    await saveMessages('#other', [vaulted], MEMORY_OWNER);
+    await saveMessages('#root', [live, sameRoomVaultOnly], MEMORY_OWNER);
     store.setState({
       ...initialState,
+      server: memoryServer,
+      ourNick: MEMORY_OWNER.identity,
       activeView: { kind: 'channel', channel: '#root' },
       channels: new Map([['#root', channel('#root', [live])]]),
       canSearchHistory: true,
@@ -257,9 +270,11 @@ describe('MessageSearch', () => {
     const liveA = message('live-needle-a', 'Kai', 'needle mobile launch brief', 1);
     const liveB = message('live-needle-b', 'Mira', 'needle mobile release plan', 2);
     const vaulted = message('vault-needle', 'Noa', 'needle mobile archive handoff', 3, '#other');
-    await saveMessages('#other', [vaulted]);
+    await saveMessages('#other', [vaulted], MEMORY_OWNER);
     store.setState({
       ...initialState,
+      server: memoryServer,
+      ourNick: MEMORY_OWNER.identity,
       activeView: { kind: 'channel', channel: '#root' },
       channels: new Map([['#root', channel('#root', [liveA, liveB])]]),
       connectionStatus: 'disconnected',
@@ -278,8 +293,17 @@ describe('MessageSearch', () => {
   });
 
   it('searches all remembered conversations from Home without offering targetless server search', async () => {
-    await saveMessages('#archive', [message('vault-home', 'Noa', 'portable rollout checklist', 3, '#archive')]);
-    store.setState({ ...initialState, activeView: { kind: 'home' } }, true);
+    await saveMessages(
+      '#archive',
+      [message('vault-home', 'Noa', 'portable rollout checklist', 3, '#archive')],
+      MEMORY_OWNER,
+    );
+    store.setState({
+      ...initialState,
+      server: memoryServer,
+      ourNick: MEMORY_OWNER.identity,
+      activeView: { kind: 'home' },
+    }, true);
     openMessageSearchWithQuery('rollout');
 
     render(() => <MessageSearch />);
@@ -367,7 +391,12 @@ describe('MessageSearch', () => {
   });
 
   it('announces the async device-memory lifecycle, including empty completion', async () => {
-    store.setState({ ...initialState, activeView: { kind: 'home' } }, true);
+    store.setState({
+      ...initialState,
+      server: memoryServer,
+      ourNick: MEMORY_OWNER.identity,
+      activeView: { kind: 'home' },
+    }, true);
     openMessageSearchWithQuery('no-such-remembered-message');
     render(() => <MessageSearch />);
 

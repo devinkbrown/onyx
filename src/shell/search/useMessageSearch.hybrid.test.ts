@@ -2,7 +2,7 @@
 import { createRoot } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Channel, ChatMessage } from '@/lib/irc/types';
-import type { VaultSearchHit } from '@/lib/vault/historyVault';
+import type { DeviceMemoryOwner, VaultSearchHit } from '@/lib/vault/historyVault';
 import { setState } from '@/lib/store';
 import { store } from '@/lib/store/store';
 import { resetPreferences } from '@/lib/prefs/preferences';
@@ -16,21 +16,41 @@ import {
 
 // Each vault matcher is stubbed so we can assert WHICH one the active mode
 // dispatches, without touching IndexedDB or the real embedding pass.
-const searchVaultMock = vi.fn<(query: string) => Promise<VaultSearchHit[]>>(async () => []);
-const searchVaultSemanticMock = vi.fn<(query: string) => Promise<VaultSearchHit[]>>(async () => []);
-const searchVaultHybridMock = vi.fn<(query: string) => Promise<VaultSearchHit[]>>(async () => []);
+interface OwnedSearchOptions {
+  signal?: AbortSignal;
+  owner?: DeviceMemoryOwner;
+}
+const searchVaultMock = vi.fn<(
+  query: string,
+  limit?: number,
+  owner?: DeviceMemoryOwner,
+) => Promise<VaultSearchHit[]>>(async () => []);
+const searchVaultSemanticMock = vi.fn<(
+  query: string,
+  opts?: OwnedSearchOptions,
+) => Promise<VaultSearchHit[]>>(async () => []);
+const searchVaultHybridMock = vi.fn<(
+  query: string,
+  opts?: OwnedSearchOptions,
+) => Promise<VaultSearchHit[]>>(async () => []);
 
-vi.mock('@/lib/vault/historyVault', () => ({
-  searchVault: (query: string) => searchVaultMock(query),
+vi.mock('@/lib/vault/historyVault', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/vault/historyVault')>(),
+  searchVault: (query: string, limit?: number, owner?: DeviceMemoryOwner) => (
+    searchVaultMock(query, limit, owner)
+  ),
 }));
 vi.mock('@/lib/vault/searchVaultSemantic', () => ({
-  searchVaultSemantic: (query: string) => searchVaultSemanticMock(query),
+  searchVaultSemantic: (query: string, opts?: OwnedSearchOptions) => (
+    searchVaultSemanticMock(query, opts)
+  ),
 }));
 vi.mock('@/lib/vault/searchVaultHybrid', () => ({
-  searchVaultHybrid: (query: string) => searchVaultHybridMock(query),
+  searchVaultHybrid: (query: string, opts?: OwnedSearchOptions) => searchVaultHybridMock(query, opts),
 }));
 
 const initialState = store.getInitialState();
+const MEMORY_OWNER = { serverUrl: 'wss://example.test', identity: 'alice' } as const;
 
 function message(id: string, from: string, text: string, minute: number, target = '#root'): ChatMessage {
   return {
@@ -64,7 +84,20 @@ function hit(id: string, from: string, text: string, minute: number, target: str
 
 describe('useMessageSearch — hybrid vault mode', () => {
   beforeEach(() => {
-    store.setState(initialState, true);
+    store.setState({
+      ...initialState,
+      ourNick: 'alice',
+      server: {
+        id: 'hybrid-search',
+        name: 'Example',
+        network: 'Example',
+        url: MEMORY_OWNER.serverUrl,
+        icon: '',
+        nick: 'alice',
+        account: MEMORY_OWNER.identity,
+        connected: true,
+      },
+    }, true);
     closeMessageSearch();
     resetPreferences();
     setVaultMode('hybrid');
@@ -107,7 +140,10 @@ describe('useMessageSearch — hybrid vault mode', () => {
     await vi.advanceTimersByTimeAsync(250);
 
     expect(searchVaultHybridMock).toHaveBeenCalledTimes(1);
-    expect(searchVaultHybridMock).toHaveBeenCalledWith('migration');
+    expect(searchVaultHybridMock).toHaveBeenCalledWith(
+      'migration',
+      expect.objectContaining({ owner: MEMORY_OWNER, signal: expect.any(AbortSignal) }),
+    );
     expect(searchVaultMock).not.toHaveBeenCalled();
     expect(searchVaultSemanticMock).not.toHaveBeenCalled();
 
@@ -142,11 +178,14 @@ describe('useMessageSearch — hybrid vault mode', () => {
 
     search.setVaultMode('exact');
     await vi.advanceTimersByTimeAsync(250);
-    expect(searchVaultMock).toHaveBeenCalledWith('needle');
+    expect(searchVaultMock).toHaveBeenCalledWith('needle', 80, MEMORY_OWNER);
 
     search.setVaultMode('semantic');
     await vi.advanceTimersByTimeAsync(250);
-    expect(searchVaultSemanticMock).toHaveBeenCalledWith('needle');
+    expect(searchVaultSemanticMock).toHaveBeenCalledWith(
+      'needle',
+      expect.objectContaining({ owner: MEMORY_OWNER, signal: expect.any(AbortSignal) }),
+    );
 
     dispose();
   });
@@ -204,7 +243,10 @@ describe('useMessageSearch — hybrid vault mode', () => {
 
     await vi.advanceTimersByTimeAsync(250);
 
-    expect(searchVaultHybridMock).toHaveBeenCalledWith('ciphertext-token');
+    expect(searchVaultHybridMock).toHaveBeenCalledWith(
+      'ciphertext-token',
+      expect.objectContaining({ owner: MEMORY_OWNER }),
+    );
     expect(search.vaultResults()).toEqual([]);
     dispose();
   });
