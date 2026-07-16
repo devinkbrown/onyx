@@ -116,6 +116,25 @@ describe('Account panel — signed in', () => {
     });
   }
 
+  it('retains and dispatches exactly six numeric authenticator-code digits', () => {
+    seedTotpEnrollment();
+    const confirm = vi.spyOn(getState(), 'totpConfirm').mockImplementation(() => {});
+    renderPanel({ account: 'alice' });
+    const input = screen.getByLabelText('Six-digit code');
+
+    fireEvent.input(input, { target: { value: '12a34 567890' } });
+
+    expect(input).toHaveAttribute('inputmode', 'numeric');
+    expect(input).toHaveAttribute('autocomplete', 'one-time-code');
+    expect(input).toHaveAttribute('maxlength', '6');
+    expect(input).toHaveValue('123456');
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm & activate' }));
+
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(confirm).toHaveBeenCalledWith('123456');
+    expect(input).toHaveValue('');
+  });
+
   it('shows the account name and fetches ACCOUNTINFO on open', () => {
     const { client } = renderPanel({ account: 'alice' });
     expect(screen.getAllByText('alice').length).toBeGreaterThan(0);

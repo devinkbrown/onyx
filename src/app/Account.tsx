@@ -60,6 +60,12 @@ export interface AccountPanelProps {
 
 /** Minimum length we accept for a new password (mirrors Connect). */
 const MIN_PASSWORD_LEN = 8;
+const TOTP_CODE_LENGTH = 6;
+const TOTP_CODE_RE = /^[0-9]{6}$/u;
+
+function boundedTotpCode(value: string): string {
+  return value.replace(/[^0-9]/gu, '').slice(0, TOTP_CODE_LENGTH);
+}
 
 // ── Password input with show / hide toggle (local; mirrors Connect's feel) ───
 
@@ -441,6 +447,14 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
     getState().certList();
   }
 
+  function submitTotpCode(event: SubmitEvent): void {
+    event.preventDefault();
+    const code = totpCode();
+    if (!TOTP_CODE_RE.test(code)) return;
+    getState().totpConfirm(code);
+    setTotpCode('');
+  }
+
   function signOut(): void {
     getState().logout();
     local.onOpenChange(false);
@@ -790,22 +804,27 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
                 <form
                   class="acct-totp-confirm"
                   noValidate
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    getState().totpConfirm(totpCode());
-                    setTotpCode('');
-                  }}
+                  onSubmit={submitTotpCode}
                   aria-label="Confirm two-factor enrollment"
                 >
                   <FormField
                     id="acct-totp-code"
                     label="Six-digit code"
                     type="text"
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                    maxlength={TOTP_CODE_LENGTH}
+                    pattern="[0-9]{6}"
                     placeholder="123456"
                     value={totpCode()}
-                    onInput={(e) => setTotpCode(e.currentTarget.value)}
+                    onInput={(e) => setTotpCode(boundedTotpCode(e.currentTarget.value))}
                   />
-                  <Button type="submit" variant="primary" size="sm" disabled={totp().busy || totpCode().trim().length < 6}>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="sm"
+                    disabled={totp().busy || totpCode().length !== TOTP_CODE_LENGTH}
+                  >
                     Confirm &amp; activate
                   </Button>
                 </form>
