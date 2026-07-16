@@ -165,7 +165,12 @@ self.addEventListener('activate', (event) => {
 
 // ── Manual update recovery from Preferences ──────────────────────────────────
 self.addEventListener('message', (event) => {
-  if (event.data?.type === 'ONYX_SKIP_WAITING') self.skipWaiting();
+  if (event.data?.type !== 'ONYX_SKIP_WAITING') return;
+  const work = Promise.resolve().then(() => self.skipWaiting());
+  // ExtendableMessageEvent keeps the worker alive until the update transition
+  // is requested. Preserve compatibility with older test/webview shims that
+  // expose a plain MessageEvent.
+  if (typeof event.waitUntil === 'function') event.waitUntil(work);
 });
 
 // ── Fetch: network-first for API/WS, cache-first for shell assets ─────────────

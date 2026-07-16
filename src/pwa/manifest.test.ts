@@ -408,6 +408,22 @@ describe('PWA manifest', () => {
     expect(precachedUrls).toContain(loadManifest().start_url);
     expect(skipWaiting).toHaveBeenCalledOnce();
 
+    let messageWork: Promise<unknown> | undefined;
+    listeners.get('message')?.({
+      data: { type: 'ONYX_SKIP_WAITING' },
+      waitUntil: (work: Promise<unknown>) => {
+        messageWork = work;
+      },
+    });
+    await messageWork;
+    expect(skipWaiting).toHaveBeenCalledTimes(2);
+
+    listeners.get('message')?.({
+      data: { type: 'UNRELATED_MESSAGE' },
+      waitUntil: vi.fn(),
+    });
+    expect(skipWaiting).toHaveBeenCalledTimes(2);
+
     let activateWork: Promise<unknown> | undefined;
     listeners.get('activate')?.({
       waitUntil: (work: Promise<unknown>) => {
