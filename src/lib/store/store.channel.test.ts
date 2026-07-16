@@ -507,6 +507,14 @@ describe('navigate() reconciles the focused channel roster', () => {
     expect(client.sendRaw).toHaveBeenCalledWith('NAMES', '#recon1');
   });
 
+  it('normalizes a mixed-case channel navigation to the map key', () => {
+    seedConnected('#NavCase');
+
+    store.getState().navigate({ kind: 'channel', channel: '#NavCase' });
+
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#navcase' });
+  });
+
   it('throttles repeated focus so it does not spam NAMES', () => {
     const client = seedConnected('#recon2');
     store.getState().navigate({ kind: 'channel', channel: '#recon2' });
@@ -531,7 +539,7 @@ describe('navigate() reconciles the focused channel roster', () => {
     expect(names).toHaveLength(0);
   });
 
-  it('self-JOIN requests NAMES so a resume/replay JOIN still populates the roster', () => {
+  it('self-JOIN requests NAMES and keeps a mixed-case resume roster addressable', () => {
     // Fresh page load of a logged-in account: channels arrive via replayed JOIN
     // lines that may not carry a NAMES burst. The self-JOIN handler must request
     // NAMES itself so the nicklist is never left empty.
@@ -544,8 +552,12 @@ describe('navigate() reconciles the focused channel roster', () => {
       channels: new Map(),
       activeView: { kind: 'home' },
     }, true);
-    feed(':me JOIN #resume1');
-    expect(client.sendRaw.mock.calls).toContainEqual(['NAMES', '#resume1']);
+    feed(':me JOIN #ResumeCase');
+    feed(':irc 353 me = #ResumeCase :me Alice');
+
+    expect(client.sendRaw.mock.calls).toContainEqual(['NAMES', '#ResumeCase']);
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#resumecase' });
+    expect([...store.getState().channels.get('#resumecase')?.users.keys() ?? []].sort()).toEqual(['alice', 'me']);
   });
 });
 

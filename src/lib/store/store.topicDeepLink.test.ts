@@ -7,7 +7,11 @@ import { parseIRCMessage } from '@/lib/irc/parser';
 import { readTopicReadMarker } from '@/lib/topics/topicReadLedger';
 import { TOPIC_PROP, TOPIC_TAG } from '@/lib/topics/topics';
 
-import { _resetPendingDeepLinkTopicResolutionForTests, store } from './store';
+import {
+  _resetNamesBurstsForTests,
+  _resetPendingDeepLinkTopicResolutionForTests,
+  store,
+} from './store';
 
 const ROOM = '#general';
 const initialState = store.getInitialState();
@@ -61,6 +65,7 @@ function feed(line: string): void {
 
 beforeEach(() => {
   vi.useFakeTimers();
+  _resetNamesBurstsForTests();
   _resetPendingDeepLinkTopicResolutionForTests();
   store.setState(initialState, true);
   localStorage.clear();
@@ -68,6 +73,7 @@ beforeEach(() => {
 
 afterEach(() => {
   _resetPendingDeepLinkTopicResolutionForTests();
+  _resetNamesBurstsForTests();
   vi.useRealTimers();
 });
 
@@ -81,6 +87,23 @@ describe('pending deep-link topics', () => {
     expect(client.sendRaw).toHaveBeenCalledWith('JOIN', '#General');
     expect(store.getState().pendingDeepLinkTopic).toBe('roadmap');
     expect(store.getState().activeChannelTopics.has(ROOM)).toBe(false);
+  });
+
+  it('keeps a plain mixed-case join deep link on the lowercase channel key', () => {
+    const client = seed();
+    store.setState({ activeView: { kind: 'home' } });
+    store.getState().setPendingDeepLinkJoin('#General', null, null);
+
+    feed(':server 001 me :Welcome');
+    vi.advanceTimersByTime(1_600);
+    expect(client.sendRaw).toHaveBeenCalledWith('JOIN', '#General');
+
+    feed(':me!u@host JOIN #General');
+    feed(':server 353 me = #General :me Alice');
+
+    const state = store.getState();
+    expect(state.activeView).toEqual({ kind: 'channel', channel: ROOM });
+    expect([...state.channels.get(ROOM)?.users.keys() ?? []].sort()).toEqual(['alice', 'me']);
   });
 
   it('resolves a canonical label from the IRCX topic registry without a phantom interim filter', () => {

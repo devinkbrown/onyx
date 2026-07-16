@@ -1166,24 +1166,64 @@ describe('AppShell', () => {
       expect(roomsButton).toHaveFocus();
     });
 
-    it('moves focus into the mobile member drawer and restores it on Escape', async () => {
+    it('keeps the closed mobile member drawer inert, then restores its trigger after Escape', async () => {
       stubMobileViewport();
       seedStore('#general');
 
-      render(() => <AppShell />);
+      const { container } = render(() => <AppShell />);
 
       const membersButton = screen.getByRole('button', { name: 'Toggle member list' });
+      const memberList = container.querySelector<HTMLElement>('.shell-members');
+      expect(memberList).not.toBeNull();
+      expect(memberList).toHaveAttribute('aria-hidden', 'true');
+      expect(memberList).toHaveAttribute('inert');
+      expect(screen.queryByRole('region', { name: 'Channel members in #general' })).toBeNull();
+      for (const trigger of memberList!.querySelectorAll<HTMLButtonElement>('.onyx-popover__trigger')) {
+        expect(trigger).toBeDisabled();
+      }
+
       membersButton.focus();
       fireEvent.click(membersButton);
 
       await waitFor(() => {
         const members = screen.getByRole('region', { name: 'Channel members in #general' });
+        expect(memberList).toHaveAttribute('aria-hidden', 'false');
+        expect(memberList).not.toHaveAttribute('inert');
+        for (const trigger of memberList!.querySelectorAll<HTMLButtonElement>('.onyx-popover__trigger')) {
+          expect(trigger).not.toBeDisabled();
+        }
         expect(members.contains(document.activeElement)).toBe(true);
       });
 
       fireEvent.keyDown(document, { key: 'Escape' });
 
-      await waitFor(() => expect(membersButton).toHaveFocus());
+      await waitFor(() => {
+        expect(memberList).toHaveAttribute('aria-hidden', 'true');
+        expect(memberList).toHaveAttribute('inert');
+        expect(membersButton).toHaveFocus();
+      });
+      expect(screen.queryByRole('region', { name: 'Channel members in #general' })).toBeNull();
+    });
+
+    it('makes the desktop-hidden member column inert until it is opened', async () => {
+      stubMobileViewport(false);
+      seedStore('#general');
+      store.setState({ showMemberList: false });
+
+      const { container } = render(() => <AppShell />);
+      const memberList = container.querySelector<HTMLElement>('.shell-members');
+      expect(memberList).not.toBeNull();
+      expect(memberList).toHaveAttribute('aria-hidden', 'true');
+      expect(memberList).toHaveAttribute('inert');
+      expect(screen.queryByRole('region', { name: 'Channel members in #general' })).toBeNull();
+
+      fireEvent.click(screen.getByRole('button', { name: /3 members — toggle member list/i }));
+
+      await waitFor(() => {
+        expect(memberList).toHaveAttribute('aria-hidden', 'false');
+        expect(memberList).not.toHaveAttribute('inert');
+        expect(screen.getByRole('region', { name: 'Channel members in #general' })).toBeInTheDocument();
+      });
     });
 
     it('summarizes unread home recaps and hands them to Spotlight', async () => {

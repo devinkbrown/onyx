@@ -20,6 +20,7 @@
  */
 
 import {
+  createEffect,
   createMemo,
   For,
   Show,
@@ -211,6 +212,7 @@ export type MemberListProps = {
 
 export function MemberList(props: MemberListProps): JSX.Element {
   const [local] = splitProps(props, ['hidden']);
+  let memberListRef: HTMLElement | undefined;
 
   const activeView = useStore((s) => s.activeView);
   const channels = useStore((s) => s.channels);
@@ -220,7 +222,7 @@ export function MemberList(props: MemberListProps): JSX.Element {
   const activeChannel = createMemo(() => {
     const view = activeView();
     if (view.kind !== 'channel') return null;
-    return channels().get(view.channel) ?? null;
+    return channels().get(view.channel.toLowerCase()) ?? null;
   });
 
   // We're in the channel but the roster hasn't landed yet (NAMES in flight): a
@@ -256,8 +258,18 @@ export function MemberList(props: MemberListProps): JSX.Element {
     return channel ? `Channel members in ${channel.name}` : 'Channel members';
   });
 
+  // Solid's DOM property table predates `HTMLElement.inert` in some supported
+  // runtimes, so assigning a boolean JSX property can become an inert expando
+  // instead of the native content attribute. Toggle the attribute explicitly:
+  // browsers activate native inertness from it, while aria-hidden + disabled
+  // member triggers below remain the keyboard/AT fallback.
+  createEffect(() => {
+    memberListRef?.toggleAttribute('inert', !!local.hidden);
+  });
+
   return (
     <aside
+      ref={memberListRef}
       class={`shell-members${local.hidden ? ' shell-members--hidden' : ''}`}
       aria-label={memberListLabel()}
       aria-hidden={local.hidden ? 'true' : 'false'}
@@ -325,6 +337,7 @@ export function MemberList(props: MemberListProps): JSX.Element {
                         <li class="shell-members-group-item">
                           <Popover
                             panelLabel={`Member details for ${user.nick}`}
+                            disabled={local.hidden}
                             trigger={
                               <div
                                 class={`shell-member-row${user.away ? ' shell-member-row--away' : ''}`}

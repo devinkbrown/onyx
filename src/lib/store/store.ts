@@ -364,6 +364,7 @@ export interface Toast {
 }
 
 export type ActiveView =
+  /** Channel is the lowercase key used by Onyx's channel-indexed maps. */
   | { kind: 'channel'; channel: string }
   | { kind: 'dm'; nick: string }
   | { kind: 'status' }
@@ -3653,7 +3654,7 @@ export const store = createStore<OnyxState>()(
       } else if (isChannel) {
         const channels = new Map(s.channels);
         channels.set(key, emptyChannel(target));
-        set({ channels, activeView: { kind: 'channel', channel: target } });
+        set({ channels, activeView: { kind: 'channel', channel: key } });
         get().joinChannel(target);
         if (preferences().localHistory) {
           void loadRecent(target, HISTORY_PAGE_SIZE).then((localMsgs) => {
@@ -3952,7 +3953,10 @@ export const store = createStore<OnyxState>()(
         set(s => {
           const activeChannelTopics = new Map(s.activeChannelTopics);
           activeChannelTopics.delete(key);
-          return { activeView: view, activeChannelTopics };
+          return {
+            activeView: { kind: 'channel' as const, channel: key },
+            activeChannelTopics,
+          };
         });
         get().captureUnreadDivider(view.channel);
         get().markRead(view.channel);
@@ -6355,7 +6359,7 @@ export const store = createStore<OnyxState>()(
             set(s => {
               const channels = new Map(s.channels);
               if (!channels.has(key)) channels.set(key, emptyChannel(ch));
-              return { channels, activeView: { kind: 'channel', channel: ch } };
+              return { channels, activeView: { kind: 'channel', channel: key } };
             });
             // Track session join history
             get().addJoinHistory(ch);
@@ -7872,7 +7876,7 @@ export const store = createStore<OnyxState>()(
 
             const activeView =
               s.activeView.kind === 'channel' && s.activeView.channel.toLowerCase() === oldKey
-                ? { kind: 'channel' as const, channel: newName }
+                ? { kind: 'channel' as const, channel: newKey }
                 : s.activeView;
 
             return {

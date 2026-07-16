@@ -14,6 +14,8 @@ export type PopoverProps = ParentProps<{
   onOpenChange?: (open: boolean) => void;
   placement?: 'bottom' | 'top';
   panelLabel?: string;
+  /** Disable the trigger and close an open panel when its owning surface is inert. */
+  disabled?: boolean;
 }>;
 
 let popoverId = 0;
@@ -43,7 +45,7 @@ function canRestoreFocus(element: HTMLElement): boolean {
 }
 
 export function Popover(props: PopoverProps) {
-  const [local, rest] = splitProps(props, ['trigger', 'id', 'open', 'defaultOpen', 'onOpenChange', 'placement', 'panelLabel', 'children']);
+  const [local, rest] = splitProps(props, ['trigger', 'id', 'open', 'defaultOpen', 'onOpenChange', 'placement', 'panelLabel', 'disabled', 'children']);
   const [innerOpen, setInnerOpen] = createSignal(local.defaultOpen ?? false);
   const instanceId = ++popoverId;
   const id = () => local.id ?? `onyx-popover-${instanceId}`;
@@ -116,6 +118,10 @@ export function Popover(props: PopoverProps) {
 
     removeFromOpenStack(stackToken);
     scheduleFocusRestore(openCycle);
+  });
+
+  createEffect(() => {
+    if (local.disabled && isOpen()) setOpen(false);
   });
 
   createEffect(() => {
@@ -208,6 +214,7 @@ export function Popover(props: PopoverProps) {
       <button
         ref={triggerRef}
         type="button"
+        disabled={local.disabled}
         class="onyx-popover__trigger"
         aria-haspopup="dialog"
         aria-expanded={isOpen()}

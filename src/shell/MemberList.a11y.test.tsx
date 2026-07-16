@@ -13,6 +13,7 @@
  */
 
 import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
+import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseIRCMessage } from '@/lib/irc/parser';
 import { _beginNamesBurstForTests, _resetNamesBurstsForTests, store } from '@/lib/store/store';
@@ -78,6 +79,42 @@ afterEach(() => {
 });
 
 describe('MemberList accessibility', () => {
+  it('makes a hidden roster inert and removes its member controls from keyboard access', () => {
+    seedChannel([makeUser('me', ['o']), makeUser('bob', ['v'])]);
+
+    const { container } = render(() => <MemberList hidden />);
+
+    const memberList = container.querySelector<HTMLElement>('.shell-members');
+    expect(memberList).not.toBeNull();
+    expect(memberList).toHaveAttribute('aria-hidden', 'true');
+    expect(memberList).toHaveAttribute('inert');
+    expect(screen.queryByRole('region', { name: 'Channel members in #general' })).toBeNull();
+
+    const triggers = container.querySelectorAll<HTMLButtonElement>('.shell-members .onyx-popover__trigger');
+    expect(triggers).toHaveLength(2);
+    for (const trigger of triggers) expect(trigger).toBeDisabled();
+  });
+
+  it('closes an open member card when the owning roster becomes hidden', () => {
+    seedChannel([makeUser('me', ['o']), makeUser('bob', ['v'])]);
+    const [hidden, setHidden] = createSignal(false);
+
+    render(() => <MemberList hidden={hidden()} />);
+
+    const bob = screen.getByRole('button', { name: /Open member details for bob, Voice/ });
+    fireEvent.click(bob);
+    expect(screen.getByRole('dialog', { name: 'Member details for bob' })).toBeInTheDocument();
+
+    setHidden(true);
+    expect(screen.queryByRole('dialog', { name: 'Member details for bob' })).toBeNull();
+    expect(bob).toBeDisabled();
+    expect(bob.closest('.shell-members')).toHaveAttribute('inert');
+
+    setHidden(false);
+    expect(bob).not.toBeDisabled();
+    expect(bob.closest('.shell-members')).not.toHaveAttribute('inert');
+  });
+
   it('exposes the member count with an accessible name but NOT as a live region', () => {
     // A polite live region here re-announces a bare integer on every join/leave,
     // history replay, and ?at= time-travel — spam. It must be readable on demand
@@ -98,6 +135,16 @@ describe('MemberList accessibility', () => {
     render(() => <MemberList />);
 
     expect(screen.getByLabelText('1 member')).toBeInTheDocument();
+  });
+
+  it('resolves a mixed-case active channel against the lowercase channel map', () => {
+    seedChannel([makeUser('me', ['o']), makeUser('Alice', ['v'])]);
+    store.setState({ activeView: { kind: 'channel', channel: '#General' } });
+
+    render(() => <MemberList />);
+
+    expect(screen.getByLabelText('2 members')).toHaveTextContent('2');
+    expect(screen.getByRole('button', { name: /Open member details for Alice, Voice/ })).toBeInTheDocument();
   });
 
   it('announces a member role in text exactly once, not doubled by the badge glyph', () => {
