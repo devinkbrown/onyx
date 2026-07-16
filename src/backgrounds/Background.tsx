@@ -13,6 +13,7 @@ import { loadBackgroundVariant } from './loader';
 import { preferences } from '@/lib/prefs/preferences';
 import { sceneMotion } from '@/lib/prefs/sceneMotion';
 import { makeMediaSignal } from '@/lib/a11y/mediaPrefs';
+import { makeReducedDataSignal } from '@/lib/a11y/reducedData';
 
 export interface BackgroundProps {
   id?: BackgroundId | string;
@@ -37,6 +38,7 @@ export function selectBackgroundId(id: string | undefined, _reducedMotion: boole
 
 export function Background(props: BackgroundProps) {
   const reducedMotion = makeMediaSignal(REDUCED_MOTION_QUERY);
+  const reducedData = makeReducedDataSignal();
   const motion = createMemo(() => sceneMotion());
   const sceneDisabled = createMemo(() => motion() === 'off');
   const effectiveReducedMotion = createMemo(() => reducedMotion() || preferences().reduceMotion || motion() === 'still');
@@ -46,7 +48,7 @@ export function Background(props: BackgroundProps) {
   // An undefined resource source is Solid's explicit "do not fetch" state.
   // Keep Off outside the lazy-loader entirely; restoring Animated/Still changes
   // this source back to an id and loads the selected renderer normally.
-  const activeId = createMemo(() => sceneDisabled()
+  const activeId = createMemo(() => sceneDisabled() || reducedData()
     ? undefined
     : selectBackgroundId(props.id, effectiveReducedMotion()));
   const [variant] = createResource(activeId, loadBackgroundVariant);
@@ -62,17 +64,19 @@ export function Background(props: BackgroundProps) {
 
   return (
     <Show when={!sceneDisabled()} fallback={null}>
-      <Show
-        when={variant()}
-        // First paint isn't blocked on the variant chunk: show a frozen themed
-        // frame (matching the reduced-motion still) until it resolves.
-        fallback={<BackgroundPlaceholder />}
-      >
+      <Show when={!reducedData()} fallback={<BackgroundPlaceholder reducedData={true} />}>
         <Show
-          when={scene()}
-          fallback={<CanvasBackground variant={canvasVariant()} quality={props.quality} reducedMotion={effectiveReducedMotion()} />}
+          when={variant()}
+          // First paint isn't blocked on the variant chunk: show a frozen themed
+          // frame (matching the reduced-motion still) until it resolves.
+          fallback={<BackgroundPlaceholder reducedData={false} />}
         >
-          {(active) => <SceneBackground scene={active()} reducedMotion={effectiveReducedMotion()} />}
+          <Show
+            when={scene()}
+            fallback={<CanvasBackground variant={canvasVariant()} quality={props.quality} reducedMotion={effectiveReducedMotion()} />}
+          >
+            {(active) => <SceneBackground scene={active()} reducedMotion={effectiveReducedMotion()} />}
+          </Show>
         </Show>
       </Show>
     </Show>
@@ -84,12 +88,14 @@ export function Background(props: BackgroundProps) {
  * variant's chunk resolving. Matches the app's base surface so there's no flash
  * and no layout work — a fixed, non-interactive, painter-only layer.
  */
-function BackgroundPlaceholder() {
+function BackgroundPlaceholder(props: { reducedData: boolean }) {
   return (
     <div
       aria-hidden="true"
       data-background-canvas="true"
       data-background-placeholder="true"
+      data-background-kind="solid"
+      data-background-reduced-data={props.reducedData ? 'true' : undefined}
       style={{
         position: 'fixed',
         inset: '0',

@@ -88,6 +88,7 @@ import {
   prefersReducedMotion,
   prefersReducedTransparency,
 } from '@/lib/a11y/mediaPrefs';
+import { makeReducedDataSignal } from '@/lib/a11y/reducedData';
 
 // ── AppShell props ───────────────────────────────────────────────────────────
 
@@ -159,6 +160,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const ourNick = useStore((s) => s.ourNick);
   const showAccount = useStore((s) => s.showAccount);
   const showKeyboardShortcuts = useStore((s) => s.showKeyboardShortcuts);
+  const reducedData = makeReducedDataSignal();
 
   // ── Global keyboard shortcuts (nav, member list, composer, help) ──
   // Spotlight is mounted once at the app root. This hook adds connected-app
@@ -221,10 +223,13 @@ export function AppShell(props: AppShellProps): JSX.Element {
   if (typeof window !== 'undefined') {
     const ric = (window as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => void })
       .requestIdleCallback;
-    const preloadMedia = () => void ensureMediaEngine().catch(() => {
-      // Best-effort idle preload. A direct user action retries and surfaces the
-      // failure in context.
-    });
+    const preloadMedia = () => {
+      if (reducedData()) return;
+      void ensureMediaEngine().catch(() => {
+        // Best-effort idle preload. A direct user action retries and surfaces
+        // the failure in context.
+      });
+    };
     if (typeof ric === 'function') ric(preloadMedia, { timeout: 2000 });
     else setTimeout(preloadMedia, 200);
   }

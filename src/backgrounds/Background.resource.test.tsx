@@ -41,6 +41,7 @@ afterEach(() => {
   resetSceneMotion();
   if (hasFocusDescriptor) Object.defineProperty(document, 'hasFocus', hasFocusDescriptor);
   else Reflect.deleteProperty(document, 'hasFocus');
+  Reflect.deleteProperty(navigator, 'connection');
 });
 
 describe('Background lazy resource gating', () => {
@@ -79,5 +80,43 @@ describe('Background lazy resource gating', () => {
 
     window.dispatchEvent(new Event('focus'));
     expect(scene?.hasAttribute('data-scene-runtime-paused')).toBe(false);
+  });
+
+  it('keeps a static branded frame and skips the render chunk under Data Saver', async () => {
+    Object.defineProperty(navigator, 'connection', {
+      configurable: true,
+      value: { saveData: true, addEventListener: vi.fn(), removeEventListener: vi.fn() },
+    });
+
+    const { container } = render(() => <Background id="starfield" />);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(loadBackgroundVariant).not.toHaveBeenCalled();
+    const placeholder = container.querySelector('[data-background-placeholder="true"]');
+    expect(placeholder).toHaveAttribute('data-background-kind', 'solid');
+    expect(placeholder).toHaveAttribute('data-background-reduced-data', 'true');
+  });
+
+  it('replaces a loaded scene when Data Saver turns on', async () => {
+    let onConnectionChange: (() => void) | undefined;
+    const connection = {
+      saveData: false,
+      addEventListener: vi.fn((_type: string, listener: () => void) => {
+        onConnectionChange = listener;
+      }),
+      removeEventListener: vi.fn(),
+    };
+    Object.defineProperty(navigator, 'connection', { configurable: true, value: connection });
+    const { container } = render(() => <Background id="starfield" />);
+    await waitFor(() => expect(container.querySelector('[data-background-id="starfield"]')).not.toBeNull());
+
+    connection.saveData = true;
+    onConnectionChange?.();
+
+    await waitFor(() => {
+      expect(container.querySelector('[data-background-id="starfield"]')).toBeNull();
+      expect(container.querySelector('[data-background-reduced-data="true"]')).not.toBeNull();
+    });
   });
 });
