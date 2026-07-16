@@ -107,6 +107,23 @@ describe('normalizeRestMessage', () => {
     expect(normalizeRestMessage(42)).toBeNull();
   });
 
+  it('bounds hostile REST fields before handing them to the shared importer', () => {
+    const row = normalizeRestMessage(
+      restMsg('1', {
+        content: 'x'.repeat(80_000),
+        author: { global_name: 'n'.repeat(400) },
+        attachments: Array.from({ length: 50 }, (_, i) => ({ url: `https://cdn.example/${i}/${'u'.repeat(3_000)}` })),
+        reactions: Array.from({ length: 80 }, () => ({ count: 1, emoji: { name: 'e'.repeat(400) } })),
+      }),
+    );
+    expect(String(row?.content)).toHaveLength(65_536);
+    expect((row?.author as { name: string }).name).toHaveLength(256);
+    expect(row?.attachments).toHaveLength(32);
+    expect((row?.attachments as { url: string }[])[0]!.url).toHaveLength(2_048);
+    expect(row?.reactions).toHaveLength(64);
+    expect((row?.reactions as { emoji: { name: string } }[])[0]!.emoji.name).toHaveLength(256);
+  });
+
   it('feeds parseDiscordExport a shape it fully transforms', () => {
     const rawMessages = [
       restMsg('200', { id: '200', content: 'first', timestamp: '2024-03-01T10:00:00.000Z' }),
@@ -217,6 +234,33 @@ describe('DiscordRestClient', () => {
     await client.getChannelMessages('123');
     await client.getChannelMessages('123', '1');
     expect(sleep).toHaveBeenCalledWith(5000);
+  });
+
+  it('parses a real streamed Response without materializing it through Response.json', async () => {
+    const response = new Response(JSON.stringify([restMsg('1')]));
+    const jsonSpy = vi.spyOn(response, 'json');
+    const fetchImpl = vi.fn<FetchFn>(async () => response);
+    const client = new DiscordRestClient({ token: 't', fetchImpl, sleep: noSleep });
+    await expect(client.getChannelMessages('123')).resolves.toHaveLength(1);
+    expect(jsonSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects an oversized REST response before reading its body', async () => {
+    const response = new Response('[]', { headers: { 'Content-Length': String(2 * 1024 * 1024 + 1) } });
+    const fetchImpl = vi.fn<FetchFn>(async () => response);
+    const client = new DiscordRestClient({ token: 't', fetchImpl, sleep: noSleep });
+    await expect(client.getChannelMessages('123')).rejects.toMatchObject({
+      kind: 'network',
+      message: 'Discord returned an unexpectedly large response.',
+    });
+  });
+
+  it('rejects invalid pagination cursors before fetching', async () => {
+    const fetchImpl = vi.fn<FetchFn>(async () => fakeRes(200, []));
+    const client = new DiscordRestClient({ token: 't', fetchImpl, sleep: noSleep });
+    await expect(client.getChannelMessages('123', '../older')).rejects.toMatchObject({ kind: 'network' });
+    await expect(client.getChannelPins('123', 'x'.repeat(100))).rejects.toMatchObject({ kind: 'network' });
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });
 
@@ -365,6 +409,12 @@ describe('DiscordRestClient guild/pins endpoints', () => {
     expect(await client.getGuildRoles('9')).toHaveLength(2);
     expect(await client.getGuildEmojis('9')).toHaveLength(1);
     expect(String(fetchImpl.mock.calls[0]![0])).toBe('/discord-import/guilds/9/channels');
+  });
+
+  it('bounds hostile guild resource arrays', async () => {
+    const fetchImpl = vi.fn<FetchFn>(async () => fakeRes(200, Array.from({ length: 1_200 }, (_, id) => ({ id }))));
+    const client = new DiscordRestClient({ token: 't', fetchImpl, sleep: noSleep });
+    await expect(client.getGuildChannels('9')).resolves.toHaveLength(1_000);
   });
 
   it('rejects a non-snowflake guild id before any fetch', async () => {

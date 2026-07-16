@@ -78,6 +78,19 @@ const MAX_429_RETRIES = 5;
 /** Absolute ceiling on messages pulled in one run (memory bound / abuse guard). */
 const MAX_TOTAL_MESSAGES = 100_000;
 
+/** Bound every proxied JSON body before parsing so a hostile proxy cannot OOM the tab. */
+const MAX_REST_RESPONSE_BYTES = 2 * 1024 * 1024;
+const MAX_RETRY_RESPONSE_BYTES = 16 * 1024;
+
+/** Per-record ceilings applied before the shared importer sees REST data. */
+const MAX_GUILD_RESOURCE_ITEMS = 1_000;
+const MAX_MESSAGE_CONTENT_CHARS = 65_536;
+const MAX_MESSAGE_ATTACHMENTS = 32;
+const MAX_MESSAGE_REACTIONS = 64;
+const MAX_URL_CHARS = 2_048;
+const MAX_NAME_CHARS = 256;
+const MAX_TIMESTAMP_CHARS = 64;
+
 /** User-facing failure text (also the thrown Error.message — never leaks the token). */
 export const DISCORD_AUTH_MESSAGE =
   'Discord rejected the request (401/403). Check the bot token, and that the bot was invited to the server with the "View Channels" and "Read Message History" permissions.';
@@ -109,6 +122,61 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value : '';
+}
+
+function boundedString(value: unknown, maxChars: number): string {
+  return asString(value).slice(0, maxChars);
+}
+
+/**
+ * Read JSON through a byte ceiling before calling JSON.parse. Real Fetch
+ * responses expose a ReadableStream; the json-only fallback exists solely for
+ * lightweight injected test doubles and is never used by a browser Response.
+ */
+async function readBoundedJson(res: Response, maxBytes = MAX_REST_RESPONSE_BYTES): Promise<unknown> {
+  const declaredLength = Number(res.headers.get('Content-Length'));
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    throw new DiscordImportError('Discord returned an unexpectedly large response.', 'network');
+  }
+
+  if (!res.body) {
+    try {
+      return await res.json();
+    } catch {
+      return undefined;
+    }
+  }
+
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      received += value.byteLength;
+      if (received > maxBytes) {
+        await reader.cancel();
+        throw new DiscordImportError('Discord returned an unexpectedly large response.', 'network');
+      }
+      chunks.push(value);
+    }
+  } catch (err) {
+    if (err instanceof DiscordImportError) throw err;
+    throw new DiscordImportError('Could not read Discord\'s response.', 'network');
+  }
+
+  const bytes = new Uint8Array(received);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+  } catch {
+    return undefined;
+  }
 }
 
 /** A Discord snowflake id is 1–20 ASCII digits — matches the proxy's guard. */
@@ -154,8 +222,8 @@ function restTypeToDce(rawType: unknown): 'Default' | 'Reply' | 'System' {
 function restAttachments(raw: unknown): { url: string }[] {
   if (!Array.isArray(raw)) return [];
   const out: { url: string }[] = [];
-  for (const a of raw) {
-    const url = isRecord(a) ? asString(a.url).trim() : '';
+  for (const a of raw.slice(0, MAX_MESSAGE_ATTACHMENTS)) {
+    const url = isRecord(a) ? boundedString(a.url, MAX_URL_CHARS).trim() : '';
     if (url) out.push({ url });
   }
   return out;
@@ -165,9 +233,9 @@ function restAttachments(raw: unknown): { url: string }[] {
 function restReactions(raw: unknown): { emoji: { name: string }; count: number }[] | undefined {
   if (!Array.isArray(raw)) return undefined;
   const out: { emoji: { name: string }; count: number }[] = [];
-  for (const r of raw) {
+  for (const r of raw.slice(0, MAX_MESSAGE_REACTIONS)) {
     if (!isRecord(r)) continue;
-    const name = isRecord(r.emoji) ? asString(r.emoji.name) : '';
+    const name = isRecord(r.emoji) ? boundedString(r.emoji.name, MAX_NAME_CHARS) : '';
     const count = typeof r.count === 'number' && Number.isFinite(r.count) ? r.count : 0;
     out.push({ emoji: { name }, count });
   }
@@ -182,24 +250,29 @@ function restReactions(raw: unknown): { emoji: { name: string }; count: number }
 export function normalizeRestMessage(raw: unknown): Record<string, unknown> | null {
   if (!isRecord(raw)) return null;
   const author = isRecord(raw.author) ? raw.author : {};
-  const name = asString(author.global_name).trim() || asString(author.username).trim() || 'unknown';
+  const name =
+    boundedString(author.global_name, MAX_NAME_CHARS).trim() ||
+    boundedString(author.username, MAX_NAME_CHARS).trim() ||
+    'unknown';
 
   const row: Record<string, unknown> = {
-    id: asString(raw.id),
+    id: boundedString(raw.id, 20),
     type: restTypeToDce(raw.type),
-    timestamp: asString(raw.timestamp),
-    content: replaceCustomEmoji(asString(raw.content)),
+    timestamp: boundedString(raw.timestamp, MAX_TIMESTAMP_CHARS),
+    content: replaceCustomEmoji(boundedString(raw.content, MAX_MESSAGE_CONTENT_CHARS)),
     attachments: restAttachments(raw.attachments),
     author: { name },
   };
 
-  const edited = asString(raw.edited_timestamp);
+  const edited = boundedString(raw.edited_timestamp, MAX_TIMESTAMP_CHARS);
   if (edited) row.timestampEdited = edited;
 
   const reactions = restReactions(raw.reactions);
   if (reactions) row.reactions = reactions;
 
-  const ref = isRecord(raw.message_reference) ? asString(raw.message_reference.message_id).trim() : '';
+  const ref = isRecord(raw.message_reference)
+    ? boundedString(raw.message_reference.message_id, 20).trim()
+    : '';
   if (ref) row.reference = { messageId: ref };
 
   return row;
@@ -314,10 +387,13 @@ export class DiscordRestClient {
     if (!isSnowflake(channelId)) {
       throw new DiscordImportError('Invalid Discord channel id.', 'network');
     }
+    if (before && !isSnowflake(before)) {
+      throw new DiscordImportError('Invalid Discord message cursor.', 'network');
+    }
     const params = new URLSearchParams({ limit: String(PAGE_LIMIT) });
     if (before) params.set('before', before);
     const res = await this.#request(`channels/${channelId}/messages?${params.toString()}`);
-    const data: unknown = await res.json().catch(() => []);
+    const data = await readBoundedJson(res);
     // Bound a single (hostile or oversized) page by construction, not just the loop.
     return Array.isArray(data) ? data.slice(0, PAGE_LIMIT) : [];
   }
@@ -342,8 +418,8 @@ export class DiscordRestClient {
       throw new DiscordImportError('Invalid Discord server id.', 'network');
     }
     const res = await this.#request(`guilds/${guildId}/${resource}`);
-    const data: unknown = await res.json().catch(() => []);
-    return Array.isArray(data) ? data : [];
+    const data = await readBoundedJson(res);
+    return Array.isArray(data) ? data.slice(0, MAX_GUILD_RESOURCE_ITEMS) : [];
   }
 
   /**
@@ -359,10 +435,13 @@ export class DiscordRestClient {
     if (!isSnowflake(channelId)) {
       throw new DiscordImportError('Invalid Discord channel id.', 'network');
     }
+    if (before && (before.length > MAX_TIMESTAMP_CHARS || !Number.isFinite(Date.parse(before)))) {
+      throw new DiscordImportError('Invalid Discord pin cursor.', 'network');
+    }
     const params = new URLSearchParams({ limit: String(PIN_PAGE_LIMIT) });
     if (before) params.set('before', before);
     const res = await this.#request(`channels/${channelId}/messages/pins?${params.toString()}`);
-    const data: unknown = await res.json().catch(() => ({}));
+    const data = await readBoundedJson(res);
     // Bound a single (hostile or oversized) page by construction, not just the loop.
     const items = isRecord(data) && Array.isArray(data.items) ? data.items.slice(0, PIN_PAGE_LIMIT) : [];
     const hasMore = isRecord(data) && data.has_more === true;
@@ -433,7 +512,7 @@ export class DiscordRestClient {
     const headerSec = Number(res.headers.get('Retry-After'));
     let bodySec = 0;
     try {
-      const body: unknown = await res.json();
+      const body = await readBoundedJson(res, MAX_RETRY_RESPONSE_BYTES);
       if (isRecord(body) && typeof body.retry_after === 'number') bodySec = body.retry_after;
     } catch {
       /* no/invalid body — rely on the header */
@@ -520,7 +599,10 @@ async function paginateChannelMessages(
       }
     }
 
-    for (const m of batch) collected.push(m);
+    for (const m of batch) {
+      if (collected.length >= opts.budget) break;
+      collected.push(m);
+    }
     opts.onCount?.(collected.length);
 
     if (batch.length < PAGE_LIMIT) {
@@ -537,8 +619,8 @@ async function paginateChannelMessages(
     }
     before = oldestId;
 
-    if (opts.cutoffMs !== null && snowflakeToMs(oldestId) < opts.cutoffMs) break;
     if (collected.length >= opts.budget) break;
+    if (opts.cutoffMs !== null && snowflakeToMs(oldestId) < opts.cutoffMs) break;
   }
 
   return { collected, reachedStart };
