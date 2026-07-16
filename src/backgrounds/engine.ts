@@ -197,6 +197,9 @@ export class BackgroundEngine {
   private themeObserver: MutationObserver | null = null;
   private pendingStaticRefresh = false;
   private listenersAttached = false;
+  /** A visible tab can still be unfocused (another window owns input). Canvas
+   * animation pauses in that state just like DOM/SVG scenes do. */
+  private windowBlurred = false;
 
   constructor(options: BackgroundEngineOptions) {
     this.canvas = options.canvas;
@@ -361,7 +364,13 @@ export class BackgroundEngine {
   }
 
   private scheduleNextFrame(): void {
-    if (!this.running || this.staticMode || this.variant.kind === 'solid' || isDocumentHidden()) return;
+    if (
+      !this.running ||
+      this.staticMode ||
+      this.variant.kind === 'solid' ||
+      isDocumentHidden() ||
+      this.windowBlurred
+    ) return;
     if (this.rafId !== null) return;
     if (typeof requestAnimationFrame === 'undefined') return;
 
@@ -408,6 +417,8 @@ export class BackgroundEngine {
 
     if (typeof window !== 'undefined') {
       window.addEventListener('resize', this.handleResize);
+      window.addEventListener('blur', this.handleWindowBlur);
+      window.addEventListener('focus', this.handleWindowFocus);
       window.addEventListener('pointerdown', this.handleUserActivity, PASSIVE_ACTIVITY_OPTIONS);
       window.addEventListener('keydown', this.handleUserActivity);
       window.addEventListener('wheel', this.handleUserActivity, PASSIVE_ACTIVITY_OPTIONS);
@@ -445,6 +456,8 @@ export class BackgroundEngine {
 
     if (typeof window !== 'undefined') {
       window.removeEventListener('resize', this.handleResize);
+      window.removeEventListener('blur', this.handleWindowBlur);
+      window.removeEventListener('focus', this.handleWindowFocus);
       window.removeEventListener('pointerdown', this.handleUserActivity, PASSIVE_ACTIVITY_OPTIONS);
       window.removeEventListener('keydown', this.handleUserActivity);
       window.removeEventListener('wheel', this.handleUserActivity, PASSIVE_ACTIVITY_OPTIONS);
@@ -459,6 +472,7 @@ export class BackgroundEngine {
     this.themeObserver?.disconnect();
     this.themeObserver = null;
     this.pendingStaticRefresh = false;
+    this.windowBlurred = false;
   }
 
   /**
@@ -506,6 +520,27 @@ export class BackgroundEngine {
     bumpThemeEpoch();
     // A frozen single frame won't repaint itself, so drive it explicitly.
     if (rendersSingleFrame(this.staticMode, this.variant.kind)) this.refreshStaticFrame();
+  };
+
+  /** Stop the live canvas loop while another window owns focus. Unlike the
+   * idle policy this is a full hold: there is no value in painting an obscured
+   * or background window at even the minimum cadence. */
+  private readonly handleWindowBlur = (): void => {
+    this.windowBlurred = true;
+    this.cancelFrame();
+    this.lastFrameAt = null;
+    this.lastRenderAt = null;
+    this.lowFpsFrames = 0;
+    this.throttled = false;
+  };
+
+  /** Focus is fresh activity: discard stale FPS evidence, restore the 30fps
+   * active cap, and schedule one new frame unless the document is still hidden. */
+  private readonly handleWindowFocus = (): void => {
+    this.windowBlurred = false;
+    if (isDocumentHidden()) return;
+    this.restoreActiveCadence(animationNow());
+    this.scheduleNextFrame();
   };
 
   private readonly handleVisibilityChange = (): void => {

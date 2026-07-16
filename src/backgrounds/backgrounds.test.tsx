@@ -235,6 +235,41 @@ describe('frame cadence cap', () => {
 });
 
 describe('BackgroundEngine lifecycle', () => {
+  it('holds canvas animation while the window is blurred and resumes at full cadence on focus', () => {
+    const hidden = Object.getOwnPropertyDescriptor(document, 'hidden');
+    const raf = installControlledAnimationFrame();
+    const now = vi.spyOn(performance, 'now').mockReturnValue(0);
+    const variant = createVariant();
+    const engine = new BackgroundEngine({ canvas: createCanvas(), variant });
+
+    try {
+      setDocumentHidden(false);
+      engine.start();
+      expect(variant.frame).toHaveBeenCalledTimes(1);
+      expect(raf.pendingCount()).toBe(1);
+
+      window.dispatchEvent(new Event('blur'));
+      expect(raf.pendingCount()).toBe(0);
+
+      // Activity in an unfocused window must not accidentally restart painting.
+      now.mockReturnValue(10_000);
+      window.dispatchEvent(new Event('pointerdown'));
+      expect(raf.pendingCount()).toBe(0);
+      expect(variant.frame).toHaveBeenCalledTimes(1);
+
+      window.dispatchEvent(new Event('focus'));
+      expect(raf.pendingCount()).toBe(1);
+      raf.runNext(10_001);
+      expect(variant.frame).toHaveBeenCalledTimes(2);
+      expect(engine.quality).toBe('high');
+    } finally {
+      engine.dispose();
+      now.mockRestore();
+      raf.restore();
+      restoreDocumentHidden(hidden);
+    }
+  });
+
   it.each([
     { label: 'solid variant', kind: 'solid' as const, staticMode: false },
     { label: 'static animated variant', kind: 'animated' as const, staticMode: true },
@@ -330,7 +365,7 @@ describe('BackgroundEngine lifecycle', () => {
       engine.start();
       engine.dispose();
 
-      for (const event of ['resize', 'pointerdown', 'keydown', 'wheel', 'touchstart']) {
+      for (const event of ['resize', 'blur', 'focus', 'pointerdown', 'keydown', 'wheel', 'touchstart']) {
         expectSymmetricListener(windowAdd.mock.calls, windowRemove.mock.calls, event);
       }
       for (const event of ['visibilitychange', 'scroll']) {
@@ -758,6 +793,7 @@ function create2dContext(): CanvasRenderingContext2D {
 
 function installControlledAnimationFrame(): {
   runNext(time: number): void;
+  pendingCount(): number;
   restore(): void;
 } {
   const originalRequest = globalThis.requestAnimationFrame;
@@ -781,6 +817,9 @@ function installControlledAnimationFrame(): {
       if (!next) throw new Error('No animation frame is scheduled');
       callbacks.delete(next[0]);
       next[1](time);
+    },
+    pendingCount() {
+      return callbacks.size;
     },
     restore() {
       callbacks.clear();
