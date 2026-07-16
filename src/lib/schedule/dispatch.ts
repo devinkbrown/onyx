@@ -23,6 +23,54 @@ export interface ScheduledMessage {
   readonly sendAt: number;
 }
 
+export const MAX_SCHEDULED_MESSAGES = 256;
+export const MAX_SCHEDULED_ID_LENGTH = 128;
+export const MAX_SCHEDULED_CHANNEL_LENGTH = 256;
+export const MAX_SCHEDULED_TEXT_LENGTH = 65_536;
+const MAX_SCHEDULED_STORAGE_LENGTH = 2 * 1024 * 1024;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** Parse the local scheduled-message queue as untrusted, version-drifting data. */
+export function parseScheduledMessages(raw: string | null): ScheduledMessage[] {
+  if (!raw || raw.length > MAX_SCHEDULED_STORAGE_LENGTH) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+
+  const messages: ScheduledMessage[] = [];
+  const ids = new Set<string>();
+  for (const value of parsed) {
+    if (messages.length >= MAX_SCHEDULED_MESSAGES) break;
+    if (!isRecord(value)) continue;
+    const { id, channel, text, sendAt } = value;
+    if (
+      typeof id !== 'string'
+      || id.length === 0
+      || id.length > MAX_SCHEDULED_ID_LENGTH
+      || ids.has(id)
+      || typeof channel !== 'string'
+      || channel.length === 0
+      || channel.length > MAX_SCHEDULED_CHANNEL_LENGTH
+      || typeof text !== 'string'
+      || text.trim().length === 0
+      || text.length > MAX_SCHEDULED_TEXT_LENGTH
+      || typeof sendAt !== 'number'
+      || !Number.isSafeInteger(sendAt)
+      || sendAt <= 0
+    ) continue;
+    ids.add(id);
+    messages.push({ id, channel, text, sendAt });
+  }
+  return messages.sort((a, b) => a.sendAt - b.sendAt || a.id.localeCompare(b.id));
+}
+
 export interface DispatchDecision {
   /** Entries whose time has come — send now, then remove from the queue. */
   readonly due: ScheduledMessage[];

@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from 'vitest';
-import { selectDueMessages, type ScheduledMessage } from './dispatch';
+import {
+  MAX_SCHEDULED_MESSAGES,
+  parseScheduledMessages,
+  selectDueMessages,
+  type ScheduledMessage,
+} from './dispatch';
 
 const NOW = 1_000_000;
 
@@ -71,5 +76,48 @@ describe('selectDueMessages', () => {
     expect(first.pending).not.toBe(second.pending);
     expect(first.due[0]).toBe(past);
     expect(first.pending[0]).toBe(future);
+  });
+});
+
+describe('parseScheduledMessages', () => {
+  it('rejects malformed and valid-but-wrong root shapes', () => {
+    for (const raw of [null, '', '{', '{}', 'null', '"queue"', '7']) {
+      expect(parseScheduledMessages(raw)).toEqual([]);
+    }
+  });
+
+  it('keeps valid entries sorted without mutating message text', () => {
+    expect(parseScheduledMessages(JSON.stringify([
+      { id: 'later', channel: '#root', text: '  keep spacing  ', sendAt: 2_000 },
+      { id: 'first', channel: '#onyx', text: 'hello', sendAt: 1_000 },
+    ]))).toEqual([
+      { id: 'first', channel: '#onyx', text: 'hello', sendAt: 1_000 },
+      { id: 'later', channel: '#root', text: '  keep spacing  ', sendAt: 2_000 },
+    ]);
+  });
+
+  it('drops invalid fields and duplicate ids instead of poisoning dispatch', () => {
+    const valid = { id: 'one', channel: '#root', text: 'hello', sendAt: 1_000 };
+    expect(parseScheduledMessages(JSON.stringify([
+      valid,
+      { ...valid, channel: '#other', sendAt: 2_000 },
+      { ...valid, id: '', sendAt: 3_000 },
+      { ...valid, id: 'bad-channel', channel: 1, sendAt: 3_000 },
+      { ...valid, id: 'empty', text: '   ', sendAt: 3_000 },
+      { ...valid, id: 'nan', sendAt: null },
+      { ...valid, id: 'fraction', sendAt: 1.5 },
+      { ...valid, id: 'negative', sendAt: -1 },
+    ]))).toEqual([valid]);
+  });
+
+  it('bounds the restored queue', () => {
+    const raw = JSON.stringify(Array.from({ length: 300 }, (_, index) => ({
+      id: `id-${index}`,
+      channel: '#root',
+      text: `message ${index}`,
+      sendAt: index + 1,
+    })));
+    expect(parseScheduledMessages(raw)).toHaveLength(MAX_SCHEDULED_MESSAGES);
+    expect(parseScheduledMessages(`"${'x'.repeat(2 * 1024 * 1024)}"`)).toEqual([]);
   });
 });

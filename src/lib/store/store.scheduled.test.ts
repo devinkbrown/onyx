@@ -48,6 +48,16 @@ describe('scheduleMessage', () => {
     expect(q.map((m) => m.text)).toEqual(['sooner', 'later']);
     expect(JSON.parse(localStorage.getItem('onyx:scheduled') || '[]')).toHaveLength(2);
   });
+
+  it('keeps the in-memory queue usable when localStorage is blocked', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('blocked', 'QuotaExceededError');
+    });
+
+    expect(() => store.getState().scheduleMessage('#root', 'still queued', 5_000)).not.toThrow();
+    expect(store.getState().scheduledMessages).toHaveLength(1);
+    expect(store.getState().scheduledMessages[0]?.text).toBe('still queued');
+  });
 });
 
 describe('_dispatchScheduledMessages', () => {

@@ -13,7 +13,7 @@ import { getMountedSuimyakuMediaEngine } from '@/lib/mediaEngineMount';
 import { parseActivity } from '@/lib/activity';
 import { OUTBOX_MAX_AGE_MS, deleteOutboxEntry, loadAround, loadOutbox, loadRecent, queueOutbox, type OutboxEntry } from '@/lib/vault/historyVault';
 import { boundedSearchField, boundedSearchQuery } from '@/lib/vault/searchBounds';
-import { selectDueMessages } from '@/lib/schedule/dispatch';
+import { parseScheduledMessages, selectDueMessages } from '@/lib/schedule/dispatch';
 import { deviceKeys, isEnvelope } from '@/lib/e2ee/dmCipher';
 import { openDmTrusted, peerSafetyNumber, pinnedPeerKey, pinPeerKey, safetyNumber, sealDmTrusted } from '@/lib/e2ee/keyPinning';
 import {
@@ -2833,6 +2833,17 @@ function _loadEmojiSkinTone(): OnyxState['emojiSkinTone'] {
 function _normalizeEmojiSkinTone(tone: string): OnyxState['emojiSkinTone'] {
   return tone === '\u{1F3FB}' || tone === '\u{1F3FC}' || tone === '\u{1F3FD}' ||
     tone === '\u{1F3FE}' || tone === '\u{1F3FF}' ? tone : '';
+}
+
+function _persistScheduledMessages(
+  messages: readonly { id: string; channel: string; text: string; sendAt: number }[],
+): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem('onyx:scheduled', JSON.stringify(messages));
+  } catch {
+    // The in-memory queue remains usable when storage is blocked or full.
+  }
 }
 
 export type State = OnyxState;
@@ -8975,7 +8986,7 @@ export const store = createStore<OnyxState>()(
     // ── Scheduled Messages ──────────────────────────────────────────────
     scheduledMessages: (() => {
       if (typeof window === 'undefined') return [];
-      try { return JSON.parse(localStorage.getItem('onyx:scheduled') || '[]'); }
+      try { return parseScheduledMessages(localStorage.getItem('onyx:scheduled')); }
       catch { return []; }
     })(),
     showScheduledMessages: false,
@@ -8987,14 +8998,14 @@ export const store = createStore<OnyxState>()(
       const entry = { id: `sched-${Date.now()}-${Math.random().toString(36).slice(2)}`, channel, text, sendAt };
       set(s => {
         const next = [...s.scheduledMessages, entry].sort((a, b) => a.sendAt - b.sendAt);
-        if (typeof window !== 'undefined') localStorage.setItem('onyx:scheduled', JSON.stringify(next));
+        _persistScheduledMessages(next);
         return { scheduledMessages: next };
       });
     },
     cancelScheduledMessage: (id) => {
       set(s => {
         const next = s.scheduledMessages.filter(m => m.id !== id);
-        if (typeof window !== 'undefined') localStorage.setItem('onyx:scheduled', JSON.stringify(next));
+        _persistScheduledMessages(next);
         return { scheduledMessages: next };
       });
     },
@@ -9007,7 +9018,7 @@ export const store = createStore<OnyxState>()(
       // idempotency never depends on the send succeeding: if sendMessage throws,
       // or a second tick fires, the entry is already gone and can't double-send.
       set(() => {
-        if (typeof window !== 'undefined') localStorage.setItem('onyx:scheduled', JSON.stringify(pending));
+        _persistScheduledMessages(pending);
         return { scheduledMessages: pending };
       });
       // Isolate each send: one entry throwing (a racing socket close, a seal
@@ -9026,7 +9037,7 @@ export const store = createStore<OnyxState>()(
       if (failed.length > 0) {
         set(s => {
           const next = [...s.scheduledMessages, ...failed].sort((a, b) => a.sendAt - b.sendAt);
-          if (typeof window !== 'undefined') localStorage.setItem('onyx:scheduled', JSON.stringify(next));
+          _persistScheduledMessages(next);
           return { scheduledMessages: next };
         });
       }
