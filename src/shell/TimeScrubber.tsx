@@ -2,6 +2,7 @@
 import './time-scrubber.css';
 
 import {
+  createEffect,
   createMemo,
   createResource,
   createSignal,
@@ -98,11 +99,29 @@ export function TimeScrubber(): JSX.Element {
   const [rovingHour, setRovingHour] = createSignal(new Date(initialNowMs).getUTCHours());
   const hourButtons: (HTMLButtonElement | undefined)[] = [];
   let copyResetTimer: ReturnType<typeof setTimeout> | null = null;
+  let copyEpoch = 0;
+  let disposed = false;
   let followsCurrentUtcDay = true;
 
   const activeChannel = createMemo(() => {
     const view = activeView();
     return view.kind === 'channel' ? view.channel : null;
+  });
+
+  const clearCopyResetTimer = (): void => {
+    if (copyResetTimer) clearTimeout(copyResetTimer);
+    copyResetTimer = null;
+  };
+
+  // The scrubber stays mounted while activeView changes. Retire clipboard
+  // feedback whenever its room or selected moment changes so an old write can
+  // never describe the replacement room.
+  createEffect(() => {
+    void activeChannel();
+    void selectedMoment().getTime();
+    copyEpoch += 1;
+    clearCopyResetTimer();
+    setCopyState('idle');
   });
 
   const [pulse, { refetch }] = createResource(
@@ -122,8 +141,10 @@ export function TimeScrubber(): JSX.Element {
     void refetch();
   }, REFRESH_MS);
   onCleanup(() => {
+    disposed = true;
+    copyEpoch += 1;
     clearInterval(timer);
-    if (copyResetTimer) clearTimeout(copyResetTimer);
+    clearCopyResetTimer();
   });
 
   const bars = createMemo(() =>
@@ -199,19 +220,26 @@ export function TimeScrubber(): JSX.Element {
   async function copyMoment(): Promise<void> {
     const channel = activeChannel();
     if (!channel) return;
+    const moment = selectedMoment();
+    const momentMs = moment.getTime();
     const href = typeof window !== 'undefined' ? window.location.href : undefined;
-    const link = buildMomentLink(channel, selectedMoment(), href);
+    const link = buildMomentLink(channel, moment, href);
+    const epoch = ++copyEpoch;
 
-    if (copyResetTimer) {
-      clearTimeout(copyResetTimer);
-      copyResetTimer = null;
-    }
+    clearCopyResetTimer();
     setCopyState('idle');
 
     const copied = await writeClipboardText(link);
+    if (
+      disposed
+      || epoch !== copyEpoch
+      || activeChannel() !== channel
+      || selectedMoment().getTime() !== momentMs
+    ) return;
     setCopyState(copied ? 'copied' : 'failed');
     if (copied) {
       copyResetTimer = setTimeout(() => {
+        if (disposed || epoch !== copyEpoch) return;
         setCopyState('idle');
         copyResetTimer = null;
       }, COPY_RESET_MS);

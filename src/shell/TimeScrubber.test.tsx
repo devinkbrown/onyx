@@ -225,6 +225,33 @@ describe('TimeScrubber accessibility', () => {
     });
   });
 
+  it('ignores an old room copy completion after the active channel changes', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      hours: Array.from({ length: 24 }, () => 0),
+      totals: { messages: 0 },
+    }), { status: 200 })));
+    let resolveCopy: (() => void) | undefined;
+    const pendingCopy = new Promise<void>((resolve) => {
+      resolveCopy = resolve;
+    });
+    const writeText = vi.fn(() => pendingCopy);
+    vi.stubGlobal('navigator', { clipboard: { writeText } });
+
+    render(() => <TimeScrubber />);
+    fireEvent.click(screen.getByRole('button', { name: 'Copy moment link for #root' }));
+    expect(writeText).toHaveBeenCalledOnce();
+
+    store.setState({ activeView: { kind: 'channel', channel: '#secret' } });
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Copy moment link for #secret' })).toBeInTheDocument());
+    expect(screen.getByRole('status')).toHaveTextContent('');
+    resolveCopy?.();
+    await pendingCopy;
+    await Promise.resolve();
+    expect(screen.getByRole('status')).toHaveTextContent('');
+    expect(screen.getByRole('button', { name: 'Copy moment link for #secret' })).toHaveTextContent('Copy moment');
+  });
+
   it('shows and announces clipboard rejection without persisting the moment link', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       hours: Array.from({ length: 24 }, () => 0),
