@@ -5,7 +5,8 @@ import type { ChatMessage } from '@/lib/irc/types';
 import { isEnvelope } from '@/lib/e2ee/dmCipher';
 import { preferences } from '@/lib/prefs/preferences';
 import { VAULT_SEARCH_MODES, loadDefaultVaultSearchMode } from '@/lib/prefs/vaultSearchMode';
-import { searchVault } from '@/lib/vault/historyVault';
+import { classifyVaultDmSearchPrivacy, searchVault } from '@/lib/vault/historyVault';
+import { getVaultDmSearchPrivacy, subscribeVaultDmSearchPrivacy } from '@/lib/vault/dmSearchPrivacy';
 import { searchVaultSemantic } from '@/lib/vault/searchVaultSemantic';
 import { searchVaultHybrid } from '@/lib/vault/searchVaultHybrid';
 import {
@@ -281,6 +282,25 @@ export function useMessageSearch(): UseMessageSearch {
   const peerDmKeys = useStore((s) => s.peerDmKeys);
   const client = useStore((s) => s.client);
 
+  // IndexedDB classification is async, but its result must participate in this
+  // reactive search gate. Missing/invalidated targets remain `unknown` and thus
+  // fail closed until the complete target scan proves them plain.
+  const [vaultPrivacyRevision, setVaultPrivacyRevision] = createSignal(0);
+  onCleanup(subscribeVaultDmSearchPrivacy(() => {
+    setVaultPrivacyRevision((revision) => revision + 1);
+  }));
+
+  createEffect(() => {
+    const view = activeView();
+    if (view.kind === 'dm') void classifyVaultDmSearchPrivacy(view.nick);
+  });
+
+  const activeDmVaultPrivacy = createMemo(() => {
+    vaultPrivacyRevision();
+    const view = activeView();
+    return view.kind === 'dm' ? getVaultDmSearchPrivacy(view.nick) : 'plain';
+  });
+
   const channelTypes = createMemo(() => client()?.isupport.CHANTYPES ?? '#&');
 
   const searchTarget = createMemo(() => {
@@ -304,6 +324,7 @@ export function useMessageSearch(): UseMessageSearch {
       (message) => message.encrypted || isEnvelope(message.text),
     ) ?? false;
     return containsEncryptedHistory
+      || activeDmVaultPrivacy() !== 'plain'
       || (preferences().e2eeDms && peerDmKeys().has(key));
   });
 

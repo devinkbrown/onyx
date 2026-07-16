@@ -22,7 +22,8 @@ import { formatTaggedLine, parseAccountInfo, parseCHANLIMIT, parseMonitorNumeric
 import type { SuimyakuPeerState, SuimyakuRoomStats, CallState } from '@/lib/suimyaku-media/types';
 import { getMountedSuimyakuMediaEngine } from '@/lib/mediaEngineMount';
 import { parseActivity } from '@/lib/activity';
-import { OUTBOX_MAX_AGE_MS, deleteOutboxEntry, loadAround, loadOutbox, loadRecent, queueOutbox, type OutboxEntry } from '@/lib/vault/historyVault';
+import { OUTBOX_MAX_AGE_MS, classifyVaultDmSearchPrivacy, deleteOutboxEntry, loadAround, loadOutbox, loadRecent, queueOutbox, type OutboxEntry } from '@/lib/vault/historyVault';
+import { getVaultDmSearchPrivacy } from '@/lib/vault/dmSearchPrivacy';
 import { boundedSearchField, boundedSearchQuery } from '@/lib/vault/searchBounds';
 import { parseScheduledMessages, selectDueMessages } from '@/lib/schedule/dispatch';
 import { deviceKeys, isEnvelope } from '@/lib/e2ee/dmCipher';
@@ -3987,14 +3988,29 @@ export const store = createStore<OnyxState>()(
       const encryptedDm = dm?.messages.some(
         (message) => message.encrypted || isEnvelope(message.text),
       ) ?? false;
-      if (encryptedDm || (preferences().e2eeDms && state.peerDmKeys.has(targetKey))) {
+      const chantypes = client.isupport.CHANTYPES ?? '#&';
+      const targetIsDm = !chantypes.includes(cleanTarget[0]!);
+      const vaultPrivacy = targetIsDm ? getVaultDmSearchPrivacy(targetKey) : 'plain';
+      const encryptedBoundary = targetIsDm && (
+        encryptedDm
+        || vaultPrivacy === 'encrypted'
+        || (preferences().e2eeDms && state.peerDmKeys.has(targetKey))
+      );
+      const privacyUnknown = targetIsDm && vaultPrivacy === 'unknown';
+      if (encryptedBoundary || privacyUnknown) {
+        // The action is a public boundary, not just a UI helper. Start the proof
+        // for a direct caller, but never hold/replay its sensitive query: the user
+        // can retry only after the target is synchronously known plain.
+        if (privacyUnknown) void classifyVaultDmSearchPrivacy(targetKey);
         set({
           serverSearch: {
             target: cleanTarget,
             query: trimmed,
             status: 'error',
             results: [],
-            error: 'Encrypted conversation search stays on this device.',
+            error: encryptedBoundary
+              ? 'Encrypted conversation search stays on this device.'
+              : 'Checking device history before server search. Try again shortly.',
             notice: null,
           },
         });

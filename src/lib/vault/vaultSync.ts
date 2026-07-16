@@ -13,7 +13,7 @@
 import { store, getState } from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
 import { preferences } from '@/lib/prefs/preferences';
-import { loadRecent, saveMessages } from './historyVault';
+import { classifyVaultDmSearchPrivacy, loadRecent, saveMessages } from './historyVault';
 
 const FLUSH_MS = 1500;
 
@@ -115,11 +115,17 @@ function scheduleFlush(target: string, messages: readonly ChatMessage[]): void {
   );
 }
 
-async function hydrate(target: string): Promise<void> {
+async function hydrate(target: string, dm = false): Promise<void> {
   const key = target.toLowerCase();
   if (_hydrated.has(key)) return;
   _hydrated.add(key);
-  const local = await loadRecent(key);
+  // DM classification covers the complete retained target, independent of the
+  // bounded rows hydration returns. Run both together; privacy remains unknown
+  // (and server SEARCH stays blocked) until the full scan proves it plain.
+  const [local] = await Promise.all([
+    loadRecent(key),
+    dm ? classifyVaultDmSearchPrivacy(key) : Promise.resolve(),
+  ]);
   if (local.length === 0) return;
   getState().hydrateHistory(key, local);
 }
@@ -145,7 +151,7 @@ export function initVaultSync(): void {
       (dms) => {
         if (!preferences().localHistory) return;
         for (const [key, dm] of dms) {
-          if (!_hydrated.has(key)) void hydrate(key);
+          if (!_hydrated.has(key)) void hydrate(key, true);
           if (dm.messages.length > 0) scheduleFlush(key, dm.messages);
         }
       },

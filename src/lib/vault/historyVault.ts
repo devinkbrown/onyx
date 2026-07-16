@@ -14,9 +14,20 @@
  *    reply metadata survive; functions/Sets never enter a ChatMessage.
  */
 import type { ChatMessage } from '@/lib/irc/types';
+import { isEnvelope } from '@/lib/e2ee/dmCipher';
 import { clearAllTopicReads } from '@/lib/topics/topicReadLedger';
 import { effectiveKeep, resolvePolicyForChannel, type RetentionPolicy } from './retentionPolicy';
 import { boundedSearchField, boundedSearchQuery } from './searchBounds';
+import {
+  _resetVaultDmSearchPrivacyForTests,
+  beginVaultDmPrivacyClear,
+  captureVaultDmPrivacyEpoch,
+  commitVaultDmSearchPrivacy,
+  finishVaultDmPrivacyClear,
+  invalidateVaultDmSearchPrivacy,
+  isVaultDmSearchPrivacyTracked,
+  type VaultDmSearchPrivacy,
+} from './dmSearchPrivacy';
 
 const DB_NAME = 'onyx-vault';
 const DB_VERSION = 3;
@@ -152,7 +163,10 @@ export async function applyRetentionPolicy(policy: RetentionPolicy | null): Prom
   if (!db) return false;
   const targets = await storedTargetKeys(db);
   for (const target of targets) {
+    const tracked = isVaultDmSearchPrivacyTracked(target);
+    if (tracked) invalidateVaultDmSearchPrivacy(target);
     await pruneTarget(db, target, policy);
+    if (tracked) await classifyVaultDmSearchPrivacy(target);
   }
   return true;
 }
@@ -260,6 +274,11 @@ export function deserializeMessage(row: StoredMessage): ChatMessage {
  */
 export async function saveMessages(target: string, msgs: readonly ChatMessage[]): Promise<boolean> {
   if (msgs.length === 0) return true;
+  const privacyTracked = isVaultDmSearchPrivacyTracked(target)
+    || msgs.some((message) => message.encrypted || isEnvelope(message.text));
+  // Invalidate before the first await. SEARCH is synchronous, so even the small
+  // window while a write is opening IndexedDB must not reuse an older `plain`.
+  if (privacyTracked) invalidateVaultDmSearchPrivacy(target);
   const db = await openVault();
   if (!db) return false;
   try {
@@ -274,11 +293,16 @@ export async function saveMessages(target: string, msgs: readonly ChatMessage[])
     const store = tx.objectStore(STORE);
     for (const m of tail) store.put(serializeMessage(target, m));
     const committed = await txDone(tx);
-    if (!committed) return false;
+    if (!committed) {
+      if (privacyTracked) await classifyVaultDmSearchPrivacy(target);
+      return false;
+    }
     await pruneTarget(db, target.toLowerCase(), _retentionPolicy);
+    if (privacyTracked) await classifyVaultDmSearchPrivacy(target);
     return true;
   } catch {
     /* quota / private mode — the vault is best-effort */
+    if (privacyTracked) await classifyVaultDmSearchPrivacy(target);
     return false;
   }
 }
@@ -310,6 +334,60 @@ export async function loadRecent(target: string, limit = VAULT_KEEP): Promise<Ch
   } catch {
     return [];
   }
+}
+
+/**
+ * Prove whether one DM target's complete on-device transcript is plain.
+ *
+ * This intentionally scans every retained row for the target rather than the
+ * bounded hydration window: one older encrypted row is enough to keep a query
+ * off the server. Cursor/transaction/open failures return `unknown`, never
+ * `plain`. Epoch commit prevents a scan racing save/import/clear from publishing
+ * a stale proof after that mutation begins.
+ */
+export async function classifyVaultDmSearchPrivacy(target: string): Promise<VaultDmSearchPrivacy> {
+  const epoch = captureVaultDmPrivacyEpoch(target);
+  if (typeof indexedDB === 'undefined') {
+    return commitVaultDmSearchPrivacy(epoch, 'plain') ? 'plain' : 'unknown';
+  }
+  const db = await openVault();
+  if (!db) {
+    commitVaultDmSearchPrivacy(epoch, 'unknown');
+    return 'unknown';
+  }
+
+  let privacy: VaultDmSearchPrivacy;
+  try {
+    privacy = await new Promise<VaultDmSearchPrivacy>((resolve) => {
+      let result: VaultDmSearchPrivacy = 'plain';
+      let settled = false;
+      const finish = (next: VaultDmSearchPrivacy): void => {
+        if (settled) return;
+        settled = true;
+        resolve(next);
+      };
+      const tx = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).index('by_target_time').openCursor(targetKeyRange(epoch.target));
+      req.onsuccess = () => {
+        const cursor = req.result;
+        if (!cursor) return;
+        const row = cursor.value as StoredMessage;
+        if (row.encrypted || isEnvelope(row.text)) {
+          result = 'encrypted';
+          return;
+        }
+        cursor.continue();
+      };
+      req.onerror = () => { result = 'unknown'; };
+      tx.oncomplete = () => finish(result);
+      tx.onerror = () => finish('unknown');
+      tx.onabort = () => finish('unknown');
+    });
+  } catch {
+    privacy = 'unknown';
+  }
+
+  return commitVaultDmSearchPrivacy(epoch, privacy) ? privacy : 'unknown';
 }
 
 /** Load the local messages nearest a timestamp, returned chronological. */
@@ -946,6 +1024,9 @@ export async function deleteOutboxEntry(id: string): Promise<void> {
 
 /** Wipe the whole vault (preferences "forget this device"). */
 export async function clearVault(): Promise<boolean> {
+  // SEARCH must fail closed for the entire clear/verification window. Only a
+  // physically verified empty store promotes every target back to plain.
+  const privacyGeneration = beginVaultDmPrivacyClear();
   // Topic cursors are device-local transcript memory too. Clear them even when
   // IndexedDB is unavailable so "forget this device" has one consistent
   // privacy boundary across the vault and localStorage.
@@ -956,7 +1037,11 @@ export async function clearVault(): Promise<boolean> {
   // message rows are absent. A browser with no IndexedDB implementation has no
   // vault to wipe and remains a successful no-op; an implementation that was
   // present but failed to open cannot be verified.
-  if (!db) return !indexedDbAvailable && topicReadsCleared;
+  if (!db) {
+    const cleared = !indexedDbAvailable && topicReadsCleared;
+    finishVaultDmPrivacyClear(privacyGeneration, cleared);
+    return cleared;
+  }
   try {
     const tx = db.transaction([STORE, OUTBOX], 'readwrite');
     const outbox = tx.objectStore(OUTBOX);
@@ -968,7 +1053,10 @@ export async function clearVault(): Promise<boolean> {
     tx.objectStore(STORE).clear();
     outbox.clear();
     const committed = await txDone(tx);
-    if (!committed) return false;
+    if (!committed) {
+      finishVaultDmPrivacyClear(privacyGeneration, false);
+      return false;
+    }
     const [messageCount, outboxCount, sanitizedOutbox] = await Promise.all([
       physicalStoreCount(db, STORE),
       physicalOutboxCount(db),
@@ -976,8 +1064,11 @@ export async function clearVault(): Promise<boolean> {
     ]);
     const outboxVerified = outboxCount === 0 && sanitizedOutbox.length === 0;
     if (outboxHadRows && outboxVerified) notifyOutbox({ kind: 'cleared' });
-    return messageCount === 0 && outboxVerified && topicReadsCleared;
+    const cleared = messageCount === 0 && outboxVerified && topicReadsCleared;
+    finishVaultDmPrivacyClear(privacyGeneration, cleared);
+    return cleared;
   } catch {
+    finishVaultDmPrivacyClear(privacyGeneration, false);
     return false;
   }
 }
@@ -1001,4 +1092,5 @@ export function _resetVaultForTests(): void {
   _retentionPolicy = null;
   _outboxSeq = 0;
   _outboxListeners.clear();
+  _resetVaultDmSearchPrivacyForTests();
 }
