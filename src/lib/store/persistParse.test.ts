@@ -2,10 +2,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   parseCounterRecord,
-  parseCtcpConfig,
   parseEmojiArray,
   parseFriendArray,
-  normalizeCtcpVersionReply,
   parseStringArray,
   parseStringArrayRecord,
   parseStringRecord,
@@ -227,19 +225,4 @@ describe('structured persisted preferences', () => {
     expect(parseFriendArray('{}')).toEqual([]);
   });
 
-  it('normalizes CTCP configuration without trusting valid JSON shape', () => {
-    expect(parseCtcpConfig(JSON.stringify({
-      versionReply: 'Custom\r\n\0\x01Reply',
-      timeEnabled: false,
-    }))).toEqual({ versionReply: 'CustomReply', timeEnabled: false });
-    expect(parseCtcpConfig(JSON.stringify({ versionReply: 7, timeEnabled: 'yes' }))).toEqual({
-      versionReply: 'Onyx IRC Client',
-      timeEnabled: true,
-    });
-    expect(parseCtcpConfig('[]')).toEqual({
-      versionReply: 'Onyx IRC Client',
-      timeEnabled: true,
-    });
-    expect(normalizeCtcpVersionReply('x'.repeat(300))).toHaveLength(256);
-  });
 });

@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { createStore } from 'zustand/vanilla';
 import { subscribeWithSelector } from 'zustand/middleware';
-import {
-  parseCtcpConfig,
-  normalizeCtcpVersionReply,
-} from './persistParse';
 import { parseStoredVoiceSettings, type StoredVoiceSettings } from './voiceSettingsPersistence';
 import {
   emptyChannelNavigationMemory,
@@ -112,6 +108,12 @@ import {
 } from '@/lib/identityOverrides';
 import { loadAutoJoinChannels, saveAutoJoinChannels } from '@/lib/autoJoinMemory';
 import { loadChannelColors, saveChannelColors } from '@/lib/channelColorMemory';
+import {
+  DEFAULT_CTCP_CONFIG,
+  loadCtcpConfig,
+  normalizeCtcpVersionReply,
+  saveCtcpConfig,
+} from '@/lib/ctcpMemory';
 import {
   DEFAULT_FAVORITE_EMOJIS,
   MAX_EMOJI_USAGE_COUNT,
@@ -2815,6 +2817,8 @@ function _resetAccountBoundState(
       favoriteEmojis: [...DEFAULT_FAVORITE_EMOJIS],
       emojiUsageCounts: {},
       emojiSkinTone: '',
+      ctcpVersionReply: DEFAULT_CTCP_CONFIG.versionReply,
+      ctcpTimeEnabled: DEFAULT_CTCP_CONFIG.timeEnabled,
       mutedDMs: new Set(),
       userNotes: new Map(),
       topicHistory: {},
@@ -3592,6 +3596,17 @@ function _loadOwnedEmojiMemory(
   return owner ? loadEmojiMemory(owner) : emptyEmojiMemory();
 }
 
+function _loadOwnedCtcpConfig(
+  state: Pick<OnyxState, 'server' | 'ourNick'>,
+): Pick<OnyxState, 'ctcpVersionReply' | 'ctcpTimeEnabled'> {
+  const owner = selectDeviceMemoryOwner(state);
+  const config = owner ? loadCtcpConfig(owner) : DEFAULT_CTCP_CONFIG;
+  return {
+    ctcpVersionReply: config.versionReply,
+    ctcpTimeEnabled: config.timeEnabled,
+  };
+}
+
 function _loadOwnedMutedDMs(
   state: Pick<OnyxState, 'server' | 'ourNick'>,
 ): Set<string> {
@@ -3958,6 +3973,7 @@ function deliverChatMessage(
 // ── Store ─────────────────────────────────────────────────────────────────────
 
 const _initialEmojiMemory = loadEmojiMemory();
+const _initialCtcpConfig = loadCtcpConfig();
 
 export const store = createStore<OnyxState>()(
   subscribeWithSelector<OnyxState>((set, get) => ({
@@ -4381,6 +4397,7 @@ export const store = createStore<OnyxState>()(
               autoJoinChannels: _loadOwnedAutoJoinChannels({ server, ourNick: newNick }),
               channelColors: _loadOwnedChannelColors({ server, ourNick: newNick }),
               ..._loadOwnedEmojiMemory({ server, ourNick: newNick }),
+              ..._loadOwnedCtcpConfig({ server, ourNick: newNick }),
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: newNick }),
               friends: _loadOwnedFriends({ server, ourNick: newNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: newNick }),
@@ -4475,6 +4492,7 @@ export const store = createStore<OnyxState>()(
               autoJoinChannels: _loadOwnedAutoJoinChannels({ server: srv, ourNick: get().ourNick }),
               channelColors: _loadOwnedChannelColors({ server: srv, ourNick: get().ourNick }),
               ..._loadOwnedEmojiMemory({ server: srv, ourNick: get().ourNick }),
+              ..._loadOwnedCtcpConfig({ server: srv, ourNick: get().ourNick }),
               mutedDMs: _loadOwnedMutedDMs({ server: srv, ourNick: get().ourNick }),
               friends: _loadOwnedFriends({ server: srv, ourNick: get().ourNick }),
               watchList: _loadOwnedWatchList({ server: srv, ourNick: get().ourNick }),
@@ -7603,6 +7621,7 @@ export const store = createStore<OnyxState>()(
               autoJoinChannels: _loadOwnedAutoJoinChannels({ server, ourNick: s.ourNick }),
               channelColors: _loadOwnedChannelColors({ server, ourNick: s.ourNick }),
               ..._loadOwnedEmojiMemory({ server, ourNick: s.ourNick }),
+              ..._loadOwnedCtcpConfig({ server, ourNick: s.ourNick }),
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
               friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
@@ -8263,6 +8282,7 @@ export const store = createStore<OnyxState>()(
                   autoJoinChannels: _loadOwnedAutoJoinChannels({ server, ourNick: s.ourNick }),
                   channelColors: _loadOwnedChannelColors({ server, ourNick: s.ourNick }),
                   ..._loadOwnedEmojiMemory({ server, ourNick: s.ourNick }),
+                  ..._loadOwnedCtcpConfig({ server, ourNick: s.ourNick }),
                 };
               });
               _saslAccount = null;
@@ -8840,6 +8860,7 @@ export const store = createStore<OnyxState>()(
                 autoJoinChannels: _loadOwnedAutoJoinChannels({ server, ourNick: newNick }),
                 channelColors: _loadOwnedChannelColors({ server, ourNick: newNick }),
                 ..._loadOwnedEmojiMemory({ server, ourNick: newNick }),
+                ..._loadOwnedCtcpConfig({ server, ourNick: newNick }),
                 mutedDMs: _loadOwnedMutedDMs({ server, ourNick: newNick }),
                 friends: _loadOwnedFriends({ server, ourNick: newNick }),
                 watchList: _loadOwnedWatchList({ server, ourNick: newNick }),
@@ -10060,6 +10081,7 @@ export const store = createStore<OnyxState>()(
                 autoJoinChannels: _loadOwnedAutoJoinChannels({ server, ourNick: s.ourNick }),
                 channelColors: _loadOwnedChannelColors({ server, ourNick: s.ourNick }),
                 ..._loadOwnedEmojiMemory({ server, ourNick: s.ourNick }),
+                ..._loadOwnedCtcpConfig({ server, ourNick: s.ourNick }),
                 mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
                 friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
                 watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
@@ -10112,6 +10134,7 @@ export const store = createStore<OnyxState>()(
               autoJoinChannels: _loadOwnedAutoJoinChannels({ server, ourNick: s.ourNick }),
               channelColors: _loadOwnedChannelColors({ server, ourNick: s.ourNick }),
               ..._loadOwnedEmojiMemory({ server, ourNick: s.ourNick }),
+              ..._loadOwnedCtcpConfig({ server, ourNick: s.ourNick }),
               mutedDMs: _loadOwnedMutedDMs({ server, ourNick: s.ourNick }),
               friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
@@ -11081,20 +11104,31 @@ export const store = createStore<OnyxState>()(
     },
 
     // ── CTCP configuration ────────────────────────────────────────────────
-    ctcpVersionReply: _loadCTCPConfig().versionReply,
-    ctcpTimeEnabled: _loadCTCPConfig().timeEnabled,
+    ctcpVersionReply: _initialCtcpConfig.versionReply,
+    ctcpTimeEnabled: _initialCtcpConfig.timeEnabled,
     ctcpPingEnabled: true,
     ctcpEnabled: true,
     setCTCPVersionReply: (reply) => {
-      const versionReply = normalizeCtcpVersionReply(reply);
-      const cfg = { ..._loadCTCPConfig(), versionReply };
-      _saveCTCPConfig(cfg);
-      set({ ctcpVersionReply: versionReply });
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
+      set(s => {
+        const saved = saveCtcpConfig({
+          versionReply: normalizeCtcpVersionReply(reply),
+          timeEnabled: s.ctcpTimeEnabled,
+        }, owner);
+        return saved ? { ctcpVersionReply: saved.versionReply } : {};
+      });
     },
     setCTCPTimeEnabled: (enabled) => {
-      const cfg = { ..._loadCTCPConfig(), timeEnabled: enabled };
-      _saveCTCPConfig(cfg);
-      set({ ctcpTimeEnabled: enabled });
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
+      set(s => {
+        const saved = saveCtcpConfig({
+          versionReply: s.ctcpVersionReply,
+          timeEnabled: enabled,
+        }, owner);
+        return saved ? { ctcpTimeEnabled: saved.timeEnabled } : {};
+      });
     },
     setCTCPPingEnabled: (enabled) => set({ ctcpPingEnabled: enabled }),
     setCTCPEnabled: (enabled) => set({ ctcpEnabled: enabled }),
@@ -13240,22 +13274,6 @@ function _addDMMessage(
   }
 
   return { dms };
-}
-
-// ── CTCP config helpers ───────────────────────────────────────────────────────
-
-const CTCP_CONFIG_KEY = 'onyx:ctcp-config';
-interface CTCPConfig { versionReply: string; timeEnabled: boolean; }
-
-function _loadCTCPConfig(): CTCPConfig {
-  if (typeof window === 'undefined') return parseCtcpConfig(null);
-  try {
-    return parseCtcpConfig(localStorage.getItem(CTCP_CONFIG_KEY));
-  } catch { return parseCtcpConfig(null); }
-}
-function _saveCTCPConfig(cfg: CTCPConfig): void {
-  if (typeof window === 'undefined') return;
-  try { localStorage.setItem(CTCP_CONFIG_KEY, JSON.stringify(cfg)); } catch {}
 }
 
 // ── Time format persistence ────────────────────────────────────────────────────

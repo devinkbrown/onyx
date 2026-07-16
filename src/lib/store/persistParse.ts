@@ -24,8 +24,6 @@ const MAX_PERSISTED_RECORD_VALUE_LENGTH = 2_048;
 const MAX_PERSISTED_NESTED_ITEMS = 32;
 const MAX_PERSISTED_NICK_LENGTH = 128;
 const MAX_PERSISTED_NOTE_LENGTH = 512;
-export const DEFAULT_CTCP_VERSION_REPLY = 'Onyx IRC Client';
-const MAX_CTCP_VERSION_REPLY_LENGTH = 256;
 
 function parseRecord(raw: string | null): Record<string, unknown> | null {
   if (!raw || raw.length > MAX_PERSISTED_COLLECTION_BYTES) return null;
@@ -146,25 +144,6 @@ export function parseFriendArray(raw: string | null): PersistedFriend[] {
     out.push(friend);
   }
   return out;
-}
-
-export interface PersistedCtcpConfig {
-  versionReply: string;
-  timeEnabled: boolean;
-}
-
-/** Keep CTCP replies within one IRC line and prevent embedded CTCP delimiters. */
-export function normalizeCtcpVersionReply(value: unknown): string {
-  if (typeof value !== 'string') return DEFAULT_CTCP_VERSION_REPLY;
-  return value.replace(/[\0\r\n\x01]/g, '').slice(0, MAX_CTCP_VERSION_REPLY_LENGTH);
-}
-
-export function parseCtcpConfig(raw: string | null): PersistedCtcpConfig {
-  const parsed = parseRecord(raw);
-  return {
-    versionReply: normalizeCtcpVersionReply(parsed?.versionReply),
-    timeEnabled: typeof parsed?.timeEnabled === 'boolean' ? parsed.timeEnabled : true,
-  };
 }
 
 export function parseStringArray(raw: string | null): string[] {
