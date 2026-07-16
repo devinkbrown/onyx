@@ -680,6 +680,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
         <MemberList
           hidden={!membersVisible()}
           modal={isMobile()}
+          onClose={closeMobileMembers}
           onOpenDm={openMemberDm}
           onOpenWhois={openMemberWhois}
         />

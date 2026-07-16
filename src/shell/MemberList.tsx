@@ -31,7 +31,7 @@ import {
 import { useStore, getState, selectIsChannelOp } from '@/lib/store';
 import type { ChannelUser } from '@/lib/irc/types';
 import { createGroupReconciler, type ResolvedRole } from '@/lib/memberGroups';
-import { Avatar, Popover, Button } from '@/primitives/index';
+import { Avatar, Popover, Button, IconButton } from '@/primitives/index';
 
 // Role resolution, grouping, and identity-stable reconciliation live in
 // `@/lib/memberGroups` (unit-tested there). See that module for why entry/group
@@ -338,12 +338,13 @@ function MemberRow(props: MemberRowProps): JSX.Element {
 export type MemberListProps = {
   hidden?: boolean;
   modal?: boolean;
+  onClose?: () => void;
   onOpenDm?: (nick: string) => void;
   onOpenWhois?: (nick: string, returnFocus: HTMLElement) => void;
 };
 
 export function MemberList(props: MemberListProps): JSX.Element {
-  const [local] = splitProps(props, ['hidden', 'modal', 'onOpenDm', 'onOpenWhois']);
+  const [local] = splitProps(props, ['hidden', 'modal', 'onClose', 'onOpenDm', 'onOpenWhois']);
   let memberListRef: HTMLElement | undefined;
 
   const activeView = useStore((s) => s.activeView);
@@ -426,7 +427,7 @@ export function MemberList(props: MemberListProps): JSX.Element {
       tabindex={!local.hidden ? -1 : undefined}
     >
       <div class="shell-members-head">
-        <span>members</span>
+        <span class="shell-members-title">members</span>
         {/*
           Not a live region: on a busy channel the count churns on every
           join/leave (and on history replay / ?at= time-travel / roster
@@ -435,16 +436,28 @@ export function MemberList(props: MemberListProps): JSX.Element {
           accessible name so it reads meaningfully on demand, but membership
           changes are announced elsewhere — never by re-reading this number.
         */}
-        <span class="shell-members-head-meta">
-          <Show when={isRefreshingRoster() && groups().length > 0}>
-            <span class="shell-members-refresh" role="status" aria-label="Refreshing members">sync</span>
-          </Show>
-          <span
-            class="shell-members-count"
-            aria-label={`${totalCount()} member${totalCount() === 1 ? '' : 's'}`}
-          >
-            {totalCount()}
+        <span class="shell-members-head-actions">
+          <span class="shell-members-head-meta">
+            <Show when={isRefreshingRoster() && groups().length > 0}>
+              <span class="shell-members-refresh" role="status" aria-label="Refreshing members">sync</span>
+            </Show>
+            <span
+              class="shell-members-count"
+              aria-label={`${totalCount()} member${totalCount() === 1 ? '' : 's'}`}
+            >
+              {totalCount()}
+            </span>
           </span>
+          <Show when={local.modal && !local.hidden && local.onClose}>
+            <IconButton
+              class="shell-members-close"
+              size="sm"
+              label="Close member list"
+              onClick={() => local.onClose?.()}
+            >
+              ×
+            </IconButton>
+          </Show>
         </span>
       </div>
 

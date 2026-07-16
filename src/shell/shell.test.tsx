@@ -1326,7 +1326,7 @@ describe('AppShell', () => {
       });
     });
 
-    it('keeps the closed mobile member drawer inert, then restores its trigger after Escape', async () => {
+    it('keeps the closed mobile member drawer inert and restores its trigger from the modal close control', async () => {
       stubMobileViewport();
       seedStore('#general');
 
@@ -1352,7 +1352,6 @@ describe('AppShell', () => {
       fireEvent.click(membersButton);
 
       await waitFor(() => {
-        const members = screen.getByRole('region', { name: 'Channel members in #general' });
         expect(memberList).toHaveAttribute('aria-hidden', 'false');
         expect(memberList).not.toHaveAttribute('inert');
         expect(sidebar).toHaveAttribute('inert');
@@ -1361,10 +1360,10 @@ describe('AppShell', () => {
         for (const trigger of memberList!.querySelectorAll<HTMLButtonElement>('.onyx-popover__trigger')) {
           expect(trigger).not.toBeDisabled();
         }
-        expect(members.contains(document.activeElement)).toBe(true);
+        expect(within(memberList!).getByRole('button', { name: 'Close member list' })).toHaveFocus();
       });
 
-      fireEvent.keyDown(document, { key: 'Escape' });
+      fireEvent.click(within(memberList!).getByRole('button', { name: 'Close member list' }));
 
       await waitFor(() => {
         expect(memberList).toHaveAttribute('aria-hidden', 'true');
@@ -1496,10 +1495,11 @@ describe('AppShell', () => {
 
       const drawer = await screen.findByRole('dialog', { name: 'Member list for #general' });
       expect(drawer).toHaveAttribute('aria-modal', 'true');
-      await waitFor(() => expect(drawer).toHaveFocus());
+      const closeButton = within(drawer).getByRole('button', { name: 'Close member list' });
+      await waitFor(() => expect(closeButton).toHaveFocus());
 
       fireEvent.keyDown(document, { key: 'Tab' });
-      expect(drawer).toHaveFocus();
+      expect(closeButton).toHaveFocus();
 
       fireEvent.keyDown(document, { key: 'Escape' });
       await waitFor(() => {

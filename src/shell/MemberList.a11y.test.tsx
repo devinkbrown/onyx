@@ -79,6 +79,20 @@ afterEach(() => {
 });
 
 describe('MemberList accessibility', () => {
+  it('provides an operable close control only when the roster is an open modal', () => {
+    seedChannel([makeUser('me', ['o']), makeUser('bob', ['v'])]);
+    const onClose = vi.fn();
+    const { unmount } = render(() => <MemberList modal onClose={onClose} />);
+
+    const closeButton = screen.getByRole('button', { name: 'Close member list' });
+    fireEvent.click(closeButton);
+    expect(onClose).toHaveBeenCalledOnce();
+
+    unmount();
+    render(() => <MemberList onClose={onClose} />);
+    expect(screen.queryByRole('button', { name: 'Close member list' })).toBeNull();
+  });
+
   it('makes a hidden roster inert and removes its member controls from keyboard access', () => {
     seedChannel([makeUser('me', ['o']), makeUser('bob', ['v'])]);
 
