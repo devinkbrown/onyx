@@ -35,6 +35,10 @@ import {
   recordClientExtensionActionRun,
   type ClientExtensionAction,
 } from '@/lib/extensions/clientActions';
+import {
+  deviceMemoryOwnerKey,
+  type DeviceMemoryOwner,
+} from '@/lib/deviceMemoryOwner';
 import { writeClipboardText } from '@/lib/clipboard/writeClipboardText';
 import { useSpotlight } from './useSpotlight';
 import { parseTimeExpr } from './timeGrammar';
@@ -51,7 +55,7 @@ export type SpotlightCommand = {
   run: () => void | Promise<void>;
 };
 
-type CommandState = Pick<State, 'channels' | 'dms' | 'server' | 'networkName' | 'activeView' | 'showMemberList' | 'voice'>;
+type CommandState = Pick<State, 'channels' | 'dms' | 'server' | 'ourNick' | 'networkName' | 'activeView' | 'showMemberList' | 'voice'>;
 
 const BACKGROUND_STORAGE_KEY = 'onyx:bg';
 const SPOTLIGHT_INPUT_ID = 'onyx-spotlight-input';
@@ -968,7 +972,16 @@ async function copyText(text: string): Promise<void> {
   await writeClipboardText(text);
 }
 
-function runClientExtensionAction(action: ClientExtensionAction): void | Promise<void> {
+function runClientExtensionAction(
+  action: ClientExtensionAction,
+  owner: DeviceMemoryOwner,
+): void | Promise<void> {
+  const expectedOwnerKey = deviceMemoryOwnerKey(owner);
+  const currentOwner = selectDeviceMemoryOwner(getState());
+  if (!expectedOwnerKey || !currentOwner || deviceMemoryOwnerKey(currentOwner) !== expectedOwnerKey) {
+    return;
+  }
+
   if (action.capability === 'open-url' && action.url) {
     if (typeof window === 'undefined') return;
     try {
@@ -976,7 +989,7 @@ function runClientExtensionAction(action: ClientExtensionAction): void | Promise
       // Browsers intentionally return null for `noopener` even when a new tab
       // opened, so the most accurate observable success boundary is that the
       // dispatch itself did not throw.
-      recordClientExtensionActionRun(action);
+      recordClientExtensionActionRun(action, owner);
     } catch {
       // A failed dispatch is not an action run and must not enter the audit.
     }
@@ -984,19 +997,20 @@ function runClientExtensionAction(action: ClientExtensionAction): void | Promise
   }
   if (action.capability === 'copy-text' && action.text) {
     return writeClipboardText(action.text).then((copied) => {
-      if (copied) recordClientExtensionActionRun(action);
+      if (copied) recordClientExtensionActionRun(action, owner);
     });
   }
 }
 
-function clientExtensionCommands(): SpotlightCommand[] {
-  return readClientExtensionActions().map((action) => ({
+function clientExtensionCommands(owner: DeviceMemoryOwner | null): SpotlightCommand[] {
+  if (!owner) return [];
+  return readClientExtensionActions(owner).map((action) => ({
     id: `extension:${action.id}`,
     section: 'Actions',
     title: action.title,
     hint: action.hint,
     keywords: ['extension', action.capability, ...action.keywords],
-    run: () => runClientExtensionAction(action),
+    run: () => runClientExtensionAction(action, owner),
   }));
 }
 
@@ -1211,6 +1225,7 @@ function peopleCommands(state: CommandState): SpotlightCommand[] {
 }
 
 export function buildCommands(state: CommandState = getState(), query = ''): SpotlightCommand[] {
+  const memoryOwner = selectDeviceMemoryOwner(state);
   const seenChannels = new Set<string>();
   const channels = Array.from(state.channels.values())
     .filter((channel) => {
@@ -1275,7 +1290,7 @@ export function buildCommands(state: CommandState = getState(), query = ''): Spo
     ...dms,
     ...peopleCommands(state),
     ...baseActionCommands(state),
-    ...clientExtensionCommands(),
+    ...clientExtensionCommands(memoryOwner),
     ...themeCommands,
     ...backgroundCommands,
   ];
@@ -1289,6 +1304,7 @@ export function useCommands(): Accessor<SpotlightCommand[]> {
       channels: store.channels,
       dms: store.dms,
       server: store.server,
+      ourNick: store.ourNick,
       networkName: store.networkName,
       activeView: store.activeView,
       showMemberList: store.showMemberList,
@@ -1298,6 +1314,7 @@ export function useCommands(): Accessor<SpotlightCommand[]> {
       a.channels === b.channels &&
       a.dms === b.dms &&
       a.server === b.server &&
+      a.ourNick === b.ourNick &&
       a.networkName === b.networkName &&
       a.activeView === b.activeView &&
       a.showMemberList === b.showMemberList &&

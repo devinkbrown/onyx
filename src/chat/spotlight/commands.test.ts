@@ -709,6 +709,7 @@ describe('buildCommands', () => {
 
   it('builds capability-scoped client extension actions', () => {
     const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    setState({ server: server(), ourNick: MEMORY_OWNER.identity });
     writeClientExtensionActionsForTests([
       {
         id: 'build.open',
@@ -717,7 +718,7 @@ describe('buildCommands', () => {
         url: 'https://example.test/build',
         keywords: ['build'],
       },
-    ]);
+    ], MEMORY_OWNER);
 
     const command = buildCommands(getState()).find((entry) => entry.id === 'extension:build.open');
     expect(command?.section).toBe('Actions');
@@ -726,7 +727,7 @@ describe('buildCommands', () => {
 
     command?.run();
     expect(open).toHaveBeenCalledWith('https://example.test/build', '_blank', 'noopener,noreferrer');
-    expect(readClientExtensionAudit()[0]).toMatchObject({
+    expect(readClientExtensionAudit(MEMORY_OWNER)[0]).toMatchObject({
       id: 'build.open',
       capability: 'open-url',
       detail: 'Opened https://example.test',
@@ -737,6 +738,7 @@ describe('buildCommands', () => {
   it('audits an extension copy only after the clipboard write succeeds', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    setState({ server: server(), ourNick: MEMORY_OWNER.identity });
     writeClientExtensionActionsForTests([
       {
         id: 'branch.copy',
@@ -744,13 +746,13 @@ describe('buildCommands', () => {
         capability: 'copy-text',
         text: 'release/onyx',
       },
-    ]);
+    ], MEMORY_OWNER);
 
     const command = buildCommands(getState()).find((entry) => entry.id === 'extension:branch.copy');
     await command?.run();
 
     expect(writeText).toHaveBeenCalledWith('release/onyx');
-    expect(readClientExtensionAudit()[0]).toMatchObject({
+    expect(readClientExtensionAudit(MEMORY_OWNER)[0]).toMatchObject({
       id: 'branch.copy',
       detail: 'Copied 12 characters',
     });
@@ -764,6 +766,7 @@ describe('buildCommands', () => {
         value: mode === 'unavailable' ? undefined : { writeText },
         configurable: true,
       });
+      setState({ server: server(), ourNick: MEMORY_OWNER.identity });
       writeClientExtensionActionsForTests([
         {
           id: 'secret.copy',
@@ -771,15 +774,53 @@ describe('buildCommands', () => {
           capability: 'copy-text',
           text: 'do-not-persist-this',
         },
-      ]);
+      ], MEMORY_OWNER);
 
       const command = buildCommands(getState()).find((entry) => entry.id === 'extension:secret.copy');
       await command?.run();
 
-      expect(readClientExtensionAudit()).toEqual([]);
+      expect(readClientExtensionAudit(MEMORY_OWNER)).toEqual([]);
       expect(localStorage.getItem('onyx:last-copied-node-address')).toBeNull();
     },
   );
+
+  it('does not expose another owner actions or run a command captured before an account switch', () => {
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const bobOwner = { ...MEMORY_OWNER, identity: 'bob' } as const;
+    setState({ server: server(), ourNick: MEMORY_OWNER.identity });
+    writeClientExtensionActionsForTests([
+      {
+        id: 'alice.open',
+        title: 'Open Alice dashboard',
+        capability: 'open-url',
+        url: 'https://alice.example.test/build',
+      },
+    ], MEMORY_OWNER);
+    writeClientExtensionActionsForTests([
+      {
+        id: 'bob.open',
+        title: 'Open Bob dashboard',
+        capability: 'open-url',
+        url: 'https://bob.example.test/build',
+      },
+    ], bobOwner);
+
+    const capturedAliceCommand = buildCommands(getState()).find((entry) => entry.id === 'extension:alice.open');
+    expect(capturedAliceCommand).toBeDefined();
+
+    setState({
+      server: { ...server(), account: 'bob', nick: 'bob' },
+      ourNick: 'bob',
+    });
+    const bobCommands = buildCommands(getState());
+    expect(bobCommands.some((entry) => entry.id === 'extension:alice.open')).toBe(false);
+    expect(bobCommands.some((entry) => entry.id === 'extension:bob.open')).toBe(true);
+
+    capturedAliceCommand?.run();
+    expect(open).not.toHaveBeenCalled();
+    expect(readClientExtensionAudit(MEMORY_OWNER)).toEqual([]);
+    expect(readClientExtensionAudit(bobOwner)).toEqual([]);
+  });
 
   describe('schedule message grammar', () => {
     const FIXED_NOW = Date.parse('2026-07-12T12:00:00Z');

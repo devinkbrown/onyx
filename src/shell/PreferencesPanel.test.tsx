@@ -1708,7 +1708,7 @@ describe('PreferencesPanel', () => {
       capability: 'open-url',
       url: 'https://example.test/build?token=secret',
       keywords: [],
-    });
+    }, MEMORY_OWNER);
     renderPreferences('App & tools');
 
     expect(screen.getByRole('list', { name: 'Recent extension actions' })).toBeInTheDocument();
@@ -1749,7 +1749,7 @@ describe('PreferencesPanel', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Review actions' }));
 
-    expect(readClientExtensionActions()).toEqual([]);
+    expect(readClientExtensionActions(MEMORY_OWNER)).toEqual([]);
     const preview = screen.getByRole('list', { name: 'Reviewed extension actions' });
     expect(preview).toHaveTextContent('Open status');
     expect(preview).toHaveTextContent('open-url');
@@ -1764,10 +1764,67 @@ describe('PreferencesPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Import reviewed actions' }));
 
     expect(screen.getByText('Imported 2 safe actions.')).toBeInTheDocument();
-    expect(readClientExtensionActions().map((action) => action.id)).toEqual(['open.status', 'copy.room']);
+    expect(readClientExtensionActions(MEMORY_OWNER).map((action) => action.id)).toEqual(['open.status', 'copy.room']);
 
     fireEvent.click(screen.getByRole('button', { name: 'Clear actions' }));
-    expect(readClientExtensionActions()).toEqual([]);
+    expect(readClientExtensionActions(MEMORY_OWNER)).toEqual([]);
+  });
+
+  it('invalidates a reviewed manifest and reloads actions when the device-memory owner changes', async () => {
+    const bobOwner = { ...MEMORY_OWNER, identity: 'bob' } as const;
+    renderPreferences('App & tools');
+    const input = screen.getByLabelText('Action manifest JSON');
+    fireEvent.input(input, {
+      target: {
+        value: JSON.stringify({
+          version: 1,
+          actions: [
+            { id: 'alice.copy', title: 'Copy Alice value', capability: 'copy-text', text: 'alice-secret' },
+          ],
+        }),
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Review actions' }));
+    const capturedConfirm = screen.getByRole('button', { name: 'Import reviewed actions' });
+
+    store.setState({
+      ourNick: 'bob',
+      server: {
+        id: 'preferences-test',
+        name: 'Preferences',
+        network: 'Preferences',
+        url: MEMORY_OWNER.serverUrl,
+        icon: '',
+        nick: 'bob',
+        account: 'bob',
+        connected: true,
+      },
+    });
+    fireEvent.click(capturedConfirm);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('list', { name: 'Reviewed extension actions' })).not.toBeInTheDocument();
+      expect(input).toHaveValue('');
+    });
+    expect(screen.getByText('Active identity changed. Review an action manifest for this identity.')).toBeInTheDocument();
+    expect(readClientExtensionActions(MEMORY_OWNER)).toEqual([]);
+    expect(readClientExtensionActions(bobOwner)).toEqual([]);
+
+    fireEvent.input(input, {
+      target: {
+        value: JSON.stringify({
+          version: 1,
+          actions: [
+            { id: 'bob.copy', title: 'Copy Bob value', capability: 'copy-text', text: 'bob-secret' },
+          ],
+        }),
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Review actions' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Import reviewed actions' }));
+
+    expect(readClientExtensionActions(bobOwner).map((action) => action.id)).toEqual(['bob.copy']);
+    expect(readClientExtensionActions(MEMORY_OWNER)).toEqual([]);
   });
 
   it('cancels and replaces staged extension actions without persistence', () => {
@@ -1783,12 +1840,12 @@ describe('PreferencesPanel', () => {
     expect(screen.getByRole('list', { name: 'Reviewed extension actions' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel reviewed actions' }));
-    expect(readClientExtensionActions()).toEqual([]);
+    expect(readClientExtensionActions(MEMORY_OWNER)).toEqual([]);
     expect(screen.queryByRole('list', { name: 'Reviewed extension actions' })).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Review actions' }));
     fireEvent.input(input, { target: { value: `${manifest} ` } });
-    expect(readClientExtensionActions()).toEqual([]);
+    expect(readClientExtensionActions(MEMORY_OWNER)).toEqual([]);
     expect(screen.queryByRole('list', { name: 'Reviewed extension actions' })).toBeNull();
   });
 
@@ -1808,7 +1865,7 @@ describe('PreferencesPanel', () => {
 
     expect(screen.getByText('Manifest must be a version 1 object or a legacy action array.')).toBeInTheDocument();
     expect(screen.queryByRole('list', { name: 'Reviewed extension actions' })).toBeNull();
-    expect(readClientExtensionActions()).toEqual([]);
+    expect(readClientExtensionActions(MEMORY_OWNER)).toEqual([]);
   });
 
   it('keeps the reviewed stage and reports failure when extension action storage is unavailable', () => {
@@ -1830,7 +1887,7 @@ describe('PreferencesPanel', () => {
 
     expect(screen.getByText('Could not save reviewed actions on this device.')).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'Reviewed extension actions' })).toBeInTheDocument();
-    expect(readClientExtensionActions()).toEqual([]);
+    expect(readClientExtensionActions(MEMORY_OWNER)).toEqual([]);
   });
 
   it('selects a default vault search mode, persisting it and applying it live', () => {

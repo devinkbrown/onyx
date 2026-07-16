@@ -1,4 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import {
+  deviceMemoryStorageKey,
+  type DeviceMemoryOwner,
+} from '@/lib/deviceMemoryOwner';
+
 export type ClientExtensionCapability = 'open-url' | 'copy-text';
 
 export type ClientExtensionAction = {
@@ -23,8 +28,8 @@ export type ClientExtensionActionPreview = Pick<ClientExtensionAction, 'title' |
   detail: string;
 };
 
-const STORAGE_KEY = 'onyx:client-extension-actions';
-const AUDIT_STORAGE_KEY = 'onyx:client-extension-audit';
+export const CLIENT_EXTENSION_ACTIONS_STORAGE_KEY = 'onyx:client-extension-actions';
+export const CLIENT_EXTENSION_AUDIT_STORAGE_KEY = 'onyx:client-extension-audit';
 const MAX_ACTIONS = 12;
 const MAX_MANIFEST_ENTRIES = MAX_ACTIONS * 4;
 const MAX_KEYWORDS = 8;
@@ -127,10 +132,33 @@ export function previewClientExtensionAction(
   };
 }
 
-export function readClientExtensionActions(): ClientExtensionAction[] {
-  if (typeof localStorage === 'undefined') return [];
+function scopedStorageKey(baseKey: string, owner?: DeviceMemoryOwner): string | null {
+  return owner ? deviceMemoryStorageKey(baseKey, owner) : null;
+}
+
+/**
+ * Ownerless extension state predates authenticated device-memory isolation. It
+ * cannot safely be attributed to whichever account opens Onyx after upgrade,
+ * so quarantine is not sufficient here: remove it at every extension storage
+ * boundary.
+ */
+export function purgeLegacyClientExtensionState(): void {
+  if (typeof localStorage === 'undefined') return;
   try {
-    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]') as unknown;
+    localStorage.removeItem(CLIENT_EXTENSION_ACTIONS_STORAGE_KEY);
+    localStorage.removeItem(CLIENT_EXTENSION_AUDIT_STORAGE_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+export function readClientExtensionActions(owner?: DeviceMemoryOwner): ClientExtensionAction[] {
+  purgeLegacyClientExtensionState();
+  if (typeof localStorage === 'undefined') return [];
+  const storageKey = scopedStorageKey(CLIENT_EXTENSION_ACTIONS_STORAGE_KEY, owner);
+  if (!storageKey) return [];
+  try {
+    const raw = JSON.parse(localStorage.getItem(storageKey) ?? '[]') as unknown;
     if (!Array.isArray(raw)) return [];
     const seen = new Set<string>();
     const actions: ClientExtensionAction[] = [];
@@ -148,11 +176,15 @@ export function readClientExtensionActions(): ClientExtensionAction[] {
 
 export function saveClientExtensionActions(
   rawActions: readonly unknown[],
+  owner?: DeviceMemoryOwner,
 ): ClientExtensionAction[] | null {
   const actions = normalizeClientExtensionActions(rawActions);
+  purgeLegacyClientExtensionState();
   if (typeof localStorage === 'undefined') return null;
+  const storageKey = scopedStorageKey(CLIENT_EXTENSION_ACTIONS_STORAGE_KEY, owner);
+  if (!storageKey) return null;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(actions));
+    localStorage.setItem(storageKey, JSON.stringify(actions));
   } catch {
     return null;
   }
@@ -160,7 +192,7 @@ export function saveClientExtensionActions(
   // A browser can accept setItem yet fail to retain/read the value (quota,
   // privacy mode, policy shims). Success means the normalized committed value is
   // byte-for-byte equivalent to what was reviewed, not merely that setItem ran.
-  const committed = readClientExtensionActions();
+  const committed = readClientExtensionActions(owner);
   return JSON.stringify(committed) === JSON.stringify(actions) ? committed : null;
 }
 
@@ -180,13 +212,17 @@ export function parseClientExtensionActionManifest(raw: string): ClientExtension
   }
 }
 
-export function exportClientExtensionActionManifest(): string {
-  return JSON.stringify({ version: 1, actions: readClientExtensionActions() }, null, 2);
+export function exportClientExtensionActionManifest(owner?: DeviceMemoryOwner): string {
+  return JSON.stringify({ version: 1, actions: readClientExtensionActions(owner) }, null, 2);
 }
 
-export function clearClientExtensionActions(): void {
+export function clearClientExtensionActions(owner?: DeviceMemoryOwner): void {
+  purgeLegacyClientExtensionState();
+  if (typeof localStorage === 'undefined') return;
+  const storageKey = scopedStorageKey(CLIENT_EXTENSION_ACTIONS_STORAGE_KEY, owner);
+  if (!storageKey) return;
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(storageKey);
   } catch {
     /* storage unavailable */
   }
@@ -223,10 +259,13 @@ function parseAuditEntry(raw: unknown): ClientExtensionAuditEntry | null {
   return { id, title, capability, at, detail };
 }
 
-export function readClientExtensionAudit(): ClientExtensionAuditEntry[] {
+export function readClientExtensionAudit(owner?: DeviceMemoryOwner): ClientExtensionAuditEntry[] {
+  purgeLegacyClientExtensionState();
   if (typeof localStorage === 'undefined') return [];
+  const storageKey = scopedStorageKey(CLIENT_EXTENSION_AUDIT_STORAGE_KEY, owner);
+  if (!storageKey) return [];
   try {
-    const raw = JSON.parse(localStorage.getItem(AUDIT_STORAGE_KEY) ?? '[]') as unknown;
+    const raw = JSON.parse(localStorage.getItem(storageKey) ?? '[]') as unknown;
     if (!Array.isArray(raw)) return [];
     return raw
       .flatMap((entry) => {
@@ -239,8 +278,14 @@ export function readClientExtensionAudit(): ClientExtensionAuditEntry[] {
   }
 }
 
-export function recordClientExtensionActionRun(action: ClientExtensionAction): void {
+export function recordClientExtensionActionRun(
+  action: ClientExtensionAction,
+  owner?: DeviceMemoryOwner,
+): void {
+  purgeLegacyClientExtensionState();
   if (typeof localStorage === 'undefined') return;
+  const storageKey = scopedStorageKey(CLIENT_EXTENSION_AUDIT_STORAGE_KEY, owner);
+  if (!storageKey) return;
   const entry: ClientExtensionAuditEntry = {
     id: action.id,
     title: action.title,
@@ -250,22 +295,31 @@ export function recordClientExtensionActionRun(action: ClientExtensionAction): v
   };
   try {
     localStorage.setItem(
-      AUDIT_STORAGE_KEY,
-      JSON.stringify([entry, ...readClientExtensionAudit()].slice(0, MAX_AUDIT_ENTRIES)),
+      storageKey,
+      JSON.stringify([entry, ...readClientExtensionAudit(owner)].slice(0, MAX_AUDIT_ENTRIES)),
     );
   } catch {
     /* storage unavailable */
   }
 }
 
-export function clearClientExtensionAudit(): void {
+export function clearClientExtensionAudit(owner?: DeviceMemoryOwner): void {
+  purgeLegacyClientExtensionState();
+  if (typeof localStorage === 'undefined') return;
+  const storageKey = scopedStorageKey(CLIENT_EXTENSION_AUDIT_STORAGE_KEY, owner);
+  if (!storageKey) return;
   try {
-    localStorage.removeItem(AUDIT_STORAGE_KEY);
+    localStorage.removeItem(storageKey);
   } catch {
     /* storage unavailable */
   }
 }
 
-export function writeClientExtensionActionsForTests(actions: unknown[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(actions));
+export function writeClientExtensionActionsForTests(
+  actions: unknown[],
+  owner: DeviceMemoryOwner,
+): void {
+  purgeLegacyClientExtensionState();
+  const storageKey = scopedStorageKey(CLIENT_EXTENSION_ACTIONS_STORAGE_KEY, owner);
+  if (storageKey) localStorage.setItem(storageKey, JSON.stringify(actions));
 }

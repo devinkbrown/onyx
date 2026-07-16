@@ -59,7 +59,10 @@ import {
   type ClientExtensionAuditEntry,
 } from '@/lib/extensions/clientActions';
 import { getState, selectDeviceMemoryOwner, useStore } from '@/lib/store';
-import type { DeviceMemoryOwner } from '@/lib/deviceMemoryOwner';
+import {
+  deviceMemoryOwnerKey,
+  type DeviceMemoryOwner,
+} from '@/lib/deviceMemoryOwner';
 import {
   clearReviewHistory,
   readReviewHistory,
@@ -2141,10 +2144,24 @@ function DiscardQueuedSendsControls(): JSX.Element {
 }
 
 function ExtensionAuditControls(): JSX.Element {
-  const [entries, setEntries] = createSignal<ClientExtensionAuditEntry[]>(readClientExtensionAudit());
+  const memoryOwner = useStore(
+    selectDeviceMemoryOwner,
+    (left, right) => (
+      left?.serverUrl === right?.serverUrl
+      && left?.identity === right?.identity
+    ),
+  );
+  const [entries, setEntries] = createSignal<ClientExtensionAuditEntry[]>([]);
+
+  createEffect(() => {
+    const owner = memoryOwner();
+    setEntries(owner ? readClientExtensionAudit(owner) : []);
+  });
 
   function clearAudit(): void {
-    clearClientExtensionAudit();
+    const owner = memoryOwner();
+    if (!owner) return;
+    clearClientExtensionAudit(owner);
     setEntries([]);
   }
 
@@ -2152,7 +2169,12 @@ function ExtensionAuditControls(): JSX.Element {
     <section class="pref-group pref-extension-audit" aria-labelledby="pref-extension-audit-title">
       <div class="pref-group-head">
         <h3 id="pref-extension-audit-title" class="pref-label">Extension action audit</h3>
-        <button type="button" class="pref-a11y-link pref-audit-clear" onClick={clearAudit}>
+        <button
+          type="button"
+          class="pref-a11y-link pref-audit-clear"
+          onClick={clearAudit}
+          disabled={!memoryOwner() || entries().length === 0}
+        >
           Clear
         </button>
       </div>
@@ -2185,47 +2207,91 @@ function ExtensionAuditControls(): JSX.Element {
 }
 
 function ExtensionActionManifestControls(): JSX.Element {
-  const [actionCount, setActionCount] = createSignal(readClientExtensionActions().length);
+  const memoryOwner = useStore(
+    selectDeviceMemoryOwner,
+    (left, right) => (
+      left?.serverUrl === right?.serverUrl
+      && left?.identity === right?.identity
+    ),
+  );
+  const [actionCount, setActionCount] = createSignal(0);
   const [manifestText, setManifestText] = createSignal('');
   const [pendingActions, setPendingActions] = createSignal<ClientExtensionAction[] | null>(null);
+  const [reviewedOwnerKey, setReviewedOwnerKey] = createSignal<string | null>(null);
   const [status, setStatus] = createSignal('');
+  let previousOwnerKey: string | null | undefined;
+
+  createEffect(() => {
+    const owner = memoryOwner();
+    const ownerKey = owner ? deviceMemoryOwnerKey(owner) : null;
+    setActionCount(owner ? readClientExtensionActions(owner).length : 0);
+
+    if (previousOwnerKey !== undefined && ownerKey !== previousOwnerKey) {
+      setManifestText('');
+      setPendingActions(null);
+      setReviewedOwnerKey(null);
+      setStatus('Active identity changed. Review an action manifest for this identity.');
+    }
+    previousOwnerKey = ownerKey;
+  });
 
   function replaceManifestText(value: string): void {
     setManifestText(value);
     setPendingActions(null);
+    setReviewedOwnerKey(null);
     setStatus('');
   }
 
   function reviewManifest(): void {
+    const owner = memoryOwner();
+    const ownerKey = owner ? deviceMemoryOwnerKey(owner) : null;
+    if (!owner || !ownerKey) {
+      setPendingActions(null);
+      setReviewedOwnerKey(null);
+      setStatus('Connect with an active identity before reviewing extension actions.');
+      return;
+    }
     const reviewed = parseClientExtensionActionManifest(manifestText());
     if (!reviewed) {
       setPendingActions(null);
+      setReviewedOwnerKey(null);
       setStatus('Manifest must be a version 1 object or a legacy action array.');
       return;
     }
     if (reviewed.length === 0) {
       setPendingActions(null);
+      setReviewedOwnerKey(null);
       setStatus('Manifest does not contain any supported safe actions.');
       return;
     }
     setPendingActions(reviewed);
+    setReviewedOwnerKey(ownerKey);
     setStatus(`Ready to import ${countLabel(reviewed.length, 'safe action')}. Review each capability and detail.`);
   }
 
   function confirmManifest(): void {
     const staged = pendingActions();
     if (!staged) return;
+    const owner = memoryOwner();
+    const ownerKey = owner ? deviceMemoryOwnerKey(owner) : null;
+    if (!owner || !ownerKey || reviewedOwnerKey() !== ownerKey) {
+      setPendingActions(null);
+      setReviewedOwnerKey(null);
+      setStatus('Active identity changed. Review the manifest again.');
+      return;
+    }
 
     // Revalidate the normalized stage at the persistence boundary and require it
     // to describe exactly the same actions the preview displayed.
     const revalidated = normalizeClientExtensionActions(staged);
     if (revalidated.length === 0 || JSON.stringify(revalidated) !== JSON.stringify(staged)) {
       setPendingActions(null);
+      setReviewedOwnerKey(null);
       setStatus('Reviewed actions changed before import. Review the manifest again.');
       return;
     }
 
-    const committed = saveClientExtensionActions(revalidated);
+    const committed = saveClientExtensionActions(revalidated, owner);
     if (!committed || JSON.stringify(committed) !== JSON.stringify(revalidated)) {
       setStatus('Could not save reviewed actions on this device.');
       return;
@@ -2233,18 +2299,28 @@ function ExtensionActionManifestControls(): JSX.Element {
 
     setActionCount(committed.length);
     setPendingActions(null);
+    setReviewedOwnerKey(null);
     setStatus(`Imported ${countLabel(committed.length, 'safe action')}.`);
   }
 
   function exportManifest(): void {
+    const owner = memoryOwner();
+    if (!owner) {
+      setStatus('Connect with an active identity before exporting extension actions.');
+      return;
+    }
     setPendingActions(null);
-    setManifestText(exportClientExtensionActionManifest());
+    setReviewedOwnerKey(null);
+    setManifestText(exportClientExtensionActionManifest(owner));
     setStatus(`Exported ${countLabel(actionCount(), 'safe action')}.`);
   }
 
   function clearManifest(): void {
-    clearClientExtensionActions();
+    const owner = memoryOwner();
+    if (!owner) return;
+    clearClientExtensionActions(owner);
     setPendingActions(null);
+    setReviewedOwnerKey(null);
     setActionCount(0);
     setManifestText('');
     setStatus('Extension actions cleared on this device.');
@@ -2269,10 +2345,10 @@ function ExtensionActionManifestControls(): JSX.Element {
         onInput={(event) => replaceManifestText(event.currentTarget.value)}
       />
       <div class="pref-import-review__actions">
-        <button type="button" class="pref-reset" onClick={reviewManifest} disabled={!manifestText().trim()}>
+        <button type="button" class="pref-reset" onClick={reviewManifest} disabled={!memoryOwner() || !manifestText().trim()}>
           Review actions
         </button>
-        <button type="button" class="pref-reset" onClick={exportManifest}>
+        <button type="button" class="pref-reset" onClick={exportManifest} disabled={!memoryOwner()}>
           Export actions
         </button>
         <button type="button" class="pref-reset" onClick={clearManifest} disabled={actionCount() === 0}>
@@ -2313,6 +2389,7 @@ function ExtensionActionManifestControls(): JSX.Element {
                 class="pref-reset"
                 onClick={() => {
                   setPendingActions(null);
+                  setReviewedOwnerKey(null);
                   setStatus('Reviewed actions cancelled.');
                 }}
               >
