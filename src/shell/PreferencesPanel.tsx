@@ -11,7 +11,7 @@
  * SOLID IDIOMS: component runs once; never destructure props; For/Show; createMemo.
  */
 
-import { createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show, type JSX } from 'solid-js';
+import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show, type JSX } from 'solid-js';
 import { Sheet } from '@/primitives';
 import {
   VAULT_KEEP,
@@ -58,7 +58,8 @@ import {
   type ClientExtensionAction,
   type ClientExtensionAuditEntry,
 } from '@/lib/extensions/clientActions';
-import { getState } from '@/lib/store';
+import { getState, selectDeviceMemoryOwner, useStore } from '@/lib/store';
+import type { DeviceMemoryOwner } from '@/lib/deviceMemoryOwner';
 import {
   clearReviewHistory,
   readReviewHistory,
@@ -1592,13 +1593,13 @@ interface LocalDraftSnapshot {
   topicCount: number;
 }
 
-function readLocalDraftSnapshot(): LocalDraftSnapshot {
+function readLocalDraftSnapshot(owner: DeviceMemoryOwner | null): LocalDraftSnapshot {
   const roomDrafts = Object.fromEntries(
-    Object.entries(loadComposerDrafts()).filter(([target]) => (
+    Object.entries(owner ? loadComposerDrafts(undefined, owner) : {}).filter(([target]) => (
       target.startsWith('#') || target.startsWith('&')
     )),
   );
-  const topicDrafts = loadChannelTopicDrafts();
+  const topicDrafts = owner ? loadChannelTopicDrafts(undefined, owner) : {};
   return {
     roomDrafts,
     topicDrafts,
@@ -1612,7 +1613,11 @@ function localDraftCountLabel(roomCount: number, topicCount: number): string {
 }
 
 function DiscardLocalDraftsControls(): JSX.Element {
-  const initial = readLocalDraftSnapshot();
+  const memoryOwner = useStore(
+    selectDeviceMemoryOwner,
+    (left, right) => left?.serverUrl === right?.serverUrl && left?.identity === right?.identity,
+  );
+  const initial = readLocalDraftSnapshot(memoryOwner());
   const [counts, setCounts] = createSignal({
     roomCount: initial.roomCount,
     topicCount: initial.topicCount,
@@ -1630,10 +1635,15 @@ function DiscardLocalDraftsControls(): JSX.Element {
   let discardAction: HTMLButtonElement | undefined;
 
   function refreshCounts(): LocalDraftSnapshot {
-    const snapshot = readLocalDraftSnapshot();
+    const snapshot = readLocalDraftSnapshot(memoryOwner());
     setCounts({ roomCount: snapshot.roomCount, topicCount: snapshot.topicCount });
     return snapshot;
   }
+
+  createEffect(() => {
+    memoryOwner();
+    if (!confirming()) refreshCounts();
+  });
 
   function beginDiscard(trigger: HTMLButtonElement): void {
     discardTrigger = trigger;
@@ -1660,6 +1670,14 @@ function DiscardLocalDraftsControls(): JSX.Element {
   function discardNow(): void {
     const expected = stagedCounts();
     if (!expected) return;
+    const owner = memoryOwner();
+    if (!owner) {
+      setStatus({
+        message: 'Connect or select an account before changing its local drafts.',
+        failure: true,
+      });
+      return;
+    }
 
     const current = refreshCounts();
     if (current.roomCount !== expected.roomCount || current.topicCount !== expected.topicCount) {
@@ -1671,7 +1689,7 @@ function DiscardLocalDraftsControls(): JSX.Element {
       return;
     }
 
-    const roomResult = clearRoomComposerDrafts();
+    const roomResult = clearRoomComposerDrafts(undefined, owner);
     if (!roomResult.success) {
       const retained = refreshCounts();
       setStagedCounts({ roomCount: retained.roomCount, topicCount: retained.topicCount });
@@ -1685,7 +1703,7 @@ function DiscardLocalDraftsControls(): JSX.Element {
     for (const target of Object.keys(current.roomDrafts)) {
       getState().setComposerDraft(target, '');
     }
-    const persistedRoomsCleared = readLocalDraftSnapshot().roomCount === 0;
+    const persistedRoomsCleared = readLocalDraftSnapshot(owner).roomCount === 0;
     const storedRoomsCleared = Object.keys(getState().composerDrafts).every((target) => (
       !target.startsWith('#') && !target.startsWith('&')
     ));
@@ -1700,7 +1718,7 @@ function DiscardLocalDraftsControls(): JSX.Element {
       return;
     }
 
-    const topicResult = clearChannelTopicDrafts();
+    const topicResult = clearChannelTopicDrafts(undefined, owner);
     if (!topicResult.success) {
       restoreRoomDrafts(current.roomDrafts);
       const retained = refreshCounts();
@@ -1712,13 +1730,13 @@ function DiscardLocalDraftsControls(): JSX.Element {
       return;
     }
 
-    const verified = readLocalDraftSnapshot();
+    const verified = readLocalDraftSnapshot(owner);
     const verifiedStore = Object.keys(getState().composerDrafts).every((target) => (
       !target.startsWith('#') && !target.startsWith('&')
     ));
     if (verified.roomCount > 0 || verified.topicCount > 0 || !verifiedStore) {
       restoreRoomDrafts(current.roomDrafts);
-      saveChannelTopicDrafts(current.topicDrafts);
+      saveChannelTopicDrafts(current.topicDrafts, undefined, owner);
       const retained = refreshCounts();
       setStagedCounts({ roomCount: retained.roomCount, topicCount: retained.topicCount });
       setStatus({

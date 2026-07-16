@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { deviceMemoryStorageKey, type DeviceMemoryOwner } from '@/lib/deviceMemoryOwner';
+
 export const CHANNEL_TOPIC_DRAFTS_KEY = 'onyx:channel-topic-drafts';
 
 export type ChannelTopicDrafts = Record<string, string>;
@@ -28,11 +30,16 @@ export function sanitizeChannelTopicDrafts(value: unknown): ChannelTopicDrafts {
   return drafts;
 }
 
-export function loadChannelTopicDrafts(storage?: TopicDraftStorage): ChannelTopicDrafts {
+export function loadChannelTopicDrafts(
+  storage?: TopicDraftStorage,
+  owner?: DeviceMemoryOwner,
+): ChannelTopicDrafts {
   const resolved = storageOrDefault(storage);
   if (!resolved) return {};
+  const storageKey = deviceMemoryStorageKey(CHANNEL_TOPIC_DRAFTS_KEY, owner);
+  if (!storageKey) return {};
   try {
-    const raw = resolved.getItem(CHANNEL_TOPIC_DRAFTS_KEY);
+    const raw = resolved.getItem(storageKey);
     return raw ? sanitizeChannelTopicDrafts(JSON.parse(raw)) : {};
   } catch {
     return {};
@@ -42,17 +49,20 @@ export function loadChannelTopicDrafts(storage?: TopicDraftStorage): ChannelTopi
 export function saveChannelTopicDrafts(
   drafts: ChannelTopicDrafts,
   storage?: TopicDraftStorage,
+  owner?: DeviceMemoryOwner,
 ): void {
   const resolved = storageOrDefault(storage);
   if (!resolved) return;
+  const storageKey = deviceMemoryStorageKey(CHANNEL_TOPIC_DRAFTS_KEY, owner);
+  if (!storageKey) return;
 
   const sanitized = sanitizeChannelTopicDrafts(drafts);
   try {
     if (Object.keys(sanitized).length === 0) {
-      resolved.removeItem(CHANNEL_TOPIC_DRAFTS_KEY);
+      resolved.removeItem(storageKey);
       return;
     }
-    resolved.setItem(CHANNEL_TOPIC_DRAFTS_KEY, JSON.stringify(sanitized));
+    resolved.setItem(storageKey, JSON.stringify(sanitized));
   } catch {}
 }
 
@@ -68,16 +78,18 @@ export interface ClearChannelTopicDraftsResult {
  */
 export function clearChannelTopicDrafts(
   storage?: TopicDraftStorage,
+  owner?: DeviceMemoryOwner,
 ): ClearChannelTopicDraftsResult {
   const resolved = storageOrDefault(storage);
-  const before = loadChannelTopicDrafts(storage);
+  const storageKey = deviceMemoryStorageKey(CHANNEL_TOPIC_DRAFTS_KEY, owner);
+  const before = loadChannelTopicDrafts(storage, owner);
   const count = Object.keys(before).length;
-  if (!resolved) return { success: false, cleared: 0, remaining: count };
+  if (!resolved || !storageKey) return { success: false, cleared: 0, remaining: count };
 
   try {
-    resolved.removeItem(CHANNEL_TOPIC_DRAFTS_KEY);
-    const remaining = Object.keys(loadChannelTopicDrafts(storage)).length;
-    const success = resolved.getItem(CHANNEL_TOPIC_DRAFTS_KEY) === null && remaining === 0;
+    resolved.removeItem(storageKey);
+    const remaining = Object.keys(loadChannelTopicDrafts(storage, owner)).length;
+    const success = resolved.getItem(storageKey) === null && remaining === 0;
     return {
       success,
       cleared: success ? count : 0,
@@ -87,13 +99,17 @@ export function clearChannelTopicDrafts(
     return {
       success: false,
       cleared: 0,
-      remaining: Object.keys(loadChannelTopicDrafts(storage)).length,
+      remaining: Object.keys(loadChannelTopicDrafts(storage, owner)).length,
     };
   }
 }
 
-export function readChannelTopicDraft(channel: string, storage?: TopicDraftStorage): string | null {
-  return loadChannelTopicDrafts(storage)[channelTopicDraftKey(channel)] ?? null;
+export function readChannelTopicDraft(
+  channel: string,
+  storage?: TopicDraftStorage,
+  owner?: DeviceMemoryOwner,
+): string | null {
+  return loadChannelTopicDrafts(storage, owner)[channelTopicDraftKey(channel)] ?? null;
 }
 
 export function saveChannelTopicDraft(
@@ -101,11 +117,12 @@ export function saveChannelTopicDraft(
   draft: string,
   serverTopic: string,
   storage?: TopicDraftStorage,
+  owner?: DeviceMemoryOwner,
 ): void {
   const key = channelTopicDraftKey(channel);
   if (!key) return;
-  const drafts = loadChannelTopicDrafts(storage);
+  const drafts = loadChannelTopicDrafts(storage, owner);
   if (draft === serverTopic) delete drafts[key];
   else drafts[key] = draft;
-  saveChannelTopicDrafts(drafts, storage);
+  saveChannelTopicDrafts(drafts, storage, owner);
 }

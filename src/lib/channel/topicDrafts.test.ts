@@ -14,6 +14,19 @@ import {
 describe('channel topic drafts', () => {
   beforeEach(() => localStorage.clear());
 
+  it('isolates Alice and Bob while quarantining ownerless legacy topic drafts', () => {
+    const alice = { serverUrl: 'wss://example.test', identity: 'Alice' };
+    const bob = { serverUrl: 'wss://example.test', identity: 'bob' };
+    localStorage.setItem(CHANNEL_TOPIC_DRAFTS_KEY, JSON.stringify({ '#legacy': 'legacy topic' }));
+
+    saveChannelTopicDrafts({ '#alice': 'Alice topic' }, undefined, alice);
+    saveChannelTopicDrafts({ '#bob': 'Bob topic' }, undefined, bob);
+
+    expect(loadChannelTopicDrafts(undefined, alice)).toEqual({ '#alice': 'Alice topic' });
+    expect(loadChannelTopicDrafts(undefined, bob)).toEqual({ '#bob': 'Bob topic' });
+    expect(loadChannelTopicDrafts()).toEqual({ '#legacy': 'legacy topic' });
+  });
+
   it('normalizes only channel targets', () => {
     expect(channelTopicDraftKey(' #Root ')).toBe('#root');
     expect(sanitizeChannelTopicDrafts({

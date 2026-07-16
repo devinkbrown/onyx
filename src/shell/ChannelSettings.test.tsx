@@ -10,13 +10,28 @@
 
 import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { store } from '@/lib/store/store';
+import { store, type Server } from '@/lib/store/store';
 import type { Channel, ChannelUser } from '@/lib/irc/types';
 import type { NotifyLevel } from '@/lib/notifications/channelNotifyMode';
-import { readChannelTopicDraft } from '@/lib/channel/topicDrafts';
+import { readChannelTopicDraft, saveChannelTopicDraft } from '@/lib/channel/topicDrafts';
 import { ChannelSettings } from './ChannelSettings';
 
 const initialState = store.getInitialState();
+const ALICE_OWNER = { serverUrl: 'wss://example.test', identity: 'alice' } as const;
+const BOB_OWNER = { serverUrl: 'wss://example.test', identity: 'bob' } as const;
+
+function testServer(account: string): Server {
+  return {
+    id: `channel-settings-${account}`,
+    name: 'Example',
+    network: 'Example',
+    url: ALICE_OWNER.serverUrl,
+    icon: '',
+    nick: account,
+    account,
+    connected: true,
+  };
+}
 
 function makeChannel(name: string): Channel {
   const users = new Map<string, ChannelUser>();
@@ -49,6 +64,7 @@ function seed(notify?: Map<string, NotifyLevel>): void {
   store.setState(
     {
       ...initialState,
+      server: testServer('alice'),
       channels,
       ourNick: 'me',
       activeView: { kind: 'channel', channel: '#general' },
@@ -156,7 +172,7 @@ describe('ChannelSettings — Topic draft durability', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save topic' }));
 
     expect(setTopic).toHaveBeenCalledWith('#general', 'Awaiting acknowledgement');
-    expect(readChannelTopicDraft('#general')).toBe('Awaiting acknowledgement');
+    expect(readChannelTopicDraft('#general', undefined, ALICE_OWNER)).toBe('Awaiting acknowledgement');
     first.unmount();
     renderPanel();
     expect(screen.getByLabelText('Topic text')).toHaveValue('Awaiting acknowledgement');
@@ -173,7 +189,7 @@ describe('ChannelSettings — Topic draft durability', () => {
 
     setServerTopic('Confirmed topic');
 
-    expect(readChannelTopicDraft('#general')).toBeNull();
+    expect(readChannelTopicDraft('#general', undefined, ALICE_OWNER)).toBeNull();
     first.unmount();
     renderPanel();
     expect(screen.getByLabelText('Topic text')).toHaveValue('Confirmed topic');
@@ -190,11 +206,23 @@ describe('ChannelSettings — Topic draft durability', () => {
 
     setServerTopic('Moderator override');
 
-    expect(readChannelTopicDraft('#general')).toBe('My proposed topic');
+    expect(readChannelTopicDraft('#general', undefined, ALICE_OWNER)).toBe('My proposed topic');
     expect(screen.getByLabelText('Topic text')).toHaveValue('My proposed topic');
     first.unmount();
     renderPanel();
     expect(screen.getByLabelText('Topic text')).toHaveValue('My proposed topic');
+  });
+
+  it('switches the topic field from Alice to Bob when the live account changes', () => {
+    saveChannelTopicDraft('#general', 'Alice proposed topic', '', undefined, ALICE_OWNER);
+    saveChannelTopicDraft('#general', 'Bob proposed topic', '', undefined, BOB_OWNER);
+    seed();
+    renderPanel();
+    expect(screen.getByLabelText('Topic text')).toHaveValue('Alice proposed topic');
+
+    store.setState({ server: testServer('bob'), ourNick: 'bob' });
+
+    expect(screen.getByLabelText('Topic text')).toHaveValue('Bob proposed topic');
   });
 });
 

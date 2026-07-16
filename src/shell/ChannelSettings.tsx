@@ -36,6 +36,7 @@ import {
   selectChannelEncryptionPolicy,
   selectChannelEphemeralSeconds,
   selectChannelModeState,
+  selectDeviceMemoryOwner,
   selectIsChannelOp,
 } from '@/lib/store';
 import {
@@ -117,6 +118,10 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
   const isOp = useStore((s) => selectIsChannelOp(local.channel)(s));
   const connectionStatus = useStore((s) => s.connectionStatus);
   const networkName = useStore((s) => s.networkName);
+  const memoryOwner = useStore(
+    selectDeviceMemoryOwner,
+    (left, right) => left?.serverUrl === right?.serverUrl && left?.identity === right?.identity,
+  );
 
   const channel = createMemo(() =>
     channels().get(local.channel.toLowerCase()) ?? null,
@@ -131,10 +136,11 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
   // (and we're not mid-edit). Keeps the field in sync without clobbering typing.
   createEffect(() => {
     const authoritativeTopic = serverTopic();
-    const savedDraft = readChannelTopicDraft(local.channel);
+    const owner = memoryOwner();
+    const savedDraft = owner ? readChannelTopicDraft(local.channel, undefined, owner) : null;
     const acknowledged = savedDraft !== null && savedDraft === authoritativeTopic;
-    if (acknowledged) {
-      saveChannelTopicDraft(local.channel, savedDraft, authoritativeTopic);
+    if (acknowledged && owner) {
+      saveChannelTopicDraft(local.channel, savedDraft, authoritativeTopic, undefined, owner);
     }
     if (!local.open) return;
     if (savedDraft === null || acknowledged) {
@@ -429,7 +435,16 @@ export function ChannelSettings(props: ChannelSettingsProps): JSX.Element {
                 value={topicDraft()}
                 onInput={(e) => {
                   setTopicDraft(e.currentTarget.value);
-                  saveChannelTopicDraft(local.channel, e.currentTarget.value, serverTopic());
+                  const owner = memoryOwner();
+                  if (owner) {
+                    saveChannelTopicDraft(
+                      local.channel,
+                      e.currentTarget.value,
+                      serverTopic(),
+                      undefined,
+                      owner,
+                    );
+                  }
                 }}
                 rows={3}
                 aria-describedby="chset-topic-hint"

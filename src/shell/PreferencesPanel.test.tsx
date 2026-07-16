@@ -66,6 +66,9 @@ import type { PortableTransferSnapshot } from '@/lib/vault/portableTransfer';
 import * as portableCompression from '@/lib/vault/portableCompression';
 import * as portableShare from '@/lib/vault/portableShare';
 import * as portableFileSave from '@/lib/vault/portableFileSave';
+import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
+
+const MEMORY_OWNER = { serverUrl: 'wss://preferences.example/ws', identity: 'testuser' } as const;
 
 function emptyPortableSnapshot(): PortableTransferSnapshot {
   return {
@@ -137,7 +140,21 @@ describe('PreferencesPanel', () => {
     setVaultMode('hybrid');
     setRetentionPolicy(null);
     closePreferences();
-    store.setState({ showAppearance: false, composerDrafts: {} });
+    store.setState({
+      showAppearance: false,
+      composerDrafts: {},
+      ourNick: MEMORY_OWNER.identity,
+      server: {
+        id: 'preferences-test',
+        name: 'Preferences',
+        network: 'Preferences',
+        url: MEMORY_OWNER.serverUrl,
+        icon: '',
+        nick: MEMORY_OWNER.identity,
+        account: MEMORY_OWNER.identity,
+        connected: true,
+      },
+    });
   });
 
   afterEach(() => {
@@ -2164,7 +2181,7 @@ describe('PreferencesPanel', () => {
       preview: 'reviewed anchor remains',
     });
     store.getState().setComposerDraft(target, 'room draft remains');
-    saveChannelTopicDrafts({ [target]: 'topic draft remains' });
+    saveChannelTopicDrafts({ [target]: 'topic draft remains' }, undefined, MEMORY_OWNER);
     localStorage.setItem('onyx:translation-target', 'fr');
     localStorage.setItem('onyx:calm', 'power');
     localStorage.setItem('onyx:channel-notify', JSON.stringify({ [target]: 'mentions' }));
@@ -2214,8 +2231,8 @@ describe('PreferencesPanel', () => {
     expect(isFollowed(target, 'private roadmap')).toBe(false);
     expect((await loadRecent(target)).map((message) => message.id)).toContain(vaultMessage.id);
     expect((await loadOutbox()).map((entry) => entry.text)).toEqual(['queued plaintext remains']);
-    expect(loadComposerDrafts()).toEqual({ [target]: 'room draft remains' });
-    expect(loadChannelTopicDrafts()).toEqual({ [target]: 'topic draft remains' });
+    expect(loadComposerDrafts(undefined, MEMORY_OWNER)).toEqual({ [target]: 'room draft remains' });
+    expect(loadChannelTopicDrafts(undefined, MEMORY_OWNER)).toEqual({ [target]: 'topic draft remains' });
     expect(readReviewHistory().map((entry) => entry.firstMessageId)).toContain(vaultMessage.id);
     expect(readTopicReadMarker(target, 'followed isolation')?.lastReadMessageId).toBe(vaultMessage.id);
     expect((await listSearches()).some((search) => search.query === 'saved query remains')).toBe(true);
@@ -2291,7 +2308,7 @@ describe('PreferencesPanel', () => {
     store.getState().setComposerDraft(target, 'first room plaintext');
     store.getState().setComposerDraft('&draft-local', 'second room plaintext');
     store.getState().setComposerDraft('alice', 'direct-message plaintext remains');
-    saveChannelTopicDrafts({ [target]: 'first topic plaintext' });
+    saveChannelTopicDrafts({ [target]: 'first topic plaintext' }, undefined, MEMORY_OWNER);
 
     renderPreferences('History & data');
 
@@ -2315,19 +2332,19 @@ describe('PreferencesPanel', () => {
 
     fireEvent.click(controls.getByRole('button', { name: 'Keep local drafts' }));
     await waitFor(() => expect(controls.getByRole('button', { name: 'Discard local drafts' })).toHaveFocus());
-    expect(loadComposerDrafts()).toEqual({
+    expect(loadComposerDrafts(undefined, MEMORY_OWNER)).toEqual({
       [target]: 'first room plaintext',
       '&draft-local': 'second room plaintext',
       alice: 'direct-message plaintext remains',
     });
-    expect(loadChannelTopicDrafts()).toEqual({ [target]: 'first topic plaintext' });
+    expect(loadChannelTopicDrafts(undefined, MEMORY_OWNER)).toEqual({ [target]: 'first topic plaintext' });
 
     fireEvent.click(controls.getByRole('button', { name: 'Discard local drafts' }));
     store.getState().setComposerDraft('#late-room', 'late room plaintext');
     saveChannelTopicDrafts({
-      ...loadChannelTopicDrafts(),
+      ...loadChannelTopicDrafts(undefined, MEMORY_OWNER),
       '#late-topic': 'late topic plaintext',
-    });
+    }, undefined, MEMORY_OWNER);
     fireEvent.click(controls.getByRole('button', { name: 'Discard room and topic drafts' }));
 
     expect(controls.getByRole('status')).toHaveTextContent(
@@ -2345,9 +2362,9 @@ describe('PreferencesPanel', () => {
       expect(controls.getByRole('button', { name: 'Discard local drafts' })).toHaveFocus();
     });
     expect(controls.getByRole('status')).not.toHaveTextContent('plaintext');
-    expect(loadComposerDrafts()).toEqual({ alice: 'direct-message plaintext remains' });
+    expect(loadComposerDrafts(undefined, MEMORY_OWNER)).toEqual({ alice: 'direct-message plaintext remains' });
     expect(store.getState().composerDrafts).toEqual({ alice: 'direct-message plaintext remains' });
-    expect(loadChannelTopicDrafts()).toEqual({});
+    expect(loadChannelTopicDrafts(undefined, MEMORY_OWNER)).toEqual({});
     expect((await loadRecent(target)).map((message) => message.id)).toContain(vaultMessage.id);
     expect((await loadOutbox()).map((entry) => entry.text)).toEqual(['queued plaintext remains']);
     expect(readReviewHistory().map((entry) => entry.firstMessageId)).toContain(vaultMessage.id);
@@ -2365,7 +2382,11 @@ describe('PreferencesPanel', () => {
   it('restores room drafts and keeps confirmation open when topic-draft clear fails', () => {
     store.getState().setComposerDraft('#retained-room-draft', 'retained room plaintext');
     store.getState().setComposerDraft('alice', 'retained dm plaintext');
-    saveChannelTopicDrafts({ '#retained-topic-draft': 'retained topic plaintext' });
+    saveChannelTopicDrafts(
+      { '#retained-topic-draft': 'retained topic plaintext' },
+      undefined,
+      MEMORY_OWNER,
+    );
     renderPreferences('History & data');
 
     const card = screen.getByRole('heading', { name: 'Local drafts' }).closest('section');
@@ -2373,7 +2394,9 @@ describe('PreferencesPanel', () => {
     fireEvent.click(controls.getByRole('button', { name: 'Discard local drafts' }));
     const removeItem = localStorage.removeItem.bind(localStorage);
     vi.spyOn(localStorage, 'removeItem').mockImplementation((key) => {
-      if (key === CHANNEL_TOPIC_DRAFTS_KEY) throw new DOMException('blocked');
+      if (key === deviceMemoryStorageKey(CHANNEL_TOPIC_DRAFTS_KEY, MEMORY_OWNER)) {
+        throw new DOMException('blocked');
+      }
       removeItem(key);
     });
     fireEvent.click(controls.getByRole('button', { name: 'Discard room and topic drafts' }));
@@ -2385,7 +2408,7 @@ describe('PreferencesPanel', () => {
     expect(controls.getByRole('alert')).not.toHaveTextContent('retained topic plaintext');
     expect(controls.getByRole('group', { name: 'Confirm discard local drafts' })).toBeInTheDocument();
     expect(controls.getByText('1 room draft · 1 topic draft')).toBeInTheDocument();
-    expect(loadComposerDrafts()).toEqual({
+    expect(loadComposerDrafts(undefined, MEMORY_OWNER)).toEqual({
       '#retained-room-draft': 'retained room plaintext',
       alice: 'retained dm plaintext',
     });
@@ -2393,7 +2416,7 @@ describe('PreferencesPanel', () => {
       '#retained-room-draft': 'retained room plaintext',
       alice: 'retained dm plaintext',
     });
-    expect(loadChannelTopicDrafts()).toEqual({
+    expect(loadChannelTopicDrafts(undefined, MEMORY_OWNER)).toEqual({
       '#retained-topic-draft': 'retained topic plaintext',
     });
   });

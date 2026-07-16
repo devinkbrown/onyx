@@ -209,9 +209,12 @@ export function HomeView(): JSX.Element {
     void refetchOutbox();
   }));
   const [topicDrafts] = createResource(
-    connectionStatus,
-    () => loadChannelTopicDrafts(),
-    { initialValue: {} },
+    memoryOwner,
+    (owner) => ({
+      ownerKey: deviceMemoryOwnerKey(owner) ?? '',
+      drafts: loadChannelTopicDrafts(undefined, owner),
+    }),
+    { initialValue: null },
   );
   const queuedEntries = createMemo<OutboxEntry[]>(() => {
     const owner = memoryOwner();
@@ -222,7 +225,12 @@ export function HomeView(): JSX.Element {
   });
   const queuedSendCount = createMemo(() => queuedEntries().length);
   const roomDraftCount = createMemo(() => channelDraftCount(composerDrafts()));
-  const topicDraftCount = createMemo(() => Object.keys(topicDrafts.latest ?? {}).length);
+  const ownedTopicDrafts = createMemo(() => {
+    const owner = memoryOwner();
+    const ownerKey = owner ? deviceMemoryOwnerKey(owner) : null;
+    return topicDrafts.latest?.ownerKey === ownerKey ? topicDrafts.latest.drafts : {};
+  });
+  const topicDraftCount = createMemo(() => Object.keys(ownedTopicDrafts()).length);
   const localMemoryStatus = createMemo(() => {
     const waiting = [
       queuedSendCount() > 0 ? countLabel(queuedSendCount(), 'queued send') : null,
