@@ -144,8 +144,9 @@ describe('PWA manifest', () => {
   it('keeps install and activation work alive and uses the cached app for offline app routes', async () => {
     const listeners = new Map<string, (event: Record<string, unknown>) => void>();
     const add = vi.fn<(url: string) => Promise<void>>(async () => undefined);
-    const cache = { add };
-    const match = vi.fn(async (key: string) => ({ fallback: key }));
+    const put = vi.fn(async () => undefined);
+    const cache = { add, put };
+    const match = vi.fn<(key: unknown) => Promise<unknown>>(async (key) => ({ fallback: key }));
     const deleteCache = vi.fn(async () => true);
     const caches = {
       open: vi.fn(async () => cache),
@@ -156,7 +157,9 @@ describe('PWA manifest', () => {
     const skipWaiting = vi.fn(async () => undefined);
     const claim = vi.fn(async () => undefined);
     const enableNavigationPreload = vi.fn(async () => undefined);
-    const networkFetch = vi.fn(async () => Promise.reject(new Error('offline')));
+    const networkFetch = vi.fn<(request: unknown) => Promise<unknown>>(async () => {
+      throw new Error('offline');
+    });
     const workerSource = readFileSync(serviceWorkerPath, 'utf8');
     const workerSelf = {
       location: { origin: 'https://onyx.test' },
@@ -176,6 +179,7 @@ describe('PWA manifest', () => {
       fetch: networkFetch,
       URL,
       Promise,
+      Response,
     });
 
     let installWork: Promise<unknown> | undefined;
@@ -229,5 +233,38 @@ describe('PWA manifest', () => {
     });
     await expect(navigationWork).resolves.toEqual({ fallback: '/' });
     expect(match).toHaveBeenLastCalledWith('/');
+
+    match.mockResolvedValueOnce(undefined);
+    listeners.get('fetch')?.({
+      request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/app/offline' },
+      respondWith: (work: Promise<unknown>) => {
+        navigationWork = work;
+      },
+    });
+    const unavailable = await navigationWork as Response;
+    expect(unavailable).toBeInstanceOf(Response);
+    expect(unavailable.status).toBe(503);
+    await expect(unavailable.text()).resolves.toContain('app shell was not cached');
+
+    const cachedClone = { kind: 'asset-clone' };
+    const assetResponse = { ok: true, clone: vi.fn(() => cachedClone) };
+    const assetRequest = { method: 'GET', mode: 'cors', url: 'https://onyx.test/assets/app.123.js' };
+    let assetResponseWork: Promise<unknown> | undefined;
+    let assetLifetimeWork: Promise<unknown> | undefined;
+    match.mockResolvedValueOnce(undefined);
+    networkFetch.mockResolvedValueOnce(assetResponse);
+    listeners.get('fetch')?.({
+      request: assetRequest,
+      respondWith: (work: Promise<unknown>) => {
+        assetResponseWork = work;
+      },
+      waitUntil: (work: Promise<unknown>) => {
+        assetLifetimeWork = work;
+      },
+    });
+    await expect(assetResponseWork).resolves.toBe(assetResponse);
+    await assetLifetimeWork;
+    expect(assetResponse.clone).toHaveBeenCalledOnce();
+    expect(put).toHaveBeenCalledWith(assetRequest, cachedClone);
   });
 });

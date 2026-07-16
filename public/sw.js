@@ -48,6 +48,19 @@ function navigationFallbackPath(pathname) {
   return pathname === '/app' || pathname.startsWith('/app/') ? '/app' : '/';
 }
 
+function offlineNavigationFallback(pathname) {
+  return caches.match(navigationFallbackPath(pathname)).then((cached) => cached ?? new Response(
+    'Onyx is unavailable offline because its app shell was not cached. Reconnect and reload once to make offline access available.',
+    {
+      status: 503,
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-store',
+      },
+    },
+  ));
+}
+
 function enableNavigationPreload() {
   try {
     const navigationPreload = self.registration?.navigationPreload;
@@ -116,7 +129,7 @@ self.addEventListener('fetch', (event) => {
       Promise.resolve(event.preloadResponse)
         .catch(() => undefined)
         .then((preloaded) => preloaded ?? fetch(request))
-        .catch(() => caches.match(navigationFallbackPath(url.pathname)))
+        .catch(() => offlineNavigationFallback(url.pathname))
     );
     return;
   }
@@ -129,18 +142,21 @@ self.addEventListener('fetch', (event) => {
     url.pathname.endsWith('.png') ||
     url.pathname.endsWith('.svg')
   ) {
-    event.respondWith(
-      caches.match(request).then((cached) => {
-        if (cached) return cached;
-        return fetch(request).then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          }
-          return response;
-        });
-      })
+    const loaded = caches.match(request).then((cached) => {
+      if (cached) return { response: cached, shouldCache: false };
+      return fetch(request).then((response) => ({ response, shouldCache: response.ok }));
+    });
+    // Keep the worker alive until a newly fetched asset is actually stored.
+    // Without waitUntil(), the browser may terminate the worker after the
+    // response is delivered and silently drop this best-effort cache write.
+    event.waitUntil(
+      loaded.then(({ response, shouldCache }) => {
+        if (!shouldCache) return undefined;
+        const clone = response.clone();
+        return caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+      }).catch(() => undefined)
     );
+    event.respondWith(loaded.then(({ response }) => response));
   }
 });
 
