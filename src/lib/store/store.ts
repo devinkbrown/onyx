@@ -7213,7 +7213,7 @@ export const store = createStore<OnyxState>()(
             // Logout / drop confirmation — clear the logged-in account and any
             // cached info so the UI flips back to the guest state.
             if (
-              /\b(logged out|logout|signed out)\b/i.test(text)
+              /\b(logged out|signed out)\b/i.test(text)
               || /\baccount (?:was )?(?:dropped|deleted)\b/i.test(text)
             ) {
               _clearRememberedSessionAfterLogout(get, set);
