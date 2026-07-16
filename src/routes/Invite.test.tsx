@@ -31,7 +31,7 @@ describe('InviteRoute', () => {
   });
 
   it('sets invite-specific metadata', () => {
-    window.history.pushState({}, '', '/invite?join=%23root');
+    window.history.pushState({}, '', '/invite/?join=%23root&ignored=noise#local-fragment');
 
     render(() => <InviteRoute />);
 
@@ -39,9 +39,9 @@ describe('InviteRoute', () => {
     expect(document.querySelector('meta[property="og:title"]')?.getAttribute('content')).toBe(
       'Join #root on Onyx',
     );
-    expect(document.querySelector('meta[property="og:url"]')?.getAttribute('content')).toContain(
-      '/invite?join=%23root',
-    );
+    const expectedUrl = `${window.location.origin}/invite/?join=%23root`;
+    expect(document.querySelector('meta[property="og:url"]')?.getAttribute('content')).toBe(expectedUrl);
+    expect(document.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe(expectedUrl);
   });
 
   it('announces copy success only after the shared clipboard write resolves', async () => {

@@ -16,7 +16,7 @@ function currentParams(): URLSearchParams {
 
 function currentOrigin(): string {
   if (typeof window === 'undefined') return 'https://eshmaki.me';
-  return `${window.location.origin}/invite`;
+  return `${window.location.origin}/invite/`;
 }
 
 function appHrefFromInvite(url: string): string {
