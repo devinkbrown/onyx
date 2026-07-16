@@ -21,6 +21,16 @@ import { store, getState } from '@/lib/store';
 import { preferences, resetPreferences } from '@/lib/prefs/preferences';
 import { loadCredentials } from '@/lib/credentials';
 
+// Connect owns only the form/shell gate. Keep its unit suite isolated from the
+// large lazy shell graph while preserving the disconnect callback contract.
+vi.mock('@/shell/AppShell', () => ({
+  AppShell: (props: { onDisconnect: () => void }) => (
+    <div data-testid="app-shell">
+      <button type="button" onClick={() => props.onDisconnect()}>Disconnect</button>
+    </div>
+  ),
+}));
+
 // The connect screen probes node latency through lightweight HTTPS on mount.
 // In jsdom that would hit the live web tiers, so stub the probe + selector here —
 // real latency routing is exercised in the browser / e2e, not in unit tests.
@@ -1059,10 +1069,8 @@ describe('View gating on connectionStatus', () => {
       activeView: { kind: 'home' },
     }, true);
     render(() => <Connect />);
-    await waitFor(() =>
-      expect(screen.queryByTestId('connect-screen')).not.toBeInTheDocument()
-    );
-    expect(screen.getByTestId('app-shell')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('app-shell')).toBeInTheDocument());
+    expect(screen.queryByTestId('connect-screen')).not.toBeInTheDocument();
   });
 
   it('returns to the connect form after disconnect', async () => {

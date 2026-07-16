@@ -35,9 +35,11 @@ import {
   createMemo,
   createEffect,
   For,
+  lazy,
   onCleanup,
   onMount,
   Show,
+  Suspense,
   type JSX,
 } from 'solid-js';
 import { useStore, getState } from '@/lib/store';
@@ -46,7 +48,6 @@ import { buildInviteCard, inviteTitle, inviteDescription } from '@/lib/invite/in
 import { setPreference } from '@/lib/prefs/preferences';
 import { isPasskeySupported } from '@/lib/webauthn/passkey';
 import { ConnectPulse } from './ConnectPulse';
-import { AppShell } from '@/shell';
 import { Button } from '@/primitives/index';
 import { FormField } from '@/primitives/index';
 import { Spinner } from '@/primitives/index';
@@ -63,6 +64,11 @@ import {
 } from '@/lib/credentials';
 import { initialNode, NODES, selectBestNode, type IrcNode } from './nodes';
 import { installConnectPageLifecycle } from './connectPageLifecycle';
+
+// The connected shell owns the transcript, roster, preferences, moderation,
+// and activity surfaces. None of that is needed on the first-arrival form, so
+// keep it out of the connection chunk and warm it while the socket handshakes.
+const AppShell = lazy(() => import('@/shell/AppShell').then((module) => ({ default: module.AppShell })));
 
 // ── Deep-water atmosphere — depth, azure currents, bioluminescence ───────────
 // Self-contained to the connect screen (namespaced .conn-sea-*) so it carries
@@ -470,6 +476,18 @@ export function Connect(props: ConnectProps): JSX.Element {
   );
   const currentNickIsAlias = useStore((s) => s.currentNickIsAlias);
   const notifications = useStore((s) => s.notifications);
+
+  createEffect(() => {
+    const status = connectionStatus();
+    if (
+      autoReconnect()
+      || status === 'connecting'
+      || status === 'reconnecting'
+      || status === 'connected'
+    ) {
+      void AppShell.preload();
+    }
+  });
 
   // Latest error notification text — used to distinguish failure types and to
   // detect a nick-in-use without modifying the store.
@@ -1513,10 +1531,21 @@ export function Connect(props: ConnectProps): JSX.Element {
       }
     >
       {/* Connected shell — reads everything from the store */}
-      <AppShell
-        onDisconnect={handleDisconnect}
-        selfNick={ourNick()}
-      />
+      <Suspense
+        fallback={
+          <div class="conn" data-testid="shell-loading">
+            <Atmosphere />
+            <div class="conn-stage">
+              <Spinner label="Opening Onyx" />
+            </div>
+          </div>
+        }
+      >
+        <AppShell
+          onDisconnect={handleDisconnect}
+          selfNick={ourNick()}
+        />
+      </Suspense>
     </Show>
   );
 }
