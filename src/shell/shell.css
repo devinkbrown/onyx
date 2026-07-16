@@ -652,6 +652,48 @@
   overflow: hidden;
 }
 
+/* Native View Transitions progressively enhance sidebar conversation changes.
+   Keep the snapshot boundary on the conversation column so the rail/sidebar do
+   not flash, and leave unsupported browsers on the existing instant path. */
+@supports (view-transition-name: none) {
+  .shell-conversation {
+    view-transition-name: onyx-conversation;
+  }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0s;
+    mix-blend-mode: normal;
+  }
+
+  ::view-transition-old(onyx-conversation) {
+    animation: onyx-conversation-out 140ms ease-in both;
+  }
+
+  ::view-transition-new(onyx-conversation) {
+    animation: onyx-conversation-in 180ms ease-out both;
+  }
+}
+
+@keyframes onyx-conversation-out {
+  to { opacity: 0; transform: translateX(-6px); }
+}
+
+@keyframes onyx-conversation-in {
+  from { opacity: 0; transform: translateX(6px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-conversation { view-transition-name: none; }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root),
+  ::view-transition-old(onyx-conversation),
+  ::view-transition-new(onyx-conversation) {
+    animation: none !important;
+  }
+}
+
 /* ── Watch-together room activity ─────────────────────────────────────── */
 .shell-watch-together {
   display: flex;

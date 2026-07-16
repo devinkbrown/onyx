@@ -28,6 +28,17 @@ export type ChannelSidebarProps = {
   onMobileClose?: () => void;
 };
 
+type NavigationViewTransition = {
+  finished: Promise<unknown>;
+  skipTransition(): void;
+};
+
+type ViewTransitionDocument = Document & {
+  startViewTransition?: (update: () => void) => NavigationViewTransition;
+};
+
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 function isChannelActive(activeView: ActiveView, channel: Channel): boolean {
@@ -82,6 +93,75 @@ function moveSidebarFocus(
 
 export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
   const [local] = splitProps(props, ['onMobileClose']);
+  let navigationEpoch = 0;
+  let activeNavigationTransition: NavigationViewTransition | null = null;
+
+  const stopActiveNavigationTransition = (): void => {
+    if (!activeNavigationTransition) return;
+    try {
+      activeNavigationTransition.skipTransition();
+    } catch {
+      // A transition may already be finished/skipped. Navigation must remain
+      // usable even when the optional visual layer rejects cancellation.
+    }
+    activeNavigationTransition = null;
+  };
+
+  const runConversationNavigation = (update: () => void, target: ActiveView): void => {
+    const epoch = ++navigationEpoch;
+    stopActiveNavigationTransition();
+
+    const current = getState().activeView;
+    const sameTarget = current.kind === target.kind && (
+      current.kind === 'channel' && target.kind === 'channel'
+        ? current.channel.toLowerCase() === target.channel.toLowerCase()
+        : current.kind === 'dm' && target.kind === 'dm'
+          ? current.nick.toLowerCase() === target.nick.toLowerCase()
+          : current.kind === 'status' || current.kind === 'home'
+    );
+    const transitionDocument = typeof document === 'undefined'
+      ? null
+      : document as ViewTransitionDocument;
+    const startViewTransition = transitionDocument?.startViewTransition;
+    const reduceMotion = (() => {
+      try {
+        return typeof window !== 'undefined' &&
+          typeof window.matchMedia === 'function' &&
+          window.matchMedia(REDUCED_MOTION_QUERY).matches;
+      } catch {
+        return true;
+      }
+    })();
+
+    if (sameTarget || !transitionDocument || typeof startViewTransition !== 'function' || reduceMotion) {
+      update();
+      return;
+    }
+
+    let updated = false;
+    const guardedUpdate = (): void => {
+      if (updated) return;
+      updated = true;
+      if (epoch === navigationEpoch) update();
+    };
+
+    let transition: NavigationViewTransition;
+    try {
+      transition = startViewTransition.call(transitionDocument, guardedUpdate);
+    } catch {
+      // Hidden documents and partially implemented browsers may throw before
+      // or after invoking the callback. The once-guard preserves navigation.
+      guardedUpdate();
+      return;
+    }
+
+    activeNavigationTransition = transition;
+    void transition.finished.catch(() => undefined).finally(() => {
+      if (epoch === navigationEpoch && activeNavigationTransition === transition) {
+        activeNavigationTransition = null;
+      }
+    });
+  };
 
   // ── store selectors ──
   const channels = useStore((s) => s.channels);
@@ -90,7 +170,11 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
   // One shared minute-tick drives every activity stamp in the list.
   const [nowMs, setNowMs] = createSignal(Date.now());
   const activityClock = setInterval(() => setNowMs(Date.now()), 60_000);
-  onCleanup(() => clearInterval(activityClock));
+  onCleanup(() => {
+    clearInterval(activityClock);
+    navigationEpoch += 1;
+    stopActiveNavigationTransition();
+  });
 
   /** Compact relative activity stamp: 4m · 2h · 3d (empty when unknown/fresh). */
   const activityStamp = (name: string): string => {
@@ -217,22 +301,26 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
     getState().joinChannel(target);
     setJoinInput('');
     // Navigate to the new channel
-    getState().navigate({ kind: 'channel', channel: target.toLowerCase() });
+    const view: ActiveView = { kind: 'channel', channel: target.toLowerCase() };
+    runConversationNavigation(() => getState().navigate(view), view);
     local.onMobileClose?.();
   }
 
   function handleChannelClick(ch: Channel): void {
-    getState().navigate({ kind: 'channel', channel: ch.name.toLowerCase() });
+    const view: ActiveView = { kind: 'channel', channel: ch.name.toLowerCase() };
+    runConversationNavigation(() => getState().navigate(view), view);
     local.onMobileClose?.();
   }
 
   function handleDmClick(dm: DMConversation): void {
-    getState().navigate({ kind: 'dm', nick: dm.nick });
+    const view: ActiveView = { kind: 'dm', nick: dm.nick };
+    runConversationNavigation(() => getState().navigate(view), view);
     local.onMobileClose?.();
   }
 
   function handleStatusClick(): void {
-    getState().navigate({ kind: 'status' });
+    const view: ActiveView = { kind: 'status' };
+    runConversationNavigation(() => getState().navigate(view), view);
     local.onMobileClose?.();
   }
 

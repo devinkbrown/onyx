@@ -21,6 +21,33 @@ import type { DMConversation } from '@/lib/store/store';
 import { ChannelSidebar } from './ChannelSidebar';
 
 const initialState = store.getInitialState();
+const originalStartViewTransition = Object.getOwnPropertyDescriptor(document, 'startViewTransition');
+
+type TestViewTransition = {
+  finished: Promise<unknown>;
+  skipTransition: ReturnType<typeof vi.fn>;
+};
+
+function installViewTransitions(
+  start: (update: () => void) => TestViewTransition,
+  reduceMotion = false,
+): ReturnType<typeof vi.fn> {
+  const startViewTransition = vi.fn(start);
+  Object.defineProperty(document, 'startViewTransition', {
+    configurable: true,
+    value: startViewTransition,
+  });
+  vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: reduceMotion }) as MediaQueryList));
+  return startViewTransition;
+}
+
+function pendingTransition(): TestViewTransition & { resolve: () => void } {
+  let resolve!: () => void;
+  const finished = new Promise<void>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { finished, resolve, skipTransition: vi.fn() };
+}
 
 function makeChannel(name: string, unread = 0, highlights = 0): Channel {
   return {
@@ -76,6 +103,13 @@ describe('ChannelSidebar accessibility', () => {
 
   afterEach(() => {
     cleanup();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    if (originalStartViewTransition) {
+      Object.defineProperty(document, 'startViewTransition', originalStartViewTransition);
+    } else {
+      Reflect.deleteProperty(document, 'startViewTransition');
+    }
   });
 
   it('exposes a labelled complementary landmark', () => {
@@ -256,5 +290,88 @@ describe('ChannelSidebar accessibility', () => {
     expect(status.getAttribute('aria-label')).toBe('Server status');
     expect(navigateSpy).toHaveBeenCalledWith({ kind: 'status' });
     navigateSpy.mockRestore();
+  });
+
+  it('wraps a changed conversation in a supported native view transition', () => {
+    seed();
+    const transition = pendingTransition();
+    const startViewTransition = installViewTransitions((update) => {
+      update();
+      return transition;
+    });
+    const navigateSpy = vi.spyOn(store.getState(), 'navigate');
+    const { getByRole } = render(() => <ChannelSidebar />);
+
+    fireEvent.click(getByRole('button', { name: '#alpha' }));
+
+    expect(startViewTransition).toHaveBeenCalledTimes(1);
+    expect(navigateSpy).toHaveBeenCalledTimes(1);
+    expect(navigateSpy).toHaveBeenCalledWith({ kind: 'channel', channel: '#alpha' });
+  });
+
+  it('uses the synchronous path when reduced motion is requested', () => {
+    seed();
+    const startViewTransition = installViewTransitions(() => pendingTransition(), true);
+    const navigateSpy = vi.spyOn(store.getState(), 'navigate');
+    const { getByRole } = render(() => <ChannelSidebar />);
+
+    fireEvent.click(getByRole('button', { name: '#alpha' }));
+
+    expect(startViewTransition).not.toHaveBeenCalled();
+    expect(navigateSpy).toHaveBeenCalledWith({ kind: 'channel', channel: '#alpha' });
+  });
+
+  it('falls back exactly once when native transition startup throws after updating', () => {
+    seed();
+    const startViewTransition = vi.fn((update: () => void) => {
+      update();
+      throw new DOMException('document hidden', 'InvalidStateError');
+    });
+    Object.defineProperty(document, 'startViewTransition', {
+      configurable: true,
+      value: startViewTransition,
+    });
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false }) as MediaQueryList));
+    const navigateSpy = vi.spyOn(store.getState(), 'navigate');
+    const { getByRole } = render(() => <ChannelSidebar />);
+
+    fireEvent.click(getByRole('button', { name: '#alpha' }));
+
+    expect(navigateSpy).toHaveBeenCalledTimes(1);
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#alpha' });
+  });
+
+  it('drops stale callbacks and keeps the newest transition active during rapid navigation', async () => {
+    seed();
+    const callbacks: Array<() => void> = [];
+    const first = pendingTransition();
+    const second = pendingTransition();
+    const third = pendingTransition();
+    const transitions = [first, second, third];
+    installViewTransitions((update) => {
+      callbacks.push(update);
+      return transitions[callbacks.length - 1]!;
+    });
+    const navigateSpy = vi.spyOn(store.getState(), 'navigate');
+    const { getByRole } = render(() => <ChannelSidebar />);
+
+    fireEvent.click(getByRole('button', { name: '#alpha' }));
+    fireEvent.click(getByRole('button', { name: '#charlie' }));
+    expect(first.skipTransition).toHaveBeenCalledTimes(1);
+    expect(navigateSpy).not.toHaveBeenCalled();
+
+    callbacks[1]?.();
+    callbacks[0]?.();
+    expect(navigateSpy).toHaveBeenCalledTimes(1);
+    expect(navigateSpy).toHaveBeenLastCalledWith({ kind: 'channel', channel: '#charlie' });
+
+    first.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    fireEvent.click(getByRole('button', { name: 'DM with dave' }));
+
+    expect(second.skipTransition).toHaveBeenCalledTimes(1);
+    callbacks[2]?.();
+    expect(navigateSpy).toHaveBeenLastCalledWith({ kind: 'dm', nick: 'dave' });
   });
 });
