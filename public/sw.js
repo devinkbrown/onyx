@@ -188,6 +188,12 @@ function requestSkipWaiting() {
     .catch(() => undefined);
 }
 
+function claimClientsBestEffort() {
+  return Promise.resolve()
+    .then(() => self.clients.claim())
+    .catch(() => undefined);
+}
+
 // ── Install: precache shell ────────────────────────────────────────────────────
 // CRITICAL: precache failures must NEVER abort install. cache.addAll rejects
 // wholesale if any single URL 404s, which bricks the update pipeline — every
@@ -211,7 +217,7 @@ self.addEventListener('activate', (event) => {
     Promise.all([
       clearStaleShellCaches(),
       enableNavigationPreload(),
-    ]).then(() => self.clients.claim())
+    ]).then(() => claimClientsBestEffort())
   );
 });
 

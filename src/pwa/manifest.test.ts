@@ -454,6 +454,7 @@ describe('PWA manifest', () => {
 
     deleteCache.mockClear();
     currentCacheMatch.mockResolvedValueOnce(undefined);
+    claim.mockRejectedValueOnce(new Error('client claim unavailable'));
     activateWork = undefined;
     listeners.get('activate')?.({
       waitUntil: (work: Promise<unknown>) => {
