@@ -3,6 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   UploadError,
+  UPLOAD_ERROR_MESSAGE_MAX_LENGTH,
+  UPLOAD_RESPONSE_MAX_BYTES,
+  UPLOAD_URL_MAX_LENGTH,
   buildUploadEndpoint,
   parseUploadResponse,
   resolveUploadUrl,
@@ -100,6 +103,9 @@ describe('upload helper', () => {
     // Arrange / Act / Assert
     expect(() => buildUploadEndpoint('')).toThrow(UploadError);
     expect(() => buildUploadEndpoint('   ')).toThrow('Media upload URL is not configured.');
+    expect(() => buildUploadEndpoint('javascript:alert(1)')).toThrow('must use HTTP(S)');
+    expect(() => buildUploadEndpoint('//evil.example/upload')).toThrow('HTTP(S) or a root-relative path');
+    expect(() => buildUploadEndpoint('media.example/upload')).toThrow('absolute or root-relative');
   });
 
   it('defaults to same-origin /upload when no media URL is configured', async () => {
@@ -130,6 +136,13 @@ describe('upload helper', () => {
     // Arrange / Act / Assert
     expect(resolveUploadUrl('https://media.example.test', 'https://cdn.example.test/a.png'))
       .toBe('https://cdn.example.test/a.png');
+  });
+
+  it('rejects unsafe or oversized upload response URLs', () => {
+    expect(() => resolveUploadUrl('/upload', 'javascript:alert(1)')).toThrow('unsafe file URL');
+    expect(() => resolveUploadUrl('/upload', 'data:text/html,hello')).toThrow('unsafe file URL');
+    expect(() => resolveUploadUrl('/upload', '//evil.example/file')).toThrow('unsafe file URL');
+    expect(() => resolveUploadUrl('/upload', `/${'x'.repeat(UPLOAD_URL_MAX_LENGTH)}`)).toThrow('too long');
   });
 
   it('roots relative response paths for the default same-origin upload endpoint', () => {
@@ -195,6 +208,34 @@ describe('upload helper', () => {
       '   ',
       null,
     )).rejects.toThrow('Upload response did not include a file URL.');
+    await expect(parseUploadResponse(
+      '/upload',
+      'x'.repeat(UPLOAD_RESPONSE_MAX_BYTES + 1),
+      'text/plain',
+    )).rejects.toThrow('Upload service response was too large.');
+  });
+
+  it('rejects an oversized fetch response before parsing it', async () => {
+    const fetchMock = vi.fn(async () => new Response(
+      'x'.repeat(UPLOAD_RESPONSE_MAX_BYTES + 1),
+      { status: 201 },
+    ));
+    const file = new File(['x'], 'x.txt', { type: 'text/plain' });
+
+    await expect(uploadFile(file, { fetchImpl: fetchMock })).rejects.toMatchObject({
+      code: 'response',
+      message: 'Upload service response was too large.',
+    });
+  });
+
+  it('bounds server-authored HTTP error text before exposing it', async () => {
+    const fetchMock = vi.fn(async () => new Response('e'.repeat(2_000), { status: 422 }));
+
+    await expect(uploadFile(new File(['x'], 'x.txt'), { fetchImpl: fetchMock })).rejects.toMatchObject({
+      code: 'response',
+      status: 422,
+      message: 'e'.repeat(UPLOAD_ERROR_MESSAGE_MAX_LENGTH),
+    });
   });
 
   it('posts multipart form data with the file field and returns the public URL', async () => {
@@ -324,6 +365,36 @@ describe('upload helper', () => {
     expect(xhr?.body?.get('asset')).toBe(file);
     expect(onProgress).toHaveBeenCalledWith({ loaded: 25, total: 100, percent: 25 });
     expect(result).toEqual({ url: 'https://media.example.test/uploads/xhr-file.jpg' });
+  });
+
+  it('removes the upload abort listener after an XHR succeeds', async () => {
+    vi.stubGlobal('XMLHttpRequest', FakeXMLHttpRequest);
+    const removeEventListener = vi.fn();
+    const signal = {
+      aborted: false,
+      addEventListener: vi.fn(),
+      removeEventListener,
+    } as unknown as AbortSignal;
+
+    await uploadFile(new File(['x'], 'done.bin'), {
+      signal,
+      onProgress: vi.fn(),
+    });
+
+    expect(removeEventListener).toHaveBeenCalledWith('abort', expect.any(Function));
+  });
+
+  it('rejects an oversized successful XHR response', async () => {
+    FakeXMLHttpRequest.responseText = 'x'.repeat(UPLOAD_RESPONSE_MAX_BYTES + 1);
+    FakeXMLHttpRequest.responseContentType = 'text/plain';
+    vi.stubGlobal('XMLHttpRequest', FakeXMLHttpRequest);
+
+    await expect(uploadFile(new File(['x'], 'large.bin'), {
+      onProgress: vi.fn(),
+    })).rejects.toMatchObject({
+      code: 'response',
+      message: 'Upload service response was too large.',
+    });
   });
 
   it('reports XHR progress without total or percent when the browser cannot compute length', async () => {

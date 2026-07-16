@@ -17,6 +17,10 @@ export type UploadOptions = {
   onProgress?: (progress: UploadProgress) => void;
 };
 
+export const UPLOAD_RESPONSE_MAX_BYTES = 64 * 1024;
+export const UPLOAD_URL_MAX_LENGTH = 2048;
+export const UPLOAD_ERROR_MESSAGE_MAX_LENGTH = 512;
+
 type UploadResponseShape = {
   url?: unknown;
   href?: unknown;
@@ -59,18 +63,47 @@ export function buildUploadEndpoint(mediaUrl: string | undefined): string {
   }
 
   const normalized = trimTrailingSlash(base);
+  if (normalized.startsWith('//')) {
+    throw new UploadError('Media upload URL must use HTTP(S) or a root-relative path.', 'config');
+  }
+  if (/^[a-z][a-z\d+.-]*:/iu.test(normalized)) {
+    let url: URL;
+    try {
+      url = new URL(normalized);
+    } catch {
+      throw new UploadError('Media upload URL is invalid.', 'config');
+    }
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      throw new UploadError('Media upload URL must use HTTP(S).', 'config');
+    }
+  } else if (!normalized.startsWith('/')) {
+    throw new UploadError('Media upload URL must be absolute or root-relative.', 'config');
+  }
   if (normalized.endsWith('/upload')) return normalized;
   return `${normalized}/upload`;
 }
 
 export function resolveUploadUrl(mediaUrl: string, returnedUrl: string): string {
+  if (returnedUrl.length > UPLOAD_URL_MAX_LENGTH) {
+    throw new UploadError('Upload response file URL is too long.', 'response');
+  }
   const raw = returnedUrl.trim();
   if (!raw) throw new UploadError('Upload response did not include a file URL.', 'response');
+  if (raw.startsWith('//')) {
+    throw new UploadError('Upload response returned an unsafe file URL.', 'response');
+  }
 
   try {
-    return new URL(raw).toString();
+    const absolute = new URL(raw);
+    if (absolute.protocol !== 'http:' && absolute.protocol !== 'https:') {
+      throw new UploadError('Upload response returned an unsafe file URL.', 'response');
+    }
+    return absolute.toString();
   } catch {
-    // Keep resolving below.
+    if (/^[a-z][a-z\d+.-]*:/iu.test(raw)) {
+      throw new UploadError('Upload response returned an unsafe file URL.', 'response');
+    }
+    // Keep resolving safe relative paths below.
   }
 
   const origin = baseOrigin(mediaUrl);
@@ -108,6 +141,9 @@ export async function parseUploadResponse(
   body: string,
   contentType: string | null,
 ): Promise<UploadResult> {
+  if (new TextEncoder().encode(body).byteLength > UPLOAD_RESPONSE_MAX_BYTES) {
+    throw new UploadError('Upload service response was too large.', 'response');
+  }
   const isJson = contentType?.toLowerCase().includes('application/json') ?? false;
 
   if (isJson) {
@@ -129,6 +165,39 @@ export async function parseUploadResponse(
   return { url: resolveUploadUrl(mediaUrl, text) };
 }
 
+async function readBoundedResponseText(response: Response): Promise<string> {
+  const rawLength = response.headers.get('content-length');
+  if (rawLength !== null) {
+    const length = Number(rawLength);
+    if (Number.isFinite(length) && length > UPLOAD_RESPONSE_MAX_BYTES) {
+      throw new UploadError('Upload service response was too large.', 'response', response.status);
+    }
+  }
+  if (!response.body) {
+    const text = await response.text();
+    if (new TextEncoder().encode(text).byteLength > UPLOAD_RESPONSE_MAX_BYTES) {
+      throw new UploadError('Upload service response was too large.', 'response', response.status);
+    }
+    return text;
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let text = '';
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+    total += value.byteLength;
+    if (total > UPLOAD_RESPONSE_MAX_BYTES) {
+      void reader.cancel().catch(() => {});
+      throw new UploadError('Upload service response was too large.', 'response', response.status);
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  return text + decoder.decode();
+}
+
 function progressFromEvent(event: ProgressEvent): UploadProgress {
   const total = event.lengthComputable ? event.total : null;
   return {
@@ -148,15 +217,38 @@ function uploadWithXhr(file: File, endpoint: string, mediaUrl: string, options: 
     xhr.upload.onprogress = (event) => {
       options.onProgress?.(progressFromEvent(event));
     };
-    xhr.onerror = () => reject(new UploadError('Upload failed before the server responded.', 'network'));
-    xhr.onabort = () => reject(new UploadError('Upload was cancelled.', 'network'));
+    let abortHandler: (() => void) | null = null;
+    const cleanup = () => {
+      if (abortHandler) {
+        (options.signal as Partial<AbortSignal> | undefined)?.removeEventListener?.('abort', abortHandler);
+        abortHandler = null;
+      }
+    };
+    const fail = (error: UploadError) => {
+      cleanup();
+      reject(error);
+    };
+    const succeed = (result: UploadResult) => {
+      cleanup();
+      resolve(result);
+    };
+    xhr.onerror = () => fail(new UploadError('Upload failed before the server responded.', 'network'));
+    xhr.onabort = () => fail(new UploadError('Upload was cancelled.', 'network'));
     xhr.onload = () => {
       if (xhr.status < 200 || xhr.status >= 300) {
-        reject(new UploadError(`Upload failed with HTTP ${xhr.status}.`, 'response', xhr.status));
+        fail(new UploadError(`Upload failed with HTTP ${xhr.status}.`, 'response', xhr.status));
+        return;
+      }
+      if (new TextEncoder().encode(xhr.responseText).byteLength > UPLOAD_RESPONSE_MAX_BYTES) {
+        fail(new UploadError('Upload service response was too large.', 'response', xhr.status));
         return;
       }
       void parseUploadResponse(mediaUrl, xhr.responseText, xhr.getResponseHeader('content-type'))
-        .then(resolve, reject);
+        .then(succeed, (error: unknown) => fail(
+          error instanceof UploadError
+            ? error
+            : new UploadError('Upload service returned an invalid response.', 'response', xhr.status),
+        ));
     };
 
     if (options.signal) {
@@ -164,7 +256,8 @@ function uploadWithXhr(file: File, endpoint: string, mediaUrl: string, options: 
         xhr.abort();
         return;
       }
-      options.signal.addEventListener('abort', () => xhr.abort(), { once: true });
+      abortHandler = () => xhr.abort();
+      options.signal.addEventListener('abort', abortHandler, { once: true });
     }
 
     xhr.send(form);
@@ -198,12 +291,14 @@ export async function uploadFile(file: File, options: UploadOptions = {}): Promi
 
   let body: string;
   try {
-    body = await response.text();
-  } catch {
+    body = await readBoundedResponseText(response);
+  } catch (error) {
+    if (error instanceof UploadError) throw error;
     throw new UploadError('Upload failed while reading the server response.', 'network');
   }
   if (!response.ok) {
-    const message = body.trim() || `Upload failed with HTTP ${response.status}.`;
+    const message = body.trim().slice(0, UPLOAD_ERROR_MESSAGE_MAX_LENGTH)
+      || `Upload failed with HTTP ${response.status}.`;
     throw new UploadError(message, 'response', response.status);
   }
 
