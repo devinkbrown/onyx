@@ -7,6 +7,7 @@
 // a stale cache-first bundle. A stale SW silently breaks features baked in at
 // build time (e.g. the media-upload URL).
 const CACHE_NAME = 'onyx-shell-__BUILD_VERSION__';
+const CACHE_PREFIX = 'onyx-shell-';
 
 // App shell assets to precache on install
 const PRECACHE_URLS = [
@@ -151,7 +152,9 @@ self.addEventListener('activate', (event) => {
       caches.keys().then((keys) =>
         Promise.all(
           keys
-            .filter((k) => k !== CACHE_NAME)
+            // This worker shares an origin with public and operational
+            // surfaces. Never erase caches owned by another application.
+            .filter((k) => k.startsWith(CACHE_PREFIX) && k !== CACHE_NAME)
             .map((k) => caches.delete(k))
         )
       ),

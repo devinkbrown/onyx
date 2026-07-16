@@ -348,7 +348,11 @@ describe('PWA manifest', () => {
     const deleteCache = vi.fn(async () => true);
     const caches = {
       open: vi.fn(async () => cache),
-      keys: vi.fn(async () => ['old-shell', 'onyx-shell-__BUILD_VERSION__']),
+      keys: vi.fn(async () => [
+        'public-site-cache',
+        'onyx-shell-old-build',
+        'onyx-shell-__BUILD_VERSION__',
+      ]),
       delete: deleteCache,
       match,
     };
@@ -399,7 +403,9 @@ describe('PWA manifest', () => {
       },
     });
     await activateWork;
-    expect(deleteCache).toHaveBeenCalledWith('old-shell');
+    expect(deleteCache).toHaveBeenCalledOnce();
+    expect(deleteCache).toHaveBeenCalledWith('onyx-shell-old-build');
+    expect(deleteCache).not.toHaveBeenCalledWith('public-site-cache');
     expect(deleteCache).not.toHaveBeenCalledWith('onyx-shell-__BUILD_VERSION__');
     expect(claim).toHaveBeenCalledOnce();
     expect(enableNavigationPreload).toHaveBeenCalledOnce();
