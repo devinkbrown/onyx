@@ -2626,6 +2626,34 @@ let _motdBuffer = '';
 // ── Latency ping tracking (module-level) ─────────────────────────────────────
 /** cookie → performance.now() timestamp when that PING was sent */
 const _pingTimestamps = new Map<string, number>();
+let _latencyPingTimer: ReturnType<typeof setTimeout> | null = null;
+
+function _stopLatencyPing(): void {
+  if (_latencyPingTimer) clearTimeout(_latencyPingTimer);
+  _latencyPingTimer = null;
+  _pingTimestamps.clear();
+}
+
+function _sendLatencyPing(get: () => OnyxState): void {
+  const { client, connectionStatus } = get();
+  if (!client || connectionStatus !== 'connected') return;
+  // A latency probe is strictly single-flight. Keeping an older unanswered
+  // cookie bought no useful RTT sample and let reconnects grow this map.
+  _pingTimestamps.clear();
+  const sentAt = _now();
+  const cookie = `lat-${sentAt | 0}`;
+  _pingTimestamps.set(cookie, sentAt);
+  if (!client.sendRaw('PING', cookie)) _pingTimestamps.delete(cookie);
+}
+
+function _scheduleLatencyPing(get: () => OnyxState, expectedClient: OnyxState['client']): void {
+  if (_latencyPingTimer) clearTimeout(_latencyPingTimer);
+  _latencyPingTimer = setTimeout(() => {
+    _latencyPingTimer = null;
+    if (!expectedClient || get().client !== expectedClient) return;
+    _sendLatencyPing(get);
+  }, 30_000);
+}
 
 /** High-res timestamp, falls back to Date.now() in non-browser envs */
 function _now(): number {
@@ -4229,6 +4257,7 @@ export const store = createStore<OnyxState>()(
       // leak across a (re)connect.
       _batchCollectors.clear();
       _openChathistoryByTarget.clear();
+      _stopLatencyPing();
       _resetServerSearchTransport();
       _pendingTravel = null;
       _clearPendingDeepLinkTopicResolution();
@@ -4346,6 +4375,7 @@ export const store = createStore<OnyxState>()(
           const searchWasPending = _pendingServerSearch !== null || get().serverSearch.status === 'pending';
           _batchCollectors.clear();
           _openChathistoryByTarget.clear();
+          _stopLatencyPing();
           _pendingTravel = null;
           _resetServerSearchTransport();
           set(s => ({
@@ -4537,6 +4567,7 @@ export const store = createStore<OnyxState>()(
       // swallow live messages after a fresh connect.
       _batchCollectors.clear();
       _openChathistoryByTarget.clear();
+      _stopLatencyPing();
       const searchWasPending = _pendingServerSearch !== null || get().serverSearch.status === 'pending';
       _resetServerSearchTransport();
       _pendingTravel = null;
@@ -7518,12 +7549,7 @@ export const store = createStore<OnyxState>()(
           // Request server stats for HomeView widget
           get().client?.sendRaw('LUSERS');
           // Send initial latency ping
-          {
-            const t = _now();
-            const cookie = `lat-${t|0}`;
-            _pingTimestamps.set(cookie, t);
-            get().client?.sendRaw('PING', cookie);
-          }
+          _sendLatencyPing(get);
           // NO blind autojoin: joining is a choice, not a default. An account
           // with orochi/session-sync gets its live channels replayed by the
           // server; everyone else lands on the Home view (a real directory)
@@ -10588,17 +10614,10 @@ export const store = createStore<OnyxState>()(
               _pingTimestamps.delete(cookie);
               // Round to nearest ms for display; sub-ms RTT is noise
               get().setLatency(Math.round(_now() - sentAt));
+              // Only a reply to our current single-flight cookie may continue
+              // the loop. Unsolicited/replayed PONGs must not spawn timers.
+              _scheduleLatencyPing(get, get().client);
             }
-            // Schedule next latency ping in 30s
-            setTimeout(() => {
-              const { client, connectionStatus } = get();
-              if (client && connectionStatus === 'connected') {
-                const t = _now();
-                const nextCookie = `lat-${t|0}`;
-                _pingTimestamps.set(nextCookie, t);
-                client.sendRaw('PING', nextCookie);
-              }
-            }, 30_000);
           }
           break;
         }
