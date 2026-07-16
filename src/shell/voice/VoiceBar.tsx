@@ -688,8 +688,10 @@ export function VoiceBar() {
               {channelLabel()}
             </span>
             <span class="voice-bar__meta">
-              <CallTimer active={isActive()} startedAt={voice().callStartedAt} />
-              <span class="voice-bar__dot" aria-hidden="true">·</span>
+              <Show when={voice().callState === 'in_call'}>
+                <CallTimer active startedAt={voice().callStartedAt} />
+                <span class="voice-bar__dot" aria-hidden="true">·</span>
+              </Show>
               <span
                 class="voice-bar__count"
                 data-testid="participant-count"

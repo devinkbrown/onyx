@@ -1140,6 +1140,24 @@ describe('VoiceBar', () => {
     expect(timer).toHaveAttribute('aria-label', 'Call duration: 1m 6s');
   });
 
+  it('does not start a call-duration timer while the call is only ringing', () => {
+    store.setState(s => ({
+      voice: {
+        ...s.voice,
+        callState: 'ringing_out',
+        callWith: 'Mina',
+        callStartedAt: null,
+      },
+    }));
+
+    const { getByTestId, queryByRole } = render(() => <VoiceBar />);
+
+    const bar = getByTestId('voice-bar');
+    expect(bar).toBeInTheDocument();
+    expect(queryByRole('timer')).toBeNull();
+    expect(bar.querySelector('.voice-bar__dot')).toBeNull();
+  });
+
   it('shows the participant count without roster data (self + peers)', () => {
     // Arrange — self + 2 peers = 3
     seedVoiceStore([makePeer('alice'), makePeer('bob')]);
