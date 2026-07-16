@@ -815,6 +815,43 @@ describe('Session resume', () => {
     expect(switcher).toHaveTextContent(/session ready/i);
   });
 
+  it('never stages a malformed persisted resume token for Connect', async () => {
+    const selected = NODES[0]!;
+    window.localStorage.setItem(
+      'onyx:credentials',
+      JSON.stringify({
+        version: 2,
+        activeKey: `${selected.wss}|kain`,
+        entries: {
+          [`${selected.wss}|kain`]: {
+            nick: 'kain',
+            server: selected.wss,
+            password: 'remembered1',
+            sessionToken: 'malformed resume token',
+            savedAt: new Date().toISOString(),
+          },
+        },
+      }),
+    );
+    let tokenSeenByConnect: string | undefined;
+    const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation((opts) => {
+      tokenSeenByConnect = loadCredentials(opts.url, opts.nick)?.sessionToken;
+    });
+
+    render(() => <Connect />);
+
+    await waitFor(() => expect(screen.getByTestId('conn-remembered-signin')).toBeInTheDocument());
+    expect(screen.queryByTestId('conn-resume')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: /remembered identities/i })).not.toHaveTextContent(
+      'malformed resume token',
+    );
+    fireEvent.click(screen.getByTestId('conn-remembered-signin'));
+
+    await waitFor(() => expect(connectSpy).toHaveBeenCalledOnce());
+    expect(tokenSeenByConnect).toBeUndefined();
+    connectSpy.mockRestore();
+  });
+
   it('connects with the remembered nick + password on resume', async () => {
     seedSavedCredentials();
     const connectSpy = vi.spyOn(getState(), 'connect').mockImplementation(() => {});

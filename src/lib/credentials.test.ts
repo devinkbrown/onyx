@@ -9,6 +9,7 @@ import {
   importAccountHandoffs,
   listRememberedIdentities,
   loadCredentials,
+  MAX_CREDENTIAL_RESUME_TOKEN_LENGTH,
   MAX_CREDENTIALS_STORAGE_CHARS,
   parseAccountHandoffs,
   removeCredentials,
@@ -80,14 +81,14 @@ describe('credentials persistence', () => {
 
     expect(stored.activeKey).toBe('https://chat.example:6697|alice');
     expect(stored.entries['https://chat.example:6697|alice']).toMatchObject({
-      nick: '  Alice  ',
+      nick: 'Alice',
       server: 'HTTPS://Chat.Example:6697/',
       password: 'secret',
       savedAt: NOW.toISOString(),
     });
-    expect(localStorage.getItem(SAVED_NICK_KEY)).toBe('  Alice  ');
+    expect(localStorage.getItem(SAVED_NICK_KEY)).toBe('Alice');
     expect(loadCredentials('https://chat.example:6697', 'ALICE')).toMatchObject({
-      nick: '  Alice  ',
+      nick: 'Alice',
       password: 'secret',
     });
   });
@@ -127,6 +128,63 @@ describe('credentials persistence', () => {
     }));
 
     expect(loadCredentials()).toBeNull();
+  });
+
+  it('rejects prototype-backed and non-own active credential records', () => {
+    localStorage.setItem(
+      CREDENTIALS_KEY,
+      '{"version":2,"activeKey":"__proto__","entries":{"__proto__":{"nick":"Mallory","server":"wss://evil.example","meshToken":"attacker-token","savedAt":"2026-07-10T12:00:00.000Z"}}}',
+    );
+
+    expect(loadCredentials()).toBeNull();
+    expect(listRememberedIdentities()).toEqual([]);
+    expect(selectRememberedIdentity('saved-attacker')).toBeNull();
+    expect(Object.prototype).not.toHaveProperty('nick');
+
+    localStorage.setItem(
+      CREDENTIALS_KEY,
+      '{"version":2,"activeKey":"toString","entries":{}}',
+    );
+
+    expect(loadCredentials()).toBeNull();
+    expect(listRememberedIdentities()).toEqual([]);
+    expect(selectRememberedIdentity('saved-attacker')).toBeNull();
+  });
+
+  it('sanitizes every optional credential field loaded from raw JSON', () => {
+    localStorage.setItem(CREDENTIALS_KEY, JSON.stringify({
+      version: 2,
+      activeKey: 'wss://irc.example|alice',
+      entries: {
+        'wss://irc.example|alice': {
+          nick: ' Alice ',
+          server: ' wss://irc.example ',
+          password: { secret: 'must-not-load' },
+          sessionToken: 'contains whitespace',
+          meshToken: `mesh\ncredential`,
+          tokenExpiry: NOW.toISOString(),
+          savedAt: ['not', 'a', 'timestamp'],
+          unknownSecret: 'must-not-load',
+        },
+      },
+    }));
+
+    expect(loadCredentials()).toEqual({
+      nick: 'Alice',
+      server: 'wss://irc.example',
+      savedAt: '',
+    });
+    const identities = listRememberedIdentities();
+    expect(identities).toMatchObject([{
+      nick: 'Alice',
+      server: 'wss://irc.example',
+      access: 'identity-only',
+    }]);
+    expect(selectRememberedIdentity(identities[0]!.id)).toEqual({
+      nick: 'Alice',
+      server: 'wss://irc.example',
+      savedAt: '',
+    });
   });
 
   it('rejects oversized credential storage before parsing', () => {
@@ -225,6 +283,24 @@ describe('credentials persistence', () => {
     expect(bob).toMatchObject({ password: 'bob-pw' });
     expect(bob?.sessionToken).toBeUndefined();
     expect(bob?.meshToken).toBeUndefined();
+  });
+
+  it('refuses malformed, oversized, or invalid-expiry token rotations', () => {
+    saveCredentials({ nick: 'Alice', server: 'wss://irc.example', password: 'pw' });
+    storeSessionToken('valid-session');
+    storeMeshToken('valid-mesh');
+
+    storeSessionToken('invalid session');
+    storeSessionToken('x'.repeat(MAX_CREDENTIAL_RESUME_TOKEN_LENGTH + 1));
+    storeSessionToken('replacement', Number.NaN);
+    storeMeshToken('invalid\nmesh');
+    storeMeshToken('y'.repeat(MAX_CREDENTIAL_RESUME_TOKEN_LENGTH + 1));
+    storeMeshToken('replacement', Number.POSITIVE_INFINITY);
+
+    expect(loadCredentials()).toMatchObject({
+      sessionToken: 'valid-session',
+      meshToken: 'valid-mesh',
+    });
   });
 
   it('clears local and mesh session tokens for a selected account', () => {
@@ -402,11 +478,12 @@ describe('credentials persistence', () => {
   });
 
   it('lists multiple identities without exposing secrets or sensitive URL parts', () => {
+    const firstKey = 'wss://alice:server-secret@chat.example/ws?token=url-secret#fragment|alice';
     writeStoredCredentials({
       version: 2,
-      activeKey: 'wss://alice:server-secret@chat.example/ws?token=url-secret|alice',
+      activeKey: firstKey,
       entries: {
-        'wss://alice:server-secret@chat.example/ws?token=url-secret|alice': {
+        [firstKey]: {
           nick: 'Alice',
           server: 'wss://alice:server-secret@chat.example/ws?token=url-secret#fragment',
           password: 'password-secret',

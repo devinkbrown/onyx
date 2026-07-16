@@ -28,6 +28,12 @@
 
 const KEY = 'onyx:credentials';
 export const MAX_CREDENTIALS_STORAGE_CHARS = 2 * 1024 * 1024;
+export const MAX_CREDENTIAL_RESUME_TOKEN_LENGTH = 4 * 1024;
+
+const MAX_CREDENTIAL_NICK_LENGTH = 64;
+const MAX_CREDENTIAL_SERVER_LENGTH = 2 * 1024;
+const MAX_CREDENTIAL_PASSWORD_LENGTH = 64 * 1024;
+const MAX_CREDENTIAL_TIMESTAMP_LENGTH = 64;
 
 export interface SavedCredentials {
   nick: string;
@@ -84,6 +90,105 @@ interface CredentialsStore {
 const MAX_HANDOFFS = 12;
 const MAX_HANDOFF_FIELD = 256;
 
+function emptyCredentialEntries(): Record<string, SavedCredentials> {
+  return Object.create(null) as Record<string, SavedCredentials>;
+}
+
+function ownCredential(
+  store: CredentialsStore,
+  key: string | undefined,
+): SavedCredentials | undefined {
+  return key && Object.hasOwn(store.entries, key) ? store.entries[key] : undefined;
+}
+
+function sanitizeCredentialNick(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length > MAX_CREDENTIAL_NICK_LENGTH * 2) return null;
+  const nick = value.trim();
+  return nick.length > 0
+    && nick.length <= MAX_CREDENTIAL_NICK_LENGTH
+    && /^[A-Za-z[\]\\`_^{|}][A-Za-z0-9[\]\\`_^{|}-]*$/u.test(nick)
+    ? nick
+    : null;
+}
+
+function sanitizeCredentialServer(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length > MAX_CREDENTIAL_SERVER_LENGTH * 2) return null;
+  const server = value.trim();
+  return server.length > 0
+    && server.length <= MAX_CREDENTIAL_SERVER_LENGTH
+    && !/[\u0000-\u0020\u007f]/u.test(server)
+    ? server
+    : null;
+}
+
+function sanitizeCredentialPassword(value: unknown): string | undefined {
+  return typeof value === 'string'
+    && value.length <= MAX_CREDENTIAL_PASSWORD_LENGTH
+    && !/[\u0000-\u001f\u007f]/u.test(value)
+    ? value
+    : undefined;
+}
+
+function sanitizeResumeToken(value: unknown): string | undefined {
+  return typeof value === 'string'
+    && value.length > 0
+    && value.length <= MAX_CREDENTIAL_RESUME_TOKEN_LENGTH
+    && !/[\s\u0000-\u001f\u007f]/u.test(value)
+    ? value
+    : undefined;
+}
+
+function sanitizeTimestamp(value: unknown): string | undefined {
+  if (
+    typeof value !== 'string'
+    || value.length === 0
+    || value.length > MAX_CREDENTIAL_TIMESTAMP_LENGTH
+  ) return undefined;
+  const milliseconds = Date.parse(value);
+  if (!Number.isFinite(milliseconds)) return undefined;
+  try {
+    return new Date(milliseconds).toISOString();
+  } catch {
+    return undefined;
+  }
+}
+
+function sanitizeSavedCredentials(value: unknown): SavedCredentials | null {
+  if (!isRecord(value)) return null;
+  const nick = sanitizeCredentialNick(value.nick);
+  const server = sanitizeCredentialServer(value.server);
+  if (!nick || !server) return null;
+
+  const password = sanitizeCredentialPassword(value.password);
+  const sessionToken = sanitizeResumeToken(value.sessionToken);
+  const meshToken = sanitizeResumeToken(value.meshToken);
+  const hasPersistedExpiry = Object.hasOwn(value, 'tokenExpiry');
+  const tokenExpiry = sanitizeTimestamp(value.tokenExpiry);
+  const acceptTokens = !hasPersistedExpiry || tokenExpiry !== undefined;
+
+  return {
+    nick,
+    server,
+    ...(password !== undefined ? { password } : {}),
+    ...(acceptTokens && sessionToken !== undefined ? { sessionToken } : {}),
+    ...(acceptTokens && meshToken !== undefined ? { meshToken } : {}),
+    ...(acceptTokens && tokenExpiry !== undefined && (sessionToken || meshToken)
+      ? { tokenExpiry }
+      : {}),
+    savedAt: sanitizeTimestamp(value.savedAt) ?? '',
+  };
+}
+
+function expiryFromSeconds(value: number | undefined): string | undefined | null {
+  if (value === undefined) return undefined;
+  if (!Number.isFinite(value) || value <= 0) return null;
+  try {
+    return new Date(value * 1000).toISOString();
+  } catch {
+    return null;
+  }
+}
+
 function normalizeServer(server: string): string {
   const trimmed = server.trim();
   try {
@@ -105,11 +210,14 @@ function tokenTargetKey(
   target?: CredentialTokenTarget,
 ): string | undefined {
   if (target) {
-    const exact = credentialKey(target.server, target.nick);
-    return store.entries[exact] ? exact : undefined;
+    const server = sanitizeCredentialServer(target.server);
+    const nick = sanitizeCredentialNick(target.nick);
+    if (!server || !nick) return undefined;
+    const exact = credentialKey(server, nick);
+    return ownCredential(store, exact) ? exact : undefined;
   }
   const active = store.activeKey ?? Object.keys(store.entries)[0];
-  return active && store.entries[active] ? active : undefined;
+  return ownCredential(store, active) ? active : undefined;
 }
 
 function identityId(key: string): string {
@@ -162,24 +270,15 @@ function identityAccess(creds: SavedCredentials): RememberedIdentityAccess {
   return hasPassword(creds) ? 'sign-in' : 'identity-only';
 }
 
-function isSavedCredentials(value: unknown): value is SavedCredentials {
-  if (!value || typeof value !== 'object') return false;
-  const candidate = value as Partial<SavedCredentials>;
-  return typeof candidate.nick === 'string'
-    && candidate.nick.length > 0
-    && typeof candidate.server === 'string'
-    && candidate.server.length > 0;
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function sanitizeHandoff(value: unknown): AccountHandoff | null {
   if (!isRecord(value)) return null;
-  const nick = typeof value.nick === 'string' ? value.nick.trim().slice(0, MAX_HANDOFF_FIELD) : '';
-  const server = typeof value.server === 'string' ? value.server.trim().slice(0, MAX_HANDOFF_FIELD) : '';
-  if (!nick || !server) return null;
+  const nick = sanitizeCredentialNick(value.nick);
+  const server = sanitizeCredentialServer(value.server);
+  if (!nick || !server || server.length > MAX_HANDOFF_FIELD) return null;
   return {
     nick,
     server,
@@ -194,30 +293,34 @@ function readStore(): CredentialsStore | null {
   if (!raw || raw.length > MAX_CREDENTIALS_STORAGE_CHARS) return null;
 
   const parsed = JSON.parse(raw) as unknown;
-  if (
-    parsed
-    && typeof parsed === 'object'
-    && (parsed as { version?: unknown }).version === 2
-    && (parsed as { entries?: unknown }).entries
-    && typeof (parsed as { entries: unknown }).entries === 'object'
-  ) {
-    const entries: Record<string, SavedCredentials> = {};
-    for (const [key, value] of Object.entries((parsed as CredentialsStore).entries)) {
-      if (isSavedCredentials(value)) entries[key] = value;
+  if (isRecord(parsed) && parsed.version === 2 && isRecord(parsed.entries)) {
+    const entries = emptyCredentialEntries();
+    for (const [key, value] of Object.entries(parsed.entries)) {
+      const credentials = sanitizeSavedCredentials(value);
+      if (credentials && key === credentialKey(credentials.server, credentials.nick)) {
+        entries[key] = credentials;
+      }
     }
+    const firstKey = Object.keys(entries)[0];
+    const requestedActiveKey = typeof parsed.activeKey === 'string'
+      ? parsed.activeKey
+      : undefined;
     return {
       version: 2,
-      activeKey: typeof (parsed as CredentialsStore).activeKey === 'string'
-        ? (parsed as CredentialsStore).activeKey
-        : undefined,
+      activeKey: ownCredential({ version: 2, entries }, requestedActiveKey)
+        ? requestedActiveKey
+        : firstKey,
       entries,
     };
   }
 
   // Legacy single-credential object.
-  if (isSavedCredentials(parsed)) {
-    const key = credentialKey(parsed.server, parsed.nick);
-    return { version: 2, activeKey: key, entries: { [key]: parsed } };
+  const legacy = sanitizeSavedCredentials(parsed);
+  if (legacy) {
+    const key = credentialKey(legacy.server, legacy.nick);
+    const entries = emptyCredentialEntries();
+    entries[key] = legacy;
+    return { version: 2, activeKey: key, entries };
   }
 
   return null;
@@ -262,7 +365,7 @@ function enforceCredentialLimit(store: CredentialsStore): boolean {
   for (const key of keys) {
     if (!keep.has(key)) delete store.entries[key];
   }
-  if (!store.activeKey || !store.entries[store.activeKey]) store.activeKey = keys[0];
+  if (!ownCredential(store, store.activeKey)) store.activeKey = keys[0];
   return true;
 }
 
@@ -277,8 +380,11 @@ export function loadCredentials(server?: string, nick?: string): SavedCredential
     const changed = tokensChanged || limitChanged;
     if (changed) writeStore(store);
 
-    const key = server && nick ? credentialKey(server, nick) : store.activeKey;
-    const creds = key ? store.entries[key] : Object.values(store.entries)[0];
+    const safeServer = server === undefined ? undefined : sanitizeCredentialServer(server);
+    const safeNick = nick === undefined ? undefined : sanitizeCredentialNick(nick);
+    if ((server !== undefined && !safeServer) || (nick !== undefined && !safeNick)) return null;
+    const key = safeServer && safeNick ? credentialKey(safeServer, safeNick) : store.activeKey;
+    const creds = key ? ownCredential(store, key) : Object.values(store.entries)[0];
     return creds ?? null;
   } catch {
     return null;
@@ -358,18 +464,22 @@ export function saveCredentials(opts: {
 }): void {
   if (typeof window === 'undefined') return;
   try {
-    const store: CredentialsStore = readStore() ?? { version: 2, entries: {} };
+    const nick = sanitizeCredentialNick(opts.nick);
+    const server = sanitizeCredentialServer(opts.server);
+    const password = sanitizeCredentialPassword(opts.password);
+    if (!nick || !server || (opts.password !== undefined && password === undefined)) return;
+    const store: CredentialsStore = readStore() ?? { version: 2, entries: emptyCredentialEntries() };
     purgeExpiredTokens(store);
-    const key = credentialKey(opts.server, opts.nick);
-    const existing = store.entries[key];
+    const key = credentialKey(server, nick);
+    const existing = ownCredential(store, key);
     const preserveToken = existing
-      && normalizeServer(existing.server) === normalizeServer(opts.server)
-      && existing.nick.trim().toLowerCase() === opts.nick.trim().toLowerCase()
-      && existing.password === opts.password;
+      && normalizeServer(existing.server) === normalizeServer(server)
+      && existing.nick.toLowerCase() === nick.toLowerCase()
+      && existing.password === password;
     const creds: SavedCredentials = {
-      nick:         opts.nick,
-      server:       opts.server,
-      password:     opts.password,
+      nick,
+      server,
+      password,
       sessionToken: preserveToken ? existing.sessionToken : undefined,
       meshToken:    preserveToken ? existing.meshToken : undefined,
       tokenExpiry:  preserveToken ? existing.tokenExpiry : undefined,
@@ -380,7 +490,7 @@ export function saveCredentials(opts: {
     enforceCredentialLimit(store);
     writeStore(store);
     // Also keep legacy key so the nick field stays pre-filled
-    localStorage.setItem('onyx:saved-nick', opts.nick);
+    localStorage.setItem('onyx:saved-nick', nick);
   } catch { /* quota */ }
 }
 
@@ -398,19 +508,24 @@ export function storeSessionToken(
 ): void {
   if (typeof window === 'undefined') return;
   try {
+    const safeToken = sanitizeResumeToken(token);
+    const expiry = expiryFromSeconds(expiresAt);
+    const safeCanonicalNick = canonicalNick === undefined
+      ? undefined
+      : sanitizeCredentialNick(canonicalNick);
+    if (!safeToken || expiry === null || (canonicalNick !== undefined && !safeCanonicalNick)) return;
     const store = readStore();
     if (!store) return; // Only store tokens when we have base credentials
     purgeExpiredTokens(store);
     const entryKey = tokenTargetKey(store, target);
     if (!entryKey) return;
-    const existing = store.entries[entryKey];
+    const existing = ownCredential(store, entryKey);
     if (!existing) return;
-    const expiry = expiresAt ? new Date(expiresAt * 1000).toISOString() : undefined;
-    const nick = canonicalNick ?? existing.nick;
+    const nick = safeCanonicalNick ?? existing.nick;
     const creds: SavedCredentials = {
       ...existing,
       nick,
-      sessionToken: token,
+      sessionToken: safeToken,
       tokenExpiry:  expiry,
     };
     const nextKey = credentialKey(existing.server, nick);
@@ -420,8 +535,8 @@ export function storeSessionToken(
     if (wasActive || !store.activeKey) store.activeKey = nextKey;
     writeStore(store);
     // Keep legacy nick key in sync
-    if (canonicalNick && store.activeKey === nextKey) {
-      localStorage.setItem('onyx:saved-nick', canonicalNick);
+    if (safeCanonicalNick && store.activeKey === nextKey) {
+      localStorage.setItem('onyx:saved-nick', safeCanonicalNick);
     }
   } catch { /* quota */ }
 }
@@ -432,9 +547,13 @@ export function clearSessionToken(server?: string, nick?: string): void {
   try {
     const store = readStore();
     if (!store) return;
-    const key = server && nick ? credentialKey(server, nick) : store.activeKey;
-    if (!key || !store.entries[key]) return;
-    store.entries[key] = { ...store.entries[key], sessionToken: undefined, meshToken: undefined, tokenExpiry: undefined };
+    const safeServer = server === undefined ? undefined : sanitizeCredentialServer(server);
+    const safeNick = nick === undefined ? undefined : sanitizeCredentialNick(nick);
+    if ((server !== undefined && !safeServer) || (nick !== undefined && !safeNick)) return;
+    const key = safeServer && safeNick ? credentialKey(safeServer, safeNick) : store.activeKey;
+    const existing = ownCredential(store, key);
+    if (!key || !existing) return;
+    store.entries[key] = { ...existing, sessionToken: undefined, meshToken: undefined, tokenExpiry: undefined };
     writeStore(store);
   } catch { /* quota */ }
 }
@@ -461,20 +580,23 @@ export function storeMeshToken(
 ): void {
   if (typeof window === 'undefined') return;
   try {
+    const safeToken = sanitizeResumeToken(token);
+    const expiry = expiryFromSeconds(expiresAt);
+    if (!safeToken || expiry === null) return;
     const store = readStore();
     if (!store) return; // Only store tokens when we have base credentials
     purgeExpiredTokens(store);
     const entryKey = tokenTargetKey(store, target);
     if (!entryKey) return;
-    const existing = store.entries[entryKey];
+    const existing = ownCredential(store, entryKey);
     if (!existing) return;
     // Only set tokenExpiry when the caller supplies one; otherwise preserve any
     // expiry already governing an existing token rather than clobbering it.
     store.entries[entryKey] = {
       ...existing,
-      meshToken: token,
-      ...(expiresAt !== undefined
-        ? { tokenExpiry: new Date(expiresAt * 1000).toISOString() }
+      meshToken: safeToken,
+      ...(expiry !== undefined
+        ? { tokenExpiry: expiry }
         : {}),
     };
     writeStore(store);
@@ -491,7 +613,7 @@ export function clearCredentials(): void {
 }
 
 function removeCredentialKey(store: CredentialsStore, key: string): boolean {
-  if (!store.entries[key]) return false;
+  if (!ownCredential(store, key)) return false;
   delete store.entries[key];
   const remainingKeys = Object.keys(store.entries);
   if (remainingKeys.length === 0) {
@@ -500,11 +622,11 @@ function removeCredentialKey(store: CredentialsStore, key: string): boolean {
     return true;
   }
 
-  if (store.activeKey === key || !store.activeKey || !store.entries[store.activeKey]) {
+  if (store.activeKey === key || !ownCredential(store, store.activeKey)) {
     store.activeKey = remainingKeys[0];
   }
   writeStore(store);
-  const active = store.activeKey ? store.entries[store.activeKey] : undefined;
+  const active = ownCredential(store, store.activeKey);
   if (active) localStorage.setItem('onyx:saved-nick', active.nick);
   return true;
 }
@@ -515,7 +637,10 @@ export function removeCredentials(server: string, nick: string): void {
   try {
     const store = readStore();
     if (!store) return;
-    const key = credentialKey(server, nick);
+    const safeServer = sanitizeCredentialServer(server);
+    const safeNick = sanitizeCredentialNick(nick);
+    if (!safeServer || !safeNick) return;
+    const key = credentialKey(safeServer, safeNick);
     removeCredentialKey(store, key);
   } catch { /* quota / malformed storage */ }
 }
@@ -560,18 +685,20 @@ export function parseAccountHandoffs(value: unknown): AccountHandoff[] {
 export function importAccountHandoffs(handoffs: readonly AccountHandoff[]): { imported: number; total: number } {
   if (typeof window === 'undefined') return { imported: 0, total: 0 };
   try {
-    const store: CredentialsStore = readStore() ?? { version: 2, entries: {} };
+    const store: CredentialsStore = readStore() ?? { version: 2, entries: emptyCredentialEntries() };
     purgeExpiredTokens(store);
     let imported = 0;
     let preferredKey: string | undefined;
     for (const handoff of parseAccountHandoffs(handoffs)) {
       const key = credentialKey(handoff.server, handoff.nick);
-      const existing = store.entries[key];
+      const existing = ownCredential(store, key);
       store.entries[key] = {
         ...(existing ?? {}),
         nick: handoff.nick,
         server: handoff.server,
-        savedAt: handoff.savedAt ?? existing?.savedAt ?? new Date().toISOString(),
+        savedAt: sanitizeTimestamp(handoff.savedAt)
+          ?? existing?.savedAt
+          ?? new Date().toISOString(),
       };
       imported += 1;
       if (handoff.active) preferredKey = key;
@@ -580,7 +707,7 @@ export function importAccountHandoffs(handoffs: readonly AccountHandoff[]): { im
     if (preferredKey) store.activeKey = preferredKey;
     if (imported > 0) {
       writeStore(store);
-      const active = store.activeKey ? store.entries[store.activeKey] : Object.values(store.entries)[0];
+      const active = ownCredential(store, store.activeKey) ?? Object.values(store.entries)[0];
       if (active) localStorage.setItem('onyx:saved-nick', active.nick);
     }
     return { imported, total: Object.keys(store.entries).length };
@@ -598,5 +725,5 @@ export function importAccountHandoffs(handoffs: readonly AccountHandoff[]): { im
  * via `SESSION RESUME` after IRC registration.
  */
 export function getAuthSecret(creds: SavedCredentials): string | undefined {
-  return creds.password;
+  return sanitizeCredentialPassword(creds.password);
 }
