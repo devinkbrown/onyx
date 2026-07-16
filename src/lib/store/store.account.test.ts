@@ -10,7 +10,13 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { _resetAccountReplyStateForTests, store, type Server } from './store';
+import {
+  _resetAccountReplyStateForTests,
+  store,
+  type DMConversation,
+  type Server,
+} from './store';
+import type { Channel, ChatMessage } from '@/lib/irc/types';
 import { parseIRCMessage } from '@/lib/irc/parser';
 import { loadCredentials, saveCredentials } from '@/lib/credentials';
 
@@ -639,6 +645,95 @@ describe('account replies — state from the message handler', () => {
 
     expect(store.getState().server?.account).toBe('bob');
     expectAccountBoundStateCleared();
+  });
+
+  it('quarantines Alice message memory when 900 switches the live account to Bob', () => {
+    const aliceDm: ChatMessage = {
+      id: 'alice-dm',
+      time: new Date(1_000),
+      from: 'trev',
+      text: 'ciphertext',
+      plaintext: 'Alice private plaintext',
+      encrypted: true,
+      type: 'msg',
+      target: 'alice',
+    };
+    const aliceChannelMessage: ChatMessage = {
+      id: 'alice-channel',
+      time: new Date(2_000),
+      from: 'alice',
+      text: 'account-only room history',
+      type: 'msg',
+      target: '#private',
+    };
+    const aliceDmBuffer: DMConversation = {
+      nick: 'trev',
+      account: 'trev',
+      unread: 1,
+      highlights: 1,
+      messages: [aliceDm],
+    };
+    const aliceChannel: Channel = {
+      name: '#private',
+      topic: 'members only',
+      topicSetBy: 'alice',
+      topicSetAt: null,
+      modes: '+s',
+      users: new Map(),
+      unread: 1,
+      highlights: 1,
+      createdAt: null,
+      messages: [aliceChannelMessage],
+    };
+    store.setState({
+      server: seedServer('alice'),
+      ourNick: 'alice',
+      dms: new Map([['trev', aliceDmBuffer]]),
+      channels: new Map([['#private', aliceChannel]]),
+      activeView: { kind: 'dm', nick: 'trev' },
+      showMessageSearch: true,
+      messageSearchQuery: 'private',
+      messageSearchResults: [aliceDm],
+      messageSearchLoading: true,
+      serverSearch: {
+        target: 'trev',
+        query: 'private',
+        status: 'done',
+        results: [aliceDm],
+        error: null,
+      },
+      replyingTo: aliceDm,
+      editingMessage: aliceDm,
+      forwardingMessage: aliceDm,
+    });
+
+    feed(':eshmaki.me 900 alice alice!u@h bob :You are now logged in as bob');
+
+    const state = store.getState();
+    expect(state.server?.account).toBe('bob');
+    expect(state.dms.size).toBe(0);
+    expect(state.activeView).toEqual({ kind: 'home' });
+    expect(state.channels.get('#private')).toMatchObject({
+      name: '#private',
+      topic: 'members only',
+      messages: [],
+      unread: 0,
+      highlights: 0,
+    });
+    expect(state.showMessageSearch).toBe(false);
+    expect(state.messageSearchQuery).toBe('');
+    expect(state.messageSearchResults).toEqual([]);
+    expect(state.messageSearchLoading).toBe(false);
+    expect(state.serverSearch).toEqual({
+      target: '',
+      query: '',
+      status: 'idle',
+      results: [],
+      error: null,
+    });
+    expect(state.replyingTo).toBeNull();
+    expect(state.editingMessage).toBeNull();
+    expect(state.forwardingMessage).toBeNull();
   });
 
   it('ignores an Alice ACCOUNTINFO reply after the live account switches to Bob', () => {

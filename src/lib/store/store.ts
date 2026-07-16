@@ -2709,6 +2709,65 @@ function _resetAccountBoundState(
   }));
 }
 
+/**
+ * Quarantine message-derived state when the identity behind a live transport
+ * changes. Channel membership and roster metadata still describe the same IRC
+ * socket, but history visibility may be account-gated, so even channel message
+ * buffers must be rehydrated from the new owner's namespace. Decrypted DMs are
+ * dropped wholesale and a DM view is closed before the new account is exposed.
+ */
+function _resetAccountPrivateMessageState(set: SetFn): void {
+  if (_pendingServerSearch) _markServerSearchStale(_pendingServerSearch);
+  _pendingServerSearch = null;
+  _clearServerSearchTimeout();
+  _pendingTravel = null;
+
+  set(s => {
+    const channels = new Map<string, Channel>();
+    for (const [key, channel] of s.channels) {
+      channels.set(key, {
+        ...channel,
+        messages: [],
+        unread: 0,
+        highlights: 0,
+      });
+    }
+    return {
+      channels,
+      dms: new Map(),
+      activeView: s.activeView.kind === 'dm' ? { kind: 'home' as const } : s.activeView,
+      timeTravelLandingId: null,
+      historyLoading: new Map(),
+      historyExhausted: new Map(),
+      firstUnreadId: new Map(),
+      lastReadAt: new Map(),
+      viewUnreadDividerId: new Map(),
+      revealedMessages: new Set(),
+      typingUsers: new Map(),
+      replyingTo: null,
+      editingMessage: null,
+      forwardingMessage: null,
+      showThreadPanel: false,
+      threadParentId: null,
+      showMessageSearch: false,
+      messageSearchResults: [],
+      messageSearchQuery: '',
+      messageSearchLoading: false,
+      serverSearch: {
+        target: '',
+        query: '',
+        status: 'idle' as const,
+        results: [],
+        error: null,
+      },
+      peerDmKeys: new Map(),
+      peerKeyChanges: new Map(),
+      peerSafetyNumbers: new Map(),
+      pendingKeySafetyNumbers: new Map(),
+    };
+  });
+}
+
 /** Test-only reset for module-level account reply ownership. */
 export function _resetAccountReplyStateForTests(): void {
   _invalidateAccountReplyContexts();
@@ -2889,6 +2948,7 @@ function _clearRememberedSessionAfterLogout(get: GetFn, set: SetFn): void {
   _clearSessionRestore(set);
   _stopNickReclaim();
   _resetAccountBoundState(set);
+  _resetAccountPrivateMessageState(set);
 }
 
 function _setRestoreRosterSyncing(set: SetFn, channelKey: string, syncing: boolean): void {
@@ -7012,6 +7072,7 @@ export const store = createStore<OnyxState>()(
           const previousAccount = get().server?.account ?? null;
           if (_accountKey(previousAccount) !== _accountKey(account)) {
             _resetAccountBoundState(set);
+            _resetAccountPrivateMessageState(set);
             _saslAccount = account;
             _credentialTokenCanonicalOnly = true;
           }
@@ -9354,6 +9415,7 @@ export const store = createStore<OnyxState>()(
               && _accountKey(previousAccount) !== _accountKey(account900)
             ) {
               _resetAccountBoundState(set);
+              _resetAccountPrivateMessageState(set);
             }
             _sessionTokenWritesAllowed = true;
             // Capture before server object exists (900 arrives during CAP/SASL, before 001)
