@@ -2163,6 +2163,7 @@ export const MAX_PASSKEY_LABEL_LENGTH = 256;
 const MAX_SYSTEM_EVENT_TEXT_LENGTH = MAX_SERVER_AUX_TEXT_LENGTH;
 export const MAX_LIVE_MEDIA_CHANNELS = 32;
 export const MAX_LIVE_MEDIA_PARTICIPANTS = 256;
+export const MAX_STAGE_RAISED_HANDS = 128;
 export const MAX_MEDIA_TRANSCRIPT_ENTRIES = 200;
 export const MAX_MEDIA_TRANSCRIPT_TEXT_LENGTH = 4 * 1024;
 const MAX_MEDIA_REACTION_LENGTH = 64;
@@ -2446,6 +2447,25 @@ function _normalizeMetadataTarget(value: string): string | null {
   ) return null;
   const key = value.toLowerCase();
   return UNSAFE_METADATA_KEYS.has(key) ? null : value;
+}
+
+function _normalizeStageNick(value: string): string | null {
+  if (
+    !_validInboundWireToken(value, MAX_TYPING_NICK_LENGTH)
+    || value.startsWith(':')
+    || value.includes(',')
+  ) return null;
+  return value;
+}
+
+function _normalizeStageChannel(value: string): string | null {
+  const channel = value.trim();
+  if (
+    !_validInboundWireToken(channel, MAX_VAULT_TARGET_LENGTH)
+    || !'#&'.includes(channel[0] ?? '')
+    || channel.includes(',')
+  ) return null;
+  return channel;
 }
 
 function _activeWhoisTarget(activeNick: string | null, value: string): string | null {
@@ -3301,6 +3321,12 @@ function _resetAccountBoundState(
       notifications: [],
       readNotificationIds: new Set(),
       showNotificationCenter: false,
+      stageChannel: null,
+      stageRaisedHands: [],
+      isStageHost: false,
+      isStageSpeaker: false,
+      stageHandRaised: false,
+      pendingSpeakInvite: null,
       registerPending: false,
       registerError: null,
       verifyRequired: false,
@@ -8586,7 +8612,23 @@ export const store = createStore<OnyxState>()(
                 : active;
               const activeChannelTopics = new Map(s.activeChannelTopics);
               activeChannelTopics.delete(key);
-              return { channels, channelFolders, activeView: next, activeChannelTopics };
+              const leftStage = s.stageChannel?.toLowerCase() === key;
+              return {
+                channels,
+                channelFolders,
+                activeView: next,
+                activeChannelTopics,
+                ...(leftStage
+                  ? {
+                      stageChannel: null,
+                      stageRaisedHands: [],
+                      isStageHost: false,
+                      isStageSpeaker: false,
+                      stageHandRaised: false,
+                      pendingSpeakInvite: null,
+                    }
+                  : {}),
+              };
             });
           } else {
             _excludeNickFromNames(key, parter);
@@ -8611,6 +8653,7 @@ export const store = createStore<OnyxState>()(
               const partText = partReason ? `${parter} left (${partReason})` : `${parter} left`;
               get().addChannelEvent(ch, { type: 'part', nick: parter, text: partText, time: new Date() });
             }
+            if (get().stageChannel?.toLowerCase() === key) get().removeRaisedHand(parter);
           }
           break;
         }
@@ -8656,6 +8699,7 @@ export const store = createStore<OnyxState>()(
             const quitText = quitReason ? `${quitter} quit (${quitReason})` : `${quitter} quit`;
             get().addChannelEvent(chanName, { type: 'quit', nick: quitter, text: quitText, time: new Date() });
           }
+          get().removeRaisedHand(quitter);
           break;
         }
 
@@ -8708,7 +8752,23 @@ export const store = createStore<OnyxState>()(
                 && s.activeView.channel.toLowerCase() === key
                 ? { kind: 'home' as const }
                 : s.activeView;
-              return { channels, channelFolders, activeChannelTopics, activeView };
+              const leftStage = s.stageChannel?.toLowerCase() === key;
+              return {
+                channels,
+                channelFolders,
+                activeChannelTopics,
+                activeView,
+                ...(leftStage
+                  ? {
+                      stageChannel: null,
+                      stageRaisedHands: [],
+                      isStageHost: false,
+                      isStageSpeaker: false,
+                      stageHandRaised: false,
+                      pendingSpeakInvite: null,
+                    }
+                  : {}),
+              };
             } else {
               const c = channels.get(key);
               if (c?.users.has(target.toLowerCase())) {
@@ -8725,6 +8785,9 @@ export const store = createStore<OnyxState>()(
           });
           if (!isSelf && removed) {
             get().addChannelEvent(ch, { type: 'kick', nick: target, text: `${target} was kicked by ${actor}${reason ? ` (${reason})` : ''}`, time: new Date() });
+          }
+          if (!isSelf && get().stageChannel?.toLowerCase() === key) {
+            get().removeRaisedHand(target);
           }
           get().addAuditEntry({
             type: 'kick',
@@ -9265,24 +9328,47 @@ export const store = createStore<OnyxState>()(
           // ── Handle incoming CTCP STAGE commands ────────────────────────
           const ctcpStageMatch = text.match(/^\x01STAGE (.+)\x01$/);
           if (ctcpStageMatch && !isSelf) {
-            const stageParts = ctcpStageMatch[1]!.split(' ');
+            const stageParts = ctcpStageMatch[1]!.split(/\s+/u, 3);
             const stageCmd = stageParts[0];
             const stageArg = stageParts[1] ?? '';
             const { ourNick: ourNickRef, stageChannel: myStageCh } = get();
+            const stageSender = _normalizeStageNick(sender);
+            // STAGE is channel-scoped CTCP state. A DM or another room must not
+            // mutate the active stage or spend its host authority.
+            if (
+              !stageSender
+              || !myStageCh
+              || !isChan(target)
+              || target.toLowerCase() !== myStageCh.toLowerCase()
+            ) break;
+            const stageMember = get().channels
+              .get(myStageCh.toLowerCase())
+              ?.users.get(stageSender.toLowerCase());
+            if (!stageMember) break;
+            const stageModerator = ['Y', 'Q', 'q', 'a', 'o'].some(mode => (
+              stageMember.modes.has(mode)
+            ));
             if (stageCmd === 'RAISE_HAND') {
-              get().addRaisedHand(sender);
+              get().addRaisedHand(stageSender);
             } else if (stageCmd === 'LOWER_HAND') {
-              get().removeRaisedHand(sender);
-            } else if (stageCmd === 'INVITE_SPEAK' && stageArg.toLowerCase() === (ourNickRef ?? '').toLowerCase()) {
-              set({ pendingSpeakInvite: sender });
-            } else if (stageCmd === 'ACCEPT_SPEAK' && myStageCh) {
+              get().removeRaisedHand(stageSender);
+            } else if (
+              stageCmd === 'INVITE_SPEAK'
+              && stageModerator
+              && stageArg.toLowerCase() === (ourNickRef ?? '').toLowerCase()
+            ) {
+              set({ pendingSpeakInvite: stageSender });
+            } else if (stageCmd === 'ACCEPT_SPEAK') {
               // Remote speaker accepted — promote them via mode if we are host
-              if (get().isStageHost) {
-                get().client?.sendRaw('MODE', myStageCh, '+v', sender);
+              const hadRaisedHand = get().stageRaisedHands.some(candidate => (
+                candidate.toLowerCase() === stageSender.toLowerCase()
+              ));
+              if (get().isStageHost && hadRaisedHand) {
+                get().client?.sendRaw('MODE', myStageCh, '+v', stageSender);
               }
-              get().removeRaisedHand(sender);
+              get().removeRaisedHand(stageSender);
             } else if (stageCmd === 'DECLINE_SPEAK') {
-              get().removeRaisedHand(sender);
+              get().removeRaisedHand(stageSender);
             }
             break;
           }
@@ -9763,19 +9849,27 @@ export const store = createStore<OnyxState>()(
 
           set(s => {
             const channels = new Map(s.channels);
+            const oldStageKey = oldNick.toLowerCase();
             for (const [key, ch] of channels) {
-              const oldKey = oldNick.toLowerCase();
-              if (ch.users.has(oldKey)) {
+              if (ch.users.has(oldStageKey)) {
                 const users = new Map(ch.users);
-                const u = users.get(oldKey)!;
-                users.delete(oldKey);
+                const u = users.get(oldStageKey)!;
+                users.delete(oldStageKey);
                 users.set(newNick.toLowerCase(), { ...u, nick: newNick });
                 const nm = sysMsg(`${oldNick} → ${newNick}`, ch.name, eventTime(tags));
                 const msgs = _appendBoundedChannelMessage(ch.messages, nm);
                 channels.set(key, { ...ch, users, messages: msgs } as Channel);
               }
             }
-            return { channels };
+            return {
+              channels,
+              stageRaisedHands: s.stageRaisedHands.map(candidate => (
+                candidate.toLowerCase() === oldStageKey ? newNick : candidate
+              )),
+              pendingSpeakInvite: s.pendingSpeakInvite?.toLowerCase() === oldStageKey
+                ? newNick
+                : s.pendingSpeakInvite,
+            };
           });
           // Wire NICK events — after state update, find channels that now have newNick
           {
@@ -11550,13 +11644,29 @@ export const store = createStore<OnyxState>()(
     stageHandRaised: false,
     pendingSpeakInvite: null,
     joinStage: (channel) => {
-      get().client?.sendRaw('JOIN', channel);
-      set({ stageChannel: channel });
+      const target = _normalizeStageChannel(channel);
+      const client = get().client;
+      if (!target || !client || !client.sendRaw('JOIN', target)) return;
+      set({
+        stageChannel: target,
+        stageRaisedHands: [],
+        isStageHost: false,
+        isStageSpeaker: false,
+        stageHandRaised: false,
+        pendingSpeakInvite: null,
+      });
     },
     leaveStage: () => {
       const ch = get().stageChannel;
       if (ch) get().client?.sendRaw('PART', ch, 'Left stage');
-      set({ stageChannel: null, isStageHost: false, isStageSpeaker: false, stageHandRaised: false, pendingSpeakInvite: null });
+      set({
+        stageChannel: null,
+        stageRaisedHands: [],
+        isStageHost: false,
+        isStageSpeaker: false,
+        stageHandRaised: false,
+        pendingSpeakInvite: null,
+      });
     },
     raiseHand: () => {
       const ch = get().stageChannel;
@@ -11574,11 +11684,13 @@ export const store = createStore<OnyxState>()(
     },
     inviteToSpeak: (nick) => {
       const ch = get().stageChannel;
-      if (ch) get().client?.sendRaw('PRIVMSG', ch, `\x01STAGE INVITE_SPEAK ${nick}\x01`);
+      const target = _normalizeStageNick(nick);
+      if (ch && target) get().client?.sendRaw('PRIVMSG', ch, `\x01STAGE INVITE_SPEAK ${target}\x01`);
     },
     moveToAudience: (nick) => {
       const ch = get().stageChannel;
-      if (ch) get().client?.sendRaw('PRIVMSG', ch, `\x01STAGE MOVE_AUDIENCE ${nick}\x01`);
+      const target = _normalizeStageNick(nick);
+      if (ch && target) get().client?.sendRaw('PRIVMSG', ch, `\x01STAGE MOVE_AUDIENCE ${target}\x01`);
     },
     acceptSpeakInvite: () => {
       const ch = get().stageChannel;
@@ -11594,16 +11706,27 @@ export const store = createStore<OnyxState>()(
     },
     grantSpeaker: (nick) => {
       const ch = get().stageChannel;
-      if (ch) get().client?.sendRaw('MODE', ch, '+v', nick);
+      const target = _normalizeStageNick(nick);
+      if (ch && target) get().client?.sendRaw('MODE', ch, '+v', target);
     },
     revokeSpeaker: (nick) => {
       const ch = get().stageChannel;
-      if (ch) get().client?.sendRaw('MODE', ch, '-v', nick);
+      const target = _normalizeStageNick(nick);
+      if (ch && target) get().client?.sendRaw('MODE', ch, '-v', target);
     },
     startStage: (channel) => {
-      get().client?.sendRaw('MODE', channel, '+m');
-      get().client?.sendRaw('PROP', channel, 'STAGE', '1');
-      set({ stageChannel: channel, isStageHost: true, isStageSpeaker: true });
+      const target = _normalizeStageChannel(channel);
+      const client = get().client;
+      if (!target || !client || !client.sendRaw('MODE', target, '+m')) return;
+      client.sendRaw('PROP', target, 'STAGE', '1');
+      set({
+        stageChannel: target,
+        stageRaisedHands: [],
+        isStageHost: true,
+        isStageSpeaker: true,
+        stageHandRaised: false,
+        pendingSpeakInvite: null,
+      });
     },
     endStage: () => {
       const ch = get().stageChannel;
@@ -11613,8 +11736,28 @@ export const store = createStore<OnyxState>()(
       }
       set({ stageChannel: null, isStageHost: false, isStageSpeaker: false, stageRaisedHands: [], stageHandRaised: false, pendingSpeakInvite: null });
     },
-    addRaisedHand: (nick) => set(s => ({ stageRaisedHands: [...s.stageRaisedHands.filter(n => n !== nick), nick] })),
-    removeRaisedHand: (nick) => set(s => ({ stageRaisedHands: s.stageRaisedHands.filter(n => n !== nick) })),
+    addRaisedHand: (nick) => {
+      const safeNick = _normalizeStageNick(nick);
+      if (!safeNick) return;
+      const key = safeNick.toLowerCase();
+      set(s => {
+        const existing = s.stageRaisedHands.findIndex(candidate => candidate.toLowerCase() === key);
+        if (existing === -1 && s.stageRaisedHands.length >= MAX_STAGE_RAISED_HANDS) return {};
+        return {
+          stageRaisedHands: [
+            ...s.stageRaisedHands.filter(candidate => candidate.toLowerCase() !== key),
+            safeNick,
+          ],
+        };
+      });
+    },
+    removeRaisedHand: (nick) => {
+      const key = _normalizeStageNick(nick)?.toLowerCase();
+      if (!key) return;
+      set(s => ({
+        stageRaisedHands: s.stageRaisedHands.filter(candidate => candidate.toLowerCase() !== key),
+      }));
+    },
 
     // ── Away / Custom status ─────────────────────────────────────────────
     isAway: false,
