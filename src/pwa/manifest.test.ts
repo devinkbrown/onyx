@@ -156,6 +156,28 @@ describe('PWA manifest', () => {
     expect(deploy).not.toMatch(/if \[ -d "\$\{LANDING\}" \]/);
   });
 
+  it('keeps landing overlays out of application-owned routes and PWA assets', () => {
+    const deploy = readFileSync(deployScriptPath, 'utf8');
+    const reservedSource = deploy.match(/for reserved in \\\n([\s\S]*?); do/)?.[1];
+    const reserved = reservedSource?.replaceAll('\\', ' ').trim().split(/\s+/).sort();
+
+    expect(reserved).toEqual([
+      'about',
+      'app',
+      'appearance',
+      'assets',
+      'icon-192.png',
+      'icon-512.png',
+      'invite',
+      'manifest.json',
+      'opcodec_wasm.js',
+      'opcodec_wasm.wasm',
+      'screenshots',
+      'sw.js',
+    ]);
+    expect(deploy).toContain('landing dist/${reserved} would clobber the SPA');
+  });
+
   it('bounds push content and keeps notification targets on canonical app routes', async () => {
     const listeners = new Map<string, (event: Record<string, unknown>) => void>();
     const showNotification = vi.fn(async () => undefined);

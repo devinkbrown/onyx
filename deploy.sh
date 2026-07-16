@@ -44,7 +44,10 @@ grep -q "onyx-shell-${VERSION}" dist/sw.js \
 # is one rsync, never a window where the root 404s.
 echo "==> building + staging the community site overlay"
 (cd "${LANDING}" && node build.mjs >/dev/null && node build.mjs --check >/dev/null)
-for reserved in app about appearance assets; do
+for reserved in \
+  app about appearance invite assets \
+  manifest.json sw.js icon-192.png icon-512.png screenshots \
+  opcodec_wasm.js opcodec_wasm.wasm; do
   if [ -e "${LANDING}/dist/${reserved}" ]; then
     echo "FAIL: landing dist/${reserved} would clobber the SPA"; exit 1
   fi
