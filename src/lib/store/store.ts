@@ -10290,11 +10290,20 @@ export const store = createStore<OnyxState>()(
       // The pinnedPeerKey read is best-effort; an unreadable pin store still
       // raises the warning (fail closed) with an empty pinnedKey.
       return pinnedPeerKey(peer).then((pinned) => {
+        // Verification runs asynchronously. The directory may have advanced to
+        // another key while this pin read was in flight; never let that stale
+        // completion replace the key the user is being asked to verify.
+        if (get().peerDmKeys.get(key) !== newKey) return;
         const already = get().peerKeyChanges.has(key);
         set(s => {
           const peerKeyChanges = new Map(s.peerKeyChanges);
+          const previous = peerKeyChanges.get(key);
           peerKeyChanges.set(key, { pinnedKey: pinned ?? '', newKey });
-          return { peerKeyChanges };
+          const pendingKeySafetyNumbers = new Map(s.pendingKeySafetyNumbers);
+          // Fingerprints are key-specific even though this cache is peer-keyed.
+          // A B→C rotation must not render B's number beneath C's warning.
+          if (previous?.newKey !== newKey) pendingKeySafetyNumbers.delete(key);
+          return { peerKeyChanges, pendingKeySafetyNumbers };
         });
         // Warn once per detected change so repeated sends/receives don't spam.
         if (already) return;
@@ -10312,13 +10321,19 @@ export const store = createStore<OnyxState>()(
 
     acceptPeerKeyChange(peer) {
       const key = peer.toLowerCase();
-      // Re-pin the newly-advertised key (from the pending change, or whatever the
-      // directory currently advertises). No new key to trust → nothing to accept.
-      const newKey = get().peerKeyChanges.get(key)?.newKey ?? get().peerDmKeys.get(key);
-      if (!newKey) return;
+      // Accept only the exact pending key that is still advertised. A stale
+      // warning must never re-pin an older key after the directory has advanced.
+      const newKey = get().peerKeyChanges.get(key)?.newKey;
+      if (!newKey || get().peerDmKeys.get(key) !== newKey) return;
       void pinPeerKey(peer, newKey).then((ok) => {
         // Could not persist the new pin → stay fail-closed, keep the warning.
         if (!ok) return;
+        // The advertised/pending key can rotate again while IndexedDB persists
+        // the acceptance. Keep that newer warning intact instead of clearing it.
+        if (
+          get().peerDmKeys.get(key) !== newKey
+          || get().peerKeyChanges.get(key)?.newKey !== newKey
+        ) return;
         set(s => {
           const peerKeyChanges = new Map(s.peerKeyChanges);
           peerKeyChanges.delete(key);
