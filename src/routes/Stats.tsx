@@ -4,9 +4,22 @@ import './data-pages.css';
 import { createMemo, createResource, createSignal, For, onCleanup, Show, type JSX } from 'solid-js';
 import { Mascot } from '@/components/brand/Mascot';
 import { fetchStatsIndex, relTime, type NetworkDay, type StatsChannel } from '@/lib/stats/networkIndex';
+import { publicFeedFreshness, type PublicFeedFreshness } from '@/lib/stats/feedBounds';
 import { setPageMeta } from './pageMeta';
 
-function PageChrome(props: { children: JSX.Element }) {
+function PageChrome(props: {
+  children: JSX.Element;
+  feedState: PublicFeedFreshness | 'unavailable';
+}) {
+  const label = () => {
+    switch (props.feedState) {
+      case 'current': return 'stats current';
+      case 'stale': return 'stats stale';
+      case 'future': return 'stats time mismatch';
+      case 'unknown': return 'stats undated';
+      default: return 'stats unavailable';
+    }
+  };
   return (
     <main class="r data-page">
       <div class="r-ground" aria-hidden="true" />
@@ -29,7 +42,7 @@ function PageChrome(props: { children: JSX.Element }) {
           <a class="hideable" href="/status">Status</a>
           <a class="hideable" href="/roadmap">Roadmap</a>
           <a class="hideable" href="/about">About</a>
-          <span class="live hideable"><i aria-hidden="true" />network online</span>
+          <span class="live hideable" data-feed-state={props.feedState}><i aria-hidden="true" />{label()}</span>
           <a class="enter" href="/app">Open Onyx</a>
         </nav>
       </header>
@@ -109,9 +122,13 @@ export default function StatsRoute() {
   const busiest = createMemo(() => channels()[0] ?? null);
   const days = createMemo(() => stats()?.network_days ?? []);
   const maxDay = createMemo(() => Math.max(0, ...days().map((d) => d.messages)));
+  const feedState = createMemo<PublicFeedFreshness | 'unavailable'>(() => {
+    const data = stats();
+    return data ? publicFeedFreshness(data.generated_at, nowMs()) : 'unavailable';
+  });
 
   return (
-    <PageChrome>
+    <PageChrome feedState={feedState()}>
       <section class="r-wrap data-hero" aria-labelledby="stats-heading">
         <p class="r-kicker">network activity</p>
         <h1 id="stats-heading">The rooms <br /><span class="gold">in motion</span></h1>

@@ -105,6 +105,13 @@
 }
 .r-status .live { color: var(--ok); display: inline-flex; align-items: center; gap: 8px; }
 .r-status .live i { width: 7px; height: 7px; border-radius: 999px; background: var(--ok); box-shadow: 0 0 10px var(--ok); animation: r-pulse 2.6s var(--ease) infinite; }
+.r-status .live:not([data-feed-state='current']) { color: var(--text-3); }
+.r-status .live[data-feed-state='degraded'] { color: var(--shu-bright); }
+.r-status .live:not([data-feed-state='current']) i {
+  background: currentColor;
+  box-shadow: none;
+  animation: none;
+}
 @keyframes r-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 @media (max-width: 820px) { .r-status .hideable { display: none; } }
 

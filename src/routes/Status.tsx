@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import './landing.css';
 import './data-pages.css';
-import { createResource, createSignal, For, onCleanup, Show } from 'solid-js';
+import { createMemo, createResource, createSignal, For, onCleanup, Show } from 'solid-js';
 import { Mascot } from '@/components/brand/Mascot';
 import { fetchBackupManifest } from '@/lib/stats/backups';
 import { relTime } from '@/lib/stats/networkIndex';
 import { fetchNetworkStatus, formatDuration } from '@/lib/stats/status';
+import { publicFeedFreshness } from '@/lib/stats/feedBounds';
 import { setPageMeta } from './pageMeta';
 
 function statusState(quorum: boolean, partitioned: boolean): 'up' | 'degraded' {
@@ -27,6 +28,23 @@ export default function StatusRoute() {
     void refetchBackups();
   }, 30_000);
   onCleanup(() => clearInterval(timer));
+  const feedState = createMemo(() => {
+    const data = status();
+    if (!data) return 'unavailable';
+    const freshness = publicFeedFreshness(data.generated_at, nowMs());
+    if (freshness !== 'current') return freshness;
+    return statusState(data.mesh.quorum, data.mesh.partitioned) === 'up' ? 'current' : 'degraded';
+  });
+  const feedLabel = createMemo(() => {
+    switch (feedState()) {
+      case 'current': return 'mesh online';
+      case 'degraded': return 'mesh degraded';
+      case 'stale': return 'status stale';
+      case 'future': return 'status time mismatch';
+      case 'unknown': return 'status undated';
+      default: return 'status unavailable';
+    }
+  });
 
   return (
     <main class="r data-page">
@@ -51,7 +69,7 @@ export default function StatusRoute() {
           <a class="hideable" href="/status" aria-current="page">Status</a>
           <a class="hideable" href="/roadmap">Roadmap</a>
           <a class="hideable" href="/about">About</a>
-          <span class="live hideable"><i aria-hidden="true" />mesh online</span>
+          <span class="live hideable" data-feed-state={feedState()}><i aria-hidden="true" />{feedLabel()}</span>
           <a class="enter" href="/app">Open Onyx</a>
         </nav>
       </header>

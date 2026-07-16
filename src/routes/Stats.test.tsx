@@ -14,11 +14,12 @@ describe('StatsRoute', () => {
 
     expect(screen.getByRole('heading', { name: /the rooms in motion/i })).toBeInTheDocument();
     expect(await screen.findByText(/stats are waiting/i)).toBeInTheDocument();
+    expect(screen.getByText('stats unavailable')).toHaveAttribute('data-feed-state', 'unavailable');
   });
 
   it('includes the recent activity graph surface for room rows', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
-      generated_at: 1783500000,
+      generated_at: Math.floor(Date.now() / 1000),
       network: 'Onyx',
       node: 'eshmaki.me',
       users_online: 8,
@@ -39,6 +40,7 @@ describe('StatsRoute', () => {
     render(() => <StatsRoute />);
 
     expect(await screen.findByLabelText(/daily message totals/i)).toBeInTheDocument();
+    expect(screen.getByText('stats current')).toHaveAttribute('data-feed-state', 'current');
     expect(screen.getByLabelText(/#root recent activity/i)).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /open/i }).some((a) =>
       a.getAttribute('href')?.startsWith('/app?join=%23root&at='),

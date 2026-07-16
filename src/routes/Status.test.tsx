@@ -13,5 +13,6 @@ describe('StatusRoute', () => {
     expect(screen.getByRole('link', { name: /open stats/i })).toHaveAttribute('href', '/stats');
     expect(screen.getByRole('link', { name: /open roadmap/i })).toHaveAttribute('href', '/roadmap');
     expect(await screen.findByText(/status is waiting/i)).toBeInTheDocument();
+    expect(screen.getByText('status unavailable')).toHaveAttribute('data-feed-state', 'unavailable');
   });
 });
