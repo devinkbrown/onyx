@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { startSceneRuntime } from './sceneRuntime';
+import { IDLE_HOLD_AFTER_MS } from '../engine';
+import { SCENE_IDLE_HOLD_MS, startSceneRuntime } from './sceneRuntime';
 
 const hiddenDescriptor = Object.getOwnPropertyDescriptor(document, 'hidden');
 const hasFocusDescriptor = Object.getOwnPropertyDescriptor(document, 'hasFocus');
@@ -20,6 +21,10 @@ afterEach(() => {
 });
 
 describe('scene runtime lifecycle', () => {
+  it('uses the same prolonged-idle hold threshold as canvas backgrounds', () => {
+    expect(SCENE_IDLE_HOLD_MS).toBe(IDLE_HOLD_AFTER_MS);
+  });
+
   it('holds after sustained inactivity, resumes on activity, and throttles bursts', () => {
     const changes: boolean[] = [];
     let now = 0;

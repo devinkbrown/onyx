@@ -1,13 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /** Central lifecycle policy for CSS-animated DOM/SVG background scenes. */
-import {
-  ACTIVITY_THROTTLE_MS,
-  IDLE_DECEL_AFTER_MS,
-  IDLE_DECEL_RAMP_MS,
-} from '../engine';
+import { ACTIVITY_THROTTLE_MS, IDLE_HOLD_AFTER_MS } from '../engine';
 
-/** Canvas reaches its idle cadence floor after this same total window. */
-export const SCENE_IDLE_HOLD_MS = IDLE_DECEL_AFTER_MS + IDLE_DECEL_RAMP_MS;
+/** DOM/SVG scenes and canvas backgrounds enter their full hold together. */
+export const SCENE_IDLE_HOLD_MS = IDLE_HOLD_AFTER_MS;
 
 const PASSIVE_ACTIVITY_OPTIONS: AddEventListenerOptions = { passive: true };
 const PASSIVE_CAPTURE_ACTIVITY_OPTIONS: AddEventListenerOptions = { passive: true, capture: true };
