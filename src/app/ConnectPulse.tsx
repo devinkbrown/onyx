@@ -39,8 +39,14 @@ async function pingAll(signal?: AbortSignal): Promise<NodePing[]> {
 
 export function ConnectPulse(props: { deepLink?: string | null }): JSX.Element {
   const pingController = typeof AbortController === 'undefined' ? null : new AbortController();
-  const [stats] = createResource(fetchStatsIndex);
-  const [pings] = createResource(() => pingAll(pingController?.signal));
+  const [stats] = createResource(fetchStatsIndex, { initialValue: null });
+  const [pings] = createResource(
+    () => pingAll(pingController?.signal),
+    // Latency is ambient decoration, never a prerequisite for the sign-in
+    // form. Seed an empty list and keep reading the last settled sample so
+    // slow probes cannot suspend the connect route.
+    { initialValue: [] as NodePing[] },
+  );
 
   const [nowMs, setNowMs] = createSignal(Date.now());
   const clock = setInterval(() => setNowMs(Date.now()), 30_000);
@@ -50,15 +56,15 @@ export function ConnectPulse(props: { deepLink?: string | null }): JSX.Element {
   });
 
   const rooms = createMemo(() => {
-    const data = stats();
+    const data = stats.latest;
     if (!data) return [];
     return [...data.channels].sort((a, b) => b.messages - a.messages).slice(0, 3);
   });
   const totalMessages = createMemo(() =>
-    (stats()?.channels ?? []).reduce((sum, c) => sum + c.messages, 0),
+    (stats.latest?.channels ?? []).reduce((sum, c) => sum + c.messages, 0),
   );
   const fastest = createMemo(() => {
-    const list = pings() ?? [];
+    const list = pings.latest ?? [];
     const finite = list.filter((p) => Number.isFinite(p.ms));
     if (finite.length === 0) return null;
     return finite.reduce((a, b) => (a.ms <= b.ms ? a : b)).host;
@@ -69,7 +75,7 @@ export function ConnectPulse(props: { deepLink?: string | null }): JSX.Element {
       <header class="cpulse-head">
         <p class="cpulse-eyebrow">tonight, on the water</p>
         <Show
-          when={stats()}
+          when={stats.latest}
           fallback={
             <p class="cpulse-wire">
               <span class="cpulse-wire-live" aria-hidden="true" />
@@ -126,7 +132,7 @@ export function ConnectPulse(props: { deepLink?: string | null }): JSX.Element {
       <footer class="cpulse-nodes" aria-label="Mesh nodes">
         <For each={NODES}>
           {(node) => {
-            const ping = createMemo(() => pings()?.find((p) => p.host === node.host));
+            const ping = createMemo(() => pings.latest?.find((p) => p.host === node.host));
             return (
               <span class="cpulse-node" data-nearest={fastest() === node.host ? 'true' : 'false'}>
                 <span class="cpulse-node-dot" aria-hidden="true" />

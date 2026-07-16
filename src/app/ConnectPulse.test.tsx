@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { cleanup, render, waitFor } from '@solidjs/testing-library';
+import { cleanup, render, screen, waitFor } from '@solidjs/testing-library';
+import { Suspense } from 'solid-js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ConnectPulse } from './ConnectPulse';
 import { NODES, pingNode } from './nodes';
@@ -25,6 +26,19 @@ afterEach(() => {
 });
 
 describe('ConnectPulse node probes', () => {
+  it('keeps the connect surface mounted while optional pulse data is pending', () => {
+    render(() => (
+      <Suspense fallback={<p data-testid="connect-suspended">Loading connect</p>}>
+        <p>Stable sign-in form</p>
+        <ConnectPulse />
+      </Suspense>
+    ));
+
+    expect(screen.queryByTestId('connect-suspended')).not.toBeInTheDocument();
+    expect(screen.getByText('Stable sign-in form')).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: 'Live network activity' })).toBeInTheDocument();
+  });
+
   it('shares one lifecycle signal with its probes and aborts it on unmount', async () => {
     const view = render(() => <ConnectPulse />);
     const probe = vi.mocked(pingNode);
