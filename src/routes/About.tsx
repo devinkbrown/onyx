@@ -48,7 +48,7 @@ export default function About() {
         <a class="brand" href="/" aria-label="Onyx home">
           <Mascot variant="mark" aria-label="Onyx" />ONYX
         </a>
-        <nav aria-label="Site navigation">
+        <nav aria-label="About page navigation">
           <a class="hideable" href="/">Home</a>
           <a class="hideable" href="#protocol">Protocol</a>
           <a class="hideable" href="#media">Media</a>

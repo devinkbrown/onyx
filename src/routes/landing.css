@@ -113,7 +113,38 @@
   animation: none;
 }
 @keyframes r-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
-@media (max-width: 820px) { .r-status .hideable { display: none; } }
+@media (max-width: 820px) {
+  .r-status {
+    gap: 12px;
+    padding: 8px max(14px, env(safe-area-inset-right)) 8px max(14px, env(safe-area-inset-left));
+  }
+
+  .r-status .brand { flex: 0 0 auto; }
+
+  .r-status nav {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    gap: 18px;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: inline proximity;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .r-status nav::-webkit-scrollbar { display: none; }
+  .r-status .hideable { display: inline-flex; }
+  .r-status .live.hideable { display: none; }
+
+  .r-status nav a {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    scroll-snap-align: start;
+  }
+}
 
 /* Shared focus ring */
 .r a:focus-visible, .r button:focus-visible { outline: 2px solid var(--lapis-bright); outline-offset: 3px; border-radius: var(--r-sm); }
