@@ -90,7 +90,7 @@ describe('normalizeIndex', () => {
     }));
     channels[1]!.channel = `#${'c'.repeat(MAX_STATS_CHANNEL_LENGTH)}`;
     const networkDays = Array.from({ length: MAX_STATS_DAYS + 2 }, (_, index) => ({
-      date: `2025-${String((index % 12) + 1).padStart(2, '0')}-${String((index % 28) + 1).padStart(2, '0')}`,
+      date: new Date(Date.UTC(2025, 0, index + 1)).toISOString().slice(0, 10),
       messages: index,
     }));
 
@@ -117,6 +117,11 @@ describe('normalizeIndex', () => {
 
   it('renders one canonical row for case-insensitive duplicate channels', () => {
     const index = normalizeIndex({
+      network_days: [
+        { date: '2026-07-15', messages: 4 },
+        { date: '2026-07-15', messages: 999 },
+        { date: '2026-07-16', messages: 8 },
+      ],
       channels: [
         { channel: '#Root', messages: 12, present: 3 },
         { channel: '#root', messages: 999, present: 99 },
@@ -126,6 +131,10 @@ describe('normalizeIndex', () => {
 
     expect(index.channels.map((channel) => channel.channel)).toEqual(['#Root', '#Elsewhere']);
     expect(index.channels[0]).toMatchObject({ messages: 12, present: 3 });
+    expect(index.network_days).toEqual([
+      { date: '2026-07-15', messages: 4 },
+      { date: '2026-07-16', messages: 8 },
+    ]);
   });
 });
 

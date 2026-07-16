@@ -58,12 +58,14 @@ export type StatsIndex = {
 function normalizeNetworkDays(raw: unknown): NetworkDay[] {
   if (!Array.isArray(raw)) return [];
   const days: NetworkDay[] = [];
+  const seenDates = new Set<string>();
   for (const entry of raw.slice(-MAX_STATS_DAYS)) {
     if (typeof entry !== 'object' || entry === null) continue;
     const e = entry as Record<string, unknown>;
     if (typeof e['date'] !== 'string' || e['date'].length > 32) continue;
     const date = e['date'];
-    if (!/^\d{4}-\d{2}-\d{2}$/u.test(date)) continue;
+    if (!/^\d{4}-\d{2}-\d{2}$/u.test(date) || seenDates.has(date)) continue;
+    seenDates.add(date);
     days.push({
       date,
       messages: boundedFeedInteger(e['messages']),
