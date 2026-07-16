@@ -15,6 +15,7 @@ import { Connect } from '../app/Connect';
 import { initVaultSync } from '../lib/vault/vaultSync';
 import { applyRetentionPolicy, setRetentionPolicy } from '../lib/vault/historyVault';
 import { readRetentionPolicy } from '../lib/vault/retentionPolicy';
+import { AppBadgeRuntime } from '../pwa/AppBadgeRuntime';
 
 /** Activate persisted retention before any connected UI or Preferences Sheet exists. */
 export function activatePersistedVaultRetention() {
@@ -37,5 +38,10 @@ export default function AppRoute() {
   onMount(() => {
     void applyRetentionPolicy(retentionPolicy).finally(() => initVaultSync());
   });
-  return <Connect />;
+  return (
+    <>
+      <AppBadgeRuntime />
+      <Connect />
+    </>
+  );
 }
