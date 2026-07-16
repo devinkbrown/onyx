@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { runInNewContext } from 'node:vm';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 type WebManifest = {
   start_url: string;
@@ -56,5 +57,67 @@ describe('PWA manifest', () => {
     for (const asset of notificationAssets) {
       expect(existsSync(join(root, 'public', asset))).toBe(true);
     }
+  });
+
+  it('bounds push content and rejects cross-origin notification destinations', async () => {
+    const listeners = new Map<string, (event: Record<string, unknown>) => void>();
+    const showNotification = vi.fn(async () => undefined);
+    const openWindow = vi.fn(async () => undefined);
+    const workerSource = readFileSync(serviceWorkerPath, 'utf8');
+    const workerSelf = {
+      location: { origin: 'https://onyx.test' },
+      addEventListener: (type: string, listener: (event: Record<string, unknown>) => void) => {
+        listeners.set(type, listener);
+      },
+      skipWaiting: vi.fn(),
+      clients: {
+        claim: vi.fn(),
+        matchAll: vi.fn(async () => []),
+        openWindow,
+      },
+      registration: { showNotification },
+    };
+    runInNewContext(workerSource, {
+      self: workerSelf,
+      caches: { open: vi.fn(), keys: vi.fn() },
+      fetch: vi.fn(),
+      URL,
+      Promise,
+    });
+    const push = listeners.get('push');
+    expect(push).toBeDefined();
+    let pushWork: Promise<unknown> | undefined;
+    push!({
+      data: {
+        json: () => ({
+          title: 't'.repeat(200),
+          body: 'b'.repeat(5000),
+          tag: 'g'.repeat(200),
+          url: 'https://evil.example/phish',
+        }),
+      },
+      waitUntil: (work: Promise<unknown>) => {
+        pushWork = work;
+      },
+    });
+    await pushWork;
+
+    expect(showNotification).toHaveBeenCalledWith('t'.repeat(160), expect.objectContaining({
+      body: 'b'.repeat(4096),
+      tag: 'g'.repeat(128),
+      data: { url: '/' },
+    }));
+
+    const click = listeners.get('notificationclick');
+    expect(click).toBeDefined();
+    let clickWork: Promise<unknown> | undefined;
+    click!({
+      notification: { close: vi.fn(), data: { url: 'javascript:alert(1)' } },
+      waitUntil: (work: Promise<unknown>) => {
+        clickWork = work;
+      },
+    });
+    await clickWork;
+    expect(openWindow).toHaveBeenCalledWith('/');
   });
 });

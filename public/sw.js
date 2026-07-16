@@ -14,6 +14,28 @@ const PRECACHE_URLS = [
   '/app',
 ];
 
+const PUSH_TITLE_MAX = 160;
+const PUSH_BODY_MAX = 4096;
+const PUSH_TAG_MAX = 128;
+const PUSH_URL_MAX = 2048;
+
+function boundedPushString(value, maxLength) {
+  return typeof value === 'string' ? value.slice(0, maxLength) : '';
+}
+
+function safeNotificationPath(value, fallback = '/') {
+  if (typeof value !== 'string' || value.length === 0 || value.length > PUSH_URL_MAX) {
+    return fallback;
+  }
+  try {
+    const url = new URL(value, self.location.origin);
+    if (url.origin !== self.location.origin) return fallback;
+    return `${url.pathname}${url.search}${url.hash}`.slice(0, PUSH_URL_MAX);
+  } catch {
+    return fallback;
+  }
+}
+
 // ── Install: precache shell ────────────────────────────────────────────────────
 // CRITICAL: precache failures must NEVER abort install. cache.addAll rejects
 // wholesale if any single URL 404s, which bricks the update pipeline — every
@@ -96,24 +118,30 @@ self.addEventListener('push', (event) => {
   } catch {
     data = { body: event.data?.text() ?? '' };
   }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) data = {};
   // Orochi's webpushNotify sends {type:'dm', from, text} (RFC 8291-encrypted
   // end to end); map it onto the generic {title, body, url} shape.
-  if (data.type === 'dm' && data.from) {
+  const dmFrom = boundedPushString(data.from, PUSH_TITLE_MAX - 13);
+  if (data.type === 'dm' && dmFrom) {
     data = {
-      title: `Message from ${data.from}`,
+      title: `Message from ${dmFrom}`,
       body: data.text ?? '',
-      tag: `onyx-dm-${data.from}`,
+      tag: `onyx-dm-${dmFrom}`,
       url: '/app',
     };
   }
+  const rawTag = boundedPushString(data.tag, PUSH_TAG_MAX);
+  const title = boundedPushString(data.title, PUSH_TITLE_MAX) || 'Onyx';
+  const body = boundedPushString(data.body, PUSH_BODY_MAX);
+  const targetUrl = safeNotificationPath(data.url);
   event.waitUntil(
-    self.registration.showNotification(data.title ?? 'Onyx', {
-      body: data.body ?? '',
+    self.registration.showNotification(title, {
+      body,
       icon: '/icon-192.png',
       badge: '/icon-192.png',
-      tag: data.tag ?? 'onyx-notification',
-      renotify: !!data.tag,
-      data: { url: data.url ?? '/' },
+      tag: rawTag || 'onyx-notification',
+      renotify: Boolean(rawTag),
+      data: { url: targetUrl },
       vibrate: [100, 50, 100],
     })
   );
@@ -122,7 +150,9 @@ self.addEventListener('push', (event) => {
 // ── Notification click: focus or open the app ─────────────────────────────────
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = event.notification.data?.url ?? '/';
+  // Revalidate click data independently: it may have been authored by an old
+  // worker or another notification source, not this push handler.
+  const targetUrl = safeNotificationPath(event.notification.data?.url);
   event.waitUntil(
     self.clients
       .matchAll({ type: 'window', includeUncontrolled: true })
@@ -130,8 +160,12 @@ self.addEventListener('notificationclick', (event) => {
         // If a window is already open, focus it and navigate
         for (const client of clientList) {
           if (client.url.startsWith(self.location.origin) && 'focus' in client) {
-            client.navigate(targetUrl);
-            return client.focus();
+            const navigation = 'navigate' in client
+              ? client.navigate(targetUrl)
+              : Promise.resolve();
+            return Promise.resolve(navigation)
+              .catch(() => undefined)
+              .then(() => client.focus());
           }
         }
         // No window open — open a new one
