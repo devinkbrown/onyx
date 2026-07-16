@@ -2283,13 +2283,17 @@ describe('PreferencesPanel', () => {
     expect(localStorage.getItem(TOPIC_READ_LEDGER_KEY)).not.toBeNull();
   });
 
-  it('resets background motion with the rest of preferences', () => {
+  it('resets background motion and announces completion without moving focus', () => {
     setSceneMotion('off');
     renderPreferences('Accessibility');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Reset to defaults' }));
+    const reset = screen.getByRole('button', { name: 'Reset to defaults' });
+    reset.focus();
+    fireEvent.click(reset);
 
     expect(sceneMotion()).toBe('animated');
     expect(document.documentElement.dataset.sceneMotion).toBe('animated');
+    expect(screen.getByRole('status')).toHaveTextContent('Preferences reset to defaults.');
+    expect(reset).toHaveFocus();
   });
 });

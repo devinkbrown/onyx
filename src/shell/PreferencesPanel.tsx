@@ -2505,6 +2505,7 @@ function PreferenceCategoryNavigation(props: {
 }): JSX.Element {
   const buttons: (HTMLButtonElement | undefined)[] = [];
   const [horizontalTabs, setHorizontalTabs] = createSignal(false);
+  const [resetAnnouncement, setResetAnnouncement] = createSignal('');
   let categoryTabsQuery: MediaQueryList | undefined;
 
   const handleCategoryTabsQueryChange = (event: MediaQueryListEvent): void => {
@@ -2527,6 +2528,11 @@ function PreferenceCategoryNavigation(props: {
     if (category === undefined) return;
     props.onSelect(category.id);
     buttons[index]?.focus();
+  }
+
+  function resetToDefaults(): void {
+    resetAllPreferences();
+    setResetAnnouncement('Preferences reset to defaults.');
   }
 
   function onKeyDown(event: KeyboardEvent, index: number): void {
@@ -2601,9 +2607,12 @@ function PreferenceCategoryNavigation(props: {
           </For>
         </div>
       </nav>
-      <button type="button" class="pref-reset pref-reset-all" onClick={() => resetAllPreferences()}>
+      <button type="button" class="pref-reset pref-reset-all" onClick={resetToDefaults}>
         Reset to defaults
       </button>
+      <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {resetAnnouncement()}
+      </span>
     </div>
   );
 }
