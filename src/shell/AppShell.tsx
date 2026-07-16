@@ -399,6 +399,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
       if (!drawer) return;
 
       if (event.key === 'Escape') {
+        if (drawer.querySelector('[role="dialog"]:not([hidden])')) return;
         event.preventDefault();
         closeActiveMobileDrawer();
         return;

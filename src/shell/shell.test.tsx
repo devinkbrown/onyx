@@ -1292,6 +1292,40 @@ describe('AppShell', () => {
       expect(screen.queryByRole('region', { name: 'Channel members in #general' })).toBeNull();
     });
 
+    it('closes member details before closing the mobile member drawer on Escape', async () => {
+      stubMobileViewport();
+      seedStore('#general');
+
+      const { container } = render(() => <AppShell />);
+      const membersButton = screen.getByRole('button', { name: 'Toggle member list' });
+      membersButton.focus();
+      fireEvent.click(membersButton);
+
+      const memberList = container.querySelector<HTMLElement>('.shell-members');
+      expect(memberList).not.toBeNull();
+      await waitFor(() => expect(memberList).toHaveAttribute('aria-hidden', 'false'));
+      const aliceTrigger = within(memberList!).getByRole('button', { name: /Open member details for alice/i });
+      fireEvent.click(aliceTrigger);
+      expect(screen.getByRole('dialog', { name: 'Member details for alice' })).toBeInTheDocument();
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: 'Member details for alice' })).not.toBeInTheDocument();
+        expect(memberList).toHaveAttribute('aria-hidden', 'false');
+        expect(membersButton).toHaveAttribute('aria-expanded', 'true');
+        expect(aliceTrigger).toHaveFocus();
+      });
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+
+      await waitFor(() => {
+        expect(memberList).toHaveAttribute('aria-hidden', 'true');
+        expect(membersButton).toHaveAttribute('aria-expanded', 'false');
+        expect(membersButton).toHaveFocus();
+      });
+    });
+
     it('makes the desktop-hidden member column inert until it is opened', async () => {
       stubMobileViewport(false);
       seedStore('#general');
