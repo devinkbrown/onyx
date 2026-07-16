@@ -3,6 +3,7 @@ import { createSignal } from 'solid-js';
 import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ModalShell } from './ModalShell';
+import { Sheet } from './Sheet';
 
 const tick = () => new Promise((resolve) => window.setTimeout(resolve, 0));
 
@@ -38,6 +39,38 @@ describe('ModalShell', () => {
     await tick();
 
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('lets only the topmost dialog handle Escape and restores focus to its underlying trigger', async () => {
+    function Harness() {
+      const [sheetOpen, setSheetOpen] = createSignal(true);
+      const [dialogOpen, setDialogOpen] = createSignal(false);
+      return (
+        <>
+          <Sheet open={sheetOpen()} title="Appearance" onOpenChange={setSheetOpen}>
+            <button type="button" onClick={() => setDialogOpen(true)}>Share or import</button>
+          </Sheet>
+          <ModalShell open={dialogOpen()} title="Import theme" onOpenChange={setDialogOpen}>
+            <button type="button">Import</button>
+          </ModalShell>
+        </>
+      );
+    }
+
+    render(() => <Harness />);
+    await tick();
+    const trigger = screen.getByRole('button', { name: 'Share or import' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    await tick();
+    expect(screen.getAllByRole('dialog')).toHaveLength(2);
+
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    await tick();
+
+    expect(screen.queryByRole('dialog', { name: 'Import theme' })).toBeNull();
+    expect(screen.getByRole('dialog', { name: 'Appearance' })).toBeInTheDocument();
+    expect(trigger).toHaveFocus();
   });
 
   it('closes from the inert backdrop click target', async () => {

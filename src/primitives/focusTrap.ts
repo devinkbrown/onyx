@@ -20,6 +20,21 @@ const focusableSelector = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
+// Sheets and modal dialogs can be layered (for example, Appearance opens its
+// theme import Sheet over the Appearance Sheet). Only the most recently opened
+// dialog may own document-level keyboard handling; otherwise one Escape event
+// reaches every open dialog and closes the entire stack.
+const dialogFocusStack: symbol[] = [];
+
+function isTopDialog(owner: symbol): boolean {
+  return dialogFocusStack[dialogFocusStack.length - 1] === owner;
+}
+
+function removeDialog(owner: symbol): void {
+  const index = dialogFocusStack.lastIndexOf(owner);
+  if (index !== -1) dialogFocusStack.splice(index, 1);
+}
+
 function focusableElements(panel: HTMLElement): HTMLElement[] {
   return Array.from(panel.querySelectorAll<HTMLElement>(focusableSelector))
     .filter((element) => !element.hasAttribute('disabled') && element.tabIndex !== -1);
@@ -87,9 +102,14 @@ export function createDialogFocus(options: DialogFocusOptions): void {
   createEffect(() => {
     if (!options.isOpen()) return;
 
+    const owner = Symbol('dialog-focus-owner');
     const previous = document.activeElement as HTMLElement | null;
+    dialogFocusStack.push(owner);
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (!isTopDialog(owner)) return;
       if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopImmediatePropagation();
         options.onEscape();
         return;
       }
@@ -99,13 +119,16 @@ export function createDialogFocus(options: DialogFocusOptions): void {
 
     document.addEventListener('keydown', handleKeyDown);
     queueMicrotask(() => {
+      if (!isTopDialog(owner)) return;
       const panel = options.getPanel();
       if (panel) focusFirst(panel);
     });
 
     onCleanup(() => {
+      const wasTopDialog = isTopDialog(owner);
       document.removeEventListener('keydown', handleKeyDown);
-      previous?.focus?.();
+      removeDialog(owner);
+      if (wasTopDialog) previous?.focus?.();
     });
   });
 }
