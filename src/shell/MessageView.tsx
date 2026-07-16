@@ -1552,7 +1552,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                       ].filter(Boolean).join(' ')}
                     data-message-search-id={msg.id}
                     data-event={msg.type}
-                    role="status"
+                    role="article"
                     tabIndex={-1}
                     aria-label={msg.text}
                     >

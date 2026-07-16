@@ -34,6 +34,17 @@ function makeMessage(id: string, from: string, text: string, topic: string | nul
   };
 }
 
+function makeSystemMessage(id: string, text: string): ChatMessage {
+  return {
+    id,
+    from: '',
+    text,
+    time: new Date('2026-07-12T12:00:00Z'),
+    type: 'system',
+    target: '#general',
+  };
+}
+
 function makeChannel(msgs: ChatMessage[]): Channel {
   const users = new Map<string, ChannelUser>([
     ['alice', { nick: 'alice', modes: new Set<string>() }],
@@ -104,6 +115,38 @@ describe('MessageView live-log topic-switch suppression (SC 4.1.3)', () => {
 
     // ... and restored to polite so genuinely new lines still announce.
     await waitFor(() => expect(feed).toHaveAttribute('aria-live', 'polite'));
+  });
+
+  it('keeps system rows non-live while the parent log owns announcement state', async () => {
+    // Arrange — opening a conversation temporarily mutes the parent log so the
+    // loaded transcript is not announced as new activity.
+    const channel = makeChannel([makeSystemMessage('system-join', 'alice joined')]);
+    store.setState(
+      {
+        ...initialState,
+        channels: new Map([['#general', channel]]),
+        activeView: { kind: 'channel', channel: '#general' },
+        connectionStatus: 'connected',
+        ourNick: 'testuser',
+      },
+      true,
+    );
+
+    render(() => <MessageView />);
+
+    // Assert — the row remains focusable and named transcript content, but the
+    // containing log is the only live-region owner during and after restoration.
+    const feed = screen.getByRole('log', { name: 'Message history' });
+    const systemRow = screen.getByRole('article', { name: 'alice joined' });
+    expect(feed).toHaveAttribute('aria-live', 'off');
+    expect(systemRow).toHaveClass('shell-msg-system');
+    expect(systemRow).toHaveAttribute('tabindex', '-1');
+    expect(systemRow).not.toHaveAttribute('aria-live');
+    expect(feed.querySelector('[role="status"]')).toBeNull();
+
+    await waitFor(() => expect(feed).toHaveAttribute('aria-live', 'polite'));
+    expect(systemRow).toHaveTextContent('alice joined');
+    expect(feed.querySelector('[role="status"]')).toBeNull();
   });
 
   it('mutes the message log when clearing the topic filter (window start rises)', async () => {
