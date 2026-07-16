@@ -374,6 +374,21 @@ describe('account replies — state from the message handler', () => {
     expect(store.getState().server?.account).toBe('alice');
   });
 
+  it('does NOT clear the account from an unrelated server notice containing "drop"', () => {
+    const client = makeClient();
+    store.setState({
+      client: client as never,
+      server: seedServer('alice'),
+      accountInfo: { account: 'alice', fetchedAt: new Date() },
+    });
+
+    feed(':eshmaki.me NOTICE alice :Drop by #support if you need help.');
+
+    expect(store.getState().server?.account).toBe('alice');
+    expect(store.getState().accountInfo?.account).toBe('alice');
+    expect(client.clearResumeTokens).not.toHaveBeenCalled();
+  });
+
   it('900 RPL_LOGGEDIN sets the server account (IDENTIFY success path)', () => {
     store.setState({ server: seedServer(null) });
     feed(':eshmaki.me 900 alice alice!u@h alice :You are now logged in as alice');
