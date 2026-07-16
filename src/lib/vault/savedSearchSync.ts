@@ -141,7 +141,7 @@ export function createSavedSearchSync(
 
   const receive = (raw: unknown): void => {
     if (closed) return;
-    let message: SavedSearchSyncMessage | null = null;
+    let message: SavedSearchSyncMessage | null;
     try {
       message = parseMessage(raw);
     } catch {
