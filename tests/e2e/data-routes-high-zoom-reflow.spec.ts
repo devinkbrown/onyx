@@ -4,6 +4,7 @@ const routes = [
   { path: '/roadmap/', heading: 'What shipped, what is next' },
   { path: '/status/', heading: 'Mesh health, in public' },
   { path: '/stats/', heading: 'The rooms in motion' },
+  { path: '/invite/?join=%23root', heading: 'Join #root' },
 ] as const;
 
 for (const route of routes) {
@@ -15,7 +16,7 @@ for (const route of routes) {
       document.documentElement.style.fontSize = '64px';
     });
 
-    const heading = page.getByRole('heading', { name: route.heading });
+    const heading = page.getByRole('heading', { name: route.heading, exact: true });
     await expect(heading).toBeVisible();
     await page.locator('.r-section').first().scrollIntoViewIfNeeded();
 

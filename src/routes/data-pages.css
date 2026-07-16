@@ -603,4 +603,19 @@
     border-radius: 8px;
     font-size: 14px;
   }
+
+  .invite-runway__grid,
+  .invite-runway__grid > * {
+    min-width: 0;
+  }
+
+  .invite-runway__grid strong {
+    font-size: 14px;
+    overflow-wrap: anywhere;
+  }
+
+  .invite-runway__grid span {
+    font-size: 18px;
+    overflow-wrap: anywhere;
+  }
 }

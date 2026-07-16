@@ -330,3 +330,93 @@
 .r-footer .base { margin-top: clamp(32px, 4vw, 48px); padding-top: 20px; border-top: 1px solid var(--seam-faint); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--washi-mute); }
 .r-footer .base span { display: inline-flex; align-items: center; gap: 8px; }
 .r-footer .base .mascot { font-size: 1.3em; color: var(--lapis-bright); }
+
+@media (max-width: 42rem) and (max-height: 30rem) {
+  main.r:not(.data-page):not(.ab-ocean) .r-wrap {
+    min-width: 0;
+    padding-inline: 12px;
+  }
+
+  main.r:not(.data-page):not(.ab-ocean) .r-section {
+    padding-block: 40px;
+  }
+
+  main.r:not(.data-page):not(.ab-ocean) .r-hero {
+    padding-block: 40px 32px;
+  }
+
+  main.r:not(.data-page):not(.ab-ocean) .r-hero-grid > *,
+  main.r:not(.data-page):not(.ab-ocean) .r-live-grid > *,
+  main.r:not(.data-page):not(.ab-ocean) .r-stats > *,
+  main.r:not(.data-page):not(.ab-ocean) .r-board > *,
+  main.r:not(.data-page):not(.ab-ocean) .grid2 > *,
+  main.r:not(.data-page):not(.ab-ocean) .r-strip > * {
+    min-width: 0;
+  }
+
+  main.r:not(.data-page):not(.ab-ocean) .r-hero h1 {
+    font-size: 56px;
+    overflow-wrap: anywhere;
+  }
+
+  main.r:not(.data-page):not(.ab-ocean) .r-hero .serif-sub {
+    font-size: 24px;
+    overflow-wrap: anywhere;
+  }
+
+  main.r:not(.data-page):not(.ab-ocean) .r-hero p.sub,
+  main.r:not(.data-page):not(.ab-ocean) .r-live-tile p,
+  main.r:not(.data-page):not(.ab-ocean) .r-stat .l,
+  main.r:not(.data-page):not(.ab-ocean) .r-card p,
+  main.r:not(.data-page):not(.ab-ocean) .r-steps li,
+  main.r:not(.data-page):not(.ab-ocean) .r-spec p {
+    font-size: 18px;
+    overflow-wrap: anywhere;
+  }
+
+  main.r:not(.data-page):not(.ab-ocean) .r-title {
+    font-size: 44px;
+    overflow-wrap: anywhere;
+  }
+
+  main.r:not(.data-page):not(.ab-ocean) .r-lede {
+    font-size: 20px;
+    overflow-wrap: anywhere;
+  }
+
+  main.r:not(.data-page):not(.ab-ocean) .r-live-tile strong,
+  main.r:not(.data-page):not(.ab-ocean) .r-stat .n {
+    font-size: 32px;
+  }
+
+  main.r:not(.data-page):not(.ab-ocean) .r-card h4 {
+    font-size: 28px;
+    overflow-wrap: anywhere;
+  }
+
+  main.r:not(.data-page):not(.ab-ocean) .term .body {
+    font-size: 16px;
+    overflow-wrap: anywhere;
+  }
+
+  main.r:not(.data-page):not(.ab-ocean) .r-btn {
+    min-height: 44px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+  }
+
+  main.r:not(.data-page):not(.ab-ocean) .r-footer .cols {
+    grid-template-columns: 1fr;
+  }
+
+  main.r:not(.data-page):not(.ab-ocean) .r-footer .sig .logo {
+    font-size: 32px;
+  }
+
+  main.r:not(.data-page):not(.ab-ocean) .r-footer .sig p,
+  main.r:not(.data-page):not(.ab-ocean) .r-footer .col a {
+    font-size: 18px;
+    overflow-wrap: anywhere;
+  }
+}
