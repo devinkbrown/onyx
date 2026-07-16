@@ -208,10 +208,11 @@ function MemberCard(props: MemberCardProps): JSX.Element {
 
 export type MemberListProps = {
   hidden?: boolean;
+  modal?: boolean;
 };
 
 export function MemberList(props: MemberListProps): JSX.Element {
-  const [local] = splitProps(props, ['hidden']);
+  const [local] = splitProps(props, ['hidden', 'modal']);
   let memberListRef: HTMLElement | undefined;
 
   const activeView = useStore((s) => s.activeView);
@@ -287,8 +288,11 @@ export function MemberList(props: MemberListProps): JSX.Element {
     <aside
       ref={memberListRef}
       class={`shell-members${local.hidden ? ' shell-members--hidden' : ''}`}
+      role={local.modal ? 'dialog' : undefined}
       aria-label={memberListLabel()}
       aria-hidden={local.hidden ? 'true' : 'false'}
+      aria-modal={local.modal && !local.hidden ? 'true' : undefined}
+      tabindex={local.modal && !local.hidden ? -1 : undefined}
     >
       <div class="shell-members-head">
         <span>members</span>

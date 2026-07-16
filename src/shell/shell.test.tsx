@@ -1326,6 +1326,34 @@ describe('AppShell', () => {
       });
     });
 
+    it('focuses and names the empty mobile member drawer until Escape restores its trigger', async () => {
+      stubMobileViewport();
+      seedStore('#general');
+      const channels = new Map(store.getState().channels);
+      const channel = channels.get('#general');
+      expect(channel).toBeDefined();
+      channels.set('#general', { ...channel!, users: new Map() });
+      store.setState({ channels });
+
+      render(() => <AppShell />);
+      const membersButton = screen.getByRole('button', { name: 'Toggle member list' });
+      membersButton.focus();
+      fireEvent.click(membersButton);
+
+      const drawer = await screen.findByRole('dialog', { name: 'Member list for #general' });
+      expect(drawer).toHaveAttribute('aria-modal', 'true');
+      await waitFor(() => expect(drawer).toHaveFocus());
+
+      fireEvent.keyDown(document, { key: 'Tab' });
+      expect(drawer).toHaveFocus();
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: 'Member list for #general' })).not.toBeInTheDocument();
+        expect(membersButton).toHaveFocus();
+      });
+    });
+
     it('makes the desktop-hidden member column inert until it is opened', async () => {
       stubMobileViewport(false);
       seedStore('#general');

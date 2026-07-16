@@ -338,7 +338,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
   function focusFirstInMobileDrawer(root: HTMLElement | null | undefined): void {
     queueMicrotask(() => {
       const first = focusableIn(root)[0];
-      first?.focus();
+      (first ?? root)?.focus();
     });
   }
 
@@ -570,7 +570,7 @@ export function AppShell(props: AppShellProps): JSX.Element {
             onClick={closeMobileMembers}
           />
         </Show>
-        <MemberList hidden={!membersVisible()} />
+        <MemberList hidden={!membersVisible()} modal={isMobile()} />
       </div>
 
       {/* Mobile bottom tab bar */}
