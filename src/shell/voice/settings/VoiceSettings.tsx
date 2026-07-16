@@ -35,6 +35,16 @@ type ToggleRowProps = {
   onChecked: (checked: boolean) => void;
 };
 
+type AudioOutputSelector = (
+  options?: { deviceId?: string },
+) => Promise<MediaDeviceInfo>;
+
+type OutputSelectionState =
+  | { kind: 'idle' }
+  | { kind: 'pending' }
+  | { kind: 'success'; message: string }
+  | { kind: 'error'; message: string };
+
 function updateVoice(patch: Partial<VoiceState>) {
   getState().setVoiceCallState(patch);
 }
@@ -64,6 +74,31 @@ function normalizeDevices(devices: MediaDeviceInfo[]) {
         label: labelFor(device, index),
       };
     });
+}
+
+function browserAudioOutputSelector(): AudioOutputSelector | null {
+  if (typeof navigator === 'undefined') return null;
+  try {
+    const mediaDevices = navigator.mediaDevices as MediaDevices & {
+      selectAudioOutput?: AudioOutputSelector;
+    };
+    if (typeof mediaDevices?.selectAudioOutput !== 'function') return null;
+    return mediaDevices.selectAudioOutput.bind(mediaDevices);
+  } catch {
+    return null;
+  }
+}
+
+function outputSelectionError(error: unknown): string | null {
+  const name = error instanceof DOMException
+    ? error.name
+    : error instanceof Error
+      ? error.name
+      : '';
+  if (name === 'AbortError') return null;
+  if (name === 'NotAllowedError') return 'Speaker selection was not allowed.';
+  if (name === 'NotFoundError') return 'No selectable speaker was found.';
+  return 'Speaker selection failed. Try again.';
 }
 
 function DeviceSelect(props: DeviceSelectProps) {
@@ -113,17 +148,21 @@ function ToggleRow(props: ToggleRowProps) {
 
 function VoiceSettingsContent() {
   const voice = useStore((state) => state.voice);
+  const selectAudioOutput = browserAudioOutputSelector();
   const [devices, setDevices] = createSignal<DeviceChoice[]>([]);
   const [deviceError, setDeviceError] = createSignal<string | null>(null);
   const [devicesLoading, setDevicesLoading] = createSignal(true);
+  const [outputSelection, setOutputSelection] = createSignal<OutputSelectionState>({ kind: 'idle' });
   const [capturingKey, setCapturingKey] = createSignal(false);
   let captureButton: HTMLButtonElement | undefined;
   let deviceLoadEpoch = 0;
+  let outputSelectionEpoch = 0;
   let disposed = false;
 
   onCleanup(() => {
     disposed = true;
     deviceLoadEpoch += 1;
+    outputSelectionEpoch += 1;
   });
 
   const inputs = createMemo(() => devices().filter((device) => device.kind === 'audioinput'));
@@ -170,6 +209,51 @@ function VoiceSettingsContent() {
       if (disposed || epoch !== deviceLoadEpoch) return;
       setDeviceError('Device enumeration failed. Check media permissions.');
       setDevicesLoading(false);
+    }
+  };
+
+  const chooseAudioOutput = async () => {
+    if (!selectAudioOutput || outputSelection().kind === 'pending') return;
+    const epoch = ++outputSelectionEpoch;
+    setOutputSelection({ kind: 'pending' });
+
+    try {
+      const currentDeviceId = getState().voice.outputDeviceId;
+      const selected = currentDeviceId
+        ? await selectAudioOutput({ deviceId: currentDeviceId })
+        : await selectAudioOutput();
+      if (disposed || epoch !== outputSelectionEpoch) return;
+      if (selected.kind !== 'audiooutput' || !selected.deviceId.trim()) {
+        setOutputSelection({ kind: 'error', message: 'The browser returned an invalid speaker.' });
+        return;
+      }
+
+      // Invalidate enumeration that began before/during the chooser. Its
+      // permission snapshot may not include the newly granted output yet.
+      deviceLoadEpoch += 1;
+      setDevices((current) => {
+        const previous = current.find((device) => (
+          device.kind === 'audiooutput' && device.deviceId === selected.deviceId
+        ));
+        const outputCount = current.filter((device) => device.kind === 'audiooutput').length;
+        const choice: DeviceChoice = {
+          deviceId: selected.deviceId,
+          kind: 'audiooutput',
+          label: selected.label.trim() || previous?.label || `Speaker ${outputCount + 1}`,
+        };
+        return [
+          ...current.filter((device) => !(
+            device.kind === 'audiooutput' && device.deviceId === selected.deviceId
+          )),
+          choice,
+        ];
+      });
+      updateVoice({ outputDeviceId: selected.deviceId });
+      setOutputSelection({ kind: 'success', message: 'Speaker access updated.' });
+    } catch (error) {
+      if (disposed || epoch !== outputSelectionEpoch) return;
+      const message = outputSelectionError(error);
+      setOutputSelection(message ? { kind: 'error', message } : { kind: 'idle' });
     }
   };
 
@@ -220,15 +304,37 @@ function VoiceSettingsContent() {
             emptyLabel="System microphone"
             onValue={(value) => updateVoice({ inputDeviceId: value })}
           />
-          <DeviceSelect
-            id="voice-output-device"
-            label="Output"
-            description="Speaker or headset for remote audio."
-            value={voice().outputDeviceId}
-            devices={outputs()}
-            emptyLabel="System speaker"
-            onValue={(value) => updateVoice({ outputDeviceId: value })}
-          />
+          <div class="voice-settings__output-choice">
+            <DeviceSelect
+              id="voice-output-device"
+              label="Output"
+              description="Speaker or headset for remote audio."
+              value={voice().outputDeviceId}
+              devices={outputs()}
+              emptyLabel="System speaker"
+              onValue={(value) => updateVoice({ outputDeviceId: value })}
+            />
+            <Show when={selectAudioOutput}>
+              <Button
+                variant="ghost"
+                onClick={() => void chooseAudioOutput()}
+                disabled={outputSelection().kind === 'pending'}
+                aria-busy={outputSelection().kind === 'pending' ? 'true' : 'false'}
+              >
+                {outputSelection().kind === 'pending' ? 'Choosing speaker…' : 'Choose speaker…'}
+              </Button>
+              <Show when={outputSelection().kind === 'success'}>
+                <p class="onyx-field__description" role="status">
+                  {(outputSelection() as Extract<OutputSelectionState, { kind: 'success' }>).message}
+                </p>
+              </Show>
+              <Show when={outputSelection().kind === 'error'}>
+                <p class="onyx-field__error" role="alert">
+                  {(outputSelection() as Extract<OutputSelectionState, { kind: 'error' }>).message}
+                </p>
+              </Show>
+            </Show>
+          </div>
           <DeviceSelect
             id="voice-camera-device"
             label="Camera"

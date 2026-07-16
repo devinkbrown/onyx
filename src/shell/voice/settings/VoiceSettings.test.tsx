@@ -66,6 +66,168 @@ describe('VoiceSettings', () => {
     expect(screen.getByRole('button', { name: 'Clear push-to-talk key' })).toBeTruthy();
   });
 
+  it('requests a non-default speaker only from the explicit action and applies the granted device', async () => {
+    const selected = mediaDevice('speaker-granted', 'audiooutput', 'USB DAC');
+    const selectAudioOutput = vi.fn().mockResolvedValue(selected);
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      writable: true,
+      value: {
+        enumerateDevices: vi.fn().mockResolvedValue([
+          mediaDevice('speaker-default', 'audiooutput', 'System output'),
+        ]),
+        selectAudioOutput,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+    });
+
+    render(() => <VoiceSettings />);
+    expect(selectAudioOutput).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Choose speaker…' }));
+
+    await waitFor(() => expect(store.getState().voice.outputDeviceId).toBe('speaker-granted'));
+    expect(selectAudioOutput).toHaveBeenCalledOnce();
+    expect(selectAudioOutput).toHaveBeenCalledWith();
+    expect(screen.getByRole('option', { name: 'USB DAC' })).toBeTruthy();
+    expect(screen.getByRole('status')).toHaveTextContent('Speaker access updated');
+  });
+
+  it('treats speaker chooser cancellation neutrally', async () => {
+    const selectAudioOutput = vi.fn().mockRejectedValue(new DOMException('Cancelled', 'AbortError'));
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      writable: true,
+      value: {
+        enumerateDevices: vi.fn().mockResolvedValue([]),
+        selectAudioOutput,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+    });
+
+    render(() => <VoiceSettings />);
+    fireEvent.click(screen.getByRole('button', { name: 'Choose speaker…' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Choose speaker…' })).not.toBeDisabled();
+    });
+    expect(store.getState().voice.outputDeviceId).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('reports speaker permission denial without changing the current output', async () => {
+    store.getState().setVoiceCallState({ outputDeviceId: 'speaker-current' });
+    const selectAudioOutput = vi.fn().mockRejectedValue(new DOMException('Denied', 'NotAllowedError'));
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      writable: true,
+      value: {
+        enumerateDevices: vi.fn().mockResolvedValue([
+          mediaDevice('speaker-current', 'audiooutput', 'Current speaker'),
+        ]),
+        selectAudioOutput,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+    });
+
+    render(() => <VoiceSettings />);
+    fireEvent.click(screen.getByRole('button', { name: 'Choose speaker…' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Speaker selection was not allowed');
+    expect(selectAudioOutput).toHaveBeenCalledWith({ deviceId: 'speaker-current' });
+    expect(store.getState().voice.outputDeviceId).toBe('speaker-current');
+  });
+
+  it('keeps enumerateDevices output selection when selectAudioOutput is unsupported', async () => {
+    render(() => <VoiceSettings />);
+
+    expect(await screen.findByRole('option', { name: 'Headset Out' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Choose speaker…' })).toBeNull();
+    fireEvent.change(screen.getByLabelText('Output'), { target: { value: 'speaker-1' } });
+    expect(store.getState().voice.outputDeviceId).toBe('speaker-1');
+  });
+
+  it('rejects an invalid device returned by the speaker chooser', async () => {
+    const selectAudioOutput = vi.fn().mockResolvedValue(
+      mediaDevice('camera-not-speaker', 'videoinput', 'Wrong device'),
+    );
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      writable: true,
+      value: {
+        enumerateDevices: vi.fn().mockResolvedValue([]),
+        selectAudioOutput,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+    });
+
+    render(() => <VoiceSettings />);
+    fireEvent.click(screen.getByRole('button', { name: 'Choose speaker…' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('browser returned an invalid speaker');
+    expect(store.getState().voice.outputDeviceId).toBeNull();
+    expect(screen.queryByRole('option', { name: 'Wrong device' })).toBeNull();
+  });
+
+  it('ignores speaker selection completion after settings unmount', async () => {
+    let resolveSelection: (device: MediaDeviceInfo) => void = () => {};
+    const pendingSelection = new Promise<MediaDeviceInfo>((resolve) => {
+      resolveSelection = resolve;
+    });
+    const selectAudioOutput = vi.fn(() => pendingSelection);
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      writable: true,
+      value: {
+        enumerateDevices: vi.fn().mockResolvedValue([]),
+        selectAudioOutput,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+    });
+
+    const view = render(() => <VoiceSettings />);
+    fireEvent.click(screen.getByRole('button', { name: 'Choose speaker…' }));
+    view.unmount();
+    resolveSelection(mediaDevice('speaker-late', 'audiooutput', 'Late speaker'));
+    await pendingSelection;
+    await Promise.resolve();
+
+    expect(store.getState().voice.outputDeviceId).toBeNull();
+    expect(screen.queryByRole('option', { name: 'Late speaker' })).toBeNull();
+  });
+
+  it('allows only one rapid speaker prompt while selection is pending', async () => {
+    let resolveSelection: (device: MediaDeviceInfo) => void = () => {};
+    const pendingSelection = new Promise<MediaDeviceInfo>((resolve) => {
+      resolveSelection = resolve;
+    });
+    const selectAudioOutput = vi.fn(() => pendingSelection);
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      writable: true,
+      value: {
+        enumerateDevices: vi.fn().mockResolvedValue([]),
+        selectAudioOutput,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+    });
+
+    render(() => <VoiceSettings />);
+    const choose = screen.getByRole('button', { name: 'Choose speaker…' });
+    fireEvent.click(choose);
+    fireEvent.click(choose);
+
+    expect(selectAudioOutput).toHaveBeenCalledOnce();
+    expect(screen.getByRole('button', { name: 'Choosing speaker…' })).toBeDisabled();
+    resolveSelection(mediaDevice('speaker-once', 'audiooutput', 'Only speaker'));
+    await waitFor(() => expect(store.getState().voice.outputDeviceId).toBe('speaker-once'));
+  });
+
   it('ignores an older device enumeration that resolves after a devicechange refresh', async () => {
     let resolveInitial: (devices: MediaDeviceInfo[]) => void = () => {};
     let resolveRefresh: (devices: MediaDeviceInfo[]) => void = () => {};
