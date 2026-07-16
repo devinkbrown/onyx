@@ -200,12 +200,14 @@ describe('webPushActive', () => {
 
   it('retires a subscription marked for another account', async () => {
     const unsubscribe = vi.fn().mockResolvedValue(true);
+    const close = vi.fn();
     store.setState({ server: server('alice') });
     markOwner('bob');
     vi.stubGlobal('window', { PushManager: class PushManager {}, Notification: class Notification {} });
     vi.stubGlobal('navigator', {
       serviceWorker: {
         ready: Promise.resolve({
+          getNotifications: vi.fn().mockResolvedValue([{ close }]),
           pushManager: {
             getSubscription: vi.fn().mockResolvedValue(pushSubscription(unsubscribe)),
           },
@@ -216,6 +218,29 @@ describe('webPushActive', () => {
     await expect(webPushActive()).resolves.toBe(false);
 
     expect(unsubscribe).toHaveBeenCalledOnce();
+    expect(close).toHaveBeenCalledOnce();
+    expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBeNull();
+  });
+
+  it('closes prior-owner notifications when the subscription is already gone', async () => {
+    const close = vi.fn();
+    store.setState({ server: server('alice') });
+    markOwner('bob');
+    vi.stubGlobal('window', { PushManager: class PushManager {}, Notification: class Notification {} });
+    vi.stubGlobal('navigator', {
+      serviceWorker: {
+        ready: Promise.resolve({
+          getNotifications: vi.fn().mockResolvedValue([{ close }]),
+          pushManager: {
+            getSubscription: vi.fn().mockResolvedValue(null),
+          },
+        }),
+      },
+    });
+
+    await expect(webPushActive()).resolves.toBe(false);
+
+    expect(close).toHaveBeenCalledOnce();
     expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBeNull();
   });
 
@@ -288,9 +313,11 @@ describe('web push operations', () => {
     const newSub = pushSubscription();
     const subscribe = vi.fn().mockResolvedValue(newSub);
     const sendRaw = vi.fn();
+    const close = vi.fn();
     stubPushBrowser(
       vi.fn().mockResolvedValue('granted'),
       Promise.resolve({
+        getNotifications: vi.fn().mockResolvedValue([{ close }]),
         pushManager: {
           getSubscription: vi.fn().mockResolvedValue(oldSub),
           subscribe,
@@ -308,6 +335,7 @@ describe('web push operations', () => {
     await expect(enableWebPush()).resolves.toEqual({ ok: true });
 
     expect(oldUnsubscribe).toHaveBeenCalledOnce();
+    expect(close).toHaveBeenCalledOnce();
     expect(subscribe).toHaveBeenCalledOnce();
     expect(sendRaw).toHaveBeenCalledWith(
       'WEBPUSH',
@@ -447,9 +475,11 @@ describe('web push operations', () => {
     const sendRaw = vi.fn();
     const unsubscribe = vi.fn().mockResolvedValue(true);
     const currentClient = client(sendRaw);
+    const close = vi.fn();
     stubPushBrowser(
       vi.fn().mockResolvedValue('granted'),
       Promise.resolve({
+        getNotifications: vi.fn().mockResolvedValue([{ close }]),
         pushManager: {
           getSubscription: vi.fn().mockResolvedValue(pushSubscription(unsubscribe)),
           subscribe: vi.fn(),
@@ -467,6 +497,7 @@ describe('web push operations', () => {
     await expect(disableWebPush()).resolves.toEqual({ ok: true });
 
     expect(unsubscribe).toHaveBeenCalledOnce();
+    expect(close).toHaveBeenCalledOnce();
     expect(sendRaw).toHaveBeenCalledWith('WEBPUSH', 'UNSUBSCRIBE', 'https://push.example/sub');
     expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBeNull();
   });

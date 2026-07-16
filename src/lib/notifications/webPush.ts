@@ -89,6 +89,17 @@ async function discardCreatedSubscription(subscription: PushSubscription | null)
   }
 }
 
+async function closeRegistrationNotifications(registration: ServiceWorkerRegistration): Promise<void> {
+  if (typeof registration.getNotifications !== 'function') return;
+  try {
+    const notifications = await registration.getNotifications();
+    for (const notification of notifications) notification.close();
+  } catch {
+    // Subscription retirement remains authoritative. Some browsers expose
+    // getNotifications() but reject it outside a worker-controlled document.
+  }
+}
+
 /**
  * True when this browser holds a subscription owned by the current account.
  * Unmarked and foreign-owner endpoints are retired locally before returning;
@@ -99,16 +110,18 @@ export async function webPushActive(): Promise<boolean> {
   const ownerKey = signedInPushOwnerKey(getState());
   try {
     const reg = await navigator.serviceWorker.ready;
+    const markedOwnerKey = readPushOwnerKey();
     const sub = await reg.pushManager.getSubscription();
     if (!sub) {
+      if (!ownerKey || markedOwnerKey !== ownerKey) await closeRegistrationNotifications(reg);
       clearPushOwnerKey();
       return false;
     }
-    const markedOwnerKey = readPushOwnerKey();
     if (ownerKey && markedOwnerKey === ownerKey && signedInPushOwnerKey(getState()) === ownerKey) return true;
     // Do not let a stale check retire a subscription after the account changed
     // while service-worker readiness was pending. The replacement check owns it.
     if (signedInPushOwnerKey(getState()) !== ownerKey) return false;
+    await closeRegistrationNotifications(reg);
     if (await sub.unsubscribe()) clearPushOwnerKey(markedOwnerKey);
     return false;
   } catch {
@@ -147,12 +160,15 @@ export async function enableWebPush(): Promise<WebPushResult> {
     let sub = await reg.pushManager.getSubscription();
     if (!pushSessionCurrent(ownerKey, client)) return { ok: false, reason: SESSION_CHANGED_REASON };
     const markedOwnerKey = readPushOwnerKey();
-    if (sub && markedOwnerKey !== ownerKey) {
-      if (!await sub.unsubscribe()) {
-        return { ok: false, reason: 'This browser could not retire another account\'s push subscription.' };
+    if (markedOwnerKey !== ownerKey) {
+      await closeRegistrationNotifications(reg);
+      if (sub) {
+        if (!await sub.unsubscribe()) {
+          return { ok: false, reason: 'This browser could not retire another account\'s push subscription.' };
+        }
+        sub = null;
       }
       clearPushOwnerKey(markedOwnerKey);
-      sub = null;
       if (!pushSessionCurrent(ownerKey, client)) return { ok: false, reason: SESSION_CHANGED_REASON };
     }
     if (!sub) {
@@ -194,6 +210,7 @@ export async function disableWebPush(): Promise<WebPushResult> {
   const client = initialState.client;
   try {
     const reg = await navigator.serviceWorker.ready;
+    await closeRegistrationNotifications(reg);
     const sub = await reg.pushManager.getSubscription();
     if (!sub) {
       clearPushOwnerKey();
