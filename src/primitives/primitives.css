@@ -250,6 +250,40 @@
   }
 }
 
+/* Edge-centred tooltips cannot preserve both anchor adjacency and readable
+   width in a 400% short viewport. Present help as a safe, non-interactive
+   strip instead, leaving the focused control and mobile navigation usable. */
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .onyx-tooltip__content,
+  .onyx-tooltip[data-placement='bottom'] .onyx-tooltip__content {
+    position: fixed;
+    top: max(8px, env(safe-area-inset-top, 0px));
+    right: max(8px, env(safe-area-inset-right, 0px));
+    bottom: auto;
+    left: max(8px, env(safe-area-inset-left, 0px));
+    width: auto;
+    max-width: none;
+    max-height: calc(
+      100dvh
+      - max(8px, env(safe-area-inset-top, 0px))
+      - var(--mnav-h, 56px)
+      - env(safe-area-inset-bottom, 0px)
+      - 16px
+    );
+    padding: 8px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    translate: none;
+    transform: none;
+    pointer-events: none;
+    font-size: 14px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+    scrollbar-width: thin;
+  }
+}
+
 .onyx-popover__trigger {
   display: inline-flex;
   align-items: center;
