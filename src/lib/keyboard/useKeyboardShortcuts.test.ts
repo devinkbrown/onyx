@@ -28,6 +28,18 @@ function mountKeyboardHarness(): () => void {
   return () => disposeRoot?.();
 }
 
+function appendModalButton(): { dialog: HTMLDivElement; button: HTMLButtonElement } {
+  const dialog = document.createElement('div');
+  dialog.setAttribute('role', 'dialog');
+  dialog.setAttribute('aria-modal', 'true');
+  const button = document.createElement('button');
+  button.type = 'button';
+  dialog.append(button);
+  document.body.append(dialog);
+  button.focus();
+  return { dialog, button };
+}
+
 describe('SHORTCUTS descriptor', () => {
   beforeEach(() => {
     store.setState(initialState, true);
@@ -167,6 +179,47 @@ describe('SHORTCUTS descriptor', () => {
     fireEvent.keyDown(input, { key: 'r', ctrlKey: true, shiftKey: true });
     expect(preferences().readerMode).toBe(false);
     input.remove();
+    dispose();
+  });
+
+  it('suppresses app-global shortcuts while a modal button owns focus, then resumes after removal', () => {
+    const dispose = mountKeyboardHarness();
+    const channel = (name: string, unread: number): Channel => ({
+      name,
+      topic: '',
+      topicSetBy: '',
+      topicSetAt: null,
+      modes: '',
+      users: new Map(),
+      unread,
+      highlights: 0,
+      createdAt: null,
+      messages: [],
+    });
+    store.setState({
+      channels: new Map([
+        ['#general', channel('#general', 0)],
+        ['#alerts', channel('#alerts', 3)],
+      ]),
+      activeView: { kind: 'channel', channel: '#general' },
+    });
+    closePreferences();
+    const { dialog, button } = appendModalButton();
+
+    fireEvent.keyDown(button, { key: 'n' });
+    fireEvent.keyDown(button, { key: ',', ctrlKey: true });
+    fireEvent.keyDown(button, { key: ',', metaKey: true });
+    fireEvent.keyDown(button, { key: 'r', ctrlKey: true, shiftKey: true });
+
+    expect(document.activeElement).toBe(button);
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#general' });
+    expect(isPreferencesOpen()).toBe(false);
+    expect(preferences().readerMode).toBe(false);
+
+    dialog.remove();
+    fireEvent.keyDown(window, { key: 'n' });
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#alerts' });
+
     dispose();
   });
 
@@ -322,6 +375,27 @@ describe('SHORTCUTS descriptor', () => {
     fireEvent.keyDown(window, { key: 'h' });
 
     expect(store.getState().activeView).toEqual({ kind: 'home' });
+    dispose();
+  });
+
+  it('clears a pending G sequence when a modal takes keyboard ownership', () => {
+    const dispose = mountKeyboardHarness();
+    store.setState({ activeView: { kind: 'channel', channel: '#general' } });
+
+    fireEvent.keyDown(window, { key: 'g' });
+    const { dialog, button } = appendModalButton();
+    fireEvent.keyDown(button, { key: 'h' });
+    expect(document.activeElement).toBe(button);
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#general' });
+
+    dialog.remove();
+    fireEvent.keyDown(window, { key: 'h' });
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#general' });
+
+    fireEvent.keyDown(window, { key: 'g' });
+    fireEvent.keyDown(window, { key: 'h' });
+    expect(store.getState().activeView).toEqual({ kind: 'home' });
+
     dispose();
   });
 

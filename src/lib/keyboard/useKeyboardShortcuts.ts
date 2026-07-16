@@ -12,9 +12,10 @@
  * the individual shortcut handlers. The listener is removed automatically via
  * `onCleanup` when the owning component unmounts.
  *
- * GUARD: shortcuts never fire when focus is inside an editable element
- * (input, textarea, contenteditable, or data-spotlight-ignore). The one
- * exception is Escape, which always closes overlays.
+ * GUARD: shortcuts never fire while an aria-modal dialog owns the keyboard or
+ * when focus is inside an editable element (input, textarea, contenteditable,
+ * or data-spotlight-ignore). The one exception is Escape, which always closes
+ * overlays.
  */
 
 import { onCleanup, onMount } from 'solid-js';
@@ -359,6 +360,14 @@ export function useKeyboardShortcuts(): void {
           state.closeKeyboardShortcuts();
         }
       }
+      return;
+    }
+
+    // Modal-local controls own the keyboard until the dialog closes. Keep this
+    // after Escape so the existing overlay close ordering remains intact, and
+    // discard a sequence that may have been armed before the modal opened.
+    if (document.querySelector('[role="dialog"][aria-modal="true"]')) {
+      clearPendingPrefix();
       return;
     }
 
