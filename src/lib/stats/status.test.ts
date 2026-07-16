@@ -124,6 +124,17 @@ describe('normalizeStatus', () => {
     expect(publicMeshFeedState(status, NOW_MS)).toBe('degraded');
   });
 
+  it('does not report a healthy topology as complete when the peer list is absent', () => {
+    const status = normalizeStatus({
+      generated_at: NOW_MS / 1000,
+      mesh: { quorum: true, partitioned: false, components: 1 },
+    })!;
+
+    expect(status.peers).toEqual([]);
+    expect(status.peers_complete).toBe(false);
+    expect(publicMeshFeedState(status, NOW_MS)).toBe('degraded');
+  });
+
   it('formats compact durations for status rows', () => {
     expect(formatDuration(45)).toBe('45s');
     expect(formatDuration(-10)).toBe('0s');

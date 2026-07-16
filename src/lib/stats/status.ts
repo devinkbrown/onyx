@@ -79,7 +79,7 @@ export function normalizeStatus(raw: unknown): NetworkStatus | null {
     ? (r['mesh'] as Record<string, unknown>)
     : {};
   const peers: StatusPeer[] = [];
-  let peersComplete = true;
+  let peersComplete = Array.isArray(r['peers']);
   if (Array.isArray(r['peers'])) {
     if (r['peers'].length > MAX_STATUS_PEERS) peersComplete = false;
     const seenPeerNames = new Set<string>();
