@@ -51,7 +51,7 @@ import {
   type ScheduledMessage,
   type ScheduledMessageOwner,
 } from '@/lib/schedule/dispatch';
-import { deviceKeys, isEnvelope } from '@/lib/e2ee/dmCipher';
+import { deviceKeys, isEnvelope, isValidPeerPublicKey } from '@/lib/e2ee/dmCipher';
 import {
   hasEncryptedMessageBoundary,
   persistedReplyPreviewText,
@@ -2128,6 +2128,12 @@ const TYPING_RATE_LIMIT_MS = 4_000;
 export const MAX_LIVE_DM_CONVERSATIONS = 256;
 export const MAX_TEGAMI_CONVERSATIONS = MAX_LIVE_DM_CONVERSATIONS;
 export const MAX_TEGAMI_COUNT = 9_999;
+export const MAX_USER_METADATA_TARGETS = 256;
+export const MAX_USER_METADATA_KEYS = 64;
+export const MAX_USER_METADATA_KEY_LENGTH = 128;
+export const MAX_USER_METADATA_VALUE_LENGTH = 8 * 1024;
+const MAX_PROFILE_LINKS = 8;
+const UNSAFE_METADATA_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 
 // ── CHATHISTORY batch collectors (module-level) ───────────────────────────────
 export const SERVER_SEARCH_RESULT_MAX = 200;
@@ -2367,6 +2373,28 @@ function _normalizeTypingToken(value: string, maxLength: number): string | null 
     || value.includes(',')
   ) return null;
   return value;
+}
+
+function _normalizeMetadataTarget(value: string): string | null {
+  if (
+    !_validInboundWireToken(value, MAX_VAULT_SENDER_LENGTH)
+    || value.startsWith(':')
+    || value.includes(',')
+  ) return null;
+  const key = value.toLowerCase();
+  return UNSAFE_METADATA_KEYS.has(key) ? null : value;
+}
+
+function _normalizeMetadataKey(value: string): string | null {
+  if (!_validInboundWireToken(value, MAX_USER_METADATA_KEY_LENGTH)) return null;
+  return UNSAFE_METADATA_KEYS.has(value.toLowerCase()) ? null : value;
+}
+
+function _boundedMetadataValue(value: string): string {
+  let bounded = value.slice(0, MAX_USER_METADATA_VALUE_LENGTH);
+  const finalCodeUnit = bounded.charCodeAt(bounded.length - 1);
+  if (finalCodeUnit >= 0xd800 && finalCodeUnit <= 0xdbff) bounded = bounded.slice(0, -1);
+  return bounded;
 }
 
 /**
@@ -3976,14 +4004,14 @@ function _syncOwnCustomStatusActivity(get: GetFn, set: SetFn, previousNick?: str
   });
 }
 
-/** Bound only known public profile values; preserve unknown METADATA contracts. */
+/** Bound known public profile values and retain unknown contracts within one row ceiling. */
 function _normalizeProfileMetadataValue(key: string, value: string): string | null {
   const norm = key.toLowerCase().replace(/^ocean\./, '');
   if (norm === 'display-name' || norm === 'displayname') return normalizeSelfDisplayName(value);
   if (norm === 'pronouns') return normalizeSelfPronouns(value);
   if (norm === 'bio') return normalizeSelfBio(value);
   if (norm === 'banner' || norm === 'banner-url') return normalizeSelfBannerUrl(value);
-  return value;
+  return _boundedMetadataValue(value);
 }
 
 function _ownedMonitorContacts(
@@ -12242,9 +12270,13 @@ export const store = createStore<OnyxState>()(
     // ── Rich user profiles ────────────────────────────────────────────────────
     userProfiles: new Map(),
     setUserProfile: (nick, data) => set(s => {
+      const safeNick = _normalizeMetadataTarget(nick);
+      if (!safeNick) return {};
+      const nickKey = safeNick.toLowerCase();
       const profiles = new Map(s.userProfiles);
-      const existing = profiles.get(nick.toLowerCase()) ?? { nick };
-      profiles.set(nick.toLowerCase(), { ...existing, ...data });
+      if (!profiles.has(nickKey) && profiles.size >= MAX_USER_METADATA_TARGETS) return {};
+      const existing = profiles.get(nickKey) ?? { nick: safeNick };
+      profiles.set(nickKey, { ...existing, ...data });
       return { userProfiles: profiles };
     }),
     getUserProfile: (nick) => get().userProfiles.get(nick.toLowerCase()) ?? null,
@@ -12271,17 +12303,18 @@ export const store = createStore<OnyxState>()(
 
     setOwnMetadata(key, value) {
       const { client, ourNick } = get();
-      if (!client || !key) return;
-      const normalizedValue = value === null ? '' : _normalizeProfileMetadataValue(key, value);
+      const safeKey = _normalizeMetadataKey(key);
+      if (!client || !safeKey) return;
+      const normalizedValue = value === null ? '' : _normalizeProfileMetadataValue(safeKey, value);
       if (normalizedValue === null) return;
       if (normalizedValue === '') {
         // Orochi handleMetadata: SET with no/empty value deletes the key.
-        client.sendRaw('METADATA', '*', 'SET', key);
+        client.sendRaw('METADATA', '*', 'SET', safeKey);
       } else {
-        client.sendRaw('METADATA', '*', 'SET', key, normalizedValue);
+        client.sendRaw('METADATA', '*', 'SET', safeKey, normalizedValue);
       }
       // Optimistic local apply — the server also echoes 761 RPL_KEYVALUE.
-      if (ourNick) get()._applyMetadata(ourNick, key, normalizedValue);
+      if (ourNick) get()._applyMetadata(ourNick, safeKey, normalizedValue);
     },
 
     _applyMetadata(target, key, value) {
@@ -12289,24 +12322,42 @@ export const store = createStore<OnyxState>()(
       // (`METADATA * SET …`) comes back as target `*`. Normalize it to our nick
       // so the metadata lands on our own profile, not a phantom `*` entry.
       const resolvedTarget = target === '*' ? (get().ourNick || target) : target;
-      const nickKey = resolvedTarget.toLowerCase();
+      const safeTarget = _normalizeMetadataTarget(resolvedTarget);
+      const safeKey = _normalizeMetadataKey(key);
+      if (!safeTarget || !safeKey) return;
+      const safeValue = _boundedMetadataValue(value);
+      const nickKey = safeTarget.toLowerCase();
+      const currentMetadata = get().userMetadata;
+      const currentEntry = currentMetadata.get(nickKey);
+      if (
+        safeValue !== ''
+        && (
+          (!currentEntry && currentMetadata.size >= MAX_USER_METADATA_TARGETS)
+          || (!Object.hasOwn(currentEntry ?? {}, safeKey)
+            && Object.keys(currentEntry ?? {}).length >= MAX_USER_METADATA_KEYS)
+        )
+      ) return;
       set(s => {
         const userMetadata = new Map(s.userMetadata);
-        const entry = { ...(userMetadata.get(nickKey) ?? {}) };
-        if (value === '') {
-          delete entry[key];
+        const existing = userMetadata.get(nickKey);
+        const entry = { ...(existing ?? {}) };
+        if (safeValue === '') {
+          if (!existing || !Object.hasOwn(existing, safeKey)) return {};
+          delete entry[safeKey];
+          if (Object.keys(entry).length === 0) userMetadata.delete(nickKey);
+          else userMetadata.set(nickKey, entry);
         } else {
-          entry[key] = value;
+          entry[safeKey] = safeValue;
+          userMetadata.set(nickKey, entry);
         }
-        userMetadata.set(nickKey, entry);
         return { userMetadata };
       });
       // E2EE device key (METADATA ocean.dm-key): remember the peer's published
       // key so their DMs decrypt and ours to them encrypt. Any change re-derives.
-      if (key.toLowerCase() === 'ocean.dm-key') {
+      if (safeKey.toLowerCase() === 'ocean.dm-key') {
         set(s => {
           const peerDmKeys = new Map(s.peerDmKeys);
-          if (value) peerDmKeys.set(nickKey, value);
+          if (safeValue && isValidPeerPublicKey(safeValue)) peerDmKeys.set(nickKey, safeValue);
           else peerDmKeys.delete(nickKey);
           return { peerDmKeys };
         });
@@ -12319,22 +12370,26 @@ export const store = createStore<OnyxState>()(
       }
       // Map namespaced ocean.* (and bare metadata-2 standard) keys onto the
       // rich profile so profile components can consume them via selectors.
-      const norm = key.toLowerCase().replace(/^ocean\./, '');
+      const norm = safeKey.toLowerCase().replace(/^ocean\./, '');
       const profilePatch: Partial<RichUserProfile> | null =
         norm === 'display-name' || norm === 'displayname'
-          ? { displayName: normalizeSelfDisplayName(value) || undefined }
+          ? { displayName: normalizeSelfDisplayName(safeValue) || undefined }
           : norm === 'pronouns'
-            ? { pronouns: normalizeSelfPronouns(value) || undefined }
+            ? { pronouns: normalizeSelfPronouns(safeValue) || undefined }
             : norm === 'bio'
-              ? { bio: normalizeSelfBio(value) || undefined }
+              ? { bio: normalizeSelfBio(safeValue) || undefined }
               : norm === 'accent' || norm === 'accent-color' || norm === 'color'
-                ? { accentColor: value || undefined }
+                ? { accentColor: normalizeNickColor(safeValue) || undefined }
                 : norm === 'links' || norm === 'url' || norm === 'website'
-                  ? { links: value ? value.split(/[\s,]+/).filter(Boolean) : undefined }
+                  ? {
+                      links: safeValue
+                        ? safeValue.split(/[\s,]+/).filter(Boolean).slice(0, MAX_PROFILE_LINKS)
+                        : undefined,
+                    }
                   : norm === 'banner' || norm === 'banner-url'
-                    ? { bannerUrl: normalizeSelfBannerUrl(value) || undefined }
+                    ? { bannerUrl: normalizeSelfBannerUrl(safeValue) || undefined }
                     : null;
-      if (profilePatch) get().setUserProfile(resolvedTarget, profilePatch);
+      if (profilePatch) get().setUserProfile(safeTarget, profilePatch);
     },
 
     publishDeviceKey() {

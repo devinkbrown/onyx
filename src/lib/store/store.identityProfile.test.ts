@@ -9,7 +9,14 @@ import {
   saveIdentityProfileMemory,
 } from '@/lib/identityProfileMemory';
 import { parseIRCMessage } from '@/lib/irc/parser';
-import { store, type Server } from './store';
+import { MAX_VAULT_SENDER_LENGTH } from '@/lib/vault/historyVault';
+import {
+  MAX_USER_METADATA_KEYS,
+  MAX_USER_METADATA_TARGETS,
+  MAX_USER_METADATA_VALUE_LENGTH,
+  store,
+  type Server,
+} from './store';
 
 const initialState = store.getInitialState();
 const serverUrl = 'wss://profile.example/ws';
@@ -180,5 +187,49 @@ describe('identity-visible local profile state', () => {
     });
     expect(store.getState().getUserProfile('alice')).toMatchObject({ pronouns: 'they/them' });
     expect(store.getState().getUserProfile('alice')?.bannerUrl).toBeUndefined();
+  });
+
+  it('bounds metadata targets, keys, values, profile lists, and device keys', () => {
+    store.setState({
+      server: server('alice'),
+      ourNick: 'alice',
+      userMetadata: new Map(),
+      userProfiles: new Map(),
+      peerDmKeys: new Map(),
+    });
+
+    store.getState()._applyMetadata('alice', 'custom.large', `${'x'.repeat(MAX_USER_METADATA_VALUE_LENGTH)}😀tail`);
+    expect(store.getState().userMetadata.get('alice')?.['custom.large'])
+      .toBe('x'.repeat(MAX_USER_METADATA_VALUE_LENGTH));
+
+    store.getState()._applyMetadata('alice', 'ocean.links', Array.from(
+      { length: 20 },
+      (_, index) => `https://profile.example/${index}`,
+    ).join(' '));
+    expect(store.getState().getUserProfile('alice')?.links).toHaveLength(8);
+
+    store.getState()._applyMetadata('alice', 'ocean.dm-key', 'not-a-public-key');
+    expect(store.getState().peerDmKeys.has('alice')).toBe(false);
+
+    store.getState()._applyMetadata('__proto__', 'safe', 'rejected target');
+    store.getState()._applyMetadata('alice', '__proto__', 'rejected key');
+    store.getState()._applyMetadata('x'.repeat(MAX_VAULT_SENDER_LENGTH + 1), 'safe', 'rejected target');
+    store.getState()._applyMetadata('nobody', 'missing', '');
+    expect(store.getState().userMetadata.has('__proto__')).toBe(false);
+    expect(Object.hasOwn(store.getState().userMetadata.get('alice') ?? {}, '__proto__')).toBe(false);
+    expect(store.getState().userMetadata.has('nobody')).toBe(false);
+
+    for (let index = 0; index < MAX_USER_METADATA_KEYS + 8; index += 1) {
+      store.getState()._applyMetadata('alice', `custom.${index}`, 'bounded');
+    }
+    expect(Object.keys(store.getState().userMetadata.get('alice') ?? {}))
+      .toHaveLength(MAX_USER_METADATA_KEYS);
+
+    store.setState({ userMetadata: new Map() });
+    for (let index = 0; index < MAX_USER_METADATA_TARGETS + 8; index += 1) {
+      store.getState()._applyMetadata(`user-${index}`, 'custom', 'bounded');
+    }
+    expect(store.getState().userMetadata.size).toBe(MAX_USER_METADATA_TARGETS);
+    expect(store.getState().userMetadata.has(`user-${MAX_USER_METADATA_TARGETS}`)).toBe(false);
   });
 });
