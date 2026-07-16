@@ -824,7 +824,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
           </Section>
 
           {/* Passkeys — WebAuthn passwordless login: register, list, rename, remove */}
-          <PasskeysSection account={account()} active={local.open} />
+          <PasskeysSection account={account()} owner={memoryOwner()} active={local.open} />
 
           <Section title="Device encryption keys" hint="Publish this browser's E2EE public key and inspect the account transparency root.">
             <div class="acct-cert-actions">

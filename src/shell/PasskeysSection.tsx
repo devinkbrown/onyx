@@ -25,6 +25,11 @@ import {
   splitProps,
   type JSX,
 } from 'solid-js';
+import {
+  deviceMemoryOwnerKey,
+  normalizeDeviceMemoryOwner,
+  type DeviceMemoryOwner,
+} from '@/lib/deviceMemoryOwner';
 import { useStore, getState } from '@/lib/store';
 import { isPasskeySupported } from '@/lib/webauthn/passkey';
 import { Button, FormField, Spinner } from '@/primitives/index';
@@ -32,6 +37,8 @@ import { Button, FormField, Spinner } from '@/primitives/index';
 export interface PasskeysSectionProps {
   /** The signed-in account name, or null for a guest (section stays inert). */
   account: string | null;
+  /** Exact server + identity that owns the passkey-management session. */
+  owner: DeviceMemoryOwner | null;
   /** Whether the containing panel is open — gates the initial list probe. */
   active: boolean;
 }
@@ -51,7 +58,7 @@ function formatCreated(createdAt: number | null): string | null {
 }
 
 export function PasskeysSection(props: PasskeysSectionProps): JSX.Element {
-  const [local] = splitProps(props, ['account', 'active']);
+  const [local] = splitProps(props, ['account', 'owner', 'active']);
 
   const busy = useStore((s) => s.passkeyBusy);
   const notice = useStore((s) => s.passkeyNotice);
@@ -66,21 +73,56 @@ export function PasskeysSection(props: PasskeysSectionProps): JSX.Element {
   const [renameValue, setRenameValue] = createSignal('');
   const [confirmingId, setConfirmingId] = createSignal<string | null>(null);
 
+  const clearLocalActionState = (): void => {
+    setLabel('');
+    setRenamingId(null);
+    setRenameValue('');
+    setConfirmingId(null);
+  };
+
+  // Typed labels and armed rename/remove controls are account authority, not
+  // generic UI state. Retire them when the panel closes or the exact endpoint
+  // + identity owner changes, including same-name accounts on another server.
+  let actionBoundaryInitialized = false;
+  let previousActionScope: string | null = null;
+  createEffect(() => {
+    const owner = local.owner;
+    const nextScope = local.active && owner ? deviceMemoryOwnerKey(owner) : null;
+    const changed = actionBoundaryInitialized && nextScope !== previousActionScope;
+    previousActionScope = nextScope;
+    actionBoundaryInitialized = true;
+    if (changed) clearLocalActionState();
+  });
+
   const browserSupported = createMemo(() => isPasskeySupported());
   const signedIn = createMemo(() => !!local.account);
+  const hasCurrentOwner = createMemo(() => {
+    const account = local.account?.trim().toLowerCase();
+    const owner = normalizeDeviceMemoryOwner(local.owner);
+    return Boolean(
+      account
+      && owner
+      && deviceMemoryOwnerKey(owner)
+      && owner.identity === account,
+    );
+  });
   // Unknown (null) is treated as "try": the section renders and probes.
   const serverUnavailable = createMemo(() => supported() === false);
   const showManager = createMemo(
-    () => signedIn() && browserSupported() && !serverUnavailable(),
+    () => hasCurrentOwner() && browserSupported() && !serverUnavailable(),
   );
 
   // Probe the server's passkey list the first time the panel opens for a
   // signed-in user. `listPasskeys()` resolves `passkeySupported` fail-closed.
   createEffect(() => {
     const activeAccount = local.account;
+    const activeOwner = normalizeDeviceMemoryOwner(local.owner);
+    const activeOwnerKey = activeOwner ? deviceMemoryOwnerKey(activeOwner) : null;
     if (
       local.active
       && activeAccount
+      && activeOwnerKey
+      && activeOwner?.identity === activeAccount.trim().toLowerCase()
       && browserSupported()
       && !serverUnavailable()
     ) {

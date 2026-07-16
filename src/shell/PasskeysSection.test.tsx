@@ -9,6 +9,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-li
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { DeviceMemoryOwner } from '@/lib/deviceMemoryOwner';
 import { store, _resetPasskeyStateForTests, type PasskeyCredential } from '@/lib/store/store';
 import { PasskeysSection } from './PasskeysSection';
 
@@ -42,6 +43,10 @@ function seedServer(account: string) {
   };
 }
 
+function memoryOwner(identity = 'alice', serverUrl = 'wss://eshmaki.me'): DeviceMemoryOwner {
+  return { serverUrl, identity };
+}
+
 const cred = (over: Partial<PasskeyCredential>): PasskeyCredential => ({
   id: 'credAAA',
   label: 'My laptop',
@@ -64,21 +69,34 @@ afterEach(() => {
 describe('PasskeysSection disabled states', () => {
   it('shows a browser-unsupported notice when WebAuthn is missing', () => {
     stubBrowserSupport(false);
-    render(() => <PasskeysSection account="alice" active={true} />);
+    render(() => <PasskeysSection account="alice" owner={memoryOwner()} active={true} />);
     expect(screen.getByTestId('passkeys-browser-unsupported')).toBeInTheDocument();
     expect(screen.queryByLabelText('Add a passkey')).not.toBeInTheDocument();
   });
 
   it('shows a server-unsupported notice when the probe resolved false', () => {
     store.setState({ passkeySupported: false });
-    render(() => <PasskeysSection account="alice" active={true} />);
+    render(() => <PasskeysSection account="alice" owner={memoryOwner()} active={true} />);
     expect(screen.getByTestId('passkeys-server-unsupported')).toBeInTheDocument();
   });
 
   it('renders nothing actionable for a guest (no account)', () => {
-    render(() => <PasskeysSection account={null} active={true} />);
+    render(() => <PasskeysSection account={null} owner={null} active={true} />);
     expect(screen.queryByLabelText('Add a passkey')).not.toBeInTheDocument();
     expect(screen.queryByTestId('passkeys-server-unsupported')).not.toBeInTheDocument();
+  });
+
+  it('renders no manager while the device owner does not match the signed-in account', () => {
+    store.setState({
+      passkeySupported: true,
+      passkeyCreds: [cred({ id: 'alice-credential', label: 'Alice laptop' })],
+    });
+    render(() => (
+      <PasskeysSection account="bob" owner={memoryOwner('alice')} active={true} />
+    ));
+
+    expect(screen.queryByLabelText('Add a passkey')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove Alice laptop' })).not.toBeInTheDocument();
   });
 });
 
@@ -86,29 +104,93 @@ describe('PasskeysSection manager', () => {
   it('probes the list when opened for a signed-in user', () => {
     const client = makeClient();
     store.setState({ client: client as never });
-    render(() => <PasskeysSection account="alice" active={true} />);
+    render(() => <PasskeysSection account="alice" owner={memoryOwner()} active={true} />);
     expect(client.sendRaw).toHaveBeenCalledWith('WEBAUTHN', 'LIST');
   });
 
   it('refreshes the list when the open panel changes from Alice to Bob', async () => {
     const client = makeClient();
     const [account, setAccount] = createSignal('alice');
+    const [owner, setOwner] = createSignal(memoryOwner());
     store.setState({ client: client as never, server: seedServer('alice') });
-    render(() => <PasskeysSection account={account()} active={true} />);
+    render(() => <PasskeysSection account={account()} owner={owner()} active={true} />);
     expect(client.sendRaw).toHaveBeenCalledTimes(1);
 
     store.setState({ server: seedServer('bob') });
     setAccount('bob');
+    setOwner(memoryOwner('bob'));
 
     await waitFor(() => expect(client.sendRaw).toHaveBeenCalledTimes(2));
     expect(client.sendRaw).toHaveBeenLastCalledWith('WEBAUTHN', 'LIST');
+  });
+
+  it('retires typed and armed actions when the same account moves to another server', async () => {
+    const client = makeClient();
+    const [owner, setOwner] = createSignal(memoryOwner());
+    store.setState({
+      client: client as never,
+      server: seedServer('alice'),
+      passkeySupported: true,
+      passkeyCreds: [
+        cred({ id: 'cred-laptop', label: 'laptop' }),
+        cred({ id: 'cred-phone', label: 'phone' }),
+      ],
+    });
+    render(() => <PasskeysSection account="alice" owner={owner()} active={true} />);
+
+    fireEvent.input(screen.getByLabelText('Passkey name (optional)'), {
+      target: { value: 'Alice security key' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Rename laptop' }));
+    fireEvent.input(screen.getByLabelText('New name'), {
+      target: { value: 'Alice work laptop' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Remove phone' }));
+    expect(screen.getByRole('group', { name: 'Confirm removal' })).toBeInTheDocument();
+
+    client.sendRaw.mockClear();
+    store.setState({ server: { ...seedServer('alice'), url: 'wss://other.example/ws' } });
+    setOwner(memoryOwner('alice', 'wss://other.example/ws'));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Passkey name (optional)')).toHaveValue('');
+      expect(screen.queryByLabelText('New name')).not.toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: 'Confirm removal' })).not.toBeInTheDocument();
+    });
+    expect(client.sendRaw).toHaveBeenCalledWith('WEBAUTHN', 'LIST');
+  });
+
+  it('retires local passkey actions when the account panel closes', async () => {
+    const [active, setActive] = createSignal(true);
+    store.setState({
+      client: makeClient() as never,
+      passkeySupported: true,
+      passkeyCreds: [cred({ id: 'credAAA', label: 'laptop' })],
+    });
+    render(() => (
+      <PasskeysSection account="alice" owner={memoryOwner()} active={active()} />
+    ));
+
+    fireEvent.input(screen.getByLabelText('Passkey name (optional)'), {
+      target: { value: 'temporary label' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Remove laptop' }));
+    expect(screen.getByRole('group', { name: 'Confirm removal' })).toBeInTheDocument();
+
+    setActive(false);
+    setActive(true);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Passkey name (optional)')).toHaveValue('');
+      expect(screen.queryByRole('group', { name: 'Confirm removal' })).not.toBeInTheDocument();
+    });
   });
 
   it('shows the empty state once the list resolves with no creds', () => {
     // active=false: no probe, so the pre-resolved (supported, not pending, empty)
     // state renders the empty placeholder rather than the loading spinner.
     store.setState({ client: makeClient() as never, passkeySupported: true, passkeyCreds: [] });
-    render(() => <PasskeysSection account="alice" active={false} />);
+    render(() => <PasskeysSection account="alice" owner={memoryOwner()} active={false} />);
     expect(screen.getByTestId('passkeys-empty')).toBeInTheDocument();
   });
 
@@ -118,7 +200,7 @@ describe('PasskeysSection manager', () => {
       passkeySupported: true,
       passkeyCreds: [cred({ label: 'My laptop', signCount: 5, createdAt: 1700000000 })],
     });
-    render(() => <PasskeysSection account="alice" active={true} />);
+    render(() => <PasskeysSection account="alice" owner={memoryOwner()} active={true} />);
     expect(screen.getByText('My laptop')).toBeInTheDocument();
     expect(screen.getByText('Used 5×')).toBeInTheDocument();
     expect(screen.getByText(/Added /)).toBeInTheDocument();
@@ -130,7 +212,7 @@ describe('PasskeysSection manager', () => {
       passkeySupported: true,
       passkeyCreds: [cred({ label: '' })],
     });
-    render(() => <PasskeysSection account="alice" active={true} />);
+    render(() => <PasskeysSection account="alice" owner={memoryOwner()} active={true} />);
     expect(screen.getByText('Unnamed passkey')).toBeInTheDocument();
   });
 
@@ -141,7 +223,7 @@ describe('PasskeysSection manager', () => {
       passkeySupported: true,
       passkeyCreds: [cred({ id: 'credAAA', label: 'laptop' })],
     });
-    render(() => <PasskeysSection account="alice" active={true} />);
+    render(() => <PasskeysSection account="alice" owner={memoryOwner()} active={true} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove laptop' }));
     // Confirm appears; the raw command only fires after confirming.
@@ -157,7 +239,7 @@ describe('PasskeysSection manager', () => {
       passkeySupported: true,
       passkeyCreds: [cred({ id: 'credAAA', label: 'laptop' })],
     });
-    render(() => <PasskeysSection account="alice" active={true} />);
+    render(() => <PasskeysSection account="alice" owner={memoryOwner()} active={true} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Rename laptop' }));
     const input = screen.getByLabelText('New name') as HTMLInputElement;
@@ -173,7 +255,7 @@ describe('PasskeysSection manager', () => {
       passkeyRenameUnsupported: true,
       passkeyCreds: [cred({ id: 'credAAA', label: 'laptop' })],
     });
-    render(() => <PasskeysSection account="alice" active={true} />);
+    render(() => <PasskeysSection account="alice" owner={memoryOwner()} active={true} />);
     expect(screen.queryByRole('button', { name: 'Rename laptop' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Remove laptop' })).toBeInTheDocument();
   });
