@@ -23,6 +23,7 @@ import { saveComposerDrafts } from '@/lib/composer/drafts';
 import { deviceMemoryStorageKey } from '@/lib/deviceMemoryOwner';
 import { DM_PINS_STORAGE_KEY, saveDMPins } from '@/lib/dmPins';
 import { saveChannelNotify } from '@/lib/notifications/channelNotifyMemory';
+import { saveHighlightWords } from '@/lib/notifications/highlightMemory';
 
 const initialState = store.getInitialState();
 
@@ -804,6 +805,21 @@ describe('account replies — state from the message handler', () => {
     expect(store.getState().shouldNotify('#alice-private', false)).toBe(true);
     expect(store.getState().shouldNotify('#bob-ops', false)).toBe(false);
     expect(store.getState().shouldNotify('#bob-ops', true)).toBe(true);
+  });
+
+  it('does not carry Alice custom highlight terms into Bob on 900', () => {
+    const bob = { serverUrl: seedServer('bob').url, identity: 'bob' } as const;
+    saveHighlightWords(['Bob incident term'], bob);
+    store.setState({
+      server: seedServer('alice'),
+      ourNick: 'alice',
+      highlightWords: ['alice confidential codename'],
+    });
+
+    feed(':eshmaki.me 900 alice alice!u@h bob :You are now logged in as bob');
+
+    expect(store.getState().highlightWords).toEqual(['bob incident term']);
+    expect(store.getState().highlightWords).not.toContain('alice confidential codename');
   });
 
   it('ignores an Alice ACCOUNTINFO reply after the live account switches to Bob', () => {

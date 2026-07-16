@@ -11,15 +11,30 @@
 import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { store } from '@/lib/store/store';
+import { store, type Server } from '@/lib/store/store';
 import type { NotifyLevel } from '@/lib/notifications/channelNotifyMode';
 import { ChannelNotifyControl } from './ChannelNotifyControl';
 
 const initialState = store.getInitialState();
+const server: Server = {
+  id: 'notify-test',
+  name: 'Notify test',
+  network: 'Notify test',
+  url: 'wss://notify.test/ws',
+  icon: '',
+  nick: 'alice',
+  account: 'alice',
+  connected: true,
+};
 
 function seed(notify?: Map<string, NotifyLevel>): void {
   store.setState(
-    { ...initialState, channelNotify: notify ?? new Map() },
+    {
+      ...initialState,
+      server,
+      ourNick: 'alice',
+      channelNotify: notify ?? new Map(),
+    },
     true,
   );
 }

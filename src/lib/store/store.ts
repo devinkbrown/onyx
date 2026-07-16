@@ -74,6 +74,11 @@ import {
 } from '@/lib/topics/topicReadLedger';
 import { isFollowed } from '@/lib/notifications/followed';
 import { loadChannelNotify, saveChannelNotify } from '@/lib/notifications/channelNotifyMemory';
+import {
+  loadHighlightWords,
+  parseHighlightWords,
+  saveHighlightWords,
+} from '@/lib/notifications/highlightMemory';
 import { channelNotifyMode as computeChannelNotifyMode, shouldNotify as computeShouldNotify, modeToLevel, type NotifyMode } from '@/lib/notifications/channelNotifyMode';
 import { parseScheduledEvent, type ScheduledEvent } from '@/lib/notifications/scheduledEvents';
 import {
@@ -2712,6 +2717,7 @@ function _resetAccountBoundState(
     showDMPins: false,
     dmPinsNick: null,
     channelNotify: new Map(),
+    highlightWords: [],
     serviceNotices: s.serviceNotices.filter(notice => notice.source !== 'Account'),
   }));
 }
@@ -3438,6 +3444,13 @@ function _loadOwnedChannelNotify(
   return owner ? loadChannelNotify(owner) : new Map();
 }
 
+function _loadOwnedHighlightWords(
+  state: Pick<OnyxState, 'server' | 'ourNick'>,
+): string[] {
+  const owner = selectDeviceMemoryOwner(state);
+  return owner ? loadHighlightWords(owner) : [];
+}
+
 export interface DeviceMemoryContext {
   readonly owner: DeviceMemoryOwner;
   readonly client: IRCClient | null;
@@ -4016,6 +4029,7 @@ export const store = createStore<OnyxState>()(
               composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: newNick }),
               dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: newNick }),
               channelNotify: _loadOwnedChannelNotify({ server, ourNick: newNick }),
+              highlightWords: _loadOwnedHighlightWords({ server, ourNick: newNick }),
             };
           });
         },
@@ -4091,6 +4105,7 @@ export const store = createStore<OnyxState>()(
               composerDrafts: _loadOwnedComposerDrafts({ server: srv, ourNick: get().ourNick }),
               dmPinnedMessages: _loadOwnedDMPins({ server: srv, ourNick: get().ourNick }),
               channelNotify: _loadOwnedChannelNotify({ server: srv, ourNick: get().ourNick }),
+              highlightWords: _loadOwnedHighlightWords({ server: srv, ourNick: get().ourNick }),
               isIRCX: client.isupport.IRCX,
               networkName: net,
               serverCapabilities: caps,
@@ -7186,6 +7201,7 @@ export const store = createStore<OnyxState>()(
               composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: s.ourNick }),
               dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: s.ourNick }),
               channelNotify: _loadOwnedChannelNotify({ server, ourNick: s.ourNick }),
+              highlightWords: _loadOwnedHighlightWords({ server, ourNick: s.ourNick }),
             };
           });
           break;
@@ -9564,6 +9580,7 @@ export const store = createStore<OnyxState>()(
                 composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: s.ourNick }),
                 dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: s.ourNick }),
                 channelNotify: _loadOwnedChannelNotify({ server, ourNick: s.ourNick }),
+                highlightWords: _loadOwnedHighlightWords({ server, ourNick: s.ourNick }),
                 passkeyBusy: false,
                 passkeyError: null,
               };
@@ -9594,6 +9611,7 @@ export const store = createStore<OnyxState>()(
               composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: s.ourNick }),
               dmPinnedMessages: _loadOwnedDMPins({ server, ourNick: s.ourNick }),
               channelNotify: _loadOwnedChannelNotify({ server, ourNick: s.ourNick }),
+              highlightWords: _loadOwnedHighlightWords({ server, ourNick: s.ourNick }),
             };
           });
           break;
@@ -10423,19 +10441,26 @@ export const store = createStore<OnyxState>()(
     },
 
     // ── Highlight words ───────────────────────────────────────────────────
-    highlightWords: _loadHighlightWords(),
+    // Custom terms can contain sensitive project/person names, so they load
+    // only after the active server identity is known.
+    highlightWords: [],
     showHighlightModal: false,
     addHighlightWord: (word) => {
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
       set(s => {
-        const words = [...s.highlightWords, word.trim().toLowerCase()].filter(Boolean);
-        _saveHighlightWords(words);
+        const words = parseHighlightWords([...s.highlightWords, word]);
+        saveHighlightWords(words, owner);
         return { highlightWords: words };
       });
     },
     removeHighlightWord: (word) => {
+      const owner = selectDeviceMemoryOwner(get());
+      if (!owner) return;
       set(s => {
-        const words = s.highlightWords.filter(w => w !== word.toLowerCase());
-        _saveHighlightWords(words);
+        const normalized = word.trim().toLowerCase();
+        const words = s.highlightWords.filter(w => w !== normalized);
+        saveHighlightWords(words, owner);
         return { highlightWords: words };
       });
     },
@@ -12538,25 +12563,6 @@ function _addDMMessage(
   }
 
   return { dms };
-}
-
-// ── Highlight words persistence ───────────────────────────────────────────────
-
-function _loadHighlightWords(): string[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    // Sanitize the boundary: highlightWords is read via `.some()` on the
-    // per-message hot path (see _handleMessage), so a valid-but-wrong-shape
-    // persisted value (`{}`, `"x"`, `5`, `null`) must NOT slip through as a
-    // non-array — that would throw for every incoming message.
-    return parseStringArray(localStorage.getItem('onyx:highlight-words'));
-  } catch { return []; }
-}
-function _saveHighlightWords(words: string[]): void {
-  if (typeof window === 'undefined') return;
-  try { localStorage.setItem('onyx:highlight-words', JSON.stringify(words)); } catch {
-    // Storage quota exceeded or unavailable — silently degrade
-  }
 }
 
 // ── Custom status persistence ─────────────────────────────────────────────────
