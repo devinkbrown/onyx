@@ -410,6 +410,16 @@ describe('PWA manifest', () => {
     expect(precachedUrls).toContain(loadManifest().start_url);
     expect(skipWaiting).toHaveBeenCalledOnce();
 
+    caches.open.mockRejectedValueOnce(new Error('Cache Storage unavailable'));
+    let cacheFailureInstallWork: Promise<unknown> | undefined;
+    listeners.get('install')?.({
+      waitUntil: (work: Promise<unknown>) => {
+        cacheFailureInstallWork = work;
+      },
+    });
+    await expect(cacheFailureInstallWork).resolves.toBeDefined();
+    expect(skipWaiting).toHaveBeenCalledTimes(2);
+
     let messageWork: Promise<unknown> | undefined;
     listeners.get('message')?.({
       data: { type: 'ONYX_SKIP_WAITING' },
@@ -418,13 +428,13 @@ describe('PWA manifest', () => {
       },
     });
     await messageWork;
-    expect(skipWaiting).toHaveBeenCalledTimes(2);
+    expect(skipWaiting).toHaveBeenCalledTimes(3);
 
     listeners.get('message')?.({
       data: { type: 'UNRELATED_MESSAGE' },
       waitUntil: vi.fn(),
     });
-    expect(skipWaiting).toHaveBeenCalledTimes(2);
+    expect(skipWaiting).toHaveBeenCalledTimes(3);
 
     let activateWork: Promise<unknown> | undefined;
     listeners.get('activate')?.({
