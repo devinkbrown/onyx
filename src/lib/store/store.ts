@@ -7,7 +7,6 @@ import {
   parseEmojiArray,
   normalizeCtcpVersionReply,
   parseStringArray,
-  parseStringArrayRecord,
   parseStringRecord,
 } from './persistParse';
 import { parseStoredVoiceSettings, type StoredVoiceSettings } from './voiceSettingsPersistence';
@@ -70,6 +69,12 @@ import {
   projectRoomTopicUnread,
   readTopicReadLedger,
 } from '@/lib/topics/topicReadLedger';
+import {
+  loadTopicHistory,
+  recordTopicHistory,
+  saveTopicHistory,
+  type TopicHistory,
+} from '@/lib/topics/topicHistory';
 import { isFollowed } from '@/lib/notifications/followed';
 import { loadChannelNotify, saveChannelNotify } from '@/lib/notifications/channelNotifyMemory';
 import {
@@ -2762,6 +2767,7 @@ function _resetAccountBoundState(
       showIgnoreList: false,
       mutedDMs: new Set(),
       userNotes: new Map(),
+      topicHistory: {},
       customStatus: '',
       customStatusExpiry: null,
       showCustomStatus: false,
@@ -3572,6 +3578,13 @@ function _loadOwnedIdentityProfile(
   return owner ? loadIdentityProfileMemory(owner) : emptyIdentityProfileMemory();
 }
 
+function _loadOwnedTopicHistory(
+  state: Pick<OnyxState, 'server' | 'ourNick'>,
+): TopicHistory {
+  const owner = selectDeviceMemoryOwner(state);
+  return owner ? loadTopicHistory(owner) : {};
+}
+
 /** Project the active owner's device-local status without retaining the old self key. */
 function _syncOwnCustomStatusActivity(get: GetFn, set: SetFn, previousNick?: string): void {
   const { customStatus, ourNick } = get();
@@ -4247,6 +4260,7 @@ export const store = createStore<OnyxState>()(
               friends: _loadOwnedFriends({ server, ourNick: newNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: newNick }),
               userNotes: _loadOwnedUserNotes({ server, ourNick: newNick }),
+              topicHistory: _loadOwnedTopicHistory({ server, ourNick: newNick }),
               ..._loadOwnedIdentityProfile({ server, ourNick: newNick }),
             };
           });
@@ -4333,6 +4347,7 @@ export const store = createStore<OnyxState>()(
               friends: _loadOwnedFriends({ server: srv, ourNick: get().ourNick }),
               watchList: _loadOwnedWatchList({ server: srv, ourNick: get().ourNick }),
               userNotes: _loadOwnedUserNotes({ server: srv, ourNick: get().ourNick }),
+              topicHistory: _loadOwnedTopicHistory({ server: srv, ourNick: get().ourNick }),
               ..._loadOwnedIdentityProfile({ server: srv, ourNick: get().ourNick }),
               isIRCX: client.isupport.IRCX,
               networkName: net,
@@ -7435,6 +7450,7 @@ export const store = createStore<OnyxState>()(
               friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
               userNotes: _loadOwnedUserNotes({ server, ourNick: s.ourNick }),
+              topicHistory: _loadOwnedTopicHistory({ server, ourNick: s.ourNick }),
               ..._loadOwnedIdentityProfile({ server, ourNick: s.ourNick }),
             };
           });
@@ -8640,6 +8656,7 @@ export const store = createStore<OnyxState>()(
                 friends: _loadOwnedFriends({ server, ourNick: newNick }),
                 watchList: _loadOwnedWatchList({ server, ourNick: newNick }),
                 userNotes: _loadOwnedUserNotes({ server, ourNick: newNick }),
+                topicHistory: _loadOwnedTopicHistory({ server, ourNick: newNick }),
                 ..._loadOwnedIdentityProfile({ server, ourNick: newNick }),
               };
             });
@@ -9849,6 +9866,7 @@ export const store = createStore<OnyxState>()(
                 friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
                 watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
                 userNotes: _loadOwnedUserNotes({ server, ourNick: s.ourNick }),
+                topicHistory: _loadOwnedTopicHistory({ server, ourNick: s.ourNick }),
                 ..._loadOwnedIdentityProfile({ server, ourNick: s.ourNick }),
                 passkeyBusy: false,
                 passkeyError: null,
@@ -9889,6 +9907,7 @@ export const store = createStore<OnyxState>()(
               friends: _loadOwnedFriends({ server, ourNick: s.ourNick }),
               watchList: _loadOwnedWatchList({ server, ourNick: s.ourNick }),
               userNotes: _loadOwnedUserNotes({ server, ourNick: s.ourNick }),
+              topicHistory: _loadOwnedTopicHistory({ server, ourNick: s.ourNick }),
               ..._loadOwnedIdentityProfile({ server, ourNick: s.ourNick }),
             };
           });
@@ -11234,17 +11253,13 @@ export const store = createStore<OnyxState>()(
     closeReactionStats: () => set({ showReactionStats: null }),
 
     // ── Topic history ─────────────────────────────────────────────────────────
-    topicHistory: _loadTopicHistory(),
+    // Topic text and private room names load only after an owner is known.
+    topicHistory: {},
     addTopicHistory: (channel, topic) => set(s => {
-      if (!topic) return {};
-      const key = channel.toLowerCase();
-      const hist = [topic, ...(s.topicHistory[key] ?? []).filter(t => t !== topic)].slice(0, 10);
-      const topicHistory = { ...s.topicHistory, [key]: hist };
-      try {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('onyx:topic-history', JSON.stringify(topicHistory));
-        }
-      } catch {}
+      const owner = selectDeviceMemoryOwner(s);
+      if (!owner) return {};
+      const topicHistory = recordTopicHistory(s.topicHistory, channel, topic);
+      saveTopicHistory(topicHistory, owner);
       return { topicHistory };
     }),
 
@@ -13099,16 +13114,6 @@ function _loadFavoriteEmojis(): string[] {
 function _saveFavoriteEmojis(emojis: string[]): void {
   if (typeof window === 'undefined') return;
   try { localStorage.setItem('onyx:fav-emojis', JSON.stringify(emojis)); } catch {}
-}
-
-// ── Topic history persistence ─────────────────────────────────────────────────
-
-function _loadTopicHistory(): Record<string, string[]> {
-  if (typeof window === 'undefined') return {};
-  try {
-    const raw = localStorage.getItem('onyx:topic-history');
-    return parseStringArrayRecord(raw);
-  } catch { return {}; }
 }
 
 // ── Channel folders persistence ───────────────────────────────────────────────

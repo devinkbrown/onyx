@@ -27,6 +27,7 @@ import {
   loadIdentityProfileMemory,
   saveIdentityProfileMemory,
 } from '@/lib/identityProfileMemory';
+import { loadTopicHistory, saveTopicHistory } from '@/lib/topics/topicHistory';
 import { sceneMotion, setSceneMotion } from '@/lib/prefs/sceneMotion';
 import {
   MAX_TOPIC_READ_ENTRIES,
@@ -483,6 +484,21 @@ describe('portableTransfer', () => {
       customStatus: 'portable private status',
       selfBio: 'portable private profile draft',
     });
+  });
+
+  it('keeps topic text history out of portable transfer and clears every owner with local history', async () => {
+    const alice = { serverUrl: 'wss://portable.example/ws', identity: 'alice' } as const;
+    const bob = { serverUrl: 'wss://portable.example/ws', identity: 'bob' } as const;
+    saveTopicHistory({ '#alice-private': ['Alice confidential topic'] }, alice);
+    saveTopicHistory({ '#bob-private': ['Bob confidential topic'] }, bob);
+
+    const serialized = JSON.stringify(await exportPortableTransfer(alice));
+    expect(serialized).not.toContain('Alice confidential topic');
+    expect(serialized).not.toContain('Bob confidential topic');
+
+    expect(await clearVault()).toBe(true);
+    expect(loadTopicHistory(alice)).toEqual({});
+    expect(loadTopicHistory(bob)).toEqual({});
   });
 
   it('rejects a local-history-disabled import when the privacy clear does not commit', async () => {
