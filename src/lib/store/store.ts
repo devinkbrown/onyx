@@ -2747,6 +2747,7 @@ function _resetAccountPrivateMessageState(set: SetFn): void {
       replyingTo: null,
       editingMessage: null,
       forwardingMessage: null,
+      composerDrafts: {},
       showThreadPanel: false,
       threadParentId: null,
       showMessageSearch: false,
@@ -3430,6 +3431,13 @@ export function selectDeviceMemoryOwner(
   return _outboxOwner(state);
 }
 
+function _loadOwnedComposerDrafts(
+  state: Pick<OnyxState, 'server' | 'ourNick'>,
+): ComposerDrafts {
+  const owner = selectDeviceMemoryOwner(state);
+  return owner ? loadComposerDrafts(undefined, owner) : {};
+}
+
 export interface DeviceMemoryContext {
   readonly owner: DeviceMemoryOwner;
   readonly client: IRCClient | null;
@@ -3680,7 +3688,9 @@ export const store = createStore<OnyxState>()(
     showNotificationCenter: false,
     toasts: [],
     // ── composer/attachments ──
-    composerDrafts: loadComposerDrafts(),
+    // Ownerless legacy drafts stay quarantined. The owned journal is loaded as
+    // soon as registration establishes a server/account context.
+    composerDrafts: {},
     editingMessage: null,
     replyingTo: null,
     typingUsers: new Map(),
@@ -3860,6 +3870,7 @@ export const store = createStore<OnyxState>()(
         server: null,
         channels: new Map(),
         dms: new Map(),
+        composerDrafts: {},
         rosterSyncing: new Set(),
         activeView: { kind: 'home' },
         firstUnreadId: new Map(),
@@ -3978,10 +3989,14 @@ export const store = createStore<OnyxState>()(
         },
         onNickChanged(newNick) {
           _addSessionRestoreIdentity(get, newNick);
-          set(s => ({
-            ourNick: newNick,
-            server: s.server ? { ...s.server, nick: newNick } : null,
-          }));
+          set(s => {
+            const server = s.server ? { ...s.server, nick: newNick } : null;
+            return {
+              ourNick: newNick,
+              server,
+              composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: newNick }),
+            };
+          });
         },
         onMessage(msg) {
           get()._handleMessage(msg);
@@ -4052,6 +4067,7 @@ export const store = createStore<OnyxState>()(
             const caps = client.negotiatedCaps ? Array.from(client.negotiatedCaps) : [];
             set({
               server: srv,
+              composerDrafts: _loadOwnedComposerDrafts({ server: srv, ourNick: get().ourNick }),
               isIRCX: client.isupport.IRCX,
               networkName: net,
               serverCapabilities: caps,
@@ -4093,6 +4109,7 @@ export const store = createStore<OnyxState>()(
         autoReconnect: false,
         channels: new Map(),
         dms: new Map(),
+        composerDrafts: {},
         rosterSyncing: new Set(),
         server: null,
         activeView: { kind: 'home' },
@@ -5295,7 +5312,8 @@ export const store = createStore<OnyxState>()(
     setComposerDraft(target, text) {
       if (!composerDraftKey(target)) return;
       const next = updateComposerDraft(get().composerDrafts, target, text);
-      saveComposerDrafts(next);
+      const owner = selectDeviceMemoryOwner(get());
+      if (owner) saveComposerDrafts(next, undefined, owner);
       set({ composerDrafts: next });
     },
 
@@ -7121,7 +7139,13 @@ export const store = createStore<OnyxState>()(
             _saslAccount = account;
             _credentialTokenCanonicalOnly = true;
           }
-          set(s => ({ server: s.server ? { ...s.server, account } : null }));
+          set(s => {
+            const server = s.server ? { ...s.server, account } : null;
+            return {
+              server,
+              composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: s.ourNick }),
+            };
+          });
           break;
         }
 
@@ -9468,11 +9492,15 @@ export const store = createStore<OnyxState>()(
             _addSessionRestoreIdentity(get, account900);
             // Clear any in-flight passkey ceremony — a passkey AUTH-FINISH that
             // verifies lands here as RPL_LOGGEDIN.
-            set(s => ({
-              server: s.server ? { ...s.server, account: account900 } : null,
-              passkeyBusy: false,
-              passkeyError: null,
-            }));
+            set(s => {
+              const server = s.server ? { ...s.server, account: account900 } : null;
+              return {
+                server,
+                composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: s.ourNick }),
+                passkeyBusy: false,
+                passkeyError: null,
+              };
+            });
           }
           break;
         }
@@ -9481,7 +9509,13 @@ export const store = createStore<OnyxState>()(
           // :server 901 nick nick!u@h :You are now logged out
           _clearRememberedSessionAfterLogout(get, set);
           _saslAccount = null;
-          set(s => ({ server: s.server ? { ...s.server, account: null } : null }));
+          set(s => {
+            const server = s.server ? { ...s.server, account: null } : null;
+            return {
+              server,
+              composerDrafts: _loadOwnedComposerDrafts({ server, ourNick: s.ourNick }),
+            };
+          });
           break;
         }
 

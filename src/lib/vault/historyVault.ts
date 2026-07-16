@@ -16,6 +16,11 @@
 import type { ChatMessage } from '@/lib/irc/types';
 import { isEnvelope } from '@/lib/e2ee/dmCipher';
 import { sanitizePersistedReplyPreviewText } from '@/lib/e2ee/replyPrivacy';
+import {
+  deviceMemoryOwnerKey,
+  normalizeDeviceMemoryOwner,
+  type DeviceMemoryOwner,
+} from '@/lib/deviceMemoryOwner';
 import { clearAllTopicReads } from '@/lib/topics/topicReadLedger';
 import { effectiveKeep, resolvePolicyForChannel, type RetentionPolicy } from './retentionPolicy';
 import { boundedSearchField, boundedSearchQuery } from './searchBounds';
@@ -114,38 +119,9 @@ export interface VaultExportSnapshot {
   targets: VaultExportTarget[];
 }
 
-export interface DeviceMemoryOwner {
-  /** Exact WebSocket endpoint that owned the composing session. */
-  serverUrl: string;
-  /** Lowercased account name, or guest nick when no account was authenticated. */
-  identity: string;
-}
-
+export { deviceMemoryOwnerKey } from '@/lib/deviceMemoryOwner';
+export type { DeviceMemoryOwner } from '@/lib/deviceMemoryOwner';
 export type OutboxOwner = DeviceMemoryOwner;
-
-const MAX_DEVICE_MEMORY_SERVER_LENGTH = 2_048;
-const MAX_DEVICE_MEMORY_IDENTITY_LENGTH = 256;
-
-function normalizeDeviceMemoryOwner(value: unknown): DeviceMemoryOwner | null {
-  if (!isRecord(value)) return null;
-  const { serverUrl, identity } = value;
-  if (
-    typeof serverUrl !== 'string'
-    || serverUrl.length === 0
-    || serverUrl.length > MAX_DEVICE_MEMORY_SERVER_LENGTH
-    || serverUrl !== serverUrl.trim()
-    || typeof identity !== 'string'
-    || identity.length === 0
-    || identity.length > MAX_DEVICE_MEMORY_IDENTITY_LENGTH
-    || identity !== identity.trim()
-  ) return null;
-  return { serverUrl, identity: identity.toLowerCase() };
-}
-
-export function deviceMemoryOwnerKey(owner: DeviceMemoryOwner): string | null {
-  const safe = normalizeDeviceMemoryOwner(owner);
-  return safe ? JSON.stringify([safe.serverUrl, safe.identity]) : null;
-}
 
 function physicalTargetKey(target: string, owner?: DeviceMemoryOwner): string {
   const logical = target.toLowerCase();

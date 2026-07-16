@@ -19,6 +19,7 @@ import {
 import type { Channel, ChatMessage } from '@/lib/irc/types';
 import { parseIRCMessage } from '@/lib/irc/parser';
 import { loadCredentials, saveCredentials } from '@/lib/credentials';
+import { saveComposerDrafts } from '@/lib/composer/drafts';
 
 const initialState = store.getInitialState();
 
@@ -734,6 +735,23 @@ describe('account replies — state from the message handler', () => {
     expect(state.replyingTo).toBeNull();
     expect(state.editingMessage).toBeNull();
     expect(state.forwardingMessage).toBeNull();
+  });
+
+  it('switches composer plaintext from Alice to Bob on 900', () => {
+    const serverUrl = seedServer('alice').url;
+    const alice = { serverUrl, identity: 'alice' };
+    const bob = { serverUrl, identity: 'bob' };
+    saveComposerDrafts({ trev: 'Alice private draft' }, undefined, alice);
+    saveComposerDrafts({ '#ops': 'Bob private draft' }, undefined, bob);
+    store.setState({
+      server: seedServer('alice'),
+      ourNick: 'alice',
+      composerDrafts: { trev: 'Alice private draft' },
+    });
+
+    feed(':eshmaki.me 900 alice alice!u@h bob :You are now logged in as bob');
+
+    expect(store.getState().composerDrafts).toEqual({ '#ops': 'Bob private draft' });
   });
 
   it('ignores an Alice ACCOUNTINFO reply after the live account switches to Bob', () => {

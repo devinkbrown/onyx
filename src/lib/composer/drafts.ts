@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { deviceMemoryStorageKey, type DeviceMemoryOwner } from '@/lib/deviceMemoryOwner';
+
 export const COMPOSER_DRAFTS_KEY = 'onyx:composer-drafts';
 
 /**
@@ -55,28 +57,39 @@ export function sanitizeComposerDrafts(value: unknown): ComposerDrafts {
   return capDraftCount(drafts);
 }
 
-export function loadComposerDrafts(storage?: DraftStorage): ComposerDrafts {
+export function loadComposerDrafts(
+  storage?: DraftStorage,
+  owner?: DeviceMemoryOwner,
+): ComposerDrafts {
   const resolved = storageOrDefault(storage);
   if (!resolved) return {};
+  const storageKey = deviceMemoryStorageKey(COMPOSER_DRAFTS_KEY, owner);
+  if (!storageKey) return {};
   try {
-    const raw = resolved.getItem(COMPOSER_DRAFTS_KEY);
+    const raw = resolved.getItem(storageKey);
     return raw ? sanitizeComposerDrafts(JSON.parse(raw)) : {};
   } catch {
     return {};
   }
 }
 
-export function saveComposerDrafts(drafts: ComposerDrafts, storage?: DraftStorage): void {
+export function saveComposerDrafts(
+  drafts: ComposerDrafts,
+  storage?: DraftStorage,
+  owner?: DeviceMemoryOwner,
+): void {
   const resolved = storageOrDefault(storage);
   if (!resolved) return;
+  const storageKey = deviceMemoryStorageKey(COMPOSER_DRAFTS_KEY, owner);
+  if (!storageKey) return;
 
   const sanitized = sanitizeComposerDrafts(drafts);
   try {
     if (Object.keys(sanitized).length === 0) {
-      resolved.removeItem(COMPOSER_DRAFTS_KEY);
+      resolved.removeItem(storageKey);
       return;
     }
-    resolved.setItem(COMPOSER_DRAFTS_KEY, JSON.stringify(sanitized));
+    resolved.setItem(storageKey, JSON.stringify(sanitized));
   } catch {}
 }
 
@@ -97,26 +110,30 @@ function isRoomDraftTarget(target: string): boolean {
  */
 export function clearRoomComposerDrafts(
   storage?: DraftStorage,
+  owner?: DeviceMemoryOwner,
 ): ClearRoomComposerDraftsResult {
   const resolved = storageOrDefault(storage);
-  const before = loadComposerDrafts(storage);
+  const storageKey = deviceMemoryStorageKey(COMPOSER_DRAFTS_KEY, owner);
+  const before = loadComposerDrafts(storage, owner);
   const roomKeys = Object.keys(before).filter(isRoomDraftTarget);
-  if (!resolved) return { success: false, cleared: 0, remaining: roomKeys.length };
+  if (!resolved || !storageKey) {
+    return { success: false, cleared: 0, remaining: roomKeys.length };
+  }
 
   const retained = Object.fromEntries(
     Object.entries(before).filter(([target]) => !isRoomDraftTarget(target)),
   );
   try {
-    if (Object.keys(retained).length === 0) resolved.removeItem(COMPOSER_DRAFTS_KEY);
-    else resolved.setItem(COMPOSER_DRAFTS_KEY, JSON.stringify(retained));
+    if (Object.keys(retained).length === 0) resolved.removeItem(storageKey);
+    else resolved.setItem(storageKey, JSON.stringify(retained));
 
-    const committed = loadComposerDrafts(storage);
+    const committed = loadComposerDrafts(storage, owner);
     const remaining = Object.keys(committed).filter(isRoomDraftTarget).length;
     const retainedCommitted = Object.fromEntries(
       Object.entries(committed).filter(([target]) => !isRoomDraftTarget(target)),
     );
     const keyShapeVerified = Object.keys(retained).length > 0
-      || resolved.getItem(COMPOSER_DRAFTS_KEY) === null;
+      || resolved.getItem(storageKey) === null;
     const success = keyShapeVerified
       && remaining === 0
       && JSON.stringify(retainedCommitted) === JSON.stringify(retained);
@@ -126,7 +143,7 @@ export function clearRoomComposerDrafts(
       remaining,
     };
   } catch {
-    const remaining = Object.keys(loadComposerDrafts(storage)).filter(isRoomDraftTarget).length;
+    const remaining = Object.keys(loadComposerDrafts(storage, owner)).filter(isRoomDraftTarget).length;
     return { success: false, cleared: 0, remaining };
   }
 }

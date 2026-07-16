@@ -26,6 +26,20 @@ function makeStorage(): Storage {
 }
 
 describe('composer draft logic', () => {
+  it('isolates Alice and Bob while quarantining ownerless legacy drafts', () => {
+    const storage = makeStorage();
+    const alice = { serverUrl: 'wss://example.test', identity: 'Alice' };
+    const bob = { serverUrl: 'wss://example.test', identity: 'bob' };
+    storage.setItem(COMPOSER_DRAFTS_KEY, JSON.stringify({ alice: 'legacy plaintext' }));
+
+    saveComposerDrafts({ alice: 'Alice unsent plaintext' }, storage, alice);
+    saveComposerDrafts({ bob: 'Bob unsent plaintext' }, storage, bob);
+
+    expect(loadComposerDrafts(storage, alice)).toEqual({ alice: 'Alice unsent plaintext' });
+    expect(loadComposerDrafts(storage, bob)).toEqual({ bob: 'Bob unsent plaintext' });
+    expect(loadComposerDrafts(storage)).toEqual({ alice: 'legacy plaintext' });
+  });
+
   it('normalizes targets for channel and dm drafts', () => {
     expect(composerDraftKey(' #Root ')).toBe('#root');
     expect(composerDraftKey('Alice')).toBe('alice');
