@@ -958,6 +958,44 @@
     scrollbar-width: thin;
   }
 
+  .voice-stage--spotlight,
+  .voice-stage--screenshare {
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-block: contain;
+    scroll-padding-block: 8px;
+    scrollbar-width: thin;
+  }
+
+  .voice-stage--spotlight .voice-stage__primary,
+  .voice-stage--screenshare .voice-stage__primary {
+    flex: 0 0 160px;
+    min-height: 160px;
+  }
+
+  .voice-stage--spotlight .voice-stage__primary .voice-tile,
+  .voice-stage--screenshare .voice-stage__primary .voice-tile {
+    height: 160px;
+    min-height: 160px;
+  }
+
+  .voice-stage--spotlight .voice-stage__filmstrip,
+  .voice-stage--screenshare .voice-stage__filmstrip {
+    flex: 0 0 auto;
+    gap: 8px;
+    min-width: 0;
+    padding: 3px;
+    overscroll-behavior-inline: contain;
+    scroll-padding-inline: 3px;
+  }
+
+  .voice-stage--spotlight .voice-stage__filmstrip .voice-tile,
+  .voice-stage--screenshare .voice-stage__filmstrip .voice-tile {
+    width: min(240px, calc(100vw - 32px));
+    height: 160px;
+    min-height: 160px;
+  }
+
   .voice-tile {
     width: 100%;
     min-height: 160px;

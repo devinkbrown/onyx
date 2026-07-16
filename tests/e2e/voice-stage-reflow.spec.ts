@@ -175,3 +175,139 @@ test('reflows participant tiles and exposes their actions at 400% short zoom', a
   expect(geometry.outlineStyle).not.toBe('none');
   expect(geometry.outlineWidth).toBeGreaterThanOrEqual(2);
 });
+
+test('keeps the spotlight filmstrip pointer and keyboard reachable at 400% zoom', async ({ page }) => {
+  await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 320, height: 256 });
+  await page.setContent(`
+    <!doctype html>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <main class="voice-stage voice-stage--spotlight" data-testid="voice-stage">
+      <div class="voice-stage__primary">
+        <article class="voice-tile" aria-label="Spotlight participant">
+          <div class="voice-tile__topbar">
+            <button class="voice-tile__pip" aria-label="Open spotlight participant in picture-in-picture">P</button>
+            <button class="voice-tile__pin" aria-label="Unpin spotlight participant">I</button>
+          </div>
+          <div class="voice-tile__bar"><span class="voice-tile__nick">Spotlight Accessibility Operator</span></div>
+        </article>
+      </div>
+      <div class="voice-stage__filmstrip" role="list" aria-label="Other participants" data-testid="filmstrip">
+        ${['Borealis', 'Cassiopeia', 'Delphinus'].map((nick) => `
+          <article class="voice-tile voice-stage__filmstrip-tile" role="listitem" aria-label="${nick}">
+            <div class="voice-tile__topbar">
+              <button class="voice-tile__pip" aria-label="Open ${nick} in picture-in-picture">P</button>
+              <button class="voice-tile__pin" aria-label="Pin ${nick}">I</button>
+            </div>
+            <div class="voice-tile__bar"><span class="voice-tile__nick">${nick} Accessibility Operator</span></div>
+          </article>
+        `).join('')}
+      </div>
+    </main>
+    <nav class="mobile-nav-fixture" aria-label="Mobile navigation"></nav>
+  `);
+  await page.addStyleTag({
+    content: `
+      *, *::before, *::after { box-sizing: border-box; }
+      :root {
+        font-size: 64px;
+        --space-2: 0.5rem;
+        --space-3: 0.75rem;
+        --r-sm: 0.25rem;
+        --r-md: 0.5rem;
+        --r-pill: 999px;
+        --dur: 0ms;
+        --ease: linear;
+        --seam: #456;
+        --seam-faint: #234;
+        --ink: #020a12;
+        --stone: #123;
+        --stone-2: #234;
+        --stone-3: #345;
+        --washi: #fff;
+        --washi-dim: #ddd;
+        --washi-mute: #aaa;
+        --lapis: #168ce0;
+        --lapis-bright: #55baff;
+        --lapis-deep: #075080;
+        --shu: #c34;
+        --font-mono: monospace;
+      }
+      html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+      .voice-stage { height: 192px !important; }
+      .mobile-nav-fixture {
+        position: fixed;
+        inset: auto 0 0;
+        height: 64px;
+        border-top: 1px solid CanvasText;
+      }
+      ${voiceCss}
+      ${accessibilityCss}
+    `,
+  });
+
+  const stage = page.getByTestId('voice-stage');
+  const filmstrip = page.getByTestId('filmstrip');
+  const lastPin = page.getByRole('button', { name: 'Pin Delphinus' });
+  await lastPin.focus();
+  await expect(lastPin).toBeFocused();
+
+  const geometry = await stage.evaluate((element) => {
+    const stageRect = element.getBoundingClientRect();
+    const strip = element.querySelector<HTMLElement>('.voice-stage__filmstrip')!;
+    const stripRect = strip.getBoundingClientRect();
+    const stripTiles = Array.from(strip.querySelectorAll<HTMLElement>('.voice-tile'));
+    const focused = document.activeElement as HTMLElement;
+    const focusedRect = focused.getBoundingClientRect();
+    const focusedStyle = getComputedStyle(focused);
+    return {
+      documentClientWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      stageClientWidth: element.clientWidth,
+      stageScrollWidth: element.scrollWidth,
+      stageClientHeight: element.clientHeight,
+      stageScrollHeight: element.scrollHeight,
+      stageScrollTop: element.scrollTop,
+      stageOverflowY: getComputedStyle(element).overflowY,
+      stripClientWidth: strip.clientWidth,
+      stripScrollWidth: strip.scrollWidth,
+      stripScrollLeft: strip.scrollLeft,
+      stripGap: Number.parseFloat(getComputedStyle(strip).gap),
+      stripPaddingBottom: Number.parseFloat(getComputedStyle(strip).paddingBottom),
+      stripTileWidths: stripTiles.map((tile) => tile.getBoundingClientRect().width),
+      stripTileHeights: stripTiles.map((tile) => tile.getBoundingClientRect().height),
+      focusedLeft: focusedRect.left,
+      focusedRight: focusedRect.right,
+      focusedTop: focusedRect.top,
+      focusedBottom: focusedRect.bottom,
+      stripLeft: stripRect.left,
+      stripRight: stripRect.right,
+      stageTop: stageRect.top,
+      stageBottom: stageRect.bottom,
+      outlineStyle: focusedStyle.outlineStyle,
+      outlineWidth: Number.parseFloat(focusedStyle.outlineWidth),
+    };
+  });
+
+  await expect(filmstrip).toBeVisible();
+  expect(geometry.documentScrollWidth).toBe(geometry.documentClientWidth);
+  expect(geometry.stageScrollWidth).toBe(geometry.stageClientWidth);
+  expect(geometry.stageScrollHeight).toBeGreaterThan(geometry.stageClientHeight);
+  expect(geometry.stageOverflowY).toBe('auto');
+  expect(geometry.stageScrollTop).toBeGreaterThan(0);
+  expect(geometry.stripScrollWidth).toBeGreaterThan(geometry.stripClientWidth);
+  expect(geometry.stripScrollLeft).toBeGreaterThan(0);
+  expect(geometry.stripGap).toBeLessThanOrEqual(8);
+  expect(geometry.stripPaddingBottom).toBeLessThanOrEqual(4);
+  for (const width of geometry.stripTileWidths) {
+    expect(width).toBeGreaterThanOrEqual(220);
+    expect(width).toBeLessThanOrEqual(geometry.stageClientWidth - 16);
+  }
+  for (const height of geometry.stripTileHeights) expect(height).toBeGreaterThanOrEqual(160);
+  expect(geometry.focusedLeft).toBeGreaterThanOrEqual(geometry.stripLeft);
+  expect(geometry.focusedRight).toBeLessThanOrEqual(geometry.stripRight);
+  expect(geometry.focusedTop).toBeGreaterThanOrEqual(geometry.stageTop);
+  expect(geometry.focusedBottom).toBeLessThanOrEqual(geometry.stageBottom);
+  expect(geometry.outlineStyle).not.toBe('none');
+  expect(geometry.outlineWidth).toBeGreaterThanOrEqual(2);
+});
