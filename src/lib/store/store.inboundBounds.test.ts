@@ -12,6 +12,7 @@ import {
 import {
   _beginNamesBurstForTests,
   MAX_CHANNEL_LIST_ENTRIES,
+  MAX_AWAY_NICKS,
   MAX_LIVE_CHANNELS,
   MAX_LIVE_CHANNEL_MESSAGES,
   MAX_LIVE_CHANNEL_USERS,
@@ -124,6 +125,45 @@ describe('live inbound message bounds', () => {
     expect(store.getState().serviceNotices.at(-1)?.text).toHaveLength(MAX_SERVER_AUX_TEXT_LENGTH);
     expect(store.getState().serverLog.at(-1)?.from).toHaveLength(MAX_SERVER_AUX_TEXT_LENGTH);
     expect(store.getState().serverLog.at(-1)?.text).toHaveLength(MAX_SERVER_AUX_TEXT_LENGTH);
+  });
+
+  it('accepts WHO away state only for bounded members in a joined roster', () => {
+    const root = channel('#root');
+    root.users.set('alice', {
+      nick: 'Alice',
+      modes: new Set(),
+      away: false,
+    });
+    store.setState({ channels: new Map([['#root', root]]) });
+
+    feed(':server 352 me #other user host server Mallory G :0 away');
+    feed(':server 352 me #root user host server Mallory G :0 away');
+    feed(`:server 352 me #root user host server ${'x'.repeat(MAX_VAULT_SENDER_LENGTH + 1)} G :0 away`);
+    expect(store.getState().awayNicks).toEqual(new Set());
+
+    feed(':server 352 me #root user host server Alice G :0 away');
+    expect(store.getState().awayNicks).toEqual(new Set(['alice']));
+    expect(store.getState().channels.get('#root')?.users.get('alice')?.away).toBe(true);
+
+    feed(':server 352 me #root user host server Alice H :0 present');
+    expect(store.getState().awayNicks).toEqual(new Set());
+    expect(store.getState().channels.get('#root')?.users.get('alice')?.away).toBe(false);
+  });
+
+  it('repairs legacy away memory and refuses growth beyond one roster ceiling', () => {
+    store.setState({
+      awayNicks: new Set(Array.from(
+        { length: MAX_AWAY_NICKS + 8 },
+        (_, index) => `legacy-${index}`,
+      )),
+    });
+
+    store.getState().setNickAway('new-peer', true);
+
+    expect(store.getState().awayNicks.size).toBe(MAX_AWAY_NICKS);
+    expect(store.getState().awayNicks.has('new-peer')).toBe(false);
+    store.getState().setNickAway('legacy-0', false);
+    expect(store.getState().awayNicks.size).toBe(MAX_AWAY_NICKS - 1);
   });
 
   it('accepts only requested, bounded, sanitized channel directory rows', () => {

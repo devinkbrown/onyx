@@ -2145,6 +2145,7 @@ export const MAX_LIVE_PROP_KEYS = 64;
 export const MAX_LIVE_PROP_KEY_LENGTH = 128;
 export const MAX_LIVE_PROP_VALUE_LENGTH = 16 * 1024;
 export const MAX_LIVE_CHANNEL_USERS = 4_096;
+export const MAX_AWAY_NICKS = MAX_LIVE_CHANNEL_USERS;
 export const MAX_LIVE_CHANNEL_MESSAGES = 500;
 export const MAX_NAMES_TOKENS_PER_LINE = MAX_LIVE_CHANNEL_USERS;
 export const MAX_CHANNEL_LIST_ENTRIES = 2_048;
@@ -2427,6 +2428,28 @@ function _normalizeTypingToken(value: string, maxLength: number): string | null 
     || value.includes(',')
   ) return null;
   return value;
+}
+
+/** Repair and update legacy WHO-away memory within one roster-sized ceiling. */
+function _updateBoundedAwayNicks(
+  source: ReadonlySet<string>,
+  nick: string,
+  away: boolean,
+): Set<string> {
+  const nickKey = nick.toLowerCase();
+  const next = new Set<string>();
+  for (const rawNick of source) {
+    if (next.size >= MAX_AWAY_NICKS) break;
+    if (
+      rawNick.toLowerCase() === nickKey
+      || !_validInboundWireToken(rawNick, MAX_VAULT_SENDER_LENGTH)
+      || rawNick.startsWith(':')
+      || rawNick.includes(',')
+    ) continue;
+    next.add(rawNick.toLowerCase());
+  }
+  if (away && next.size < MAX_AWAY_NICKS) next.add(nickKey);
+  return next;
 }
 
 function _deleteCaseInsensitive(source: Set<string>, value: string): Set<string> {
@@ -11048,30 +11071,32 @@ export const store = createStore<OnyxState>()(
           const nick352 = params[5] ?? '';
           const flags352 = params[6] ?? '';
           const isAway352 = flags352.startsWith('G');
-          if (nick352) {
-            set(s => {
-              const awayNicks = new Set(s.awayNicks);
-              if (isAway352) awayNicks.add(nick352.toLowerCase());
-              else awayNicks.delete(nick352.toLowerCase());
-
-              // Also update channel.users[nick].away for sort accuracy
-              const nk = nick352.toLowerCase();
-              const channels = new Map(s.channels);
-              if (ch352) {
-                const ck = ch352.toLowerCase();
-                const c = channels.get(ck);
-                if (c) {
-                  const u = c.users.get(nk);
-                  if (u) {
-                    const users = new Map(c.users);
-                    users.set(nk, { ...u, away: isAway352 });
-                    channels.set(ck, { ...c, users });
-                  }
-                }
-              }
-              return { awayNicks, channels };
-            });
-          }
+          if (
+            !ch352
+            || !_validInboundWireToken(ch352, MAX_VAULT_TARGET_LENGTH)
+            || ch352.startsWith(':')
+            || ch352.includes(',')
+            || !isChan(ch352)
+            || !_validInboundWireToken(nick352, MAX_VAULT_SENDER_LENGTH)
+            || nick352.startsWith(':')
+            || nick352.includes(',')
+          ) break;
+          const channelKey352 = ch352.toLowerCase();
+          const nickKey352 = nick352.toLowerCase();
+          if (!get().channels.get(channelKey352)?.users.has(nickKey352)) break;
+          set(s => {
+            const channel352 = s.channels.get(channelKey352);
+            const user352 = channel352?.users.get(nickKey352);
+            if (!channel352 || !user352) return {};
+            const users = new Map(channel352.users);
+            users.set(nickKey352, { ...user352, away: isAway352 });
+            const channels = new Map(s.channels);
+            channels.set(channelKey352, { ...channel352, users });
+            return {
+              awayNicks: _updateBoundedAwayNicks(s.awayNicks, nick352, isAway352),
+              channels,
+            };
+          });
           break;
         }
 
@@ -12615,11 +12640,13 @@ export const store = createStore<OnyxState>()(
     // ── WHO / away tracking ───────────────────────────────────────────────────
     awayNicks: new Set(),
     setNickAway: (nick, away) => {
+      if (
+        !_validInboundWireToken(nick, MAX_VAULT_SENDER_LENGTH)
+        || nick.startsWith(':')
+        || nick.includes(',')
+      ) return;
       set(s => {
-        const awayNicks = new Set(s.awayNicks);
-        if (away) awayNicks.add(nick.toLowerCase());
-        else awayNicks.delete(nick.toLowerCase());
-        return { awayNicks };
+        return { awayNicks: _updateBoundedAwayNicks(s.awayNicks, nick, away) };
       });
     },
 
