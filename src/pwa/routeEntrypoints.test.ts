@@ -93,10 +93,28 @@ describe('SPA route entrypoint materializer', () => {
         .toBe(meta.description);
       expect(document.querySelector('meta[property="og:url"]')?.getAttribute('content'), route)
         .toBe(canonical);
+      expect(document.querySelector('meta[property="og:site_name"]')?.getAttribute('content'), route)
+        .toBe('Onyx');
+      expect(document.querySelector('meta[property="og:image"]')?.getAttribute('content'), route)
+        .toBe('https://eshmaki.me/icon-512.png');
+      expect(document.querySelector('meta[property="og:image:width"]')?.getAttribute('content'), route)
+        .toBe('512');
+      expect(document.querySelector('meta[property="og:image:height"]')?.getAttribute('content'), route)
+        .toBe('512');
+      expect(document.querySelector('meta[property="og:image:alt"]')?.getAttribute('content'), route)
+        .toMatch(/Onyx water-current mark/i);
       expect(document.querySelector('meta[name="twitter:title"]')?.getAttribute('content'), route)
         .toBe(meta.title);
       expect(document.querySelector('meta[name="twitter:description"]')?.getAttribute('content'), route)
         .toBe(meta.description);
+      expect(document.querySelector('meta[name="twitter:image"]')?.getAttribute('content'), route)
+        .toBe('https://eshmaki.me/icon-512.png');
+      expect(document.querySelector('meta[name="twitter:image:alt"]')?.getAttribute('content'), route)
+        .toMatch(/Onyx water-current mark/i);
+      expect(document.querySelector('link[rel="icon"]')?.getAttribute('href'), route)
+        .toBe('/favicon.ico');
+      expect(document.querySelector('link[rel="apple-touch-icon"]')?.getAttribute('href'), route)
+        .toBe('/icon-192.png');
     }
   });
 

@@ -78,6 +78,27 @@ describe('PWA manifest', () => {
     }
   });
 
+  it('backs entrypoint share and platform icon metadata with public assets', () => {
+    const document = new DOMParser().parseFromString(
+      readFileSync(entryDocumentPath, 'utf8'),
+      'text/html',
+    );
+    const publicPaths = [
+      document.querySelector('meta[property="og:image"]')?.getAttribute('content'),
+      document.querySelector('meta[name="twitter:image"]')?.getAttribute('content'),
+      document.querySelector('link[rel="icon"]')?.getAttribute('href'),
+      document.querySelector('link[rel="apple-touch-icon"]')?.getAttribute('href'),
+    ].map((value) => value ? new URL(value, 'https://eshmaki.me').pathname : '');
+
+    expect(document.querySelector('meta[property="og:site_name"]')?.getAttribute('content')).toBe('Onyx');
+    expect(document.querySelector('meta[property="og:image:alt"]')?.getAttribute('content')).toMatch(/Onyx/i);
+    expect(document.querySelector('meta[name="twitter:image:alt"]')?.getAttribute('content')).toMatch(/Onyx/i);
+    expect(publicPaths).not.toContain('');
+    for (const path of publicPaths) {
+      expect(existsSync(join(root, 'public', path))).toBe(true);
+    }
+  });
+
   it('keeps the worker cache version contract aligned with deploy output', () => {
     const placeholder = 'onyx-shell-__BUILD_VERSION__';
     const worker = readFileSync(serviceWorkerPath, 'utf8');
