@@ -2111,9 +2111,15 @@ export const SERVER_SEARCH_RESULT_MAX = 200;
 /** Stop doing full validation after this many rows in one untrusted replay. */
 export const SERVER_SEARCH_ROW_MAX = 400;
 export const SERVER_SEARCH_TEXT_MAX = 8 * 1024;
+export const HISTORY_BATCH_MESSAGE_MAX = 400;
+export const MULTILINE_BATCH_PART_MAX = 64;
+export const MULTILINE_BATCH_TEXT_MAX = 64 * 1024;
+export const OPEN_BATCH_COLLECTOR_MAX = 64;
+const BATCH_REF_MAX = 128;
 const SERVER_SEARCH_TARGET_MAX = 512;
 const SERVER_SEARCH_ID_MAX = 256;
 const SERVER_SEARCH_FROM_MAX = 128;
+const HISTORY_BATCH_TEXT_MAX = 64 * 1024;
 const SERVER_SEARCH_TIMEOUT_MS = 6_000;
 
 interface PendingServerSearch {
@@ -2147,6 +2153,8 @@ interface BatchCollector {
   encryptedDropped?: boolean;
   /** Raw line parts for multiline assembly (concat = join without newline). */
   parts?: { text: string; concat: boolean }[];
+  multilineChars?: number;
+  multilineRejected?: boolean;
   /** First inner line's provenance, reused for the assembled synthetic PRIVMSG. */
   src?: { tags: Record<string, string>; prefix: string | null; nick: string | null; host: string | null };
 }
@@ -2270,6 +2278,52 @@ function _collectServerSearchMessage(
   });
 }
 
+function _collectHistoryMessage(collector: BatchCollector, message: ChatMessage): void {
+  if (collector.kind || collector.messages.length >= HISTORY_BATCH_MESSAGE_MAX) return;
+  const timeMs = message.time.getTime();
+  if (!Number.isFinite(timeMs)) return;
+  const id = message.id.slice(0, SERVER_SEARCH_ID_MAX);
+  const from = message.from.slice(0, SERVER_SEARCH_FROM_MAX);
+  let text = message.text.slice(0, HISTORY_BATCH_TEXT_MAX);
+  const finalCodeUnit = text.charCodeAt(text.length - 1);
+  if (finalCodeUnit >= 0xd800 && finalCodeUnit <= 0xdbff) text = text.slice(0, -1);
+  collector.messages.push({
+    ...message,
+    id,
+    from,
+    text,
+    time: new Date(timeMs),
+    target: collector.target,
+  });
+}
+
+function _collectMultilinePart(collector: BatchCollector, text: string, concat: boolean): void {
+  if (collector.kind !== 'multiline' || collector.multilineRejected) return;
+  const parts = collector.parts ?? (collector.parts = []);
+  const separatorChars = parts.length > 0 && !concat ? 1 : 0;
+  const nextChars = (collector.multilineChars ?? 0) + separatorChars + text.length;
+  if (parts.length >= MULTILINE_BATCH_PART_MAX || nextChars > MULTILINE_BATCH_TEXT_MAX) {
+    collector.multilineRejected = true;
+    collector.parts = [];
+    collector.multilineChars = 0;
+    collector.src = undefined;
+    return;
+  }
+  parts.push({ text, concat });
+  collector.multilineChars = nextChars;
+}
+
+function _validBatchEnvelope(batchRef: string, target: string): boolean {
+  return Boolean(
+    batchRef
+    && batchRef.length <= BATCH_REF_MAX
+    && !/[\u0000-\u0020\u007f]/u.test(batchRef)
+    && target
+    && target.length <= SERVER_SEARCH_TARGET_MAX
+    && !/[\u0000-\u001f\u007f]/u.test(target)
+  );
+}
+
 /**
  * draft/event-playback guard — CHATHISTORY replays include historical
  * JOIN/PART/QUIT/KICK/TOPIC lines. They must NEVER mutate live state: a QUIT
@@ -2301,7 +2355,7 @@ function _pushReplayEvent(tags: Record<string, string>, channel: string | null, 
   const collector = ref !== undefined ? _batchCollectors.get(ref) : undefined;
   if (!collector || collector.kind) return; // only plain chathistory collectors
   const time = eventTime(tags);
-  collector.messages.push({
+  _collectHistoryMessage(collector, {
     ...sysMsg(text, collector.target, time),
     id: replayEventId(tags, collector.target, text, time),
   });
@@ -2320,6 +2374,13 @@ const _batchCollectors = new Map<string, BatchCollector>();
  * compliance / future-proofing against other servers).
  */
 const _openChathistoryByTarget = new Map<string, string>();
+
+/** Isolate module-level batch transport state between focused store tests. */
+export function _resetBatchCollectorsForTests(): void {
+  _batchCollectors.clear();
+  _openChathistoryByTarget.clear();
+  _resetServerSearchTransport();
+}
 
 // ── Time travel (module-level) ────────────────────────────────────────────────
 /**
@@ -8742,13 +8803,17 @@ export const store = createStore<OnyxState>()(
           //  2. Orochi omits that tag on CHATHISTORY replay, so fall back to the
           //     open-batch-by-target map populated on `BATCH +ref chathistory`.
           const batchTag = tags['batch'];
-          if (batchTag && _batchCollectors.has(batchTag)) {
-            const collector = _batchCollectors.get(batchTag)!;
+          if (batchTag) {
+            const collector = _batchCollectors.get(batchTag);
+            // Content for an unknown/rejected batch is not a live message.
+            // Dropping it also prevents rows beyond an open-collector ceiling
+            // from escaping the bound and rendering through the normal path.
+            if (!collector) break;
             if (collector.kind === 'multiline') {
               const concat =
                 'draft/multiline-concat' in tags || '+draft/multiline-concat' in tags;
-              collector.parts!.push({ text: params[params.length - 1] ?? '', concat });
-              if (!collector.src) {
+              _collectMultilinePart(collector, params[params.length - 1] ?? '', concat);
+              if (!collector.multilineRejected && !collector.src) {
                 collector.src = { tags: { ...tags }, prefix: msg.prefix, nick, host: msg.host };
               }
             } else if (collector.kind === 'search' || collector.kind === 'search-quarantine') {
@@ -8759,7 +8824,7 @@ export const store = createStore<OnyxState>()(
                 boundedServerTime !== null,
               );
             } else {
-              collector.messages.push(chatMsg);
+              _collectHistoryMessage(collector, chatMsg);
             }
             break;
           }
@@ -8774,7 +8839,7 @@ export const store = createStore<OnyxState>()(
                 boundedServerTime !== null,
               );
             } else {
-              collector.messages.push(chatMsg);
+              _collectHistoryMessage(collector, chatMsg);
             }
             break;
           }
@@ -9714,11 +9779,13 @@ export const store = createStore<OnyxState>()(
             const batchType = params[1] ?? '';
             const batchTarget = params[2] ?? '';
             if (
-              batchTarget &&
-              batchTarget.length <= SERVER_SEARCH_TARGET_MAX &&
+              _validBatchEnvelope(batchRef, batchTarget) &&
               (batchType === 'draft/chathistory' || batchType === 'chathistory')
             ) {
-              if (!batchRef || _batchCollectors.has(batchRef)) break;
+              if (
+                _batchCollectors.has(batchRef)
+                || _batchCollectors.size >= OPEN_BATCH_COLLECTOR_MAX
+              ) break;
               const targetKey = batchTarget.toLowerCase();
               const pendingSearch = _pendingServerSearch;
               const staleSearch = _staleServerSearches.get(targetKey);
@@ -9770,7 +9837,12 @@ export const store = createStore<OnyxState>()(
                 ...(kind === 'search' ? { seenIds: new Set<string>() } : {}),
               });
               _openChathistoryByTarget.set(targetKey, batchRef);
-            } else if (batchTarget && batchType === 'draft/multiline') {
+            } else if (
+              batchType === 'draft/multiline'
+              && _validBatchEnvelope(batchRef, batchTarget)
+              && !_batchCollectors.has(batchRef)
+              && _batchCollectors.size < OPEN_BATCH_COLLECTOR_MAX
+            ) {
               // draft/multiline: the inner PRIVMSGs reassemble into ONE message
               // when the batch closes (echo of our own sends included).
               _batchCollectors.set(batchRef, {
@@ -9778,6 +9850,7 @@ export const store = createStore<OnyxState>()(
                 messages: [],
                 kind: 'multiline',
                 parts: [],
+                multilineChars: 0,
               });
             }
           } else if (batchParam.startsWith('-')) {
@@ -9845,7 +9918,7 @@ export const store = createStore<OnyxState>()(
             if (collector && collector.kind === 'multiline') {
               _batchCollectors.delete(batchRef);
               const parts = collector.parts ?? [];
-              if (parts.length > 0 && collector.src) {
+              if (!collector.multilineRejected && parts.length > 0 && collector.src) {
                 // Re-dispatch the assembled body as one synthetic PRIVMSG so it
                 // flows through the full delivery path (highlights, unread,
                 // notifications, DM routing) exactly like a plain message.
