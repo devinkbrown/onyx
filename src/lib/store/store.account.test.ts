@@ -374,7 +374,9 @@ describe('account replies — state from the message handler', () => {
   });
 
   it('FAIL ACCOUNTSET surfaces accountActionError and a notification', () => {
-    store.setState({ server: seedServer('alice') });
+    const client = makeClient();
+    store.setState({ client: client as never, server: seedServer('alice') });
+    store.getState().accountSet('secure', 'on', 'alice-password');
     feed(':eshmaki.me FAIL ACCOUNTSET INVALID_VALUE :Bad value for secure');
 
     expect(store.getState().accountActionError).toMatchObject({
@@ -386,6 +388,9 @@ describe('account replies — state from the message handler', () => {
   });
 
   it('FAIL IDENTIFY surfaces accountActionError', () => {
+    const client = makeClient();
+    store.setState({ client: client as never, server: seedServer(null) });
+    store.getState().identify('alice', 'alice-password');
     feed(':eshmaki.me FAIL IDENTIFY TEMPORARILY_UNAVAILABLE :try later');
     expect(store.getState().accountActionError).toMatchObject({
       command: 'IDENTIFY',
@@ -472,11 +477,64 @@ describe('account replies — state from the message handler', () => {
       server: seedServer('alice'),
     });
     seedAccountBoundState();
+    store.getState().logout();
     feed(':eshmaki.me NOTICE alice :You are now logged out.');
 
     expect(store.getState().server?.account).toBeNull();
     expectAccountBoundStateCleared();
     expect(client.clearResumeTokens).toHaveBeenCalledOnce();
+  });
+
+  it('rejects late Alice LOGOUT and DROP confirmations after switching to Bob', () => {
+    const client = makeClient();
+    store.setState({ client: client as never, server: seedServer('alice') });
+    store.getState().logout();
+    store.getState().dropAccount('alice', 'alice-password');
+
+    feed(':eshmaki.me 900 alice alice!u@h bob :You are now logged in as bob');
+    feed(':eshmaki.me NOTICE alice :You are now logged out.');
+    feed(':eshmaki.me NOTICE alice :Account was dropped successfully.');
+
+    expect(store.getState().server?.account).toBe('bob');
+    expect(client.clearResumeTokens).not.toHaveBeenCalled();
+
+    store.getState().logout();
+    feed(':eshmaki.me NOTICE alice :You are now logged out.');
+    expect(store.getState().server?.account).toBeNull();
+    expect(client.clearResumeTokens).toHaveBeenCalledOnce();
+  });
+
+  it('rejects a late Alice ACCOUNTSET reply after switching to Bob', () => {
+    const client = makeClient();
+    store.setState({ client: client as never, server: seedServer('alice') });
+    store.getState().accountSet('email', 'alice@example.net', 'alice-password');
+
+    feed(':eshmaki.me 900 alice alice!u@h bob :You are now logged in as bob');
+    client.sendRaw.mockClear();
+    feed(':eshmaki.me FAIL ACCOUNTSET INVALID_VALUE :Alice email failed');
+    feed(':eshmaki.me NOTE ACCOUNTSET UPDATED :email updated');
+
+    expect(store.getState().accountActionError).toBeNull();
+    expect(client.sendRaw).not.toHaveBeenCalled();
+
+    store.getState().accountSet('email', 'bob@example.net', 'bob-password');
+    feed(':eshmaki.me FAIL ACCOUNTSET INVALID_VALUE :Bob email failed');
+    expect(store.getState().accountActionError).toMatchObject({
+      command: 'ACCOUNTSET',
+      description: 'Bob email failed',
+    });
+  });
+
+  it('rejects a late IDENTIFY failure after another account logs in', () => {
+    const client = makeClient();
+    store.setState({ client: client as never, server: seedServer(null) });
+    store.getState().identify('alice', 'alice-password');
+
+    feed(':eshmaki.me 900 guest guest!u@h bob :You are now logged in as bob');
+    feed(':eshmaki.me FAIL IDENTIFY INVALID_CREDENTIALS :Alice credentials failed');
+
+    expect(store.getState().server?.account).toBe('bob');
+    expect(store.getState().accountActionError).toBeNull();
   });
 
   it('901 RPL_LOGGEDOUT clears the server account', () => {
@@ -593,6 +651,7 @@ describe('account replies — state from the message handler', () => {
   it('an ACCOUNTSET confirmation NOTICE re-fetches ACCOUNTINFO', () => {
     const client = makeClient();
     store.setState({ client: client as never, server: seedServer('alice') });
+    store.getState().accountSet('secure', 'on', 'alice-password');
     feed(':eshmaki.me NOTICE alice :Secure mode enabled.');
     // The confirmation has no structured payload, so the store asks the server
     // for fresh details to reflect the new value in the panel.
@@ -603,12 +662,19 @@ describe('account replies — state from the message handler', () => {
   it('a NOTE ACCOUNTSET confirmation (no payload) re-fetches ACCOUNTINFO', () => {
     const client = makeClient();
     store.setState({ client: client as never, server: seedServer('alice') });
+    store.getState().accountSet('email', 'alice@example.net', 'alice-password');
     feed(':eshmaki.me NOTE ACCOUNTSET :email updated');
     expect(client.sendRaw).toHaveBeenCalledWith('ACCOUNTINFO');
   });
 
   it('a DROP confirmation NOTICE clears the account', () => {
-    store.setState({ server: seedServer('alice'), accountInfo: { account: 'alice', fetchedAt: new Date() } });
+    const client = makeClient();
+    store.setState({
+      client: client as never,
+      server: seedServer('alice'),
+      accountInfo: { account: 'alice', fetchedAt: new Date() },
+    });
+    store.getState().dropAccount('alice', 'alice-password');
     feed(':eshmaki.me NOTICE alice :Account dropped.');
     expect(store.getState().server?.account).toBeNull();
     expect(store.getState().accountInfo).toBeNull();

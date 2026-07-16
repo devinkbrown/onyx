@@ -2269,6 +2269,11 @@ let _vhostReplyContext: AccountReplyContext | null = null;
 let _e2eeKeyReplyContext: AccountReplyContext | null = null;
 let _keyTransparencyReplyContext: AccountReplyContext | null = null;
 let _certReplyContext: AccountReplyContext | null = null;
+let _identifyReplyContext: AccountReplyContext | null = null;
+let _accountSetReplyContext: AccountReplyContext | null = null;
+let _logoutReplyContext: AccountReplyContext | null = null;
+let _recoverReplyContext: AccountReplyContext | null = null;
+let _dropReplyContext: AccountReplyContext | null = null;
 
 function passkeyErrText(e: unknown): string {
   if (e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'AbortError')) {
@@ -2655,6 +2660,11 @@ function _invalidateAccountReplyContexts(): void {
   _e2eeKeyReplyContext = null;
   _keyTransparencyReplyContext = null;
   _certReplyContext = null;
+  _identifyReplyContext = null;
+  _accountSetReplyContext = null;
+  _logoutReplyContext = null;
+  _recoverReplyContext = null;
+  _dropReplyContext = null;
   if (_pendingPasskeyAuth?.timer) clearTimeout(_pendingPasskeyAuth.timer);
   _pendingPasskeyAuth = null;
   _pendingPasskeyList = null;
@@ -4657,6 +4667,7 @@ export const store = createStore<OnyxState>()(
       if (!client || !acct || !password) return;
       set({ accountActionError: null });
       _credentialTokenCanonicalOnly = true;
+      _identifyReplyContext = _captureAccountReplyContext(get, acct);
       // Login success returns as 900 RPL_LOGGEDIN (sets server.account);
       // failure as 464 ERR_PASSWDMISMATCH or `FAIL IDENTIFY`.
       client.sendRaw('IDENTIFY', acct, password);
@@ -4761,6 +4772,7 @@ export const store = createStore<OnyxState>()(
     logout() {
       const { client } = get();
       if (!client) return;
+      _logoutReplyContext = _captureAccountReplyContext(get);
       set({ accountActionError: null });
       // Orochi LOGOUT replies with an optional `MODE <nick> :-o` then a
       // confirming NOTICE. The 901 RPL_LOGGEDOUT (if sent) clears server.account;
@@ -4787,6 +4799,7 @@ export const store = createStore<OnyxState>()(
       const { client, server } = get();
       const acct = server?.account ?? null;
       if (!client || !acct || !password) return;
+      _accountSetReplyContext = _captureAccountReplyContext(get, acct);
       set({ accountActionError: null });
       // `ACCOUNTSET <account> <password> <field> <value>` — owner-only, password
       // verified. The confirming NOTICE optimistically updates accountInfo.
@@ -4797,6 +4810,7 @@ export const store = createStore<OnyxState>()(
       const { client } = get();
       const target = nick.trim();
       if (!client || !target) return;
+      _recoverReplyContext = _captureAccountReplyContext(get);
       set({ accountActionError: null });
       // `RECOVER <nick> [password]` — caller must be identified to the owning
       // account. Force-renames the holder to a Guest… nick on success.
@@ -4808,6 +4822,7 @@ export const store = createStore<OnyxState>()(
       const { client } = get();
       const acct = account.trim();
       if (!client || !acct || !password) return;
+      _dropReplyContext = _captureAccountReplyContext(get, acct);
       set({ accountActionError: null });
       // `DROP <account> <password>` — irreversible. The server logs the session
       // out on success; the confirming NOTICE clears account state.
@@ -6465,6 +6480,26 @@ export const store = createStore<OnyxState>()(
         // as a `NOTE ACCOUNTINFO :account=… flags=…`.
         if (ACCOUNT_COMMANDS.has(standard.command)) {
           if (
+            standard.command === 'IDENTIFY'
+            && !_replyTransportIsCurrent(_identifyReplyContext, get)
+          ) return;
+          if (
+            standard.command === 'ACCOUNTSET'
+            && !_replyAccountIsCurrent(_accountSetReplyContext, get)
+          ) return;
+          if (
+            standard.command === 'LOGOUT'
+            && !_replyAccountIsCurrent(_logoutReplyContext, get)
+          ) return;
+          if (
+            standard.command === 'RECOVER'
+            && !_replyAccountIsCurrent(_recoverReplyContext, get)
+          ) return;
+          if (
+            standard.command === 'DROP'
+            && !_replyAccountIsCurrent(_dropReplyContext, get)
+          ) return;
+          if (
             standard.command === 'E2EEKEY'
             && !_replyAccountIsCurrent(_e2eeKeyReplyContext, get)
           ) return;
@@ -7498,10 +7533,11 @@ export const store = createStore<OnyxState>()(
             }
             // Logout / drop confirmation — clear the logged-in account and any
             // cached info so the UI flips back to the guest state.
-            if (
-              /\b(logged out|signed out)\b/i.test(text)
-              || /\baccount (?:was )?(?:dropped|deleted)\b/i.test(text)
-            ) {
+            const logoutConfirmation = /\b(logged out|signed out)\b/i.test(text);
+            const dropConfirmation = /\baccount (?:was )?(?:dropped|deleted)\b/i.test(text);
+            if (logoutConfirmation || dropConfirmation) {
+              const context = dropConfirmation ? _dropReplyContext : _logoutReplyContext;
+              if (!_replyAccountIsCurrent(context, get)) break;
               _clearRememberedSessionAfterLogout(get, set);
               set(s => ({
                 server: s.server ? { ...s.server, account: null } : s.server,
@@ -7521,6 +7557,7 @@ export const store = createStore<OnyxState>()(
               /\b(email|secure|enforce|flag|flags|password)\b/i.test(text) &&
               /\b(updated|set|changed|enabled|disabled|saved|on|off)\b/i.test(text)
             ) {
+              if (!_replyAccountIsCurrent(_accountSetReplyContext, get)) break;
               set({ accountActionError: null });
               get().accountInfo_fetch();
               get().addServiceNotice('Account', text);
