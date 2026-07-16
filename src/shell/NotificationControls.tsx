@@ -57,6 +57,9 @@ export function NotificationControls(): JSX.Element {
   const dndEnabled = useStore((s) => s.dndEnabled);
   const dndUntil = useStore((s) => s.dndUntil);
   const account = useStore(selectAccount);
+  const webPushOwnerScope = useStore((s) => (
+    s.server ? JSON.stringify([s.server.url, selectAccount(s)]) : null
+  ));
   const [permission, setPermission] = createSignal(getDesktopNotificationPermission());
   const [webPushOn, setWebPushOn] = createSignal(false);
   const [webPushBusy, setWebPushBusy] = createSignal(false);
@@ -110,8 +113,16 @@ export function NotificationControls(): JSX.Element {
     if (deadline !== null) scheduleDndDeadline(deadline);
   });
 
-  onMount(() => {
+  // A PushSubscription is browser-global. Reconcile it whenever the connected
+  // server/account owner changes so a replacement account cannot inherit the
+  // prior owner's endpoint. A fully disconnected client deliberately skips
+  // reconciliation: push must keep working while the tab is closed.
+  createEffect(() => {
+    const ownerScope = webPushOwnerScope();
     const operation = ++webPushOperation;
+    setWebPushBusy(false);
+    setWebPushOn(false);
+    if (ownerScope === null) return;
     void webPushActive().then((active) => {
       if (isCurrentWebPushOperation(operation)) setWebPushOn(active);
     }).catch(() => {
@@ -147,16 +158,18 @@ export function NotificationControls(): JSX.Element {
     setWebPushBusy(true);
     try {
       const result = enable ? await enableWebPush() : await disableWebPush();
-      if (!isCurrentWebPushOperation(operation)) return;
-
+      if (disposed) return;
       const current = getState();
       if (enable && (selectAccount(current) !== startingAccount || current.client !== startingClient)) {
         setWebPushOn(false);
+        setWebPushBusy(false);
         current.addToast({
           variant: 'warning',
           title: 'Push setup changed',
           description: 'Your account or connection changed before push setup finished. Try again.',
         });
+      } else if (!isCurrentWebPushOperation(operation)) {
+        return;
       } else if (result.ok) {
         setWebPushOn(enable);
         current.addToast(enable

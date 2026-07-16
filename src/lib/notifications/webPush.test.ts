@@ -1,8 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { deviceMemoryOwnerKey } from '@/lib/deviceMemoryOwner';
 import { store, type OnyxState, type Server } from '@/lib/store/store';
-import { disableWebPush, enableWebPush, vapidKeyToBytes, webPushActive, webPushSupported } from './webPush';
+import {
+  disableWebPush,
+  enableWebPush,
+  vapidKeyToBytes,
+  WEB_PUSH_OWNER_STORAGE_KEY,
+  webPushActive,
+  webPushSupported,
+} from './webPush';
 
 const initialState = store.getInitialState();
 
@@ -24,6 +32,16 @@ function client(sendRaw = vi.fn()): NonNullable<OnyxState['client']> {
     isupport: { VAPID: 'AQID' },
     sendRaw,
   } as unknown as NonNullable<OnyxState['client']>;
+}
+
+function ownerKey(account: string): string {
+  const key = deviceMemoryOwnerKey({ serverUrl: server(account).url, identity: account });
+  if (!key) throw new Error('Expected a valid web push owner key');
+  return key;
+}
+
+function markOwner(account: string): void {
+  localStorage.setItem(WEB_PUSH_OWNER_STORAGE_KEY, ownerKey(account));
 }
 
 function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
@@ -55,10 +73,12 @@ function stubPushBrowser(
 }
 
 beforeEach(() => {
+  localStorage.clear();
   store.setState(initialState, true);
 });
 
 afterEach(() => {
+  localStorage.clear();
   store.setState(initialState, true);
   vi.unstubAllGlobals();
 });
@@ -154,14 +174,17 @@ describe('webPushActive', () => {
     expect(active).toBe(false);
   });
 
-  it('returns true when a current subscription exists', async () => {
+  it('returns true only when the current owner marked the subscription', async () => {
     // Arrange
+    const unsubscribe = vi.fn().mockResolvedValue(true);
+    store.setState({ server: server('alice') });
+    markOwner('alice');
     vi.stubGlobal('window', { PushManager: class PushManager {}, Notification: class Notification {} });
     vi.stubGlobal('navigator', {
       serviceWorker: {
         ready: Promise.resolve({
           pushManager: {
-            getSubscription: vi.fn().mockResolvedValue({ endpoint: 'https://push.example/sub' }),
+            getSubscription: vi.fn().mockResolvedValue(pushSubscription(unsubscribe)),
           },
         }),
       },
@@ -172,6 +195,28 @@ describe('webPushActive', () => {
 
     // Assert
     expect(active).toBe(true);
+    expect(unsubscribe).not.toHaveBeenCalled();
+  });
+
+  it('retires a subscription marked for another account', async () => {
+    const unsubscribe = vi.fn().mockResolvedValue(true);
+    store.setState({ server: server('alice') });
+    markOwner('bob');
+    vi.stubGlobal('window', { PushManager: class PushManager {}, Notification: class Notification {} });
+    vi.stubGlobal('navigator', {
+      serviceWorker: {
+        ready: Promise.resolve({
+          pushManager: {
+            getSubscription: vi.fn().mockResolvedValue(pushSubscription(unsubscribe)),
+          },
+        }),
+      },
+    });
+
+    await expect(webPushActive()).resolves.toBe(false);
+
+    expect(unsubscribe).toHaveBeenCalledOnce();
+    expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBeNull();
   });
 
   it('returns false for missing subscriptions and service-worker failures', async () => {
@@ -186,9 +231,11 @@ describe('webPushActive', () => {
         }),
       },
     });
+    markOwner('alice');
 
     // Act / Assert
     await expect(webPushActive()).resolves.toBe(false);
+    expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBeNull();
 
     // Arrange
     vi.stubGlobal('navigator', {
@@ -222,6 +269,7 @@ describe('web push operations', () => {
       connectionStatus: 'connected',
       client: currentClient,
     }, true);
+    markOwner('alice');
 
     await expect(enableWebPush()).resolves.toEqual({ ok: true });
     expect(sendRaw).toHaveBeenCalledWith(
@@ -231,6 +279,74 @@ describe('web push operations', () => {
       'p256dh-key',
       'auth-key',
     );
+    expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBe(ownerKey('alice'));
+  });
+
+  it('retires a foreign endpoint before subscribing the current account', async () => {
+    const oldUnsubscribe = vi.fn().mockResolvedValue(true);
+    const oldSub = pushSubscription(oldUnsubscribe);
+    const newSub = pushSubscription();
+    const subscribe = vi.fn().mockResolvedValue(newSub);
+    const sendRaw = vi.fn();
+    stubPushBrowser(
+      vi.fn().mockResolvedValue('granted'),
+      Promise.resolve({
+        pushManager: {
+          getSubscription: vi.fn().mockResolvedValue(oldSub),
+          subscribe,
+        },
+      }),
+    );
+    store.setState({
+      ...initialState,
+      server: server('alice'),
+      connectionStatus: 'connected',
+      client: client(sendRaw),
+    }, true);
+    markOwner('bob');
+
+    await expect(enableWebPush()).resolves.toEqual({ ok: true });
+
+    expect(oldUnsubscribe).toHaveBeenCalledOnce();
+    expect(subscribe).toHaveBeenCalledOnce();
+    expect(sendRaw).toHaveBeenCalledWith(
+      'WEBPUSH',
+      'SUBSCRIBE',
+      'https://push.example/sub',
+      'p256dh-key',
+      'auth-key',
+    );
+    expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBe(ownerKey('alice'));
+  });
+
+  it('refuses to cross-register an endpoint when foreign retirement fails', async () => {
+    const oldUnsubscribe = vi.fn().mockResolvedValue(false);
+    const subscribe = vi.fn();
+    const sendRaw = vi.fn();
+    stubPushBrowser(
+      vi.fn().mockResolvedValue('granted'),
+      Promise.resolve({
+        pushManager: {
+          getSubscription: vi.fn().mockResolvedValue(pushSubscription(oldUnsubscribe)),
+          subscribe,
+        },
+      }),
+    );
+    store.setState({
+      ...initialState,
+      server: server('alice'),
+      connectionStatus: 'connected',
+      client: client(sendRaw),
+    }, true);
+    markOwner('bob');
+
+    await expect(enableWebPush()).resolves.toEqual({
+      ok: false,
+      reason: 'This browser could not retire another account\'s push subscription.',
+    });
+    expect(subscribe).not.toHaveBeenCalled();
+    expect(sendRaw).not.toHaveBeenCalled();
+    expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBe(ownerKey('bob'));
   });
 
   it('rejects an enable completion after the account client changes', async () => {
@@ -327,6 +443,34 @@ describe('web push operations', () => {
     });
   });
 
+  it('unregisters only the current owner endpoint after local retirement', async () => {
+    const sendRaw = vi.fn();
+    const unsubscribe = vi.fn().mockResolvedValue(true);
+    const currentClient = client(sendRaw);
+    stubPushBrowser(
+      vi.fn().mockResolvedValue('granted'),
+      Promise.resolve({
+        pushManager: {
+          getSubscription: vi.fn().mockResolvedValue(pushSubscription(unsubscribe)),
+          subscribe: vi.fn(),
+        },
+      }),
+    );
+    store.setState({
+      ...initialState,
+      server: server('alice'),
+      connectionStatus: 'connected',
+      client: currentClient,
+    }, true);
+    markOwner('alice');
+
+    await expect(disableWebPush()).resolves.toEqual({ ok: true });
+
+    expect(unsubscribe).toHaveBeenCalledOnce();
+    expect(sendRaw).toHaveBeenCalledWith('WEBPUSH', 'UNSUBSCRIBE', 'https://push.example/sub');
+    expect(localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY)).toBeNull();
+  });
+
   it('does not send unsubscribe through a replacement account session', async () => {
     const ready = deferred<{ pushManager: Pick<PushManager, 'getSubscription' | 'subscribe'> }>();
     const oldSendRaw = vi.fn();
@@ -340,6 +484,7 @@ describe('web push operations', () => {
       connectionStatus: 'connected',
       client: oldClient,
     }, true);
+    markOwner('alice');
 
     const result = disableWebPush();
     store.setState({ server: server('bob'), client: client(newSendRaw) });

@@ -9,7 +9,8 @@
  * end-to-end-encrypted payload when a DM lands while no session is attached;
  * the service worker renders it. Account-scoped: guests can't subscribe.
  */
-import { getState, selectAccount } from '@/lib/store';
+import { deviceMemoryOwnerKey } from '@/lib/deviceMemoryOwner';
+import { getState, selectAccount, selectDeviceMemoryOwner } from '@/lib/store';
 import type { OnyxState } from '@/lib/store/store';
 
 export type WebPushResult =
@@ -36,10 +37,46 @@ export function webPushSupported(): boolean {
 }
 
 const SESSION_CHANGED_REASON = 'Your account or connection changed. Try again.';
+export const WEB_PUSH_OWNER_STORAGE_KEY = 'onyx:web-push-owner';
 
-function pushSessionCurrent(account: string, client: NonNullable<OnyxState['client']>): boolean {
+function signedInPushOwnerKey(state: OnyxState): string | null {
+  if (!selectAccount(state)) return null;
+  const owner = selectDeviceMemoryOwner(state);
+  return owner ? deviceMemoryOwnerKey(owner) : null;
+}
+
+function readPushOwnerKey(): string | null {
+  try {
+    const value = localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY);
+    return value && value.length <= 4_096 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function savePushOwnerKey(ownerKey: string): boolean {
+  try {
+    localStorage.setItem(WEB_PUSH_OWNER_STORAGE_KEY, ownerKey);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function clearPushOwnerKey(expectedOwnerKey?: string | null): void {
+  try {
+    if (expectedOwnerKey !== undefined && localStorage.getItem(WEB_PUSH_OWNER_STORAGE_KEY) !== expectedOwnerKey) return;
+    localStorage.removeItem(WEB_PUSH_OWNER_STORAGE_KEY);
+  } catch {
+    // A blocked storage area cannot be made less private by retaining a marker.
+  }
+}
+
+function pushSessionCurrent(ownerKey: string, client: NonNullable<OnyxState['client']>): boolean {
   const state = getState();
-  return state.connectionStatus === 'connected' && state.client === client && selectAccount(state) === account;
+  return state.connectionStatus === 'connected'
+    && state.client === client
+    && signedInPushOwnerKey(state) === ownerKey;
 }
 
 async function discardCreatedSubscription(subscription: PushSubscription | null): Promise<void> {
@@ -52,12 +89,28 @@ async function discardCreatedSubscription(subscription: PushSubscription | null)
   }
 }
 
-/** True when this browser holds a live push subscription. */
+/**
+ * True when this browser holds a subscription owned by the current account.
+ * Unmarked and foreign-owner endpoints are retired locally before returning;
+ * they must never be inherited or registered by a replacement account.
+ */
 export async function webPushActive(): Promise<boolean> {
   if (!webPushSupported()) return false;
+  const ownerKey = signedInPushOwnerKey(getState());
   try {
     const reg = await navigator.serviceWorker.ready;
-    return (await reg.pushManager.getSubscription()) !== null;
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      clearPushOwnerKey();
+      return false;
+    }
+    const markedOwnerKey = readPushOwnerKey();
+    if (ownerKey && markedOwnerKey === ownerKey && signedInPushOwnerKey(getState()) === ownerKey) return true;
+    // Do not let a stale check retire a subscription after the account changed
+    // while service-worker readiness was pending. The replacement check owns it.
+    if (signedInPushOwnerKey(getState()) !== ownerKey) return false;
+    if (await sub.unsubscribe()) clearPushOwnerKey(markedOwnerKey);
+    return false;
   } catch {
     return false;
   }
@@ -68,7 +121,8 @@ export async function enableWebPush(): Promise<WebPushResult> {
   if (!webPushSupported()) return { ok: false, reason: 'This browser does not support push.' };
   const initialState = getState();
   const account = selectAccount(initialState);
-  if (!account) return { ok: false, reason: 'Sign in first — push is tied to your account.' };
+  const ownerKey = signedInPushOwnerKey(initialState);
+  if (!account || !ownerKey) return { ok: false, reason: 'Sign in first — push is tied to your account.' };
   if (initialState.connectionStatus !== 'connected' || !initialState.client) {
     return { ok: false, reason: 'Reconnect first.' };
   }
@@ -83,15 +137,24 @@ export async function enableWebPush(): Promise<WebPushResult> {
     return { ok: false, reason: 'Requesting notification permission failed.' };
   }
   if (permission !== 'granted') return { ok: false, reason: 'Notifications are blocked by the browser.' };
-  if (!pushSessionCurrent(account, client)) return { ok: false, reason: SESSION_CHANGED_REASON };
+  if (!pushSessionCurrent(ownerKey, client)) return { ok: false, reason: SESSION_CHANGED_REASON };
 
   let createdSubscription: PushSubscription | null = null;
   try {
     const reg = await navigator.serviceWorker.ready;
-    if (!pushSessionCurrent(account, client)) return { ok: false, reason: SESSION_CHANGED_REASON };
+    if (!pushSessionCurrent(ownerKey, client)) return { ok: false, reason: SESSION_CHANGED_REASON };
 
     let sub = await reg.pushManager.getSubscription();
-    if (!pushSessionCurrent(account, client)) return { ok: false, reason: SESSION_CHANGED_REASON };
+    if (!pushSessionCurrent(ownerKey, client)) return { ok: false, reason: SESSION_CHANGED_REASON };
+    const markedOwnerKey = readPushOwnerKey();
+    if (sub && markedOwnerKey !== ownerKey) {
+      if (!await sub.unsubscribe()) {
+        return { ok: false, reason: 'This browser could not retire another account\'s push subscription.' };
+      }
+      clearPushOwnerKey(markedOwnerKey);
+      sub = null;
+      if (!pushSessionCurrent(ownerKey, client)) return { ok: false, reason: SESSION_CHANGED_REASON };
+    }
     if (!sub) {
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
@@ -99,7 +162,7 @@ export async function enableWebPush(): Promise<WebPushResult> {
       });
       createdSubscription = sub;
     }
-    if (!pushSessionCurrent(account, client)) {
+    if (!pushSessionCurrent(ownerKey, client)) {
       await discardCreatedSubscription(createdSubscription);
       return { ok: false, reason: SESSION_CHANGED_REASON };
     }
@@ -110,6 +173,10 @@ export async function enableWebPush(): Promise<WebPushResult> {
     if (!sub.endpoint || !p256dh || !auth) {
       await discardCreatedSubscription(createdSubscription);
       return { ok: false, reason: 'The browser returned an incomplete subscription.' };
+    }
+    if (!savePushOwnerKey(ownerKey)) {
+      await sub.unsubscribe().catch(() => false);
+      return { ok: false, reason: 'This browser could not bind push to the current account.' };
     }
     client.sendRaw('WEBPUSH', 'SUBSCRIBE', sub.endpoint, p256dh, auth);
     return { ok: true };
@@ -123,20 +190,25 @@ export async function enableWebPush(): Promise<WebPushResult> {
 export async function disableWebPush(): Promise<WebPushResult> {
   if (!webPushSupported()) return { ok: false, reason: 'This browser does not support push.' };
   const initialState = getState();
-  const account = selectAccount(initialState);
+  const ownerKey = signedInPushOwnerKey(initialState);
   const client = initialState.client;
   try {
     const reg = await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.getSubscription();
-    if (!sub) return { ok: true };
+    if (!sub) {
+      clearPushOwnerKey();
+      return { ok: true };
+    }
+    const markedOwnerKey = readPushOwnerKey();
 
     if (!await sub.unsubscribe()) {
       return { ok: false, reason: 'The browser could not remove its push subscription.' };
     }
+    clearPushOwnerKey(markedOwnerKey);
 
     // Never unregister an endpoint through a replacement account/session.
     // Local unsubscribe remains safe and makes the browser truthfully off.
-    if (account && client && pushSessionCurrent(account, client)) {
+    if (ownerKey && markedOwnerKey === ownerKey && client && pushSessionCurrent(ownerKey, client)) {
       try {
         client.sendRaw('WEBPUSH', 'UNSUBSCRIBE', sub.endpoint);
       } catch {

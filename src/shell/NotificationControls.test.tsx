@@ -265,6 +265,33 @@ describe('NotificationControls accessibility', () => {
     expect(screen.getByRole('button', { name: 'Disable web push' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('reconciles the browser subscription when the connected account changes', async () => {
+    webPushMocks.supported.mockReturnValue(true);
+    webPushMocks.active
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+    store.setState({ server: server('alice') });
+    render(() => <NotificationControls />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Disable web push' })).toBeEnabled());
+
+    store.setState({ server: server('bob') });
+
+    await waitFor(() => expect(webPushMocks.active).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole('button', { name: 'Enable web push' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('does not retire push merely because the connected server is cleared', async () => {
+    webPushMocks.supported.mockReturnValue(true);
+    webPushMocks.active.mockResolvedValue(true);
+    store.setState({ server: server('alice') });
+    render(() => <NotificationControls />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Disable web push' })).toBeEnabled());
+
+    store.setState({ server: null });
+
+    expect(webPushMocks.active).toHaveBeenCalledOnce();
+  });
+
   it('lets only the newest overlapping desktop permission request update state', async () => {
     const older = deferred<NotificationPermission>();
     const newer = deferred<NotificationPermission>();
