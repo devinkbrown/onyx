@@ -2274,6 +2274,8 @@ let _accountSetReplyContext: AccountReplyContext | null = null;
 let _logoutReplyContext: AccountReplyContext | null = null;
 let _recoverReplyContext: AccountReplyContext | null = null;
 let _dropReplyContext: AccountReplyContext | null = null;
+let _registerReplyContext: AccountReplyContext | null = null;
+let _verifyReplyContext: AccountReplyContext | null = null;
 
 function passkeyErrText(e: unknown): string {
   if (e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'AbortError')) {
@@ -2665,6 +2667,8 @@ function _invalidateAccountReplyContexts(): void {
   _logoutReplyContext = null;
   _recoverReplyContext = null;
   _dropReplyContext = null;
+  _registerReplyContext = null;
+  _verifyReplyContext = null;
   if (_pendingPasskeyAuth?.timer) clearTimeout(_pendingPasskeyAuth.timer);
   _pendingPasskeyAuth = null;
   _pendingPasskeyList = null;
@@ -2693,6 +2697,9 @@ function _resetAccountBoundState(
     totp: { status: 'unknown', secret: null, otpauth: null, error: null, busy: false },
     personas: [],
     personaOffers: [],
+    registerPending: false,
+    registerError: null,
+    verifyRequired: false,
     serviceNotices: s.serviceNotices.filter(notice => notice.source !== 'Account'),
   }));
 }
@@ -4642,6 +4649,7 @@ export const store = createStore<OnyxState>()(
     registerAccount(account, email, password) {
       const { client } = get();
       if (!client) return;
+      _registerReplyContext = _captureAccountReplyContext(get, account);
       set({ registerPending: true, registerError: null, verifyRequired: false });
       client.sendRaw('REGISTER', account, email?.trim() || '*', password);
       // ONYX-UI: RegisterForm should call registerAccount() and render
@@ -4651,6 +4659,7 @@ export const store = createStore<OnyxState>()(
     verifyAccount(account, code) {
       const { client } = get();
       if (!client) return;
+      _verifyReplyContext = _captureAccountReplyContext(get, account);
       set({ registerPending: true, registerError: null });
       client.sendRaw('VERIFY', account, code);
       // ONYX-UI: verification UI should call verifyAccount(account, code).
@@ -6468,7 +6477,13 @@ export const store = createStore<OnyxState>()(
           return;
         }
         if (standard.command === 'REGISTER' || standard.command === 'VERIFY') {
+          const context = standard.command === 'REGISTER'
+            ? _registerReplyContext
+            : _verifyReplyContext;
+          if (!_replyTransportIsCurrent(context, get)) return;
           if (standard.kind === 'FAIL') {
+            if (standard.command === 'REGISTER') _registerReplyContext = null;
+            else _verifyReplyContext = null;
             set({ registerPending: false, registerError: standard.description || standard.code, verifyRequired: false });
           }
           return;
@@ -6934,18 +6949,23 @@ export const store = createStore<OnyxState>()(
         }
 
         case 'REGISTER': {
+          if (!_replyTransportIsCurrent(_registerReplyContext, get)) break;
           const sub = (params[0] ?? '').toUpperCase();
           if (sub === 'SUCCESS') {
+            _registerReplyContext = null;
             set({ registerPending: false, registerError: null, verifyRequired: false });
           } else if (sub === 'VERIFICATION_REQUIRED') {
+            _registerReplyContext = null;
             set({ registerPending: false, registerError: null, verifyRequired: true });
           }
           break;
         }
 
         case 'VERIFY': {
+          if (!_replyTransportIsCurrent(_verifyReplyContext, get)) break;
           const sub = (params[0] ?? '').toUpperCase();
           if (sub === 'SUCCESS') {
+            _verifyReplyContext = null;
             set({ registerPending: false, registerError: null, verifyRequired: false });
           }
           break;

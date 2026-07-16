@@ -349,6 +349,50 @@ describe('account actions — raw command dispatch', () => {
 });
 
 describe('account replies — state from the message handler', () => {
+  it('folds current REGISTER and VERIFY replies into the registration state', () => {
+    const client = makeClient();
+    store.setState({ client: client as never, server: seedServer(null) });
+    store.getState().registerAccount('alice', 'alice@example.net', 'alice-password');
+    expect(store.getState().registerPending).toBe(true);
+
+    feed(':eshmaki.me REGISTER VERIFICATION_REQUIRED');
+    expect(store.getState().registerPending).toBe(false);
+    expect(store.getState().verifyRequired).toBe(true);
+
+    store.getState().verifyAccount('alice', '123456');
+    feed(':eshmaki.me VERIFY SUCCESS');
+    expect(store.getState().registerPending).toBe(false);
+    expect(store.getState().registerError).toBeNull();
+    expect(store.getState().verifyRequired).toBe(false);
+  });
+
+  it('surfaces a current REGISTER failure', () => {
+    const client = makeClient();
+    store.setState({ client: client as never, server: seedServer(null) });
+    store.getState().registerAccount('alice', 'alice@example.net', 'alice-password');
+
+    feed(':eshmaki.me FAIL REGISTER ACCOUNT_EXISTS :Account already exists');
+
+    expect(store.getState().registerPending).toBe(false);
+    expect(store.getState().registerError).toBe('Account already exists');
+    expect(store.getState().verifyRequired).toBe(false);
+  });
+
+  it('cancels registration and rejects late replies after another account logs in', () => {
+    const client = makeClient();
+    store.setState({ client: client as never, server: seedServer(null) });
+    store.getState().registerAccount('alice', 'alice@example.net', 'alice-password');
+
+    feed(':eshmaki.me 900 guest guest!u@h bob :You are now logged in as bob');
+    feed(':eshmaki.me FAIL REGISTER ACCOUNT_EXISTS :Alice already exists');
+    feed(':eshmaki.me REGISTER VERIFICATION_REQUIRED');
+
+    expect(store.getState().server?.account).toBe('bob');
+    expect(store.getState().registerPending).toBe(false);
+    expect(store.getState().registerError).toBeNull();
+    expect(store.getState().verifyRequired).toBe(false);
+  });
+
   it('ACCOUNTINFO NOTICE populates structured accountInfo', () => {
     store.setState({ client: makeClient() as never, server: seedServer('alice') });
     store.getState().accountInfo_fetch();
