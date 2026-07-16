@@ -5144,6 +5144,34 @@
   margin-top: 6px;
 }
 
+.shell-msg-media-consent {
+  display: inline-grid;
+  gap: 2px;
+  max-width: min(480px, 100%);
+  padding: 8px 11px;
+  border: 1px dashed color-mix(in oklab, var(--lapis-bright) 42%, var(--line));
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--lapis) 8%, var(--stone));
+  color: var(--washi-dim);
+  font: 700 0.72rem var(--font-mono);
+  text-align: left;
+  cursor: pointer;
+}
+
+.shell-msg-media-consent small {
+  overflow: hidden;
+  color: var(--washi-mute);
+  font: 500 0.64rem var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell-msg-media-consent:hover,
+.shell-msg-media-consent:focus-visible {
+  border-color: var(--lapis-bright);
+  color: var(--lapis-bright);
+}
+
 .shell-msg-media-link {
   display: inline-block;
   border: none;
@@ -5436,13 +5464,18 @@
   border-left: 2px solid color-mix(in oklab, var(--lapis) 55%, transparent);
   border-radius: 10px;
   background: color-mix(in oklab, var(--stone-2) 50%, transparent);
-  color: inherit;
-  text-decoration: none;
   transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
 .shell-msg-preview:hover {
   border-color: color-mix(in oklab, var(--lapis) 40%, var(--line));
   background: color-mix(in oklab, var(--stone-2) 70%, transparent);
+}
+.shell-msg-preview-link {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
 }
 .shell-msg-preview-body {
   display: flex;
@@ -5467,7 +5500,7 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.shell-msg-preview:hover .shell-msg-preview-title { text-decoration: underline; }
+.shell-msg-preview-link:hover .shell-msg-preview-title { text-decoration: underline; }
 .shell-msg-preview-desc {
   font-size: 0.78rem;
   color: var(--washi-dim);
@@ -5485,9 +5518,28 @@
   border: 1px solid var(--line);
   align-self: center;
 }
+.shell-msg-preview-consent {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  align-self: center;
+  padding: 7px;
+  border: 1px dashed color-mix(in oklab, var(--lapis-bright) 42%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--lapis) 8%, var(--ink));
+  color: var(--washi-mute);
+  font: 700 0.62rem/1.25 var(--font-mono);
+  cursor: pointer;
+}
+.shell-msg-preview-consent:hover,
+.shell-msg-preview-consent:focus-visible {
+  border-color: var(--lapis-bright);
+  color: var(--lapis-bright);
+}
 @media (max-width: 600px) {
   .shell-msg-preview { max-width: 100%; }
-  .shell-msg-preview-thumb { width: 56px; height: 56px; }
+  .shell-msg-preview-thumb,
+  .shell-msg-preview-consent { width: 56px; height: 56px; }
 }
 
 /* ── Channel activity stamps (sidebar) ─────────────────────────────────── */

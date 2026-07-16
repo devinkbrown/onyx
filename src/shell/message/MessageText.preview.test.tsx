@@ -74,7 +74,7 @@ describe('MessageText link-preview scheme guard', () => {
 
     await waitFor(() => expect(fetchLinkPreview).toHaveBeenCalled());
     // The inline link for the real https URL is fine; the poisoned CARD is not.
-    expect(container.querySelector('a.shell-msg-preview')).toBeNull();
+    expect(container.querySelector('.shell-msg-preview')).toBeNull();
     // No anchor anywhere carries the dangerous scheme.
     for (const a of Array.from(container.querySelectorAll('a'))) {
       expect(a.getAttribute('href') ?? '').not.toMatch(/^javascript:/i);
@@ -91,7 +91,7 @@ describe('MessageText link-preview scheme guard', () => {
     ));
 
     await waitFor(() => expect(screen.getByText('Safe')).toBeInTheDocument());
-    const card = container.querySelector('a.shell-msg-preview');
+    const card = container.querySelector('a.shell-msg-preview-link');
     expect(card).not.toBeNull();
     // The card renders, but the javascript: image never reaches an <img src>.
     expect(card?.querySelector('img.shell-msg-preview-thumb')).toBeNull();
@@ -107,7 +107,7 @@ describe('MessageText link-preview scheme guard', () => {
     ));
 
     await waitFor(() => expect(fetchLinkPreview).toHaveBeenCalled());
-    expect(container.querySelector('a.shell-msg-preview')).toBeNull();
+    expect(container.querySelector('.shell-msg-preview')).toBeNull();
     expect(container.querySelector('[href*="alice:secret"]')).toBeNull();
   });
 
@@ -125,7 +125,7 @@ describe('MessageText link-preview scheme guard', () => {
     ));
 
     await waitFor(() => expect(screen.getByText('Safe card')).toBeInTheDocument());
-    expect(container.querySelector('a.shell-msg-preview')).not.toBeNull();
+    expect(container.querySelector('a.shell-msg-preview-link')).not.toBeNull();
     expect(container.querySelector('img.shell-msg-preview-thumb')).toBeNull();
   });
 
@@ -139,7 +139,7 @@ describe('MessageText link-preview scheme guard', () => {
     ));
 
     await waitFor(() => expect(fetchLinkPreview).toHaveBeenCalled());
-    expect(container.querySelector('a.shell-msg-preview')).toBeNull();
+    expect(container.querySelector('.shell-msg-preview')).toBeNull();
     expect(container.querySelector('[href*="127.0.0.1"]')).toBeNull();
   });
 
@@ -157,11 +157,11 @@ describe('MessageText link-preview scheme guard', () => {
     ));
 
     await waitFor(() => expect(screen.getByText('Safe card')).toBeInTheDocument());
-    expect(container.querySelector('a.shell-msg-preview')).not.toBeNull();
+    expect(container.querySelector('a.shell-msg-preview-link')).not.toBeNull();
     expect(container.querySelector('img.shell-msg-preview-thumb')).toBeNull();
   });
 
-  it('renders a fully benign http(s) preview card unchanged', async () => {
+  it('waits for consent before creating an external preview thumbnail resource', async () => {
     fetchLinkPreview.mockResolvedValue(
       preview({ url: 'https://ok.example/page', title: 'Good', image: 'https://cdn.example/i.png' }),
     );
@@ -171,6 +171,11 @@ describe('MessageText link-preview scheme guard', () => {
     ));
 
     await waitFor(() => expect(screen.getByText('Good')).toBeInTheDocument());
+    expect(container.querySelector('img.shell-msg-preview-thumb')).toBeNull();
+    fireEvent.click(screen.getByRole('button', {
+      name: 'Load external preview image from cdn.example',
+    }));
+
     const thumb = container.querySelector('img.shell-msg-preview-thumb');
     expect(thumb).not.toBeNull();
     expect(thumb?.getAttribute('src')).toBe('https://cdn.example/i.png');
@@ -184,7 +189,22 @@ describe('MessageText link-preview scheme guard', () => {
     fireEvent.error(thumb!);
 
     expect(container.querySelector('img.shell-msg-preview-thumb')).toBeNull();
-    expect(container.querySelector('a.shell-msg-preview')).not.toBeNull();
+    expect(container.querySelector('a.shell-msg-preview-link')).not.toBeNull();
     expect(screen.getByText('Good')).toBeInTheDocument();
+  });
+
+  it('preserves automatic same-origin preview thumbnails', async () => {
+    const image = new URL('/uploads/preview.png', window.location.href).toString();
+    fetchLinkPreview.mockResolvedValue(
+      preview({ url: 'https://ok.example/page', title: 'Local image', image }),
+    );
+
+    const { container } = render(() => (
+      <MessageText text="look at https://ok.example/page please" />
+    ));
+
+    await waitFor(() => expect(screen.getByText('Local image')).toBeInTheDocument());
+    expect(container.querySelector('img.shell-msg-preview-thumb')).toHaveAttribute('src', image);
+    expect(container.querySelector('.shell-msg-preview-consent')).toBeNull();
   });
 });

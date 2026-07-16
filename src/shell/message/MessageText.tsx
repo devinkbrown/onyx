@@ -84,15 +84,35 @@ function isHttpUrl(url: string): boolean {
 }
 
 /**
- * Automatic subresource loads get a stricter boundary than user-activated
- * links: credentials and internal/private hosts must never be contacted merely
- * because a message entered the viewport. Ordinary public credential-free
- * http(s) attachments remain direct browser loads; using
- * `crossorigin="anonymous"` here would CORS-block many otherwise valid user
- * attachments, so it is deliberately not imposed.
+ * Resource candidates get a stricter boundary than user-activated links:
+ * credential-bearing URLs are always rejected, and internal/private hosts are
+ * admitted only when they are the app's own origin. Public cross-origin URLs
+ * still require explicit consent at the render sink below.
  */
 function isAutoLoadableHttpUrl(url: string): boolean {
-  return isPreviewableUrl(url);
+  return isSameOriginHttpUrl(url) || isPreviewableUrl(url);
+}
+
+/** Same-origin resources do not disclose the viewer to a third-party host. */
+function isSameOriginHttpUrl(url: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const parsed = new URL(url, window.location.href);
+    return (parsed.protocol === 'http:' || parsed.protocol === 'https:')
+      && parsed.username === ''
+      && parsed.password === ''
+      && parsed.origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
+function resourceHost(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return 'external host';
+  }
 }
 
 function detectMediaKind(url: string): MediaKind {
@@ -120,10 +140,11 @@ type MediaUnfurlProps = {
 function MediaUnfurl(props: MediaUnfurlProps): JSX.Element {
   const [local] = splitProps(props, ['href', 'kind']);
   const [failed, setFailed] = createSignal(false);
+  const [externalAllowed, setExternalAllowed] = createSignal(false);
 
-  // Defense in depth at the sink: only public credential-free http(s) may
-  // auto-load. A message must never probe the viewer's localhost/LAN merely by
-  // entering the viewport.
+  // Defense in depth at the sink: only credential-free same-origin or public
+  // http(s) may reach the media gate. Public cross-origin resources remain
+  // inert until this specific unfurl's consent button is activated.
   // detectMediaKind already enforces the scheme today, but re-checking here
   // protects future callers and prevents ambient loads from URL userinfo.
   const safeHref = createMemo(() => (isAutoLoadableHttpUrl(local.href) ? local.href : null));
@@ -134,6 +155,12 @@ function MediaUnfurl(props: MediaUnfurlProps): JSX.Element {
     if (nextResource === observedResource) return;
     observedResource = nextResource;
     setFailed(false);
+    setExternalAllowed(false);
+  });
+
+  const allowedHref = createMemo(() => {
+    const href = safeHref();
+    return href && (isSameOriginHttpUrl(href) || externalAllowed()) ? href : null;
   });
 
   return (
@@ -141,65 +168,82 @@ function MediaUnfurl(props: MediaUnfurlProps): JSX.Element {
       {(href) => (
         <div class="shell-msg-media">
           <Show
-            when={!failed()}
+            when={allowedHref()}
             fallback={(
-              <a
-                href={href()}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="shell-msg-link shell-msg-media-fallback"
+              <button
+                type="button"
+                class="shell-msg-media-consent"
+                aria-label={`Load external ${local.kind ?? 'media'} from ${resourceHost(href())}`}
+                onClick={() => setExternalAllowed(true)}
               >
-                {local.kind === 'image'
-                  ? 'Image preview unavailable — open attachment'
-                  : local.kind === 'video'
-                    ? 'Video preview unavailable — open attachment'
-                    : 'Audio preview unavailable — open attachment'}
-              </a>
+                <span>Load external {local.kind ?? 'media'}</span>
+                <small>{resourceHost(href())}</small>
+              </button>
             )}
           >
-            <Switch>
-              <Match when={local.kind === 'image'}>
-                <a
-                  href={href()}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="shell-msg-media-link"
-                  aria-label="Open image in new tab"
-                >
-                  <img
-                    src={href()}
-                    alt=""
-                    loading="lazy"
-                    decoding="async"
-                    referrerPolicy="no-referrer"
-                    class="shell-msg-media-img"
-                    onError={() => setFailed(true)}
-                  />
-                </a>
-              </Match>
-              <Match when={local.kind === 'video'}>
-                <video
-                  {...{ loading: 'lazy' }}
-                  src={href()}
-                  controls
-                  preload="none"
-                  class="shell-msg-media-video"
-                  aria-label="Attached video"
-                  onError={() => setFailed(true)}
-                />
-              </Match>
-              <Match when={local.kind === 'audio'}>
-                <audio
-                  {...{ loading: 'lazy' }}
-                  src={href()}
-                  controls
-                  preload="none"
-                  class="shell-msg-media-audio"
-                  aria-label="Attached audio"
-                  onError={() => setFailed(true)}
-                />
-              </Match>
-            </Switch>
+            {(allowed) => (
+              <Show
+                when={!failed()}
+                fallback={(
+                  <a
+                    href={allowed()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="shell-msg-link shell-msg-media-fallback"
+                  >
+                    {local.kind === 'image'
+                      ? 'Image preview unavailable — open attachment'
+                      : local.kind === 'video'
+                        ? 'Video preview unavailable — open attachment'
+                        : 'Audio preview unavailable — open attachment'}
+                  </a>
+                )}
+              >
+                <Switch>
+                  <Match when={local.kind === 'image'}>
+                    <a
+                      href={allowed()}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="shell-msg-media-link"
+                      aria-label="Open image in new tab"
+                    >
+                      <img
+                        src={allowed()}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        referrerPolicy="no-referrer"
+                        class="shell-msg-media-img"
+                        onError={() => setFailed(true)}
+                      />
+                    </a>
+                  </Match>
+                  <Match when={local.kind === 'video'}>
+                    <video
+                      {...{ loading: 'lazy' }}
+                      src={allowed()}
+                      controls
+                      preload="none"
+                      class="shell-msg-media-video"
+                      aria-label="Attached video"
+                      onError={() => setFailed(true)}
+                    />
+                  </Match>
+                  <Match when={local.kind === 'audio'}>
+                    <audio
+                      {...{ loading: 'lazy' }}
+                      src={allowed()}
+                      controls
+                      preload="none"
+                      class="shell-msg-media-audio"
+                      aria-label="Attached audio"
+                      onError={() => setFailed(true)}
+                    />
+                  </Match>
+                </Switch>
+              </Show>
+            )}
           </Show>
         </div>
       )}
@@ -872,13 +916,14 @@ function LinkPreviewCard(props: { url: string }): JSX.Element {
     { initialValue: null },
   );
   const [thumbnailFailed, setThumbnailFailed] = createSignal(false);
+  const [externalThumbnailAllowed, setExternalThumbnailAllowed] = createSignal(false);
 
   // Defense in depth at the sink: the card's canonical URL is extracted by the
   // same-origin /linkpreview endpoint from the (untrusted) target page's OG
   // metadata, so a hostile page could set og:url to a javascript: scheme. The
   // same-origin endpoint is the real boundary; here we drop any card whose URL
-  // is not public credential-free http(s), so a dangerous scheme, URL userinfo,
-  // or internal/private host never reaches the anchor.
+  // is not credential-free same-origin/public http(s), so a dangerous scheme,
+  // URL userinfo, or third-party internal/private host never reaches the anchor.
   const safe = createMemo(() => {
     const p = preview.latest;
     return p && isAutoLoadableHttpUrl(p.url) ? p : null;
@@ -890,43 +935,74 @@ function LinkPreviewCard(props: { url: string }): JSX.Element {
     if (nextThumbnail === observedThumbnail) return;
     observedThumbnail = nextThumbnail;
     setThumbnailFailed(false);
+    setExternalThumbnailAllowed(false);
+  });
+
+  const safeThumbnail = createMemo(() => {
+    const image = safe()?.image ?? '';
+    return image && isAutoLoadableHttpUrl(image) ? image : null;
+  });
+
+  const allowedThumbnail = createMemo(() => {
+    const image = safeThumbnail();
+    return image && (isSameOriginHttpUrl(image) || externalThumbnailAllowed()) ? image : null;
   });
 
   return (
     <Show when={safe()}>
       {(p) => (
-        <a
-          class="shell-msg-preview"
-          href={p().url}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={`Link preview: ${p().title || p().url}`}
-        >
-          <span class="shell-msg-preview-body">
-            <Show when={p().site}>
-              <span class="shell-msg-preview-site">{p().site}</span>
-            </Show>
-            <Show when={p().title}>
-              <span class="shell-msg-preview-title">{p().title}</span>
-            </Show>
-            <Show when={p().description}>
-              <span class="shell-msg-preview-desc">{p().description}</span>
-            </Show>
-          </span>
-          <Show when={!thumbnailFailed() && p().image && isAutoLoadableHttpUrl(p().image)}>
-            <img
-              class="shell-msg-preview-thumb"
-              src={p().image}
-              alt=""
-              width={72}
-              height={72}
-              loading="lazy"
-              decoding="async"
-              referrerPolicy="no-referrer"
-              onError={() => setThumbnailFailed(true)}
-            />
+        <span class="shell-msg-preview">
+          <a
+            class="shell-msg-preview-link"
+            href={p().url}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Link preview: ${p().title || p().url}`}
+          >
+            <span class="shell-msg-preview-body">
+              <Show when={p().site}>
+                <span class="shell-msg-preview-site">{p().site}</span>
+              </Show>
+              <Show when={p().title}>
+                <span class="shell-msg-preview-title">{p().title}</span>
+              </Show>
+              <Show when={p().description}>
+                <span class="shell-msg-preview-desc">{p().description}</span>
+              </Show>
+            </span>
+          </a>
+          <Show when={!thumbnailFailed() && safeThumbnail()}>
+            {(thumbnail) => (
+              <Show
+                when={allowedThumbnail()}
+                fallback={(
+                  <button
+                    type="button"
+                    class="shell-msg-preview-consent"
+                    aria-label={`Load external preview image from ${resourceHost(thumbnail())}`}
+                    onClick={() => setExternalThumbnailAllowed(true)}
+                  >
+                    Load image
+                  </button>
+                )}
+              >
+                {(allowed) => (
+                  <img
+                    class="shell-msg-preview-thumb"
+                    src={allowed()}
+                    alt=""
+                    width={72}
+                    height={72}
+                    loading="lazy"
+                    decoding="async"
+                    referrerPolicy="no-referrer"
+                    onError={() => setThumbnailFailed(true)}
+                  />
+                )}
+              </Show>
+            )}
           </Show>
-        </a>
+        </span>
       )}
     </Show>
   );
@@ -953,6 +1029,7 @@ export function MessageText(props: MessageTextProps): JSX.Element {
 
   /** Collect top-level link tokens that are media URLs for unfurling. */
   const mediaLinks = createMemo<Array<{ href: string; kind: NonNullable<MediaKind> }>>(() => {
+    if (!preferences().linkPreviews) return [];
     const result: Array<{ href: string; kind: NonNullable<MediaKind> }> = [];
     for (const t of tokens()) {
       if (t.type === 'link') {

@@ -3337,7 +3337,7 @@ export function PreferencesPanel(): JSX.Element {
             <Toggle
               legend="Link previews"
               title="Preview web links"
-              description="Unfurl the first link in a message into a title-and-image card (fetched via this server, never your browser)."
+              description="Show link details fetched through this server. Same-site media loads inline; external images wait for you to approve them."
               value={() => preferences().linkPreviews}
               onToggle={(value) => setPreference('linkPreviews', value)}
             />
