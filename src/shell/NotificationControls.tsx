@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { createSignal, onCleanup, onMount, Show, untrack, type JSX } from 'solid-js';
+import { createEffect, createSignal, onCleanup, onMount, Show, untrack, type JSX } from 'solid-js';
 
 import { useStore, getState, selectAccount } from '@/lib/store';
 import {
@@ -60,12 +60,55 @@ export function NotificationControls(): JSX.Element {
   const [permission, setPermission] = createSignal(getDesktopNotificationPermission());
   const [webPushOn, setWebPushOn] = createSignal(false);
   const [webPushBusy, setWebPushBusy] = createSignal(false);
+  const [dndNowMs, setDndNowMs] = createSignal(Date.now());
   let disposed = false;
   let desktopOperation = 0;
   let webPushOperation = 0;
+  let dndDeadlineTimer: ReturnType<typeof setTimeout> | undefined;
 
   const isCurrentWebPushOperation = (operation: number): boolean => !disposed && operation === webPushOperation;
   const isCurrentDesktopOperation = (operation: number): boolean => !disposed && operation === desktopOperation;
+
+  function clearDndDeadlineTimer(): void {
+    if (dndDeadlineTimer === undefined) return;
+    clearTimeout(dndDeadlineTimer);
+    dndDeadlineTimer = undefined;
+  }
+
+  function scheduleDndDeadline(deadline: number): void {
+    clearDndDeadlineTimer();
+    const now = Date.now();
+    setDndNowMs(now);
+
+    if (now >= deadline) {
+      const state = getState();
+      if (state.dndUntil === deadline) state.setDndUntil(null);
+      return;
+    }
+
+    dndDeadlineTimer = setTimeout(() => {
+      dndDeadlineTimer = undefined;
+      const settledAt = Date.now();
+      setDndNowMs(settledAt);
+      // Wall time can move backwards while a timeout uses a monotonic clock.
+      // Re-arm for the remaining duration instead of expiring early.
+      if (settledAt < deadline) {
+        scheduleDndDeadline(deadline);
+        return;
+      }
+      const state = getState();
+      if (state.dndUntil === deadline) state.setDndUntil(null);
+    }, deadline - now);
+  }
+
+  // A timed mute changes state once, at its exact deadline. Re-arm only when
+  // that deadline changes; there is no session-long polling clock.
+  createEffect(() => {
+    const deadline = dndUntil();
+    clearDndDeadlineTimer();
+    setDndNowMs(Date.now());
+    if (deadline !== null) scheduleDndDeadline(deadline);
+  });
 
   onMount(() => {
     const operation = ++webPushOperation;
@@ -92,6 +135,7 @@ export function NotificationControls(): JSX.Element {
     disposed = true;
     desktopOperation += 1;
     webPushOperation += 1;
+    clearDndDeadlineTimer();
   });
 
   async function handleWebPushToggle(): Promise<void> {
@@ -128,7 +172,7 @@ export function NotificationControls(): JSX.Element {
 
   const dndActive = (): boolean => {
     const until = dndUntil();
-    return dndEnabled() || (until !== null && Date.now() < until);
+    return dndEnabled() || (until !== null && dndNowMs() < until);
   };
 
   const desktopActive = (): boolean => pushEnabled() && permission() === 'granted';
@@ -155,6 +199,16 @@ export function NotificationControls(): JSX.Element {
   }
 
   function handleDndToggle(): void {
+    const until = dndUntil();
+    const now = Date.now();
+    // A click can race the deadline callback while the old "Turn off" label is
+    // still painted. Settle that expired override instead of converting the
+    // click into a new persistent DND enable.
+    if (!dndEnabled() && until !== null && now >= until) {
+      setDndNowMs(now);
+      getState().setDndUntil(null);
+      return;
+    }
     const next = !dndActive();
     getState().setDndEnabled(next);
     if (!next) getState().setDndUntil(null);

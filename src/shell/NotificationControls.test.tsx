@@ -85,6 +85,7 @@ describe('NotificationControls accessibility', () => {
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
     restorePermissions();
     store.setState(initialState, true);
     setCalmPreset('regular');
@@ -153,6 +154,66 @@ describe('NotificationControls accessibility', () => {
       name: 'Notification controls',
       description: /notification mode Power; notification sound off; do not disturb on/i,
     })).toBeInTheDocument();
+  });
+
+  it('expires a timed do-not-disturb state in its accessible controls at the deadline', () => {
+    vi.useFakeTimers();
+    const now = new Date('2026-07-16T08:00:00.000Z');
+    vi.setSystemTime(now);
+    store.setState({ dndEnabled: false, dndUntil: now.getTime() + 60_000 });
+
+    render(() => <NotificationControls />);
+
+    expect(screen.getByRole('button', { name: 'Turn off do not disturb' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('group', {
+      name: 'Notification controls',
+      description: /do not disturb on/i,
+    })).toBeInTheDocument();
+
+    vi.advanceTimersByTime(60_001);
+
+    expect(screen.getByRole('button', { name: 'Turn on do not disturb' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('group', {
+      name: 'Notification controls',
+      description: /do not disturb off/i,
+    })).toBeInTheDocument();
+    expect(store.getState()).toMatchObject({ dndEnabled: false, dndUntil: null });
+  });
+
+  it('clears an expired timed override instead of enabling persistent DND on a raced click', () => {
+    vi.useFakeTimers();
+    const now = new Date('2026-07-16T08:00:00.000Z');
+    vi.setSystemTime(now);
+    store.setState({ dndEnabled: false, dndUntil: now.getTime() + 60_000 });
+
+    render(() => <NotificationControls />);
+
+    const staleTurnOff = screen.getByRole('button', { name: 'Turn off do not disturb' });
+    // Move wall time past the deadline without running the queued callback:
+    // this is the click-vs-timeout race the handler must settle safely.
+    vi.setSystemTime(now.getTime() + 60_001);
+    fireEvent.click(staleTurnOff);
+
+    expect(store.getState()).toMatchObject({ dndEnabled: false, dndUntil: null });
+    expect(screen.getByRole('button', { name: 'Turn on do not disturb' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('replaces a changed DND deadline and cancels the remaining timer on unmount', () => {
+    vi.useFakeTimers();
+    const now = new Date('2026-07-16T08:00:00.000Z');
+    vi.setSystemTime(now);
+    store.setState({ dndEnabled: false, dndUntil: now.getTime() + 60_000 });
+
+    const view = render(() => <NotificationControls />);
+    expect(vi.getTimerCount()).toBe(1);
+
+    store.setState({ dndUntil: now.getTime() + 120_000 });
+    expect(vi.getTimerCount()).toBe(1);
+    vi.advanceTimersByTime(60_001);
+    expect(screen.getByRole('button', { name: 'Turn off do not disturb' })).toHaveAttribute('aria-pressed', 'true');
+
+    view.unmount();
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('cycles compact calm presets through the same persisted mode as preferences', () => {
