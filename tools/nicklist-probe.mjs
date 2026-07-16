@@ -1,58 +1,76 @@
 import { chromium } from '@playwright/test';
 
 const origin = process.env.ONYX_ORIGIN ?? 'https://eshmaki.me';
-const nick = `nlprobe${Math.floor(Math.random() * 100_000)}`;
+const suffix = Math.floor(Math.random() * 100_000);
+const nicks = [`nlprobeA${suffix}`, `nlprobeB${suffix}`];
+const channel = process.env.ONYX_ROSTER_CHANNEL ?? `#nlprobe${suffix}`;
 const durationMs = Number.parseInt(process.env.ONYX_ROSTER_PROBE_MS ?? '70000', 10);
-const sampleMs = 2_000;
+const sampleMs = 1_000;
 const browser = await chromium.launch();
-const page = await (await browser.newContext({
-  viewport: { width: 1440, height: 900 },
-  serviceWorkers: 'block',
-})).newPage();
 const errs = [];
-page.on('pageerror', (e) => errs.push(String(e).slice(0, 200)));
-await page.goto(`${origin}/app/`, { waitUntil: 'domcontentloaded' });
-await page.waitForTimeout(2500);
-await page.getByPlaceholder('your-nick').fill(nick);
-await page.getByPlaceholder('#root').fill('#root');
-await page.getByRole('button', { name: 'Connect to Onyx as a guest' }).click();
+const probes = [];
+
+for (const nick of nicks) {
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+    serviceWorkers: 'block',
+  });
+  const page = await context.newPage();
+  page.on('pageerror', (error) => errs.push({ nick, error: String(error).slice(0, 200) }));
+  await page.goto(`${origin}/app/`, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(2500);
+  await page.getByPlaceholder('your-nick').fill(nick);
+  await page.getByPlaceholder('#root').fill(channel);
+  await page.getByRole('button', { name: 'Connect to Onyx as a guest' }).click();
+  probes.push({ context, nick, page });
+}
+
 try {
-  await page.locator('.shell-member-row').first().waitFor({ state: 'visible', timeout: 45_000 });
+  await Promise.all(probes.flatMap(({ page }) => nicks.map((expectedNick) => (
+    page.locator('.shell-member-nick', { hasText: expectedNick }).waitFor({ state: 'visible', timeout: 45_000 })
+  ))));
 } catch (error) {
   console.error('nicklist probe timed out:', String(error));
-  console.error('page state:', (await page.locator('body').innerText()).slice(0, 1_200));
+  for (const { nick, page } of probes) {
+    console.error(`${nick} page state:`, (await page.locator('body').innerText()).slice(0, 1_200));
+  }
   await browser.close();
   process.exitCode = 1;
   process.exit();
 }
+
 const failures = [];
-let members = [];
-let previousSignature = '';
+const finalMembers = new Map();
+const previousSignatures = new Map();
 for (let elapsedMs = 0; elapsedMs <= durationMs; elapsedMs += sampleMs) {
-  const sample = await page.evaluate(() => ({
-    shellMounted: document.querySelector('[data-testid="app-shell"]') !== null,
-    panelVisible: document.querySelector('.shell-members:not(.shell-members--hidden)') !== null,
-    members: [...document.querySelectorAll('.shell-member-row')]
-      .map((row) => row.querySelector('.shell-member-nick')?.textContent?.trim() ?? '')
-      .filter(Boolean)
-      .slice(0, 20),
-  }));
-  members = sample.members;
-  const signature = `${sample.shellMounted}:${sample.panelVisible}:${members.join(',')}`;
-  if (signature !== previousSignature) {
-    console.log(`roster at +${String(elapsedMs / 1000).padStart(2, '0')}s:`, signature);
-    previousSignature = signature;
+  for (const { nick, page } of probes) {
+    const sample = await page.evaluate(() => ({
+      shellMounted: document.querySelector('[data-testid="app-shell"]') !== null,
+      panelVisible: document.querySelector('.shell-members:not(.shell-members--hidden)') !== null,
+      members: [...document.querySelectorAll('.shell-member-row')]
+        .map((row) => row.querySelector('.shell-member-nick')?.textContent?.trim() ?? '')
+        .filter(Boolean)
+        .slice(0, 20),
+    }));
+    const normalized = new Set(sample.members.map((member) => member.toLowerCase()));
+    const missing = nicks.filter((expected) => !normalized.has(expected.toLowerCase()));
+    const signature = `${sample.shellMounted}:${sample.panelVisible}:${sample.members.join(',')}`;
+    if (signature !== previousSignatures.get(nick)) {
+      console.log(`${nick} roster at +${String(elapsedMs / 1000).padStart(2, '0')}s:`, signature);
+      previousSignatures.set(nick, signature);
+    }
+    finalMembers.set(nick, sample.members);
+    if (!sample.shellMounted || !sample.panelVisible || missing.length > 0) {
+      failures.push({ elapsedMs, observer: nick, missing, ...sample });
+    }
   }
-  if (!sample.shellMounted || !sample.panelVisible || members.length === 0) {
-    failures.push({ elapsedMs, ...sample });
-  }
-  if (elapsedMs < durationMs) await page.waitForTimeout(sampleMs);
+  if (elapsedMs < durationMs) await probes[0].page.waitForTimeout(sampleMs);
 }
-console.log('final member rows:', JSON.stringify(members, null, 1));
-const memberPanelText = await page.evaluate(() => document.querySelector('.shell-members')?.textContent?.slice(0, 400));
-console.log('panel text:', memberPanelText);
+
+console.log('final member rows:', JSON.stringify(Object.fromEntries(finalMembers), null, 1));
 console.log('errors:', errs.length ? errs : 'none');
 console.log('transient roster failures:', failures.length ? failures : 'none');
+for (const { context } of probes) await context.close().catch(() => {});
 await browser.close();
 
-if (members.length === 0 || failures.length > 0 || errs.length > 0) process.exitCode = 1;
+if (failures.length > 0 || errs.length > 0) process.exitCode = 1;
