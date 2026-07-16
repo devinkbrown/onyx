@@ -89,6 +89,7 @@ import {
   prefersReducedTransparency,
 } from '@/lib/a11y/mediaPrefs';
 import { makeReducedDataSignal } from '@/lib/a11y/reducedData';
+import { scheduleBackgroundTask, type CancelBackgroundTask } from '@/lib/backgroundTask';
 
 // ── AppShell props ───────────────────────────────────────────────────────────
 
@@ -198,8 +199,10 @@ export function AppShell(props: AppShellProps): JSX.Element {
   const mediaOwner = getOwner();
   let mediaBootPromise: Promise<boolean> | null = null;
   let mediaDisposed = false;
+  let cancelMediaPreload: CancelBackgroundTask = () => {};
   onCleanup(() => {
     mediaDisposed = true;
+    cancelMediaPreload();
   });
   function ensureMediaEngine(): Promise<boolean> {
     if (mediaDisposed) return Promise.resolve(false);
@@ -221,8 +224,6 @@ export function AppShell(props: AppShellProps): JSX.Element {
     return mediaBootPromise;
   }
   if (typeof window !== 'undefined') {
-    const ric = (window as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => void })
-      .requestIdleCallback;
     const preloadMedia = () => {
       if (reducedData()) return;
       void ensureMediaEngine().catch(() => {
@@ -230,8 +231,10 @@ export function AppShell(props: AppShellProps): JSX.Element {
         // the failure in context.
       });
     };
-    if (typeof ric === 'function') ric(preloadMedia, { timeout: 2000 });
-    else setTimeout(preloadMedia, 200);
+    cancelMediaPreload = scheduleBackgroundTask(preloadMedia, {
+      idleTimeoutMs: 2_000,
+      timerDelayMs: 200,
+    });
   }
 
   const voice = useStore((s) => s.voice);
