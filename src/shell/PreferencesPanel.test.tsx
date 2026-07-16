@@ -2282,6 +2282,32 @@ describe('PreferencesPanel', () => {
     expect(screen.queryByRole('button', { name: 'Retry erasing stored conversations' })).not.toBeInTheDocument();
   });
 
+  it('disarms owner-bound destructive confirmations after an account change', async () => {
+    renderPreferences('History & data');
+    const reviewed = within(screen.getByRole('heading', { name: 'Reviewed catch-up anchors' }).closest('section')!);
+    const followedControls = within(screen.getByRole('heading', { name: 'Followed conversations' }).closest('section')!);
+    const drafts = within(screen.getByRole('heading', { name: 'Local drafts' }).closest('section')!);
+
+    fireEvent.click(reviewed.getByRole('button', { name: 'Clear reviewed anchors' }));
+    fireEvent.click(followedControls.getByRole('button', { name: 'Clear followed conversations' }));
+    fireEvent.click(drafts.getByRole('button', { name: 'Discard local drafts' }));
+    expect(reviewed.getByRole('group', { name: 'Confirm clear reviewed anchors' })).toBeInTheDocument();
+    expect(followedControls.getByRole('group', { name: 'Confirm clear followed conversations' })).toBeInTheDocument();
+    expect(drafts.getByRole('group', { name: 'Confirm discard local drafts' })).toBeInTheDocument();
+
+    const current = store.getState().server;
+    store.setState({
+      ourNick: 'bob',
+      server: current ? { ...current, nick: 'bob', account: 'bob' } : null,
+    });
+
+    await waitFor(() => {
+      expect(reviewed.queryByRole('group', { name: 'Confirm clear reviewed anchors' })).toBeNull();
+      expect(followedControls.queryByRole('group', { name: 'Confirm clear followed conversations' })).toBeNull();
+      expect(drafts.queryByRole('group', { name: 'Confirm discard local drafts' })).toBeNull();
+    });
+  });
+
   it('confirms or cancels reviewed-anchor clearing without touching other local data', async () => {
     globalThis.indexedDB = new IDBFactory();
     _resetVaultForTests();

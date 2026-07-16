@@ -1176,6 +1176,8 @@ function ClearReviewedAnchorsControls(): JSX.Element {
   createEffect(() => {
     const owner = memoryOwner();
     setAnchorCount(owner ? readReviewHistory(owner).length : 0);
+    setConfirming(false);
+    setStatus(null);
     if (owner) {
       onCleanup(subscribeReviewHistory((entries) => setAnchorCount(entries.length), owner));
     }
@@ -1663,6 +1665,13 @@ function ClearFollowedConversationsControls(): JSX.Element {
   let clearTrigger: HTMLButtonElement | undefined;
   let eraseAction: HTMLButtonElement | undefined;
 
+  createEffect(() => {
+    memoryOwner();
+    setConfirming(false);
+    setStagedCount(null);
+    setStatus(null);
+  });
+
   function beginClear(trigger: HTMLButtonElement): void {
     const owner = memoryOwner();
     if (!owner) {
@@ -1845,8 +1854,11 @@ function DiscardLocalDraftsControls(): JSX.Element {
   }
 
   createEffect(() => {
-    memoryOwner();
-    if (!confirming()) refreshCounts();
+    const snapshot = readLocalDraftSnapshot(memoryOwner());
+    setCounts({ roomCount: snapshot.roomCount, topicCount: snapshot.topicCount });
+    setConfirming(false);
+    setStagedCounts(null);
+    setStatus(null);
   });
 
   function beginDiscard(trigger: HTMLButtonElement): void {
