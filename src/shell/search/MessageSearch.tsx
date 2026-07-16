@@ -25,6 +25,8 @@ import {
   type SavedSearch,
 } from '@/lib/vault/savedSearches';
 import { openPreferences } from '@/lib/prefs/preferences';
+import { selectDeviceMemoryOwner, useStore } from '@/lib/store';
+import type { DeviceMemoryOwner } from '@/lib/deviceMemoryOwner';
 import './message-search.css';
 
 export type SavedSearchPersistence = {
@@ -109,6 +111,10 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
   const savedStore = createMemo<SavedSearchPersistence>(() => (
     local.savedSearchPersistence ?? DEFAULT_SAVED_SEARCH_PERSISTENCE
   ));
+  const memoryOwner = useStore(
+    selectDeviceMemoryOwner,
+    (left, right) => left?.serverUrl === right?.serverUrl && left?.identity === right?.identity,
+  );
   let inputRef: HTMLInputElement | undefined;
   let closeRef: HTMLButtonElement | undefined;
   let pulseTimer: number | undefined;
@@ -190,21 +196,29 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
     return ids.length > 0 ? ids.join(' ') : undefined;
   });
 
-  function savedOperationCurrent(epoch: number, operation: number): boolean {
+  function savedOperationCurrent(
+    epoch: number,
+    operation: number,
+    owner: DeviceMemoryOwner,
+  ): boolean {
+    const currentOwner = memoryOwner();
     return !disposed
       && search.isOpen()
       && epoch === savedOpenEpoch
-      && operation === savedOperationSeq;
+      && operation === savedOperationSeq
+      && currentOwner?.serverUrl === owner.serverUrl
+      && currentOwner.identity === owner.identity;
   }
 
   async function refreshSavedSearches(
     epoch: number,
     operation: number,
+    owner: DeviceMemoryOwner,
   ): Promise<'applied' | 'failed' | 'stale'> {
     const refresh = ++savedRefreshSeq;
     let rows: SavedSearch[];
     try {
-      rows = await savedStore().listSearches();
+      rows = await savedStore().listSearches(owner);
     } catch {
       if (
         disposed
@@ -212,6 +226,7 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
         || epoch !== savedOpenEpoch
         || operation !== savedOperationSeq
         || refresh !== savedRefreshSeq
+        || !savedOperationCurrent(epoch, operation, owner)
       ) return 'stale';
       return 'failed';
     }
@@ -221,6 +236,7 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
       || epoch !== savedOpenEpoch
       || operation !== savedOperationSeq
       || refresh !== savedRefreshSeq
+      || !savedOperationCurrent(epoch, operation, owner)
     ) return 'stale';
     setSavedSearches(rows);
     return 'applied';
@@ -232,13 +248,18 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
     onCleanup(subscribe(() => {
       untrack(() => {
         if (disposed || !search.isOpen() || savedBusy()) return;
+        const owner = memoryOwner();
+        if (!owner) {
+          setSavedSearches([]);
+          return;
+        }
         const epoch = savedOpenEpoch;
         const operation = savedOperationSeq;
         setSavedStatus('refreshing');
         setSavedStatusMessage('Refreshing saved searches after an on-device change…');
         void (async () => {
-          const result = await refreshSavedSearches(epoch, operation);
-          if (!savedOperationCurrent(epoch, operation) || result === 'stale') return;
+          const result = await refreshSavedSearches(epoch, operation, owner);
+          if (!savedOperationCurrent(epoch, operation, owner) || result === 'stale') return;
           if (result === 'failed') {
             setSavedStatus('error');
             setSavedStatusMessage('Saved searches changed, but this browser could not refresh the list.');
@@ -253,24 +274,26 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
 
   createEffect(() => {
     const open = search.isOpen();
+    const owner = memoryOwner();
     const epoch = ++savedOpenEpoch;
     const operation = ++savedOperationSeq;
     savedRefreshSeq += 1;
-    if (!open) {
+    if (!open || !owner) {
       // The label is a draft for the current query, not a persisted preference.
       // Dropping it with the query prevents a private/irrelevant name from
       // resurfacing when the always-mounted Search Center opens later.
       setSavedLabel('');
       setSavedStatus('idle');
       setSavedStatusMessage('');
+      setSavedSearches([]);
       return;
     }
 
     setSavedStatus('refreshing');
     setSavedStatusMessage('Refreshing saved searches…');
     void (async () => {
-      const result = await refreshSavedSearches(epoch, operation);
-      if (!savedOperationCurrent(epoch, operation) || result === 'stale') return;
+      const result = await refreshSavedSearches(epoch, operation, owner);
+      if (!savedOperationCurrent(epoch, operation, owner) || result === 'stale') return;
       if (result === 'failed') {
         setSavedStatus('error');
         setSavedStatusMessage('This browser could not refresh saved searches.');
@@ -287,6 +310,12 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
     const mode = search.vaultMode();
     const target = search.targetLabel();
     if (!label || query.length < 2 || savedBusy()) return;
+    const owner = memoryOwner();
+    if (!owner) {
+      setSavedStatus('error');
+      setSavedStatusMessage('An active account or guest identity is required to save this search.');
+      return;
+    }
     const epoch = savedOpenEpoch;
     const operation = ++savedOperationSeq;
     savedRefreshSeq += 1;
@@ -294,18 +323,18 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
     setSavedStatusMessage(`Saving ${label}…`);
     let saved: SavedSearch | null;
     try {
-      saved = await savedStore().saveSearch({ label, query, mode });
+      saved = await savedStore().saveSearch({ label, query, mode }, owner);
     } catch {
       saved = null;
     }
-    if (!savedOperationCurrent(epoch, operation)) return;
+    if (!savedOperationCurrent(epoch, operation, owner)) return;
     if (!saved) {
       setSavedStatus('error');
       setSavedStatusMessage('This browser could not save the search.');
       return;
     }
-    const refreshed = await refreshSavedSearches(epoch, operation);
-    if (!savedOperationCurrent(epoch, operation) || refreshed === 'stale') return;
+    const refreshed = await refreshSavedSearches(epoch, operation, owner);
+    if (!savedOperationCurrent(epoch, operation, owner) || refreshed === 'stale') return;
     if (refreshed === 'failed') {
       setSavedStatus('error');
       setSavedStatusMessage('The search was saved, but this browser could not refresh the list.');
@@ -337,6 +366,12 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
 
   async function removeSavedSearch(saved: SavedSearch): Promise<void> {
     if (savedBusy()) return;
+    const owner = memoryOwner();
+    if (!owner) {
+      setSavedStatus('error');
+      setSavedStatusMessage('An active account or guest identity is required to delete this saved search.');
+      return;
+    }
     const epoch = savedOpenEpoch;
     const operation = ++savedOperationSeq;
     savedRefreshSeq += 1;
@@ -344,11 +379,11 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
     setSavedStatusMessage(`Deleting ${saved.label}…`);
     let deleted: boolean;
     try {
-      deleted = await savedStore().deleteSearch(saved.id);
+      deleted = await savedStore().deleteSearch(saved.id, owner);
     } catch {
       deleted = false;
     }
-    if (!savedOperationCurrent(epoch, operation)) return;
+    if (!savedOperationCurrent(epoch, operation, owner)) return;
     // A false result means the storage layer could not verify deletion by
     // readback. Keep the currently rendered row instead of replacing it with
     // an ambiguous empty/error fallback.
@@ -357,8 +392,8 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
       setSavedStatusMessage('This browser could not delete the saved search.');
       return;
     }
-    const refreshed = await refreshSavedSearches(epoch, operation);
-    if (!savedOperationCurrent(epoch, operation) || refreshed === 'stale') return;
+    const refreshed = await refreshSavedSearches(epoch, operation, owner);
+    if (!savedOperationCurrent(epoch, operation, owner) || refreshed === 'stale') return;
     if (refreshed === 'failed') {
       setSavedStatus('error');
       setSavedStatusMessage('The search was deleted, but this browser could not refresh the list.');

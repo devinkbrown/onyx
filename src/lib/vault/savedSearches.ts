@@ -3,8 +3,7 @@
  * savedSearches.ts — local-first "saved searches" for the vault.
  *
  * Persists named search queries (label + query + mode + createdAt) so a user's
- * favourite lexical/semantic searches survive reloads and stay on-device. No
- * cloud, no account — the device remembers.
+ * favourite lexical/semantic searches survive reloads and stay on-device.
  *
  * Design constraints (mirroring historyVault.ts):
  *  - NEVER block or break the UI: every call feature-detects IndexedDB and
@@ -19,6 +18,7 @@
  */
 
 import { createSavedSearchSync, type SavedSearchSync } from './savedSearchSync';
+import { deviceMemoryOwnerKey, type DeviceMemoryOwner } from '@/lib/deviceMemoryOwner';
 
 const DB_NAME = 'onyx-vault-searches';
 const DB_VERSION = 1;
@@ -75,7 +75,7 @@ export interface SavedSearchExport {
 }
 
 let _seq = 0;
-let dbPromise: Promise<IDBDatabase | null> | null = null;
+const dbPromises = new Map<string, Promise<IDBDatabase | null>>();
 let changeRevision = 0;
 let crossTabSync: SavedSearchSync | null = null;
 
@@ -133,12 +133,21 @@ function publishSavedSearchChange(reason: SavedSearchChangeReason, count: number
   savedSearchSync().publish(change);
 }
 
-function openSearchDb(): Promise<IDBDatabase | null> {
-  if (dbPromise) return dbPromise;
-  dbPromise = new Promise((resolve) => {
+function physicalDbName(owner?: DeviceMemoryOwner): string | null {
+  if (owner === undefined) return DB_NAME;
+  const ownerKey = deviceMemoryOwnerKey(owner);
+  return ownerKey ? `${DB_NAME}:owner:${encodeURIComponent(ownerKey)}` : null;
+}
+
+function openSearchDb(owner?: DeviceMemoryOwner): Promise<IDBDatabase | null> {
+  const dbName = physicalDbName(owner);
+  if (!dbName) return Promise.resolve(null);
+  const existing = dbPromises.get(dbName);
+  if (existing) return existing;
+  const pending = new Promise<IDBDatabase | null>((resolve) => {
     try {
       if (typeof indexedDB === 'undefined') return resolve(null);
-      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      const req = indexedDB.open(dbName, DB_VERSION);
       req.onupgradeneeded = () => {
         const db = req.result;
         if (!db.objectStoreNames.contains(STORE)) {
@@ -152,7 +161,8 @@ function openSearchDb(): Promise<IDBDatabase | null> {
       resolve(null);
     }
   });
-  return dbPromise;
+  dbPromises.set(dbName, pending);
+  return pending;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -357,10 +367,13 @@ function hasRow(db: IDBDatabase, id: string): Promise<boolean> {
  * label/query and bad mode (returns null); a matching normalized label reuses
  * the existing id so labels never duplicate. Prunes to SAVED_SEARCH_CAP after.
  */
-export async function saveSearch(input: SavedSearchInput): Promise<SavedSearch | null> {
+export async function saveSearch(
+  input: SavedSearchInput,
+  owner?: DeviceMemoryOwner,
+): Promise<SavedSearch | null> {
   const valid = validateSearchInput(input);
   if (!valid) return null;
-  const db = await openSearchDb();
+  const db = await openSearchDb(owner);
   if (!db) return null;
   try {
     const norm = normalizeLabel(valid.label);
@@ -394,8 +407,8 @@ export async function saveSearch(input: SavedSearchInput): Promise<SavedSearch |
 }
 
 /** List saved searches, newest first. */
-export async function listSearches(): Promise<SavedSearch[]> {
-  const db = await openSearchDb();
+export async function listSearches(owner?: DeviceMemoryOwner): Promise<SavedSearch[]> {
+  const db = await openSearchDb(owner);
   if (!db) return [];
   try {
     const read = await getBoundedRows(db);
@@ -406,10 +419,10 @@ export async function listSearches(): Promise<SavedSearch[]> {
 }
 
 /** Delete one saved search by id and verify the privacy-affecting write. */
-export async function deleteSearch(id: string): Promise<boolean> {
+export async function deleteSearch(id: string, owner?: DeviceMemoryOwner): Promise<boolean> {
   const safeId = sanitizeId(id);
   if (!safeId || safeId !== id) return false;
-  const db = await openSearchDb();
+  const db = await openSearchDb(owner);
   if (!db) return false;
   try {
     const existed = await hasRow(db, safeId);
@@ -425,8 +438,8 @@ export async function deleteSearch(id: string): Promise<boolean> {
 }
 
 /** Wipe every saved search and verify that no row remains. */
-export async function clearSavedSearches(): Promise<boolean> {
-  const db = await openSearchDb();
+export async function clearSavedSearches(owner?: DeviceMemoryOwner): Promise<boolean> {
+  const db = await openSearchDb(owner);
   if (!db) return false;
   try {
     const tx = db.transaction(STORE, 'readwrite');
@@ -442,14 +455,14 @@ export async function clearSavedSearches(): Promise<boolean> {
 }
 
 /** Export saved searches, including user-entered query text, as portable JSON. */
-export async function exportSavedSearches(): Promise<SavedSearchExport> {
+export async function exportSavedSearches(owner?: DeviceMemoryOwner): Promise<SavedSearchExport> {
   const snapshot: SavedSearchExport = {
     kind: 'onyx-saved-searches',
     version: 1,
     exportedAt: new Date().toISOString(),
     searches: [],
   };
-  const db = await openSearchDb();
+  const db = await openSearchDb(owner);
   if (!db) return snapshot;
   try {
     const read = await getBoundedRows(db);
@@ -491,10 +504,13 @@ export function parseSavedSearchExport(raw: unknown): SavedSearchExport | null {
  * (reusing any existing id), preserve each entry's createdAt, then prune to the
  * cap. Returns how many rows were written.
  */
-export async function importSavedSearches(snapshot: SavedSearchExport): Promise<{ imported: number }> {
+export async function importSavedSearches(
+  snapshot: SavedSearchExport,
+  owner?: DeviceMemoryOwner,
+): Promise<{ imported: number }> {
   const parsed = parseSavedSearchExport(snapshot);
   if (!parsed || parsed.searches.length === 0) return { imported: 0 };
-  const db = await openSearchDb();
+  const db = await openSearchDb(owner);
   if (!db) return { imported: 0 };
   try {
     const existing = await getBoundedRows(db);
@@ -622,7 +638,7 @@ function txDone(tx: IDBTransaction): Promise<boolean> {
 export function _resetSavedSearchesForTests(): void {
   crossTabSync?.close();
   crossTabSync = null;
-  dbPromise = null;
+  dbPromises.clear();
   _seq = 0;
   changeRevision = 0;
   changeListeners.clear();

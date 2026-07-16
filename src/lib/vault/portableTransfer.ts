@@ -138,7 +138,7 @@ function parsePreferenceHandoff(value: unknown): PortablePreferenceHandoff | nul
 export async function exportPortableTransfer(
   owner?: DeviceMemoryOwner,
 ): Promise<PortableTransferSnapshot> {
-  const savedSearches = await exportSavedSearches();
+  const savedSearches = await exportSavedSearches(owner);
   return {
     ...(await exportVault(owner)),
     reviewHistory: readReviewHistory(owner),
@@ -261,7 +261,7 @@ export async function importPortableTransfer(
     version: 1,
     exportedAt: new Date().toISOString(),
     searches: snapshot.savedSearches,
-  });
+  }, owner);
   return {
     targets: vault.targets,
     messages: vault.messages,

@@ -154,6 +154,19 @@ describe('savedSearches', () => {
   });
 
   describe('saveSearch / listSearches', () => {
+    it('isolates Alice and Bob query plaintext and quarantines legacy rows', async () => {
+      const alice = { serverUrl: 'wss://searches.example/ws', identity: 'alice' } as const;
+      const bob = { serverUrl: 'wss://searches.example/ws', identity: 'bob' } as const;
+
+      await saveSearch({ label: 'Legacy', query: 'legacy private query', mode: 'exact' });
+      await saveSearch({ label: 'Alice', query: 'alice private query', mode: 'exact' }, alice);
+      await saveSearch({ label: 'Bob', query: 'bob private query', mode: 'hybrid' }, bob);
+
+      expect((await listSearches(alice)).map((entry) => entry.query)).toEqual(['alice private query']);
+      expect((await listSearches(bob)).map((entry) => entry.query)).toEqual(['bob private query']);
+      expect((await listSearches()).map((entry) => entry.query)).toEqual(['legacy private query']);
+    });
+
     it('creates a search and reads it back', async () => {
       const created = await saveSearch({ label: 'Mentions', query: 'kain', mode: 'exact' });
       expect(created).not.toBeNull();

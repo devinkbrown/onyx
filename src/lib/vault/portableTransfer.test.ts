@@ -238,6 +238,9 @@ describe('portableTransfer', () => {
     saveChannelTopicDrafts({ '#alice': 'alice topic plaintext' }, undefined, alice);
     saveChannelTopicDrafts({ '#bob': 'bob topic plaintext' }, undefined, bob);
     saveChannelTopicDrafts({ '#legacy': 'legacy topic plaintext' });
+    await saveSearch({ label: 'Alice search', query: 'alice search plaintext', mode: 'exact' }, alice);
+    await saveSearch({ label: 'Bob search', query: 'bob search plaintext', mode: 'exact' }, bob);
+    await saveSearch({ label: 'Legacy search', query: 'legacy search plaintext', mode: 'exact' });
 
     const exported = await exportPortableTransfer(alice);
     const serialized = JSON.stringify(exported);
@@ -246,8 +249,13 @@ describe('portableTransfer', () => {
     expect(exported.reviewHistory.map((entry) => entry.target)).toEqual(['#alice']);
     expect(exported.composerDrafts).toEqual({ '#alice': 'alice room plaintext' });
     expect(exported.channelTopicDrafts).toEqual({ '#alice': 'alice topic plaintext' });
+    expect(exported.savedSearches).toEqual([
+      expect.objectContaining({ label: 'Alice search', query: 'alice search plaintext' }),
+    ]);
     expect(serialized).not.toContain('bob room plaintext');
     expect(serialized).not.toContain('legacy room plaintext');
+    expect(serialized).not.toContain('bob search plaintext');
+    expect(serialized).not.toContain('legacy search plaintext');
 
     const imported = await importPortableTransfer(exported, bob);
 
@@ -256,6 +264,9 @@ describe('portableTransfer', () => {
     expect(readReviewHistory(bob).map((entry) => entry.target)).toContain('#alice');
     expect(loadComposerDrafts(undefined, bob)).toMatchObject({ '#alice': 'alice room plaintext' });
     expect(loadChannelTopicDrafts(undefined, bob)).toMatchObject({ '#alice': 'alice topic plaintext' });
+    expect(await listSearches(bob)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: 'Alice search', query: 'alice search plaintext' }),
+    ]));
     expect(readReviewHistory(alice).map((entry) => entry.target)).toEqual(['#alice']);
   });
 

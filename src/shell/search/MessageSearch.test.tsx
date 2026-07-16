@@ -22,7 +22,6 @@ import {
 } from './useMessageSearch';
 import { MessageSearch, type SavedSearchPersistence } from './MessageSearch';
 
-const initialState = store.getInitialState();
 const MEMORY_OWNER = { serverUrl: 'wss://example.test', identity: 'testuser' } as const;
 const memoryServer: Server = {
   id: 'message-search',
@@ -33,6 +32,11 @@ const memoryServer: Server = {
   nick: 'testuser',
   account: MEMORY_OWNER.identity,
   connected: true,
+};
+const initialState = {
+  ...store.getInitialState(),
+  server: memoryServer,
+  ourNick: MEMORY_OWNER.identity,
 };
 
 function deferred<T>(): {
@@ -467,7 +471,7 @@ describe('MessageSearch', () => {
 
     const run = await screen.findByRole('button', { name: 'Run saved search Release trail' });
     await waitFor(async () => {
-      await expect(listSearches()).resolves.toEqual([
+      await expect(listSearches(MEMORY_OWNER)).resolves.toEqual([
         expect.objectContaining({ label: 'Release trail', query: 'release handoff', mode: 'hybrid' }),
       ]);
     });
@@ -485,7 +489,7 @@ describe('MessageSearch', () => {
       expect(screen.queryByRole('button', { name: 'Run saved search Release trail' })).not.toBeInTheDocument();
     });
     expect(screen.getByText('Deleted saved search Release trail.')).toHaveAttribute('role', 'status');
-    await expect(listSearches()).resolves.toEqual([]);
+    await expect(listSearches(MEMORY_OWNER)).resolves.toEqual([]);
   });
 
   it('refreshes an open Search Center after a same-tab storage invalidation', async () => {
@@ -500,11 +504,31 @@ describe('MessageSearch', () => {
       label: 'Added elsewhere',
       query: 'external private query',
       mode: 'exact',
-    });
+    }, MEMORY_OWNER);
 
     expect(await screen.findByRole('button', { name: 'Run saved search Added elsewhere' }))
       .toBeInTheDocument();
     expect(screen.getByText('Saved searches updated on this device.')).toHaveAttribute('role', 'status');
+  });
+
+  it('switches saved-query plaintext with the active account namespace', async () => {
+    const bobOwner = { ...MEMORY_OWNER, identity: 'bob' } as const;
+    await saveSearch({ label: 'Alice only', query: 'alice private query', mode: 'exact' }, MEMORY_OWNER);
+    await saveSearch({ label: 'Bob only', query: 'bob private query', mode: 'hybrid' }, bobOwner);
+    store.setState({ ...initialState, activeView: { kind: 'home' } }, true);
+    openMessageSearch();
+    render(() => <MessageSearch />);
+
+    expect(await screen.findByRole('button', { name: 'Run saved search Alice only' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Run saved search Bob only' })).toBeNull();
+
+    store.setState({
+      ourNick: 'bob',
+      server: { ...memoryServer, nick: 'bob', account: 'bob' },
+    });
+
+    expect(await screen.findByRole('button', { name: 'Run saved search Bob only' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Run saved search Alice only' })).toBeNull();
   });
 
   it('keeps the newest refresh after a rapid close and reopen', async () => {
@@ -615,7 +639,7 @@ describe('MessageSearch', () => {
       label: 'Captured search',
       query: 'captured query',
       mode: 'hybrid',
-    });
+    }, MEMORY_OWNER);
 
     fireEvent.input(screen.getByRole('searchbox', { name: 'Search messages' }), {
       target: { value: 'new context' },
@@ -716,7 +740,7 @@ describe('MessageSearch', () => {
   });
 
   it('closes with Escape from saved-search controls, not only the query input', async () => {
-    await saveSearch({ label: 'Release trail', query: 'release handoff', mode: 'hybrid' });
+    await saveSearch({ label: 'Release trail', query: 'release handoff', mode: 'hybrid' }, MEMORY_OWNER);
     store.setState({ ...initialState, activeView: { kind: 'home' } }, true);
     openMessageSearch();
     render(() => <MessageSearch />);

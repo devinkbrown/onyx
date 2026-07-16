@@ -1242,6 +1242,10 @@ function ClearReviewedAnchorsControls(): JSX.Element {
 }
 
 function ClearSavedSearchesControls(): JSX.Element {
+  const memoryOwner = useStore(
+    selectDeviceMemoryOwner,
+    (left, right) => left?.serverUrl === right?.serverUrl && left?.identity === right?.identity,
+  );
   const [searchCount, setSearchCount] = createSignal<number | null>(null);
   const [stagedCount, setStagedCount] = createSignal<number | null>(null);
   const [confirming, setConfirming] = createSignal(false);
@@ -1252,25 +1256,60 @@ function ClearSavedSearchesControls(): JSX.Element {
   } | null>(null);
   let clearTrigger: HTMLButtonElement | undefined;
   let eraseAction: HTMLButtonElement | undefined;
+  let ownerEpoch = 0;
 
-  async function refreshCount(): Promise<number> {
-    const count = (await listSearches()).length;
+  function ownerIsCurrent(owner: DeviceMemoryOwner, epoch: number): boolean {
+    const current = memoryOwner();
+    return epoch === ownerEpoch
+      && current?.serverUrl === owner.serverUrl
+      && current.identity === owner.identity;
+  }
+
+  async function refreshCount(
+    owner: DeviceMemoryOwner,
+    epoch: number,
+  ): Promise<number | null> {
+    const count = (await listSearches(owner)).length;
+    if (!ownerIsCurrent(owner, epoch)) return null;
     setSearchCount(count);
     return count;
   }
 
-  onMount(() => {
-    void refreshCount();
+  createEffect(() => {
+    const owner = memoryOwner();
+    const epoch = ++ownerEpoch;
+    setConfirming(false);
+    setStagedCount(null);
+    setStatus(null);
+    if (!owner) {
+      setSearchCount(0);
+      return;
+    }
+    void refreshCount(owner, epoch);
   });
   onCleanup(subscribeSavedSearches(() => {
-    void refreshCount();
+    const owner = memoryOwner();
+    if (owner) void refreshCount(owner, ownerEpoch);
   }));
 
   async function beginClear(trigger: HTMLButtonElement): Promise<void> {
+    const owner = memoryOwner();
+    if (!owner) {
+      setStatus({
+        message: 'Could not resolve an active account or guest identity. No saved searches were changed.',
+        failure: true,
+      });
+      return;
+    }
+    const epoch = ownerEpoch;
     clearTrigger = trigger;
     setBusy(true);
     setStatus(null);
-    const count = await refreshCount();
+    const count = await refreshCount(owner, epoch);
+    if (count === null) {
+      setBusy(false);
+      return;
+    }
     setStagedCount(count);
     setConfirming(true);
     setBusy(false);
@@ -1287,8 +1326,21 @@ function ClearSavedSearchesControls(): JSX.Element {
   async function confirmClear(): Promise<void> {
     const expected = stagedCount();
     if (expected === null) return;
+    const owner = memoryOwner();
+    if (!owner) {
+      setStatus({
+        message: 'Could not resolve an active account or guest identity. No saved searches were changed.',
+        failure: true,
+      });
+      return;
+    }
+    const epoch = ownerEpoch;
     setBusy(true);
-    const current = (await listSearches()).length;
+    const current = (await listSearches(owner)).length;
+    if (!ownerIsCurrent(owner, epoch)) {
+      setBusy(false);
+      return;
+    }
     setSearchCount(current);
     if (current !== expected) {
       setStagedCount(current);
@@ -1300,8 +1352,12 @@ function ClearSavedSearchesControls(): JSX.Element {
       return;
     }
 
-    const cleared = await clearSavedSearches();
-    const remaining = (await listSearches()).length;
+    const cleared = await clearSavedSearches(owner);
+    const remaining = (await listSearches(owner)).length;
+    if (!ownerIsCurrent(owner, epoch)) {
+      setBusy(false);
+      return;
+    }
     if (!cleared || remaining > 0) {
       // A false clear result means the empty readback is not authoritative.
       // Keep the disclosed count when verification failed without retained rows.

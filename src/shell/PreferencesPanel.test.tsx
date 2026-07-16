@@ -21,9 +21,10 @@ import {
 import * as historyVault from '@/lib/vault/historyVault';
 import {
   _resetSavedSearchesForTests,
-  deleteSearch,
-  listSearches,
-  saveSearch,
+  deleteSearch as deleteScopedSearch,
+  listSearches as listScopedSearches,
+  saveSearch as saveScopedSearch,
+  type SavedSearchInput,
 } from '@/lib/vault/savedSearches';
 import { RETENTION_POLICY_STORAGE_KEY } from '@/lib/vault/retentionPolicy';
 import {
@@ -77,6 +78,18 @@ function readReviewHistory(): ReviewHistoryEntry[] {
 
 function recordReviewHistory(entry: ReviewHistoryEntry): ReviewHistoryEntry[] {
   return recordScopedReviewHistory(entry, MEMORY_OWNER);
+}
+
+function listSearches() {
+  return listScopedSearches(MEMORY_OWNER);
+}
+
+function saveSearch(input: SavedSearchInput) {
+  return saveScopedSearch(input, MEMORY_OWNER);
+}
+
+function deleteSearch(id: string) {
+  return deleteScopedSearch(id, MEMORY_OWNER);
 }
 
 function emptyPortableSnapshot(): PortableTransferSnapshot {
