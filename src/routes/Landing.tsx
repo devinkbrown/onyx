@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import './landing.css';
-import { createMemo, createResource, onCleanup, Show } from 'solid-js';
+import { createMemo, createResource, createSignal, onCleanup, Show } from 'solid-js';
 import { Mascot } from '@/components/brand/Mascot';
 import { fetchStatsIndex } from '@/lib/stats/networkIndex';
-import { fetchNetworkStatus, formatDuration } from '@/lib/stats/status';
+import {
+  fetchNetworkStatus,
+  formatDuration,
+  publicMeshFeedLabel,
+  publicMeshFeedState,
+} from '@/lib/stats/status';
 import { setPageMeta } from './pageMeta';
 
 /** Onyx launch site — deep-water dark luxury, community-first.
@@ -18,7 +23,9 @@ export default function Landing() {
   );
   const [stats, { refetch: refetchStats }] = createResource(fetchStatsIndex, { initialValue: null });
   const [status, { refetch: refetchStatus }] = createResource(fetchNetworkStatus, { initialValue: null });
+  const [nowMs, setNowMs] = createSignal(Date.now());
   const refreshTimer = setInterval(() => {
+    setNowMs(Date.now());
     void refetchStats();
     void refetchStatus();
   }, 30_000);
@@ -26,10 +33,16 @@ export default function Landing() {
   const busiest = createMemo(() =>
     [...(stats.latest?.channels ?? [])].sort((a, b) => b.messages - a.messages)[0] ?? null,
   );
+  const feedState = createMemo(() => publicMeshFeedState(status.latest, nowMs()));
   const meshState = createMemo(() => {
-    const s = status.latest;
-    if (!s) return 'listening';
-    return s.mesh.quorum && !s.mesh.partitioned ? 'operational' : 'degraded';
+    switch (feedState()) {
+      case 'current': return 'operational';
+      case 'degraded': return 'degraded';
+      case 'stale': return 'stale';
+      case 'future': return 'time mismatch';
+      case 'unknown': return 'undated';
+      default: return 'listening';
+    }
   });
 
   return (
@@ -59,7 +72,9 @@ export default function Landing() {
           <a class="hideable" href="/status/">Status</a>
           <a class="hideable" href="/roadmap/">Roadmap</a>
           <a class="hideable" href="#join">Join</a>
-          <span class="live hideable"><i aria-hidden="true" />network online</span>
+          <span class="live hideable" data-feed-state={feedState()}>
+            <i aria-hidden="true" />{publicMeshFeedLabel(feedState())}
+          </span>
           <a class="enter" href="/app/">Open Onyx</a>
         </nav>
       </header>

@@ -85,13 +85,36 @@ describe('Landing', () => {
   it('keeps the landing shell visible while public feeds are pending', () => {
     vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
 
-    const { getByRole, queryByTestId } = render(() => (
+    const { getByRole, getByText, queryByTestId, queryByText } = render(() => (
       <Suspense fallback={<p data-testid="landing-suspended">Loading landing</p>}>
         <Landing />
       </Suspense>
     ));
 
     expect(getByRole('heading', { name: /come liveon the water/i })).toBeInTheDocument();
+    expect(getByText('status unavailable')).toHaveAttribute('data-feed-state', 'unavailable');
+    expect(queryByText('network online')).not.toBeInTheDocument();
     expect(queryByTestId('landing-suspended')).not.toBeInTheDocument();
+  });
+
+  it('does not call a future-skewed public status sample online', async () => {
+    const futureStatus = {
+      generated_at: Math.floor((Date.now() + 10 * 60_000) / 1000),
+      network: 'Onyx',
+      node: 'eshmaki.me',
+      uptime_seconds: 60,
+      users_online: 2,
+      mesh: { quorum: true, partitioned: false, components: 1 },
+      peers: [],
+    };
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => new Response(
+      JSON.stringify(String(input).includes('status.json') ? futureStatus : {}),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    )));
+
+    const { findByText, queryByText } = render(() => <Landing />);
+
+    expect(await findByText('status time mismatch')).toHaveAttribute('data-feed-state', 'future');
+    expect(queryByText('network online')).not.toBeInTheDocument();
   });
 });

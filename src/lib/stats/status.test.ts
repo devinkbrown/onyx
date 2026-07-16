@@ -6,7 +6,21 @@ import {
   MAX_STATUS_PEER_NAME_LENGTH,
   MAX_STATUS_PEERS,
   normalizeStatus,
+  publicMeshFeedLabel,
+  publicMeshFeedState,
+  type NetworkStatus,
 } from './status';
+
+const NOW_MS = Date.UTC(2026, 6, 16, 12, 0, 0);
+const HEALTHY_STATUS: NetworkStatus = {
+  generated_at: NOW_MS / 1000,
+  network: 'Onyx',
+  node: 'eshmaki.me',
+  uptime_seconds: 60,
+  users_online: 2,
+  mesh: { quorum: true, partitioned: false, components: 1 },
+  peers: [],
+};
 
 describe('normalizeStatus', () => {
   it('returns null for non-object status feeds', () => {
@@ -96,5 +110,45 @@ describe('normalizeStatus', () => {
     expect(formatDuration(3600 + 180)).toBe('1h 3m');
     expect(formatDuration(2 * 86400 + 3600)).toBe('2d 1h');
     expect(formatDuration(Number.POSITIVE_INFINITY)).toBe('0s');
+  });
+});
+
+describe('public mesh feed state', () => {
+  it('reports online only for a fresh healthy quorum sample', () => {
+    expect(publicMeshFeedState(HEALTHY_STATUS, NOW_MS)).toBe('current');
+    expect(publicMeshFeedLabel('current')).toBe('mesh online');
+  });
+
+  it('keeps topology failures distinct from feed freshness failures', () => {
+    expect(publicMeshFeedState({
+      ...HEALTHY_STATUS,
+      mesh: { quorum: false, partitioned: true, components: 2 },
+    }, NOW_MS)).toBe('degraded');
+    expect(publicMeshFeedState({
+      ...HEALTHY_STATUS,
+      generated_at: (NOW_MS - 10 * 60_000) / 1000,
+    }, NOW_MS)).toBe('stale');
+    expect(publicMeshFeedState({
+      ...HEALTHY_STATUS,
+      generated_at: (NOW_MS + 10 * 60_000) / 1000,
+    }, NOW_MS)).toBe('future');
+    expect(publicMeshFeedState({ ...HEALTHY_STATUS, generated_at: 0 }, NOW_MS)).toBe('unknown');
+    expect(publicMeshFeedState(null, NOW_MS)).toBe('unavailable');
+  });
+
+  it('gives every non-current state truthful public wording', () => {
+    expect([
+      publicMeshFeedLabel('degraded'),
+      publicMeshFeedLabel('stale'),
+      publicMeshFeedLabel('future'),
+      publicMeshFeedLabel('unknown'),
+      publicMeshFeedLabel('unavailable'),
+    ]).toEqual([
+      'mesh degraded',
+      'status stale',
+      'status time mismatch',
+      'status undated',
+      'status unavailable',
+    ]);
   });
 });

@@ -4,9 +4,9 @@
  *
  * Strategy: static source + runtime DOM assertions.
  *
- * The About page is a fully static component (no signals, effects, or
- * server-fetched data). Its source is the single source of truth for
- * content and structure. We test two ways:
+ * The About page is editorial except for its bounded public mesh-health badge.
+ * Its source is the single source of truth for content and structure. We test
+ * two ways:
  *
  *  1. Source analysis (fast, env-agnostic): read About.tsx and scan for
  *     required content strings, class names, and structural markers. This
@@ -92,6 +92,13 @@ describe('About page — source structure', () => {
 
   it('has a <header class="r-status"> top bar', () => {
     expect(srcContains('class="r-status"')).toBe(true);
+  });
+
+  it('derives the mesh badge from bounded public feed state', () => {
+    expect(srcContains('publicMeshFeedState')).toBe(true);
+    expect(srcContains('publicMeshFeedLabel')).toBe(true);
+    expect(srcContains('data-feed-state={feedState()}')).toBe(true);
+    expect(src).not.toMatch(/>mesh online<\/span>/);
   });
 
   it('has a footer with class r-footer', () => {

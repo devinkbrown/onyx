@@ -5,11 +5,15 @@ import { createMemo, createResource, createSignal, For, onCleanup, Show } from '
 import { Mascot } from '@/components/brand/Mascot';
 import { fetchBackupManifest } from '@/lib/stats/backups';
 import { relTime } from '@/lib/stats/networkIndex';
-import { fetchNetworkStatus, formatDuration } from '@/lib/stats/status';
-import { publicFeedFreshness } from '@/lib/stats/feedBounds';
+import {
+  fetchNetworkStatus,
+  formatDuration,
+  publicMeshFeedLabel,
+  publicMeshFeedState,
+} from '@/lib/stats/status';
 import { setPageMeta } from './pageMeta';
 
-function statusState(quorum: boolean, partitioned: boolean): 'up' | 'degraded' {
+function topologyState(quorum: boolean, partitioned: boolean): 'up' | 'degraded' {
   return quorum && !partitioned ? 'up' : 'degraded';
 }
 
@@ -29,21 +33,7 @@ export default function StatusRoute() {
   }, 30_000);
   onCleanup(() => clearInterval(timer));
   const feedState = createMemo(() => {
-    const data = status.latest;
-    if (!data) return 'unavailable';
-    const freshness = publicFeedFreshness(data.generated_at, nowMs());
-    if (freshness !== 'current') return freshness;
-    return statusState(data.mesh.quorum, data.mesh.partitioned) === 'up' ? 'current' : 'degraded';
-  });
-  const feedLabel = createMemo(() => {
-    switch (feedState()) {
-      case 'current': return 'mesh online';
-      case 'degraded': return 'mesh degraded';
-      case 'stale': return 'status stale';
-      case 'future': return 'status time mismatch';
-      case 'unknown': return 'status undated';
-      default: return 'status unavailable';
-    }
+    return publicMeshFeedState(status.latest, nowMs());
   });
 
   return (
@@ -69,7 +59,9 @@ export default function StatusRoute() {
           <a class="hideable" href="/status/" aria-current="page">Status</a>
           <a class="hideable" href="/roadmap/">Roadmap</a>
           <a class="hideable" href="/about/">About</a>
-          <span class="live hideable" data-feed-state={feedState()}><i aria-hidden="true" />{feedLabel()}</span>
+          <span class="live hideable" data-feed-state={feedState()}>
+            <i aria-hidden="true" />{publicMeshFeedLabel(feedState())}
+          </span>
           <a class="enter" href="/app/">Open Onyx</a>
         </nav>
       </header>
@@ -83,7 +75,7 @@ export default function StatusRoute() {
         </p>
         <Show when={status.latest} fallback={<div class="data-empty">Status is waiting for the next exported feed.</div>}>
           {(data) => {
-            const state = () => statusState(data().mesh.quorum, data().mesh.partitioned);
+            const state = () => topologyState(data().mesh.quorum, data().mesh.partitioned);
             const upPeers = () => data().peers.filter((p) => p.up).length;
             return (
               <div class="data-summary" aria-label="Status summary">

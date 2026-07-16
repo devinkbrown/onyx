@@ -10,6 +10,8 @@ import {
   boundedFeedNumber,
   boundedFeedText,
   boundedUnixSeconds,
+  publicFeedFreshness,
+  type PublicFeedFreshness,
 } from './feedBounds';
 import { fetchPublicJson } from './fetchPublicJson';
 
@@ -41,6 +43,29 @@ export type NetworkStatus = {
   mesh: MeshEnvelope;
   peers: StatusPeer[];
 };
+
+export type PublicMeshFeedState = PublicFeedFreshness | 'degraded' | 'unavailable';
+
+export function publicMeshFeedState(
+  status: Pick<NetworkStatus, 'generated_at' | 'mesh'> | null,
+  nowMs: number,
+): PublicMeshFeedState {
+  if (!status) return 'unavailable';
+  const freshness = publicFeedFreshness(status.generated_at, nowMs);
+  if (freshness !== 'current') return freshness;
+  return status.mesh.quorum && !status.mesh.partitioned ? 'current' : 'degraded';
+}
+
+export function publicMeshFeedLabel(state: PublicMeshFeedState): string {
+  switch (state) {
+    case 'current': return 'mesh online';
+    case 'degraded': return 'mesh degraded';
+    case 'stale': return 'status stale';
+    case 'future': return 'status time mismatch';
+    case 'unknown': return 'status undated';
+    default: return 'status unavailable';
+  }
+}
 
 export function normalizeStatus(raw: unknown): NetworkStatus | null {
   if (typeof raw !== 'object' || raw === null) return null;

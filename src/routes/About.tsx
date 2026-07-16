@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import './landing.css';
 import './about.css';
+import { createMemo, createResource, createSignal, onCleanup } from 'solid-js';
 import { Mascot } from '@/components/brand/Mascot';
+import { fetchNetworkStatus, publicMeshFeedLabel, publicMeshFeedState } from '@/lib/stats/status';
 import { AccessibilityStatement } from '@/shell/AccessibilityStatement';
 import { setPageMeta } from './pageMeta';
 
@@ -23,6 +25,14 @@ export default function About() {
     'Learn how Onyx, Suimyaku media, and the open mesh work together without closed-platform lock-in.',
     '/about/',
   );
+  const [status, { refetch }] = createResource(fetchNetworkStatus, { initialValue: null });
+  const [nowMs, setNowMs] = createSignal(Date.now());
+  const refreshTimer = setInterval(() => {
+    setNowMs(Date.now());
+    void refetch();
+  }, 30_000);
+  onCleanup(() => clearInterval(refreshTimer));
+  const feedState = createMemo(() => publicMeshFeedState(status.latest, nowMs()));
   return (
     <main class="r ab-ocean">
       {/* ── Living atmosphere (shared with landing, blue-tinted here) ── */}
@@ -54,7 +64,9 @@ export default function About() {
           <a class="hideable" href="#media">Media</a>
           <a class="hideable" href="#mesh">Mesh</a>
           <a class="hideable" href="#accessibility">Accessibility</a>
-          <span class="live hideable"><i aria-hidden="true" />mesh online</span>
+          <span class="live hideable" data-feed-state={feedState()}>
+            <i aria-hidden="true" />{publicMeshFeedLabel(feedState())}
+          </span>
           <a class="enter" href="/app/">Open Onyx</a>
         </nav>
       </header>
