@@ -18,34 +18,78 @@ const PUSH_TITLE_MAX = 160;
 const PUSH_BODY_MAX = 4096;
 const PUSH_TAG_MAX = 128;
 const PUSH_URL_MAX = 2048;
+const APP_PATH = '/app/';
 
 function boundedPushString(value, maxLength) {
   return typeof value === 'string' ? value.slice(0, maxLength) : '';
 }
 
-function safeNotificationPath(value, fallback = '/') {
+function safeNotificationPath(value, fallback = APP_PATH) {
   if (typeof value !== 'string' || value.length === 0 || value.length > PUSH_URL_MAX) {
     return fallback;
   }
   try {
     const url = new URL(value, self.location.origin);
     if (url.origin !== self.location.origin) return fallback;
+    if (url.pathname === '/app') url.pathname = APP_PATH;
+    if (!isAppPath(url.pathname)) return fallback;
     return `${url.pathname}${url.search}${url.hash}`.slice(0, PUSH_URL_MAX);
   } catch {
     return fallback;
   }
 }
 
-function isSameOriginClient(client) {
+function clientUrl(client) {
   try {
-    return new URL(client.url).origin === self.location.origin;
+    const url = new URL(client.url);
+    return url.origin === self.location.origin ? url : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
+function isAppPath(pathname) {
+  return pathname === '/app' || pathname.startsWith(APP_PATH);
+}
+
+function chooseNotificationClient(clientList, targetUrl) {
+  const sameOrigin = clientList
+    .map((client) => ({ client, url: clientUrl(client) }))
+    .filter(({ url }) => url !== null);
+  const exact = sameOrigin.find(({ url }) =>
+    `${url.pathname}${url.search}${url.hash}` === `${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`
+  );
+  if (exact) return { client: exact.client, exact: true };
+  if (isAppPath(targetUrl.pathname)) {
+    const app = sameOrigin.find(({ url }) => isAppPath(url.pathname));
+    if (app) return { client: app.client, exact: false };
+    return null;
+  }
+  const first = sameOrigin[0];
+  return first ? { client: first.client, exact: false } : null;
+}
+
+function focusNotificationTarget(clientList, targetPath) {
+  const targetUrl = new URL(targetPath, self.location.origin);
+  const selected = chooseNotificationClient(clientList, targetUrl);
+  if (!selected) return self.clients.openWindow(targetPath);
+  const { client, exact } = selected;
+  if (exact && 'focus' in client) {
+    return Promise.resolve(client.focus()).catch(() => self.clients.openWindow(targetPath));
+  }
+  if (!('navigate' in client)) {
+    return isAppPath(targetUrl.pathname) && isAppPath(clientUrl(client)?.pathname ?? '') && 'focus' in client
+      ? client.focus()
+      : self.clients.openWindow(targetPath);
+  }
+  return Promise.resolve(client.navigate(targetPath))
+    .then((navigated) => navigated && 'focus' in navigated ? navigated : client)
+    .then((focused) => 'focus' in focused ? focused.focus() : undefined)
+    .catch(() => self.clients.openWindow(targetPath));
+}
+
 function navigationFallbackPath(pathname) {
-  if (pathname === '/app' || pathname.startsWith('/app/')) return '/app/';
+  if (isAppPath(pathname)) return APP_PATH;
   if (pathname === '/') return '/';
   return null;
 }
@@ -184,7 +228,7 @@ self.addEventListener('push', (event) => {
       title: `Message from ${dmFrom}`,
       body: data.text ?? '',
       tag: `onyx-dm-${dmFrom}`,
-      url: '/app/',
+      url: APP_PATH,
     };
   }
   const rawTag = boundedPushString(data.tag, PUSH_TAG_MAX);
@@ -214,19 +258,7 @@ self.addEventListener('notificationclick', (event) => {
     self.clients
       .matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientList) => {
-        // If a window is already open, focus it and navigate
-        for (const client of clientList) {
-          if (isSameOriginClient(client) && 'focus' in client) {
-            const navigation = 'navigate' in client
-              ? client.navigate(targetUrl)
-              : Promise.resolve();
-            return Promise.resolve(navigation)
-              .catch(() => undefined)
-              .then(() => client.focus());
-          }
-        }
-        // No window open — open a new one
-        return self.clients.openWindow(targetUrl);
+        return focusNotificationTarget(clientList, targetUrl);
       })
   );
 });

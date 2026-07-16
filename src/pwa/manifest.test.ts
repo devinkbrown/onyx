@@ -114,7 +114,7 @@ describe('PWA manifest', () => {
     expect(stamped).toContain("const CACHE_NAME = 'onyx-shell-20260716-test';");
   });
 
-  it('bounds push content and rejects cross-origin notification destinations', async () => {
+  it('bounds push content and keeps notification targets on canonical app routes', async () => {
     const listeners = new Map<string, (event: Record<string, unknown>) => void>();
     const showNotification = vi.fn(async () => undefined);
     const openWindow = vi.fn(async () => undefined);
@@ -161,7 +161,61 @@ describe('PWA manifest', () => {
     expect(showNotification).toHaveBeenCalledWith('t'.repeat(160), expect.objectContaining({
       body: 'b'.repeat(4096),
       tag: 'g'.repeat(128),
-      data: { url: '/' },
+      data: { url: '/app/' },
+    }));
+
+    for (const payload of [
+      { title: 'Missing target' },
+      { title: 'Marketing target', url: '/' },
+    ]) {
+      pushWork = undefined;
+      push!({
+        data: { json: () => payload },
+        waitUntil: (work: Promise<unknown>) => {
+          pushWork = work;
+        },
+      });
+      await pushWork;
+      expect(showNotification).toHaveBeenLastCalledWith(payload.title, expect.objectContaining({
+        data: { url: '/app/' },
+      }));
+    }
+
+    pushWork = undefined;
+    push!({
+      data: {
+        json: () => ({
+          title: 'Room mention',
+          url: 'https://onyx.test/app?join=%23root&at=42#message',
+        }),
+      },
+      waitUntil: (work: Promise<unknown>) => {
+        pushWork = work;
+      },
+    });
+    await pushWork;
+    expect(showNotification).toHaveBeenLastCalledWith('Room mention', expect.objectContaining({
+      data: { url: '/app/?join=%23root&at=42#message' },
+    }));
+
+    pushWork = undefined;
+    push!({
+      data: {
+        json: () => ({
+          type: 'dm',
+          from: 'Alice',
+          text: 'Hello',
+          url: '/',
+        }),
+      },
+      waitUntil: (work: Promise<unknown>) => {
+        pushWork = work;
+      },
+    });
+    await pushWork;
+    expect(showNotification).toHaveBeenLastCalledWith('Message from Alice', expect.objectContaining({
+      body: 'Hello',
+      data: { url: '/app/' },
     }));
 
     const click = listeners.get('notificationclick');
@@ -174,7 +228,7 @@ describe('PWA manifest', () => {
       },
     });
     await clickWork;
-    expect(openWindow).toHaveBeenCalledWith('/');
+    expect(openWindow).toHaveBeenCalledWith('/app/');
 
     const prefixClient = {
       url: 'https://onyx.test.evil.example/app',
@@ -194,6 +248,67 @@ describe('PWA manifest', () => {
     expect(prefixClient.navigate).not.toHaveBeenCalled();
     expect(prefixClient.focus).not.toHaveBeenCalled();
     expect(openWindow).toHaveBeenCalledWith('/app/');
+
+    const landingClient = {
+      url: 'https://onyx.test/',
+      focus: vi.fn(async () => undefined),
+      navigate: vi.fn(async () => undefined),
+    };
+    const appClient = {
+      url: 'https://onyx.test/app/',
+      focus: vi.fn(async () => undefined),
+      navigate: vi.fn(async () => undefined),
+    };
+    const roomTarget = '/app/?join=%23root#message-42';
+    workerSelf.clients.matchAll.mockResolvedValueOnce([landingClient, appClient]);
+    openWindow.mockClear();
+    clickWork = undefined;
+    click!({
+      notification: { close: vi.fn(), data: { url: roomTarget } },
+      waitUntil: (work: Promise<unknown>) => {
+        clickWork = work;
+      },
+    });
+    await clickWork;
+    expect(appClient.navigate).toHaveBeenCalledWith(roomTarget);
+    expect(appClient.focus).toHaveBeenCalledOnce();
+    expect(landingClient.navigate).not.toHaveBeenCalled();
+    expect(landingClient.focus).not.toHaveBeenCalled();
+    expect(openWindow).not.toHaveBeenCalled();
+
+    appClient.url = `https://onyx.test${roomTarget}`;
+    appClient.navigate.mockClear();
+    appClient.focus.mockClear();
+    workerSelf.clients.matchAll.mockResolvedValueOnce([landingClient, appClient]);
+    clickWork = undefined;
+    click!({
+      notification: { close: vi.fn(), data: { url: roomTarget } },
+      waitUntil: (work: Promise<unknown>) => {
+        clickWork = work;
+      },
+    });
+    await clickWork;
+    expect(appClient.navigate).not.toHaveBeenCalled();
+    expect(appClient.focus).toHaveBeenCalledOnce();
+
+    const marketingOnlyClient = {
+      url: 'https://onyx.test/',
+      focus: vi.fn(async () => undefined),
+      navigate: vi.fn(async () => undefined),
+    };
+    workerSelf.clients.matchAll.mockResolvedValueOnce([marketingOnlyClient]);
+    openWindow.mockClear();
+    clickWork = undefined;
+    click!({
+      notification: { close: vi.fn(), data: { url: roomTarget } },
+      waitUntil: (work: Promise<unknown>) => {
+        clickWork = work;
+      },
+    });
+    await clickWork;
+    expect(marketingOnlyClient.navigate).not.toHaveBeenCalled();
+    expect(marketingOnlyClient.focus).not.toHaveBeenCalled();
+    expect(openWindow).toHaveBeenCalledWith(roomTarget);
   });
 
   it('keeps install and activation alive without substituting shells for offline document routes', async () => {
@@ -275,6 +390,19 @@ describe('PWA manifest', () => {
 
     listeners.get('fetch')?.({
       request: { method: 'GET', mode: 'navigate', url: 'https://onyx.test/app?join=%23root' },
+      respondWith: (work: Promise<unknown>) => {
+        navigationWork = work;
+      },
+    });
+    await expect(navigationWork).resolves.toEqual({ fallback: '/app/' });
+    expect(match).toHaveBeenLastCalledWith('/app/');
+
+    listeners.get('fetch')?.({
+      request: {
+        method: 'GET',
+        mode: 'navigate',
+        url: 'https://onyx.test/app/?join=%23root#message-42',
+      },
       respondWith: (work: Promise<unknown>) => {
         navigationWork = work;
       },
