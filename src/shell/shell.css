@@ -5201,6 +5201,7 @@
   .shell-sidebar-network {
     flex: none;
     gap: 8px;
+    font-size: 14px;
     letter-spacing: 0.04em;
   }
 
@@ -5213,6 +5214,46 @@
     width: 44px;
     height: 44px;
     font-size: 24px;
+  }
+
+  /* Rem-based sidebar rows otherwise become roughly 120px tall at 400% zoom,
+     leaving a short drawer with only one useful destination. Keep the rows as
+     full-size touch targets while bounding their text and metadata so the
+     navigation remains scannable and its count badges do not overflow. */
+  .shell-sidebar-scroll {
+    padding-bottom: 4px;
+  }
+
+  .shell-sidebar-section {
+    padding: 8px 8px 4px;
+  }
+
+  .shell-sidebar-section-label {
+    padding-bottom: 4px;
+    font-size: 14px;
+    letter-spacing: 0.08em;
+  }
+
+  .shell-channel-item {
+    gap: 8px;
+    min-height: 44px;
+    padding: 6px 8px;
+    font-size: 14px;
+  }
+
+  .shell-channel-sigil {
+    font-size: 14px;
+  }
+
+  .shell-channel-badge {
+    min-width: 24px;
+    height: 24px;
+    padding: 0 5px;
+    font-size: 12px;
+  }
+
+  .shell-channel-item .shell-channel-time {
+    font-size: 11px;
   }
 
   .shell-members-title {
