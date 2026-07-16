@@ -1,0 +1,130 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { parseIRCMessage } from '@/lib/irc/parser';
+import type { Channel } from '@/lib/irc/types';
+import {
+  MAX_BAN_LIST_ENTRIES,
+  _resetBanListTransportForTests,
+  store,
+  type Server,
+} from './store';
+
+const initialState = store.getInitialState();
+
+function channel(name: string): Channel {
+  return {
+    name,
+    topic: '',
+    topicSetBy: '',
+    topicSetAt: null,
+    modes: '',
+    users: new Map(),
+    unread: 0,
+    highlights: 0,
+    createdAt: null,
+    messages: [],
+  };
+}
+
+function makeClient() {
+  return {
+    sendRaw: vi.fn((..._args: string[]) => true),
+    send: vi.fn((_line: string) => true),
+    destroy: vi.fn(),
+    isupport: { CHANTYPES: '#&' },
+    negotiatedCaps: new Set<string>(),
+    capValues: new Map<string, string>(),
+    prefixToMode: {} as Record<string, string>,
+  };
+}
+
+function connect(room = '#room', account = 'alice') {
+  const client = makeClient();
+  const server: Server = {
+    id: 'ban-test',
+    name: 'Ban test',
+    network: 'Ban test',
+    url: 'wss://ban.test',
+    icon: '',
+    nick: 'me',
+    account,
+    connected: true,
+  };
+  store.setState({
+    ...initialState,
+    client: client as never,
+    server,
+    ourNick: 'me',
+    connectionStatus: 'connected',
+    channels: new Map([[room.toLowerCase(), channel(room)]]),
+  }, true);
+  return client;
+}
+
+function feed(line: string): void {
+  store.getState()._handleMessage(parseIRCMessage(line));
+}
+
+beforeEach(() => {
+  _resetBanListTransportForTests();
+  store.setState(initialState, true);
+});
+
+describe('RPL_BANLIST transport bounds', () => {
+  it('retains only bounded, normalized rows for a joined channel', () => {
+    connect();
+    feed(`:ban.test 367 me #room ${'x'.repeat(900)} ${'setter'.repeat(40)} 123`);
+    for (let index = 1; index < MAX_BAN_LIST_ENTRIES + 50; index += 1) {
+      feed(`:ban.test 367 me #room bad${index}!*@* oper ${index}`);
+    }
+    feed(':ban.test 368 me #room :End of channel ban list');
+
+    const bans = store.getState().banList.get('#room');
+    expect(bans).toHaveLength(MAX_BAN_LIST_ENTRIES);
+    expect(bans?.[0]?.mask).toHaveLength(512);
+    expect(bans?.[0]?.setBy).toHaveLength(128);
+    expect(bans?.[0]?.setAt).toBe(123);
+    expect(bans?.at(-1)?.mask).toBe(`bad${MAX_BAN_LIST_ENTRIES - 1}!*@*`);
+  });
+
+  it('ignores unsolicited lists for channels outside the live session', () => {
+    connect('#room');
+    feed(':ban.test 367 me #ghost bad!*@* oper 123');
+    feed(':ban.test 368 me #ghost :End of channel ban list');
+
+    expect(store.getState().banList.has('#ghost')).toBe(false);
+  });
+
+  it('drops an incomplete numeric burst before a replacement session', () => {
+    connect();
+    feed(':ban.test 367 me #room stale!*@* old-oper 123');
+    store.getState().disconnect();
+
+    connect();
+    feed(':ban.test 368 me #room :End of channel ban list');
+    expect(store.getState().banList.get('#room')).toEqual([]);
+  });
+
+  it('clears completed masks when the authenticated account changes', () => {
+    connect();
+    store.getState().setBanList('#room', [{ mask: 'private!*@*', setBy: 'oper', setAt: 123 }]);
+    expect(store.getState().banList.get('#room')).toHaveLength(1);
+
+    feed(':me!user@host ACCOUNT bob');
+    expect(store.getState().banList.size).toBe(0);
+  });
+
+  it('bounds direct state writes at the same protocol boundary', () => {
+    connect();
+    const oversized = Array.from(
+      { length: MAX_BAN_LIST_ENTRIES + 20 },
+      (_, index) => ({ mask: `mask${index}!*@*`, setAt: Number.NaN }),
+    );
+    store.getState().setBanList('#room', oversized);
+
+    const bans = store.getState().banList.get('#room');
+    expect(bans).toHaveLength(MAX_BAN_LIST_ENTRIES);
+    expect(bans?.[0]).toEqual({ mask: 'mask0!*@*' });
+  });
+});

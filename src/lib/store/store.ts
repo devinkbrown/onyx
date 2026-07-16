@@ -2662,7 +2662,64 @@ function _now(): number {
 
 // ── Ban list accumulator (module-level) ───────────────────────────────────────
 /** channel.toLowerCase() → accumulated bans while RPL_BANLIST numerics arrive */
-const _banBuffer = new Map<string, Array<{ mask: string; setBy?: string; setAt?: number }>>();
+type BanListEntry = { mask: string; setBy?: string; setAt?: number };
+export const MAX_BAN_LIST_ENTRIES = 512;
+const MAX_BAN_LIST_CHANNELS = 32;
+const MAX_BAN_CHANNEL_LENGTH = 256;
+const MAX_BAN_MASK_LENGTH = 512;
+const MAX_BAN_SETTER_LENGTH = 128;
+const _banBuffer = new Map<string, BanListEntry[]>();
+
+function _normalizeBanChannel(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const channel = value.trim();
+  if (
+    !channel
+    || channel.length > MAX_BAN_CHANNEL_LENGTH
+    || !'#&'.includes(channel[0] ?? '')
+    || /[\u0000-\u0020\u007f]/u.test(channel)
+  ) return null;
+  return channel.toLowerCase();
+}
+
+function _normalizeBanEntry(value: BanListEntry): BanListEntry | null {
+  if (typeof value.mask !== 'string') return null;
+  const mask = value.mask.trim().slice(0, MAX_BAN_MASK_LENGTH);
+  if (!mask || /[\u0000-\u001f\u007f]/u.test(mask)) return null;
+  const setByRaw = typeof value.setBy === 'string'
+    ? value.setBy.trim().slice(0, MAX_BAN_SETTER_LENGTH)
+    : '';
+  const setBy = setByRaw && !/[\u0000-\u001f\u007f]/u.test(setByRaw) ? setByRaw : undefined;
+  const setAt = typeof value.setAt === 'number'
+    && Number.isSafeInteger(value.setAt)
+    && value.setAt >= 0
+    ? value.setAt
+    : undefined;
+  return {
+    mask,
+    ...(setBy ? { setBy } : {}),
+    ...(setAt !== undefined ? { setAt } : {}),
+  };
+}
+
+function _normalizeBanList(values: readonly BanListEntry[]): BanListEntry[] {
+  const normalized: BanListEntry[] = [];
+  for (const value of values) {
+    if (normalized.length >= MAX_BAN_LIST_ENTRIES) break;
+    const entry = _normalizeBanEntry(value);
+    if (entry) normalized.push(entry);
+  }
+  return normalized;
+}
+
+function _clearBanListTransport(): void {
+  _banBuffer.clear();
+}
+
+/** Isolate module-level protocol state between focused store tests. */
+export function _resetBanListTransportForTests(): void {
+  _clearBanListTransport();
+}
 
 // ── Temp-ban timers (module-level) ─────────────────────────────────────────────
 /** channel/mask → timer; survives moderation panel unmounts and uses the current client when firing */
@@ -2796,6 +2853,7 @@ function _resetAccountBoundState(
   preservePasskeyError = false,
 ): void {
   _invalidateAccountReplyContexts();
+  _clearBanListTransport();
   _nickAliasTryIdx = 0;
   set(s => {
     const ownKey = s.ourNick.toLowerCase();
@@ -2849,6 +2907,7 @@ function _resetAccountBoundState(
       ctcpVersionReply: DEFAULT_CTCP_CONFIG.versionReply,
       ctcpTimeEnabled: DEFAULT_CTCP_CONFIG.timeEnabled,
       invisibleMode: false,
+      banList: new Map(),
       mutedDMs: new Set(),
       userNotes: new Map(),
       topicHistory: {},
@@ -4376,6 +4435,7 @@ export const store = createStore<OnyxState>()(
           _batchCollectors.clear();
           _openChathistoryByTarget.clear();
           _stopLatencyPing();
+          _clearBanListTransport();
           _pendingTravel = null;
           _resetServerSearchTransport();
           set(s => ({
@@ -10371,18 +10431,31 @@ export const store = createStore<OnyxState>()(
           const mask367 = params[2] ?? '';
           const setBy367 = params[3];
           const setAt367 = params[4] ? parseInt(params[4], 10) : undefined;
-          const key367 = ch367.toLowerCase();
-          if (!_banBuffer.has(key367)) _banBuffer.set(key367, []);
-          _banBuffer.get(key367)!.push({ mask: mask367, setBy: setBy367, setAt: setAt367 });
+          const key367 = _normalizeBanChannel(ch367);
+          // MODE +b replies are meaningful only for a channel this session is
+          // actually in. Ignore unsolicited numerics instead of letting a
+          // hostile server allocate arbitrary channel buckets.
+          if (!key367 || !get().channels.has(key367)) break;
+          let bans367 = _banBuffer.get(key367);
+          if (!bans367) {
+            if (_banBuffer.size >= MAX_BAN_LIST_CHANNELS) break;
+            bans367 = [];
+            _banBuffer.set(key367, bans367);
+          }
+          if (bans367.length >= MAX_BAN_LIST_ENTRIES) break;
+          const entry367 = _normalizeBanEntry({ mask: mask367, setBy: setBy367, setAt: setAt367 });
+          if (entry367) bans367.push(entry367);
           break;
         }
 
         // ── RPL_ENDOFBANLIST (368) ────────────────────────────────────────
         case '368': {
           const ch368 = params[1] ?? '';
-          const key368 = ch368.toLowerCase();
+          const key368 = _normalizeBanChannel(ch368);
+          if (!key368) break;
           const bans368 = _banBuffer.get(key368) ?? [];
           _banBuffer.delete(key368);
+          if (!get().channels.has(key368)) break;
           get().setBanList(ch368, bans368);
           break;
         }
@@ -11018,9 +11091,21 @@ export const store = createStore<OnyxState>()(
       moderationLog: [{ ...entry, timestamp: Date.now() }, ...s.moderationLog].slice(0, 200),
     })),
     banList: new Map(),
-    setBanList: (channel, bans) => set(s => ({
-      banList: new Map(s.banList).set(channel.toLowerCase(), bans),
-    })),
+    setBanList: (channel, bans) => set(s => {
+      const key = _normalizeBanChannel(channel);
+      if (!key) return {};
+      const banList = new Map(s.banList);
+      // Refresh insertion order so bounded eviction removes the least recently
+      // completed channel list rather than an actively inspected one.
+      banList.delete(key);
+      banList.set(key, _normalizeBanList(bans));
+      while (banList.size > MAX_BAN_LIST_CHANNELS) {
+        const oldest = banList.keys().next().value;
+        if (oldest === undefined) break;
+        banList.delete(oldest);
+      }
+      return { banList };
+    }),
     fetchBanList: (channel) => {
       get().client?.sendRaw('MODE', channel, '+b');
     },
