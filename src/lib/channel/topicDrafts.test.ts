@@ -2,6 +2,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   CHANNEL_TOPIC_DRAFTS_KEY,
+  MAX_CHANNEL_TOPIC_DRAFT_LENGTH,
+  MAX_CHANNEL_TOPIC_DRAFTS,
+  MAX_CHANNEL_TOPIC_TARGET_LENGTH,
   channelTopicDraftKey,
   clearChannelTopicDrafts,
   loadChannelTopicDrafts,
@@ -38,6 +41,24 @@ describe('channel topic drafts', () => {
       '#root': 'topic draft',
       '&ops': 'ops draft',
     });
+  });
+
+  it('bounds persisted channel count, target length, and draft length', () => {
+    const drafts = Object.fromEntries(
+      Array.from({ length: MAX_CHANNEL_TOPIC_DRAFTS + 2 }, (_, index) => [
+        `#room-${index}`,
+        index === 0 ? 'x'.repeat(MAX_CHANNEL_TOPIC_DRAFT_LENGTH + 25) : `topic ${index}`,
+      ]),
+    );
+    drafts[`#${'z'.repeat(MAX_CHANNEL_TOPIC_TARGET_LENGTH)}`] = 'oversized target';
+
+    const sanitized = sanitizeChannelTopicDrafts(drafts);
+
+    expect(Object.keys(sanitized)).toHaveLength(MAX_CHANNEL_TOPIC_DRAFTS);
+    expect(sanitized['#room-0']).toHaveLength(MAX_CHANNEL_TOPIC_DRAFT_LENGTH);
+    expect(sanitized['#room-49']).toBe('topic 49');
+    expect(sanitized['#room-50']).toBeUndefined();
+    expect(sanitized[`#${'z'.repeat(MAX_CHANNEL_TOPIC_TARGET_LENGTH)}`]).toBeUndefined();
   });
 
   it('persists and clears drafts relative to the server topic', () => {

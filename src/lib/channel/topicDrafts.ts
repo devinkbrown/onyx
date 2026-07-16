@@ -2,6 +2,9 @@
 import { deviceMemoryStorageKey, type DeviceMemoryOwner } from '@/lib/deviceMemoryOwner';
 
 export const CHANNEL_TOPIC_DRAFTS_KEY = 'onyx:channel-topic-drafts';
+export const MAX_CHANNEL_TOPIC_DRAFTS = 50;
+export const MAX_CHANNEL_TOPIC_DRAFT_LENGTH = 2048;
+export const MAX_CHANNEL_TOPIC_TARGET_LENGTH = 256;
 
 export type ChannelTopicDrafts = Record<string, string>;
 
@@ -23,9 +26,14 @@ export function sanitizeChannelTopicDrafts(value: unknown): ChannelTopicDrafts {
   const drafts: ChannelTopicDrafts = {};
   for (const [channel, draft] of Object.entries(value)) {
     const key = channelTopicDraftKey(channel);
-    if (!key || !(key.startsWith('#') || key.startsWith('&'))) continue;
+    if (!key || key.length > MAX_CHANNEL_TOPIC_TARGET_LENGTH || !(key.startsWith('#') || key.startsWith('&'))) continue;
     if (typeof draft !== 'string' || draft.length === 0) continue;
-    drafts[key] = draft;
+    if (Object.hasOwn(drafts, key)) {
+      drafts[key] = draft.slice(0, MAX_CHANNEL_TOPIC_DRAFT_LENGTH);
+      continue;
+    }
+    if (Object.keys(drafts).length >= MAX_CHANNEL_TOPIC_DRAFTS) continue;
+    drafts[key] = draft.slice(0, MAX_CHANNEL_TOPIC_DRAFT_LENGTH);
   }
   return drafts;
 }
