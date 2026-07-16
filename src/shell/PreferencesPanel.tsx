@@ -2801,6 +2801,13 @@ function ClearLocalHistoryControls(): JSX.Element {
   const [status, setStatus] = createSignal<string | null>(null);
   let triggerButton: HTMLButtonElement | undefined;
   let eraseButton: HTMLButtonElement | undefined;
+  let clearEpoch = 0;
+  let disposed = false;
+
+  onCleanup(() => {
+    disposed = true;
+    clearEpoch += 1;
+  });
 
   function openConfirmation(): void {
     setStatus(null);
@@ -2814,17 +2821,24 @@ function ClearLocalHistoryControls(): JSX.Element {
   }
 
   async function clearNow(): Promise<void> {
+    if (busy()) return;
+    const epoch = ++clearEpoch;
     setBusy(true);
     try {
       const cleared = await clearVault();
+      if (disposed || epoch !== clearEpoch) return;
       setStatus(cleared
         ? 'Local history cleared on this device.'
         : 'Could not clear all local history. Try again after freeing storage.');
     } catch {
-      setStatus('Could not clear local history. Try again after freeing storage.');
+      if (!disposed && epoch === clearEpoch) {
+        setStatus('Could not clear local history. Try again after freeing storage.');
+      }
     } finally {
-      setBusy(false);
-      closeConfirmation();
+      if (!disposed && epoch === clearEpoch) {
+        setBusy(false);
+        closeConfirmation();
+      }
     }
   }
 

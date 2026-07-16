@@ -2200,6 +2200,29 @@ describe('PreferencesPanel', () => {
     expect(screen.getByText('Local history cleared on this device.')).toBeInTheDocument();
   });
 
+  it('retires a pending local-history clear completion when Preferences unmounts', async () => {
+    let resolveClear: (cleared: boolean) => void = () => {};
+    const pendingClear = new Promise<boolean>((resolve) => {
+      resolveClear = resolve;
+    });
+    const clearVault = vi.spyOn(historyVault, 'clearVault').mockReturnValue(pendingClear);
+    const view = renderPreferences('History & data');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear local history' }));
+    const erase = screen.getByRole('button', { name: 'Erase history' });
+    fireEvent.click(erase);
+    fireEvent.click(erase);
+    expect(clearVault).toHaveBeenCalledOnce();
+    expect(erase).toBeDisabled();
+
+    view.unmount();
+    resolveClear(true);
+    await pendingClear;
+    await Promise.resolve();
+
+    expect(screen.queryByText('Local history cleared on this device.')).not.toBeInTheDocument();
+  });
+
   it('hands focus into the local history confirmation and restores it when cancelled', async () => {
     renderPreferences('History & data');
     await Promise.resolve();
