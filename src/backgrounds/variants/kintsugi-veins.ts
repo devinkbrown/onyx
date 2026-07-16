@@ -14,9 +14,7 @@ export const kintsugiVeins = {
   id: 'kintsugi-veins',
   label: 'Gold Veins',
   kind: 'animated',
-  init(ctx) {
-    this.frame(ctx, 0);
-  },
+  init(_ctx) {},
   frame(ctx, time) {
     composeSignature(ctx, time, (theme, t) => {
       const veinCount = Math.max(4, Math.floor(9 * ctx.qualityScale));

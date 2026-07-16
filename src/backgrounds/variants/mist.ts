@@ -17,9 +17,7 @@ export const mist = {
   id: 'mist',
   label: 'Mist',
   kind: 'animated',
-  init(ctx) {
-    this.frame(ctx, 0);
-  },
+  init(_ctx) {},
   frame(ctx, time) {
     composeSignature(ctx, time, (theme, t) => {
       drawMistBands(ctx, theme, t);

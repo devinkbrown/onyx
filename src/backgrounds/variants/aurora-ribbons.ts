@@ -19,9 +19,7 @@ export const auroraRibbons = {
   id: 'aurora-ribbons',
   label: 'Aurora Ribbons',
   kind: 'animated',
-  init(ctx) {
-    this.frame(ctx, 0);
-  },
+  init(_ctx) {},
   frame(ctx, time) {
     // Reduced motion / staticMode freezes the field at its calm t=0 phase — a
     // deterministic, legible still rather than an arbitrary mid-drift snapshot.

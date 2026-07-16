@@ -18,9 +18,7 @@ export const forest = {
   id: 'forest',
   label: 'Grove',
   kind: 'animated',
-  init(ctx) {
-    this.frame(ctx, 0);
-  },
+  init(_ctx) {},
   frame(ctx, time) {
     composeSignature(ctx, time, (theme, t) => {
       drawCanopyDapple(ctx, theme, t);

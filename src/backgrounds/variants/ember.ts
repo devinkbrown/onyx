@@ -20,9 +20,7 @@ export const ember = {
   id: 'ember',
   label: 'Ember',
   kind: 'animated',
-  init(ctx) {
-    this.frame(ctx, 0);
-  },
+  init(_ctx) {},
   frame(ctx, time) {
     composeSignature(ctx, time, (theme, t) => {
       drawBankedGlow(ctx, theme, t);

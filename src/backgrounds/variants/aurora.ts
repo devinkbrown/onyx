@@ -15,9 +15,7 @@ export const aurora = {
   id: 'aurora',
   label: 'Mineral Aurora',
   kind: 'animated',
-  init(ctx) {
-    this.frame(ctx, 0);
-  },
+  init(_ctx) {},
   frame(ctx, time) {
     composeSignature(ctx, time, (theme, t) => {
       drawAuroraBands(ctx, theme, t);

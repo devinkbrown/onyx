@@ -6,9 +6,7 @@ export const lapisGradient = {
   id: 'lapis-gradient',
   label: 'Lapis Gradient',
   kind: 'solid',
-  init(ctx) {
-    this.frame(ctx, 0);
-  },
+  init(_ctx) {},
   frame(ctx) {
     const theme = readBackgroundTheme(ctx.canvas);
     const c = ctx.context;

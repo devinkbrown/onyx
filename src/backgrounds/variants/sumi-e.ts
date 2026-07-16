@@ -15,9 +15,7 @@ export const sumiE = {
   id: 'sumi-e',
   label: 'Sumi-e',
   kind: 'animated',
-  init(ctx) {
-    this.frame(ctx, 0);
-  },
+  init(_ctx) {},
   frame(ctx, time) {
     composeSignature(ctx, time, (theme, t) => {
       drawInkBlooms(ctx, theme, t);

@@ -17,9 +17,7 @@ export const deepCurrent = {
   id: 'deep-current',
   label: 'Deep Current',
   kind: 'animated',
-  init(ctx) {
-    this.frame(ctx, 0);
-  },
+  init(_ctx) {},
   frame(ctx, time) {
     const currentTime = prefersReducedMotion() ? 0 : time;
     composeSignature(ctx, currentTime, (theme, t) => {

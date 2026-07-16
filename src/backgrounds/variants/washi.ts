@@ -14,9 +14,7 @@ export const washi = {
   id: 'washi',
   label: 'Paper Grain',
   kind: 'solid',
-  init(ctx) {
-    this.frame(ctx, 0);
-  },
+  init(_ctx) {},
   frame(ctx) {
     composeSignature(ctx, 0, (theme) => {
       drawFibres(ctx, theme);

@@ -19,9 +19,7 @@ export const resin = {
   id: 'resin',
   label: 'Resin',
   kind: 'animated',
-  init(ctx) {
-    this.frame(ctx, 0);
-  },
+  init(_ctx) {},
   frame(ctx, time) {
     composeSignature(ctx, time, (theme, t) => {
       drawAmberPools(ctx, theme, t);

@@ -6,9 +6,7 @@ export const obsidian = {
   id: 'obsidian',
   label: 'Obsidian',
   kind: 'solid',
-  init(ctx) {
-    this.frame(ctx, 0);
-  },
+  init(_ctx) {},
   frame(ctx) {
     const theme = readBackgroundTheme(ctx.canvas);
     clearCanvas(ctx);

@@ -24,6 +24,7 @@ export interface BackgroundVariant {
   id: string;
   label: string;
   kind: CanvasBackgroundKind;
+  /** Prepare renderer-owned state only. BackgroundEngine owns the first paint. */
   init(ctx: BackgroundFrameContext): void;
   frame(ctx: BackgroundFrameContext, time: number): void;
   dispose(): void;
@@ -279,6 +280,13 @@ export class BackgroundEngine {
     const dpr = getDevicePixelRatio(this.currentQuality);
     const pixelWidth = Math.max(1, Math.floor(width * dpr));
     const pixelHeight = Math.max(1, Math.floor(height * dpr));
+    const previous = this.frameContext;
+    const frameChanged =
+      previous === null ||
+      previous.width !== width ||
+      previous.height !== height ||
+      previous.dpr !== dpr ||
+      previous.quality !== this.currentQuality;
 
     if (this.canvas.width !== pixelWidth) this.canvas.width = pixelWidth;
     if (this.canvas.height !== pixelHeight) this.canvas.height = pixelHeight;
@@ -294,10 +302,16 @@ export class BackgroundEngine {
       qualityScale: QUALITY_PROFILES[this.currentQuality].scale,
     };
 
-    // Assigning canvas.width/height clears the bitmap. Once initialized, every
-    // resize path (viewport, ResizeObserver, or a quality change) must repaint a
-    // renderer that has no animation loop of its own.
-    if (this.running && this.initialized && rendersSingleFrame(this.staticMode, this.variant.kind)) {
+    // ResizeObserver delivers an initial callback after mount even when the
+    // canvas already has the exact backing/layout metrics established above.
+    // Repaint frozen renderers only when their frame inputs actually changed;
+    // real viewport, DPR, and quality changes still redraw immediately.
+    if (
+      frameChanged &&
+      this.running &&
+      this.initialized &&
+      rendersSingleFrame(this.staticMode, this.variant.kind)
+    ) {
       this.refreshStaticFrame();
     }
   }

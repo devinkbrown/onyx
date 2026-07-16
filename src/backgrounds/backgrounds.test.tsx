@@ -235,6 +235,27 @@ describe('frame cadence cap', () => {
 });
 
 describe('BackgroundEngine lifecycle', () => {
+  it('owns exactly one startup paint for a real catalogue canvas variant', () => {
+    // Catalogue variants used to call frame() from init(), so engine.start()
+    // painted the full viewport twice before yielding. Keep init setup-only and
+    // let the engine guarantee the one visible first frame, including static mode.
+    const variant = backgroundRegistry[0];
+    const init = vi.spyOn(variant, 'init');
+    const frame = vi.spyOn(variant, 'frame');
+    const engine = new BackgroundEngine({ canvas: createCanvas(), variant, staticMode: true });
+
+    try {
+      engine.start();
+
+      expect(init).toHaveBeenCalledTimes(1);
+      expect(frame).toHaveBeenCalledTimes(1);
+    } finally {
+      engine.dispose();
+      init.mockRestore();
+      frame.mockRestore();
+    }
+  });
+
   it('holds canvas animation while the window is blurred and resumes at full cadence on focus', () => {
     const hidden = Object.getOwnPropertyDescriptor(document, 'hidden');
     const raf = installControlledAnimationFrame();
@@ -273,12 +294,29 @@ describe('BackgroundEngine lifecycle', () => {
   it.each([
     { label: 'solid variant', kind: 'solid' as const, staticMode: false },
     { label: 'static animated variant', kind: 'animated' as const, staticMode: true },
-  ])('repaints a $label after resize clears the bitmap', ({ kind, staticMode }) => {
+  ])('does not repaint a $label for a no-op resize notification', ({ kind, staticMode }) => {
     const variant = { ...createVariant(), kind };
     const engine = new BackgroundEngine({ canvas: createCanvas(), variant, staticMode });
 
     engine.start();
     const framesAtStart = (variant.frame as ReturnType<typeof vi.fn>).mock.calls.length;
+    window.dispatchEvent(new Event('resize'));
+
+    expect(variant.frame).toHaveBeenCalledTimes(framesAtStart);
+    engine.dispose();
+  });
+
+  it.each([
+    { label: 'solid variant', kind: 'solid' as const, staticMode: false },
+    { label: 'static animated variant', kind: 'animated' as const, staticMode: true },
+  ])('repaints a $label for real layout and quality changes', ({ kind, staticMode }) => {
+    const canvas = createCanvas();
+    const variant = { ...createVariant(), kind };
+    const engine = new BackgroundEngine({ canvas, variant, staticMode });
+
+    engine.start();
+    const framesAtStart = (variant.frame as ReturnType<typeof vi.fn>).mock.calls.length;
+    vi.mocked(canvas.getBoundingClientRect).mockReturnValue(canvasBounds(800, 450));
     window.dispatchEvent(new Event('resize'));
 
     expect(variant.frame).toHaveBeenCalledTimes(framesAtStart + 1);
@@ -298,6 +336,7 @@ describe('BackgroundEngine lifecycle', () => {
       const framesAtStart = (variant.frame as ReturnType<typeof vi.fn>).mock.calls.length;
 
       setDocumentHidden(true);
+      vi.mocked(engine.canvas.getBoundingClientRect).mockReturnValue(canvasBounds(800, 450));
       window.dispatchEvent(new Event('resize'));
       expect(variant.frame).toHaveBeenCalledTimes(framesAtStart);
 
@@ -576,6 +615,17 @@ describe('Background reduced-motion selection', () => {
 });
 
 describe('background variants', () => {
+  it.each(backgroundRegistry)('$id keeps init setup-only', (variant) => {
+    const frame = vi.spyOn(variant, 'frame');
+
+    try {
+      variant.init(createFrameContext());
+      expect(frame).not.toHaveBeenCalled();
+    } finally {
+      frame.mockRestore();
+    }
+  });
+
   it.each(backgroundRegistry)('runs init, frame, and dispose for $id without throwing', (variant) => {
     // Arrange
     const ctx = createFrameContext();
@@ -724,19 +774,23 @@ function createCanvas(): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   Object.defineProperty(canvas, 'clientWidth', { value: 640, configurable: true });
   Object.defineProperty(canvas, 'clientHeight', { value: 360, configurable: true });
-  canvas.getBoundingClientRect = vi.fn(() => ({
-    x: 0,
-    y: 0,
-    width: 640,
-    height: 360,
-    top: 0,
-    right: 640,
-    bottom: 360,
-    left: 0,
-    toJSON: () => '',
-  }));
+  canvas.getBoundingClientRect = vi.fn(() => canvasBounds(640, 360));
   canvas.getContext = vi.fn(() => create2dContext()) as unknown as typeof canvas.getContext;
   return canvas;
+}
+
+function canvasBounds(width: number, height: number): DOMRect {
+  return {
+    x: 0,
+    y: 0,
+    width,
+    height,
+    top: 0,
+    right: width,
+    bottom: height,
+    left: 0,
+    toJSON: () => '',
+  } as DOMRect;
 }
 
 function createFrameContext(): BackgroundFrameContext {

@@ -19,9 +19,7 @@ export const tideBands = {
   id: 'tide-bands',
   label: 'Tide Bands',
   kind: 'animated',
-  init(ctx) {
-    this.frame(ctx, 0);
-  },
+  init(_ctx) {},
   frame(ctx, time) {
     // Reduced motion / staticMode holds the tide at its t=0 phase: the bands and
     // their sheen freeze at a fixed, legible position rather than mid-sweep.

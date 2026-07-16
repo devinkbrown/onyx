@@ -15,9 +15,7 @@ export const frost = {
   id: 'frost',
   label: 'Frost',
   kind: 'animated',
-  init(ctx) {
-    this.frame(ctx, 0);
-  },
+  init(_ctx) {},
   frame(ctx, time) {
     const theme = readBackgroundTheme(ctx.canvas);
 

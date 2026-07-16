@@ -15,9 +15,7 @@ export const pyriteField = {
   id: 'pyrite-field',
   label: 'Pyrite Field',
   kind: 'animated',
-  init(ctx) {
-    this.frame(ctx, 0);
-  },
+  init(_ctx) {},
   frame(ctx, time) {
     composeSignature(ctx, time, (theme, t) => {
       drawDiagonals(ctx, theme, t);
