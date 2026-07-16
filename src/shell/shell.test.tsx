@@ -1543,7 +1543,7 @@ describe('AppShell', () => {
       await waitFor(() => expect(memberList).toHaveFocus());
     });
 
-    it('gives Escape to a portaled WHOIS before closing the mobile member drawer', async () => {
+    it('gives keyboard ownership to a portaled WHOIS before closing the mobile member drawer', async () => {
       stubMobileViewport();
       seedStore('#general');
       store.setState({
@@ -1564,7 +1564,12 @@ describe('AppShell', () => {
       const memberTrigger = within(memberList!).getByRole('button', { name: /Open member details for alice/i });
       fireEvent.click(memberTrigger);
       fireEvent.click(screen.getByRole('button', { name: 'View profile of alice' }));
-      await screen.findByRole('dialog', { name: 'Profile: alice' });
+      const profile = await screen.findByRole('dialog', { name: 'Profile: alice' });
+
+      fireEvent.keyDown(document, { key: 'Tab' });
+      expect(profile.contains(document.activeElement)).toBe(true);
+      expect(within(profile).getByRole('button', { name: 'Close member profile' })).toHaveFocus();
+      expect(memberList).toHaveAttribute('aria-hidden', 'false');
 
       fireEvent.keyDown(document, { key: 'Escape' });
       await waitFor(() => {

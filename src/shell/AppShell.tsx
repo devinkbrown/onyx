@@ -410,12 +410,13 @@ export function AppShell(props: AppShellProps): JSX.Element {
     const onKeyDown = (event: KeyboardEvent): void => {
       const drawer = activeMobileDrawerElement();
       if (!drawer || keyboardEventIsClaimed(event)) return;
+      // A portaled modal sits outside the drawer DOM but above it visually.
+      // Its later focus-trap listener must own every key, especially Tab and
+      // Escape; otherwise this older drawer listener can move focus behind it.
+      if (hasPortaledModalAboveDrawer(drawer)) return;
 
       if (event.key === 'Escape') {
-        if (
-          drawer.querySelector('[role="dialog"]:not([hidden])')
-          || hasPortaledModalAboveDrawer(drawer)
-        ) return;
+        if (drawer.querySelector('[role="dialog"]:not([hidden])')) return;
         event.preventDefault();
         closeActiveMobileDrawer();
         return;
