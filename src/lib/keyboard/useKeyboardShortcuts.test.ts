@@ -182,6 +182,51 @@ describe('SHORTCUTS descriptor', () => {
     dispose();
   });
 
+  it('leaves app-global shortcuts inert while an IME owns the keyboard', () => {
+    const dispose = mountKeyboardHarness();
+    const channel = (name: string, unread: number): Channel => ({
+      name,
+      topic: '',
+      topicSetBy: '',
+      topicSetAt: null,
+      modes: '',
+      users: new Map(),
+      unread,
+      highlights: 0,
+      createdAt: null,
+      messages: [],
+    });
+    store.setState({
+      channels: new Map([
+        ['#general', channel('#general', 0)],
+        ['#alerts', channel('#alerts', 3)],
+      ]),
+      activeView: { kind: 'channel', channel: '#general' },
+    });
+    closePreferences();
+
+    fireEvent.keyDown(window, { key: 'n', isComposing: true });
+    fireEvent.keyDown(window, { key: ',', ctrlKey: true, isComposing: true });
+    fireEvent.keyDown(window, { key: 'r', ctrlKey: true, shiftKey: true, isComposing: true });
+
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#general' });
+    expect(isPreferencesOpen()).toBe(false);
+    expect(preferences().readerMode).toBe(false);
+    dispose();
+  });
+
+  it('cancels a pending G sequence when IME composition starts', () => {
+    const dispose = mountKeyboardHarness();
+    store.setState({ activeView: { kind: 'channel', channel: '#general' } });
+
+    fireEvent.keyDown(window, { key: 'g' });
+    fireEvent.keyDown(window, { key: 'h', isComposing: true });
+    fireEvent.keyDown(window, { key: 'h' });
+
+    expect(store.getState().activeView).toEqual({ kind: 'channel', channel: '#general' });
+    dispose();
+  });
+
   it('suppresses app-global shortcuts while a modal button owns focus, then resumes after removal', () => {
     const dispose = mountKeyboardHarness();
     const channel = (name: string, unread: number): Channel => ({

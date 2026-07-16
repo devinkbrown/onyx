@@ -345,6 +345,16 @@ export function useKeyboardShortcuts(): void {
 
   function handleKeyDown(event: KeyboardEvent): void {
     if (event.defaultPrevented) return;
+
+    // IME candidate selection owns every key while composition is active.
+    // Without this guard, ordinary composition keystrokes such as N/J/K/G can
+    // navigate the app, toggle follows, or close an overlay out from under the
+    // candidate window. `keyCode === 229` covers engines that do not reliably
+    // expose `isComposing` on the terminal keydown event.
+    if (event.isComposing || event.keyCode === 229) {
+      clearPendingPrefix();
+      return;
+    }
     const inEditable = isEditableTarget(event.target);
 
     // ── Escape — always close overlays regardless of focus ──────────────────
