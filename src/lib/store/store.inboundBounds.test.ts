@@ -24,6 +24,8 @@ import {
   MAX_SERVER_RULE_LINES,
   MAX_TEGAMI_CONVERSATIONS,
   MAX_TEGAMI_COUNT,
+  MAX_WHOIS_CACHE_ENTRIES,
+  MAX_WHOIS_CHANNELS,
   store,
 } from './store';
 
@@ -66,6 +68,36 @@ beforeEach(() => {
 });
 
 describe('live inbound message bounds', () => {
+  it('retains only the active bounded WHOIS working set', () => {
+    feed(':server 311 me unsolicited user host * :Unsolicited profile');
+    expect(store.getState().whoisData.size).toBe(0);
+    expect(store.getState().userProfiles.size).toBe(0);
+
+    for (let index = 0; index < MAX_WHOIS_CACHE_ENTRIES + 8; index += 1) {
+      store.getState().openWhois(`peer-${index}`);
+    }
+    expect(store.getState().whoisData.size).toBe(MAX_WHOIS_CACHE_ENTRIES);
+    expect(store.getState().whoisData.has('peer-0')).toBe(false);
+
+    store.getState().openWhois('active-peer');
+    feed(`:server 311 me active-peer ${'u'.repeat(MAX_SERVER_AUX_TEXT_LENGTH + 8)} host * :${'r'.repeat(MAX_SERVER_AUX_TEXT_LENGTH + 8)}`);
+    const channels = Array.from({ length: MAX_WHOIS_CHANNELS + 32 }, (_, index) => `#c-${index}`).join(' ');
+    feed(`:server 319 me active-peer :${channels}`);
+    feed(':server 317 me active-peer -5 not-a-number :seconds idle');
+
+    const active = store.getState().whoisData.get('active-peer');
+    expect(active?.username).toHaveLength(MAX_SERVER_AUX_TEXT_LENGTH);
+    expect(active?.realname).toHaveLength(MAX_SERVER_AUX_TEXT_LENGTH);
+    expect(active?.channels).toHaveLength(MAX_WHOIS_CHANNELS);
+    expect(active?.idleSecs).toBe(0);
+    expect(active?.signOnTs).toBe(0);
+
+    store.getState().openWhois('replacement');
+    feed(':server 330 me active-peer old-account :is logged in as');
+    expect(store.getState().whoisData.get('active-peer')?.account).toBeUndefined();
+    expect(store.getState().userProfiles.get('active-peer')?.account).toBeUndefined();
+  });
+
   it('bounds requested MOTD, rules, service notices, and server-log text', () => {
     feed(':server 372 me :unsolicited MOTD');
     feed(':server 376 me :end');

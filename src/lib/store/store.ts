@@ -2133,6 +2133,8 @@ export const MAX_USER_METADATA_TARGETS = 256;
 export const MAX_USER_METADATA_KEYS = 64;
 export const MAX_USER_METADATA_KEY_LENGTH = 128;
 export const MAX_USER_METADATA_VALUE_LENGTH = 8 * 1024;
+export const MAX_WHOIS_CACHE_ENTRIES = 64;
+export const MAX_WHOIS_CHANNELS = 256;
 const MAX_PROFILE_LINKS = 8;
 const UNSAFE_METADATA_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 export const MAX_LIVE_PROP_TARGETS = 256;
@@ -2434,6 +2436,46 @@ function _normalizeMetadataTarget(value: string): string | null {
   ) return null;
   const key = value.toLowerCase();
   return UNSAFE_METADATA_KEYS.has(key) ? null : value;
+}
+
+function _activeWhoisTarget(activeNick: string | null, value: string): string | null {
+  const safeNick = _normalizeMetadataTarget(value);
+  return safeNick && activeNick?.toLowerCase() === safeNick.toLowerCase() ? safeNick : null;
+}
+
+function _updateActiveWhois(
+  source: Map<string, WhoisInfo>,
+  activeNick: string | null,
+  value: string,
+  patch: Partial<WhoisInfo>,
+): Map<string, WhoisInfo> | null {
+  const safeNick = _activeWhoisTarget(activeNick, value);
+  if (!safeNick) return null;
+  const key = safeNick.toLowerCase();
+  const existing = source.get(key);
+  if (!existing) return null;
+  const next = new Map(source);
+  // Refresh insertion order so the bounded cache behaves as an LRU working set.
+  next.delete(key);
+  next.set(key, { ...existing, ...patch, nick: safeNick });
+  return next;
+}
+
+function _boundedWhoisText(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  return _boundedSystemEventText(value);
+}
+
+function _boundedWhoisNumber(value: string | undefined): number {
+  const parsed = Number.parseInt(value ?? '', 10);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+function _boundedWhoisChannels(value: string | undefined): string[] {
+  return _boundedSystemEventText(value ?? '')
+    .split(/\s+/u)
+    .filter((channel) => _validInboundWireToken(channel, MAX_VAULT_TARGET_LENGTH))
+    .slice(0, MAX_WHOIS_CHANNELS);
 }
 
 function _normalizeMetadataKey(value: string): string | null {
@@ -6778,19 +6820,28 @@ export const store = createStore<OnyxState>()(
 
     // ── profile modal ─────────────────────────────────────────────────────
     openWhois(nick) {
+      const safeNick = _normalizeMetadataTarget(nick);
+      if (!safeNick) return;
       const { client, connectionStatus } = get();
       const canRequest = client !== null && connectionStatus === 'connected';
       set(s => {
         const whoisData = new Map(s.whoisData);
-        whoisData.set(nick.toLowerCase(), {
-          nick,
+        const key = safeNick.toLowerCase();
+        whoisData.delete(key);
+        while (whoisData.size >= MAX_WHOIS_CACHE_ENTRIES) {
+          const oldest = whoisData.keys().next().value;
+          if (oldest === undefined) break;
+          whoisData.delete(oldest);
+        }
+        whoisData.set(key, {
+          nick: safeNick,
           loading: canRequest,
           ...(canRequest ? {} : { error: 'Reconnect to request profile details.' }),
         });
-        return { showWhois: true, whoisNick: nick, whoisData };
+        return { showWhois: true, whoisNick: safeNick, whoisData };
       });
       // WHOIS nick nick — double nick requests idle time (RPL_WHOISIDLE 317)
-      if (canRequest) client.sendRaw('WHOIS', nick, nick);
+      if (canRequest) client.sendRaw('WHOIS', safeNick, safeNick);
     },
     closeWhois() {
       set({ showWhois: false, whoisNick: null });
@@ -10854,7 +10905,8 @@ export const store = createStore<OnyxState>()(
         // ── ERR numerics ──────────────────────────────────────────────────
 
         case '401': { // ERR_NOSUCHNICK
-          const target401 = params[1] ?? '';
+          const target401 = _activeWhoisTarget(get().whoisNick, params[1] ?? '');
+          if (!target401) break;
           const key401 = target401.toLowerCase();
           set(s => {
             if (!key401 || s.whoisNick?.toLowerCase() !== key401) return {};
@@ -11109,54 +11161,53 @@ export const store = createStore<OnyxState>()(
         // ── WHOIS numerics ────────────────────────────────────────────────
         // 311 RPL_WHOISUSER  :server 311 me nick user host * :realname
         case '311': {
-          const whoisNick311 = params[1];
+          const whoisNick311 = _activeWhoisTarget(get().whoisNick, params[1] ?? '');
           if (!whoisNick311) break;
-          const key311 = whoisNick311.toLowerCase();
           set(s => {
-            const whoisData = new Map(s.whoisData);
-            const existing = whoisData.get(key311) ?? { nick: whoisNick311, loading: true };
-            whoisData.set(key311, {
-              ...existing,
-              nick: whoisNick311,
-              username: params[2],
-              host: params[3],
-              realname: params[5],
+            const whoisData = _updateActiveWhois(s.whoisData, s.whoisNick, whoisNick311, {
+              username: _boundedWhoisText(params[2]),
+              host: _boundedWhoisText(params[3]),
+              realname: _boundedWhoisText(params[5]),
             });
-            return { whoisData };
+            return whoisData ? { whoisData } : {};
           });
-          get().setUserProfile(whoisNick311, { nick: whoisNick311, realname: params[5] });
+          get().setUserProfile(whoisNick311, {
+            nick: whoisNick311,
+            realname: _boundedWhoisText(params[5]),
+          });
           break;
         }
 
         // 312 RPL_WHOISSERVER
         case '312': {
-          const whoisNick312 = params[1];
+          const whoisNick312 = _activeWhoisTarget(get().whoisNick, params[1] ?? '');
           if (!whoisNick312) break;
-          const key312 = whoisNick312.toLowerCase();
           set(s => {
-            const whoisData = new Map(s.whoisData);
-            const existing = whoisData.get(key312) ?? { nick: whoisNick312, loading: true };
-            whoisData.set(key312, {
-              ...existing,
-              server: params[2],
-              serverInfo: params[3],
+            const whoisData = _updateActiveWhois(s.whoisData, s.whoisNick, whoisNick312, {
+              server: _boundedWhoisText(params[2]),
+              serverInfo: _boundedWhoisText(params[3]),
             });
-            return { whoisData };
+            return whoisData ? { whoisData } : {};
           });
-          get().setUserProfile(whoisNick312, { server: params[2], serverInfo: params[3] });
+          get().setUserProfile(whoisNick312, {
+            server: _boundedWhoisText(params[2]),
+            serverInfo: _boundedWhoisText(params[3]),
+          });
           break;
         }
 
         // 313 RPL_WHOISOPERATOR
         case '313': {
-          const whoisNick313 = params[1];
+          const whoisNick313 = _activeWhoisTarget(get().whoisNick, params[1] ?? '');
           if (!whoisNick313) break;
-          const key313 = whoisNick313.toLowerCase();
           set(s => {
-            const whoisData = new Map(s.whoisData);
-            const existing = whoisData.get(key313) ?? { nick: whoisNick313, loading: true };
-            whoisData.set(key313, { ...existing, isOper: true });
-            return { whoisData };
+            const whoisData = _updateActiveWhois(
+              s.whoisData,
+              s.whoisNick,
+              whoisNick313,
+              { isOper: true },
+            );
+            return whoisData ? { whoisData } : {};
           });
           get().setUserProfile(whoisNick313, { ircOperator: true });
           break;
@@ -11164,101 +11215,91 @@ export const store = createStore<OnyxState>()(
 
         // 317 RPL_WHOISIDLE  :server 317 me nick idlesecs signonts :...
         case '317': {
-          const whoisNick317 = params[1];
+          const whoisNick317 = _activeWhoisTarget(get().whoisNick, params[1] ?? '');
           if (!whoisNick317) break;
-          const key317 = whoisNick317.toLowerCase();
+          const idleSecs317 = _boundedWhoisNumber(params[2]);
+          const signOnTs317 = _boundedWhoisNumber(params[3]);
           set(s => {
-            const whoisData = new Map(s.whoisData);
-            const existing = whoisData.get(key317) ?? { nick: whoisNick317, loading: true };
-            whoisData.set(key317, {
-              ...existing,
-              idleSecs: parseInt(params[2] ?? '0', 10),
-              signOnTs: parseInt(params[3] ?? '0', 10),
+            const whoisData = _updateActiveWhois(s.whoisData, s.whoisNick, whoisNick317, {
+              idleSecs: idleSecs317,
+              signOnTs: signOnTs317,
             });
-            return { whoisData };
+            return whoisData ? { whoisData } : {};
           });
           get().setUserProfile(whoisNick317, {
-            idleSeconds: parseInt(params[2] ?? '0', 10),
-            signonTime: parseInt(params[3] ?? '0', 10),
+            idleSeconds: idleSecs317,
+            signonTime: signOnTs317,
           });
           break;
         }
 
         // 318 RPL_ENDOFWHOIS — mark loading done
         case '318': {
-          const whoisNick318 = params[1];
+          const whoisNick318 = _activeWhoisTarget(get().whoisNick, params[1] ?? '');
           if (!whoisNick318) break;
-          const key318 = whoisNick318.toLowerCase();
           set(s => {
-            const whoisData = new Map(s.whoisData);
-            const existing = whoisData.get(key318);
-            if (existing) {
-              whoisData.set(key318, { ...existing, loading: false });
-            }
-            return { whoisData };
+            const whoisData = _updateActiveWhois(
+              s.whoisData,
+              s.whoisNick,
+              whoisNick318,
+              { loading: false },
+            );
+            return whoisData ? { whoisData } : {};
           });
           break;
         }
 
         // 319 RPL_WHOISCHANNELS
         case '319': {
-          const whoisNick319 = params[1];
+          const whoisNick319 = _activeWhoisTarget(get().whoisNick, params[1] ?? '');
           if (!whoisNick319) break;
-          const key319 = whoisNick319.toLowerCase();
+          const channels319 = _boundedWhoisChannels(params[2]);
           set(s => {
-            const whoisData = new Map(s.whoisData);
-            const existing = whoisData.get(key319) ?? { nick: whoisNick319, loading: true };
-            whoisData.set(key319, {
-              ...existing,
-              channels: (params[2] ?? '').split(' ').filter(Boolean),
+            const whoisData = _updateActiveWhois(s.whoisData, s.whoisNick, whoisNick319, {
+              channels: channels319,
             });
-            return { whoisData };
+            return whoisData ? { whoisData } : {};
           });
-          get().setUserProfile(whoisNick319, {
-            channels: (params[2] ?? '').split(' ').filter(Boolean),
-          });
+          get().setUserProfile(whoisNick319, { channels: channels319 });
           break;
         }
 
         // 320 RPL_WHOISSPECIAL
         case '320': {
-          const whoisNick320 = params[1];
+          const whoisNick320 = _activeWhoisTarget(get().whoisNick, params[1] ?? '');
           if (!whoisNick320) break;
-          const key320 = whoisNick320.toLowerCase();
           set(s => {
-            const whoisData = new Map(s.whoisData);
-            const existing = whoisData.get(key320) ?? { nick: whoisNick320, loading: true };
-            whoisData.set(key320, { ...existing, special: params[2] });
-            return { whoisData };
+            const whoisData = _updateActiveWhois(s.whoisData, s.whoisNick, whoisNick320, {
+              special: _boundedWhoisText(params[2]),
+            });
+            return whoisData ? { whoisData } : {};
           });
           break;
         }
 
         // 330 RPL_WHOISACCOUNT
         case '330': {
-          const whoisNick330 = params[1];
+          const whoisNick330 = _activeWhoisTarget(get().whoisNick, params[1] ?? '');
           if (!whoisNick330) break;
-          const key330 = whoisNick330.toLowerCase();
           set(s => {
-            const whoisData = new Map(s.whoisData);
-            const existing = whoisData.get(key330) ?? { nick: whoisNick330, loading: true };
-            whoisData.set(key330, { ...existing, account: params[2] });
-            return { whoisData };
+            const whoisData = _updateActiveWhois(s.whoisData, s.whoisNick, whoisNick330, {
+              account: _boundedWhoisText(params[2]),
+            });
+            return whoisData ? { whoisData } : {};
           });
-          get().setUserProfile(whoisNick330, { account: params[2] });
+          get().setUserProfile(whoisNick330, { account: _boundedWhoisText(params[2]) });
           break;
         }
 
         // 338 RPL_WHOISACTUALLY
         case '338': {
-          const whoisNick338 = params[1];
+          const whoisNick338 = _activeWhoisTarget(get().whoisNick, params[1] ?? '');
           if (!whoisNick338) break;
-          const key338 = whoisNick338.toLowerCase();
           set(s => {
-            const whoisData = new Map(s.whoisData);
-            const existing = whoisData.get(key338) ?? { nick: whoisNick338, loading: true };
-            whoisData.set(key338, { ...existing, realHost: params[2] });
-            return { whoisData };
+            const whoisData = _updateActiveWhois(s.whoisData, s.whoisNick, whoisNick338, {
+              realHost: _boundedWhoisText(params[2]),
+            });
+            return whoisData ? { whoisData } : {};
           });
           break;
         }
